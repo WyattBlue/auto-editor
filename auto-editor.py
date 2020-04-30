@@ -1,14 +1,14 @@
 '''auto-editor.py'''
 
 # external python libraries
-import numpy as np
-import cv2
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
 from scipy.io import wavfile
+import numpy as np
+import cv2
 
 # internal python libraries
-import math
+from math import ceil
 import os
 import argparse
 import subprocess
@@ -17,6 +17,14 @@ import datetime
 import time
 from shutil import copyfile, rmtree
 
+def quality_type(x):
+    x = int(x)
+    if(x > 31):
+        raise argparse.ArgumentTypeError("Minimum frame quality is 31")
+    if(x < 1):
+        raise argparse.ArgumentTypeError("Maximum frame quality is 1")
+    return x
+
 parser = argparse.ArgumentParser()
 parser.add_argument('input',
     help='the path to the video file you want modified. can be a URL with youtube-dl.')
@@ -24,21 +32,21 @@ parser.add_argument('-o', '--output_file', type=str, default='',
     help='name the output file.')
 parser.add_argument('-t', '--silent_threshold', type=float, default=0.04,
     help='the volume that frames audio needs to surpass to be sounded. It ranges from 0 to 1.')
-parser.add_argument('-s', '--sounded_speed', type=float, default=1.80,
+parser.add_argument('-v', '--video_speed', type=float, default=1.00,
     help='the speed that sounded (spoken) frames should be played at.')
-parser.add_argument('-u', '--silent_speed', type=float, default=8.00,
+parser.add_argument('-s', '--silent_speed', type=float, default=99999,
     help='the speed that silent frames should be played at.')
-parser.add_argument('-m', '--frame_margin', type=float, default=3,
+parser.add_argument('-m', '--frame_margin', type=float, default=4,
     help='tells how many frames on either side of speech should be included.')
 parser.add_argument('-r', '--sample_rate', type=float, default=44100,
     help='sample rate of the input and output videos.')
 parser.add_argument('-f', '--frame_rate', type=float,
     help='manually set the frame rate (fps) of the input video. auto-editor will try to set it for you.')
-parser.add_argument('-q', '--frame_quality', type=int, default=1,
+parser.add_argument('-q', '--frame_quality', type=quality_type, default=3,
     help='quality of frames from input video. 1 is highest, 31 is lowest.')
 parser.add_argument('--get_auto_fps', '--get_frame_rate', action='store_true',
     help='return what auto-editor thinks the frame rate is.')
-parser.add_argument('-v', '--verbose', action='store_true',
+parser.add_argument('--verbose', action='store_true',
     help='display more information when running.')
 
 args = parser.parse_args()
@@ -53,7 +61,7 @@ AUDIO_FADE_ENVELOPE_SIZE = 400
 SAMPLE_RATE = args.sample_rate
 SILENT_THRESHOLD = args.silent_threshold
 FRAME_SPREADAGE = args.frame_margin
-NEW_SPEED = [args.silent_speed, args.sounded_speed]
+NEW_SPEED = [args.silent_speed, args.video_speed]
 FRAME_QUALITY = args.frame_quality
 VERBOSE = args.verbose
 
@@ -87,7 +95,6 @@ else:
     dotIndex = INPUT_FILE.rfind('.')
     OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+INPUT_FILE[dotIndex:]
 
-
 # make Temp directory
 try:
     os.mkdir(TEMP_FOLDER)
@@ -96,7 +103,10 @@ except OSError:
     os.mkdir(TEMP_FOLDER)
 
 print('Splitting video into jpgs. (This can take a while)')
-command = f'ffmpeg -i {INPUT_FILE} -qscale:v {FRAME_QUALITY} {TEMP_FOLDER}/frame%06d.jpg -nostats -loglevel 0'
+
+command = f'ffmpeg -i {INPUT_FILE} -qscale:v {FRAME_QUALITY} {TEMP_FOLDER}/frame%06d.jpg'
+if(not VERBOSE):
+    command += ' -nostats -loglevel 0'
 subprocess.call(command, shell=True)
 
 # -b:a means audio bitrate
@@ -104,7 +114,9 @@ subprocess.call(command, shell=True)
 # -ar means set the audio sampling rate
 # -vn means disable video
 print('Separating audio from video.')
-command = f'ffmpeg -i {INPUT_FILE} -b:a 160k -ac 2 -ar {SAMPLE_RATE} -vn {TEMP_FOLDER}/audio.wav -nostats -loglevel 0'
+command = f'ffmpeg -i {INPUT_FILE} -b:a 160k -ac 2 -ar {SAMPLE_RATE} -vn {TEMP_FOLDER}/audio.wav '
+if(not VERBOSE):
+    command += '-nostats -loglevel 0'
 subprocess.call(command, shell=True)
 
 def getMaxVolume(s):
@@ -130,7 +142,7 @@ audioSampleCount = audioData.shape[0]
 maxAudioVolume = getMaxVolume(audioData)
 
 samplesPerFrame = sampleRate / frameRate
-audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
+audioFrameCount = int(ceil(audioSampleCount / samplesPerFrame))
 hasLoudAudio = np.zeros((audioFrameCount))
 
 print('Calculating new audio and frames.')
@@ -186,8 +198,8 @@ for chunk in chunks:
         outputAudioData[outputPointer:outputPointer+AUDIO_FADE_ENVELOPE_SIZE] *= mask
         outputAudioData[endPointer-AUDIO_FADE_ENVELOPE_SIZE:endPointer] *= 1-mask
 
-    startOutputFrame = int(math.ceil(outputPointer / samplesPerFrame))
-    endOutputFrame = int(math.ceil(endPointer / samplesPerFrame))
+    startOutputFrame = int(ceil(outputPointer / samplesPerFrame))
+    endOutputFrame = int(ceil(endPointer / samplesPerFrame))
 
     for outputFrame in range(startOutputFrame, endOutputFrame):
         inputFrame = int(chunk[0]+NEW_SPEED[int(chunk[2])] * (outputFrame-startOutputFrame))
@@ -204,7 +216,11 @@ print('Creating finished audio.')
 wavfile.write(TEMP_FOLDER+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
 
 print('Creating finished video. (This can take a while)')
-command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg -i {TEMP_FOLDER}/audioNew.wav -strict -2 {OUTPUT_FILE}'
+command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg -i {TEMP_FOLDER}/audioNew.wav -strict -2'
+# -pix_fmt yuvj420p is added for the output to work in QuickTime and most other players
+command += ' -pix_fmt yuvj420p'
+command += ' -movflags +faststart'
+command += f' {OUTPUT_FILE}'
 if(not VERBOSE):
     command += ' -nostats -loglevel 0'
 subprocess.call(command, shell=True)
