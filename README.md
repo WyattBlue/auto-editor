@@ -6,7 +6,7 @@ It works by using ffmpeg to split the video up into the audio and the frames. Ca
 
 This project is a fork of Carykh's inactive [jumpcutter](https://github.com/carykh/jumpcutter). This project seeks to fix the issues (and design flaws) of the original while still following the same general idea.
 
-# Usage
+## Usage
 Using auto-editor with its default parameters.
 
 ``` python3 auto-editor.py example.mp4```
@@ -23,7 +23,7 @@ get help on any of the other parameters
 
 ``` pythnon3 auto-editor.py --help```
 
-# Download the Libraries and Dependencies
+## Download the Libraries and Dependencies
 This program is written in Python. Check if you have Python 3 by running.
 
 ``` python3 --version```
@@ -47,7 +47,7 @@ python3 -m pip install --upgrade pip
 python3 -m pip install scipy audiotsm opencv-python
 ```
 > Note: Be warned that ffmpeg can take up to 15 minutes to install if you do not already have it.
-# Installation
+## Installation
 
 Click 'Clone or Download' then 'Download ZIP'. You should see the file being downloaded. 
 
@@ -59,6 +59,4 @@ Run  ``` python3 auto-editor.py --help``` to make sure terminal can find the fil
 
 If it runs successfully, then congratulations, you have installed auto-editor. See usage to see more examples.
 
-If it didn't run successfully or if you have any other suggestions or concerns, then feel free to create a new issue on this page.
-
-Visit jumpcutter's [official discord.](https://discord.gg/2snkzhy)
+If it didn't run successfully or if you have any other suggestions or concerns, then feel free to create a new issue on this page. Alternatively, you can discuss this in jumpcutter's [official discord.](https://discord.gg/2snkzhy)
