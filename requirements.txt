@@ -1,0 +1,15 @@
+Command Line Programs:
+	ffmpeg
+	youtube-dl (optional)
+
+External Python Libraries:
+	scipy
+	audiotsm
+	opencv-python
+
+
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+brew install ffmpeg
+brew install youtube-dl
+
+python3 -m pip install scipy audiotsm opencv-python
