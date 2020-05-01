@@ -1,10 +1,10 @@
-# auto-editor
+# Auto-Editor
 Easily remove the boring parts of the video.
 
-auto-editor is a tool that can find the silent (boring) parts of the video and cut or speed them up. 
+Auto-Editor is a tool that can find the silent (boring) parts of the video and cut or speed them up. 
 It works by using ffmpeg to split the video up into the audio and the frames. Calculates the new audio and adds and drops frames where needed, and stiches that back into a video.
 
-This project is a fork of Carykh's inactive [jumpcutter](https://github.com/carykh/jumpcutter). This project seeks to fix the issues (and design flaws) of the original while still following the same general idea.
+This project is a fork of Carykh's inactive [jumpcutter](https://github.com/carykh/jumpcutter). This project seeks to fix the issues (and design flaws) of the original while still following the same general idea and allowing the same parameters.
 
 ## Usage
 Using auto-editor with its default parameters.
@@ -59,4 +59,4 @@ Run  ``` python3 auto-editor.py --help``` to make sure terminal can find the fil
 
 If it runs successfully, then congratulations, you have installed auto-editor. See usage to see more examples.
 
-If it didn't run successfully or if you have any other suggestions or concerns, then feel free to create a new issue on this page. Alternatively, you can discuss this in jumpcutter's [official discord.](https://discord.gg/2snkzhy)
+If it didn't run successfully or if you have any other suggestions or concerns, then feel free to create a new issue on this page. Alternatively, you can discuss the issue in jumpcutter's [official discord.](https://discord.gg/2snkzhy)
