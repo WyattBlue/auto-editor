@@ -1,6 +1,4 @@
 # Auto-Editor
-Easily remove the boring parts of the video.
-
 Auto-Editor is a tool that can find the silent (boring) parts of the video and cut or speed them up. 
 It works by using ffmpeg to split the video up into the audio and the frames. Calculates the new audio and adds and drops frames where needed, and stiches that back into a video.
 
