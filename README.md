@@ -21,7 +21,7 @@ speed up a lecture with Carykh's procrastinator settings.
 
 get help on any of the other parameters
 
-``` pythnon3 auto-editor.py --help```
+``` python3 auto-editor.py --help```
 
 ## Download the Libraries and Dependencies
 This program is written in Python. Check if you have Python 3 by running.
