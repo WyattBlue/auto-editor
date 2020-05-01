@@ -30,7 +30,7 @@ This program is written in Python. Check if you have Python 3 by running.
 
 if the terminal says ```command not found: python3``` you need to get Python 3 https://www.python.org/downloads/ and install Python 3.
 
-> Note: if you installed Python 3 but the terminal still won't recognize python3, try python --version and see if that has the right version. If it does, then you need to remove the 3 for all of the commands
+> Note: if you installed Python 3 but the terminal still doesn't recognize python3, try running ```python --version``` and see if that leads to Python 3. If it does, then all you need to do is replace "python3" with just "python" for all of your commands.
 
 Check if you have Homebrew.
 
