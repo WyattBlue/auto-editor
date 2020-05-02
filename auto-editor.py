@@ -62,6 +62,7 @@ def createAudio(chunks, samplesPerFrame, AUDIO_FADE_ENVELOPE_SIZE,
 
     print('Creating finished audio.')
     wavfile.write(TEMP_FOLDER+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
+    print('Audio finished.')
 
 
 def copyFrame(inputFrame, newIndex, frameRate):
@@ -69,7 +70,7 @@ def copyFrame(inputFrame, newIndex, frameRate):
     if(os.path.isfile(src)):
         dst = ''.join([TEMP_FOLDER, '/newFrame{:06d}'.format(newIndex+1), '.jpg'])
         copyfile(src, dst)
-        if(newIndex % 100 == 0):
+        if(newIndex % 200 == 0):
             f_sec = round(newIndex / frameRate)
             print(f'{newIndex} frames done ({datetime.timedelta(seconds=f_sec)})')
 
@@ -86,6 +87,12 @@ def createVideo(chunks, NEW_SPEED, frameRate):
             if(n <= end):
                 newIndex += 1
                 copyFrame(int(n), newIndex, frameRate)
+    print('Creating finished video. (This can take a while)')
+    command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg'
+    command += f' {TEMP_FOLDER}/output.mp4'
+    command += ' -nostats -loglevel 0'
+    subprocess.call(command, shell=True)
+    print('Video finished.')
 
 
 def getMaxVolume(s):
@@ -239,8 +246,10 @@ if(__name__ == '__main__'):
     p1.join()
     p2.join()
 
-    print('Creating finished video. (This can take a while)')
-    command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg -i {TEMP_FOLDER}/audioNew.wav -strict -2'
+
+    print('Muxing audio and video.')
+    command = f'ffmpeg -y -i {TEMP_FOLDER}/output.mp4 -i {TEMP_FOLDER}/audioNew.wav -c:v copy -c:a aac'
+
     # -pix_fmt yuvj420p is added for the output to work in QuickTime and most other players
     command += ' -pix_fmt yuvj420p'
     # faststart is recommended for YouTube videos since it lets the player play the video
