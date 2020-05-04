@@ -1,10 +1,5 @@
-Command Line Programs
------
 ffmpeg
-youtube-dl (optional)
-
-External Python Libraries
------
+youtube-dl
 scipy
 audiotsm
 opencv-python
