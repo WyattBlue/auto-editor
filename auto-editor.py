@@ -19,6 +19,7 @@ from shutil import copyfile, rmtree
 from multiprocessing import Process
 
 TEMP_FOLDER = '.TEMP'
+CACHE = '.CACHE'
 
 def createAudio(chunks, samplesPerFrame, AUDIO_FADE_ENVELOPE_SIZE,
     NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume):
@@ -29,36 +30,38 @@ def createAudio(chunks, samplesPerFrame, AUDIO_FADE_ENVELOPE_SIZE,
     outputPointer = 0
 
     num = 0
+    chunk_len = str(len(chunks))
     for chunk in chunks:
-        audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
+        if(NEW_SPEED[int(chunk[2])] < 99999):
+            audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
 
-        sFile = ''.join([TEMP_FOLDER, '/tempStart.wav'])
-        eFile = ''.join([TEMP_FOLDER, '/tempEnd.wav'])
-        wavfile.write(sFile, SAMPLE_RATE, audioChunk)
-        with WavReader(sFile) as reader:
-            with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
-                tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
-                tsm.run(reader, writer)
-        _, alteredAudioData = wavfile.read(eFile)
-        leng = alteredAudioData.shape[0]
-        endPointer = outputPointer + leng
-        outputAudioData = np.concatenate((outputAudioData, alteredAudioData / maxAudioVolume))
+            sFile = ''.join([TEMP_FOLDER, '/tempStart.wav'])
+            eFile = ''.join([TEMP_FOLDER, '/tempEnd.wav'])
+            wavfile.write(sFile, SAMPLE_RATE, audioChunk)
+            with WavReader(sFile) as reader:
+                with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
+                    tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
+                    tsm.run(reader, writer)
+            _, alteredAudioData = wavfile.read(eFile)
+            leng = alteredAudioData.shape[0]
+            endPointer = outputPointer + leng
+            outputAudioData = np.concatenate((outputAudioData, alteredAudioData / maxAudioVolume))
 
-        # smooth out transitiion's audio by quickly fading in/out
-        if(leng < AUDIO_FADE_ENVELOPE_SIZE):
-            outputAudioData[outputPointer:endPointer] = 0
-        else:
-            premask = np.arange(AUDIO_FADE_ENVELOPE_SIZE) / AUDIO_FADE_ENVELOPE_SIZE
-            # make the fade-envelope mask stereo
-            mask = np.repeat(premask[:, np.newaxis], 2, axis=1)
-            outputAudioData[outputPointer:outputPointer+AUDIO_FADE_ENVELOPE_SIZE] *= mask
-            outputAudioData[endPointer-AUDIO_FADE_ENVELOPE_SIZE:endPointer] *= 1-mask
+            # smooth out transitiion's audio by quickly fading in/out
+            if(leng < AUDIO_FADE_ENVELOPE_SIZE):
+                outputAudioData[outputPointer:endPointer] = 0
+            else:
+                premask = np.arange(AUDIO_FADE_ENVELOPE_SIZE) / AUDIO_FADE_ENVELOPE_SIZE
+                # make the fade-envelope mask stereo
+                mask = np.repeat(premask[:, np.newaxis], 2, axis=1)
+                outputAudioData[outputPointer:outputPointer+AUDIO_FADE_ENVELOPE_SIZE] *= mask
+                outputAudioData[endPointer-AUDIO_FADE_ENVELOPE_SIZE:endPointer] *= 1-mask
 
-        outputPointer = endPointer
+            outputPointer = endPointer
 
         num += 1
         if(num % 10 == 0):
-            print(f'{num} audio chunks done.')
+            print(''.join([str(num), '/', chunk_len, ' audio chunks done.']))
 
     print('Creating finished audio.')
     wavfile.write(TEMP_FOLDER+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
@@ -66,7 +69,7 @@ def createAudio(chunks, samplesPerFrame, AUDIO_FADE_ENVELOPE_SIZE,
 
 
 def copyFrame(inputFrame, newIndex, frameRate):
-    src = ''.join([TEMP_FOLDER, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
+    src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
     if(os.path.isfile(src)):
         dst = ''.join([TEMP_FOLDER, '/newFrame{:06d}'.format(newIndex+1), '.jpg'])
         copyfile(src, dst)
@@ -87,6 +90,7 @@ def createVideo(chunks, NEW_SPEED, frameRate):
             if(n <= end):
                 newIndex += 1
                 copyFrame(int(n), newIndex, frameRate)
+
     print('Creating finished video. (This can take a while)')
     command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg'
     command += f' {TEMP_FOLDER}/output.mp4'
@@ -144,6 +148,10 @@ if(__name__ == '__main__'):
     SAMPLE_RATE = args.sample_rate
     SILENT_THRESHOLD = args.silent_threshold
     FRAME_SPREADAGE = args.frame_margin
+    if(args.silent_speed <= 0):
+        args.silent_speed = 99999
+    if(args.video_speed <= 0):
+        args.video_speed = 99999
     NEW_SPEED = [args.silent_speed, args.video_speed]
     FRAME_QUALITY = args.frame_quality
     VERBOSE = args.verbose
@@ -178,31 +186,49 @@ if(__name__ == '__main__'):
         dotIndex = INPUT_FILE.rfind('.')
         OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+INPUT_FILE[dotIndex:]
 
-    # make Temp directory
+    # make Temp folder
     try:
         os.mkdir(TEMP_FOLDER)
     except OSError:
         rmtree(TEMP_FOLDER, ignore_errors=False)
         os.mkdir(TEMP_FOLDER)
 
-    print('Splitting video into jpgs. (This can take a while)')
+    # make Cache folder
+    SKIP = False
+    try:
+        os.mkdir(CACHE)
+    except OSError:
+        if(os.path.isfile(f'{CACHE}/cache.txt')):
+            print('CACHE exists')
+            file = open(f'{CACHE}/cache.txt', 'r')
+            x = file.readlines()
+            if(x[0] == ORIGINAL_NAME+'\n' and x[1] == str(frameRate)):
+                SKIP = True
+            file.close()
+        if(not SKIP):
+            print('failed.')
+            rmtree(CACHE, ignore_errors=False)
+            os.mkdir(CACHE)
 
-    command = f'ffmpeg -i {INPUT_FILE} -qscale:v {FRAME_QUALITY} {TEMP_FOLDER}/frame%06d.jpg'
-    if(not VERBOSE):
-        command += ' -nostats -loglevel 0'
-    subprocess.call(command, shell=True)
+    if(not SKIP):
+        print('Splitting video into jpgs. (This can take a while)')
 
-    # -b:a means audio bitrate
-    # -ac 2 means set the audio channels to 2. (stereo)
-    # -ar means set the audio sampling rate
-    # -vn means disable video
-    print('Separating audio from video.')
-    command = f'ffmpeg -i {INPUT_FILE} -b:a 160k -ac 2 -ar {SAMPLE_RATE} -vn {TEMP_FOLDER}/audio.wav '
-    if(not VERBOSE):
-        command += '-nostats -loglevel 0'
-    subprocess.call(command, shell=True)
+        command = f'ffmpeg -i {INPUT_FILE} -qscale:v {FRAME_QUALITY} {CACHE}/frame%06d.jpg'
+        if(not VERBOSE):
+            command += ' -nostats -loglevel 0'
+        subprocess.call(command, shell=True)
 
-    sampleRate, audioData = wavfile.read(TEMP_FOLDER+'/audio.wav')
+        # -b:a means audio bitrate
+        # -ac 2 means set the audio channels to 2. (stereo)
+        # -ar means set the audio sampling rate
+        # -vn means disable video
+        print('Separating audio from video.')
+        command = f'ffmpeg -i {INPUT_FILE} -b:a 160k -ac 2 -ar {SAMPLE_RATE} -vn {CACHE}/audio.wav '
+        if(not VERBOSE):
+            command += '-nostats -loglevel 0'
+        subprocess.call(command, shell=True)
+
+    sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
 
@@ -246,7 +272,6 @@ if(__name__ == '__main__'):
     p1.join()
     p2.join()
 
-
     print('Muxing audio and video.')
     command = f'ffmpeg -y -i {TEMP_FOLDER}/output.mp4 -i {TEMP_FOLDER}/audioNew.wav -c:v copy -c:a aac'
 
@@ -263,5 +288,8 @@ if(__name__ == '__main__'):
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
     print(f'took {timeLength} seconds ({datetime.timedelta(seconds=timeLength)})')
+
+    file = open(f'{CACHE}/cache.txt', 'w')
+    file.write(f'{ORIGINAL_NAME}\n{frameRate}')
 
     rmtree(TEMP_FOLDER, ignore_errors=False)
