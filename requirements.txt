@@ -1,4 +1,3 @@
-ffmpeg
 youtube-dl
 scipy
 audiotsm
