@@ -26,7 +26,7 @@ This program is written in Python. Check if you have Python 3 by running.
 
 ``` python --version```
 
-if the terminal says ```command not found: python3``` you need to get Python 3 [from python.org](https://www.python.org/downloads/) and install.
+if the terminal says ```command not found``` or it has the wrong version you need to get Python 3 [from python.org](https://www.python.org/downloads/) and install.
 
 > Note: 'python' points to Python 2.7 on macOS but points to Python 3.8 on Linux and Windows. 'python3' is a 'command not found' error on Windows but 'py' works on Windows only.
 
