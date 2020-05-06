@@ -73,14 +73,13 @@ def copyFrame(inputFrame, newIndex, frameRate):
     if(os.path.isfile(src)):
         dst = ''.join([TEMP_FOLDER, '/newFrame{:06d}'.format(newIndex+1), '.jpg'])
         copyfile(src, dst)
-        if(newIndex % 200 == 0):
-            f_sec = round(newIndex / frameRate)
-            print(f'{newIndex} frames done ({datetime.timedelta(seconds=f_sec)})')
 
 
 def createVideo(chunks, NEW_SPEED, frameRate):
     print('Creating new video.')
     newIndex = 0
+    num = 0
+    chunk_len = str(len(chunks))
     for chunk in chunks:
         n = chunk[0]
         end = chunk[1]
@@ -90,6 +89,10 @@ def createVideo(chunks, NEW_SPEED, frameRate):
             if(n <= end):
                 newIndex += 1
                 copyFrame(int(n), newIndex, frameRate)
+        num += 1
+        if(n % 10 == 0):
+            print(''.join([str(num), '/', chunk_len, ' video chunks done.']))
+
 
     print('Creating finished video. (This can take a while)')
     command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg'
@@ -199,14 +202,13 @@ if(__name__ == '__main__'):
         os.mkdir(CACHE)
     except OSError:
         if(os.path.isfile(f'{CACHE}/cache.txt')):
-            print('CACHE exists')
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.readlines()
             if(x[0] == ORIGINAL_NAME+'\n' and x[1] == str(frameRate)):
+                print('Using cache.')
                 SKIP = True
             file.close()
         if(not SKIP):
-            print('failed.')
             rmtree(CACHE, ignore_errors=False)
             os.mkdir(CACHE)
 
@@ -236,8 +238,7 @@ if(__name__ == '__main__'):
     audioFrameCount = int(ceil(audioSampleCount / samplesPerFrame))
     hasLoudAudio = np.zeros((audioFrameCount))
 
-    print('Calculating chunks.')
-
+    # calculating chunks.
     for i in range(audioFrameCount):
         start = int(i * samplesPerFrame)
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
