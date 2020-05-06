@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.org/WyattBlue/auto-editor)
+[![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 
 # Auto-Editor
 Auto-Editor is a tool that can find the silent (boring) parts of the video and cut or speed them up.
