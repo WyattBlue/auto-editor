@@ -54,7 +54,7 @@ Go to your download location and move the file to your Home directory (your user
 
 Open the ZIP file, then go to your terminal and run ```cd auto-editor-master```. This will take you where auto-editor is.
 
-Run  ```python auto-editor.py --help``` to make sure your command-line can find the file.
+Run ```python auto-editor.py --help``` to make sure your command-line can find the file.
 
 If it runs successfully, then congratulations, you have installed auto-editor. See the usage section for more examples.
 
