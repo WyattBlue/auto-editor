@@ -2,6 +2,6 @@ language: python
 python:
   - "3.8"
 install:
-  - pip install -r requirements.txt
+  - pip3.8 install scipy audiotsm opencv-python
 script:
-  - pytest
+  - python auto-editor.py --help
