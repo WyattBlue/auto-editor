@@ -2,6 +2,8 @@ language: python
 python:
   - "3.8"
 install:
-  - pip3.8 install scipy audiotsm opencv-python
+  - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+  - brew install youtube-dl
+  - pip3 install numpy scipy audiotsm opencv-python
 script:
   - python auto-editor.py --help
