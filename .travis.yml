@@ -16,16 +16,7 @@ jobs:
       language: shell       # 'language: python' is an error on Travis CI macOS
       before_isntall:
         - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-        - brew install youtube-dl
-        - pip3 install numpy scipy audiotsm opencv-python
-    - name: "Python Dev on Windows"
-      os: windows           # Windows 10.0.17134 N/A Build 17134
-      language: shell       # 'language: python' is an error on Travis CI Windows
-      before_install:
-        - sudo apt-get install python-dev python-numpy
-        - python -m pip install numpy scipy audiotsm
-        - python -m pip install opencv-python
-      env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install: 
- - echo "Setup complete."
+ - brew install youtube-dl
+ - pip3 install numpy scipy audiotsm opencv-python
 script: python3 auto-editor.py --help || python auto-editor.py --help
