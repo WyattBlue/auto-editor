@@ -21,7 +21,8 @@ jobs:
       language: shell       # 'language: python' is an error on Travis CI Windows
       before_install:
         - choco install python --version 3.8.0
-         - pip3 install --upgrade pip --user
+        - python -m pip install --upgrade pip
+        - python -m pip install numpy scipy audiotsm opencv-python
       env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install: 
  - pip3 install numpy scipy audiotsm opencv-python
