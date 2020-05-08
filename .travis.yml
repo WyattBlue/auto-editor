@@ -22,7 +22,8 @@ jobs:
       before_install:
         - choco install python --version 3.8.0
         - python -m pip install --upgrade pip
-        - python -m pip install numpy scipy audiotsm opencv-python
+        - python -m pip install numpy scipy audiotsm
+        - python -m pip install opencv_python‑3.2.0‑cp36‑cp36m‑win_amd64.whl
       env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install: 
  - pip3 install numpy scipy audiotsm opencv-python
