@@ -148,6 +148,8 @@ if(__name__ == '__main__'):
         help='return what auto-editor thinks the frame rate is.')
     parser.add_argument('--verbose', action='store_true',
         help='display more information when running.')
+    parser.add_argument('--prerun', action='store_true',
+        help='create cache without making an output file or doing extra work.')
 
     args = parser.parse_args()
 
@@ -166,6 +168,7 @@ if(__name__ == '__main__'):
     NEW_SPEED = [args.silent_speed, args.video_speed]
     FRAME_QUALITY = args.frame_quality
     VERBOSE = args.verbose
+    PRERUN = args.prerun
 
     ORIGINAL_NAME = args.input
 
@@ -177,8 +180,7 @@ if(__name__ == '__main__'):
         print('Finished Download')
         ORIGINAL_NAME = 'web_download.mp4'
 
-
-    INPUT_FILE = ORIGINAL_NAME.replace(' ', '\\ ')
+    INPUT_FILE = ORIGINAL_NAME
 
     # find fps if frame_rate is not given
     if(args.frame_rate is None):
@@ -223,7 +225,7 @@ if(__name__ == '__main__'):
     if(not SKIP):
         print('Splitting video into jpgs. (This can take a while)')
 
-        command = f'ffmpeg -i {INPUT_FILE} -qscale:v {FRAME_QUALITY} {CACHE}/frame%06d.jpg'
+        command = f'ffmpeg -i "{INPUT_FILE}" -qscale:v {FRAME_QUALITY} {CACHE}/frame%06d.jpg'
         if(not VERBOSE):
             command += ' -nostats -loglevel 0'
         subprocess.call(command, shell=True)
@@ -233,10 +235,14 @@ if(__name__ == '__main__'):
         # -ar means set the audio sampling rate
         # -vn means disable video
         print('Separating audio from video.')
-        command = f'ffmpeg -i {INPUT_FILE} -b:a 160k -ac 2 -ar {SAMPLE_RATE} -vn {CACHE}/audio.wav '
+        command = f'ffmpeg -i "{INPUT_FILE}" -b:a 160k -ac 2 -ar {SAMPLE_RATE} -vn {CACHE}/audio.wav '
         if(not VERBOSE):
             command += '-nostats -loglevel 0'
         subprocess.call(command, shell=True)
+
+    if(PRERUN):
+        print('Done.')
+        sys.exit()
 
     sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
     audioSampleCount = audioData.shape[0]
@@ -286,7 +292,7 @@ if(__name__ == '__main__'):
     # faststart is recommended for YouTube videos since it lets the player play the video
     # before everything is loaded.
     command += ' -movflags +faststart'
-    command += f' {OUTPUT_FILE}'
+    command += f' "{OUTPUT_FILE}"'
     if(not VERBOSE):
         command += ' -nostats -loglevel 0'
     subprocess.call(command, shell=True)
