@@ -26,8 +26,11 @@ def createAudio(chunks, samplesPerFrame, AUDIO_FADE_ENVELOPE_SIZE,
 
     print('Creating new audio.')
 
-    outputAudioData = np.zeros((0, audioData.shape[1]))
+    outputAudioData = [] # [np.zeros((0, audioData.shape[1]))]
     outputPointer = 0
+
+    # create audio envelope mask
+    mask = [x / AUDIO_FADE_ENVELOPE_SIZE for x in range(AUDIO_FADE_ENVELOPE_SIZE)]
 
     num = 0
     chunk_len = str(len(chunks))
@@ -45,17 +48,21 @@ def createAudio(chunks, samplesPerFrame, AUDIO_FADE_ENVELOPE_SIZE,
             _, alteredAudioData = wavfile.read(eFile)
             leng = alteredAudioData.shape[0]
             endPointer = outputPointer + leng
-            outputAudioData = np.concatenate((outputAudioData, alteredAudioData / maxAudioVolume))
+            outputAudioData.extend((alteredAudioData / maxAudioVolume).tolist())
+
+            # outputAudioData = np.concatenate((outputAudioData, alteredAudioData / maxAudioVolume))
 
             # smooth out transitiion's audio by quickly fading in/out
             if(leng < AUDIO_FADE_ENVELOPE_SIZE):
-                outputAudioData[outputPointer:endPointer] = 0
+                for i in range(outputPointer, endPointer):
+                    outputAudioData[i] = 0
             else:
-                premask = np.arange(AUDIO_FADE_ENVELOPE_SIZE) / AUDIO_FADE_ENVELOPE_SIZE
-                # make the fade-envelope mask stereo
-                mask = np.repeat(premask[:, np.newaxis], 2, axis=1)
-                outputAudioData[outputPointer:outputPointer+AUDIO_FADE_ENVELOPE_SIZE] *= mask
-                outputAudioData[endPointer-AUDIO_FADE_ENVELOPE_SIZE:endPointer] *= 1-mask
+                for i in range(outputPointer, outputPointer+AUDIO_FADE_ENVELOPE_SIZE):
+                    outputAudioData[i][0] *= mask[i-outputPointer]
+                    outputAudioData[i][1] *= mask[i-outputPointer]
+                for i in range(endPointer-AUDIO_FADE_ENVELOPE_SIZE, endPointer):
+                    outputAudioData[i][0] *= (1-mask[i-endPointer+AUDIO_FADE_ENVELOPE_SIZE])
+                    outputAudioData[i][1] *= (1-mask[i-endPointer+AUDIO_FADE_ENVELOPE_SIZE])
 
             outputPointer = endPointer
 
@@ -64,6 +71,7 @@ def createAudio(chunks, samplesPerFrame, AUDIO_FADE_ENVELOPE_SIZE,
             print(''.join([str(num), '/', chunk_len, ' audio chunks done.']))
 
     print('Creating finished audio.')
+    outputAudioData = np.asarray(outputAudioData)
     wavfile.write(TEMP_FOLDER+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
     print('Audio finished.')
 
@@ -275,9 +283,6 @@ if(__name__ == '__main__'):
 
     print('Muxing audio and video.')
     command = f'ffmpeg -y -i {TEMP_FOLDER}/output.mp4 -i {TEMP_FOLDER}/audioNew.wav -c:v copy -c:a aac'
-
-    # -pix_fmt yuvj420p is added for the output to work in QuickTime and most other players
-    command += ' -pix_fmt yuvj420p'
     # faststart is recommended for YouTube videos since it lets the player play the video
     # before everything is loaded.
     command += ' -movflags +faststart'
@@ -288,7 +293,8 @@ if(__name__ == '__main__'):
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
-    print(f'took {timeLength} seconds ({datetime.timedelta(seconds=timeLength)})')
+    minutes = round(timeLength)
+    print(f'took {timeLength} seconds ({datetime.timedelta(seconds=minutes)})')
 
     file = open(f'{CACHE}/cache.txt', 'w')
     file.write(f'{ORIGINAL_NAME}\n{frameRate}')
