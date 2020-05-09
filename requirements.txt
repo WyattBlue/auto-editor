@@ -1,4 +1,2 @@
-youtube-dl
 scipy
 audiotsm
-opencv-python
