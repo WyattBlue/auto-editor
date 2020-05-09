@@ -5,32 +5,32 @@ from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
 from scipy.io import wavfile
 import numpy as np
-import cv2
 
 # internal python libraries
 from math import ceil
 import os
 import argparse
 import subprocess
-import sys
-import datetime
-import time
-from shutil import copyfile, rmtree
+from re import search
+from sys import exit
+from datetime import timedelta
+from time import time
+from shutil import move, rmtree, copyfile
 from multiprocessing import Process
 
+FADE_SIZE = 400
 TEMP_FOLDER = '.TEMP'
 CACHE = '.CACHE'
 
-def createAudio(chunks, samplesPerFrame, AUDIO_FADE_ENVELOPE_SIZE,
-    NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume):
+def createAudio(chunks, samplesPerFrame, NEW_SPEED,
+    audioData, SAMPLE_RATE, maxAudioVolume):
 
     print('Creating new audio.')
 
-    outputAudioData = [] # [np.zeros((0, audioData.shape[1]))]
+    outputAudioData = []
     outputPointer = 0
-
     # create audio envelope mask
-    mask = [x / AUDIO_FADE_ENVELOPE_SIZE for x in range(AUDIO_FADE_ENVELOPE_SIZE)]
+    mask = [x / FADE_SIZE for x in range(FADE_SIZE)]
 
     num = 0
     chunk_len = str(len(chunks))
@@ -45,24 +45,22 @@ def createAudio(chunks, samplesPerFrame, AUDIO_FADE_ENVELOPE_SIZE,
                 with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
                     tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
                     tsm.run(reader, writer)
-            _, alteredAudioData = wavfile.read(eFile)
+            __, alteredAudioData = wavfile.read(eFile)
             leng = alteredAudioData.shape[0]
             endPointer = outputPointer + leng
             outputAudioData.extend((alteredAudioData / maxAudioVolume).tolist())
 
-            # outputAudioData = np.concatenate((outputAudioData, alteredAudioData / maxAudioVolume))
-
             # smooth out transitiion's audio by quickly fading in/out
-            if(leng < AUDIO_FADE_ENVELOPE_SIZE):
+            if(leng < FADE_SIZE):
                 for i in range(outputPointer, endPointer):
                     outputAudioData[i] = 0
             else:
-                for i in range(outputPointer, outputPointer+AUDIO_FADE_ENVELOPE_SIZE):
+                for i in range(outputPointer, outputPointer+FADE_SIZE):
                     outputAudioData[i][0] *= mask[i-outputPointer]
                     outputAudioData[i][1] *= mask[i-outputPointer]
-                for i in range(endPointer-AUDIO_FADE_ENVELOPE_SIZE, endPointer):
-                    outputAudioData[i][0] *= (1-mask[i-endPointer+AUDIO_FADE_ENVELOPE_SIZE])
-                    outputAudioData[i][1] *= (1-mask[i-endPointer+AUDIO_FADE_ENVELOPE_SIZE])
+                for i in range(endPointer-FADE_SIZE, endPointer):
+                    outputAudioData[i][0] *= (1-mask[i-endPointer+FADE_SIZE])
+                    outputAudioData[i][1] *= (1-mask[i-endPointer+FADE_SIZE])
 
             outputPointer = endPointer
 
@@ -98,7 +96,7 @@ def createVideo(chunks, NEW_SPEED, frameRate):
                 newIndex += 1
                 copyFrame(int(n), newIndex, frameRate)
         num += 1
-        if(n % 10 == 0):
+        if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' video chunks done.']))
 
 
@@ -108,6 +106,16 @@ def createVideo(chunks, NEW_SPEED, frameRate):
     command += ' -nostats -loglevel 0'
     subprocess.call(command, shell=True)
     print('Video finished.')
+
+
+def getFrameRate(path):
+    process = subprocess.Popen(['ffmpeg', '-i', path],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    stdout, __ = process.communicate()
+    # __ represents an unneeded variable
+    output = stdout.decode()
+    match_dict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
+    return float(match_dict["fps"])
 
 
 def getMaxVolume(s):
@@ -123,6 +131,7 @@ def quality_type(x):
     if(x < 1):
         raise argparse.ArgumentTypeError("Maximum frame quality is 1")
     return x
+
 
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
@@ -141,7 +150,7 @@ if(__name__ == '__main__'):
     parser.add_argument('-r', '--sample_rate', type=float, default=44100,
         help='sample rate of the input and output videos.')
     parser.add_argument('-f', '--frame_rate', type=float,
-        help='manually set the frame rate (fps) of the input video. auto-editor will try to set it for you.')
+        help='manually set the frame rate (fps) of the input video.')
     parser.add_argument('-q', '--frame_quality', type=quality_type, default=3,
         help='quality of frames from input video. 1 is highest, 31 is lowest.')
     parser.add_argument('--get_auto_fps', '--get_frame_rate', action='store_true',
@@ -150,13 +159,12 @@ if(__name__ == '__main__'):
         help='display more information when running.')
     parser.add_argument('--prerun', action='store_true',
         help='create cache without making an output file or doing extra work.')
+    parser.add_argument('--clear_cache', action='store_true',
+        help='remove the cache folder.')
 
     args = parser.parse_args()
 
-    startTime = time.time()
-
-    # smooth out transitiion's audio by quickly fading in/out
-    AUDIO_FADE_ENVELOPE_SIZE = 400
+    startTime = time()
 
     SAMPLE_RATE = args.sample_rate
     SILENT_THRESHOLD = args.silent_threshold
@@ -170,28 +178,29 @@ if(__name__ == '__main__'):
     VERBOSE = args.verbose
     PRERUN = args.prerun
 
-    ORIGINAL_NAME = args.input
+    INPUT_FILE = args.input
+
+    if(args.clear_cache):
+        rmtree(CACHE)
+        exit()
 
     # check if we need to download the file with youtube-dl
-    if(ORIGINAL_NAME.startswith('http://') or ORIGINAL_NAME.startswith('https://')):
+    if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
         print('URL detected, using youtube-dl to download from webpage.')
-        command = f"youtube-dl -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4' '{ORIGINAL_NAME}' --output web_download"
+        command = f"youtube-dl -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4' '{INPUT_FILE}' --output web_download"
         subprocess.call(command, shell=True)
         print('Finished Download')
-        ORIGINAL_NAME = 'web_download.mp4'
-
-    INPUT_FILE = ORIGINAL_NAME
+        INPUT_FILE = 'web_download.mp4'
 
     # find fps if frame_rate is not given
     if(args.frame_rate is None):
-        cap = cv2.VideoCapture(ORIGINAL_NAME)
-        frameRate = cap.get(cv2.CAP_PROP_FPS)
+        frameRate = getFrameRate(INPUT_FILE)
     else:
         frameRate = args.frame_rate
 
     if(args.get_auto_fps):
         print(frameRate)
-        sys.exit()
+        exit()
 
     if(len(args.output_file) >= 1):
         OUTPUT_FILE = args.output_file
@@ -203,7 +212,7 @@ if(__name__ == '__main__'):
     try:
         os.mkdir(TEMP_FOLDER)
     except OSError:
-        rmtree(TEMP_FOLDER, ignore_errors=False)
+        rmtree(TEMP_FOLDER)
         os.mkdir(TEMP_FOLDER)
 
     # make Cache folder
@@ -214,12 +223,12 @@ if(__name__ == '__main__'):
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.readlines()
-            if(x[0] == ORIGINAL_NAME+'\n' and x[1] == str(frameRate)):
+            if(x[0] == INPUT_FILE+'\n' and x[1] == str(frameRate)):
                 print('Using cache.')
                 SKIP = True
             file.close()
         if(not SKIP):
-            rmtree(CACHE, ignore_errors=False)
+            rmtree(CACHE)
             os.mkdir(CACHE)
 
     if(not SKIP):
@@ -242,8 +251,9 @@ if(__name__ == '__main__'):
 
     if(PRERUN):
         print('Done.')
-        sys.exit()
+        exit()
 
+    # calculating chunks.
     sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
@@ -252,7 +262,6 @@ if(__name__ == '__main__'):
     audioFrameCount = int(ceil(audioSampleCount / samplesPerFrame))
     hasLoudAudio = np.zeros((audioFrameCount))
 
-    # calculating chunks.
     for i in range(audioFrameCount):
         start = int(i * samplesPerFrame)
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
@@ -278,8 +287,7 @@ if(__name__ == '__main__'):
     # chunks = [startFrame, stopFrame, isLoud?]
 
     p1 = Process(target=createAudio, args=(chunks, samplesPerFrame,
-        AUDIO_FADE_ENVELOPE_SIZE, NEW_SPEED, audioData,
-        SAMPLE_RATE, maxAudioVolume))
+        NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
     p1.start()
     p2 = Process(target=createVideo, args=(chunks, NEW_SPEED, frameRate))
     p2.start()
@@ -298,11 +306,11 @@ if(__name__ == '__main__'):
     subprocess.call(command, shell=True)
 
     print('Finished.')
-    timeLength = round(time.time() - startTime, 2)
-    minutes = round(timeLength)
-    print(f'took {timeLength} seconds ({datetime.timedelta(seconds=minutes)})')
+    timeLength = round(time() - startTime, 2)
+    minutes = timedelta(seconds=round(timeLength))
+    print(f'took {timeLength} seconds ({minutes})')
 
     file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{ORIGINAL_NAME}\n{frameRate}')
+    file.write(f'{INPUT_FILE}\n{frameRate}')
 
-    rmtree(TEMP_FOLDER, ignore_errors=False)
+    rmtree(TEMP_FOLDER)
