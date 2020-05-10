@@ -4,6 +4,7 @@
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
 from scipy.io import wavfile
+from PIL import Image # pip install pillow
 import numpy as np
 
 # internal python libraries
@@ -12,7 +13,7 @@ import os
 import argparse
 import subprocess
 from re import search
-from sys import exit
+import sys
 from datetime import timedelta
 from time import time
 from shutil import move, rmtree, copyfile
@@ -74,14 +75,35 @@ def createAudio(chunks, samplesPerFrame, NEW_SPEED,
     print('Audio finished.')
 
 
-def copyFrame(inputFrame, newIndex, frameRate):
+def resize(input_file, output_file, size):
+    im = Image.open(input_file)
+    w, h = im.size
+    size_tuple = (int(w * size), int(h * size))
+    im = im.resize(size_tuple)
+    nw, nh = im.size
+
+    dif1 = nw - w
+    dif2 = nh - h
+    left = dif1 / 2
+    right = w + dif1 / 2
+    top = dif2 / 2
+    bottom = h + dif2 / 2
+
+    cropped_im = im.crop((left, top, right, bottom))
+    cropped_im.save(output_file)
+
+
+def copyFrame(inputFrame, newIndex, frameRate, theZoom):
     src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
     if(os.path.isfile(src)):
         dst = ''.join([TEMP_FOLDER, '/newFrame{:06d}'.format(newIndex+1), '.jpg'])
-        copyfile(src, dst)
+        if(theZoom == 1):
+            copyfile(src, dst)
+        else:
+            resize(src, dst, theZoom)
 
 
-def createVideo(chunks, NEW_SPEED, frameRate):
+def createVideo(chunks, NEW_SPEED, frameRate, ZOOM):
     print('Creating new video.')
     newIndex = 0
     num = 0
@@ -90,11 +112,12 @@ def createVideo(chunks, NEW_SPEED, frameRate):
         n = chunk[0]
         end = chunk[1]
         theSpeed = NEW_SPEED[int(chunk[2])]
+        theZoom = ZOOM[int(chunk[2])]
         while(n <= end):
             n += theSpeed
             if(n <= end):
                 newIndex += 1
-                copyFrame(int(n), newIndex, frameRate)
+                copyFrame(int(n), newIndex, frameRate, theZoom)
         num += 1
         if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' video chunks done.']))
@@ -124,6 +147,11 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
+def getAvgVolume(s):
+    new_s = np.absolute(s)
+    return np.mean(new_s)
+
+
 def quality_type(x):
     x = int(x)
     if(x > 31):
@@ -141,6 +169,8 @@ if(__name__ == '__main__'):
         help='name the output file.')
     parser.add_argument('-t', '--silent_threshold', type=float, default=0.04,
         help='the volume that frames audio needs to surpass to be sounded. It ranges from 0 to 1.')
+    parser.add_argument('-l', '--loudness_threshold', type=float, default=0.50,
+        help='(New!) the volume that needs to be surpassed to zoom in the video.')
     parser.add_argument('-v', '--video_speed', type=float, default=1.00,
         help='the speed that sounded (spoken) frames should be played at.')
     parser.add_argument('-s', '--silent_speed', type=float, default=99999,
@@ -158,9 +188,9 @@ if(__name__ == '__main__'):
     parser.add_argument('--verbose', action='store_true',
         help='display more information when running.')
     parser.add_argument('--prerun', action='store_true',
-        help='create cache without making an output file or doing extra work.')
+        help='create the cache folder without doing extra work.')
     parser.add_argument('--clear_cache', action='store_true',
-        help='remove the cache folder.')
+        help='delete the cache folder and all of its contents.')
 
     args = parser.parse_args()
 
@@ -168,12 +198,14 @@ if(__name__ == '__main__'):
 
     SAMPLE_RATE = args.sample_rate
     SILENT_THRESHOLD = args.silent_threshold
+    LOUD_THRESHOLD = args.loudness_threshold
     FRAME_SPREADAGE = args.frame_margin
     if(args.silent_speed <= 0):
         args.silent_speed = 99999
     if(args.video_speed <= 0):
         args.video_speed = 99999
-    NEW_SPEED = [args.silent_speed, args.video_speed]
+    NEW_SPEED = [args.silent_speed, args.video_speed, args.video_speed]
+    ZOOM = [1, 1, 1.2]
     FRAME_QUALITY = args.frame_quality
     VERBOSE = args.verbose
     PRERUN = args.prerun
@@ -182,7 +214,7 @@ if(__name__ == '__main__'):
 
     if(args.clear_cache):
         rmtree(CACHE)
-        exit()
+        sys.exit()
 
     # check if we need to download the file with youtube-dl
     if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
@@ -200,7 +232,7 @@ if(__name__ == '__main__'):
 
     if(args.get_auto_fps):
         print(frameRate)
-        exit()
+        sys.exit()
 
     if(len(args.output_file) >= 1):
         OUTPUT_FILE = args.output_file
@@ -251,7 +283,7 @@ if(__name__ == '__main__'):
 
     if(PRERUN):
         print('Done.')
-        exit()
+        sys.exit()
 
     # calculating chunks.
     sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
@@ -267,7 +299,9 @@ if(__name__ == '__main__'):
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
         audiochunks = audioData[start:end]
         maxchunksVolume = getMaxVolume(audiochunks) / maxAudioVolume
-        if(maxchunksVolume >= SILENT_THRESHOLD):
+        if(maxchunksVolume >= LOUD_THRESHOLD):
+            hasLoudAudio[i] = 2
+        elif(maxchunksVolume >= SILENT_THRESHOLD):
             hasLoudAudio[i] = 1
 
     chunks = [[0, 0, 0]]
@@ -284,12 +318,13 @@ if(__name__ == '__main__'):
     chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])
     chunks = chunks[1:]
 
+    print(getAvgVolume(audiochunks) / maxAudioVolume)
     # chunks = [startFrame, stopFrame, isLoud?]
 
     p1 = Process(target=createAudio, args=(chunks, samplesPerFrame,
         NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
     p1.start()
-    p2 = Process(target=createVideo, args=(chunks, NEW_SPEED, frameRate))
+    p2 = Process(target=createVideo, args=(chunks, NEW_SPEED, frameRate, ZOOM))
     p2.start()
 
     p1.join()
