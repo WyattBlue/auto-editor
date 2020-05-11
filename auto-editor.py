@@ -9,19 +9,37 @@ import numpy as np
 
 # internal python libraries
 from math import ceil
+import math
 import os
 import argparse
 import subprocess
 from re import search
 import sys
+import time
 from datetime import timedelta
-from time import time
 from shutil import move, rmtree, copyfile
 from multiprocessing import Process
 
 FADE_SIZE = 400
 TEMP_FOLDER = '.TEMP'
 CACHE = '.CACHE'
+
+def mux(OUTPUT_FILE, TEMP, VERBOSE):
+    command = f'ffmpeg -y -i {TEMP}/output.mp4 -i {TEMP}/audioNew.wav'
+    command += ' -c:v copy -c:a aac -movflags +faststart'
+    command += f' "{OUTPUT_FILE}"'
+    if(not VERBOSE):
+        command += ' -nostats -loglevel 0'
+    subprocess.call(command, shell=True)
+
+
+def combine(OUTPUT_FILE, TEMP, frameRate, VERBOSE):
+    command = f'ffmpeg -y -framerate {frameRate} -i {TEMP}/newFrame%06d.jpg'
+    command += f' -i {TEMP}/audioNew.wav -strict -2 {OUTPUT_FILE}'
+    if(not VERBOSE):
+        command += ' -nostats -loglevel 0'
+    subprocess.call(command, shell=True)
+
 
 def createAudio(chunks, samplesPerFrame, NEW_SPEED,
     audioData, SAMPLE_RATE, maxAudioVolume):
@@ -93,17 +111,21 @@ def resize(input_file, output_file, size):
     cropped_im.save(output_file)
 
 
-def copyFrame(inputFrame, newIndex, frameRate, theZoom):
+def copyFrame(inputFrame, newIndex, frameRate, zooms):
     src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
     if(os.path.isfile(src)):
         dst = ''.join([TEMP_FOLDER, '/newFrame{:06d}'.format(newIndex+1), '.jpg'])
+        if(inputFrame not in zooms):
+            theZoom = 1
+        else:
+            theZoom = zooms[inputFrame]
         if(theZoom == 1):
             copyfile(src, dst)
         else:
             resize(src, dst, theZoom)
 
 
-def createVideo(chunks, NEW_SPEED, frameRate, ZOOM):
+def createVideo(chunks, NEW_SPEED, frameRate, zooms):
     print('Creating new video.')
     newIndex = 0
     num = 0
@@ -112,22 +134,21 @@ def createVideo(chunks, NEW_SPEED, frameRate, ZOOM):
         n = chunk[0]
         end = chunk[1]
         theSpeed = NEW_SPEED[int(chunk[2])]
-        theZoom = ZOOM[int(chunk[2])]
         while(n <= end):
             n += theSpeed
             if(n <= end):
                 newIndex += 1
-                copyFrame(int(n), newIndex, frameRate, theZoom)
+                copyFrame(int(n), newIndex, frameRate, zooms)
         num += 1
         if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' video chunks done.']))
 
 
-    print('Creating finished video. (This can take a while)')
-    command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg'
-    command += f' {TEMP_FOLDER}/output.mp4'
-    command += ' -nostats -loglevel 0'
-    subprocess.call(command, shell=True)
+    # print('Creating finished video. (This can take a while)')
+    # command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg'
+    # command += f' {TEMP_FOLDER}/output.mp4'
+    # command += ' -nostats -loglevel 0'
+    # subprocess.call(command, shell=True)
     print('Video finished.')
 
 
@@ -169,7 +190,7 @@ if(__name__ == '__main__'):
         help='name the output file.')
     parser.add_argument('-t', '--silent_threshold', type=float, default=0.04,
         help='the volume that frames audio needs to surpass to be sounded. It ranges from 0 to 1.')
-    parser.add_argument('-l', '--loudness_threshold', type=float, default=0.50,
+    parser.add_argument('-l', '--loudness_threshold', type=float, default=0.70,
         help='(New!) the volume that needs to be surpassed to zoom in the video.')
     parser.add_argument('-v', '--video_speed', type=float, default=1.00,
         help='the speed that sounded (spoken) frames should be played at.')
@@ -194,7 +215,7 @@ if(__name__ == '__main__'):
 
     args = parser.parse_args()
 
-    startTime = time()
+    startTime = time.time()
 
     SAMPLE_RATE = args.sample_rate
     SILENT_THRESHOLD = args.silent_threshold
@@ -204,8 +225,8 @@ if(__name__ == '__main__'):
         args.silent_speed = 99999
     if(args.video_speed <= 0):
         args.video_speed = 99999
-    NEW_SPEED = [args.silent_speed, args.video_speed, args.video_speed]
-    ZOOM = [1, 1, 1.2]
+    NEW_SPEED = [args.silent_speed, args.video_speed]
+
     FRAME_QUALITY = args.frame_quality
     VERBOSE = args.verbose
     PRERUN = args.prerun
@@ -309,7 +330,7 @@ if(__name__ == '__main__'):
     for i in range(audioFrameCount):
         start = int(max(0, i-FRAME_SPREADAGE))
         end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
-        shouldIncludeFrame[i] = np.max(hasLoudAudio[start:end])
+        shouldIncludeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
         # did we flip?
         if (i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
@@ -318,30 +339,59 @@ if(__name__ == '__main__'):
     chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])
     chunks = chunks[1:]
 
-    print(getAvgVolume(audiochunks) / maxAudioVolume)
+    # determine where and how to zoom the video.
+    zooms = {}
+    shouldIncludeFrame = np.zeros((audioFrameCount))
+
+    hold = False
+    for i in range(audioFrameCount):
+        start = int(max(0, i))
+        end = int(min(audioFrameCount, i+1))
+        shouldIncludeFrame[i] = np.max(hasLoudAudio[start:end])
+
+        if(i in zooms):
+            pass
+        if(i >= 2 and shouldIncludeFrame[i] == 2 and hold == False):
+            if(shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
+                # create zoom animation
+                # 1.0 -> 1.2
+                for x in range(6):
+                    trans = math.cos(0.63 * x + math.pi) * 0.1 + 0.1
+                    zooms[i + x - 2] = 1 + trans
+                zooms[i+x-1] = 1.2
+                zooms[i+x] = 1.2
+                hold = True
+        if(hold == True):
+            zooms[i] = 1.2
+            if(shouldIncludeFrame[i] == 1):
+                hold = False
+
+
+
+    print(chunks)
+    print('')
+    print(zooms)
+
     # chunks = [startFrame, stopFrame, isLoud?]
 
     p1 = Process(target=createAudio, args=(chunks, samplesPerFrame,
         NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
     p1.start()
-    p2 = Process(target=createVideo, args=(chunks, NEW_SPEED, frameRate, ZOOM))
+    p2 = Process(target=createVideo, args=(chunks, NEW_SPEED, frameRate, zooms))
     p2.start()
 
     p1.join()
     p2.join()
 
-    print('Muxing audio and video.')
-    command = f'ffmpeg -y -i {TEMP_FOLDER}/output.mp4 -i {TEMP_FOLDER}/audioNew.wav -c:v copy -c:a aac'
-    # faststart is recommended for YouTube videos since it lets the player play the video
-    # before everything is loaded.
-    command += ' -movflags +faststart'
-    command += f' "{OUTPUT_FILE}"'
-    if(not VERBOSE):
-        command += ' -nostats -loglevel 0'
-    subprocess.call(command, shell=True)
+    # print('Muxing audio and video.')
+    # mux(OUTPUT_FILE, TEMP_FOLDER, VERBOSE)
+
+    print('Finishing video.')
+    combine(OUTPUT_FILE, TEMP_FOLDER, frameRate, VERBOSE)
+
 
     print('Finished.')
-    timeLength = round(time() - startTime, 2)
+    timeLength = round(time.time() - startTime, 2)
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')
 
