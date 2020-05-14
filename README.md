@@ -18,21 +18,19 @@ You do that by setting the loudness thershold to a number between 0 (when the vi
 
 (video source from jacksfilms)
 
-## (New!) Converting Wav Files Directly
+## (New!) Input Audio Files
 
-You can now input audio files and auto-editor will know what 
+You can now use audio formats (.wav, .mp3) instead of just video formats and auto-editor will output an altered version.
 
 ```python auto-editor.py example.wav```
 
-This will create a new file, example_ALTERED.wav
-
-## Downloading Video from a Website
+## Download Video from a Website
 
 Thanks to youtube-dl, you can enter in URL's as your input source instead of local files.
 
 `python auto-editor.py "https://www.youtube.com/watch?v=kcs82HnguGc"`
 
-## Changing Video Speed
+## Change Video Speed
 
 You can change how fast the video plays at when the video is normal and when it's silent (below the silent thershold). Use use the flags --video_speed and --silent_speed respectively. This terminal snippit shows how to set the video speed to 1.8 times the normal playback and the silent speed to 8 times.
 
