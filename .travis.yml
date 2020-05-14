@@ -8,8 +8,6 @@ jobs:
         - mkdir ~/.linuxbrew/bin
         - ln -s ~/.linuxbrew/Homebrew/bin/brew ~/.linuxbrew/bin
         - eval $(~/.linuxbrew/bin/brew shellenv)
-        - brew install youtube-dl
-        - pip3 install numpy scipy audiotsm opencv-python
     - name: "Python 3.7.4 on macOS"
       os: osx
       osx_image: xcode11.2  # Python 3.7.4 running on macOS 10.14.4
@@ -18,5 +16,5 @@ jobs:
         - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 install: 
  - brew install youtube-dl
- - pip3 install numpy scipy audiotsm opencv-python
+ - pip3 install scipy audiotsm pillow
 script: python3 auto-editor.py --help || python auto-editor.py --help
