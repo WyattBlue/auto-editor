@@ -263,23 +263,23 @@ if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
     parser.add_argument('input',
         help='the path to the video file you want modified. can be a URL with youtube-dl.')
-    parser.add_argument('-o', '--output_file', type=str, default='',
+    parser.add_argument('--output_file', '-o', type=str, default='',
         help='name the output file.')
-    parser.add_argument('-t', '--silent_threshold', type=float, default=0.04,
+    parser.add_argument('--silent_threshold', '-t', type=float, default=0.04,
         help='the volume that frames audio needs to surpass to be sounded. It ranges from 0 to 1.')
-    parser.add_argument('-l', '--loudness_threshold', type=float, default=2.00,
+    parser.add_argument('--loudness_threshold', '-l', type=float, default=2.00,
         help='(New!) the volume that needs to be surpassed to zoom in the video. (0-1)')
-    parser.add_argument('-v', '--video_speed', type=float, default=1.00,
+    parser.add_argument('--video_speed', '-v', type=float, default=1.00,
         help='the speed that sounded (spoken) frames should be played at.')
-    parser.add_argument('-s', '--silent_speed', type=float, default=99999,
+    parser.add_argument('--silent_speed', '-s', type=float, default=99999,
         help='the speed that silent frames should be played at.')
-    parser.add_argument('-m', '--frame_margin', type=float, default=4,
+    parser.add_argument('--frame_margin', '-m', type=float, default=4,
         help='tells how many frames on either side of speech should be included.')
-    parser.add_argument('-r', '--sample_rate', type=float, default=44100,
+    parser.add_argument('--sample_rate', '-r', type=float, default=44100,
         help='sample rate of the input and output videos.')
-    parser.add_argument('-f', '--frame_rate', type=float,
+    parser.add_argument('--frame_rate', '-f', type=float,
         help='manually set the frame rate (fps) of the input video.')
-    parser.add_argument('-q', '--frame_quality', type=quality_type, default=3,
+    parser.add_argument('--frame_quality', '-q', type=quality_type, default=3,
         help='quality of frames from input video. 1 is highest, 31 is lowest.')
     parser.add_argument('--get_auto_fps', '--get_frame_rate', action='store_true',
         help='return what auto-editor thinks the frame rate is.')
