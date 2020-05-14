@@ -43,7 +43,7 @@ To install all of the needed dependencies, paste this to your command-line.
 brew update
 brew install ffmpeg
 brew install youtube-dl
-pip3 install scipy audiotsm
+pip3 install scipy audiotsm pillow
 ```
 > Note: Be warned that ffmpeg can take up to 15 minutes to install if you do not already have it.
 
