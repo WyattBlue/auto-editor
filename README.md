@@ -4,28 +4,57 @@
 Auto-Editor is a tool that can find the silent (boring) parts of the video and cut or speed them up.
 It works by using ffmpeg to split the video up into the audio and the frames. Calculates the new audio and adds and drops frames where needed, and stiches that back into a video.
 
-This project is a fork of Carykh's inactive [jumpcutter](https://github.com/carykh/jumpcutter). This project seeks to fix the issues (and design flaws) of the original while still following the same general idea and allowing the same parameters.
+# Usage
+## (New!) Auto Zoom
+<p align="center">
+  <img src="https://github.com/WyattBlue/auto-editor/blob/master/auto_zoom_demo.gif" width="500">
+</p>
 
-## Usage
-Using auto-editor with its default parameters.
+You can now tell auto-editor zoom in whenever the video gets especially loud. 
 
-`python auto-editor.py example.mp4`
+You do that by setting the loudness thershold to a number between 0 (when the video is completely quiet) and 1 (when the video is at its loudest). 0.8 is a good value to set it to.
 
-Download a video in a URL and remove the boring parts.
+```python auto-editor.py example.mp4 --loudness_threshold 0.8```
+
+(video source from jacksfilms)
+
+## (New!) Converting Wav Files Directly
+
+You can now input audio files and auto-editor will know what 
+
+```python auto-editor.py example.wav```
+
+This will create a new file, example_ALTERED.wav
+
+## Downloading Video from a Website
+
+Thanks to youtube-dl, you can enter in URL's as your input source instead of local files.
 
 `python auto-editor.py "https://www.youtube.com/watch?v=kcs82HnguGc"`
 
-speed up a lecture with Carykh's procrastinator settings.
+## Changing Video Speed
 
-`python auto-editor.py "https://www.youtube.com/watch?v=_PwhiWxHK8o" --video_speed=1.8 --silent_speed=8`
+You can change how fast the video plays at when the video is normal and when it's silent (below the silent thershold). Use use the flags --video_speed and --silent_speed respectively. This terminal snippit shows how to set the video speed to 1.8 times the normal playback and the silent speed to 8 times.
 
-get help on any of the other parameters
+`python auto-editor.py example.mp4 --video_speed 1.8 --silent_speed 8`
+
+Alternatively, you can use the short versions:
+
+`python auto-editor.py example.mp4 -v 1.8 -s 8`
+
+## Other Commands
+
+Get the list of all the other commands by typing in this command.
 
 `python auto-editor.py --help`
 
-## Download the Libraries and Dependencies
-This program is written in Python. Check if you have Python 3 by running.
+Auto-Editor will print out all the commands and a brief description on how to use them.
 
+
+
+# Installing Auto-Editor
+## Download the Libraries and Dependencies
+This project is written in Python3. Check if you have it by typing in
 `python --version`
 
 if your command-line says ```command not found``` or it has the wrong version you need to get Python 3 [from python.org](https://www.python.org/downloads/) and install it.
@@ -47,7 +76,8 @@ pip3 install scipy audiotsm pillow
 ```
 > Note: Be warned that ffmpeg can take up to 15 minutes to install if you do not already have it.
 
-## Installation
+## Running Auto-Editor on your Terminal
+
 Open your command-line and run `git clone https://github.com/WyattBlue/auto-editor.git`
 
 then run `cd auto-editor`. This will take you where auto-editor is.
@@ -56,5 +86,8 @@ Run `python auto-editor.py --help` to make sure your command-line can find the f
 
 If that runs successfully, then congratulations, you have successfully installed auto-editor. See the usage section for more examples.
 
-## Help 
-If it didn't run successfully or if you have any other suggestions or concerns, then feel free to create a new issue on this page. Alternatively, you can discuss the issue in jumpcutter's [official discord.](https://discord.gg/2snkzhy)
+# About
+This project is a fork of Carykh's inactive [jumpcutter](https://github.com/carykh/jumpcutter). It seeks to fix the issues (and design flaws) of the original while still following the same general idea and allowing the same parameters.
+
+# Help 
+If you can't figure out how to install this or you have any other suggestions or concerns, then create a new issue on project with the details. Alternatively, you can discuss the issue in jumpcutter's [official discord.](https://discord.gg/2snkzhy)
