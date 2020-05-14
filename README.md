@@ -1,8 +1,8 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 
 # Auto-Editor
-Auto-Editor is a tool that can find the silent (boring) parts of the video and cut or speed them up.
-It works by using ffmpeg to split the video up into the audio and the frames. Calculates the new audio and adds and drops frames where needed, and stiches that back into a video.
+Auto-Editor is a video editing tool that will automatically edit raw source video into a entertaining and polished video.
+It works by analyzing the video's audio to detect when a section needs to be cut, kept in, or zoomed in, then auto-editor runs a subproccess called ffmpeg to create the new video.
 
 # Usage
 ## (New!) Auto Zoom
@@ -18,9 +18,9 @@ You do that by setting the loudness thershold to a number between 0 (when the vi
 
 (video source from jacksfilms)
 
-## (New!) Input Audio Files
+## (New!) Audio File Types Supported
 
-You can now use audio formats (.wav, .mp3) instead of just video formats and auto-editor will output an altered version.
+You can use audio formats (.wav, .mp3) instead of just video formats and auto-editor will output an altered version.
 
 ```python auto-editor.py example.wav```
 
@@ -32,7 +32,7 @@ Thanks to youtube-dl, you can enter in URL's as your input source instead of loc
 
 ## Change Video Speed
 
-You can change how fast the video plays at when the video is normal and when it's silent (below the silent thershold). Use use the flags --video_speed and --silent_speed respectively. This terminal snippit shows how to set the video speed to 1.8 times the normal playback and the silent speed to 8 times.
+You can change how fast the video plays at when the video is normal and when it's silent (below the silent thershold). Use use the flags --video_speed and --silent_speed respectively. This snippet shows how to set the video speed to 1.8 times the normal playback and the silent speed to 8 times.
 
 `python auto-editor.py example.mp4 --video_speed 1.8 --silent_speed 8`
 
@@ -47,7 +47,6 @@ Get the list of all the other commands by typing in this command.
 `python auto-editor.py --help`
 
 Auto-Editor will print out all the commands and a brief description on how to use them.
-
 
 
 # Installing Auto-Editor
