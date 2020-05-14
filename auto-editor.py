@@ -8,14 +8,13 @@ from PIL import Image # pip install pillow
 import numpy as np
 
 # internal python libraries
-from math import ceil
 import math
 import os
 import argparse
 import subprocess
-from re import search
 import sys
 import time
+from re import search
 from datetime import timedelta
 from shutil import move, rmtree, copyfile
 from multiprocessing import Process
@@ -55,19 +54,31 @@ def createAudio(chunks, samplesPerFrame, NEW_SPEED,
     chunk_len = str(len(chunks))
     for chunk in chunks:
         if(NEW_SPEED[int(chunk[2])] < 99999):
-            audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
+
+            start = int(chunk[0] * samplesPerFrame)
+            end = int(chunk[1] * samplesPerFrame)
+            audioChunk = audioData[start:end]
 
             sFile = ''.join([TEMP_FOLDER, '/tempStart.wav'])
             eFile = ''.join([TEMP_FOLDER, '/tempEnd.wav'])
             wavfile.write(sFile, SAMPLE_RATE, audioChunk)
-            with WavReader(sFile) as reader:
-                with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
-                    tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
-                    tsm.run(reader, writer)
-            __, alteredAudioData = wavfile.read(eFile)
-            leng = alteredAudioData.shape[0]
+            if(NEW_SPEED[int(chunk[2])] == 1):
+
+                __, samefile = wavfile.read(sFile)
+                leng = samefile.shape[0]
+
+                outputAudioData.extend((samefile / maxAudioVolume).tolist())
+            else:
+                with WavReader(sFile) as reader:
+                    with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
+                        tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
+                        tsm.run(reader, writer)
+                __, alteredAudioData = wavfile.read(eFile)
+
+                leng = alteredAudioData.shape[0]
+                outputAudioData.extend((alteredAudioData / maxAudioVolume).tolist())
+
             endPointer = outputPointer + leng
-            outputAudioData.extend((alteredAudioData / maxAudioVolume).tolist())
 
             # smooth out transitiion's audio by quickly fading in/out
             if(leng < FADE_SIZE):
@@ -123,33 +134,66 @@ def copyFrame(inputFrame, newIndex, frameRate, zooms):
             copyfile(src, dst)
         else:
             resize(src, dst, theZoom)
+        return True
+    return False
 
 
-def createVideo(chunks, NEW_SPEED, frameRate, zooms):
+def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE, audioData):
     print('Creating new video.')
-    newIndex = 0
     num = 0
     chunk_len = str(len(chunks))
+    lastExistingFrame = None
+    outputPointer = 0
     for chunk in chunks:
-        n = chunk[0]
-        end = chunk[1]
-        theSpeed = NEW_SPEED[int(chunk[2])]
-        while(n <= end):
-            n += theSpeed
-            if(n <= end):
-                newIndex += 1
-                copyFrame(int(n), newIndex, frameRate, zooms)
+
+        if(NEW_SPEED[int(chunk[2])] < 99999):
+            audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
+
+            sFile = TEMP_FOLDER + '/tempStart2.wav'
+            eFile = TEMP_FOLDER + '/tempEnd2.wav'
+            wavfile.write(sFile, SAMPLE_RATE, audioChunk)
+
+            if(NEW_SPEED[int(chunk[2])] == 1):
+                __, samefile = wavfile.read(sFile)
+                leng = samefile.shape[0]
+            else:
+                with WavReader(sFile) as reader:
+                    with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
+                        tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
+                        tsm.run(reader, writer)
+                __, alteredAudioData = wavfile.read(eFile)
+
+                leng = alteredAudioData.shape[0]
+
+            # mine = len(audioChunk)
+            # mine = int(mine)
+            # print('mine:',mine)
+            # print('leng:',leng)
+
+            endPointer = outputPointer+leng
+
+            startOutputFrame = int(math.ceil(outputPointer/samplesPerFrame))
+            endOutputFrame = int(math.ceil(endPointer/samplesPerFrame))
+            for outputFrame in range(startOutputFrame, endOutputFrame):
+                inputFrame = int(chunk[0]+NEW_SPEED[int(chunk[2])]*(outputFrame-startOutputFrame))
+                didItWork = copyFrame(inputFrame, outputFrame, frameRate, zooms)
+                if didItWork:
+                    lastExistingFrame = inputFrame
+                else:
+                    copyFrame(lastExistingFrame, outputFrame, frameRate, zooms)
+
+            outputPointer = endPointer
+
         num += 1
         if(num % 10 == 0):
-            print(''.join([str(num), '/', chunk_len, ' video chunks done.']))
-
+            print(''.join([str(num), '/', chunk_len, ' frame chunks done.']))
 
     # print('Creating finished video. (This can take a while)')
     # command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg'
     # command += f' {TEMP_FOLDER}/output.mp4'
     # command += ' -nostats -loglevel 0'
     # subprocess.call(command, shell=True)
-    print('Video finished.')
+    print('New frames finished.')
 
 
 def getFrameRate(path):
@@ -161,6 +205,39 @@ def getFrameRate(path):
     match_dict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
     return float(match_dict["fps"])
 
+
+def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
+    zooms = {}
+    shouldIncludeFrame = np.zeros((audioFrameCount))
+    hold = False
+    endZoom = 0
+    wait = ''
+    for i in range(audioFrameCount):
+        if(i in zooms):
+            continue
+        start = int(max(0, i-FRAME_SPREADAGE))
+        end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
+        shouldIncludeFrame[i] = np.max(hasLoudAudio[start:end])
+        if(i >= 2 and shouldIncludeFrame[i] == 2 and hold == False):
+            if(shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
+                # transition smoothly using a sine wave, see here:
+                # https://www.desmos.com/calculator/ah0gfcukry
+                a = 1.2 - 1.0 # 1.0 -> 1.2
+                p = int(frameRate / 3)
+                for x in range(1, p + 1):
+                    trans = a * math.sin((math.pi/(2*p)) * x + (2*math.pi))
+                    zooms[i+x-3] = 1 + trans
+                hold = True
+                endZoom = i + x
+                continue
+        if(hold == True):
+            zooms[i-1] = 1.2
+            if(len(shouldIncludeFrame) - i > int(frameRate * 1.5) and
+                shouldIncludeFrame[i] == 1 and i-endZoom > int(frameRate/2)):
+                for y in range(len(chunks)):
+                    if(chunks[y][0] == i and chunks[y][2] == 1):
+                        hold = False
+    return zooms
 
 def getMaxVolume(s):
     maxv = float(np.max(s))
@@ -190,8 +267,8 @@ if(__name__ == '__main__'):
         help='name the output file.')
     parser.add_argument('-t', '--silent_threshold', type=float, default=0.04,
         help='the volume that frames audio needs to surpass to be sounded. It ranges from 0 to 1.')
-    parser.add_argument('-l', '--loudness_threshold', type=float, default=0.70,
-        help='(New!) the volume that needs to be surpassed to zoom in the video.')
+    parser.add_argument('-l', '--loudness_threshold', type=float, default=2.00,
+        help='(New!) the volume that needs to be surpassed to zoom in the video. (0-1)')
     parser.add_argument('-v', '--video_speed', type=float, default=1.00,
         help='the speed that sounded (spoken) frames should be played at.')
     parser.add_argument('-s', '--silent_speed', type=float, default=99999,
@@ -237,6 +314,15 @@ if(__name__ == '__main__'):
         rmtree(CACHE)
         sys.exit()
 
+    dotIndex = INPUT_FILE.rfind('.')
+    if(len(args.output_file) >= 1):
+        OUTPUT_FILE = args.output_file
+    else:
+        OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+INPUT_FILE[dotIndex:]
+
+    extension = INPUT_FILE[dotIndex:]
+    audioOnly = extension == '.wav' or extension == '.mp3'
+
     # check if we need to download the file with youtube-dl
     if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
         print('URL detected, using youtube-dl to download from webpage.')
@@ -245,21 +331,23 @@ if(__name__ == '__main__'):
         print('Finished Download')
         INPUT_FILE = 'web_download.mp4'
 
-    # find fps if frame_rate is not given
+
+    if(not os.path.isfile(INPUT_FILE)):
+        print('Could not Find File:', INPUT_FILE)
+        sys.exit()
+
+    # find frameRate if not given
     if(args.frame_rate is None):
-        frameRate = getFrameRate(INPUT_FILE)
+        if(audioOnly):
+            frameRate = 30
+        else:
+            frameRate = getFrameRate(INPUT_FILE)
     else:
         frameRate = args.frame_rate
 
     if(args.get_auto_fps):
         print(frameRate)
         sys.exit()
-
-    if(len(args.output_file) >= 1):
-        OUTPUT_FILE = args.output_file
-    else:
-        dotIndex = INPUT_FILE.rfind('.')
-        OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+INPUT_FILE[dotIndex:]
 
     # make Temp folder
     try:
@@ -285,12 +373,12 @@ if(__name__ == '__main__'):
             os.mkdir(CACHE)
 
     if(not SKIP):
-        print('Splitting video into jpgs. (This can take a while)')
-
-        command = f'ffmpeg -i "{INPUT_FILE}" -qscale:v {FRAME_QUALITY} {CACHE}/frame%06d.jpg'
-        if(not VERBOSE):
-            command += ' -nostats -loglevel 0'
-        subprocess.call(command, shell=True)
+        if(not audioOnly):
+            print('Splitting video into jpgs. (This can take a while)')
+            command = f'ffmpeg -i "{INPUT_FILE}" -qscale:v {FRAME_QUALITY} {CACHE}/frame%06d.jpg'
+            if(not VERBOSE):
+                command += ' -nostats -loglevel 0'
+            subprocess.call(command, shell=True)
 
         # -b:a means audio bitrate
         # -ac 2 means set the audio channels to 2. (stereo)
@@ -312,7 +400,7 @@ if(__name__ == '__main__'):
     maxAudioVolume = getMaxVolume(audioData)
 
     samplesPerFrame = sampleRate / frameRate
-    audioFrameCount = int(ceil(audioSampleCount / samplesPerFrame))
+    audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
     hasLoudAudio = np.zeros((audioFrameCount))
 
     for i in range(audioFrameCount):
@@ -340,62 +428,50 @@ if(__name__ == '__main__'):
     chunks = chunks[1:]
 
     # determine where and how to zoom the video.
-    zooms = {}
-    shouldIncludeFrame = np.zeros((audioFrameCount))
-
-    hold = False
-    for i in range(audioFrameCount):
-        start = int(max(0, i))
-        end = int(min(audioFrameCount, i+1))
-        shouldIncludeFrame[i] = np.max(hasLoudAudio[start:end])
-
-        if(i in zooms):
-            pass
-        if(i >= 2 and shouldIncludeFrame[i] == 2 and hold == False):
-            if(shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
-                # create zoom animation
-                # 1.0 -> 1.2
-                for x in range(6):
-                    trans = math.cos(0.63 * x + math.pi) * 0.1 + 0.1
-                    zooms[i + x - 2] = 1 + trans
-                zooms[i+x-1] = 1.2
-                zooms[i+x] = 1.2
-                hold = True
-        if(hold == True):
-            zooms[i] = 1.2
-            if(shouldIncludeFrame[i] == 1):
-                hold = False
-
-
-
-    print(chunks)
-    print('')
-    print(zooms)
+    if(not audioOnly):
+        zooms = getZooms(chunks, audioFrameCount,
+            hasLoudAudio, FRAME_SPREADAGE)
+    else:
+        zooms = {}
 
     # chunks = [startFrame, stopFrame, isLoud?]
+    if(not audioOnly):
+        p1 = Process(target=createAudio, args=(chunks, samplesPerFrame,
+            NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
+        p1.start()
+        p2 = Process(target=createVideo, args=(chunks, NEW_SPEED, frameRate, zooms,
+            samplesPerFrame, SAMPLE_RATE, audioData))
+        p2.start()
 
-    p1 = Process(target=createAudio, args=(chunks, samplesPerFrame,
-        NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
-    p1.start()
-    p2 = Process(target=createVideo, args=(chunks, NEW_SPEED, frameRate, zooms))
-    p2.start()
-
-    p1.join()
-    p2.join()
+        p1.join()
+        p2.join()
+    else:
+        createAudio(chunks, samplesPerFrame, NEW_SPEED, audioData,
+            SAMPLE_RATE, maxAudioVolume)
 
     # print('Muxing audio and video.')
     # mux(OUTPUT_FILE, TEMP_FOLDER, VERBOSE)
 
-    print('Finishing video.')
-    combine(OUTPUT_FILE, TEMP_FOLDER, frameRate, VERBOSE)
-
+    if(audioOnly):
+        print('Moving audio.')
+        move(f'{TEMP_FOLDER}/audioNew.wav', OUTPUT_FILE)
+    else:
+        print('Finishing video.')
+        combine(OUTPUT_FILE, TEMP_FOLDER, frameRate, VERBOSE)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')
 
-    file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{INPUT_FILE}\n{frameRate}')
+    # os.startfile(OUTPUT_FILE)
+    if(not audioOnly):
+        file = open(f'{CACHE}/cache.txt', 'w')
+        file.write(f'{INPUT_FILE}\n{frameRate}')
 
     rmtree(TEMP_FOLDER)
+
+    # revert renames when running
+
+    # delete all files that start with 'frame'
+    # delete 'audioNew.wav'
