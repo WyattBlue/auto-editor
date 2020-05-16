@@ -14,8 +14,8 @@ jobs:
       language: shell
       before_isntall:
         - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+        - brew install ffmpeg
 install:
- - brew install ffmpeg
  - brew install youtube-dl
  - pip3 install scipy audiotsm pillow
 script: python3 auto-editor.py example.mp4 || python auto-editor.py example.mp4
