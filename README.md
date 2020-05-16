@@ -7,7 +7,7 @@ It works by analyzing the video's audio to detect when a section needs to be cut
 # Usage
 ## (New!) Auto Zoom
 <p align="center">
-  <img src="https://github.com/WyattBlue/auto-editor/blob/master/auto_zoom_demo.gif" width="500">
+  <img src="https://github.com/WyattBlue/auto-editor/blob/master/auto_zoom_demo.gif" width="800">
 </p>
 
 You can now tell auto-editor to zoom in whenever the video gets especially loud. 
