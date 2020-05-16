@@ -8,7 +8,7 @@ jobs:
         - mkdir ~/.linuxbrew/bin
         - ln -s ~/.linuxbrew/Homebrew/bin/brew ~/.linuxbrew/bin
         - eval $(~/.linuxbrew/bin/brew shellenv)
-        - apt-get install ffmpeg -y
+        - sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg
     - name: "Python 3.7.4 on macOS"
       os: osx
       osx_image: xcode11.2
