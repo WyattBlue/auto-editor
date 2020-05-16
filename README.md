@@ -10,7 +10,7 @@ It works by analyzing the video's audio to detect when a section needs to be cut
   <img src="https://github.com/WyattBlue/auto-editor/blob/master/auto_zoom_demo.gif" width="500">
 </p>
 
-You can now tell auto-editor zoom in whenever the video gets especially loud. 
+You can now tell auto-editor to zoom in whenever the video gets especially loud. 
 
 You do that by setting the loudness thershold to a number between 0 (when the video is completely quiet) and 1 (when the video is at its loudest). 0.8 is a good value to set it to.
 
