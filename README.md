@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w2a
+ &nbsp;&nbsp;<sup>version 20w20a
 # Auto-Editor
 Auto-Editor is a video editing tool that will automatically edit raw source video into a entertaining and polished video.
 It works by analyzing the video's audio to detect when a section needs to be cut, kept in, or zoomed in, then auto-editor runs a subproccess called ffmpeg to create the new video.
@@ -69,38 +69,11 @@ Auto-Editor will print out all the commands and a brief description on how to us
 
 
 # Installing Auto-Editor
-## Download the Libraries and Dependencies
-This project is written in Python3. Check if you have it by typing in
-`python --version`
+[Installing for Windows](/install_win.md)
 
-if your command-line says ```command not found``` or it has the wrong version you need to get Python 3 [from python.org](https://www.python.org/downloads/) and install it.
+[Installing for Mac](/install_mac.md)
 
-> Note: `python` points to Python 2.7 on macOS but points to Python 3.8 on Linux and Windows. `python3` doesn't work on Windows but `py` works only on Windows.
-
-Check if you have Homebrew.
-
-`brew --version`
-
-If not then go to https://brew.sh and install Homebrew.
-
-To install all of the needed dependencies, paste this to your command-line.
-```
-brew update
-brew install ffmpeg
-brew install youtube-dl
-pip3 install scipy audiotsm pillow
-```
-> Note: Be warned that ffmpeg can take up to 15 minutes to install if you do not already have it.
-
-## Running Auto-Editor on your Terminal
-
-Open your command-line and run `git clone https://github.com/WyattBlue/auto-editor.git`
-
-then run `cd auto-editor`. This will take you where auto-editor is.
-
-Run `python auto-editor.py --help` to make sure your command-line can find the file.
-
-If that runs successfully, then congratulations, you have successfully installed auto-editor. See the usage section for more examples.
+[Installing for Linux](/install_lin.md)
 
 # Help 
 If you can't figure out how to install this or you have any other suggestions or concerns, then create a new issue on project with the details.
