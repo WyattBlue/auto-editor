@@ -23,7 +23,6 @@ jobs:
       language: shell       # 'language: python' is an error on Travis CI Windows
       before_install:
         - choco install ffmpeg
-        - ffmpeg -version
         - choco install python --version 3.8.0
       env: PATH=/c/Python38:/c/Python38/Scripts:/c/ffmpeg:/c/ffmpeg/$PATH
 install:
