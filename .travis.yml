@@ -23,8 +23,10 @@ jobs:
       language: shell       # 'language: python' is an error on Travis CI Windows
       before_install:
         - choco install ffmpeg
+        - ls
+        - C:\ffmpeg\bin\ffmpeg.exe -codecs
         - choco install python --version 3.8.0
-      env: PATH=/c/Python38:/c/Python38/Scripts:/c/ffmpeg:/c/ffmpeg/$PATH
+      env: PATH=/c/Python38:/c/Python38/Scripts:/c/ffmpeg/bin/$PATH
 install:
  - pip3 install scipy audiotsm pillow # install libraries
 script: python3 auto-editor.py example.mp4 || python auto-editor.py example.mp4
