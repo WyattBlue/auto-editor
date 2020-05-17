@@ -18,14 +18,6 @@ jobs:
         - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
         - brew install ffmpeg
         - brew install youtube-dl
-    - name: "Python 3.8.0 on Windows"
-      os: windows           # Windows 10.0.17134 N/A Build 17134
-      language: shell       # 'language: python' is an error on Travis CI Windows
-      before_install:
-        - choco install ffmpeg
-        - C:/ProgramData/chocolatey/bin/ffmpeg.exe -codecs
-        - choco install python --version 3.8.0
-      env: PATH=/c/Python38:/c/Python38/Scripts:/%ALLUSERSPROFILE%/chocolatey/bin/$PATH
 install:
  - pip3 install scipy audiotsm pillow # install libraries
 script: python3 auto-editor.py example.mp4 || python auto-editor.py example.mp4
