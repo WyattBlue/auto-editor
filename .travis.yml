@@ -24,6 +24,7 @@ jobs:
       before_install:
         - choco install python --version 3.8.0
         - choco install ffmpeg
+        - set PATH=%PATH%;C:\ffmpeg\bin\
         - ffmpeg --help
       env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install:
