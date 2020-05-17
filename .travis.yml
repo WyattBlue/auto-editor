@@ -28,5 +28,5 @@ jobs:
         - ffmpeg --help
       env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install:
- - pip3 install scipy audiotsm pillow
+ - pip3 install scipy audiotsm pillow # install libraries
 script: python3 auto-editor.py example.mp4 || python auto-editor.py example.mp4
