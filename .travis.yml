@@ -22,9 +22,9 @@ jobs:
       os: windows           # Windows 10.0.17134 N/A Build 17134
       language: shell       # 'language: python' is an error on Travis CI Windows
       before_install:
+        - @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command " [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
         - choco install python --version 3.8.0
         - choco install ffmpeg
-        - set PATH=%PATH%;C:\ffmpeg\bin\
         - ffmpeg --help
       env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install:
