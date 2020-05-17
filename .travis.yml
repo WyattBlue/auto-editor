@@ -8,15 +8,23 @@ jobs:
         - mkdir ~/.linuxbrew/bin
         - ln -s ~/.linuxbrew/Homebrew/bin/brew ~/.linuxbrew/bin
         - eval $(~/.linuxbrew/bin/brew shellenv)
+        - brew install youtube-dl
         - sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg
     - name: "Python 3.7.4 on macOS"
       os: osx
       osx_image: xcode11.2
       language: shell
-      before_isntall:
+      before_install:
         - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
         - brew install ffmpeg
+        - brew install youtube-dl
+    - name: "Python 3.8.0 on Windows"
+      os: windows           # Windows 10.0.17134 N/A Build 17134
+      language: shell       # 'language: python' is an error on Travis CI Windows
+      before_install:
+        - choco install python --version 3.8.0
+        - choco install ffmpeg
+      env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install:
- - brew install youtube-dl
  - pip3 install scipy audiotsm pillow
 script: python3 auto-editor.py example.mp4 || python auto-editor.py example.mp4
