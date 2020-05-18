@@ -20,7 +20,7 @@ from shutil import move, rmtree, copyfile
 from multiprocessing import Process
 
 FADE_SIZE = 400
-TEMP_FOLDER = '.TEMP'
+TEMP = '.TEMP'
 CACHE = '.CACHE'
 
 def mux(OUTPUT_FILE, TEMP, VERBOSE):
@@ -59,8 +59,8 @@ def createAudio(chunks, samplesPerFrame, NEW_SPEED,
             end = int(chunk[1] * samplesPerFrame)
             audioChunk = audioData[start:end]
 
-            sFile = ''.join([TEMP_FOLDER, '/tempStart.wav'])
-            eFile = ''.join([TEMP_FOLDER, '/tempEnd.wav'])
+            sFile = ''.join([TEMP, '/tempStart.wav'])
+            eFile = ''.join([TEMP, '/tempEnd.wav'])
             wavfile.write(sFile, SAMPLE_RATE, audioChunk)
             if(NEW_SPEED[int(chunk[2])] == 1):
 
@@ -100,7 +100,7 @@ def createAudio(chunks, samplesPerFrame, NEW_SPEED,
 
     print('Creating finished audio.')
     outputAudioData = np.asarray(outputAudioData)
-    wavfile.write(TEMP_FOLDER+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
+    wavfile.write(TEMP+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
     print('Audio finished.')
 
 
@@ -125,7 +125,7 @@ def resize(input_file, output_file, size):
 def copyFrame(inputFrame, newIndex, frameRate, zooms):
     src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
     if(os.path.isfile(src)):
-        dst = ''.join([TEMP_FOLDER, '/newFrame{:06d}'.format(newIndex+1), '.jpg'])
+        dst = ''.join([TEMP, '/newFrame{:06d}'.format(newIndex+1), '.jpg'])
         if(inputFrame not in zooms):
             theZoom = 1
         else:
@@ -149,8 +149,8 @@ def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RAT
         if(NEW_SPEED[int(chunk[2])] < 99999):
             audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
 
-            sFile = TEMP_FOLDER + '/tempStart2.wav'
-            eFile = TEMP_FOLDER + '/tempEnd2.wav'
+            sFile = TEMP + '/tempStart2.wav'
+            eFile = TEMP + '/tempEnd2.wav'
             wavfile.write(sFile, SAMPLE_RATE, audioChunk)
 
             if(NEW_SPEED[int(chunk[2])] == 1):
@@ -189,8 +189,8 @@ def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RAT
             print(''.join([str(num), '/', chunk_len, ' frame chunks done.']))
 
     # print('Creating finished video. (This can take a while)')
-    # command = f'ffmpeg -y -framerate {frameRate} -i {TEMP_FOLDER}/newFrame%06d.jpg'
-    # command += f' {TEMP_FOLDER}/output.mp4'
+    # command = f'ffmpeg -y -framerate {frameRate} -i {TEMP}/newFrame%06d.jpg'
+    # command += f' {TEMP}/output.mp4'
     # command += ' -nostats -loglevel 0'
     # subprocess.call(command, shell=True)
     print('New frames finished.')
@@ -351,10 +351,10 @@ if(__name__ == '__main__'):
 
     # make Temp folder
     try:
-        os.mkdir(TEMP_FOLDER)
+        os.mkdir(TEMP)
     except OSError:
-        rmtree(TEMP_FOLDER)
-        os.mkdir(TEMP_FOLDER)
+        rmtree(TEMP)
+        os.mkdir(TEMP)
 
     # make Cache folder
     SKIP = False
@@ -450,14 +450,14 @@ if(__name__ == '__main__'):
             SAMPLE_RATE, maxAudioVolume)
 
     # print('Muxing audio and video.')
-    # mux(OUTPUT_FILE, TEMP_FOLDER, VERBOSE)
+    # mux(OUTPUT_FILE, TEMP, VERBOSE)
 
     if(audioOnly):
         print('Moving audio.')
-        move(f'{TEMP_FOLDER}/audioNew.wav', OUTPUT_FILE)
+        move(f'{TEMP}/audioNew.wav', OUTPUT_FILE)
     else:
         print('Finishing video.')
-        combine(OUTPUT_FILE, TEMP_FOLDER, frameRate, VERBOSE)
+        combine(OUTPUT_FILE, TEMP, frameRate, VERBOSE)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
@@ -469,7 +469,16 @@ if(__name__ == '__main__'):
         file = open(f'{CACHE}/cache.txt', 'w')
         file.write(f'{INPUT_FILE}\n{frameRate}')
 
-    rmtree(TEMP_FOLDER)
+    try: # should work on Windows
+        os.startfile(OUTPUT_FILE)
+    except AttributeError:
+        try: # should work on MacOS
+            subprocess.call(['open', OUTPUT_FILE])
+        except:
+            # tough luck for linux users
+            print('Could not open output file.')
+
+    rmtree(TEMP)
 
     # revert renames when running
 
