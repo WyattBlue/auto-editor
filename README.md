@@ -82,9 +82,3 @@ then run `cd auto-editor`. This will take you where auto-editor is.
 Run `python auto-editor.py --help` to make sure your command-line can find the file.
 
 If that runs successfully, then congratulations, you have successfully installed auto-editor. See the usage section for more examples.
-
-# About
-This project is a fork of Carykh's inactive [jumpcutter](https://github.com/carykh/jumpcutter). It seeks to fix the issues (and design flaws) of the original while still following the same general idea and allowing the same parameters.
-
-# Help 
-If you can't figure out how to install this or you have any other suggestions or concerns, then create a new issue on project with the details. Alternatively, you can discuss the issue in jumpcutter's [official discord.](https://discord.gg/2snkzhy)
