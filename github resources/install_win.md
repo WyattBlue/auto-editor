@@ -11,35 +11,28 @@ If Command Prompt says this:
 command not found: python
 ```
 
-or this
+or this:
 ```terminal
 Python 2.7.16
 ```
 
-you need to install [python3](https://www.python.org/downloads/).
+you need to install [python 3](https://www.python.org/downloads/).
 
-## Choco
-Check if you have Choco
-
-```terminal
-choco --version
-```
-
-If not, then install it by running:
+## FFmpeg
+Check if you have ffmpeg.
 
 ```terminal
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+ffmpeg -h
 ```
+
+If not then follow [this guide](https://www.wikihow.com/Install-FFmpeg-on-Windows). Unfortunately, it seems that you cannot install ffmpeg with the path correctly set with only commands. If you know how to do that, please show how in an issue.
+
 
 ## Dependencies
 To install all of the needed dependencies, run this:
 ```terminal
-brew update
-brew install ffmpeg
-brew install youtube-dl
 pip3 install scipy audiotsm pillow
 ```
-> This ususally takes about 5 minutes.
 
 Wait for all the libraries to install and once that's done, close and reopen Command Prompt
 
@@ -50,9 +43,9 @@ If you have git, then you can simply run:
 git clone https://github.com/WyattBlue/auto-editor.git
 ```
 
-to download the repo or download it [here.](https://github.com/WyattBlue/auto-editor/archive/master.zip)
+to download the repo or download the zip version [here.](https://github.com/WyattBlue/auto-editor/archive/master.zip)
 
-Run 
+Run
 ```terminal
 python auto-editor.py --help
 ```

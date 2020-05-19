@@ -17,7 +17,7 @@ instead of this something like this:
 Python 3.8.3
 ```
 
-you need to install [python3](https://www.python.org/downloads/).
+you need to install [python 3](https://www.python.org/downloads/).
 
 ## Homebrew
 Check if you have Homebrew.
@@ -51,9 +51,9 @@ If you have git, then you can simply run:
 git clone https://github.com/WyattBlue/auto-editor.git
 ```
 
-to download the repo or download it [here.](https://github.com/WyattBlue/auto-editor/archive/master.zip)
+to download the repo or download the zip version [here.](https://github.com/WyattBlue/auto-editor/archive/master.zip)
 
-Run 
+Run
 ```terminal
 python3 auto-editor.py --help
 ```
