@@ -27,6 +27,9 @@ ffmpeg -h
 
 If not then follow [this guide](https://www.wikihow.com/Install-FFmpeg-on-Windows). Unfortunately, it seems that you cannot install ffmpeg with the path correctly set with only commands. If you know how to do that, please show how in an issue.
 
+## Youtube-dl
+You can install youtube-dl [here](https://ytdl-org.github.io/youtube-dl/download.html).
+
 
 ## Dependencies
 To install all of the needed dependencies, run this:
