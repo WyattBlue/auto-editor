@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 21w20a
+ &nbsp;&nbsp;<sup>version 20w21a
 # Auto-Editor
 Auto-Editor is a video editing tool that will automatically edit raw source video into a entertaining and polished video.
 It works by analyzing the video's audio to detect when a section needs to be cut, kept in, or zoomed in, then auto-editor runs a subproccess called ffmpeg to create the new video.
