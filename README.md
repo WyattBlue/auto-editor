@@ -28,7 +28,7 @@ $ python auto-editor.py example.mp4 -v 1.8 -s 8
 
 ## Zoom In Automatically
 <p align="center">
-  <img src="https://github.com/WyattBlue/auto-editor/blob/master/auto_zoom_demo.gif" width="800">
+  <img src="/github%20resources/auto_zoom_demo.gif" width="800">
 </p>
 
 You can now tell auto-editor to zoom in whenever the video gets especially loud. 
