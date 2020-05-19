@@ -69,8 +69,8 @@ Auto-Editor will print out all the commands and a brief description on how to us
 
 
 # Installing Auto-Editor
-[Installing for Windows](/install_win.md)
+[Installing for Windows](/github%20resources/install_win.md)
 
-[Installing for Mac](/install_mac.md)
+[Installing for Mac](/github%20resources/install_mac.md)
 
-[Installing for Linux](/install_lin.md)
+[Installing for Linux](/github%20resources/install_lin.md)
