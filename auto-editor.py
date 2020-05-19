@@ -23,8 +23,8 @@ FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
 
-def mux(OUTPUT_FILE, TEMP, VERBOSE):
-    command = f'ffmpeg -y -i {TEMP}/output.mp4 -i {TEMP}/audioNew.wav'
+def mux(INPUT_VID, INPUT_AUD, VERBOSE):
+    command = f'ffmpeg -y -i {INPUT_VID} -i {INPUT_AUD}'
     command += ' -c:v copy -c:a aac -movflags +faststart'
     command += f' "{OUTPUT_FILE}"'
     if(not VERBOSE):
@@ -145,30 +145,20 @@ def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RAT
     lastExistingFrame = None
     outputPointer = 0
     for chunk in chunks:
-
         if(NEW_SPEED[int(chunk[2])] < 99999):
             audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
-
-            sFile = TEMP + '/tempStart2.wav'
-            eFile = TEMP + '/tempEnd2.wav'
-            wavfile.write(sFile, SAMPLE_RATE, audioChunk)
-
             if(NEW_SPEED[int(chunk[2])] == 1):
-                __, samefile = wavfile.read(sFile)
-                leng = samefile.shape[0]
+                leng = len(audioChunk)
             else:
+                sFile = TEMP + '/tempStart2.wav'
+                eFile = TEMP + '/tempEnd2.wav'
+                wavfile.write(sFile, SAMPLE_RATE, audioChunk)
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
                         tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
                         tsm.run(reader, writer)
                 __, alteredAudioData = wavfile.read(eFile)
-
                 leng = alteredAudioData.shape[0]
-
-            # mine = len(audioChunk)
-            # mine = int(mine)
-            # print('mine:',mine)
-            # print('leng:',leng)
 
             endPointer = outputPointer+leng
 
@@ -187,12 +177,6 @@ def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RAT
         num += 1
         if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' frame chunks done.']))
-
-    # print('Creating finished video. (This can take a while)')
-    # command = f'ffmpeg -y -framerate {frameRate} -i {TEMP}/newFrame%06d.jpg'
-    # command += f' {TEMP}/output.mp4'
-    # command += ' -nostats -loglevel 0'
-    # subprocess.call(command, shell=True)
     print('New frames finished.')
 
 
@@ -200,7 +184,6 @@ def getFrameRate(path):
     process = subprocess.Popen(['ffmpeg', '-i', path],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
-    # __ represents an unneeded variable
     output = stdout.decode()
     match_dict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
     return float(match_dict["fps"])
@@ -220,8 +203,6 @@ def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
         shouldIncludeFrame[i] = np.max(hasLoudAudio[start:end])
         if(i >= 2 and shouldIncludeFrame[i] == 2 and hold == False):
             if(shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
-                # transition smoothly using a sine wave, see here:
-                # https://www.desmos.com/calculator/ah0gfcukry
                 a = 1.2 - 1.0 # 1.0 -> 1.2
                 p = int(frameRate / 3)
                 for x in range(1, p + 1):
@@ -261,7 +242,7 @@ def quality_type(x):
 
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
-    parser.add_argument('input',
+    parser.add_argument('input', nargs='+',
         help='the path to the video file you want modified. can be a URL with youtube-dl.')
     parser.add_argument('--output_file', '-o', type=str, default='',
         help='name the output file.')
@@ -269,11 +250,11 @@ if(__name__ == '__main__'):
         help='the volume that frames audio needs to surpass to be sounded. It ranges from 0 to 1.')
     parser.add_argument('--loudness_threshold', '-l', type=float, default=2.00,
         help='(New!) the volume that needs to be surpassed to zoom in the video. (0-1)')
-    parser.add_argument('--video_speed', '-v', type=float, default=1.00,
+    parser.add_argument('--video_speed', '--sounded_speed', '-v', type=float, default=1.00,
         help='the speed that sounded (spoken) frames should be played at.')
     parser.add_argument('--silent_speed', '-s', type=float, default=99999,
         help='the speed that silent frames should be played at.')
-    parser.add_argument('--frame_margin', '-m', type=float, default=4,
+    parser.add_argument('--frame_margin', '-m', type=int, default=4,
         help='tells how many frames on either side of speech should be included.')
     parser.add_argument('--sample_rate', '-r', type=float, default=44100,
         help='sample rate of the input and output videos.')
@@ -308,7 +289,8 @@ if(__name__ == '__main__'):
     VERBOSE = args.verbose
     PRERUN = args.prerun
 
-    INPUT_FILE = args.input
+    INPUT_FILE = args.input[0]
+    INPUTS = args.input
 
     if(args.clear_cache):
         rmtree(CACHE)
@@ -380,10 +362,6 @@ if(__name__ == '__main__'):
                 command += ' -nostats -loglevel 0'
             subprocess.call(command, shell=True)
 
-        # -b:a means audio bitrate
-        # -ac 2 means set the audio channels to 2. (stereo)
-        # -ar means set the audio sampling rate
-        # -vn means disable video
         print('Separating audio from video.')
         command = f'ffmpeg -i "{INPUT_FILE}" -b:a 160k -ac 2 -ar {SAMPLE_RATE} -vn {CACHE}/audio.wav '
         if(not VERBOSE):
@@ -420,22 +398,22 @@ if(__name__ == '__main__'):
         end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
         shouldIncludeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
-        # did we flip?
         if (i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
             chunks.append([chunks[-1][1], i, shouldIncludeFrame[i-1]])
 
     chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])
     chunks = chunks[1:]
 
-    # determine where and how to zoom the video.
-    if(not audioOnly):
+    if(audioOnly):
+        zooms = {}
+    else:
         zooms = getZooms(chunks, audioFrameCount,
             hasLoudAudio, FRAME_SPREADAGE)
-    else:
-        zooms = {}
 
-    # chunks = [startFrame, stopFrame, isLoud?]
-    if(not audioOnly):
+    if(audioOnly):
+        createAudio(chunks, samplesPerFrame, NEW_SPEED, audioData,
+            SAMPLE_RATE, maxAudioVolume)
+    else:
         p1 = Process(target=createAudio, args=(chunks, samplesPerFrame,
             NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
         p1.start()
@@ -445,12 +423,6 @@ if(__name__ == '__main__'):
 
         p1.join()
         p2.join()
-    else:
-        createAudio(chunks, samplesPerFrame, NEW_SPEED, audioData,
-            SAMPLE_RATE, maxAudioVolume)
-
-    # print('Muxing audio and video.')
-    # mux(OUTPUT_FILE, TEMP, VERBOSE)
 
     if(audioOnly):
         print('Moving audio.')
@@ -464,7 +436,6 @@ if(__name__ == '__main__'):
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')
 
-    # os.startfile(OUTPUT_FILE)
     if(not audioOnly):
         file = open(f'{CACHE}/cache.txt', 'w')
         file.write(f'{INPUT_FILE}\n{frameRate}')
