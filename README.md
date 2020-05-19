@@ -74,6 +74,3 @@ Auto-Editor will print out all the commands and a brief description on how to us
 [Installing for Mac](/install_mac.md)
 
 [Installing for Linux](/install_lin.md)
-
-# Help 
-If you can't figure out how to install this or you have any other suggestions or concerns, then create a new issue on project with the details.
