@@ -8,7 +8,7 @@ python --version
 If Terminal says this:
 
 ```terminal
-zsh: command not found: python
+command not found: python
 ```
 
 or this
@@ -34,15 +34,27 @@ If not, then install it by running:
 - eval $(~/.linuxbrew/bin/brew shellenv)
 ```
 
-## Dependencies
+## FFmpeg
+
+Run this command to install ffmpeg and its dependences.
+
+```terminal
+sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg
+```
+
+Make sure ffmpeg is on your PATH by running this:
+
+```terminal
+ffmpeg -h
+```
+
+## Other Dependencies
 To install all of the needed dependencies, run this:
 ```terminal
-brew update
-brew install ffmpeg
 brew install youtube-dl
 pip3 install scipy audiotsm pillow
 ```
-> This ususally takes about 5 minutes.
+> This usually takes about 5 minutes.
 
 Wait for all the libraries to install and once that's done, close and reopen Terminal.
 
