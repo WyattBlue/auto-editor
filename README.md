@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w21a
+ &nbsp;&nbsp;<sup>version 20w21b
 # Auto-Editor
-Auto-Editor is a video editing tool that will automatically edit raw source video into a entertaining and polished video.
+Auto-Editor is a video editing tool that can automatically edit raw source video into a entertaining and polished video.
 It works by analyzing the video's audio to detect when a section needs to be cut, kept in, or zoomed in, then auto-editor runs a subproccess called ffmpeg to create the new video.
 
 # Usage
@@ -12,60 +12,27 @@ Create an edited version of example.mp4 with the default parameters.
 $ python auto-editor.py example.mp4
 ```
 
-## Change Video Speed
-
+## Change the "Padding"
 You can change how fast the video plays at when the video is normal and when it's silent (below the silent thershold). Use use the flags --video_speed and --silent_speed respectively. This snippet shows how to set the video speed to 1.8 times the normal playback and the silent speed to 8 times.
 
 ```console
-$ python auto-editor.py example.mp4 --video_speed 1.8 --silent_speed 8
+$ python auto-editor.py example.mp4 --frame_margin 8 --silent_threshold 0.06
 ```
 
 Alternatively, you can use the short versions:
 
 ```console
-$ python auto-editor.py example.mp4 -v 1.8 -s 8
-```
-
-## Zoom In Automatically
-<p align="center">
-  <img src="/github%20resources/auto_zoom_demo.gif" width="800">
-</p>
-
-You can now tell auto-editor to zoom in whenever the video gets especially loud. 
-
-You do that by setting the loudness thershold to a number between 0 (when the video is completely quiet) and 1 (when the video is at its loudest). 0.8 is a good value to set it to.
-
-```console
-$ python auto-editor.py example.mp4 --loudness_threshold 0.8
-```
-
-(video source from jacksfilms)
-
-## Using Audio File Types
-
-You can use audio formats (.wav, .mp3) instead of just video formats and auto-editor will output an altered version.
-
-```console
-$ python auto-editor.py example.wav
-```
-
-## Download Video from a Website
-
-Thanks to youtube-dl, you can enter in URL's as your input source instead of local files.
-
-```console
-$ python auto-editor.py "https://www.youtube.com/watch?v=kcs82HnguGc"
+$ python auto-editor.py example.mp4 -m 8 -s 0.06
 ```
 
 ## Other Commands
-
 Get the list of all the other commands by typing in this command.
 
 ```console
 $ python auto-editor.py --help
 ```
 
-Auto-Editor will print out all the commands and a brief description on how to use them.
+See [the docs](/github%20resources/docs.md) for more commands and usages.
 
 
 # Installing Auto-Editor
@@ -74,3 +41,6 @@ Auto-Editor will print out all the commands and a brief description on how to us
 [Installing for Mac](/github%20resources/install_mac.md)
 
 [Installing for Linux](/github%20resources/install_lin.md)
+
+# Help or Issues
+If you have a bug or a suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this or contact the dev personally. You can do that by [joining the discord server](https://discord.com/invite/kMHAWJJ).

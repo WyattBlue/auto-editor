@@ -23,21 +23,12 @@ FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
 
-def mux(INPUT_VID, INPUT_AUD, VERBOSE):
-    command = f'ffmpeg -y -i {INPUT_VID} -i {INPUT_AUD}'
-    command += ' -c:v copy -c:a aac -movflags +faststart'
-    command += f' "{OUTPUT_FILE}"'
+def mux(vid, aud, out, VERBOSE):
+    cmd = ['ffmpeg', '-y', '-i', vid, '-i', aud, '-c:v', 'copy', '-c:a', 'aac', '-movflags',
+    '+faststart', out]
     if(not VERBOSE):
-        command += ' -nostats -loglevel 0'
-    subprocess.call(command, shell=True)
-
-
-def combine(OUTPUT_FILE, TEMP, frameRate, VERBOSE):
-    command = f'ffmpeg -y -framerate {frameRate} -i {TEMP}/newFrame%06d.jpg'
-    command += f' -i {TEMP}/audioNew.wav -strict -2 {OUTPUT_FILE}'
-    if(not VERBOSE):
-        command += ' -nostats -loglevel 0'
-    subprocess.call(command, shell=True)
+        cmd.extend(['-nostats', '-loglevel', '0'])
+    subprocess.call(cmd)
 
 
 def createAudio(chunks, samplesPerFrame, NEW_SPEED,
@@ -47,14 +38,11 @@ def createAudio(chunks, samplesPerFrame, NEW_SPEED,
 
     outputAudioData = []
     outputPointer = 0
-    # create audio envelope mask
     mask = [x / FADE_SIZE for x in range(FADE_SIZE)]
-
     num = 0
     chunk_len = str(len(chunks))
     for chunk in chunks:
         if(NEW_SPEED[int(chunk[2])] < 99999):
-
             start = int(chunk[0] * samplesPerFrame)
             end = int(chunk[1] * samplesPerFrame)
             audioChunk = audioData[start:end]
@@ -63,7 +51,6 @@ def createAudio(chunks, samplesPerFrame, NEW_SPEED,
             eFile = ''.join([TEMP, '/tempEnd.wav'])
             wavfile.write(sFile, SAMPLE_RATE, audioChunk)
             if(NEW_SPEED[int(chunk[2])] == 1):
-
                 __, samefile = wavfile.read(sFile)
                 leng = samefile.shape[0]
 
@@ -74,8 +61,8 @@ def createAudio(chunks, samplesPerFrame, NEW_SPEED,
                         tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
                         tsm.run(reader, writer)
                 __, alteredAudioData = wavfile.read(eFile)
-
                 leng = alteredAudioData.shape[0]
+
                 outputAudioData.extend((alteredAudioData / maxAudioVolume).tolist())
 
             endPointer = outputPointer + leng
@@ -104,46 +91,42 @@ def createAudio(chunks, samplesPerFrame, NEW_SPEED,
     print('Audio finished.')
 
 
-def resize(input_file, output_file, size):
-    im = Image.open(input_file)
+def resize(inputFile, outputFile, size):
+    im = Image.open(inputFile)
     w, h = im.size
     size_tuple = (int(w * size), int(h * size))
     im = im.resize(size_tuple)
     nw, nh = im.size
 
-    dif1 = nw - w
-    dif2 = nh - h
-    left = dif1 / 2
-    right = w + dif1 / 2
-    top = dif2 / 2
-    bottom = h + dif2 / 2
+    left = (nw - w) / 2
+    right = w + (nw - w) / 2
+    top = (nh - h) / 2
+    bottom = h + (nh - h) / 2
 
     cropped_im = im.crop((left, top, right, bottom))
-    cropped_im.save(output_file)
+    cropped_im.save(outputFile)
 
 
 def copyFrame(inputFrame, newIndex, frameRate, zooms):
     src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
     if(os.path.isfile(src)):
         dst = ''.join([TEMP, '/newFrame{:06d}'.format(newIndex+1), '.jpg'])
-        if(inputFrame not in zooms):
-            theZoom = 1
+        if(inputFrame in zooms):
+            resize(src, dst, zooms[inputFrame])
         else:
-            theZoom = zooms[inputFrame]
-        if(theZoom == 1):
-            copyfile(src, dst)
-        else:
-            resize(src, dst, theZoom)
+            os.rename(src, dst)
         return True
     return False
 
 
-def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE, audioData):
+def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE, audioData,
+    extension, VERBOSE):
     print('Creating new video.')
     num = 0
     chunk_len = str(len(chunks))
     lastExistingFrame = None
     outputPointer = 0
+    Renames = []
     for chunk in chunks:
         if(NEW_SPEED[int(chunk[2])] < 99999):
             audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
@@ -160,17 +143,26 @@ def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RAT
                 __, alteredAudioData = wavfile.read(eFile)
                 leng = alteredAudioData.shape[0]
 
-            endPointer = outputPointer+leng
+            endPointer = outputPointer + leng
 
             startOutputFrame = int(math.ceil(outputPointer/samplesPerFrame))
             endOutputFrame = int(math.ceil(endPointer/samplesPerFrame))
             for outputFrame in range(startOutputFrame, endOutputFrame):
                 inputFrame = int(chunk[0]+NEW_SPEED[int(chunk[2])]*(outputFrame-startOutputFrame))
+
                 didItWork = copyFrame(inputFrame, outputFrame, frameRate, zooms)
                 if didItWork:
                     lastExistingFrame = inputFrame
+                    src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
+                    dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
+                    if(inputFrame not in zooms):
+                        Renames.extend([src, dst])
                 else:
-                    copyFrame(lastExistingFrame, outputFrame, frameRate, zooms)
+                    didItWork = copyFrame(lastExistingFrame, outputFrame, frameRate, zooms)
+                    if(didItWork and lastExistingFrame not in zooms):
+                        src = ''.join([CACHE, '/frame{:06d}'.format(lastExistingFrame+1), '.jpg'])
+                        dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
+                        Renames.extend([src, dst])
 
             outputPointer = endPointer
 
@@ -178,6 +170,17 @@ def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RAT
         if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' frame chunks done.']))
     print('New frames finished.')
+
+    with open(f'{TEMP}/Renames.txt', 'w') as f:
+        for item in Renames:
+            f.write(f"{item}\n")
+
+    print('Creating finished video. (This can take a while)')
+    cmd = ['ffmpeg', '-y', '-framerate', str(frameRate), '-i', f'{TEMP}/newFrame%06d.jpg',
+        f'{TEMP}/output{extension}']
+    if(not VERBOSE):
+        cmd.extend(['-nostats', '-loglevel', '0'])
+    subprocess.call(cmd)
 
 
 def getFrameRate(path):
@@ -242,7 +245,7 @@ def quality_type(x):
 
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
-    parser.add_argument('input', nargs='+',
+    parser.add_argument('input', nargs='?',
         help='the path to the video file you want modified. can be a URL with youtube-dl.')
     parser.add_argument('--output_file', '-o', type=str, default='',
         help='name the output file.')
@@ -270,8 +273,18 @@ if(__name__ == '__main__'):
         help='create the cache folder without doing extra work.')
     parser.add_argument('--clear_cache', action='store_true',
         help='delete the cache folder and all of its contents.')
+    parser.add_argument('--version', action='store_true',
+        help='show which auto-editor you have')
 
     args = parser.parse_args()
+
+    if(args.version):
+        print('Auto-Editor version: 20w21b')
+        sys.exit()
+
+    if(args.clear_cache):
+        rmtree(CACHE)
+        sys.exit()
 
     startTime = time.time()
 
@@ -289,12 +302,12 @@ if(__name__ == '__main__'):
     VERBOSE = args.verbose
     PRERUN = args.prerun
 
+    if(args.input is None):
+        print('auto-editor.py: error: the following arguments are required: input')
+        sys.exit(0)
+
     INPUT_FILE = args.input[0]
     INPUTS = args.input
-
-    if(args.clear_cache):
-        rmtree(CACHE)
-        sys.exit()
 
     dotIndex = INPUT_FILE.rfind('.')
     if(len(args.output_file) >= 1):
@@ -305,20 +318,22 @@ if(__name__ == '__main__'):
     extension = INPUT_FILE[dotIndex:]
     audioOnly = extension == '.wav' or extension == '.mp3'
 
-    # check if we need to download the file with youtube-dl
+    # if input is URL, download as mp4 with youtube-dl
+    myURL = None
     if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
+        myURL = INPUT_FILE
         print('URL detected, using youtube-dl to download from webpage.')
-        command = f"youtube-dl -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4' '{INPUT_FILE}' --output web_download"
-        subprocess.call(command, shell=True)
+        cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4", INPUT_FILE, "--output", "web_download"]
+        subprocess.call(cmd)
         print('Finished Download')
         INPUT_FILE = 'web_download.mp4'
-
+        OUTPUT_FILE = 'web_download_ALTERED.mp4'
+        extension = '.mp4'
 
     if(not os.path.isfile(INPUT_FILE)):
         print('Could not Find File:', INPUT_FILE)
         sys.exit()
 
-    # find frameRate if not given
     if(args.frame_rate is None):
         if(audioOnly):
             frameRate = 30
@@ -327,11 +342,12 @@ if(__name__ == '__main__'):
     else:
         frameRate = args.frame_rate
 
+    fileSize = os.stat(INPUT_FILE).st_size
+
     if(args.get_auto_fps):
         print(frameRate)
         sys.exit()
 
-    # make Temp folder
     try:
         os.mkdir(TEMP)
     except OSError:
@@ -345,8 +361,8 @@ if(__name__ == '__main__'):
     except OSError:
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
-            x = file.readlines()
-            if(x[0] == INPUT_FILE+'\n' and x[1] == str(frameRate)):
+            x = file.read().splitlines()
+            if(x[0] == INPUT_FILE and x[1] == str(frameRate) and x[2] == str(fileSize)):
                 print('Using cache.')
                 SKIP = True
             file.close()
@@ -357,16 +373,21 @@ if(__name__ == '__main__'):
     if(not SKIP):
         if(not audioOnly):
             print('Splitting video into jpgs. (This can take a while)')
-            command = f'ffmpeg -i "{INPUT_FILE}" -qscale:v {FRAME_QUALITY} {CACHE}/frame%06d.jpg'
+            cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY), f'{CACHE}/frame%06d.jpg']
             if(not VERBOSE):
-                command += ' -nostats -loglevel 0'
-            subprocess.call(command, shell=True)
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
+
+            # create cache check with vid stats
+            file = open(f'{CACHE}/cache.txt', 'w')
+            file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n')
 
         print('Separating audio from video.')
-        command = f'ffmpeg -i "{INPUT_FILE}" -b:a 160k -ac 2 -ar {SAMPLE_RATE} -vn {CACHE}/audio.wav '
+        cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar', str(SAMPLE_RATE),
+         '-vn', f'{CACHE}/audio.wav']
         if(not VERBOSE):
-            command += '-nostats -loglevel 0'
-        subprocess.call(command, shell=True)
+            cmd.extend(['-nostats', '-loglevel', '0'])
+        subprocess.call(cmd)
 
     if(PRERUN):
         print('Done.')
@@ -418,7 +439,7 @@ if(__name__ == '__main__'):
             NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
         p1.start()
         p2 = Process(target=createVideo, args=(chunks, NEW_SPEED, frameRate, zooms,
-            samplesPerFrame, SAMPLE_RATE, audioData))
+            samplesPerFrame, SAMPLE_RATE, audioData, extension, VERBOSE))
         p2.start()
 
         p1.join()
@@ -429,29 +450,26 @@ if(__name__ == '__main__'):
         move(f'{TEMP}/audioNew.wav', OUTPUT_FILE)
     else:
         print('Finishing video.')
-        combine(OUTPUT_FILE, TEMP, frameRate, VERBOSE)
+        mux(vid=TEMP+'/output'+extension, aud=TEMP+'/audioNew.wav',
+            out=OUTPUT_FILE, VERBOSE=VERBOSE)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')
 
-    if(not audioOnly):
-        file = open(f'{CACHE}/cache.txt', 'w')
-        file.write(f'{INPUT_FILE}\n{frameRate}')
-
     try: # should work on Windows
         os.startfile(OUTPUT_FILE)
     except AttributeError:
-        try: # should work on MacOS
+        try: # should work on MacOS and most linux versions
             subprocess.call(['open', OUTPUT_FILE])
         except:
-            # tough luck for linux users
             print('Could not open output file.')
 
+    # reset cache folder
+    with open(f'{TEMP}/Renames.txt', 'r') as f:
+        renames = f.read().splitlines()
+        for i in range(0, len(renames), 2):
+            os.rename(renames[i+1], renames[i])
+
     rmtree(TEMP)
-
-    # revert renames when running
-
-    # delete all files that start with 'frame'
-    # delete 'audioNew.wav'
