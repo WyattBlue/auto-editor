@@ -245,7 +245,7 @@ def quality_type(x):
 
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
-    parser.add_argument('input', nargs='?',
+    parser.add_argument('input', nargs='*',
         help='the path to the video file you want modified. can be a URL with youtube-dl.')
     parser.add_argument('--output_file', '-o', type=str, default='',
         help='name the output file.')
@@ -309,19 +309,8 @@ if(__name__ == '__main__'):
     INPUT_FILE = args.input[0]
     INPUTS = args.input
 
-    dotIndex = INPUT_FILE.rfind('.')
-    if(len(args.output_file) >= 1):
-        OUTPUT_FILE = args.output_file
-    else:
-        OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+INPUT_FILE[dotIndex:]
-
-    extension = INPUT_FILE[dotIndex:]
-    audioOnly = extension == '.wav' or extension == '.mp3'
-
     # if input is URL, download as mp4 with youtube-dl
-    myURL = None
     if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
-        myURL = INPUT_FILE
         print('URL detected, using youtube-dl to download from webpage.')
         cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4", INPUT_FILE, "--output", "web_download"]
         subprocess.call(cmd)
@@ -329,9 +318,19 @@ if(__name__ == '__main__'):
         INPUT_FILE = 'web_download.mp4'
         OUTPUT_FILE = 'web_download_ALTERED.mp4'
         extension = '.mp4'
+        audioOnly = False
+    else:
+        dotIndex = INPUT_FILE.rfind('.')
+        if(len(args.output_file) >= 1):
+            OUTPUT_FILE = args.output_file
+        else:
+            OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+INPUT_FILE[dotIndex:]
+
+        extension = INPUT_FILE[dotIndex:]
+        audioOnly = extension == '.wav' or extension == '.mp3'
 
     if(not os.path.isfile(INPUT_FILE)):
-        print('Could not Find File:', INPUT_FILE)
+        print('Could not find file:', INPUT_FILE)
         sys.exit()
 
     if(args.frame_rate is None):
