@@ -19,7 +19,7 @@ jobs:
         - brew install ffmpeg
         - brew install youtube-dl
 install:
- - pip3 install scipy audiotsm pillow # install libraries
+ - pip3 install scipy audiotsm pillow pydub # install libraries
 script:
  - python3 auto-editor.py example.mp4 || python auto-editor.py example.mp4
  - python3 auto-editor.py example.mp4 -s 2 || python auto-editor.py example.mp4 -s 2
