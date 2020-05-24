@@ -28,13 +28,17 @@ ffmpeg -h
 If not then follow [this guide](https://www.wikihow.com/Install-FFmpeg-on-Windows). Unfortunately, it seems that you cannot install ffmpeg with the path correctly set with only commands. If you know how to do that, please show how in an issue.
 
 ## Youtube-dl
-You can install youtube-dl [here](https://ytdl-org.github.io/youtube-dl/download.html).
+Run this to test if you have it installed.
+```terminal
+youtube-dl --version
+```
 
+If not, you can install youtube-dl [here](https://ytdl-org.github.io/youtube-dl/download.html).
 
 ## Dependencies
 To install all of the needed dependencies, run this:
 ```terminal
-pip3 install scipy audiotsm pillow
+pip3 install scipy audiotsm pillow pydub
 ```
 
 Wait for all the libraries to install and once that's done, close and reopen Command Prompt
@@ -52,4 +56,4 @@ Run
 ```terminal
 python auto-editor.py --help
 ```
-to test it and if that runs successfully, then congratulations, you have successfully installed auto-editor. See the usage section for more examples.
+to test it and if that runs successfully, then congratulations, you have successfully installed auto-editor. See [the docs](/github%20resources/docs.md) for more commands and usages.
