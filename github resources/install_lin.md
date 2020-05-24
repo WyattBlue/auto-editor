@@ -52,7 +52,7 @@ ffmpeg -h
 To install all of the needed dependencies, run this:
 ```terminal
 brew install youtube-dl
-pip3 install scipy audiotsm pillow
+pip3 install scipy audiotsm pillow pydub
 ```
 > This usually takes about 5 minutes.
 
@@ -71,4 +71,4 @@ Run
 ```terminal
 python auto-editor.py --help
 ```
-to test it and if that runs successfully, then congratulations, you have successfully installed auto-editor. See the usage section for more examples.
+to test it and if that runs successfully, then congratulations, you have successfully installed auto-editor. See [the docs](/github%20resources/docs.md) for more commands and usages.
