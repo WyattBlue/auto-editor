@@ -1,6 +1,7 @@
 '''auto-editor.py'''
 
 # external python libraries
+from pydub import AudioSegment
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
 from scipy.io import wavfile
@@ -31,7 +32,7 @@ def mux(vid, aud, out, VERBOSE):
     subprocess.call(cmd)
 
 
-def createAudio(chunks, samplesPerFrame, NEW_SPEED,
+def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
     audioData, SAMPLE_RATE, maxAudioVolume):
 
     print('Creating new audio.')
@@ -47,15 +48,13 @@ def createAudio(chunks, samplesPerFrame, NEW_SPEED,
             end = int(chunk[1] * samplesPerFrame)
             audioChunk = audioData[start:end]
 
-            sFile = ''.join([TEMP, '/tempStart.wav'])
-            eFile = ''.join([TEMP, '/tempEnd.wav'])
-            wavfile.write(sFile, SAMPLE_RATE, audioChunk)
             if(NEW_SPEED[int(chunk[2])] == 1):
-                __, samefile = wavfile.read(sFile)
-                leng = samefile.shape[0]
-
-                outputAudioData.extend((samefile / maxAudioVolume).tolist())
+                outputAudioData.extend(audioChunk)
+                leng = len(audioChunk)
             else:
+                sFile = ''.join([TEMP, '/tempStart.wav'])
+                eFile = ''.join([TEMP, '/tempEnd.wav'])
+                wavfile.write(sFile, SAMPLE_RATE, audioChunk)
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
                         tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
@@ -107,19 +106,7 @@ def resize(inputFile, outputFile, size):
     cropped_im.save(outputFile)
 
 
-def copyFrame(inputFrame, newIndex, frameRate, zooms):
-    src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
-    if(os.path.isfile(src)):
-        dst = ''.join([TEMP, '/newFrame{:06d}'.format(newIndex+1), '.jpg'])
-        if(inputFrame in zooms):
-            resize(src, dst, zooms[inputFrame])
-        else:
-            os.rename(src, dst)
-        return True
-    return False
-
-
-def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE, audioData,
+def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE, audioData,
     extension, VERBOSE):
     print('Creating new video.')
     num = 0
@@ -150,20 +137,16 @@ def createVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RAT
             for outputFrame in range(startOutputFrame, endOutputFrame):
                 inputFrame = int(chunk[0]+NEW_SPEED[int(chunk[2])]*(outputFrame-startOutputFrame))
 
-                didItWork = copyFrame(inputFrame, outputFrame, frameRate, zooms)
-                if didItWork:
-                    lastExistingFrame = inputFrame
-                    src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
-                    dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
-                    if(inputFrame not in zooms):
+                src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
+                dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
+                if(os.path.isfile(src)):
+                    if(inputFrame in zooms):
+                        resize(src, dst, zooms[inputFrame])
+                    else:
+                        os.rename(src, dst)
                         Renames.extend([src, dst])
                 else:
-                    didItWork = copyFrame(lastExistingFrame, outputFrame, frameRate, zooms)
-                    if(didItWork and lastExistingFrame not in zooms):
-                        src = ''.join([CACHE, '/frame{:06d}'.format(lastExistingFrame+1), '.jpg'])
-                        dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
-                        Renames.extend([src, dst])
-
+                    print('This shouldn\'t happen.')
             outputPointer = endPointer
 
         num += 1
@@ -275,6 +258,8 @@ if(__name__ == '__main__'):
         help='delete the cache folder and all of its contents.')
     parser.add_argument('--version', action='store_true',
         help='show which auto-editor you have')
+    parser.add_argument('--background_music',
+        help='add background music to your output')
 
     args = parser.parse_args()
 
@@ -377,10 +362,6 @@ if(__name__ == '__main__'):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
 
-            # create cache check with vid stats
-            file = open(f'{CACHE}/cache.txt', 'w')
-            file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n')
-
         print('Separating audio from video.')
         cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar', str(SAMPLE_RATE),
          '-vn', f'{CACHE}/audio.wav']
@@ -431,18 +412,34 @@ if(__name__ == '__main__'):
             hasLoudAudio, FRAME_SPREADAGE)
 
     if(audioOnly):
-        createAudio(chunks, samplesPerFrame, NEW_SPEED, audioData,
+        splitAudio(chunks, samplesPerFrame, NEW_SPEED, audioData,
             SAMPLE_RATE, maxAudioVolume)
     else:
-        p1 = Process(target=createAudio, args=(chunks, samplesPerFrame,
+        p1 = Process(target=splitAudio, args=(chunks, samplesPerFrame,
             NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
         p1.start()
-        p2 = Process(target=createVideo, args=(chunks, NEW_SPEED, frameRate, zooms,
+        p2 = Process(target=splitVideo, args=(chunks, NEW_SPEED, frameRate, zooms,
             samplesPerFrame, SAMPLE_RATE, audioData, extension, VERBOSE))
         p2.start()
 
         p1.join()
         p2.join()
+
+    if(args.background_music is None):
+        pass
+    else:
+        sound1 = AudioSegment.from_file("audioNew.wav")
+        back = AudioSegment.from_file("1.mp3")
+
+        def match_target_amplitude(sound, talk, target):
+            diff = sound.dBFS - talk.dBFS
+            change_in_dBFS = target - diff
+            return sound.apply_gain(change_in_dBFS)
+
+        back = match_target_amplitude(back, sound1, -10)
+
+        combined = sound1.overlay(back)
+        combined.export(TEMP+"/audioNew.wav", format='wav')
 
     if(audioOnly):
         print('Moving audio.')
@@ -470,5 +467,9 @@ if(__name__ == '__main__'):
         renames = f.read().splitlines()
         for i in range(0, len(renames), 2):
             os.rename(renames[i+1], renames[i])
+
+    # create cache check with vid stats
+    file = open(f'{CACHE}/cache.txt', 'w')
+    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n')
 
     rmtree(TEMP)
