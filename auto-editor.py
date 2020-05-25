@@ -23,6 +23,15 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
+version = '20w21c'
+
+def debug():
+    print('Python Version:')
+    print(sys.version)
+    print('Is your python 64-Bit?')
+    print(sys.maxsize > 2**32)
+    print('Auto-Editor Version:')
+    print(version)
 
 def mux(vid, aud, out, VERBOSE):
     cmd = ['ffmpeg', '-y', '-i', vid, '-i', aud, '-c:v', 'copy', '-c:a', 'aac', '-movflags',
@@ -93,7 +102,12 @@ def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
     print('Creating finished audio.')
     outputAudioData = np.asarray(outputAudioData)
     wavfile.write(TEMP+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
-    print('Audio finished.')
+
+    if(not os.path.isfile(TEMP+'/audioNew.wav')):
+        print('Error: Audio file failed to be created.')
+        print('-------')
+    else:
+        print('Audio finished.')
 
 
 def resize(inputFile, outputFile, size):
@@ -264,13 +278,19 @@ if(__name__ == '__main__'):
         help='delete the cache folder and all of its contents.')
     parser.add_argument('--version', action='store_true',
         help='show which auto-editor you have')
+    parser.add_argument('--debug'. action='store_true',
+        help='show helpful debugging values.')
     parser.add_argument('--background_music',
         help='add background music to your output')
 
     args = parser.parse_args()
 
+    if(args.debug):
+        debug()
+        sys.exit()
+
     if(args.version):
-        print('Auto-Editor version: 20w21d')
+        print('Auto-Editor version:', version)
         sys.exit()
 
     if(args.clear_cache):
@@ -479,3 +499,6 @@ if(__name__ == '__main__'):
     file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n')
 
     rmtree(TEMP)
+
+    if(VERBOSE):
+        debug()
