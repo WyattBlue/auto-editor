@@ -62,7 +62,7 @@ You can tell auto-editor to zoom in when the input's audio is above the loudness
 ```
 
 Command | `--loudness_threshold`
-------------------------------
+--------|---------------------
 type    | float
 range   | 0 to 1
 default | 2
