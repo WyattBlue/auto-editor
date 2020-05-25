@@ -18,24 +18,8 @@ Python 2.7.16
 
 you need to install [python 3](https://www.python.org/downloads/).
 
-## Homebrew
-Check if you have Homebrew.
-
-```terminal
-brew --version
-```
-
-If not, then install it by running:
-
-```terminal
-- git clone https://github.com/Homebrew/brew ~/.linuxbrew/Homebrew
-- mkdir ~/.linuxbrew/bin
-- ln -s ~/.linuxbrew/Homebrew/bin/brew ~/.linuxbrew/bin
-- eval $(~/.linuxbrew/bin/brew shellenv)
-```
 
 ## FFmpeg
-
 Run this command to install ffmpeg and its dependences.
 
 ```terminal
@@ -51,8 +35,7 @@ ffmpeg -h
 ## Other Dependencies
 To install all of the needed dependencies, run this:
 ```terminal
-brew install youtube-dl
-pip3 install scipy audiotsm pillow pydub
+pip3 install scipy audiotsm pillow pydub youtube_dl
 ```
 > This usually takes about 5 minutes.
 
