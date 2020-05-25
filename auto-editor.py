@@ -278,7 +278,7 @@ if(__name__ == '__main__'):
         help='delete the cache folder and all of its contents.')
     parser.add_argument('--version', action='store_true',
         help='show which auto-editor you have')
-    parser.add_argument('--debug'. action='store_true',
+    parser.add_argument('--debug', action='store_true',
         help='show helpful debugging values.')
     parser.add_argument('--background_music',
         help='add background music to your output')
