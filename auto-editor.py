@@ -270,7 +270,7 @@ if(__name__ == '__main__'):
     args = parser.parse_args()
 
     if(args.version):
-        print('Auto-Editor version: 20w21c')
+        print('Auto-Editor version: 20w21d')
         sys.exit()
 
     if(args.clear_cache):
