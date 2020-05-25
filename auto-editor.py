@@ -23,7 +23,7 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
-version = '20w21c'
+version = '20w22a'
 
 def debug():
     print('Python Version:')
