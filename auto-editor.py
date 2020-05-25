@@ -57,8 +57,8 @@ def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
 
                 outputAudioData.extend((samefile / maxAudioVolume).tolist())
 
-                # this method is causing problems on travis.
-                #outputAudioData.extend(list(audioChunk))
+                # this method is causing problems.
+                #outputAudioData.extend(audioChunk)
                 #leng = len(audioChunk)
             else:
                 with WavReader(sFile) as reader:
