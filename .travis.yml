@@ -15,6 +15,7 @@ jobs:
 install:
  - pip3 install scipy audiotsm pillow pydub youtube_dl # install libraries
 script:
+ - python3 auto-editor.py --debug
  - python3 auto-editor.py example.mp4 || python auto-editor.py example.mp4
  - python3 auto-editor.py example.mp4 -s 2 || python auto-editor.py example.mp4 -s 2
  - python3 auto-editor.py --clear_cache || python auto-editor.py --clear_cache
