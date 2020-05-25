@@ -33,6 +33,7 @@ def debug():
     print('Auto-Editor Version:')
     print(version)
 
+
 def mux(vid, aud, out, VERBOSE):
     cmd = ['ffmpeg', '-y', '-i', vid, '-i', aud, '-c:v', 'copy', '-c:a', 'aac', '-movflags',
     '+faststart', out]
@@ -191,8 +192,21 @@ def getFrameRate(path):
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     output = stdout.decode()
-    match_dict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
-    return float(match_dict["fps"])
+    matchDict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
+    return float(matchDict["fps"])
+
+
+def getVideoLength(path):
+    process = subprocess.Popen(['ffmpeg', '-i', path],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    stdout, __ = process.communicate()
+    output = stdout.decode()
+    m = search(r'(\d\d:\d\d:\d\d.\d\d,)', output)
+    if(m):
+        text = m.group(1)[:-1]
+        return text
+    else:
+        return 'Unknown length'
 
 
 def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
@@ -318,6 +332,7 @@ if(__name__ == '__main__'):
         sys.exit(0)
 
     INPUT_FILE = args.input[0]
+    BACK_MUS = args.background_music
     INPUTS = args.input
 
     # if input is URL, download as mp4 with youtube-dl
@@ -454,8 +469,15 @@ if(__name__ == '__main__'):
     if(args.background_music is None):
         pass
     else:
-        sound1 = AudioSegment.from_file("audioNew.wav")
-        back = AudioSegment.from_file("1.mp3")
+        cmd = ['ffmpeg', '-i', TEMP+'/audioNew.wav', '-vn', '-ar',
+            str(SAMPLE_RATE), '-ac', '2', '-ab', '192k', '-f', 'mp3', TEMP+'/output.mp3']
+        if(not VERBOSE):
+            cmd.extend(['-nostats', '-loglevel', '0'])
+        subprocess.call(cmd)
+
+        sound1 = AudioSegment.from_file(TEMP+'/output.mp3')
+
+        back = AudioSegment.from_file(BACK_MUS)
 
         def match_target_amplitude(sound, talk, target):
             diff = sound.dBFS - talk.dBFS
