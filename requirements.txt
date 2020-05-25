@@ -2,3 +2,4 @@ scipy
 audiotsm
 pillow
 pydub
+youtube_dl
