@@ -48,13 +48,15 @@ def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
             end = int(chunk[1] * samplesPerFrame)
             audioChunk = audioData[start:end]
 
+            sFile = ''.join([TEMP, '/tempStart.wav'])
+            eFile = ''.join([TEMP, '/tempEnd.wav'])
+            wavfile.write(sFile, SAMPLE_RATE, audioChunk)
             if(NEW_SPEED[int(chunk[2])] == 1):
-                outputAudioData.extend(audioChunk)
+                __, samefile = wavfile.read(sFile)
                 leng = len(audioChunk)
+
+                outputAudioData.extend((samefile / maxAudioVolume).tolist())
             else:
-                sFile = ''.join([TEMP, '/tempStart.wav'])
-                eFile = ''.join([TEMP, '/tempEnd.wav'])
-                wavfile.write(sFile, SAMPLE_RATE, audioChunk)
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
                         tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
@@ -111,7 +113,6 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
     print('Creating new video.')
     num = 0
     chunk_len = str(len(chunks))
-    lastExistingFrame = None
     outputPointer = 0
     Renames = []
     for chunk in chunks:
@@ -146,7 +147,8 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                         os.rename(src, dst)
                         Renames.extend([src, dst])
                 else:
-                    print('This shouldn\'t happen.')
+                    print("This shouldn't happen.")
+
             outputPointer = endPointer
 
         num += 1
@@ -235,7 +237,7 @@ if(__name__ == '__main__'):
     parser.add_argument('--silent_threshold', '-t', type=float, default=0.04,
         help='the volume that frames audio needs to surpass to be sounded. It ranges from 0 to 1.')
     parser.add_argument('--loudness_threshold', '-l', type=float, default=2.00,
-        help='(New!) the volume that needs to be surpassed to zoom in the video. (0-1)')
+        help='the volume that needs to be surpassed to zoom in the video. (0-1)')
     parser.add_argument('--video_speed', '--sounded_speed', '-v', type=float, default=1.00,
         help='the speed that sounded (spoken) frames should be played at.')
     parser.add_argument('--silent_speed', '-s', type=float, default=99999,
