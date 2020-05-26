@@ -88,7 +88,7 @@ Input is the only required argument in auto-editor. It supports video formats, a
 
 You can add background music to your video automatically.
 
-```console
+```terminal
  $ python auto-editor.py example.mp4 --background_music example_media/Magic_in_the_Garden.mp3
 ```
 
