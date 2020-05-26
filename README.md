@@ -7,7 +7,7 @@ It works by analyzing the video's audio to detect when a section needs to be cut
 # New!
 You can now automatically add background music to your videos.
 
-```console
+```terminal
  $ python auto-editor.py example.mp4 --background_music example_media/Magic_in_the_Garden.mp3
 ```
 
@@ -17,7 +17,7 @@ It will always be quieter than the main audio and it will automatically fade out
 
 You can get debug info by running:
 
-```console
+```terminal
  $ python auto-editor.py --debug
  ```
 
@@ -25,15 +25,15 @@ You can get debug info by running:
 ## Minimal Example
 
 Create an edited version of example.mp4 with the default parameters.
-```console
-$ python auto-editor.py example.mp4
+```terminal
+ $ python auto-editor.py example.mp4
 ```
 
 ## Change the Feel
 You can change feel of the video by changing how much frames
 
-```console
-$ python auto-editor.py example.mp4 --frame_margin 8 --silent_threshold 0.03
+```terminal
+ $ python auto-editor.py example.mp4 --frame_margin 8 --silent_threshold 0.03
 ```
 
 See [the docs](/github%20resources/docs.md) for more commands and usages.
