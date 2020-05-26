@@ -488,6 +488,7 @@ if(__name__ == '__main__'):
             change_in_dBFS = target - diff
             return sound.apply_gain(change_in_dBFS)
 
+        # fade the background music out by 1 second
         back = match_target_amplitude(back, sound1, -10).fade_out(1000)
 
         combined = sound1.overlay(back)
