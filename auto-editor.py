@@ -329,7 +329,7 @@ if(__name__ == '__main__'):
     VERBOSE = args.verbose
     PRERUN = args.prerun
 
-    if(args.input is None):
+    if(args.input == []):
         print('auto-editor.py: error: the following arguments are required: input')
         sys.exit(0)
 
