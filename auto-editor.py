@@ -66,10 +66,6 @@ def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
                 leng = len(audioChunk)
 
                 outputAudioData.extend((samefile / maxAudioVolume).tolist())
-
-                # this method is causing problems.
-                #outputAudioData.extend(audioChunk)
-                #leng = len(audioChunk)
             else:
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
@@ -389,7 +385,7 @@ if(__name__ == '__main__'):
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x[0] == INPUT_FILE and x[1] == str(frameRate) and x[2] == str(fileSize)):
+            if(x == [INPUT_FILE, str(frameRate), str(fileSize)]):
                 print('Using cache.')
                 SKIP = True
             file.close()
@@ -468,7 +464,7 @@ if(__name__ == '__main__'):
         p1.join()
         p2.join()
 
-    if(args.background_music is None):
+    if(BACK_MUS is None):
         pass
     else:
         cmd = ['ffmpeg', '-i', TEMP+'/audioNew.wav', '-vn', '-ar',
@@ -477,23 +473,21 @@ if(__name__ == '__main__'):
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
 
-        sound1 = AudioSegment.from_file(TEMP+'/output.mp3')
+        vidSound = AudioSegment.from_file(TEMP+'/output.mp3')
 
-        old_back = AudioSegment.from_file(BACK_MUS)
-        if(len(old_back) > len(sound1)):
-            back = old_back[:len(sound1)]
-        else:
-            back = old_back
+        back = AudioSegment.from_file(BACK_MUS)
+        if(len(back) > len(vidSound)):
+            back = back[:len(vidSound)]
 
-        def match_target_amplitude(sound, talk, target):
-            diff = sound.dBFS - talk.dBFS
+        def match_target_amplitude(back, vidSound, target):
+            diff = back.dBFS - vidSound.dBFS
             change_in_dBFS = target - diff
-            return sound.apply_gain(change_in_dBFS)
+            return back.apply_gain(change_in_dBFS)
 
         # fade the background music out by 1 second
-        back = match_target_amplitude(back, sound1, -10).fade_out(1000)
+        back = match_target_amplitude(back, vidSound, -10).fade_out(1000)
 
-        combined = sound1.overlay(back)
+        combined = vidSound.overlay(back)
         combined.export(TEMP+"/audioNew.wav", format='wav')
 
     if(audioOnly):
@@ -525,7 +519,7 @@ if(__name__ == '__main__'):
 
     # create cache check with vid stats
     file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n')
+    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n')
 
     rmtree(TEMP)
 
