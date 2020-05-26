@@ -246,9 +246,11 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def getAvgVolume(s):
-    new_s = np.absolute(s)
-    return np.mean(new_s)
+def file_type(file):
+    if(not os.path.isfile(file)):
+        print('Could not locate file:', file)
+        sys.exit()
+    return file
 
 
 def quality_type(x):
@@ -294,7 +296,7 @@ if(__name__ == '__main__'):
         help='show which auto-editor you have')
     parser.add_argument('--debug', action='store_true',
         help='show helpful debugging values.')
-    parser.add_argument('--background_music',
+    parser.add_argument('--background_music', type=file_type,
         help='add background music to your output')
 
     args = parser.parse_args()
