@@ -477,14 +477,18 @@ if(__name__ == '__main__'):
 
         sound1 = AudioSegment.from_file(TEMP+'/output.mp3')
 
-        back = AudioSegment.from_file(BACK_MUS)
+        old_back = AudioSegment.from_file(BACK_MUS)
+        if(len(old_back) > len(sound1)):
+            back = old_back[:len(sound1)]
+        else:
+            back = old_back
 
         def match_target_amplitude(sound, talk, target):
             diff = sound.dBFS - talk.dBFS
             change_in_dBFS = target - diff
             return sound.apply_gain(change_in_dBFS)
 
-        back = match_target_amplitude(back, sound1, -10)
+        back = match_target_amplitude(back, sound1, -10).fade_out(1000)
 
         combined = sound1.overlay(back)
         combined.export(TEMP+"/audioNew.wav", format='wav')
