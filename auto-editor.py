@@ -23,6 +23,16 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
+version = '20w22a'
+
+def debug():
+    print('Python Version:')
+    print(sys.version)
+    print('Is your python 64-Bit?')
+    print(sys.maxsize > 2**32)
+    print('Auto-Editor Version:')
+    print(version)
+
 
 def mux(vid, aud, out, VERBOSE):
     cmd = ['ffmpeg', '-y', '-i', vid, '-i', aud, '-c:v', 'copy', '-c:a', 'aac', '-movflags',
@@ -93,7 +103,12 @@ def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
     print('Creating finished audio.')
     outputAudioData = np.asarray(outputAudioData)
     wavfile.write(TEMP+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
-    print('Audio finished.')
+
+    if(not os.path.isfile(TEMP+'/audioNew.wav')):
+        print('Error: Audio file failed to be created.')
+        print('-------')
+    else:
+        print('Audio finished.')
 
 
 def resize(inputFile, outputFile, size):
@@ -177,8 +192,21 @@ def getFrameRate(path):
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     output = stdout.decode()
-    match_dict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
-    return float(match_dict["fps"])
+    matchDict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
+    return float(matchDict["fps"])
+
+
+def getVideoLength(path):
+    process = subprocess.Popen(['ffmpeg', '-i', path],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    stdout, __ = process.communicate()
+    output = stdout.decode()
+    m = search(r'(\d\d:\d\d:\d\d.\d\d,)', output)
+    if(m):
+        text = m.group(1)[:-1]
+        return text
+    else:
+        return 'Unknown length'
 
 
 def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
@@ -218,9 +246,11 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def getAvgVolume(s):
-    new_s = np.absolute(s)
-    return np.mean(new_s)
+def file_type(file):
+    if(not os.path.isfile(file)):
+        print('Could not locate file:', file)
+        sys.exit()
+    return file
 
 
 def quality_type(x):
@@ -264,13 +294,19 @@ if(__name__ == '__main__'):
         help='delete the cache folder and all of its contents.')
     parser.add_argument('--version', action='store_true',
         help='show which auto-editor you have')
-    parser.add_argument('--background_music',
+    parser.add_argument('--debug', action='store_true',
+        help='show helpful debugging values.')
+    parser.add_argument('--background_music', type=file_type,
         help='add background music to your output')
 
     args = parser.parse_args()
 
+    if(args.debug):
+        debug()
+        sys.exit()
+
     if(args.version):
-        print('Auto-Editor version: 20w21d')
+        print('Auto-Editor version:', version)
         sys.exit()
 
     if(args.clear_cache):
@@ -298,6 +334,7 @@ if(__name__ == '__main__'):
         sys.exit(0)
 
     INPUT_FILE = args.input[0]
+    BACK_MUS = args.background_music
     INPUTS = args.input
 
     # if input is URL, download as mp4 with youtube-dl
@@ -434,15 +471,27 @@ if(__name__ == '__main__'):
     if(args.background_music is None):
         pass
     else:
-        sound1 = AudioSegment.from_file("audioNew.wav")
-        back = AudioSegment.from_file("1.mp3")
+        cmd = ['ffmpeg', '-i', TEMP+'/audioNew.wav', '-vn', '-ar',
+            str(SAMPLE_RATE), '-ac', '2', '-ab', '192k', '-f', 'mp3', TEMP+'/output.mp3']
+        if(not VERBOSE):
+            cmd.extend(['-nostats', '-loglevel', '0'])
+        subprocess.call(cmd)
+
+        sound1 = AudioSegment.from_file(TEMP+'/output.mp3')
+
+        old_back = AudioSegment.from_file(BACK_MUS)
+        if(len(old_back) > len(sound1)):
+            back = old_back[:len(sound1)]
+        else:
+            back = old_back
 
         def match_target_amplitude(sound, talk, target):
             diff = sound.dBFS - talk.dBFS
             change_in_dBFS = target - diff
             return sound.apply_gain(change_in_dBFS)
 
-        back = match_target_amplitude(back, sound1, -10)
+        # fade the background music out by 1 second
+        back = match_target_amplitude(back, sound1, -10).fade_out(1000)
 
         combined = sound1.overlay(back)
         combined.export(TEMP+"/audioNew.wav", format='wav')
@@ -479,3 +528,6 @@ if(__name__ == '__main__'):
     file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n')
 
     rmtree(TEMP)
+
+    if(VERBOSE):
+        debug()
