@@ -35,15 +35,15 @@ def debug():
 
 
 def mux(vid, aud, out, VERBOSE):
-    cmd = ['ffmpeg', '-y', '-i', vid, '-i', aud, '-c:v', 'copy', '-c:a', 'aac', '-movflags',
-    '+faststart', out]
+    cmd = ['ffmpeg', '-y', '-i', vid, '-i', aud, '-c:v', 'copy', '-c:a', 'aac',
+        '-movflags', '+faststart', out]
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)
 
 
-def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
-    audioData, SAMPLE_RATE, maxAudioVolume):
+def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE,
+    maxAudioVolume):
 
     print('Creating new audio.')
 
@@ -98,9 +98,9 @@ def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
 
     print('Creating finished audio.')
     outputAudioData = np.asarray(outputAudioData)
-    wavfile.write(TEMP+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
+    wavfile.write(filename, SAMPLE_RATE, outputAudioData)
 
-    if(not os.path.isfile(TEMP+'/audioNew.wav')):
+    if(not os.path.isfile(filename)):
         print('Error: Audio file failed to be created.')
         print('-------')
     else:
@@ -123,8 +123,8 @@ def resize(inputFile, outputFile, size):
     cropped_im.save(outputFile)
 
 
-def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE, audioData,
-    extension, VERBOSE):
+def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE,
+    audioData, extension, VERBOSE):
     print('Creating new video.')
     num = 0
     chunk_len = str(len(chunks))
@@ -176,8 +176,8 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
             f.write(f"{item}\n")
 
     print('Creating finished video. (This can take a while)')
-    cmd = ['ffmpeg', '-y', '-framerate', str(frameRate), '-i', f'{TEMP}/newFrame%06d.jpg',
-        f'{TEMP}/output{extension}']
+    cmd = ['ffmpeg', '-y', '-framerate', str(frameRate), '-i',
+        f'{TEMP}/newFrame%06d.jpg', f'{TEMP}/output{extension}']
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)
@@ -336,7 +336,8 @@ if(__name__ == '__main__'):
     # if input is URL, download as mp4 with youtube-dl
     if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
         print('URL detected, using youtube-dl to download from webpage.')
-        cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4", INPUT_FILE, "--output", "web_download"]
+        cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
+            INPUT_FILE, "--output", "web_download"]
         subprocess.call(cmd)
         print('Finished Download')
         INPUT_FILE = 'web_download.mp4'
@@ -385,7 +386,7 @@ if(__name__ == '__main__'):
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x == [INPUT_FILE, str(frameRate), str(fileSize)]):
+            if(x == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]):
                 print('Using cache.')
                 SKIP = True
             file.close()
@@ -451,11 +452,11 @@ if(__name__ == '__main__'):
             hasLoudAudio, FRAME_SPREADAGE)
 
     if(audioOnly):
-        splitAudio(chunks, samplesPerFrame, NEW_SPEED, audioData,
+        splitAudio(TEMP+'/audioNew.wav', chunks, samplesPerFrame, NEW_SPEED, audioData,
             SAMPLE_RATE, maxAudioVolume)
     else:
-        p1 = Process(target=splitAudio, args=(chunks, samplesPerFrame,
-            NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
+        p1 = Process(target=splitAudio, args=(TEMP+'/audioNew.wav', chunks,
+            samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
         p1.start()
         p2 = Process(target=splitVideo, args=(chunks, NEW_SPEED, frameRate, zooms,
             samplesPerFrame, SAMPLE_RATE, audioData, extension, VERBOSE))
