@@ -19,7 +19,7 @@ jobs:
         - choco install python --version 3.8.0
         - python -V
         - choco install ffmpeg --notsilent
-        - "C:\ProgramData\chocolatey\lib\ffmpeg\tools" -h
+        - "C:\ProgramData\\chocolatey\\lib\\ffmpeg\\tools" -h
       env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install:
  - pip3 install scipy audiotsm pillow pydub youtube_dl # install libraries
