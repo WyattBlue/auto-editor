@@ -12,15 +12,6 @@ jobs:
       before_install:
         - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
         - brew install ffmpeg
-    - name: "Python 3.8.0 on Windows"
-      os: windows
-      language: shell
-      before_install:
-        - choco install python --version 3.8.0
-        - python -V
-        - choco install ffmpeg --notsilent
-        - "C:\ProgramData\\chocolatey\\lib\\ffmpeg\\tools" -h
-      env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install:
  - pip3 install scipy audiotsm pillow pydub youtube_dl # install libraries
 script:
