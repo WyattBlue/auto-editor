@@ -23,7 +23,7 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
-version = '20w22b'
+version = '20w22c'
 
 def debug():
     print('Python Version:')
@@ -416,6 +416,11 @@ if(__name__ == '__main__'):
         if(audioOnly):
             print('Formatting audio.')
             formatAudio(INPUT_FILE, f'{CACHE}/audio.wav', SAMPLE_RATE, '160k', VERBOSE)
+            cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar', str(SAMPLE_RATE),
+             '-vn', f'{CACHE}/audio.wav']
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
         else:
             print('Splitting video into jpgs. (This can take a while)')
             cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY), f'{CACHE}/frame%06d.jpg']
@@ -424,7 +429,14 @@ if(__name__ == '__main__'):
             subprocess.call(cmd)
 
             print('Separating audio from video.')
-            formatAudio(INPUT_FILE, f'{CACHE}/audio.wav', SAMPLE_RATE, '160k', VERBOSE)
+
+            num = 0
+            cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar', str(SAMPLE_RATE),
+             '-vn', '-map', '0:a:'+str(num), outputFile]
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
+
 
     if(PRERUN):
         print('Done.')
@@ -547,10 +559,11 @@ if(__name__ == '__main__'):
             print('Could not open output file.')
 
     # reset cache folder
-    with open(f'{TEMP}/Renames.txt', 'r') as f:
-        renames = f.read().splitlines()
-        for i in range(0, len(renames), 2):
-            os.rename(renames[i+1], renames[i])
+    if(not audioOnly):
+        with open(f'{TEMP}/Renames.txt', 'r') as f:
+            renames = f.read().splitlines()
+            for i in range(0, len(renames), 2):
+                os.rename(renames[i+1], renames[i])
 
     # create cache check with vid stats
     file = open(f'{CACHE}/cache.txt', 'w')
