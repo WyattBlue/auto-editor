@@ -45,8 +45,6 @@ def mux(vid, aud, out, VERBOSE):
 def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE,
     maxAudioVolume):
 
-    print('Creating new audio.')
-
     outputAudioData = []
     outputPointer = 0
     mask = [x / FADE_SIZE for x in range(FADE_SIZE)]
@@ -95,7 +93,7 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
         if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' audio chunks done.']))
 
-    print('Creating finished audio.')
+    print(''.join([str(num), '/', chunk_len, ' audio chunks done.']))
     outputAudioData = np.asarray(outputAudioData)
     wavfile.write(filename, SAMPLE_RATE, outputAudioData)
 
@@ -107,6 +105,7 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
 
 
 def handleAudio(tracks, chunks, samplesPerFrame, NEW_SPEED, maxAudioVolume):
+    print('Creating new audio.')
     for i in range(tracks):
         sampleRate, audioData = wavfile.read(f'{CACHE}/{i}.wav')
         splitAudio(f'{TEMP}/new{i}.wav', chunks, samplesPerFrame, NEW_SPEED,
@@ -416,9 +415,10 @@ if(__name__ == '__main__'):
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]):
+            if(x[:4] == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]):
                 print('Using cache.')
                 SKIP = True
+                tracks = int(x[4])
             file.close()
         if(not SKIP):
             rmtree(CACHE)
@@ -596,7 +596,7 @@ if(__name__ == '__main__'):
 
     # create cache check with vid stats
     file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n')
+    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}')
 
     rmtree(TEMP)
 
