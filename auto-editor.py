@@ -69,8 +69,7 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
             else:
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
-                        tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
-                        tsm.run(reader, writer)
+                        phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])]).run(reader, writer)
                 __, alteredAudioData = wavfile.read(eFile)
                 leng = alteredAudioData.shape[0]
 
@@ -107,6 +106,15 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
         print('Audio finished.')
 
 
+def handleAudio(tracks, chunks, samplesPerFrame, NEW_SPEED, maxAudioVolume):
+    for i in range(tracks):
+        sampleRate, audioData = wavfile.read(f'{CACHE}/{i}.wav')
+        splitAudio(f'{TEMP}/new{i}.wav', chunks, samplesPerFrame, NEW_SPEED,
+            audioData, sampleRate, maxAudioVolume)
+
+    if(tracks != 1):
+        print('All audio tracks finished.')
+
 def resize(inputFile, outputFile, size):
     im = Image.open(inputFile)
     w, h = im.size
@@ -141,8 +149,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                 wavfile.write(sFile, SAMPLE_RATE, audioChunk)
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
-                        tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
-                        tsm.run(reader, writer)
+                        phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])]).run(reader, writer)
                 __, alteredAudioData = wavfile.read(eFile)
                 leng = alteredAudioData.shape[0]
 
@@ -309,8 +316,10 @@ if(__name__ == '__main__'):
         help='show helpful debugging values.')
     parser.add_argument('--background_music', type=file_type,
         help='add background music to your output')
-    parser.add_argument('--cut_by_this_track', '-ct', type=file_type,
-        help='base cuts by this audio track instead of the video\'s audio')
+    parser.add_argument('--cut_by_this_audio', type=file_type,
+        help='base cuts by this audio file instead of the video\'s audio')
+    parser.add_argument('--cut_by_this_track', '-ct', type=int, default=0,
+        help='base cuts by a different audio track in the video.')
 
     args = parser.parse_args()
 
@@ -323,8 +332,10 @@ if(__name__ == '__main__'):
         sys.exit()
 
     if(args.clear_cache):
+        print('Removing cache')
         rmtree(CACHE)
-        sys.exit()
+        if(args.input == []):
+            sys.exit()
 
     startTime = time.time()
 
@@ -348,7 +359,8 @@ if(__name__ == '__main__'):
 
     INPUT_FILE = args.input[0]
     BACK_MUS = args.background_music
-    NEW_TRAC = args.cut_by_this_track
+    NEW_TRAC = args.cut_by_this_audio
+    BASE_TRAC = args.cut_by_this_track
     INPUTS = args.input
 
     # if input is URL, download as mp4 with youtube-dl
@@ -415,23 +427,35 @@ if(__name__ == '__main__'):
     if(not SKIP):
         if(audioOnly):
             print('Formatting audio.')
-            formatAudio(INPUT_FILE, f'{CACHE}/audio.wav', SAMPLE_RATE, '160k', VERBOSE)
+            formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
         else:
             print('Splitting video into jpgs. (This can take a while)')
-            cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY), f'{CACHE}/frame%06d.jpg']
+            cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY),
+                f'{CACHE}/frame%06d.jpg']
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
 
             print('Separating audio from video.')
 
-            num = 0
-            cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar', str(SAMPLE_RATE),
-             '-vn', '-map', '0:a:'+str(num), f'{CACHE}/audio.wav']
-            if(not VERBOSE):
-                cmd.extend(['-nostats', '-loglevel', '0'])
-            subprocess.call(cmd)
+            # Videos can have more than one audio track os we need to
+            # extract them all
+            tracks = 0
+            while(True):
+                cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar',
+                    str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks), f'{CACHE}/{tracks}.wav']
 
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT)
+                stdout, __ = process.communicate()
+                output = stdout.decode()
+                output = output[-70:]
+                # no more audio tracks
+                if("To ignore this, add a trailing '?' to the map." in output):
+                    break
+                tracks += 1
+
+            print('done with audio.', tracks)
 
     if(PRERUN):
         print('Done.')
@@ -439,7 +463,8 @@ if(__name__ == '__main__'):
 
     # calculating chunks.
     if(NEW_TRAC is None):
-        sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
+        # always base cuts by the first track
+        sampleRate, audioData = wavfile.read(CACHE+'/0.wav')
     else:
         formatAudio(NEW_TRAC, f'{TEMP}/NEW_TRAC.wav', SAMPLE_RATE, '160k', VERBOSE)
         sampleRate, audioData = wavfile.read(f'{TEMP}/NEW_TRAC.wav')
@@ -474,17 +499,14 @@ if(__name__ == '__main__'):
     chunks = chunks[1:]
 
     if(audioOnly):
-        zooms = {}
+        splitAudio(TEMP+'/audioNew.wav', chunks, samplesPerFrame, NEW_SPEED, audioData,
+            SAMPLE_RATE, maxAudioVolume)
     else:
         zooms = getZooms(chunks, audioFrameCount,
             hasLoudAudio, FRAME_SPREADAGE)
 
-    if(audioOnly):
-        splitAudio(TEMP+'/audioNew.wav', chunks, samplesPerFrame, NEW_SPEED, audioData,
-            SAMPLE_RATE, maxAudioVolume)
-    else:
-        p1 = Process(target=splitAudio, args=(TEMP+'/audioNew.wav', chunks,
-            samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
+        p1 = Process(target=handleAudio, args=(tracks, chunks, samplesPerFrame, NEW_SPEED,
+            maxAudioVolume))
         p1.start()
         p2 = Process(target=splitVideo, args=(chunks, NEW_SPEED, frameRate, zooms,
             samplesPerFrame, SAMPLE_RATE, audioData, extension, VERBOSE))
@@ -493,6 +515,19 @@ if(__name__ == '__main__'):
         p1.join()
         p2.join()
 
+
+    # combine all audio tracks into TEMP+/audioNew.wav
+    if(tracks == 1):
+        move(TEMP+'/0.wav', TEMP+'/audioNew.wav')
+    else:
+        for i in range(tracks):
+            formatForPydub(f'{TEMP}/new{i}.wav', f'{TEMP}/for{i}.mp3', SAMPLE_RATE)
+            if(i == 0):
+                allAuds = AudioSegment.from_file(f'{TEMP}/for{i}.mp3')
+            else:
+                newTrack = AudioSegment.from_file(f'{TEMP}/for{i}.mp3')
+                allAuds = allAuds.overlay(newTrack)
+        allAuds.export(TEMP+"/audioNew.wav", format='wav')
 
     if(NEW_TRAC is not None):
         # New track is in TEMP+/audioNew.wav
