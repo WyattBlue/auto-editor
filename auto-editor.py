@@ -23,7 +23,7 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
-version = '20w22a'
+version = '20w22b'
 
 def debug():
     print('Python Version:')
@@ -35,15 +35,15 @@ def debug():
 
 
 def mux(vid, aud, out, VERBOSE):
-    cmd = ['ffmpeg', '-y', '-i', vid, '-i', aud, '-c:v', 'copy', '-c:a', 'aac', '-movflags',
-    '+faststart', out]
+    cmd = ['ffmpeg', '-y', '-i', vid, '-i', aud, '-c:v', 'copy', '-c:a', 'aac',
+        '-movflags', '+faststart', out]
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)
 
 
-def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
-    audioData, SAMPLE_RATE, maxAudioVolume):
+def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE,
+    maxAudioVolume):
 
     print('Creating new audio.')
 
@@ -98,9 +98,9 @@ def splitAudio(chunks, samplesPerFrame, NEW_SPEED,
 
     print('Creating finished audio.')
     outputAudioData = np.asarray(outputAudioData)
-    wavfile.write(TEMP+'/audioNew.wav', SAMPLE_RATE, outputAudioData)
+    wavfile.write(filename, SAMPLE_RATE, outputAudioData)
 
-    if(not os.path.isfile(TEMP+'/audioNew.wav')):
+    if(not os.path.isfile(filename)):
         print('Error: Audio file failed to be created.')
         print('-------')
     else:
@@ -123,8 +123,8 @@ def resize(inputFile, outputFile, size):
     cropped_im.save(outputFile)
 
 
-def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE, audioData,
-    extension, VERBOSE):
+def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE,
+    audioData, extension, VERBOSE):
     print('Creating new video.')
     num = 0
     chunk_len = str(len(chunks))
@@ -176,8 +176,8 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
             f.write(f"{item}\n")
 
     print('Creating finished video. (This can take a while)')
-    cmd = ['ffmpeg', '-y', '-framerate', str(frameRate), '-i', f'{TEMP}/newFrame%06d.jpg',
-        f'{TEMP}/output{extension}']
+    cmd = ['ffmpeg', '-y', '-framerate', str(frameRate), '-i',
+        f'{TEMP}/newFrame%06d.jpg', f'{TEMP}/output{extension}']
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)
@@ -242,6 +242,21 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
+def formatAudio(inputFile, outputFile, sampleRate, size, VERBOSE=False):
+    cmd = ['ffmpeg', '-i', inputFile, '-b:a', size, '-ac', '2', '-ar', str(sampleRate),
+     '-vn', outputFile]
+    if(not VERBOSE):
+        cmd.extend(['-nostats', '-loglevel', '0'])
+    subprocess.call(cmd)
+
+
+def formatForPydub(inputFile, outputFile, SAMPLE_RATE):
+    cmd = ['ffmpeg', '-i', inputFile, '-vn', '-ar',
+        str(SAMPLE_RATE), '-ac', '2', '-ab', '192k', '-f', 'mp3', outputFile]
+    cmd.extend(['-nostats', '-loglevel', '0'])
+    subprocess.call(cmd)
+
+
 def file_type(file):
     if(not os.path.isfile(file)):
         print('Could not locate file:', file)
@@ -294,6 +309,8 @@ if(__name__ == '__main__'):
         help='show helpful debugging values.')
     parser.add_argument('--background_music', type=file_type,
         help='add background music to your output')
+    parser.add_argument('--cut_by_this_track', '-ct', type=file_type,
+        help='base cuts by this audio track instead of the video\'s audio')
 
     args = parser.parse_args()
 
@@ -331,12 +348,14 @@ if(__name__ == '__main__'):
 
     INPUT_FILE = args.input[0]
     BACK_MUS = args.background_music
+    NEW_TRAC = args.cut_by_this_track
     INPUTS = args.input
 
     # if input is URL, download as mp4 with youtube-dl
     if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
         print('URL detected, using youtube-dl to download from webpage.')
-        cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4", INPUT_FILE, "--output", "web_download"]
+        cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
+            INPUT_FILE, "--output", "web_download"]
         subprocess.call(cmd)
         print('Finished Download')
         INPUT_FILE = 'web_download.mp4'
@@ -385,7 +404,7 @@ if(__name__ == '__main__'):
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x == [INPUT_FILE, str(frameRate), str(fileSize)]):
+            if(x == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]):
                 print('Using cache.')
                 SKIP = True
             file.close()
@@ -394,26 +413,29 @@ if(__name__ == '__main__'):
             os.mkdir(CACHE)
 
     if(not SKIP):
-        if(not audioOnly):
+        if(audioOnly):
+            print('Formatting audio.')
+            formatAudio(INPUT_FILE, f'{CACHE}/audio.wav', SAMPLE_RATE, '160k', VERBOSE)
+        else:
             print('Splitting video into jpgs. (This can take a while)')
             cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY), f'{CACHE}/frame%06d.jpg']
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
 
-        print('Separating audio from video.')
-        cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar', str(SAMPLE_RATE),
-         '-vn', f'{CACHE}/audio.wav']
-        if(not VERBOSE):
-            cmd.extend(['-nostats', '-loglevel', '0'])
-        subprocess.call(cmd)
+            print('Separating audio from video.')
+            formatAudio(INPUT_FILE, f'{CACHE}/audio.wav', SAMPLE_RATE, '160k', VERBOSE)
 
     if(PRERUN):
         print('Done.')
         sys.exit()
 
     # calculating chunks.
-    sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
+    if(NEW_TRAC is None):
+        sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
+    else:
+        formatAudio(NEW_TRAC, f'{TEMP}/NEW_TRAC.wav', SAMPLE_RATE, '160k', VERBOSE)
+        sampleRate, audioData = wavfile.read(f'{TEMP}/NEW_TRAC.wav')
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
 
@@ -451,11 +473,11 @@ if(__name__ == '__main__'):
             hasLoudAudio, FRAME_SPREADAGE)
 
     if(audioOnly):
-        splitAudio(chunks, samplesPerFrame, NEW_SPEED, audioData,
+        splitAudio(TEMP+'/audioNew.wav', chunks, samplesPerFrame, NEW_SPEED, audioData,
             SAMPLE_RATE, maxAudioVolume)
     else:
-        p1 = Process(target=splitAudio, args=(chunks, samplesPerFrame,
-            NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
+        p1 = Process(target=splitAudio, args=(TEMP+'/audioNew.wav', chunks,
+            samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
         p1.start()
         p2 = Process(target=splitVideo, args=(chunks, NEW_SPEED, frameRate, zooms,
             samplesPerFrame, SAMPLE_RATE, audioData, extension, VERBOSE))
@@ -464,14 +486,27 @@ if(__name__ == '__main__'):
         p1.join()
         p2.join()
 
-    if(BACK_MUS is None):
-        pass
-    else:
-        cmd = ['ffmpeg', '-i', TEMP+'/audioNew.wav', '-vn', '-ar',
-            str(SAMPLE_RATE), '-ac', '2', '-ab', '192k', '-f', 'mp3', TEMP+'/output.mp3']
-        if(not VERBOSE):
-            cmd.extend(['-nostats', '-loglevel', '0'])
-        subprocess.call(cmd)
+
+    if(NEW_TRAC is not None):
+        # New track is in TEMP+/audioNew.wav
+        sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
+        splitAudio(TEMP+'/vidAudio.wav', chunks, samplesPerFrame, NEW_SPEED, audioData,
+            SAMPLE_RATE, maxAudioVolume)
+
+        formatForPydub(TEMP+'/audioNew.wav', TEMP+'/newTrack.mp3', SAMPLE_RATE)
+        formatForPydub(TEMP+'/vidAudio.wav', TEMP+'/vidAudio.mp3', SAMPLE_RATE)
+
+        newTrack = AudioSegment.from_file(TEMP+'/newTrack.mp3')
+        vidAudio = AudioSegment.from_file(TEMP+'/vidAudio.mp3')
+
+        if(len(newTrack) > len(vidAudio)):
+            newTrack = newTrack[:len(vidAudio)]
+
+        combined = newTrack.overlay(vidAudio)
+        combined.export(TEMP+"/audioNew.wav", format='wav')
+
+    if(BACK_MUS is not None):
+        formatForPydub(TEMP+'/audioNew.wav', TEMP+'/output.mp3', SAMPLE_RATE)
 
         vidSound = AudioSegment.from_file(TEMP+'/output.mp3')
 
@@ -485,7 +520,7 @@ if(__name__ == '__main__'):
             return back.apply_gain(change_in_dBFS)
 
         # fade the background music out by 1 second
-        back = match_target_amplitude(back, vidSound, -10).fade_out(1000)
+        back = match_target_amplitude(back, vidSound, -12).fade_out(1000)
 
         combined = vidSound.overlay(back)
         combined.export(TEMP+"/audioNew.wav", format='wav')
