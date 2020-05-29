@@ -319,6 +319,8 @@ if(__name__ == '__main__'):
         help='base cuts by this audio file instead of the video\'s audio')
     parser.add_argument('--cut_by_this_track', '-ct', type=int, default=0,
         help='base cuts by a different audio track in the video.')
+    parser.add_argument('--cut_by_all_tracks', action='store_true',
+        help='combine all audio tracks into 1 before basing cuts')
 
     args = parser.parse_args()
 
@@ -360,6 +362,7 @@ if(__name__ == '__main__'):
     BACK_MUS = args.background_music
     NEW_TRAC = args.cut_by_this_audio
     BASE_TRAC = args.cut_by_this_track
+    COMBINE_TRAC = args.cut_by_all_tracks
     INPUTS = args.input
 
     # if input is URL, download as mp4 with youtube-dl
@@ -415,7 +418,8 @@ if(__name__ == '__main__'):
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x[:4] == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]):
+            if(x[:4] == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]
+                and x[5] == str(COMBINE_TRAC)):
                 print('Using cache.')
                 SKIP = True
                 tracks = int(x[4])
@@ -429,21 +433,22 @@ if(__name__ == '__main__'):
             print('Formatting audio.')
             formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
         else:
-            print('Splitting video into jpgs. (This can take a while)')
-            cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY),
-                f'{CACHE}/frame%06d.jpg']
-            if(not VERBOSE):
-                cmd.extend(['-nostats', '-loglevel', '0'])
-            subprocess.call(cmd)
-
-            print('Separating audio from video.')
 
             # Videos can have more than one audio track os we need to
             # extract them all
+
+            print('Separating audio from video.')
+
             tracks = 0
             while(True):
-                cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar',
-                    str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks), f'{CACHE}/{tracks}.wav']
+                if(COMBINE_TRAC):
+                    cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '192k', '-ac', '2', '-ar',
+                        str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks),
+                        f'{CACHE}/{tracks}.wav']
+                else:
+                    cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar',
+                        str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks),
+                        f'{CACHE}/{tracks}.wav']
 
                 process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT)
@@ -455,7 +460,30 @@ if(__name__ == '__main__'):
                     break
                 tracks += 1
 
+                if(BASE_TRAC >= tracks):
+                    print("Error: You choose a track that doesn't exist.")
+                    print(f'There are only {tracks} tracks (starting from 0)')
+                    sys.exit()
+
+            if(COMBINE_TRAC):
+                for i in range(tracks):
+                    if(i == 0):
+                        allAuds = AudioSegment.from_file(f'{CACHE}/{i}.wav')
+                    else:
+                        newTrack = AudioSegment.from_file(f'{CACHE}/{i}.wav')
+                        allAuds = allAuds.overlay(newTrack)
+                allAuds.export(f'{CACHE}/my0.wav', format='wav')
+                os.rename(f'{CACHE}/my0.wav', f'{CACHE}/0.wav')
+                tracks = 1
             print('done with audio.', tracks)
+
+            # now deal with the video (this takes longer)
+            print('Splitting video into jpgs. (This can take a while)')
+            cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY),
+                f'{CACHE}/frame%06d.jpg']
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
 
     if(PRERUN):
         print('Done.')
@@ -464,7 +492,7 @@ if(__name__ == '__main__'):
     # calculating chunks.
     if(NEW_TRAC is None):
         # always base cuts by the first track
-        sampleRate, audioData = wavfile.read(CACHE+'/0.wav')
+        sampleRate, audioData = wavfile.read(CACHE+'/'+str(BASE_TRAC)+'.wav')
     else:
         formatAudio(NEW_TRAC, f'{TEMP}/NEW_TRAC.wav', SAMPLE_RATE, '160k', VERBOSE)
         sampleRate, audioData = wavfile.read(f'{TEMP}/NEW_TRAC.wav')
@@ -596,9 +624,6 @@ if(__name__ == '__main__'):
 
     # create cache check with vid stats
     file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}')
+    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
 
     rmtree(TEMP)
-
-    if(VERBOSE):
-        debug()
