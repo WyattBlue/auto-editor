@@ -23,7 +23,7 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
-version = '20w22b'
+version = '20w22c'
 
 def debug():
     print('Python Version:')
@@ -44,8 +44,6 @@ def mux(vid, aud, out, VERBOSE):
 
 def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE,
     maxAudioVolume):
-
-    print('Creating new audio.')
 
     outputAudioData = []
     outputPointer = 0
@@ -69,8 +67,7 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
             else:
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
-                        tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
-                        tsm.run(reader, writer)
+                        phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])]).run(reader, writer)
                 __, alteredAudioData = wavfile.read(eFile)
                 leng = alteredAudioData.shape[0]
 
@@ -96,7 +93,7 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
         if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' audio chunks done.']))
 
-    print('Creating finished audio.')
+    print(''.join([str(num), '/', chunk_len, ' audio chunks done.']))
     outputAudioData = np.asarray(outputAudioData)
     wavfile.write(filename, SAMPLE_RATE, outputAudioData)
 
@@ -106,6 +103,16 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
     else:
         print('Audio finished.')
 
+
+def handleAudio(tracks, chunks, samplesPerFrame, NEW_SPEED, maxAudioVolume):
+    print('Creating new audio.')
+    for i in range(tracks):
+        sampleRate, audioData = wavfile.read(f'{CACHE}/{i}.wav')
+        splitAudio(f'{TEMP}/new{i}.wav', chunks, samplesPerFrame, NEW_SPEED,
+            audioData, sampleRate, maxAudioVolume)
+
+    if(tracks != 1):
+        print('All audio tracks finished.')
 
 def resize(inputFile, outputFile, size):
     im = Image.open(inputFile)
@@ -141,8 +148,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                 wavfile.write(sFile, SAMPLE_RATE, audioChunk)
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
-                        tsm = phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])])
-                        tsm.run(reader, writer)
+                        phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])]).run(reader, writer)
                 __, alteredAudioData = wavfile.read(eFile)
                 leng = alteredAudioData.shape[0]
 
@@ -309,8 +315,12 @@ if(__name__ == '__main__'):
         help='show helpful debugging values.')
     parser.add_argument('--background_music', type=file_type,
         help='add background music to your output')
-    parser.add_argument('--cut_by_this_track', '-ct', type=file_type,
-        help='base cuts by this audio track instead of the video\'s audio')
+    parser.add_argument('--cut_by_this_audio', type=file_type,
+        help='base cuts by this audio file instead of the video\'s audio')
+    parser.add_argument('--cut_by_this_track', '-ct', type=int, default=0,
+        help='base cuts by a different audio track in the video.')
+    parser.add_argument('--cut_by_all_tracks', action='store_true',
+        help='combine all audio tracks into 1 before basing cuts')
 
     args = parser.parse_args()
 
@@ -323,8 +333,10 @@ if(__name__ == '__main__'):
         sys.exit()
 
     if(args.clear_cache):
+        print('Removing cache')
         rmtree(CACHE)
-        sys.exit()
+        if(args.input == []):
+            sys.exit()
 
     startTime = time.time()
 
@@ -348,7 +360,9 @@ if(__name__ == '__main__'):
 
     INPUT_FILE = args.input[0]
     BACK_MUS = args.background_music
-    NEW_TRAC = args.cut_by_this_track
+    NEW_TRAC = args.cut_by_this_audio
+    BASE_TRAC = args.cut_by_this_track
+    COMBINE_TRAC = args.cut_by_all_tracks
     INPUTS = args.input
 
     # if input is URL, download as mp4 with youtube-dl
@@ -404,9 +418,11 @@ if(__name__ == '__main__'):
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]):
+            if(x[:4] == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]
+                and x[5] == str(COMBINE_TRAC)):
                 print('Using cache.')
                 SKIP = True
+                tracks = int(x[4])
             file.close()
         if(not SKIP):
             rmtree(CACHE)
@@ -415,16 +431,59 @@ if(__name__ == '__main__'):
     if(not SKIP):
         if(audioOnly):
             print('Formatting audio.')
-            formatAudio(INPUT_FILE, f'{CACHE}/audio.wav', SAMPLE_RATE, '160k', VERBOSE)
+            formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
         else:
+
+            # Videos can have more than one audio track os we need to
+            # extract them all
+
+            print('Separating audio from video.')
+
+            tracks = 0
+            while(True):
+                if(COMBINE_TRAC):
+                    cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '192k', '-ac', '2', '-ar',
+                        str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks),
+                        f'{CACHE}/{tracks}.wav']
+                else:
+                    cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar',
+                        str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks),
+                        f'{CACHE}/{tracks}.wav']
+
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT)
+                stdout, __ = process.communicate()
+                output = stdout.decode()
+                output = output[-70:]
+                # no more audio tracks
+                if("To ignore this, add a trailing '?' to the map." in output):
+                    break
+                tracks += 1
+
+                if(BASE_TRAC >= tracks):
+                    print("Error: You choose a track that doesn't exist.")
+                    print(f'There are only {tracks} tracks (starting from 0)')
+                    sys.exit()
+
+            if(COMBINE_TRAC):
+                for i in range(tracks):
+                    if(i == 0):
+                        allAuds = AudioSegment.from_file(f'{CACHE}/{i}.wav')
+                    else:
+                        newTrack = AudioSegment.from_file(f'{CACHE}/{i}.wav')
+                        allAuds = allAuds.overlay(newTrack)
+                allAuds.export(f'{CACHE}/my0.wav', format='wav')
+                os.rename(f'{CACHE}/my0.wav', f'{CACHE}/0.wav')
+                tracks = 1
+            print('done with audio.', tracks)
+
+            # now deal with the video (this takes longer)
             print('Splitting video into jpgs. (This can take a while)')
-            cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY), f'{CACHE}/frame%06d.jpg']
+            cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY),
+                f'{CACHE}/frame%06d.jpg']
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
-
-            print('Separating audio from video.')
-            formatAudio(INPUT_FILE, f'{CACHE}/audio.wav', SAMPLE_RATE, '160k', VERBOSE)
 
     if(PRERUN):
         print('Done.')
@@ -432,7 +491,8 @@ if(__name__ == '__main__'):
 
     # calculating chunks.
     if(NEW_TRAC is None):
-        sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
+        # always base cuts by the first track
+        sampleRate, audioData = wavfile.read(CACHE+'/'+str(BASE_TRAC)+'.wav')
     else:
         formatAudio(NEW_TRAC, f'{TEMP}/NEW_TRAC.wav', SAMPLE_RATE, '160k', VERBOSE)
         sampleRate, audioData = wavfile.read(f'{TEMP}/NEW_TRAC.wav')
@@ -467,17 +527,14 @@ if(__name__ == '__main__'):
     chunks = chunks[1:]
 
     if(audioOnly):
-        zooms = {}
+        splitAudio(TEMP+'/audioNew.wav', chunks, samplesPerFrame, NEW_SPEED, audioData,
+            SAMPLE_RATE, maxAudioVolume)
     else:
         zooms = getZooms(chunks, audioFrameCount,
             hasLoudAudio, FRAME_SPREADAGE)
 
-    if(audioOnly):
-        splitAudio(TEMP+'/audioNew.wav', chunks, samplesPerFrame, NEW_SPEED, audioData,
-            SAMPLE_RATE, maxAudioVolume)
-    else:
-        p1 = Process(target=splitAudio, args=(TEMP+'/audioNew.wav', chunks,
-            samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE, maxAudioVolume))
+        p1 = Process(target=handleAudio, args=(tracks, chunks, samplesPerFrame, NEW_SPEED,
+            maxAudioVolume))
         p1.start()
         p2 = Process(target=splitVideo, args=(chunks, NEW_SPEED, frameRate, zooms,
             samplesPerFrame, SAMPLE_RATE, audioData, extension, VERBOSE))
@@ -486,6 +543,18 @@ if(__name__ == '__main__'):
         p1.join()
         p2.join()
 
+    # combine all audio tracks into TEMP+/audioNew.wav
+    if(tracks == 1):
+        move(TEMP+'/new0.wav', TEMP+'/audioNew.wav')
+    else:
+        for i in range(tracks):
+            formatForPydub(f'{TEMP}/new{i}.wav', f'{TEMP}/for{i}.mp3', SAMPLE_RATE)
+            if(i == 0):
+                allAuds = AudioSegment.from_file(f'{TEMP}/for{i}.mp3')
+            else:
+                newTrack = AudioSegment.from_file(f'{TEMP}/for{i}.mp3')
+                allAuds = allAuds.overlay(newTrack)
+        allAuds.export(TEMP+"/audioNew.wav", format='wav')
 
     if(NEW_TRAC is not None):
         # New track is in TEMP+/audioNew.wav
@@ -547,16 +616,14 @@ if(__name__ == '__main__'):
             print('Could not open output file.')
 
     # reset cache folder
-    with open(f'{TEMP}/Renames.txt', 'r') as f:
-        renames = f.read().splitlines()
-        for i in range(0, len(renames), 2):
-            os.rename(renames[i+1], renames[i])
+    if(not audioOnly):
+        with open(f'{TEMP}/Renames.txt', 'r') as f:
+            renames = f.read().splitlines()
+            for i in range(0, len(renames), 2):
+                os.rename(renames[i+1], renames[i])
 
     # create cache check with vid stats
     file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n')
+    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
 
     rmtree(TEMP)
-
-    if(VERBOSE):
-        debug()
