@@ -97,10 +97,12 @@ It will be quiet than the video's audio by 10dB and will fade out at the last se
 You can add an audio track to your video that will replace the video's audio as the one to base cuts on.
 
 ```terminal
- $ python auto-editor.py example.mp4 --cut_by_this_track example_media/newCommentary.mp3
+ $ python auto-editor.py example.mp4 --cut_by_this_audio example_media/newCommentary.mp3
 ```
 
 This option is good for combining gameplay videos with commentary, but beware that it doesn't change the volume for either audio unlike `--background_music`.
+
+##
 
 
 ## Miscellaneous
