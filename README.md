@@ -4,11 +4,11 @@
 Auto-Editor is a video editing tool that can automatically edit raw source video into a entertaining and polished video.
 It works by analyzing the video's audio to detect when a section needs to be cut, kept in, or zoomed in, then auto-editor runs a subprocess called ffmpeg to create the new video.
 
-# New in 20w22c!
+## New in 20w22c!
 You can now change which audio track to base the cuts on by adding an audio track to the `cut_by_this_track` option.
 
 ```terminal
- $ python3 auto-editor.py videoWith2Tracks.mp4 --cut_by_this_track 1
+ $ python auto-editor.py videoWith2Tracks.mp4 --cut_by_this_track 1
 ```
 
 The old functionally of `cut_by_this_track` has been moved to `cut_by_this_audio`
@@ -19,7 +19,7 @@ The old functionally of `cut_by_this_track` has been moved to `cut_by_this_audio
 You can also combine all tracks like they were in one before cutting.
 
 ```terminal
- $ python3 auto-editor.py videoWith2Tracks.mp4 --cut_by_all_tracks
+ $ python auto-editor.py videoWith2Tracks.mp4 --cut_by_all_tracks
 ```
 
 # Usage
