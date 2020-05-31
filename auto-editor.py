@@ -551,9 +551,7 @@ if(__name__ == '__main__'):
         p2.join()
 
     # combine all audio tracks into TEMP+/audioNew.wav
-    if(tracks == 1):
-        move(TEMP+'/new0.wav', TEMP+'/audioNew.wav')
-    elif(1 == 0):
+    if(1 == 0):
         for i in range(tracks):
             formatForPydub(f'{TEMP}/new{i}.wav', f'{TEMP}/for{i}.mp3', SAMPLE_RATE)
             if(i == 0):
