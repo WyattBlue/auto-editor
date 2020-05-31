@@ -23,7 +23,7 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
-version = '20w22c'
+version = '20w22d'
 
 def debug():
     print('Python Version:')
@@ -440,30 +440,52 @@ if(__name__ == '__main__'):
             print('Separating audio from video.')
 
             tracks = 0
-            while(True):
-                if(COMBINE_TRAC):
+
+
+            if(COMBINE_TRAC):
+                while(True):
                     cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '192k', '-ac', '2', '-ar',
-                        str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks),
-                        f'{CACHE}/{tracks}.wav']
-                else:
-                    cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '160k', '-ac', '2', '-ar',
-                        str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks),
-                        f'{CACHE}/{tracks}.wav']
+                            str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks),
+                            f'{CACHE}/{tracks}.wav']
+
+                    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT)
+                    stdout, __ = process.communicate()
+                    output = stdout.decode()
+                    output = output[-70:]
+                    # no more audio tracks
+                    if("To ignore this, add a trailing '?' to the map." in output):
+                        break
+                    tracks += 1
+
+                    if(BASE_TRAC >= tracks):
+                        print("Error: You choose a track that doesn't exist.")
+                        print(f'There are only {tracks} tracks. (starting from 0)')
+                        sys.exit()
+            else:
+                cmd = ['ffprobe', INPUT_FILE, '-hide_banner', '-loglevel', 'panic',
+                    '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
+                    'compact=p=0:nk=1']
 
                 process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT)
                 stdout, __ = process.communicate()
                 output = stdout.decode()
-                output = output[-70:]
-                # no more audio tracks
-                if("To ignore this, add a trailing '?' to the map." in output):
-                    break
-                tracks += 1
+
+                print(output)
+
+                tracks = len(subprocess.getoutput(output).split('\n'))
+
+                print(f'Number of tracks: {tracks}')
 
                 if(BASE_TRAC >= tracks):
                     print("Error: You choose a track that doesn't exist.")
-                    print(f'There are only {tracks} tracks (starting from 0)')
+                    print(f'There are only {tracks} tracks. (starting from 0)')
                     sys.exit()
+                for trackNumber in range(tracks):
+                    cmd = ['ffmpeg', '-i', INPUT_FILE, '-map', f'0:a:{trackNumber}',
+                        f'{CACHE}/{trackNumber}.wav']
+                    subprocess.call(cmd)
 
             if(COMBINE_TRAC):
                 for i in range(tracks):
@@ -599,8 +621,20 @@ if(__name__ == '__main__'):
         move(f'{TEMP}/audioNew.wav', OUTPUT_FILE)
     else:
         print('Finishing video.')
-        mux(vid=TEMP+'/output'+extension, aud=TEMP+'/audioNew.wav',
-            out=OUTPUT_FILE, VERBOSE=VERBOSE)
+
+
+        # ffmpeg -i 0.wav -i 1.wav -i vid.mp4 -map 0:a:0 -map 1:a:0 -map
+        #  2:v:0 -c:v copy out.mp4
+
+        cmd = ['ffmpeg']
+        for i in range(tracks):
+            cmd.extend(['-i', f'{tracks}.wav'])
+        cmd.append(TEMP+'/output'+extension) # add input video
+        for i in range(tracks):
+            cmd.extend(['-map', f'{tracks}:a:0'])
+        cmd.extend(['-c:v', 'copy', OUTPUT_FILE])
+
+        subprocess.call(cmd)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
