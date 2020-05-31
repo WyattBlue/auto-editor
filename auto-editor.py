@@ -34,14 +34,6 @@ def debug():
     print(version)
 
 
-def mux(vid, aud, out, VERBOSE):
-    cmd = ['ffmpeg', '-y', '-i', vid, '-i', aud, '-c:v', 'copy', '-c:a', 'aac',
-        '-movflags', '+faststart', out]
-    if(not VERBOSE):
-        cmd.extend(['-nostats', '-loglevel', '0'])
-    subprocess.call(cmd)
-
-
 def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE,
     maxAudioVolume):
 
@@ -175,7 +167,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
         num += 1
         if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' frame chunks done.']))
-    print('New frames finished.')
+    print(''.join([str(num), '/', chunk_len, ' frame chunks done.']))
 
     with open(f'{TEMP}/Renames.txt', 'w') as f:
         for item in Renames:
@@ -471,11 +463,7 @@ if(__name__ == '__main__'):
                 stdout, __ = process.communicate()
                 output = stdout.decode()
 
-                print(output)
-
                 tracks = len(subprocess.getoutput(output).split('\n'))
-
-                print(f'Number of tracks: {tracks}')
 
                 if(BASE_TRAC >= tracks):
                     print("Error: You choose a track that doesn't exist.")
@@ -484,6 +472,8 @@ if(__name__ == '__main__'):
                 for trackNumber in range(tracks):
                     cmd = ['ffmpeg', '-i', INPUT_FILE, '-map', f'0:a:{trackNumber}',
                         f'{CACHE}/{trackNumber}.wav']
+                    if(not VERBOSE):
+                        cmd.extend(['-nostats', '-loglevel', '0'])
                     subprocess.call(cmd)
 
             if(COMBINE_TRAC):
@@ -496,7 +486,7 @@ if(__name__ == '__main__'):
                 allAuds.export(f'{CACHE}/my0.wav', format='wav')
                 os.rename(f'{CACHE}/my0.wav', f'{CACHE}/0.wav')
                 tracks = 1
-            print('done with audio.', tracks)
+            print(f'Done with audio. ({tracks} tracks)')
 
             # now deal with the video (this takes longer)
             print('Splitting video into jpgs. (This can take a while)')
@@ -624,16 +614,19 @@ if(__name__ == '__main__'):
         # ffmpeg -i 0.wav -i 1.wav -i vid.mp4 -map 0:a:0 -map 1:a:0 -map
         #  2:v:0 -c:v copy out.mp4
 
-        cmd = ['ffmpeg']
+        cmd = ['ffmpeg', '-y']
         for i in range(tracks):
-            cmd.extend(['-i', f'new{tracks}.wav'])
-        cmd.append(TEMP+'/output'+extension) # add input video
+            cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
+        cmd.extend(['-i', TEMP+'/output'+extension]) # add input video
         for i in range(tracks):
-            cmd.extend(['-map', f'{tracks}:a:0'])
-        cmd.extend(['-c:v', 'copy', OUTPUT_FILE])
+            cmd.extend(['-map', f'{i}:a:0'])
+        cmd.extend(['-map', f'{tracks}:v:0','-c:v', 'copy', '-movflags', '+faststart',
+            OUTPUT_FILE])
 
         if(not VERBOSE):
             cmd.extend(['-nostats', '-loglevel', '0'])
+
+        print(cmd)
 
         subprocess.call(cmd)
 
