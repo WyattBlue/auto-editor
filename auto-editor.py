@@ -425,14 +425,10 @@ if(__name__ == '__main__'):
             print('Formatting audio.')
             formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
         else:
-
-            # Videos can have more than one audio track os we need to
-            # extract them all
-
+            # Videos can have more than one audio track os we need to extract them all
             print('Separating audio from video.')
 
             tracks = 0
-
             if(COMBINE_TRAC):
                 while(True):
                     cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '192k', '-ac', '2', '-ar',
