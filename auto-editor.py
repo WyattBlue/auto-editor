@@ -441,7 +441,6 @@ if(__name__ == '__main__'):
 
             tracks = 0
 
-
             if(COMBINE_TRAC):
                 while(True):
                     cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '192k', '-ac', '2', '-ar',
@@ -568,7 +567,7 @@ if(__name__ == '__main__'):
     # combine all audio tracks into TEMP+/audioNew.wav
     if(tracks == 1):
         move(TEMP+'/new0.wav', TEMP+'/audioNew.wav')
-    else:
+    elif(1 == 0):
         for i in range(tracks):
             formatForPydub(f'{TEMP}/new{i}.wav', f'{TEMP}/for{i}.mp3', SAMPLE_RATE)
             if(i == 0):
@@ -622,17 +621,19 @@ if(__name__ == '__main__'):
     else:
         print('Finishing video.')
 
-
         # ffmpeg -i 0.wav -i 1.wav -i vid.mp4 -map 0:a:0 -map 1:a:0 -map
         #  2:v:0 -c:v copy out.mp4
 
         cmd = ['ffmpeg']
         for i in range(tracks):
-            cmd.extend(['-i', f'{tracks}.wav'])
+            cmd.extend(['-i', f'new{tracks}.wav'])
         cmd.append(TEMP+'/output'+extension) # add input video
         for i in range(tracks):
             cmd.extend(['-map', f'{tracks}:a:0'])
         cmd.extend(['-c:v', 'copy', OUTPUT_FILE])
+
+        if(not VERBOSE):
+            cmd.extend(['-nostats', '-loglevel', '0'])
 
         subprocess.call(cmd)
 
@@ -640,6 +641,9 @@ if(__name__ == '__main__'):
     timeLength = round(time.time() - startTime, 2)
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')
+
+    if(not os.path.isfile(OUTPUT_FILE)):
+        raise IOError(f'The file {OUTPUT_FILE} was not created.')
 
     try: # should work on Windows
         os.startfile(OUTPUT_FILE)
