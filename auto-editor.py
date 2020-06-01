@@ -313,6 +313,8 @@ if(__name__ == '__main__'):
         help='base cuts by a different audio track in the video.')
     parser.add_argument('--cut_by_all_tracks', action='store_true',
         help='combine all audio tracks into 1 before basing cuts')
+    parser.add_argument('--hardware_accel', type=str,
+        help='set the hardware used for gpu acceleration')
 
     args = parser.parse_args()
 
@@ -458,8 +460,13 @@ if(__name__ == '__main__'):
                     stderr=subprocess.STDOUT)
                 stdout, __ = process.communicate()
                 output = stdout.decode()
-
-                tracks = len(subprocess.getoutput(output).split('\n'))
+                numbers = output.split('\n')
+                try:
+                    test = int(numbers[0])
+                    tracks = len(numbers)-1
+                except ValueError:
+                    print('ffprobe had an invalid input.')
+                    tracks = 1
 
                 if(BASE_TRAC >= tracks):
                     print("Error: You choose a track that doesn't exist.")
