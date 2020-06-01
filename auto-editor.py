@@ -306,6 +306,8 @@ if(__name__ == '__main__'):
         help='show helpful debugging values.')
     parser.add_argument('--background_music', type=file_type,
         help='add background music to your output')
+    parser.add_argument('--background_volume', type=float, default=-12,
+        help="set the dBs louder or softer compared to the audio track that bases the cuts")
     parser.add_argument('--cut_by_this_audio', type=file_type,
         help='base cuts by this audio file instead of the video\'s audio')
     parser.add_argument('--cut_by_this_track', '-ct', type=int, default=0,
@@ -357,6 +359,7 @@ if(__name__ == '__main__'):
 
     INPUT_FILE = args.input[0]
     BACK_MUS = args.background_music
+    BACK_VOL = args.background_volume
     NEW_TRAC = args.cut_by_this_audio
     BASE_TRAC = args.cut_by_this_track
     COMBINE_TRAC = args.cut_by_all_tracks
@@ -581,7 +584,7 @@ if(__name__ == '__main__'):
             return back.apply_gain(change_in_dBFS)
 
         # fade the background music out by 1 second
-        back = match_target_amplitude(back, vidSound, -12).fade_out(1000)
+        back = match_target_amplitude(back, vidSound, BACK_VOL).fade_out(1000)
         #combined = vidSound.overlay(back)
         print('exporting background music')
         back.export(f'{TEMP}/new{tracks}.wav', format='wav')
@@ -614,15 +617,17 @@ if(__name__ == '__main__'):
             # downmix the audio tracks
             # example command:
             # ffmpeg -i 0.mp3 -i 1.mp3 -filter_complex amerge=inputs=2 -ac 2 out.mp3
-
-            cmd = ['ffmpeg']
-            for i in range(tracks):
-                cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
-            cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
-                f'{TEMP}/newAudioFile.wav'])
-            if(not VERBOSE):
-                cmd.extend(['-nostats', '-loglevel', '0'])
-            subprocess.call(cmd)
+            if(tracks > 1):
+                cmd = ['ffmpeg']
+                for i in range(tracks):
+                    cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
+                cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
+                    f'{TEMP}/newAudioFile.wav'])
+                if(not VERBOSE):
+                    cmd.extend(['-nostats', '-loglevel', '0'])
+                subprocess.call(cmd)
+            else:
+                os.rename(f'{TEMP}/new0.wav', f'{TEMP}/newAudioFile.wav')
 
             cmd = ['ffmpeg', '-y']
             if(HWACCEL is not None):

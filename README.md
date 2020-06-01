@@ -1,26 +1,29 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w22c
+ &nbsp;&nbsp;<sup>version 20w23a
 # Auto-Editor
 Auto-Editor is a video editing tool that can automatically edit raw source video into a entertaining and polished video.
 It works by analyzing the video's audio to detect when a section needs to be cut, kept in, or zoomed in, then auto-editor runs a subprocess called ffmpeg to create the new video.
 
-## New in 20w22c!
-You can now change which audio track to base the cuts on by adding an audio track to the `cut_by_this_track` option.
+## New in 20w23a!
+You can now enable hardware acceleration with the `--hardware_accel` flag.
 
 ```terminal
- $ python auto-editor.py videoWith2Tracks.mp4 --cut_by_this_track 1
+ $ python3 auto-editor.py example.mp4 --hardware_accel SomeHardware
 ```
 
-The old functionally of `cut_by_this_track` has been moved to `cut_by_this_audio`
-```terminal
- $ python auto-editor.py example.mp4 --cut_by_this_audio example_media/newCommentary.mp3
-```
-
-You can also combine all tracks like they were in one before cutting.
+What APIs you have avaiable determines from machine to machine. To see what's avaiable for you run this command:
 
 ```terminal
- $ python auto-editor.py videoWith2Tracks.mp4 --cut_by_all_tracks
+ $ ffmpeg -hide_banner -hwaccel asdf -i example.mp4 out.mp4
 ```
+
+and it will show the supported hwaccels. This is important because auto-editor will not show a warning for selecting a non-existant hardware setting, even with the `--verbose` flag.
+
+### Other stuff
+
+## Note:
+
+This feature isn't new to this version but `--debug` flag with say if your version of python is running a 64-bit version or not.
 
 # Usage
 ## Minimal Example
@@ -48,4 +51,4 @@ See [the docs](/github%20resources/docs.md) for more commands and usages.
 [Installing for Linux](/github%20resources/install_lin.md)
 
 # Help or Issues
-If you have a bug or a suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this or contact the dev personally. You can do that by [joining the discord server](https://discord.com/invite/kMHAWJJ).
+If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this project, suggest new features, or chat with other users, do that in [the discord server](https://discord.com/invite/kMHAWJJ).
