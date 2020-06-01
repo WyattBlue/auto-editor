@@ -12,7 +12,7 @@ Create an edited version of example.mp4 with the default parameters.
 
 ## Changing the Feel
 ###### a.k.a. Changing the padding
-You can change how much space (frames) their is between each cut by specifing the frame margin. The frame margin is how much frames there are on each side between the loud parts.
+You can change how much space (frames) their is between each cut by specifying the frame margin. The frame margin is how much frames there are on each side between the loud parts.
 
 ```terminal
  $ python auto-editor.py example.mp4 --frame_margin 1
@@ -102,7 +102,24 @@ You can add an audio track to your video that will replace the video's audio as 
 
 This option is good for combining gameplay videos with commentary, but beware that it doesn't change the volume for either audio unlike `--background_music`.
 
-##
+## Video Tracks
+Video files can contain more than audio file and auto-editor. These 'audio files' are what we call audio tracks and auto-editor has a set of tools to deal with these tracks. First, if you'll like the tracks be separated on the output, use the flag `--keep_tracks_seperate`
+
+```terminal
+ $ python auto-editor.py videoWith2Tracks.mp4 --keep_tracks_seperate
+```
+
+Auto-Editor works by cutting out the silent parts and it needs to choose which audio track to base cuts on. By default it will be set to 0 (the first track) but you can change that with the `--cut_by_this_track` command.
+
+```terminal
+ $ python auto-editor.py videoWith2Tracks.mp4 --cut_by_this_track 1
+```
+
+Now the video with be cut by second audio track's volume! But what if you wanted to just ignore tracks all together? Well, with the `--cut_by_all_tracks` command, auto-editor will act is if all tracks were muxed into a single one.
+
+```terminal
+ $ python auto-editor.py videoWith2Tracks.mp4 --cut_by_all_tracks
+```
 
 
 ## Miscellaneous
@@ -116,4 +133,10 @@ Get the version of auto-editor you're using.
 
 ```terminal
  $ python auto-editor.py --version
+```
+
+Get debug information regarding auto-editor. Including your python version, whether the your python is 64-bit or not, and your auto-editor version.
+
+```terminal
+ $ python auto-editor.py --debug
 ```

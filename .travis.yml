@@ -18,8 +18,7 @@ script:
  - python3 auto-editor.py --debug
  - python3 auto-editor.py --version
  - python3 auto-editor.py -h
- - python3 auto-editor.py --help
- - python3 auto-editor.py example.mp4
+ - python3 auto-editor.py example.mp4 --verbose
  - python3 auto-editor.py example.mp4 -s 2
  - python3 auto-editor.py example.mp4 -v 2
  - python3 auto-editor.py example.mp4 --sounded_speed 2
