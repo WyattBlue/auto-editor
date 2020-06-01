@@ -566,25 +566,6 @@ if(__name__ == '__main__'):
         p1.join()
         p2.join()
 
-    if(NEW_TRAC is not None):
-        # New track is in TEMP+/audioNew.wav
-        sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
-        splitAudio(TEMP+'/vidAudio.wav', chunks, samplesPerFrame, NEW_SPEED, audioData,
-            SAMPLE_RATE, maxAudioVolume)
-
-        formatForPydub(TEMP+'/audioNew.wav', TEMP+'/newTrack.mp3', SAMPLE_RATE)
-        formatForPydub(TEMP+'/vidAudio.wav', TEMP+'/vidAudio.mp3', SAMPLE_RATE)
-
-        newTrack = AudioSegment.from_file(TEMP+'/newTrack.mp3')
-        vidAudio = AudioSegment.from_file(TEMP+'/vidAudio.mp3')
-
-        if(len(newTrack) > len(vidAudio)):
-            newTrack = newTrack[:len(vidAudio)]
-
-        combined = newTrack.overlay(vidAudio)
-        tracks = 1
-        combined.export(f'{TEMP}/new{tracks}.wav', format='wav')
-
     if(BACK_MUS is not None):
         formatForPydub(f'{TEMP}/new{BASE_TRAC}.wav', TEMP+'/output.mp3', SAMPLE_RATE)
 
@@ -630,7 +611,7 @@ if(__name__ == '__main__'):
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
         else:
-            # downmix the all audio tracks
+            # downmix the audio tracks
             # example command:
             # ffmpeg -i 0.mp3 -i 1.mp3 -filter_complex amerge=inputs=2 -ac 2 out.mp3
 
@@ -677,6 +658,9 @@ if(__name__ == '__main__'):
                 os.rename(renames[i+1], renames[i])
 
     # create cache check with vid stats
+
+    if(BACK_MUS is not None):
+        tracks -= 1
     file = open(f'{CACHE}/cache.txt', 'w')
     file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
 
