@@ -90,8 +90,7 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
     wavfile.write(filename, SAMPLE_RATE, outputAudioData)
 
     if(not os.path.isfile(filename)):
-        print('Error: Audio file failed to be created.')
-        print('-------')
+        raise IOError(f'Error: The file {filename} was not created.')
     else:
         print('Audio finished.')
 
@@ -313,6 +312,8 @@ if(__name__ == '__main__'):
         help='base cuts by a different audio track in the video.')
     parser.add_argument('--cut_by_all_tracks', action='store_true',
         help='combine all audio tracks into 1 before basing cuts')
+    parser.add_argument('--keep_tracks_seperate', action='store_true',
+        help="Don't combine audio tracks ever. (Warning, multiple audio tracks are not supported on most platforms (YouTube)")
     parser.add_argument('--hardware_accel', type=str,
         help='set the hardware used for gpu acceleration')
 
@@ -348,6 +349,7 @@ if(__name__ == '__main__'):
     VERBOSE = args.verbose
     PRERUN = args.prerun
     HWACCEL = args.hardware_accel
+    KEEP_SEP = args.keep_tracks_seperate
 
     if(args.input == []):
         print('auto-editor.py: error: the following arguments are required: input')
@@ -466,7 +468,7 @@ if(__name__ == '__main__'):
                     test = int(numbers[0])
                     tracks = len(numbers)-1
                 except ValueError:
-                    print('ffprobe had an invalid input.')
+                    print('Warning: ffprobe had an invalid output.')
                     tracks = 1
 
                 if(BASE_TRAC >= tracks):
@@ -564,17 +566,6 @@ if(__name__ == '__main__'):
         p1.join()
         p2.join()
 
-    # combine all audio tracks into TEMP+/audioNew.wav
-    if(1 == 0):
-        for i in range(tracks):
-            formatForPydub(f'{TEMP}/new{i}.wav', f'{TEMP}/for{i}.mp3', SAMPLE_RATE)
-            if(i == 0):
-                allAuds = AudioSegment.from_file(f'{TEMP}/for{i}.mp3')
-            else:
-                newTrack = AudioSegment.from_file(f'{TEMP}/for{i}.mp3')
-                allAuds = allAuds.overlay(newTrack)
-        allAuds.export(TEMP+"/audioNew.wav", format='wav')
-
     if(NEW_TRAC is not None):
         # New track is in TEMP+/audioNew.wav
         sampleRate, audioData = wavfile.read(CACHE+'/audio.wav')
@@ -591,10 +582,11 @@ if(__name__ == '__main__'):
             newTrack = newTrack[:len(vidAudio)]
 
         combined = newTrack.overlay(vidAudio)
-        combined.export(TEMP+"/audioNew.wav", format='wav')
+        tracks = 1
+        combined.export(f'{TEMP}/new{tracks}.wav', format='wav')
 
     if(BACK_MUS is not None):
-        formatForPydub(TEMP+'/audioNew.wav', TEMP+'/output.mp3', SAMPLE_RATE)
+        formatForPydub(f'{TEMP}/new{BASE_TRAC}.wav', TEMP+'/output.mp3', SAMPLE_RATE)
 
         vidSound = AudioSegment.from_file(TEMP+'/output.mp3')
 
@@ -609,9 +601,14 @@ if(__name__ == '__main__'):
 
         # fade the background music out by 1 second
         back = match_target_amplitude(back, vidSound, -12).fade_out(1000)
+        #combined = vidSound.overlay(back)
+        print('exporting background music')
+        back.export(f'{TEMP}/new{tracks}.wav', format='wav')
 
-        combined = vidSound.overlay(back)
-        combined.export(TEMP+"/audioNew.wav", format='wav')
+        if(not os.path.isfile(f'{TEMP}/new{tracks}.wav')):
+            raise IOError(f'The new music audio file was not created.')
+
+        tracks += 1
 
     if(audioOnly):
         print('Moving audio.')
@@ -619,25 +616,41 @@ if(__name__ == '__main__'):
     else:
         print('Finishing video.')
 
-        # ffmpeg -i 0.wav -i 1.wav -i vid.mp4 -map 0:a:0 -map 1:a:0 -map
-        #  2:v:0 -c:v copy out.mp4
+        if(KEEP_SEP):
+            cmd = ['ffmpeg', '-y']
+            if(HWACCEL is not None):
+                cmd.extend(['-hwaccel', HWACCEL])
+            for i in range(tracks):
+                cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
+            cmd.extend(['-i', TEMP+'/output'+extension]) # add input video
+            for i in range(tracks):
+                cmd.extend(['-map', f'{i}:a:0'])
+            cmd.extend(['-map', f'{tracks}:v:0','-c:v', 'copy', '-movflags', '+faststart',
+                OUTPUT_FILE])
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+        else:
+            # downmix the all audio tracks
+            # example command:
+            # ffmpeg -i 0.mp3 -i 1.mp3 -filter_complex amerge=inputs=2 -ac 2 out.mp3
 
-        cmd = ['ffmpeg', '-y']
-        if(HWACCEL is not None):
-            cmd.extend(['-hwaccel', HWACCEL])
-        for i in range(tracks):
-            cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
-        cmd.extend(['-i', TEMP+'/output'+extension]) # add input video
-        for i in range(tracks):
-            cmd.extend(['-map', f'{i}:a:0'])
-        cmd.extend(['-map', f'{tracks}:v:0','-c:v', 'copy', '-movflags', '+faststart',
-            OUTPUT_FILE])
+            cmd = ['ffmpeg']
+            for i in range(tracks):
+                cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
+            cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
+                f'{TEMP}/newAudioFile.wav'])
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
 
-        if(not VERBOSE):
-            cmd.extend(['-nostats', '-loglevel', '0'])
-
-        print(cmd)
-
+            cmd = ['ffmpeg', '-y']
+            if(HWACCEL is not None):
+                cmd.extend(['-hwaccel', HWACCEL])
+            cmd.extend(['-i', f'{TEMP}/newAudioFile.wav'])
+            cmd.extend(['-i', f'{TEMP}/output{extension}']) # add input video
+            cmd.extend(['-c:v', 'copy', '-movflags', '+faststart', OUTPUT_FILE])
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
 
     print('Finished.')
@@ -646,7 +659,7 @@ if(__name__ == '__main__'):
     print(f'took {timeLength} seconds ({minutes})')
 
     if(not os.path.isfile(OUTPUT_FILE)):
-        raise IOError(f'The file {OUTPUT_FILE} was not created.')
+        raise IOError(f'Error: The file {OUTPUT_FILE} was not created.')
 
     try: # should work on Windows
         os.startfile(OUTPUT_FILE)
