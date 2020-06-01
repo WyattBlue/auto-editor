@@ -23,7 +23,7 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
-version = '20w22d'
+version = '20w23a'
 
 def debug():
     print('Python Version:')
@@ -347,6 +347,7 @@ if(__name__ == '__main__'):
     FRAME_QUALITY = args.frame_quality
     VERBOSE = args.verbose
     PRERUN = args.prerun
+    HWACCEL = args.hardware_accel
 
     if(args.input == []):
         print('auto-editor.py: error: the following arguments are required: input')
@@ -473,8 +474,11 @@ if(__name__ == '__main__'):
                     print(f'There are only {tracks} tracks. (starting from 0)')
                     sys.exit()
                 for trackNumber in range(tracks):
-                    cmd = ['ffmpeg', '-i', INPUT_FILE, '-map', f'0:a:{trackNumber}',
-                        f'{CACHE}/{trackNumber}.wav']
+                    cmd = ['ffmpeg']
+                    if(HWACCEL is not None):
+                        cmd.extend(['-hwaccel', HWACCEL])
+                    cmd.extend(['-i', INPUT_FILE, '-map', f'0:a:{trackNumber}',
+                        f'{CACHE}/{trackNumber}.wav'])
                     if(not VERBOSE):
                         cmd.extend(['-nostats', '-loglevel', '0'])
                     subprocess.call(cmd)
@@ -493,8 +497,11 @@ if(__name__ == '__main__'):
 
             # now deal with the video (this takes longer)
             print('Splitting video into jpgs. (This can take a while)')
-            cmd = ['ffmpeg', '-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY),
-                f'{CACHE}/frame%06d.jpg']
+            cmd = ['ffmpeg']
+            if(HWACCEL is not None):
+                cmd.extend(['-hwaccel', HWACCEL])
+            cmd.extend(['-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY),
+                f'{CACHE}/frame%06d.jpg'])
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
@@ -616,6 +623,8 @@ if(__name__ == '__main__'):
         #  2:v:0 -c:v copy out.mp4
 
         cmd = ['ffmpeg', '-y']
+        if(HWACCEL is not None):
+            cmd.extend(['-hwaccel', HWACCEL])
         for i in range(tracks):
             cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
         cmd.extend(['-i', TEMP+'/output'+extension]) # add input video
