@@ -239,8 +239,8 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def formatAudio(inputFile, outputFile, sampleRate, size, VERBOSE=False):
-    cmd = ['ffmpeg', '-i', inputFile, '-b:a', size, '-ac', '2', '-ar', str(sampleRate),
+def formatAudio(inputFile, outputFile, sampleRate, bitrate, VERBOSE=False):
+    cmd = ['ffmpeg', '-i', inputFile, '-b:a', bitrate, '-ac', '2', '-ar', str(sampleRate),
      '-vn', outputFile]
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
@@ -378,13 +378,16 @@ if(__name__ == '__main__'):
         audioOnly = False
     else:
         dotIndex = INPUT_FILE.rfind('.')
+        extension = INPUT_FILE[dotIndex:]
         if(len(args.output_file) >= 1):
             OUTPUT_FILE = args.output_file
         else:
-            OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+INPUT_FILE[dotIndex:]
+            if(extension == '.m4a'):
+                OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED.wav'
+            else:
+                OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+extension
 
-        extension = INPUT_FILE[dotIndex:]
-        audioOnly = extension == '.wav' or extension == '.mp3'
+        audioOnly = extension in ['.wav', '.mp3', '.m4a']
 
     if(not os.path.isfile(INPUT_FILE)):
         print('Could not find file:', INPUT_FILE)
@@ -432,6 +435,7 @@ if(__name__ == '__main__'):
         if(audioOnly):
             print('Formatting audio.')
             formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
+            tracks = 1
         else:
             # Videos can have more than one audio track os we need to extract them all
             print('Separating audio from video.')
