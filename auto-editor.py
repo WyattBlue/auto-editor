@@ -406,25 +406,39 @@ if(__name__ == '__main__'):
         print('Could not find file:', INPUT_FILE)
         sys.exit()
 
-    if(args.frame_rate is None):
-        if(audioOnly):
+    try:
+        os.mkdir(TEMP)
+    except OSError:
+        rmtree(TEMP)
+        os.mkdir(TEMP)
+
+    if(audioOnly):
+        if(args.frame_rate is None):
             frameRate = 30
         else:
-            frameRate = getFrameRate(INPUT_FILE)
+            frameRate = args.frame_rate
     else:
-        frameRate = args.frame_rate
+        try:
+            frameRate = getFrameRate(INPUT_FILE)
+        except AttributeError:
+            # convert frame rate to 30 or a user defined value
+            if(args.frame_rate is None):
+                frameRate = 30
+            else:
+                frameRate = args.frame_rate
+
+            cmd = ['ffmpeg', '-i', INPUT_FILE, '-filter:v', f'fps=fps={frameRate}',
+                TEMP+'/constantVid'+extension, '-hide_banner']
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
+            INPUT_FILE = TEMP+'/constantVid'+extension
 
     fileSize = os.stat(INPUT_FILE).st_size
 
     if(args.get_auto_fps):
         print(frameRate)
         sys.exit()
-
-    try:
-        os.mkdir(TEMP)
-    except OSError:
-        rmtree(TEMP)
-        os.mkdir(TEMP)
 
     # make Cache folder
     SKIP = False
