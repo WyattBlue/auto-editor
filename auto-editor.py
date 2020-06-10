@@ -534,6 +534,8 @@ if(__name__ == '__main__'):
             subprocess.call(cmd)
 
     if(PRERUN):
+        file = open(f'{CACHE}/cache.txt', 'w')
+        file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
         print('Done.')
         sys.exit()
 
