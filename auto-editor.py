@@ -421,6 +421,8 @@ if(__name__ == '__main__'):
         try:
             frameRate = getFrameRate(INPUT_FILE)
         except AttributeError:
+            print('Warning! frame rate detection failed.')
+            print('If your video has a variable frame rate, ignore this message.')
             # convert frame rate to 30 or a user defined value
             if(args.frame_rate is None):
                 frameRate = 30
@@ -468,56 +470,36 @@ if(__name__ == '__main__'):
             print('Separating audio from video.')
 
             tracks = 0
-            if(COMBINE_TRAC):
-                while(True):
-                    cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '192k', '-ac', '2', '-ar',
-                            str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks),
-                            f'{CACHE}/{tracks}.wav']
 
-                    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT)
-                    stdout, __ = process.communicate()
-                    output = stdout.decode()
-                    output = output[-70:]
-                    # no more audio tracks
-                    if("To ignore this, add a trailing '?' to the map." in output):
-                        break
-                    tracks += 1
+            cmd = ['ffprobe', INPUT_FILE, '-hide_banner', '-loglevel', 'panic',
+                '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
+                'compact=p=0:nk=1']
 
-                    if(BASE_TRAC >= tracks):
-                        print("Error: You choose a track that doesn't exist.")
-                        print(f'There are only {tracks} tracks. (starting from 0)')
-                        sys.exit()
-            else:
-                cmd = ['ffprobe', INPUT_FILE, '-hide_banner', '-loglevel', 'panic',
-                    '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
-                    'compact=p=0:nk=1']
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT)
+            stdout, __ = process.communicate()
+            output = stdout.decode()
+            numbers = output.split('\n')
+            try:
+                test = int(numbers[0])
+                tracks = len(numbers)-1
+            except ValueError:
+                print('Warning: ffprobe had an invalid output.')
+                tracks = 1
 
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT)
-                stdout, __ = process.communicate()
-                output = stdout.decode()
-                numbers = output.split('\n')
-                try:
-                    test = int(numbers[0])
-                    tracks = len(numbers)-1
-                except ValueError:
-                    print('Warning: ffprobe had an invalid output.')
-                    tracks = 1
-
-                if(BASE_TRAC >= tracks):
-                    print("Error: You choose a track that doesn't exist.")
-                    print(f'There are only {tracks} tracks. (starting from 0)')
-                    sys.exit()
-                for trackNumber in range(tracks):
-                    cmd = ['ffmpeg']
-                    if(HWACCEL is not None):
-                        cmd.extend(['-hwaccel', HWACCEL])
-                    cmd.extend(['-i', INPUT_FILE, '-map', f'0:a:{trackNumber}',
-                        f'{CACHE}/{trackNumber}.wav'])
-                    if(not VERBOSE):
-                        cmd.extend(['-nostats', '-loglevel', '0'])
-                    subprocess.call(cmd)
+            if(BASE_TRAC >= tracks):
+                print("Error: You choose a track that doesn't exist.")
+                print(f'There are only {tracks} tracks. (starting from 0)')
+                sys.exit()
+            for trackNumber in range(tracks):
+                cmd = ['ffmpeg']
+                if(HWACCEL is not None):
+                    cmd.extend(['-hwaccel', HWACCEL])
+                cmd.extend(['-i', INPUT_FILE, '-map', f'0:a:{trackNumber}',
+                    f'{CACHE}/{trackNumber}.wav'])
+                if(not VERBOSE):
+                    cmd.extend(['-nostats', '-loglevel', '0'])
+                subprocess.call(cmd)
 
             if(COMBINE_TRAC):
                 for i in range(tracks):
