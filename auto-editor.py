@@ -669,13 +669,16 @@ if(__name__ == '__main__'):
     if(not os.path.isfile(OUTPUT_FILE)):
         raise IOError(f'Error: The file {OUTPUT_FILE} was not created.')
 
-    try: # should work on Windows
+    try:  # should work on Windows
         os.startfile(OUTPUT_FILE)
     except AttributeError:
-        try: # should work on MacOS and most linux versions
-            subprocess.call(['open', OUTPUT_FILE])
+        try:  # should work on MacOS and most linux versions
+            subprocess.call(["open", OUTPUT_FILE])
         except:
-            print('Could not open output file.')
+            try: # should work on WSL2
+                subprocess.call(["cmd.exe", "/C", "start", OUTPUT_FILE])
+            except:
+                print("could not open output file")
 
     # reset cache folder
     if(not audioOnly):

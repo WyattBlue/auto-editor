@@ -6,6 +6,7 @@ It works by analyzing the video's audio to detect when a section needs to be cut
 
 ## New in 20w24a!
  * You can now use m4a audio files as an input type
+ * You can now use videos with variable frame rates
  * Small output bug now fixed
 
 # Usage
