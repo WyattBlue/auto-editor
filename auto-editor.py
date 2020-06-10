@@ -154,25 +154,34 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                 src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
                 dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
                 if(os.path.isfile(src)):
+                    lastExisting = inputFrame
                     if(inputFrame in zooms):
                         resize(src, dst, zooms[inputFrame])
                     else:
-                        if(min(NEW_SPEED) < 1):
-                            copyfile(src, dist)
-                        else:
-                            os.rename(src, dst)
+                        os.rename(src, dst)
                         Renames.extend([src, dst])
                 else:
+                    if(lastExisting == None):
+                        print(src + ' does not exist.')
+                        raise IOError(f'Fatal Error! No existing frame exist.')
                     src = ''.join([CACHE, '/frame{:06d}'.format(lastExisting+1), '.jpg'])
                     if(os.path.isfile(src)):
                         if(lastExisting in zooms):
                             resize(src, dst, zooms[lastExisting])
                         else:
-                            if(min(NEW_SPEED) < 1):
-                                copyfile(src, dist)
-                            else:
-                                os.rename(src, dst)
+                            os.rename(src, dst)
                             Renames.extend([src, dst])
+                    else:
+                        # uh oh, we need to find the file we just renamed!
+                        myFile = None
+                        for i in range(0, len(Renames), 2):
+                            if(Renames[i] == src):
+                                myFile = Renames[i+1]
+                                break
+                        if(myFile is not None):
+                            copyfile(myFile, dst)
+                        else:
+                            raise IOError(f'Error! The file {src} does not exist.')
 
             outputPointer = endPointer
 
