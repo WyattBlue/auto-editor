@@ -23,7 +23,7 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
-version = '20w23a'
+version = '20w24a'
 
 def debug():
     print('Python Version:')
@@ -128,6 +128,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
     chunk_len = str(len(chunks))
     outputPointer = 0
     Renames = []
+    lastExisting = None
     for chunk in chunks:
         if(NEW_SPEED[int(chunk[2])] < 99999):
             audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
@@ -156,10 +157,22 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                     if(inputFrame in zooms):
                         resize(src, dst, zooms[inputFrame])
                     else:
-                        os.rename(src, dst)
+                        if(min(NEW_SPEED) < 1):
+                            copyfile(src, dist)
+                        else:
+                            os.rename(src, dst)
                         Renames.extend([src, dst])
                 else:
-                    print("This shouldn't happen.")
+                    src = ''.join([CACHE, '/frame{:06d}'.format(lastExisting+1), '.jpg'])
+                    if(os.path.isfile(src)):
+                        if(lastExisting in zooms):
+                            resize(src, dst, zooms[lastExisting])
+                        else:
+                            if(min(NEW_SPEED) < 1):
+                                copyfile(src, dist)
+                            else:
+                                os.rename(src, dst)
+                            Renames.extend([src, dst])
 
             outputPointer = endPointer
 

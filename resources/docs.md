@@ -72,7 +72,7 @@ shorts  | `-l`
 Here is a side by side comparison between a video with no zoom, and a video with auto zoom.
 
 <p align="center">
-  <img src="/github%20resources/auto_zoom_demo.gif" width="800">
+  <img src="/resources/auto_zoom_demo.gif" width="800">
 </p>
 
 (video source from jacksfilms)
