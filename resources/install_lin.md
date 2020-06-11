@@ -54,4 +54,4 @@ Run
 ```terminal
 python auto-editor.py --help
 ```
-to test it and if that runs successfully, then congratulations, you have successfully installed auto-editor. See [the docs](/github%20resources/docs.md) for more commands and usages.
+to test it and if that runs successfully, then congratulations, you have successfully installed auto-editor. See [the docs](/resources/docs.md) for more commands and usages.

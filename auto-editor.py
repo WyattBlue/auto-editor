@@ -23,7 +23,7 @@ from multiprocessing import Process
 FADE_SIZE = 400
 TEMP = '.TEMP'
 CACHE = '.CACHE'
-version = '20w23a'
+version = '20w24a'
 
 def debug():
     print('Python Version:')
@@ -128,6 +128,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
     chunk_len = str(len(chunks))
     outputPointer = 0
     Renames = []
+    lastExisting = None
     for chunk in chunks:
         if(NEW_SPEED[int(chunk[2])] < 99999):
             audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
@@ -153,13 +154,34 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                 src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
                 dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
                 if(os.path.isfile(src)):
+                    lastExisting = inputFrame
                     if(inputFrame in zooms):
                         resize(src, dst, zooms[inputFrame])
                     else:
                         os.rename(src, dst)
                         Renames.extend([src, dst])
                 else:
-                    print("This shouldn't happen.")
+                    if(lastExisting == None):
+                        print(src + ' does not exist.')
+                        raise IOError(f'Fatal Error! No existing frame exist.')
+                    src = ''.join([CACHE, '/frame{:06d}'.format(lastExisting+1), '.jpg'])
+                    if(os.path.isfile(src)):
+                        if(lastExisting in zooms):
+                            resize(src, dst, zooms[lastExisting])
+                        else:
+                            os.rename(src, dst)
+                            Renames.extend([src, dst])
+                    else:
+                        # uh oh, we need to find the file we just renamed!
+                        myFile = None
+                        for i in range(0, len(Renames), 2):
+                            if(Renames[i] == src):
+                                myFile = Renames[i+1]
+                                break
+                        if(myFile is not None):
+                            copyfile(myFile, dst)
+                        else:
+                            raise IOError(f'Error! The file {src} does not exist.')
 
             outputPointer = endPointer
 
@@ -239,8 +261,8 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def formatAudio(inputFile, outputFile, sampleRate, size, VERBOSE=False):
-    cmd = ['ffmpeg', '-i', inputFile, '-b:a', size, '-ac', '2', '-ar', str(sampleRate),
+def formatAudio(inputFile, outputFile, sampleRate, bitrate, VERBOSE=False):
+    cmd = ['ffmpeg', '-i', inputFile, '-b:a', bitrate, '-ac', '2', '-ar', str(sampleRate),
      '-vn', outputFile]
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
@@ -378,30 +400,19 @@ if(__name__ == '__main__'):
         audioOnly = False
     else:
         dotIndex = INPUT_FILE.rfind('.')
+        extension = INPUT_FILE[dotIndex:]
         if(len(args.output_file) >= 1):
             OUTPUT_FILE = args.output_file
         else:
-            OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+INPUT_FILE[dotIndex:]
+            if(extension == '.m4a'):
+                OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED.wav'
+            else:
+                OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+extension
 
-        extension = INPUT_FILE[dotIndex:]
-        audioOnly = extension == '.wav' or extension == '.mp3'
+        audioOnly = extension in ['.wav', '.mp3', '.m4a']
 
     if(not os.path.isfile(INPUT_FILE)):
         print('Could not find file:', INPUT_FILE)
-        sys.exit()
-
-    if(args.frame_rate is None):
-        if(audioOnly):
-            frameRate = 30
-        else:
-            frameRate = getFrameRate(INPUT_FILE)
-    else:
-        frameRate = args.frame_rate
-
-    fileSize = os.stat(INPUT_FILE).st_size
-
-    if(args.get_auto_fps):
-        print(frameRate)
         sys.exit()
 
     try:
@@ -409,6 +420,36 @@ if(__name__ == '__main__'):
     except OSError:
         rmtree(TEMP)
         os.mkdir(TEMP)
+
+    if(audioOnly):
+        if(args.frame_rate is None):
+            frameRate = 30
+        else:
+            frameRate = args.frame_rate
+    else:
+        try:
+            frameRate = getFrameRate(INPUT_FILE)
+        except AttributeError:
+            print('Warning! frame rate detection failed.')
+            print('If your video has a variable frame rate, ignore this message.')
+            # convert frame rate to 30 or a user defined value
+            if(args.frame_rate is None):
+                frameRate = 30
+            else:
+                frameRate = args.frame_rate
+
+            cmd = ['ffmpeg', '-i', INPUT_FILE, '-filter:v', f'fps=fps={frameRate}',
+                TEMP+'/constantVid'+extension, '-hide_banner']
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
+            INPUT_FILE = TEMP+'/constantVid'+extension
+
+    fileSize = os.stat(INPUT_FILE).st_size
+
+    if(args.get_auto_fps):
+        print(frameRate)
+        sys.exit()
 
     # make Cache folder
     SKIP = False
@@ -432,61 +473,42 @@ if(__name__ == '__main__'):
         if(audioOnly):
             print('Formatting audio.')
             formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
+            tracks = 1
         else:
             # Videos can have more than one audio track os we need to extract them all
             print('Separating audio from video.')
 
             tracks = 0
-            if(COMBINE_TRAC):
-                while(True):
-                    cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', '192k', '-ac', '2', '-ar',
-                            str(SAMPLE_RATE), '-vn', '-map', '0:a:'+str(tracks),
-                            f'{CACHE}/{tracks}.wav']
 
-                    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT)
-                    stdout, __ = process.communicate()
-                    output = stdout.decode()
-                    output = output[-70:]
-                    # no more audio tracks
-                    if("To ignore this, add a trailing '?' to the map." in output):
-                        break
-                    tracks += 1
+            cmd = ['ffprobe', INPUT_FILE, '-hide_banner', '-loglevel', 'panic',
+                '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
+                'compact=p=0:nk=1']
 
-                    if(BASE_TRAC >= tracks):
-                        print("Error: You choose a track that doesn't exist.")
-                        print(f'There are only {tracks} tracks. (starting from 0)')
-                        sys.exit()
-            else:
-                cmd = ['ffprobe', INPUT_FILE, '-hide_banner', '-loglevel', 'panic',
-                    '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
-                    'compact=p=0:nk=1']
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT)
+            stdout, __ = process.communicate()
+            output = stdout.decode()
+            numbers = output.split('\n')
+            try:
+                test = int(numbers[0])
+                tracks = len(numbers)-1
+            except ValueError:
+                print('Warning: ffprobe had an invalid output.')
+                tracks = 1
 
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT)
-                stdout, __ = process.communicate()
-                output = stdout.decode()
-                numbers = output.split('\n')
-                try:
-                    test = int(numbers[0])
-                    tracks = len(numbers)-1
-                except ValueError:
-                    print('Warning: ffprobe had an invalid output.')
-                    tracks = 1
-
-                if(BASE_TRAC >= tracks):
-                    print("Error: You choose a track that doesn't exist.")
-                    print(f'There are only {tracks} tracks. (starting from 0)')
-                    sys.exit()
-                for trackNumber in range(tracks):
-                    cmd = ['ffmpeg']
-                    if(HWACCEL is not None):
-                        cmd.extend(['-hwaccel', HWACCEL])
-                    cmd.extend(['-i', INPUT_FILE, '-map', f'0:a:{trackNumber}',
-                        f'{CACHE}/{trackNumber}.wav'])
-                    if(not VERBOSE):
-                        cmd.extend(['-nostats', '-loglevel', '0'])
-                    subprocess.call(cmd)
+            if(BASE_TRAC >= tracks):
+                print("Error: You choose a track that doesn't exist.")
+                print(f'There are only {tracks} tracks. (starting from 0)')
+                sys.exit()
+            for trackNumber in range(tracks):
+                cmd = ['ffmpeg']
+                if(HWACCEL is not None):
+                    cmd.extend(['-hwaccel', HWACCEL])
+                cmd.extend(['-i', INPUT_FILE, '-map', f'0:a:{trackNumber}',
+                    f'{CACHE}/{trackNumber}.wav'])
+                if(not VERBOSE):
+                    cmd.extend(['-nostats', '-loglevel', '0'])
+                subprocess.call(cmd)
 
             if(COMBINE_TRAC):
                 for i in range(tracks):
@@ -512,6 +534,8 @@ if(__name__ == '__main__'):
             subprocess.call(cmd)
 
     if(PRERUN):
+        file = open(f'{CACHE}/cache.txt', 'w')
+        file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
         print('Done.')
         sys.exit()
 
@@ -647,13 +671,16 @@ if(__name__ == '__main__'):
     if(not os.path.isfile(OUTPUT_FILE)):
         raise IOError(f'Error: The file {OUTPUT_FILE} was not created.')
 
-    try: # should work on Windows
+    try:  # should work on Windows
         os.startfile(OUTPUT_FILE)
     except AttributeError:
-        try: # should work on MacOS and most linux versions
-            subprocess.call(['open', OUTPUT_FILE])
+        try:  # should work on MacOS and most linux versions
+            subprocess.call(["open", OUTPUT_FILE])
         except:
-            print('Could not open output file.')
+            try: # should work on WSL2
+                subprocess.call(["cmd.exe", "/C", "start", OUTPUT_FILE])
+            except:
+                print("could not open output file")
 
     # reset cache folder
     if(not audioOnly):
