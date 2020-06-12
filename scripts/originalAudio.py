@@ -1,3 +1,5 @@
+'''originalAudio.py'''
+
 import numpy as np
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
