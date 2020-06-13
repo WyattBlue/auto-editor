@@ -56,7 +56,7 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
 
     return chunks
 
-def fastVideo(videoFile, silentThreshold, frameMargin):
+def fastVideo(videoFile, outFile, silentThreshold, frameMargin):
 
     TEMP = '.TEMP'
 
@@ -139,14 +139,12 @@ def fastVideo(videoFile, silentThreshold, frameMargin):
     first = videoFile[:videoFile.rfind('.')]
     extension = videoFile[videoFile.rfind('.'):]
 
-    outFile = f'{first}_faster{extension}'
+    if(outFile == ''):
+        outFile = f'{first}_ALTERED{extension}'
 
     cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/spedup.mp4', '-i']
     cmd.extend([f"{TEMP}/spedupAudio.wav", "-c:v", "copy", "-c:a", "aac", outFile])
     cmd.extend(["-nostats", "-loglevel", "0"])
     subprocess.call(cmd)
 
-    if(not os.path.isfile(outFile)):
-        raise IOError(f'the file {outFile} was not created')
-
-    rmtree(TEMP)
+    return outFile

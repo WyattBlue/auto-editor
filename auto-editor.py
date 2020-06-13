@@ -83,7 +83,7 @@ if(__name__ == '__main__'):
     parser.add_argument('--cut_by_all_tracks', action='store_true',
         help='combine all audio tracks into 1 before basing cuts')
     parser.add_argument('--keep_tracks_seperate', action='store_true',
-        help="Don't combine audio tracks ever. (Warning, multiple audio tracks are not supported on most platforms (YouTube)")
+        help="Don't combine audio tracks ever. (Warning, multiple audio tracks are not supported on most platforms")
     parser.add_argument('--hardware_accel', type=str,
         help='set the hardware used for gpu acceleration')
 
@@ -108,10 +108,13 @@ if(__name__ == '__main__'):
         if(args.input == []):
             sys.exit()
 
-    startTime = time.time()
+    if(args.input == []):
+        print('auto-editor.py: error: the following arguments are required: input')
+        sys.exit()
 
 
     INPUT_FILE = args.input[0]
+
     OUTPUT_FILE = args.output_file
     BACK_MUS = args.background_music
     BACK_VOL = args.background_volume
@@ -139,10 +142,6 @@ if(__name__ == '__main__'):
     HWACCEL = args.hardware_accel
     KEEP_SEP = args.keep_tracks_seperate
 
-    if(args.input == []):
-        print('auto-editor.py: error: the following arguments are required: input')
-        sys.exit()
-
     # if input is URL, download as mp4 with youtube-dl
     if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
         print('URL detected, using youtube-dl to download from webpage.')
@@ -154,13 +153,29 @@ if(__name__ == '__main__'):
         OUTPUT_FILE = 'web_download_ALTERED.mp4'
 
     if(args.get_auto_fps):
-        print(frameRate)
+        from scripts.originalMethod import getFrameRate
+        print(getFrameRate(INPUT_FILE))
         sys.exit()
 
-    OUTPUT_FILE = originalMethod(INPUT_FILE, OUTPUT_FILE, GIVEN_FPS, FRAME_SPREADAGE, FRAME_QUALITY,
-        SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED, VIDEO_SPEED,
-        KEEP_SEP, BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE,
-        PRERUN, HWACCEL)
+    startTime = time.time()
+
+    if(BACK_MUS is None and BACK_VOL != -12):
+        print('Warning! Background volume specified even though no background music was provided.')
+
+
+    if(KEEP_SEP == False and PRERUN == False and BACK_MUS is None and LOUD_THRESHOLD == 2
+        and NEW_TRAC == None and SILENT_SPEED == 99999 and VIDEO_SPEED == 1
+        and BASE_TRAC == 0):
+
+        print('Using fast version.')
+
+        OUTPUT_FILE = fastVideo(INPUT_FILE, OUTPUT_FILE, SILENT_THRESHOLD, FRAME_SPREADAGE)
+
+    else:
+        OUTPUT_FILE = originalMethod(INPUT_FILE, OUTPUT_FILE, GIVEN_FPS, FRAME_SPREADAGE,
+            FRAME_QUALITY, SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED,
+            VIDEO_SPEED, KEEP_SEP, BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC,
+            VERBOSE, PRERUN, HWACCEL)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
@@ -173,7 +188,7 @@ if(__name__ == '__main__'):
     try:  # should work on Windows
         os.startfile(OUTPUT_FILE)
     except AttributeError:
-        try:  # should work on MacOS and most linux versions
+        try:  # should work on MacOS and most Linux versions
             subprocess.call(['open', OUTPUT_FILE])
         except:
             try: # should work on WSL2
