@@ -1,4 +1,4 @@
-'''originalAudio.py'''
+'''scripts/originalAudio.py'''
 
 import numpy as np
 from audiotsm import phasevocoder

@@ -4,36 +4,23 @@
 from pydub import AudioSegment
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
-from scipy.io import wavfile
 from PIL import Image # pip install pillow
 import numpy as np
 
 # internal python libraries
-import math
 import os
 import argparse
 import subprocess
 import sys
 import time
 from datetime import timedelta
-from shutil import move, rmtree, copyfile
-from multiprocessing import Process
+from shutil import rmtree
 
 # included functions
-from scripts.originalAudio import handleAudio
-from scripts.originalVid import splitVideo
-from scripts.original #???
+from scripts.originalMethod import originalMethod
+from scripts.fastVideo import fastVideo
 
-version = '20w24a'
-
-def debug():
-    print('Python Version:')
-    print(sys.version)
-    print('Is your python 64-Bit?')
-    print(sys.maxsize > 2**32)
-    print('Auto-Editor Version:')
-    print(version)
-
+version = '20w24b'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -103,7 +90,12 @@ if(__name__ == '__main__'):
     args = parser.parse_args()
 
     if(args.debug):
-        debug()
+        print('Python Version:')
+        print(sys.version)
+        print('Is your python 64-Bit?')
+        print(sys.maxsize > 2**32)
+        print('Auto-Editor Version:')
+        print(version)
         sys.exit()
 
     if(args.version):
@@ -118,17 +110,30 @@ if(__name__ == '__main__'):
 
     startTime = time.time()
 
+
+    INPUT_FILE = args.input[0]
+    OUTPUT_FILE = args.output_file
+    BACK_MUS = args.background_music
+    BACK_VOL = args.background_volume
+    NEW_TRAC = args.cut_by_this_audio
+    BASE_TRAC = args.cut_by_this_track
+    COMBINE_TRAC = args.cut_by_all_tracks
+    GIVEN_FPS = args.frame_rate
+
     SAMPLE_RATE = args.sample_rate
     SILENT_THRESHOLD = args.silent_threshold
     LOUD_THRESHOLD = args.loudness_threshold
     FRAME_SPREADAGE = args.frame_margin
-    if(args.silent_speed <= 0):
-        args.silent_speed = 99999
-    if(args.video_speed <= 0):
-        args.video_speed = 99999
-    NEW_SPEED = [args.silent_speed, args.video_speed]
-
     FRAME_QUALITY = args.frame_quality
+
+    SILENT_SPEED = args.silent_speed
+    VIDEO_SPEED = args.video_speed
+
+    if(SILENT_SPEED <= 0):
+        SILENT_SPEED = 99999
+    if(VIDEO_SPEED <= 0):
+        VIDEO_SPEED = 99999
+
     VERBOSE = args.verbose
     PRERUN = args.prerun
     HWACCEL = args.hardware_accel
@@ -136,15 +141,7 @@ if(__name__ == '__main__'):
 
     if(args.input == []):
         print('auto-editor.py: error: the following arguments are required: input')
-        sys.exit(0)
-
-    INPUT_FILE = args.input[0]
-    BACK_MUS = args.background_music
-    BACK_VOL = args.background_volume
-    NEW_TRAC = args.cut_by_this_audio
-    BASE_TRAC = args.cut_by_this_track
-    COMBINE_TRAC = args.cut_by_all_tracks
-    INPUTS = args.input
+        sys.exit()
 
     # if input is URL, download as mp4 with youtube-dl
     if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
@@ -156,13 +153,14 @@ if(__name__ == '__main__'):
         INPUT_FILE = 'web_download.mp4'
         OUTPUT_FILE = 'web_download_ALTERED.mp4'
 
-
     if(args.get_auto_fps):
         print(frameRate)
         sys.exit()
 
-    # original method
-    originalMethod()
+    OUTPUT_FILE = originalMethod(INPUT_FILE, OUTPUT_FILE, GIVEN_FPS, FRAME_SPREADAGE, FRAME_QUALITY,
+        SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED, VIDEO_SPEED,
+        KEEP_SEP, BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE,
+        PRERUN, HWACCEL)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
@@ -176,25 +174,12 @@ if(__name__ == '__main__'):
         os.startfile(OUTPUT_FILE)
     except AttributeError:
         try:  # should work on MacOS and most linux versions
-            subprocess.call(["open", OUTPUT_FILE])
+            subprocess.call(['open', OUTPUT_FILE])
         except:
             try: # should work on WSL2
-                subprocess.call(["cmd.exe", "/C", "start", OUTPUT_FILE])
+                subprocess.call(['cmd.exe', '/C', 'start', OUTPUT_FILE])
             except:
-                print("could not open output file")
+                print('Could not open output file.')
 
-    # reset cache folder
-    if(not audioOnly):
-        with open(f'{TEMP}/Renames.txt', 'r') as f:
-            renames = f.read().splitlines()
-            for i in range(0, len(renames), 2):
-                os.rename(renames[i+1], renames[i])
-
-    # create cache check with vid stats
-
-    if(BACK_MUS is not None):
-        tracks -= 1
-    file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
-
-    rmtree(TEMP)
+    if(os.path.isfile('.TEMP')):
+        rmtree('.TEMP')

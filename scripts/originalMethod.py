@@ -1,17 +1,23 @@
-'''originalMethod.py'''
+'''scripts/originalMethod.py'''
 
 import pydub
+import numpy as np
 
 import os
+import sys
+import math
 import subprocess
 from re import search
+from multiprocessing import Process
+from shutil import move, rmtree
 
-import handleAudio
-import splitVideo
+from scipy.io import wavfile
+
+from scripts.originalAudio import handleAudio
+from scripts.originalVid import splitVideo
 
 TEMP = '.TEMP'
 CACHE = '.CACHE'
-
 
 def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
     zooms = {}
@@ -51,16 +57,16 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def formatAudio(inputFile, outputFile, sampleRate, bitrate, VERBOSE=False):
-    cmd = ['ffmpeg', '-i', inputFile, '-b:a', bitrate, '-ac', '2', '-ar', str(sampleRate),
+def formatAudio(INPUT_FILE, outputFile, sampleRate, bitrate, VERBOSE=False):
+    cmd = ['ffmpeg', '-i', INPUT_FILE, '-b:a', bitrate, '-ac', '2', '-ar', str(sampleRate),
      '-vn', outputFile]
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)
 
 
-def formatForPydub(inputFile, outputFile, SAMPLE_RATE):
-    cmd = ['ffmpeg', '-i', inputFile, '-vn', '-ar',
+def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
+    cmd = ['ffmpeg', '-i', INPUT_FILE, '-vn', '-ar',
         str(SAMPLE_RATE), '-ac', '2', '-ab', '192k', '-f', 'mp3', outputFile]
     cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)
@@ -76,7 +82,7 @@ def getVideoLength(path):
         text = m.group(1)[:-1]
         return text
     else:
-        return 'Unknown length'
+        return 'unknown'
 
 
 def getFrameRate(path):
@@ -88,24 +94,23 @@ def getFrameRate(path):
     return float(matchDict["fps"])
 
 
-def prepareInput(inputFile, audioOnly, )
+def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUALITY,
+    SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
+    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE, PRERUN, HWACCEL):
 
+    NEW_SPEED = [SILENT_SPEED, VIDEO_SPEED]
 
     dotIndex = INPUT_FILE.rfind('.')
     extension = INPUT_FILE[dotIndex:]
-    if(len(args.output_file) >= 1):
-        OUTPUT_FILE = args.output_file
+    if(len(OUTPUT_FILE) >= 1):
+        outFile = OUTPUT_FILE
     else:
         if(extension == '.m4a'):
-            OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED.wav'
+            outFile = INPUT_FILE[:dotIndex]+'_ALTERED.wav'
         else:
-            OUTPUT_FILE = INPUT_FILE[:dotIndex]+'_ALTERED'+extension
+            outFile = INPUT_FILE[:dotIndex]+'_ALTERED'+extension
 
     audioOnly = extension in ['.wav', '.mp3', '.m4a']
-
-
-    ###
-
 
     if(not os.path.isfile(INPUT_FILE)):
         print('Could not find file:', INPUT_FILE)
@@ -118,10 +123,10 @@ def prepareInput(inputFile, audioOnly, )
         os.mkdir(TEMP)
 
     if(audioOnly):
-        if(args.frame_rate is None):
+        if(givenFPS is None):
             frameRate = 30
         else:
-            frameRate = args.frame_rate
+            frameRate = givenFPS
     else:
         try:
             frameRate = getFrameRate(INPUT_FILE)
@@ -129,10 +134,10 @@ def prepareInput(inputFile, audioOnly, )
             print('Warning! frame rate detection failed.')
             print('If your video has a variable frame rate, ignore this message.')
             # convert frame rate to 30 or a user defined value
-            if(args.frame_rate is None):
+            if(givenFPS is None):
                 frameRate = 30
             else:
-                frameRate = args.frame_rate
+                frameRate = givenFPS
 
             cmd = ['ffmpeg', '-i', INPUT_FILE, '-filter:v', f'fps=fps={frameRate}',
                 TEMP+'/constantVid'+extension, '-hide_banner']
@@ -141,7 +146,7 @@ def prepareInput(inputFile, audioOnly, )
             subprocess.call(cmd)
             INPUT_FILE = TEMP+'/constantVid'+extension
 
-    fileSize = os.stat(inputFile).st_size
+    fileSize = os.stat(INPUT_FILE).st_size
 
     # make Cache folder
     SKIP = False
@@ -151,7 +156,7 @@ def prepareInput(inputFile, audioOnly, )
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x[:4] == [inputFile, str(frameRate), str(fileSize), str(FRAME_QUALITY)]
+            if(x[:4] == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]
                 and x[5] == str(COMBINE_TRAC)):
                 print('Using cache.')
                 SKIP = True
@@ -164,7 +169,7 @@ def prepareInput(inputFile, audioOnly, )
     if(not SKIP):
         if(audioOnly):
             print('Formatting audio.')
-            formatAudio(inputFile, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
+            formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
             tracks = 1
         else:
             # Videos can have more than one audio track os we need to extract them all
@@ -172,7 +177,7 @@ def prepareInput(inputFile, audioOnly, )
 
             tracks = 0
 
-            cmd = ['ffprobe', inputFile, '-hide_banner', '-loglevel', 'panic',
+            cmd = ['ffprobe', INPUT_FILE, '-hide_banner', '-loglevel', 'panic',
                 '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
                 'compact=p=0:nk=1']
 
@@ -196,7 +201,7 @@ def prepareInput(inputFile, audioOnly, )
                 cmd = ['ffmpeg']
                 if(HWACCEL is not None):
                     cmd.extend(['-hwaccel', HWACCEL])
-                cmd.extend(['-i', inputFile, '-map', f'0:a:{trackNumber}',
+                cmd.extend(['-i', INPUT_FILE, '-map', f'0:a:{trackNumber}',
                     f'{CACHE}/{trackNumber}.wav'])
                 if(not VERBOSE):
                     cmd.extend(['-nostats', '-loglevel', '0'])
@@ -219,7 +224,7 @@ def prepareInput(inputFile, audioOnly, )
             cmd = ['ffmpeg']
             if(HWACCEL is not None):
                 cmd.extend(['-hwaccel', HWACCEL])
-            cmd.extend(['-i', inputFile, '-qscale:v', str(FRAME_QUALITY),
+            cmd.extend(['-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY),
                 f'{CACHE}/frame%06d.jpg'])
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
@@ -227,7 +232,7 @@ def prepareInput(inputFile, audioOnly, )
 
     if(PRERUN):
         file = open(f'{CACHE}/cache.txt', 'w')
-        file.write(f'{inputFile}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
+        file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
         print('Done.')
         sys.exit()
 
@@ -312,7 +317,7 @@ def prepareInput(inputFile, audioOnly, )
 
     if(audioOnly):
         print('Moving audio.')
-        move(f'{TEMP}/audioNew.wav', OUTPUT_FILE)
+        move(f'{TEMP}/audioNew.wav', outFile)
     else:
         print('Finishing video.')
 
@@ -326,7 +331,7 @@ def prepareInput(inputFile, audioOnly, )
             for i in range(tracks):
                 cmd.extend(['-map', f'{i}:a:0'])
             cmd.extend(['-map', f'{tracks}:v:0','-c:v', 'copy', '-movflags', '+faststart',
-                OUTPUT_FILE])
+                outFile])
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
         else:
@@ -350,7 +355,26 @@ def prepareInput(inputFile, audioOnly, )
                 cmd.extend(['-hwaccel', HWACCEL])
             cmd.extend(['-i', f'{TEMP}/newAudioFile.wav'])
             cmd.extend(['-i', f'{TEMP}/output{extension}']) # add input video
-            cmd.extend(['-c:v', 'copy', '-movflags', '+faststart', OUTPUT_FILE])
+            cmd.extend(['-c:v', 'copy', '-movflags', '+faststart', outFile])
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
+
+    # reset cache folder
+    if(not audioOnly):
+        with open(f'{TEMP}/Renames.txt', 'r') as f:
+            renames = f.read().splitlines()
+            for i in range(0, len(renames), 2):
+                os.rename(renames[i+1], renames[i])
+
+    # create cache check with vid stats
+
+    print('orig out', OUTPUT_FILE)
+
+    if(BACK_MUS is not None):
+        tracks -= 1
+    file = open(f'{CACHE}/cache.txt', 'w')
+    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
+
+    return outFile
+
