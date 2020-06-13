@@ -3,6 +3,7 @@
 import numpy as np
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
+from scipy.io import wavfile
 from PIL import Image
 
 import os

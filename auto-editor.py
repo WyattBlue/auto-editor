@@ -104,7 +104,7 @@ if(__name__ == '__main__'):
 
     if(args.clear_cache):
         print('Removing cache')
-        rmtree(CACHE)
+        rmtree('.CACHE')
         if(args.input == []):
             sys.exit()
 
