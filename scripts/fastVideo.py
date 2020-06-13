@@ -18,6 +18,7 @@ import os
 import subprocess
 import argparse
 from shutil import rmtree
+from time import time, localtime
 
 def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPREADAGE):
 
@@ -56,7 +57,36 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
 
     return chunks
 
+
+def getVideoLength(path):
+    from re import search
+
+    process = subprocess.Popen(['ffmpeg', '-i', path],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    stdout, __ = process.communicate()
+    output = stdout.decode()
+    m = search(r'(\d\d:\d\d:\d\d.\d\d,)', output)
+    if(m):
+        text = m.group(1)[:-1]
+        hours = int(text[0:2])
+        minutes = int(text[3:5])
+        seconds = float(text[6:11])
+        return hours * 360 + minutes * 60 + seconds
+    else:
+        return 'unknown'
+
+
 def fastVideo(videoFile, outFile, silentThreshold, frameMargin):
+
+    print('Running from fastVideo.py')
+
+    timeTaken = getVideoLength(videoFile) / 5
+
+    if(timeTaken > 99):
+        wait = round(timeTaken / 60, 2)
+        print(f'Please wait about {wait} minutes.')
+    else:
+        print(f'Please wait about {timeTaken} seconds.')
 
     TEMP = '.TEMP'
 
@@ -109,14 +139,11 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin):
         audioChunk = audioData[audioSampleStart:audioSampleEnd]
 
         state = None
-        normal = True
         for chunk in chunks:
             if(cframe >= chunk[0] and cframe <= chunk[1]):
                 state = chunk[2]
-                if(cframe == chunk[1]):
-                    normal = False
                 break
-        if(state == 1):
+        if(state > 0):
             out.write(frame)
 
             switchStart = switchEnd

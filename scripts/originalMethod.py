@@ -2,6 +2,7 @@
 
 import pydub
 import numpy as np
+from scipy.io import wavfile
 
 import os
 import sys
@@ -10,8 +11,6 @@ import subprocess
 from re import search
 from multiprocessing import Process
 from shutil import move, rmtree
-
-from scipy.io import wavfile
 
 from scripts.originalAudio import handleAudio
 from scripts.originalVid import splitVideo
@@ -70,19 +69,6 @@ def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
         str(SAMPLE_RATE), '-ac', '2', '-ab', '192k', '-f', 'mp3', outputFile]
     cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)
-
-
-def getVideoLength(path):
-    process = subprocess.Popen(['ffmpeg', '-i', path],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    output = stdout.decode()
-    m = search(r'(\d\d:\d\d:\d\d.\d\d,)', output)
-    if(m):
-        text = m.group(1)[:-1]
-        return text
-    else:
-        return 'unknown'
 
 
 def getFrameRate(path):
@@ -368,13 +354,9 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
                 os.rename(renames[i+1], renames[i])
 
     # create cache check with vid stats
-
-    print('orig out', OUTPUT_FILE)
-
     if(BACK_MUS is not None):
         tracks -= 1
     file = open(f'{CACHE}/cache.txt', 'w')
     file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
 
     return outFile
-
