@@ -30,7 +30,7 @@ def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
         start = int(max(0, i-FRAME_SPREADAGE))
         end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
         shouldIncludeFrame[i] = np.max(hasLoudAudio[start:end])
-        if(i >= 2 and shouldIncludeFrame[i] == 2 and hold == False):
+        if(i >= 2 and shouldIncludeFrame[i] == 2 and not hold):
             if(shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
                 a = 1.2 - 1.0 # 1.0 -> 1.2
                 p = int(frameRate / 3)
@@ -40,12 +40,12 @@ def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
                 hold = True
                 endZoom = i + x
                 continue
-        if(hold == True):
+        if(hold):
             zooms[i-1] = 1.2
             if(len(shouldIncludeFrame) - i > int(frameRate * 1.5) and
                 shouldIncludeFrame[i] == 1 and i-endZoom > int(frameRate/2)):
-                for y in range(len(chunks)):
-                    if(chunks[y][0] == i and chunks[y][2] == 1):
+                for chunk in chunks:
+                    if chunk[0] == i and chunk[2] == 1:
                         hold = False
     return zooms
 
@@ -65,9 +65,8 @@ def formatAudio(INPUT_FILE, outputFile, sampleRate, bitrate, VERBOSE=False):
 
 
 def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
-    cmd = ['ffmpeg', '-i', INPUT_FILE, '-vn', '-ar',
-        str(SAMPLE_RATE), '-ac', '2', '-ab', '192k', '-f', 'mp3', outputFile]
-    cmd.extend(['-nostats', '-loglevel', '0'])
+    cmd = ['ffmpeg', '-i', INPUT_FILE, '-vn', '-ar', str(SAMPLE_RATE), '-ac', '2',
+    '-ab', '192k', '-f', 'mp3', outputFile, '-nostats', '-loglevel', '0']
     subprocess.call(cmd)
 
 
