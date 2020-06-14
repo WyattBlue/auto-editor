@@ -157,6 +157,9 @@ if(__name__ == '__main__'):
         print(getFrameRate(INPUT_FILE))
         sys.exit()
 
+    isAudio = INPUT_FILE.endswith('.wav') or INPUT_FILE.endswith('.mp3')
+        or INPUT_FILE.endswith('.m4a')
+
     startTime = time.time()
 
     if(BACK_MUS is None and BACK_VOL != -12):
@@ -165,7 +168,7 @@ if(__name__ == '__main__'):
 
     if(KEEP_SEP == False and PRERUN == False and BACK_MUS is None and LOUD_THRESHOLD == 2
         and NEW_TRAC == None and SILENT_SPEED == 99999 and VIDEO_SPEED == 1
-        and BASE_TRAC == 0 and HWACCEL is None):
+        and BASE_TRAC == 0 and HWACCEL is None and not isAudio):
 
         OUTPUT_FILE = fastVideo(INPUT_FILE, OUTPUT_FILE, SILENT_THRESHOLD,
             FRAME_SPREADAGE, SAMPLE_RATE)
