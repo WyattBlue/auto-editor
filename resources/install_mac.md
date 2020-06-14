@@ -36,7 +36,7 @@ If not, then install it by running:
 To install all of the needed dependencies, run this:
 ```terminal
 brew install ffmpeg
-pip3 install scipy audiotsm pillow pydub youtube_dl
+pip3 install scipy audiotsm pillow pydub opencv-python youtube_dl
 ```
 > This ususally takes about 5 minutes.
 

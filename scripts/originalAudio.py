@@ -45,10 +45,11 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
 
             endPointer = outputPointer + leng
 
-            # smooth out transitiion's audio by quickly fading in/out
+            # smooth out transition's audio by quickly fading in/out
             if(leng < FADE_SIZE):
                 for i in range(outputPointer, endPointer):
-                    outputAudioData[i] = 0
+                    outputAudioData[i][0] = 0
+                    outputAudioData[i][1] = 0
             else:
                 for i in range(outputPointer, outputPointer+FADE_SIZE):
                     outputAudioData[i][0] *= mask[i-outputPointer]

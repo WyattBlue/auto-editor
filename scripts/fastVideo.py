@@ -59,34 +59,42 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
 
 
 def getVideoLength(path):
-    from re import search
-
-    process = subprocess.Popen(['ffmpeg', '-i', path],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    output = stdout.decode()
-    m = search(r'(\d\d:\d\d:\d\d.\d\d,)', output)
-    if(m):
-        text = m.group(1)[:-1]
-        hours = int(text[0:2])
-        minutes = int(text[3:5])
-        seconds = float(text[6:11])
-        return hours * 360 + minutes * 60 + seconds
-    else:
-        return 'unknown'
+    result = subprocess.run(['ffprobe', '-v', 'error', '-show_entries',
+                             'format=duration', '-of',
+                             'default=noprint_wrappers=1:nokey=1', path],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT)
+    return float(result.stdout)
 
 
-def fastVideo(videoFile, outFile, silentThreshold, frameMargin):
+def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE):
 
     print('Running from fastVideo.py')
 
     timeTaken = getVideoLength(videoFile) / 5
 
-    if(timeTaken > 99):
-        wait = round(timeTaken / 60, 2)
-        print(f'Please wait about {wait} minutes.')
+    newTime = localtime(time() + timeTaken)
+
+    hours = newTime.tm_hour
+
+    if(hours == 0):
+        ampm = 'AM'
+        hours = 12
+    elif(hours >= 12):
+        hours -= 12
+        ampm = 'PM'
     else:
-        print(f'Please wait about {timeTaken} seconds.')
+        ampm = 'AM'
+    minutes = newTime.tm_min
+
+    newTime = f'{hours:02}:{minutes:02} {ampm}'
+
+    if(timeTaken > 99):
+        wait = round(timeTaken / 60)
+        print(f'Please wait about {wait} minutes. (until sometime in {newTime})')
+    else:
+        wait = round(timeTaken)
+        print(f'Please wait about {wait} seconds.')
 
     TEMP = '.TEMP'
 
@@ -102,9 +110,8 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin):
         rmtree(TEMP)
         os.mkdir(TEMP)
 
-    extractAudio = ["ffmpeg", "-i", videoFile, "-ab", "160k", "-ac", "2", "-ar"]
-    extractAudio.extend(["44100", "-vn", f"{TEMP}/output.wav", "-nostats", "-loglevel"])
-    extractAudio.extend(["0"])
+    extractAudio = ["ffmpeg", "-i", videoFile, "-ab", "160k", "-ac", "2", "-ar",
+        str(SAMPLE_RATE), "-vn", f"{TEMP}/output.wav", "-nostats", "-loglevel", "0"]
 
     subprocess.call(extractAudio)
 

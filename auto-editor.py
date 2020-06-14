@@ -167,7 +167,8 @@ if(__name__ == '__main__'):
         and NEW_TRAC == None and SILENT_SPEED == 99999 and VIDEO_SPEED == 1
         and BASE_TRAC == 0):
 
-        OUTPUT_FILE = fastVideo(INPUT_FILE, OUTPUT_FILE, SILENT_THRESHOLD, FRAME_SPREADAGE)
+        OUTPUT_FILE = fastVideo(INPUT_FILE, OUTPUT_FILE, SILENT_THRESHOLD,
+            FRAME_SPREADAGE, SAMPLE_RATE)
 
     else:
         OUTPUT_FILE = originalMethod(INPUT_FILE, OUTPUT_FILE, GIVEN_FPS, FRAME_SPREADAGE,

@@ -30,7 +30,7 @@ If not then follow [this guide](https://www.wikihow.com/Install-FFmpeg-on-Window
 ## Dependencies
 To install all of the needed dependencies, run this:
 ```terminal
-pip3 install scipy audiotsm pillow pydub youtube_dl
+pip3 install scipy audiotsm pillow pydub opencv-python youtube_dl
 ```
 
 Wait for all the libraries to install and once that's done, close and reopen Command Prompt
