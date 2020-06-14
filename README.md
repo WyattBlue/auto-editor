@@ -6,7 +6,6 @@ It works by analyzing the video's audio to detect when a section needs to be cut
 
 ## New in 20w24b!
  * Introduced a brand new method of editing videos that is **4x faster**. Right now, it can't handle changes in sounded or silence speeds so it will default to the original method.
- ** You can force
  * Fixed rare audio bug that stopped new audio being generated.
  * The main script has been split into more manageable parts to aid future collaborators. You can find them in the 'scripts' folder.
 
