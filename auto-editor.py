@@ -130,7 +130,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
     Renames = []
     lastExisting = None
     for chunk in chunks:
-        if(NEW_SPEED[int(chunk[2])] < 99999):
+        if (NEW_SPEED[int(chunk[2])] < 99999):
             audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
             if(NEW_SPEED[int(chunk[2])] == 1):
                 leng = len(audioChunk)
@@ -153,7 +153,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
 
                 src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
                 dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
-                if(os.path.isfile(src)):
+                if os.path.isfile(src):
                     lastExisting = inputFrame
                     if(inputFrame in zooms):
                         resize(src, dst, zooms[inputFrame])
@@ -161,7 +161,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                         os.rename(src, dst)
                         Renames.extend([src, dst])
                 else:
-                    if(lastExisting == None):
+                    if lastExisting is None:
                         print(src + ' does not exist.')
                         raise IOError(f'Fatal Error! No existing frame exist.')
                     src = ''.join([CACHE, '/frame{:06d}'.format(lastExisting+1), '.jpg'])
@@ -217,9 +217,8 @@ def getVideoLength(path):
     stdout, __ = process.communicate()
     output = stdout.decode()
     m = search(r'(\d\d:\d\d:\d\d.\d\d,)', output)
-    if(m):
-        text = m.group(1)[:-1]
-        return text
+    if (m):
+        return m.group(1)[:-1]
     else:
         return 'Unknown length'
 
@@ -236,22 +235,26 @@ def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
         start = int(max(0, i-FRAME_SPREADAGE))
         end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
         shouldIncludeFrame[i] = np.max(hasLoudAudio[start:end])
-        if(i >= 2 and shouldIncludeFrame[i] == 2 and hold == False):
-            if(shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
-                a = 1.2 - 1.0 # 1.0 -> 1.2
-                p = int(frameRate / 3)
-                for x in range(1, p + 1):
-                    trans = a * math.sin((math.pi/(2*p)) * x + (2*math.pi))
-                    zooms[i+x-3] = 1 + trans
-                hold = True
-                endZoom = i + x
-                continue
-        if(hold == True):
+        if (
+            i >= 2
+            and shouldIncludeFrame[i] == 2
+            and not hold
+            and (shouldIncludeFrame[i] != shouldIncludeFrame[i - 1])
+        ):
+            a = 1.2 - 1.0 # 1.0 -> 1.2
+            p = int(frameRate / 3)
+            for x in range(1, p + 1):
+                trans = a * math.sin((math.pi/(2*p)) * x + (2*math.pi))
+                zooms[i+x-3] = 1 + trans
+            hold = True
+            endZoom = i + x
+            continue
+        if hold:
             zooms[i-1] = 1.2
-            if(len(shouldIncludeFrame) - i > int(frameRate * 1.5) and
+            if (len(shouldIncludeFrame) - i > int(frameRate * 1.5) and
                 shouldIncludeFrame[i] == 1 and i-endZoom > int(frameRate/2)):
-                for y in range(len(chunks)):
-                    if(chunks[y][0] == i and chunks[y][2] == 1):
+                for chunk in chunks:
+                    if chunk[0] == i and chunk[2] == 1:
                         hold = False
     return zooms
 
@@ -270,9 +273,25 @@ def formatAudio(inputFile, outputFile, sampleRate, bitrate, VERBOSE=False):
 
 
 def formatForPydub(inputFile, outputFile, SAMPLE_RATE):
-    cmd = ['ffmpeg', '-i', inputFile, '-vn', '-ar',
-        str(SAMPLE_RATE), '-ac', '2', '-ab', '192k', '-f', 'mp3', outputFile]
-    cmd.extend(['-nostats', '-loglevel', '0'])
+    cmd = [
+        'ffmpeg',
+        '-i',
+        inputFile,
+        '-vn',
+        '-ar',
+        str(SAMPLE_RATE),
+        '-ac',
+        '2',
+        '-ab',
+        '192k',
+        '-f',
+        'mp3',
+        outputFile,
+        '-nostats',
+        '-loglevel',
+        '0',
+    ]
+
     subprocess.call(cmd)
 
 
