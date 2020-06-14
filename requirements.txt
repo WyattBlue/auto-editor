@@ -3,3 +3,4 @@ audiotsm
 pillow
 pydub
 youtube_dl
+opencv-python

@@ -23,11 +23,11 @@ Command | `--frame_margin`
 type    | int
 range   | 0 to Infinity
 default | 4
-shorts  | `-m`
+short   | `-m`
 
 
 ## Changing Video Speed
-Video speed will change speed of the output's video and audio. For instance, if the speed is set to 2. Half of the frames will be dropped and the audio will be speed up with phasevocoder. This does not affect parts of the that are below the silent threshold.
+Video speed will change speed of the output's video and audio. For instance, if the speed is set to 2. Half of the frames will be dropped and the audio will be speed up. This does not affect parts of the video that are below the silent threshold.
 ```
  $ python auto-editor.py example.mp4 --video_speed 2
 ```
@@ -37,7 +37,7 @@ Command | `--video_speed`
 type    | float
 range   | 0 to 99999
 default | 1
-shorts  | `-v`
+short   | `-v`
 alias   | `--sounded_speed`
 
 You can also do the same, but for the silent parts with --silent_speed
@@ -51,7 +51,7 @@ Command | `--silent_speed`
 type    | float
 range   | 0 to 99999
 default | 99999
-shorts  | `-s`
+short   | `-s`
 
 
 ## Zooming In
@@ -66,7 +66,7 @@ Command | `--loudness_threshold`
 type    | float
 range   | 0 to 1
 default | 2
-shorts  | `-l`
+short   | `-l`
 
 
 Here is a side by side comparison between a video with no zoom, and a video with auto zoom.
@@ -128,7 +128,7 @@ Now the video with be cut by second audio track's volume! But what if you wanted
 ```
 
 ## Caching In
-Every video needs to be split into a jpeg sequence and a wav file, but what if you want to use the same video but use different parameters. That's where caching comes in. The jpeg sequence and the audio are stored away in the .CACHE folder, ready to be used again if it is right.
+Some videos need to be converted to a jpeg image sequence before hand but this can take awhile. What if you want to use the same video but use different parameters. That's where caching comes in. The jpeg sequence and the audio are stored away in the .CACHE folder, ready to be used again if it is right.
 
 The .CACHE folder can take quiet a bit of space so if you want to delete the folder and all its contents, run this command.
 
@@ -161,7 +161,7 @@ Get the version of auto-editor you're using.
  $ python auto-editor.py --version
 ```
 
-Get debug information regarding auto-editor. Including your python version, whether the your python is 64-bit or not, and your auto-editor version.
+Get debug information regarding auto-editor, including your python version, whether the your python is 64-bit or not, and the current version.
 
 ```terminal
  $ python auto-editor.py --debug
