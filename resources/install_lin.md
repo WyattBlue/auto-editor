@@ -35,7 +35,7 @@ ffmpeg -h
 ## Other Dependencies
 To install all of the needed dependencies, run this:
 ```terminal
-pip3 install scipy audiotsm pillow pydub youtube_dl
+pip3 install scipy audiotsm pillow pydub opencv-python youtube_dl
 ```
 > This usually takes about 5 minutes.
 
