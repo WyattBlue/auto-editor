@@ -157,14 +157,12 @@ if(__name__ == '__main__'):
         print(getFrameRate(INPUT_FILE))
         sys.exit()
 
-    isAudio = INPUT_FILE.endswith('.wav') or INPUT_FILE.endswith('.mp3')
-        or INPUT_FILE.endswith('.m4a')
+    isAudio = INPUT_FILE.endswith('.wav') or INPUT_FILE.endswith('.mp3') or INPUT_FILE.endswith('.m4a')
 
     startTime = time.time()
 
     if(BACK_MUS is None and BACK_VOL != -12):
         print('Warning! Background volume specified even though no background music was provided.')
-
 
     if(KEEP_SEP == False and PRERUN == False and BACK_MUS is None and LOUD_THRESHOLD == 2
         and NEW_TRAC == None and SILENT_SPEED == 99999 and VIDEO_SPEED == 1
@@ -172,7 +170,6 @@ if(__name__ == '__main__'):
 
         OUTPUT_FILE = fastVideo(INPUT_FILE, OUTPUT_FILE, SILENT_THRESHOLD,
             FRAME_SPREADAGE, SAMPLE_RATE)
-
     else:
         OUTPUT_FILE = originalMethod(INPUT_FILE, OUTPUT_FILE, GIVEN_FPS, FRAME_SPREADAGE,
             FRAME_QUALITY, SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED,

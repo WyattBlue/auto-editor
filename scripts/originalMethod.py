@@ -12,7 +12,7 @@ from re import search
 from multiprocessing import Process
 from shutil import move, rmtree
 
-from scripts.originalAudio import handleAudio
+from scripts.originalAudio import handleAudio, splitAudio
 from scripts.originalVid import splitVideo
 
 TEMP = '.TEMP'
