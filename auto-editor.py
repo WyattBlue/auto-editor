@@ -1,10 +1,6 @@
 '''auto-editor.py'''
 
 # external python libraries
-from pydub import AudioSegment
-from audiotsm import phasevocoder
-from audiotsm.io.wav import WavReader, WavWriter
-from PIL import Image # pip install pillow
 import numpy as np
 
 # internal python libraries
@@ -20,7 +16,10 @@ from shutil import rmtree
 from scripts.originalMethod import originalMethod
 from scripts.fastVideo import fastVideo
 
-version = '20w24b'
+version = '20w24b hotfix'
+
+TEMP = '.TEMP'
+CACHE = '.CACHE'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -112,7 +111,6 @@ if(__name__ == '__main__'):
         print('auto-editor.py: error: the following arguments are required: input')
         sys.exit()
 
-
     INPUT_FILE = args.input[0]
 
     OUTPUT_FILE = args.output_file
@@ -132,9 +130,9 @@ if(__name__ == '__main__'):
     SILENT_SPEED = args.silent_speed
     VIDEO_SPEED = args.video_speed
 
-    if(SILENT_SPEED <= 0):
+    if(SILENT_SPEED <= 0 or SILENT_SPEED > 99999):
         SILENT_SPEED = 99999
-    if(VIDEO_SPEED <= 0):
+    if(VIDEO_SPEED <= 0 or VIDEO_SPEED > 99999):
         VIDEO_SPEED = 99999
 
     VERBOSE = args.verbose
@@ -152,12 +150,44 @@ if(__name__ == '__main__'):
         INPUT_FILE = 'web_download.mp4'
         OUTPUT_FILE = 'web_download_ALTERED.mp4'
 
+    if(not os.path.isfile(INPUT_FILE)):
+        print('Could not find file:', INPUT_FILE)
+        sys.exit()
+
     if(args.get_auto_fps):
-        from scripts.originalMethod import getFrameRate
         print(getFrameRate(INPUT_FILE))
         sys.exit()
 
     isAudio = INPUT_FILE.endswith('.wav') or INPUT_FILE.endswith('.mp3') or INPUT_FILE.endswith('.m4a')
+
+    def getFrameRate(path):
+        from re import search
+
+        process = subprocess.Popen(['ffmpeg', '-i', path],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        stdout, __ = process.communicate()
+        output = stdout.decode()
+        matchDict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
+        return float(matchDict["fps"])
+
+    if(not isAudio):
+        try:
+            frameRate = getFrameRate(INPUT_FILE)
+        except AttributeError:
+            print('Warning! frame rate detection failed.')
+            print('If your video has a variable frame rate, ignore this message.')
+            # convert frame rate to 30 or a user defined value
+            if(GIVEN_FPS is None):
+                frameRate = 30
+            else:
+                frameRate = GIVEN_FPS
+
+            cmd = ['ffmpeg', '-i', INPUT_FILE, '-filter:v', f'fps=fps={frameRate}',
+                TEMP+'/constantVid'+extension, '-hide_banner']
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
+            INPUT_FILE = TEMP+'/constantVid'+extension
 
     startTime = time.time()
 
@@ -169,7 +199,7 @@ if(__name__ == '__main__'):
         and BASE_TRAC == 0 and HWACCEL is None and not isAudio):
 
         OUTPUT_FILE = fastVideo(INPUT_FILE, OUTPUT_FILE, SILENT_THRESHOLD,
-            FRAME_SPREADAGE, SAMPLE_RATE)
+            FRAME_SPREADAGE, SAMPLE_RATE, VERBOSE)
     else:
         OUTPUT_FILE = originalMethod(INPUT_FILE, OUTPUT_FILE, GIVEN_FPS, FRAME_SPREADAGE,
             FRAME_QUALITY, SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED,

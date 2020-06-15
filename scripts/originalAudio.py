@@ -42,24 +42,30 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
                 leng = alteredAudioData.shape[0]
 
                 outputAudioData.extend((alteredAudioData / maxAudioVolume).tolist())
-
             endPointer = outputPointer + leng
 
             # smooth out transition's audio by quickly fading in/out
             if(leng < FADE_SIZE):
                 for i in range(outputPointer, endPointer):
-                    outputAudioData[i][0] = 0
-                    outputAudioData[i][1] = 0
+                    try:
+                        outputAudioData[i][0] = 0
+                        outputAudioData[i][1] = 0
+                    except TypeError:
+                        outputAudioData[i] = 0
             else:
-                for i in range(outputPointer, outputPointer+FADE_SIZE):
-                    outputAudioData[i][0] *= mask[i-outputPointer]
-                    outputAudioData[i][1] *= mask[i-outputPointer]
-                for i in range(endPointer-FADE_SIZE, endPointer):
-                    outputAudioData[i][0] *= (1-mask[i-endPointer+FADE_SIZE])
-                    outputAudioData[i][1] *= (1-mask[i-endPointer+FADE_SIZE])
-
+                for i in range(outputPointer, outputPointer + FADE_SIZE):
+                    try:
+                        outputAudioData[i][0] *= mask[i-outputPointer]
+                        outputAudioData[i][1] *= mask[i-outputPointer]
+                    except TypeError:
+                        outputAudioData[i] *= mask[i-outputPointer]
+                for i in range(endPointer - FADE_SIZE, endPointer):
+                    try:
+                        outputAudioData[i][0] *= (1-mask[i-endPointer+FADE_SIZE])
+                        outputAudioData[i][1] *= (1-mask[i-endPointer+FADE_SIZE])
+                    except TypeError:
+                        outputAudioData[i] *= (1-mask[i-endPointer+FADE_SIZE])
             outputPointer = endPointer
-
         num += 1
         if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' audio chunks done.']))
