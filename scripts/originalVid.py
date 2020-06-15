@@ -9,6 +9,7 @@ from PIL import Image
 import os
 import math
 import subprocess
+from shutil import copyfile
 
 TEMP = '.TEMP'
 CACHE = '.CACHE'
