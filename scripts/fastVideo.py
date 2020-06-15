@@ -145,6 +145,8 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
         if(not ret):
             break
 
+        numFrames += 1
+
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
 
         currentTime = cframe / fps
@@ -171,7 +173,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
             yPointer = yPointerEnd
 
         if(VERBOSE and numFrames % (fps * 2) == 0):
-            print(str(round(numFrames / fps)) + 'seconds of video processed.')
+            print(str(round(numFrames / fps)) + ' seconds of video processed.')
 
     # finish audio
     y = y[:yPointer]
