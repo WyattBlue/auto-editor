@@ -4,7 +4,7 @@
 This method is used for mp4 files that only need frame margin and silent_threshold
 specified.
 
-It's about 4x faster than the safe method. 1 Minute of video takes about 12 seconds.
+It's about 4x faster than the safe method. 1 Minute of video may take about 12 seconds.
 """
 
 # External libraries
@@ -59,42 +59,51 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
 
 
 def getVideoLength(path):
-    result = subprocess.run(['ffprobe', '-v', 'error', '-show_entries',
-                             'format=duration', '-of',
-                             'default=noprint_wrappers=1:nokey=1', path],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT)
-    return float(result.stdout)
+    try:
+        result = subprocess.run(['ffprobe', '-v', 'error', '-show_entries',
+                                 'format=duration', '-of',
+                                 'default=noprint_wrappers=1:nokey=1', path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        return float(result.stdout)
+    except(e):
+        print(f'Warning! failed to get video length. {e}')
+        return -1
 
 
-def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE):
+def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VERBOSE):
 
     print('Running from fastVideo.py')
 
-    timeTaken = getVideoLength(videoFile) / 5
+    vidLength = getVideoLength
 
-    newTime = localtime(time() + timeTaken)
-
-    hours = newTime.tm_hour
-
-    if(hours == 0):
-        ampm = 'AM'
-        hours = 12
-    elif(hours >= 12):
-        hours -= 12
-        ampm = 'PM'
+    if(vidLength == -1):
+        VERBOSE = True
     else:
-        ampm = 'AM'
-    minutes = newTime.tm_min
+        timeTaken = vidLength / 4
 
-    newTime = f'{hours:02}:{minutes:02} {ampm}'
+        newTime = localtime(time() + timeTaken)
 
-    if(timeTaken > 99):
-        wait = round(timeTaken / 60)
-        print(f'Please wait about {wait} minutes. (until sometime in {newTime})')
-    else:
-        wait = round(timeTaken)
-        print(f'Please wait about {wait} seconds.')
+        hours = newTime.tm_hour
+
+        if(hours == 0):
+            ampm = 'AM'
+            hours = 12
+        elif(hours >= 12):
+            hours -= 12
+            ampm = 'PM'
+        else:
+            ampm = 'AM'
+        minutes = newTime.tm_min
+
+        newTime = f'{hours:02}:{minutes:02} {ampm}'
+
+        if(timeTaken > 99):
+            wait = round(timeTaken / 60)
+            print(f'Please wait about {wait} minutes. (until sometime in {newTime})')
+        else:
+            wait = round(timeTaken)
+            print(f'Please wait about {wait} seconds.')
 
     TEMP = '.TEMP'
 
@@ -129,6 +138,8 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE):
     # premask = np.arange(FADE_SIZE) / FADE_SIZE
     # mask = np.repeat(premask[:, np.newaxis], 2, axis=1)
 
+    numFrames = 0
+
     while cap.isOpened():
         ret, frame = cap.read()
         if(not ret):
@@ -158,6 +169,9 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE):
             yPointerEnd = yPointer + audioChunk.shape[0]
             y[yPointer:yPointerEnd] = audioChunk
             yPointer = yPointerEnd
+
+        if(VERBOSE and numFrames % (fps * 2) == 0):
+            print(str(round(numFrames / fps)) + 'seconds of video processed.')
 
     # finish audio
     y = y[:yPointer]

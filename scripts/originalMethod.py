@@ -8,7 +8,6 @@ import os
 import sys
 import math
 import subprocess
-from re import search
 from multiprocessing import Process
 from shutil import move, rmtree
 
@@ -70,15 +69,6 @@ def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
     subprocess.call(cmd)
 
 
-def getFrameRate(path):
-    process = subprocess.Popen(['ffmpeg', '-i', path],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    output = stdout.decode()
-    matchDict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
-    return float(matchDict["fps"])
-
-
 def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUALITY,
     SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
     BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE, PRERUN, HWACCEL):
@@ -107,6 +97,8 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
         rmtree(TEMP)
         os.mkdir(TEMP)
 
+    fileSize = os.stat(INPUT_FILE).st_size
+
     if(audioOnly):
         if(givenFPS is None):
             frameRate = 30
@@ -116,22 +108,12 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
         try:
             frameRate = getFrameRate(INPUT_FILE)
         except AttributeError:
-            print('Warning! frame rate detection failed.')
-            print('If your video has a variable frame rate, ignore this message.')
-            # convert frame rate to 30 or a user defined value
             if(givenFPS is None):
                 frameRate = 30
             else:
                 frameRate = givenFPS
 
-            cmd = ['ffmpeg', '-i', INPUT_FILE, '-filter:v', f'fps=fps={frameRate}',
-                TEMP+'/constantVid'+extension, '-hide_banner']
-            if(not VERBOSE):
-                cmd.extend(['-nostats', '-loglevel', '0'])
-            subprocess.call(cmd)
-            INPUT_FILE = TEMP+'/constantVid'+extension
-
-    fileSize = os.stat(INPUT_FILE).st_size
+            # we are assuming VFR videos are already converted.
 
     # make Cache folder
     SKIP = False
@@ -252,7 +234,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
         end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
         shouldIncludeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
-        if (i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
+        if(i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
             chunks.append([chunks[-1][1], i, shouldIncludeFrame[i-1]])
 
     chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])
