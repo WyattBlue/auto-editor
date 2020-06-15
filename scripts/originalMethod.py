@@ -17,6 +17,17 @@ from scripts.originalVid import splitVideo
 TEMP = '.TEMP'
 CACHE = '.CACHE'
 
+def getFrameRate(path):
+    from re import search
+
+    process = subprocess.Popen(['ffmpeg', '-i', path],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    stdout, __ = process.communicate()
+    output = stdout.decode()
+    matchDict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
+    return float(matchDict["fps"])
+
+
 def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
     zooms = {}
     shouldIncludeFrame = np.zeros((audioFrameCount))

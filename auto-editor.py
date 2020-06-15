@@ -21,17 +21,6 @@ version = '20w24b hotfix'
 TEMP = '.TEMP'
 CACHE = '.CACHE'
 
-def getFrameRate(path):
-    from re import search
-
-    process = subprocess.Popen(['ffmpeg', '-i', path],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    output = stdout.decode()
-    matchDict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
-    return float(matchDict["fps"])
-
-
 def file_type(file):
     if(not os.path.isfile(file)):
         print('Could not locate file:', file)
@@ -166,11 +155,20 @@ if(__name__ == '__main__'):
         sys.exit()
 
     if(args.get_auto_fps):
-        from scripts.originalMethod import getFrameRate
         print(getFrameRate(INPUT_FILE))
         sys.exit()
 
     isAudio = INPUT_FILE.endswith('.wav') or INPUT_FILE.endswith('.mp3') or INPUT_FILE.endswith('.m4a')
+
+    def getFrameRate(path):
+        from re import search
+
+        process = subprocess.Popen(['ffmpeg', '-i', path],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        stdout, __ = process.communicate()
+        output = stdout.decode()
+        matchDict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
+        return float(matchDict["fps"])
 
     if(not isAudio):
         try:

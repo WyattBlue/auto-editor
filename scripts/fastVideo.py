@@ -75,7 +75,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
 
     print('Running from fastVideo.py')
 
-    vidLength = getVideoLength
+    vidLength = getVideoLength(videoFile)
 
     if(vidLength == -1):
         VERBOSE = True
