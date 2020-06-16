@@ -156,7 +156,18 @@ if(__name__ == '__main__'):
         for filename in os.listdir(INPUT_FILE):
             if(not filename.startswith('.')):
                 INPUTS.append(os.path.join(INPUT_FILE, filename))
+
+        outputDir = INPUT_FILE+'_ALTERED'
+
+        # create the new folder for all the outputs
+        try:
+            os.mkdir(outputDir)
+        except OSError:
+            rmtree(outputDir)
+            os.mkdir(outputDir)
+
     else:
+        outputDir = ''
         if(os.path.isfile(INPUT_FILE)):
             # if input is URL, download as mp4 with youtube-dl
             if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
@@ -188,7 +199,7 @@ if(__name__ == '__main__'):
         extension = INPUT_FILE[dotIndex:]
         isAudio = extension in ['.wav', '.mp3', '.m4a']
 
-        print(INPUT_FILE)
+        print('converting:', INPUT_FILE)
 
         if(not isAudio):
             try:
@@ -212,14 +223,20 @@ if(__name__ == '__main__'):
         if(BACK_MUS is None and BACK_VOL != -12):
             print('Warning! Background volume specified even though no background music was provided.')
 
+        if(outputDir != ''):
+            newOutput = os.path.join(outputDir, os.path.basename(INPUT_FILE))
+            print(newOutput)
+        else:
+            newOutput = OUTPUT_FILE
+
         if(KEEP_SEP == False and PRERUN == False and BACK_MUS is None and LOUD_THRESHOLD == 2
             and NEW_TRAC == None and SILENT_SPEED == 99999 and VIDEO_SPEED == 1
             and BASE_TRAC == 0 and HWACCEL is None and not isAudio):
 
-            OUTPUT_FILE = fastVideo(INPUT_FILE, OUTPUT_FILE, SILENT_THRESHOLD,
+            outFile = fastVideo(INPUT_FILE, newOutput, SILENT_THRESHOLD,
                 FRAME_SPREADAGE, SAMPLE_RATE, VERBOSE)
         else:
-            OUTPUT_FILE = originalMethod(INPUT_FILE, OUTPUT_FILE, GIVEN_FPS, FRAME_SPREADAGE,
+            outFile = originalMethod(INPUT_FILE, newOutput, GIVEN_FPS, FRAME_SPREADAGE,
                 FRAME_QUALITY, SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED,
                 VIDEO_SPEED, KEEP_SEP, BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC,
                 VERBOSE, PRERUN, HWACCEL)
@@ -229,17 +246,17 @@ if(__name__ == '__main__'):
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')
 
-    if(not os.path.isfile(OUTPUT_FILE)):
-        raise IOError(f'Error: The file {OUTPUT_FILE} was not created.')
+    if(not os.path.isfile(outFile)):
+        raise IOError(f'Error: The file {outFile} was not created.')
 
     try:  # should work on Windows
-        os.startfile(OUTPUT_FILE)
+        os.startfile(outFile)
     except AttributeError:
         try:  # should work on MacOS and most Linux versions
-            subprocess.call(['open', OUTPUT_FILE])
+            subprocess.call(['open', outFile])
         except:
             try: # should work on WSL2
-                subprocess.call(['cmd.exe', '/C', 'start', OUTPUT_FILE])
+                subprocess.call(['cmd.exe', '/C', 'start', outFile])
             except:
                 print('Could not open output file.')
 
