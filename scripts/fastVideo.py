@@ -165,6 +165,10 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
             if(cframe >= chunk[0] and cframe <= chunk[1]):
                 state = chunk[2]
                 break
+        if(state is None):
+            print('Warning! the state is none')
+            print('debug info', cframe, chunks)
+            continue
         if(state > 0):
             out.write(frame)
 
