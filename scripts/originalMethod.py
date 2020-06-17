@@ -82,7 +82,7 @@ def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
 
 def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUALITY,
     SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
-    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE, PRERUN, HWACCEL):
+    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE, HWACCEL):
 
     NEW_SPEED = [SILENT_SPEED, VIDEO_SPEED]
 
@@ -186,6 +186,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
                 subprocess.call(cmd)
 
             if(COMBINE_TRAC):
+                print('Hello')
                 for i in range(tracks):
                     if(i == 0):
                         allAuds = AudioSegment.from_file(f'{CACHE}/{i}.wav')
@@ -193,6 +194,10 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
                         newTrack = AudioSegment.from_file(f'{CACHE}/{i}.wav')
                         allAuds = allAuds.overlay(newTrack)
                 allAuds.export(f'{CACHE}/my0.wav', format='wav')
+
+                # os.rename isn't atomic on windows so we must check and remove beforehand.
+                if(os.path.isfile(f'{CACHE}/0.wav')):
+                    os.remove(f'{CACHE}/0.wav')
                 os.rename(f'{CACHE}/my0.wav', f'{CACHE}/0.wav')
                 tracks = 1
             print(f'Done with audio. ({tracks} tracks)')
@@ -207,12 +212,6 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
-
-    if(PRERUN):
-        file = open(f'{CACHE}/cache.txt', 'w')
-        file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
-        print('Done.')
-        sys.exit()
 
     # calculating chunks.
     if(NEW_TRAC is None):

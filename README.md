@@ -1,16 +1,13 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w24b
+ &nbsp;&nbsp;<sup>version 20w25a
 # Auto-Editor
 Auto-Editor is a command line application program for automatically editing **video or audio**.
 It works by analyzing the video's audio to detect when a section needs to be cut or kept in, then it runs a subprocess called ffmpeg to create the new video.
 
-## New in 20w24b!
- * Introduced a brand new method of editing videos that is **4x faster**. Right now, it can't handle changes in sounded or silence speeds so it will default to the original method.
- * Fixed rare audio bug that stopped new audio being generated.
- * The main script has been split into more manageable parts to aid future collaborators. You can find them in the 'scripts' folder.
+## New in 20w25a!
+ * New Feature: You can now use a folder with videos in there as an input type.
 
- For old users, remember to install cv2 for python.
- ``` $ pip3 install opencv-python```
+ * Lots of bug fixes
 
 ## Usage
 ### Minimal Example

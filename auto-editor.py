@@ -74,8 +74,6 @@ if(__name__ == '__main__'):
         help='return what auto-editor thinks the frame rate is.')
     parser.add_argument('--verbose', action='store_true',
         help='display more information when running.')
-    parser.add_argument('--prerun', action='store_true',
-        help='create the cache folder without doing extra work.')
     parser.add_argument('--clear_cache', action='store_true',
         help='delete the cache folder and all of its contents.')
     parser.add_argument('--version', action='store_true',
@@ -114,7 +112,8 @@ if(__name__ == '__main__'):
 
     if(args.clear_cache):
         print('Removing cache')
-        rmtree('.CACHE')
+        if(os.path.isfile('.CACHE')):
+            rmtree('.CACHE')
         if(args.input == []):
             sys.exit()
 
@@ -146,7 +145,6 @@ if(__name__ == '__main__'):
         VIDEO_SPEED = 99999
 
     VERBOSE = args.verbose
-    PRERUN = args.prerun
     HWACCEL = args.hardware_accel
     KEEP_SEP = args.keep_tracks_seperate
 
@@ -229,7 +227,7 @@ if(__name__ == '__main__'):
         else:
             newOutput = OUTPUT_FILE
 
-        if(KEEP_SEP == False and PRERUN == False and BACK_MUS is None and LOUD_THRESHOLD == 2
+        if(KEEP_SEP == False and BACK_MUS is None and LOUD_THRESHOLD == 2
             and NEW_TRAC == None and SILENT_SPEED == 99999 and VIDEO_SPEED == 1
             and BASE_TRAC == 0 and HWACCEL is None and not isAudio):
 
@@ -239,7 +237,7 @@ if(__name__ == '__main__'):
             outFile = originalMethod(INPUT_FILE, newOutput, GIVEN_FPS, FRAME_SPREADAGE,
                 FRAME_QUALITY, SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED,
                 VIDEO_SPEED, KEEP_SEP, BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC,
-                VERBOSE, PRERUN, HWACCEL)
+                VERBOSE, HWACCEL)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
