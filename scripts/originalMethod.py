@@ -1,6 +1,6 @@
 '''scripts/originalMethod.py'''
 
-import pydub
+from pydub import AudioSegment
 import numpy as np
 from scipy.io import wavfile
 

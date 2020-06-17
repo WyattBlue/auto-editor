@@ -26,3 +26,4 @@ script:
  - python3 auto-editor.py "https://www.youtube.com/watch?v=kcs82HnguGc"
  - python3 auto-editor.py media/newCommentary.mp4 --silent_threshold 0.1
  - python3 auto-editor.py example.mp4 --cut_by_this_audio media/newCommentary.mp4
+ - python3 auto-editor.py example.mp4 --background_music media/Magic_in_the_Garden.mp3
