@@ -185,20 +185,16 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
                     cmd.extend(['-nostats', '-loglevel', '0'])
                 subprocess.call(cmd)
 
+            print('tracks', tracks)
+            print(os.listdir(CACHE))
             if(COMBINE_TRAC):
-                print('Hello')
                 for i in range(tracks):
                     if(i == 0):
                         allAuds = AudioSegment.from_file(f'{CACHE}/{i}.wav')
                     else:
                         newTrack = AudioSegment.from_file(f'{CACHE}/{i}.wav')
                         allAuds = allAuds.overlay(newTrack)
-                allAuds.export(f'{CACHE}/my0.wav', format='wav')
-
-                # os.rename isn't atomic on windows so we must check and remove beforehand.
-                if(os.path.isfile(f'{CACHE}/0.wav')):
-                    os.remove(f'{CACHE}/0.wav')
-                os.rename(f'{CACHE}/my0.wav', f'{CACHE}/0.wav')
+                allAuds.export(f'{CACHE}/0.wav', format='wav')
                 tracks = 1
             print(f'Done with audio. ({tracks} tracks)')
 
