@@ -153,12 +153,11 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
             # Videos can have more than one audio track os we need to extract them all
             print('Separating audio from video.')
 
-            tracks = 0
-
             cmd = ['ffprobe', INPUT_FILE, '-hide_banner', '-loglevel', 'panic',
                 '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
                 'compact=p=0:nk=1']
 
+            # get the number of audio tracks in a video
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT)
             stdout, __ = process.communicate()

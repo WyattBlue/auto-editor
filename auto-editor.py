@@ -11,6 +11,7 @@ import sys
 import time
 from datetime import timedelta
 from shutil import rmtree
+from operator import itemgetter
 
 # included functions
 from scripts.originalMethod import originalMethod
@@ -153,9 +154,23 @@ if(__name__ == '__main__'):
         INPUTS = []
         for filename in os.listdir(INPUT_FILE):
             if(not filename.startswith('.')):
-                INPUTS.append(os.path.join(INPUT_FILE, filename))
+                dic = {}
+                dic['file'] = os.path.join(INPUT_FILE, filename)
+                dic['time'] = os.path.getmtime(dic['file'])
+                print(dic['time'])
+                INPUTS.append(dic)
 
         outputDir = INPUT_FILE+'_ALTERED'
+        newlist = sorted(INPUTS, key=itemgetter('time'), reverse=False)
+
+        INPUTS = []
+        for item in newlist:
+            INPUTS.append(item['file'])
+        del newlist
+
+        print(INPUTS)
+
+        sys.exit()
 
         # create the new folder for all the outputs
         try:
