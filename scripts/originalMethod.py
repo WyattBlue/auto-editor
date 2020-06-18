@@ -1,6 +1,6 @@
 '''scripts/originalMethod.py'''
 
-import pydub
+from pydub import AudioSegment
 import numpy as np
 from scipy.io import wavfile
 
@@ -82,7 +82,7 @@ def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
 
 def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUALITY,
     SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
-    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE, PRERUN, HWACCEL):
+    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE, HWACCEL):
 
     NEW_SPEED = [SILENT_SPEED, VIDEO_SPEED]
 
@@ -153,12 +153,11 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
             # Videos can have more than one audio track os we need to extract them all
             print('Separating audio from video.')
 
-            tracks = 0
-
             cmd = ['ffprobe', INPUT_FILE, '-hide_banner', '-loglevel', 'panic',
                 '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
                 'compact=p=0:nk=1']
 
+            # get the number of audio tracks in a video
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT)
             stdout, __ = process.communicate()
@@ -185,6 +184,8 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
                     cmd.extend(['-nostats', '-loglevel', '0'])
                 subprocess.call(cmd)
 
+            print('tracks', tracks)
+            print(os.listdir(CACHE))
             if(COMBINE_TRAC):
                 for i in range(tracks):
                     if(i == 0):
@@ -192,8 +193,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
                     else:
                         newTrack = AudioSegment.from_file(f'{CACHE}/{i}.wav')
                         allAuds = allAuds.overlay(newTrack)
-                allAuds.export(f'{CACHE}/my0.wav', format='wav')
-                os.rename(f'{CACHE}/my0.wav', f'{CACHE}/0.wav')
+                allAuds.export(f'{CACHE}/0.wav', format='wav')
                 tracks = 1
             print(f'Done with audio. ({tracks} tracks)')
 
@@ -207,12 +207,6 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
-
-    if(PRERUN):
-        file = open(f'{CACHE}/cache.txt', 'w')
-        file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
-        print('Done.')
-        sys.exit()
 
     # calculating chunks.
     if(NEW_TRAC is None):
