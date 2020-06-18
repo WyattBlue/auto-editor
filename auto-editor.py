@@ -18,7 +18,7 @@ from operator import itemgetter
 from scripts.originalMethod import originalMethod
 from scripts.fastVideo import fastVideo
 
-version = '20w25a'
+version = '20w25b'
 
 TEMP = '.TEMP'
 CACHE = '.CACHE'
@@ -96,6 +96,8 @@ if(__name__ == '__main__'):
         help="Don't combine audio tracks ever. (Warning, multiple audio tracks are not supported on most platforms")
     parser.add_argument('--hardware_accel', type=str,
         help='set the hardware used for gpu acceleration')
+    parser.add_argument('--combine_files', action='store_true',
+        help='combine all files in a folder before editing')
 
     args = parser.parse_args()
 
@@ -131,6 +133,7 @@ if(__name__ == '__main__'):
     BASE_TRAC = args.cut_by_this_track
     COMBINE_TRAC = args.cut_by_all_tracks
     GIVEN_FPS = args.frame_rate
+    COMBINE_FILES = args.combine_files
 
     SAMPLE_RATE = args.sample_rate
     SILENT_THRESHOLD = args.silent_threshold
@@ -161,7 +164,6 @@ if(__name__ == '__main__'):
                 print(dic['time'])
                 INPUTS.append(dic)
 
-        outputDir = INPUT_FILE+'_ALTERED'
         newlist = sorted(INPUTS, key=itemgetter('time'), reverse=False)
 
         INPUTS = []
@@ -169,12 +171,28 @@ if(__name__ == '__main__'):
             INPUTS.append(item['file'])
         del newlist
 
-        # create the new folder for all the outputs
-        try:
-            os.mkdir(outputDir)
-        except OSError:
-            rmtree(outputDir)
-            os.mkdir(outputDir)
+        if(COMBINE_FILES):
+            outputDir = ''
+            # make needed text file
+            with open('combine_files.txt', 'w') as outfile:
+                for fileref in INPUTS:
+                    outfile.write("file '"+ fileref + "'\n")
+
+            cmd = ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', 'combine_files.txt', '-c',
+            'copy', 'combined.mp4']
+            subprocess.call(cmd)
+
+            INPUTS = ['combined.mp4']
+
+            os.remove('combine_files.txt')
+        else:
+            outputDir = INPUT_FILE+'_ALTERED'
+            # create the new folder for all the outputs
+            try:
+                os.mkdir(outputDir)
+            except OSError:
+                rmtree(outputDir)
+                os.mkdir(outputDir)
 
     else:
         outputDir = ''

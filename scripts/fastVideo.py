@@ -76,6 +76,8 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
     if(not os.path.isfile(videoFile)):
         print('Could not find file:', videoFile)
         sys.exit()
+    else:
+        print(videoFile)
 
     vidLength = getVideoLength(videoFile)
 
