@@ -15,6 +15,7 @@ from scipy.io import wavfile
 # Internal libraries
 import math
 import os
+import sys
 import subprocess
 import argparse
 from shutil import rmtree
@@ -54,26 +55,27 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
 
     chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])
     chunks = chunks[1:]
-
     return chunks
 
 
 def getVideoLength(path):
     try:
         result = subprocess.run(['ffprobe', '-v', 'error', '-show_entries',
-                                 'format=duration', '-of',
-                                 'default=noprint_wrappers=1:nokey=1', path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
+            'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', path],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return float(result.stdout)
-    except(e):
-        print(f'Warning! failed to get video length. {e}')
+    except:
+        print(f'Warning! failed to get video length.')
         return -1
 
 
 def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VERBOSE):
 
     print('Running from fastVideo.py')
+
+    if(not os.path.isfile(videoFile)):
+        print('Could not find file:', videoFile)
+        sys.exit()
 
     vidLength = getVideoLength(videoFile)
 
@@ -163,7 +165,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
             if(cframe >= chunk[0] and cframe <= chunk[1]):
                 state = chunk[2]
                 break
-        if(state > 0):
+        if(state == 1):
             out.write(frame)
 
             switchStart = switchEnd
