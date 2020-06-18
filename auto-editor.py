@@ -169,10 +169,6 @@ if(__name__ == '__main__'):
             INPUTS.append(item['file'])
         del newlist
 
-        print(INPUTS)
-
-        sys.exit()
-
         # create the new folder for all the outputs
         try:
             os.mkdir(outputDir)
@@ -212,8 +208,6 @@ if(__name__ == '__main__'):
         dotIndex = INPUT_FILE.rfind('.')
         extension = INPUT_FILE[dotIndex:]
         isAudio = extension in ['.wav', '.mp3', '.m4a']
-
-        print('converting:', INPUT_FILE)
 
         if(not isAudio):
             try:
