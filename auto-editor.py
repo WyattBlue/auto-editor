@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 '''auto-editor.py'''
 
 # external python libraries
