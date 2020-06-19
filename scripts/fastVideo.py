@@ -76,8 +76,6 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
     if(not os.path.isfile(videoFile)):
         print('Could not find file:', videoFile)
         sys.exit()
-    else:
-        print(videoFile)
 
     vidLength = getVideoLength(videoFile)
 
@@ -85,9 +83,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
         VERBOSE = True
     else:
         timeTaken = vidLength / 4
-
         newTime = localtime(time() + timeTaken)
-
         hours = newTime.tm_hour
 
         if(hours == 0):
@@ -99,16 +95,13 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
         else:
             ampm = 'AM'
         minutes = newTime.tm_min
-
         newTime = f'{hours:02}:{minutes:02} {ampm}'
-
         if(timeTaken > 99):
             wait = round(timeTaken / 60)
             print(f'Please wait about {wait} minutes. (until sometime in {newTime})')
         else:
             wait = round(timeTaken)
             print(f'Please wait about {wait} seconds.')
-
     TEMP = '.TEMP'
 
     cap = cv2.VideoCapture(videoFile)

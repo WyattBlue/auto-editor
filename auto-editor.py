@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 '''auto-editor.py'''
 
-# external python libraries
-import numpy as np
-
 # internal python libraries
 import os
 import argparse
