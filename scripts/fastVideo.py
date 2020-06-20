@@ -18,7 +18,7 @@ import os
 import sys
 import subprocess
 import argparse
-from shutil import rmtree
+from shutil import rmtree, get_terminal_size
 from time import time, localtime
 
 def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPREADAGE):
@@ -58,17 +58,6 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
     return chunks
 
 
-def getVideoLength(path):
-    try:
-        result = subprocess.run(['ffprobe', '-v', 'error', '-show_entries',
-            'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', path],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        return float(result.stdout)
-    except:
-        print(f'Warning! failed to get video length.')
-        return -1
-
-
 def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VERBOSE):
 
     print('Running from fastVideo.py')
@@ -77,31 +66,6 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
         print('Could not find file:', videoFile)
         sys.exit()
 
-    vidLength = getVideoLength(videoFile)
-
-    if(vidLength == -1):
-        VERBOSE = True
-    else:
-        timeTaken = vidLength / 4
-        newTime = localtime(time() + timeTaken)
-        hours = newTime.tm_hour
-
-        if(hours == 0):
-            ampm = 'AM'
-            hours = 12
-        elif(hours >= 12):
-            hours -= 12
-            ampm = 'PM'
-        else:
-            ampm = 'AM'
-        minutes = newTime.tm_min
-        newTime = f'{hours:02}:{minutes:02} {ampm}'
-        if(timeTaken > 99):
-            wait = round(timeTaken / 60)
-            print(f'Please wait about {wait} minutes. (until sometime in {newTime})')
-        else:
-            wait = round(timeTaken)
-            print(f'Please wait about {wait} seconds.')
     TEMP = '.TEMP'
 
     cap = cv2.VideoCapture(videoFile)
@@ -117,7 +81,9 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
         os.mkdir(TEMP)
 
     extractAudio = ["ffmpeg", "-i", videoFile, "-ab", "160k", "-ac", "2", "-ar",
-        str(SAMPLE_RATE), "-vn", f"{TEMP}/output.wav", "-nostats", "-loglevel", "0"]
+        str(SAMPLE_RATE), "-vn", f"{TEMP}/output.wav"]
+    if(not VERBOSE):
+        extractAudio.extend(["-nostats", "-loglevel", "0"])
 
     subprocess.call(extractAudio)
 
@@ -135,7 +101,59 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
     # premask = np.arange(FADE_SIZE) / FADE_SIZE
     # mask = np.repeat(premask[:, np.newaxis], 2, axis=1)
 
+    def prettyTime(newTime):
+        newTime = localtime(newTime)
+        hours = newTime.tm_hour
+
+        if(hours == 0):
+            hours = 12
+        if(hours > 12):
+            hours -= 12
+
+        if(newTime.tm_hour >= 12):
+            ampm = 'PM'
+        else:
+            ampm = 'AM'
+
+        minutes = newTime.tm_min
+        return f'{hours:02}:{minutes:02} {ampm}'
+
+    def print_percent_done(index, total, bar_len=34, title='Please wait'):
+
+        termsize = get_terminal_size().columns
+
+        bar_len = max(1, termsize - (len(title) + 50))
+        percent_done = (index+1) / total * 100
+        percent_done = round(percent_done, 1)
+
+        done = round(percent_done / (100/bar_len))
+        togo = bar_len - done
+
+        done_str = '█'*int(done)
+        togo_str = '░'*int(togo)
+
+        curTime = time() - beginTime
+
+        if(percent_done == 0):
+            percentPerSec = 0
+        else:
+            percentPerSec = curTime / percent_done
+
+        newTime = prettyTime(beginTime + (percentPerSec * 100))
+
+        bar = f'  ⏳{title}: [{done_str}{togo_str}] {percent_done}% done ETA {newTime}  '
+
+        # clear the screen to prevent
+        print(' ' * (termsize - 2), end='\r', flush=True)
+        # then print everything
+        if(index != total - 1):
+            print(bar, end='\r', flush=True)
+        else:
+            print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)
+
+    totalFrames = chunks[len(chunks) - 1][1]
     numFrames = 0
+    beginTime = time()
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -151,7 +169,6 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
         # handle audio
         audioSampleStart = int(currentTime * sampleRate)
         audioSampleEnd = audioSampleStart + (sampleRate // fps)
-        switchEnd = audioSampleEnd
 
         audioChunk = audioData[audioSampleStart:audioSampleEnd]
 
@@ -163,14 +180,11 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
         if(state == 1):
             out.write(frame)
 
-            switchStart = switchEnd
-
             yPointerEnd = yPointer + audioChunk.shape[0]
             y[yPointer:yPointerEnd] = audioChunk
             yPointer = yPointerEnd
 
-        if(VERBOSE and numFrames % (fps * 2) == 0):
-            print(str(round(numFrames / fps)) + ' seconds of video processed.')
+        print_percent_done(numFrames, totalFrames)
 
     # finish audio
     y = y[:yPointer]
