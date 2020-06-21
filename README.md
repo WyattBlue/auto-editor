@@ -1,12 +1,17 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w25a
+ &nbsp;&nbsp;<sup>version 20w25b
 # Auto-Editor
 Auto-Editor is a command line application program for automatically editing **video or audio**.
 It works by analyzing the video's audio to detect when a section needs to be cut or kept in, then it runs a subprocess called ffmpeg to create the new video.
 
-## New in 20w25a!
- * New Feature: You can now use a folder with videos in there as an input type.
- * Lots of bug fixes
+## New in 20w25b!
+ * If you are using a **folder** as an input, you can now combine all files in a folder **before editing** with the `--combine_files` flag. It combines them in order of date modified.
+ * The `--prerun` option has been **removed** due to the fact that all it does is create the cache folder which is less important because of both general speed increases and the fact that the most common method of editing videos (fastVideo.py) don't need to make a cache folder nor need every frame converted to a jpeg.
+ * fastVideo.py now has a
+ * `--loudness_threshold` has been **renamed** to `--zoom_threshold` sense it is a better description of what it does.
+ * new option `--no_open`, which prevents the opening of the new file after rendering. Useful when editing lots of videos.
+ * new option `--audio_bitrate`, which lets you specify how many bits per second of audio you want. Recommended values are 160k, 192k, and 320k.
+ * fastVideo.py now has a progress bar. Thank you all who voted in the discord server for your input.
 
 ## Usage
 ### Minimal Example
