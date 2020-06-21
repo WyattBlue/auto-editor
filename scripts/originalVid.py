@@ -32,6 +32,22 @@ def resize(inputFile, outputFile, size):
 
 def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE,
     audioData, extension, VERBOSE):
+    """
+    This function is responsible for outputting a new image sequence in the correct order.
+
+    splitVideo is also responsible for creating Renames.txt. copying every jpeg is
+    computationally expensive, renaming the file is less so, but we still need to create
+    the cache folder and we can't do that if the program has no idea what it renamed
+    and where. Renames.txt will be read in originalMethod.py to recreate the original
+    image sequence.
+
+    To avoid desyncing issues with the audio, we need to have audioData and go along
+    roughly the same way originalAudio.py does it. Specifically, get the length of the
+    new audio chunk.
+
+    If the speed set is 1, this is easy. If not, we have to create a new file modified
+    to be the new speed with audiotsm, then read that file to get the length.
+    """
     print('Creating new video.')
     num = 0
     chunk_len = str(len(chunks))

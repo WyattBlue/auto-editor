@@ -18,14 +18,18 @@ TEMP = '.TEMP'
 CACHE = '.CACHE'
 
 def getFrameRate(path):
+    """
+    get the frame rate by asking ffmpeg to do it for us then using a regex command to
+    retrieve it.
+    """
     from re import search
 
     process = subprocess.Popen(['ffmpeg', '-i', path],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     output = stdout.decode()
-    matchDict = search(r"\s(?P<fps>[\d\.]+?)\stbr", output).groupdict()
-    return float(matchDict["fps"])
+    matchDict = search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
+    return float(matchDict['fps'])
 
 
 def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
@@ -75,14 +79,31 @@ def formatAudio(INPUT_FILE, outputFile, sampleRate, bitrate, VERBOSE=False):
 
 
 def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
+    """
+    This is old code and should be reviewed if it's necessary to convert the
+    sound file bitrate to 192k. Converting to mp3 is definitely not nessary.
+
+    Remember that pydub, like auto-editor, is active and can change over time.
+    """
     cmd = ['ffmpeg', '-i', INPUT_FILE, '-vn', '-ar', str(SAMPLE_RATE), '-ac', '2',
     '-ab', '192k', '-f', 'mp3', outputFile, '-nostats', '-loglevel', '0']
     subprocess.call(cmd)
 
 
 def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUALITY,
-    SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
-    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE, HWACCEL):
+    SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, AUD_BITRATE, SILENT_SPEED,
+    VIDEO_SPEED, KEEP_SEP, BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC,
+    VERBOSE, HWACCEL):
+    """
+    This function takes in the path the the input file (and a bunch of other options)
+    and outputs a new output file. This is both the safest and slowest of all methods.
+
+    Safest in the fact that if feature isn't supported here, like multi-track audio,
+    or support obscure file type, it's not supported anywhere.
+
+    It's also the slowest. For example, processing a 50 minute video takes about 45 minutes
+    for this method but only about 12 minutes for fastVideo. (Results may vary)
+    """
 
     NEW_SPEED = [SILENT_SPEED, VIDEO_SPEED]
 
@@ -123,9 +144,6 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
                 frameRate = 30
             else:
                 frameRate = givenFPS
-
-            # we are assuming VFR videos are already converted.
-
     # make Cache folder
     SKIP = False
     try:
@@ -147,7 +165,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
     if(not SKIP):
         if(audioOnly):
             print('Formatting audio.')
-            formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
+            formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, AUD_BITRATE, VERBOSE)
             tracks = 1
         else:
             # Videos can have more than one audio track os we need to extract them all
