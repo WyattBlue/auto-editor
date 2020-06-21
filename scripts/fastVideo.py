@@ -84,7 +84,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     extractAudio = ['ffmpeg', '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
         str(SAMPLE_RATE), '-vn', f'{TEMP}/output.wav']
     if(not VERBOSE):
-        extractAudio.extend(["-nostats", "-loglevel", "0"])
+        extractAudio.extend(['-nostats', '-loglevel', '0'])
 
     subprocess.call(extractAudio)
 

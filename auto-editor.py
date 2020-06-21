@@ -171,7 +171,7 @@ if(__name__ == '__main__'):
 
             with open('combine_files.txt', 'w') as outfile:
                 for fileref in INPUTS:
-                    outfile.write("file '"+ fileref + "'\n")
+                    outfile.write(f"file '{fileref}'\n")
 
             cmd = ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', 'combine_files.txt',
             '-c', 'copy', 'combined.mp4']
@@ -181,7 +181,7 @@ if(__name__ == '__main__'):
 
             os.remove('combine_files.txt')
         else:
-            outputDir = INPUT_FILE+'_ALTERED'
+            outputDir = INPUT_FILE + '_ALTERED'
             # create the new folder for all the outputs
             try:
                 os.mkdir(outputDir)
