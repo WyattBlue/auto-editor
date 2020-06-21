@@ -119,8 +119,8 @@ if(__name__ == '__main__'):
 
     if(args.clear_cache):
         print('Removing cache')
-        if(os.path.isfile('.CACHE')):
-            rmtree('.CACHE')
+        if(os.path.isdir(CACHE)):
+            rmtree(CACHE)
         if(args.input == []):
             sys.exit()
 
@@ -269,7 +269,7 @@ if(__name__ == '__main__'):
     if(not os.path.isfile(outFile)):
         raise IOError(f'Error: The file {outFile} was not created.')
 
-    if(args.no_open):
+    if(not args.no_open):
         try:  # should work on Windows
             os.startfile(outFile)
         except AttributeError:
@@ -281,5 +281,5 @@ if(__name__ == '__main__'):
                 except:
                     print('Could not open output file.')
 
-    if(os.path.isfile(TEMP)):
+    if(os.path.isdir(TEMP)):
         rmtree(TEMP)
