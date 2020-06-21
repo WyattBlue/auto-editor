@@ -58,7 +58,8 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
     return chunks
 
 
-def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VERBOSE):
+def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
+    AUD_BITRATE, VERBOSE):
 
     print('Running from fastVideo.py')
 
@@ -80,8 +81,8 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
         rmtree(TEMP)
         os.mkdir(TEMP)
 
-    extractAudio = ["ffmpeg", "-i", videoFile, "-ab", "160k", "-ac", "2", "-ar",
-        str(SAMPLE_RATE), "-vn", f"{TEMP}/output.wav"]
+    extractAudio = ['ffmpeg', '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
+        str(SAMPLE_RATE), '-vn', f'{TEMP}/output.wav']
     if(not VERBOSE):
         extractAudio.extend(["-nostats", "-loglevel", "0"])
 
@@ -203,9 +204,10 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE, VER
     if(outFile == ''):
         outFile = f'{first}_ALTERED{extension}'
 
-    cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/spedup.mp4', '-i']
-    cmd.extend([f"{TEMP}/spedupAudio.wav", "-c:v", "copy", "-c:a", "aac", outFile])
-    cmd.extend(["-nostats", "-loglevel", "0"])
+    cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/spedup.mp4', '-i', f'{TEMP}/spedupAudio.wav',
+        '-c:v', 'copy', '-c:a', 'aac', outFile]
+    if(not VERBOSE):
+        cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)
 
     return outFile

@@ -81,8 +81,9 @@ def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
 
 
 def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUALITY,
-    SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
-    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE, HWACCEL):
+    SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, AUD_BITRATE, SILENT_SPEED,
+    VIDEO_SPEED, KEEP_SEP, BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC,
+    VERBOSE, HWACCEL):
 
     NEW_SPEED = [SILENT_SPEED, VIDEO_SPEED]
 
@@ -147,7 +148,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
     if(not SKIP):
         if(audioOnly):
             print('Formatting audio.')
-            formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, '160k', VERBOSE)
+            formatAudio(INPUT_FILE, f'{CACHE}/0.wav', SAMPLE_RATE, AUD_BITRATE, VERBOSE)
             tracks = 1
         else:
             # Videos can have more than one audio track os we need to extract them all
