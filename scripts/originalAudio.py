@@ -14,6 +14,9 @@ FADE_SIZE = 400
 
 def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_RATE,
     maxAudioVolume):
+    """
+    This function creates new audio based on the chunk date and the numpy audio data.
+    """
 
     outputAudioData = []
     outputPointer = 0
