@@ -35,6 +35,15 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
     audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
     hasLoudAudio = np.zeros((audioFrameCount))
 
+    if(maxAudioVolume == 0):
+        print('Warning! The entire video is silent')
+        print(audioData)
+        # WyattBlue is doing tests with silent mkv video files and he wants them to
+        # be "edified" so that he can see if fastVideo.py is lossless.
+
+        # That's why the entire length of the video is outputed.
+        return [[0, audioFrameCount, 1]]
+
     for i in range(audioFrameCount):
         start = int(i * samplesPerFrame)
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
