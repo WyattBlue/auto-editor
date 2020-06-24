@@ -215,6 +215,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
     cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/spedup.mp4', '-i', f'{TEMP}/spedupAudio.wav',
         '-c:v', 'copy', '-c:a', 'aac', outFile]
+
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)

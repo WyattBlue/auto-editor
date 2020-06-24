@@ -15,6 +15,7 @@ from operator import itemgetter
 # included functions
 from scripts.originalMethod import originalMethod
 from scripts.fastVideo import fastVideo
+from scripts.fastVideoPlus import fastVideoPlus
 
 version = '20w25b'
 
@@ -65,14 +66,14 @@ if(__name__ == '__main__'):
         help='the speed that silent frames should be played at.')
     parser.add_argument('--frame_margin', '-m', type=int, default=4,
         help='tells how many frames on either side of speech should be included.')
-    parser.add_argument('--sample_rate', '-r', type=float, default=44100,
+    parser.add_argument('--sample_rate', '-r', type=float, default=44800,
         help='sample rate of the input and output videos.')
     parser.add_argument('--audio_bitrate', type=str, default='160k',
         help='number of bits per second for audio. Example, 160k.')
     parser.add_argument('--frame_rate', '-f', type=float,
         help='manually set the frame rate (fps) of the input video.')
-    parser.add_argument('--frame_quality', '-q', type=quality_type, default=3,
-        help='quality of frames from input video. 1 is highest, 31 is lowest.')
+    parser.add_argument('--frame_quality', '-q', type=quality_type, default=1,
+        help='(Depreciated!) quality of frames from input video. 1 is highest, 31 is lowest.')
     parser.add_argument('--get_auto_fps', '--get_frame_rate', action='store_true',
         help='return what auto-editor thinks the frame rate is.')
     parser.add_argument('--verbose', action='store_true',
@@ -250,11 +251,14 @@ if(__name__ == '__main__'):
             newOutput = OUTPUT_FILE
 
         if(KEEP_SEP == False and BACK_MUS is None and args.zoom_threshold == 2
-            and NEW_TRAC == None and SILENT_SPEED == 99999 and VIDEO_SPEED == 1
-            and BASE_TRAC == 0 and HWACCEL is None and not isAudio):
+            and NEW_TRAC == None and BASE_TRAC == 0 and HWACCEL is None and not isAudio):
 
-            outFile = fastVideo(INPUT_FILE, newOutput, args.silent_threshold,
-                args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose)
+            if(SILENT_SPEED == 99999 and VIDEO_SPEED == 1):
+                outFile = fastVideo(INPUT_FILE, newOutput, args.silent_threshold,
+                    args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose)
+            else:
+                outFile = fastVideoPlus(INPUT_FILE, newOutput, args.silent_threshold,
+                    args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose, VIDEO_SPEED, SILENT_SPEED)
         else:
             outFile = originalMethod(INPUT_FILE, newOutput, args.frame_rate, args.frame_margin,
                 args.frame_quality, args.silent_threshold, args.zoom_threshold, args.sample_rate,
