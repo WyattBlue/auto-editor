@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 '''auto-editor.py'''
 
-# internal python libraries
+# Internal python libraries
 import os
 import argparse
 import subprocess
@@ -12,7 +12,7 @@ from datetime import timedelta
 from shutil import rmtree
 from operator import itemgetter
 
-# included functions
+# Included functions
 from scripts.originalMethod import originalMethod
 from scripts.fastVideo import fastVideo
 from scripts.fastVideoPlus import fastVideoPlus
