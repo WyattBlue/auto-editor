@@ -17,7 +17,7 @@ from scripts.originalMethod import originalMethod
 from scripts.fastVideo import fastVideo
 from scripts.fastVideoPlus import fastVideoPlus
 
-version = '20w25b'
+version = '20w26a'
 
 # files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'

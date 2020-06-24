@@ -66,22 +66,21 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     subprocess.call(extractAudio)
 
     out = cv2.VideoWriter(f'{TEMP}/spedup.mp4', fourcc, fps, (width, height))
+
     sampleRate, audioData = wavfile.read(f'{TEMP}/output.wav')
-
     chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin)
-
     channels = int(audioData.shape[1])
 
     switchStart = 0
-
     needChange = False
     preve = None
     endMargin = 0
 
-    hmm = int(preview(chunks, NEW_SPEED, fps))
+    hmm = preview(chunks, NEW_SPEED, fps)
+    estLeng = int((hmm * SAMPLE_RATE) * 1.05)
 
     # y needs to be as big or bigger than the new audio data or this program will fail
-    y = np.zeros(((hmm * SAMPLE_RATE) + SAMPLE_RATE, 2), dtype=np.int16)
+    y = np.zeros((estLeng, 2), dtype=np.int16)
     yPointer = 0
     frameBuffer = []
 
