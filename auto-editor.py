@@ -86,7 +86,7 @@ if(__name__ == '__main__'):
         help='show helpful debugging values.')
     parser.add_argument('--background_music', type=file_type,
         help='add background music to your output.')
-    parser.add_argument('--background_volume', type=float, default=-12,
+    parser.add_argument('--background_volume', type=float, default=-8,
         help="set the dBs louder or softer compared to the audio track that bases the cuts.")
     parser.add_argument('--cut_by_this_audio', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
