@@ -71,6 +71,14 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
     return chunks
 
 
+def preview(chunks, NEW_SPEED, frameRate):
+    timeInSeconds = 0
+    for chunk in chunks:
+        leng = chunk[1] - chunk[0]
+        if(NEW_SPEED[int(chunk[2])] < 99999):
+            timeInSeconds += leng * (1 / NEW_SPEED[int(chunk[2])]) / 30
+    return timeInSeconds
+
 def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     AUD_BITRATE, VERBOSE, videoSpeed, silentSpeed):
 
@@ -123,7 +131,10 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     preve = None
     endMargin = 0
 
-    y = np.zeros_like(audioData, dtype=np.int16)
+    hmm = int(preview(chunks, NEW_SPEED, 30))
+
+    # y needs to be as big or bigger than the new audio data or this program will fail
+    y = np.zeros(((hmm * SAMPLE_RATE) + SAMPLE_RATE, 2), dtype=np.int16)
     yPointer = 0
     frameBuffer = []
 
@@ -144,7 +155,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         minutes = newTime.tm_min
         return f'{hours:02}:{minutes:02} {ampm}'
 
-    def print_percent_done(index, total, bar_len=34, title='Please wait'):
+    def print_percent_done(index, total, title='Please wait'):
 
         termsize = get_terminal_size().columns
 
@@ -155,8 +166,8 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         done = round(percent_done / (100/bar_len))
         togo = bar_len - done
 
-        done_str = '█'*int(done)
-        togo_str = '░'*int(togo)
+        done_str = '█' * int(done)
+        togo_str = '░' * int(togo)
 
         curTime = time() - beginTime
 
@@ -169,9 +180,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
         bar = f'  ⏳{title}: [{done_str}{togo_str}] {percent_done}% done ETA {newTime}  '
 
-        # clear the screen to prevent
         print(' ' * (termsize - 2), end='\r', flush=True)
-        # then print everything
         if(index != total - 1):
             print(bar, end='\r', flush=True)
         else:
@@ -202,8 +211,6 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             break
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
-
-        print(nFrames)
 
         currentTime = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
         audioSampleStart = math.floor(currentTime * sampleRate)
@@ -251,8 +258,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
                         spedupAudio = writer.output
 
                 yPointerEnd = yPointer + spedupAudio.shape[0]
-                y[yPointer:yPointerEnd] = spedupAudio
-
+                y[yPointer: yPointerEnd] = spedupAudio
                 yPointer = yPointerEnd
             else:
                 yPointerEnd = yPointer

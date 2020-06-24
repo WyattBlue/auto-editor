@@ -122,7 +122,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         minutes = newTime.tm_min
         return f'{hours:02}:{minutes:02} {ampm}'
 
-    def print_percent_done(index, total, bar_len=34, title='Please wait'):
+    def print_percent_done(index, total, title='Please wait'):
 
         termsize = get_terminal_size().columns
 
@@ -133,8 +133,8 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         done = round(percent_done / (100/bar_len))
         togo = bar_len - done
 
-        done_str = '█'*int(done)
-        togo_str = '░'*int(togo)
+        done_str = '█' * int(done)
+        togo_str = '░' * int(togo)
 
         curTime = time() - beginTime
 
@@ -147,9 +147,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
         bar = f'  ⏳{title}: [{done_str}{togo_str}] {percent_done}% done ETA {newTime}  '
 
-        # clear the screen to prevent
         print(' ' * (termsize - 2), end='\r', flush=True)
-        # then print everything
         if(index != total - 1):
             print(bar, end='\r', flush=True)
         else:
