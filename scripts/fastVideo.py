@@ -102,14 +102,8 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
     chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin)
 
-    channels = int(audioData.shape[1])
-
     y = np.zeros_like(audioData, dtype=np.int16)
     yPointer = 0
-    samplesPerFrame = sampleRate / fps
-
-    # premask = np.arange(FADE_SIZE) / FADE_SIZE
-    # mask = np.repeat(premask[:, np.newaxis], 2, axis=1)
 
     def prettyTime(newTime):
         newTime = localtime(newTime)
@@ -162,15 +156,12 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)
 
     totalFrames = chunks[len(chunks) - 1][1]
-    numFrames = 0
     beginTime = time()
 
     while cap.isOpened():
         ret, frame = cap.read()
         if(not ret):
             break
-
-        numFrames += 1
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
 
@@ -194,7 +185,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             y[yPointer:yPointerEnd] = audioChunk
             yPointer = yPointerEnd
 
-        print_percent_done(numFrames, totalFrames)
+        print_percent_done(cframe, totalFrames)
 
     # finish audio
     y = y[:yPointer]

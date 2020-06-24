@@ -193,7 +193,6 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
 
     totalFrames = chunks[len(chunks) - 1][1]
-    numFrames = 0
     outFrame = 0
     beginTime = time()
 
@@ -202,9 +201,9 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         if(not ret):
             break
 
-        numFrames += 1
-
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
+
+        print(nFrames)
 
         currentTime = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
         audioSampleStart = math.floor(currentTime * sampleRate)
@@ -263,7 +262,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             switchStart = switchEnd
             needChange = False
 
-        print_percent_done(numFrames, totalFrames)
+        print_percent_done(cframe, totalFrames)
 
     # finish audio
     y = y[:yPointer]
