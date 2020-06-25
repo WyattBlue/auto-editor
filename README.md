@@ -1,9 +1,9 @@
+[![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
+ &nbsp;&nbsp;<sup>version 20w26a
+
 <p align="center">
   <img src="/resources/auto-editor_banner.png" width="800">
 </p>
-
-[![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w26a
 
 # Auto-Editor
 Auto-Editor is a command line application program for automatically editing **video or audio**.
@@ -37,7 +37,7 @@ There are many more features in auto-editor, including **adding in background mu
 ## Installing Auto-Editor
 [Installing for Windows](/resources/install_win.md)
 
-[Installing for Mac](/resources/install_mac.md)
+[Installing for MacOS](/resources/install_mac.md)
 
 [Installing for Linux](/resources/install_lin.md)
 
