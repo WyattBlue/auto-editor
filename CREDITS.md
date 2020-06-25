@@ -2,10 +2,14 @@ Thank You
 
 
 ### Major Code Contributions/Inspiration
-> * [ ] @WyattBlue
+@WyattBlue
+
 @gusals3587
+
 @carykh
+
 @flyingzambie
+
 @seaty6
 
 ### Minor Code Contributions
