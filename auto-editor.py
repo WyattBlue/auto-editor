@@ -107,7 +107,7 @@ if(__name__ == '__main__'):
 
     if(args.debug):
         is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
-        print('python version', platform.python_version(), is64bit)
+        print('Python Version:', platform.python_version(), is64bit)
         # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
         # more here: https://docs.python.org/3/library/platform.html#platform.system
         print('Platform:', platform.system())
@@ -241,7 +241,7 @@ if(__name__ == '__main__'):
                 subprocess.call(cmd)
                 INPUT_FILE = TEMP+'/constantVid'+extension
 
-        if(BACK_MUS is None and BACK_VOL != -12):
+        if(BACK_MUS is None and BACK_VOL != -8):
             print('Warning! Background volume specified even though no background music was provided.')
 
         if(outputDir != ''):

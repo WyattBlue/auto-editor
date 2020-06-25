@@ -76,9 +76,7 @@ def prettyTime(newTime):
     return f'{hours:02}:{minutes:02} {ampm}'
 
 def progressBar(index, total, beginTime, title='Please wait'):
-
     termsize = get_terminal_size().columns
-
     bar_len = max(1, termsize - (len(title) + 50))
     percent_done = (index+1) / total * 100
     percent_done = round(percent_done, 1)
