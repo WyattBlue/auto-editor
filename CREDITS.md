@@ -2,7 +2,7 @@ Thank You
 
 
 ### Major Code Contributions/Inspiration
-@WyattBlue
+> * [ ] @WyattBlue
 @gusals3587
 @carykh
 @flyingzambie
@@ -24,7 +24,7 @@ Youtuber: Mark Santos/quesemnocao
 @callmedougan
 @p4jo
 
-### Documetation and Media
+### Documentation and Media
 @WyattBlue
 
 ### Third Party Libraries

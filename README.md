@@ -10,7 +10,7 @@ Auto-Editor is a command line application program for automatically editing **vi
 It works by analyzing the video's audio to detect when a section needs to be cut or kept in, then it runs a subprocess called ffmpeg to create the new video.
 
 ## New in 20w26a!
- * new method, fastVideoPlus.py that supports video speeds of any king. `--video_speed`, `--silent_speed`
+ * new method, fastVideoPlus.py that supports video speeds of any kind. `--video_speed`, `--silent_speed`
  * default sample rate changed from `44100` to `48000`.  (44.1 kHz -> 48.0 kHz)
  * `--frame_quality` default set to highest and marked as depreciated.
 
