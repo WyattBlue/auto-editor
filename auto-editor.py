@@ -66,7 +66,7 @@ if(__name__ == '__main__'):
         help='the speed that silent frames should be played at.')
     parser.add_argument('--frame_margin', '-m', type=int, default=4,
         help='tells how many frames on either side of speech should be included.')
-    parser.add_argument('--sample_rate', '-r', type=float, default=44800,
+    parser.add_argument('--sample_rate', '-r', type=float, default=48000,
         help='sample rate of the input and output videos.')
     parser.add_argument('--audio_bitrate', type=str, default='160k',
         help='number of bits per second for audio. Example, 160k.')
