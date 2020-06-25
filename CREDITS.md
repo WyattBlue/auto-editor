@@ -1,37 +1,38 @@
-Thank You
+# Credit
+
+### This project would not be the same without the contributions of all of these lovely people.
 
 
-### Major Code Contributions/Inspiration
-@WyattBlue
+###  Major Code Contributions/Inspiration
+@WyattBlue<br>
+@gusals3587<br>
+@carykh<br>
+@flyingzambie<br>
+@seaty6<br>
 
-@gusals3587
-
-@carykh
-
-@flyingzambie
-
-@seaty6
-
-### Minor Code Contributions
-@m-rey
-@zoe1337
+###  Minor Code Contributions
+@m-rey<br>
+@zoe1337<br>
 
 
 ### Testing and Small Code Snippets
-Discord User: Breadstick King
-Discord User: cuye
-Twitch User: GanerRL
-Youtuber: Mark Santos/quesemnocao
-@WyattBlue
-@flyingzambie
-@sasa
-@callmedougan
-@p4jo
+Discord User: Breadstick King<br>
+Discord User: cuye<br>
+Twitch User: GanerRL<br>
+Youtuber: Mark Santos/quesemnocao<br>
+@WyattBlue<br>
+@flyingzambie<br>
+@sasa<br>
+@callmedougan<br>
+@p4jo<br>
 
 ### Documentation and Media
 @WyattBlue
 
 ### Third Party Libraries
-audiotsm by @Muges
-the pydub team
-and the thousands of people who worked on FFmpeg
+Thanks to
+  *  audiotsm by @Muges
+  * a
+
+the pydub team<br>
+and the thousands of people who worked on FFmpeg and opencv<br>
