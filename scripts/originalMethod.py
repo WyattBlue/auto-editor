@@ -85,8 +85,8 @@ def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
 
     Remember that pydub, like auto-editor, is active and can change over time.
     """
-    cmd = ['ffmpeg', '-i', INPUT_FILE, '-vn', '-ar', str(SAMPLE_RATE), '-ac', '2',
-    '-ab', '192k', '-f', 'mp3', outputFile, '-nostats', '-loglevel', '0']
+    cmd = ['ffmpeg', '-i', INPUT_FILE, '-vn', '-ar', '44100', '-ac', '2',
+    '-ab', '192k', '-f', 'mp3', outputFile]
     subprocess.call(cmd)
 
 

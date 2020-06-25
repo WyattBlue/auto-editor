@@ -3,8 +3,6 @@
 """
 This script is like fastVideo but it supports sounded and silent speeds. It might be a
 bit RAM intensive though.
-
-This script is not currently being used.
 """
 
 # External libraries
@@ -12,19 +10,27 @@ import cv2
 import numpy as np
 from scipy.io import wavfile
 from audiotsm import phasevocoder
-from readAudio import ArrReader, ArrWriter
+
+# Included functions
+from scripts.readAudio import ArrReader, ArrWriter
+from scripts.usefulFunctions import getAudioChunks, progressBar
 
 # Internal libraries
-import math
 import sys
-import time
 import os
 import subprocess
-import argparse
 from shutil import rmtree
-from datetime import timedelta
+from time import time
 
 nFrames = 0
+
+def preview(chunks, NEW_SPEED, frameRate):
+    timeInSeconds = 0
+    for chunk in chunks:
+        leng = chunk[1] - chunk[0]
+        if(NEW_SPEED[int(chunk[2])] < 99999):
+            timeInSeconds += leng * (1 / NEW_SPEED[int(chunk[2])]) / frameRate
+    return timeInSeconds
 
 
 def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
@@ -60,29 +66,23 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     subprocess.call(extractAudio)
 
     out = cv2.VideoWriter(f'{TEMP}/spedup.mp4', fourcc, fps, (width, height))
-    sampleRate, audioData = wavfile.read(f'{TEMP}/output.wav')
 
-    skipped = 0
+    sampleRate, audioData = wavfile.read(f'{TEMP}/output.wav')
+    chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin)
     channels = int(audioData.shape[1])
 
-    def getMaxVolume(s):
-        maxv = np.max(s)
-        minv = np.min(s)
-        return max(maxv, -minv)
-
     switchStart = 0
-    maxVolume = getMaxVolume(audioData)
-
     needChange = False
     preve = None
     endMargin = 0
 
-    y = np.zeros_like(audioData, dtype=np.int16)
+    hmm = preview(chunks, NEW_SPEED, fps)
+    estLeng = int((hmm * SAMPLE_RATE) * 1.05)
+
+    # y needs to be as big or bigger than the new audio data or this program will fail
+    y = np.zeros((estLeng, 2), dtype=np.int16)
     yPointer = 0
     frameBuffer = []
-
-    premask = np.arange(FADE_SIZE) / FADE_SIZE
-    mask = np.repeat(premask[:, np.newaxis], 2, axis=1)
 
     def writeFrames(frames, nAudio, speed, samplePerSecond, writer):
         numAudioChunks = round(nAudio / samplePerSecond * fps)
@@ -97,12 +97,20 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             else:
                 writer.write(frames[frameIndex])
 
+
+    totalFrames = chunks[len(chunks) - 1][1]
+    outFrame = 0
+    beginTime = time()
+
     while cap.isOpened():
         ret, frame = cap.read()
         if(not ret):
             break
+
+        cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
+
         currentTime = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
-        audioSampleStart = math.floor(currentTime * sampleRate)
+        audioSampleStart = int(currentTime * sampleRate)
 
         audioSampleEnd = min(
             audioSampleStart + sampleRate // fps * frameMargin, len(audioData)
@@ -111,7 +119,13 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
         audioChunk = audioData[audioSampleStart:audioSampleEnd]
 
-        if(getMaxVolume(audioChunk) / maxVolume < silentThreshold):
+        state = None
+        for chunk in chunks:
+            if(cframe >= chunk[0] and cframe <= chunk[1]):
+                state = chunk[2]
+                break
+
+        if(state == 0):
             if(endMargin < 1):
                 isSilent = 1
             else:
@@ -126,7 +140,6 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         preve = isSilent
 
         if(not needChange):
-            skipped += 1
             frameBuffer.append(frame)
         else:
             theSpeed = NEW_SPEED[isSilent]
@@ -141,17 +154,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
                         spedupAudio = writer.output
 
                 yPointerEnd = yPointer + spedupAudio.shape[0]
-                y[yPointer:yPointerEnd] = spedupAudio
-
-                if(spedupAudio.shape[0] < FADE_SIZE):
-                    y[yPointer:yPointerEnd] = 0
-                else:
-                    y[yPointer : yPointer + FADE_SIZE] = (
-                        y[yPointer : yPointer + FADE_SIZE] * mask
-                    )
-                    y[yPointerEnd - FADE_SIZE : yPointerEnd] = (
-                        y[yPointerEnd - FADE_SIZE : yPointerEnd] * 1 - mask
-                    )
+                y[yPointer: yPointerEnd] = spedupAudio
                 yPointer = yPointerEnd
             else:
                 yPointerEnd = yPointer
@@ -161,15 +164,14 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             switchStart = switchEnd
             needChange = False
 
-        if(skipped % 200 == 0):
-            print(f"{skipped} frames inspected")
-            skipped += 1
+        progressBar(cframe, totalFrames, beginTime)
 
+    # finish audio
     y = y[:yPointer]
     wavfile.write(f'{TEMP}/spedupAudio.wav', sampleRate, y)
 
-    if not os.path.isfile(f'{TEMP}/spedupAudio.wav'):
-        raise IOError('The new audio file was not created.')
+    if(not os.path.isfile(f'{TEMP}/spedupAudio.wav')):
+        raise IOError('audio file not created.')
 
     cap.release()
     out.release()
@@ -178,7 +180,8 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     first = videoFile[:videoFile.rfind('.')]
     extension = videoFile[videoFile.rfind('.'):]
 
-    outFile = f'{first}_faster{extension}'
+    if(outFile == ''):
+        outFile = f'{first}_ALTERED{extension}'
 
     cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/spedup.mp4', '-i',
         f'{TEMP}/spedupAudio.wav', '-c:v', 'copy', '-c:a', 'aac', outFile]
