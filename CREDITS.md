@@ -1,4 +1,4 @@
-# Credit
+# Credits
 
 ### This project would not be the same without the contributions of all of these lovely people.
 
@@ -30,9 +30,8 @@ Youtuber: Mark Santos/quesemnocao<br>
 @WyattBlue
 
 ### Third Party Libraries
-Thanks to
-  *  audiotsm by @Muges
-  * a
-
-the pydub team<br>
+Thanks to<br>
+audiotsm by @Muges for tools for changing the speed of audio
+pydub by @jiaaro and others for advanced tools for laying and fading out audio
+wavfile.py in [scipy.io](https://github.com/scipy/scipy/blob/master/scipy/io/wavfile.py)
 and the thousands of people who worked on FFmpeg and opencv<br>
