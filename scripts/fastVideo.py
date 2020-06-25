@@ -12,51 +12,15 @@ import cv2
 import numpy as np
 from scipy.io import wavfile
 
+# Included functions
+from scripts.usefulFunctions import getAudioChunks, progressBar
+
 # Internal libraries
-import math
 import os
 import sys
 import subprocess
-import argparse
-from shutil import rmtree, get_terminal_size
-from time import time, localtime
-
-def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPREADAGE):
-
-    def getMaxVolume(s):
-        maxv = float(np.max(s))
-        minv = float(np.min(s))
-        return max(maxv, -minv)
-
-    audioSampleCount = audioData.shape[0]
-    maxAudioVolume = getMaxVolume(audioData)
-
-    samplesPerFrame = sampleRate / frameRate
-    audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
-    hasLoudAudio = np.zeros((audioFrameCount))
-
-    for i in range(audioFrameCount):
-        start = int(i * samplesPerFrame)
-        end = min(int((i+1) * samplesPerFrame), audioSampleCount)
-        audiochunks = audioData[start:end]
-        maxchunksVolume = getMaxVolume(audiochunks) / maxAudioVolume
-        if(maxchunksVolume >= SILENT_THRESHOLD):
-            hasLoudAudio[i] = 1
-
-    chunks = [[0, 0, 0]]
-    shouldIncludeFrame = np.zeros((audioFrameCount))
-    for i in range(audioFrameCount):
-        start = int(max(0, i-FRAME_SPREADAGE))
-        end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
-        shouldIncludeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
-
-        if (i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
-            chunks.append([chunks[-1][1], i, shouldIncludeFrame[i-1]])
-
-    chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])
-    chunks = chunks[1:]
-    return chunks
-
+from shutil import rmtree
+from time import time
 
 def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     AUD_BITRATE, VERBOSE):
@@ -93,75 +57,16 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
     chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin)
 
-    channels = int(audioData.shape[1])
-
     y = np.zeros_like(audioData, dtype=np.int16)
     yPointer = 0
-    samplesPerFrame = sampleRate / fps
-
-    # premask = np.arange(FADE_SIZE) / FADE_SIZE
-    # mask = np.repeat(premask[:, np.newaxis], 2, axis=1)
-
-    def prettyTime(newTime):
-        newTime = localtime(newTime)
-        hours = newTime.tm_hour
-
-        if(hours == 0):
-            hours = 12
-        if(hours > 12):
-            hours -= 12
-
-        if(newTime.tm_hour >= 12):
-            ampm = 'PM'
-        else:
-            ampm = 'AM'
-
-        minutes = newTime.tm_min
-        return f'{hours:02}:{minutes:02} {ampm}'
-
-    def print_percent_done(index, total, bar_len=34, title='Please wait'):
-
-        termsize = get_terminal_size().columns
-
-        bar_len = max(1, termsize - (len(title) + 50))
-        percent_done = (index+1) / total * 100
-        percent_done = round(percent_done, 1)
-
-        done = round(percent_done / (100/bar_len))
-        togo = bar_len - done
-
-        done_str = '█'*int(done)
-        togo_str = '░'*int(togo)
-
-        curTime = time() - beginTime
-
-        if(percent_done == 0):
-            percentPerSec = 0
-        else:
-            percentPerSec = curTime / percent_done
-
-        newTime = prettyTime(beginTime + (percentPerSec * 100))
-
-        bar = f'  ⏳{title}: [{done_str}{togo_str}] {percent_done}% done ETA {newTime}  '
-
-        # clear the screen to prevent
-        print(' ' * (termsize - 2), end='\r', flush=True)
-        # then print everything
-        if(index != total - 1):
-            print(bar, end='\r', flush=True)
-        else:
-            print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)
 
     totalFrames = chunks[len(chunks) - 1][1]
-    numFrames = 0
     beginTime = time()
 
     while cap.isOpened():
         ret, frame = cap.read()
         if(not ret):
             break
-
-        numFrames += 1
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
 
@@ -185,7 +90,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             y[yPointer:yPointerEnd] = audioChunk
             yPointer = yPointerEnd
 
-        print_percent_done(numFrames, totalFrames)
+        progressBar(cframe, totalFrames, beginTime)
 
     # finish audio
     y = y[:yPointer]
@@ -206,6 +111,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
     cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/spedup.mp4', '-i', f'{TEMP}/spedupAudio.wav',
         '-c:v', 'copy', '-c:a', 'aac', outFile]
+
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
     subprocess.call(cmd)
