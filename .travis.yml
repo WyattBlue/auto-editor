@@ -12,12 +12,20 @@ jobs:
       before_install:
         - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
         - brew install ffmpeg
+    - name: "Python 3.8.0 on Windows"
+      os: windows
+      language: shell
+      before_install:
+        - choco install python --version 3.8.0
+        - python -m pip install --upgrade pip
+        - choco install ffmpeg
+      env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
 install:
  - pip3 install scipy audiotsm pillow pydub opencv-python youtube_dl # install libraries
 script:
- - python3 auto-editor.py --debug
- - python3 auto-editor.py --version
- - python3 auto-editor.py example.mp4 --verbose
+ - python3 auto-editor.py --debug || python auto-editor.py --debug
+ - python3 auto-editor.py --version || python auto-editor.py --version
+ - python3 auto-editor.py example.mp4 --verbose || python auto-editor.py --verbose
  - python3 auto-editor.py example.mp4 -s 2
  - python3 auto-editor.py example.mp4 -v 2
  - python3 auto-editor.py example.mp4 --sounded_speed 0.5
