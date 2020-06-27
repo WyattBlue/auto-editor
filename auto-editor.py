@@ -125,6 +125,8 @@ if(__name__ == '__main__'):
         print('Removing cache')
         if(os.path.isdir(CACHE)):
             rmtree(CACHE)
+        if(os.path.isdir(TEMP)):
+            rmtree(TEMP)
         if(args.input == []):
             sys.exit()
 

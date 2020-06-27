@@ -13,6 +13,7 @@ from shutil import move, rmtree
 
 from scripts.originalAudio import handleAudio, splitAudio
 from scripts.originalVid import splitVideo
+from scripts.usefulFunctions import getAudioChunks
 
 TEMP = '.TEMP'
 CACHE = '.CACHE'
@@ -238,7 +239,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
 
     samplesPerFrame = sampleRate / frameRate
     audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
-    hasLoudAudio = np.zeros((audioFrameCount))
+    hasLoudAudio = np.zeros((audioFrameCount), dtype=np.uint8)
 
     for i in range(audioFrameCount):
         start = int(i * samplesPerFrame)
@@ -251,7 +252,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
             hasLoudAudio[i] = 1
 
     chunks = [[0, 0, 0]]
-    shouldIncludeFrame = np.zeros((audioFrameCount))
+    shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
     for i in range(audioFrameCount):
         start = int(max(0, i-FRAME_SPREADAGE))
         end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))

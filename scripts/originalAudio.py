@@ -24,7 +24,7 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
     num = 0
     chunk_len = str(len(chunks))
     for chunk in chunks:
-        if(NEW_SPEED[int(chunk[2])] < 99999):
+        if(NEW_SPEED[chunk[2]] < 99999):
             start = int(chunk[0] * samplesPerFrame)
             end = int(chunk[1] * samplesPerFrame)
             audioChunk = audioData[start:end]
@@ -32,7 +32,7 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
             sFile = ''.join([TEMP, '/tempStart.wav'])
             eFile = ''.join([TEMP, '/tempEnd.wav'])
             wavfile.write(sFile, SAMPLE_RATE, audioChunk)
-            if(NEW_SPEED[int(chunk[2])] == 1):
+            if(NEW_SPEED[chunk[2]] == 1):
                 __, samefile = wavfile.read(sFile)
                 leng = len(audioChunk)
 
@@ -40,7 +40,7 @@ def splitAudio(filename, chunks, samplesPerFrame, NEW_SPEED, audioData, SAMPLE_R
             else:
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
-                        phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])]).run(reader, writer)
+                        phasevocoder(reader.channels, speed=NEW_SPEED[chunk[2]]).run(reader, writer)
                 __, alteredAudioData = wavfile.read(eFile)
                 leng = alteredAudioData.shape[0]
 
