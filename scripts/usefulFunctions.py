@@ -19,7 +19,7 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin):
+def getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin):
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
 
@@ -36,17 +36,19 @@ def getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin):
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
         audiochunks = audioData[start:end]
         maxchunksVolume = getMaxVolume(audiochunks) / maxAudioVolume
-        if(maxchunksVolume >= silentThreshold):
+        if(maxchunksVolume >= zoomT):
+            hasLoudAudio[i] = 2
+        elif(maxchunksVolume >= silentT):
             hasLoudAudio[i] = 1
 
     chunks = [[0, 0, 0]]
-    shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.int8)
+    shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
     for i in range(audioFrameCount):
         start = int(max(0, i - frameMargin))
         end = int(min(audioFrameCount, i+1+frameMargin))
         shouldIncludeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
-        if (i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
+        if(i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
             chunks.append([chunks[-1][1], i, shouldIncludeFrame[i-1]])
 
     chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])

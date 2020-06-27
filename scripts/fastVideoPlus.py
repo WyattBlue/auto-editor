@@ -6,7 +6,7 @@ bit RAM intensive though.
 """
 
 # External libraries
-import cv2
+import cv2  # pip3 install opencv-python
 import numpy as np
 from scipy.io import wavfile
 from audiotsm import phasevocoder
@@ -69,7 +69,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     out = cv2.VideoWriter(f'{TEMP}/spedup.mp4', fourcc, fps, (width, height))
 
     sampleRate, audioData = wavfile.read(f'{TEMP}/output.wav')
-    chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin)
+    chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, 2, frameMargin)
     channels = int(audioData.shape[1])
 
     switchStart = 0

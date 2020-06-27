@@ -8,7 +8,7 @@ It's about 4x faster than the safe method. 1 Minute of video may take about 12 s
 """
 
 # External libraries
-import cv2
+import cv2  # pip3 install opencv-python
 import numpy as np
 from scipy.io import wavfile
 
@@ -55,7 +55,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     out = cv2.VideoWriter(f'{TEMP}/spedup.mp4', fourcc, fps, (width, height))
     sampleRate, audioData = wavfile.read(f'{TEMP}/output.wav')
 
-    chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin)
+    chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, 2, frameMargin)
 
     y = np.zeros_like(audioData, dtype=np.int16)
     yPointer = 0
