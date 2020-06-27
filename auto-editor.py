@@ -16,6 +16,7 @@ from operator import itemgetter
 from scripts.originalMethod import originalMethod
 from scripts.fastVideo import fastVideo
 from scripts.fastVideoPlus import fastVideoPlus
+from scripts.preview import preview
 
 version = '20w26a'
 
@@ -102,6 +103,8 @@ if(__name__ == '__main__'):
         help='combine all files in a folder before editing.')
     parser.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
+    parser.add_argument('--preview', action='store_true',
+        help='show stats on how the video will be cut.')
 
     args = parser.parse_args()
 
@@ -209,6 +212,11 @@ if(__name__ == '__main__'):
 
     if(args.get_auto_fps):
         print(getFrameRate(INPUT_FILE))
+        sys.exit()
+
+    if(args.preview):
+        preview(INPUT_FILE, args.silent_threshold, args.zoom_threshold,
+            args.frame_margin, args.sample_rate, VIDEO_SPEED, SILENT_SPEED)
         sys.exit()
 
     startTime = time.time()

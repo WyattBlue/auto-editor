@@ -18,13 +18,14 @@ def getMaxVolume(s):
     minv = float(np.min(s))
     return max(maxv, -minv)
 
-def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPREADAGE):
+
+def getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin):
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
 
-    samplesPerFrame = sampleRate / frameRate
+    samplesPerFrame = sampleRate / fps
     audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
-    hasLoudAudio = np.zeros((audioFrameCount))
+    hasLoudAudio = np.zeros((audioFrameCount), dtype=np.uint8)
 
     if(maxAudioVolume == 0):
         print('Warning! The entire audio is silent')
@@ -35,14 +36,14 @@ def getAudioChunks(audioData, sampleRate, frameRate, SILENT_THRESHOLD, FRAME_SPR
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
         audiochunks = audioData[start:end]
         maxchunksVolume = getMaxVolume(audiochunks) / maxAudioVolume
-        if(maxchunksVolume >= SILENT_THRESHOLD):
+        if(maxchunksVolume >= silentThreshold):
             hasLoudAudio[i] = 1
 
     chunks = [[0, 0, 0]]
-    shouldIncludeFrame = np.zeros((audioFrameCount))
+    shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.int8)
     for i in range(audioFrameCount):
-        start = int(max(0, i-FRAME_SPREADAGE))
-        end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
+        start = int(max(0, i - frameMargin))
+        end = int(min(audioFrameCount, i+1+frameMargin))
         shouldIncludeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
         if (i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
@@ -73,27 +74,23 @@ def prettyTime(newTime):
 
 def progressBar(index, total, beginTime, title='Please wait'):
     termsize = get_terminal_size().columns
-    bar_len = max(1, termsize - (len(title) + 50))
-    percent_done = (index+1) / total * 100
-    percent_done = round(percent_done, 1)
+    barLen = max(1, termsize - (len(title) + 50))
+    percentDone = (index+1) / total * 100
+    percentDone = round(percentDone, 1)
 
-    done = round(percent_done / (100/bar_len))
-    togo = bar_len - done
-    done_str = '█' * int(done)
-    togo_str = '░' * int(togo)
+    done = round(percentDone / (100 / barLen))
+    doneStr = '█' * done
+    togoStr = '░' * int(barLen - done)
 
-    curTime = time() - beginTime
-
-    if(percent_done == 0):
+    if(percentDone == 0):
         percentPerSec = 0
     else:
-        percentPerSec = curTime / percent_done
+        percentPerSec = (time() - beginTime) / percentDone
 
     newTime = prettyTime(beginTime + (percentPerSec * 100))
-    bar = f'  ⏳{title}: [{done_str}{togo_str}] {percent_done}% done ETA {newTime}  '
+    bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}  '
     print(' ' * (termsize - 2), end='\r', flush=True)
-    if(percent_done < 99.9):
+    if(percentDone < 99.9):
         print(bar, end='\r', flush=True)
     else:
         print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)
-
