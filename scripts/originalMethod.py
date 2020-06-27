@@ -13,7 +13,6 @@ from shutil import move, rmtree
 
 from scripts.originalAudio import handleAudio, splitAudio
 from scripts.originalVid import splitVideo
-from scripts.usefulFunctions import getAudioChunks
 
 TEMP = '.TEMP'
 CACHE = '.CACHE'
@@ -35,7 +34,7 @@ def getFrameRate(path):
 
 def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
     zooms = {}
-    shouldIncludeFrame = np.zeros((audioFrameCount))
+    shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
     hold = False
     endZoom = 0
     wait = ''

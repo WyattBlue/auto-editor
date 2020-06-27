@@ -92,7 +92,10 @@ def progressBar(index, total, beginTime, title='Please wait'):
     newTime = prettyTime(beginTime + (percentPerSec * 100))
     if(percentDone < 99.9):
         bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
-        bar += ' ' * min(2, (termsize - len(bar) - 4))
+        if(len(bar) > termsize - 2):
+            bar = bar[:termsize - 2]
+        else:
+            bar += ' ' * (termsize - len(bar) - 4)
         print(bar, end='\r', flush=True)
     else:
         print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)

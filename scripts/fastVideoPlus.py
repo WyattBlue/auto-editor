@@ -31,6 +31,8 @@ def preview(chunks, NEW_SPEED, fps):
         leng = chunk[1] - chunk[0]
         if(NEW_SPEED[chunk[2]] < 99999):
             timeInSeconds += leng * (1 / NEW_SPEED[chunk[2]])
+            print(leng * (1 / NEW_SPEED[chunk[2]]))
+    print('new time', timeInSeconds / fps)
     return timeInSeconds / fps
 
 
@@ -78,7 +80,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     endMargin = 0
 
     hmm = preview(chunks, NEW_SPEED, fps)
-    estLeng = int((hmm * SAMPLE_RATE) * 1.15)
+    estLeng = int((hmm * SAMPLE_RATE) * 1.2) + int(SAMPLE_RATE * 2)
 
     # y needs to be as big or bigger than the new audio data or this program will fail
     y = np.zeros((estLeng, 2), dtype=np.int16)
