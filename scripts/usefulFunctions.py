@@ -77,8 +77,8 @@ def prettyTime(newTime):
 def progressBar(index, total, beginTime, title='Please wait'):
     termsize = get_terminal_size().columns
     barLen = max(1, termsize - (len(title) + 50))
-    percentDone = (index+1) / total * 100
-    percentDone = round(percentDone, 1)
+
+    percentDone = round((index+1) / total * 100, 1)
 
     done = round(percentDone / (100 / barLen))
     doneStr = '█' * done
@@ -90,9 +90,9 @@ def progressBar(index, total, beginTime, title='Please wait'):
         percentPerSec = (time() - beginTime) / percentDone
 
     newTime = prettyTime(beginTime + (percentPerSec * 100))
-    bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}  '
-    print(' ' * (termsize - 2), end='\r', flush=True)
     if(percentDone < 99.9):
+        bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
+        bar += ' ' * min(2, (termsize - len(bar) - 4))
         print(bar, end='\r', flush=True)
     else:
         print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)

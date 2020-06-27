@@ -39,7 +39,7 @@ def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silent
 
     sampleRate, audioData = wavfile.read(f'{TEMP}/output.wav')
 
-    chunks = getAudioChunks(audioData, sampleRate, fps, silentT, zoomT frameMargin)
+    chunks = getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin)
 
 
     def printTimeFrame(title, frames, fps):
