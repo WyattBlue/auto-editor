@@ -268,7 +268,9 @@ if(__name__ == '__main__'):
                     args.verbose, args.cut_by_this_track, args.keep_tracks_seperate)
             else:
                 outFile = fastVideoPlus(INPUT_FILE, newOutput, args.silent_threshold,
-                    args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose, VIDEO_SPEED, SILENT_SPEED)
+                    args.frame_margin, args.sample_rate, args.audio_bitrate,
+                    args.verbose, VIDEO_SPEED, SILENT_SPEED, args.cut_by_this_track,
+                    args.keep_tracks_seperate)
         else:
             outFile = originalMethod(INPUT_FILE, newOutput, args.frame_rate, args.frame_margin,
                 args.frame_quality, args.silent_threshold, args.zoom_threshold, args.sample_rate,
