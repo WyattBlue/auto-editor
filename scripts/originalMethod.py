@@ -1,7 +1,7 @@
 '''scripts/originalMethod.py'''
 
-from pydub import AudioSegment
 import numpy as np
+from pydub import AudioSegment
 from scipy.io import wavfile
 
 import os
@@ -32,7 +32,7 @@ def getFrameRate(path):
     return float(matchDict['fps'])
 
 
-def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
+def getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin):
     zooms = {}
     shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
     hold = False
@@ -41,8 +41,8 @@ def getZooms(chunks, audioFrameCount, hasLoudAudio, FRAME_SPREADAGE):
     for i in range(audioFrameCount):
         if(i in zooms):
             continue
-        start = int(max(0, i-FRAME_SPREADAGE))
-        end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
+        start = int(max(0, i-frameMargin))
+        end = int(min(audioFrameCount, i+1+frameMargin))
         shouldIncludeFrame[i] = np.max(hasLoudAudio[start:end])
         if(i >= 2 and shouldIncludeFrame[i] == 2 and not hold):
             if(shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
@@ -90,7 +90,7 @@ def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
     subprocess.call(cmd)
 
 
-def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUALITY,
+def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, frameMargin,
     SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, AUD_BITRATE, SILENT_SPEED,
     VIDEO_SPEED, KEEP_SEP, BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC,
     VERBOSE, HWACCEL):
@@ -152,8 +152,8 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x[:4] == [INPUT_FILE, str(frameRate), str(fileSize), str(FRAME_QUALITY)]
-                and x[5] == str(COMBINE_TRAC)):
+            if(x[:3] == [INPUT_FILE, str(frameRate), str(fileSize)]
+                and x[4] == str(COMBINE_TRAC)):
                 print('Using cache.')
                 SKIP = True
                 tracks = int(x[4])
@@ -169,7 +169,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
             tracks = 1
         else:
             # Videos can have more than one audio track os we need to extract them all
-            print('Separating audio from video.')
+            print('Seperating audio from video.')
 
             cmd = ['ffprobe', INPUT_FILE, '-hide_banner', '-loglevel', 'panic',
                 '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
@@ -190,7 +190,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
 
             if(BASE_TRAC >= tracks):
                 print("Error: You choose a track that doesn't exist.")
-                print(f'There are only {tracks} tracks. (starting from 0)')
+                print(f'There are only {tracks-1} tracks. (starting from 0)')
                 sys.exit()
             for trackNumber in range(tracks):
                 cmd = ['ffmpeg']
@@ -220,8 +220,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
             cmd = ['ffmpeg']
             if(HWACCEL is not None):
                 cmd.extend(['-hwaccel', HWACCEL])
-            cmd.extend(['-i', INPUT_FILE, '-qscale:v', str(FRAME_QUALITY),
-                f'{CACHE}/frame%06d.jpg'])
+            cmd.extend(['-i', INPUT_FILE, f'{CACHE}/frame%06d.jpg'])
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
@@ -229,7 +228,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
     # calculating chunks.
     if(NEW_TRAC is None):
         # always base cuts by the first track
-        sampleRate, audioData = wavfile.read(CACHE+'/'+str(BASE_TRAC)+'.wav')
+        sampleRate, audioData = wavfile.read(f'{CACHE}/{BASE_TRAC}.wav')
     else:
         formatAudio(NEW_TRAC, f'{TEMP}/NEW_TRAC.wav', SAMPLE_RATE, '160k', VERBOSE)
         sampleRate, audioData = wavfile.read(f'{TEMP}/NEW_TRAC.wav')
@@ -253,8 +252,8 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
     chunks = [[0, 0, 0]]
     shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
     for i in range(audioFrameCount):
-        start = int(max(0, i-FRAME_SPREADAGE))
-        end = int(min(audioFrameCount, i+1+FRAME_SPREADAGE))
+        start = int(max(0, i-frameMargin))
+        end = int(min(audioFrameCount, i+1+frameMargin))
         shouldIncludeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
         if(i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
@@ -268,7 +267,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
             SAMPLE_RATE, maxAudioVolume)
     else:
         zooms = getZooms(chunks, audioFrameCount,
-            hasLoudAudio, FRAME_SPREADAGE)
+            hasLoudAudio, frameMargin)
 
         p1 = Process(target=handleAudio, args=(tracks, chunks, samplesPerFrame, NEW_SPEED,
             maxAudioVolume))
@@ -361,6 +360,6 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, FRAME_SPREADAGE, FRAME_QUA
     if(BACK_MUS is not None):
         tracks -= 1
     file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{FRAME_QUALITY}\n{tracks}\n{COMBINE_TRAC}\n')
+    file.write(f'{INPUT_FILE}\n{frameRate}\n{fileSize}\n{tracks}\n{COMBINE_TRAC}\n')
 
     return outFile

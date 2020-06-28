@@ -20,7 +20,6 @@ from datetime import timedelta
 
 
 def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silentSpeed):
-
     TEMP = '.TEMP'
 
     cap = cv2.VideoCapture(myInput)
@@ -34,13 +33,10 @@ def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silent
 
     cmd = ['ffmpeg', '-i', myInput, '-ab', '160k', '-ac', '2', '-ar',
         str(sampleRate), '-vn', f'{TEMP}/output.wav', '-nostats', '-loglevel', '0']
-
     subprocess.call(cmd)
 
     sampleRate, audioData = wavfile.read(f'{TEMP}/output.wav')
-
     chunks = getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin)
-
 
     def printTimeFrame(title, frames, fps):
         inSec = round(frames / fps, 1)
@@ -61,7 +57,6 @@ def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silent
         if(NEW_SPEED[chunk[2]] < 99999):
             frameLen += leng * (1 / NEW_SPEED[chunk[2]])
 
-
     printTimeFrame('New length', frameLen, fps)
 
     cuts = 0
@@ -77,5 +72,3 @@ def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silent
     printTimeFrame('Smallest clip length', min(cutLengths), fps)
     printTimeFrame('Largest clip length', max(cutLengths), fps)
     printTimeFrame('Average clip length', sum(cutLengths) / len(cutLengths), fps)
-    print(chunks)
-
