@@ -151,7 +151,6 @@ if(__name__ == '__main__'):
         VIDEO_SPEED = 99999
 
     HWACCEL = args.hardware_accel
-    KEEP_SEP = args.keep_tracks_seperate
 
     if(os.path.isdir(INPUT_FILE)):
         # get the file path and date modified so that it can be sorted later.
@@ -214,7 +213,7 @@ if(__name__ == '__main__'):
 
     if(args.get_auto_fps):
         print(getFrameRate(INPUT_FILE))
-        sys.exit()
+        quit()
 
     if(args.preview):
         preview(INPUT_FILE, args.silent_threshold, args.zoom_threshold,
@@ -260,20 +259,20 @@ if(__name__ == '__main__'):
         else:
             newOutput = OUTPUT_FILE
 
-        if(KEEP_SEP == False and BACK_MUS is None and args.zoom_threshold == 2
+        if(BACK_MUS is None and args.zoom_threshold == 2
             and NEW_TRAC == None and HWACCEL is None and not isAudio):
 
             if(SILENT_SPEED == 99999 and VIDEO_SPEED == 1):
                 outFile = fastVideo(INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
-                    args.verbose, args.cut_by_this_track)
+                    args.verbose, args.cut_by_this_track, args.keep_tracks_seperate)
             else:
                 outFile = fastVideoPlus(INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose, VIDEO_SPEED, SILENT_SPEED)
         else:
             outFile = originalMethod(INPUT_FILE, newOutput, args.frame_rate, args.frame_margin,
                 args.frame_quality, args.silent_threshold, args.zoom_threshold, args.sample_rate,
-                args.audio_bitrate, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP, BACK_MUS,
+                args.audio_bitrate, SILENT_SPEED, VIDEO_SPEED, args.keep_tracks_seperate, BACK_MUS,
                 BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, args.verbose, HWACCEL)
 
     print('Finished.')

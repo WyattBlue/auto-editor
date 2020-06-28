@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w26a
+ &nbsp;&nbsp;<sup>version 20w26b
 
 <p align="center">
   <img src="/resources/auto-editor_banner.png" width="800">
@@ -9,10 +9,11 @@
 Auto-Editor is a command line application program for automatically editing **video or audio**.
 It works by analyzing the video's audio to detect when a section needs to be cut or kept in, then it runs a subprocess called ffmpeg to create the new video.
 
-## New in 20w26a!
- * new method, fastVideoPlus.py that supports video speeds of any kind. `--video_speed`, `--silent_speed`
- * default sample rate changed from `44100` to `48000`.  (44.1 kHz -> 48.0 kHz)
- * `--frame_quality` default set to highest and marked as depreciated.
+## New in 20w26b!
+ * Get basic facts about the new edited video without waiting for potentially hours with the `--preview` flag.
+ * FastVideo.py now supports multiple audio tracks.
+ * Small optimzations made for all methods.
+ * Fixed bug where FastVideoPlus.py did not give enough space for the new audio to take.
 
 ## Usage
 ### Minimal Example
