@@ -261,11 +261,12 @@ if(__name__ == '__main__'):
             newOutput = OUTPUT_FILE
 
         if(KEEP_SEP == False and BACK_MUS is None and args.zoom_threshold == 2
-            and NEW_TRAC == None and BASE_TRAC == 0 and HWACCEL is None and not isAudio):
+            and NEW_TRAC == None and HWACCEL is None and not isAudio):
 
             if(SILENT_SPEED == 99999 and VIDEO_SPEED == 1):
                 outFile = fastVideo(INPUT_FILE, newOutput, args.silent_threshold,
-                    args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose)
+                    args.frame_margin, args.sample_rate, args.audio_bitrate,
+                    args.verbose, args.cut_by_this_track)
             else:
                 outFile = fastVideoPlus(INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose, VIDEO_SPEED, SILENT_SPEED)

@@ -10,6 +10,7 @@ import numpy as np
 
 # Internal libraries
 import math
+import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
 
@@ -72,6 +73,28 @@ def prettyTime(newTime):
 
     minutes = newTime.tm_min
     return f'{hours:02}:{minutes:02} {ampm}'
+
+
+def vidTracks(videoFile):
+    """
+    Return the number of audio tracks in a video file.
+    """
+    cmd = ['ffprobe', videoFile, '-hide_banner', '-loglevel', 'panic',
+        '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
+        'compact=p=0:nk=1']
+
+    # read what ffprobe piped in
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT)
+    stdout, __ = process.communicate()
+    output = stdout.decode()
+    numbers = output.split('\n')
+    try:
+        test = int(numbers[0])
+        return len(numbers) - 1
+    except ValueError:
+        print('Warning: ffprobe had an invalid output.')
+        return 1
 
 
 def progressBar(index, total, beginTime, title='Please wait'):
