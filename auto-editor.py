@@ -16,14 +16,19 @@ from operator import itemgetter
 from scripts.originalMethod import originalMethod
 from scripts.fastVideo import fastVideo
 from scripts.fastVideoPlus import fastVideoPlus
+from scripts.preview import preview
 
-version = '20w26a'
+version = '20w26b'
 
 # files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
 CACHE = '.CACHE'
 
 def getFrameRate(path):
+    """
+    get the frame rate by asking ffmpeg to do it for us then using a regex command to
+    retrieve it.
+    """
     from re import search
 
     process = subprocess.Popen(['ffmpeg', '-i', path],
@@ -39,15 +44,6 @@ def file_type(file):
         print('Could not locate file:', file)
         sys.exit()
     return file
-
-
-def quality_type(x):
-    x = int(x)
-    if(x > 31):
-        raise argparse.ArgumentTypeError('Minimum frame quality is 31')
-    if(x < 1):
-        raise argparse.ArgumentTypeError('Maximum frame quality is 1')
-    return x
 
 
 if(__name__ == '__main__'):
@@ -72,10 +68,6 @@ if(__name__ == '__main__'):
         help='number of bits per second for audio. Example, 160k.')
     parser.add_argument('--frame_rate', '-f', type=float,
         help='manually set the frame rate (fps) of the input video.')
-    parser.add_argument('--frame_quality', '-q', type=quality_type, default=1,
-        help='(Depreciated!) quality of frames from input video. 1 is highest, 31 is lowest.')
-    parser.add_argument('--get_auto_fps', '--get_frame_rate', action='store_true',
-        help='return what auto-editor thinks the frame rate is.')
     parser.add_argument('--verbose', action='store_true',
         help='display more information when running.')
     parser.add_argument('--clear_cache', action='store_true',
@@ -102,6 +94,8 @@ if(__name__ == '__main__'):
         help='combine all files in a folder before editing.')
     parser.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
+    parser.add_argument('--preview', action='store_true',
+        help='show stats on how the video will be cut.')
 
     args = parser.parse_args()
 
@@ -122,6 +116,8 @@ if(__name__ == '__main__'):
         print('Removing cache')
         if(os.path.isdir(CACHE)):
             rmtree(CACHE)
+        if(os.path.isdir(TEMP)):
+            rmtree(TEMP)
         if(args.input == []):
             sys.exit()
 
@@ -146,7 +142,6 @@ if(__name__ == '__main__'):
         VIDEO_SPEED = 99999
 
     HWACCEL = args.hardware_accel
-    KEEP_SEP = args.keep_tracks_seperate
 
     if(os.path.isdir(INPUT_FILE)):
         # get the file path and date modified so that it can be sorted later.
@@ -207,8 +202,9 @@ if(__name__ == '__main__'):
             print('Could not find file:', INPUT_FILE)
             sys.exit()
 
-    if(args.get_auto_fps):
-        print(getFrameRate(INPUT_FILE))
+    if(args.preview):
+        preview(INPUT_FILE, args.silent_threshold, args.zoom_threshold,
+            args.frame_margin, args.sample_rate, VIDEO_SPEED, SILENT_SPEED)
         sys.exit()
 
     startTime = time.time()
@@ -250,19 +246,22 @@ if(__name__ == '__main__'):
         else:
             newOutput = OUTPUT_FILE
 
-        if(KEEP_SEP == False and BACK_MUS is None and args.zoom_threshold == 2
-            and NEW_TRAC == None and BASE_TRAC == 0 and HWACCEL is None and not isAudio):
+        if(BACK_MUS is None and args.zoom_threshold == 2
+            and NEW_TRAC == None and HWACCEL is None and not isAudio):
 
             if(SILENT_SPEED == 99999 and VIDEO_SPEED == 1):
                 outFile = fastVideo(INPUT_FILE, newOutput, args.silent_threshold,
-                    args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose)
+                    args.frame_margin, args.sample_rate, args.audio_bitrate,
+                    args.verbose, args.cut_by_this_track, args.keep_tracks_seperate)
             else:
                 outFile = fastVideoPlus(INPUT_FILE, newOutput, args.silent_threshold,
-                    args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose, VIDEO_SPEED, SILENT_SPEED)
+                    args.frame_margin, args.sample_rate, args.audio_bitrate,
+                    args.verbose, VIDEO_SPEED, SILENT_SPEED, args.cut_by_this_track,
+                    args.keep_tracks_seperate)
         else:
             outFile = originalMethod(INPUT_FILE, newOutput, args.frame_rate, args.frame_margin,
-                args.frame_quality, args.silent_threshold, args.zoom_threshold, args.sample_rate,
-                args.audio_bitrate, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP, BACK_MUS,
+                args.silent_threshold, args.zoom_threshold, args.sample_rate,
+                args.audio_bitrate, SILENT_SPEED, VIDEO_SPEED, args.keep_tracks_seperate, BACK_MUS,
                 BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, args.verbose, HWACCEL)
 
     print('Finished.')
