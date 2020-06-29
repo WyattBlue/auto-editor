@@ -57,7 +57,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
     for chunk in chunks:
         if(NEW_SPEED[int(chunk[2])] < 99999):
             audioChunk = audioData[int(chunk[0]*samplesPerFrame):int(chunk[1]*samplesPerFrame)]
-            if(NEW_SPEED[int(chunk[2])] == 1):
+            if(NEW_SPEED[chunk[2]] == 1):
                 leng = len(audioChunk)
             else:
                 sFile = TEMP + '/tempStart2.wav'
@@ -65,7 +65,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                 wavfile.write(sFile, SAMPLE_RATE, audioChunk)
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
-                        phasevocoder(reader.channels, speed=NEW_SPEED[int(chunk[2])]).run(reader, writer)
+                        phasevocoder(reader.channels, speed=NEW_SPEED[chunk[2]]).run(reader, writer)
                 __, alteredAudioData = wavfile.read(eFile)
                 leng = alteredAudioData.shape[0]
 
@@ -74,7 +74,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
             startOutputFrame = int(math.ceil(outputPointer/samplesPerFrame))
             endOutputFrame = int(math.ceil(endPointer/samplesPerFrame))
             for outputFrame in range(startOutputFrame, endOutputFrame):
-                inputFrame = int(chunk[0]+NEW_SPEED[int(chunk[2])]*(outputFrame-startOutputFrame))
+                inputFrame = int(chunk[0]+NEW_SPEED[chunk[2]]*(outputFrame-startOutputFrame))
 
                 src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
                 dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
