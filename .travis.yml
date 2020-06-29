@@ -1,4 +1,4 @@
-language: python            # this works for Linux but is an error on macOS or Windows
+language: python
 jobs:
   include:
     - name: "Python 3.8.0 on Xenial Linux"
@@ -13,7 +13,7 @@ jobs:
         - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
         - brew install ffmpeg
 install:
- - pip3 install scipy audiotsm pillow pydub opencv-python youtube_dl # install libraries
+ - pip3 install scipy audiotsm pillow pydub opencv-python youtube_dl
 script:
  - python3 auto-editor.py --debug
  - python3 auto-editor.py --version

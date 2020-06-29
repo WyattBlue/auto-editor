@@ -6,35 +6,36 @@ bit RAM intensive though.
 """
 
 # External libraries
-import cv2
+import cv2  # pip3 install opencv-python
 import numpy as np
 from scipy.io import wavfile
 from audiotsm import phasevocoder
 
 # Included functions
 from scripts.readAudio import ArrReader, ArrWriter
-from scripts.usefulFunctions import getAudioChunks, progressBar
+from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
 
 # Internal libraries
 import sys
 import os
+import math
 import subprocess
 from shutil import rmtree
 from time import time
 
 nFrames = 0
 
-def preview(chunks, NEW_SPEED, frameRate):
+def preview(chunks, NEW_SPEED, fps):
     timeInSeconds = 0
     for chunk in chunks:
         leng = chunk[1] - chunk[0]
-        if(NEW_SPEED[int(chunk[2])] < 99999):
-            timeInSeconds += leng * (1 / NEW_SPEED[int(chunk[2])]) / frameRate
-    return timeInSeconds
+        if(NEW_SPEED[chunk[2]] < 99999):
+            timeInSeconds += leng * (1 / NEW_SPEED[chunk[2]])
+    return timeInSeconds / fps
 
 
 def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
-    AUD_BITRATE, VERBOSE, videoSpeed, silentSpeed):
+    AUD_BITRATE, VERBOSE, videoSpeed, silentSpeed, cutByThisTrack, keepTracksSep):
 
     print('Running from fastVideoPlus.py')
 
@@ -58,29 +59,45 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         rmtree(TEMP)
         os.mkdir(TEMP)
 
-    extractAudio = ['ffmpeg', '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
-        str(SAMPLE_RATE), '-vn', f'{TEMP}/output.wav']
-    if(not VERBOSE):
-        extractAudio.extend(['-nostats', '-loglevel', '0'])
+    tracks = vidTracks(videoFile)
 
-    subprocess.call(extractAudio)
+    if(cutByThisTrack >= tracks):
+        print("Error: You choose a track that doesn't exist.")
+        print(f'There are only {tracks-1} tracks. (starting from 0)')
+        sys.exit()
+    for trackNumber in range(tracks):
+        cmd = ['ffmpeg', '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
+        str(SAMPLE_RATE),'-map', f'0:a:{trackNumber}', f'{TEMP}/{trackNumber}.wav']
+        if(not VERBOSE):
+            cmd.extend(['-nostats', '-loglevel', '0'])
+        else:
+            cmd.extend(['-hide_banner'])
+        subprocess.call(cmd)
+
+    sampleRate, audioData = wavfile.read(f'{TEMP}/{cutByThisTrack}.wav')
+    chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, 2, frameMargin)
+
+    hmm = preview(chunks, NEW_SPEED, fps)
+    estLeng = int((hmm * SAMPLE_RATE) * 1.5) + int(SAMPLE_RATE * 2)
+
+    oldAudios = []
+    newAudios = []
+    for i in range(tracks):
+        __, audioData = wavfile.read(f'{TEMP}/{i}.wav')
+        oldAudios.append(audioData)
+        newAudios.append(np.zeros((estLeng, 2), dtype=np.int16))
+
+    yPointer = 0
 
     out = cv2.VideoWriter(f'{TEMP}/spedup.mp4', fourcc, fps, (width, height))
 
-    sampleRate, audioData = wavfile.read(f'{TEMP}/output.wav')
-    chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, frameMargin)
-    channels = int(audioData.shape[1])
+    channels = 2
 
     switchStart = 0
     needChange = False
     preve = None
     endMargin = 0
 
-    hmm = preview(chunks, NEW_SPEED, fps)
-    estLeng = int((hmm * SAMPLE_RATE) * 1.05)
-
-    # y needs to be as big or bigger than the new audio data or this program will fail
-    y = np.zeros((estLeng, 2), dtype=np.int16)
     yPointer = 0
     frameBuffer = []
 
@@ -144,18 +161,23 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         else:
             theSpeed = NEW_SPEED[isSilent]
             if(theSpeed < 99999):
-                spedChunk = audioData[switchStart:switchEnd]
-                spedupAudio = np.zeros((0, 2), dtype=np.int16)
-                with ArrReader(spedChunk, channels, sampleRate, 2) as reader:
-                    with ArrWriter(spedupAudio, channels, sampleRate, 2) as writer:
-                        phasevocoder(reader.channels, speed=theSpeed).run(
-                            reader, writer
-                        )
-                        spedupAudio = writer.output
 
-                yPointerEnd = yPointer + spedupAudio.shape[0]
-                y[yPointer: yPointerEnd] = spedupAudio
+                # handle audio tracks
+                for i, oneAudioData in enumerate(oldAudios):
+                    spedChunk = oneAudioData[switchStart:switchEnd]
+                    spedupAudio = np.zeros((0, 2), dtype=np.int16)
+                    with ArrReader(spedChunk, channels, sampleRate, 2) as reader:
+                        with ArrWriter(spedupAudio, channels, sampleRate, 2) as writer:
+                            phasevocoder(reader.channels, speed=theSpeed).run(
+                                reader, writer
+                            )
+                            spedupAudio = writer.output
+
+                    yPointerEnd = yPointer + spedupAudio.shape[0]
+
+                    newAudios[i][yPointer:yPointerEnd] = spedupAudio
                 yPointer = yPointerEnd
+
             else:
                 yPointerEnd = yPointer
 
@@ -167,11 +189,12 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         progressBar(cframe, totalFrames, beginTime)
 
     # finish audio
-    y = y[:yPointer]
-    wavfile.write(f'{TEMP}/spedupAudio.wav', sampleRate, y)
+    for i, newData in enumerate(newAudios):
+        newData = newData[:yPointer]
+        wavfile.write(f'{TEMP}/new{i}.wav', sampleRate, newData)
 
-    if(not os.path.isfile(f'{TEMP}/spedupAudio.wav')):
-        raise IOError('audio file not created.')
+        if(not os.path.isfile(f'{TEMP}/new{i}.wav')):
+            raise IOError('audio file not created.')
 
     cap.release()
     out.release()
@@ -183,11 +206,37 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     if(outFile == ''):
         outFile = f'{first}_ALTERED{extension}'
 
-    cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/spedup.mp4', '-i',
-        f'{TEMP}/spedupAudio.wav', '-c:v', 'copy', '-c:a', 'aac', outFile]
+    # Now mix new audio(s) and the new video.
 
-    if(not VERBOSE):
-        cmd.extend(['-nostats', '-loglevel', '0'])
-    subprocess.call(cmd)
+    if(keepTracksSep):
+        cmd = ['ffmpeg', '-y']
+        for i in range(tracks):
+            cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
+        cmd.extend(['-i', f'{TEMP}/spedup.mp4']) # add input video
+        for i in range(tracks):
+            cmd.extend(['-map', f'{i}:a:0'])
+        cmd.extend(['-map', f'{tracks}:v:0','-c:v', 'copy', '-movflags', '+faststart',
+            outFile])
+        if(not VERBOSE):
+            cmd.extend(['-nostats', '-loglevel', '0'])
+    else:
+        if(tracks > 1):
+            cmd = ['ffmpeg']
+            for i in range(tracks):
+                cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
+            cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
+                f'{TEMP}/newAudioFile.wav'])
+            if(not VERBOSE):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
+        else:
+            os.rename(f'{TEMP}/new0.wav', f'{TEMP}/newAudioFile.wav')
+
+        cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/newAudioFile.wav', '-i',
+            f'{TEMP}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
+            outFile]
+        if(not VERBOSE):
+            cmd.extend(['-nostats', '-loglevel', '0'])
+        subprocess.call(cmd)
 
     return outFile
