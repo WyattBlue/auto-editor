@@ -11,9 +11,11 @@ It works by analyzing the video's audio to detect when a section needs to be cut
 
 ## New in 20w26b!
  * Get basic facts about the new edited video without waiting for potentially hours with the `--preview` flag.
- * FastVideo.py now supports multiple audio tracks.
+ * FastVideo.py and FastVideoPlus.py now supports multiple audio tracks. You can also choose to cut by a specific track using `--cut_by_this_track`, and you can use `--keep_tracks_seperate` flag too.
  * Small optimzations made for all methods.
  * Fixed bug where FastVideoPlus.py did not give enough space for the new audio to take.
+ * `--frame_quality` has now been removed. Instead, it will always choose the best quality automatically.
+ * `--get_frame_rate` also known as `--get_auto_fps` has been removed. Getting specific info on videos is not the point of auto-editor, you can use FFmpeg like this instead. `ffmpeg -i example.mp4`
 
 ## Usage
 ### Minimal Example
