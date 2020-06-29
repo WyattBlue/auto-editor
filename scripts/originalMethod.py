@@ -90,10 +90,9 @@ def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
     subprocess.call(cmd)
 
 
-def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, frameMargin,
-    SILENT_THRESHOLD, LOUD_THRESHOLD, SAMPLE_RATE, AUD_BITRATE, SILENT_SPEED,
-    VIDEO_SPEED, KEEP_SEP, BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC,
-    VERBOSE, HWACCEL):
+def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, frameMargin, SILENT_THRESHOLD,
+    LOUD_THRESHOLD, SAMPLE_RATE, AUD_BITRATE, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
+    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, VERBOSE, HWACCEL):
     """
     This function takes in the path the the input file (and a bunch of other options)
     and outputs a new output file. This is both the safest and slowest of all methods.
@@ -156,7 +155,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, frameMargin,
                 and x[4] == str(COMBINE_TRAC)):
                 print('Using cache.')
                 SKIP = True
-                tracks = int(x[4])
+                tracks = int(x[3])
             file.close()
         if(not SKIP):
             rmtree(CACHE)
@@ -220,7 +219,7 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, frameMargin,
             cmd = ['ffmpeg']
             if(HWACCEL is not None):
                 cmd.extend(['-hwaccel', HWACCEL])
-            cmd.extend(['-i', INPUT_FILE, f'{CACHE}/frame%06d.jpg'])
+            cmd.extend(['-i', INPUT_FILE, '-qscale:v', '1', f'{CACHE}/frame%06d.jpg'])
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
@@ -342,9 +341,9 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, frameMargin,
             cmd = ['ffmpeg', '-y']
             if(HWACCEL is not None):
                 cmd.extend(['-hwaccel', HWACCEL])
-            cmd.extend(['-i', f'{TEMP}/newAudioFile.wav'])
-            cmd.extend(['-i', f'{TEMP}/output{extension}']) # add input video
-            cmd.extend(['-c:v', 'copy', '-movflags', '+faststart', outFile])
+            cmd.extend(['-i', f'{TEMP}/newAudioFile.wav', '-i',
+                f'{TEMP}/output{extension}', '-c:v', 'copy', '-movflags', '+faststart',
+                outFile])
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
