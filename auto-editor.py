@@ -19,7 +19,7 @@ from scripts.fastVideo import fastVideo
 from scripts.fastVideoPlus import fastVideoPlus
 from scripts.preview import preview
 
-version = '20w26b'
+version = '20w27a'
 
 # files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
@@ -30,13 +30,11 @@ def getFrameRate(path):
     get the frame rate by asking ffmpeg to do it for us then using a regex command to
     retrieve it.
     """
-    from re import search
-
     process = subprocess.Popen(['ffmpeg', '-i', path],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     output = stdout.decode()
-    matchDict = search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
+    matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
     return float(matchDict['fps'])
 
 
@@ -196,10 +194,10 @@ if(__name__ == '__main__'):
             cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
                    INPUT_FILE, "--output", basename]
             subprocess.call(cmd)
-            print('Finished Download')
+
             INPUT_FILE = basename + '.mp4'
             INPUTS = [INPUT_FILE]
-            if not OUTPUT_FILE:
+            if(OUTPUT_FILE == ''):
                 OUTPUT_FILE = basename + '_ALTERED.mp4'
         else:
             print('Could not find file:', INPUT_FILE)
