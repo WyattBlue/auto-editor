@@ -45,6 +45,16 @@ def file_type(file):
     return file
 
 
+def time_units(uinput):
+    try:
+        return int(uinput)
+    except ValueError:
+        if(uinput.endswith('secs')):
+            return int(uinput[:3])
+        else:
+            print('Incorrect format for time units')
+            sys.exit()
+
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
     parser.add_argument('input', nargs='*',

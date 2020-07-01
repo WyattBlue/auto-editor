@@ -19,6 +19,7 @@ from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
 import sys
 import os
 import math
+import tempfile
 import subprocess
 from shutil import rmtree
 from time import time
@@ -43,7 +44,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         print('Could not find file:', videoFile)
         sys.exit()
 
-    TEMP = '.TEMP'
+    TEMP = tempfile.mkdtemp()
     FADE_SIZE = 400
     NEW_SPEED = [silentSpeed, videoSpeed]
 
@@ -52,12 +53,6 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     fps = round(cap.get(cv2.CAP_PROP_FPS))
-
-    try:
-        os.mkdir(TEMP)
-    except OSError:
-        rmtree(TEMP)
-        os.mkdir(TEMP)
 
     tracks = vidTracks(videoFile)
 
@@ -207,7 +202,6 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         outFile = f'{first}_ALTERED{extension}'
 
     # Now mix new audio(s) and the new video.
-
     if(keepTracksSep):
         cmd = ['ffmpeg', '-y']
         for i in range(tracks):
@@ -238,5 +232,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         if(not VERBOSE):
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
+
+    rmtree(TEMP)
 
     return outFile
