@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w26b
+ &nbsp;&nbsp;<sup>version 20w27a
 
 <p align="center">
   <img src="/resources/auto-editor_banner.png" width="800">
@@ -9,13 +9,10 @@
 Auto-Editor is a command line application program for automatically editing **video or audio**.
 It works by analyzing the video's audio to detect when a section needs to be cut or kept in, then it runs a subprocess called ffmpeg to create the new video.
 
-## New in 20w26b!
- * Get basic facts about the new edited video without waiting for potentially hours with the `--preview` flag.
- * FastVideo.py and FastVideoPlus.py now supports multiple audio tracks. You can also choose to cut by a specific track using `--cut_by_this_track`, and you can use `--keep_tracks_seperate` flag too.
- * Small optimzations made for all methods.
- * Fixed bug where FastVideoPlus.py did not give enough space for the new audio to take.
- * `--frame_quality` has now been removed. Instead, it will always choose the best quality automatically.
- * `--get_frame_rate` also known as `--get_auto_fps` has been removed. Getting specific info on videos is not the point of auto-editor, you can use FFmpeg like this instead. `ffmpeg -i example.mp4`
+## New in 20w27a!
+ * Videos downloaded with youtube-dl are now named based on their URL. Thanks to @eykd for that update.
+ * fastVideo and fastVideoPlus now use python's tempfile system.
+ * Outdated documentation has been changed.
 
 ## Usage
 ### Minimal Example
