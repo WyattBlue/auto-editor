@@ -19,6 +19,7 @@ from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
 import os
 import sys
 import subprocess
+import tempfile
 from shutil import rmtree
 from time import time
 
@@ -31,19 +32,13 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         print('Could not find file:', videoFile)
         sys.exit()
 
-    TEMP = '.TEMP'
+    TEMP = tempfile.mkdtemp()
 
     cap = cv2.VideoCapture(videoFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     fps = round(cap.get(cv2.CAP_PROP_FPS))
-
-    try:
-        os.mkdir(TEMP)
-    except OSError:
-        rmtree(TEMP)
-        os.mkdir(TEMP)
 
     tracks = vidTracks(videoFile)
 
@@ -159,5 +154,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         if(not VERBOSE):
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
+
+    rmtree(TEMP)
 
     return outFile

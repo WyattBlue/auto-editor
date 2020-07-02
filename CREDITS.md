@@ -13,12 +13,13 @@
 ###  Minor Code Contributions
 @m-rey<br>
 @zoe1337<br>
+@eykd<br>
 
 ### Testing and Small Code Snippets
 Discord User: Breadstick King<br>
 Discord User: cuye<br>
 Twitch User: GanerRL<br>
-Youtuber: Mark Santos/quesemnocao<br>
+Youtuber: Mark Santos<br>
 @WyattBlue<br>
 @flyingzambie<br>
 @sasa<br>
