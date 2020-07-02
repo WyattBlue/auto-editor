@@ -4,6 +4,7 @@
 # Internal python libraries
 import os
 import argparse
+import re
 import subprocess
 import sys
 import time
@@ -18,7 +19,7 @@ from scripts.fastVideo import fastVideo
 from scripts.fastVideoPlus import fastVideoPlus
 from scripts.preview import preview
 
-version = '20w26b'
+version = '20w27a'
 
 # files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
@@ -29,13 +30,11 @@ def getFrameRate(path):
     get the frame rate by asking ffmpeg to do it for us then using a regex command to
     retrieve it.
     """
-    from re import search
-
     process = subprocess.Popen(['ffmpeg', '-i', path],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     output = stdout.decode()
-    matchDict = search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
+    matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
     return float(matchDict['fps'])
 
 
@@ -45,6 +44,16 @@ def file_type(file):
         sys.exit()
     return file
 
+
+def time_units(uinput):
+    try:
+        return int(uinput)
+    except ValueError:
+        if(uinput.endswith('secs')):
+            return int(uinput[:3])
+        else:
+            print('Incorrect format for time units')
+            sys.exit()
 
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
@@ -187,17 +196,19 @@ if(__name__ == '__main__'):
     else:
         outputDir = ''
         if(os.path.isfile(INPUT_FILE)):
-            # if input is URL, download as mp4 with youtube-dl
-            if(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
-                print('URL detected, using youtube-dl to download from webpage.')
-                cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
-                    INPUT_FILE, "--output", "web_download"]
-                subprocess.call(cmd)
-                print('Finished Download')
-                INPUT_FILE = 'web_download.mp4'
-                OUTPUT_FILE = 'web_download_ALTERED.mp4'
-
             INPUTS = [INPUT_FILE]
+        # if input is URL, download as mp4 with youtube-dl
+        elif(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
+            print('URL detected, using youtube-dl to download from webpage.')
+            basename = re.sub(r'\W+', '-', INPUT_FILE)
+            cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
+                   INPUT_FILE, "--output", basename]
+            subprocess.call(cmd)
+
+            INPUT_FILE = basename + '.mp4'
+            INPUTS = [INPUT_FILE]
+            if(OUTPUT_FILE == ''):
+                OUTPUT_FILE = basename + '_ALTERED.mp4'
         else:
             print('Could not find file:', INPUT_FILE)
             sys.exit()

@@ -58,10 +58,10 @@ short   | `-s`
 You can tell auto-editor to zoom in when the input's audio is above the loudness threshold. Auto-Editor will hold the zoom until there's a cut.
 
 ```terminal
---loudness_threshold
+--zoom_threshold
 ```
 
-Command | `--loudness_threshold`
+Command | `--zoom_threshold`
 --------|---------------------
 type    | float
 range   | 0 to 1
@@ -128,7 +128,7 @@ Now the video with be cut by second audio track's volume! But what if you wanted
 ```
 
 ## Caching In
-Some videos need to be converted to a jpeg image sequence before hand but this can take awhile. What if you want to use the same video but use different parameters. That's where caching comes in. The jpeg sequence and the audio are stored away in the .CACHE folder, ready to be used again if it is right.
+Some videos need to be converted to a jpeg image sequence beforehand and this can take awhile. What if you want to use the same video but use different parameters. That's where caching comes in. The jpeg sequence and the audio are stored away in the .CACHE folder, ready to be used again if it is right.
 
 The .CACHE folder can take quiet a bit of space so if you want to delete the folder and all its contents, run this command.
 
