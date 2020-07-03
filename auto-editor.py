@@ -294,7 +294,7 @@ if(__name__ == '__main__'):
     if(not os.path.isfile(outFile)):
         raise IOError(f'Error: The file {outFile} was not created.')
 
-    if(not args.no_open):
+    if(not args.no_open and not args.export_to_premiere):
         try:  # should work on Windows
             os.startfile(outFile)
         except AttributeError:

@@ -18,19 +18,19 @@ Python 2.7.16
 
 you need to install [python 3](https://www.python.org/downloads/).
 
-## FFmpeg
-Check if you have ffmpeg.
+## Installing FFmpeg
+Use choco to download ffmpeg.
 
 ```terminal
-ffmpeg -h
+choco install ffmpeg
 ```
 
-If not then follow [this guide](https://www.wikihow.com/Install-FFmpeg-on-Windows). Unfortunately, it seems that you cannot install ffmpeg with the path correctly set with only commands. If you know how to do that, please show how in an issue.
+Follow [these instructions](https://chocolatey.org/install#install-step2) to install choco if you do not already have it on your windows machine.
 
 ## Dependencies
 To install all of the needed dependencies, run this:
 ```terminal
-pip3 install scipy audiotsm pillow pydub opencv-python youtube_dl
+pip3 install audiotsm pillow pydub opencv-python youtube_dl
 ```
 
 Wait for all the libraries to install and once that's done, close and reopen Command Prompt
