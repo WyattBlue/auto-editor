@@ -15,6 +15,7 @@ from scripts.wavfile import read, write
 
 # Internal libraries
 import os
+import sys
 import tempfile
 import subprocess
 from shutil import rmtree
@@ -41,6 +42,10 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         if(chunk[2] == 1):
             clips.append([chunk[0], chunk[1]])
 
+
+    if(len(clips) < 2):
+        print('Error! Less than 2 clips.')
+        sys.exit()
 
     print('\nWarning, this code is very underdeveloped and does not support many features.')
 
@@ -91,10 +96,11 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         outfile.write('\t\t\t\t\t</samplecharacteristics>\n')
         outfile.write('\t\t\t\t</format>\n')
         outfile.write('\t\t\t\t<track>\n')
-        for i, clip in enumerate(clips):
-            print(i, clip)
-            if(i == 0):
-                outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{i+7}">\n')
+
+        # handle first clip.
+        for j, clip in enumerate(clips):
+            if(j == 0):
+                outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{j+7}">\n')
                 outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
                 outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
                 outfile.write(f'\t\t\t\t\t\t<start>{clip[0]}</start>\n')
@@ -111,10 +117,66 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
                 outfile.write('\t\t\t\t\t\t\t<media>\n')
                 outfile.write('\t\t\t\t\t\t\t\t<video>\n')
                 outfile.write('\t\t\t\t\t\t\t\t\t<samplecharacteristics>\n')
-
-
+                outfile.write('\t\t\t\t\t\t\t\t\t\t<rate>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t\t<timebase>{fps}</timebase>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
+                outfile.write('\t\t\t\t\t\t\t\t\t\t</rate>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t<width>{width}</width>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t<height>{height}</height>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t<anamorphic>{ana}</anamorphic>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t<pixelaspectratio>{pixelar}</pixelaspectratio>\n')
+                outfile.write('\t\t\t\t\t\t\t\t\t\t<fielddominance>none</fielddominance>\n')
                 outfile.write('\t\t\t\t\t\t\t\t\t</samplecharacteristics>\n')
                 outfile.write('\t\t\t\t\t\t\t\t</video>\n')
-
+                outfile.write('\t\t\t\t\t\t\t\t<audio>\n')
+                outfile.write('\t\t\t\t\t\t\t\t\t<samplecharacteristics>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t<depth>{depth}</depth>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t<samplerate>{sr}</samplerate>\n')
+                outfile.write('\t\t\t\t\t\t\t\t\t</samplecharacteristics>\n')
+                outfile.write('\t\t\t\t\t\t\t\t\t<channelcount>2</channelcount>\n')
+                outfile.write('\t\t\t\t\t\t\t\t</audio>\n')
+                outfile.write('\t\t\t\t\t\t\t</media>\n')
+                outfile.write('\t\t\t\t\t\t</file>\n')
+                for i in range(len(clips)):
+                    outfile.write('\t\t\t\t\t\t<link>\n')
+                    outfile.write(f'\t\t\t\t\t\t\t<linkclipref>clipitem-{(i*(len(clips)+1))+7}</linkclipref>\n')
+                    outfile.write('\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
+                    outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
+                    outfile.write('\t\t\t\t\t\t\t<clipindex>1</clipindex>\n')
+                    if(i != 1):
+                        outfile.write('\t\t\t\t\t\t\t<groupindex>1</groupindex>\n')
+                    outfile.write('\t\t\t\t\t\t</link>\n')
+                outfile.write('\t\t\t\t\t</clipitem>\n')
+            else:
+                outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{j+7}">\n')
+                outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
+                outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
+                outfile.write(f'\t\t\t\t\t\t<start>{clip[0]}</start>\n')
+                outfile.write(f'\t\t\t\t\t\t<end>{clip[1]}</end>\n')
+                outfile.write(f'\t\t\t\t\t\t<in>212</in>\n')
+                outfile.write(f'\t\t\t\t\t\t<out>427</out>\n')
+                outfile.write(f'\t\t\t\t\t\t<alphatype>none</alphatype>\n')
+                outfile.write(f'\t\t\t\t\t\t<file id="file-2"/>\n')
+                for i in range(len(clips)):
+                    outfile.write('\t\t\t\t\t\t<link>\n')
+                    outfile.write(f'\t\t\t\t\t\t\t<linkclipref>clipitem-{(i*(len(clips)+1))+7+j}</linkclipref>\n')
+                    outfile.write('\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
+                    outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
+                    outfile.write('\t\t\t\t\t\t\t<clipindex>1</clipindex>\n')
+                    if(i != 1):
+                        outfile.write('\t\t\t\t\t\t\t<groupindex>1</groupindex>\n')
+                    outfile.write('\t\t\t\t\t\t</link>\n')
+                outfile.write('\t\t\t\t\t</clipitem>\n')
+        outfile.write('\t\t\t\t</track>\n')
+        outfile.write('\t\t\t</video>\n')
+        outfile.write('\t\t\t<audio>\n')
+        outfile.write('\t\t\t\t<numOutputChannels>2</numOutputChannels>\n')
+        outfile.write('\t\t\t\t<format>\n')
+        outfile.write('\t\t\t\t\t<samplecharacteristics>\n')
+        outfile.write(f'\t\t\t\t\t\t<depth>{depth}</depth>\n')
+        outfile.write(f'\t\t\t\t\t\t<samplerate>{sr}</samplerate>\n')
+        outfile.write('\t\t\t\t\t</samplecharacteristics>\n')
+        outfile.write('\t\t\t\t</format>\n')
+        outfile.write('\t\t\t\t\t<track PannerIsInverted="true" PannerStartKeyframe="-91445760000000000,0.5,0,0,0,0,0,0" PannerName="Balance" currentExplodedTrackIndex="0" totalExplodedTrackCount="2" premiereTrackType="Stereo">\n')
 
     return 'export.xml'
