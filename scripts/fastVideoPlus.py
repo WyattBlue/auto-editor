@@ -8,12 +8,12 @@ bit RAM intensive though.
 # External libraries
 import cv2  # pip3 install opencv-python
 import numpy as np
-from scipy.io import wavfile
 from audiotsm import phasevocoder
 
 # Included functions
 from scripts.readAudio import ArrReader, ArrWriter
 from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
+from scripts.wavfile import read, write
 
 # Internal libraries
 import sys
@@ -69,7 +69,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             cmd.extend(['-hide_banner'])
         subprocess.call(cmd)
 
-    sampleRate, audioData = wavfile.read(f'{TEMP}/{cutByThisTrack}.wav')
+    sampleRate, audioData = read(f'{TEMP}/{cutByThisTrack}.wav')
     chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, 2, frameMargin)
 
     hmm = preview(chunks, NEW_SPEED, fps)
@@ -78,7 +78,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     oldAudios = []
     newAudios = []
     for i in range(tracks):
-        __, audioData = wavfile.read(f'{TEMP}/{i}.wav')
+        __, audioData = read(f'{TEMP}/{i}.wav')
         oldAudios.append(audioData)
         newAudios.append(np.zeros((estLeng, 2), dtype=np.int16))
 
@@ -186,7 +186,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     # finish audio
     for i, newData in enumerate(newAudios):
         newData = newData[:yPointer]
-        wavfile.write(f'{TEMP}/new{i}.wav', sampleRate, newData)
+        write(f'{TEMP}/new{i}.wav', sampleRate, newData)
 
         if(not os.path.isfile(f'{TEMP}/new{i}.wav')):
             raise IOError('audio file not created.')
