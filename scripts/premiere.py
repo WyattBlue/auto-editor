@@ -34,14 +34,21 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
 
     sampleRate, audioData = read(f'{TEMP}/output.wav')
     chunks = getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin)
-
     rmtree(TEMP)
+
+    clips = []
+    for chunk in chunks:
+        if(chunk[2] == 1):
+            clips.append([chunk[0], chunk[1]])
+
 
     print('\nWarning, this code is very underdeveloped and does not support many features.')
 
     print('\nDev Info\n========')
 
     print(chunks)
+    print('clips:')
+    print(clips)
     pathurl = 'file://localhost' + os.path.abspath(myInput)
     print('pathurl:', pathurl)
     name = os.path.basename(myInput)
@@ -55,6 +62,7 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
     height = '720'
     pixelar = 'square' # pixel aspect ratio
     colordepth = '24'
+    fps = '30' # aka timebase
     sr = sampleRate
 
 
@@ -82,12 +90,31 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         outfile.write(f'\t\t\t\t\t\t<colordepth>{colordepth}</colordepth>\n')
         outfile.write('\t\t\t\t\t</samplecharacteristics>\n')
         outfile.write('\t\t\t\t</format>\n')
+        outfile.write('\t\t\t\t<track>\n')
+        for i, clip in enumerate(clips):
+            print(i, clip)
+            if(i == 0):
+                outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{i+7}">\n')
+                outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
+                outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
+                outfile.write(f'\t\t\t\t\t\t<start>{clip[0]}</start>\n')
+                outfile.write(f'\t\t\t\t\t\t<end>{clip[1]}</end>\n')
+                outfile.write(f'\t\t\t\t\t\t<in>{clip[0]}</in>\n')
+                outfile.write(f'\t\t\t\t\t\t<out>{clip[1]}</out>\n')
+                outfile.write('\t\t\t\t\t\t<file id="file-2">\n')
+                outfile.write(f'\t\t\t\t\t\t\t<name>{name}</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t<pathurl>{pathurl}</pathurl>\n')
+                outfile.write('\t\t\t\t\t\t\t<rate>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<timebase>{fps}</timebase>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
+                outfile.write('\t\t\t\t\t\t\t</rate>\n')
+                outfile.write('\t\t\t\t\t\t\t<media>\n')
+                outfile.write('\t\t\t\t\t\t\t\t<video>\n')
+                outfile.write('\t\t\t\t\t\t\t\t\t<samplecharacteristics>\n')
+
+
+                outfile.write('\t\t\t\t\t\t\t\t\t</samplecharacteristics>\n')
+                outfile.write('\t\t\t\t\t\t\t\t</video>\n')
 
 
     return 'export.xml'
-
-
-
-
-
-
