@@ -100,6 +100,8 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         # handle first clip.
         for j, clip in enumerate(clips):
             if(j == 0):
+                myStart = clip[0]
+                myEnd = clip[1]
                 outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{j+7}">\n')
                 outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
                 outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
@@ -148,13 +150,17 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
                     outfile.write('\t\t\t\t\t\t</link>\n')
                 outfile.write('\t\t\t\t\t</clipitem>\n')
             else:
+                temp = myEnd
+                myStart = myEnd
+                myEnd = myStart + temp
+
                 outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{j+7}">\n')
                 outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
                 outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
-                outfile.write(f'\t\t\t\t\t\t<start>{clip[0]}</start>\n')
-                outfile.write(f'\t\t\t\t\t\t<end>{clip[1]}</end>\n')
-                outfile.write(f'\t\t\t\t\t\t<in>212</in>\n')
-                outfile.write(f'\t\t\t\t\t\t<out>427</out>\n')
+                outfile.write(f'\t\t\t\t\t\t<start>{myStart}</start>\n')
+                outfile.write(f'\t\t\t\t\t\t<end>{myEnd}</end>\n')
+                outfile.write(f'\t\t\t\t\t\t<in>{clip[0]}</in>\n')
+                outfile.write(f'\t\t\t\t\t\t<out>{clip[1]}</out>\n')
                 outfile.write(f'\t\t\t\t\t\t<alphatype>none</alphatype>\n')
                 outfile.write(f'\t\t\t\t\t\t<file id="file-2"/>\n')
                 for i in range(len(clips)):
@@ -163,7 +169,7 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
                     outfile.write('\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
                     outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
                     outfile.write('\t\t\t\t\t\t\t<clipindex>1</clipindex>\n')
-                    if(i != 1):
+                    if(i != 0):
                         outfile.write('\t\t\t\t\t\t\t<groupindex>1</groupindex>\n')
                     outfile.write('\t\t\t\t\t\t</link>\n')
                 outfile.write('\t\t\t\t\t</clipitem>\n')
@@ -177,6 +183,48 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         outfile.write(f'\t\t\t\t\t\t<samplerate>{sr}</samplerate>\n')
         outfile.write('\t\t\t\t\t</samplecharacteristics>\n')
         outfile.write('\t\t\t\t</format>\n')
-        outfile.write('\t\t\t\t\t<track PannerIsInverted="true" PannerStartKeyframe="-91445760000000000,0.5,0,0,0,0,0,0" PannerName="Balance" currentExplodedTrackIndex="0" totalExplodedTrackCount="2" premiereTrackType="Stereo">\n')
+        outfile.write('\t\t\t\t<track PannerIsInverted="true" PannerStartKeyframe="-91445760000000000,0.5,0,0,0,0,0,0" PannerName="Balance" currentExplodedTrackIndex="0" totalExplodedTrackCount="2" premiereTrackType="Stereo">\n')
+
+
+        # Audio Clips
+        for j, clip in enumerate(clips):
+            outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{len(clips)+8+j}" premiereChannelType="stereo">\n')
+            outfile.write(f'\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
+            outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
+
+            if(j == 0):
+                myStart = clip[0]
+                myEnd = clip[1]
+            else:
+                temp = myEnd
+                myStart = myEnd
+                myEnd = myStart + temp
+            outfile.write(f'\t\t\t\t\t\t<start>{myStart}</start>\n')
+            outfile.write(f'\t\t\t\t\t\t<end>{myEnd}</end>\n')
+
+            outfile.write(f'\t\t\t\t\t\t<in>{clip[0]}</in>\n')
+            outfile.write(f'\t\t\t\t\t\t<out>{clip[1]}</out>\n')
+            outfile.write('\t\t\t\t\t\t<file id="file-2"/>\n')
+            outfile.write('\t\t\t\t\t\t<sourcetrack>\n')
+            outfile.write('\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n')
+            outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
+            outfile.write('\t\t\t\t\t\t</sourcetrack>\n')
+            for i in range(len(clips)):
+                outfile.write('\t\t\t\t\t\t<link>\n')
+                outfile.write(f'\t\t\t\t\t\t\t<linkclipref>clipitem-{(i*(len(clips)+1))+7+j}</linkclipref>\n')
+                outfile.write('\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
+                outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
+                outfile.write(f'\t\t\t\t\t\t\t<clipindex>{i+1}</clipindex>\n')
+                if(i != 0):
+                    outfile.write('\t\t\t\t\t\t\t<groupindex>1</groupindex>\n')
+                outfile.write('\t\t\t\t\t\t</link>\n')
+            outfile.write('\t\t\t\t\t</clipitem>\n')
+        outfile.write('\t\t\t\t\t<outputchannelindex>1</outputchannelindex>\n')
+        outfile.write('\t\t\t\t</track>\n')
+        outfile.write('\t\t\t</audio>\n')
+        outfile.write('\t\t</media>\n')
+        outfile.write('\t</sequence>\n')
+        outfile.write('</xmeml>')
+
 
     return 'export.xml'
