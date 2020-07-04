@@ -36,18 +36,6 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-
-
-"""
-Module to read / write wav files using NumPy arrays
-
-Functions
----------
-`read`: Return the sample rate (in samples/sec) and data from a WAV file.
-
-`write`: Write a NumPy array as a WAV file.
-
-"""
 import sys
 import numpy
 import struct
@@ -55,24 +43,11 @@ import warnings
 from enum import IntEnum
 
 
-__all__ = [
-    'WavFileWarning',
-    'read',
-    'write'
-]
-
-
 class WavFileWarning(UserWarning):
     pass
 
 
 class WAVE_FORMAT(IntEnum):
-    """
-    WAVE form wFormatTag IDs
-
-    Complete list is in mmreg.h in Windows 10 SDK.  ALAC and OPUS are the
-    newest additions, in v10.0.14393 2016-07
-    """
     UNKNOWN = 0x0000
     PCM = 0x0001
     ADPCM = 0x0002
@@ -347,28 +322,6 @@ KNOWN_WAVE_FORMATS = {WAVE_FORMAT.PCM, WAVE_FORMAT.IEEE_FLOAT}
 
 
 def _read_fmt_chunk(fid, is_big_endian):
-    """
-    Returns
-    -------
-    size : int
-        size of format subchunk in bytes (minus 8 for "fmt " and itself)
-    format_tag : int
-        PCM, float, or compressed format
-    channels : int
-        number of channels
-    fs : int
-        sampling frequency in samples per second
-    bytes_per_second : int
-        overall byte rate for the file
-    block_align : int
-        bytes per sample, including all channels
-    bit_depth : int
-        bits per sample
-
-    Notes
-    -----
-    Assumes file pointer is immediately after the 'fmt ' id
-    """
     if is_big_endian:
         fmt = '>'
     else:
@@ -491,10 +444,6 @@ def _skip_unknown_chunk(fid, is_big_endian):
         fmt = '<I'
 
     data = fid.read(4)
-    # call unpack() and seek() only if we have really read data from file
-    # otherwise empty read at the end of the file would trigger
-    # unnecessary exception at unpack() call
-    # in case data equals somehow to 0, there is no need for seek() anyway
     if data:
         size = struct.unpack(fmt, data)[0]
         fid.seek(size, 1)
@@ -532,87 +481,6 @@ def _handle_pad_byte(fid, size):
 
 
 def read(filename, mmap=False):
-    """
-    Open a WAV file
-
-    Return the sample rate (in samples/sec) and data from a WAV file.
-
-    Parameters
-    ----------
-    filename : string or open file handle
-        Input wav file.
-    mmap : bool, optional
-        Whether to read data as memory-mapped.
-        Only to be used on real files (Default: False).
-
-        .. versionadded:: 0.12.0
-
-    Returns
-    -------
-    rate : int
-        Sample rate of wav file.
-    data : numpy array
-        Data read from wav file. Data-type is determined from the file;
-        see Notes.  Data is 1-D for 1-channel WAV, or 2-D of shape
-        (Nsamples, Nchannels) otherwise.
-
-    Notes
-    -----
-    This function cannot read wav files with 24-bit data.
-
-    Common data types: [1]_
-
-    =====================  ===========  ===========  =============
-         WAV format            Min          Max       NumPy dtype
-    =====================  ===========  ===========  =============
-    32-bit floating-point  -1.0         +1.0         float32
-    32-bit PCM             -2147483648  +2147483647  int32
-    16-bit PCM             -32768       +32767       int16
-    8-bit PCM              0            255          uint8
-    =====================  ===========  ===========  =============
-
-    Note that 8-bit PCM is unsigned.
-
-    References
-    ----------
-    .. [1] IBM Corporation and Microsoft Corporation, "Multimedia Programming
-       Interface and Data Specifications 1.0", section "Data Format of the
-       Samples", August 1991
-       http://www.tactilemedia.com/info/MCI_Control_Info.html
-
-    Examples
-    --------
-    >>> from os.path import dirname, join as pjoin
-    >>> from scipy.io import wavfile
-    >>> import scipy.io
-
-    Get the filename for an example .wav file from the tests/data directory.
-
-    >>> data_dir = pjoin(dirname(scipy.io.__file__), 'tests', 'data')
-    >>> wav_fname = pjoin(data_dir, 'test-44100Hz-2ch-32bit-float-be.wav')
-
-    Load the .wav file contents.
-
-    >>> samplerate, data = wavfile.read(wav_fname)
-    >>> print(f"number of channels = {data.shape[1]}")
-    number of channels = 2
-    >>> length = data.shape[0] / samplerate
-    >>> print(f"length = {length}s")
-    length = 0.01s
-
-    Plot the waveform.
-
-    >>> import matplotlib.pyplot as plt
-    >>> import numpy as np
-    >>> time = np.linspace(0., length, data.shape[0])
-    >>> plt.plot(time, data[:, 0], label="Left channel")
-    >>> plt.plot(time, data[:, 1], label="Right channel")
-    >>> plt.legend()
-    >>> plt.xlabel("Time [s]")
-    >>> plt.ylabel("Amplitude")
-    >>> plt.show()
-
-    """
     if hasattr(filename, 'read'):
         fid = filename
         mmap = False
@@ -684,58 +552,6 @@ def read(filename, mmap=False):
 
 
 def write(filename, rate, data):
-    """
-    Write a NumPy array as a WAV file.
-
-    Parameters
-    ----------
-    filename : string or open file handle
-        Output wav file.
-    rate : int
-        The sample rate (in samples/sec).
-    data : ndarray
-        A 1-D or 2-D NumPy array of either integer or float data-type.
-
-    Notes
-    -----
-    * Writes a simple uncompressed WAV file.
-    * To write multiple-channels, use a 2-D array of shape
-      (Nsamples, Nchannels).
-    * The bits-per-sample and PCM/float will be determined by the data-type.
-
-    Common data types: [1]_
-
-    =====================  ===========  ===========  =============
-         WAV format            Min          Max       NumPy dtype
-    =====================  ===========  ===========  =============
-    32-bit floating-point  -1.0         +1.0         float32
-    32-bit PCM             -2147483648  +2147483647  int32
-    16-bit PCM             -32768       +32767       int16
-    8-bit PCM              0            255          uint8
-    =====================  ===========  ===========  =============
-
-    Note that 8-bit PCM is unsigned.
-
-    References
-    ----------
-    .. [1] IBM Corporation and Microsoft Corporation, "Multimedia Programming
-       Interface and Data Specifications 1.0", section "Data Format of the
-       Samples", August 1991
-       http://www.tactilemedia.com/info/MCI_Control_Info.html
-
-    Examples
-    --------
-    Create a 100Hz sine wave, sampled at 44100Hz.
-    Write to 16-bit PCM, Mono.
-
-    >>> from scipy.io.wavfile import write
-    >>> samplerate = 44100; fs = 100
-    >>> t = np.linspace(0., 1., samplerate)
-    >>> amplitude = np.iinfo(np.int16).max
-    >>> data = amplitude * np.sin(2. * np.pi * fs * t)
-    >>> write("example.wav", samplerate, data)
-
-    """
     if hasattr(filename, 'write'):
         fid = filename
     else:

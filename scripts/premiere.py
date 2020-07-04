@@ -47,7 +47,7 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         print('Error! Less than 1 clip.')
         sys.exit()
 
-    print('\nWarning, this code is nderdeveloped and does not support many features.')
+    print('\nWarning, this code is underdeveloped and does not support many features.')
 
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
@@ -61,7 +61,6 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
     height = '720'
     pixelar = 'square' # pixel aspect ratio
     colordepth = '24'
-    fps = '30' # aka timebase
     sr = sampleRate
 
 
@@ -91,7 +90,7 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         outfile.write('\t\t\t\t</format>\n')
         outfile.write('\t\t\t\t<track>\n')
 
-        # handle first clip.
+        # Handle video clips.
         total = 0
         for j, clip in enumerate(clips):
             myStart = total

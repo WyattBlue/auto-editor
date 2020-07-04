@@ -10,8 +10,7 @@ import cv2
 
 # Included functions
 from scripts.usefulFunctions import getAudioChunks
-#from scripts.wavfile import read, write
-from scipy.io.wavfile import read, write
+from scripts.wavfile import read, write
 
 # Internal libraries
 import os
