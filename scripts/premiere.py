@@ -47,17 +47,11 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         print('Error! Less than 1 clip.')
         sys.exit()
 
-    print('\nWarning, this code is very underdeveloped and does not support many features.')
+    print('\nWarning, this code is nderdeveloped and does not support many features.')
 
-    print('\nDev Info\n========')
-
-    print(chunks)
-    print('clips:')
-    print(clips)
     pathurl = 'file://localhost' + os.path.abspath(myInput)
-    print('pathurl:', pathurl)
+
     name = os.path.basename(myInput)
-    print('video name:', name)
 
     ntsc = 'TRUE'
     ana = 'FALSE' # anamorphic
