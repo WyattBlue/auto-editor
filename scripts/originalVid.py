@@ -3,8 +3,9 @@
 import numpy as np
 from audiotsm import phasevocoder
 from audiotsm.io.wav import WavReader, WavWriter
-from scipy.io import wavfile
 from PIL import Image
+
+from scripts.wavfile import read, write
 
 import os
 import math
@@ -62,11 +63,11 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
             else:
                 sFile = TEMP + '/tempStart2.wav'
                 eFile = TEMP + '/tempEnd2.wav'
-                wavfile.write(sFile, SAMPLE_RATE, audioChunk)
+                write(sFile, SAMPLE_RATE, audioChunk)
                 with WavReader(sFile) as reader:
                     with WavWriter(eFile, reader.channels, reader.samplerate) as writer:
                         phasevocoder(reader.channels, speed=NEW_SPEED[chunk[2]]).run(reader, writer)
-                __, alteredAudioData = wavfile.read(eFile)
+                __, alteredAudioData = read(eFile)
                 leng = alteredAudioData.shape[0]
 
             endPointer = outputPointer + leng

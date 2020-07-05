@@ -8,12 +8,12 @@ It's about 4x faster than the safe method. 1 Minute of video may take about 12 s
 """
 
 # External libraries
-import cv2  # pip3 install opencv-python
+import cv2  # pip3 install opencv-python; this module takes a long time to "load"
 import numpy as np
-from scipy.io import wavfile
 
 # Included functions
 from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
+from scripts.wavfile import read, write
 
 # Internal libraries
 import os
@@ -55,13 +55,13 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             cmd.extend(['-hide_banner'])
         subprocess.call(cmd)
 
-    sampleRate, audioData = wavfile.read(f'{TEMP}/{cutByThisTrack}.wav')
+    sampleRate, audioData = read(f'{TEMP}/{cutByThisTrack}.wav')
     chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, 2, frameMargin)
 
     oldAudios = []
     newAudios = []
     for i in range(tracks):
-        __, audioData = wavfile.read(f'{TEMP}/{i}.wav')
+        __, audioData = read(f'{TEMP}/{i}.wav')
         oldAudios.append(audioData)
         newAudios.append(np.zeros_like(audioData, dtype=np.int16))
 
@@ -107,7 +107,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     # finish audio
     for i, newData in enumerate(newAudios):
         newData = newData[:yPointer]
-        wavfile.write(f'{TEMP}/new{i}.wav', sampleRate, newData)
+        write(f'{TEMP}/new{i}.wav', sampleRate, newData)
 
         if(not os.path.isfile(f'{TEMP}/new{i}.wav')):
             raise IOError('audio file not created.')

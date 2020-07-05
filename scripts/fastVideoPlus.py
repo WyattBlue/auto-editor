@@ -8,12 +8,12 @@ bit RAM intensive though.
 # External libraries
 import cv2  # pip3 install opencv-python
 import numpy as np
-from scipy.io import wavfile
 from audiotsm import phasevocoder
 
 # Included functions
 from scripts.readAudio import ArrReader, ArrWriter
 from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
+from scripts.wavfile import read, write
 
 # Internal libraries
 import sys
@@ -23,8 +23,6 @@ import tempfile
 import subprocess
 from shutil import rmtree
 from time import time
-
-nFrames = 0
 
 def preview(chunks, NEW_SPEED, fps):
     timeInSeconds = 0
@@ -69,7 +67,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             cmd.extend(['-hide_banner'])
         subprocess.call(cmd)
 
-    sampleRate, audioData = wavfile.read(f'{TEMP}/{cutByThisTrack}.wav')
+    sampleRate, audioData = read(f'{TEMP}/{cutByThisTrack}.wav')
     chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, 2, frameMargin)
 
     hmm = preview(chunks, NEW_SPEED, fps)
@@ -78,7 +76,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     oldAudios = []
     newAudios = []
     for i in range(tracks):
-        __, audioData = wavfile.read(f'{TEMP}/{i}.wav')
+        __, audioData = read(f'{TEMP}/{i}.wav')
         oldAudios.append(audioData)
         newAudios.append(np.zeros((estLeng, 2), dtype=np.int16))
 
@@ -94,25 +92,13 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     endMargin = 0
 
     yPointer = 0
-    frameBuffer = []
-
-    def writeFrames(frames, nAudio, speed, samplePerSecond, writer):
-        numAudioChunks = round(nAudio / samplePerSecond * fps)
-        global nFrames
-        numWrites = numAudioChunks - nFrames
-        nFrames += numWrites  # if sync issue exists, change this back
-        limit = len(frames) - 1
-        for i in range(numWrites):
-            frameIndex = round(i * speed)
-            if(frameIndex > limit):
-                writer.write(frames[-1])
-            else:
-                writer.write(frames[frameIndex])
-
 
     totalFrames = chunks[len(chunks) - 1][1]
+    lastChunk = chunks[len(chunks) - 1][0]
     outFrame = 0
     beginTime = time()
+
+    remander = 0
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -151,12 +137,18 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
         preve = isSilent
 
-        if(not needChange):
-            frameBuffer.append(frame)
-        else:
-            theSpeed = NEW_SPEED[isSilent]
-            if(theSpeed < 99999):
+        # handle when to add a frame
+        mySpeed = NEW_SPEED[state]
+        if(mySpeed != 99999):
+            doIt = 1 / mySpeed + remander
+            for __ in range(int(doIt)):
+                out.write(frame)
+            remander = doIt % 1
 
+        # handle audio
+        if(needChange):
+            theSpeed = NEW_SPEED[isSilent]
+            if(theSpeed != 99999):
                 # handle audio tracks
                 for i, oneAudioData in enumerate(oldAudios):
                     spedChunk = oneAudioData[switchStart:switchEnd]
@@ -176,8 +168,6 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             else:
                 yPointerEnd = yPointer
 
-            writeFrames(frameBuffer, yPointerEnd, NEW_SPEED[isSilent], sampleRate, out)
-            frameBuffer = []
             switchStart = switchEnd
             needChange = False
 
@@ -186,7 +176,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     # finish audio
     for i, newData in enumerate(newAudios):
         newData = newData[:yPointer]
-        wavfile.write(f'{TEMP}/new{i}.wav', sampleRate, newData)
+        write(f'{TEMP}/new{i}.wav', sampleRate, newData)
 
         if(not os.path.isfile(f'{TEMP}/new{i}.wav')):
             raise IOError('audio file not created.')
