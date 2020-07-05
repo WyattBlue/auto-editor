@@ -13,13 +13,7 @@ from datetime import timedelta
 from shutil import rmtree
 from operator import itemgetter
 
-# Included functions
-from scripts.originalMethod import originalMethod
-from scripts.fastVideo import fastVideo
-from scripts.fastVideoPlus import fastVideoPlus
-from scripts.preview import preview
-
-version = '20w27a'
+version = '20w27b'
 
 # files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
@@ -105,6 +99,8 @@ if(__name__ == '__main__'):
         help='do not open the file after editing is done.')
     parser.add_argument('--preview', action='store_true',
         help='show stats on how the video will be cut.')
+    parser.add_argument('--export_to_premiere', action='store_true',
+        help='export as an XML file for Adobe Premiere Pro instead of outputting a video.')
 
     args = parser.parse_args()
 
@@ -214,6 +210,8 @@ if(__name__ == '__main__'):
             sys.exit()
 
     if(args.preview):
+        from scripts.preview import preview
+
         preview(INPUT_FILE, args.silent_threshold, args.zoom_threshold,
             args.frame_margin, args.sample_rate, VIDEO_SPEED, SILENT_SPEED)
         sys.exit()
@@ -224,7 +222,6 @@ if(__name__ == '__main__'):
     del INPUT_FILE
 
     for INPUT_FILE in INPUTS:
-
         dotIndex = INPUT_FILE.rfind('.')
         extension = INPUT_FILE[dotIndex:]
         isAudio = extension in ['.wav', '.mp3', '.m4a']
@@ -257,19 +254,33 @@ if(__name__ == '__main__'):
         else:
             newOutput = OUTPUT_FILE
 
+        if(args.export_to_premiere):
+            from scripts.premiere import exportToPremiere
+
+            outFile = exportToPremiere(INPUT_FILE, newOutput, args.silent_threshold,
+                args.zoom_threshold, args.frame_margin, args.sample_rate, VIDEO_SPEED,
+                SILENT_SPEED)
+            continue
+
         if(BACK_MUS is None and args.zoom_threshold == 2
             and NEW_TRAC == None and HWACCEL is None and not isAudio):
 
             if(SILENT_SPEED == 99999 and VIDEO_SPEED == 1):
+                from scripts.fastVideo import fastVideo
+
                 outFile = fastVideo(INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
                     args.verbose, args.cut_by_this_track, args.keep_tracks_seperate)
             else:
+                from scripts.fastVideoPlus import fastVideoPlus
+
                 outFile = fastVideoPlus(INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
                     args.verbose, VIDEO_SPEED, SILENT_SPEED, args.cut_by_this_track,
                     args.keep_tracks_seperate)
         else:
+            from scripts.originalMethod import originalMethod
+
             outFile = originalMethod(INPUT_FILE, newOutput, args.frame_rate, args.frame_margin,
                 args.silent_threshold, args.zoom_threshold, args.sample_rate,
                 args.audio_bitrate, SILENT_SPEED, VIDEO_SPEED, args.keep_tracks_seperate, BACK_MUS,
@@ -283,7 +294,7 @@ if(__name__ == '__main__'):
     if(not os.path.isfile(outFile)):
         raise IOError(f'Error: The file {outFile} was not created.')
 
-    if(not args.no_open):
+    if(not args.no_open and not args.export_to_premiere):
         try:  # should work on Windows
             os.startfile(outFile)
         except AttributeError:
