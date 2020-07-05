@@ -38,9 +38,10 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
     rmtree(TEMP)
 
     clips = []
+    newSpeed = [silentSpeed, videoSpeed]
     for chunk in chunks:
-        if(chunk[2] == 1):
-            clips.append([chunk[0], chunk[1]])
+        if(newSpeed[chunk[2]] != 99999):
+            clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
 
     if(len(clips) < 1):
         print('Error! Less than 1 clip.')
@@ -92,17 +93,17 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         # Handle video clips.
         total = 0
         for j, clip in enumerate(clips):
-            myStart = total
-            total += clip[1] - clip[0]
-            myEnd = total
+            myStart = int(total)
+            total += (clip[1] - clip[0]) / (clip[2] / 100)
+            myEnd = int(total)
 
             outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{j+7}">\n')
             outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
             outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
             outfile.write(f'\t\t\t\t\t\t<start>{myStart}</start>\n')
             outfile.write(f'\t\t\t\t\t\t<end>{myEnd}</end>\n')
-            outfile.write(f'\t\t\t\t\t\t<in>{clip[0]}</in>\n')
-            outfile.write(f'\t\t\t\t\t\t<out>{clip[1]}</out>\n')
+            outfile.write(f'\t\t\t\t\t\t<in>{int(clip[0] / (clip[2] / 100))}</in>\n')
+            outfile.write(f'\t\t\t\t\t\t<out>{int(clip[1] / (clip[2] / 100))}</out>\n')
 
             if(j == 0):
                 outfile.write('\t\t\t\t\t\t<file id="file-2">\n')
@@ -138,7 +139,43 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
             else:
                 outfile.write(f'\t\t\t\t\t\t<file id="file-2"/>\n')
 
-            # Linking for video blocsk
+            # Add the speed effect if nessecary
+            if(clip[2] != 100):
+                outfile.write(f'\t\t\t\t\t\t<filter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t<effect>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<name>Time Remap</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<effectid>timeremap</effectid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<effectcategory>motion</effectcategory>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<effecttype>motion</effecttype>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<parameterid>variablespeed</parameterid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<name>variablespeed</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<valuemin>0</valuemin>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<valuemax>1</valuemax>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<value>0</value>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t</parameter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<parameterid>speed</parameterid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<name>speed</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<valuemin>-100000</valuemin>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<valuemax>100000</valuemax>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<value>{clip[2]}</value>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t</parameter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<parameterid>reverse</parameterid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<name>reverse</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t</parameter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<parameterid>frameblending</parameterid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<name>frameblending</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t</parameter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t</effect>\n')
+                outfile.write(f'\t\t\t\t\t\t</filter>\n')
+
+            # Linking for video blocks
             for i in range(3):
                 outfile.write('\t\t\t\t\t\t<link>\n')
                 outfile.write(f'\t\t\t\t\t\t\t<linkclipref>clipitem-{(i*(len(clips)+1))+7+j}</linkclipref>\n')
@@ -175,20 +212,56 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
             outfile.write(f'\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
             outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
 
-            myStart = total
-            total += clip[1] - clip[0]
-            myEnd = total
+            myStart = int(total)
+            total += (clip[1] - clip[0]) / (clip[2] / 100)
+            myEnd = int(total)
 
             outfile.write(f'\t\t\t\t\t\t<start>{myStart}</start>\n')
             outfile.write(f'\t\t\t\t\t\t<end>{myEnd}</end>\n')
 
-            outfile.write(f'\t\t\t\t\t\t<in>{clip[0]}</in>\n')
-            outfile.write(f'\t\t\t\t\t\t<out>{clip[1]}</out>\n')
+            outfile.write(f'\t\t\t\t\t\t<in>{int(clip[0] / (clip[2] / 100))}</in>\n')
+            outfile.write(f'\t\t\t\t\t\t<out>{int(clip[1] / (clip[2] / 100))}</out>\n')
             outfile.write('\t\t\t\t\t\t<file id="file-2"/>\n')
             outfile.write('\t\t\t\t\t\t<sourcetrack>\n')
             outfile.write('\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n')
             outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
             outfile.write('\t\t\t\t\t\t</sourcetrack>\n')
+
+            # Add speed effect for audio blocks
+            if(clip[2] != 100):
+                outfile.write(f'\t\t\t\t\t\t<filter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t<effect>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<name>Time Remap</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<effectid>timeremap</effectid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<effectcategory>motion</effectcategory>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<effecttype>motion</effecttype>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<parameterid>variablespeed</parameterid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<name>variablespeed</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<valuemin>0</valuemin>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<valuemax>1</valuemax>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<value>0</value>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t</parameter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<parameterid>speed</parameterid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<name>speed</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<valuemin>-100000</valuemin>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<valuemax>100000</valuemax>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<value>{clip[2]}</value>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t</parameter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<parameterid>reverse</parameterid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<name>reverse</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t</parameter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<parameterid>frameblending</parameterid>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<name>frameblending</name>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t</parameter>\n')
+                outfile.write(f'\t\t\t\t\t\t\t</effect>\n')
+                outfile.write(f'\t\t\t\t\t\t</filter>\n')
 
             for i in range(3):
                 outfile.write('\t\t\t\t\t\t<link>\n')
