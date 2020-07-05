@@ -419,8 +419,8 @@ def _read_data_chunk(fid, format_tag, channels, bit_depth, is_big_endian,
             dtype = f'{fmt}i{bytes_per_sample}'
         else:
             dtype = f'{fmt}f{bytes_per_sample}'
-    print('mmap', mmap)
-    print('size', size)
+    # print('mmap', mmap)
+    # print('size', size)
     if not mmap:
         hmm = fid.read(size)
         data = numpy.frombuffer(hmm, dtype=dtype)

@@ -42,18 +42,17 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
         if(chunk[2] == 1):
             clips.append([chunk[0], chunk[1]])
 
-
     if(len(clips) < 1):
         print('Error! Less than 1 clip.')
         sys.exit()
 
-    print('\nWarning, this code is underdeveloped and does not support many features.')
+    print('\nWarning, this method is underdeveloped and does not support many features.')
 
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
     name = os.path.basename(myInput)
 
-    ntsc = 'TRUE'
+    ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
     alphatype = 'none'
     depth = '16'
@@ -97,14 +96,15 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
             total += clip[1] - clip[0]
             myEnd = total
 
+            outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{j+7}">\n')
+            outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
+            outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
+            outfile.write(f'\t\t\t\t\t\t<start>{myStart}</start>\n')
+            outfile.write(f'\t\t\t\t\t\t<end>{myEnd}</end>\n')
+            outfile.write(f'\t\t\t\t\t\t<in>{clip[0]}</in>\n')
+            outfile.write(f'\t\t\t\t\t\t<out>{clip[1]}</out>\n')
+
             if(j == 0):
-                outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{j+7}">\n')
-                outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
-                outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
-                outfile.write(f'\t\t\t\t\t\t<start>{myStart}</start>\n')
-                outfile.write(f'\t\t\t\t\t\t<end>{myEnd}</end>\n')
-                outfile.write(f'\t\t\t\t\t\t<in>{clip[0]}</in>\n')
-                outfile.write(f'\t\t\t\t\t\t<out>{clip[1]}</out>\n')
                 outfile.write('\t\t\t\t\t\t<file id="file-2">\n')
                 outfile.write(f'\t\t\t\t\t\t\t<name>{name}</name>\n')
                 outfile.write(f'\t\t\t\t\t\t\t<pathurl>{pathurl}</pathurl>\n')
@@ -136,14 +136,6 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
                 outfile.write('\t\t\t\t\t\t\t</media>\n')
                 outfile.write('\t\t\t\t\t\t</file>\n')
             else:
-                outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{j+7}">\n')
-                outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
-                outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
-                outfile.write(f'\t\t\t\t\t\t<start>{myStart}</start>\n')
-                outfile.write(f'\t\t\t\t\t\t<end>{myEnd}</end>\n')
-                outfile.write(f'\t\t\t\t\t\t<in>{clip[0]}</in>\n')
-                outfile.write(f'\t\t\t\t\t\t<out>{clip[1]}</out>\n')
-                outfile.write(f'\t\t\t\t\t\t<alphatype>none</alphatype>\n')
                 outfile.write(f'\t\t\t\t\t\t<file id="file-2"/>\n')
 
             # Linking for video blocsk
