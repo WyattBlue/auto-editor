@@ -7,36 +7,33 @@ selected options are used.
 
 # External libraries
 import cv2
-from scipy.io import wavfile
 
 # Included functions
 from scripts.usefulFunctions import getAudioChunks
+from scripts.wavfile import read, write
 
 # Internal libraries
 import os
+import tempfile
 import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
 
 def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silentSpeed):
-    TEMP = '.TEMP'
+    TEMP = tempfile.mkdtemp()
 
     cap = cv2.VideoCapture(myInput)
     fps = round(cap.get(cv2.CAP_PROP_FPS))
-
-    try:
-        os.mkdir(TEMP)
-    except OSError:
-        rmtree(TEMP)
-        os.mkdir(TEMP)
 
     cmd = ['ffmpeg', '-i', myInput, '-ab', '160k', '-ac', '2', '-ar',
         str(sampleRate), '-vn', f'{TEMP}/output.wav', '-nostats', '-loglevel', '0']
     subprocess.call(cmd)
 
-    sampleRate, audioData = wavfile.read(f'{TEMP}/output.wav')
+    sampleRate, audioData = read(f'{TEMP}/output.wav')
     chunks = getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin)
+
+    rmtree(TEMP)
 
     def printTimeFrame(title, frames, fps):
         inSec = round(frames / fps, 1)

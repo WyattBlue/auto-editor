@@ -1,4 +1,3 @@
-scipy
 audiotsm
 pillow
 pydub

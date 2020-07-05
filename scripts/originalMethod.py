@@ -2,7 +2,6 @@
 
 import numpy as np
 from pydub import AudioSegment
-from scipy.io import wavfile
 
 import os
 import sys
@@ -13,6 +12,7 @@ from shutil import move, rmtree
 
 from scripts.originalAudio import handleAudio, splitAudio
 from scripts.originalVid import splitVideo
+from scripts.wavfile import read, write
 
 TEMP = '.TEMP'
 CACHE = '.CACHE'
@@ -227,10 +227,10 @@ def originalMethod(INPUT_FILE, OUTPUT_FILE, givenFPS, frameMargin, SILENT_THRESH
     # calculating chunks.
     if(NEW_TRAC is None):
         # always base cuts by the first track
-        sampleRate, audioData = wavfile.read(f'{CACHE}/{BASE_TRAC}.wav')
+        sampleRate, audioData = read(f'{CACHE}/{BASE_TRAC}.wav')
     else:
         formatAudio(NEW_TRAC, f'{TEMP}/NEW_TRAC.wav', SAMPLE_RATE, '160k', VERBOSE)
-        sampleRate, audioData = wavfile.read(f'{TEMP}/NEW_TRAC.wav')
+        sampleRate, audioData = read(f'{TEMP}/NEW_TRAC.wav')
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
 

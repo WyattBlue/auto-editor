@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w27a
+ &nbsp;&nbsp;<sup>version 20w27b
 
 <p align="center">
   <img src="/resources/auto-editor_banner.png" width="800">
@@ -9,10 +9,12 @@
 Auto-Editor is a command line application program for automatically editing **video or audio**.
 It works by analyzing the video's audio to detect when a section needs to be cut or kept in, then it runs a subprocess called ffmpeg to create the new video.
 
-## New in 20w27a!
- * Videos downloaded with youtube-dl are now named based on their URL. Thanks to @eykd for that update.
- * fastVideo and fastVideoPlus now use python's tempfile system.
- * Outdated documentation has been changed.
+## New in 20w27b!
+ * You now edit the cuts Auto-Editor does with Adobe Premiere Pro using the `--export_to_premiere` flag. It will make an XML file that you can import to Premiere.
+ * fastVideoPlus.py is no longer so RAM intensive.
+ * preview.py now uses tempfile.
+ * The SciPy the module is no longer needed.
+ * Other small improvements have been made.
 
 ## Usage
 ### Minimal Example
