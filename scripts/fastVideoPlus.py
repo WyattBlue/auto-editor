@@ -94,7 +94,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     yPointer = 0
 
     totalFrames = chunks[len(chunks) - 1][1]
-    lastChunk chunks[len(chunks) - 1][0]
+    lastChunk = chunks[len(chunks) - 1][0]
     outFrame = 0
     beginTime = time()
 
