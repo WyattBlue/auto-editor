@@ -13,7 +13,7 @@ from datetime import timedelta
 from shutil import rmtree
 from operator import itemgetter
 
-version = '20w27a'
+version = '20w27b'
 
 # files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
@@ -100,7 +100,7 @@ if(__name__ == '__main__'):
     parser.add_argument('--preview', action='store_true',
         help='show stats on how the video will be cut.')
     parser.add_argument('--export_to_premiere', action='store_true',
-        help='export as an XML file for premiere instead of outputing a video.')
+        help='export as an XML file for Adobe Premiere Pro instead of outputting a video.')
 
     args = parser.parse_args()
 

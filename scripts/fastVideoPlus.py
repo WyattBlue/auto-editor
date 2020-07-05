@@ -100,8 +100,6 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
     remander = 0
 
-    print(chunks)
-
     while cap.isOpened():
         ret, frame = cap.read()
         if(not ret):
