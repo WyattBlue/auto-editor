@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w27b
+ &nbsp;&nbsp;<sup>version 20w27b hotfix
 
 <p align="center">
   <img src="/resources/auto-editor_banner.png" width="800">
