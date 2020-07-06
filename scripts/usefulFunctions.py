@@ -104,8 +104,12 @@ def progressBar(index, total, beginTime, title='Please wait'):
     percentDone = round((index+1) / total * 100, 1)
 
     done = round(percentDone / (100 / barLen))
-    doneStr = '█' * done
-    togoStr = '░' * int(barLen - done)
+    try:
+        doneStr = '█' * done
+        togoStr = '░' * int(barLen - done)
+    except UnicodeEncodeError:
+        doneStr = 'O' * done
+        togoStr = ' ' * int(barLen - done)
 
     if(percentDone == 0):
         percentPerSec = 0
