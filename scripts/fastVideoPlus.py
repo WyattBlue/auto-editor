@@ -138,12 +138,13 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         preve = isSilent
 
         # handle when to add a frame
-        mySpeed = NEW_SPEED[state]
-        if(mySpeed != 99999):
-            doIt = 1 / mySpeed + remander
-            for __ in range(int(doIt)):
-                out.write(frame)
-            remander = doIt % 1
+        if(state is not None):
+            mySpeed = NEW_SPEED[state]
+            if(mySpeed != 99999):
+                doIt = 1 / mySpeed + remander
+                for __ in range(int(doIt)):
+                    out.write(frame)
+                remander = doIt % 1
 
         # handle audio
         if(needChange):
