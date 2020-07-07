@@ -102,16 +102,9 @@ def progressBar(index, total, beginTime, title='Please wait'):
     barLen = max(1, termsize - (len(title) + 50))
 
     percentDone = round((index+1) / total * 100, 1)
-
     done = round(percentDone / (100 / barLen))
-    try:
-        doneStr = '█' * done
-        togoStr = '░' * int(barLen - done)
-        glass = '⏳'
-    except UnicodeEncodeError:
-        doneStr = 'O' * done
-        togoStr = ' ' * int(barLen - done)
-        glass = ' '
+    doneStr = '█' * done
+    togoStr = '░' * int(barLen - done)
 
     if(percentDone == 0):
         percentPerSec = 0
@@ -120,11 +113,14 @@ def progressBar(index, total, beginTime, title='Please wait'):
 
     newTime = prettyTime(beginTime + (percentPerSec * 100))
     if(percentDone < 99.9):
-        bar = f'  {glass}{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
+        bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
         if(len(bar) > termsize - 2):
             bar = bar[:termsize - 2]
         else:
             bar += ' ' * (termsize - len(bar) - 4)
-        print(bar, end='\r', flush=True)
+        try:
+            print(bar, end='\r', flush=True)
+        except UnicodeEncodeError:
+            print(f'   {percentDone}% done ETA {newTime}')
     else:
         print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)

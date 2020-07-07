@@ -13,7 +13,7 @@ from datetime import timedelta
 from shutil import rmtree
 from operator import itemgetter
 
-version = '20w27b hotfix'
+version = '20w28a'
 
 # files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
