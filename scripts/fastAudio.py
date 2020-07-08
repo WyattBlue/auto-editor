@@ -70,16 +70,21 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
 
     channels = 2
     yPointer = 0
-    switchStart = 0
+
+    # samples per frame
+    spf = int(sampleRate / 30)
 
     for chunk in chunks:
         audioSampleStart = int(chunk[0] / 30 * sampleRate)
-        switchEnd = audioSampleStart + sampleRate // 30
+        audioSampleEnd = audioSampleStart + spf * (chunk[1] - chunk[0])
 
         theSpeed = NEW_SPEED[chunk[2]]
+
+        print(yPointer)
+
         if(theSpeed != 99999):
-            spedChunk = audioData[switchStart:switchEnd]
-            spedupAudio = np.zeros((0, 2), dtype=np.int16) # does this need to be here?
+            spedChunk = audioData[audioSampleStart:audioSampleEnd]
+            spedupAudio = np.zeros((0, 2), dtype=np.int16)
             with ArrReader(spedChunk, channels, sampleRate, 2) as reader:
                 with ArrWriter(spedupAudio, channels, sampleRate, 2) as writer:
                     phasevocoder(reader.channels, speed=theSpeed).run(
@@ -95,6 +100,7 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
             # Speed is too high so skip this section.
             yPointerEnd = yPointer
 
+    newAudio = newAudio[:yPointer]
     write(outFile, sampleRate, newAudio)
     return outFile
 

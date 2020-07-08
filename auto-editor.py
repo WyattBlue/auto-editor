@@ -3,19 +3,19 @@
 
 # Internal python libraries
 import os
-import argparse
 import re
-import subprocess
 import sys
 import time
 import platform
-from datetime import timedelta
+import argparse
+import subprocess
 from shutil import rmtree
+from datetime import timedelta
 from operator import itemgetter
 
 version = '20w28a'
 
-# files that start with . are hidden, but can be viewed by running "ls -f" from console.
+# Files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
 CACHE = '.CACHE'
 
@@ -35,7 +35,7 @@ def getFrameRate(path):
 def file_type(file):
     if(not os.path.isfile(file)):
         print('Could not locate file:', file)
-        sys.exit()
+        sys.exit(1)
     return file
 
 
@@ -46,8 +46,8 @@ def time_units(uinput):
         if(uinput.endswith('secs')):
             return int(uinput[:3])
         else:
-            print('Incorrect format for time units')
-            sys.exit()
+            print(f'Error! Input for time unit could not be parsed. {uinput}')
+            sys.exit(1)
 
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
@@ -63,7 +63,7 @@ if(__name__ == '__main__'):
         help='the speed that sounded (spoken) frames should be played at.')
     parser.add_argument('--silent_speed', '-s', type=float, default=99999,
         help='the speed that silent frames should be played at.')
-    parser.add_argument('--frame_margin', '-m', type=int, default=4,
+    parser.add_argument('--frame_margin', '-m', type=time_units, default=4,
         help='tells how many frames on either side of speech should be included.')
     parser.add_argument('--sample_rate', '-r', type=float, default=48000,
         help='sample rate of the input and output videos.')
@@ -128,7 +128,7 @@ if(__name__ == '__main__'):
 
     if(args.input == []):
         print('auto-editor.py: error: the following arguments are required: input')
-        sys.exit()
+        sys.exit(1)
 
     INPUT_FILE = args.input[0]
     OUTPUT_FILE = args.output_file
@@ -218,9 +218,6 @@ if(__name__ == '__main__'):
 
     startTime = time.time()
 
-    # all the inputs are stored in the INPUTS variable
-    del INPUT_FILE
-
     for INPUT_FILE in INPUTS:
         dotIndex = INPUT_FILE.rfind('.')
         extension = INPUT_FILE[dotIndex:]
@@ -233,7 +230,7 @@ if(__name__ == '__main__'):
             newOutput = OUTPUT_FILE
 
         if(isAudio):
-            from fastAudio import fastAudio
+            from scripts.fastAudio import fastAudio
 
             outFile = fastAudio(INPUT_FILE, newOutput, args.silent_threshold, args.frame_margin,
                 args.sample_rate, args.audio_bitrate, args.verbose, SILENT_SPEED,
