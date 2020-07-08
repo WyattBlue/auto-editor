@@ -5,9 +5,8 @@ install:
  - pip3 install audiotsm pillow pydub opencv-python youtube_dl
 python:
   - "3.6"
-  - "3.6"
+  - "3.7"
   - "3.8"
-  - "pypy3"
 script:
  - python3 auto-editor.py --debug
  - python3 auto-editor.py --version
