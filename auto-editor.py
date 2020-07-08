@@ -231,7 +231,7 @@ if(__name__ == '__main__'):
 
             fastAudio(INPUT_FILE, newOutput, args.silent_threshold, args.frame_margin,
                 args.sample_rate, args.audio_bitrate, args.verbose, SILENT_SPEED,
-                VIDEO_SPEED, True):
+                VIDEO_SPEED, True)
             continue
         else:
             try:
