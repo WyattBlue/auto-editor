@@ -43,7 +43,6 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         sys.exit()
 
     TEMP = tempfile.mkdtemp()
-    FADE_SIZE = 400
     NEW_SPEED = [silentSpeed, videoSpeed]
 
     cap = cv2.VideoCapture(videoFile)
@@ -110,12 +109,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         currentTime = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
         audioSampleStart = int(currentTime * sampleRate)
 
-        audioSampleEnd = min(
-            audioSampleStart + sampleRate // fps * frameMargin, len(audioData)
-        )
         switchEnd = audioSampleStart + sampleRate // fps
-
-        audioChunk = audioData[audioSampleStart:audioSampleEnd]
 
         state = None
         for chunk in chunks:

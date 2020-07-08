@@ -226,7 +226,14 @@ if(__name__ == '__main__'):
         extension = INPUT_FILE[dotIndex:]
         isAudio = extension in ['.wav', '.mp3', '.m4a']
 
-        if(not isAudio):
+        if(isAudio):
+            from fastAudio import fastAudio
+
+            fastAudio(INPUT_FILE, newOutput, args.silent_threshold, args.frame_margin,
+                args.sample_rate, args.audio_bitrate, args.verbose, SILENT_SPEED,
+                VIDEO_SPEED, True):
+            continue
+        else:
             try:
                 frameRate = getFrameRate(INPUT_FILE)
             except AttributeError:
@@ -263,7 +270,7 @@ if(__name__ == '__main__'):
             continue
 
         if(BACK_MUS is None and args.zoom_threshold == 2
-            and NEW_TRAC == None and HWACCEL is None and not isAudio):
+            and NEW_TRAC == None and HWACCEL is None):
 
             if(SILENT_SPEED == 99999 and VIDEO_SPEED == 1):
                 from scripts.fastVideo import fastVideo
