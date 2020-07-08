@@ -6,6 +6,7 @@ This script is for handling audio files ONLY.
 
 # External libraries
 import numpy as np
+from audiotsm import phasevocoder
 
 # Included functions
 from scripts.readAudio import ArrReader, ArrWriter
@@ -26,7 +27,7 @@ def preview(chunks, NEW_SPEED, fps):
     return timeInFrames / fps
 
 
-def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, verbose
+def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, verbose,
     silentSpeed, soundedSpeed, needConvert):
 
     print('Running from fastAudio.py')
@@ -34,6 +35,10 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
     if(not os.path.isfile(theFile)):
         print('Could not find file:', theFile)
         sys.exit()
+
+    fileName = theFile[:theFile.rfind('.')]
+    if(outFile == ''):
+        outFile = f'{fileName}_ALTERED.wav'
 
     if(needConvert):
         import tempfile
@@ -43,7 +48,7 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
 
         cmd = ['ffmpeg', '-i', theFile, '-b:a', audioBit, '-ac', '2', '-ar', str(SAMPLE_RATE),
          '-vn', f'{TEMP}/fastAud.wav']
-        if(not VERBOSE):
+        if(not verbose):
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
 
@@ -71,7 +76,7 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
         audioSampleStart = int(chunk[0] / 30 * sampleRate)
         switchEnd = audioSampleStart + sampleRate // 30
 
-        theSpeed = NEW_SPEED[isSilent]
+        theSpeed = NEW_SPEED[chunk[2]]
         if(theSpeed != 99999):
             spedChunk = audioData[switchStart:switchEnd]
             spedupAudio = np.zeros((0, 2), dtype=np.int16) # does this need to be here?
@@ -90,11 +95,6 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
             # Speed is too high so skip this section.
             yPointerEnd = yPointer
 
-    fileName = theFile[:videoFile.rfind('.')]
-    if(outFile == ''):
-        outFile = f'{fileName}_ALTERED.wav'
-
     write(outFile, sampleRate, newAudio)
-
     return outFile
 

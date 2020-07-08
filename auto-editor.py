@@ -226,10 +226,16 @@ if(__name__ == '__main__'):
         extension = INPUT_FILE[dotIndex:]
         isAudio = extension in ['.wav', '.mp3', '.m4a']
 
+        if(outputDir != ''):
+            newOutput = os.path.join(outputDir, os.path.basename(INPUT_FILE))
+            print(newOutput)
+        else:
+            newOutput = OUTPUT_FILE
+
         if(isAudio):
             from fastAudio import fastAudio
 
-            fastAudio(INPUT_FILE, newOutput, args.silent_threshold, args.frame_margin,
+            outFile = fastAudio(INPUT_FILE, newOutput, args.silent_threshold, args.frame_margin,
                 args.sample_rate, args.audio_bitrate, args.verbose, SILENT_SPEED,
                 VIDEO_SPEED, True)
             continue
@@ -254,12 +260,6 @@ if(__name__ == '__main__'):
 
         if(BACK_MUS is None and BACK_VOL != -8):
             print('Warning! Background volume specified even though no background music was provided.')
-
-        if(outputDir != ''):
-            newOutput = os.path.join(outputDir, os.path.basename(INPUT_FILE))
-            print(newOutput)
-        else:
-            newOutput = OUTPUT_FILE
 
         if(args.export_to_premiere):
             from scripts.premiere import exportToPremiere
