@@ -35,7 +35,8 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
         sys.exit()
 
     if(outFile == ''):
-        outFile = f'{theFile[:theFile.rfind('.')]}_ALTERED.wav'
+        fileName = theFile[:theFile.rfind('.')]
+        outFile = f'{fileName}_ALTERED.wav'
 
     if(needConvert):
         # Only print this here so other programs can use this function.
