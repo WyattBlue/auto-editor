@@ -30,24 +30,24 @@ def preview(chunks, NEW_SPEED, fps):
 def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, verbose,
     silentSpeed, soundedSpeed, needConvert):
 
-    print('Running from fastAudio.py')
-
     if(not os.path.isfile(theFile)):
         print('Could not find file:', theFile)
         sys.exit()
 
-    fileName = theFile[:theFile.rfind('.')]
     if(outFile == ''):
-        outFile = f'{fileName}_ALTERED.wav'
+        outFile = f'{theFile[:theFile.rfind('.')]}_ALTERED.wav'
 
     if(needConvert):
+        # Only print this here so other programs can use this function.
+        print('Running from fastAudio.py')
+
         import tempfile
         from shutil import rmtree
 
         TEMP = tempfile.mkdtemp()
 
-        cmd = ['ffmpeg', '-i', theFile, '-b:a', audioBit, '-ac', '2', '-ar', str(SAMPLE_RATE),
-         '-vn', f'{TEMP}/fastAud.wav']
+        cmd = ['ffmpeg', '-i', theFile, '-b:a', audioBit, '-ac', '2', '-ar',
+            str(SAMPLE_RATE), '-vn', f'{TEMP}/fastAud.wav']
         if(not verbose):
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
@@ -102,5 +102,8 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
 
     newAudio = newAudio[:yPointer]
     write(outFile, sampleRate, newAudio)
+
+    if('TEMP' in locals()):
+        rmtree(TEMP)
     return outFile
 

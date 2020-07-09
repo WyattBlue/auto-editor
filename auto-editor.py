@@ -21,7 +21,7 @@ CACHE = '.CACHE'
 
 def getFrameRate(path):
     """
-    get the frame rate by asking ffmpeg to do it for us then using a regex command to
+    Get the frame rate by asking ffmpeg to do it for us then using a regex command to
     retrieve it.
     """
     process = subprocess.Popen(['ffmpeg', '-i', path],
@@ -31,23 +31,32 @@ def getFrameRate(path):
     matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
     return float(matchDict['fps'])
 
-
 def file_type(file):
     if(not os.path.isfile(file)):
         print('Could not locate file:', file)
         sys.exit(1)
     return file
 
+def float_type(num):
+    """
+    Allow percentages to be used too.
+    """
+    if(num.endswith('%')):
+        num = float(num[:-1]) / 100
+    else:
+        num = float(num)
+    return num
 
-def time_units(uinput):
-    try:
-        return int(uinput)
-    except ValueError:
-        if(uinput.endswith('secs')):
-            return int(uinput[:3])
-        else:
-            print(f'Error! Input for time unit could not be parsed. {uinput}')
-            sys.exit(1)
+def sample_rate_type(num):
+    if(num.endswith(' Hz')):
+        num = int(num[:-3])
+    elif(num.endswith(' kHz')):
+        num = int(float(num[:-4]) * 1000)
+    else:
+        num = int(num)
+    print(num)
+    return num
+
 
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
@@ -55,17 +64,17 @@ if(__name__ == '__main__'):
         help='the path to the video file you want modified. can be a URL with youtube-dl.')
     parser.add_argument('--output_file', '-o', type=str, default='',
         help='name the output file.')
-    parser.add_argument('--silent_threshold', '-t', type=float, default=0.04,
+    parser.add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
         help='the volume that frames audio needs to surpass to be sounded. It ranges from 0 to 1.')
-    parser.add_argument('--zoom_threshold', '-l', type=float, default=2.00,
+    parser.add_argument('--zoom_threshold', '-l', type=float_type, default=2.00,
         help='the volume that needs to be surpassed to zoom in the video. (0-1)')
-    parser.add_argument('--video_speed', '--sounded_speed', '-v', type=float, default=1.00,
+    parser.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
         help='the speed that sounded (spoken) frames should be played at.')
-    parser.add_argument('--silent_speed', '-s', type=float, default=99999,
+    parser.add_argument('--silent_speed', '-s', type=float_type, default=99999,
         help='the speed that silent frames should be played at.')
-    parser.add_argument('--frame_margin', '-m', type=time_units, default=4,
+    parser.add_argument('--frame_margin', '-m', type=int, default=4,
         help='tells how many frames on either side of speech should be included.')
-    parser.add_argument('--sample_rate', '-r', type=float, default=48000,
+    parser.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000,
         help='sample rate of the input and output videos.')
     parser.add_argument('--audio_bitrate', type=str, default='160k',
         help='number of bits per second for audio. Example, 160k.')
@@ -90,7 +99,7 @@ if(__name__ == '__main__'):
     parser.add_argument('--cut_by_all_tracks', action='store_true',
         help='combine all audio tracks into 1 before basing cuts.')
     parser.add_argument('--keep_tracks_seperate', action='store_true',
-        help="Don't combine audio tracks. (Warning, multiple audio tracks are not supported on most platforms)")
+        help="don't combine audio tracks.")
     parser.add_argument('--hardware_accel', type=str,
         help='set the hardware used for gpu acceleration.')
     parser.add_argument('--combine_files', action='store_true',
@@ -132,19 +141,11 @@ if(__name__ == '__main__'):
 
     INPUT_FILE = args.input[0]
     OUTPUT_FILE = args.output_file
-    BACK_MUS = args.background_music
-    BACK_VOL = args.background_volume
-    NEW_TRAC = args.cut_by_this_audio
-    BASE_TRAC = args.cut_by_this_track
-    COMBINE_TRAC = args.cut_by_all_tracks
 
-    SILENT_SPEED = args.silent_speed
-    VIDEO_SPEED = args.video_speed
-
-    if(SILENT_SPEED <= 0 or SILENT_SPEED > 99999):
-        SILENT_SPEED = 99999
-    if(VIDEO_SPEED <= 0 or VIDEO_SPEED > 99999):
-        VIDEO_SPEED = 99999
+    if(args.silent_speed <= 0 or args.silent_speed > 99999):
+        args.silent_speed = 99999
+    if(args.video_speed <= 0 or args.video_speed > 99999):
+        args.video_speed = 99999
 
     HWACCEL = args.hardware_accel
 
@@ -159,7 +160,7 @@ if(__name__ == '__main__'):
 
                 INPUTS.append(dic)
 
-        # sort the list by the key 'time'.
+        # Sort the list by the key 'time'.
         newlist = sorted(INPUTS, key=itemgetter('time'), reverse=False)
 
         # then reduce to a list that only has strings.
@@ -183,18 +184,20 @@ if(__name__ == '__main__'):
             os.remove('combine_files.txt')
         else:
             outputDir = INPUT_FILE + '_ALTERED'
-            # create the new folder for all the outputs
+            # Create the new folder for all the outputs.
             try:
                 os.mkdir(outputDir)
             except OSError:
                 rmtree(outputDir)
                 os.mkdir(outputDir)
     else:
+        if(args.combine_files):
+            print('Warning! --combine_files flag raised even though input type is a file, not a folder.')
         outputDir = ''
         if(os.path.isfile(INPUT_FILE)):
             INPUTS = [INPUT_FILE]
-        # if input is URL, download as mp4 with youtube-dl
         elif(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
+            # If input is a URL, download as mp4 with youtube-dl.
             print('URL detected, using youtube-dl to download from webpage.')
             basename = re.sub(r'\W+', '-', INPUT_FILE)
             cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
@@ -213,7 +216,7 @@ if(__name__ == '__main__'):
         from scripts.preview import preview
 
         preview(INPUT_FILE, args.silent_threshold, args.zoom_threshold,
-            args.frame_margin, args.sample_rate, VIDEO_SPEED, SILENT_SPEED)
+            args.frame_margin, args.sample_rate, args.video_speed, args.silent_speed)
         sys.exit()
 
     startTime = time.time()
@@ -221,20 +224,18 @@ if(__name__ == '__main__'):
     for INPUT_FILE in INPUTS:
         dotIndex = INPUT_FILE.rfind('.')
         extension = INPUT_FILE[dotIndex:]
-        isAudio = extension in ['.wav', '.mp3', '.m4a']
-
         if(outputDir != ''):
             newOutput = os.path.join(outputDir, os.path.basename(INPUT_FILE))
             print(newOutput)
         else:
             newOutput = OUTPUT_FILE
-
+        isAudio = extension in ['.wav', '.mp3', '.m4a']
         if(isAudio):
             from scripts.fastAudio import fastAudio
 
             outFile = fastAudio(INPUT_FILE, newOutput, args.silent_threshold, args.frame_margin,
-                args.sample_rate, args.audio_bitrate, args.verbose, SILENT_SPEED,
-                VIDEO_SPEED, True)
+                args.sample_rate, args.audio_bitrate, args.verbose, args.silent_speed,
+                args.video_speed, True)
             continue
         else:
             try:
@@ -255,21 +256,21 @@ if(__name__ == '__main__'):
                 subprocess.call(cmd)
                 INPUT_FILE = TEMP+'/constantVid'+extension
 
-        if(BACK_MUS is None and BACK_VOL != -8):
+        if(args.background_music is None and args.background_volume != -8):
             print('Warning! Background volume specified even though no background music was provided.')
 
         if(args.export_to_premiere):
             from scripts.premiere import exportToPremiere
 
             outFile = exportToPremiere(INPUT_FILE, newOutput, args.silent_threshold,
-                args.zoom_threshold, args.frame_margin, args.sample_rate, VIDEO_SPEED,
-                SILENT_SPEED)
+                args.zoom_threshold, args.frame_margin, args.sample_rate, args.video_speed,
+                args.silent_speed)
             continue
 
-        if(BACK_MUS is None and args.zoom_threshold == 2
-            and NEW_TRAC == None and HWACCEL is None):
+        if(args.background_music is None and args.zoom_threshold == 2
+            and args.cut_by_this_audio == None and HWACCEL is None):
 
-            if(SILENT_SPEED == 99999 and VIDEO_SPEED == 1):
+            if(args.silent_speed == 99999 and args.video_speed == 1):
                 from scripts.fastVideo import fastVideo
 
                 outFile = fastVideo(INPUT_FILE, newOutput, args.silent_threshold,
@@ -280,15 +281,17 @@ if(__name__ == '__main__'):
 
                 outFile = fastVideoPlus(INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
-                    args.verbose, VIDEO_SPEED, SILENT_SPEED, args.cut_by_this_track,
-                    args.keep_tracks_seperate)
+                    args.verbose, args.video_speed, args.silent_speed,
+                    args.cut_by_this_track, args.keep_tracks_seperate)
         else:
             from scripts.originalMethod import originalMethod
 
-            outFile = originalMethod(INPUT_FILE, newOutput, args.frame_rate, args.frame_margin,
-                args.silent_threshold, args.zoom_threshold, args.sample_rate,
-                args.audio_bitrate, SILENT_SPEED, VIDEO_SPEED, args.keep_tracks_seperate, BACK_MUS,
-                BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, args.verbose, HWACCEL)
+            outFile = originalMethod(INPUT_FILE, newOutput, args.frame_rate,
+                args.frame_margin, args.silent_threshold, args.zoom_threshold,
+                args.sample_rate, args.audio_bitrate, args.silent_speed, args.video_speed,
+                args.keep_tracks_seperate, args.background_music, args.background_volume,
+                args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
+                args.verbose, HWACCEL)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
