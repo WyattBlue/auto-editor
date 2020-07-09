@@ -25,12 +25,12 @@ from shutil import rmtree
 from time import time
 
 def preview(chunks, NEW_SPEED, fps):
-    timeInSeconds = 0
+    timeInFrames = 0
     for chunk in chunks:
         leng = chunk[1] - chunk[0]
         if(NEW_SPEED[chunk[2]] < 99999):
-            timeInSeconds += leng * (1 / NEW_SPEED[chunk[2]])
-    return timeInSeconds / fps
+            timeInFrames += leng * (1 / NEW_SPEED[chunk[2]])
+    return timeInFrames / fps
 
 
 def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,

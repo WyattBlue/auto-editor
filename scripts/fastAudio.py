@@ -32,7 +32,7 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
 
     if(not os.path.isfile(theFile)):
         print('Could not find file:', theFile)
-        sys.exit()
+        sys.exit(1)
 
     if(outFile == ''):
         fileName = theFile[:theFile.rfind('.')]

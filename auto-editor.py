@@ -50,9 +50,7 @@ def sample_rate_type(num):
     return num
 
 if(__name__ == '__main__'):
-    parser = argparse.ArgumentParser(prog='Auto-Editor',
-        usage='Auto-Editor: [options]',
-        description='Effort free video editing!')
+    parser = argparse.ArgumentParser(prog='Auto-Editor', usage='Auto-Editor: [options]')
 
     basic = parser.add_argument_group('Basic Options')
     basic.add_argument('input', nargs='*',
@@ -153,8 +151,6 @@ if(__name__ == '__main__'):
         args.silent_speed = 99999
     if(args.video_speed <= 0 or args.video_speed > 99999):
         args.video_speed = 99999
-
-    HWACCEL = args.hardware_accel
 
     if(os.path.isdir(INPUT_FILE)):
         # get the file path and date modified so that it can be sorted later.
@@ -275,7 +271,7 @@ if(__name__ == '__main__'):
             continue
 
         if(args.background_music is None and args.zoom_threshold == 2
-            and args.cut_by_this_audio == None and HWACCEL is None):
+            and args.cut_by_this_audio == None and args.hardware_accel is None):
 
             if(args.silent_speed == 99999 and args.video_speed == 1):
                 from scripts.fastVideo import fastVideo
@@ -298,7 +294,7 @@ if(__name__ == '__main__'):
                 args.sample_rate, args.audio_bitrate, args.silent_speed, args.video_speed,
                 args.keep_tracks_seperate, args.background_music, args.background_volume,
                 args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
-                args.verbose, HWACCEL)
+                args.verbose, args.hardware_accel)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
