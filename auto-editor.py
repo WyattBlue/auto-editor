@@ -51,46 +51,47 @@ def sample_rate_type(num):
 
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser(prog='Auto-Editor',
-        usage='Auto-Editor: Effort free video editing!')
+        usage='Auto-Editor: [options]',
+        description='Effort free video editing!')
 
     basic = parser.add_argument_group('Basic Options')
     basic.add_argument('input', nargs='*',
         help='the path to the video file you want modified (can be a URL).')
-    basic.add_argument('--frame_margin', '-m', type=int, default=4,
+    basic.add_argument('--frame_margin', '-m', type=int, default=4, metavar='',
         help='tells how many frames on either side of speech should be included.')
-    basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
+    basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='',
         help='the volume that frames audio needs to surpass to be sounded. (0-1)')
-    basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
+    basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00, metavar='',
         help='the speed that sounded (spoken) frames should be played at.')
-    basic.add_argument('--silent_speed', '-s', type=float_type, default=99999,
+    basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='',
         help='the speed that silent frames should be played at.')
-    basic.add_argument('--output_file', '-o', type=str, default='',
+    basic.add_argument('--output_file', '-o', type=str, default='', metavar='',
         help='name the output file.')
 
     advance = parser.add_argument_group('Advanced Options')
     advance.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    advance.add_argument('--zoom_threshold', type=float_type, default=2.00,
+    advance.add_argument('--zoom_threshold', type=float_type, default=2.00, metavar='',
         help='the volume that needs to be surpassed to zoom in the video. (0-1)')
     advance.add_argument('--combine_files', action='store_true',
         help='when using a folder as the input, combine all files in a folder before editing.')
-    advance.add_argument('--hardware_accel', type=str,
+    advance.add_argument('--hardware_accel', type=str, metavar='',
         help='set the hardware used for gpu acceleration.')
 
     audio = parser.add_argument_group('Audio Options')
-    audio.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000,
+    audio.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='',
         help='sample rate of the input and output videos.')
-    audio.add_argument('--audio_bitrate', type=str, default='160k',
+    audio.add_argument('--audio_bitrate', type=str, default='160k', metavar='',
         help='set the number of bits per second for audio.')
-    audio.add_argument('--background_music', type=file_type,
+    audio.add_argument('--background_music', type=file_type, metavar='',
         help='add background music to your output.')
-    audio.add_argument('--background_volume', type=float, default=-8,
+    audio.add_argument('--background_volume', type=float, default=-8, metavar='',
         help="set the dBs louder or softer compared to the audio track that bases the cuts.")
 
     cutting = parser.add_argument_group('Options for Cutting')
-    cutting.add_argument('--cut_by_this_audio', type=file_type,
+    cutting.add_argument('--cut_by_this_audio', type=file_type, metavar='',
         help="base cuts by this audio file instead of the video's audio.")
-    cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0,
+    cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='',
         help='base cuts by a different audio track in the video.')
     cutting.add_argument('--cut_by_all_tracks', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
@@ -114,7 +115,7 @@ if(__name__ == '__main__'):
         help='export as an XML file for Adobe Premiere Pro instead of outputting a video.')
 
     dep = parser.add_argument_group('Deprecated Options')
-    dep.add_argument('--frame_rate', '-f', type=float,
+    dep.add_argument('--frame_rate', '-f', type=float, metavar='',
         help='(Deprecated!) manually set the frame rate (fps) of the input video.')
 
     args = parser.parse_args()
