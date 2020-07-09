@@ -61,25 +61,48 @@ def sample_rate_type(num):
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser()
     parser.add_argument('input', nargs='*',
-        help='the path to the video file you want modified. can be a URL with youtube-dl.')
+        help='the path to the video file you want modified. it can be a URL.')
     parser.add_argument('--output_file', '-o', type=str, default='',
         help='name the output file.')
+    # Basic Options
+    parser.add_argument('--frame_margin', '-m', type=int, default=4,
+        help='tells how many frames on either side of speech should be included.')
     parser.add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
-        help='the volume that frames audio needs to surpass to be sounded. It ranges from 0 to 1.')
+        help='the volume that frames audio needs to surpass to be sounded. (0-1)')
     parser.add_argument('--zoom_threshold', '-l', type=float_type, default=2.00,
         help='the volume that needs to be surpassed to zoom in the video. (0-1)')
     parser.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
         help='the speed that sounded (spoken) frames should be played at.')
     parser.add_argument('--silent_speed', '-s', type=float_type, default=99999,
         help='the speed that silent frames should be played at.')
-    parser.add_argument('--frame_margin', '-m', type=int, default=4,
-        help='tells how many frames on either side of speech should be included.')
     parser.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000,
         help='sample rate of the input and output videos.')
+
+    # Advanced Options
+    parser.add_argument('--no_open', action='store_true',
+        help='do not open the file after editing is done.')
+    parser.add_argument('--combine_files', action='store_true',
+        help='combine all files in a folder before editing.')
+    parser.add_argument('--background_music', type=file_type,
+        help='add background music to your output.')
+    parser.add_argument('--background_volume', type=float, default=-8,
+        help="set the dBs louder or softer compared to the audio track that bases the cuts.")
     parser.add_argument('--audio_bitrate', type=str, default='160k',
         help='number of bits per second for audio. Example, 160k.')
-    parser.add_argument('--frame_rate', '-f', type=float,
-        help='manually set the frame rate (fps) of the input video.')
+    parser.add_argument('--hardware_accel', type=str,
+        help='set the hardware used for gpu acceleration.')
+
+    # Options for Cutting
+    parser.add_argument('--cut_by_this_audio', type=file_type,
+        help="base cuts by this audio file instead of the video's audio.")
+    parser.add_argument('--cut_by_this_track', '-ct', type=int, default=0,
+        help='base cuts by a different audio track in the video.')
+    parser.add_argument('--cut_by_all_tracks', action='store_true',
+        help='combine all audio tracks into one before basing cuts.')
+    parser.add_argument('--keep_tracks_seperate', action='store_true',
+        help="don't combine audio tracks.")
+
+    # Options for Debugging
     parser.add_argument('--verbose', action='store_true',
         help='display more information when running.')
     parser.add_argument('--clear_cache', action='store_true',
@@ -88,28 +111,16 @@ if(__name__ == '__main__'):
         help='show which auto-editor you have.')
     parser.add_argument('--debug', action='store_true',
         help='show helpful debugging values.')
-    parser.add_argument('--background_music', type=file_type,
-        help='add background music to your output.')
-    parser.add_argument('--background_volume', type=float, default=-8,
-        help="set the dBs louder or softer compared to the audio track that bases the cuts.")
-    parser.add_argument('--cut_by_this_audio', type=file_type,
-        help="base cuts by this audio file instead of the video's audio.")
-    parser.add_argument('--cut_by_this_track', '-ct', type=int, default=0,
-        help='base cuts by a different audio track in the video.')
-    parser.add_argument('--cut_by_all_tracks', action='store_true',
-        help='combine all audio tracks into 1 before basing cuts.')
-    parser.add_argument('--keep_tracks_seperate', action='store_true',
-        help="don't combine audio tracks.")
-    parser.add_argument('--hardware_accel', type=str,
-        help='set the hardware used for gpu acceleration.')
-    parser.add_argument('--combine_files', action='store_true',
-        help='combine all files in a folder before editing.')
-    parser.add_argument('--no_open', action='store_true',
-        help='do not open the file after editing is done.')
+
+    # Options that completely change what auto-editor does
     parser.add_argument('--preview', action='store_true',
         help='show stats on how the video will be cut.')
     parser.add_argument('--export_to_premiere', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of outputting a video.')
+
+    # Deprecated Options
+    parser.add_argument('--frame_rate', '-f', type=float,
+        help='(Deprecated!) manually set the frame rate (fps) of the input video.')
 
     args = parser.parse_args()
 
@@ -192,7 +203,7 @@ if(__name__ == '__main__'):
                 os.mkdir(outputDir)
     else:
         if(args.combine_files):
-            print('Warning! --combine_files flag raised even though input type is a file, not a folder.')
+            print('Warning! --combine_files does nothing since input type is not a folder.')
         outputDir = ''
         if(os.path.isfile(INPUT_FILE)):
             INPUTS = [INPUT_FILE]
@@ -210,7 +221,7 @@ if(__name__ == '__main__'):
                 OUTPUT_FILE = basename + '_ALTERED.mp4'
         else:
             print('Could not find file:', INPUT_FILE)
-            sys.exit()
+            sys.exit(1)
 
     if(args.preview):
         from scripts.preview import preview
