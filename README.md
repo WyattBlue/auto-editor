@@ -12,11 +12,11 @@ It works by analyzing the video's audio to detect when a section needs to be cut
 ## New in 20w28a!
  * You can now use percentages for speeds.
  ```terminal
-  $ python auto-editor.py --video_speed 200%`
+  $ python auto-editor.py --video_speed 200%
  ```
- * You can know use Hz or kHz when setting the sample rate.
+ * You can now use Hz or kHz when setting the sample rate.
  ```terminal
-  $ python auto-editor.py --sample_rate 44.1 kHz`
+  $ python auto-editor.py --sample_rate 44.1 kHz
  ```
  * The help screen has been overhauled to be simpler and cleaner.
  * New dedicated script for handling audio files has been added.
