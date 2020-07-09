@@ -9,12 +9,19 @@
 Auto-Editor is a command line application program for automatically editing **video or audio**.
 It works by analyzing the video's audio to detect when a section needs to be cut or kept in, then it runs a subprocess called ffmpeg to create the new video.
 
-## New in 20w27b!
- * You now edit the cuts Auto-Editor does with Adobe Premiere Pro using the `--export_to_premiere` flag. It will make an XML file that you can import to Premiere.
- * fastVideoPlus.py is no longer so RAM intensive.
- * preview.py now uses tempfile.
- * The SciPy the module is no longer needed.
- * Other small improvements have been made.
+## New in 20w28a!
+ * You can now use percentages for speeds.
+ ```terminal
+  $ python auto-editor.py --video_speed 200%`
+ ```
+ * You can know use Hz or kHz when setting the sample rate.
+ ```terminal
+  $ python auto-editor.py --sample_rate 44.1 kHz`
+ ```
+ * The help screen has been overhauled to be simpler and cleaner.
+ * New dedicated script for handling audio files has been added.
+ * Older versions of Python can now handle hours long audio files without crashing.
+ * Auto-Editor won't crash anymore if your console does not support Unicode characters.
 
 ## Usage
 ### Minimal Example

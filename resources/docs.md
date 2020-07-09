@@ -1,18 +1,44 @@
 # Documentation
-## A Note about Formating
-The $ symbol that you in commands should not actually be included when you type a command in or copy-paste it to your command-line. Their purpose is to:
- 1. Signify that this command should be run on a command-line.
- 2. Signify that this command is a complete version that you can run, unlike fragments that are meant to demonstrate a specific argument.
 
-## Minimal Example
+
+## Table of Contents
+
+- [The Basics](#The-Basics)
+- [Vocabulary](#Vocabulary)
+- [Auto-Editor Options](#Options)
+  - [Basic Options](#Basic-Options)
+  - [Advanced Options](#Advanced-Options)
+  - [Audio Options](#Audio-Options)
+  - [Options for Cutting](#Options-for-Cutting)
+  - [Options for Debugging](#Options-for-Debugging)
+  - [Options That Completely Change What Auto-Editor Does](#Options-That-Completely-Change-What-Auto-Editor-Does)
+  - [Deprecated Options](#Deprecated-Options)
+
+
+## The Basics
+
+### Minimal Example
 Create an edited version of example.mp4 with the default parameters.
 ```terminal
  $ python auto-editor.py example.mp4
 ```
 
-## Changing the Feel
-###### a.k.a. Changing the padding
-You can change how much space (frames) their is between each cut by specifying the frame margin. The frame margin is how much frames there are on each side between the loud parts.
+### A Note about Formating
+Dollar sign notation is used to indicate that you should be running this in your console.
+Don't actually put one in when typing commands.
+
+`python` works for Windows and some Linux distros, but not for all. In that case, you should replace `python` with some other key word that links to your Python 3 installation, typically `python3`.
+
+You can see where a keyword links to by typing in.
+```terminal
+ $ which python
+```
+
+## Auto-Editor Options
+
+### Basic Options
+
+Frame margin is how much extra silent frames there are on each side between the loud parts.
 
 ```terminal
  $ python auto-editor.py example.mp4 --frame_margin 1
@@ -24,6 +50,71 @@ type    | int
 range   | 0 to Infinity
 default | 4
 short   | `-m`
+
+Silent Threshold is the level at which any section below it is considered "silent". It uses percentages that represent how loud a chunk is compared to the loudest part in the audio. Using Decibels (dB) is not supported yet.
+
+```terminal
+ $ python auto-editor.py example.mp4 --silent_threshold 0.02
+```
+
+Command | `--silent_threshold`
+--------|--------------
+type    | float_type
+range   | 0 to 1, 0% to 100%
+default | 0.04, 4%
+short   | `-t`
+
+Video Speed represents how fast to play the parts of the video that are "loud". You can set to a number or a percentage. It also has an alias, `--sounded_speed` since auto-editor can edit audio files and setting the video speed is strange since there isn't a video in this case.
+
+```terminal
+ $ python auto-editor.py example.mp4 --video_speed 150%
+```
+
+Command | `--video_speed`
+--------|--------------
+type    | float_type
+range   | 0 to 99999, 0% to 9999900%
+default | 1, 100%
+short   | `-v`
+alias   | `--sounded_speed`
+
+Silent Speed represents how fast to play the parts of the video that are "silent". It's default is set to 99999 which, unlike 99998, is a special number because it completely throws away any frames or audio without even considering creating new audio/frames. You can set to a number or a percentage.
+
+```terminal
+ $ python auto-editor.py example.mp4 --silent_speed 5
+```
+
+Command | `--silent_speed`
+--------|--------------
+type    | float_type
+range   | 0 to 99999, 0% to 9999900%
+default | 99999, 9999900%
+short   | `-s`
+
+Output File changes where the new file will be saved. It if is blank, it will append "\_ALTERED" to the name.
+
+```termianl
+ $ python auto-editor.py example.mp4 --output_file edited_example.mp4
+```
+
+Command | `--output_file`
+--------|--------------
+type    | str
+default | ''
+short   | `-o`
+
+### Advanced Options
+
+### Audio Options
+
+### Options for Cutting
+
+### Options for Debugging
+
+### Options That Completely Change What Auto-Editor Does
+
+### Deprecated Options
+
 
 
 ## Changing Video Speed
