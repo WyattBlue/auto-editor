@@ -1,18 +1,44 @@
 # Documentation
-## A Note about Formating
-The $ symbol that you in commands should not actually be included when you type a command in or copy-paste it to your command-line. Their purpose is to:
- 1. Signify that this command should be run on a command-line.
- 2. Signify that this command is a complete version that you can run, unlike fragments that are meant to demonstrate a specific argument.
 
-## Minimal Example
+
+## Table of Contents
+
+- [The Basics](#The-Basics)
+- [Auto-Editor Options](#Auto-Editor-Options)
+  - [Basic Options](#Basic-Options)
+  - [Advanced Options](#Advanced-Options)
+  - [Audio Options](#Audio-Options)
+  - [Options for Cutting](#Options-for-Cutting)
+  - [Options for Debugging](#Options-for-Debugging)
+  - [Options That Completely Change What Auto-Editor Does](#Options-That-Completely-Change-What-Auto-Editor-Does)
+  - [Deprecated Options](#Deprecated-Options)
+  - [Input](#Input)
+
+
+## The Basics
+
+### Minimal Example
 Create an edited version of example.mp4 with the default parameters.
 ```terminal
  $ python auto-editor.py example.mp4
 ```
 
-## Changing the Feel
-###### a.k.a. Changing the padding
-You can change how much space (frames) their is between each cut by specifying the frame margin. The frame margin is how much frames there are on each side between the loud parts.
+### A Note about Formating
+Dollar sign notation is used to indicate that you should be running this in your console.
+Don't actually put one in when typing commands.
+
+`python` works for Windows and some Linux distros, others need to use `python3` instead. You can also use `py` when using Windows.
+
+Those are the defaults Python installs for you but can change it to something else. The only important part is that your command links to your installation of Python 3.
+
+You can see where command links to by typing in. `which` + the keyword.
+
+
+# Auto-Editor Options
+## Basic Options
+
+### Frame Margin
+Frame Margin is how much extra silent frames there are on each side between the loud parts.
 
 ```terminal
  $ python auto-editor.py example.mp4 --frame_margin 1
@@ -25,49 +51,89 @@ range   | 0 to Infinity
 default | 4
 short   | `-m`
 
+### Silent Threshold
+Silent Threshold is the level at which any section below it is considered "silent". It uses percentages that represent how loud a chunk is compared to the loudest part in the audio. Using Decibels (dB) is not supported yet.
 
-## Changing Video Speed
-Video speed will change speed of the output's video and audio. For instance, if the speed is set to 2. Half of the frames will be dropped and the audio will be speed up. This does not affect parts of the video that are below the silent threshold.
+```terminal
+ $ python auto-editor.py example.mp4 --silent_threshold 0.02
 ```
- $ python auto-editor.py example.mp4 --video_speed 2
+
+Command | `--silent_threshold`
+--------|--------------
+type    | float_type
+range   | 0 to 1, 0% to 100%
+default | 0.04, 4%
+short   | `-t`
+
+### Video Speed
+Video Speed represents how fast to play the parts of the video that are "loud". You can set to a number or a percentage. It also has an alias, `--sounded_speed` since auto-editor can edit audio files and setting the video speed is strange since there isn't a video in this case.
+
+```terminal
+ $ python auto-editor.py example.mp4 --video_speed 150%
 ```
 
 Command | `--video_speed`
 --------|--------------
-type    | float
-range   | 0 to 99999
-default | 1
+type    | float_type
+range   | 0 to 99999, 0% to 9999900%
+default | 1, 100%
 short   | `-v`
 alias   | `--sounded_speed`
 
-You can also do the same, but for the silent parts with --silent_speed
-```
- $ python auto-editor.py example.mp4 --video_speed 2 --silent_speed 8
-```
+### Silent Speed
+Silent Speed represents how fast to play the parts of the video that are "silent". It's default is set to 99999 which, unlike 99998, is a special number because it completely throws away any frames or audio without even considering creating new audio/frames. You can set to a number or a percentage.
 
+```terminal
+ $ python auto-editor.py example.mp4 --silent_speed 5
+```
 
 Command | `--silent_speed`
 --------|--------------
-type    | float
-range   | 0 to 99999
-default | 99999
+type    | float_type
+range   | 0 to 99999, 0% to 9999900%
+default | 99999, 9999900%
 short   | `-s`
 
+### Output File
+Output File changes where the new file will be saved. It if is blank, it will append "\_ALTERED" to the name.
 
-## Zooming In
+```termianl
+ $ python auto-editor.py example.mp4 --output_file edited_example.mp4
+```
+
+Command | `--output_file`
+--------|--------------
+type    | str
+default | ''
+short   | `-o`
+
+### Help
+Get all the commands and options in Auto-Editor.
+
+```terminal
+ $ python auto-editor.py --help
+```
+
+Command | `--help`
+--------|--------------
+type    | flag
+short   | `-h`
+
+
+## Advanced Options
+
+### Zoom Threshold
 You can tell auto-editor to zoom in when the input's audio is above the loudness threshold. Auto-Editor will hold the zoom until there's a cut.
 
 ```terminal
---zoom_threshold
+ $ python auto-editor.py example.mp4 --zoom_threshold 50%
 ```
 
 Command | `--zoom_threshold`
 --------|---------------------
-type    | float
-range   | 0 to 1
-default | 2
-short   | `-l`
-
+type    | float_type
+range   | 0 to 1, 0% to 100%
+default | 2, 200%
 
 Here is a side by side comparison between a video with no zoom, and a video with auto zoom.
 
@@ -77,86 +143,192 @@ Here is a side by side comparison between a video with no zoom, and a video with
 
 (video source from jacksfilms)
 
-## Inputing Files
-```
-auto-editor.py input
-```
+## Audio Options
 
-Input is the only required argument for auto-editor. It supports video formats, audio formats, and URLs. For certain commands that do simple things, such as `--clear_cache` or `--version`, it's okay to skip providing an input.
-
-Here an example of using a url as the input for auto-editor. You should always wrap the url around single quotes or double quotes.
+### Sample Rate
+Sample Rate sets the sample rate of the audio.
 
 ```terminal
- $ python auto-editor.py "https://www.youtube.com/watch?v=kcs82HnguGc"
+ $ python auto-editor.py example.mp4 --sample_rate 44.1 kHz
 ```
 
-## Adding Music
-You can add background music to your video automatically.
+Command | `--sample_rate`
+--------|---------------------
+type    | sample_rate_type
+range   | 0 to Infinity
+default | 48000, 48000 Hz, 48.0 kHz
+short   | `-r`
+
+
+### Audio Bitrate
+Audio Bitrate sets the number of bits per second for audio.
+
+```terminal
+ $ python auto-editor.py example.mp4 --audio_bitrate '192k'
+```
+
+Command | `--audio_bitrate`
+--------|---------------------
+type    | str
+default | '160k'
+
+### Background Music
+Background Music adds in a audio file you specify and will automatically change the volume so that it is lower than audio track being cut.
 
 ```terminal
  $ python auto-editor.py example.mp4 --background_music media/Magic_in_the_Garden.mp3
 ```
 
-It will be quiet than the video's audio by 10dB and will fade out at the last second of the video.
+### Background Volume
+Background Volume sets the difference between the video's audio and the background's music volume.
 
-## Adding Commentary
-You can add an audio track to your video that will replace the video's audio as the one to base cuts on.
+Command | `--background_volume`
+--------|---------------------
+type    | float
+range   | -Infinity to Infinity
+default | -8
+
+## Options for Cutting
+
+### Cut By This Audio
+Choose which audio track to cut by.
 
 ```terminal
  $ python auto-editor.py example.mp4 --cut_by_this_audio media/newCommentary.mp3
 ```
 
-This option is good for combining gameplay videos with commentary, but beware that it doesn't change the volume for either audio unlike `--background_music`.
+Command | `--cut_by_this_audio`
+--------|---------------------
+type    | file_type
+default | ''
 
-## Video Tracks
-Video files can contain more than audio file and auto-editor. These 'audio files' are what we call audio tracks and auto-editor has a set of tools to deal with these tracks. First, if you'll like the tracks be separated on the output, use the flag `--keep_tracks_seperate`
-
-```terminal
- $ python auto-editor.py videoWith2Tracks.mp4 --keep_tracks_seperate
-```
-
-Auto-Editor works by cutting out the silent parts and it needs to choose which audio track to base cuts on. By default it will be set to 0 (the first track) but you can change that with the `--cut_by_this_track` command.
+### Cut By This Track
+Select a certain audio track in a video before
 
 ```terminal
  $ python auto-editor.py videoWith2Tracks.mp4 --cut_by_this_track 1
 ```
 
-Now the video with be cut by second audio track's volume! But what if you wanted to just ignore tracks all together? Well, with the `--cut_by_all_tracks` command, auto-editor will act is if all tracks were muxed into a single one.
+Command | `--cut_by_this_track`
+--------|---------------------
+type    | int
+range   | 0 to Infinity
+default | 0
+short   | `-ct`
+
+### Cut By All Tracks
+Cut By All Tracks combines all audio tracks into one before determining how to edit the video.
 
 ```terminal
  $ python auto-editor.py videoWith2Tracks.mp4 --cut_by_all_tracks
 ```
 
-## Caching In
-Some videos need to be converted to a jpeg image sequence beforehand and this can take awhile. What if you want to use the same video but use different parameters. That's where caching comes in. The jpeg sequence and the audio are stored away in the .CACHE folder, ready to be used again if it is right.
+Command | `--cut_by_this_track`
+--------|---------------------
+type    | flag
 
-The .CACHE folder can take quiet a bit of space so if you want to delete the folder and all its contents, run this command.
+
+### Keep Tracks Seperate
+Keep Tracks Seperate tells auto-editor don't combine the audio tracks when outputing a video with multiple audio tracks.
+
+Command | `--keep_tracks_seperate`
+--------|---------------------
+type    | flag
+
+## Options for Debugging
+
+### Verbose
+Verbose displays more information while running auto-editor. Particularly ffmpeg stats and banners.
+
+```terminal
+ $ python auto-editor.py --verbose
+```
+
+Command | `--verbose`
+--------|---------------------
+type    | flag
+
+
+### Clear Cache
+Clear Cache will delete the directory named `.CACHE` in the auto-editor folder.
 
 ```terminal
  $ python auto-editor.py --clear_cache
 ```
 
-Or, you can clear the cache before making a new one.
+Command | `--clear_cache`
+--------|---------------------
+type    | flag
 
-```terminal
- $ python auto-editor.py example.mp4 --clear_cache
-```
-
-## Miscellaneous
-Get the list of commands generated by argparse.
-
-```terminal
- $ python auto-editor.py --help
-```
-
+### Version
 Get the version of auto-editor you're using.
 
 ```terminal
  $ python auto-editor.py --version
 ```
 
-Get debug information regarding auto-editor, including your python version, whether the your python is 64-bit or not, and the current version.
+Command | `--version`
+--------|---------------------
+type    | flag
+
+### Debug
+Debug will get debug information regarding auto-editor, including your python version, whether the your python is 64-bit or not, and the current version.
 
 ```terminal
  $ python auto-editor.py --debug
 ```
+
+Command | `--debug`
+--------|---------------------
+type    | flag
+
+
+## Options That Completely Change What Auto-Editor Does
+
+### Preview
+Preview gives you an overview of how auto-editor will cut the video without having to create the new video.
+
+```terminal
+ $ python auto-editor.py --preview
+```
+
+Command | `--preview`
+--------|---------------------
+type    | flag
+
+### Export To Premiere
+Export To Premiere makes a XML file that can be imported to Adobe Premiere Pro instead of making a new video.
+
+```terminal
+ $ python auto-editor.py --export_to_premiere
+```
+
+Command | `--export_to_premiere`
+--------|---------------------
+type    | flag
+
+## Deprecated Options
+
+### Frame Rate
+Frame Rate tells auto-editor what the frame rate is for the video. This is depreciated since auto-editor can automatically detect the frame rate and the user provided number is largely ignored.
+
+Command | `--frame_rate`
+--------|---------------------
+type    | float
+range   | 0 to Infinity
+default | 30
+
+
+## Input
+Input is the only required argument for auto-editor. It supports video formats, audio formats, and URLs.
+
+Here an example of using a URL as the input for auto-editor. You should always wrap the url around single quotes or double quotes.
+
+```terminal
+ $ python auto-editor.py "https://www.youtube.com/watch?v=kcs82HnguGc"
+```
+
+Command | `[input]`
+--------|--------------
+type    | input
+
