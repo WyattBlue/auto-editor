@@ -2,7 +2,7 @@
 
 """
 To prevent duplicate code being pasted between methods, common functions should be
-put here.
+put here. No code here should make or delete files.
 """
 
 # External libraries
@@ -102,14 +102,9 @@ def progressBar(index, total, beginTime, title='Please wait'):
     barLen = max(1, termsize - (len(title) + 50))
 
     percentDone = round((index+1) / total * 100, 1)
-
     done = round(percentDone / (100 / barLen))
-    try:
-        doneStr = '█' * done
-        togoStr = '░' * int(barLen - done)
-    except UnicodeEncodeError:
-        doneStr = 'O' * done
-        togoStr = ' ' * int(barLen - done)
+    doneStr = '█' * done
+    togoStr = '░' * int(barLen - done)
 
     if(percentDone == 0):
         percentPerSec = 0
@@ -123,6 +118,9 @@ def progressBar(index, total, beginTime, title='Please wait'):
             bar = bar[:termsize - 2]
         else:
             bar += ' ' * (termsize - len(bar) - 4)
-        print(bar, end='\r', flush=True)
+        try:
+            print(bar, end='\r', flush=True)
+        except UnicodeEncodeError:
+            print(f'   {percentDone}% done ETA {newTime}')
     else:
         print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)

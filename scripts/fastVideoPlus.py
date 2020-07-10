@@ -25,12 +25,12 @@ from shutil import rmtree
 from time import time
 
 def preview(chunks, NEW_SPEED, fps):
-    timeInSeconds = 0
+    timeInFrames = 0
     for chunk in chunks:
         leng = chunk[1] - chunk[0]
         if(NEW_SPEED[chunk[2]] < 99999):
-            timeInSeconds += leng * (1 / NEW_SPEED[chunk[2]])
-    return timeInSeconds / fps
+            timeInFrames += leng * (1 / NEW_SPEED[chunk[2]])
+    return timeInFrames / fps
 
 
 def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
@@ -43,7 +43,6 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         sys.exit()
 
     TEMP = tempfile.mkdtemp()
-    FADE_SIZE = 400
     NEW_SPEED = [silentSpeed, videoSpeed]
 
     cap = cv2.VideoCapture(videoFile)
@@ -110,12 +109,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         currentTime = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
         audioSampleStart = int(currentTime * sampleRate)
 
-        audioSampleEnd = min(
-            audioSampleStart + sampleRate // fps * frameMargin, len(audioData)
-        )
         switchEnd = audioSampleStart + sampleRate // fps
-
-        audioChunk = audioData[audioSampleStart:audioSampleEnd]
 
         state = None
         for chunk in chunks:

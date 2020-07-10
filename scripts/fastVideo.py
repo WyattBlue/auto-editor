@@ -1,10 +1,7 @@
 '''scripts/fastVideo.py'''
 
 """
-This method is used for mp4 files that only need frame margin and silent_threshold
-specified.
-
-It's about 4x faster than the safe method. 1 Minute of video may take about 12 seconds.
+This method supports making new videos without changing the speed.
 """
 
 # External libraries
