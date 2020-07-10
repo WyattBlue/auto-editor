@@ -54,23 +54,23 @@ if(__name__ == '__main__'):
 
     basic = parser.add_argument_group('Basic Options')
     basic.add_argument('input', nargs='*',
-        help='the path to the video file you want modified (can be a URL).')
+        help='the path to the file, folder, or url you want edited.')
     basic.add_argument('--frame_margin', '-m', type=int, default=4, metavar='',
-        help='tells how many frames on either side of speech should be included.')
+        help='set how many "silent" frames of on either side of "loud" sections be included.')
     basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='',
-        help='the volume that frames audio needs to surpass to be sounded. (0-1)')
+        help='set the volume that frames audio needs to surpass to be sounded. (0-1)')
     basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00, metavar='',
-        help='the speed that sounded (spoken) frames should be played at.')
+        help='set the speed that "loud" sections should be played at.')
     basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='',
-        help='the speed that silent frames should be played at.')
+        help='set the speed that "silent" sections should be played at.')
     basic.add_argument('--output_file', '-o', type=str, default='', metavar='',
-        help='name the output file.')
+        help='set the name of the new output.')
 
     advance = parser.add_argument_group('Advanced Options')
     advance.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
     advance.add_argument('--zoom_threshold', type=float_type, default=2.00, metavar='',
-        help='the volume that needs to be surpassed to zoom in the video. (0-1)')
+        help='set the volume that needs to be surpassed to zoom in the video. (0-1)')
     advance.add_argument('--combine_files', action='store_true',
         help='when using a folder as the input, combine all files in a folder before editing.')
     advance.add_argument('--hardware_accel', type=str, metavar='',
@@ -78,11 +78,11 @@ if(__name__ == '__main__'):
 
     audio = parser.add_argument_group('Audio Options')
     audio.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='',
-        help='sample rate of the input and output videos.')
+        help='set the sample rate of the input and output videos.')
     audio.add_argument('--audio_bitrate', type=str, default='160k', metavar='',
         help='set the number of bits per second for audio.')
     audio.add_argument('--background_music', type=file_type, metavar='',
-        help='add background music to your output.')
+        help='set an audio file to be added as background music to your output.')
     audio.add_argument('--background_volume', type=float, default=-8, metavar='',
         help="set the dBs louder or softer compared to the audio track that bases the cuts.")
 
@@ -114,7 +114,7 @@ if(__name__ == '__main__'):
 
     dep = parser.add_argument_group('Deprecated Options')
     dep.add_argument('--frame_rate', '-f', type=float, metavar='',
-        help='(Deprecated!) manually set the frame rate (fps) of the input video.')
+        help='manually set the frame rate (fps) of the input video.')
 
     args = parser.parse_args()
 
@@ -195,7 +195,7 @@ if(__name__ == '__main__'):
                 os.mkdir(outputDir)
     else:
         if(args.combine_files):
-            print('Warning! --combine_files does nothing since input type is not a folder.')
+            print('Warning! --combine_files does nothing since input is not a folder.')
         outputDir = ''
         if(os.path.isfile(INPUT_FILE)):
             INPUTS = [INPUT_FILE]
