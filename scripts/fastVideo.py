@@ -46,7 +46,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
     for trackNumber in range(tracks):
         cmd = ['ffmpeg', '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
-        str(SAMPLE_RATE),'-map', f'0:a:{trackNumber}', f'{TEMP}/{trackNumber}.wav']
+            str(SAMPLE_RATE),'-map', f'0:a:{trackNumber}', f'{TEMP}/{trackNumber}.wav']
         if(not VERBOSE):
             cmd.extend(['-nostats', '-loglevel', '0'])
         else:
@@ -140,15 +140,19 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
                 f'{TEMP}/newAudioFile.wav'])
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
+            else:
+                cmd.extend(['-hide_banner'])
             subprocess.call(cmd)
         else:
             os.rename(f'{TEMP}/new0.wav', f'{TEMP}/newAudioFile.wav')
 
-        cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/newAudioFile.wav', '-i',
+        cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/newAudioFile.wav', '-strict', '-2', '-i',
             f'{TEMP}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
             outFile]
         if(not VERBOSE):
             cmd.extend(['-nostats', '-loglevel', '0'])
+        else:
+            cmd.extend(['-hide_banner'])
         subprocess.call(cmd)
 
     rmtree(TEMP)

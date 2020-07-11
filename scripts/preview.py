@@ -64,9 +64,9 @@ def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silent
     clipLengths = []
     for chunk in chunks:
         state = chunk[2]
-        if(NEW_SPEED[state] != 99999):
+        if(speeds[state] != 99999):
             clips += 1
-            leng = (chunk[1] - chunk[0]) / NEW_SPEED[state]
+            leng = (chunk[1] - chunk[0]) / speeds[state]
             clipLengths.append(leng)
 
     print('Number of clips:', clips)
