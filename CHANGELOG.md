@@ -48,10 +48,10 @@ Issue #35 fixed.
 ## [Version 20w25b](https://github.com/WyattBlue/auto-editor/tree/d17529c13fdf86a8715c416ec2e9e08ab94aff95)
 
 * **--combine_files** flag has been added. It combines them in order of date modified.
-* **--prerun** flag has been removed.
-* **--loudness_threshold** has been renamed to --zoom_threshold.
-* **New** flag added, --no_open, which prevents the opening of the new file after rendering.
-* **New** option --audio_bitrate, which specifies the bitrate.
+* `--prerun` flag has been removed.
+* `--loudness_threshold` has been renamed to `--zoom_threshold`.
+* **New** flag added, `--no_open`, which prevents the opening of the new file after rendering.
+* **New** option, `--audio_bitrate`, which specifies the bitrate.
 * **Progress** bar has been added in fastVideo.py. Thank you all who voted in the discord server.
 
 
