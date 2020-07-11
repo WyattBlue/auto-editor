@@ -109,7 +109,7 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         currentTime = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
         audioSampleStart = int(currentTime * sampleRate)
 
-        switchEnd = audioSampleStart + sampleRate // fps
+        switchEnd = int(audioSampleStart + sampleRate / fps)
 
         state = None
         for chunk in chunks:
