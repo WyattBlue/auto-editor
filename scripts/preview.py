@@ -57,7 +57,8 @@ def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silent
     oldTime = chunks[len(chunks)-1][1]
     printTimeFrame('Old length', oldTime, fps)
 
-    printTimeFrame('New length', getNewLength(chunks, NEW_SPEED, fps), fps)
+    speeds = [silentSpeed, videoSpeed]
+    printTimeFrame('New length', getNewLength(chunks, speeds, fps), fps)
 
     clips = 0
     clipLengths = []
