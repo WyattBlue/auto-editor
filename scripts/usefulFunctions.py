@@ -123,4 +123,4 @@ def progressBar(index, total, beginTime, title='Please wait'):
         except UnicodeEncodeError:
             print(f'   {percentDone}% done ETA {newTime}')
     else:
-        print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)
+        print('Finished process.' + (' ' * (termsize - 19)), end='\r', flush=True)

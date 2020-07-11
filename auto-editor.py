@@ -296,7 +296,7 @@ if(__name__ == '__main__'):
                 args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
                 args.verbose, args.hardware_accel)
 
-    print('Finished.')
+    print('Finished.        ')
     timeLength = round(time.time() - startTime, 2)
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')
