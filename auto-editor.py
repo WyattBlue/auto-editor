@@ -219,7 +219,8 @@ if(__name__ == '__main__'):
         from scripts.preview import preview
 
         preview(INPUT_FILE, args.silent_threshold, args.zoom_threshold,
-            args.frame_margin, args.sample_rate, args.video_speed, args.silent_speed)
+            args.frame_margin, args.sample_rate, args.video_speed, args.silent_speed,
+            args.cut_by_this_track, args.audio_bitrate)
         sys.exit()
 
     startTime = time.time()

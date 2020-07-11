@@ -17,7 +17,7 @@ Issue #35 fixed.
 
 ## [Version 20w27b](https://github.com/WyattBlue/auto-editor/tree/a876057b1dbfc97fbccb46e6eb780a165d8afa65)
 
-* **--export_to_premiere** flag added.
+* `--export_to_premiere` flag added.
 * **fastVideoPlus.py** is no longer so RAM intensive.
 * **preview.py** now uses Python's tempfile.
 * **The** SciPy the module is no longer needed.
@@ -31,23 +31,23 @@ Issue #35 fixed.
 
 ## [Version 20w26b](https://github.com/WyattBlue/auto-editor/tree/f93313694e8d70f1bf2bccbc01be04baac2507de)
 
-* **--preview** flag added.
+* `--preview` flag added.
 * **fastVideo.py** and fastVideoPlus.py now supports multiple audio tracks.
 * **Fixed** bug where fastVideoPlus.py did not give enough space for the new audio to take.
-* **--frame_quality** has now been removed.
-* **--get_frame_rate** aka, --get_auto_fps has been removed.
+* `--frame_quality` has now been removed.
+* `--get_frame_rate` aka, --get_auto_fps has been removed.
 
 
 ## [Version 20w26a](https://github.com/WyattBlue/auto-editor/tree/48c7864386b35c6cadc74e120ecf51b790e418af)
 
 * **fastVideoPlus.py** supports more video speeds.
 * **Default** sample rate changed from 44100 to 48000. (44.1 kHz -> 48.0 kHz)
-* **--frame_quality** default set to highest and marked as depreciated.
+* `--frame_quality` default set to highest and marked as depreciated.
 
 
 ## [Version 20w25b](https://github.com/WyattBlue/auto-editor/tree/d17529c13fdf86a8715c416ec2e9e08ab94aff95)
 
-* **--combine_files** flag has been added. It combines them in order of date modified.
+* `--combine_files` flag has been added. It combines them in order of date modified.
 * `--prerun` flag has been removed.
 * `--loudness_threshold` has been renamed to `--zoom_threshold`.
 * **New** flag added, `--no_open`, which prevents the opening of the new file after rendering.

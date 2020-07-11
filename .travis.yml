@@ -21,3 +21,4 @@ script:
  - python3 auto-editor.py example.mp4 --cut_by_this_audio media/newCommentary.mp3
  - python3 auto-editor.py example.mp4 --background_music media/Magic_in_the_Garden.mp3
  - python3 auto-editor.py example.mp4 --export_to_premiere
+ - python3 auto-editor.py example.mp4 --preview

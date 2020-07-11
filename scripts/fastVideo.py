@@ -42,7 +42,8 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     if(cutByThisTrack >= tracks):
         print("Error: You choose a track that doesn't exist.")
         print(f'There are only {tracks-1} tracks. (starting from 0)')
-        sys.exit()
+        sys.exit(1)
+
     for trackNumber in range(tracks):
         cmd = ['ffmpeg', '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
         str(SAMPLE_RATE),'-map', f'0:a:{trackNumber}', f'{TEMP}/{trackNumber}.wav']

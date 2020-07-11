@@ -12,7 +12,7 @@ from audiotsm import phasevocoder
 
 # Included functions
 from scripts.readAudio import ArrReader, ArrWriter
-from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
+from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks, getNewLength
 from scripts.wavfile import read, write
 
 # Internal libraries
@@ -23,15 +23,6 @@ import tempfile
 import subprocess
 from shutil import rmtree
 from time import time
-
-def preview(chunks, NEW_SPEED, fps):
-    timeInFrames = 0
-    for chunk in chunks:
-        leng = chunk[1] - chunk[0]
-        if(NEW_SPEED[chunk[2]] < 99999):
-            timeInFrames += leng * (1 / NEW_SPEED[chunk[2]])
-    return timeInFrames / fps
-
 
 def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     AUD_BITRATE, VERBOSE, videoSpeed, silentSpeed, cutByThisTrack, keepTracksSep):
@@ -56,7 +47,8 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     if(cutByThisTrack >= tracks):
         print("Error: You choose a track that doesn't exist.")
         print(f'There are only {tracks-1} tracks. (starting from 0)')
-        sys.exit()
+        sys.exit(1)
+
     for trackNumber in range(tracks):
         cmd = ['ffmpeg', '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
         str(SAMPLE_RATE),'-map', f'0:a:{trackNumber}', f'{TEMP}/{trackNumber}.wav']
@@ -69,8 +61,8 @@ def fastVideoPlus(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     sampleRate, audioData = read(f'{TEMP}/{cutByThisTrack}.wav')
     chunks = getAudioChunks(audioData, sampleRate, fps, silentThreshold, 2, frameMargin)
 
-    hmm = preview(chunks, NEW_SPEED, fps)
-    estLeng = int((hmm * SAMPLE_RATE) * 1.5) + int(SAMPLE_RATE * 2)
+    newL = getNewLength(chunks, NEW_SPEED, fps)
+    estLeng = int((newL * SAMPLE_RATE) * 1.5) + int(SAMPLE_RATE * 2)
 
     oldAudios = []
     newAudios = []

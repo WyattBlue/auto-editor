@@ -10,22 +10,13 @@ from audiotsm import phasevocoder
 
 # Included functions
 from scripts.readAudio import ArrReader, ArrWriter
-from scripts.usefulFunctions import getAudioChunks, progressBar
+from scripts.usefulFunctions import getAudioChunks, progressBar, getNewLength
 from scripts.wavfile import read, write
 
 # Internal libraries
 import os
 import sys
 import subprocess
-
-def preview(chunks, NEW_SPEED, fps):
-    timeInFrames = 0
-    for chunk in chunks:
-        leng = chunk[1] - chunk[0]
-        if(NEW_SPEED[chunk[2]] < 99999):
-            timeInFrames += leng * (1 / NEW_SPEED[chunk[2]])
-    return timeInFrames / fps
-
 
 def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, verbose,
     silentSpeed, soundedSpeed, needConvert):
@@ -61,10 +52,10 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
     chunks = getAudioChunks(audioData, sampleRate, 30, silentT, 2, frameMargin)
 
     # Get the estimated length of the new audio in frames.
-    hmm = preview(chunks, NEW_SPEED, 30)
+    newL = getNewLength(chunks, NEW_SPEED, 30)
 
     # Get the new length in samples with some extra leeway.
-    estLeng = int((hmm * sampleRate) * 1.5) + int(sampleRate * 2)
+    estLeng = int((newL * sampleRate) * 1.5) + int(sampleRate * 2)
 
     # Create an empty array for the new audio.
     newAudio = np.zeros((estLeng, 2), dtype=np.int16)

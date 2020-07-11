@@ -14,6 +14,15 @@ import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
 
+def getNewLength(chunks, speeds, fps):
+    timeInFrames = 0
+    for chunk in chunks:
+        leng = chunk[1] - chunk[0]
+        if(speeds[chunk[2]] < 99999):
+            timeInFrames += leng * (1 / speeds[chunk[2]])
+    return timeInFrames / fps
+
+
 def getMaxVolume(s):
     maxv = float(np.max(s))
     minv = float(np.min(s))
