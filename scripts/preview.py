@@ -20,8 +20,8 @@ from shutil import rmtree
 from datetime import timedelta
 
 
-def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silentSpeed,
-        cutByThisTrack, bitrate):
+def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed,
+        silentSpeed, cutByThisTrack, bitrate):
     TEMP = tempfile.mkdtemp()
 
     cap = cv2.VideoCapture(myInput)
@@ -35,7 +35,7 @@ def preview(myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed, silent
         sys.exit(1)
 
     for trackNumber in range(tracks):
-        cmd = ['ffmpeg', '-i', myInput, '-ab', bitrate, '-ac', '2', '-ar',
+        cmd = [ffmpeg, '-i', myInput, '-ab', bitrate, '-ac', '2', '-ar',
             str(sampleRate),'-map', f'0:a:{trackNumber}',  f'{TEMP}/{trackNumber}.wav',
             '-nostats', '-loglevel', '0']
         subprocess.call(cmd)

@@ -20,7 +20,7 @@ TEMP = '.TEMP'
 CACHE = '.CACHE'
 
 def getFrameRate(path):
-    process = subprocess.Popen(['ffmpeg', '-i', path],
+    process = subprocess.Popen([ffmpeg, '-i', path],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     output = stdout.decode()
@@ -127,6 +127,13 @@ if(__name__ == '__main__'):
         print('Auto-Editor Version:', version)
         sys.exit()
 
+    if(platform.system() == 'Windows'):
+        ffmpeg = 'scripts/win-ffmpeg/bin/ffmpeg.exe'
+    elif(platform.system() == 'Darwin'):
+        ffmpeg = 'scripts/unix-ffmpeg'
+    else:
+        ffmpeg = 'ffmpeg'
+
     if(args.version):
         print('Auto-Editor version:', version)
         sys.exit()
@@ -178,7 +185,7 @@ if(__name__ == '__main__'):
                 for fileref in INPUTS:
                     outfile.write(f"file '{fileref}'\n")
 
-            cmd = ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', 'combine_files.txt',
+            cmd = [ffmpeg, '-f', 'concat', '-safe', '0', '-i', 'combine_files.txt',
             '-c', 'copy', 'combined.mp4']
             subprocess.call(cmd)
 
@@ -237,9 +244,9 @@ if(__name__ == '__main__'):
         if(isAudio):
             from scripts.fastAudio import fastAudio
 
-            outFile = fastAudio(INPUT_FILE, newOutput, args.silent_threshold, args.frame_margin,
-                args.sample_rate, args.audio_bitrate, args.verbose, args.silent_speed,
-                args.video_speed, True)
+            outFile = fastAudio(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
+                args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose,
+                args.silent_speed, args.video_speed, True)
             continue
         else:
             try:
@@ -253,7 +260,7 @@ if(__name__ == '__main__'):
                 else:
                     frameRate = args.frame_rate
 
-                cmd = ['ffmpeg', '-i', INPUT_FILE, '-filter:v', f'fps=fps={frameRate}',
+                cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps={frameRate}',
                     TEMP+'/constantVid'+extension, '-hide_banner']
                 if(not args.verbose):
                     cmd.extend(['-nostats', '-loglevel', '0'])
@@ -266,9 +273,9 @@ if(__name__ == '__main__'):
         if(args.export_to_premiere):
             from scripts.premiere import exportToPremiere
 
-            outFile = exportToPremiere(INPUT_FILE, newOutput, args.silent_threshold,
-                args.zoom_threshold, args.frame_margin, args.sample_rate, args.video_speed,
-                args.silent_speed)
+            outFile = exportToPremiere(ffmpeg, INPUT_FILE, newOutput,
+                args.silent_threshold, args.zoom_threshold, args.frame_margin,
+                args.sample_rate, args.video_speed, args.silent_speed)
             continue
 
         if(args.background_music is None and args.zoom_threshold == 2
@@ -277,13 +284,13 @@ if(__name__ == '__main__'):
             if(args.silent_speed == 99999 and args.video_speed == 1):
                 from scripts.fastVideo import fastVideo
 
-                outFile = fastVideo(INPUT_FILE, newOutput, args.silent_threshold,
+                outFile = fastVideo(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
                     args.verbose, args.cut_by_this_track, args.keep_tracks_seperate)
             else:
                 from scripts.fastVideoPlus import fastVideoPlus
 
-                outFile = fastVideoPlus(INPUT_FILE, newOutput, args.silent_threshold,
+                outFile = fastVideoPlus(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
                     args.verbose, args.video_speed, args.silent_speed,
                     args.cut_by_this_track, args.keep_tracks_seperate)

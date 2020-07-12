@@ -18,8 +18,8 @@ import os
 import sys
 import subprocess
 
-def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, verbose,
-    silentSpeed, soundedSpeed, needConvert):
+def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit,
+        verbose, silentSpeed, soundedSpeed, needConvert):
 
     if(not os.path.isfile(theFile)):
         print('Could not find file:', theFile)
@@ -30,7 +30,7 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
         outFile = f'{fileName}_ALTERED.wav'
 
     if(needConvert):
-        # Only print this here so other programs can use this function.
+        # Only print this here so other scripts can use this function.
         print('Running from fastAudio.py')
 
         import tempfile
@@ -38,7 +38,7 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
 
         TEMP = tempfile.mkdtemp()
 
-        cmd = ['ffmpeg', '-i', theFile, '-b:a', audioBit, '-ac', '2', '-ar',
+        cmd = [ffmpeg, '-i', theFile, '-b:a', audioBit, '-ac', '2', '-ar',
             str(SAMPLE_RATE), '-vn', f'{TEMP}/fastAud.wav']
         if(not verbose):
             cmd.extend(['-nostats', '-loglevel', '0'])
@@ -46,13 +46,13 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
 
         theFile = f'{TEMP}/fastAud.wav'
 
-    NEW_SPEED = [silentSpeed, soundedSpeed]
+    speeds = [silentSpeed, soundedSpeed]
 
     sampleRate, audioData = read(theFile)
     chunks = getAudioChunks(audioData, sampleRate, 30, silentT, 2, frameMargin)
 
     # Get the estimated length of the new audio in frames.
-    newL = getNewLength(chunks, NEW_SPEED, 30)
+    newL = getNewLength(chunks, speeds, 30)
 
     # Get the new length in samples with some extra leeway.
     estLeng = int((newL * sampleRate) * 1.5) + int(sampleRate * 2)
@@ -62,15 +62,13 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
 
     channels = 2
     yPointer = 0
-
-    # samples per frame
-    spf = int(sampleRate / 30)
+    spf = int(sampleRate / 30) # samples per frame
 
     for chunk in chunks:
         audioSampleStart = int(chunk[0] / 30 * sampleRate)
         audioSampleEnd = audioSampleStart + spf * (chunk[1] - chunk[0])
 
-        theSpeed = NEW_SPEED[chunk[2]]
+        theSpeed = speeds[chunk[2]]
 
         print(yPointer)
 
@@ -98,4 +96,3 @@ def fastAudio(theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit, ver
     if('TEMP' in locals()):
         rmtree(TEMP)
     return outFile
-

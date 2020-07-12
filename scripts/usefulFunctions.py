@@ -10,6 +10,7 @@ import numpy as np
 
 # Internal libraries
 import math
+import platform
 import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
@@ -88,7 +89,14 @@ def vidTracks(videoFile):
     """
     Return the number of audio tracks in a video file.
     """
-    cmd = ['ffprobe', videoFile, '-hide_banner', '-loglevel', 'panic',
+    if(platform.system() == 'Windows'):
+        ffporbe = 'scripts/win-ffmpeg/bin/ffprobe.exe'
+    elif(platform.system() == 'Darwin'):
+        ffprobe = 'scripts/unix-ffprobe'
+    else:
+        ffprobe = 'ffprobe'
+
+    cmd = [ffprobe, videoFile, '-hide_banner', '-loglevel', 'panic',
         '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
         'compact=p=0:nk=1']
 

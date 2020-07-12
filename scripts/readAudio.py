@@ -1,3 +1,6 @@
+'''scripts/readAudio.py'''
+
+# External library
 import numpy as np
 
 class ArrReader:
@@ -39,10 +42,6 @@ class ArrReader:
     def __enter__(self):
         return self
 
-    def __exit__(self, _1, _2, _3):
-        pass
-
-
 class ArrWriter:
     pointer = 0
 
@@ -69,6 +68,3 @@ class ArrWriter:
 
     def __enter__(self):
         return self
-
-    def __exit__(self, _1, _2, _3):
-        pass

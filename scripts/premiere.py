@@ -21,7 +21,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate,
+def exportToPremiere(ffmpeg, myInput, newOutput, silentT, zoomT, frameMargin, sampleRate,
     videoSpeed, silentSpeed):
     print('Running from premiere.py')
     TEMP = tempfile.mkdtemp()
@@ -29,7 +29,7 @@ def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate
     cap = cv2.VideoCapture(myInput)
     fps = round(cap.get(cv2.CAP_PROP_FPS))
 
-    cmd = ['ffmpeg', '-i', myInput, '-ab', '160k', '-ac', '2', '-ar',
+    cmd = [ffmpeg, '-i', myInput, '-ab', '160k', '-ac', '2', '-ar',
         str(sampleRate), '-vn', f'{TEMP}/output.wav', '-nostats', '-loglevel', '0']
     subprocess.call(cmd)
 

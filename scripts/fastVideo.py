@@ -20,7 +20,7 @@ import tempfile
 from shutil import rmtree
 from time import time
 
-def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
+def fastVideo(ffmpeg, videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     AUD_BITRATE, VERBOSE, cutByThisTrack, keepTracksSep):
 
     print('Running from fastVideo.py')
@@ -45,7 +45,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         sys.exit(1)
 
     for trackNumber in range(tracks):
-        cmd = ['ffmpeg', '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
+        cmd = [ffmpeg, '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
             str(SAMPLE_RATE),'-map', f'0:a:{trackNumber}', f'{TEMP}/{trackNumber}.wav']
         if(not VERBOSE):
             cmd.extend(['-nostats', '-loglevel', '0'])
@@ -121,7 +121,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     # Now mix new audio(s) and the new video.
 
     if(keepTracksSep):
-        cmd = ['ffmpeg', '-y']
+        cmd = [ffmpeg, '-y']
         for i in range(tracks):
             cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
         cmd.extend(['-i', f'{TEMP}/spedup.mp4']) # add input video
@@ -133,7 +133,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             cmd.extend(['-nostats', '-loglevel', '0'])
     else:
         if(tracks > 1):
-            cmd = ['ffmpeg']
+            cmd = [ffmpeg]
             for i in range(tracks):
                 cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
             cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
@@ -146,9 +146,9 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         else:
             os.rename(f'{TEMP}/new0.wav', f'{TEMP}/newAudioFile.wav')
 
-        cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/newAudioFile.wav', '-strict', '-2', '-i',
+        cmd = [ffmpeg, '-y', '-i', f'{TEMP}/newAudioFile.wav', '-i',
             f'{TEMP}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
-            outFile]
+            '-strict', '-2', outFile]
         if(not VERBOSE):
             cmd.extend(['-nostats', '-loglevel', '0'])
         else:
