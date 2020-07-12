@@ -129,15 +129,13 @@ def progressBar(index, total, beginTime, title='Please wait'):
         percentPerSec = (time() - beginTime) / percentDone
 
     newTime = prettyTime(beginTime + (percentPerSec * 100))
-    if(percentDone < 99.9):
-        bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
-        if(len(bar) > termsize - 2):
-            bar = bar[:termsize - 2]
-        else:
-            bar += ' ' * (termsize - len(bar) - 4)
-        try:
-            print(bar, end='\r', flush=True)
-        except UnicodeEncodeError:
-            print(f'   {percentDone}% done ETA {newTime}')
+
+    bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
+    if(len(bar) > termsize - 2):
+        bar = bar[:termsize - 2]
     else:
-        print('Finished process.' + (' ' * (termsize - 19)), end='\r', flush=True)
+        bar += ' ' * (termsize - len(bar) - 4)
+    try:
+        print(bar, end='\r', flush=True)
+    except UnicodeEncodeError:
+        print(f'   {percentDone}% done ETA {newTime}')

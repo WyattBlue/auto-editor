@@ -16,10 +16,11 @@ from scripts.wavfile import read, write
 # Internal libraries
 import os
 import sys
+import time
 import subprocess
 
 def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit,
-        verbose, silentSpeed, soundedSpeed, needConvert):
+        verbose, silentSpeed, soundedSpeed, needConvert, chunks=[], fps=30):
 
     if(not os.path.isfile(theFile)):
         print('Could not find file:', theFile)
@@ -49,10 +50,12 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
     speeds = [silentSpeed, soundedSpeed]
 
     sampleRate, audioData = read(theFile)
-    chunks = getAudioChunks(audioData, sampleRate, 30, silentT, 2, frameMargin)
+    if(chunks == []):
+        print('Creating chunks')
+        chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
 
     # Get the estimated length of the new audio in frames.
-    newL = getNewLength(chunks, speeds, 30)
+    newL = getNewLength(chunks, speeds, fps)
 
     # Get the new length in samples with some extra leeway.
     estLeng = int((newL * sampleRate) * 1.5) + int(sampleRate * 2)
@@ -62,15 +65,17 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
 
     channels = 2
     yPointer = 0
-    spf = int(sampleRate / 30) # samples per frame
 
-    for chunk in chunks:
-        audioSampleStart = int(chunk[0] / 30 * sampleRate)
-        audioSampleEnd = audioSampleStart + spf * (chunk[1] - chunk[0])
+    totalChunks = len(chunks)
+    beginTime = time.time()
+
+    print('samples per frame', sampleRate / 30)
+
+    for chunkNum, chunk in enumerate(chunks):
+        audioSampleStart = int(chunk[0] / fps * sampleRate)
+        audioSampleEnd = int(audioSampleStart + (sampleRate / fps) * (chunk[1] - chunk[0]))
 
         theSpeed = speeds[chunk[2]]
-
-        print(yPointer)
 
         if(theSpeed != 99999):
             spedChunk = audioData[audioSampleStart:audioSampleEnd]
@@ -89,6 +94,8 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
         else:
             # Speed is too high so skip this section.
             yPointerEnd = yPointer
+
+        progressBar(chunkNum, totalChunks, beginTime, title='Creating new audio')
 
     newAudio = newAudio[:yPointer]
     write(outFile, sampleRate, newAudio)
