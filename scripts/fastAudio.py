@@ -69,8 +69,6 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
     totalChunks = len(chunks)
     beginTime = time.time()
 
-    print('samples per frame', sampleRate / 30)
-
     for chunkNum, chunk in enumerate(chunks):
         audioSampleStart = int(chunk[0] / fps * sampleRate)
         audioSampleEnd = int(audioSampleStart + (sampleRate / fps) * (chunk[1] - chunk[0]))
@@ -97,6 +95,10 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
 
         progressBar(chunkNum, totalChunks, beginTime, title='Creating new audio')
 
+    if(verbose):
+        print('yPointer', yPointer)
+        print('samples per frame', sampleRate / fps)
+        print('Expected video length', yPointer / (sampleRate / fps))
     newAudio = newAudio[:yPointer]
     write(outFile, sampleRate, newAudio)
 

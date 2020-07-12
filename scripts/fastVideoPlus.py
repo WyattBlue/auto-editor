@@ -75,6 +75,7 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
     beginTime = time()
 
     remander = 0
+    framesWritten = 0
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -94,13 +95,20 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
                 doIt = 1 / mySpeed + remander
                 for __ in range(int(doIt)):
                     out.write(frame)
+                    framesWritten += 1
                 remander = doIt % 1
+        else:
+            if(verbose):
+                print('state is None')
 
         progressBar(cframe, totalFrames, beginTime, title='Creating new video')
 
     cap.release()
     out.release()
     cv2.destroyAllWindows()
+
+    if(verbose):
+        print('Frames written', framesWritten)
 
     first = videoFile[:videoFile.rfind('.')]
     extension = videoFile[videoFile.rfind('.'):]
