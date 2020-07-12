@@ -69,7 +69,7 @@ if(__name__ == '__main__'):
     advance = parser.add_argument_group('Advanced Options')
     advance.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    advance.add_argument('--zoom_threshold', type=float_type, default=2.00, metavar='',
+    advance.add_argument('--zoom_threshold', type=float_type, default=1.01, metavar='',
         help='set the volume that needs to be surpassed to zoom in the video. (0-1)')
     advance.add_argument('--combine_files', action='store_true',
         help='when using a folder as the input, combine all files in a folder before editing.')

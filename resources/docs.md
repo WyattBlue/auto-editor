@@ -123,7 +123,7 @@ short   | `-h`
 ## Advanced Options
 
 ### Zoom Threshold
-You can tell auto-editor to zoom in when the input's audio is above the loudness threshold. Auto-Editor will hold the zoom until there's a cut.
+You can tell auto-editor to zoom in when the input's audio is above the loudness threshold. Auto-Editor will hold the zoom until there's a cut. Setting this option to 101% or more will disable zooming.
 
 ```terminal
  $ python auto-editor.py example.mp4 --zoom_threshold 50%
@@ -132,8 +132,8 @@ You can tell auto-editor to zoom in when the input's audio is above the loudness
 Command | `--zoom_threshold`
 --------|---------------------
 type    | float_type
-range   | 0 to 1, 0% to 100%
-default | 2, 200%
+range   | 0 to 1.01, 0% to 101%
+default | 1.01, 101%
 
 Here is a side by side comparison between a video with no zoom, and a video with auto zoom.
 
@@ -320,9 +320,9 @@ default | 30
 
 
 ## Input
-Input is the only required argument for auto-editor. It supports video formats, audio formats, and URLs.
+Input is the only required argument for auto-editor. It supports video formats, audio formats, and URLs
 
-Here an example of using a URL as the input for auto-editor. You should always wrap the url around single quotes or double quotes.
+Here an example of using a URL as the input for auto-editor. You should always wrap the URL around single quotes or double quotes.
 
 ```terminal
  $ python auto-editor.py "https://www.youtube.com/watch?v=kcs82HnguGc"
