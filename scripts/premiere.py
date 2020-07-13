@@ -27,7 +27,8 @@ def exportToPremiere(ffmpeg, myInput, newOutput, silentT, zoomT, frameMargin, sa
     TEMP = tempfile.mkdtemp()
 
     cap = cv2.VideoCapture(myInput)
-    fps = round(cap.get(cv2.CAP_PROP_FPS))
+    #fps = round(cap.get(cv2.CAP_PROP_FPS))
+    fps = 29.97
 
     cmd = [ffmpeg, '-i', myInput, '-ab', '160k', '-ac', '2', '-ar',
         str(sampleRate), '-vn', f'{TEMP}/output.wav', '-nostats', '-loglevel', '0']
