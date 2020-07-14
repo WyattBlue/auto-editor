@@ -218,10 +218,10 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
 
     conwrite('')
 
-    newCuts = handleAudio(ffmpeg, tracks, CACHE, TEMP, silentT, frameMargin,
+    handleAudio(ffmpeg, tracks, CACHE, TEMP, silentT, frameMargin,
         SAMPLE_RATE, audioBit, verbose, SILENT_SPEED, VIDEO_SPEED, chunks, frameRate)
 
-    splitVideo(ffmpeg, newCuts, speeds, frameRate, zooms, samplesPerFrame,
+    splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
         SAMPLE_RATE, audioData, extension, verbose)
 
     if(BACK_MUS is not None):

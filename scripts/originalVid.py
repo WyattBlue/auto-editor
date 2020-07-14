@@ -36,18 +36,18 @@ def splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
     Renames = []
     lastExisting = None
     remander = 0
-    outputFrame = -1
-    framesWritten = 0
+    outputFrame = 0
+    print('given chunks', chunks)
 
     for chunk in chunks:
         for inputFrame in range(chunk[0], chunk[1]):
-            outputFrame += 1
 
-            src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
-            dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame+1), '.jpg'])
-
-            doIt = 1 / chunk[2] + remander
+            doIt = 1 / speeds[chunk[2]] + remander
             for __ in range(int(doIt)):
+                outputFrame += 1
+
+                src = ''.join([CACHE, '/frame{:06d}'.format(inputFrame+1), '.jpg'])
+                dst = ''.join([TEMP, '/newFrame{:06d}'.format(outputFrame), '.jpg'])
 
                 if(os.path.isfile(src)):
                     lastExisting = inputFrame
@@ -57,7 +57,7 @@ def splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
                         os.rename(src, dst)
                         Renames.extend([src, dst])
                 else:
-                    if(lastExisting == None):
+                    if(lastExisting is None):
                         raise IOError(f'Error! No existing frame exist.')
                     src = ''.join([CACHE, '/frame{:06d}'.format(lastExisting+1), '.jpg'])
                     if(os.path.isfile(src)):
@@ -82,6 +82,8 @@ def splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
     with open(f'{TEMP}/Renames.txt', 'w') as f:
         for item in Renames:
             f.write(f"{item}\n")
+
+    print('frames written', outputFrame)
 
     cmd = [ffmpeg, '-y', '-framerate', str(frameRate), '-i',
         f'{TEMP}/newFrame%06d.jpg', f'{TEMP}/output{extension}']

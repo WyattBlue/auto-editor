@@ -71,7 +71,7 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
             raise IOError('Error! Audio file not created.')
 
     out = cv2.VideoWriter(f'{TEMP}/spedup.mp4', fourcc, fps, (width, height))
-    totalFrames = chunks[len(chunks) - 1][1]
+    totalFrames = newCuts[len(newCuts) - 1][1]
     beginTime = time()
 
     remander = 0
@@ -84,25 +84,25 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
         state = None
-        for chunk in newCuts:
+        for chunk in newChunks:
             if(cframe >= chunk[0] and cframe <= chunk[1]):
                 state = chunk[2]
                 break
 
         if(state is not None):
             mySpeed = speeds[state]
-            print('mySpeed', mySpeed)
-            doIt = 1 / mySpeed + remander
-            print(doIt)
-            for __ in range(int(doIt)):
-                out.write(frame)
-                framesWritten += 1
-            remander = doIt % 1
+
+            if(mySpeed != 99999):
+                doIt = (1 / mySpeed) + remander
+                for __ in range(int(doIt)):
+                    out.write(frame)
+                    framesWritten += 1
+                remander = doIt % 1
         else:
             if(verbose):
-                print('state is None')
+                pass#print('state is None')
 
-        progressBar(cframe, totalFrames, beginTime, title='Creating new video')
+        #progressBar(cframe, totalFrames, beginTime, title='Creating new video')
 
     cap.release()
     out.release()
@@ -122,7 +122,7 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
         cmd = [ffmpeg, '-y']
         for i in range(tracks):
             cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
-        cmd.extend(['-i', f'{TEMP}/spedup.mp4']) # add input video
+        cmd.extend(['-i', f'{TEMP}/spedup.mp4'])
         for i in range(tracks):
             cmd.extend(['-map', f'{i}:a:0'])
         cmd.extend(['-map', f'{tracks}:v:0','-c:v', 'copy', '-movflags', '+faststart',
