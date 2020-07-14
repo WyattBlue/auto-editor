@@ -70,7 +70,7 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def formatAudio(INPUT_FILE, outputFile, sampleRate, bitrate, VERBOSE=False):
+def formatAudio(ffmpeg, INPUT_FILE, outputFile, sampleRate, bitrate, VERBOSE=False):
     cmd = [ffmpeg, '-i', INPUT_FILE, '-b:a', bitrate, '-ac', '2', '-ar', str(sampleRate),
      '-vn', outputFile]
     if(not VERBOSE):
@@ -78,7 +78,7 @@ def formatAudio(INPUT_FILE, outputFile, sampleRate, bitrate, VERBOSE=False):
     subprocess.call(cmd)
 
 
-def formatForPydub(INPUT_FILE, outputFile, SAMPLE_RATE):
+def formatForPydub(ffmpeg, INPUT_FILE, outputFile, SAMPLE_RATE):
     """
     This is old code and should be reviewed if it's necessary to convert the
     sound file bitrate to 192k. Converting to mp3 is definitely not nessary.
@@ -212,7 +212,7 @@ def originalMethod(ffmpeg, INPUT_FILE, OUTPUT_FILE, frameMargin, SILENT_THRESHOL
     if(NEW_TRAC is None):
         sampleRate, audioData = read(f'{CACHE}/{BASE_TRAC}.wav')
     else:
-        formatAudio(NEW_TRAC, f'{TEMP}/NEW_TRAC.wav', SAMPLE_RATE, '160k', VERBOSE)
+        formatAudio(ffmpeg, NEW_TRAC, f'{TEMP}/NEW_TRAC.wav', SAMPLE_RATE, '160k', VERBOSE)
         sampleRate, audioData = read(f'{TEMP}/NEW_TRAC.wav')
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
@@ -258,7 +258,8 @@ def originalMethod(ffmpeg, INPUT_FILE, OUTPUT_FILE, frameMargin, SILENT_THRESHOL
     p2.join()
 
     if(BACK_MUS is not None):
-        formatForPydub(f'{TEMP}/new{BASE_TRAC}.wav', TEMP+'/output.mp3', SAMPLE_RATE)
+        formatForPydub(ffmpeg, f'{TEMP}/new{BASE_TRAC}.wav', TEMP+'/output.mp3',
+            SAMPLE_RATE)
 
         vidSound = AudioSegment.from_file(TEMP+'/output.mp3')
 
