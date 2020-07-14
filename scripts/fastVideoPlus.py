@@ -12,7 +12,7 @@ from audiotsm import phasevocoder
 
 # Included functions
 from scripts.fastAudio import fastAudio
-from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
+from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks, conwrite
 from scripts.wavfile import read, write
 
 # Internal libraries
@@ -63,15 +63,15 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
 
     # Handle the Audio
     for trackNumber in range(tracks):
-        newCuts = fastAudio(ffmpeg, f'{TEMP}/{trackNumber}.wav',
-            f'{TEMP}/new{trackNumber}.wav', silentT, frameMargin, SAMPLE_RATE,
-            AUD_BITRATE, verbose, silentSpeed, videoSpeed, False, chunks=chunks, fps=fps)
+        fastAudio(ffmpeg, f'{TEMP}/{trackNumber}.wav', f'{TEMP}/new{trackNumber}.wav',
+            silentT, frameMargin, SAMPLE_RATE, AUD_BITRATE, verbose, silentSpeed,
+            videoSpeed, False, chunks=chunks, fps=fps)
 
         if(not os.path.isfile(f'{TEMP}/new{trackNumber}.wav')):
             raise IOError('Error! Audio file not created.')
 
     out = cv2.VideoWriter(f'{TEMP}/spedup.mp4', fourcc, fps, (width, height))
-    totalFrames = newCuts[len(newCuts) - 1][1]
+    totalFrames = chunks[len(chunks) - 1][1]
     beginTime = time()
 
     remander = 0
@@ -84,7 +84,7 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
         state = None
-        for chunk in newChunks:
+        for chunk in chunks:
             if(cframe >= chunk[0] and cframe <= chunk[1]):
                 state = chunk[2]
                 break
@@ -102,11 +102,13 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
             if(verbose):
                 pass#print('state is None')
 
-        #progressBar(cframe, totalFrames, beginTime, title='Creating new video')
+        progressBar(cframe, totalFrames, beginTime, title='Creating new video')
 
     cap.release()
     out.release()
     cv2.destroyAllWindows()
+
+    conwrite('')
 
     if(verbose):
         print('Frames written', framesWritten)
