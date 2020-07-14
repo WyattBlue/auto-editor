@@ -6,7 +6,6 @@ bit RAM intensive though.
 """
 
 # External libraries
-import cv2  # pip3 install opencv-python
 import numpy as np
 from audiotsm import phasevocoder
 
@@ -27,6 +26,10 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
     AUD_BITRATE, verbose, videoSpeed, silentSpeed, cutByThisTrack, keepTracksSep):
 
     print('Running from fastVideoPlus.py')
+
+    import cv2  # pip3 install opencv-python
+
+    conwrite('Reading audio.')
 
     if(not os.path.isfile(videoFile)):
         print('Could not find file:', videoFile)

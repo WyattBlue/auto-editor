@@ -5,7 +5,6 @@ This method supports making new videos without changing the speed.
 """
 
 # External libraries
-import cv2  # pip3 install opencv-python; this module takes a long time to "load"
 import numpy as np
 
 # Included functions
@@ -24,6 +23,10 @@ def fastVideo(ffmpeg, videoFile, outFile, silentThreshold, frameMargin, SAMPLE_R
     AUD_BITRATE, VERBOSE, cutByThisTrack, keepTracksSep):
 
     print('Running from fastVideo.py')
+
+    import cv2  # pip3 install opencv-python
+
+    conwrite('Reading audio.')
 
     if(not os.path.isfile(videoFile)):
         print('Could not find file:', videoFile)
@@ -101,7 +104,7 @@ def fastVideo(ffmpeg, videoFile, outFile, silentThreshold, frameMargin, SAMPLE_R
         progressBar(cframe, totalFrames, beginTime)
 
     # finish audio
-    conwrite('  Writing the output file.')
+    conwrite('Writing the output file.')
     for i, newData in enumerate(newAudios):
         newData = newData[:yPointer]
         write(f'{TEMP}/new{i}.wav', sampleRate, newData)

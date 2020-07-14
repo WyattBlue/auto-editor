@@ -161,7 +161,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
                 tracks = 1
 
             # Now deal with the video.
-            conwrite('  Splitting video into jpgs. (This can take a while)')
+            conwrite('Splitting video into jpgs. (This can take a while)')
             cmd = [ffmpeg]
             if(HWACCEL is not None):
                 cmd.extend(['-hwaccel', HWACCEL])

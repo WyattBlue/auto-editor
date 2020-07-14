@@ -115,8 +115,8 @@ def vidTracks(videoFile):
 
 
 def conwrite(message):
-    numSpaces = get_terminal_size().columns - len(message) - 1
-    print(message + ' ' * numSpaces, end='\r', flush=True)
+    numSpaces = get_terminal_size().columns - len(message) - 3
+    print('  ' + message + ' ' * numSpaces, end='\r', flush=True)
 
 
 def progressBar(index, total, beginTime, title='Please wait'):

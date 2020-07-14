@@ -1,5 +1,14 @@
 # Auto-Editor Change Log
 
+## Version 20w29a
+* ffmpeg binaries are included in auto-editor.
+* desyncing issue when video speed is set is fixed.
+* video cutting off prematurely is fixed.
+* originalMethod changed so that it uses modern code and functions.
+* `--frame_rate` flag has been removed.
+* Changelog added.
+
+
 ## Version 20w28a
 
 * **Percentage** units are now supported.
