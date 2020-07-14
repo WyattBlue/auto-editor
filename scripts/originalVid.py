@@ -1,8 +1,6 @@
 '''originalVid.py'''
 
 import numpy as np
-from audiotsm import phasevocoder
-from audiotsm.io.wav import WavReader, WavWriter
 from PIL import Image
 
 from scripts.wavfile import read, write
@@ -37,7 +35,6 @@ def splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
     lastExisting = None
     remander = 0
     outputFrame = 0
-    print('given chunks', chunks)
 
     for chunk in chunks:
         for inputFrame in range(chunk[0], chunk[1]):

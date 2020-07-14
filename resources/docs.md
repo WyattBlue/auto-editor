@@ -11,7 +11,6 @@
   - [Options for Cutting](#Options-for-Cutting)
   - [Options for Debugging](#Options-for-Debugging)
   - [Options That Completely Change What Auto-Editor Does](#Options-That-Completely-Change-What-Auto-Editor-Does)
-  - [Deprecated Options](#Deprecated-Options)
   - [Input](#Input)
 
 
@@ -306,17 +305,6 @@ Export To Premiere makes a XML file that can be imported to Adobe Premiere Pro i
 Command | `--export_to_premiere`
 --------|---------------------
 type    | flag
-
-## Deprecated Options
-
-### Frame Rate
-Frame Rate tells auto-editor what the frame rate is for the video. This is depreciated since auto-editor can automatically detect the frame rate and the user provided number is largely ignored.
-
-Command | `--frame_rate`
---------|---------------------
-type    | float
-range   | 0 to Infinity
-default | 30
 
 
 ## Input
