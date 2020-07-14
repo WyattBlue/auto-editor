@@ -9,7 +9,7 @@ import cv2  # pip3 install opencv-python; this module takes a long time to "load
 import numpy as np
 
 # Included functions
-from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
+from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks, conwrite
 from scripts.wavfile import read, write
 
 # Internal libraries
@@ -101,6 +101,7 @@ def fastVideo(ffmpeg, videoFile, outFile, silentThreshold, frameMargin, SAMPLE_R
         progressBar(cframe, totalFrames, beginTime)
 
     # finish audio
+    conwrite('  Writing the output file.')
     for i, newData in enumerate(newAudios):
         newData = newData[:yPointer]
         write(f'{TEMP}/new{i}.wav', sampleRate, newData)
@@ -156,5 +157,6 @@ def fastVideo(ffmpeg, videoFile, outFile, silentThreshold, frameMargin, SAMPLE_R
         subprocess.call(cmd)
 
     rmtree(TEMP)
+    conwrite('')
 
     return outFile

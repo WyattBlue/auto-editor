@@ -100,7 +100,7 @@ def vidTracks(videoFile):
         '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
         'compact=p=0:nk=1']
 
-    # read what ffprobe piped in
+    # Read what ffprobe piped in.
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
@@ -112,6 +112,11 @@ def vidTracks(videoFile):
     except ValueError:
         print('Warning: ffprobe had an invalid output.')
         return 1
+
+
+def conwrite(message):
+    numSpaces = get_terminal_size().columns - len(message) - 1
+    print(message + ' ' * numSpaces, end='\r', flush=True)
 
 
 def progressBar(index, total, beginTime, title='Please wait'):

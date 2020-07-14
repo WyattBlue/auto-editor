@@ -19,14 +19,6 @@ version = '20w28a'
 TEMP = '.TEMP'
 CACHE = '.CACHE'
 
-def getFrameRate(path):
-    process = subprocess.Popen([ffmpeg, '-i', path],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    output = stdout.decode()
-    matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
-    return float(matchDict['fps'])
-
 def file_type(file):
     if(not os.path.isfile(file)):
         print('Could not locate file:', file)
@@ -101,6 +93,8 @@ if(__name__ == '__main__'):
         help='display more information when running.')
     debug.add_argument('--clear_cache', action='store_true',
         help='delete the cache folder and all its contents.')
+    debug.add_argument('--my_ffmpeg', action='store_true',
+        help='use your ffmpeg and other binaries instead of the ones packaged.')
     debug.add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
     debug.add_argument('--debug', action='store_true',
@@ -112,9 +106,7 @@ if(__name__ == '__main__'):
     misc.add_argument('--export_to_premiere', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of outputting a video.')
 
-    dep = parser.add_argument_group('Deprecated Options')
-    dep.add_argument('--frame_rate', '-f', type=float, metavar='',
-        help='manually set the frame rate (fps) of the input video.')
+    #dep = parser.add_argument_group('Deprecated Options')
 
     args = parser.parse_args()
 
@@ -127,9 +119,10 @@ if(__name__ == '__main__'):
         print('Auto-Editor Version:', version)
         sys.exit()
 
-    if(platform.system() == 'Windows'):
+    # Set the file path to the ffmpeg installation.
+    if(platform.system() == 'Windows' and not args.my_ffmpeg):
         ffmpeg = 'scripts/win-ffmpeg/bin/ffmpeg.exe'
-    elif(platform.system() == 'Darwin'):
+    elif(platform.system() == 'Darwin' and not args.my_ffmpeg):
         ffmpeg = 'scripts/unix-ffmpeg'
     else:
         ffmpeg = 'ffmpeg'
@@ -160,7 +153,7 @@ if(__name__ == '__main__'):
         args.video_speed = 99999
 
     if(os.path.isdir(INPUT_FILE)):
-        # get the file path and date modified so that it can be sorted later.
+        # Get the file path and date modified so that it can be sorted later.
         INPUTS = []
         for filename in os.listdir(INPUT_FILE):
             if(not filename.startswith('.')):
@@ -172,8 +165,7 @@ if(__name__ == '__main__'):
 
         # Sort the list by the key 'time'.
         newlist = sorted(INPUTS, key=itemgetter('time'), reverse=False)
-
-        # then reduce to a list that only has strings.
+        # Then reduce to a list that only has strings.
         INPUTS = []
         for item in newlist:
             INPUTS.append(item['file'])
@@ -207,7 +199,7 @@ if(__name__ == '__main__'):
         if(os.path.isfile(INPUT_FILE)):
             INPUTS = [INPUT_FILE]
         elif(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
-            # If input is a URL, download as mp4 with youtube-dl.
+            # If input is a URL, download as a mp4 with youtube-dl.
             print('URL detected, using youtube-dl to download from webpage.')
             basename = re.sub(r'\W+', '-', INPUT_FILE)
             cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
@@ -250,17 +242,22 @@ if(__name__ == '__main__'):
             continue
         else:
             try:
-                frameRate = getFrameRate(INPUT_FILE)
+                path = INPUT_FILE
+                process = subprocess.Popen([ffmpeg, '-i', path],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                stdout, __ = process.communicate()
+                output = stdout.decode()
+                matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
+                __ = float(matchDict['fps'])
             except AttributeError:
                 print('Warning! frame rate detection failed.')
                 print('If your video has a variable frame rate, ignore this message.')
-                # convert frame rate to 30 or a user defined value
-                if(args.frame_rate is None):
-                    frameRate = 30
-                else:
-                    frameRate = args.frame_rate
 
-                cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps={frameRate}',
+                # Auto-Editor wouldn't work if the video has a variable framerate, so
+                # it needs to make a video with a constant framerate and use that for
+                # it's input instead.
+
+                cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
                     TEMP+'/constantVid'+extension, '-hide_banner']
                 if(not args.verbose):
                     cmd.extend(['-nostats', '-loglevel', '0'])
@@ -268,7 +265,7 @@ if(__name__ == '__main__'):
                 INPUT_FILE = TEMP+'/constantVid'+extension
 
         if(args.background_music is None and args.background_volume != -8):
-            print('Warning! Background volume specified even though no background music was provided.')
+            print('Warning! Background volume specified even though no music was provided.')
 
         if(args.export_to_premiere):
             from scripts.premiere import exportToPremiere
@@ -278,7 +275,7 @@ if(__name__ == '__main__'):
                 args.sample_rate, args.video_speed, args.silent_speed)
             continue
 
-        if(args.background_music is None and args.zoom_threshold == 2
+        if(args.background_music is None and args.zoom_threshold > 1
             and args.cut_by_this_audio == None and args.hardware_accel is None):
 
             if(args.silent_speed == 99999 and args.video_speed == 1):
@@ -297,9 +294,9 @@ if(__name__ == '__main__'):
         else:
             from scripts.originalMethod import originalMethod
 
-            outFile = originalMethod(INPUT_FILE, newOutput, args.frame_rate,
-                args.frame_margin, args.silent_threshold, args.zoom_threshold,
-                args.sample_rate, args.audio_bitrate, args.silent_speed, args.video_speed,
+            outFile = originalMethod(ffmpeg, INPUT_FILE, newOutput, args.frame_margin,
+                args.silent_threshold, args.zoom_threshold, args.sample_rate,
+                args.audio_bitrate, args.silent_speed, args.video_speed,
                 args.keep_tracks_seperate, args.background_music, args.background_volume,
                 args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
                 args.verbose, args.hardware_accel)

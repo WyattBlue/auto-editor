@@ -31,8 +31,8 @@ def resize(inputFile, outputFile, size):
     cropped_im.save(outputFile)
 
 
-def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE,
-    audioData, extension, VERBOSE):
+def splitVideo(ffmpeg, chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame,
+    SAMPLE_RATE, audioData, extension, VERBOSE):
     """
     This function is responsible for outputting a new image sequence in the correct order.
 
@@ -89,7 +89,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                 else:
                     if(lastExisting == None):
                         print(src + ' does not exist.')
-                        raise IOError(f'Fatal Error! No existing frame exist.')
+                        raise IOError(f'Error! No existing frame exist.')
                     src = ''.join([CACHE, '/frame{:06d}'.format(lastExisting+1), '.jpg'])
                     if(os.path.isfile(src)):
                         if(lastExisting in zooms):
@@ -108,9 +108,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
                             copyfile(myFile, dst)
                         else:
                             raise IOError(f'Error! The file {src} does not exist.')
-
             outputPointer = endPointer
-
         num += 1
         if(num % 10 == 0):
             print(''.join([str(num), '/', chunk_len, ' frame chunks done.']))
@@ -121,7 +119,7 @@ def splitVideo(chunks, NEW_SPEED, frameRate, zooms, samplesPerFrame, SAMPLE_RATE
             f.write(f"{item}\n")
 
     print('Creating finished video. (This can take a while)')
-    cmd = ['ffmpeg', '-y', '-framerate', str(frameRate), '-i',
+    cmd = [ffmpeg, '-y', '-framerate', str(frameRate), '-i',
         f'{TEMP}/newFrame%06d.jpg', f'{TEMP}/output{extension}']
     if(not VERBOSE):
         cmd.extend(['-nostats', '-loglevel', '0'])
