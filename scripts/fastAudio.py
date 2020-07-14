@@ -69,6 +69,8 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
     totalChunks = len(chunks)
     beginTime = time.time()
 
+    newCuts = []
+
     for chunkNum, chunk in enumerate(chunks):
         audioSampleStart = int(chunk[0] / fps * sampleRate)
         audioSampleEnd = int(audioSampleStart + (sampleRate / fps) * (chunk[1] - chunk[0]))
@@ -89,6 +91,11 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
             newAudio[yPointer:yPointerEnd] = spedupAudio
 
             yPointer = yPointerEnd
+
+            newEnd = chunk[0] + (spedupAudio.shape[0] /
+                (sampleRate / fps))
+
+            newCuts.append([chunk[0], int(newEnd), chunk[2]])
         else:
             # Speed is too high so skip this section.
             yPointerEnd = yPointer
@@ -104,4 +111,8 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
 
     if('TEMP' in locals()):
         rmtree(TEMP)
-    return outFile
+
+    if(needConvert):
+        return outFile
+    else:
+        return newCuts

@@ -63,9 +63,9 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
 
     # Handle the Audio
     for trackNumber in range(tracks):
-        fastAudio(ffmpeg, f'{TEMP}/{trackNumber}.wav', f'{TEMP}/new{trackNumber}.wav',
-            silentT, frameMargin, SAMPLE_RATE, AUD_BITRATE, verbose, silentSpeed,
-            videoSpeed, False, chunks=chunks, fps=fps)
+        newCuts = fastAudio(ffmpeg, f'{TEMP}/{trackNumber}.wav',
+            f'{TEMP}/new{trackNumber}.wav', silentT, frameMargin, SAMPLE_RATE,
+            AUD_BITRATE, verbose, silentSpeed, videoSpeed, False, chunks=chunks, fps=fps)
 
         if(not os.path.isfile(f'{TEMP}/new{trackNumber}.wav')):
             raise IOError('Error! Audio file not created.')
@@ -84,19 +84,20 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
         state = None
-        for chunk in chunks:
+        for chunk in newCuts:
             if(cframe >= chunk[0] and cframe <= chunk[1]):
                 state = chunk[2]
                 break
 
         if(state is not None):
             mySpeed = speeds[state]
-            if(mySpeed != 99999):
-                doIt = 1 / mySpeed + remander
-                for __ in range(int(doIt)):
-                    out.write(frame)
-                    framesWritten += 1
-                remander = doIt % 1
+            print('mySpeed', mySpeed)
+            doIt = 1 / mySpeed + remander
+            print(doIt)
+            for __ in range(int(doIt)):
+                out.write(frame)
+                framesWritten += 1
+            remander = doIt % 1
         else:
             if(verbose):
                 print('state is None')
