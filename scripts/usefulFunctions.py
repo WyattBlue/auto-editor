@@ -10,9 +10,19 @@ import numpy as np
 
 # Internal libraries
 import math
+import platform
 import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
+
+def getNewLength(chunks, speeds, fps):
+    timeInFrames = 0
+    for chunk in chunks:
+        leng = chunk[1] - chunk[0]
+        if(speeds[chunk[2]] < 99999):
+            timeInFrames += leng * (1 / speeds[chunk[2]])
+    return timeInFrames / fps
+
 
 def getMaxVolume(s):
     maxv = float(np.max(s))
@@ -79,11 +89,18 @@ def vidTracks(videoFile):
     """
     Return the number of audio tracks in a video file.
     """
-    cmd = ['ffprobe', videoFile, '-hide_banner', '-loglevel', 'panic',
+    if(platform.system() == 'Windows'):
+        ffporbe = 'scripts/win-ffmpeg/bin/ffprobe.exe'
+    elif(platform.system() == 'Darwin'):
+        ffprobe = 'scripts/unix-ffprobe'
+    else:
+        ffprobe = 'ffprobe'
+
+    cmd = [ffprobe, videoFile, '-hide_banner', '-loglevel', 'panic',
         '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
         'compact=p=0:nk=1']
 
-    # read what ffprobe piped in
+    # Read what ffprobe piped in.
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
@@ -95,6 +112,11 @@ def vidTracks(videoFile):
     except ValueError:
         print('Warning: ffprobe had an invalid output.')
         return 1
+
+
+def conwrite(message):
+    numSpaces = get_terminal_size().columns - len(message) - 3
+    print('  ' + message + ' ' * numSpaces, end='\r', flush=True)
 
 
 def progressBar(index, total, beginTime, title='Please wait'):
@@ -112,15 +134,13 @@ def progressBar(index, total, beginTime, title='Please wait'):
         percentPerSec = (time() - beginTime) / percentDone
 
     newTime = prettyTime(beginTime + (percentPerSec * 100))
-    if(percentDone < 99.9):
-        bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
-        if(len(bar) > termsize - 2):
-            bar = bar[:termsize - 2]
-        else:
-            bar += ' ' * (termsize - len(bar) - 4)
-        try:
-            print(bar, end='\r', flush=True)
-        except UnicodeEncodeError:
-            print(f'   {percentDone}% done ETA {newTime}')
+
+    bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
+    if(len(bar) > termsize - 2):
+        bar = bar[:termsize - 2]
     else:
-        print('Finished.' + (' ' * (termsize - 11)), end='\r', flush=True)
+        bar += ' ' * (termsize - len(bar) - 4)
+    try:
+        print(bar, end='\r', flush=True)
+    except UnicodeEncodeError:
+        print(f'   {percentDone}% done ETA {newTime}')

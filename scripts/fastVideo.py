@@ -5,11 +5,10 @@ This method supports making new videos without changing the speed.
 """
 
 # External libraries
-import cv2  # pip3 install opencv-python; this module takes a long time to "load"
 import numpy as np
 
 # Included functions
-from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks
+from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks, conwrite
 from scripts.wavfile import read, write
 
 # Internal libraries
@@ -20,10 +19,14 @@ import tempfile
 from shutil import rmtree
 from time import time
 
-def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
+def fastVideo(ffmpeg, videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     AUD_BITRATE, VERBOSE, cutByThisTrack, keepTracksSep):
 
     print('Running from fastVideo.py')
+
+    import cv2  # pip3 install opencv-python
+
+    conwrite('Reading audio.')
 
     if(not os.path.isfile(videoFile)):
         print('Could not find file:', videoFile)
@@ -35,17 +38,18 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    fps = round(cap.get(cv2.CAP_PROP_FPS))
+    fps = cap.get(cv2.CAP_PROP_FPS)
 
     tracks = vidTracks(videoFile)
 
     if(cutByThisTrack >= tracks):
         print("Error: You choose a track that doesn't exist.")
         print(f'There are only {tracks-1} tracks. (starting from 0)')
-        sys.exit()
+        sys.exit(1)
+
     for trackNumber in range(tracks):
-        cmd = ['ffmpeg', '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
-        str(SAMPLE_RATE),'-map', f'0:a:{trackNumber}', f'{TEMP}/{trackNumber}.wav']
+        cmd = [ffmpeg, '-i', videoFile, '-ab', AUD_BITRATE, '-ac', '2', '-ar',
+            str(SAMPLE_RATE),'-map', f'0:a:{trackNumber}', f'{TEMP}/{trackNumber}.wav']
         if(not VERBOSE):
             cmd.extend(['-nostats', '-loglevel', '0'])
         else:
@@ -76,8 +80,6 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
 
-        currentTime = cframe / fps
-
         state = None
         for chunk in chunks:
             if(cframe >= chunk[0] and cframe <= chunk[1]):
@@ -87,8 +89,8 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         if(state == 1):
             out.write(frame)
 
-            audioSampleStart = int(currentTime * sampleRate)
-            audioSampleEnd = audioSampleStart + (sampleRate // fps)
+            audioSampleStart = int((cframe / fps) * sampleRate)
+            audioSampleEnd = int(audioSampleStart + sampleRate / fps)
 
             # handle audio tracks
             for i, oneAudioData in enumerate(oldAudios):
@@ -102,6 +104,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
         progressBar(cframe, totalFrames, beginTime)
 
     # finish audio
+    conwrite('Writing the output file.')
     for i, newData in enumerate(newAudios):
         newData = newData[:yPointer]
         write(f'{TEMP}/new{i}.wav', sampleRate, newData)
@@ -122,7 +125,7 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
     # Now mix new audio(s) and the new video.
 
     if(keepTracksSep):
-        cmd = ['ffmpeg', '-y']
+        cmd = [ffmpeg, '-y']
         for i in range(tracks):
             cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
         cmd.extend(['-i', f'{TEMP}/spedup.mp4']) # add input video
@@ -134,24 +137,29 @@ def fastVideo(videoFile, outFile, silentThreshold, frameMargin, SAMPLE_RATE,
             cmd.extend(['-nostats', '-loglevel', '0'])
     else:
         if(tracks > 1):
-            cmd = ['ffmpeg']
+            cmd = [ffmpeg]
             for i in range(tracks):
                 cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
             cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
                 f'{TEMP}/newAudioFile.wav'])
             if(not VERBOSE):
                 cmd.extend(['-nostats', '-loglevel', '0'])
+            else:
+                cmd.extend(['-hide_banner'])
             subprocess.call(cmd)
         else:
             os.rename(f'{TEMP}/new0.wav', f'{TEMP}/newAudioFile.wav')
 
-        cmd = ['ffmpeg', '-y', '-i', f'{TEMP}/newAudioFile.wav', '-i',
+        cmd = [ffmpeg, '-y', '-i', f'{TEMP}/newAudioFile.wav', '-i',
             f'{TEMP}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
-            outFile]
+            '-strict', '-2', outFile]
         if(not VERBOSE):
             cmd.extend(['-nostats', '-loglevel', '0'])
+        else:
+            cmd.extend(['-hide_banner'])
         subprocess.call(cmd)
 
     rmtree(TEMP)
+    conwrite('')
 
     return outFile
