@@ -6,9 +6,6 @@ This script's purpose is to export an XML file that can be imported by Adobe Pre
 It doesn't support zooming in yet.
 """
 
-# External libraries
-import cv2
-
 # Included functions
 from scripts.usefulFunctions import getAudioChunks
 from scripts.wavfile import read, write
@@ -21,15 +18,14 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-def exportToPremiere(myInput, newOutput, silentT, zoomT, frameMargin, sampleRate,
+def exportToPremiere(ffmpeg, myInput, newOutput, silentT, zoomT, frameMargin, sampleRate,
     videoSpeed, silentSpeed):
     print('Running from premiere.py')
     TEMP = tempfile.mkdtemp()
 
-    cap = cv2.VideoCapture(myInput)
-    fps = round(cap.get(cv2.CAP_PROP_FPS))
+    fps = 29.97
 
-    cmd = ['ffmpeg', '-i', myInput, '-ab', '160k', '-ac', '2', '-ar',
+    cmd = [ffmpeg, '-i', myInput, '-ab', '160k', '-ac', '2', '-ar',
         str(sampleRate), '-vn', f'{TEMP}/output.wav', '-nostats', '-loglevel', '0']
     subprocess.call(cmd)
 

@@ -1,3 +1,6 @@
+'''scripts/readAudio.py'''
+
+# External library
 import numpy as np
 
 class ArrReader:
