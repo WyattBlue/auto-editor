@@ -5,9 +5,9 @@
   <img src="/resources/auto-editor_banner.png" width="800">
 </p>
 
-<h1 align="center"> Auto-Editor</h1>
-Auto-Editor is a command line application program for automatically editing **video or audio**.
-It works by analyzing the video's audio to detect when a section needs to be cut or kept in, then it runs a subprocess called ffmpeg to create the new video.
+
+<h2>Auto-Editor is a command line application for automatically editing **video or audio**.
+It works by analyzing the video's audio to detect when a section needs to be cut or kept in.</h2>
 
 ### Usage
 
