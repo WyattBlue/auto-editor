@@ -5,6 +5,13 @@
 *.webm
 *.xml
 
+__pycache__/
+*.py[cod]
+*$py.class
+
+build/
+dist/
+
 # Compiled source
 *.dll
 *.exe
@@ -20,57 +27,19 @@
 .DS_Store
 .DS_Store?
 ._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
 
 # Other
 *.pyc
 *.pyo
 *~
-*#
-*.bak
-*.swp
-*.ai
-*.eps
-*.psd
 
-# Python
-
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
 
 MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
 .pybuilder/
-target/
 
 __pypackages__/
 
@@ -91,12 +60,6 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
 
 # Cython debug symbols
 cython_debug/
