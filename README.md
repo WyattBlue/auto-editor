@@ -43,6 +43,8 @@ Run `pip3 install -r requirements.txt`
 The binaries you'll need are already installed, unless you're using Linux.
 Linux users need to run this command. `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
 
+(If you would like to use your own ffmpeg, add the flag `--my_ffmpeg` when using auto-editor)
+
 
 Now run it with the example video to make sure it is working.
 

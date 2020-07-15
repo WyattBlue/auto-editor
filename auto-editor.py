@@ -13,7 +13,7 @@ from shutil import rmtree
 from datetime import timedelta
 from operator import itemgetter
 
-version = '20w29a'
+version = '20w29b'
 
 # Files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
@@ -110,15 +110,6 @@ if(__name__ == '__main__'):
 
     args = parser.parse_args()
 
-    if(args.debug):
-        is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
-        print('Python Version:', platform.python_version(), is64bit)
-        # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
-        # more here: https://docs.python.org/3/library/platform.html#platform.system
-        print('Platform:', platform.system())
-        print('Auto-Editor Version:', version)
-        sys.exit()
-
     # Set the file path to the ffmpeg installation.
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
         ffmpeg = 'scripts/win-ffmpeg/bin/ffmpeg.exe'
@@ -126,6 +117,17 @@ if(__name__ == '__main__'):
         ffmpeg = 'scripts/unix-ffmpeg'
     else:
         ffmpeg = 'ffmpeg'
+
+    if(args.debug):
+        is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
+        print('Python Version:', platform.python_version(), is64bit)
+        # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
+        # more here: https://docs.python.org/3/library/platform.html#platform.system
+        print('Platform:', platform.system())
+        print('FFmpeg:', ffmpeg)
+        print('Auto-Editor Version:', version)
+        if(args.input == []):
+            sys.exit()
 
     if(args.version):
         print('Auto-Editor version:', version)

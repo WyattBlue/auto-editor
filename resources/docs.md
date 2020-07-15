@@ -270,6 +270,18 @@ Command | `--version`
 --------|---------------------
 type    | flag
 
+
+### My FFmpeg
+Use your own ffmpeg instead of the one's provided.
+
+```terminal
+ $ python auto-editor.py example.mp4 --my_ffmpeg
+```
+
+Command | `--my_ffmpeg`
+--------|---------------------
+type    | flag
+
 ### Debug
 Debug will get debug information regarding auto-editor, including your python version, whether the your python is 64-bit or not, and the current version.
 

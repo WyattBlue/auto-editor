@@ -85,7 +85,7 @@ def prettyTime(newTime):
     return f'{hours:02}:{minutes:02} {ampm}'
 
 
-def vidTracks(videoFile):
+def vidTracks(videoFile, myffmpeg):
     """
     Return the number of audio tracks in a video file.
     """
