@@ -260,11 +260,11 @@ if(__name__ == '__main__'):
                 # it's input instead.
 
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
-                    TEMP+'/constantVid'+extension, '-hide_banner']
+                    f'{TEMP}/constantVid{extension}', '-hide_banner']
                 if(not args.verbose):
                     cmd.extend(['-nostats', '-loglevel', '0'])
                 subprocess.call(cmd)
-                INPUT_FILE = TEMP+'/constantVid'+extension
+                INPUT_FILE = f'{TEMP}/constantVid{extension}'
 
         if(args.background_music is None and args.background_volume != -8):
             print('Warning! Background volume specified even though no music was provided.')
@@ -303,7 +303,7 @@ if(__name__ == '__main__'):
                 args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
                 args.verbose, args.hardware_accel)
 
-    print('Finished.        ')
+    print('Finished.')
     timeLength = round(time.time() - startTime, 2)
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')

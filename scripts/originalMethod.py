@@ -132,7 +132,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
 
     if(not SKIP):
         # Videos can have more than one audio track os we need to extract them all.
-        tracks = vidTracks(vidFile)
+        tracks = vidTracks(vidFile, ffmpeg)
 
         if(BASE_TRAC >= tracks):
             print("Error! You choose a track that doesn't exist.")

@@ -85,24 +85,26 @@ def prettyTime(newTime):
     return f'{hours:02}:{minutes:02} {ampm}'
 
 
-def vidTracks(videoFile, myffmpeg):
+def vidTracks(videoFile, ffmpeg):
     """
     Return the number of audio tracks in a video file.
     """
-    if(platform.system() == 'Windows'):
-        ffporbe = 'scripts/win-ffmpeg/bin/ffprobe.exe'
-    elif(platform.system() == 'Darwin'):
-        ffprobe = 'scripts/unix-ffprobe'
-    else:
+    if(ffmpeg == 'ffmpeg'):
         ffprobe = 'ffprobe'
+    else:
+        if(platform.system() == 'Windows'):
+            ffporbe = 'scripts/win-ffmpeg/bin/ffprobe.exe'
+        elif(platform.system() == 'Darwin'):
+            ffprobe = 'scripts/unix-ffprobe'
+        else:
+            ffprobe = 'ffprobe'
 
     cmd = [ffprobe, videoFile, '-hide_banner', '-loglevel', 'panic',
         '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
         'compact=p=0:nk=1']
 
     # Read what ffprobe piped in.
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     output = stdout.decode()
     numbers = output.split('\n')
