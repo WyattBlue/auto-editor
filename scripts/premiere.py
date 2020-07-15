@@ -2,8 +2,6 @@
 
 """
 This script's purpose is to export an XML file that can be imported by Adobe Premiere.
-
-It doesn't support zooming in yet.
 """
 
 # Included functions

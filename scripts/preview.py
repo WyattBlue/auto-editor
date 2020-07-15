@@ -27,7 +27,7 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
     cap = cv2.VideoCapture(myInput)
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    tracks = vidTracks(myInput)
+    tracks = vidTracks(myInput, ffmpeg)
 
     if(cutByThisTrack >= tracks):
         print("Error: You choose a track that doesn't exist.")
