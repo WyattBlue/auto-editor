@@ -110,13 +110,22 @@ if(__name__ == '__main__'):
 
     args = parser.parse_args()
 
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+    print(os.path.isfile('scripts/unix-ffmpeg'))
+
+    ffmpeg = 'ffmpeg'
     # Set the file path to the ffmpeg installation.
-    if(platform.system() == 'Windows' and not args.my_ffmpeg):
-        ffmpeg = 'scripts/win-ffmpeg/bin/ffmpeg.exe'
-    elif(platform.system() == 'Darwin' and not args.my_ffmpeg):
-        ffmpeg = 'scripts/unix-ffmpeg'
-    else:
-        ffmpeg = 'ffmpeg'
+    if(platform.system() == 'Windows' and not args.my_ffmpeg
+        and os.path.isfile(os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe'))):
+
+        ffmpeg = os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe')
+
+    if(platform.system() == 'Darwin' and not args.my_ffmpeg
+        and os.path.isfile(os.path.join(dirPath, 'scripts/unix-ffmpeg'))):
+
+        ffmpeg = os.path.join(dirPath, 'scripts/unix-ffmpeg')
+
+    print(ffmpeg)
 
     if(args.debug):
         is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'

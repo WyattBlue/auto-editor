@@ -9,8 +9,6 @@ put here. No code here should make or delete files.
 import numpy as np
 
 # Internal libraries
-import math
-import platform
 import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
@@ -31,6 +29,8 @@ def getMaxVolume(s):
 
 
 def getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin):
+    import math
+
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
 
@@ -89,13 +89,18 @@ def vidTracks(videoFile, ffmpeg):
     """
     Return the number of audio tracks in a video file.
     """
+    import os
+    import platform
+
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+
     if(ffmpeg == 'ffmpeg'):
         ffprobe = 'ffprobe'
     else:
         if(platform.system() == 'Windows'):
-            ffporbe = 'scripts/win-ffmpeg/bin/ffprobe.exe'
+            ffporbe = os.path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
         elif(platform.system() == 'Darwin'):
-            ffprobe = 'scripts/unix-ffprobe'
+            ffprobe = os.path.join(dirPath, 'unix-ffprobe')
         else:
             ffprobe = 'ffprobe'
 
