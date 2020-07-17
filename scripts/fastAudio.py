@@ -7,9 +7,9 @@ This script is for handling audio files ONLY.
 # External libraries
 import numpy as np
 from audiotsm2 import phasevocoder
+from audiotsm2.io.array import ArrReader, ArrWriter
 
 # Included functions
-from scripts.readAudio import ArrReader, ArrWriter
 from scripts.usefulFunctions import getAudioChunks, progressBar, getNewLength
 from scripts.wavfile import read, write
 
