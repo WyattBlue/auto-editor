@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w29a
+ &nbsp;&nbsp;<sup>version 20w29b
 
 <p align="center">
   <img src="/resources/auto-editor_banner.png" width="700">
@@ -15,7 +15,6 @@
 [See the Changelog](CHANGELOGmd) for all the differences between releases.
 
 ## Usage
-
 Create an edited version of example.mp4 with the default parameters.
 ```terminal
  $ python auto-editor.py example.mp4
@@ -31,7 +30,6 @@ There are many more features in auto-editor, including **adding in background mu
 
 
 ## Installing Auto-Editor
-
 Download and Install the Latest Version of [Python 3](https://www.python.org/downloads/).
 
 Download [Auto-Editor.](https://github.com/WyattBlue/auto-editor/archive/master.zip)
