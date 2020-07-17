@@ -7,7 +7,7 @@ bit RAM intensive though.
 
 # External libraries
 import numpy as np
-from audiotsm import phasevocoder
+from audiotsm2 import phasevocoder
 
 # Included functions
 from scripts.fastAudio import fastAudio
