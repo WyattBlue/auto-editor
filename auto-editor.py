@@ -6,7 +6,6 @@ import os
 import re
 import sys
 import time
-import zipfile
 import platform
 import argparse
 import subprocess
@@ -79,7 +78,7 @@ if(__name__ == '__main__'):
     audio.add_argument('--background_volume', type=float, default=-8, metavar='',
         help="set the dBs louder or softer compared to the audio track that bases the cuts.")
 
-    cutting = parser.add_argument_group('Options for Cutting')
+    cutting = parser.add_argument_group('Cutting Options')
     cutting.add_argument('--cut_by_this_audio', type=file_type, metavar='',
         help="base cuts by this audio file instead of the video's audio.")
     cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='',
@@ -89,7 +88,7 @@ if(__name__ == '__main__'):
     cutting.add_argument('--keep_tracks_seperate', action='store_true',
         help="don't combine audio tracks. mutually exclusive with cut_by_all_tracks.")
 
-    debug = parser.add_argument_group('Options for Debugging')
+    debug = parser.add_argument_group('Developer/Debugging Options')
     debug.add_argument('--clear_cache', action='store_true',
         help='delete the cache folder and all its contents.')
     debug.add_argument('--my_ffmpeg', action='store_true',
@@ -99,7 +98,7 @@ if(__name__ == '__main__'):
     debug.add_argument('--debug', '--verbose', action='store_true',
         help='show helpful debugging values.')
 
-    misc = parser.add_argument_group('Options That Completely Change What Auto-Editor Does')
+    misc = parser.add_argument_group('Export Options')
     misc.add_argument('--preview', action='store_true',
         help='show stats on how the video will be cut.')
     misc.add_argument('--export_to_premiere', action='store_true',
@@ -108,41 +107,6 @@ if(__name__ == '__main__'):
     #dep = parser.add_argument_group('Deprecated Options')
 
     args = parser.parse_args()
-
-    # Set the file path to the ffmpeg installation.
-    dirPath = os.path.dirname(os.path.realpath(__file__))
-    ffmpeg = 'ffmpeg'
-    if(platform.system() == 'Windows' and not args.my_ffmpeg):
-
-        if(os.path.isfile(os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe'))):
-            ffmpeg = os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe')
-        else:
-            zipPath = os.path.join(dirPath, 'scripts/win-ffmpeg.zip')
-            with zipfile.ZipFile(zipPath, 'r') as zipRef:
-                zipRef.extractall(os.path.join(dirPath, 'scripts/win-ffmpeg'))
-            ffmpeg = os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe')
-
-    if(platform.system() == 'Darwin' and not args.my_ffmpeg):
-
-        if(os.path.isfile(os.path.join(dirPath, 'scripts/mac-ffmpeg/unix-ffmpeg'))):
-            ffmpeg = os.path.join(dirPath, 'scripts/mac-ffmpeg/unix-ffmpeg')
-        else:
-            zipPath = os.path.join(dirPath, 'scripts/mac-ffmpeg.zip')
-            with zipfile.ZipFile(zipPath, 'r') as zipRef:
-                zipRef.extractall(os.path.join(dirPath, 'scripts/mac-ffmpeg'))
-            ffmpeg = os.path.join(dirPath, 'scripts/mac-ffmpeg/unix-ffmpeg')
-
-
-    if(args.debug):
-        is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
-        print('Python Version:', platform.python_version(), is64bit)
-        # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
-        # more here: https://docs.python.org/3/library/platform.html#platform.system
-        print('Platform:', platform.system())
-        print('FFmpeg:', ffmpeg)
-        print('Auto-Editor Version:', version)
-        if(args.input == []):
-            sys.exit()
 
     if(args.version):
         print('Auto-Editor version:', version)
@@ -154,6 +118,40 @@ if(__name__ == '__main__'):
             rmtree(CACHE)
         if(os.path.isdir(TEMP)):
             rmtree(TEMP)
+        if(args.input == []):
+            sys.exit()
+
+    # Set the file path to the ffmpeg installation.
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+    ffmpeg = 'ffmpeg'
+    if(platform.system() == 'Windows' and not args.my_ffmpeg):
+
+        if(os.path.isfile(os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe'))):
+            ffmpeg = os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe')
+
+    if(platform.system() == 'Darwin' and not args.my_ffmpeg):
+        newF = os.path.join(dirPath, 'scripts/mac-ffmpeg/unix-ffmpeg')
+        binPath = os.path.join(dirPath, 'scripts/mac-ffmpeg.7z')
+
+        if(os.path.isfile(newF)):
+            ffmpeg = newF
+        elif(os.path.isfile(binPath)):
+            print('Unzipping folder with ffmpeg binaries.')
+
+            # Use default program to extract the files.
+            subprocess.call(['open', str(binPath)])
+            while not os.path.exists(newF):
+                time.sleep(0.5)
+            ffmpeg = newF
+
+    if(args.debug):
+        is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
+        print('Python Version:', platform.python_version(), is64bit)
+        # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
+        # more here: https://docs.python.org/3/library/platform.html#platform.system
+        print('Platform:', platform.system())
+        print('FFmpeg:', ffmpeg)
+        print('Auto-Editor Version:', version)
         if(args.input == []):
             sys.exit()
 
