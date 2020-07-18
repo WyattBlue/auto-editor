@@ -11,6 +11,10 @@
 ## New in 20w29b!
 * `--preview` how displays the correct duration for the new output.
 * Auto-Editor now works even when running the script in a different working directory.
+* The `--debug` and `--verbose` commands have been combined. Both now do the same thing.
+* The macOS binaries have been compressed in the 7zip format and should be extracted with Archive Utility.
+
+# Important! `pip3 install audiotsm2`
 
 [See the Changelog](CHANGELOG.md) for all the differences between releases.
 
