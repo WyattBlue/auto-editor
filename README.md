@@ -12,7 +12,7 @@
 * `--preview` how displays the correct duration for the new output.
 * Auto-Editor now works even when running the script in a different working directory.
 
-[See the Changelog](CHANGELOGmd) for all the differences between releases.
+[See the Changelog](CHANGELOG.md) for all the differences between releases.
 
 ## Usage
 Create an edited version of example.mp4 with the default parameters.
