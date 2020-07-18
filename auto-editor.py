@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import time
+import zipfile
 import platform
 import argparse
 import subprocess
@@ -89,15 +90,13 @@ if(__name__ == '__main__'):
         help="don't combine audio tracks. mutually exclusive with cut_by_all_tracks.")
 
     debug = parser.add_argument_group('Options for Debugging')
-    debug.add_argument('--verbose', action='store_true',
-        help='display more information when running.')
     debug.add_argument('--clear_cache', action='store_true',
         help='delete the cache folder and all its contents.')
     debug.add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
     debug.add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
-    debug.add_argument('--debug', action='store_true',
+    debug.add_argument('--debug', '--verbose', action='store_true',
         help='show helpful debugging values.')
 
     misc = parser.add_argument_group('Options That Completely Change What Auto-Editor Does')
@@ -113,15 +112,26 @@ if(__name__ == '__main__'):
     # Set the file path to the ffmpeg installation.
     dirPath = os.path.dirname(os.path.realpath(__file__))
     ffmpeg = 'ffmpeg'
-    if(platform.system() == 'Windows' and not args.my_ffmpeg
-        and os.path.isfile(os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe'))):
+    if(platform.system() == 'Windows' and not args.my_ffmpeg):
 
-        ffmpeg = os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe')
+        if(os.path.isfile(os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe'))):
+            ffmpeg = os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe')
+        else:
+            zipPath = os.path.join(dirPath, 'scripts/win-ffmpeg.zip')
+            with zipfile.ZipFile(zipPath, 'r') as zipRef:
+                zipRef.extractall(os.path.join(dirPath, 'scripts/win-ffmpeg'))
+            ffmpeg = os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe')
 
-    if(platform.system() == 'Darwin' and not args.my_ffmpeg
-        and os.path.isfile(os.path.join(dirPath, 'scripts/unix-ffmpeg'))):
+    if(platform.system() == 'Darwin' and not args.my_ffmpeg):
 
-        ffmpeg = os.path.join(dirPath, 'scripts/unix-ffmpeg')
+        if(os.path.isfile(os.path.join(dirPath, 'scripts/mac-ffmpeg/unix-ffmpeg'))):
+            ffmpeg = os.path.join(dirPath, 'scripts/mac-ffmpeg/unix-ffmpeg')
+        else:
+            zipPath = os.path.join(dirPath, 'scripts/mac-ffmpeg.zip')
+            with zipfile.ZipFile(zipPath, 'r') as zipRef:
+                zipRef.extractall(os.path.join(dirPath, 'scripts/mac-ffmpeg'))
+            ffmpeg = os.path.join(dirPath, 'scripts/mac-ffmpeg/unix-ffmpeg')
+
 
     if(args.debug):
         is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
@@ -244,7 +254,7 @@ if(__name__ == '__main__'):
             from scripts.fastAudio import fastAudio
 
             outFile = fastAudio(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
-                args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose,
+                args.frame_margin, args.sample_rate, args.audio_bitrate, args.debug,
                 args.silent_speed, args.video_speed, True)
             continue
         else:
@@ -266,7 +276,7 @@ if(__name__ == '__main__'):
 
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
                     f'{TEMP}/constantVid{extension}', '-hide_banner']
-                if(not args.verbose):
+                if(not args.debug):
                     cmd.extend(['-nostats', '-loglevel', '0'])
                 subprocess.call(cmd)
                 INPUT_FILE = f'{TEMP}/constantVid{extension}'
@@ -290,13 +300,13 @@ if(__name__ == '__main__'):
 
                 outFile = fastVideo(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
-                    args.verbose, args.cut_by_this_track, args.keep_tracks_seperate)
+                    args.debug, args.cut_by_this_track, args.keep_tracks_seperate)
             else:
                 from scripts.fastVideoPlus import fastVideoPlus
 
                 outFile = fastVideoPlus(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
-                    args.verbose, args.video_speed, args.silent_speed,
+                    args.debug, args.video_speed, args.silent_speed,
                     args.cut_by_this_track, args.keep_tracks_seperate)
         else:
             from scripts.originalMethod import originalMethod
@@ -306,7 +316,7 @@ if(__name__ == '__main__'):
                 args.audio_bitrate, args.silent_speed, args.video_speed,
                 args.keep_tracks_seperate, args.background_music, args.background_volume,
                 args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
-                args.verbose, args.hardware_accel)
+                args.debug, args.hardware_accel)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)

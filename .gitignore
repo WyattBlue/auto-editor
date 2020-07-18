@@ -4,6 +4,12 @@
 *.TEMP
 *.webm
 *.xml
+*.pyc
+*.pyo
+*~
+
+win-ffmpeg/
+mac-ffmpeg/
 
 __pycache__/
 *.py[cod]
@@ -12,26 +18,12 @@ __pycache__/
 build/
 dist/
 
-# Compiled source
-*.dll
-*.exe
-*.o
-*.so
-
-# Logs and databases
-*.log
-*.sql
-*.sqlite
-
 # OS generated files
 .DS_Store
 .DS_Store?
 ._*
 
-# Other
-*.pyc
-*.pyo
-*~
+
 
 
 MANIFEST
@@ -52,14 +44,3 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Cython debug symbols
-cython_debug/
