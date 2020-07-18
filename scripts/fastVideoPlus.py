@@ -1,8 +1,7 @@
 '''fastVideoPlus.py'''
 
 """
-This script is like fastVideo but it supports sounded and silent speeds. It might be a
-bit RAM intensive though.
+This script is like fastVideo but it supports sounded and silent speeds.
 """
 
 # External libraries

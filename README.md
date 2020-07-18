@@ -75,5 +75,12 @@ The best way to contribute is to [fork auto-editor](https://github.com/WyattBlue
 
 No change is too small whether that be a typo in the docs or a small improvement of code.
 
+## Licensing
+Original code in auto-editor is under the [MIT License](/LICENSE)
+
+The FFmpeg binaries are under the [LGPL License](/scripts/win-ffmpeg/LICENSE.txt)
+
+wavfile.py is under the [BSD 3-Clause "New" or "Revised" License](https://github.com/scipy/scipy/blob/master/LICENSE.txt)
+
 ## Help or Issues
 If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this project, suggest new features, or chat with other users, do that in [the discord server](https://discord.com/invite/kMHAWJJ).

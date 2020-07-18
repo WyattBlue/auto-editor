@@ -8,7 +8,6 @@
 *.pyo
 *~
 
-win-ffmpeg/
 mac-ffmpeg/
 
 __pycache__/
