@@ -13,7 +13,7 @@ from shutil import rmtree
 from datetime import timedelta
 from operator import itemgetter
 
-version = '20w29a'
+version = '20w29b'
 
 # Files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
@@ -78,7 +78,7 @@ if(__name__ == '__main__'):
     audio.add_argument('--background_volume', type=float, default=-8, metavar='',
         help="set the dBs louder or softer compared to the audio track that bases the cuts.")
 
-    cutting = parser.add_argument_group('Options for Cutting')
+    cutting = parser.add_argument_group('Cutting Options')
     cutting.add_argument('--cut_by_this_audio', type=file_type, metavar='',
         help="base cuts by this audio file instead of the video's audio.")
     cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='',
@@ -88,19 +88,17 @@ if(__name__ == '__main__'):
     cutting.add_argument('--keep_tracks_seperate', action='store_true',
         help="don't combine audio tracks. mutually exclusive with cut_by_all_tracks.")
 
-    debug = parser.add_argument_group('Options for Debugging')
-    debug.add_argument('--verbose', action='store_true',
-        help='display more information when running.')
+    debug = parser.add_argument_group('Developer/Debugging Options')
     debug.add_argument('--clear_cache', action='store_true',
         help='delete the cache folder and all its contents.')
     debug.add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
     debug.add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
-    debug.add_argument('--debug', action='store_true',
+    debug.add_argument('--debug', '--verbose', action='store_true',
         help='show helpful debugging values.')
 
-    misc = parser.add_argument_group('Options That Completely Change What Auto-Editor Does')
+    misc = parser.add_argument_group('Export Options')
     misc.add_argument('--preview', action='store_true',
         help='show stats on how the video will be cut.')
     misc.add_argument('--export_to_premiere', action='store_true',
@@ -109,23 +107,6 @@ if(__name__ == '__main__'):
     #dep = parser.add_argument_group('Deprecated Options')
 
     args = parser.parse_args()
-
-    if(args.debug):
-        is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
-        print('Python Version:', platform.python_version(), is64bit)
-        # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
-        # more here: https://docs.python.org/3/library/platform.html#platform.system
-        print('Platform:', platform.system())
-        print('Auto-Editor Version:', version)
-        sys.exit()
-
-    # Set the file path to the ffmpeg installation.
-    if(platform.system() == 'Windows' and not args.my_ffmpeg):
-        ffmpeg = 'scripts/win-ffmpeg/bin/ffmpeg.exe'
-    elif(platform.system() == 'Darwin' and not args.my_ffmpeg):
-        ffmpeg = 'scripts/unix-ffmpeg'
-    else:
-        ffmpeg = 'ffmpeg'
 
     if(args.version):
         print('Auto-Editor version:', version)
@@ -137,6 +118,40 @@ if(__name__ == '__main__'):
             rmtree(CACHE)
         if(os.path.isdir(TEMP)):
             rmtree(TEMP)
+        if(args.input == []):
+            sys.exit()
+
+    # Set the file path to the ffmpeg installation.
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+    ffmpeg = 'ffmpeg'
+    if(platform.system() == 'Windows' and not args.my_ffmpeg):
+
+        if(os.path.isfile(os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe'))):
+            ffmpeg = os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe')
+
+    if(platform.system() == 'Darwin' and not args.my_ffmpeg):
+        newF = os.path.join(dirPath, 'scripts/mac-ffmpeg/unix-ffmpeg')
+        binPath = os.path.join(dirPath, 'scripts/mac-ffmpeg.7z')
+
+        if(os.path.isfile(newF)):
+            ffmpeg = newF
+        elif(os.path.isfile(binPath)):
+            print('Unzipping folder with ffmpeg binaries.')
+
+            # Use default program to extract the files.
+            subprocess.call(['open', str(binPath)])
+            while not os.path.exists(newF):
+                time.sleep(0.5)
+            ffmpeg = newF
+
+    if(args.debug):
+        is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
+        print('Python Version:', platform.python_version(), is64bit)
+        # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
+        # more here: https://docs.python.org/3/library/platform.html#platform.system
+        print('Platform:', platform.system())
+        print('FFmpeg:', ffmpeg)
+        print('Auto-Editor Version:', version)
         if(args.input == []):
             sys.exit()
 
@@ -237,7 +252,7 @@ if(__name__ == '__main__'):
             from scripts.fastAudio import fastAudio
 
             outFile = fastAudio(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
-                args.frame_margin, args.sample_rate, args.audio_bitrate, args.verbose,
+                args.frame_margin, args.sample_rate, args.audio_bitrate, args.debug,
                 args.silent_speed, args.video_speed, True)
             continue
         else:
@@ -258,11 +273,11 @@ if(__name__ == '__main__'):
                 # it's input instead.
 
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
-                    TEMP+'/constantVid'+extension, '-hide_banner']
-                if(not args.verbose):
+                    f'{TEMP}/constantVid{extension}', '-hide_banner']
+                if(not args.debug):
                     cmd.extend(['-nostats', '-loglevel', '0'])
                 subprocess.call(cmd)
-                INPUT_FILE = TEMP+'/constantVid'+extension
+                INPUT_FILE = f'{TEMP}/constantVid{extension}'
 
         if(args.background_music is None and args.background_volume != -8):
             print('Warning! Background volume specified even though no music was provided.')
@@ -283,13 +298,13 @@ if(__name__ == '__main__'):
 
                 outFile = fastVideo(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
-                    args.verbose, args.cut_by_this_track, args.keep_tracks_seperate)
+                    args.debug, args.cut_by_this_track, args.keep_tracks_seperate)
             else:
                 from scripts.fastVideoPlus import fastVideoPlus
 
                 outFile = fastVideoPlus(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                     args.frame_margin, args.sample_rate, args.audio_bitrate,
-                    args.verbose, args.video_speed, args.silent_speed,
+                    args.debug, args.video_speed, args.silent_speed,
                     args.cut_by_this_track, args.keep_tracks_seperate)
         else:
             from scripts.originalMethod import originalMethod
@@ -299,9 +314,9 @@ if(__name__ == '__main__'):
                 args.audio_bitrate, args.silent_speed, args.video_speed,
                 args.keep_tracks_seperate, args.background_music, args.background_volume,
                 args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
-                args.verbose, args.hardware_accel)
+                args.debug, args.hardware_accel)
 
-    print('Finished.        ')
+    print('Finished.')
     timeLength = round(time.time() - startTime, 2)
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')

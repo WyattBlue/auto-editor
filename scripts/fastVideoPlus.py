@@ -1,13 +1,12 @@
 '''fastVideoPlus.py'''
 
 """
-This script is like fastVideo but it supports sounded and silent speeds. It might be a
-bit RAM intensive though.
+This script is like fastVideo but it supports sounded and silent speeds.
 """
 
 # External libraries
 import numpy as np
-from audiotsm import phasevocoder
+from audiotsm2 import phasevocoder
 
 # Included functions
 from scripts.fastAudio import fastAudio
@@ -44,7 +43,7 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    tracks = vidTracks(videoFile)
+    tracks = vidTracks(videoFile, ffmpeg)
 
     if(cutByThisTrack >= tracks):
         print("Error! You choose a track that doesn't exist.")
