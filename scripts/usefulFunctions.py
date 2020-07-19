@@ -9,8 +9,6 @@ put here. No code here should make or delete files.
 import numpy as np
 
 # Internal libraries
-import math
-import platform
 import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
@@ -31,6 +29,8 @@ def getMaxVolume(s):
 
 
 def getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin):
+    import math
+
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
 
@@ -85,24 +85,31 @@ def prettyTime(newTime):
     return f'{hours:02}:{minutes:02} {ampm}'
 
 
-def vidTracks(videoFile):
+def vidTracks(videoFile, ffmpeg):
     """
     Return the number of audio tracks in a video file.
     """
-    if(platform.system() == 'Windows'):
-        ffporbe = 'scripts/win-ffmpeg/bin/ffprobe.exe'
-    elif(platform.system() == 'Darwin'):
-        ffprobe = 'scripts/unix-ffprobe'
-    else:
+    import os
+    import platform
+
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+
+    if(ffmpeg == 'ffmpeg'):
         ffprobe = 'ffprobe'
+    else:
+        if(platform.system() == 'Windows'):
+            ffporbe = os.path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
+        elif(platform.system() == 'Darwin'):
+            ffprobe = os.path.join(dirPath, 'mac-ffmpeg/unix-ffprobe')
+        else:
+            ffprobe = 'ffprobe'
 
     cmd = [ffprobe, videoFile, '-hide_banner', '-loglevel', 'panic',
         '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
         'compact=p=0:nk=1']
 
     # Read what ffprobe piped in.
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     output = stdout.decode()
     numbers = output.split('\n')

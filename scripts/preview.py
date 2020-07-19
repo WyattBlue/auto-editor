@@ -27,7 +27,7 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
     cap = cv2.VideoCapture(myInput)
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    tracks = vidTracks(myInput)
+    tracks = vidTracks(myInput, ffmpeg)
 
     if(cutByThisTrack >= tracks):
         print("Error: You choose a track that doesn't exist.")
@@ -47,6 +47,8 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
 
     def printTimeFrame(title, frames, fps):
         inSec = round(frames / fps, 1)
+        if(fps % 1 == 0):
+            fps = round(fps)
         if(inSec < 1):
             minutes = f'{int(frames)}/{fps} frames'
         else:
@@ -58,7 +60,8 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
     printTimeFrame('Old length', oldTime, fps)
 
     speeds = [silentSpeed, videoSpeed]
-    printTimeFrame('New length', getNewLength(chunks, speeds, fps), fps)
+    newL = getNewLength(chunks, speeds, fps)
+    printTimeFrame('New length', newL * fps, fps)
 
     clips = 0
     clipLengths = []

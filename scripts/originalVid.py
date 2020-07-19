@@ -80,8 +80,6 @@ def splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
         for item in Renames:
             f.write(f"{item}\n")
 
-    print('frames written', outputFrame)
-
     cmd = [ffmpeg, '-y', '-framerate', str(frameRate), '-i',
         f'{TEMP}/newFrame%06d.jpg', f'{TEMP}/output{extension}']
     if(not verbose):

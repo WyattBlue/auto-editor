@@ -1,5 +1,5 @@
-audiotsm
+opencv-python
+audiotsm2
+youtube_dl
 pillow
 pydub
-youtube_dl
-opencv-python

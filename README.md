@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w29a
+ &nbsp;&nbsp;<sup>version 20w29b
 
 <p align="center">
   <img src="/resources/auto-editor_banner.png" width="700">
@@ -8,8 +8,17 @@
 
 **Auto-Editor** is a command line application for automatically editing **video** or **audio** by removing the silent parts.
 
-## Usage
+## New in 20w29b!
+* `--preview` how displays the correct duration for the new output.
+* Auto-Editor now works even when running the script in a different working directory.
+* The `--debug` and `--verbose` commands have been combined. Both now do the same thing.
+* The macOS binaries have been compressed in the 7zip format and should be extracted with Archive Utility.
 
+# Important! `pip3 install audiotsm2`
+
+[See the Changelog](CHANGELOG.md) for all the differences between releases.
+
+## Usage
 Create an edited version of example.mp4 with the default parameters.
 ```terminal
  $ python auto-editor.py example.mp4
@@ -25,7 +34,6 @@ There are many more features in auto-editor, including **adding in background mu
 
 
 ## Installing Auto-Editor
-
 Download and Install the Latest Version of [Python 3](https://www.python.org/downloads/).
 
 Download [Auto-Editor.](https://github.com/WyattBlue/auto-editor/archive/master.zip)
@@ -42,6 +50,8 @@ Run `pip3 install -r requirements.txt`
 
 The binaries you'll need are already installed, unless you're using Linux.
 Linux users need to run this command. `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
+
+(If you would like to use your own ffmpeg, add the flag `--my_ffmpeg` when using auto-editor)
 
 
 Now run it with the example video to make sure it is working.
@@ -60,14 +70,17 @@ python3 auto-editor.py C:path\to\your\video
 [See the docs](/resources/docs.md) for more commands and usages.
 
 
-## Changes
-[See the Changelog](CHANGELOG.md) for all the differences between releases.
-
-
 ## Contributing
 The best way to contribute is to [fork auto-editor](https://github.com/WyattBlue/auto-editor/fork) and make changes there. Once you're happy with those changes, make a new pull request and type in a brief description on how you improved the code.
 
 No change is too small whether that be a typo in the docs or a small improvement of code.
+
+## Licensing
+Original code in auto-editor is under the [MIT License](/LICENSE)
+
+The FFmpeg binaries are under the [LGPL License](/scripts/win-ffmpeg/LICENSE.txt)
+
+wavfile.py is under the [BSD 3-Clause "New" or "Revised" License](https://github.com/scipy/scipy/blob/master/LICENSE.txt)
 
 ## Help or Issues
 If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this project, suggest new features, or chat with other users, do that in [the discord server](https://discord.com/invite/kMHAWJJ).

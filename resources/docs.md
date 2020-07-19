@@ -8,9 +8,9 @@
   - [Basic Options](#Basic-Options)
   - [Advanced Options](#Advanced-Options)
   - [Audio Options](#Audio-Options)
-  - [Options for Cutting](#Options-for-Cutting)
-  - [Options for Debugging](#Options-for-Debugging)
-  - [Options That Completely Change What Auto-Editor Does](#Options-That-Completely-Change-What-Auto-Editor-Does)
+  - [Cutting Options](#Options-for-Cutting)
+  - [Developer/Debugging Options](#Developer-Debugging-Options)
+  - [Export Options](#Export-Options)
   - [Input](#Input)
 
 
@@ -234,19 +234,7 @@ Command | `--keep_tracks_seperate`
 --------|---------------------
 type    | flag
 
-## Options for Debugging
-
-### Verbose
-Verbose displays more information while running auto-editor. Particularly ffmpeg stats and banners.
-
-```terminal
- $ python auto-editor.py --verbose
-```
-
-Command | `--verbose`
---------|---------------------
-type    | flag
-
+## Developer Debugging Options
 
 ### Clear Cache
 Clear Cache will delete the directory named `.CACHE` in the auto-editor folder.
@@ -270,6 +258,18 @@ Command | `--version`
 --------|---------------------
 type    | flag
 
+
+### My FFmpeg
+Use your own ffmpeg instead of the one's provided.
+
+```terminal
+ $ python auto-editor.py example.mp4 --my_ffmpeg
+```
+
+Command | `--my_ffmpeg`
+--------|---------------------
+type    | flag
+
 ### Debug
 Debug will get debug information regarding auto-editor, including your python version, whether the your python is 64-bit or not, and the current version.
 
@@ -282,7 +282,7 @@ Command | `--debug`
 type    | flag
 
 
-## Options That Completely Change What Auto-Editor Does
+## Export Options
 
 ### Preview
 Preview gives you an overview of how auto-editor will cut the video without having to create the new video.
