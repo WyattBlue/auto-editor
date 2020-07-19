@@ -2,7 +2,7 @@ language: python
 before_install:
  - sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg
 install:
- - pip3 install audiotsm pillow pydub opencv-python youtube_dl
+ - pip3 install -r requirements.txt
 python:
   - "3.6"
   - "3.7"
