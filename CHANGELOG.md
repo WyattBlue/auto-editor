@@ -1,5 +1,15 @@
 # Auto-Editor Change Log
 
+## Version 20w29b
+* `--preview` how displays the correct duration for the new output.
+* Auto-Editor now works even when running the script in a different working directory.
+* The `--debug` and `--verbose` commands have been combined. Both now do the same thing.
+* The macOS binaries have been compressed in the 7zip format and should be extracted with Archive Utility.
+
+### Package Change
+ * audiotsm removed.
+ * audiotsm2 added.
+
 ## Version 20w29a
 * ffmpeg binaries are included in auto-editor.
 * desyncing issue when video speed is set is fixed.

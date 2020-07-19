@@ -40,7 +40,7 @@ def getFrameRate(ffmpeg, path):
     return float(matchDict['fps'])
 
 
-def getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin):
+def getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, frameRate):
     zooms = {}
     shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
     hold = False
@@ -132,7 +132,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
 
     if(not SKIP):
         # Videos can have more than one audio track os we need to extract them all.
-        tracks = vidTracks(vidFile)
+        tracks = vidTracks(vidFile, ffmpeg)
 
         if(BASE_TRAC >= tracks):
             print("Error! You choose a track that doesn't exist.")
@@ -214,7 +214,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
     chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])
     chunks = chunks[1:]
 
-    zooms = getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin)
+    zooms = getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, frameRate)
 
     conwrite('')
 
