@@ -100,9 +100,9 @@ if(__name__ == '__main__'):
 
     misc = parser.add_argument_group('Export Options')
     misc.add_argument('--preview', action='store_true',
-        help='show stats on how the video will be cut.')
+        help='show stats on how the input will be cut.')
     misc.add_argument('--export_to_premiere', action='store_true',
-        help='export as an XML file for Adobe Premiere Pro instead of outputting a video.')
+        help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
 
     #dep = parser.add_argument_group('Deprecated Options')
 
@@ -193,7 +193,7 @@ if(__name__ == '__main__'):
                     outfile.write(f"file '{fileref}'\n")
 
             cmd = [ffmpeg, '-f', 'concat', '-safe', '0', '-i', 'combine_files.txt',
-            '-c', 'copy', 'combined.mp4']
+                '-c', 'copy', 'combined.mp4']
             subprocess.call(cmd)
 
             INPUTS = ['combined.mp4']
@@ -247,6 +247,15 @@ if(__name__ == '__main__'):
             print(newOutput)
         else:
             newOutput = OUTPUT_FILE
+
+        if(args.export_to_premiere):
+            from scripts.premiere import exportToPremiere
+
+            outFile = exportToPremiere(ffmpeg, INPUT_FILE, newOutput,
+                args.silent_threshold, args.zoom_threshold, args.frame_margin,
+                args.sample_rate, args.video_speed, args.silent_speed)
+            continue
+
         isAudio = extension in ['.wav', '.mp3', '.m4a']
         if(isAudio):
             from scripts.fastAudio import fastAudio
@@ -281,14 +290,6 @@ if(__name__ == '__main__'):
 
         if(args.background_music is None and args.background_volume != -8):
             print('Warning! Background volume specified even though no music was provided.')
-
-        if(args.export_to_premiere):
-            from scripts.premiere import exportToPremiere
-
-            outFile = exportToPremiere(ffmpeg, INPUT_FILE, newOutput,
-                args.silent_threshold, args.zoom_threshold, args.frame_margin,
-                args.sample_rate, args.video_speed, args.silent_speed)
-            continue
 
         if(args.background_music is None and args.zoom_threshold > 1
             and args.cut_by_this_audio == None and args.hardware_accel is None):
