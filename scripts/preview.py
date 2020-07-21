@@ -5,8 +5,7 @@ This script is only meant to output info about how the video will be cut if the
 selected options are used.
 """
 
-# External libraries
-import cv2
+
 
 # Included functions
 from scripts.usefulFunctions import getAudioChunks, vidTracks, getNewLength
@@ -24,24 +23,39 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
         silentSpeed, cutByThisTrack, bitrate):
     TEMP = tempfile.mkdtemp()
 
-    cap = cv2.VideoCapture(myInput)
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    extension = myInput[myInput.rfind('.'):]
+    audioFile = extension in ['.wav', '.mp3', '.m4a']
 
-    tracks = vidTracks(myInput, ffmpeg)
+    if(audioFile):
+        fps = 30
 
-    if(cutByThisTrack >= tracks):
-        print("Error: You choose a track that doesn't exist.")
-        print(f'There are only {tracks-1} tracks. (starting from 0)')
-        sys.exit(1)
-
-    for trackNumber in range(tracks):
-        cmd = [ffmpeg, '-i', myInput, '-ab', bitrate, '-ac', '2', '-ar',
-            str(sampleRate),'-map', f'0:a:{trackNumber}',  f'{TEMP}/{trackNumber}.wav',
-            '-nostats', '-loglevel', '0']
+        cmd = [ffmpeg, '-i', myInput, '-b:a', bitrate, '-ac', '2', '-ar',
+            str(sampleRate), '-vn', f'{TEMP}/fastAud.wav', '-nostats', '-loglevel', '0']
         subprocess.call(cmd)
 
-    sampleRate, audioData = read(f'{TEMP}/{cutByThisTrack}.wav')
-    chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
+        sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
+        chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
+    else:
+        import cv2
+
+        cap = cv2.VideoCapture(myInput)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+
+        tracks = vidTracks(myInput, ffmpeg)
+
+        if(cutByThisTrack >= tracks):
+            print("Error! You choose a track that doesn't exist.")
+            print(f'There are only {tracks-1} tracks. (starting from 0)')
+            sys.exit(1)
+
+        for trackNumber in range(tracks):
+            cmd = [ffmpeg, '-i', myInput, '-ab', bitrate, '-ac', '2', '-ar',
+                str(sampleRate),'-map', f'0:a:{trackNumber}',  f'{TEMP}/{trackNumber}.wav',
+                '-nostats', '-loglevel', '0']
+            subprocess.call(cmd)
+
+            sampleRate, audioData = read(f'{TEMP}/{cutByThisTrack}.wav')
+            chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
 
     rmtree(TEMP)
 

@@ -323,7 +323,8 @@ if(__name__ == '__main__'):
     print(f'took {timeLength} seconds ({minutes})')
 
     if(not os.path.isfile(outFile)):
-        raise IOError(f'Error: The file {outFile} was not created.')
+        print(f'Error! The file {outFile} was not created.')
+        sys.exit(1)
 
     if(not args.no_open and not args.export_to_premiere):
         try:  # should work on Windows
@@ -335,7 +336,7 @@ if(__name__ == '__main__'):
                 try: # should work on WSL2
                     subprocess.call(['cmd.exe', '/C', 'start', outFile])
                 except:
-                    print('Could not open output file.')
+                    print('Warning! Could not open output file.')
 
     if(os.path.isdir(TEMP)):
         rmtree(TEMP)
