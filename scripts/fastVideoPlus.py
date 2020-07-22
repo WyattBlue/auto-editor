@@ -70,7 +70,8 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
             videoSpeed, False, chunks=chunks, fps=fps)
 
         if(not os.path.isfile(f'{TEMP}/new{trackNumber}.wav')):
-            raise IOError('Error! Audio file not created.')
+            print('Error! Audio file not created.')
+            sys.exit(1)
 
     out = cv2.VideoWriter(f'{TEMP}/spedup.mp4', fourcc, fps, (width, height))
     totalFrames = chunks[len(chunks) - 1][1]
@@ -100,9 +101,6 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
                     out.write(frame)
                     framesWritten += 1
                 remander = doIt % 1
-        else:
-            if(verbose):
-                pass#print('state is None')
 
         progressBar(cframe, totalFrames, beginTime, title='Creating new video')
 
@@ -136,6 +134,7 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
         else:
             cmd.extend(['-nostats', '-loglevel', '0'])
     else:
+        # Merge all the audio tracks into one.
         if(tracks > 1):
             cmd = [ffmpeg]
             for i in range(tracks):
@@ -148,6 +147,7 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
         else:
+            # L
             os.rename(f'{TEMP}/new0.wav', f'{TEMP}/newAudioFile.wav')
 
         cmd = [ffmpeg, '-y', '-i', f'{TEMP}/newAudioFile.wav', '-i',

@@ -5,7 +5,7 @@ This script's purpose is to export an XML file that can be imported by Adobe Pre
 """
 
 # Included functions
-from scripts.usefulFunctions import getAudioChunks
+from scripts.usefulFunctions import getAudioChunks, conwrite
 from scripts.wavfile import read, write
 
 # Internal libraries
@@ -49,8 +49,21 @@ def exportToPremiere(ffmpeg, myInput, newOutput, silentT, zoomT, frameMargin, sa
     ana = 'FALSE' # anamorphic
     alphatype = 'none'
     depth = '16'
-    width = '1280'
-    height = '720'
+    try:
+        conwrite('Grabbing video dimensions.')
+        import cv2
+
+        cap = cv2.VideoCapture(videoFile)
+        width = str(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
+        height = str(int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+    except ImportError:
+        width = '1280'
+        height = '720'
+
     pixelar = 'square' # pixel aspect ratio
     colordepth = '24'
     sr = sampleRate

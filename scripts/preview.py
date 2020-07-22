@@ -5,8 +5,6 @@ This script is only meant to output info about how the video will be cut if the
 selected options are used.
 """
 
-
-
 # Included functions
 from scripts.usefulFunctions import getAudioChunks, vidTracks, getNewLength
 from scripts.wavfile import read, write
@@ -17,7 +15,6 @@ import tempfile
 import subprocess
 from shutil import rmtree
 from datetime import timedelta
-
 
 def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed,
         silentSpeed, cutByThisTrack, bitrate):

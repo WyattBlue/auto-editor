@@ -13,7 +13,7 @@ from shutil import rmtree
 from datetime import timedelta
 from operator import itemgetter
 
-version = '20w29b'
+version = '20w30a'
 
 # Files that start with . are hidden, but can be viewed by running "ls -f" from console.
 TEMP = '.TEMP'
@@ -292,7 +292,7 @@ if(__name__ == '__main__'):
             print('Warning! Background volume specified even though no music was provided.')
 
         if(args.background_music is None and args.zoom_threshold > 1
-            and args.cut_by_this_audio == None and args.hardware_accel is None):
+            and args.cut_by_this_audio == None):
 
             if(args.silent_speed == 99999 and args.video_speed == 1):
                 from scripts.fastVideo import fastVideo

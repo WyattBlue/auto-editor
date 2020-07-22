@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w29b
+ &nbsp;&nbsp;<sup>version 20w30a
 
 <p align="center">
   <img src="/resources/auto-editor_banner.png" width="700">
@@ -8,13 +8,11 @@
 
 **Auto-Editor** is a command line application for automatically editing **video** or **audio** by removing the silent parts.
 
-## New in 20w29b!
+## New in 20w30a
 * `--preview` how displays the correct duration for the new output.
 * Auto-Editor now works even when running the script in a different working directory.
 * The `--debug` and `--verbose` commands have been combined. Both now do the same thing.
 * The macOS binaries have been compressed in the 7zip format and should be extracted with Archive Utility.
-
-# Important! `pip3 install audiotsm2`
 
 [See the Changelog](CHANGELOG.md) for all the differences between releases.
 
