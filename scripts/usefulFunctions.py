@@ -98,7 +98,7 @@ def vidTracks(videoFile, ffmpeg):
         ffprobe = 'ffprobe'
     else:
         if(platform.system() == 'Windows'):
-            ffporbe = os.path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
+            ffprobe = os.path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
         elif(platform.system() == 'Darwin'):
             ffprobe = os.path.join(dirPath, 'mac-ffmpeg/unix-ffprobe')
         else:
