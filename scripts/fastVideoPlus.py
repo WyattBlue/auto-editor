@@ -147,7 +147,6 @@ def fastVideoPlus(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
         else:
-            # L
             os.rename(f'{TEMP}/new0.wav', f'{TEMP}/newAudioFile.wav')
 
         cmd = [ffmpeg, '-y', '-i', f'{TEMP}/newAudioFile.wav', '-i',

@@ -50,10 +50,11 @@ def exportToPremiere(ffmpeg, myInput, newOutput, silentT, zoomT, frameMargin, sa
     alphatype = 'none'
     depth = '16'
     try:
-        conwrite('Grabbing video dimensions.')
         import cv2
+        conwrite('Grabbing video dimensions.')
 
-        cap = cv2.VideoCapture(videoFile)
+
+        cap = cv2.VideoCapture(myInput)
         width = str(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
         height = str(int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 
@@ -373,4 +374,5 @@ def exportToPremiere(ffmpeg, myInput, newOutput, silentT, zoomT, frameMargin, sa
         outfile.write('\t</sequence>\n')
         outfile.write('</xmeml>')
 
+    conwrite('')
     return newFile
