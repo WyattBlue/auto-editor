@@ -9,12 +9,11 @@
 **Auto-Editor** is a command line application for automatically editing **video** or **audio** by removing the silent parts.
 
 ## New in 20w30a
-* `--preview` how displays the correct duration for the new output.
-* Auto-Editor now works even when running the script in a different working directory.
-* The `--debug` and `--verbose` commands have been combined. Both now do the same thing.
-* The macOS binaries have been compressed in the 7zip format and should be extracted with Archive Utility.
+ * Fixed ffprobe bug that was effecting Windows users.
+ * Added support for audio tracks for `--export_to_premiere`
+ * Files re-arranged
 
-[See the Changelog](CHANGELOG.md) for all the differences between releases.
+[See the Changelog](/resources/CHANGELOG.md) for all the differences between releases.
 
 ## Usage
 Create an edited version of example.mp4 with the default parameters.

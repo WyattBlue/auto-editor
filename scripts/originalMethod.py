@@ -152,6 +152,9 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
                 from pydub import AudioSegment
 
                 for i in range(tracks):
+                    if(not os.path.isfile(f'{CACHE}/{i}.wav')):
+                        print('Error! Audio file(s) could not be found.')
+                        sys.exit(1)
                     if(i == 0):
                         allAuds = AudioSegment.from_file(f'{CACHE}/{i}.wav')
                     else:
