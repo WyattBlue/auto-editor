@@ -247,12 +247,11 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
 
         # Fade the background music out by 1 second.
         back = match_target_amplitude(back, vidSound, BACK_VOL).fade_out(1000)
-        # Write edited audio
         back.export(f'{TEMP}/new{tracks}.wav', format='wav')
 
         if(not os.path.isfile(f'{TEMP}/new{tracks}.wav')):
-            raise IOError(f'The new music audio file was not created.')
-
+            print('Error! The new music audio file was not created.')
+            sys.exit(1)
         tracks += 1
 
     if(KEEP_SEP):
@@ -267,8 +266,11 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
             cmd.extend(['-map', f'{i}:a:0'])
         cmd.extend(['-map', f'{tracks}:v:0','-c:v', 'copy', '-movflags', '+faststart',
             outFile])
-        if(not verbose):
+        if(verbose):
+            cmd.extend(['-hide_banner'])
+        else:
             cmd.extend(['-nostats', '-loglevel', '0'])
+        subprocess.call(cmd)
     else:
         if(tracks > 1):
             cmd = [ffmpeg]
@@ -276,7 +278,9 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
                 cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
             cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
                 f'{TEMP}/newAudioFile.wav'])
-            if(not verbose):
+            if(verbose):
+                cmd.extend(['-hide_banner'])
+            else:
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
         else:
@@ -288,9 +292,11 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         cmd.extend(['-i', f'{TEMP}/newAudioFile.wav', '-i',
             f'{TEMP}/output{extension}', '-c:v', 'copy', '-movflags', '+faststart',
             outFile])
-        if(not verbose):
+        if(verbose):
+            cmd.extend(['-hide_banner'])
+        else:
             cmd.extend(['-nostats', '-loglevel', '0'])
-    subprocess.call(cmd)
+        subprocess.call(cmd)
 
     with open(f'{TEMP}/Renames.txt', 'r') as f:
         renames = f.read().splitlines()

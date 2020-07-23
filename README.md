@@ -11,7 +11,7 @@
 ## New in 20w30a
  * Fixed ffprobe bug that was effecting Windows users.
  * Added support for audio tracks for `--export_to_premiere`
- * Files re-arranged
+ * Files in the media folder moved to resources. Changelog and credits moved to resources.
 
 [See the Changelog](/resources/CHANGELOG.md) for all the differences between releases.
 
