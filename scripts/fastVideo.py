@@ -1,7 +1,7 @@
 '''scripts/fastVideo.py'''
 
 """
-This method supports making new videos without changing the speed.
+This function supports making new videos without changing the speed.
 """
 
 # External libraries

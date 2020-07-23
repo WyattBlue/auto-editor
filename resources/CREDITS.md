@@ -1,19 +1,20 @@
 # Credits
 
-### This project would not be the same without the contributions of all of these lovely people.
+### This project woudn't be the same without the contributions of all of these lovely people.
 
 
-###  Major Code Contributions/Inspiration
+### Major Code Contributions/Inspiration
 @WyattBlue<br>
 @gusals3587<br>
 @carykh<br>
 @flyingzambie<br>
 @seaty6<br>
 
-###  Minor Code Contributions
+### Minor Code Contributions
 @m-rey<br>
 @zoe1337<br>
 @eykd<br>
+@mlinje<br>
 
 ### Testing and Small Code Snippets
 Discord User: Breadstick King<br>
