@@ -1,22 +1,19 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w29b
+ &nbsp;&nbsp;<sup>version 20w30a
 
 <p align="center">
   <img src="/resources/auto-editor_banner.png" width="700">
 </p>
 
 
-**Auto-Editor** is a command line application for automatically editing **video** or **audio** by removing the silent parts.
+**Auto-Editor** is a command line application for automatically **editing video and audio** by removing the silent parts.
 
-## New in 20w29b!
-* `--preview` how displays the correct duration for the new output.
-* Auto-Editor now works even when running the script in a different working directory.
-* The `--debug` and `--verbose` commands have been combined. Both now do the same thing.
-* The macOS binaries have been compressed in the 7zip format and should be extracted with Archive Utility.
+## New in 20w30a
+ * Fixed ffprobe bug that was effecting Windows users.
+ * Added support for audio tracks for `--export_to_premiere`
+ * Files in the media folder moved to resources. Changelog and credits moved to resources.
 
-# Important! `pip3 install audiotsm2`
-
-[See the Changelog](CHANGELOG.md) for all the differences between releases.
+[See the Changelog](/resources/CHANGELOG.md) for all the differences between releases.
 
 ## Usage
 Create an edited version of example.mp4 with the default parameters.
