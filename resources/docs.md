@@ -1,6 +1,5 @@
 # Documentation
 
-
 ## Table of Contents
 
 - [The Basics](#The-Basics)
@@ -175,7 +174,7 @@ default | '160k'
 Background Music adds in a audio file you specify and will automatically change the volume so that it is lower than audio track being cut.
 
 ```terminal
- $ python auto-editor.py example.mp4 --background_music media/Magic_in_the_Garden.mp3
+ $ python auto-editor.py example.mp4 --background_music resources/Magic_in_the_Garden.mp3
 ```
 
 ### Background Volume
@@ -193,7 +192,7 @@ default | -8
 Choose which audio track to cut by.
 
 ```terminal
- $ python auto-editor.py example.mp4 --cut_by_this_audio media/newCommentary.mp3
+ $ python auto-editor.py example.mp4 --cut_by_this_audio resources/newCommentary.mp3
 ```
 
 Command | `--cut_by_this_audio`
