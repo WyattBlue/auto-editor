@@ -6,7 +6,7 @@
 </p>
 
 
-**Auto-Editor** is a command line application for automatically editing **video** or **audio** by removing the silent parts.
+**Auto-Editor** is a command line application for automatically **editing video and audio** by removing the silent parts.
 
 ## New in 20w30a
  * Fixed ffprobe bug that was effecting Windows users.
