@@ -111,7 +111,7 @@ if(__name__ == '__main__'):
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
     gitPath = os.path.join(dirPath, '.git')
-    CACHE = os.path.join(dirPath, 'CACHE')
+    CACHE = os.path.join(dirPath, 'cache')
 
     if(args.version):
         print('Auto-Editor version:', version)
@@ -346,3 +346,4 @@ if(__name__ == '__main__'):
                     print('Warning! Could not open output file.')
 
     removeDir('.TEMP')
+    removeDir('.CACHE')
