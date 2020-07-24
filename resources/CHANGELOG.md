@@ -110,27 +110,36 @@
 
 <h1 align="center">Pre-Version Builds</h1>
 
-## ["Auto-Editor caches your last video..." (May 4, 20w19a)](https://github.com/WyattBlue/auto-editor/tree/233b5bec5b0129986e9b5049f2930b23809ba439)
+### ["Changed how video data is logged"](https://github.com/WyattBlue/auto-editor/tree/b01dedca4c40304097b132d9f1a4426f44f41733) <sup>May 6, 20w20a
+
+### ["Auto-Editor caches your last video..."](https://github.com/WyattBlue/auto-editor/tree/233b5bec5b0129986e9b5049f2930b23809ba439) <sup>May 4, 20w19a
+
+
+#### Packages
+* Added youtube-dl as pip module.
 
 * Auto-Editor caches your last video. Making a repeated run of the same video much faster. This works even if you have different parameters.
 
-## ["Made auto-editor a lot faster" (May 2, 20w18d)](https://github.com/WyattBlue/auto-editor/tree/51286ac00895740d4d0ca8d4103b7d9b5b3e3abb)
+### ["Made auto-editor a lot faster"](https://github.com/WyattBlue/auto-editor/tree/51286ac00895740d4d0ca8d4103b7d9b5b3e3abb) <sup>May 2, 20w18d
 
 * Added more commands and print statements.
 
-## ["added multi-processing capabilities" (May 1, 20w18c)](https://github.com/WyattBlue/auto-editor/tree/2a4a32a5bf9b5b318cac45f55e125e8d728e7bdd)
+### ["added multi-processing capabilities"](https://github.com/WyattBlue/auto-editor/tree/2a4a32a5bf9b5b318cac45f55e125e8d728e7bdd) <sup>May 1, 20w18c
 
 * Auto-Editor runs faster but needs more CPU processing.
 
-## ["Update auto-editor.py" (Apr 30, 20w18b)](https://github.com/WyattBlue/auto-editor/tree/35307b5e2968c46fe84cb453d63bd605d135b12e)
+### ["Update auto-editor.py"](https://github.com/WyattBlue/auto-editor/tree/35307b5e2968c46fe84cb453d63bd605d135b12e) <sup>Apr 30, 20w18b
 
 * The verbose short `-v` was removed. Verbose checked more in code.
 * `--sounded_speed` was changed to `--video_speed`
 * Frame margin default was changed from 3 to 4.
 
-## ["Add files via upload" (Apr 30, 20w18a)](https://github.com/WyattBlue/auto-editor/tree/714e5be499aa77afe3748a5ef62feb55f64d02f9)
+### ["Add files via upload"](https://github.com/WyattBlue/auto-editor/tree/714e5be499aa77afe3748a5ef62feb55f64d02f9) <sup>Apr 30, 20w18a
 
 The project was created.
 
-
+#### Packages
+* scipy
+* audiotsm
+* opencv-python
 

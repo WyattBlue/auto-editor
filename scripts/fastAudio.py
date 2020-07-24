@@ -54,9 +54,7 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
         print('Creating chunks')
         chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
 
-    # Get the estimated length of the new audio in frames.
     newL = getNewLength(chunks, speeds, fps)
-
     # Get the new length in samples with some extra leeway.
     estLeng = int((newL * sampleRate) * 1.5) + int(sampleRate * 2)
 
@@ -77,17 +75,22 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
 
         if(theSpeed != 99999):
             spedChunk = audioData[audioSampleStart:audioSampleEnd]
-            spedupAudio = np.zeros((0, 2), dtype=np.int16)
-            with ArrReader(spedChunk, channels, sampleRate, 2) as reader:
-                with ArrWriter(spedupAudio, channels, sampleRate, 2) as writer:
-                    phasevocoder(reader.channels, speed=theSpeed).run(
-                        reader, writer
-                    )
-                    spedupAudio = writer.output
+
+            if(theSpeed == 1):
+                yPointerEnd = yPointer + spedChunk.shape[0]
+                newAudio[yPointer:yPointerEnd] = spedChunk
+            else:
+                spedupAudio = np.zeros((0, 2), dtype=np.int16)
+                with ArrReader(spedChunk, channels, sampleRate, 2) as reader:
+                    with ArrWriter(spedupAudio, channels, sampleRate, 2) as writer:
+                        phasevocoder(reader.channels, speed=theSpeed).run(
+                            reader, writer
+                        )
+                        spedupAudio = writer.output
 
 
-            yPointerEnd = yPointer + spedupAudio.shape[0]
-            newAudio[yPointer:yPointerEnd] = spedupAudio
+                yPointerEnd = yPointer + spedupAudio.shape[0]
+                newAudio[yPointer:yPointerEnd] = spedupAudio
 
             myL = chunk[1] - chunk[0]
             mySamples = (myL / fps) * sampleRate

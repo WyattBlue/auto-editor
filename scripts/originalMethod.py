@@ -6,15 +6,13 @@ import os
 import sys
 import math
 import subprocess
+import tempfile
 from shutil import move, rmtree
 
 from scripts.fastAudio import fastAudio
 from scripts.originalVid import splitVideo
 from scripts.wavfile import read, write
 from scripts.usefulFunctions import vidTracks, getMaxVolume, conwrite
-
-TEMP = '.TEMP'
-CACHE = '.CACHE'
 
 def handleAudio(ffmpeg, tracks, CACHE, TEMP, silentT, frameMargin, SAMPLE_RATE, audioBit,
     verbose, SILENT_SPEED, VIDEO_SPEED, chunks, frameRate):
@@ -86,6 +84,8 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
     print('Running from originalMethod.py')
 
     speeds = [SILENT_SPEED, VIDEO_SPEED]
+    TEMP = tempfile.mkdtemp()
+    CACHE = 'CACHE'
 
     dotIndex = vidFile.rfind('.')
     extension = vidFile[dotIndex:]
@@ -97,12 +97,6 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
     if(not os.path.isfile(vidFile)):
         print('Could not find file:', vidFile)
         sys.exit(1)
-
-    try:
-        os.mkdir(TEMP)
-    except OSError:
-        rmtree(TEMP)
-        os.mkdir(TEMP)
 
     fileSize = os.stat(vidFile).st_size
 
@@ -219,13 +213,11 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
 
     zooms = getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, frameRate)
 
-    conwrite('')
-
     handleAudio(ffmpeg, tracks, CACHE, TEMP, silentT, frameMargin,
         SAMPLE_RATE, audioBit, verbose, SILENT_SPEED, VIDEO_SPEED, chunks, frameRate)
 
     splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
-        SAMPLE_RATE, audioData, extension, verbose)
+        SAMPLE_RATE, audioData, extension, verbose, TEMP, CACHE)
 
     if(BACK_MUS is not None):
         from pydub import AudioSegment
@@ -303,10 +295,14 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         for i in range(0, len(renames), 2):
             os.rename(renames[i+1], renames[i])
 
+    rmtree(TEMP)
+
     # Create cache.txt to see if the created cache is usable for next time.
     if(BACK_MUS is not None):
         tracks -= 1
     file = open(f'{CACHE}/cache.txt', 'w')
     file.write(f'{vidFile}\n{frameRate}\n{fileSize}\n{tracks}\n{COMBINE_TRAC}\n')
+    file.close()
 
+    conwrite('')
     return outFile

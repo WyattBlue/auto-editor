@@ -31,28 +31,26 @@ There are many more features in auto-editor, including **adding in background mu
 
 
 ## Installing Auto-Editor
-Download and Install the Latest Version of [Python 3](https://www.python.org/downloads/).
+ 1. Download and Install the Latest Version of [Python 3](https://www.python.org/downloads/).
 
-Download [Auto-Editor.](https://github.com/WyattBlue/auto-editor/archive/master.zip)
+ 2. Download [Auto-Editor.](https://github.com/WyattBlue/auto-editor/archive/master.zip)
 
-Open the ZIP file.
+ 3. Open the ZIP file.
 
-Open Your Console. (Command Prompt on Windows, Terminal on MacOS)
+ 4. Open Your Console. (Command Prompt on Windows, Terminal on MacOS)
 
-Type in the Console, `cd` then hit the spacebar.
+ 5. Type in the Console, `cd` and space.
 
-Drag the folder, "auto-editor-master", to your Console. Let go of the mouse button, then hit enter.
+ 6. Drag the folder, "auto-editor-master", to your Console. Let go of the mouse button, then hit enter. You are now in the auto-editor-master directory.
 
-Run `pip3 install -r requirements.txt`
+ 7. Run `pip3 install -r requirements.txt`
 
 The binaries you'll need are already installed, unless you're using Linux.
 Linux users need to run this command. `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
 
 (If you would like to use your own ffmpeg, add the flag `--my_ffmpeg` when using auto-editor)
 
-
 Now run it with the example video to make sure it is working.
-
 
 ```terminal
 python3 auto-editor.py example.mp4
@@ -73,11 +71,11 @@ The best way to contribute is to [fork auto-editor](https://github.com/WyattBlue
 No change is too small whether that be a typo in the docs or a small improvement of code.
 
 ## Licensing
-Original code in auto-editor is under the [MIT License](/LICENSE)
-
 The FFmpeg binaries are under the [LGPL License](/scripts/win-ffmpeg/LICENSE.txt)
 
 wavfile.py is under the [BSD 3-Clause "New" or "Revised" License](https://github.com/scipy/scipy/blob/master/LICENSE.txt)
+
+Everything else in auto-editor is under the [MIT License](/LICENSE)
 
 ## Help or Issues
 If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this project, suggest new features, or chat with other users, do that in [the discord server](https://discord.com/invite/kMHAWJJ).

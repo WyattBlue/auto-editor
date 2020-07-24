@@ -292,21 +292,14 @@ if(__name__ == '__main__'):
             print('Warning! Background volume specified even though no music was provided.')
 
         if(args.background_music is None and args.zoom_threshold > 1
-            and args.cut_by_this_audio == None):
+            and args.cut_by_this_audio is None):
 
-            if(args.silent_speed == 99999 and args.video_speed == 1):
-                from scripts.fastVideo import fastVideo
+            from scripts.fastVideo import fastVideo
 
-                outFile = fastVideo(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
-                    args.frame_margin, args.sample_rate, args.audio_bitrate,
-                    args.debug, args.cut_by_this_track, args.keep_tracks_seperate)
-            else:
-                from scripts.fastVideoPlus import fastVideoPlus
-
-                outFile = fastVideoPlus(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
-                    args.frame_margin, args.sample_rate, args.audio_bitrate,
-                    args.debug, args.video_speed, args.silent_speed,
-                    args.cut_by_this_track, args.keep_tracks_seperate)
+            outFile = fastVideo(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
+                args.frame_margin, args.sample_rate, args.audio_bitrate,
+                args.debug, args.video_speed, args.silent_speed,
+                args.cut_by_this_track, args.keep_tracks_seperate)
         else:
             from scripts.originalMethod import originalMethod
 
