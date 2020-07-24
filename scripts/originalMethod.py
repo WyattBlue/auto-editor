@@ -72,7 +72,7 @@ def getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, frameRate):
 
 def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
     LOUD_THRESHOLD, SAMPLE_RATE, audioBit, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
-    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, verbose, HWACCEL):
+    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, verbose, HWACCEL, CACHE):
     """
     This function takes in the path the the input file (and a bunch of other options)
     and outputs a new output file. This is both the safest and slowest of all methods.
@@ -85,7 +85,6 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
 
     speeds = [SILENT_SPEED, VIDEO_SPEED]
     TEMP = tempfile.mkdtemp()
-    CACHE = 'CACHE'
 
     dotIndex = vidFile.rfind('.')
     extension = vidFile[dotIndex:]
@@ -107,6 +106,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         frameRate = 30
 
     SKIP = False
+    print(CACHE)
     try:
         os.mkdir(CACHE)
     except OSError:
@@ -114,13 +114,15 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x[:3] == [vidFile, str(frameRate), str(fileSize)]
+            baseFile = os.path.basename(vidFile)
+            if(x[:3] == [baseFile, str(frameRate), str(fileSize)]
                 and x[4] == str(COMBINE_TRAC)):
                 print('Using cache.')
                 SKIP = True
                 tracks = int(x[3])
             file.close()
         if(not SKIP):
+            print('Removing cache')
             rmtree(CACHE)
             os.mkdir(CACHE)
 
@@ -301,7 +303,8 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
     if(BACK_MUS is not None):
         tracks -= 1
     file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{vidFile}\n{frameRate}\n{fileSize}\n{tracks}\n{COMBINE_TRAC}\n')
+    baseFile = os.path.basename(vidFile)
+    file.write(f'{baseFile}\n{frameRate}\n{fileSize}\n{tracks}\n{COMBINE_TRAC}\n')
     file.close()
 
     conwrite('')

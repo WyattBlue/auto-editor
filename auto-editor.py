@@ -6,8 +6,9 @@ import os
 import re
 import sys
 import time
-import platform
 import argparse
+import platform
+import tempfile
 import subprocess
 from shutil import rmtree
 from datetime import timedelta
@@ -15,9 +16,13 @@ from operator import itemgetter
 
 version = '20w30a'
 
-# Files that start with . are hidden, but can be viewed by running "ls -f" from console.
-TEMP = '.TEMP'
-CACHE = '.CACHE'
+def safeRemove(file):
+    if(os.path.isfile(file)):
+        os.remove(file)
+
+def removeDir(myDir):
+    if(os.path.isdir(myDir)):
+        rmtree(myDir)
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -27,19 +32,15 @@ def file_type(file):
 
 def float_type(num):
     if(num.endswith('%')):
-        num = float(num[:-1]) / 100
-    else:
-        num = float(num)
-    return num
+        return float(num[:-1]) / 100
+    return float(num)
 
 def sample_rate_type(num):
     if(num.endswith(' Hz')):
-        num = int(num[:-3])
-    elif(num.endswith(' kHz')):
-        num = int(float(num[:-4]) * 1000)
-    else:
-        num = int(num)
-    return num
+        return int(num[:-3])
+    if(num.endswith(' kHz')):
+        return int(float(num[:-4]) * 1000)
+    return int(num)
 
 if(__name__ == '__main__'):
     parser = argparse.ArgumentParser(prog='Auto-Editor', usage='Auto-Editor: [options]')
@@ -108,21 +109,34 @@ if(__name__ == '__main__'):
 
     args = parser.parse_args()
 
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+    gitPath = os.path.join(dirPath, '.git')
+    CACHE = os.path.join(dirPath, 'CACHE')
+
     if(args.version):
         print('Auto-Editor version:', version)
         sys.exit()
 
     if(args.clear_cache):
         print('Removing cache')
-        if(os.path.isdir(CACHE)):
-            rmtree(CACHE)
-        if(os.path.isdir(TEMP)):
-            rmtree(TEMP)
+        removeDir(CACHE)
+        removeDir('.CACHE')
+        removeDir('.TEMP')
         if(args.input == []):
             sys.exit()
 
+    if(not os.path.isdir(gitPath)):
+        # Remove files only useful for developers
+        safeRemove(os.path.join(dirPath, '.gitignore'))
+        safeRemove(os.path.join(dirPath, '.travis.yml'))
+        removeDir(os.path.join(dirPath, '.github'))
+        removeDir(os.path.join(dirPath, 'resources'))
+        if(platform.system() != 'Windows'):
+            removeDir(os.path.join(dirPath, 'scripts/win-ffmpeg'))
+        if(platform.system() != 'Darwin'):
+            safeRemove(os.path.join(dirPath, 'scripts/mac-ffmpeg.7z'))
+
     # Set the file path to the ffmpeg installation.
-    dirPath = os.path.dirname(os.path.realpath(__file__))
     ffmpeg = 'ffmpeg'
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
 
@@ -308,7 +322,7 @@ if(__name__ == '__main__'):
                 args.audio_bitrate, args.silent_speed, args.video_speed,
                 args.keep_tracks_seperate, args.background_music, args.background_volume,
                 args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
-                args.debug, args.hardware_accel)
+                args.debug, args.hardware_accel, CACHE)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)
@@ -331,5 +345,4 @@ if(__name__ == '__main__'):
                 except:
                     print('Warning! Could not open output file.')
 
-    if(os.path.isdir(TEMP)):
-        rmtree(TEMP)
+    removeDir('.TEMP')

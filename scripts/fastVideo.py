@@ -1,9 +1,5 @@
 '''scripts/fastVideo.py'''
 
-"""
-This script is like fastVideo but it supports sounded and silent speeds.
-"""
-
 # External libraries
 import numpy as np
 from audiotsm2 import phasevocoder

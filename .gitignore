@@ -1,6 +1,8 @@
 *_ALTERED.mp4
 *_ALTERED
 *.CACHE
+*CACHE/
+*cache/
 *.TEMP
 *.webm
 *.xml
@@ -21,8 +23,6 @@ dist/
 .DS_Store
 .DS_Store?
 ._*
-
-
 
 
 MANIFEST
