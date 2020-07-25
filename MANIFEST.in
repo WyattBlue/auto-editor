@@ -1,0 +1,13 @@
+include scripts/mac-ffmpeg/unix-ffmpeg
+include scripts/mac-ffmpeg/unix-ffprobe
+include scripts/win-ffmpeg/bin/ffmpeg.exe
+include scripts/win-ffmpeg/bin/ffprobe.exe
+include scripts/win-ffmpeg/LICENSE.txt
+include scripts/win-ffmpeg/presets/ffprobe.xsd
+include scripts/win-ffmpeg/presets/libvpx-360p.ffpreset
+include scripts/win-ffmpeg/presets/libvpx-720p.ffpreset
+include scripts/win-ffmpeg/presets/libvpx-720p50_60.ffpreset
+include scripts/win-ffmpeg/presets/libvpx-1080p.ffpreset
+include scripts/win-ffmpeg/presets/libvpx-1080p50_60.ffpreset
+
+include *.md

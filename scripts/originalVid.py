@@ -1,17 +1,16 @@
-'''originalVid.py'''
+'''scripts/originalVid.py'''
 
 import numpy as np
 from PIL import Image
 
-from scripts.wavfile import read, write
+from wavfile import read, write
+from usefulFunctions import progressBar
 
 import os
 import math
+import time
 import subprocess
 from shutil import copyfile
-
-TEMP = '.TEMP'
-CACHE = '.CACHE'
 
 def resize(inputFile, outputFile, size):
     im = Image.open(inputFile)
@@ -30,14 +29,21 @@ def resize(inputFile, outputFile, size):
 
 
 def splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
-    SAMPLE_RATE, audioData, extension, verbose):
+    SAMPLE_RATE, audioData, extension, verbose, TEMP, CACHE):
     Renames = []
     lastExisting = None
     remander = 0
     outputFrame = 0
 
+    lastChunk = chunks[len(chunks)-1][1]
+    nums = 0
+    beginTime = time.time()
+
     for chunk in chunks:
         for inputFrame in range(chunk[0], chunk[1]):
+            nums += 1
+            progressBar(min(nums, lastChunk-1), lastChunk, beginTime,
+                title='Creating new video.')
 
             doIt = 1 / speeds[chunk[2]] + remander
             for __ in range(int(doIt)):
@@ -75,6 +81,7 @@ def splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
                         else:
                             raise IOError(f'Error! The file {src} does not exist.')
             remander = doIt % 1
+
 
     with open(f'{TEMP}/Renames.txt', 'w') as f:
         for item in Renames:

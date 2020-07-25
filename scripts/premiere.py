@@ -5,8 +5,8 @@ This script's purpose is to export an XML file that can be imported by Adobe Pre
 """
 
 # Included functions
-from scripts.usefulFunctions import getAudioChunks, conwrite
-from scripts.wavfile import read, write
+from usefulFunctions import getAudioChunks, conwrite
+from wavfile import read, write
 
 # Internal libraries
 import os
