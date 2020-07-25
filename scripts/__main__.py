@@ -14,11 +14,7 @@ from shutil import rmtree
 from datetime import timedelta
 from operator import itemgetter
 
-version = '20w30a'
-
-def safeRemove(file):
-    if(os.path.isfile(file)):
-        os.remove(file)
+version = '20w30b'
 
 def removeDir(myDir):
     if(os.path.isdir(myDir)):
@@ -42,7 +38,8 @@ def sample_rate_type(num):
         return int(float(num[:-4]) * 1000)
     return int(num)
 
-if(__name__ == '__main__'):
+
+def main():
     parser = argparse.ArgumentParser(prog='Auto-Editor', usage='Auto-Editor: [options]')
 
     basic = parser.add_argument_group('Basic Options')
@@ -110,7 +107,6 @@ if(__name__ == '__main__'):
     args = parser.parse_args()
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    gitPath = os.path.join(dirPath, '.git')
     CACHE = os.path.join(dirPath, 'cache')
 
     if(args.version):
@@ -120,32 +116,19 @@ if(__name__ == '__main__'):
     if(args.clear_cache):
         print('Removing cache')
         removeDir(CACHE)
-        removeDir('.CACHE')
-        removeDir('.TEMP')
         if(args.input == []):
             sys.exit()
-
-    if(not os.path.isdir(gitPath)):
-        # Remove files only useful for developers
-        safeRemove(os.path.join(dirPath, '.gitignore'))
-        safeRemove(os.path.join(dirPath, '.travis.yml'))
-        removeDir(os.path.join(dirPath, '.github'))
-        removeDir(os.path.join(dirPath, 'resources'))
-        if(platform.system() != 'Windows'):
-            removeDir(os.path.join(dirPath, 'scripts/win-ffmpeg'))
-        if(platform.system() != 'Darwin'):
-            safeRemove(os.path.join(dirPath, 'scripts/mac-ffmpeg.7z'))
 
     # Set the file path to the ffmpeg installation.
     ffmpeg = 'ffmpeg'
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
 
-        if(os.path.isfile(os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe'))):
-            ffmpeg = os.path.join(dirPath, 'scripts/win-ffmpeg/bin/ffmpeg.exe')
+        if(os.path.isfile(os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe'))):
+            ffmpeg = os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
 
     if(platform.system() == 'Darwin' and not args.my_ffmpeg):
-        newF = os.path.join(dirPath, 'scripts/mac-ffmpeg/unix-ffmpeg')
-        binPath = os.path.join(dirPath, 'scripts/mac-ffmpeg.7z')
+        newF = os.path.join(dirPath, 'mac-ffmpeg/unix-ffmpeg')
+        binPath = os.path.join(dirPath, 'mac-ffmpeg.7z')
 
         if(os.path.isfile(newF)):
             ffmpeg = newF
@@ -170,7 +153,8 @@ if(__name__ == '__main__'):
             sys.exit()
 
     if(args.input == []):
-        print('auto-editor.py: error: the following arguments are required: input')
+        print('Error! The following arguments are required: input')
+        print('\nIn other words, you need a the path to a video or an audio file so that Auto-Editor can do the work for you.')
         sys.exit(1)
 
     INPUT_FILE = args.input[0]
@@ -345,5 +329,6 @@ if(__name__ == '__main__'):
                 except:
                     print('Warning! Could not open output file.')
 
-    removeDir('.TEMP')
-    removeDir('.CACHE')
+
+if(__name__ == '__main__'):
+    main()

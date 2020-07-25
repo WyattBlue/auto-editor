@@ -1,30 +1,30 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w30a
+ &nbsp;&nbsp;<sup>version 20w30b
 
 <p align="center">
-  <img src="/resources/auto-editor_banner.png" width="700">
+  <img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700">
 </p>
 
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by removing the silent parts.
 
-## New in 20w30a
- * Fixed ffprobe bug that was effecting Windows users.
- * Added support for audio tracks for `--export_to_premiere`
- * Files in the media folder moved to resources. Changelog and credits moved to resources.
+## New in 20w30b
+
+ * fastVideoPlus and fastVideo have been combined.
+ * Auto-Editor is now a proper command line program. You can now download **everything** with pip.
 
 [See the Changelog](/resources/CHANGELOG.md) for all the differences between releases.
 
 ## Usage
 Create an edited version of example.mp4 with the default parameters.
 ```terminal
- $ python auto-editor.py example.mp4
+auto-editor example.mp4
 ```
 
 You can change the **pace** of a video by changing by including frames that are silent but are next to loud parts. A frame margin of 8 will add up to 8 frames before and 8 frames after the loud part.
 
 ```terminal
- $ python auto-editor.py example.mp4 --frame_margin 8
+auto-editor example.mp4 --frame_margin 8
 ```
 
 There are many more features in auto-editor, including **adding in background music** that automatically gets quieter, and **zooming in** the video when it gets especially loud.
@@ -33,17 +33,9 @@ There are many more features in auto-editor, including **adding in background mu
 ## Installing Auto-Editor
  1. Download and Install the Latest Version of [Python 3](https://www.python.org/downloads/).
 
- 2. Download [Auto-Editor.](https://github.com/WyattBlue/auto-editor/archive/master.zip)
-
- 3. Open the ZIP file.
-
- 4. Open Your Console. (Command Prompt on Windows, Terminal on MacOS)
-
- 5. Type in the Console, `cd` and space.
-
- 6. Drag the folder, "auto-editor-master", to your Console. Let go of the mouse button, then hit enter. You are now in the auto-editor-master directory.
-
- 7. Run `pip3 install -r requirements.txt`
+```terminal
+pip3 install auto-editor
+```
 
 The binaries you'll need are already installed, unless you're using Linux.
 Linux users need to run this command. `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
@@ -51,17 +43,23 @@ Linux users need to run this command. `sudo apt-get install libavformat-dev liba
 Now run it with the example video to make sure it is working.
 
 ```terminal
-python3 auto-editor.py example.mp4
+auto-editor example.mp4
 ```
 
 If that works then congratulations, you have successfully installed auto-editor. You can use now use this with any other type of video or audio that you have.
 
 ```terminal
-python3 auto-editor.py C:path\to\your\video
+auto-editor C:path\to\your\video
 ```
 
 [See the docs](/resources/docs.md) for more commands and usages.
 
+
+## Upgrading
+
+```terminal
+pip3 install auto-editor --upgrade
+```
 
 ## Contributing
 The best way to contribute is to [fork auto-editor](https://github.com/WyattBlue/auto-editor/fork) and make changes there. Once you're happy with those changes, make a new pull request and type in a brief description on how you improved the code.
