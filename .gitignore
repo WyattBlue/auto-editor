@@ -1,6 +1,8 @@
 *_ALTERED.mp4
 *_ALTERED
 *.CACHE
+*CACHE/
+*cache/
 *.TEMP
 *.webm
 *.xml
@@ -8,21 +10,18 @@
 *.pyo
 *~
 
-mac-ffmpeg/
-
 __pycache__/
 *.py[cod]
 *$py.class
 
 build/
 dist/
+*.egg-info
 
 # OS generated files
 .DS_Store
 .DS_Store?
 ._*
-
-
 
 
 MANIFEST
