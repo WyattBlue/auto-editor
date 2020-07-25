@@ -122,23 +122,13 @@ def main():
     # Set the file path to the ffmpeg installation.
     ffmpeg = 'ffmpeg'
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
-
-        if(os.path.isfile(os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe'))):
-            ffmpeg = os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
+        newF = os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
+        if(os.path.isfile(newF)):
+            ffmpeg = newF
 
     if(platform.system() == 'Darwin' and not args.my_ffmpeg):
         newF = os.path.join(dirPath, 'mac-ffmpeg/unix-ffmpeg')
-        binPath = os.path.join(dirPath, 'mac-ffmpeg.7z')
-
         if(os.path.isfile(newF)):
-            ffmpeg = newF
-        elif(os.path.isfile(binPath)):
-            print('Unzipping folder with ffmpeg binaries.')
-
-            # Use default program to extract the files.
-            subprocess.call(['open', str(binPath)])
-            while not os.path.exists(newF):
-                time.sleep(0.5)
             ffmpeg = newF
 
     if(args.debug):

@@ -9,10 +9,10 @@ import subprocess
 import tempfile
 from shutil import move, rmtree
 
-from scripts.fastAudio import fastAudio
-from scripts.originalVid import splitVideo
-from scripts.wavfile import read, write
-from scripts.usefulFunctions import vidTracks, getMaxVolume, conwrite
+from fastAudio import fastAudio
+from originalVid import splitVideo
+from wavfile import read, write
+from usefulFunctions import vidTracks, getMaxVolume, conwrite
 
 def handleAudio(ffmpeg, tracks, CACHE, TEMP, silentT, frameMargin, SAMPLE_RATE, audioBit,
     verbose, SILENT_SPEED, VIDEO_SPEED, chunks, frameRate):

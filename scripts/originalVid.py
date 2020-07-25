@@ -3,8 +3,8 @@
 import numpy as np
 from PIL import Image
 
-from scripts.wavfile import read, write
-from scripts.usefulFunctions import progressBar
+from wavfile import read, write
+from usefulFunctions import progressBar
 
 import os
 import math

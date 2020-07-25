@@ -4,7 +4,7 @@ import sys
 from setuptools import setup, find_packages
 
 def find_version():
-    return '0.1.5'
+    return '0.1.6'
 
 
 # 'setup.py publish' shortcut.

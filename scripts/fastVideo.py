@@ -5,9 +5,9 @@ import numpy as np
 from audiotsm2 import phasevocoder
 
 # Included functions
-from scripts.fastAudio import fastAudio
-from scripts.usefulFunctions import getAudioChunks, progressBar, vidTracks, conwrite
-from scripts.wavfile import read, write
+from fastAudio import fastAudio
+from usefulFunctions import getAudioChunks, progressBar, vidTracks, conwrite
+from wavfile import read, write
 
 # Internal libraries
 import os
@@ -22,7 +22,7 @@ def fastVideo(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
 
     print('Running from fastVideo.py')
 
-    import cv2  # pip3 install opencv-python
+    import cv2
 
     conwrite('Reading audio.')
 
@@ -155,5 +155,6 @@ def fastVideo(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
         subprocess.call(cmd)
 
     rmtree(TEMP)
+    conwrite('')
 
     return outFile

@@ -22,4 +22,4 @@ script:
  - python3 scripts/__main__.py example.mp4 --background_music resources/Magic_in_the_Garden.mp3
  - python3 scripts/__main__.py example.mp4 --export_to_premiere
  - python3 scripts/__main__.py example.mp4 --preview
- - python3 scripts/__main__.py example.mp4 --zoom_threshold 0.45
+ - python3 scripts/__main__.py example.mp4 --zoom_threshold 0.8
