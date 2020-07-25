@@ -218,7 +218,7 @@ def main():
             sys.exit(1)
 
     if(args.preview):
-        from scripts.preview import preview
+        from preview import preview
 
         preview(ffmpeg, INPUT_FILE, args.silent_threshold, args.zoom_threshold,
             args.frame_margin, args.sample_rate, args.video_speed, args.silent_speed,
@@ -237,7 +237,7 @@ def main():
             newOutput = OUTPUT_FILE
 
         if(args.export_to_premiere):
-            from scripts.premiere import exportToPremiere
+            from premiere import exportToPremiere
 
             outFile = exportToPremiere(ffmpeg, INPUT_FILE, newOutput,
                 args.silent_threshold, args.zoom_threshold, args.frame_margin,
@@ -246,7 +246,7 @@ def main():
 
         isAudio = extension in ['.wav', '.mp3', '.m4a']
         if(isAudio):
-            from scripts.fastAudio import fastAudio
+            from fastAudio import fastAudio
 
             outFile = fastAudio(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                 args.frame_margin, args.sample_rate, args.audio_bitrate, args.debug,
@@ -282,14 +282,14 @@ def main():
         if(args.background_music is None and args.zoom_threshold > 1
             and args.cut_by_this_audio is None):
 
-            from scripts.fastVideo import fastVideo
+            from fastVideo import fastVideo
 
             outFile = fastVideo(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                 args.frame_margin, args.sample_rate, args.audio_bitrate,
                 args.debug, args.video_speed, args.silent_speed,
                 args.cut_by_this_track, args.keep_tracks_seperate)
         else:
-            from scripts.originalMethod import originalMethod
+            from originalMethod import originalMethod
 
             outFile = originalMethod(ffmpeg, INPUT_FILE, newOutput, args.frame_margin,
                 args.silent_threshold, args.zoom_threshold, args.sample_rate,
