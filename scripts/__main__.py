@@ -154,7 +154,7 @@ def main():
 
     if(args.input == []):
         print('Error! The following arguments are required: input')
-        print('\nIn other words, you need a the path to a video or an audio file so that Auto-Editor can do the work for you.')
+        print('\nIn other words, you need the path to a video or an audio file so that auto-editor can do the work for you.')
         sys.exit(1)
 
     INPUT_FILE = args.input[0]

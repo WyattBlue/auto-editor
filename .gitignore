@@ -10,8 +10,6 @@
 *.pyo
 *~
 
-mac-ffmpeg/
-
 __pycache__/
 *.py[cod]
 *$py.class

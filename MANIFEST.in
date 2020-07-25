@@ -1,4 +1,5 @@
-include scripts/mac-ffmpeg.7z
+include scripts/mac-ffmpeg/unix-ffmpeg
+include scripts/mac-ffmpeg/unix-ffprobe
 include scripts/win-ffmpeg/bin/ffmpeg.exe
 include scripts/win-ffmpeg/bin/ffprobe.exe
 include scripts/win-ffmpeg/LICENSE.txt
