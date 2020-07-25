@@ -6,15 +6,13 @@ import os
 import sys
 import math
 import subprocess
+import tempfile
 from shutil import move, rmtree
 
-from scripts.fastAudio import fastAudio
-from scripts.originalVid import splitVideo
-from scripts.wavfile import read, write
-from scripts.usefulFunctions import vidTracks, getMaxVolume, conwrite
-
-TEMP = '.TEMP'
-CACHE = '.CACHE'
+from fastAudio import fastAudio
+from originalVid import splitVideo
+from wavfile import read, write
+from usefulFunctions import vidTracks, getMaxVolume, conwrite
 
 def handleAudio(ffmpeg, tracks, CACHE, TEMP, silentT, frameMargin, SAMPLE_RATE, audioBit,
     verbose, SILENT_SPEED, VIDEO_SPEED, chunks, frameRate):
@@ -74,7 +72,7 @@ def getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, frameRate):
 
 def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
     LOUD_THRESHOLD, SAMPLE_RATE, audioBit, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
-    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, verbose, HWACCEL):
+    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, verbose, HWACCEL, CACHE):
     """
     This function takes in the path the the input file (and a bunch of other options)
     and outputs a new output file. This is both the safest and slowest of all methods.
@@ -86,6 +84,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
     print('Running from originalMethod.py')
 
     speeds = [SILENT_SPEED, VIDEO_SPEED]
+    TEMP = tempfile.mkdtemp()
 
     dotIndex = vidFile.rfind('.')
     extension = vidFile[dotIndex:]
@@ -98,12 +97,6 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         print('Could not find file:', vidFile)
         sys.exit(1)
 
-    try:
-        os.mkdir(TEMP)
-    except OSError:
-        rmtree(TEMP)
-        os.mkdir(TEMP)
-
     fileSize = os.stat(vidFile).st_size
 
     try:
@@ -113,6 +106,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         frameRate = 30
 
     SKIP = False
+    print(CACHE)
     try:
         os.mkdir(CACHE)
     except OSError:
@@ -120,13 +114,15 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         if(os.path.isfile(f'{CACHE}/cache.txt')):
             file = open(f'{CACHE}/cache.txt', 'r')
             x = file.read().splitlines()
-            if(x[:3] == [vidFile, str(frameRate), str(fileSize)]
+            baseFile = os.path.basename(vidFile)
+            if(x[:3] == [baseFile, str(frameRate), str(fileSize)]
                 and x[4] == str(COMBINE_TRAC)):
                 print('Using cache.')
                 SKIP = True
                 tracks = int(x[3])
             file.close()
         if(not SKIP):
+            print('Removing cache')
             rmtree(CACHE)
             os.mkdir(CACHE)
 
@@ -219,13 +215,11 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
 
     zooms = getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, frameRate)
 
-    conwrite('')
-
     handleAudio(ffmpeg, tracks, CACHE, TEMP, silentT, frameMargin,
         SAMPLE_RATE, audioBit, verbose, SILENT_SPEED, VIDEO_SPEED, chunks, frameRate)
 
     splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
-        SAMPLE_RATE, audioData, extension, verbose)
+        SAMPLE_RATE, audioData, extension, verbose, TEMP, CACHE)
 
     if(BACK_MUS is not None):
         from pydub import AudioSegment
@@ -303,10 +297,15 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         for i in range(0, len(renames), 2):
             os.rename(renames[i+1], renames[i])
 
+    rmtree(TEMP)
+
     # Create cache.txt to see if the created cache is usable for next time.
     if(BACK_MUS is not None):
         tracks -= 1
     file = open(f'{CACHE}/cache.txt', 'w')
-    file.write(f'{vidFile}\n{frameRate}\n{fileSize}\n{tracks}\n{COMBINE_TRAC}\n')
+    baseFile = os.path.basename(vidFile)
+    file.write(f'{baseFile}\n{frameRate}\n{fileSize}\n{tracks}\n{COMBINE_TRAC}\n')
+    file.close()
 
+    conwrite('')
     return outFile

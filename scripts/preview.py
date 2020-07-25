@@ -6,8 +6,8 @@ selected options are used.
 """
 
 # Included functions
-from scripts.usefulFunctions import getAudioChunks, vidTracks, getNewLength
-from scripts.wavfile import read, write
+from usefulFunctions import getAudioChunks, vidTracks, getNewLength
+from wavfile import read, write
 
 # Internal libraries
 import os
