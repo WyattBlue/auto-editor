@@ -127,7 +127,7 @@ def main():
             ffmpeg = newF
 
     if(platform.system() == 'Darwin' and not args.my_ffmpeg):
-        newF = os.path.join(dirPath, 'mac-ffmpeg/unix-ffmpeg')
+        newF = os.path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
         if(os.path.isfile(newF)):
             ffmpeg = newF
 
@@ -259,6 +259,10 @@ def main():
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 stdout, __ = process.communicate()
                 output = stdout.decode()
+                if(args.debug):
+                    print('FFmpeg test:')
+                    print(output)
+                    print('\n')
                 matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
                 __ = float(matchDict['fps'])
             except AttributeError:
@@ -268,6 +272,8 @@ def main():
                 # Auto-Editor wouldn't work if the video has a variable framerate, so
                 # it needs to make a video with a constant framerate and use that for
                 # it's input instead.
+
+                TEMP = tempfile.mkdtemp()
 
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
                     f'{TEMP}/constantVid{extension}', '-hide_banner']
@@ -319,6 +325,8 @@ def main():
                 except:
                     print('Warning! Could not open output file.')
 
+    if('TEMP' in locals()):
+        rmtree(TEMP)
 
 if(__name__ == '__main__'):
     main()
