@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w30b
+ &nbsp;&nbsp;<sup>version 20w30b hotfix
 
 <p align="center">
   <img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700">
@@ -12,6 +12,10 @@
 
  * fastVideoPlus and fastVideo have been combined.
  * Auto-Editor is now a proper command line program. You can now download **everything** with pip.
+
+#### Hotfix
+ * fixed macOS FFmpeg binaries not working unless the user already installed ffmpeg at some point.
+ * fixed premiere.py searching for the width and height of an audio file.
 
 [See the Changelog](/resources/CHANGELOG.md) for all the differences between releases.
 

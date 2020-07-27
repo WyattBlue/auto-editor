@@ -45,35 +45,37 @@ def exportToPremiere(ffmpeg, myInput, newOutput, silentT, zoomT, frameMargin, sa
 
     name = os.path.basename(myInput)
 
-    ntsc = 'FALSE'
-    ana = 'FALSE' # anamorphic
-    alphatype = 'none'
-    depth = '16'
-    try:
-        import cv2
-        conwrite('Grabbing video dimensions.')
-
-
-        cap = cv2.VideoCapture(myInput)
-        width = str(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
-        height = str(int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-
-        cap.release()
-        cv2.destroyAllWindows()
-
-    except ImportError:
-        width = '1280'
-        height = '720'
-
-    pixelar = 'square' # pixel aspect ratio
-    colordepth = '24'
-    sr = sampleRate
-
     extension = myInput[myInput.rfind('.'):]
     audioFile = extension in ['.wav', '.mp3', '.m4a']
 
     first = myInput[:myInput.rfind('.')]
     newFile = f'{first}.xml'
+
+    ntsc = 'FALSE'
+    ana = 'FALSE' # anamorphic
+    alphatype = 'none'
+    depth = '16'
+    if(not audioFile):
+        try:
+            import cv2
+            conwrite('Grabbing video dimensions.')
+
+
+            cap = cv2.VideoCapture(myInput)
+            width = str(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
+            height = str(int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+
+            cap.release()
+            cv2.destroyAllWindows()
+
+        except ImportError:
+            width = '1280'
+            height = '720'
+
+    pixelar = 'square' # pixel aspect ratio
+    colordepth = '24'
+    sr = sampleRate
+
 
     if(audioFile):
         with open(newFile, 'w', encoding='utf-8') as outfile:

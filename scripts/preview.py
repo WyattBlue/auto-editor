@@ -75,6 +75,7 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
     printTimeFrame('New length', newL * fps, fps)
 
     clips = 0
+    cuts = 0
     clipLengths = []
     for chunk in chunks:
         state = chunk[2]
@@ -82,8 +83,11 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
             clips += 1
             leng = (chunk[1] - chunk[0]) / speeds[state]
             clipLengths.append(leng)
+        else:
+            cuts += 1
 
     print('Number of clips:', clips)
+    #print('Number of cuts:', cuts)
     printTimeFrame('Smallest clip length', min(clipLengths), fps)
     printTimeFrame('Largest clip length', max(clipLengths), fps)
     printTimeFrame('Average clip length', sum(clipLengths) / len(clipLengths), fps)
