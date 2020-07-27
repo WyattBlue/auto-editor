@@ -14,7 +14,7 @@ from shutil import rmtree
 from datetime import timedelta
 from operator import itemgetter
 
-version = '20w30b'
+version = '20w30b hotfix'
 
 def removeDir(myDir):
     if(os.path.isdir(myDir)):
