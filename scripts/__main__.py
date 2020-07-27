@@ -107,6 +107,10 @@ def main():
     args = parser.parse_args()
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
+
+    # fixes pip not able to find other included modules.
+    sys.path.append(os.path.abspath(dirPath))
+
     CACHE = os.path.join(dirPath, 'cache')
 
     if(args.version):
