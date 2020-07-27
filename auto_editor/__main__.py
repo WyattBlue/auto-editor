@@ -12,17 +12,12 @@ import tempfile
 import subprocess
 from shutil import rmtree
 from datetime import timedelta
-from operator import itemgetter
 
-version = '20w30b hotfix'
-
-def removeDir(myDir):
-    if(os.path.isdir(myDir)):
-        rmtree(myDir)
+version = '20w31a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
-        print('Could not locate file:', file)
+        print('Error! Could not locate file:', file)
         sys.exit(1)
     return file
 
@@ -118,8 +113,9 @@ def main():
         sys.exit()
 
     if(args.clear_cache):
-        print('Removing cache')
-        removeDir(CACHE)
+        if(os.path.isdir(CACHE)):
+            rmtree(CACHE)
+        print('Removed cache.')
         if(args.input == []):
             sys.exit()
 
@@ -148,7 +144,7 @@ def main():
 
     if(args.input == []):
         print('Error! The following arguments are required: input')
-        print('\nIn other words, you need the path to a video or an audio file so that auto-editor can do the work for you.')
+        print('In other words, you need the path to a video or an audio file so that auto-editor can do the work for you.')
         sys.exit(1)
 
     INPUT_FILE = args.input[0]
@@ -160,22 +156,8 @@ def main():
         args.video_speed = 99999
 
     if(os.path.isdir(INPUT_FILE)):
-        # Get the file path and date modified so that it can be sorted later.
-        INPUTS = []
-        for filename in os.listdir(INPUT_FILE):
-            if(not filename.startswith('.')):
-                dic = {}
-                dic['file'] = os.path.join(INPUT_FILE, filename)
-                dic['time'] = os.path.getmtime(dic['file'])
-
-                INPUTS.append(dic)
-
-        # Sort the list by the key 'time'.
-        newlist = sorted(INPUTS, key=itemgetter('time'), reverse=False)
-        # Then reduce to a list that only has strings.
-        INPUTS = []
-        for item in newlist:
-            INPUTS.append(item['file'])
+        # Sort files in folder by name.
+        INPUTS = sort(os.listdir(INPUT_FILE))
 
         if(args.combine_files):
             outputDir = ''
@@ -209,12 +191,13 @@ def main():
             # If input is a URL, download as a mp4 with youtube-dl.
             print('URL detected, using youtube-dl to download from webpage.')
             basename = re.sub(r'\W+', '-', INPUT_FILE)
-            cmd = ["youtube-dl", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
-                   INPUT_FILE, "--output", basename]
+            cmd = ['youtube-dl', '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
+                   INPUT_FILE, '--output', basename, '--no-check-certificate']
+            if(ffmpeg != 'ffmpeg'):
+                cmd.extend(['--ffmpeg-location', ffmpeg])
             subprocess.call(cmd)
 
-            INPUT_FILE = basename + '.mp4'
-            INPUTS = [INPUT_FILE]
+            INPUTS = [basename + '.mp4']
             if(OUTPUT_FILE == ''):
                 OUTPUT_FILE = basename + '_ALTERED.mp4'
         else:

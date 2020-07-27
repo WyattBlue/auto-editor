@@ -1,10 +1,9 @@
 import os
-import re
 import sys
 from setuptools import setup, find_packages
 
 def find_version():
-    return '20.30.2.4'
+    return '20.31.1.0'
 
 
 # 'setup.py publish' shortcut.
@@ -15,10 +14,8 @@ if(sys.argv[-1] == 'publish'):
     os.system('twine upload dist/*')
     sys.exit()
 
-
 with open('README.md', 'r') as f:
     long_description = f.read()
-
 
 setup(
     name='auto-editor',
@@ -30,13 +27,9 @@ setup(
     url='https://github.com/WyattBlue/auto-editor',
     author='WyattBlue',
     author_email='wyattbluesandbox@gmail.com',
-
     packages=find_packages(),
-
     include_package_data=True,
-
     install_requires=[
-        'numpy',
         'opencv-python',
         'audiotsm2',
         'youtube_dl',
@@ -58,6 +51,6 @@ setup(
         'Programming Language :: Python :: Implementation :: Jython',
     ],
     entry_points={
-        "console_scripts": ["auto-editor=scripts.__main__:main"]
+        "console_scripts": ["auto-editor=auto_editor.__main__:main"]
     }
 )

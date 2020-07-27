@@ -17,7 +17,7 @@ from shutil import rmtree
 from datetime import timedelta
 
 def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed,
-        silentSpeed, cutByThisTrack, bitrate):
+        silentSpeed, cutByThisTrack, bitrate, cache):
     TEMP = tempfile.mkdtemp()
 
     extension = myInput[myInput.rfind('.'):]
@@ -51,15 +51,14 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
                 '-nostats', '-loglevel', '0']
             subprocess.call(cmd)
 
-            sampleRate, audioData = read(f'{TEMP}/{cutByThisTrack}.wav')
-            chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
+        sampleRate, audioData = read(f'{TEMP}/{cutByThisTrack}.wav')
+        chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
 
     rmtree(TEMP)
 
     def printTimeFrame(title, frames, fps):
         inSec = round(frames / fps, 1)
-        if(fps % 1 == 0):
-            fps = round(fps)
+        fps = round(fps)
         if(inSec < 1):
             minutes = f'{int(frames)}/{fps} frames'
         else:
@@ -68,14 +67,17 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
 
 
     oldTime = chunks[len(chunks)-1][1]
+    print('')
     printTimeFrame('Old length', oldTime, fps)
 
     speeds = [silentSpeed, videoSpeed]
     newL = getNewLength(chunks, speeds, fps)
     printTimeFrame('New length', newL * fps, fps)
+    print('')
 
     clips = 0
     cuts = 0
+    cutL = []
     clipLengths = []
     for chunk in chunks:
         state = chunk[2]
@@ -85,9 +87,19 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
             clipLengths.append(leng)
         else:
             cuts += 1
+            leng = chunk[1] - chunk[0]
+            cutL.append(leng)
 
     print('Number of clips:', clips)
-    #print('Number of cuts:', cuts)
     printTimeFrame('Smallest clip length', min(clipLengths), fps)
     printTimeFrame('Largest clip length', max(clipLengths), fps)
     printTimeFrame('Average clip length', sum(clipLengths) / len(clipLengths), fps)
+    print('')
+    print('Number of cuts:', cuts)
+    printTimeFrame('Smallest cut length', min(cutL), fps)
+    printTimeFrame('Largest cut length', max(cutL), fps)
+    printTimeFrame('Average cut length', sum(cutL) / len(cutL), fps)
+    print('')
+    if(not audioFile):
+        print('Video framerate:', fps)
+
