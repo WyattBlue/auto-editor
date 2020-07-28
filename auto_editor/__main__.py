@@ -165,7 +165,7 @@ def main():
             if(ffmpeg != 'ffmpeg'):
                 cmd.extend(['--ffmpeg-location', ffmpeg])
             subprocess.call(cmd)
-            inputList.append.(basename + '.mp4')
+            inputList.append(basename + '.mp4')
         else:
             print('Could not find file:', myInput)
             sys.exit(1)
@@ -203,7 +203,8 @@ def main():
 
     from usefulFunctions import isAudioFile
 
-    for INPUT_FILE in inputList:
+    for i, INPUT_FILE in enumerate(inputList):
+        newOutput = args.output_file[i]
         if(args.export_to_premiere):
             from premiere import exportToPremiere
 
