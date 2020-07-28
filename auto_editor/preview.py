@@ -19,6 +19,10 @@ from datetime import timedelta
 def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed,
         silentSpeed, cutByThisTrack, bitrate, cache):
 
+    if(not os.path.isfile(myInput)):
+        print('Could not find file:', myInput)
+        sys.exit(1)
+
     audioFile = isAudioFile(myInput)
     if(audioFile):
         fps = 30
@@ -51,7 +55,7 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
             print(f'There are only {tracks-1} tracks. (starting from 0)')
             sys.exit(1)
 
-        if(useCache):
+        if(useCache and os.path.isfile(f'{cache}/{cutByThisTrack}.wav')):
             sampleRate, audioData = read(f'{cache}/{cutByThisTrack}.wav')
         else:
             for trackNum in range(tracks):

@@ -194,7 +194,7 @@ def main():
     if(args.preview):
         from preview import preview
 
-        preview(ffmpeg, myInput[0], args.silent_threshold, args.zoom_threshold,
+        preview(ffmpeg, inputList[0], args.silent_threshold, args.zoom_threshold,
             args.frame_margin, args.sample_rate, args.video_speed, args.silent_speed,
             args.cut_by_this_track, args.audio_bitrate, cache)
         sys.exit()
