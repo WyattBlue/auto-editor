@@ -148,9 +148,6 @@ def main():
     if(args.video_speed <= 0 or args.video_speed > 99999):
         args.video_speed = 99999
 
-    INPUT_FILE = args.input[0]
-    OUTPUT_FILE = args.output_file
-
     inputList = []
     for myInput in args.input:
         if(os.path.isdir(myInput)):
@@ -169,6 +166,9 @@ def main():
         else:
             print('Could not find file:', myInput)
             sys.exit(1)
+
+    if(args.output_file is None):
+        args.output_file = []
 
     if(len(args.output_file) < len(inputList)):
         for i in range(len(inputList) - len(args.output_file)):
@@ -194,7 +194,7 @@ def main():
     if(args.preview):
         from preview import preview
 
-        preview(ffmpeg, INPUT_FILE, args.silent_threshold, args.zoom_threshold,
+        preview(ffmpeg, myInput[0], args.silent_threshold, args.zoom_threshold,
             args.frame_margin, args.sample_rate, args.video_speed, args.silent_speed,
             args.cut_by_this_track, args.audio_bitrate, cache)
         sys.exit()
@@ -271,19 +271,19 @@ def main():
     minutes = timedelta(seconds=round(timeLength))
     print(f'took {timeLength} seconds ({minutes})')
 
-    if(not os.path.isfile(outFile)):
-        print(f'Error! The file {outFile} was not created.')
+    if(not os.path.isfile(newOutput)):
+        print(f'Error! The file {newOutput} was not created.')
         sys.exit(1)
 
     if(not args.no_open and not args.export_to_premiere):
         try:  # should work on Windows
-            os.startfile(outFile)
+            os.startfile(newOutput)
         except AttributeError:
             try:  # should work on MacOS and most Linux versions
-                subprocess.call(['open', outFile])
+                subprocess.call(['open', newOutput])
             except:
                 try: # should work on WSL2
-                    subprocess.call(['cmd.exe', '/C', 'start', outFile])
+                    subprocess.call(['cmd.exe', '/C', 'start', newOutput])
                 except:
                     print('Warning! Could not open output file.')
 
