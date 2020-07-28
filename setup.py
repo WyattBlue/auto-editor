@@ -32,7 +32,7 @@ setup(
     install_requires=[
         'opencv-python',
         'audiotsm2',
-        'youtube_dl',
+        'youtube-dl',
         'pillow',
         'pydub',
     ],

@@ -201,8 +201,9 @@ def main():
 
     startTime = time.time()
 
-    for INPUT_FILE in inputList:
+    from usefulFunctions import isAudioFile
 
+    for INPUT_FILE in inputList:
         if(args.export_to_premiere):
             from premiere import exportToPremiere
 
@@ -210,9 +211,7 @@ def main():
                 args.silent_threshold, args.zoom_threshold, args.frame_margin,
                 args.sample_rate, args.video_speed, args.silent_speed)
             continue
-
-        isAudio = extension in ['.wav', '.mp3', '.m4a']
-        if(isAudio):
+        if(isAudioFile(INPUT_FILE)):
             from fastAudio import fastAudio
 
             fastAudio(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
@@ -221,8 +220,7 @@ def main():
             continue
         else:
             try:
-                path = INPUT_FILE
-                process = subprocess.Popen([ffmpeg, '-i', path],
+                process = subprocess.Popen([ffmpeg, '-i', INPUT_FILE],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 stdout, __ = process.communicate()
                 output = stdout.decode()
