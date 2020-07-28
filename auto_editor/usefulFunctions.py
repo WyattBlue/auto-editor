@@ -21,7 +21,6 @@ def isAudioFile(filePath):
 
 
 def createCache(cache, myFile, fps, tracks):
-    print('myFile', myFile)
     baseFile = os.path.basename(myFile)
     fileSize = str(os.stat(myFile).st_size)
     with open(f'{cache}/cache.txt', 'w') as ct:

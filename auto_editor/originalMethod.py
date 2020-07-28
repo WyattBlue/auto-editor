@@ -185,8 +185,9 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT, zoomT, SAMPLE
     handleAudio(ffmpeg, tracks, cache, TEMP, silentT, frameMargin,
         SAMPLE_RATE, audioBit, verbose, silentSpeed, videoSpeed, chunks, frameRate)
 
+    ext = vidFile[vidFile.rfind('.'):]
     splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
-        SAMPLE_RATE, audioData, extension, verbose, TEMP, cache)
+        SAMPLE_RATE, audioData, ext, verbose, TEMP, cache)
 
     if(backMusic is not None):
         from pydub import AudioSegment
@@ -222,7 +223,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT, zoomT, SAMPLE
             cmd.extend(['-hwaccel', hwaccel])
         for i in range(tracks):
             cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
-        cmd.extend(['-i', f'{TEMP}/output{extension}'])
+        cmd.extend(['-i', f'{TEMP}/output{ext}'])
         for i in range(tracks):
             cmd.extend(['-map', f'{i}:a:0'])
         cmd.extend(['-map', f'{tracks}:v:0','-c:v', 'copy', '-movflags', '+faststart',
@@ -251,7 +252,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT, zoomT, SAMPLE
         if(hwaccel is not None):
             cmd.extend(['-hwaccel', hwaccel])
         cmd.extend(['-i', f'{TEMP}/newAudioFile.wav', '-i',
-            f'{TEMP}/output{extension}', '-c:v', 'copy', '-movflags', '+faststart',
+            f'{TEMP}/output{ext}', '-c:v', 'copy', '-movflags', '+faststart',
             outFile])
         if(verbose):
             cmd.extend(['-hide_banner'])
@@ -266,9 +267,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT, zoomT, SAMPLE
 
     rmtree(TEMP)
 
-    # Create cache.txt to see if the created cache is usable for next time.
     if(backMusic is not None):
         tracks -= 1
-
     createCache(cache, vidFile, frameRate, tracks)
     conwrite('')
