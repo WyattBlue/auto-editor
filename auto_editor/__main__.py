@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-'''auto-editor.py'''
+'''__main__.py'''
 
 # Internal python libraries
 import os
@@ -35,7 +35,7 @@ def sample_rate_type(num):
 
 
 def main():
-    parser = argparse.ArgumentParser(prog='Auto-Editor', usage='Auto-Editor: [options]')
+    parser = argparse.ArgumentParser(prog='Auto-Editor', usage='auto-editor [input] [options]')
 
     basic = parser.add_argument_group('Basic Options')
     basic.add_argument('input', nargs='*',
@@ -48,8 +48,8 @@ def main():
         help='set the speed that "loud" sections should be played at.')
     basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='',
         help='set the speed that "silent" sections should be played at.')
-    basic.add_argument('--output_file', '-o', type=str, default='', metavar='',
-        help='set the name of the new output.')
+    basic.add_argument('--output_file', '-o', nargs='*', metavar='',
+        help='set the name(s) of the new output.')
 
     advance = parser.add_argument_group('Advanced Options')
     advance.add_argument('--no_open', action='store_true',
@@ -102,43 +102,39 @@ def main():
     args = parser.parse_args()
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
-
     # fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
 
-    CACHE = os.path.join(dirPath, 'cache')
+    cache = os.path.join(dirPath, 'cache')
 
     if(args.version):
         print('Auto-Editor version:', version)
         sys.exit()
 
     if(args.clear_cache):
-        if(os.path.isdir(CACHE)):
-            rmtree(CACHE)
+        if(os.path.isdir(cache)):
+            rmtree(cache)
         print('Removed cache.')
         if(args.input == []):
             sys.exit()
 
-    # Set the file path to the ffmpeg installation.
-    ffmpeg = 'ffmpeg'
+    newF = None
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
         newF = os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
-        if(os.path.isfile(newF)):
-            ffmpeg = newF
-
     if(platform.system() == 'Darwin' and not args.my_ffmpeg):
         newF = os.path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
-        if(os.path.isfile(newF)):
-            ffmpeg = newF
+    if(newF is not None and os.path.isfile(newF)):
+        ffmpeg = newF
+    else:
+        ffmpeg = 'ffmpeg'
 
     if(args.debug):
         is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
         print('Python Version:', platform.python_version(), is64bit)
         # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
-        # more here: https://docs.python.org/3/library/platform.html#platform.system
         print('Platform:', platform.system())
-        print('FFmpeg:', ffmpeg)
-        print('Auto-Editor Version:', version)
+        print('FFmpeg path:', ffmpeg)
+        print('Auto-Editor version', version)
         if(args.input == []):
             sys.exit()
 
@@ -147,86 +143,70 @@ def main():
         print('In other words, you need the path to a video or an audio file so that auto-editor can do the work for you.')
         sys.exit(1)
 
-    INPUT_FILE = args.input[0]
-    OUTPUT_FILE = args.output_file
-
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
     if(args.video_speed <= 0 or args.video_speed > 99999):
         args.video_speed = 99999
 
-    if(os.path.isdir(INPUT_FILE)):
-        # Sort files in folder by name.
-        INPUTS = sort(os.listdir(INPUT_FILE))
+    INPUT_FILE = args.input[0]
+    OUTPUT_FILE = args.output_file
 
-        if(args.combine_files):
-            outputDir = ''
-
-            with open('combine_files.txt', 'w') as outfile:
-                for fileref in INPUTS:
-                    outfile.write(f"file '{fileref}'\n")
-
-            cmd = [ffmpeg, '-f', 'concat', '-safe', '0', '-i', 'combine_files.txt',
-                '-c', 'copy', 'combined.mp4']
-            subprocess.call(cmd)
-
-            INPUTS = ['combined.mp4']
-
-            os.remove('combine_files.txt')
-        else:
-            outputDir = INPUT_FILE + '_ALTERED'
-            # Create the new folder for all the outputs.
-            try:
-                os.mkdir(outputDir)
-            except OSError:
-                rmtree(outputDir)
-                os.mkdir(outputDir)
-    else:
-        if(args.combine_files):
-            print('Warning! --combine_files does nothing since input is not a folder.')
-        outputDir = ''
-        if(os.path.isfile(INPUT_FILE)):
-            INPUTS = [INPUT_FILE]
-        elif(INPUT_FILE.startswith('http://') or INPUT_FILE.startswith('https://')):
-            # If input is a URL, download as a mp4 with youtube-dl.
+    inputList = []
+    for myInput in args.input:
+        if(os.path.isdir(myInput)):
+            inputList += sort(os.listdir(myInput))
+        elif(os.path.isfile(myInput)):
+            inputList.append(myInput)
+        elif(myInput.startswith('http://') or myInput.startswith('https://')):
             print('URL detected, using youtube-dl to download from webpage.')
-            basename = re.sub(r'\W+', '-', INPUT_FILE)
+            basename = re.sub(r'\W+', '-', myInput)
             cmd = ['youtube-dl', '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
-                   INPUT_FILE, '--output', basename, '--no-check-certificate']
+                   myInput, '--output', basename, '--no-check-certificate']
             if(ffmpeg != 'ffmpeg'):
                 cmd.extend(['--ffmpeg-location', ffmpeg])
             subprocess.call(cmd)
-
-            INPUTS = [basename + '.mp4']
-            if(OUTPUT_FILE == ''):
-                OUTPUT_FILE = basename + '_ALTERED.mp4'
+            inputList.append.(basename + '.mp4')
         else:
-            print('Could not find file:', INPUT_FILE)
+            print('Could not find file:', myInput)
             sys.exit(1)
+
+    if(len(args.output_file) < len(inputList)):
+        for i in range(len(inputList) - len(args.output_file)):
+            oldFile = inputList[i]
+            dotIndex = oldFile.rfind('.')
+            if(args.export_to_premiere):
+                args.output_file.append(oldFile[:dotIndex] + '.xml')
+            else:
+                end = '_ALTERED' + oldFile[dotIndex:]
+                args.output_file.append(oldFile[:dotIndex] + end)
+
+    if(args.combine_files):
+        with open('combine_files.txt', 'w') as outfile:
+            for fileref in inputList:
+                outfile.write(f"file '{fileref}'\n")
+
+        cmd = [ffmpeg, '-f', 'concat', '-safe', '0', '-i', 'combine_files.txt',
+            '-c', 'copy', 'combined.mp4']
+        subprocess.call(cmd)
+        inputList = ['combined.mp4']
+        os.remove('combine_files.txt')
 
     if(args.preview):
         from preview import preview
 
         preview(ffmpeg, INPUT_FILE, args.silent_threshold, args.zoom_threshold,
             args.frame_margin, args.sample_rate, args.video_speed, args.silent_speed,
-            args.cut_by_this_track, args.audio_bitrate)
+            args.cut_by_this_track, args.audio_bitrate, cache)
         sys.exit()
 
     startTime = time.time()
 
-    for INPUT_FILE in INPUTS:
-        dotIndex = INPUT_FILE.rfind('.')
-        extension = INPUT_FILE[dotIndex:]
-        if(outputDir != ''):
-            newOutput = os.path.join(outputDir, os.path.basename(INPUT_FILE))
-            print(newOutput)
-        else:
-            newOutput = OUTPUT_FILE
+    for INPUT_FILE in inputList:
 
         if(args.export_to_premiere):
             from premiere import exportToPremiere
 
-            outFile = exportToPremiere(ffmpeg, INPUT_FILE, newOutput,
+            exportToPremiere(ffmpeg, INPUT_FILE, newOutput,
                 args.silent_threshold, args.zoom_threshold, args.frame_margin,
                 args.sample_rate, args.video_speed, args.silent_speed)
             continue
@@ -235,7 +215,7 @@ def main():
         if(isAudio):
             from fastAudio import fastAudio
 
-            outFile = fastAudio(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
+            fastAudio(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                 args.frame_margin, args.sample_rate, args.audio_bitrate, args.debug,
                 args.silent_speed, args.video_speed, True)
             continue
@@ -256,10 +236,6 @@ def main():
                 print('Warning! frame rate detection failed.')
                 print('If your video has a variable frame rate, ignore this message.')
 
-                # Auto-Editor wouldn't work if the video has a variable framerate, so
-                # it needs to make a video with a constant framerate and use that for
-                # it's input instead.
-
                 TEMP = tempfile.mkdtemp()
 
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
@@ -277,19 +253,19 @@ def main():
 
             from fastVideo import fastVideo
 
-            outFile = fastVideo(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
+            fastVideo(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
                 args.frame_margin, args.sample_rate, args.audio_bitrate,
                 args.debug, args.video_speed, args.silent_speed,
                 args.cut_by_this_track, args.keep_tracks_seperate)
         else:
             from originalMethod import originalMethod
 
-            outFile = originalMethod(ffmpeg, INPUT_FILE, newOutput, args.frame_margin,
+            originalMethod(ffmpeg, INPUT_FILE, newOutput, args.frame_margin,
                 args.silent_threshold, args.zoom_threshold, args.sample_rate,
                 args.audio_bitrate, args.silent_speed, args.video_speed,
                 args.keep_tracks_seperate, args.background_music, args.background_volume,
                 args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
-                args.debug, args.hardware_accel, CACHE)
+                args.debug, args.hardware_accel, cache)
 
     print('Finished.')
     timeLength = round(time.time() - startTime, 2)

@@ -1,17 +1,58 @@
-'''scripts/usefulFunctions.py'''
+'''usefulFunctions.py'''
 
 """
-To prevent duplicate code being pasted between methods, common functions should be
-put here. No code here should make or delete files.
+To prevent duplicate code being pasted between scripts, common functions should be
+put here. No code here should modify or create video/audio files.
 """
 
 # External libraries
 import numpy as np
 
 # Internal libraries
+import os
 import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
+
+
+def isAudioFile(filePath):
+    extension = filePath[filePath.rfind('.'):]
+    return extension in ['.wav', '.mp3', '.m4a']
+
+
+def createCache(cache, myFile, fps, tracks):
+    baseFile = os.path.basename(myFile)
+    fileSize = str(os.stat(myFile).st_size)
+    with open(f'{cache}/cache.txt', 'w') as ct:
+        ct.write('\n'.join([baseFile, str(fps), fileSize, str(tracks)]) + '\n')
+
+
+def checkCache(cache, myFile, fps):
+    from shutil import rmtree
+
+    useCache = False
+    tracks = 0
+    try:
+        os.mkdir(cache)
+    except OSError:
+        # There must a cache already, check if that's usable.
+        if(os.path.isfile(f'{cache}/cache.txt')):
+            file = open(f'{cache}/cache.txt', 'r')
+            x = file.read().splitlines()
+            file.close()
+
+            baseFile = os.path.basename(myFile)
+            fileSize = str(os.stat(myFile).st_size)
+            if(x[:3] == [baseFile, str(fps), fileSize]):
+                useCache = True
+                tracks = int(x[3])
+
+        if(not useCache):
+            rmtree(cache)
+            os.mkdir(cache)
+
+    return useCache, tracks
+
 
 def getNewLength(chunks, speeds, fps):
     timeInFrames = 0
@@ -89,7 +130,6 @@ def vidTracks(videoFile, ffmpeg):
     """
     Return the number of audio tracks in a video file.
     """
-    import os
     import platform
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
@@ -117,7 +157,7 @@ def vidTracks(videoFile, ffmpeg):
         test = int(numbers[0])
         return len(numbers) - 1
     except ValueError:
-        print('Warning: ffprobe had an invalid output.')
+        print('Warning! ffprobe had an invalid output.')
         return 1
 
 

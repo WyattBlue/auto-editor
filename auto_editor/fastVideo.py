@@ -1,4 +1,4 @@
-'''scripts/fastVideo.py'''
+'''fastVideo.py'''
 
 # External libraries
 import numpy as np
@@ -109,12 +109,6 @@ def fastVideo(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
     if(verbose):
         print('Frames written', framesWritten)
 
-    first = videoFile[:videoFile.rfind('.')]
-    extension = videoFile[videoFile.rfind('.'):]
-
-    if(outFile == ''):
-        outFile = f'{first}_ALTERED{extension}'
-
     # Now mix new audio(s) and the new video.
     if(keepTracksSep):
         cmd = [ffmpeg, '-y']
@@ -156,5 +150,3 @@ def fastVideo(ffmpeg, videoFile, outFile, silentT, frameMargin, SAMPLE_RATE,
 
     rmtree(TEMP)
     conwrite('')
-
-    return outFile

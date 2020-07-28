@@ -1,4 +1,4 @@
-'''scripts/originalMethod.py'''
+'''originalMethod.py'''
 
 import numpy as np
 
@@ -12,22 +12,18 @@ from shutil import move, rmtree
 from fastAudio import fastAudio
 from originalVid import splitVideo
 from wavfile import read, write
-from usefulFunctions import vidTracks, getMaxVolume, conwrite
+from usefulFunctions import vidTracks, getMaxVolume, conwrite, createCache
 
-def handleAudio(ffmpeg, tracks, CACHE, TEMP, silentT, frameMargin, SAMPLE_RATE, audioBit,
-    verbose, SILENT_SPEED, VIDEO_SPEED, chunks, frameRate):
+def handleAudio(ffmpeg, tracks, cache, TEMP, silentT, frameMargin, SAMPLE_RATE, audioBit,
+    verbose, silentSpeed, videoSpeed, chunks, frameRate):
     for i in range(tracks):
-        newCuts = fastAudio(ffmpeg, f'{CACHE}/{i}.wav', f'{TEMP}/new{i}.wav', silentT,
-            frameMargin, SAMPLE_RATE, audioBit, verbose, SILENT_SPEED, VIDEO_SPEED,
+        newCuts = fastAudio(ffmpeg, f'{cache}/{i}.wav', f'{TEMP}/new{i}.wav', silentT,
+            frameMargin, SAMPLE_RATE, audioBit, verbose, silentSpeed, videoSpeed,
             False, chunks=chunks, fps=frameRate)
     return newCuts
 
 
 def getFrameRate(ffmpeg, path):
-    """
-    get the frame rate by asking ffmpeg to do it for us then using a regex command to
-    retrieve it.
-    """
     from re import search
 
     process = subprocess.Popen([ffmpeg, '-i', path],
@@ -70,28 +66,18 @@ def getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, frameRate):
     return zooms
 
 
-def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
-    LOUD_THRESHOLD, SAMPLE_RATE, audioBit, SILENT_SPEED, VIDEO_SPEED, KEEP_SEP,
-    BACK_MUS, BACK_VOL, NEW_TRAC, BASE_TRAC, COMBINE_TRAC, verbose, HWACCEL, CACHE):
+def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT, zoomT, SAMPLE_RATE,
+    audioBit, silentSpeed, videoSpeed, keepSep, backMusic, backVolume, newTrack,
+    baseTrack, combineTrack, verbose, hwaccel, cache):
     """
-    This function takes in the path the the input file (and a bunch of other options)
-    and outputs a new output file. This is both the safest and slowest of all methods.
-
-    Safest in the fact that if feature isn't supported here, like handling certain
-    commands or support obscure file type, it's not supported anywhere.
+    This method splits the video into jpegs which allows for more advanced effects.
+    As of 20w31a, zooming is the only unique effect.
     """
 
     print('Running from originalMethod.py')
 
-    speeds = [SILENT_SPEED, VIDEO_SPEED]
+    speeds = [silentSpeed, videoSpeed]
     TEMP = tempfile.mkdtemp()
-
-    dotIndex = vidFile.rfind('.')
-    extension = vidFile[dotIndex:]
-    if(outFile == ''):
-        outFile = vidFile[:dotIndex] + '_ALTERED' + extension
-    else:
-        outFile = outFile
 
     if(not os.path.isfile(vidFile)):
         print('Could not find file:', vidFile)
@@ -105,84 +91,65 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         print('Warning! frame rate detection has failed, defaulting to 30.')
         frameRate = 30
 
-    SKIP = False
-    print(CACHE)
-    try:
-        os.mkdir(CACHE)
-    except OSError:
-        # There must a cache already, check if that's usable.
-        if(os.path.isfile(f'{CACHE}/cache.txt')):
-            file = open(f'{CACHE}/cache.txt', 'r')
-            x = file.read().splitlines()
-            baseFile = os.path.basename(vidFile)
-            if(x[:3] == [baseFile, str(frameRate), str(fileSize)]
-                and x[4] == str(COMBINE_TRAC)):
-                print('Using cache.')
-                SKIP = True
-                tracks = int(x[3])
-            file.close()
-        if(not SKIP):
-            print('Removing cache')
-            rmtree(CACHE)
-            os.mkdir(CACHE)
+    SKIP, tracks = checkCache(cache, vidFile, frameRate)
 
     if(not SKIP):
         # Videos can have more than one audio track os we need to extract them all.
         tracks = vidTracks(vidFile, ffmpeg)
 
-        if(BASE_TRAC >= tracks):
+        if(baseTrack >= tracks):
             print("Error! You choose a track that doesn't exist.")
             print(f'There are only {tracks-1} tracks. (starting from 0)')
             sys.exit(1)
-        for trackNumber in range(tracks):
+        for trackNum in range(tracks):
             cmd = [ffmpeg]
-            if(HWACCEL is not None):
-                cmd.extend(['-hwaccel', HWACCEL])
-            cmd.extend(['-i', vidFile, '-map', f'0:a:{trackNumber}',
-                f'{CACHE}/{trackNumber}.wav'])
+            if(hwaccel is not None):
+                cmd.extend(['-hwaccel', hwaccel])
+            cmd.extend(['-i', vidFile, '-map', f'0:a:{trackNum}',
+                f'{cache}/{trackNum}.wav'])
             if(not verbose):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
 
-            if(COMBINE_TRAC):
+            if(combineTrack):
                 from pydub import AudioSegment
 
                 for i in range(tracks):
-                    if(not os.path.isfile(f'{CACHE}/{i}.wav')):
+                    if(not os.path.isfile(f'{cache}/{i}.wav')):
                         print('Error! Audio file(s) could not be found.')
                         sys.exit(1)
                     if(i == 0):
-                        allAuds = AudioSegment.from_file(f'{CACHE}/{i}.wav')
+                        allAuds = AudioSegment.from_file(f'{cache}/{i}.wav')
                     else:
-                        newTrack = AudioSegment.from_file(f'{CACHE}/{i}.wav')
+                        newTrack = AudioSegment.from_file(f'{cache}/{i}.wav')
                         allAuds = allAuds.overlay(newTrack)
-                allAuds.export(f'{CACHE}/0.wav', format='wav')
+                allAuds.export(f'{cache}/0.wav', format='wav')
                 tracks = 1
 
             # Now deal with the video.
             conwrite('Splitting video into jpgs. (This can take a while)')
             cmd = [ffmpeg]
-            if(HWACCEL is not None):
-                cmd.extend(['-hwaccel', HWACCEL])
-            cmd.extend(['-i', vidFile, '-qscale:v', '1', f'{CACHE}/frame%06d.jpg'])
+            if(hwaccel is not None):
+                cmd.extend(['-hwaccel', hwaccel])
+            cmd.extend(['-i', vidFile, '-qscale:v', '1', f'{cache}/frame%06d.jpg'])
             if(verbose):
                 cmd.extend(['-hide_banner'])
             else:
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
 
-    if(NEW_TRAC is None):
-        sampleRate, audioData = read(f'{CACHE}/{BASE_TRAC}.wav')
+    if(newTrack is None):
+        sampleRate, audioData = read(f'{cache}/{baseTrack}.wav')
     else:
-        cmd = [ffmpeg, '-i', NEW_TRAC, '-ac', '2', '-ar', str(SAMPLE_RATE), '-vn',
-            f'{TEMP}/NEW_TRAC.wav']
+        cmd = [ffmpeg, '-i', newTrack, '-ac', '2', '-ar', str(SAMPLE_RATE), '-vn',
+            f'{TEMP}/newTrack.wav']
         if(verbose):
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
 
-        sampleRate, audioData = read(f'{TEMP}/NEW_TRAC.wav')
+        sampleRate, audioData = read(f'{TEMP}/newTrack.wav')
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
 
@@ -195,7 +162,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
         audiochunks = audioData[start:end]
         maxchunksVolume = getMaxVolume(audiochunks) / maxAudioVolume
-        if(maxchunksVolume >= LOUD_THRESHOLD):
+        if(maxchunksVolume >= zoomT):
             hasLoudAudio[i] = 2
         elif(maxchunksVolume >= silentT):
             hasLoudAudio[i] = 1
@@ -215,22 +182,22 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
 
     zooms = getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, frameRate)
 
-    handleAudio(ffmpeg, tracks, CACHE, TEMP, silentT, frameMargin,
-        SAMPLE_RATE, audioBit, verbose, SILENT_SPEED, VIDEO_SPEED, chunks, frameRate)
+    handleAudio(ffmpeg, tracks, cache, TEMP, silentT, frameMargin,
+        SAMPLE_RATE, audioBit, verbose, silentSpeed, videoSpeed, chunks, frameRate)
 
     splitVideo(ffmpeg, chunks, speeds, frameRate, zooms, samplesPerFrame,
-        SAMPLE_RATE, audioData, extension, verbose, TEMP, CACHE)
+        SAMPLE_RATE, audioData, extension, verbose, TEMP, cache)
 
-    if(BACK_MUS is not None):
+    if(backMusic is not None):
         from pydub import AudioSegment
 
-        cmd = [ffmpeg, '-i', f'{TEMP}/new{BASE_TRAC}.wav', '-vn', '-ar', '44100', '-ac',
+        cmd = [ffmpeg, '-i', f'{TEMP}/new{baseTrack}.wav', '-vn', '-ar', '44100', '-ac',
             '2', '-ab', '192k', '-f', 'mp3', f'{TEMP}/output.mp3']
         subprocess.call(cmd)
 
         vidSound = AudioSegment.from_file(f'{TEMP}/output.mp3')
 
-        back = AudioSegment.from_file(BACK_MUS)
+        back = AudioSegment.from_file(backMusic)
         if(len(back) > len(vidSound)):
             back = back[:len(vidSound)]
 
@@ -240,7 +207,7 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
             return back.apply_gain(change_in_dBFS)
 
         # Fade the background music out by 1 second.
-        back = match_target_amplitude(back, vidSound, BACK_VOL).fade_out(1000)
+        back = match_target_amplitude(back, vidSound, backVolume).fade_out(1000)
         back.export(f'{TEMP}/new{tracks}.wav', format='wav')
 
         if(not os.path.isfile(f'{TEMP}/new{tracks}.wav')):
@@ -248,11 +215,11 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
             sys.exit(1)
         tracks += 1
 
-    if(KEEP_SEP):
+    if(keepSep):
         # Mux the video and audio so that there are still multiple audio tracks.
         cmd = [ffmpeg, '-y']
-        if(HWACCEL is not None):
-            cmd.extend(['-hwaccel', HWACCEL])
+        if(hwaccel is not None):
+            cmd.extend(['-hwaccel', hwaccel])
         for i in range(tracks):
             cmd.extend(['-i', f'{TEMP}/new{i}.wav'])
         cmd.extend(['-i', f'{TEMP}/output{extension}'])
@@ -281,8 +248,8 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
             os.rename(f'{TEMP}/new0.wav', f'{TEMP}/newAudioFile.wav')
 
         cmd = [ffmpeg, '-y']
-        if(HWACCEL is not None):
-            cmd.extend(['-hwaccel', HWACCEL])
+        if(hwaccel is not None):
+            cmd.extend(['-hwaccel', hwaccel])
         cmd.extend(['-i', f'{TEMP}/newAudioFile.wav', '-i',
             f'{TEMP}/output{extension}', '-c:v', 'copy', '-movflags', '+faststart',
             outFile])
@@ -300,12 +267,8 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT,
     rmtree(TEMP)
 
     # Create cache.txt to see if the created cache is usable for next time.
-    if(BACK_MUS is not None):
+    if(backMusic is not None):
         tracks -= 1
-    file = open(f'{CACHE}/cache.txt', 'w')
-    baseFile = os.path.basename(vidFile)
-    file.write(f'{baseFile}\n{frameRate}\n{fileSize}\n{tracks}\n{COMBINE_TRAC}\n')
-    file.close()
 
+    createCache(cache, vidFile, frameRate, tracks)
     conwrite('')
-    return outFile

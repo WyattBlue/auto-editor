@@ -1,4 +1,4 @@
-'''scripts/fastAudio.py'''
+'''fastAudio.py'''
 
 """
 This script is for handling audio files ONLY.
@@ -26,10 +26,6 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
         print('Could not find file:', theFile)
         sys.exit(1)
 
-    if(outFile == ''):
-        fileName = theFile[:theFile.rfind('.')]
-        outFile = f'{fileName}_ALTERED.wav'
-
     if(needConvert):
         # Only print this here so other scripts can use this function.
         print('Running from fastAudio.py')
@@ -56,14 +52,13 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
 
     newL = getNewLength(chunks, speeds, fps)
     # Get the new length in samples with some extra leeway.
-    estLeng = int((newL * sampleRate) * 1.5) + int(sampleRate * 2)
+    estLeng = int(newL * sampleRate * 1.5) + int(sampleRate * 2)
 
     # Create an empty array for the new audio.
     newAudio = np.zeros((estLeng, 2), dtype=np.int16)
 
     channels = 2
     yPointer = 0
-
     totalChunks = len(chunks)
     beginTime = time.time()
 
@@ -72,7 +67,6 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
         audioSampleEnd = int(audioSampleStart + (sampleRate / fps) * (chunk[1] - chunk[0]))
 
         theSpeed = speeds[chunk[2]]
-
         if(theSpeed != 99999):
             spedChunk = audioData[audioSampleStart:audioSampleEnd]
 
@@ -87,7 +81,6 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
                             reader, writer
                         )
                         spedupAudio = writer.output
-
 
                 yPointerEnd = yPointer + spedupAudio.shape[0]
                 newAudio[yPointer:yPointerEnd] = spedupAudio
@@ -112,6 +105,3 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
 
     if('TEMP' in locals()):
         rmtree(TEMP)
-
-    if(needConvert):
-        return outFile
