@@ -12,7 +12,7 @@ from shutil import move, rmtree
 from fastAudio import fastAudio
 from originalVid import splitVideo
 from wavfile import read, write
-from usefulFunctions import vidTracks, getMaxVolume, conwrite, createCache, chechCache
+from usefulFunctions import vidTracks, getMaxVolume, conwrite, createCache, checkCache
 
 def handleAudio(ffmpeg, tracks, cache, TEMP, silentT, frameMargin, SAMPLE_RATE, audioBit,
     verbose, silentSpeed, videoSpeed, chunks, frameRate):
