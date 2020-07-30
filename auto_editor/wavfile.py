@@ -1,4 +1,4 @@
-'''scripts/wavfile.py'''
+'''wavfile.py'''
 
 """
 This file was copied from SciPy and therefore has a different code.

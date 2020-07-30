@@ -43,7 +43,7 @@ def main():
     basic.add_argument('--frame_margin', '-m', type=int, default=4, metavar='',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
     basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='',
-        help='set the volume that frames audio needs to surpass to be sounded. (0-1)')
+        help='set the volume that frames audio needs to surpass to be "loud". (0-1)')
     basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00, metavar='',
         help='set the speed that "loud" sections should be played at.')
     basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='',
@@ -54,6 +54,10 @@ def main():
     advance = parser.add_argument_group('Advanced Options')
     advance.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
+    advance.add_argument('--min_clip_length', type=int, default=2, metavar='',
+        help='set the minimum length a clip can be. If a clip is too short, cut it.')
+    advance.add_argument('--min_cut_length', type=int, default=2, metavar='',
+        help="set the minimum length a cut can be. If a cut is too short, don't cut")
     advance.add_argument('--zoom_threshold', type=float_type, default=1.01, metavar='',
         help='set the volume that needs to be surpassed to zoom in the video. (0-1)')
     advance.add_argument('--combine_files', action='store_true',
@@ -79,7 +83,7 @@ def main():
     cutting.add_argument('--cut_by_all_tracks', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
     cutting.add_argument('--keep_tracks_seperate', action='store_true',
-        help="don't combine audio tracks. mutually exclusive with cut_by_all_tracks.")
+        help="don't combine audio tracks when exporting.")
 
     debug = parser.add_argument_group('Developer/Debugging Options')
     debug.add_argument('--clear_cache', action='store_true',
@@ -148,6 +152,9 @@ def main():
     if(args.video_speed <= 0 or args.video_speed > 99999):
         args.video_speed = 99999
 
+    if(args.background_music is None and args.background_volume != -8):
+        print('Warning! Background volume specified even though no music was provided.')
+
     inputList = []
     for myInput in args.input:
         if(os.path.isdir(myInput)):
@@ -164,7 +171,7 @@ def main():
             subprocess.call(cmd)
             inputList.append(basename + '.mp4')
         else:
-            print('Could not find file:', myInput)
+            print('Error! Could not find file:', myInput)
             sys.exit(1)
 
     if(args.output_file is None):
@@ -191,33 +198,76 @@ def main():
         inputList = ['combined.mp4']
         os.remove('combine_files.txt')
 
-    if(args.preview):
-        from preview import preview
+    import cv2
 
-        preview(ffmpeg, inputList[0], args.silent_threshold, args.zoom_threshold,
-            args.frame_margin, args.sample_rate, args.video_speed, args.silent_speed,
-            args.cut_by_this_track, args.audio_bitrate, cache)
-        sys.exit()
+    TEMP = tempfile.mkdtemp()
+    speeds = [args.silent_speed, args.video_speed]
 
     startTime = time.time()
 
-    from usefulFunctions import isAudioFile
+    from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks, checkCache
+    from wavfile import read, write
 
     for i, INPUT_FILE in enumerate(inputList):
         newOutput = args.output_file[i]
+
+        cap = cv2.VideoCapture(INPUT_FILE)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        useCache, tracks = checkCache(cache, myInput, fps)
+
+        if(not useCache):
+            tracks = vidTracks(INPUT_FILE, ffmpeg)
+
+        if(args.cut_by_this_track >= tracks):
+            print("Error! You choose a track that doesn't exist.")
+            print(f'There are only {tracks-1} tracks. (starting from 0)')
+            sys.exit(1)
+
+        if(not useCache):
+            for trackNum in range(tracks):
+                cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
+                '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
+                f'{cache}/{trackNum}.wav']
+                if(args.debug):
+                    cmd.extend(['-hide_banner'])
+                else:
+                    cmd.extend(['-nostats', '-loglevel', '0'])
+                subprocess.call(cmd)
+
+        if(args.cut_by_all_tracks):
+            cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2', '-ar',
+            str(args.sample_rate),'-map', '0', f'{temp}/combined.wav']
+            if(args.debug):
+                cmd.extend(['-hide_banner'])
+            else:
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
+
+            sampleRate, audioData = read(f'{cache}/combined.wav')
+        else:
+            sampleRate, audioData = read(f'{cache}/{args.cut_by_this_track}.wav')
+
+        chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
+            args.frame_margin, args.min_clip_length, args.min_cut_length)
+
+        if(args.preview):
+            args.no_open = True
+            from preview import preview
+
+            preview(INPUT_FILE, chunks, speeds)
+            continue
+
         if(args.export_to_premiere):
+            args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(ffmpeg, INPUT_FILE, newOutput,
-                args.silent_threshold, args.zoom_threshold, args.frame_margin,
-                args.sample_rate, args.video_speed, args.silent_speed)
+            exportToPremiere(INPUT_FILE, newOutput, chunks, speeds, sampleRate)
             continue
         if(isAudioFile(INPUT_FILE)):
             from fastAudio import fastAudio
 
-            fastAudio(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
-                args.frame_margin, args.sample_rate, args.audio_bitrate, args.debug,
-                args.silent_speed, args.video_speed, True)
+            fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
+            sampleRate, args.debug, True)
             continue
         else:
             try:
@@ -235,8 +285,7 @@ def main():
                 print('Warning! frame rate detection failed.')
                 print('If your video has a variable frame rate, ignore this message.')
 
-                TEMP = tempfile.mkdtemp()
-
+                extension = INPUT_FILE[INPUT_FILE.rfind('.'):]
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
                     f'{TEMP}/constantVid{extension}', '-hide_banner']
                 if(not args.debug):
@@ -244,18 +293,12 @@ def main():
                 subprocess.call(cmd)
                 INPUT_FILE = f'{TEMP}/constantVid{extension}'
 
-        if(args.background_music is None and args.background_volume != -8):
-            print('Warning! Background volume specified even though no music was provided.')
-
-        if(args.background_music is None and args.zoom_threshold > 1
-            and args.cut_by_this_audio is None):
-
+        if(args.background_music is None and args.zoom_threshold > 1):
             from fastVideo import fastVideo
 
-            fastVideo(ffmpeg, INPUT_FILE, newOutput, args.silent_threshold,
-                args.frame_margin, args.sample_rate, args.audio_bitrate,
-                args.debug, args.video_speed, args.silent_speed,
-                args.cut_by_this_track, args.keep_tracks_seperate)
+            fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
+                args.audio_bitrate, sampleRate, args.debug, TEMP, cache,
+                args.keep_tracks_seperate)
         else:
             from originalMethod import originalMethod
 
@@ -266,16 +309,17 @@ def main():
                 args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
                 args.debug, args.hardware_accel, cache)
 
-    print('Finished.')
-    timeLength = round(time.time() - startTime, 2)
-    minutes = timedelta(seconds=round(timeLength))
-    print(f'took {timeLength} seconds ({minutes})')
-
     if(not os.path.isfile(newOutput)):
         print(f'Error! The file {newOutput} was not created.')
         sys.exit(1)
 
-    if(not args.no_open and not args.export_to_premiere):
+    if(not args.preview and not args.export_to_premiere):
+        print('Finished.')
+        timeLength = round(time.time() - startTime, 2)
+        minutes = timedelta(seconds=round(timeLength))
+        print(f'took {timeLength} seconds ({minutes})')
+
+    if(not args.no_open):
         try:  # should work on Windows
             os.startfile(newOutput)
         except AttributeError:
@@ -286,9 +330,7 @@ def main():
                     subprocess.call(['cmd.exe', '/C', 'start', newOutput])
                 except:
                     print('Warning! Could not open output file.')
-
-    if('TEMP' in locals()):
-        rmtree(TEMP)
+    rmtree(TEMP)
 
 if(__name__ == '__main__'):
     main()

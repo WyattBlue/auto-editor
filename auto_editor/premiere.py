@@ -11,28 +11,15 @@ from wavfile import read, write
 # Internal libraries
 import os
 import sys
-import tempfile
 import subprocess
-from shutil import rmtree
-from datetime import timedelta
 
-def exportToPremiere(ffmpeg, myInput, output, silentT, zoomT, frameMargin, sampleRate,
-    videoSpeed, silentSpeed):
+def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate):
     print('Running from premiere.py')
-    TEMP = tempfile.mkdtemp()
 
     fps = 29.97
 
-    cmd = [ffmpeg, '-i', myInput, '-ab', '160k', '-ac', '2', '-ar',
-        str(sampleRate), '-vn', f'{TEMP}/output.wav', '-nostats', '-loglevel', '0']
-    subprocess.call(cmd)
-
-    sampleRate, audioData = read(f'{TEMP}/output.wav')
-    chunks = getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin)
-    rmtree(TEMP)
-
     clips = []
-    newSpeed = [silentSpeed, videoSpeed]
+    # newSpeed = [silentSpeed, videoSpeed]
     for chunk in chunks:
         if(newSpeed[chunk[2]] != 99999):
             clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])

@@ -6,37 +6,21 @@ selected options are used.
 """
 
 # Included functions
-from usefulFunctions import getAudioChunks, vidTracks, getNewLength, isAudioFile, checkCache, createCache
-from wavfile import read, write
+from usefulFunctions import getNewLength, isAudioFile
 
 # Internal libraries
 import os
-import tempfile
-import subprocess
-from shutil import rmtree
 from datetime import timedelta
 
-def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed,
-        silentSpeed, cutByThisTrack, bitrate, cache):
+def preview(myInput, chunks, speeds):
 
     if(not os.path.isfile(myInput)):
-        print('Could not find file:', myInput)
+        print('preview.py: Could not find file ', myInput)
         sys.exit(1)
 
     audioFile = isAudioFile(myInput)
     if(audioFile):
         fps = 30
-        tracks = 0
-        TEMP = tempfile.mkdtemp()
-
-        cmd = [ffmpeg, '-i', myInput, '-b:a', bitrate, '-ac', '2', '-ar',
-            str(sampleRate), '-vn', f'{TEMP}/fastAud.wav', '-nostats', '-loglevel', '0']
-        subprocess.call(cmd)
-
-        sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
-        chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
-
-        rmtree(TEMP)
     else:
         import cv2
 
@@ -44,27 +28,6 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
         fps = cap.get(cv2.CAP_PROP_FPS)
         cap.release()
         cv2.destroyAllWindows()
-
-        useCache, tracks = checkCache(cache, myInput, fps)
-
-        if(not useCache):
-            tracks = vidTracks(myInput, ffmpeg)
-
-        if(cutByThisTrack >= tracks):
-            print("Error! You choose a track that doesn't exist.")
-            print(f'There are only {tracks-1} tracks. (starting from 0)')
-            sys.exit(1)
-
-        if(useCache and os.path.isfile(f'{cache}/{cutByThisTrack}.wav')):
-            sampleRate, audioData = read(f'{cache}/{cutByThisTrack}.wav')
-        else:
-            for trackNum in range(tracks):
-                cmd = [ffmpeg, '-i', myInput, '-ab', bitrate, '-ac', '2', '-ar',
-                    str(sampleRate), '-map', f'0:a:{trackNum}',
-                    f'{cache}/{trackNum}.wav', '-nostats', '-loglevel', '0']
-                subprocess.call(cmd)
-                sampleRate, audioData = read(f'{cache}/{cutByThisTrack}.wav')
-        chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
 
     def printTimeFrame(title, frames, fps):
         inSec = round(frames / fps, 1)
@@ -80,7 +43,6 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
     print('')
     printTimeFrame('Old length', oldTime, fps)
 
-    speeds = [silentSpeed, videoSpeed]
     newL = getNewLength(chunks, speeds, fps)
     printTimeFrame('New length', newL * fps, fps)
     print('')
@@ -112,6 +74,3 @@ def preview(ffmpeg, myInput, silentT, zoomT, frameMargin, sampleRate, videoSpeed
     print('')
     if(not audioFile):
         print('Video framerate:', fps)
-
-    if(not useCache):
-        createCache(cache, myInput, fps, tracks)

@@ -69,7 +69,7 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin):
+def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, minCut):
     import math
 
     audioSampleCount = audioData.shape[0]
@@ -87,24 +87,56 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, zoomT, frameMargin):
         start = int(i * samplesPerFrame)
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
         audiochunks = audioData[start:end]
-        maxchunksVolume = getMaxVolume(audiochunks) / maxAudioVolume
-        if(maxchunksVolume >= zoomT):
-            hasLoudAudio[i] = 2
-        elif(maxchunksVolume >= silentT):
+        if(getMaxVolume(audiochunks) / maxAudioVolume >= silentT):
             hasLoudAudio[i] = 1
 
-    chunks = [[0, 0, 0]]
-    shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
+    includeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
     for i in range(audioFrameCount):
         start = int(max(0, i - frameMargin))
         end = int(min(audioFrameCount, i+1+frameMargin))
-        shouldIncludeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
+        includeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
-        if(i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
-            chunks.append([chunks[-1][1], i, shouldIncludeFrame[i-1]])
+    # Remove unneeded clips.
+    startP = 0
+    active = False
+    for j, item in enumerate(includeFrame):
+        if(item == 1):
+            if(not active):
+                startP = j
+                active = True
+            if(j == len(includeFrame) - 1):
+                if(j - startP < minClip):
+                    includeFrame[startP:j+1] = 0
+        else:
+            if(active):
+                if(j - startP < minClip):
+                    includeFrame[startP:j] = 0
+                active = False
 
-    chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])
-    chunks = chunks[1:]
+    # Remove unneeded cuts.
+    startP = 0
+    active = False
+    for j, item in enumerate(includeFrame):
+        if(item == 0):
+            if(not active):
+                startP = j
+                active = True
+            if(j == len(includeFrame) - 1):
+                if(j - startP < minCut):
+                    includeFrame[startP:j+1] = 1
+        else:
+            if(active):
+                if(j - startP < minCut):
+                    includeFrame[startP:j] = 1
+                active = False
+    chunks = []
+    startP = 0
+    for j in range(1, audioFrameCount):
+        if(includeFrame[j] != includeFrame[j - 1]):
+            chunks.append([startP, j, includeFrame[j-1]])
+            startP = j
+    chunks.append([startP, audioFrameCount, includeFrame[j]])
+    print(chunks)
     return chunks
 
 

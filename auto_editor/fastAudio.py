@@ -19,11 +19,11 @@ import sys
 import time
 import subprocess
 
-def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audioBit,
-        verbose, silentSpeed, soundedSpeed, needConvert, chunks=[], fps=30):
+def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, sampleRate, verbose,
+    needConvert, fps=30):
 
     if(not os.path.isfile(theFile)):
-        print('Could not find file:', theFile)
+        print('fastAudio.py: Could not find file ', theFile)
         sys.exit(1)
 
     if(needConvert):
@@ -36,19 +36,14 @@ def fastAudio(ffmpeg, theFile, outFile, silentT, frameMargin, SAMPLE_RATE, audio
         TEMP = tempfile.mkdtemp()
 
         cmd = [ffmpeg, '-i', theFile, '-b:a', audioBit, '-ac', '2', '-ar',
-            str(SAMPLE_RATE), '-vn', f'{TEMP}/fastAud.wav']
+            str(sampleRate), '-vn', f'{TEMP}/fastAud.wav']
         if(not verbose):
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
 
         theFile = f'{TEMP}/fastAud.wav'
 
-    speeds = [silentSpeed, soundedSpeed]
-
     sampleRate, audioData = read(theFile)
-    if(chunks == []):
-        print('Creating chunks')
-        chunks = getAudioChunks(audioData, sampleRate, fps, silentT, 2, frameMargin)
 
     newL = getNewLength(chunks, speeds, fps)
     # Get the new length in samples with some extra leeway.

@@ -73,7 +73,6 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT, zoomT, SAMPLE
     This method splits the video into jpegs which allows for more advanced effects.
     As of 20w31a, zooming is the only unique effect.
     """
-
     print('Running from originalMethod.py')
 
     speeds = [silentSpeed, videoSpeed]
@@ -83,60 +82,16 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT, zoomT, SAMPLE
         print('Could not find file:', vidFile)
         sys.exit(1)
 
-    fileSize = os.stat(vidFile).st_size
-
-    try:
-        frameRate = getFrameRate(ffmpeg, vidFile)
-    except AttributeError:
-        print('Warning! frame rate detection has failed, defaulting to 30.')
-        frameRate = 30
-
-    SKIP, tracks = checkCache(cache, vidFile, frameRate)
-
-    if(not SKIP):
-        # Videos can have more than one audio track os we need to extract them all.
-        tracks = vidTracks(vidFile, ffmpeg)
-
-        if(baseTrack >= tracks):
-            print("Error! You choose a track that doesn't exist.")
-            print(f'There are only {tracks-1} tracks. (starting from 0)')
-            sys.exit(1)
-        for trackNum in range(tracks):
-            cmd = [ffmpeg]
-            if(hwaccel is not None):
-                cmd.extend(['-hwaccel', hwaccel])
-            cmd.extend(['-i', vidFile, '-map', f'0:a:{trackNum}',
-                f'{cache}/{trackNum}.wav'])
-            if(not verbose):
-                cmd.extend(['-nostats', '-loglevel', '0'])
-            subprocess.call(cmd)
-
-            if(combineTrack):
-                from pydub import AudioSegment
-
-                for i in range(tracks):
-                    if(not os.path.isfile(f'{cache}/{i}.wav')):
-                        print('Error! Audio file(s) could not be found.')
-                        sys.exit(1)
-                    if(i == 0):
-                        allAuds = AudioSegment.from_file(f'{cache}/{i}.wav')
-                    else:
-                        newTrack = AudioSegment.from_file(f'{cache}/{i}.wav')
-                        allAuds = allAuds.overlay(newTrack)
-                allAuds.export(f'{cache}/0.wav', format='wav')
-                tracks = 1
-
-            # Now deal with the video.
-            conwrite('Splitting video into jpgs. (This can take a while)')
-            cmd = [ffmpeg]
-            if(hwaccel is not None):
-                cmd.extend(['-hwaccel', hwaccel])
-            cmd.extend(['-i', vidFile, '-qscale:v', '1', f'{cache}/frame%06d.jpg'])
-            if(verbose):
-                cmd.extend(['-hide_banner'])
-            else:
-                cmd.extend(['-nostats', '-loglevel', '0'])
-            subprocess.call(cmd)
+    conwrite('Splitting video into jpgs. (This can take a while)')
+    cmd = [ffmpeg]
+    if(hwaccel is not None):
+        cmd.extend(['-hwaccel', hwaccel])
+    cmd.extend(['-i', vidFile, '-qscale:v', '1', f'{cache}/frame%06d.jpg'])
+    if(verbose):
+        cmd.extend(['-hide_banner'])
+    else:
+        cmd.extend(['-nostats', '-loglevel', '0'])
+    subprocess.call(cmd)
 
     if(newTrack is None):
         sampleRate, audioData = read(f'{cache}/{baseTrack}.wav')
@@ -150,35 +105,22 @@ def originalMethod(ffmpeg, vidFile, outFile, frameMargin, silentT, zoomT, SAMPLE
         subprocess.call(cmd)
 
         sampleRate, audioData = read(f'{TEMP}/newTrack.wav')
-    audioSampleCount = audioData.shape[0]
+
+
+
     maxAudioVolume = getMaxVolume(audioData)
 
     samplesPerFrame = sampleRate / frameRate
-    audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
+    audioFrameCount = int(math.ceil(audioData.shape[0] / samplesPerFrame))
     hasLoudAudio = np.zeros((audioFrameCount), dtype=np.uint8)
-
     for i in range(audioFrameCount):
         start = int(i * samplesPerFrame)
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
-        audiochunks = audioData[start:end]
-        maxchunksVolume = getMaxVolume(audiochunks) / maxAudioVolume
-        if(maxchunksVolume >= zoomT):
+        threshold = getMaxVolume(audioData[start:end]) / maxAudioVolume
+        if(threshold >= zoomT):
             hasLoudAudio[i] = 2
-        elif(maxchunksVolume >= silentT):
+        elif(threshold >= silentT):
             hasLoudAudio[i] = 1
-
-    chunks = [[0, 0, 0]]
-    shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
-    for i in range(audioFrameCount):
-        start = int(max(0, i-frameMargin))
-        end = int(min(audioFrameCount, i+1+frameMargin))
-        shouldIncludeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
-
-        if(i >= 1 and shouldIncludeFrame[i] != shouldIncludeFrame[i-1]):
-            chunks.append([chunks[-1][1], i, shouldIncludeFrame[i-1]])
-
-    chunks.append([chunks[-1][1], audioFrameCount, shouldIncludeFrame[i-1]])
-    chunks = chunks[1:]
 
     zooms = getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, frameRate)
 
