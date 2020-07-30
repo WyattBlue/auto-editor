@@ -8,7 +8,7 @@ import math
 import subprocess
 
 from fastAudio import fastAudio
-from splitVideo import splitVideo
+from splitVid import splitVideo
 from usefulFunctions import getMaxVolume, conwrite
 
 
