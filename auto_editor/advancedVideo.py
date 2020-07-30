@@ -108,7 +108,7 @@ def advancedVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, silentT, zoo
     if(backMusic is not None):
         from pydub import AudioSegment
 
-        cmd = [ffmpeg, '-i', f'{temp}/new{baseTrack}.wav', '-vn', '-ar', '44100', '-ac',
+        cmd = [ffmpeg, '-i', f'{temp}/new0.wav', '-vn', '-ar', '44100', '-ac',
             '2', '-ab', '192k', '-f', 'mp3', f'{temp}/output.mp3']
         subprocess.call(cmd)
 

@@ -211,9 +211,9 @@ def main():
 
         if(isAudioFile(INPUT_FILE)):
             fps = 30
-            cmd = [ffmpeg, '-i', myInput, '-b:a', bitrate, '-ac', '2', '-ar',
-                str(sampleRate), '-vn', f'{TEMP}/fastAud.wav', '-nostats', '-loglevel',
-                '0']
+            cmd = [ffmpeg, '-i', myInput, '-b:a', args.audio_bitrate, '-ac', '2', '-ar',
+                str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav', '-nostats',
+                '-loglevel', '0']
             subprocess.call(cmd)
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
