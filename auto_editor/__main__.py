@@ -39,7 +39,7 @@ def main():
 
     basic = parser.add_argument_group('Basic Options')
     basic.add_argument('input', nargs='*',
-        help='the path to the file, folder, or url you want edited.')
+        help='the path to the file(s), folder, or url you want edited.')
     basic.add_argument('--frame_margin', '-m', type=int, default=4, metavar='',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
     basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='',
@@ -54,9 +54,9 @@ def main():
     advance = parser.add_argument_group('Advanced Options')
     advance.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    advance.add_argument('--min_clip_length', type=int, default=2, metavar='',
+    advance.add_argument('--min_clip_length', '-mclip', type=int, default=2, metavar='',
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    advance.add_argument('--min_cut_length', type=int, default=2, metavar='',
+    advance.add_argument('--min_cut_length', '-mcut', type=int, default=2, metavar='',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
     advance.add_argument('--zoom_threshold', type=float_type, default=1.01, metavar='',
         help='set the volume that needs to be surpassed to zoom in the video. (0-1)')
@@ -76,11 +76,11 @@ def main():
         help="set the dBs louder or softer compared to the audio track that bases the cuts.")
 
     cutting = parser.add_argument_group('Cutting Options')
-    cutting.add_argument('--cut_by_this_audio', type=file_type, metavar='',
+    cutting.add_argument('--cut_by_this_audio', '-ca', type=file_type, metavar='',
         help="base cuts by this audio file instead of the video's audio.")
     cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='',
         help='base cuts by a different audio track in the video.')
-    cutting.add_argument('--cut_by_all_tracks', action='store_true',
+    cutting.add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
     cutting.add_argument('--keep_tracks_seperate', action='store_true',
         help="don't combine audio tracks when exporting.")
@@ -300,14 +300,13 @@ def main():
                 args.audio_bitrate, sampleRate, args.debug, TEMP, cache,
                 args.keep_tracks_seperate)
         else:
-            from originalMethod import originalMethod
+            from advancedVideo import advancedVideo
 
-            originalMethod(ffmpeg, INPUT_FILE, newOutput, args.frame_margin,
-                args.silent_threshold, args.zoom_threshold, args.sample_rate,
-                args.audio_bitrate, args.silent_speed, args.video_speed,
-                args.keep_tracks_seperate, args.background_music, args.background_volume,
-                args.cut_by_this_audio, args.cut_by_this_track, args.cut_by_all_tracks,
-                args.debug, args.hardware_accel, cache)
+            advancedVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
+                args.silent_threshold, args.zoom_threshold, args.frame_margin, sampleRate, args.audio_bitrate,
+                args.keep_tracks_seperate, args.background_music,
+                args.background_volume, args.debug, args.hardware_accel, TEMP,
+                cache, audioData, fps)
 
     if(not os.path.isfile(newOutput)):
         print(f'Error! The file {newOutput} was not created.')

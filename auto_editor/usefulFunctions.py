@@ -90,6 +90,40 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
         if(getMaxVolume(audiochunks) / maxAudioVolume >= silentT):
             hasLoudAudio[i] = 1
 
+    # Remove small loudness spikes
+    startP = 0
+    active = False
+    for j, item in enumerate(hasLoudAudio):
+        if(item == 1):
+            if(not active):
+                startP = j
+                active = True
+            if(j == len(hasLoudAudio) - 1):
+                if(j - startP < minClip):
+                    hasLoudAudio[startP:j+1] = 0
+        else:
+            if(active):
+                if(j - startP < minClip):
+                    hasLoudAudio[startP:j] = 0
+                active = False
+
+    # Remove small silences
+    startP = 0
+    active = False
+    for j, item in enumerate(hasLoudAudio):
+        if(item == 0):
+            if(not active):
+                startP = j
+                active = True
+            if(j == len(hasLoudAudio) - 1):
+                if(j - startP < minCut):
+                    hasLoudAudio[startP:j+1] = 1
+        else:
+            if(active):
+                if(j - startP < minCut):
+                    hasLoudAudio[startP:j] = 1
+                active = False
+
     includeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
     for i in range(audioFrameCount):
         start = int(max(0, i - frameMargin))
@@ -136,7 +170,6 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
             chunks.append([startP, j, includeFrame[j-1]])
             startP = j
     chunks.append([startP, audioFrameCount, includeFrame[j]])
-    print(chunks)
     return chunks
 
 
