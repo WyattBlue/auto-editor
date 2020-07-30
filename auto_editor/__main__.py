@@ -198,8 +198,6 @@ def main():
         inputList = ['combined.mp4']
         os.remove('combine_files.txt')
 
-    import cv2
-
     TEMP = tempfile.mkdtemp()
     speeds = [args.silent_speed, args.video_speed]
 
@@ -211,41 +209,51 @@ def main():
     for i, INPUT_FILE in enumerate(inputList):
         newOutput = args.output_file[i]
 
-        cap = cv2.VideoCapture(INPUT_FILE)
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        useCache, tracks = checkCache(cache, myInput, fps)
+        if(isAudioFile(INPUT_FILE)):
+            fps = 30
+            cmd = [ffmpeg, '-i', myInput, '-b:a', bitrate, '-ac', '2', '-ar',
+                str(sampleRate), '-vn', f'{TEMP}/fastAud.wav', '-nostats', '-loglevel',
+                '0']
+            subprocess.call(cmd)
 
-        if(not useCache):
-            tracks = vidTracks(INPUT_FILE, ffmpeg)
+            sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
+        else:
+            import cv2
+            cap = cv2.VideoCapture(INPUT_FILE)
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            useCache, tracks = checkCache(cache, myInput, fps)
 
-        if(args.cut_by_this_track >= tracks):
-            print("Error! You choose a track that doesn't exist.")
-            print(f'There are only {tracks-1} tracks. (starting from 0)')
-            sys.exit(1)
+            if(not useCache):
+                tracks = vidTracks(INPUT_FILE, ffmpeg)
 
-        if(not useCache):
-            for trackNum in range(tracks):
-                cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
-                '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
-                f'{cache}/{trackNum}.wav']
+            if(args.cut_by_this_track >= tracks):
+                print("Error! You choose a track that doesn't exist.")
+                print(f'There are only {tracks-1} tracks. (starting from 0)')
+                sys.exit(1)
+
+            if(not useCache):
+                for trackNum in range(tracks):
+                    cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
+                    '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
+                    f'{cache}/{trackNum}.wav']
+                    if(args.debug):
+                        cmd.extend(['-hide_banner'])
+                    else:
+                        cmd.extend(['-nostats', '-loglevel', '0'])
+                    subprocess.call(cmd)
+
+            if(args.cut_by_all_tracks):
+                cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2', '-ar',
+                str(args.sample_rate),'-map', '0', f'{temp}/combined.wav']
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:
                     cmd.extend(['-nostats', '-loglevel', '0'])
                 subprocess.call(cmd)
 
-        if(args.cut_by_all_tracks):
-            cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2', '-ar',
-            str(args.sample_rate),'-map', '0', f'{temp}/combined.wav']
-            if(args.debug):
-                cmd.extend(['-hide_banner'])
+                sampleRate, audioData = read(f'{cache}/combined.wav')
             else:
-                cmd.extend(['-nostats', '-loglevel', '0'])
-            subprocess.call(cmd)
-
-            sampleRate, audioData = read(f'{cache}/combined.wav')
-        else:
-            sampleRate, audioData = read(f'{cache}/{args.cut_by_this_track}.wav')
+                sampleRate, audioData = read(f'{cache}/{args.cut_by_this_track}.wav')
 
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
             args.frame_margin, args.min_clip_length, args.min_cut_length)
