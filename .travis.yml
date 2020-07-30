@@ -2,24 +2,23 @@ language: python
 before_install:
  - sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg
 install:
- - pip3 install -r requirements.txt
+ - pip3 install opencv-python audiotsm2 youtube-dl pillow pydub
 python:
   - "3.6"
   - "3.7"
   - "3.8"
 script:
- - python3 scripts/__main__.py --debug
- - python3 scripts/__main__.py --version
- - python3 scripts/__main__.py example.mp4 --verbose
- - python3 scripts/__main__.py example.mp4 -s 2
- - python3 scripts/__main__.py example.mp4 -v 2
- - python3 scripts/__main__.py example.mp4 --sounded_speed 0.5
- - python3 scripts/__main__.py example.mp4 --silent_speed 0.5
- - python3 scripts/__main__.py --clear_cache
- - python3 scripts/__main__.py "https://www.youtube.com/watch?v=kcs82HnguGc"
- - python3 scripts/__main__.py resources/newCommentary.mp3 --silent_threshold 0.1
- - python3 scripts/__main__.py example.mp4 --cut_by_this_audio resources/newCommentary.mp3
- - python3 scripts/__main__.py example.mp4 --background_music resources/Magic_in_the_Garden.mp3
- - python3 scripts/__main__.py example.mp4 --export_to_premiere
- - python3 scripts/__main__.py example.mp4 --preview
- - python3 scripts/__main__.py example.mp4 --zoom_threshold 0.8
+ - python3 auto_editor/__main__.py --debug
+ - python3 auto_editor/__main__.py --version
+ - python3 auto_editor/__main__.py example.mp4 --verbose
+ - python3 auto_editor/__main__.py example.mp4 -s 2
+ - python3 auto_editor/__main__.py example.mp4 -v 2
+ - python3 auto_editor/__main__.py example.mp4 --sounded_speed 0.5
+ - python3 auto_editor/__main__.py example.mp4 --silent_speed 0.5
+ - python3 auto_editor/__main__.py --clear_cache
+ - python3 auto_editor/__main__.py resources/newCommentary.mp3 --silent_threshold 0.1
+ - python3 auto_editor/__main__.py example.mp4 --cut_by_this_audio resources/newCommentary.mp3
+ - python3 auto_editor/__main__.py example.mp4 --background_music resources/Magic_in_the_Garden.mp3
+ - python3 auto_editor/__main__.py example.mp4 --export_to_premiere
+ - python3 auto_editor/__main__.py example.mp4 --preview
+ - python3 auto_editor/__main__.py example.mp4 --zoom_threshold 0.8
