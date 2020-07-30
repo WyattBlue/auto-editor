@@ -1,17 +1,19 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w31a
+ &nbsp;&nbsp;<small>version 20w31a</small>
 
-<img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700" style="text-align:center; display:block;">
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by removing the silent parts.
 
 ## New in 20w31a
  * Calculating chunks is now done in \_\_main\_\_.py so all cutting commands like `--combine_all_tracks` work automatically for all existing and feature methods.
  * Calculating chunks is now changed so that it is better.
- * added two new commands `--min_clip_length`, `--min_cut_length`. They change how cutting works so, for instance, that one volume spike gets ignored.
- * scripts/ has been changed to auto_editor/.
+ * Added two new commands `--min_clip_length`, `--min_cut_length`. They change how cutting works so, for instance, that one volume spike gets ignored.
+ * Added short `-ca` for `--cut_by_this_audio`.
+ * Added short `-cat` for `--cut_by_all_tracks`.
+ * The scripts folder has been renamed to auto_editor.
  * requirements.txt has been removed.
-
+ * Renamed originalMethod.py to advancedVideo.py. Similarly, originalVid.py has been renamed to splitVid.py
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
@@ -53,8 +55,6 @@ If that works then congratulations, you have successfully installed auto-editor.
 auto-editor C:path\to\your\video
 ```
 
-[See the docs](https://github.com/WyattBlue/auto-editor/blob/master/resources/docs.md) for more commands and usages.
-
 
 ## Upgrading
 
@@ -72,7 +72,7 @@ The FFmpeg binaries are under the [LGPL License](https://github.com/WyattBlue/au
 
 wavfile.py is under the [BSD 3-Clause "New" or "Revised" License](https://github.com/scipy/scipy/blob/master/LICENSE.txt)
 
-Everything else in auto-editor is under the [MIT License](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE)
+Everything else in auto-editor is under the [MIT License](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and was made by [these people.](https://github.com/WyattBlue/auto-editor/blob/master/resources/CREDITS.md)
 
 ## Help or Issues
 If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this project, suggest new features, or chat with other users, do that in [the discord server](https://discord.com/invite/kMHAWJJ).
