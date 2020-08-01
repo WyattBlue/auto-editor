@@ -223,6 +223,14 @@ def main():
             fps = cap.get(cv2.CAP_PROP_FPS)
             useCache, tracks = checkCache(cache, myInput, fps)
 
+
+            fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
+
+            if(fileFormat == '.mp4'):
+                vcodec = 'h264'
+            else:
+                vcodec = 'copy'
+
             if(not useCache):
                 tracks = vidTracks(INPUT_FILE, ffmpeg)
 
@@ -262,7 +270,7 @@ def main():
             args.no_open = True
             from preview import preview
 
-            preview(INPUT_FILE, chunks, speeds)
+            preview(INPUT_FILE, chunks, speeds, args.debug)
             continue
 
         if(args.export_to_premiere):
@@ -306,7 +314,7 @@ def main():
 
             fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
                 args.audio_bitrate, sampleRate, args.debug, TEMP, cache,
-                args.keep_tracks_seperate)
+                args.keep_tracks_seperate, vcodec)
         else:
             from advancedVideo import advancedVideo
 

@@ -16,8 +16,8 @@ from time import time, localtime
 
 
 def isAudioFile(filePath):
-    extension = filePath[filePath.rfind('.'):]
-    return extension in ['.wav', '.mp3', '.m4a']
+    fileFormat = filePath[filePath.rfind('.'):]
+    return fileFormat in ['.wav', '.mp3', '.m4a']
 
 
 def createCache(cache, myFile, fps, tracks):
