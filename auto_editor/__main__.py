@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w31a'
+version = '20w32a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -33,6 +33,16 @@ def sample_rate_type(num):
         return int(float(num[:-4]) * 1000)
     return int(num)
 
+def pipeToConsole(myCommands):
+    process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT)
+    stdout, __ = process.communicate()
+    return stdout.decode()
+
+def ffmpegFPS(ffmpeg, path):
+    output = pipeToConsole([ffmpeg, '-i', path])
+    matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
+    return float(matchDict['fps'])
 
 def main():
     parser = argparse.ArgumentParser(prog='Auto-Editor', usage='auto-editor [input] [options]')
@@ -40,7 +50,7 @@ def main():
     basic = parser.add_argument_group('Basic Options')
     basic.add_argument('input', nargs='*',
         help='the path to the file(s), folder, or url you want edited.')
-    basic.add_argument('--frame_margin', '-m', type=int, default=4, metavar='',
+    basic.add_argument('--frame_margin', '-m', type=int, default=6, metavar='',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
     basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='',
         help='set the volume that frames audio needs to surpass to be "loud". (0-1)')
@@ -54,9 +64,9 @@ def main():
     advance = parser.add_argument_group('Advanced Options')
     advance.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    advance.add_argument('--min_clip_length', '-mclip', type=int, default=2, metavar='',
+    advance.add_argument('--min_clip_length', '-mclip', type=int, default=3, metavar='',
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    advance.add_argument('--min_cut_length', '-mcut', type=int, default=2, metavar='',
+    advance.add_argument('--min_cut_length', '-mcut', type=int, default=6, metavar='',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
     advance.add_argument('--zoom_threshold', type=float_type, default=1.01, metavar='',
         help='set the volume that needs to be surpassed to zoom in the video. (0-1)')
@@ -98,8 +108,10 @@ def main():
     misc = parser.add_argument_group('Export Options')
     misc.add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
-    misc.add_argument('--export_to_premiere', action='store_true',
+    misc.add_argument('--export_to_premiere', '-exp', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
+    misc.add_argument('--export_to_resolve', '-exr', action='store_true',
+        help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
     #dep = parser.add_argument_group('Deprecated Options')
 
@@ -112,7 +124,7 @@ def main():
     cache = os.path.join(dirPath, 'cache')
 
     if(args.version):
-        print('Auto-Editor version:', version)
+        print('Auto-Editor version', version)
         sys.exit()
 
     if(args.clear_cache):
@@ -131,6 +143,16 @@ def main():
         ffmpeg = newF
     else:
         ffmpeg = 'ffmpeg'
+
+    if(args.hardware_accel is not None):
+        output = pipeToConsle([ffmpeg, '-hwaccels', '-hide_banner'])
+        output = output.replace('Hardware acceleration methods:', '')
+        output = output.replace('\n', '')
+        hwaccels = output.split(',')
+        if(args.hardware_accel not in hwaccels):
+            print('Error! Invalid hardware accel:', args.hardware_accel)
+            print('Available hardware: ', ' '.join(hwaccels))
+            sys.exit(1)
 
     if(args.debug):
         is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
@@ -181,7 +203,7 @@ def main():
         for i in range(len(inputList) - len(args.output_file)):
             oldFile = inputList[i]
             dotIndex = oldFile.rfind('.')
-            if(args.export_to_premiere):
+            if(args.export_to_premiere or args.export_to_resolve):
                 args.output_file.append(oldFile[:dotIndex] + '.xml')
             else:
                 end = '_ALTERED' + oldFile[dotIndex:]
@@ -208,6 +230,7 @@ def main():
 
     for i, INPUT_FILE in enumerate(inputList):
         newOutput = args.output_file[i]
+        fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
         if(isAudioFile(INPUT_FILE)):
             fps = 30
@@ -218,13 +241,24 @@ def main():
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
-            import cv2
-            cap = cv2.VideoCapture(INPUT_FILE)
-            fps = cap.get(cv2.CAP_PROP_FPS)
+            cv2exists = True
+            try:
+                import cv2
+                cap = cv2.VideoCapture(INPUT_FILE)
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                cap.release()
+                cv2.destroyAllWindows()
+            except ModuleNotFoundError:
+                cv2exists = False
+                try:
+                    fps = ffmpegFPS(ffmpeg, INPUT_FILE)
+                except AttributeError:
+                    print('Warning! frame rate detection failed.')
+                    print('If your video has a variable frame rate, ignore this message.')
+                    fps = None
+
             useCache, tracks = checkCache(cache, myInput, fps)
 
-
-            fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
             if(fileFormat == '.mp4'):
                 vcodec = 'h264'
@@ -272,12 +306,17 @@ def main():
 
             preview(INPUT_FILE, chunks, speeds, args.debug)
             continue
-
         if(args.export_to_premiere):
             args.no_open = True
             from premiere import exportToPremiere
 
             exportToPremiere(INPUT_FILE, newOutput, chunks, speeds, sampleRate)
+            continue
+        if(args.export_to_resolve):
+            args.no_open = True
+            from resolve import exportToResolve
+
+            exportToResolve(INPUT_FILE, newOutput, chunks, speeds, sampleRate)
             continue
         if(isAudioFile(INPUT_FILE)):
             from fastAudio import fastAudio
@@ -285,29 +324,13 @@ def main():
             fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
             sampleRate, args.debug, True)
             continue
-        else:
-            try:
-                process = subprocess.Popen([ffmpeg, '-i', INPUT_FILE],
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                stdout, __ = process.communicate()
-                output = stdout.decode()
-                if(args.debug):
-                    print('FFmpeg test:')
-                    print(output)
-                    print('\n')
-                matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
-                __ = float(matchDict['fps'])
-            except AttributeError:
-                print('Warning! frame rate detection failed.')
-                print('If your video has a variable frame rate, ignore this message.')
-
-                extension = INPUT_FILE[INPUT_FILE.rfind('.'):]
-                cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
-                    f'{TEMP}/constantVid{extension}', '-hide_banner']
-                if(not args.debug):
-                    cmd.extend(['-nostats', '-loglevel', '0'])
-                subprocess.call(cmd)
-                INPUT_FILE = f'{TEMP}/constantVid{extension}'
+        elif(fps is None):
+            cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
+                f'{TEMP}/constantVid{fileFormat}', '-hide_banner']
+            if(not args.debug):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
+            INPUT_FILE = f'{TEMP}/constantVid{fileFormat}'
 
         if(args.background_music is None and args.zoom_threshold > 1):
             from fastVideo import fastVideo
@@ -328,7 +351,7 @@ def main():
         print(f'Error! The file {newOutput} was not created.')
         sys.exit(1)
 
-    if(not args.preview and not args.export_to_premiere):
+    if(not args.preview and not args.export_to_premiere and not args.export_to_resolve):
         print('Finished.')
         timeLength = round(time.time() - startTime, 2)
         minutes = timedelta(seconds=round(timeLength))

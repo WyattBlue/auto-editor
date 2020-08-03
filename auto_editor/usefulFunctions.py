@@ -14,7 +14,6 @@ import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
 
-
 def isAudioFile(filePath):
     fileFormat = filePath[filePath.rfind('.'):]
     return fileFormat in ['.wav', '.mp3', '.m4a']

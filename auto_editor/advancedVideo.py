@@ -11,18 +11,6 @@ from fastAudio import fastAudio
 from splitVid import splitVideo
 from usefulFunctions import getMaxVolume, conwrite
 
-
-def getFrameRate(ffmpeg, path):
-    from re import search
-
-    process = subprocess.Popen([ffmpeg, '-i', path],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    output = stdout.decode()
-    matchDict = search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
-    return float(matchDict['fps'])
-
-
 def getZooms(chunks, audioFrameCount, hasLoudAudio, frameMargin, fps):
     zooms = {}
     shouldIncludeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
