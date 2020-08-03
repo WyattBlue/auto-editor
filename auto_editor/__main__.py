@@ -239,7 +239,7 @@ def main():
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
-            fps = ffmpegFPS(INPUT_FILE)
+            fps = ffmpegFPS(ffmpeg, INPUT_FILE)
             tracks = vidTracks(INPUT_FILE, ffmpeg)
 
             if(args.cut_by_this_track >= tracks):
@@ -282,7 +282,9 @@ def main():
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
             cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
                 constantLoc, '-hide_banner']
-            if(not args.debug):
+            if(args.debug):
+                cmd.extend(['-hide_banner'])
+            else:
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
             INPUT_FILE = constancLoc
@@ -316,7 +318,7 @@ def main():
         from fastVideo import fastVideo
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
-            args.keep_tracks_seperate, args.video_codec)
+            args.keep_tracks_seperate, args.video_codec, fps)
 
     if(not os.path.isfile(newOutput)):
         print(f'Error! The file {newOutput} was not created.')

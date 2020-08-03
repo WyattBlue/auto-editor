@@ -18,7 +18,7 @@ import subprocess
 from shutil import rmtree
 
 def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, samplerate,
-    debug, temp, keepTracksSep, vcodec):
+    debug, temp, keepTracksSep, vcodec, fps):
 
     if(not os.path.isfile(vidFile)):
         print('Could not find file', vidFile)
@@ -28,7 +28,6 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    fps = cap.get(cv2.CAP_PROP_FPS)
 
     for trackNum in range(tracks):
         fastAudio(ffmpeg, f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
