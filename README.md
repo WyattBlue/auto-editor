@@ -8,19 +8,15 @@
 ## New in 20w32a
  * Preview now prints chunks values in debug mode.
  * Using audio files with `--export_to_premiere` no longer causes an error by referencing a non-existent variable.
+ * The `--hardware_accel` is improved tremendously.
+   * If you input an invalid argument for this option, it will now stop before causing problems and will list valid arguments instead.
+   * It work's much better than it did in the past, especially with the `cuvid` argument.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
 ## Usage
 
-Auto-Editor is used by many people, including youtubers who want to edit their long livestream quicky, editors to make a base before tweaking the cuts so that it feels just right, and regular viewers who want to make their boring lectures more enjoyable.
-
-
-
-
-
-
-
+Auto-Editor is used by many people, including youtubers who want to edit their long livestream quickly, editors to make a base before tweaking the cuts so that it feels just right, and regular viewers who want to make their boring lectures more enjoyable.
 
 Create an edited version of example.mp4 with the default parameters.
 ```terminal

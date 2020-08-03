@@ -3,8 +3,7 @@ import sys
 from setuptools import setup, find_packages
 
 def find_version():
-    return '20.31.1.1'
-
+    return '20.32.1.0'
 
 # 'setup.py publish' shortcut.
 if(sys.argv[-1] == 'publish'):
@@ -30,11 +29,9 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'opencv-python',
         'audiotsm2',
+        'opencv-python',
         'youtube-dl',
-        'pillow',
-        'pydub',
     ],
     classifiers=[
         'Topic :: Multimedia :: Video',

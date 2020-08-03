@@ -41,8 +41,13 @@ def pipeToConsole(myCommands):
 
 def ffmpegFPS(ffmpeg, path):
     output = pipeToConsole([ffmpeg, '-i', path])
-    matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
-    return float(matchDict['fps'])
+    try:
+        matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
+        return float(matchDict['fps'])
+    except AttributeError:
+        print('Warning! frame rate detection failed.')
+        print('If your video has a variable frame rate, ignore this message.')
+        return None
 
 def main():
     parser = argparse.ArgumentParser(prog='Auto-Editor', usage='auto-editor [input] [options]')
@@ -68,22 +73,16 @@ def main():
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
     advance.add_argument('--min_cut_length', '-mcut', type=int, default=6, metavar='',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
-    advance.add_argument('--zoom_threshold', type=float_type, default=1.01, metavar='',
-        help='set the volume that needs to be surpassed to zoom in the video. (0-1)')
     advance.add_argument('--combine_files', action='store_true',
-        help='when using a folder as the input, combine all files in a folder before editing.')
-    advance.add_argument('--hardware_accel', type=str, metavar='',
-        help='set the hardware used for gpu acceleration.')
+        help='combine all input files into one before editing.')
+    advance.add_argument('--video_codec', '-vcodec', default='copy',
+        help='(for exporting video only) set the video codec for the output file.')
 
     audio = parser.add_argument_group('Audio Options')
     audio.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='',
         help='set the sample rate of the input and output videos.')
     audio.add_argument('--audio_bitrate', type=str, default='160k', metavar='',
         help='set the number of bits per second for audio.')
-    audio.add_argument('--background_music', type=file_type, metavar='',
-        help='set an audio file to be added as background music to your output.')
-    audio.add_argument('--background_volume', type=float, default=-8, metavar='',
-        help="set the dBs louder or softer compared to the audio track that bases the cuts.")
 
     cutting = parser.add_argument_group('Cutting Options')
     cutting.add_argument('--cut_by_this_audio', '-ca', type=file_type, metavar='',
@@ -96,8 +95,6 @@ def main():
         help="don't combine audio tracks when exporting.")
 
     debug = parser.add_argument_group('Developer/Debugging Options')
-    debug.add_argument('--clear_cache', action='store_true',
-        help='delete the cache folder and all its contents.')
     debug.add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
     debug.add_argument('--version', action='store_true',
@@ -113,7 +110,11 @@ def main():
     misc.add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
-    #dep = parser.add_argument_group('Deprecated Options')
+    dep = parser.add_argument_group('Deprecated Options')
+    dep.add_argument('--clear_cache', action='store_true',
+        help='delete the cache folder and all its contents.')
+    dep.add_argument('--hardware_accel', type=str, metavar='',
+        help='set the hardware used for gpu acceleration.')
 
     args = parser.parse_args()
 
@@ -121,13 +122,12 @@ def main():
     # fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
 
-    cache = os.path.join(dirPath, 'cache')
-
     if(args.version):
         print('Auto-Editor version', version)
         sys.exit()
 
     if(args.clear_cache):
+        cache = os.path.join(dirPath, 'cache')
         if(os.path.isdir(cache)):
             rmtree(cache)
         print('Removed cache.')
@@ -144,6 +144,8 @@ def main():
     else:
         ffmpeg = 'ffmpeg'
 
+    makingDataFile = args.export_to_premiere or args.export_to_resolve
+
     if(args.hardware_accel is not None):
         output = pipeToConsle([ffmpeg, '-hwaccels', '-hide_banner'])
         output = output.replace('Hardware acceleration methods:', '')
@@ -151,7 +153,7 @@ def main():
         hwaccels = output.split(',')
         if(args.hardware_accel not in hwaccels):
             print('Error! Invalid hardware accel:', args.hardware_accel)
-            print('Available hardware: ', ' '.join(hwaccels))
+            print('Available hardware:', ' '.join(hwaccels))
             sys.exit(1)
 
     if(args.debug):
@@ -173,9 +175,6 @@ def main():
         args.silent_speed = 99999
     if(args.video_speed <= 0 or args.video_speed > 99999):
         args.video_speed = 99999
-
-    if(args.background_music is None and args.background_volume != -8):
-        print('Warning! Background volume specified even though no music was provided.')
 
     inputList = []
     for myInput in args.input:
@@ -210,22 +209,21 @@ def main():
                 args.output_file.append(oldFile[:dotIndex] + end)
 
     if(args.combine_files):
-        with open('combine_files.txt', 'w') as outfile:
+        with open(f'{TEMP}/combines.txt', 'w') as outfile:
             for fileref in inputList:
                 outfile.write(f"file '{fileref}'\n")
 
-        cmd = [ffmpeg, '-f', 'concat', '-safe', '0', '-i', 'combine_files.txt',
+        cmd = [ffmpeg, '-f', 'concat', '-safe', '0', '-i', f'{TEMP}/combines.txt',
             '-c', 'copy', 'combined.mp4']
         subprocess.call(cmd)
         inputList = ['combined.mp4']
-        os.remove('combine_files.txt')
 
     TEMP = tempfile.mkdtemp()
     speeds = [args.silent_speed, args.video_speed]
 
     startTime = time.time()
 
-    from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks, checkCache
+    from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
     from wavfile import read, write
 
     for i, INPUT_FILE in enumerate(inputList):
@@ -241,64 +239,53 @@ def main():
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
-            cv2exists = True
-            try:
-                import cv2
-                cap = cv2.VideoCapture(INPUT_FILE)
-                fps = cap.get(cv2.CAP_PROP_FPS)
-                cap.release()
-                cv2.destroyAllWindows()
-            except ModuleNotFoundError:
-                cv2exists = False
-                try:
-                    fps = ffmpegFPS(ffmpeg, INPUT_FILE)
-                except AttributeError:
-                    print('Warning! frame rate detection failed.')
-                    print('If your video has a variable frame rate, ignore this message.')
-                    fps = None
-
-            useCache, tracks = checkCache(cache, myInput, fps)
-
-
-            if(fileFormat == '.mp4'):
-                vcodec = 'h264'
-            else:
-                vcodec = 'copy'
-
-            if(not useCache):
-                tracks = vidTracks(INPUT_FILE, ffmpeg)
+            fps = ffmpegFPS(INPUT_FILE)
+            tracks = vidTracks(INPUT_FILE, ffmpeg)
 
             if(args.cut_by_this_track >= tracks):
                 print("Error! You choose a track that doesn't exist.")
                 print(f'There are only {tracks-1} tracks. (starting from 0)')
                 sys.exit(1)
 
-            if(not useCache):
-                for trackNum in range(tracks):
-                    cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
-                    '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
-                    f'{cache}/{trackNum}.wav']
-                    if(args.debug):
-                        cmd.extend(['-hide_banner'])
-                    else:
-                        cmd.extend(['-nostats', '-loglevel', '0'])
-                    subprocess.call(cmd)
-
-            if(args.cut_by_all_tracks):
-                cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2', '-ar',
-                str(args.sample_rate),'-map', '0', f'{temp}/combined.wav']
+            for trackNum in range(tracks):
+                cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
+                '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
+                f'{TEMP}/{trackNum}.wav']
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:
                     cmd.extend(['-nostats', '-loglevel', '0'])
                 subprocess.call(cmd)
 
-                sampleRate, audioData = read(f'{cache}/combined.wav')
+            if(args.cut_by_all_tracks):
+                cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2', '-ar',
+                str(args.sample_rate),'-map', '0', f'{TEMP}/combined.wav']
+                if(args.debug):
+                    cmd.extend(['-hide_banner'])
+                else:
+                    cmd.extend(['-nostats', '-loglevel', '0'])
+                subprocess.call(cmd)
+
+                sampleRate, audioData = read(f'{TEMP}/combined.wav')
             else:
-                sampleRate, audioData = read(f'{cache}/{args.cut_by_this_track}.wav')
+                sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
 
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
             args.frame_margin, args.min_clip_length, args.min_cut_length)
+
+        if(fps is None not isAudioFile(INPUT_FILE)):
+            if(makingDataFile):
+                dotIndex = INPUT_FILE.rfind('.')
+                end = '_constantFPS' + oldFile[dotIndex:]
+                constantLoc = oldFile[:dotIndex] + end
+            else:
+                constantLoc = f'{TEMP}/constantVid{fileFormat}'
+            cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
+                constantLoc '-hide_banner']
+            if(not args.debug):
+                cmd.extend(['-nostats', '-loglevel', '0'])
+            subprocess.call(cmd)
+            INPUT_FILE = constancLoc
 
         if(args.preview):
             args.no_open = True
@@ -306,6 +293,7 @@ def main():
 
             preview(INPUT_FILE, chunks, speeds, args.debug)
             continue
+
         if(args.export_to_premiere):
             args.no_open = True
             from premiere import exportToPremiere
@@ -318,40 +306,23 @@ def main():
 
             exportToResolve(INPUT_FILE, newOutput, chunks, speeds, sampleRate)
             continue
-        if(isAudioFile(INPUT_FILE)):
+        if(isAudioFile(INPUT_FILE) and not makingDataFile):
             from fastAudio import fastAudio
 
             fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
             sampleRate, args.debug, True)
             continue
-        elif(fps is None):
-            cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
-                f'{TEMP}/constantVid{fileFormat}', '-hide_banner']
-            if(not args.debug):
-                cmd.extend(['-nostats', '-loglevel', '0'])
-            subprocess.call(cmd)
-            INPUT_FILE = f'{TEMP}/constantVid{fileFormat}'
 
-        if(args.background_music is None and args.zoom_threshold > 1):
-            from fastVideo import fastVideo
-
-            fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
-                args.audio_bitrate, sampleRate, args.debug, TEMP, cache,
-                args.keep_tracks_seperate, vcodec)
-        else:
-            from advancedVideo import advancedVideo
-
-            advancedVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
-                args.silent_threshold, args.zoom_threshold, args.frame_margin, sampleRate, args.audio_bitrate,
-                args.keep_tracks_seperate, args.background_music,
-                args.background_volume, args.debug, args.hardware_accel, TEMP,
-                cache, audioData, fps)
+        from fastVideo import fastVideo
+        fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
+            args.audio_bitrate, sampleRate, args.debug, TEMP,
+            args.keep_tracks_seperate, args.video_codec)
 
     if(not os.path.isfile(newOutput)):
         print(f'Error! The file {newOutput} was not created.')
         sys.exit(1)
 
-    if(not args.preview and not args.export_to_premiere and not args.export_to_resolve):
+    if(not args.preview and makingDataFile):
         print('Finished.')
         timeLength = round(time.time() - startTime, 2)
         minutes = timedelta(seconds=round(timeLength))
