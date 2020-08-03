@@ -273,7 +273,7 @@ def main():
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
             args.frame_margin, args.min_clip_length, args.min_cut_length)
 
-        if(fps is None not isAudioFile(INPUT_FILE)):
+        if(fps is None and not isAudioFile(INPUT_FILE)):
             if(makingDataFile):
                 dotIndex = INPUT_FILE.rfind('.')
                 end = '_constantFPS' + oldFile[dotIndex:]
