@@ -281,7 +281,7 @@ def main():
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
             cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
-                constantLoc '-hide_banner']
+                constantLoc, '-hide_banner']
             if(not args.debug):
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
