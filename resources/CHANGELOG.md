@@ -1,5 +1,23 @@
 # Auto-Editor Change Log
 
+## Version 20w31a
+ * Calculating chunks is now done in \_\_main\_\_.py so all cutting commands like `--combine_all_tracks` work automatically for all existing and feature methods.
+ * Calculating chunks is now changed so that it is better.
+ * Added two new commands `--min_clip_length`, `--min_cut_length`. They change how cutting works so, for instance, that one volume spike gets ignored.
+ * Added short `-ca` for `--cut_by_this_audio`.
+ * Added short `-cat` for `--cut_by_all_tracks`.
+ * The scripts folder has been renamed to auto_editor.
+ * requirements.txt has been removed.
+ * Renamed originalMethod.py to advancedVideo.py. Similarly, originalVid.py has been renamed to splitVid.py
+
+## Version 20w30b Hotfix
+* fixed macOS FFmpeg binaries not working unless the user already installed ffmpeg at some point.
+* fixed premiere.py searching for the width and height of an audio file.
+
+## Version 20w30b
+* fastVideoPlus and fastVideo have been combined.
+* Auto-Editor is now a proper command line program. You can now download **everything** with pip.
+
 ## Version 20w30a
 * Fixed ffprobe bug that was effecting Windows users.
 * Added support for audio tracks for `--export_to_premiere`

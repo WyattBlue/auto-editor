@@ -12,7 +12,7 @@ from usefulFunctions import getNewLength, isAudioFile
 import os
 from datetime import timedelta
 
-def preview(myInput, chunks, speeds):
+def preview(myInput, chunks, speeds, debug):
 
     if(not os.path.isfile(myInput)):
         print('preview.py: Could not find file ', myInput)
@@ -74,3 +74,6 @@ def preview(myInput, chunks, speeds):
     print('')
     if(not audioFile):
         print('Video framerate:', fps)
+    if(debug):
+        print('Chunks:')
+        print(chunks)

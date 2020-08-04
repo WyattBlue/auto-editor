@@ -121,7 +121,8 @@ def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate):
             outfile.write('\t</sequence>\n')
             outfile.write('</xmeml>')
 
-            return newFile
+            # Exit out of this function prematurely.
+            return None
 
             # End of audio file code.
 
