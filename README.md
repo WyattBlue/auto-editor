@@ -8,9 +8,9 @@
 ## New in 20w32a
  * Preview now prints chunks values in debug mode.
  * Using audio files with `--export_to_premiere` no longer causes an error by referencing a non-existent variable.
- * The `--hardware_accel` is improved tremendously.
-   * If you input an invalid argument for this option, it will now stop before causing problems and will list valid arguments instead.
-   * It work's much better than it did in the past, especially with the `cuvid` argument.
+ * `--background_music`, `--background_volume`, and `--zoom_threshold` have been removed. Although the lose of functionality those options provide is regrettable, those options are rarely used but it made it possible to delete three hundred lines of code and remove two modules.
+ * If you input an invalid argument for `--hardware_accel`, it will now stop before causing problems and will list valid arguments instead. Unfortunately, there isn't any use for this option right now, so it has been moved to depreciated.
+ * New option added `--video_codec`, which is set to "copy" as the default but can be changed to "h264" or something else.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
