@@ -1,24 +1,27 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w31a</sup>
+ &nbsp;&nbsp;<sup>version 20w32a</sup>
 
 <p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>
 
-**Auto-Editor** is a command line application for automatically **editing video and audio** by removing the silent parts.
+**Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
-## New in 20w31a
- * Calculating chunks is now done in \_\_main\_\_.py so all cutting commands like `--combine_all_tracks` work automatically for all existing and feature methods.
- * Calculating chunks is now changed so that it is better.
- * Added two new commands `--min_clip_length`, `--min_cut_length`. They change how cutting works so, for instance, that one volume spike gets ignored.
- * Added short `-ca` for `--cut_by_this_audio`.
- * Added short `-cat` for `--cut_by_all_tracks`.
- * The scripts folder has been renamed to auto_editor.
- * requirements.txt has been removed.
- * Renamed originalMethod.py to advancedVideo.py. Similarly, originalVid.py has been renamed to splitVid.py
+## New in 20w32a
+ * `--export_to_resolve` added. This option creates an XML that can be imported by DaVinci Resolve. Go to File > Import Timeline > Import AAF, EDL, XML and choose the XML Auto-Editor just created.
+ * `--background_music`, `--background_volume`, and `--zoom_threshold` have been removed. `--background_music` was rarely used and it was not any more convenient than using a traditional editor. It was never obvious where `--zoom_threshold` would choose to zoom so it wasn't very helpful for editing. Removing those options also made it possible to delete three hundred lines of code and remove two modules.
+ * New option added `--video_codec`, which does what you think it does. It is set to "copy" as the default but can be changed to "h264" and others so the output size is a lot smaller.
+
+#### Bug Fixes
+ * Preview now prints chunks values in debug mode.
+ * Using audio files with `--export_to_premiere` no longer causes an error by referencing a non-existent variable.
+ * If you input an invalid argument for `--hardware_accel`, it will now stop before causing problems and will list valid arguments instead. Unfortunately, there isn't any use for this option right now, so it has been moved to depreciated.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
 ## Usage
-Create an edited version of example.mp4 with the default parameters.
+
+Auto-Editor is used by many people, including youtubers who want to edit their long livestream quickly, editors to make a base before tweaking the cuts so that it feels just right, and regular viewers who want to make their boring lectures more enjoyable.
+
+Here's how you create an edited version of example.mp4 with the default parameters.
 ```terminal
 auto-editor example.mp4
 ```
