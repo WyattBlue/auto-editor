@@ -14,44 +14,9 @@ import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
 
-
 def isAudioFile(filePath):
-    extension = filePath[filePath.rfind('.'):]
-    return extension in ['.wav', '.mp3', '.m4a']
-
-
-def createCache(cache, myFile, fps, tracks):
-    baseFile = os.path.basename(myFile)
-    fileSize = str(os.stat(myFile).st_size)
-    with open(f'{cache}/cache.txt', 'w') as ct:
-        ct.write('\n'.join([baseFile, str(fps), fileSize, str(tracks)]) + '\n')
-
-
-def checkCache(cache, myFile, fps):
-    from shutil import rmtree
-
-    useCache = False
-    tracks = 0
-    try:
-        os.mkdir(cache)
-    except OSError:
-        # There must a cache already, check if that's usable.
-        if(os.path.isfile(f'{cache}/cache.txt')):
-            file = open(f'{cache}/cache.txt', 'r')
-            x = file.read().splitlines()
-            file.close()
-
-            baseFile = os.path.basename(myFile)
-            fileSize = str(os.stat(myFile).st_size)
-            if(x[:3] == [baseFile, str(fps), fileSize]):
-                useCache = True
-                tracks = int(x[3])
-
-        if(not useCache):
-            rmtree(cache)
-            os.mkdir(cache)
-
-    return useCache, tracks
+    fileFormat = filePath[filePath.rfind('.'):]
+    return fileFormat in ['.wav', '.mp3', '.m4a']
 
 
 def getNewLength(chunks, speeds, fps):

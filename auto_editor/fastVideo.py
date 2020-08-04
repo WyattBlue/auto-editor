@@ -18,22 +18,19 @@ import subprocess
 from shutil import rmtree
 
 def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, samplerate,
-    debug, temp, cache, keepTracksSep):
+    debug, temp, keepTracksSep, vcodec, fps):
 
     if(not os.path.isfile(vidFile)):
-        print('advancedVideo.py: Could not find file', vidFile)
+        print('Could not find file', vidFile)
         sys.exit(1)
-
-    print('Running from fastVideo.py')
 
     cap = cv2.VideoCapture(vidFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    fps = cap.get(cv2.CAP_PROP_FPS)
 
     for trackNum in range(tracks):
-        fastAudio(ffmpeg, f'{cache}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
+        fastAudio(ffmpeg, f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
             speeds, bitrate, samplerate, debug, False, fps=fps)
 
         if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
@@ -88,7 +85,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
         cmd.extend(['-i', f'{temp}/spedup.mp4'])
         for i in range(tracks):
             cmd.extend(['-map', f'{i}:a:0'])
-        cmd.extend(['-map', f'{tracks}:v:0','-c:v', 'copy', '-movflags', '+faststart',
+        cmd.extend(['-map', f'{tracks}:v:0', '-c:v', vcodec, '-movflags', '+faststart',
             outFile])
         if(debug):
             cmd.extend(['-hide_banner'])
@@ -111,8 +108,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
             os.rename(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
-            outFile]
+            f'{temp}/spedup.mp4', '-c:v', vcodec, '-movflags', '+faststart', outFile]
         if(debug):
             cmd.extend(['-hide_banner'])
         else:
