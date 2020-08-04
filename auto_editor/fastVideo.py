@@ -108,8 +108,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
             os.rename(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-c:v', vcodec, '-movflags', '+faststart',
-            outFile]
+            f'{temp}/spedup.mp4', '-c:v', vcodec, '-movflags', '+faststart', outFile]
         if(debug):
             cmd.extend(['-hide_banner'])
         else:

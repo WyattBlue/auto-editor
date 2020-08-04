@@ -14,8 +14,6 @@ import sys
 import subprocess
 
 def exportToResolve(myInput, output, chunks, newSpeed, sampleRate):
-    fps = 29.97
-
     clips = []
     # newSpeed = [silentSpeed, videoSpeed]
     for chunk in chunks:

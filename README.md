@@ -6,11 +6,14 @@
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
 ## New in 20w32a
+ * `--export_to_resolve` added. This option creates an XML that can be imported by DaVinci Resolve. Go to File > Import Timeline > Import AAF, EDL, XML and choose the XML Auto-Editor just created.
+ * `--background_music`, `--background_volume`, and `--zoom_threshold` have been removed. `--background_music` was rarely used and it was not any more convenient than using a traditional editor. It was never obvious where `--zoom_threshold` would choose to zoom so it wasn't very helpful for editing. Removing those options also made it possible to delete three hundred lines of code and remove two modules.
+ * New option added `--video_codec`, which does what you think it does. It is set to "copy" as the default but can be changed to "h264" and others so the output size is a lot smaller.
+
+#### Bug Fixes
  * Preview now prints chunks values in debug mode.
  * Using audio files with `--export_to_premiere` no longer causes an error by referencing a non-existent variable.
- * `--background_music`, `--background_volume`, and `--zoom_threshold` have been removed. Although the lose of functionality those options provide is regrettable, those options are rarely used but it made it possible to delete three hundred lines of code and remove two modules.
  * If you input an invalid argument for `--hardware_accel`, it will now stop before causing problems and will list valid arguments instead. Unfortunately, there isn't any use for this option right now, so it has been moved to depreciated.
- * New option added `--video_codec`, which is set to "copy" as the default but can be changed to "h264" or something else.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 

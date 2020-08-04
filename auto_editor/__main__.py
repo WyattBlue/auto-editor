@@ -75,7 +75,7 @@ def main():
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
     advance.add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
-    advance.add_argument('--video_codec', '-vcodec', default='copy',
+    advance.add_argument('--video_codec', '-vcodec', default='copy', metavar='',
         help='(for exporting video only) set the video codec for the output file.')
 
     audio = parser.add_argument_group('Audio Options')
