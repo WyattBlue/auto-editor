@@ -79,8 +79,6 @@ def main():
         help='(for exporting video only) set the video codec for the output file.')
 
     audio = parser.add_argument_group('Audio Options')
-    audio.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='',
-        help='set the sample rate of the input and output videos.')
     audio.add_argument('--audio_bitrate', type=str, default='160k', metavar='',
         help='set the number of bits per second for audio.')
 
@@ -115,6 +113,8 @@ def main():
         help='delete the cache folder and all its contents.')
     dep.add_argument('--hardware_accel', type=str, metavar='',
         help='set the hardware used for gpu acceleration.')
+    dep.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='',
+        help='set the sample rate of the input and output videos.')
 
     args = parser.parse_args()
 

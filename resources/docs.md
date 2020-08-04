@@ -1,5 +1,31 @@
 # Documentation
 
+## Installing
+Auto-Editor supports python version from 3.6.0 to the latest public build.
+
+Auto-Editor needs either its pre-installed ffmpeg binaries or you to install ffmpeg on your own machine.
+For Linux users, that is a requirement, however, installing is easy. Just run `sudo apt-get install ffmpeg libavformat-dev libavfilter-dev libavdevice-dev`
+
+Then run:
+
+```terminal
+sudo -H pip3 install -U auto-editor
+```
+
+If auto-editor does not get linked to the main files in your console. Try using pipx to fix it.
+
+```terminal
+pip3 install pipx
+pipx install auto-editor
+pipx ensurepath
+# close and reopen your console
+```
+
+You can also try auto-editor without installing using pipx.
+
+```terminal
+pipx run auto-editor example.mp4
+```
 
 ## Installing from Source
 Sometimes, pip won't work, you want to downgrade to a very early version of auto-editor, or you're working on maintaining this project. In that case, you'll need to download and run the source code. Use git to download the repository then run \_\_main\_\_.py with python.

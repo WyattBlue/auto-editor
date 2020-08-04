@@ -21,7 +21,7 @@
 
 Auto-Editor is used by many people, including youtubers who want to edit their long livestream quickly, editors to make a base before tweaking the cuts so that it feels just right, and regular viewers who want to make their boring lectures more enjoyable.
 
-Create an edited version of example.mp4 with the default parameters.
+Here's how you create an edited version of example.mp4 with the default parameters.
 ```terminal
 auto-editor example.mp4
 ```
