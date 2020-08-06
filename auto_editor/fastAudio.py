@@ -21,11 +21,10 @@ import tempfile
 import subprocess
 
 def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, debug,
-    needConvert, fps=30):
+    needConvert, log, fps=30):
 
     if(not os.path.isfile(theFile)):
-        print('fastAudio.py: Could not find file', theFile)
-        sys.exit(1)
+        log.error('Could not find file ' + theFile)
 
     if(needConvert):
         # Only print this here so other scripts can use this function.
@@ -92,7 +91,7 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
 
         progressBar(chunkNum, totalChunks, beginTime, title='Creating new audio')
 
-    if(debug):
+    log.debug('yPointer' + str(yPointer))
         print('yPointer', yPointer)
         print('samples per frame', samplerate / fps)
         print('Expected video length', yPointer / (samplerate / fps))

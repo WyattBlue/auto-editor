@@ -5,7 +5,7 @@ Export an XML file that can be imported by Adobe Premiere.
 """
 
 # Included functions
-from usefulFunctions import getAudioChunks, conwrite, isAudioFile
+from usefulFunctions import conwrite, isAudioFile
 from wavfile import read, write
 
 # Internal libraries

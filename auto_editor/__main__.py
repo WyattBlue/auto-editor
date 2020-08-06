@@ -17,8 +17,7 @@ version = '20w32a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
-        print('Error! Could not locate file:', file)
-        sys.exit(1)
+        print('Error! Could not locate file: ' + file)
     return file
 
 def float_type(num):
@@ -39,14 +38,14 @@ def pipeToConsole(myCommands):
     stdout, __ = process.communicate()
     return stdout.decode()
 
-def ffmpegFPS(ffmpeg, path):
+def ffmpegFPS(ffmpeg, path, log):
     output = pipeToConsole([ffmpeg, '-i', path])
     try:
         matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
         return float(matchDict['fps'])
     except AttributeError:
-        print('Warning! frame rate detection failed.')
-        print('If your video has a variable frame rate, ignore this message.')
+        log.warning('frame rate detection failed.\n' \
+            'If your video has a variable frame rate, ignore this message.')
         return None
 
 def main():
@@ -103,6 +102,8 @@ def main():
     misc = parser.add_argument_group('Export Options')
     misc.add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
+    misc.add_argument('--export_as_audio', '-exa', action='store_true',
+        help='export as a WAV audio file.')
     misc.add_argument('--export_to_premiere', '-exp', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
     misc.add_argument('--export_to_resolve', '-exr', action='store_true',
@@ -166,10 +167,13 @@ def main():
         if(args.input == []):
             sys.exit()
 
+    from usefulFunctions import Log
+    log = Log(3 if args.debug else 2)
+
     if(args.input == []):
-        print('Error! The following arguments are required: input')
-        print('In other words, you need the path to a video or an audio file so that auto-editor can do the work for you.')
-        sys.exit(1)
+        log.error('The following arguments are required: input\n' \
+            'In other words, you need the path to a video or an audio file ' \
+            'so that auto-editor can do the work for you.')
 
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
@@ -192,8 +196,7 @@ def main():
             subprocess.call(cmd)
             inputList.append(basename + '.mp4')
         else:
-            print('Error! Could not find file:', myInput)
-            sys.exit(1)
+            log.error('Could not find file: ' + myInput)
 
     if(args.output_file is None):
         args.output_file = []
@@ -205,7 +208,10 @@ def main():
             if(args.export_to_premiere or args.export_to_resolve):
                 args.output_file.append(oldFile[:dotIndex] + '.xml')
             else:
-                end = '_ALTERED' + oldFile[dotIndex:]
+                ext = oldFile[dotIndex:]
+                if(args.export_as_audio):
+                    ext = '.wav'
+                end = '_ALTERED' + ext
                 args.output_file.append(oldFile[:dotIndex] + end)
 
     if(args.combine_files):
@@ -239,14 +245,12 @@ def main():
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
-            fps = ffmpegFPS(ffmpeg, INPUT_FILE)
+            fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
             tracks = vidTracks(INPUT_FILE, ffmpeg)
 
             if(args.cut_by_this_track >= tracks):
-                print("Error! You choose a track that doesn't exist.")
-                print(f'There are only {tracks-1} tracks. (starting from 0)')
-                sys.exit(1)
-
+                log.error("You choose a track that doesn't exist.\n" \
+                    'There are only {tracks-1} tracks. (starting from 0)')
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
                 '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
@@ -318,13 +322,12 @@ def main():
         from fastVideo import fastVideo
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
-            args.keep_tracks_seperate, args.video_codec, fps)
+            args.keep_tracks_seperate, args.video_codec, fps, args.export_as_audio)
 
     if(not os.path.isfile(newOutput)):
-        print(f'Error! The file {newOutput} was not created.')
-        sys.exit(1)
+        log.error(f'Error! The file {newOutput} was not created.')
 
-    if(not args.preview and makingDataFile):
+    if(not args.preview and not makingDataFile):
         print('Finished.')
         timeLength = round(time.time() - startTime, 2)
         minutes = timedelta(seconds=round(timeLength))
@@ -340,7 +343,7 @@ def main():
                 try: # should work on WSL2
                     subprocess.call(['cmd.exe', '/C', 'start', newOutput])
                 except:
-                    print('Warning! Could not open output file.')
+                    log.warning('Could not open output file.')
     rmtree(TEMP)
 
 if(__name__ == '__main__'):

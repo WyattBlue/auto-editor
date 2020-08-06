@@ -18,11 +18,10 @@ import subprocess
 from shutil import rmtree
 
 def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, samplerate,
-    debug, temp, keepTracksSep, vcodec, fps):
+    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, log):
 
     if(not os.path.isfile(vidFile)):
-        print('Could not find file', vidFile)
-        sys.exit(1)
+        log.error('Could not find file ' + vidFile)
 
     cap = cv2.VideoCapture(vidFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -31,11 +30,16 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
 
     for trackNum in range(tracks):
         fastAudio(ffmpeg, f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
-            speeds, bitrate, samplerate, debug, False, fps=fps)
+            speeds, bitrate, samplerate, debug, False, log, fps=fps)
 
         if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
-            print('Error! Audio file not created.')
-            sys.exit(1)
+            log.error('Audio file not created.')
+
+    if(exportAsAudio):
+        # TODO: combine all the audio tracks
+        # TODO: warn the user if they add keep_tracks_seperate
+        os.rename(f'{temp}/0.wav', outFile)
+        return None
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
     totalFrames = chunks[len(chunks) - 1][1]
@@ -74,8 +78,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
     out.release()
     cv2.destroyAllWindows()
 
-    if(debug):
-        print('Frames written', framesWritten)
+    log.debug('Frames written ' + framesWritten)
 
     # Now mix new audio(s) and the new video.
     if(keepTracksSep):
