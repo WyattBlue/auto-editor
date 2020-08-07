@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 <a href="https://discord.com/invite/kMHAWJJ/">
-	<img src="https://img.shields.io/badge/discord-kMHAWJJ-green.svg" alt="discord kMHAWJJ">
+	<img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg">
 </a>
 **20w32a**
 
