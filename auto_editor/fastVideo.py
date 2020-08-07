@@ -78,7 +78,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
     out.release()
     cv2.destroyAllWindows()
 
-    log.debug('Frames written ' + framesWritten)
+    log.debug('Frames written ' + str(framesWritten))
 
     # Now mix new audio(s) and the new video.
     if(keepTracksSep):

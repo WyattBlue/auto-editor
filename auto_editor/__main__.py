@@ -245,12 +245,15 @@ def main():
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
-            fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
+            if(args.export_to_premiere):
+                fps = 29.97
+            else:
+                fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
             tracks = vidTracks(INPUT_FILE, ffmpeg)
 
             if(args.cut_by_this_track >= tracks):
                 log.error("You choose a track that doesn't exist.\n" \
-                    'There are only {tracks-1} tracks. (starting from 0)')
+                    f'There are only {tracks-1} tracks. (starting from 0)')
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
                 '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
@@ -304,7 +307,7 @@ def main():
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, newOutput, chunks, speeds, sampleRate)
+            exportToPremiere(INPUT_FILE, newOutput, chunks, speeds, sampleRate, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
@@ -316,13 +319,13 @@ def main():
             from fastAudio import fastAudio
 
             fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
-            sampleRate, args.debug, True)
+            sampleRate, args.debug, True, log)
             continue
 
         from fastVideo import fastVideo
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
-            args.keep_tracks_seperate, args.video_codec, fps, args.export_as_audio)
+            args.keep_tracks_seperate, args.video_codec, fps, args.export_as_audio, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'Error! The file {newOutput} was not created.')

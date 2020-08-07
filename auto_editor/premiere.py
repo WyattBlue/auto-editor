@@ -13,10 +13,8 @@ import os
 import sys
 import subprocess
 
-def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate):
-    print('Running from premiere.py')
-
-    fps = 29.97
+def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate, log):
+    log.debug('Running from premiere.py')
 
     clips = []
     # newSpeed = [silentSpeed, videoSpeed]
@@ -25,8 +23,7 @@ def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate):
             clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
 
     if(len(clips) < 1):
-        print('Error! Less than 1 clip.')
-        sys.exit(1)
+        log.error('Less than 1 clip.')
 
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
@@ -355,3 +352,4 @@ def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate):
         outfile.write('</xmeml>')
 
     conwrite('')
+    print(chunks)

@@ -67,8 +67,6 @@ def getMaxVolume(s):
 def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, minCut):
     import math
 
-    log.warning('testing', 10)
-
     audioSampleCount = audioData.shape[0]
     maxAudioVolume = getMaxVolume(audioData)
 
@@ -96,6 +94,7 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
                 if(not active):
                     startP = j
                     active = True
+                # Special case for end.
                 if(j == len(hasLoudAudio) - 1):
                     if(j - startP < limit):
                         hasLoudAudio[startP:j+1] = with_
@@ -119,9 +118,9 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
         includeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
     # Remove small clips created. (not necessary unless frame margin is negative)
-    hasLoudAudio = removeSmall(hasLoudAudio, minClip, replace=1, with_=0)
+    includeFrame = removeSmall(includeFrame, minClip, replace=1, with_=0)
     # Remove small cuts created by appling frame margin rules.
-    hasLoudAudio = removeSmall(hasLoudAudio, minCut, replace=0, with_=1)
+    includeFrame = removeSmall(includeFrame, minCut, replace=0, with_=1)
 
     # Convert long numpy array into properly formatted chunks list.
     chunks = []
