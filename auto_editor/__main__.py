@@ -17,7 +17,8 @@ version = '20w32a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
-        print('Error! Could not locate file: ' + file)
+        print('Auto-Editor could not find the file: ' + file)
+        sys.exit(1)
     return file
 
 def float_type(num):
@@ -54,13 +55,13 @@ def main():
     basic = parser.add_argument_group('Basic Options')
     basic.add_argument('input', nargs='*',
         help='the path to the file(s), folder, or url you want edited.')
-    basic.add_argument('--frame_margin', '-m', type=int, default=6, metavar='',
+    basic.add_argument('--frame_margin', '-m', type=int, default=6, metavar='6',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
-    basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='',
+    basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='0.04',
         help='set the volume that frames audio needs to surpass to be "loud". (0-1)')
-    basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00, metavar='',
+    basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00, metavar='1',
         help='set the speed that "loud" sections should be played at.')
-    basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='',
+    basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='99999',
         help='set the speed that "silent" sections should be played at.')
     basic.add_argument('--output_file', '-o', nargs='*', metavar='',
         help='set the name(s) of the new output.')
@@ -68,23 +69,25 @@ def main():
     advance = parser.add_argument_group('Advanced Options')
     advance.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    advance.add_argument('--min_clip_length', '-mclip', type=int, default=3, metavar='',
+    advance.add_argument('--min_clip_length', '-mclip', type=int, default=3, metavar='3',
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    advance.add_argument('--min_cut_length', '-mcut', type=int, default=6, metavar='',
+    advance.add_argument('--min_cut_length', '-mcut', type=int, default=6, metavar='6',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
     advance.add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
-    advance.add_argument('--video_codec', '-vcodec', default='copy', metavar='',
+    advance.add_argument('--preview', action='store_true',
+        help='show stats on how the input will be cut.')
+    advance.add_argument('--video_codec', '-vcodec', default='copy', metavar='copy',
         help='(for exporting video only) set the video codec for the output file.')
 
     audio = parser.add_argument_group('Audio Options')
-    audio.add_argument('--audio_bitrate', type=str, default='160k', metavar='',
+    audio.add_argument('--audio_bitrate', type=str, default='160k', metavar='160k',
         help='set the number of bits per second for audio.')
 
     cutting = parser.add_argument_group('Cutting Options')
     cutting.add_argument('--cut_by_this_audio', '-ca', type=file_type, metavar='',
         help="base cuts by this audio file instead of the video's audio.")
-    cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='',
+    cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='0',
         help='base cuts by a different audio track in the video.')
     cutting.add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
@@ -100,8 +103,6 @@ def main():
         help='show helpful debugging values.')
 
     misc = parser.add_argument_group('Export Options')
-    misc.add_argument('--preview', action='store_true',
-        help='show stats on how the input will be cut.')
     misc.add_argument('--export_as_audio', '-exa', action='store_true',
         help='export as a WAV audio file.')
     misc.add_argument('--export_to_premiere', '-exp', action='store_true',
@@ -114,7 +115,7 @@ def main():
         help='delete the cache folder and all its contents.')
     dep.add_argument('--hardware_accel', type=str, metavar='',
         help='set the hardware used for gpu acceleration.')
-    dep.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='',
+    dep.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='48000',
         help='set the sample rate of the input and output videos.')
 
     args = parser.parse_args()
@@ -313,7 +314,7 @@ def main():
             args.no_open = True
             from resolve import exportToResolve
 
-            exportToResolve(INPUT_FILE, newOutput, chunks, speeds, sampleRate)
+            exportToResolve(INPUT_FILE, newOutput, chunks, speeds, sampleRate, log)
             continue
         if(isAudioFile(INPUT_FILE) and not makingDataFile):
             from fastAudio import fastAudio

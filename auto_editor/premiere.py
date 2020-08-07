@@ -10,14 +10,11 @@ from wavfile import read, write
 
 # Internal libraries
 import os
-import sys
 import subprocess
 
 def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate, log):
-    log.debug('Running from premiere.py')
-
+    print('Exporting to Adobe Premiere Pro XML file.')
     clips = []
-    # newSpeed = [silentSpeed, videoSpeed]
     for chunk in chunks:
         if(newSpeed[chunk[2]] != 99999):
             clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
@@ -352,4 +349,4 @@ def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate, log):
         outfile.write('</xmeml>')
 
     conwrite('')
-    print(chunks)
+    log.debug(chunks)

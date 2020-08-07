@@ -1,5 +1,8 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w32a</sup>
+<a href="https://discord.com/invite/kMHAWJJ/">
+	<img src="https://img.shields.io/badge/discord-kMHAWJJ-green.svg" alt="discord kMHAWJJ">
+</a>
+**20w32a**
 
 <p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>
 

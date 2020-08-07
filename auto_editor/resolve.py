@@ -1,7 +1,7 @@
 '''resolve.py'''
 
 """
-Export an XML file that can be imported by Adobe Premiere.
+Export an XML file that can be imported by DaVinci Resolve.
 """
 
 # Included functions
@@ -10,19 +10,17 @@ from wavfile import read, write
 
 # Internal libraries
 import os
-import sys
 import subprocess
 
-def exportToResolve(myInput, output, chunks, newSpeed, sampleRate):
+def exportToResolve(myInput, output, chunks, newSpeed, sampleRate, log):
+    print('Exporting to DaVinci Resolve XMl file.')
     clips = []
-    # newSpeed = [silentSpeed, videoSpeed]
     for chunk in chunks:
         if(newSpeed[chunk[2]] != 99999):
             clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
 
     if(len(clips) < 1):
-        print('Error! Less than 1 clip.')
-        sys.exit(1)
+        log.error('Less than 1 clip.')
 
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
@@ -31,7 +29,6 @@ def exportToResolve(myInput, output, chunks, newSpeed, sampleRate):
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
-    alphatype = 'none'
     depth = '16'
     if(not audioFile):
         try:
