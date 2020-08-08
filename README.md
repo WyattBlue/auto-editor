@@ -1,7 +1,6 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
-<a href="https://discord.com/invite/kMHAWJJ/">
-	<img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg">
-</a>
+<a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg"></a>
+
 <img src="https://img.shields.io/badge/version-20w32b-blue.svg">
 
 <p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>

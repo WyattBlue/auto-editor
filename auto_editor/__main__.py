@@ -77,12 +77,6 @@ def main():
         help='combine all input files into one before editing.')
     advance.add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
-    advance.add_argument('--video_codec', '-vcodec', default='copy', metavar='copy',
-        help='(for exporting video only) set the video codec for the output file.')
-
-    audio = parser.add_argument_group('Audio Options')
-    audio.add_argument('--audio_bitrate', type=str, default='160k', metavar='160k',
-        help='set the number of bits per second for audio.')
 
     cutting = parser.add_argument_group('Cutting Options')
     cutting.add_argument('--cut_by_this_audio', '-ca', type=file_type, metavar='',
@@ -110,13 +104,19 @@ def main():
     misc.add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
+    size = parser.add_argument_group('Size Options')
+    size.add_argument('--video_bitrate', '-vb', type=str, default='160k', metavar='160k',
+        help='set the number of bits per second for video.')
+    size.add_argument('--audio_bitrate', '-ab', type=str, default='160k', metavar='160k',
+        help='set the number of bits per second for audio.')
+    size.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='48000',
+        help='set the sample rate of the input and output videos.')
+    size.add_argument('--video_codec', '-vcodec', default='copy', metavar='copy',
+        help='set the video codec for the output file.')
+
     dep = parser.add_argument_group('Deprecated Options')
-    dep.add_argument('--clear_cache', action='store_true',
-        help='delete the cache folder and all its contents.')
     dep.add_argument('--hardware_accel', type=str, metavar='',
         help='set the hardware used for gpu acceleration.')
-    dep.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='48000',
-        help='set the sample rate of the input and output videos.')
 
     args = parser.parse_args()
 
@@ -128,13 +128,12 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    if(args.clear_cache):
-        cache = os.path.join(dirPath, 'cache')
-        if(os.path.isdir(cache)):
-            rmtree(cache)
-        print('Removed cache.')
-        if(args.input == []):
-            sys.exit()
+    if(args.export_to_premiere):
+        print('Exporting to Adobe Premiere Pro XML file.')
+    if(args.export_to_resolve):
+        print('Exporting to DaVinci Resolve XML file.')
+    if(args.export_as_audio):
+        print('Exporting as audio.')
 
     newF = None
     if(platform.system() == 'Windows' and not args.my_ffmpeg):

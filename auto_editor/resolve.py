@@ -13,7 +13,6 @@ import os
 import subprocess
 
 def exportToResolve(myInput, output, chunks, newSpeed, sampleRate, log):
-    print('Exporting to DaVinci Resolve XMl file.')
     clips = []
     for chunk in chunks:
         if(newSpeed[chunk[2]] != 99999):
