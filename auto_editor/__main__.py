@@ -105,7 +105,7 @@ def main():
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
     size = parser.add_argument_group('Size Options')
-    size.add_argument('--video_bitrate', '-vb', type=str, default='160k', metavar='160k',
+    size.add_argument('--video_bitrate', '-vb', type=str, default='250k', metavar='250k',
         help='set the number of bits per second for video.')
     size.add_argument('--audio_bitrate', '-ab', type=str, default='160k', metavar='160k',
         help='set the number of bits per second for audio.')
@@ -134,6 +134,9 @@ def main():
         print('Exporting to DaVinci Resolve XML file.')
     if(args.export_as_audio):
         print('Exporting as audio.')
+
+    if(args.video_bitrate != '250k' and args.vcodec == 'copy'):
+        log.warning('Your bitrate will not be applied because the video codec is copyed.')
 
     newF = None
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
@@ -325,7 +328,8 @@ def main():
         from fastVideo import fastVideo
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
-            args.keep_tracks_seperate, args.video_codec, fps, args.export_as_audio, log)
+            args.keep_tracks_seperate, args.video_codec, fps, args.export_as_audio,
+            args.video_bitrate, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'Error! The file {newOutput} was not created.')

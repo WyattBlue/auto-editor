@@ -18,7 +18,7 @@ import subprocess
 from shutil import rmtree
 
 def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, samplerate,
-    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, log):
+    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, log):
 
     if(not os.path.isfile(vidFile)):
         log.error('Could not find file ' + vidFile)
@@ -88,8 +88,8 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
         cmd.extend(['-i', f'{temp}/spedup.mp4'])
         for i in range(tracks):
             cmd.extend(['-map', f'{i}:a:0'])
-        cmd.extend(['-map', f'{tracks}:v:0', '-c:v', vcodec, '-movflags', '+faststart',
-            outFile])
+        cmd.extend(['-map', f'{tracks}:v:0', '-b:v', vbitrate, '-c:v', vcodec,
+            '-movflags', '+faststart', outFile])
         if(debug):
             cmd.extend(['-hide_banner'])
         else:
@@ -111,11 +111,13 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
             os.rename(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-c:v', vcodec, '-movflags', '+faststart', outFile]
+            f'{temp}/spedup.mp4', '-b:v', vbitrate, '-c:v', vcodec, '-movflags',
+            '+faststart', outFile]
         if(debug):
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
+        log.debug(cmd)
 
     conwrite('')
