@@ -116,7 +116,7 @@ def main():
 
     dep = parser.add_argument_group('Deprecated Options')
     dep.add_argument('--hardware_accel', type=str, metavar='',
-        help='set the hardware used for gpu acceleration.')
+        help='')
 
     args = parser.parse_args()
 
@@ -135,7 +135,7 @@ def main():
     if(args.export_as_audio):
         print('Exporting as audio.')
 
-    if(args.video_bitrate != '250k' and args.vcodec == 'copy'):
+    if(args.video_bitrate != '250k' and args.video_codec == 'copy'):
         log.warning('Your bitrate will not be applied because the video codec is copyed.')
 
     newF = None
@@ -252,7 +252,7 @@ def main():
                 fps = 29.97
             else:
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
-            tracks = vidTracks(INPUT_FILE, ffmpeg)
+            tracks = vidTracks(INPUT_FILE, ffmpeg, log)
 
             if(args.cut_by_this_track >= tracks):
                 log.error("You choose a track that doesn't exist.\n" \
@@ -281,7 +281,7 @@ def main():
                 sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
 
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
-            args.frame_margin, args.min_clip_length, args.min_cut_length)
+            args.frame_margin, args.min_clip_length, args.min_cut_length, log)
 
         if(fps is None and not isAudioFile(INPUT_FILE)):
             if(makingDataFile):

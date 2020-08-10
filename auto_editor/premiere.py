@@ -5,12 +5,10 @@ Export an XML file that can be imported by Adobe Premiere.
 """
 
 # Included functions
-from usefulFunctions import getAudioChunks, conwrite, isAudioFile
-from wavfile import read, write
+from usefulFunctions import conwrite, isAudioFile
 
 # Internal libraries
 import os
-import subprocess
 
 def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate, log):
     clips = []

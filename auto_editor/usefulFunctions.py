@@ -42,8 +42,6 @@ class Log():
         if(self.level > 2):
             print(message)
 
-log = Log(level=3)
-
 def isAudioFile(filePath):
     fileFormat = filePath[filePath.rfind('.'):]
     return fileFormat in ['.wav', '.mp3', '.m4a']
@@ -64,7 +62,8 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, minCut):
+def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, minCut,
+    log):
     import math
 
     audioSampleCount = audioData.shape[0]
@@ -151,7 +150,7 @@ def prettyTime(newTime):
     return f'{hours:02}:{minutes:02} {ampm}'
 
 
-def vidTracks(videoFile, ffmpeg):
+def vidTracks(videoFile, ffmpeg, log):
     """
     Return the number of audio tracks in a video file.
     """

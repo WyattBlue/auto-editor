@@ -6,6 +6,10 @@
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
 ## New in 20w32b
+* Added `--video_bitrate`
+* Exporting to premiere shows more useful information now.
+* `--clear_cache` has been removed.
+* `--sample_rate` has been moved to size options.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 

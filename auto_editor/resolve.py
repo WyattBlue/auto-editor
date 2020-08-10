@@ -6,17 +6,18 @@ Export an XML file that can be imported by DaVinci Resolve.
 
 # Included functions
 from usefulFunctions import conwrite, isAudioFile
-from wavfile import read, write
 
 # Internal libraries
 import os
-import subprocess
 
 def exportToResolve(myInput, output, chunks, newSpeed, sampleRate, log):
     clips = []
+    numCuts = 0
     for chunk in chunks:
         if(newSpeed[chunk[2]] != 99999):
             clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
+        else:
+            numCuts += 1
 
     if(len(clips) < 1):
         log.error('Less than 1 clip.')
@@ -360,3 +361,19 @@ def exportToResolve(myInput, output, chunks, newSpeed, sampleRate, log):
         outfile.write('</xmeml>')
 
     conwrite('')
+
+    timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
+    units = 'seconds'
+    if(timeSave >= 3600):
+        timeSave = round(timeSave / 3600, 1)
+        if(timeSave % 1 == 0):
+            timeSave = round(timeSave)
+        units = 'hours'
+    if(timeSave >= 60):
+        timeSave = round(timeSave / 60, 1)
+        if(timeSave >= 10 or timeSave % 1 == 0):
+            timeSave = round(timeSave)
+        units = 'minutes'
+
+    print(f'Auto-Editor made {numCuts} cuts, which would have taked about ' \
+        f'{timeSave} {units} if edited manually.')
