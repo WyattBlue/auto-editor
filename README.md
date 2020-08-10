@@ -1,24 +1,19 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
- &nbsp;&nbsp;<sup>version 20w32a</sup>
-
+<a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg"></a>
+<img src="https://img.shields.io/badge/version-20w32b-blue.svg">
 <p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
-## New in 20w32a
- * `--export_to_resolve` added. This option creates an XML that can be imported by DaVinci Resolve. Go to File > Import Timeline > Import AAF, EDL, XML and choose the XML Auto-Editor just created.
- * `--background_music`, `--background_volume`, and `--zoom_threshold` have been removed. `--background_music` was rarely used and it was not any more convenient than using a traditional editor. It was never obvious where `--zoom_threshold` would choose to zoom so it wasn't very helpful for editing. Removing those options also made it possible to delete three hundred lines of code and remove two modules.
- * New option added `--video_codec`, which does what you think it does. It is set to "copy" as the default but can be changed to "h264" and others so the output size is a lot smaller.
-
-#### Bug Fixes
- * Preview now prints chunks values in debug mode.
- * Using audio files with `--export_to_premiere` no longer causes an error by referencing a non-existent variable.
- * If you input an invalid argument for `--hardware_accel`, it will now stop before causing problems and will list valid arguments instead. Unfortunately, there isn't any use for this option right now, so it has been moved to depreciated.
+## New in 20w32b
+* Added `--video_bitrate` which allows you to change the video size when you use video codec like h264.
+* Exporting to premiere shows more useful information.
+* `--clear_cache` has been removed.
+* `--sample_rate` has been moved to size options.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
 ## Usage
-
 Auto-Editor is used by many people, including youtubers who want to edit their long livestream quickly, editors to make a base before tweaking the cuts so that it feels just right, and regular viewers who want to make their boring lectures more enjoyable.
 
 Here's how you create an edited version of example.mp4 with the default parameters.

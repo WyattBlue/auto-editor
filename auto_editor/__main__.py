@@ -13,11 +13,11 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w32a'
+version = '20w32b'
 
 def file_type(file):
     if(not os.path.isfile(file)):
-        print('Error! Could not locate file:', file)
+        print('Auto-Editor could not find the file: ' + file)
         sys.exit(1)
     return file
 
@@ -39,14 +39,14 @@ def pipeToConsole(myCommands):
     stdout, __ = process.communicate()
     return stdout.decode()
 
-def ffmpegFPS(ffmpeg, path):
+def ffmpegFPS(ffmpeg, path, log):
     output = pipeToConsole([ffmpeg, '-i', path])
     try:
         matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
         return float(matchDict['fps'])
     except AttributeError:
-        print('Warning! frame rate detection failed.')
-        print('If your video has a variable frame rate, ignore this message.')
+        log.warning('frame rate detection failed.\n' \
+            'If your video has a variable frame rate, ignore this message.')
         return None
 
 def main():
@@ -55,13 +55,13 @@ def main():
     basic = parser.add_argument_group('Basic Options')
     basic.add_argument('input', nargs='*',
         help='the path to the file(s), folder, or url you want edited.')
-    basic.add_argument('--frame_margin', '-m', type=int, default=6, metavar='',
+    basic.add_argument('--frame_margin', '-m', type=int, default=6, metavar='6',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
-    basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='',
+    basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='0.04',
         help='set the volume that frames audio needs to surpass to be "loud". (0-1)')
-    basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00, metavar='',
+    basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00, metavar='1',
         help='set the speed that "loud" sections should be played at.')
-    basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='',
+    basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='99999',
         help='set the speed that "silent" sections should be played at.')
     basic.add_argument('--output_file', '-o', nargs='*', metavar='',
         help='set the name(s) of the new output.')
@@ -69,23 +69,19 @@ def main():
     advance = parser.add_argument_group('Advanced Options')
     advance.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    advance.add_argument('--min_clip_length', '-mclip', type=int, default=3, metavar='',
+    advance.add_argument('--min_clip_length', '-mclip', type=int, default=3, metavar='3',
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    advance.add_argument('--min_cut_length', '-mcut', type=int, default=6, metavar='',
+    advance.add_argument('--min_cut_length', '-mcut', type=int, default=6, metavar='6',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
     advance.add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
-    advance.add_argument('--video_codec', '-vcodec', default='copy', metavar='',
-        help='(for exporting video only) set the video codec for the output file.')
-
-    audio = parser.add_argument_group('Audio Options')
-    audio.add_argument('--audio_bitrate', type=str, default='160k', metavar='',
-        help='set the number of bits per second for audio.')
+    advance.add_argument('--preview', action='store_true',
+        help='show stats on how the input will be cut.')
 
     cutting = parser.add_argument_group('Cutting Options')
     cutting.add_argument('--cut_by_this_audio', '-ca', type=file_type, metavar='',
         help="base cuts by this audio file instead of the video's audio.")
-    cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='',
+    cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='0',
         help='base cuts by a different audio track in the video.')
     cutting.add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
@@ -101,20 +97,26 @@ def main():
         help='show helpful debugging values.')
 
     misc = parser.add_argument_group('Export Options')
-    misc.add_argument('--preview', action='store_true',
-        help='show stats on how the input will be cut.')
+    misc.add_argument('--export_as_audio', '-exa', action='store_true',
+        help='export as a WAV audio file.')
     misc.add_argument('--export_to_premiere', '-exp', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
     misc.add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
-    dep = parser.add_argument_group('Deprecated Options')
-    dep.add_argument('--clear_cache', action='store_true',
-        help='delete the cache folder and all its contents.')
-    dep.add_argument('--hardware_accel', type=str, metavar='',
-        help='set the hardware used for gpu acceleration.')
-    dep.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='',
+    size = parser.add_argument_group('Size Options')
+    size.add_argument('--video_bitrate', '-vb', type=str, default='250k', metavar='250k',
+        help='set the number of bits per second for video.')
+    size.add_argument('--audio_bitrate', '-ab', type=str, default='160k', metavar='160k',
+        help='set the number of bits per second for audio.')
+    size.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='48000',
         help='set the sample rate of the input and output videos.')
+    size.add_argument('--video_codec', '-vcodec', default='copy', metavar='copy',
+        help='set the video codec for the output file.')
+
+    dep = parser.add_argument_group('Deprecated Options')
+    dep.add_argument('--hardware_accel', type=str, metavar='',
+        help='')
 
     args = parser.parse_args()
 
@@ -126,13 +128,15 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    if(args.clear_cache):
-        cache = os.path.join(dirPath, 'cache')
-        if(os.path.isdir(cache)):
-            rmtree(cache)
-        print('Removed cache.')
-        if(args.input == []):
-            sys.exit()
+    if(args.export_to_premiere):
+        print('Exporting to Adobe Premiere Pro XML file.')
+    if(args.export_to_resolve):
+        print('Exporting to DaVinci Resolve XML file.')
+    if(args.export_as_audio):
+        print('Exporting as audio.')
+
+    if(args.video_bitrate != '250k' and args.video_codec == 'copy'):
+        log.warning('Your bitrate will not be applied because the video codec is copyed.')
 
     newF = None
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
@@ -166,10 +170,13 @@ def main():
         if(args.input == []):
             sys.exit()
 
+    from usefulFunctions import Log
+    log = Log(3 if args.debug else 2)
+
     if(args.input == []):
-        print('Error! The following arguments are required: input')
-        print('In other words, you need the path to a video or an audio file so that auto-editor can do the work for you.')
-        sys.exit(1)
+        log.error('The following arguments are required: input\n' \
+            'In other words, you need the path to a video or an audio file ' \
+            'so that auto-editor can do the work for you.')
 
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
@@ -192,8 +199,7 @@ def main():
             subprocess.call(cmd)
             inputList.append(basename + '.mp4')
         else:
-            print('Error! Could not find file:', myInput)
-            sys.exit(1)
+            log.error('Could not find file: ' + myInput)
 
     if(args.output_file is None):
         args.output_file = []
@@ -205,7 +211,10 @@ def main():
             if(args.export_to_premiere or args.export_to_resolve):
                 args.output_file.append(oldFile[:dotIndex] + '.xml')
             else:
-                end = '_ALTERED' + oldFile[dotIndex:]
+                ext = oldFile[dotIndex:]
+                if(args.export_as_audio):
+                    ext = '.wav'
+                end = '_ALTERED' + ext
                 args.output_file.append(oldFile[:dotIndex] + end)
 
     if(args.combine_files):
@@ -239,14 +248,15 @@ def main():
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
-            fps = ffmpegFPS(ffmpeg, INPUT_FILE)
-            tracks = vidTracks(INPUT_FILE, ffmpeg)
+            if(args.export_to_premiere):
+                fps = 29.97
+            else:
+                fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
+            tracks = vidTracks(INPUT_FILE, ffmpeg, log)
 
             if(args.cut_by_this_track >= tracks):
-                print("Error! You choose a track that doesn't exist.")
-                print(f'There are only {tracks-1} tracks. (starting from 0)')
-                sys.exit(1)
-
+                log.error("You choose a track that doesn't exist.\n" \
+                    f'There are only {tracks-1} tracks. (starting from 0)')
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
                 '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
@@ -271,7 +281,7 @@ def main():
                 sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
 
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
-            args.frame_margin, args.min_clip_length, args.min_cut_length)
+            args.frame_margin, args.min_clip_length, args.min_cut_length, log)
 
         if(fps is None and not isAudioFile(INPUT_FILE)):
             if(makingDataFile):
@@ -300,31 +310,31 @@ def main():
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, newOutput, chunks, speeds, sampleRate)
+            exportToPremiere(INPUT_FILE, newOutput, chunks, speeds, sampleRate, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
             from resolve import exportToResolve
 
-            exportToResolve(INPUT_FILE, newOutput, chunks, speeds, sampleRate)
+            exportToResolve(INPUT_FILE, newOutput, chunks, speeds, sampleRate, log)
             continue
         if(isAudioFile(INPUT_FILE) and not makingDataFile):
             from fastAudio import fastAudio
 
             fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
-            sampleRate, args.debug, True)
+            sampleRate, args.debug, True, log)
             continue
 
         from fastVideo import fastVideo
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
-            args.keep_tracks_seperate, args.video_codec, fps)
+            args.keep_tracks_seperate, args.video_codec, fps, args.export_as_audio,
+            args.video_bitrate, log)
 
     if(not os.path.isfile(newOutput)):
-        print(f'Error! The file {newOutput} was not created.')
-        sys.exit(1)
+        log.error(f'Error! The file {newOutput} was not created.')
 
-    if(not args.preview and makingDataFile):
+    if(not args.preview and not makingDataFile):
         print('Finished.')
         timeLength = round(time.time() - startTime, 2)
         minutes = timedelta(seconds=round(timeLength))
@@ -340,7 +350,7 @@ def main():
                 try: # should work on WSL2
                     subprocess.call(['cmd.exe', '/C', 'start', newOutput])
                 except:
-                    print('Warning! Could not open output file.')
+                    log.warning('Could not open output file.')
     rmtree(TEMP)
 
 if(__name__ == '__main__'):
