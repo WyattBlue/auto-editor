@@ -50,53 +50,73 @@ optional arguments:
   -h, --help            show this help message and exit
 
 Basic Options:
-  input                 the path to the file(s), folder, or url you want edited.
-  --frame_margin , -m   set how many "silent" frames of on either side of "loud" sections be included.
-  --silent_threshold , -t
-                        set the volume that frames audio needs to surpass to be "loud". (0-1)
-  --video_speed , --sounded_speed , -v
-                        set the speed that "loud" sections should be played at.
-  --silent_speed , -s   set the speed that "silent" sections should be played at.
+  input                 the path to the file(s), folder, or url you want
+                        edited.
+  --frame_margin 6, -m 6
+                        set how many "silent" frames of on either side of
+                        "loud" sections be included.
+  --silent_threshold 0.04, -t 0.04
+                        set the volume that frames audio needs to surpass
+                        to be "loud". (0-1)
+  --video_speed 1, --sounded_speed 1, -v 1
+                        set the speed that "loud" sections should be
+                        played at.
+  --silent_speed 99999, -s 99999
+                        set the speed that "silent" sections should be
+                        played at.
   --output_file [ [ ...]], -o [ [ ...]]
                         set the name(s) of the new output.
 
 Advanced Options:
   --no_open             do not open the file after editing is done.
-  --min_clip_length , -mclip
-                        set the minimum length a clip can be. If a clip is too short, cut it.
-  --min_cut_length , -mcut
-                        set the minimum length a cut can be. If a cut is too short, don't cut
+  --min_clip_length 3, -mclip 3
+                        set the minimum length a clip can be. If a clip is
+                        too short, cut it.
+  --min_cut_length 6, -mcut 6
+                        set the minimum length a cut can be. If a cut is
+                        too short, don't cut
   --combine_files       combine all input files into one before editing.
-  --video_codec , -vcodec
-                        (for exporting video only) set the video codec for the output file.
-
-Audio Options:
-  --sample_rate , -r    set the sample rate of the input and output videos.
-  --audio_bitrate       set the number of bits per second for audio.
+  --preview             show stats on how the input will be cut.
 
 Cutting Options:
   --cut_by_this_audio , -ca
-                        base cuts by this audio file instead of the video's audio.
-  --cut_by_this_track , -ct
+                        base cuts by this audio file instead of the
+                        video's audio.
+  --cut_by_this_track 0, -ct 0
                         base cuts by a different audio track in the video.
   --cut_by_all_tracks, -cat
-                        combine all audio tracks into one before basing cuts.
+                        combine all audio tracks into one before basing
+                        cuts.
   --keep_tracks_seperate
                         don't combine audio tracks when exporting.
 
 Developer/Debugging Options:
-  --my_ffmpeg           use your ffmpeg and other binaries instead of the ones packaged.
+  --my_ffmpeg           use your ffmpeg and other binaries instead of the
+                        ones packaged.
   --version             show which auto-editor you have.
   --debug, --verbose    show helpful debugging values.
 
 Export Options:
-  --preview             show stats on how the input will be cut.
+  --export_as_audio, -exa
+                        export as a WAV audio file.
   --export_to_premiere, -exp
-                        export as an XML file for Adobe Premiere Pro instead of outputting a media file.
+                        export as an XML file for Adobe Premiere Pro
+                        instead of outputting a media file.
   --export_to_resolve, -exr
-                        export as an XML file for DaVinci Resolve instead of outputting a media file.
+                        export as an XML file for DaVinci Resolve instead
+                        of outputting a media file.
+
+Size Options:
+  --video_bitrate 250k, -vb 250k
+                        set the number of bits per second for video.
+  --audio_bitrate 160k, -ab 160k
+                        set the number of bits per second for audio.
+  --sample_rate 48000, -r 48000
+                        set the sample rate of the input and output
+                        videos.
+  --video_codec copy, -vcodec copy
+                        set the video codec for the output file.
 
 Deprecated Options:
-  --clear_cache         delete the cache folder and all its contents.
-  --hardware_accel      set the hardware used for gpu acceleration.
+  --hardware_accel
 ```

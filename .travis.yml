@@ -19,5 +19,7 @@ script:
  - python3 auto_editor/__main__.py example.mp4 --cut_by_this_audio resources/newCommentary.mp3
  - python3 auto_editor/__main__.py example.mp4 -exp
  - python3 auto_editor/__main__.py resources/newCommentary.mp3 -exp
+ - python3 auto_editor/__main__.py example.mp4 -exr
+ - python3 auto_editor/__main__.py resources/newCommentary.mp3 -exr
  - python3 auto_editor/__main__.py example.mp4 --preview
  - python3 auto_editor/__main__.py example.mp4 --video_codec h264
