@@ -5,28 +5,22 @@ Export an XML file that can be imported by Adobe Premiere.
 """
 
 # Included functions
-from usefulFunctions import getAudioChunks, conwrite, isAudioFile
-from wavfile import read, write
+from usefulFunctions import conwrite, isAudioFile
 
 # Internal libraries
 import os
-import sys
-import subprocess
 
-def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate):
-    print('Running from premiere.py')
-
-    fps = 29.97
-
+def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate, log):
     clips = []
-    # newSpeed = [silentSpeed, videoSpeed]
+    numCuts = 0
     for chunk in chunks:
         if(newSpeed[chunk[2]] != 99999):
             clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
+        else:
+            numCuts += 1
 
     if(len(clips) < 1):
-        print('Error! Less than 1 clip.')
-        sys.exit(1)
+        log.error('Less than 1 clip.')
 
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
@@ -355,3 +349,20 @@ def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate):
         outfile.write('</xmeml>')
 
     conwrite('')
+    log.debug(chunks)
+
+    timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
+    units = 'seconds'
+    if(timeSave >= 3600):
+        timeSave = round(timeSave / 3600, 1)
+        if(timeSave % 1 == 0):
+            timeSave = round(timeSave)
+        units = 'hours'
+    if(timeSave >= 60):
+        timeSave = round(timeSave / 60, 1)
+        if(timeSave >= 10 or timeSave % 1 == 0):
+            timeSave = round(timeSave)
+        units = 'minutes'
+
+    print(f'Auto-Editor made {numCuts} cuts, which would have taked about ' \
+        f'{timeSave} {units} if edited manually.')
