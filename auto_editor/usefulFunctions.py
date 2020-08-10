@@ -14,6 +14,34 @@ import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
 
+
+class Log():
+    """
+    Log(0), print nothing
+    Log(1), print errors
+    Log(2), print errors and warnings.
+    Log(3), print errors, warnings, and debug.
+
+    Log(-1), don't crash when errors happen
+    """
+    def __init__(self, level=3):
+        self.level = level
+
+    def error(self, message):
+        if(self.level > 0):
+            print('Error!', message)
+        if(self.level != -1):
+            import sys
+            sys.exit(1)
+
+    def warning(self, message):
+        if(self.level > 1):
+            print('Warning!', message)
+
+    def debug(self, message):
+        if(self.level > 2):
+            print(message)
+
 def isAudioFile(filePath):
     fileFormat = filePath[filePath.rfind('.'):]
     return fileFormat in ['.wav', '.mp3', '.m4a']
@@ -34,7 +62,8 @@ def getMaxVolume(s):
     return max(maxv, -minv)
 
 
-def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, minCut):
+def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, minCut,
+    log):
     import math
 
     audioSampleCount = audioData.shape[0]
@@ -45,9 +74,10 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
     hasLoudAudio = np.zeros((audioFrameCount), dtype=np.uint8)
 
     if(maxAudioVolume == 0):
-        print('Warning! The entire audio is silent')
+        log.warning('The entire audio is silent')
         return [[0, audioFrameCount, 1]]
 
+    # Calculate when the audio is lould or silent.
     for i in range(audioFrameCount):
         start = int(i * samplesPerFrame)
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
@@ -55,79 +85,43 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
         if(getMaxVolume(audiochunks) / maxAudioVolume >= silentT):
             hasLoudAudio[i] = 1
 
+    def removeSmall(hasLoudAudio, limit, replace, with_):
+        startP = 0
+        active = False
+        for j, item in enumerate(hasLoudAudio):
+            if(item == replace):
+                if(not active):
+                    startP = j
+                    active = True
+                # Special case for end.
+                if(j == len(hasLoudAudio) - 1):
+                    if(j - startP < limit):
+                        hasLoudAudio[startP:j+1] = with_
+            else:
+                if(active):
+                    if(j - startP < limit):
+                        hasLoudAudio[startP:j] = with_
+                    active = False
+        return hasLoudAudio
+
     # Remove small loudness spikes
-    startP = 0
-    active = False
-    for j, item in enumerate(hasLoudAudio):
-        if(item == 1):
-            if(not active):
-                startP = j
-                active = True
-            if(j == len(hasLoudAudio) - 1):
-                if(j - startP < minClip):
-                    hasLoudAudio[startP:j+1] = 0
-        else:
-            if(active):
-                if(j - startP < minClip):
-                    hasLoudAudio[startP:j] = 0
-                active = False
-
+    hasLoudAudio = removeSmall(hasLoudAudio, minClip, replace=1, with_=0)
     # Remove small silences
-    startP = 0
-    active = False
-    for j, item in enumerate(hasLoudAudio):
-        if(item == 0):
-            if(not active):
-                startP = j
-                active = True
-            if(j == len(hasLoudAudio) - 1):
-                if(j - startP < minCut):
-                    hasLoudAudio[startP:j+1] = 1
-        else:
-            if(active):
-                if(j - startP < minCut):
-                    hasLoudAudio[startP:j] = 1
-                active = False
+    hasLoudAudio = removeSmall(hasLoudAudio, minCut, replace=0, with_=1)
 
+    # Apply frame margin rules.
     includeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
     for i in range(audioFrameCount):
         start = int(max(0, i - frameMargin))
         end = int(min(audioFrameCount, i+1+frameMargin))
         includeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
-    # Remove unneeded clips.
-    startP = 0
-    active = False
-    for j, item in enumerate(includeFrame):
-        if(item == 1):
-            if(not active):
-                startP = j
-                active = True
-            if(j == len(includeFrame) - 1):
-                if(j - startP < minClip):
-                    includeFrame[startP:j+1] = 0
-        else:
-            if(active):
-                if(j - startP < minClip):
-                    includeFrame[startP:j] = 0
-                active = False
+    # Remove small clips created. (not necessary unless frame margin is negative)
+    includeFrame = removeSmall(includeFrame, minClip, replace=1, with_=0)
+    # Remove small cuts created by appling frame margin rules.
+    includeFrame = removeSmall(includeFrame, minCut, replace=0, with_=1)
 
-    # Remove unneeded cuts.
-    startP = 0
-    active = False
-    for j, item in enumerate(includeFrame):
-        if(item == 0):
-            if(not active):
-                startP = j
-                active = True
-            if(j == len(includeFrame) - 1):
-                if(j - startP < minCut):
-                    includeFrame[startP:j+1] = 1
-        else:
-            if(active):
-                if(j - startP < minCut):
-                    includeFrame[startP:j] = 1
-                active = False
+    # Convert long numpy array into properly formatted chunks list.
     chunks = []
     startP = 0
     for j in range(1, audioFrameCount):
@@ -156,7 +150,7 @@ def prettyTime(newTime):
     return f'{hours:02}:{minutes:02} {ampm}'
 
 
-def vidTracks(videoFile, ffmpeg):
+def vidTracks(videoFile, ffmpeg, log):
     """
     Return the number of audio tracks in a video file.
     """
@@ -187,7 +181,9 @@ def vidTracks(videoFile, ffmpeg):
         test = int(numbers[0])
         return len(numbers) - 1
     except ValueError:
-        print('Warning! ffprobe had an invalid output.')
+        log.warning('ffprobe had an invalid output.')
+        # Most of the time, there's only one track anyway,
+        # so just assume that's the case.
         return 1
 
 
