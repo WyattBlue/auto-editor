@@ -1,12 +1,12 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg"></a>
-<img src="https://img.shields.io/badge/version-20w32b-blue.svg">
+<img src="https://img.shields.io/badge/version-20w33a-blue.svg">
 <p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
-## New in 20w32b
-* Added `--video_bitrate` which allows you to change the video size when you use video codec like h264.
+## New in 20w33a
+* Added `--video_bitrate` which allows you to change the video size when you usevideo codec like h264.'
 * Exporting to premiere shows more useful information.
 * `--clear_cache` has been removed.
 * `--sample_rate` has been moved to size options.
