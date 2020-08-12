@@ -6,7 +6,7 @@
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
 ## New in 20w33a
-* Added `--video_bitrate` which allows you to change the video size when you usevideo codec like h264.'
+* Added `--video_bitrate` which allows you to change the video size when you use video codec like h264.
 * Exporting to premiere shows more useful information.
 * `--clear_cache` has been removed.
 * `--sample_rate` has been moved to size options.
@@ -17,13 +17,13 @@
 Auto-Editor is used by many people, including youtubers who want to edit their long livestream quickly, editors to make a base before tweaking the cuts so that it feels just right, and regular viewers who want to make their boring lectures more enjoyable.
 
 Here's how you create an edited version of example.mp4 with the default parameters.
-```terminal
+```
 auto-editor example.mp4
 ```
 
 You can change the **pace** of a video by changing by including frames that are silent but are next to loud parts. A frame margin of 8 will add up to 8 frames before and 8 frames after the loud part.
 
-```terminal
+```
 auto-editor example.mp4 --frame_margin 8
 ```
 
@@ -32,31 +32,25 @@ There are many more features in auto-editor, including **adding in background mu
 [See the docs](https://github.com/WyattBlue/auto-editor/blob/master/resources/docs.md) for more commands and usages.
 
 ## Installing Auto-Editor
- 1. Download and Install the Latest Version of [Python 3](https://www.python.org/downloads/).
-
-```terminal
-pip3 install auto-editor
-```
+Download and install the latest version of [Python 3](https://www.python.org/downloads/), then run `pip3 install auto-editor` on your console then run
 
 The binaries you'll need are already installed, unless you're using Linux.
 Linux users need to run this command. `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
 
 Now run it with the example video to make sure it is working.
 
-```terminal
+```
 auto-editor example.mp4
 ```
 
 If that works then congratulations, you have successfully installed auto-editor. You can use now use this with any other type of video or audio that you have.
 
-```terminal
+```
 auto-editor C:path\to\your\video
 ```
 
-
 ## Upgrading
-
-```terminal
+```
 pip3 install auto-editor --upgrade
 ```
 

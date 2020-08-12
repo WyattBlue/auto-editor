@@ -1,14 +1,25 @@
 # Auto-Editor Change Log
 
+## Version 20w32b
+* Added `--video_bitrate` which allows you to change the video size when you use video codec like h264.
+* Exporting to premiere shows more useful information.
+* `--clear_cache` has been removed.
+* `--sample_rate` has been moved to size options.
+
+## Version 20w32a
+* `--export_to_resolve` added. This option creates an XML that can be imported by DaVinci Resolve. Go to File > Import Timeline > Import AAF, EDL, XML and choose the XML Auto-Editor just created.
+* Calculating chunks is now changed so that it is better.	 * `--background_music`, `--background_volume`, and `--zoom_threshold` have been removed. `--background_music` was rarely used and it was not any more convenient than using a traditional editor. It was never obvious where `--zoom_threshold` would choose to zoom so it wasn't very helpful for editing. Removing those options also made it possible to delete three hundred lines of code and remove two modules.
+* Added two new commands `--min_clip_length`, `--min_cut_length`. They change how cutting works so, for instance, that one volume spike gets ignored.	 * New option added `--video_codec`, which does what you think it does. It is set to "copy" as the default but can be changed to "h264" and others so the output size is a lot smaller.
+
 ## Version 20w31a
- * Calculating chunks is now done in \_\_main\_\_.py so all cutting commands like `--combine_all_tracks` work automatically for all existing and feature methods.
- * Calculating chunks is now changed so that it is better.
- * Added two new commands `--min_clip_length`, `--min_cut_length`. They change how cutting works so, for instance, that one volume spike gets ignored.
- * Added short `-ca` for `--cut_by_this_audio`.
- * Added short `-cat` for `--cut_by_all_tracks`.
- * The scripts folder has been renamed to auto_editor.
- * requirements.txt has been removed.
- * Renamed originalMethod.py to advancedVideo.py. Similarly, originalVid.py has been renamed to splitVid.py
+* Calculating chunks is now done in \_\_main\_\_.py so all cutting commands like `--combine_all_tracks` work automatically for all existing and feature methods.
+* Calculating chunks is now changed so that it is better.
+* Added two new commands `--min_clip_length`, `--min_cut_length`. They change how cutting works so, for instance, that one volume spike gets ignored.
+* Added short `-ca` for `--cut_by_this_audio`.
+* Added short `-cat` for `--cut_by_all_tracks`.
+* The scripts folder has been renamed to auto_editor.
+* requirements.txt has been removed.
+* Renamed originalMethod.py to advancedVideo.py. Similarly, originalVid.py has been renamed to splitVid.py
 
 ## Version 20w30b Hotfix
 * fixed macOS FFmpeg binaries not working unless the user already installed ffmpeg at some point.
@@ -160,4 +171,3 @@ The project was created.
 * scipy
 * audiotsm
 * opencv-python
-
