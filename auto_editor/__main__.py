@@ -149,8 +149,9 @@ def main():
 
     if(args.debug):
         print('Python Version:', platform.python_version(), is64bit)
-        # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
         print('Platform:', platform.system())
+        # Platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
+
         print('FFmpeg path:', ffmpeg)
         print('Auto-Editor version', version)
         if(args.input == []):
@@ -233,18 +234,15 @@ def main():
         newOutput = args.output_file[i]
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
-
-
         sr = args.sample_rate
         if(sr is None):
             output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
-            print(output)
             try:
-                matchDict = re.search(r'\s(?P<video>\w+?)\sHz', output).groupdict()
-                sr = matchDict['video']
+                matchDict = re.search(r'\s(?P<grp>\w+?)\sHz', output).groupdict()
+                sr = matchDict['grp']
             except AttributeError:
-                sr = 46000
-        print(sr)
+                sr = 48000
+        args.sample_rate = sr
 
         if(isAudioFile(INPUT_FILE)):
             fps = 30
@@ -267,7 +265,6 @@ def main():
             vcodec = args.video_codec
             if(vcodec is None):
                 output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
-                print(output)
                 try:
                     matchDict = re.search(r'\s(?P<video>\w+?)\s\(Main\)', output).groupdict()
                     vcodec = matchDict['video']
@@ -275,7 +272,6 @@ def main():
                     vcodec = 'copy'
             if(args.video_bitrate != '250k' and vcodec == 'copy'):
                 log.warning('Your bitrate will not be applied because the video codec is "copy".')
-
 
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
@@ -298,7 +294,10 @@ def main():
 
                 sampleRate, audioData = read(f'{TEMP}/combined.wav')
             else:
-                sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
+                if(os.path.isfile(f'{TEMP}/{args.cut_by_this_track}.wav')):
+                    sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
+                else:
+                    log.error('Audio track not found!')
 
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
             args.frame_margin, args.min_clip_length, args.min_cut_length, log)
@@ -310,8 +309,7 @@ def main():
                 constantLoc = oldFile[:dotIndex] + end
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
-            cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
-                constantLoc, '-hide_banner']
+            cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30', constantLoc]
             if(args.debug):
                 cmd.extend(['-hide_banner'])
             else:
