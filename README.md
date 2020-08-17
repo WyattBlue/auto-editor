@@ -6,10 +6,9 @@
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
 ## New in 20w33a
-* Added `--video_bitrate` which allows you to change the video size when you use video codec like h264.
-* Exporting to premiere shows more useful information.
-* `--clear_cache` has been removed.
-* `--sample_rate` has been moved to size options.
+* the default for `--sample_rate` is now the same as the input.
+* the default `--video_codec` is now the same as the video.
+* the `--hardware_accel` option has been removed because it is not used anywhere in the program.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
@@ -59,8 +58,14 @@ The best way to contribute is to [fork auto-editor](https://github.com/WyattBlue
 
 No change is too small whether that be a typo in the docs or a small improvement of code.
 
-## Licensing
-The FFmpeg binaries are under the [LGPL License](https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/win-ffmpeg/LICENSE.txt)
+## Legal
+Auto-Editor, nor any of its dependencies, claims any copyright over any **output file** it produces. All rights are reserved to you.
+
+
+If you wish to use the **source code or binaries** of this project, you need to acknowledge auto-editors dependencies if they are present.
+
+
+Both ffmpeg binaries are under the [LGPLv3 License](https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/win-ffmpeg/LICENSE.txt)
 
 wavfile.py is under the [BSD 3-Clause "New" or "Revised" License](https://github.com/scipy/scipy/blob/master/LICENSE.txt)
 

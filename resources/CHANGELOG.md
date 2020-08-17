@@ -1,5 +1,10 @@
 # Auto-Editor Change Log
 
+## Version 20w33a
+* the default for `--sample_rate` is now the same as the input.
+* the default `--video_codec` is now the same as the video.
+* the `--hardware_accel` option has been removed because it is not used anywhere in the program.
+
 ## Version 20w32b
 * Added `--video_bitrate` which allows you to change the video size when you use video codec like h264.
 * Exporting to premiere shows more useful information.
