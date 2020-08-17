@@ -9,7 +9,7 @@ For Linux users, that is a requirement, however, installing is easy. Just run `s
 Then run:
 
 ```terminal
-sudo -H pip3 install -U auto-editor
+pip3 install -U auto-editor
 ```
 
 If auto-editor does not get linked to the main files in your console. Try using pipx to fix it.
@@ -21,12 +21,6 @@ pipx ensurepath
 # close and reopen your console
 ```
 
-You can also try auto-editor without installing using pipx.
-
-```terminal
-pipx run auto-editor example.mp4
-```
-
 ## Installing from Source
 Sometimes, pip won't work, you want to downgrade to a very early version of auto-editor, or you're working on maintaining this project. In that case, you'll need to download and run the source code. Use git to download the repository then run \_\_main\_\_.py with python.
 
@@ -34,9 +28,8 @@ Sometimes, pip won't work, you want to downgrade to a very early version of auto
 ```terminal
 git clone https://github.com/WyattBlue/auto-editor.git
 cd auto-editor
-python3 auto_editor/__main__.py --debug
+python3 auto_editor/__main__.py example.mp4 [add your options here]
 ```
-
 
 
 ## All the Commands
