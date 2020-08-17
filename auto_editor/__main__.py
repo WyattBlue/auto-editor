@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w32b'
+version = '20w33a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -40,7 +40,7 @@ def pipeToConsole(myCommands):
     return stdout.decode()
 
 def ffmpegFPS(ffmpeg, path, log):
-    output = pipeToConsole([ffmpeg, '-i', path])
+    output = pipeToConsole([ffmpeg, '-i', path, '-hide_banner'])
     try:
         matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
         return float(matchDict['fps'])
@@ -109,14 +109,12 @@ def main():
         help='set the number of bits per second for video.')
     size.add_argument('--audio_bitrate', '-ab', type=str, default='160k', metavar='160k',
         help='set the number of bits per second for audio.')
-    size.add_argument('--sample_rate', '-r', type=sample_rate_type, default=48000, metavar='48000',
+    size.add_argument('--sample_rate', '-r', type=sample_rate_type, metavar='',
         help='set the sample rate of the input and output videos.')
-    size.add_argument('--video_codec', '-vcodec', default='copy', metavar='copy',
+    size.add_argument('--video_codec', '-vcodec', metavar='',
         help='set the video codec for the output file.')
 
-    dep = parser.add_argument_group('Deprecated Options')
-    dep.add_argument('--hardware_accel', type=str, metavar='',
-        help='')
+    # dep = parser.add_argument_group('Deprecated Options')
 
     args = parser.parse_args()
 
@@ -135,9 +133,6 @@ def main():
     if(args.export_as_audio):
         print('Exporting as audio.')
 
-    if(args.video_bitrate != '250k' and args.video_codec == 'copy'):
-        log.warning('Your bitrate will not be applied because the video codec is copyed.')
-
     newF = None
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
         newF = os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
@@ -150,21 +145,13 @@ def main():
 
     makingDataFile = args.export_to_premiere or args.export_to_resolve
 
-    if(args.hardware_accel is not None):
-        output = pipeToConsle([ffmpeg, '-hwaccels', '-hide_banner'])
-        output = output.replace('Hardware acceleration methods:', '')
-        output = output.replace('\n', '')
-        hwaccels = output.split(',')
-        if(args.hardware_accel not in hwaccels):
-            print('Error! Invalid hardware accel:', args.hardware_accel)
-            print('Available hardware:', ' '.join(hwaccels))
-            sys.exit(1)
+    is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
     if(args.debug):
-        is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
         print('Python Version:', platform.python_version(), is64bit)
-        # platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
         print('Platform:', platform.system())
+        # Platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
+
         print('FFmpeg path:', ffmpeg)
         print('Auto-Editor version', version)
         if(args.input == []):
@@ -172,6 +159,14 @@ def main():
 
     from usefulFunctions import Log
     log = Log(3 if args.debug else 2)
+
+    if(is64bit == '32-bit'):
+        # I should have put this warning a long time ago.
+        log.warning("You have the 32-bit version of Python, which means you won't be " \
+            'able to handle long videos.')
+
+    if(args.frame_margin < 0):
+        log.error('Frame margin cannot be negative.')
 
     if(args.input == []):
         log.error('The following arguments are required: input\n' \
@@ -239,6 +234,16 @@ def main():
         newOutput = args.output_file[i]
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
+        sr = args.sample_rate
+        if(sr is None):
+            output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
+            try:
+                matchDict = re.search(r'\s(?P<grp>\w+?)\sHz', output).groupdict()
+                sr = matchDict['grp']
+            except AttributeError:
+                sr = 48000
+        args.sample_rate = sr
+
         if(isAudioFile(INPUT_FILE)):
             fps = 30
             cmd = [ffmpeg, '-i', myInput, '-b:a', args.audio_bitrate, '-ac', '2', '-ar',
@@ -253,10 +258,21 @@ def main():
             else:
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
             tracks = vidTracks(INPUT_FILE, ffmpeg, log)
-
             if(args.cut_by_this_track >= tracks):
                 log.error("You choose a track that doesn't exist.\n" \
                     f'There are only {tracks-1} tracks. (starting from 0)')
+
+            vcodec = args.video_codec
+            if(vcodec is None):
+                output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
+                try:
+                    matchDict = re.search(r'\s(?P<video>\w+?)\s\(Main\)', output).groupdict()
+                    vcodec = matchDict['video']
+                except AttributeError:
+                    vcodec = 'copy'
+            if(args.video_bitrate != '250k' and vcodec == 'copy'):
+                log.warning('Your bitrate will not be applied because the video codec is "copy".')
+
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
                 '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
@@ -278,7 +294,10 @@ def main():
 
                 sampleRate, audioData = read(f'{TEMP}/combined.wav')
             else:
-                sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
+                if(os.path.isfile(f'{TEMP}/{args.cut_by_this_track}.wav')):
+                    sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
+                else:
+                    log.error('Audio track not found!')
 
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
             args.frame_margin, args.min_clip_length, args.min_cut_length, log)
@@ -290,8 +309,7 @@ def main():
                 constantLoc = oldFile[:dotIndex] + end
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
-            cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
-                constantLoc, '-hide_banner']
+            cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30', constantLoc]
             if(args.debug):
                 cmd.extend(['-hide_banner'])
             else:
@@ -328,7 +346,7 @@ def main():
         from fastVideo import fastVideo
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
-            args.keep_tracks_seperate, args.video_codec, fps, args.export_as_audio,
+            args.keep_tracks_seperate, vcodec, fps, args.export_as_audio,
             args.video_bitrate, log)
 
     if(not os.path.isfile(newOutput)):

@@ -201,7 +201,7 @@ def progressBar(index, total, beginTime, title='Please wait'):
     doneStr = '█' * done
     togoStr = '░' * int(barLen - done)
 
-    if(percentDone == 0):
+    if(percentDone == 0): # prevent dividing by zero
         percentPerSec = 0
     else:
         percentPerSec = (time() - beginTime) / percentDone
