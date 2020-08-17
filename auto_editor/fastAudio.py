@@ -10,7 +10,7 @@ from audiotsm2 import phasevocoder
 from audiotsm2.io.array import ArrReader, ArrWriter
 
 # Included functions
-from usefulFunctions import getAudioChunks, progressBar, getNewLength
+from usefulFunctions import getAudioChunks, progressBar, getNewLength, conwrite
 from wavfile import read, write
 
 # Internal libraries
@@ -99,3 +99,6 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
 
     if('TEMP' in locals()):
         rmtree(TEMP)
+
+    if(needConvert):
+        conwrite('')
