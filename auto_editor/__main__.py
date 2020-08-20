@@ -266,10 +266,12 @@ def main():
             if(vcodec is None):
                 output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
                 try:
-                    matchDict = re.search(r'\s(?P<video>\w+?)\s\(Main\)', output).groupdict()
+                    matchDict = re.search(r'Video:\s(?P<video>\w+?)\s', output).groupdict()
                     vcodec = matchDict['video']
+                    log.debug(vcodec)
                 except AttributeError:
                     vcodec = 'copy'
+                    log.warning("Couldn't automatically detect the video codec.")
             if(args.video_bitrate != '250k' and vcodec == 'copy'):
                 log.warning('Your bitrate will not be applied because the video codec is "copy".')
 
@@ -350,7 +352,7 @@ def main():
             args.video_bitrate, log)
 
     if(not os.path.isfile(newOutput)):
-        log.error(f'Error! The file {newOutput} was not created.')
+        log.error(f'The file {newOutput} was not created.')
 
     if(not args.preview and not makingDataFile):
         print('Finished.')

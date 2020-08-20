@@ -77,7 +77,7 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
         log.warning('The entire audio is silent')
         return [[0, audioFrameCount, 1]]
 
-    # Calculate when the audio is lould or silent.
+    # Calculate when the audio is loud or silent.
     for i in range(audioFrameCount):
         start = int(i * samplesPerFrame)
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
