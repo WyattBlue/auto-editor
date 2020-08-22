@@ -7,7 +7,7 @@ from audiotsm2 import phasevocoder
 
 # Included functions
 from fastAudio import fastAudio
-from usefulFunctions import getAudioChunks, progressBar, vidTracks, conwrite
+from usefulFunctions import getAudioChunks, progressBar, conwrite
 
 # Internal libraries
 import os

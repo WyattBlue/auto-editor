@@ -134,14 +134,19 @@ def main():
         print('Exporting as audio.')
 
     newF = None
+    newP = None
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
         newF = os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
+        newP = os.path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
     if(platform.system() == 'Darwin' and not args.my_ffmpeg):
         newF = os.path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
+        newP = os.path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
     if(newF is not None and os.path.isfile(newF)):
         ffmpeg = newF
+        ffprobe = newP
     else:
         ffmpeg = 'ffmpeg'
+        ffprobe = 'ffprobe'
 
     makingDataFile = args.export_to_premiere or args.export_to_resolve
 
@@ -257,7 +262,7 @@ def main():
                 fps = 29.97
             else:
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
-            tracks = vidTracks(INPUT_FILE, ffmpeg, log)
+            tracks = vidTracks(INPUT_FILE, ffprobe, log)
             if(args.cut_by_this_track >= tracks):
                 log.error("You choose a track that doesn't exist.\n" \
                     f'There are only {tracks-1} tracks. (starting from 0)')
@@ -272,6 +277,23 @@ def main():
                 except AttributeError:
                     vcodec = 'copy'
                     log.warning("Couldn't automatically detect the video codec.")
+
+            vbit = args.video_bitrate
+            if(vbit is None):
+                output = pipeToConsole([ffprobe, '-v', 'error' '-select_streams', 'v:0',
+                    '-show_entries', 'stream=bit_rate', '-of',
+                    'default=noprint_wrappers=1', INPUT_FILE])
+
+
+
+
+
+
+
+
+
+
+
             if(args.video_bitrate != '250k' and vcodec == 'copy'):
                 log.warning('Your bitrate will not be applied because the video codec is "copy".')
 
