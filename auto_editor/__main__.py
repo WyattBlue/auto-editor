@@ -105,9 +105,9 @@ def main():
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
     size = parser.add_argument_group('Size Options')
-    size.add_argument('--video_bitrate', '-vb', type=str, default='250k', metavar='250k',
+    size.add_argument('--video_bitrate', '-vb', metavar='',
         help='set the number of bits per second for video.')
-    size.add_argument('--audio_bitrate', '-ab', type=str, default='160k', metavar='160k',
+    size.add_argument('--audio_bitrate', '-ab', metavar='160k',
         help='set the number of bits per second for audio.')
     size.add_argument('--sample_rate', '-r', type=sample_rate_type, metavar='',
         help='set the sample rate of the input and output videos.')
@@ -280,22 +280,40 @@ def main():
 
             vbit = args.video_bitrate
             if(vbit is None):
-                output = pipeToConsole([ffprobe, '-v', 'error' '-select_streams', 'v:0',
-                    '-show_entries', 'stream=bit_rate', '-of',
-                    'default=noprint_wrappers=1', INPUT_FILE])
+                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
+                    'v:0', '-show_entries', 'stream=bit_rate', '-of',
+                    'compact=p=0:nk=1', INPUT_FILE])
+                try:
+                    vbit = int(output)
+                except:
+                    log.warning("Couldn't automatically detect video bitrate.")
+                    vbit = '500k'
+                    log.debug('Setting vbit to ' + vbit)
+                else:
+                    vbit = str(round(vbit / 1000)) + 'k'
+            else:
+                vbit = str(vbit)
+                if(vcodec == 'copy'):
+                    log.warning('Your bitrate will not be applied because' \
+                        ' the video codec is "copy".')
+            args.video_bitrate = vbit
 
-
-
-
-
-
-
-
-
-
-
-            if(args.video_bitrate != '250k' and vcodec == 'copy'):
-                log.warning('Your bitrate will not be applied because the video codec is "copy".')
+            abit = args.audio_bitrate
+            if(abit is None):
+                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
+                    'a:0', '-show_entries', 'stream=bit_rate', '-of',
+                    'compact=p=0:nk=1', INPUT_FILE])
+                try:
+                    abit = int(output)
+                except:
+                    log.warning("Couldn't automatically detect audio bitrate.")
+                    abit = '500k'
+                    log.debug('Setting abit to ' + abit)
+                else:
+                    abit = str(round(abit / 1000)) + 'k'
+            else:
+                abit = str(abit)
+            args.audio_bitrate = abit
 
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
