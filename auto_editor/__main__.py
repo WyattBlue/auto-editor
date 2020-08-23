@@ -107,7 +107,7 @@ def main():
     size = parser.add_argument_group('Size Options')
     size.add_argument('--video_bitrate', '-vb', metavar='',
         help='set the number of bits per second for video.')
-    size.add_argument('--audio_bitrate', '-ab', metavar='160k',
+    size.add_argument('--audio_bitrate', '-ab', metavar='',
         help='set the number of bits per second for audio.')
     size.add_argument('--sample_rate', '-r', type=sample_rate_type, metavar='',
         help='set the sample rate of the input and output videos.')
@@ -271,7 +271,7 @@ def main():
             cmd = [ffmpeg, '-i', myInput, '-b:a', args.audio_bitrate, '-ac', '2', '-ar',
                 str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
             if(args.debug):
-                cmd.extend('-hide_banner')
+                cmd.extend(['-hide_banner'])
             else:
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
@@ -402,6 +402,25 @@ def main():
         timeLength = round(time.time() - startTime, 2)
         minutes = timedelta(seconds=round(timeLength))
         print(f'took {timeLength} seconds ({minutes})')
+
+    timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
+    units = 'seconds'
+    if(timeSave >= 3600):
+        timeSave = round(timeSave / 3600, 1)
+        if(timeSave % 1 == 0):
+            timeSave = round(timeSave)
+        units = 'hours'
+    if(timeSave >= 60):
+        timeSave = round(timeSave / 60, 1)
+        if(timeSave >= 10 or timeSave % 1 == 0):
+            timeSave = round(timeSave)
+        units = 'minutes'
+
+    print(f'Auto-Editor made {numCuts} cuts', end='') # Don't add a newline.
+    if(numCuts > 2):
+        print(f', which would have taked about {timeSave} {units} if edited manually.')
+    else:
+        print('.')
 
     if(not args.no_open):
         try:  # should work on Windows

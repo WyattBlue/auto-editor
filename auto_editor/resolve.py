@@ -361,19 +361,3 @@ def exportToResolve(myInput, output, chunks, newSpeed, sampleRate, log):
         outfile.write('</xmeml>')
 
     conwrite('')
-
-    timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
-    units = 'seconds'
-    if(timeSave >= 3600):
-        timeSave = round(timeSave / 3600, 1)
-        if(timeSave % 1 == 0):
-            timeSave = round(timeSave)
-        units = 'hours'
-    if(timeSave >= 60):
-        timeSave = round(timeSave / 60, 1)
-        if(timeSave >= 10 or timeSave % 1 == 0):
-            timeSave = round(timeSave)
-        units = 'minutes'
-
-    print(f'Auto-Editor made {numCuts} cuts, which would have taked about ' \
-        f'{timeSave} {units} if edited manually.')
