@@ -249,11 +249,31 @@ def main():
                 sr = 48000
         args.sample_rate = sr
 
+        abit = args.audio_bitrate
+        if(abit is None):
+            output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
+                'a:0', '-show_entries', 'stream=bit_rate', '-of',
+                'compact=p=0:nk=1', INPUT_FILE])
+            try:
+                abit = int(output)
+            except:
+                log.warning("Couldn't automatically detect audio bitrate.")
+                abit = '500k'
+                log.debug('Setting abit to ' + abit)
+            else:
+                abit = str(round(abit / 1000)) + 'k'
+        else:
+            abit = str(abit)
+        args.audio_bitrate = abit
+
         if(isAudioFile(INPUT_FILE)):
             fps = 30
             cmd = [ffmpeg, '-i', myInput, '-b:a', args.audio_bitrate, '-ac', '2', '-ar',
-                str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav', '-nostats',
-                '-loglevel', '0']
+                str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
+            if(args.debug):
+                cmd.extend('-hide_banner')
+            else:
+                cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
@@ -297,23 +317,6 @@ def main():
                     log.warning('Your bitrate will not be applied because' \
                         ' the video codec is "copy".')
             args.video_bitrate = vbit
-
-            abit = args.audio_bitrate
-            if(abit is None):
-                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                    'a:0', '-show_entries', 'stream=bit_rate', '-of',
-                    'compact=p=0:nk=1', INPUT_FILE])
-                try:
-                    abit = int(output)
-                except:
-                    log.warning("Couldn't automatically detect audio bitrate.")
-                    abit = '500k'
-                    log.debug('Setting abit to ' + abit)
-                else:
-                    abit = str(round(abit / 1000)) + 'k'
-            else:
-                abit = str(abit)
-            args.audio_bitrate = abit
 
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
