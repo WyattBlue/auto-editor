@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w33a'
+version = '20w34a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
