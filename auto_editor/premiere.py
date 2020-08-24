@@ -10,7 +10,7 @@ from usefulFunctions import conwrite, isAudioFile
 # Internal libraries
 import os
 
-def exportToPremiere(myInput, output, chunks, sampleRate, log):
+def exportToPremiere(myInput, output, clips, sampleRate, log):
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
     name = os.path.basename(myInput)
@@ -338,4 +338,3 @@ def exportToPremiere(myInput, output, chunks, sampleRate, log):
         outfile.write('</xmeml>')
 
     conwrite('')
-    log.debug(chunks)

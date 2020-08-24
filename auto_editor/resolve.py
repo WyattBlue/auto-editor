@@ -10,7 +10,7 @@ from usefulFunctions import conwrite, isAudioFile
 # Internal libraries
 import os
 
-def exportToResolve(myInput, output, chunks, sampleRate, log):
+def exportToResolve(myInput, output, clips, sampleRate, log):
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
     name = os.path.basename(myInput)
@@ -350,4 +350,3 @@ def exportToResolve(myInput, output, chunks, sampleRate, log):
         outfile.write('</xmeml>')
 
     conwrite('')
-    log.debug(chunks)

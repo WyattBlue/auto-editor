@@ -348,9 +348,12 @@ def main():
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
             args.frame_margin, args.min_clip_length, args.min_cut_length, log)
 
+        clips = []
         for chunk in chunks:
             if(speeds[chunk[2]] == 99999):
                 numCuts += 1
+            else:
+                clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
 
         if(fps is None and not isAudioFile(INPUT_FILE)):
             if(makingDataFile):
@@ -378,13 +381,13 @@ def main():
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, newOutput, chunks, sampleRate, log)
+            exportToPremiere(INPUT_FILE, newOutput, clips, sampleRate, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
             from resolve import exportToResolve
 
-            exportToResolve(INPUT_FILE, newOutput, chunks, sampleRate, log)
+            exportToResolve(INPUT_FILE, newOutput, clips, sampleRate, log)
             continue
         if(isAudioFile(INPUT_FILE) and not makingDataFile):
             from fastAudio import fastAudio
