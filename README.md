@@ -1,14 +1,14 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg"></a>
-<img src="https://img.shields.io/badge/version-20w33a-blue.svg">
+<img src="https://img.shields.io/badge/version-20w34a-blue.svg">
 <p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
-## New in 20w33a
-* the default for `--sample_rate` is now the same as the input.
-* the default `--video_codec` is now the same as the video.
-* the `--hardware_accel` option has been removed because it is not used anywhere in the program.
+## New in 20w34a
+* Auto-Editor detects the video codec correctly in more situations.
+* Auto-Editor uses the inputs video and audio bitrate's as the default instead of an arbitrary value.
+* The ending screen now shows how many cuts it made.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
@@ -60,7 +60,6 @@ No change is too small whether that be a typo in the docs or a small improvement
 
 ## Legal
 Auto-Editor, nor any of its dependencies, claims any copyright over any **output file** it produces. All rights are reserved to you.
-
 
 If you wish to use the **source code or binaries** of this project, you need to acknowledge auto-editors dependencies if they are present.
 

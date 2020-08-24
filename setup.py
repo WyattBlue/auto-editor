@@ -13,16 +13,16 @@ from setuptools import setup, find_packages
 
 def pip_version():
     # pip doesn't allow us to use standard version format (20w10a), so we have to
-    # comform it to look like Semantic Versioning even though auto-editor does not
+    # conform it to look like Semantic Versioning even though auto-editor does not
     # use that format.
-    return '20.33.1.0'
+    return '20.34.1.0'
 
 
 def changes():
     text = '''
-    * the default for `--sample_rate` is now the same as the input.
-    * the default `--video_codec` is now the same as the video.
-    * the `--hardware_accel` option has been removed because it is not used anywhere in the program.
+    * Auto-Editor detects the video codec correctly in more situations.
+    * Auto-Editor uses the inputs video and audio
+    bitrate's as the default instead of an arbitrary value.
     '''
 
     text = text.replace('\n', '')
@@ -32,7 +32,7 @@ def changes():
 
 def numToNormal(text):
     """
-    convert semantic versioning to our prefered version format.
+    convert semantic versioning to our preferred version format.
     20.10.1.0 -> 20w10a
     """
     import string
@@ -75,7 +75,7 @@ if(sys.argv[-1] == 'makedocs'):
     with open('resources/CHANGELOG.md', 'w') as file:
         file.write(newDoc.rstrip('\n'))
 
-    print(f'Done, rewrited docs to {vr}')
+    print(f'Done, rewritten docs to {vr}')
     sys.exit()
 
 if(sys.argv[-1] == 'publish'):
@@ -98,7 +98,7 @@ setup(
     url='https://github.com/WyattBlue/auto-editor',
     author='WyattBlue',
     author_email='wyattbluesandbox@gmail.com',
-    keywords='video editing editor audio processing nonlinear',
+    keywords='video editing editor audio processing nonlinear automatic',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
