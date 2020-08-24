@@ -385,9 +385,10 @@ def main():
             continue
         if(args.export_to_resolve):
             args.no_open = True
+            duration = chunks[len(chunks) - 1][1]
             from resolve import exportToResolve
 
-            exportToResolve(INPUT_FILE, newOutput, clips, sampleRate, log)
+            exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate, log)
             continue
         if(isAudioFile(INPUT_FILE) and not makingDataFile):
             from fastAudio import fastAudio

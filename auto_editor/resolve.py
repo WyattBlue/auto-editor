@@ -10,7 +10,7 @@ from usefulFunctions import conwrite, isAudioFile
 # Internal libraries
 import os
 
-def exportToResolve(myInput, output, clips, sampleRate, log):
+def exportToResolve(myInput, output, clips, duration, sampleRate, log):
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
     name = os.path.basename(myInput)
@@ -39,8 +39,6 @@ def exportToResolve(myInput, output, clips, sampleRate, log):
     pixelar = 'square' # pixel aspect ratio
     colordepth = '24'
     sr = sampleRate
-
-    duration = chunks[len(chunks) - 1][1]
 
     if(audioFile):
         with open(output, 'w', encoding='utf-8') as outfile:
