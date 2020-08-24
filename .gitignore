@@ -1,9 +1,7 @@
 *_ALTERED.mp4
+*_ALTERED.mkv
+*_ALTERED.wav
 *_ALTERED
-*.CACHE
-*CACHE/
-*cache/
-*.TEMP
 *.webm
 *.xml
 *.pyc

@@ -1,5 +1,9 @@
 # Auto-Editor Change Log
 
+## Version 20w34a
+* Auto-Editor detects the video codec correctly in more situations.
+* Auto-Editor uses the inputs video and audiobitrate's as the default instead of an arbitrary value.
+
 ## Version 20w33a
 * the default for `--sample_rate` is now the same as the input.
 * the default `--video_codec` is now the same as the video.
