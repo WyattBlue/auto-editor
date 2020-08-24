@@ -77,7 +77,7 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
         log.warning('The entire audio is silent')
         return [[0, audioFrameCount, 1]]
 
-    # Calculate when the audio is lould or silent.
+    # Calculate when the audio is loud or silent.
     for i in range(audioFrameCount):
         start = int(i * samplesPerFrame)
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
@@ -150,23 +150,10 @@ def prettyTime(newTime):
     return f'{hours:02}:{minutes:02} {ampm}'
 
 
-def vidTracks(videoFile, ffmpeg, log):
+def vidTracks(videoFile, ffprobe, log):
     """
     Return the number of audio tracks in a video file.
     """
-    import platform
-
-    dirPath = os.path.dirname(os.path.realpath(__file__))
-
-    if(ffmpeg == 'ffmpeg'):
-        ffprobe = 'ffprobe'
-    else:
-        if(platform.system() == 'Windows'):
-            ffprobe = os.path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
-        elif(platform.system() == 'Darwin'):
-            ffprobe = os.path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
-        else:
-            ffprobe = 'ffprobe'
 
     cmd = [ffprobe, videoFile, '-hide_banner', '-loglevel', 'panic',
         '-show_entries', 'stream=index', '-select_streams', 'a', '-of',

@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w33a'
+version = '20w34a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -105,9 +105,9 @@ def main():
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
     size = parser.add_argument_group('Size Options')
-    size.add_argument('--video_bitrate', '-vb', type=str, default='250k', metavar='250k',
+    size.add_argument('--video_bitrate', '-vb', metavar='',
         help='set the number of bits per second for video.')
-    size.add_argument('--audio_bitrate', '-ab', type=str, default='160k', metavar='160k',
+    size.add_argument('--audio_bitrate', '-ab', metavar='',
         help='set the number of bits per second for audio.')
     size.add_argument('--sample_rate', '-r', type=sample_rate_type, metavar='',
         help='set the sample rate of the input and output videos.')
@@ -134,14 +134,19 @@ def main():
         print('Exporting as audio.')
 
     newF = None
+    newP = None
     if(platform.system() == 'Windows' and not args.my_ffmpeg):
         newF = os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
+        newP = os.path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
     if(platform.system() == 'Darwin' and not args.my_ffmpeg):
         newF = os.path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
+        newP = os.path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
     if(newF is not None and os.path.isfile(newF)):
         ffmpeg = newF
+        ffprobe = newP
     else:
         ffmpeg = 'ffmpeg'
+        ffprobe = 'ffprobe'
 
     makingDataFile = args.export_to_premiere or args.export_to_resolve
 
@@ -230,6 +235,7 @@ def main():
     from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
     from wavfile import read, write
 
+    numCuts = 0
     for i, INPUT_FILE in enumerate(inputList):
         newOutput = args.output_file[i]
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
@@ -244,11 +250,31 @@ def main():
                 sr = 48000
         args.sample_rate = sr
 
+        abit = args.audio_bitrate
+        if(abit is None):
+            output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
+                'a:0', '-show_entries', 'stream=bit_rate', '-of',
+                'compact=p=0:nk=1', INPUT_FILE])
+            try:
+                abit = int(output)
+            except:
+                log.warning("Couldn't automatically detect audio bitrate.")
+                abit = '500k'
+                log.debug('Setting abit to ' + abit)
+            else:
+                abit = str(round(abit / 1000)) + 'k'
+        else:
+            abit = str(abit)
+        args.audio_bitrate = abit
+
         if(isAudioFile(INPUT_FILE)):
             fps = 30
             cmd = [ffmpeg, '-i', myInput, '-b:a', args.audio_bitrate, '-ac', '2', '-ar',
-                str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav', '-nostats',
-                '-loglevel', '0']
+                str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
+            if(args.debug):
+                cmd.extend(['-hide_banner'])
+            else:
+                cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
@@ -257,7 +283,7 @@ def main():
                 fps = 29.97
             else:
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
-            tracks = vidTracks(INPUT_FILE, ffmpeg, log)
+            tracks = vidTracks(INPUT_FILE, ffprobe, log)
             if(args.cut_by_this_track >= tracks):
                 log.error("You choose a track that doesn't exist.\n" \
                     f'There are only {tracks-1} tracks. (starting from 0)')
@@ -266,12 +292,32 @@ def main():
             if(vcodec is None):
                 output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
                 try:
-                    matchDict = re.search(r'\s(?P<video>\w+?)\s\(Main\)', output).groupdict()
+                    matchDict = re.search(r'Video:\s(?P<video>\w+?)\s', output).groupdict()
                     vcodec = matchDict['video']
+                    log.debug(vcodec)
                 except AttributeError:
                     vcodec = 'copy'
-            if(args.video_bitrate != '250k' and vcodec == 'copy'):
-                log.warning('Your bitrate will not be applied because the video codec is "copy".')
+                    log.warning("Couldn't automatically detect the video codec.")
+
+            vbit = args.video_bitrate
+            if(vbit is None):
+                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
+                    'v:0', '-show_entries', 'stream=bit_rate', '-of',
+                    'compact=p=0:nk=1', INPUT_FILE])
+                try:
+                    vbit = int(output)
+                except:
+                    log.warning("Couldn't automatically detect video bitrate.")
+                    vbit = '500k'
+                    log.debug('Setting vbit to ' + vbit)
+                else:
+                    vbit = str(round(vbit / 1000)) + 'k'
+            else:
+                vbit = str(vbit)
+                if(vcodec == 'copy'):
+                    log.warning('Your bitrate will not be applied because' \
+                        ' the video codec is "copy".')
+            args.video_bitrate = vbit
 
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
@@ -302,6 +348,13 @@ def main():
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
             args.frame_margin, args.min_clip_length, args.min_cut_length, log)
 
+        clips = []
+        for chunk in chunks:
+            if(speeds[chunk[2]] == 99999):
+                numCuts += 1
+            else:
+                clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
+
         if(fps is None and not isAudioFile(INPUT_FILE)):
             if(makingDataFile):
                 dotIndex = INPUT_FILE.rfind('.')
@@ -328,13 +381,14 @@ def main():
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, newOutput, chunks, speeds, sampleRate, log)
+            exportToPremiere(INPUT_FILE, newOutput, clips, sampleRate, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
+            duration = chunks[len(chunks) - 1][1]
             from resolve import exportToResolve
 
-            exportToResolve(INPUT_FILE, newOutput, chunks, speeds, sampleRate, log)
+            exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate, log)
             continue
         if(isAudioFile(INPUT_FILE) and not makingDataFile):
             from fastAudio import fastAudio
@@ -350,13 +404,31 @@ def main():
             args.video_bitrate, log)
 
     if(not os.path.isfile(newOutput)):
-        log.error(f'Error! The file {newOutput} was not created.')
+        log.error(f'The file {newOutput} was not created.')
 
     if(not args.preview and not makingDataFile):
-        print('Finished.')
         timeLength = round(time.time() - startTime, 2)
         minutes = timedelta(seconds=round(timeLength))
-        print(f'took {timeLength} seconds ({minutes})')
+        print(f'Finished. took {timeLength} seconds ({minutes})')
+
+    timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
+    units = 'seconds'
+    if(timeSave >= 3600):
+        timeSave = round(timeSave / 3600, 1)
+        if(timeSave % 1 == 0):
+            timeSave = round(timeSave)
+        units = 'hours'
+    if(timeSave >= 60):
+        timeSave = round(timeSave / 60, 1)
+        if(timeSave >= 10 or timeSave % 1 == 0):
+            timeSave = round(timeSave)
+        units = 'minutes'
+
+    print(f'Auto-Editor made {numCuts} cuts', end='') # Don't add a newline.
+    if(numCuts > 2):
+        print(f', which would have taken about {timeSave} {units} if edited manually.')
+    else:
+        print('.')
 
     if(not args.no_open):
         try:  # should work on Windows
