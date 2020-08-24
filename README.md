@@ -7,7 +7,8 @@
 
 ## New in 20w34a
 * Auto-Editor detects the video codec correctly in more situations.
-* Auto-Editor uses the inputs video and audiobitrate's as the default instead of an arbitrary value.
+* Auto-Editor uses the inputs video and audio bitrate's as the default instead of an arbitrary value.
+* The ending screen now shows how many cuts it made.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
@@ -59,7 +60,6 @@ No change is too small whether that be a typo in the docs or a small improvement
 
 ## Legal
 Auto-Editor, nor any of its dependencies, claims any copyright over any **output file** it produces. All rights are reserved to you.
-
 
 If you wish to use the **source code or binaries** of this project, you need to acknowledge auto-editors dependencies if they are present.
 

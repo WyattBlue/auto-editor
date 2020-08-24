@@ -353,7 +353,7 @@ def main():
             if(speeds[chunk[2]] == 99999):
                 numCuts += 1
             else:
-                clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
+                clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
 
         if(fps is None and not isAudioFile(INPUT_FILE)):
             if(makingDataFile):
