@@ -10,18 +10,7 @@ from usefulFunctions import conwrite, isAudioFile
 # Internal libraries
 import os
 
-def exportToResolve(myInput, output, chunks, newSpeed, sampleRate, log):
-    clips = []
-    numCuts = 0
-    for chunk in chunks:
-        if(newSpeed[chunk[2]] != 99999):
-            clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
-        else:
-            numCuts += 1
-
-    if(len(clips) < 1):
-        log.error('Less than 1 clip.')
-
+def exportToResolve(myInput, output, chunks, sampleRate, log):
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
     name = os.path.basename(myInput)
@@ -361,3 +350,4 @@ def exportToResolve(myInput, output, chunks, newSpeed, sampleRate, log):
         outfile.write('</xmeml>')
 
     conwrite('')
+    log.debug(chunks)

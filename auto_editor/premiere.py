@@ -10,10 +10,7 @@ from usefulFunctions import conwrite, isAudioFile
 # Internal libraries
 import os
 
-def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate, log):
-    if(len(clips) < 1):
-        log.error('Less than 1 clip.')
-
+def exportToPremiere(myInput, output, chunks, sampleRate, log):
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
     name = os.path.basename(myInput)
@@ -342,19 +339,3 @@ def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate, log):
 
     conwrite('')
     log.debug(chunks)
-
-    timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
-    units = 'seconds'
-    if(timeSave >= 3600):
-        timeSave = round(timeSave / 3600, 1)
-        if(timeSave % 1 == 0):
-            timeSave = round(timeSave)
-        units = 'hours'
-    if(timeSave >= 60):
-        timeSave = round(timeSave / 60, 1)
-        if(timeSave >= 10 or timeSave % 1 == 0):
-            timeSave = round(timeSave)
-        units = 'minutes'
-
-    print(f'Auto-Editor made {numCuts} cuts, which would have taked about ' \
-        f'{timeSave} {units} if edited manually.')

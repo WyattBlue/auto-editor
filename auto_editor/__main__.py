@@ -349,7 +349,7 @@ def main():
             args.frame_margin, args.min_clip_length, args.min_cut_length, log)
 
         for chunk in chunks:
-            if(newSpeed[chunk[2]] == 99999):
+            if(speeds[chunk[2]] == 99999):
                 numCuts += 1
 
         if(fps is None and not isAudioFile(INPUT_FILE)):
@@ -378,13 +378,13 @@ def main():
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, newOutput, chunks, speeds, sampleRate, log)
+            exportToPremiere(INPUT_FILE, newOutput, chunks, sampleRate, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
             from resolve import exportToResolve
 
-            exportToResolve(INPUT_FILE, newOutput, chunks, speeds, sampleRate, log)
+            exportToResolve(INPUT_FILE, newOutput, chunks, sampleRate, log)
             continue
         if(isAudioFile(INPUT_FILE) and not makingDataFile):
             from fastAudio import fastAudio
@@ -403,10 +403,9 @@ def main():
         log.error(f'The file {newOutput} was not created.')
 
     if(not args.preview and not makingDataFile):
-        print('Finished.')
         timeLength = round(time.time() - startTime, 2)
         minutes = timedelta(seconds=round(timeLength))
-        print(f'took {timeLength} seconds ({minutes})')
+        print(f'Finished. took {timeLength} seconds ({minutes})')
 
     timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
     units = 'seconds'
@@ -423,7 +422,7 @@ def main():
 
     print(f'Auto-Editor made {numCuts} cuts', end='') # Don't add a newline.
     if(numCuts > 2):
-        print(f', which would have taked about {timeSave} {units} if edited manually.')
+        print(f', which would have taken about {timeSave} {units} if edited manually.')
     else:
         print('.')
 
