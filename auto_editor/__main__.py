@@ -235,6 +235,7 @@ def main():
     from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
     from wavfile import read, write
 
+    numCuts = 0
     for i, INPUT_FILE in enumerate(inputList):
         newOutput = args.output_file[i]
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
@@ -346,6 +347,10 @@ def main():
 
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
             args.frame_margin, args.min_clip_length, args.min_cut_length, log)
+
+        for chunk in chunks:
+            if(newSpeed[chunk[2]] == 99999):
+                numCuts += 1
 
         if(fps is None and not isAudioFile(INPUT_FILE)):
             if(makingDataFile):

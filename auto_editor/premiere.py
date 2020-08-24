@@ -11,14 +11,6 @@ from usefulFunctions import conwrite, isAudioFile
 import os
 
 def exportToPremiere(myInput, output, chunks, newSpeed, sampleRate, log):
-    clips = []
-    numCuts = 0
-    for chunk in chunks:
-        if(newSpeed[chunk[2]] != 99999):
-            clips.append([chunk[0], chunk[1], newSpeed[chunk[2]] * 100])
-        else:
-            numCuts += 1
-
     if(len(clips) < 1):
         log.error('Less than 1 clip.')
 
