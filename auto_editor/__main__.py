@@ -114,6 +114,12 @@ def main():
     size.add_argument('--video_codec', '-vcodec', metavar='',
         help='set the video codec for the output file.')
 
+    # sub = parser.add_argument_group('Sub-Commands')
+    # sub.add_argument('ignore',
+    #     help="Leave the input alone in this range. (Dont't edit there)")
+    ## chop_off_before
+    ## chop_off_after
+
     # dep = parser.add_argument_group('Deprecated Options')
 
     args = parser.parse_args()
@@ -311,6 +317,7 @@ def main():
                     vbit = '500k'
                     log.debug('Setting vbit to ' + vbit)
                 else:
+                    vbit += 300 * 1000 # Add more for better quality.
                     vbit = str(round(vbit / 1000)) + 'k'
             else:
                 vbit = str(vbit)
@@ -411,24 +418,25 @@ def main():
         minutes = timedelta(seconds=round(timeLength))
         print(f'Finished. took {timeLength} seconds ({minutes})')
 
-    timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
-    units = 'seconds'
-    if(timeSave >= 3600):
-        timeSave = round(timeSave / 3600, 1)
-        if(timeSave % 1 == 0):
-            timeSave = round(timeSave)
-        units = 'hours'
-    if(timeSave >= 60):
-        timeSave = round(timeSave / 60, 1)
-        if(timeSave >= 10 or timeSave % 1 == 0):
-            timeSave = round(timeSave)
-        units = 'minutes'
+    if(not args.preview and makingDataFile):
+        timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
+        units = 'seconds'
+        if(timeSave >= 3600):
+            timeSave = round(timeSave / 3600, 1)
+            if(timeSave % 1 == 0):
+                timeSave = round(timeSave)
+            units = 'hours'
+        if(timeSave >= 60):
+            timeSave = round(timeSave / 60, 1)
+            if(timeSave >= 10 or timeSave % 1 == 0):
+                timeSave = round(timeSave)
+            units = 'minutes'
 
-    print(f'Auto-Editor made {numCuts} cuts', end='') # Don't add a newline.
-    if(numCuts > 2):
-        print(f', which would have taken about {timeSave} {units} if edited manually.')
-    else:
-        print('.')
+        print(f'Auto-Editor made {numCuts} cuts', end='') # Don't add a newline.
+        if(numCuts > 4):
+            print(f', which would have taken about {timeSave} {units} if edited manually.')
+        else:
+            print('.')
 
     if(not args.no_open):
         try:  # should work on Windows

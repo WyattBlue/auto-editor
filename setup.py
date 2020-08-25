@@ -15,14 +15,17 @@ def pip_version():
     # pip doesn't allow us to use standard version format (20w10a), so we have to
     # conform it to look like Semantic Versioning even though auto-editor does not
     # use that format.
-    return '20.34.1.0'
+    return '20.34.1.1'
 
 
 def changes():
     text = '''
-    * Auto-Editor detects the video codec correctly in more situations.
-    * Auto-Editor uses the inputs video and audio
-    bitrate's as the default instead of an arbitrary value.
+    * A critical bug is that causes a failure to convert a video has been mitigated.
+    * The default bitrate was increased because it was very obvious that the ouput had
+    been compressed.
+    * The "made X cuts" message will now only show when exporting to premiere or resolve.
+    I found this message to be more annoying than helpful most of the time and you can use
+    `--preview` to get that same information.
     '''
 
     text = text.replace('\n', '')
@@ -38,7 +41,11 @@ def numToNormal(text):
     import string
     alphabet = list(string.ascii_lowercase)
     nums = text.split('.')
-    return nums[0] + 'w' + nums[1] + alphabet[int(nums[2]) - 1]
+
+    text = nums[0] + 'w' + nums[1] + alphabet[int(nums[2]) - 1]
+    if(nums[3] != '0'):
+        text += ' Hotfix'
+    return text
 
 # Automatically replace outdated docs with correct one.
 if(sys.argv[-1] == 'makedocs'):

@@ -110,14 +110,29 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
         else:
             os.rename(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
 
+
+        def pipeToConsole(myCommands):
+            process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT)
+            stdout, __ = process.communicate()
+            return stdout.decode()
+
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-b:v', vbitrate, '-c:v', vcodec, '-movflags',
-            '+faststart', outFile]
-        if(debug):
-            cmd.extend(['-hide_banner'])
-        else:
-            cmd.extend(['-nostats', '-loglevel', '0'])
-        subprocess.call(cmd)
+            f'{temp}/spedup.mp4', '-b:v', 'taco', '-c:v', vcodec, '-movflags',
+            '+faststart', outFile, '-hide_banner']
+
+        message = pipeToConsole(cmd)
+
+        log.debug(message)
+
+        if('Conversion failed!' in message):
+            log.warning('The muxing/compression failed. '\
+                'This may be a problem with your ffmpeg, your codec, or your bitrate.'\
+                '\nTrying, again but using the "copy" video codec.')
+            cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
+                f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
+                outFile, '-nostats', '-loglevel', '0']
+            subprocess.call(cmd)
         log.debug(cmd)
 
     conwrite('')
