@@ -1,5 +1,10 @@
 # Auto-Editor Change Log
 
+## Version 20w34a Hotfix
+* A critical bug is that causes a failure to convert a video has been mitigated.
+* The default bitrate was increased because it was very obvious that the ouput hadbeen compressed.
+* The "made X cuts" message will now only show when exporting to premiere or resolve.I found this message to be more annoying than helpful most of the time and you can use`--preview` to get that same information.
+
 ## Version 20w34a
 * Auto-Editor detects the video codec correctly in more situations.
 * Auto-Editor uses the inputs video and audiobitrate's as the default instead of an arbitrary value.
