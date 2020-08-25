@@ -15,7 +15,7 @@ def pip_version():
     # pip doesn't allow us to use standard version format (20w10a), so we have to
     # conform it to look like Semantic Versioning even though auto-editor does not
     # use that format.
-    return '20.34.1.1'
+    return '20.34.1.2'
 
 
 def changes():

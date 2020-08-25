@@ -118,7 +118,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
             return stdout.decode()
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-b:v', 'taco', '-c:v', vcodec, '-movflags',
+            f'{temp}/spedup.mp4', '-b:v', bitrate, '-c:v', vcodec, '-movflags',
             '+faststart', outFile, '-hide_banner']
 
         message = pipeToConsole(cmd)
