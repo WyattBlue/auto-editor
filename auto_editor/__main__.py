@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w34a'
+version = '20w35a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -113,14 +113,6 @@ def main():
         help='set the sample rate of the input and output videos.')
     size.add_argument('--video_codec', '-vcodec', metavar='',
         help='set the video codec for the output file.')
-
-    # sub = parser.add_argument_group('Sub-Commands')
-    # sub.add_argument('ignore',
-    #     help="Leave the input alone in this range. (Dont't edit there)")
-    ## chop_off_before
-    ## chop_off_after
-
-    # dep = parser.add_argument_group('Deprecated Options')
 
     args = parser.parse_args()
 

@@ -16,6 +16,7 @@ script:
  - python3 auto_editor/__main__.py example.mp4 --sounded_speed 0.5
  - python3 auto_editor/__main__.py example.mp4 --silent_speed 0.5
  - python3 auto_editor/__main__.py resources/newCommentary.mp3 --silent_threshold 0.1
+ - python3 auto_editor/__main__.py resources/multi-track.mov --cut_by_all_tracks
  - python3 auto_editor/__main__.py example.mp4 --cut_by_this_audio resources/newCommentary.mp3
  - python3 auto_editor/__main__.py example.mp4 -exp
  - python3 auto_editor/__main__.py resources/newCommentary.mp3 -exp
