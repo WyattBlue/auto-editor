@@ -329,12 +329,14 @@ def main():
                 subprocess.call(cmd)
 
             if(args.cut_by_all_tracks):
-                cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2', '-ar',
-                str(args.sample_rate),'-map', '0', f'{TEMP}/combined.wav']
+                cmd = [ffmpeg, '-i', INPUT_FILE, '-filter_complex',
+                    f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
+                    str(args.sample_rate), '-ac', '2', f'{TEMP}/combined.wav']
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:
                     cmd.extend(['-nostats', '-loglevel', '0'])
+
                 subprocess.call(cmd)
 
                 sampleRate, audioData = read(f'{TEMP}/combined.wav')
