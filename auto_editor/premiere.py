@@ -10,11 +10,41 @@ from usefulFunctions import conwrite, isAudioFile
 # Internal libraries
 import os
 
-def exportToPremiere(myInput, output, clips, sampleRate, log):
-    pathurl = 'file://localhost' + os.path.abspath(myInput)
+def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
+
+    def makepath(filepath):
+        return 'file://localhost' + os.path.abspath(filepath)
+
+    pathurl = makepath(myInput)
 
     name = os.path.basename(myInput)
     audioFile = isAudioFile(myInput)
+
+    print('tracks', tracks)
+    print(os.path.dirname(os.path.abspath(myInput)))
+
+    if(tracks > 1):
+        # XML in Adobe Premiere doesn't support multiple audio tracks so
+        # we need to do some stupid things to get it working.
+        from shutil import rmtree
+
+        inFolder = os.path.dirname(os.path.abspath(myInput))
+
+        hmm = name[:name.rfind('.')]
+
+        newFolderName = os.path.join(inFolder, hmm + '_tracks')
+        print(newFolderName)
+        try:
+            os.mkdir(newFolderName)
+        except OSError:
+            rmtree(newFolderName)
+            os.mkdir(newFolderName)
+
+        for i in range(1, tracks):
+            print(i)
+            hmm = os.path.join(temp, f'{i}.wav')
+            os.rename(hmm, os.path.join(newFolderName, f'{i}.wav'))
+
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic

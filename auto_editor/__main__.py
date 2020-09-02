@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w35a'
+version = '20w36a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -382,7 +382,7 @@ def main():
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, newOutput, clips, sampleRate, log)
+            exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
