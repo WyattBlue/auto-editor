@@ -267,6 +267,7 @@ def main():
 
         if(isAudioFile(INPUT_FILE)):
             fps = 30
+            tracks = 1
             cmd = [ffmpeg, '-i', myInput, '-b:a', args.audio_bitrate, '-ac', '2', '-ar',
                 str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
             if(args.debug):
@@ -331,7 +332,7 @@ def main():
             if(args.cut_by_all_tracks):
                 cmd = [ffmpeg, '-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
-                    str(args.sample_rate), '-ac', '2', f'{TEMP}/combined.wav']
+                    str(args.sample_rate), '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:
