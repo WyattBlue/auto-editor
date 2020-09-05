@@ -47,7 +47,7 @@ def ffmpegFPS(ffmpeg, path, log):
     except AttributeError:
         log.warning('frame rate detection failed.\n' \
             'If your video has a variable frame rate, ignore this message.')
-        return None
+        return 30
 
 def main():
     parser = argparse.ArgumentParser(prog='Auto-Editor', usage='auto-editor [input] [options]')
