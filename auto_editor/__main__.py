@@ -258,7 +258,7 @@ def main():
             except:
                 log.warning("Couldn't automatically detect audio bitrate.")
                 abit = '500k'
-                log.debug('Setting abit to ' + abit)
+                log.debug('Setting audio bitrate to ' + abit)
             else:
                 abit = str(round(abit / 1000)) + 'k'
         else:
