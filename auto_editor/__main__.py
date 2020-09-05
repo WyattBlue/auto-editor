@@ -184,7 +184,7 @@ def main():
     inputList = []
     for myInput in args.input:
         if(os.path.isdir(myInput)):
-            inputList += sort(os.listdir(myInput))
+            inputList += sorted(os.listdir(myInput))
         elif(os.path.isfile(myInput)):
             inputList.append(myInput)
         elif(myInput.startswith('http://') or myInput.startswith('https://')):

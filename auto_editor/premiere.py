@@ -332,7 +332,6 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
         outfile.write('\t\t\t\t</track>\n')
 
         if(tracks > 1):
-            print('OKAY!')
             outfile.write('\t\t\t\t<track currentExplodedTrackIndex="0" premiereTrackType="Stereo">\n')
             total = 0
             startClip = len(clips) * 2
