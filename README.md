@@ -1,14 +1,15 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg"></a>
-<img src="https://img.shields.io/badge/version-20w34a Hotfix-blue.svg">
+<img src="https://img.shields.io/badge/version-20w36a-blue.svg">
 <p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
-## New in 20w34a Hotfix
-* A critical bug is that causes a failure to convert a video has been mitigated.
-* The default bitrate was increased because it was very obvious that the ouput hadbeen compressed.
-* The "made X cuts" message will now only show when exporting to premiere or resolve.I found this message to be more annoying than helpful most of the time and you can use`--preview` to get that same information.
+## New in 20w36a
+* Detecting Video bitrate has been made much more accurate.
+* Changed how audio files are combined internally so `--cut_all_tracks` works every time.
+* Exporting to Premiere Pro now supports two audio tracks. (More support will come later.)
+* Folder Inputs have been ridden off errors and are now tested with TravisCI.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 

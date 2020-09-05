@@ -17,7 +17,7 @@ import tempfile
 import subprocess
 from shutil import rmtree
 
-def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, samplerate,
+def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, samplerate,
     debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, log):
 
     if(not os.path.isfile(vidFile)):
@@ -30,7 +30,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
 
     for trackNum in range(tracks):
         fastAudio(ffmpeg, f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
-            speeds, bitrate, samplerate, debug, False, log, fps=fps)
+            speeds, abitrate, samplerate, debug, False, log, fps=fps)
 
         if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
             log.error('Audio file not created.')
@@ -118,11 +118,11 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, bitrate, sampler
             return stdout.decode()
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-b:v', bitrate, '-c:v', vcodec, '-movflags',
+            f'{temp}/spedup.mp4', '-b:v', vbitrate, '-c:v', vcodec, '-movflags',
             '+faststart', outFile, '-hide_banner']
 
         message = pipeToConsole(cmd)
-
+        log.debug('')
         log.debug(message)
 
         if('Conversion failed!' in message):
