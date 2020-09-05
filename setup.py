@@ -15,17 +15,15 @@ def pip_version():
     # pip doesn't allow us to use standard version format (20w10a), so we have to
     # conform it to look like Semantic Versioning even though auto-editor does not
     # use that format.
-    return '20.34.1.2'
+    return '20.36.1.0'
 
 
 def changes():
     text = '''
-    * A critical bug is that causes a failure to convert a video has been mitigated.
-    * The default bitrate was increased because it was very obvious that the ouput had
-    been compressed.
-    * The "made X cuts" message will now only show when exporting to premiere or resolve.
-    I found this message to be more annoying than helpful most of the time and you can use
-    `--preview` to get that same information.
+    * Detecting Video bitrate has been made much more accurate.
+    * Changed how audio files are combined internally so `--cut_all_tracks` works every time.
+    * Exporting to Premiere Pro now supports two audio tracks. (More support will come later.)
+    * Folder Inputs have been ridden off errors and are now tested with TravisCI.
     '''
 
     text = text.replace('\n', '')

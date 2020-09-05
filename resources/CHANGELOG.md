@@ -1,5 +1,11 @@
 # Auto-Editor Change Log
 
+## Version 20w36a
+* Detecting Video bitrate has been made much more accurate.
+* Changed how audio files are combined internally so `--cut_all_tracks` works every time.
+* Exporting to Premiere Pro now supports two audio tracks. (More support will come later.)
+* Folder Inputs have been ridden off errors and are now tested with TravisCI.
+
 ## Version 20w34a Hotfix
 * A critical bug is that causes a failure to convert a video has been mitigated.
 * The default bitrate was increased because it was very obvious that the ouput hadbeen compressed.
