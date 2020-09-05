@@ -122,7 +122,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
             '+faststart', outFile, '-hide_banner']
 
         message = pipeToConsole(cmd)
-
+        log.debug('')
         log.debug(message)
 
         if('Conversion failed!' in message):
