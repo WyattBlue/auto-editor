@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w34a'
+version = '20w36a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -47,7 +47,7 @@ def ffmpegFPS(ffmpeg, path, log):
     except AttributeError:
         log.warning('frame rate detection failed.\n' \
             'If your video has a variable frame rate, ignore this message.')
-        return None
+        return 30
 
 def main():
     parser = argparse.ArgumentParser(prog='Auto-Editor', usage='auto-editor [input] [options]')
@@ -113,14 +113,6 @@ def main():
         help='set the sample rate of the input and output videos.')
     size.add_argument('--video_codec', '-vcodec', metavar='',
         help='set the video codec for the output file.')
-
-    # sub = parser.add_argument_group('Sub-Commands')
-    # sub.add_argument('ignore',
-    #     help="Leave the input alone in this range. (Dont't edit there)")
-    ## chop_off_before
-    ## chop_off_after
-
-    # dep = parser.add_argument_group('Deprecated Options')
 
     args = parser.parse_args()
 
@@ -192,7 +184,14 @@ def main():
     inputList = []
     for myInput in args.input:
         if(os.path.isdir(myInput)):
-            inputList += sort(os.listdir(myInput))
+            def validFiles(path):
+                for f in os.listdir(path):
+                    if(not f.startswith('.') and not f.endswith('.xml')
+                        and not f.endswith('.png') and not f.endswith('.md')
+                        and not os.path.isdir(f)):
+                        yield os.path.join(path, f)
+
+            inputList += sorted(validFiles(myInput))
         elif(os.path.isfile(myInput)):
             inputList.append(myInput)
         elif(myInput.startswith('http://') or myInput.startswith('https://')):
@@ -223,6 +222,8 @@ def main():
                 end = '_ALTERED' + ext
                 args.output_file.append(oldFile[:dotIndex] + end)
 
+    TEMP = tempfile.mkdtemp()
+
     if(args.combine_files):
         with open(f'{TEMP}/combines.txt', 'w') as outfile:
             for fileref in inputList:
@@ -233,7 +234,7 @@ def main():
         subprocess.call(cmd)
         inputList = ['combined.mp4']
 
-    TEMP = tempfile.mkdtemp()
+
     speeds = [args.silent_speed, args.video_speed]
 
     startTime = time.time()
@@ -246,6 +247,7 @@ def main():
         newOutput = args.output_file[i]
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
+        # Grab the sample rate from the input.
         sr = args.sample_rate
         if(sr is None):
             output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
@@ -256,6 +258,7 @@ def main():
                 sr = 48000
         args.sample_rate = sr
 
+        # Grab the audio bitrate from the input.
         abit = args.audio_bitrate
         if(abit is None):
             output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
@@ -266,7 +269,7 @@ def main():
             except:
                 log.warning("Couldn't automatically detect audio bitrate.")
                 abit = '500k'
-                log.debug('Setting abit to ' + abit)
+                log.debug('Setting audio bitrate to ' + abit)
             else:
                 abit = str(round(abit / 1000)) + 'k'
         else:
@@ -275,8 +278,9 @@ def main():
 
         if(isAudioFile(INPUT_FILE)):
             fps = 30
-            cmd = [ffmpeg, '-i', myInput, '-b:a', args.audio_bitrate, '-ac', '2', '-ar',
-                str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
+            tracks = 1
+            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', args.audio_bitrate, '-ac', '2',
+                '-ar', str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
             if(args.debug):
                 cmd.extend(['-hide_banner'])
             else:
@@ -327,8 +331,8 @@ def main():
             args.video_bitrate = vbit
 
             for trackNum in range(tracks):
-                cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2',
-                '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
+                cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', args.audio_bitrate,
+                '-ac', '2', '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
                 f'{TEMP}/{trackNum}.wav']
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
@@ -337,12 +341,14 @@ def main():
                 subprocess.call(cmd)
 
             if(args.cut_by_all_tracks):
-                cmd = [ffmpeg, '-i', INPUT_FILE, '-ab', args.audio_bitrate, '-ac', '2', '-ar',
-                str(args.sample_rate),'-map', '0', f'{TEMP}/combined.wav']
+                cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
+                    f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
+                    str(args.sample_rate), '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:
                     cmd.extend(['-nostats', '-loglevel', '0'])
+
                 subprocess.call(cmd)
 
                 sampleRate, audioData = read(f'{TEMP}/combined.wav')
@@ -369,7 +375,7 @@ def main():
                 constantLoc = oldFile[:dotIndex] + end
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
-            cmd = [ffmpeg, '-i', INPUT_FILE, '-filter:v', f'fps=fps=30', constantLoc]
+            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', f'fps=fps=30', constantLoc]
             if(args.debug):
                 cmd.extend(['-hide_banner'])
             else:
@@ -388,7 +394,7 @@ def main():
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, newOutput, clips, sampleRate, log)
+            exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
