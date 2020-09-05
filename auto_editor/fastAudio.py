@@ -91,7 +91,7 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
 
         progressBar(chunkNum, totalChunks, beginTime, title='Creating new audio')
 
-    log.debug('yPointer: ' + str(yPointer))
+    log.debug('\nyPointer: ' + str(yPointer))
     log.debug('samples per frame: ' + str(samplerate / fps))
     log.debug('Expected video length: ' + str(yPointer / (samplerate / fps)))
     newAudio = newAudio[:yPointer]
