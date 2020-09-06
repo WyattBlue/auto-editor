@@ -15,7 +15,7 @@ import sys
 import time
 import tempfile
 import subprocess
-from shutil import rmtree
+from shutil import rmtree, move
 
 def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, samplerate,
     debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, log):
@@ -38,7 +38,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
     if(exportAsAudio):
         # TODO: combine all the audio tracks
         # TODO: warn the user if they add keep_tracks_seperate
-        os.rename(f'{temp}/0.wav', outFile)
+        move(f'{temp}/0.wav', outFile)
         return None
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
@@ -108,7 +108,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
         else:
-            os.rename(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
+            move(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
 
 
         def pipeToConsole(myCommands):

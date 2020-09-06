@@ -50,71 +50,117 @@ def ffmpegFPS(ffmpeg, path, log):
         return 30
 
 def main():
-    parser = argparse.ArgumentParser(prog='Auto-Editor', usage='auto-editor [input] [options]')
+    options = []
+    option_names = []
 
-    basic = parser.add_argument_group('Basic Options')
-    basic.add_argument('input', nargs='*',
+    def add_argument(name, short=None, nargs=1, type=int, default=0,
+        action='default', help=''):
+        nonlocal options
+        nonlocal option_names
+
+        newDic = {}
+        newDic['name'] = name
+        newDic['short'] = short
+        newDic['nargs'] = nargs
+        newDic['type'] = type
+        newDic['default'] = default
+        newDic['action'] = action
+        newDic['help'] = help
+        options.append(newDic)
+        option_names.append(name)
+        if(short is not None):
+            option_names.append(short)
+
+
+    add_argument('input', nargs='*',
         help='the path to the file(s), folder, or url you want edited.')
-    basic.add_argument('--frame_margin', '-m', type=int, default=6, metavar='6',
+    add_argument('--help', '-h',
+        help='print this message and exit.')
+
+    add_argument('--frame_margin', '-m', type=int, default=6,
         help='set how many "silent" frames of on either side of "loud" sections be included.')
-    basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='0.04',
+    add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
         help='set the volume that frames audio needs to surpass to be "loud". (0-1)')
-    basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00, metavar='1',
+    add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
         help='set the speed that "loud" sections should be played at.')
-    basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='99999',
+    add_argument('--silent_speed', '-s', type=float_type, default=99999,
         help='set the speed that "silent" sections should be played at.')
-    basic.add_argument('--output_file', '-o', nargs='*', metavar='',
+    add_argument('--output_file', '-o', nargs='*',
         help='set the name(s) of the new output.')
 
-    advance = parser.add_argument_group('Advanced Options')
-    advance.add_argument('--no_open', action='store_true',
+
+    add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    advance.add_argument('--min_clip_length', '-mclip', type=int, default=3, metavar='3',
+    add_argument('--min_clip_length', '-mclip', type=int, default=3,
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    advance.add_argument('--min_cut_length', '-mcut', type=int, default=6, metavar='6',
+    add_argument('--min_cut_length', '-mcut', type=int, default=6,
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
-    advance.add_argument('--combine_files', action='store_true',
+    add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
-    advance.add_argument('--preview', action='store_true',
+    add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
 
-    cutting = parser.add_argument_group('Cutting Options')
-    cutting.add_argument('--cut_by_this_audio', '-ca', type=file_type, metavar='',
+
+    add_argument('--cut_by_this_audio', '-ca', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
-    cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='0',
+    add_argument('--cut_by_this_track', '-ct', type=int, default=0,
         help='base cuts by a different audio track in the video.')
-    cutting.add_argument('--cut_by_all_tracks', '-cat', action='store_true',
+    add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
-    cutting.add_argument('--keep_tracks_seperate', action='store_true',
+    add_argument('--keep_tracks_seperate', action='store_true',
         help="don't combine audio tracks when exporting.")
 
-    debug = parser.add_argument_group('Developer/Debugging Options')
-    debug.add_argument('--my_ffmpeg', action='store_true',
+
+    add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
-    debug.add_argument('--version', action='store_true',
+    add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
-    debug.add_argument('--debug', '--verbose', action='store_true',
+    add_argument('--debug', '--verbose', action='store_true',
         help='show helpful debugging values.')
 
-    misc = parser.add_argument_group('Export Options')
-    misc.add_argument('--export_as_audio', '-exa', action='store_true',
+    add_argument('--export_as_audio', '-exa', action='store_true',
         help='export as a WAV audio file.')
-    misc.add_argument('--export_to_premiere', '-exp', action='store_true',
+    add_argument('--export_to_premiere', '-exp', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
-    misc.add_argument('--export_to_resolve', '-exr', action='store_true',
+    add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
-    size = parser.add_argument_group('Size Options')
-    size.add_argument('--video_bitrate', '-vb', metavar='',
+    add_argument('--video_bitrate', '-vb',
         help='set the number of bits per second for video.')
-    size.add_argument('--audio_bitrate', '-ab', metavar='',
+    add_argument('--audio_bitrate', '-ab',
         help='set the number of bits per second for audio.')
-    size.add_argument('--sample_rate', '-r', type=sample_rate_type, metavar='',
+    add_argument('--sample_rate', '-r', type=sample_rate_type,
         help='set the sample rate of the input and output videos.')
-    size.add_argument('--video_codec', '-vcodec', metavar='',
+    add_argument('--video_codec', '-vcodec',
         help='set the video codec for the output file.')
 
-    args = parser.parse_args()
+    from usefulFunctions import Log
+    from types import SimpleNamespace
+
+
+    prelog = Log(3)
+
+    args = SimpleNamespace()
+
+    arguments = sys.argv[1:]
+
+    i = 0
+    end_of_inputs = False
+    while(i < len(arguments)):
+        item = arguments[i]
+
+        if(item in option_names):
+            # print(item)
+            end_of_inputs = True
+        else:
+            if(end_of_inputs):
+                prelog.error(f'{item} is not a valid option.')
+            else:
+                args.input.append(item)
+
+        i += 1
+    print(args.input)
+    sys.exit()
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # fixes pip not able to find other included modules.
@@ -160,7 +206,6 @@ def main():
         if(args.input == []):
             sys.exit()
 
-    from usefulFunctions import Log
     log = Log(3 if args.debug else 2)
 
     if(is64bit == '32-bit'):
