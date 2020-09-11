@@ -6,7 +6,7 @@ import os
 import re
 import sys
 import time
-import argparse
+import difflib
 import platform
 import tempfile
 import subprocess
@@ -53,7 +53,7 @@ def main():
     options = []
     option_names = []
 
-    def add_argument(name, short=None, nargs=1, type=int, default=0,
+    def add_argument(name, short=None, alias=None, nargs=1, type=int, default=None,
         action='default', help=''):
         nonlocal options
         nonlocal option_names
@@ -61,6 +61,7 @@ def main():
         newDic = {}
         newDic['name'] = name
         newDic['short'] = short
+        newDic['alias'] = alias
         newDic['nargs'] = nargs
         newDic['type'] = type
         newDic['default'] = default
@@ -81,13 +82,12 @@ def main():
         help='set how many "silent" frames of on either side of "loud" sections be included.')
     add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
         help='set the volume that frames audio needs to surpass to be "loud". (0-1)')
-    add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
+    add_argument('--video_speed', '-v', '--sounded_speed', type=float_type, default=1.00,
         help='set the speed that "loud" sections should be played at.')
     add_argument('--silent_speed', '-s', type=float_type, default=99999,
         help='set the speed that "silent" sections should be played at.')
     add_argument('--output_file', '-o', nargs='*',
         help='set the name(s) of the new output.')
-
 
     add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
@@ -100,7 +100,6 @@ def main():
     add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
 
-
     add_argument('--cut_by_this_audio', '-ca', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
     add_argument('--cut_by_this_track', '-ct', type=int, default=0,
@@ -109,7 +108,6 @@ def main():
         help='combine all audio tracks into one before basing cuts.')
     add_argument('--keep_tracks_seperate', action='store_true',
         help="don't combine audio tracks when exporting.")
-
 
     add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
@@ -135,32 +133,49 @@ def main():
         help='set the video codec for the output file.')
 
     from usefulFunctions import Log
-    from types import SimpleNamespace
-
-
     prelog = Log(3)
 
-    args = SimpleNamespace()
 
-    arguments = sys.argv[1:]
+    class parse_options():
+        def __init__(self, userArgs, log, *args):
 
-    i = 0
-    end_of_inputs = False
-    while(i < len(arguments)):
-        item = arguments[i]
+            # Set the default options.
+            for options in args:
+                for option in options:
+                    key = option['name'].replace('-', '')
+                    if(option['action'] == 'store_true'):
+                        value = False
+                    elif(option['nargs'] == '*'):
+                        value = []
+                    else:
+                        value = option['default']
+                    setattr(self, key, value)
 
-        if(item in option_names):
-            # print(item)
-            end_of_inputs = True
-        else:
-            if(end_of_inputs):
-                prelog.error(f'{item} is not a valid option.')
-            else:
-                args.input.append(item)
+            # Figure out attributes changed by user.
+            my_inputs = []
+            setting_inputs = True
+            for item in userArgs:
+                if(item in option_names):
+                    setting_inputs = False
+                else:
+                    if(setting_inputs and not item.startswith('-')):
+                        my_inputs.append(item)
+                    else:
+                        # Unknown Option!
+                        hmm = difflib.get_close_matches(item, option_names)
+                        append = ''
+                        potential_options = ', '.join(hmm)
+                        if(hmm != []):
+                            append = f'\n\n    Did you mean:\n        {potential_options}'
+                        log.error(f'Unknown option: {item}{append}')
 
-        i += 1
+            setattr(self, 'input', my_inputs)
+
+
+
+
+    args = parse_options(sys.argv[1:], prelog, options)
     print(args.input)
-    sys.exit()
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # fixes pip not able to find other included modules.
@@ -283,6 +298,12 @@ def main():
     speeds = [args.silent_speed, args.video_speed]
 
     startTime = time.time()
+
+    # Debug commands
+    print(startTime)
+    args.debug = True
+
+
 
     from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
     from wavfile import read, write
