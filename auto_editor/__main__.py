@@ -53,38 +53,36 @@ def main():
     options = []
     option_names = []
 
-    def add_argument(name, short=None, alias=None, nargs=1, type=int, default=None,
-        action='default', help=''):
+    def add_argument(*names, nargs=1, type=str, default=None,
+        action='default', range=None, help=''):
         nonlocal options
         nonlocal option_names
 
         newDic = {}
-        newDic['name'] = name
-        newDic['short'] = short
-        newDic['alias'] = alias
+        newDic['names'] = names
         newDic['nargs'] = nargs
         newDic['type'] = type
         newDic['default'] = default
         newDic['action'] = action
         newDic['help'] = help
+        newDic['range'] = range
         options.append(newDic)
-        option_names.append(name)
-        if(short is not None):
-            option_names.append(short)
+        option_names = option_names + list(names)
 
 
     add_argument('input', nargs='*',
         help='the path to the file(s), folder, or url you want edited.')
-    add_argument('--help', '-h',
+    add_argument('--help', '-h', action='store_true',
         help='print this message and exit.')
 
     add_argument('--frame_margin', '-m', type=int, default=6,
         help='set how many "silent" frames of on either side of "loud" sections be included.')
     add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
         help='set the volume that frames audio needs to surpass to be "loud". (0-1)')
-    add_argument('--video_speed', '-v', '--sounded_speed', type=float_type, default=1.00,
+    add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
+        range='0 to 999999',
         help='set the speed that "loud" sections should be played at.')
-    add_argument('--silent_speed', '-s', type=float_type, default=99999,
+    add_argument('--silent_speed', '-s', type=float_type, default=99999, range='0 to 99999',
         help='set the speed that "silent" sections should be played at.')
     add_argument('--output_file', '-o', nargs='*',
         help='set the name(s) of the new output.')
@@ -142,7 +140,7 @@ def main():
             # Set the default options.
             for options in args:
                 for option in options:
-                    key = option['name'].replace('-', '')
+                    key = option['names'][0].replace('-', '')
                     if(option['action'] == 'store_true'):
                         value = False
                     elif(option['nargs'] == '*'):
@@ -151,46 +149,102 @@ def main():
                         value = option['default']
                     setattr(self, key, value)
 
+
+            def get_option(item, the_args):
+                for options in the_args:
+                    for option in options:
+                        if(item in option['names']):
+                            return option
+                return None
+
             # Figure out attributes changed by user.
             my_inputs = []
             setting_inputs = True
-            for item in userArgs:
-                if(item in option_names):
+            i = 0
+            while i < len(userArgs):
+                item = userArgs[i]
+                if(i == len(userArgs) - 1):
+                    nextItem = None
+                else:
+                    nextItem = userArgs[i+1]
+
+                option = get_option(item, args)
+
+                if(option is not None):
                     setting_inputs = False
+
+                    key = option['names'][0].replace('-', '')
+
+                    # show help for specific option.
+                    if(nextItem == '-h' or nextItem == '--help'):
+                        print(' ', ', '.join(option['names']))
+                        print('   ', option['help'])
+                        if(option['action'] == 'default'):
+                            print(f'  type:', option['type'].__name__)
+                            print(f'  default:', option['default'])
+                            if(option['range'] is not None):
+                                print(f'  range:', option['range'])
+                        else:
+                            print(f'  type: flag')
+                        sys.exit(0)
+
+                    if(option['action'] == 'store_true'):
+                        value = True
+                    else:
+                        try:
+                            # convert to correct type
+                            value = option['type'](nextItem)
+                        except:
+                            typeName = option['type'].__name__
+                            prelog.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
+                        i += 2
+                    setattr(self, key, value)
                 else:
                     if(setting_inputs and not item.startswith('-')):
+                        # Input file names
                         my_inputs.append(item)
                     else:
                         # Unknown Option!
                         hmm = difflib.get_close_matches(item, option_names)
-                        append = ''
                         potential_options = ', '.join(hmm)
+                        append = ''
                         if(hmm != []):
                             append = f'\n\n    Did you mean:\n        {potential_options}'
                         log.error(f'Unknown option: {item}{append}')
+                i += 1
 
             setattr(self, 'input', my_inputs)
 
 
-
-
     args = parse_options(sys.argv[1:], prelog, options)
-    print(args.input)
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
 
+    # Print help screen for entire program.
+    if(args.help):
+        for option in options:
+            print(', '.join(option['names']) + ':', option['help'])
+            if(option['action'] == 'default'):
+                print(f'  type:', option['type'].__name__)
+            else:
+                print(f'  type: flag')
+        print('\nHave an issue? Make an issue. '\
+            'Visit https://github.com/wyattblue/auto-editor/issues')
+        sys.exit()
+
     if(args.version):
         print('Auto-Editor version', version)
         sys.exit()
 
-    if(args.export_to_premiere):
-        print('Exporting to Adobe Premiere Pro XML file.')
-    if(args.export_to_resolve):
-        print('Exporting to DaVinci Resolve XML file.')
-    if(args.export_as_audio):
-        print('Exporting as audio.')
+    if(not args.preview):
+        if(args.export_to_premiere):
+            print('Exporting to Adobe Premiere Pro XML file.')
+        if(args.export_to_resolve):
+            print('Exporting to DaVinci Resolve XML file.')
+        if(args.export_as_audio):
+            print('Exporting as audio.')
 
     newF = None
     newP = None
@@ -298,12 +352,6 @@ def main():
     speeds = [args.silent_speed, args.video_speed]
 
     startTime = time.time()
-
-    # Debug commands
-    print(startTime)
-    args.debug = True
-
-
 
     from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
     from wavfile import read, write
