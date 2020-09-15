@@ -18,7 +18,7 @@ import subprocess
 from shutil import rmtree, move
 
 def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, samplerate,
-    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, log):
+    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, preset, log):
 
     if(not os.path.isfile(vidFile)):
         log.error('Could not find file ' + vidFile)
@@ -36,8 +36,11 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
             log.error('Audio file not created.')
 
     if(exportAsAudio):
-        # TODO: combine all the audio tracks
-        # TODO: warn the user if they add keep_tracks_seperate
+        if(keepTracksSep):
+            log.warning("Audio files can't have multiple tracks.")
+        else:
+            pass
+            # TODO: combine all the audio tracks
         move(f'{temp}/0.wav', outFile)
         return None
 
@@ -88,8 +91,13 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
         cmd.extend(['-i', f'{temp}/spedup.mp4'])
         for i in range(tracks):
             cmd.extend(['-map', f'{i}:a:0'])
-        cmd.extend(['-map', f'{tracks}:v:0', '-b:v', vbitrate, '-c:v', vcodec,
-            '-movflags', '+faststart', outFile])
+
+        cmd.extend(['-map', f'{tracks}:v:0', '-c:v', vcodec])
+        if(vbitrate is None):
+            cmd.extend(['-crf', '18'])
+        else:
+            cmd.extend(['-b:v', vbitrate])
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile])
         if(debug):
             cmd.extend(['-hide_banner'])
         else:
@@ -118,8 +126,12 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
             return stdout.decode()
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-b:v', vbitrate, '-c:v', vcodec, '-movflags',
-            '+faststart', outFile, '-hide_banner']
+            f'{temp}/spedup.mp4', '-c:v', vcodec]
+        if(vbitrate is None):
+            cmd.extend(['-crf', '18'])
+        else:
+            cmd.extend(['-b:v', vbitrate])
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile, '-hide_banner'])
 
         message = pipeToConsole(cmd)
         log.debug('')

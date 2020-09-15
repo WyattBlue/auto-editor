@@ -54,7 +54,7 @@ def main():
     option_names = []
 
     def add_argument(*names, nargs=1, type=str, default=None,
-        action='default', range=None, help='', extra=''):
+        action='default', range=None, choices=None, help='', extra=''):
         nonlocal options
         nonlocal option_names
 
@@ -67,6 +67,7 @@ def main():
         newDic['help'] = help
         newDic['extra'] = extra
         newDic['range'] = range
+        newDic['choices'] = choices
         options.append(newDic)
         option_names = option_names + list(names)
 
@@ -131,6 +132,10 @@ def main():
         help='set the sample rate of the input and output videos.')
     add_argument('--video_codec', '-vcodec',
         help='set the video codec for the output file.')
+    add_argument('--video_preset', '-p', default='medium',
+        choices=['ultrafast', 'superfast', 'faster', 'fast', 'medium',
+            'slow', 'slower', 'veryslow'],
+        help='set the preset to save file size by taking longer to compress the video.')
 
     from usefulFunctions import Log
     prelog = Log(3)
@@ -145,7 +150,7 @@ def main():
                     key = option['names'][0].replace('-', '')
                     if(option['action'] == 'store_true'):
                         value = False
-                    elif(option['nargs'] == '*'):
+                    elif(option['nargs'] != 1):
                         value = []
                     else:
                         value = option['default']
@@ -183,10 +188,12 @@ def main():
                         print('   ', option['help'])
                         print('   ', option['extra'])
                         if(option['action'] == 'default'):
-                            print(f'    type:', option['type'].__name__)
-                            print(f'    default:', option['default'])
+                            print('    type:', option['type'].__name__)
+                            print('    default:', option['default'])
                             if(option['range'] is not None):
-                                print(f'    range:', option['range'])
+                                print('    range:', option['range'])
+                            if(option['choices'] is not None):
+                                print('    choices:', ', '.join(option['choices']))
                         else:
                             print(f'    type: flag')
                         sys.exit(0)
@@ -423,26 +430,9 @@ def main():
                     vcodec = 'copy'
                     log.warning("Couldn't automatically detect the video codec.")
 
-            vbit = args.video_bitrate
-            if(vbit is None):
-                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                    'v:0', '-show_entries', 'stream=bit_rate', '-of',
-                    'compact=p=0:nk=1', INPUT_FILE])
-                try:
-                    vbit = int(output)
-                except:
-                    log.warning("Couldn't automatically detect video bitrate.")
-                    vbit = '500k'
-                    log.debug('Setting vbit to ' + vbit)
-                else:
-                    vbit += 300 * 1000 # Add more for better quality.
-                    vbit = str(round(vbit / 1000)) + 'k'
-            else:
-                vbit = str(vbit)
-                if(vcodec == 'copy'):
-                    log.warning('Your bitrate will not be applied because' \
+            if(args.video_bitrate is not None and vcodec == 'copy'):
+                log.warning('Your bitrate will not be applied because' \
                         ' the video codec is "copy".')
-            args.video_bitrate = vbit
 
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', args.audio_bitrate,
@@ -528,7 +518,7 @@ def main():
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
             args.keep_tracks_seperate, vcodec, fps, args.export_as_audio,
-            args.video_bitrate, log)
+            args.video_bitrate, args.video_preset, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'The file {newOutput} was not created.')
