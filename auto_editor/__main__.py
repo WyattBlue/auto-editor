@@ -54,7 +54,7 @@ def main():
     option_names = []
 
     def add_argument(*names, nargs=1, type=str, default=None,
-        action='default', range=None, help=''):
+        action='default', range=None, help='', extra=''):
         nonlocal options
         nonlocal option_names
 
@@ -65,6 +65,7 @@ def main():
         newDic['default'] = default
         newDic['action'] = action
         newDic['help'] = help
+        newDic['extra'] = extra
         newDic['range'] = range
         options.append(newDic)
         option_names = option_names + list(names)
@@ -75,10 +76,10 @@ def main():
     add_argument('--help', '-h', action='store_true',
         help='print this message and exit.')
 
-    add_argument('--frame_margin', '-m', type=int, default=6,
+    add_argument('--frame_margin', '-m', type=int, default=6, range='0 to Infinity',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
-    add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
-        help='set the volume that frames audio needs to surpass to be "loud". (0-1)')
+    add_argument('--silent_threshold', '-t', type=float_type, default=0.04, range='0 to 1',
+        help='set the volume that frames audio needs to surpass to be "loud".')
     add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
         range='0 to 999999',
         help='set the speed that "loud" sections should be played at.')
@@ -89,9 +90,9 @@ def main():
 
     add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    add_argument('--min_clip_length', '-mclip', type=int, default=3,
+    add_argument('--min_clip_length', '-mclip', type=int, default=3, range='0 to Infinity',
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    add_argument('--min_cut_length', '-mcut', type=int, default=6,
+    add_argument('--min_cut_length', '-mcut', type=int, default=6, range='0 to Infinity',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
     add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
@@ -101,6 +102,7 @@ def main():
     add_argument('--cut_by_this_audio', '-ca', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
     add_argument('--cut_by_this_track', '-ct', type=int, default=0,
+        range='0 to the number of audio tracks',
         help='base cuts by a different audio track in the video.')
     add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
@@ -179,13 +181,14 @@ def main():
                     if(nextItem == '-h' or nextItem == '--help'):
                         print(' ', ', '.join(option['names']))
                         print('   ', option['help'])
+                        print('   ', option['extra'])
                         if(option['action'] == 'default'):
-                            print(f'  type:', option['type'].__name__)
-                            print(f'  default:', option['default'])
+                            print(f'    type:', option['type'].__name__)
+                            print(f'    default:', option['default'])
                             if(option['range'] is not None):
-                                print(f'  range:', option['range'])
+                                print(f'    range:', option['range'])
                         else:
-                            print(f'  type: flag')
+                            print(f'    type: flag')
                         sys.exit(0)
 
                     if(option['action'] == 'store_true'):
@@ -197,7 +200,7 @@ def main():
                         except:
                             typeName = option['type'].__name__
                             prelog.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
-                        i += 2
+                        i += 1
                     setattr(self, key, value)
                 else:
                     if(setting_inputs and not item.startswith('-')):
@@ -215,7 +218,6 @@ def main():
 
             setattr(self, 'input', my_inputs)
 
-
     args = parse_options(sys.argv[1:], prelog, options)
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
@@ -225,11 +227,7 @@ def main():
     # Print help screen for entire program.
     if(args.help):
         for option in options:
-            print(', '.join(option['names']) + ':', option['help'])
-            if(option['action'] == 'default'):
-                print(f'  type:', option['type'].__name__)
-            else:
-                print(f'  type: flag')
+            print(' ', ', '.join(option['names']) + ':', option['help'])
         print('\nHave an issue? Make an issue. '\
             'Visit https://github.com/wyattblue/auto-editor/issues')
         sys.exit()
@@ -238,13 +236,18 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
+    from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
+    from wavfile import read, write
+
     if(not args.preview):
         if(args.export_to_premiere):
-            print('Exporting to Adobe Premiere Pro XML file.')
-        if(args.export_to_resolve):
-            print('Exporting to DaVinci Resolve XML file.')
-        if(args.export_as_audio):
-            print('Exporting as audio.')
+            conwrite('Exporting to Adobe Premiere Pro XML file.')
+        elif(args.export_to_resolve):
+            conwrite('Exporting to DaVinci Resolve XML file.')
+        elif(args.export_as_audio):
+            conwrite('Exporting as audio.')
+        else:
+            conwrite('Starting.')
 
     newF = None
     newP = None
@@ -352,9 +355,6 @@ def main():
     speeds = [args.silent_speed, args.video_speed]
 
     startTime = time.time()
-
-    from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
-    from wavfile import read, write
 
     numCuts = 0
     for i, INPUT_FILE in enumerate(inputList):
