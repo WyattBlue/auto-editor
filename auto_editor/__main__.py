@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w36a'
+version = '20w38a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -72,7 +72,7 @@ def main():
         option_names = option_names + list(names)
 
 
-    add_argument('input', nargs='*',
+    add_argument('(input)', nargs='*',
         help='the path to the file(s), folder, or url you want edited.')
     add_argument('--help', '-h', action='store_true',
         help='print this message and exit.')
@@ -207,6 +207,9 @@ def main():
                         except:
                             typeName = option['type'].__name__
                             prelog.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
+                        if(option['choices'] is not None):
+                            if(value not in option['choices']):
+                                prelog.error(f'{value} is not choice for {option}')
                         i += 1
                     setattr(self, key, value)
                 else:
@@ -296,9 +299,7 @@ def main():
         log.error('Frame margin cannot be negative.')
 
     if(args.input == []):
-        log.error('The following arguments are required: input\n' \
-            'In other words, you need the path to a video or an audio file ' \
-            'so that auto-editor can do the work for you.')
+        log.error('You need the (input) argument so that auto-editor can do the work for you.')
 
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
