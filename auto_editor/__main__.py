@@ -117,6 +117,7 @@ def main():
     add_argument('--debug', '--verbose', action='store_true',
         help='show helpful debugging values.')
 
+    # TODO: add export_as_video
     add_argument('--export_as_audio', '-exa', action='store_true',
         help='export as a WAV audio file.')
     add_argument('--export_to_premiere', '-exp', action='store_true',
@@ -132,10 +133,20 @@ def main():
         help='set the sample rate of the input and output videos.')
     add_argument('--video_codec', '-vcodec',
         help='set the video codec for the output file.')
-    add_argument('--video_preset', '-p', default='medium',
+    add_argument('--preset', '-p', default='medium',
         choices=['ultrafast', 'superfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
-        help='set the preset to save file size by taking longer to compress the video.')
+        help='set the preset for ffmpeg to help save file size or increase quality.')
+    add_argument('--tune', '-t', default='none',
+        choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
+            'zerolatency', 'none'],
+        help='set the tune for ffmpeg to help compress video better.')
+
+    add_argument('--ignore', nargs='*',
+        help="the range (in seconds) that shouldn't be edited at all. (uses range syntax)")
+    add_argument('--cut_out', nargs='*',
+        help='the range (in seconds) that should be cut out completely, '\
+            'regardless of anything else. (uses range syntax)')
 
     from usefulFunctions import Log
     prelog = Log(3)
@@ -165,8 +176,9 @@ def main():
                 return None
 
             # Figure out attributes changed by user.
-            my_inputs = []
-            setting_inputs = True
+            myList = []
+            settingInputs = True
+            optionList = 'input'
             i = 0
             while i < len(userArgs):
                 item = userArgs[i]
@@ -178,7 +190,9 @@ def main():
                 option = get_option(item, args)
 
                 if(option is not None):
-                    setting_inputs = False
+                    setattr(self, optionList, myList)
+                    settingInputs = False
+                    myList = []
 
                     key = option['names'][0].replace('-', '')
 
@@ -198,7 +212,10 @@ def main():
                             print(f'    type: flag')
                         sys.exit(0)
 
-                    if(option['action'] == 'store_true'):
+                    if(option['nargs'] != 1):
+                        settingInputs = True
+                        optionList = key
+                    elif(option['action'] == 'store_true'):
                         value = True
                     else:
                         try:
@@ -209,13 +226,13 @@ def main():
                             prelog.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
                         if(option['choices'] is not None):
                             if(value not in option['choices']):
-                                prelog.error(f'{value} is not choice for {option}')
+                                prelog.error(f'{value} is not a choice for {option}')
                         i += 1
                     setattr(self, key, value)
                 else:
-                    if(setting_inputs and not item.startswith('-')):
+                    if(settingInputs and not item.startswith('-')):
                         # Input file names
-                        my_inputs.append(item)
+                        myList.append(item)
                     else:
                         # Unknown Option!
                         hmm = difflib.get_close_matches(item, option_names)
@@ -225,8 +242,8 @@ def main():
                             append = f'\n\n    Did you mean:\n        {potential_options}'
                         log.error(f'Unknown option: {item}{append}')
                 i += 1
-
-            setattr(self, 'input', my_inputs)
+            if(settingInputs):
+                setattr(self, optionList, myList)
 
     args = parse_options(sys.argv[1:], prelog, options)
 
@@ -464,7 +481,8 @@ def main():
                     log.error('Audio track not found!')
 
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
-            args.frame_margin, args.min_clip_length, args.min_cut_length, log)
+            args.frame_margin, args.min_clip_length, args.min_cut_length,
+            args.ignore, args.cut_out, log)
 
         clips = []
         for chunk in chunks:
@@ -519,7 +537,7 @@ def main():
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
             args.keep_tracks_seperate, vcodec, fps, args.export_as_audio,
-            args.video_bitrate, args.video_preset, log)
+            args.video_bitrate, args.preset, args.tune, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'The file {newOutput} was not created.')

@@ -18,7 +18,7 @@ import subprocess
 from shutil import rmtree, move
 
 def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, samplerate,
-    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, preset, log):
+    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, preset, tune, log):
 
     if(not os.path.isfile(vidFile)):
         log.error('Could not find file ' + vidFile)
@@ -97,6 +97,8 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
             cmd.extend(['-crf', '18'])
         else:
             cmd.extend(['-b:v', vbitrate])
+        if(tune != 'none'):
+            cmd.extend(['-tune', tune])
         cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile])
         if(debug):
             cmd.extend(['-hide_banner'])
@@ -128,11 +130,14 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', vcodec]
         if(vbitrate is None):
-            cmd.extend(['-crf', '18'])
+            cmd.extend(['-crf', '15'])
         else:
             cmd.extend(['-b:v', vbitrate])
+        if(tune != 'none'):
+            cmd.extend(['-tune', tune])
         cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile, '-hide_banner'])
 
+        log.debug(cmd)
         message = pipeToConsole(cmd)
         log.debug('')
         log.debug(message)
