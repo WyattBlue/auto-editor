@@ -135,13 +135,13 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
     if(ignore != []):
         includeFrame = setRange(includeFrame, ignore, fps, 1)
 
-    # cut out ranges.
+    # Cut out ranges.
     if(cutOut != []):
         includeFrame = setRange(includeFrame, cutOut, fps, 0)
 
-    # Remove small clips created. (not necessary unless frame margin is negative)
+    # Remove small clips created by applying other rules.
     includeFrame = removeSmall(includeFrame, minClip, replace=1, with_=0)
-    # Remove small cuts created by appling frame margin rules.
+    # Remove small cuts created.
     includeFrame = removeSmall(includeFrame, minCut, replace=0, with_=1)
 
     # Convert long numpy array into properly formatted chunks list.

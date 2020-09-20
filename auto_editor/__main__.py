@@ -167,7 +167,6 @@ def main():
                         value = option['default']
                     setattr(self, key, value)
 
-
             def get_option(item, the_args):
                 for options in the_args:
                     for option in options:
@@ -190,8 +189,10 @@ def main():
                 option = get_option(item, args)
 
                 if(option is not None):
-                    setattr(self, optionList, myList)
+                    if(optionList is not None):
+                        setattr(self, optionList, myList)
                     settingInputs = False
+                    optionList = None
                     myList = []
 
                     key = option['names'][0].replace('-', '')
@@ -210,7 +211,7 @@ def main():
                                 print('    choices:', ', '.join(option['choices']))
                         else:
                             print(f'    type: flag')
-                        sys.exit(0)
+                        sys.exit()
 
                     if(option['nargs'] != 1):
                         settingInputs = True
@@ -219,7 +220,7 @@ def main():
                         value = True
                     else:
                         try:
-                            # convert to correct type
+                            # Convert to correct type.
                             value = option['type'](nextItem)
                         except:
                             typeName = option['type'].__name__
@@ -246,6 +247,8 @@ def main():
                 setattr(self, optionList, myList)
 
     args = parse_options(sys.argv[1:], prelog, options)
+    print(args.silent_speed)
+    print(args.min_cut_length)
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # fixes pip not able to find other included modules.
