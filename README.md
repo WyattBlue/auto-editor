@@ -1,15 +1,26 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg"></a>
-<img src="https://img.shields.io/badge/version-20w36a-blue.svg">
+<img src="https://img.shields.io/badge/version-20w38a-blue.svg">
 <p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
-## New in 20w36a
-* Detecting Video bitrate has been made much more accurate.
-* Changed how audio files are combined internally so `--cut_all_tracks` works every time.
-* Exporting to Premiere Pro now supports two audio tracks. (More support will come later.)
-* Folder Inputs have been ridden off errors and are now tested with TravisCI.
+Auto-Editor has a powerful suite of features to make your life easy including:
+
+
+## Features
+ * Change what is considered silence
+ * Change the pace or speed to suit any need.
+
+
+<h2 align="center">Export to Adobe Premiere or DaVinci Resolve to change the edits in any way you like.</h2>
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/premiere_editing.png"></p>
+
+## New in 20w38a
+* argparse has been replaced with a custom parser that can be expanded upon more easily one change that has is the ability for the help option to give specific instructions if it's next to another option.
+* the --preset, --tune, --ignore and --cut_out options have been added.
+* the default way the video is compressed has been changed so it now uses crf instead of a video bitrate to shrink the file size. The quality should be a lot better now.
+* fixed a bug where the program would crash if the output folder is on another drive.
 
 [See the Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
@@ -59,17 +70,8 @@ The best way to contribute is to [fork auto-editor](https://github.com/WyattBlue
 
 No change is too small whether that be a typo in the docs or a small improvement of code.
 
-## Legal
-Auto-Editor, nor any of its dependencies, claims any copyright over any **output file** it produces. All rights are reserved to you.
-
-If you wish to use the **source code or binaries** of this project, you need to acknowledge auto-editors dependencies if they are present.
-
-
-Both ffmpeg binaries are under the [LGPLv3 License](https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/win-ffmpeg/LICENSE.txt)
-
-wavfile.py is under the [BSD 3-Clause "New" or "Revised" License](https://github.com/scipy/scipy/blob/master/LICENSE.txt)
-
-Everything else in auto-editor is under the [MIT License](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and was made by [these people.](https://github.com/WyattBlue/auto-editor/blob/master/resources/CREDITS.md)
+## Software Licensing
+[See Legal Info](https://github.com/WyattBlue/auto-editor/blob/master/resources/legalinfo.md)
 
 ## Help or Issues
 If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this project, suggest new features, or chat with other users, do that in [the discord server](https://discord.com/invite/kMHAWJJ).

@@ -94,7 +94,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
 
         cmd.extend(['-map', f'{tracks}:v:0', '-c:v', vcodec])
         if(vbitrate is None):
-            cmd.extend(['-crf', '18'])
+            cmd.extend(['-crf', '15'])
         else:
             cmd.extend(['-b:v', vbitrate])
         if(tune != 'none'):

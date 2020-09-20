@@ -73,7 +73,7 @@ def main():
 
 
     add_argument('(input)', nargs='*',
-        help='the path to the file(s), folder, or url you want edited.')
+        help='the path to a file, folder, or url you want edited.')
     add_argument('--help', '-h', action='store_true',
         help='print this message and exit.')
 
@@ -247,8 +247,6 @@ def main():
                 setattr(self, optionList, myList)
 
     args = parse_options(sys.argv[1:], prelog, options)
-    print(args.silent_speed)
-    print(args.min_cut_length)
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # fixes pip not able to find other included modules.
