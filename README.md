@@ -5,15 +5,13 @@
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
-Auto-Editor has a powerful suite of features to make your life easy that can:
-
+<Auto-Editor has a powerful suite of features to make your life easy that can:
 
 <h3 align="center">Run on Any Platform</h3>
 <p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/cross_platform.png" width="600">
 
-
 <h3 align="center">Export to your Favorite Editing Software.</h2>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/premiere_editing.png"><br><span style="color: gray">Including Adobe Premiere Pro and DaVinci Resolve</span></p>
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/premiere_editing.png"><span style="color: gray">Including Adobe Premiere Pro and DaVinci Resolve</span></p>
 
 ## New in 20w38a
 * argparse has been replaced with a custom parser that can be expanded upon more easily one change that has is the ability for the help option to give specific instructions if it's next to another option.
@@ -39,30 +37,11 @@ auto-editor example.mp4 --frame_margin 8
 
 There are many more features in auto-editor, including **adding in background music** that automatically gets quieter, and **zooming in** the video when it gets especially loud.
 
-[See the docs](https://github.com/WyattBlue/auto-editor/blob/master/resources/docs.md) for more commands and usages.
+[SEE DOCS](https://github.com/WyattBlue/auto-editor/blob/master/resources/docs.md) for more commands and usages.
 
-## Installing Auto-Editor
-Download and install the latest version of [Python 3](https://www.python.org/downloads/), then run `pip3 install auto-editor` on your console then run
+## Installing
 
-The binaries you'll need are already installed, unless you're using Linux.
-Linux users need to run this command. `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
-
-Now run it with the example video to make sure it is working.
-
-```
-auto-editor example.mp4
-```
-
-If that works then congratulations, you have successfully installed auto-editor. You can use now use this with any other type of video or audio that you have.
-
-```
-auto-editor C:path\to\your\video
-```
-
-## Upgrading
-```
-pip3 install auto-editor --upgrade
-```
+[SEE INSTALLING](https://github.com/WyattBlue/auto-editor/blob/master/resources/installing.md)
 
 ## Contributing
 The best way to contribute is to [fork auto-editor](https://github.com/WyattBlue/auto-editor/fork) and make changes there. Once you're happy with those changes, make a new pull request and type in a brief description on how you improved the code.
