@@ -9,11 +9,11 @@ Auto-Editor has a powerful suite of features to make your life easy that can:
 
 
 <h3 align="center">Run on Any Platform</h3>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/cross_platform.png">
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/cross_platform.png" width="600">
 
 
-<h3 align="center">Export to Adobe Premiere or DaVinci Resolve to change the edits in any way you like.</h2>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/premiere_editing.png"></p>
+<h3 align="center">Export to your Favorite Editing Software.</h2>
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/premiere_editing.png"><br><span style="color: gray">Including Adobe Premiere Pro and DaVinci Resolve</span></p>
 
 ## New in 20w38a
 * argparse has been replaced with a custom parser that can be expanded upon more easily one change that has is the ability for the help option to give specific instructions if it's next to another option.
