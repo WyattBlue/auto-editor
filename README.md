@@ -5,16 +5,15 @@
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
-Auto-Editor has a powerful suite of features to make your life easy including:
+Auto-Editor has a powerful suite of features to make your life easy that can:
 
 
-## Features
- * Change what is considered silence
- * Change the pace or speed to suit any need.
+<h3 align="center">Run on Any Platform</h3>
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/cross_platform.png">
 
 
-<h2 align="center">Export to Adobe Premiere or DaVinci Resolve to change the edits in any way you like.</h2>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/premiere_editing.png"></p>
+<h3 align="center">Export to Adobe Premiere or DaVinci Resolve to change the edits in any way you like.</h2>
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/premiere_editing.png"></p>
 
 ## New in 20w38a
 * argparse has been replaced with a custom parser that can be expanded upon more easily one change that has is the ability for the help option to give specific instructions if it's next to another option.
