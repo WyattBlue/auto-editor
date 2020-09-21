@@ -15,15 +15,18 @@ def pip_version():
     # pip doesn't allow us to use standard version format (20w10a), so we have to
     # conform it to look like Semantic Versioning even though auto-editor does not
     # use that format.
-    return '20.36.1.0'
+    return '20.38.1.0'
 
 
 def changes():
     text = '''
-    * Detecting Video bitrate has been made much more accurate.
-    * Changed how audio files are combined internally so `--cut_all_tracks` works every time.
-    * Exporting to Premiere Pro now supports two audio tracks. (More support will come later.)
-    * Folder Inputs have been ridden off errors and are now tested with TravisCI.
+    * argparse has been replaced with a custom parser that can be expanded upon more easily
+     one change that has is the ability for the help option to give specific instrutions
+     if it's next to another option.
+    * the --preset, --tune, --ignore and --cut_out options have been added.
+    * the default way the video is compressed has been changed so it now uses crf instead
+     of a video bitrate to shrink the file size. The quality should be a lot better now.
+    * fixed a bug where the program would crash if the output folder is on another drive.
     '''
 
     text = text.replace('\n', '')

@@ -63,7 +63,7 @@ def getMaxVolume(s):
 
 
 def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, minCut,
-    log):
+    ignore, cutOut, log):
     import math
 
     audioSampleCount = audioData.shape[0]
@@ -104,6 +104,21 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
                     active = False
         return hasLoudAudio
 
+
+    def setRange(includeFrame, syntaxRange, fps, with_):
+        for item in syntaxRange:
+            pair = []
+            for num in item.split('-'):
+                if(num == 'start'):
+                    pair.append(0)
+                elif(num == 'end'):
+                    pair.append(len(includeFrame) - 1)
+                else:
+                    pair.append(round(float(num) * fps))
+            includeFrame[pair[0]:pair[1]+1] = with_
+        return includeFrame
+
+
     # Remove small loudness spikes
     hasLoudAudio = removeSmall(hasLoudAudio, minClip, replace=1, with_=0)
     # Remove small silences
@@ -116,9 +131,17 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
         end = int(min(audioFrameCount, i+1+frameMargin))
         includeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
 
-    # Remove small clips created. (not necessary unless frame margin is negative)
+    # Apply ignore rules if applicable.
+    if(ignore != []):
+        includeFrame = setRange(includeFrame, ignore, fps, 1)
+
+    # Cut out ranges.
+    if(cutOut != []):
+        includeFrame = setRange(includeFrame, cutOut, fps, 0)
+
+    # Remove small clips created by applying other rules.
     includeFrame = removeSmall(includeFrame, minClip, replace=1, with_=0)
-    # Remove small cuts created by appling frame margin rules.
+    # Remove small cuts created.
     includeFrame = removeSmall(includeFrame, minCut, replace=0, with_=1)
 
     # Convert long numpy array into properly formatted chunks list.

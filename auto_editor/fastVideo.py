@@ -15,10 +15,10 @@ import sys
 import time
 import tempfile
 import subprocess
-from shutil import rmtree
+from shutil import rmtree, move
 
 def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, samplerate,
-    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, log):
+    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, preset, tune, log):
 
     if(not os.path.isfile(vidFile)):
         log.error('Could not find file ' + vidFile)
@@ -36,9 +36,12 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
             log.error('Audio file not created.')
 
     if(exportAsAudio):
-        # TODO: combine all the audio tracks
-        # TODO: warn the user if they add keep_tracks_seperate
-        os.rename(f'{temp}/0.wav', outFile)
+        if(keepTracksSep):
+            log.warning("Audio files can't have multiple tracks.")
+        else:
+            pass
+            # TODO: combine all the audio tracks
+        move(f'{temp}/0.wav', outFile)
         return None
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
@@ -88,8 +91,15 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
         cmd.extend(['-i', f'{temp}/spedup.mp4'])
         for i in range(tracks):
             cmd.extend(['-map', f'{i}:a:0'])
-        cmd.extend(['-map', f'{tracks}:v:0', '-b:v', vbitrate, '-c:v', vcodec,
-            '-movflags', '+faststart', outFile])
+
+        cmd.extend(['-map', f'{tracks}:v:0', '-c:v', vcodec])
+        if(vbitrate is None):
+            cmd.extend(['-crf', '15'])
+        else:
+            cmd.extend(['-b:v', vbitrate])
+        if(tune != 'none'):
+            cmd.extend(['-tune', tune])
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile])
         if(debug):
             cmd.extend(['-hide_banner'])
         else:
@@ -108,7 +118,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
                 cmd.extend(['-nostats', '-loglevel', '0'])
             subprocess.call(cmd)
         else:
-            os.rename(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
+            move(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
 
 
         def pipeToConsole(myCommands):
@@ -118,9 +128,16 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
             return stdout.decode()
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-b:v', vbitrate, '-c:v', vcodec, '-movflags',
-            '+faststart', outFile, '-hide_banner']
+            f'{temp}/spedup.mp4', '-c:v', vcodec]
+        if(vbitrate is None):
+            cmd.extend(['-crf', '15'])
+        else:
+            cmd.extend(['-b:v', vbitrate])
+        if(tune != 'none'):
+            cmd.extend(['-tune', tune])
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile, '-hide_banner'])
 
+        log.debug(cmd)
         message = pipeToConsole(cmd)
         log.debug('')
         log.debug(message)
