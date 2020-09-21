@@ -134,7 +134,7 @@ def main():
     add_argument('--video_codec', '-vcodec',
         help='set the video codec for the output file.')
     add_argument('--preset', '-p', default='medium',
-        choices=['ultrafast', 'superfast', 'faster', 'fast', 'medium',
+        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
         help='set the preset for ffmpeg to help save file size or increase quality.')
     add_argument('--tune', default='none',
@@ -147,6 +147,10 @@ def main():
     add_argument('--cut_out', nargs='*',
         help='the range (in seconds) that should be cut out completely, '\
             'regardless of anything else. (uses range syntax)')
+
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+    # Fixes pip not able to find other included modules.
+    sys.path.append(os.path.abspath(dirPath))
 
     from usefulFunctions import Log
 
@@ -244,10 +248,6 @@ def main():
                 setattr(self, optionList, myList)
 
     args = parse_options(sys.argv[1:], Log(3), options)
-
-    dirPath = os.path.dirname(os.path.realpath(__file__))
-    # Fixes pip not able to find other included modules.
-    sys.path.append(os.path.abspath(dirPath))
 
     # Print help screen for entire program.
     if(args.help):
