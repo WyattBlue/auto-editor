@@ -6,14 +6,14 @@ import os
 import re
 import sys
 import time
-import argparse
+import difflib
 import platform
 import tempfile
 import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w36a'
+version = '20w38a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -50,86 +50,229 @@ def ffmpegFPS(ffmpeg, path, log):
         return 30
 
 def main():
-    parser = argparse.ArgumentParser(prog='Auto-Editor', usage='auto-editor [input] [options]')
+    options = []
+    option_names = []
 
-    basic = parser.add_argument_group('Basic Options')
-    basic.add_argument('input', nargs='*',
-        help='the path to the file(s), folder, or url you want edited.')
-    basic.add_argument('--frame_margin', '-m', type=int, default=6, metavar='6',
+    def add_argument(*names, nargs=1, type=str, default=None,
+        action='default', range=None, choices=None, help='', extra=''):
+        nonlocal options
+        nonlocal option_names
+
+        newDic = {}
+        newDic['names'] = names
+        newDic['nargs'] = nargs
+        newDic['type'] = type
+        newDic['default'] = default
+        newDic['action'] = action
+        newDic['help'] = help
+        newDic['extra'] = extra
+        newDic['range'] = range
+        newDic['choices'] = choices
+        options.append(newDic)
+        option_names = option_names + list(names)
+
+
+    add_argument('(input)', nargs='*',
+        help='the path to a file, folder, or url you want edited.')
+    add_argument('--help', '-h', action='store_true',
+        help='print this message and exit.')
+
+    add_argument('--frame_margin', '-m', type=int, default=6, range='0 to Infinity',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
-    basic.add_argument('--silent_threshold', '-t', type=float_type, default=0.04, metavar='0.04',
-        help='set the volume that frames audio needs to surpass to be "loud". (0-1)')
-    basic.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00, metavar='1',
+    add_argument('--silent_threshold', '-t', type=float_type, default=0.04, range='0 to 1',
+        help='set the volume that frames audio needs to surpass to be "loud".')
+    add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
+        range='0 to 999999',
         help='set the speed that "loud" sections should be played at.')
-    basic.add_argument('--silent_speed', '-s', type=float_type, default=99999, metavar='99999',
+    add_argument('--silent_speed', '-s', type=float_type, default=99999, range='0 to 99999',
         help='set the speed that "silent" sections should be played at.')
-    basic.add_argument('--output_file', '-o', nargs='*', metavar='',
+    add_argument('--output_file', '-o', nargs='*',
         help='set the name(s) of the new output.')
 
-    advance = parser.add_argument_group('Advanced Options')
-    advance.add_argument('--no_open', action='store_true',
+    add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    advance.add_argument('--min_clip_length', '-mclip', type=int, default=3, metavar='3',
+    add_argument('--min_clip_length', '-mclip', type=int, default=3, range='0 to Infinity',
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    advance.add_argument('--min_cut_length', '-mcut', type=int, default=6, metavar='6',
+    add_argument('--min_cut_length', '-mcut', type=int, default=6, range='0 to Infinity',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
-    advance.add_argument('--combine_files', action='store_true',
+    add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
-    advance.add_argument('--preview', action='store_true',
+    add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
 
-    cutting = parser.add_argument_group('Cutting Options')
-    cutting.add_argument('--cut_by_this_audio', '-ca', type=file_type, metavar='',
+    add_argument('--cut_by_this_audio', '-ca', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
-    cutting.add_argument('--cut_by_this_track', '-ct', type=int, default=0, metavar='0',
+    add_argument('--cut_by_this_track', '-ct', type=int, default=0,
+        range='0 to the number of audio tracks',
         help='base cuts by a different audio track in the video.')
-    cutting.add_argument('--cut_by_all_tracks', '-cat', action='store_true',
+    add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
-    cutting.add_argument('--keep_tracks_seperate', action='store_true',
+    add_argument('--keep_tracks_seperate', action='store_true',
         help="don't combine audio tracks when exporting.")
 
-    debug = parser.add_argument_group('Developer/Debugging Options')
-    debug.add_argument('--my_ffmpeg', action='store_true',
+    add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
-    debug.add_argument('--version', action='store_true',
+    add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
-    debug.add_argument('--debug', '--verbose', action='store_true',
+    add_argument('--debug', '--verbose', action='store_true',
         help='show helpful debugging values.')
 
-    misc = parser.add_argument_group('Export Options')
-    misc.add_argument('--export_as_audio', '-exa', action='store_true',
+    # TODO: add export_as_video
+    add_argument('--export_as_audio', '-exa', action='store_true',
         help='export as a WAV audio file.')
-    misc.add_argument('--export_to_premiere', '-exp', action='store_true',
+    add_argument('--export_to_premiere', '-exp', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
-    misc.add_argument('--export_to_resolve', '-exr', action='store_true',
+    add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
-    size = parser.add_argument_group('Size Options')
-    size.add_argument('--video_bitrate', '-vb', metavar='',
+    add_argument('--video_bitrate', '-vb',
         help='set the number of bits per second for video.')
-    size.add_argument('--audio_bitrate', '-ab', metavar='',
+    add_argument('--audio_bitrate', '-ab',
         help='set the number of bits per second for audio.')
-    size.add_argument('--sample_rate', '-r', type=sample_rate_type, metavar='',
+    add_argument('--sample_rate', '-r', type=sample_rate_type,
         help='set the sample rate of the input and output videos.')
-    size.add_argument('--video_codec', '-vcodec', metavar='',
+    add_argument('--video_codec', '-vcodec',
         help='set the video codec for the output file.')
+    add_argument('--preset', '-p', default='medium',
+        choices=['ultrafast', 'superfast', 'faster', 'fast', 'medium',
+            'slow', 'slower', 'veryslow'],
+        help='set the preset for ffmpeg to help save file size or increase quality.')
+    add_argument('--tune', default='none',
+        choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
+            'zerolatency', 'none'],
+        help='set the tune for ffmpeg to help compress video better.')
 
-    args = parser.parse_args()
+    add_argument('--ignore', nargs='*',
+        help="the range (in seconds) that shouldn't be edited at all. (uses range syntax)")
+    add_argument('--cut_out', nargs='*',
+        help='the range (in seconds) that should be cut out completely, '\
+            'regardless of anything else. (uses range syntax)')
+
+    from usefulFunctions import Log
+
+    class parse_options():
+        def __init__(self, userArgs, log, *args):
+            # Set the default options.
+            for options in args:
+                for option in options:
+                    key = option['names'][0].replace('-', '')
+                    if(option['action'] == 'store_true'):
+                        value = False
+                    elif(option['nargs'] != 1):
+                        value = []
+                    else:
+                        value = option['default']
+                    setattr(self, key, value)
+
+            def get_option(item, the_args):
+                for options in the_args:
+                    for option in options:
+                        if(item in option['names']):
+                            return option
+                return None
+
+            # Figure out attributes changed by user.
+            myList = []
+            settingInputs = True
+            optionList = 'input'
+            i = 0
+            while i < len(userArgs):
+                item = userArgs[i]
+                if(i == len(userArgs) - 1):
+                    nextItem = None
+                else:
+                    nextItem = userArgs[i+1]
+
+                option = get_option(item, args)
+
+                if(option is not None):
+                    if(optionList is not None):
+                        setattr(self, optionList, myList)
+                    settingInputs = False
+                    optionList = None
+                    myList = []
+
+                    key = option['names'][0].replace('-', '')
+
+                    # show help for specific option.
+                    if(nextItem == '-h' or nextItem == '--help'):
+                        print(' ', ', '.join(option['names']))
+                        print('   ', option['help'])
+                        print('   ', option['extra'])
+                        if(option['action'] == 'default'):
+                            print('    type:', option['type'].__name__)
+                            print('    default:', option['default'])
+                            if(option['range'] is not None):
+                                print('    range:', option['range'])
+                            if(option['choices'] is not None):
+                                print('    choices:', ', '.join(option['choices']))
+                        else:
+                            print(f'    type: flag')
+                        sys.exit()
+
+                    if(option['nargs'] != 1):
+                        settingInputs = True
+                        optionList = key
+                    elif(option['action'] == 'store_true'):
+                        value = True
+                    else:
+                        try:
+                            # Convert to correct type.
+                            value = option['type'](nextItem)
+                        except:
+                            typeName = option['type'].__name__
+                            log.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
+                        if(option['choices'] is not None):
+                            if(value not in option['choices']):
+                                log.error(f'{value} is not a choice for {option}')
+                        i += 1
+                    setattr(self, key, value)
+                else:
+                    if(settingInputs and not item.startswith('-')):
+                        # Input file names
+                        myList.append(item)
+                    else:
+                        # Unknown Option!
+                        hmm = difflib.get_close_matches(item, option_names)
+                        potential_options = ', '.join(hmm)
+                        append = ''
+                        if(hmm != []):
+                            append = f'\n\n    Did you mean:\n        {potential_options}'
+                        log.error(f'Unknown option: {item}{append}')
+                i += 1
+            if(settingInputs):
+                setattr(self, optionList, myList)
+
+    args = parse_options(sys.argv[1:], Log(3), options)
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    # fixes pip not able to find other included modules.
+    # Fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
+
+    # Print help screen for entire program.
+    if(args.help):
+        for option in options:
+            print(' ', ', '.join(option['names']) + ':', option['help'])
+        print('\nHave an issue? Make an issue. '\
+            'Visit https://github.com/wyattblue/auto-editor/issues')
+        sys.exit()
 
     if(args.version):
         print('Auto-Editor version', version)
         sys.exit()
 
-    if(args.export_to_premiere):
-        print('Exporting to Adobe Premiere Pro XML file.')
-    if(args.export_to_resolve):
-        print('Exporting to DaVinci Resolve XML file.')
-    if(args.export_as_audio):
-        print('Exporting as audio.')
+    from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
+    from wavfile import read, write
+
+    if(not args.preview):
+        if(args.export_to_premiere):
+            conwrite('Exporting to Adobe Premiere Pro XML file.')
+        elif(args.export_to_resolve):
+            conwrite('Exporting to DaVinci Resolve XML file.')
+        elif(args.export_as_audio):
+            conwrite('Exporting as audio.')
+        else:
+            conwrite('Starting.')
 
     newF = None
     newP = None
@@ -160,7 +303,6 @@ def main():
         if(args.input == []):
             sys.exit()
 
-    from usefulFunctions import Log
     log = Log(3 if args.debug else 2)
 
     if(is64bit == '32-bit'):
@@ -172,9 +314,7 @@ def main():
         log.error('Frame margin cannot be negative.')
 
     if(args.input == []):
-        log.error('The following arguments are required: input\n' \
-            'In other words, you need the path to a video or an audio file ' \
-            'so that auto-editor can do the work for you.')
+        log.error('You need the (input) argument so that auto-editor can do the work for you.')
 
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
@@ -238,9 +378,6 @@ def main():
     speeds = [args.silent_speed, args.video_speed]
 
     startTime = time.time()
-
-    from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
-    from wavfile import read, write
 
     numCuts = 0
     for i, INPUT_FILE in enumerate(inputList):
@@ -309,26 +446,9 @@ def main():
                     vcodec = 'copy'
                     log.warning("Couldn't automatically detect the video codec.")
 
-            vbit = args.video_bitrate
-            if(vbit is None):
-                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                    'v:0', '-show_entries', 'stream=bit_rate', '-of',
-                    'compact=p=0:nk=1', INPUT_FILE])
-                try:
-                    vbit = int(output)
-                except:
-                    log.warning("Couldn't automatically detect video bitrate.")
-                    vbit = '500k'
-                    log.debug('Setting vbit to ' + vbit)
-                else:
-                    vbit += 300 * 1000 # Add more for better quality.
-                    vbit = str(round(vbit / 1000)) + 'k'
-            else:
-                vbit = str(vbit)
-                if(vcodec == 'copy'):
-                    log.warning('Your bitrate will not be applied because' \
+            if(args.video_bitrate is not None and vcodec == 'copy'):
+                log.warning('Your bitrate will not be applied because' \
                         ' the video codec is "copy".')
-            args.video_bitrate = vbit
 
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', args.audio_bitrate,
@@ -359,7 +479,8 @@ def main():
                     log.error('Audio track not found!')
 
         chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
-            args.frame_margin, args.min_clip_length, args.min_cut_length, log)
+            args.frame_margin, args.min_clip_length, args.min_cut_length,
+            args.ignore, args.cut_out, log)
 
         clips = []
         for chunk in chunks:
@@ -414,7 +535,7 @@ def main():
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
             args.keep_tracks_seperate, vcodec, fps, args.export_as_audio,
-            args.video_bitrate, log)
+            args.video_bitrate, args.preset, args.tune, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'The file {newOutput} was not created.')
