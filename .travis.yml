@@ -27,4 +27,4 @@ script:
  - python3 auto_editor/__main__.py example.mp4 --preview
  - python3 auto_editor/__main__.py example.mp4 --video_codec h264
  - python3 auto_editor/__main__.py example.mp4 --preset veryfast
- - python3 auto_editor/__main__.py example.mp4 --cut_off 0-5.3
+ - python3 auto_editor/__main__.py example.mp4 --cut_out 0-5.3
