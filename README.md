@@ -9,13 +9,13 @@
 Auto-Editor has a powerful suite of features to make your life easy, including:
 
 <h3 align="center">Using URLs as input directly</h3>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/download_url.png" width="600" title="Supports other websites too! Not just YouTube."></p>
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/download_url.png" width="600" title="Supports other websites too! Not just YouTube."></p>
 
 <h3 align="center">Exporting to Adobe Premiere and DaVinci Resolve</h2>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/premiere_editing.png" width="700" title="Final Cut Pro and a few others might also work."></p>
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/premiere_editing.png" width="700" title="Final Cut Pro and a few others might also work."></p>
 
 <h3 align="center">Cross Platform Support</h3>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/experimental/resources/cross_platform.png" width="600" title="and chromeOS, but they are tricky to set up."></p>
+<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/cross_platform.png" width="600" title="and chromeOS, but they are tricky to set up."></p>
 
 ## New Features
 The help option has been changed so that it can be chained to any option and it will give more information about that option.
