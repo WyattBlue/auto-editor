@@ -137,7 +137,7 @@ def main():
         choices=['ultrafast', 'superfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
         help='set the preset for ffmpeg to help save file size or increase quality.')
-    add_argument('--tune', '-t', default='none',
+    add_argument('--tune', default='none',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none'],
         help='set the tune for ffmpeg to help compress video better.')
@@ -149,12 +149,9 @@ def main():
             'regardless of anything else. (uses range syntax)')
 
     from usefulFunctions import Log
-    prelog = Log(3)
-
 
     class parse_options():
         def __init__(self, userArgs, log, *args):
-
             # Set the default options.
             for options in args:
                 for option in options:
@@ -224,10 +221,10 @@ def main():
                             value = option['type'](nextItem)
                         except:
                             typeName = option['type'].__name__
-                            prelog.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
+                            log.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
                         if(option['choices'] is not None):
                             if(value not in option['choices']):
-                                prelog.error(f'{value} is not a choice for {option}')
+                                log.error(f'{value} is not a choice for {option}')
                         i += 1
                     setattr(self, key, value)
                 else:
@@ -246,10 +243,10 @@ def main():
             if(settingInputs):
                 setattr(self, optionList, myList)
 
-    args = parse_options(sys.argv[1:], prelog, options)
+    args = parse_options(sys.argv[1:], Log(3), options)
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    # fixes pip not able to find other included modules.
+    # Fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
 
     # Print help screen for entire program.

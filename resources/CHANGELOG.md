@@ -1,25 +1,25 @@
 # Auto-Editor Change Log
 
 ## Version 20w38a
-* argparse has been replaced with a custom parser that can be expanded upon more easily one change that has is the ability for the help option to give specific instrutions if it's next to another option.
+* argparse has been replaced with a custom parser that can be expanded upon more easily one change that has is the ability for the help option to give specific instructions if it's next to another option.
 * the --preset, --tune, --ignore and --cut_out options have been added.
 * the default way the video is compressed has been changed so it now uses crf instead of a video bitrate to shrink the file size. The quality should be a lot better now.
 * fixed a bug where the program would crash if the output folder is on another drive.
 
 ## Version 20w36a
-* Detecting Video bitrate has been made much more accurate.
+* Detecting Fixed bug wear auto-editor was applying the video bitrate with the audio bitrate value.
 * Changed how audio files are combined internally so `--cut_all_tracks` works every time.
 * Exporting to Premiere Pro now supports two audio tracks. (More support will come later.)
 * Folder Inputs have been ridden off errors and are now tested with TravisCI.
 
 ## Version 20w34a Hotfix
 * A critical bug is that causes a failure to convert a video has been mitigated.
-* The default bitrate was increased because it was very obvious that the ouput hadbeen compressed.
+* The default bitrate has been increased.
 * The "made X cuts" message will now only show when exporting to premiere or resolve.I found this message to be more annoying than helpful most of the time and you can use`--preview` to get that same information.
 
 ## Version 20w34a
 * Auto-Editor detects the video codec correctly in more situations.
-* Auto-Editor uses the inputs video and audiobitrate's as the default instead of an arbitrary value.
+* Auto-Editor uses the inputs video and audio bitrate's as the default instead of an arbitrary value.
 
 ## Version 20w33a
 * the default for `--sample_rate` is now the same as the input.
@@ -48,7 +48,7 @@
 * Renamed originalMethod.py to advancedVideo.py. Similarly, originalVid.py has been renamed to splitVid.py
 
 ## Version 20w30b Hotfix
-* fixed macOS FFmpeg binaries not working unless the user already installed ffmpeg at some point.
+* fixed macOS FFmpeg binaries not working unless the user already installed FFmpeg at some point.
 * fixed premiere.py searching for the width and height of an audio file.
 
 ## Version 20w30b
@@ -56,9 +56,9 @@
 * Auto-Editor is now a proper command line program. You can now download **everything** with pip.
 
 ## Version 20w30a
-* Fixed ffprobe bug that was effecting Windows users.
+* Fixed FFprobe bug that was effecting Windows users.
 * Added support for audio tracks for `--export_to_premiere`
-* Files in the media folder moved to resources. Changelog and credits moved to resources.
+* Files in the media folder moved to resources. Change-log and credits moved to resources.
 
 ## Version 20w29b
 * `--preview` how displays the correct duration for the new output.
@@ -67,8 +67,7 @@
 * The macOS binaries have been compressed in the 7zip format and should be extracted with Archive Utility.
 
 ### Package Change
- * audiotsm removed.
- * audiotsm2 added.
+ * audiotsm has been changed to audiotsm2.
 
 ## Version 20w29a [Yanked]
 * ffmpeg binaries are included in auto-editor.
@@ -78,8 +77,7 @@
 * `--frame_rate` flag has been removed.
 * Changelog added.
 
-> This build had ffmpeg binaries that had licenses that were incompatabile with this project. Those binaries have been removed from history. Please use 20w29b instead.
-
+> This build had FFmpeg binaries that had licenses that were incompatible with this project. Those binaries have been removed from history. Please use 20w29b instead.
 
 ## Version 20w28a
 
@@ -114,15 +112,15 @@
 
 * `--preview` flag added.
 * **fastVideo.py** and fastVideoPlus.py now supports multiple audio tracks.
-* **Fixed** bug where fastVideoPlus.py did not give enough space for the new audio to take.
+* Fixed bug where fastVideoPlus.py did not give enough space for the new audio to take.
 * `--frame_quality` has now been removed.
 * `--get_frame_rate` aka, --get_auto_fps has been removed.
 
 
 ## [Version 20w26a](https://github.com/WyattBlue/auto-editor/tree/48c7864386b35c6cadc74e120ecf51b790e418af)
 
-* **fastVideoPlus.py** supports more video speeds.
-* **Default** sample rate changed from 44100 to 48000. (44.1 kHz -> 48.0 kHz)
+* fastVideoPlus.py supports more video speeds.
+* Default sample rate changed from 44100 to 48000. (44.1 kHz -> 48.0 kHz)
 * `--frame_quality` default set to highest and marked as depreciated.
 
 
