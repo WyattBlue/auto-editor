@@ -29,7 +29,12 @@ auto-editor --video_codec --help
     default: medium
     choices: ultrafast, superfast, faster, fast, medium, slow, slower, veryslow
 ```
-* the --preset, --tune, --ignore and --cut_out options have been added.
+* the options `--preset` and `--tune` have been added. They are for allowing finer compression with FFmpeg and they work pretty much the same way.
+
+`--ignore` and `--cut_out` options have been added. Cut out means get rid of this part of the video. Ignore means ignore editing this section, don't cut anything out. Both use a new data type called **range syntax**,
+so `0-20` selects the first 20 seconds (not frames) of a video, and `45-55.3` selects the 45th second to the 55.3 second. There's also a special value that is the length of the video. `30-end` selects the 30th second all the way to the end of the video.
+
+
 * the default way the video is compressed has been changed so it now uses crf instead of a video bitrate to shrink the file size. The quality should be a lot better now.
 * fixed a bug where the program would crash if the output folder is on another drive.
 
