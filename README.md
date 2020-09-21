@@ -55,7 +55,7 @@ auto-editor example.mp4 --frame_margin 8
 [See Installing](https://github.com/WyattBlue/auto-editor/blob/master/resources/installing.md)
 
 ## Documentation
-* [See docs](https://github.com/WyattBlue/auto-editor/blob/master/resources/docs.md)
+* [See Docs](https://github.com/WyattBlue/auto-editor/blob/master/resources/docs.md)
 * [See Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
 ## Help
