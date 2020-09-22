@@ -478,9 +478,9 @@ def main():
                 else:
                     log.error('Audio track not found!')
 
-        chunks = getAudioChunks(audioData, sampleRate, fps, args.silent_threshold,
-            args.frame_margin, args.min_clip_length, args.min_cut_length,
-            args.ignore, args.cut_out, log)
+        chunks, includeFrame = getAudioChunks(audioData, sampleRate, fps,
+            args.silent_threshold, args.frame_margin, args.min_clip_length,
+            args.min_cut_length, args.ignore, args.cut_out, log)
 
         clips = []
         for chunk in chunks:
@@ -532,7 +532,7 @@ def main():
             continue
 
         from fastVideo import fastVideo
-        fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, tracks,
+        fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, includeFrame, speeds, tracks,
             args.audio_bitrate, sampleRate, args.debug, TEMP,
             args.keep_tracks_seperate, vcodec, fps, args.export_as_audio,
             args.video_bitrate, args.preset, args.tune, log)

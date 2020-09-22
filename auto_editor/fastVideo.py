@@ -17,8 +17,9 @@ import tempfile
 import subprocess
 from shutil import rmtree, move
 
-def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, samplerate,
-    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, preset, tune, log):
+def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, abitrate,
+    samplerate, debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate,
+    preset, tune, log):
 
     if(not os.path.isfile(vidFile)):
         log.error('Could not find file ' + vidFile)
@@ -45,33 +46,31 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
         return None
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
-    totalFrames = chunks[len(chunks) - 1][1]
+
+    totalFrames = np.where(includeFrame == 1)[0][-1]
+
     beginTime = time.time()
 
     remander = 0
     framesWritten = 0
+    cframe = 0
 
     while cap.isOpened():
+        #cap.set()
         ret, frame = cap.read()
-        if(not ret):
+        if(not ret or cframe > totalFrames):
             break
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
-        state = None
-        for chunk in chunks:
-            if(cframe >= chunk[0] and cframe <= chunk[1]):
-                state = chunk[2]
-                break
+        state = includeFrame[cframe]
+        mySpeed = speeds[state]
 
-        if(state is not None):
-            mySpeed = speeds[state]
-
-            if(mySpeed != 99999):
-                doIt = (1 / mySpeed) + remander
-                for __ in range(int(doIt)):
-                    out.write(frame)
-                    framesWritten += 1
-                remander = doIt % 1
+        if(mySpeed != 99999):
+            doIt = (1 / mySpeed) + remander
+            for __ in range(int(doIt)):
+                out.write(frame)
+                framesWritten += 1
+            remander = doIt % 1
 
         progressBar(cframe, totalFrames, beginTime, title='Creating new video')
 

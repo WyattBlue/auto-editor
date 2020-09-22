@@ -152,7 +152,7 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
             chunks.append([startP, j, includeFrame[j-1]])
             startP = j
     chunks.append([startP, audioFrameCount, includeFrame[j]])
-    return chunks
+    return chunks, includeFrame
 
 
 def prettyTime(newTime):
