@@ -47,16 +47,23 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
 
-    totalFrames = np.where(includeFrame == 1)[0][-1]
+    if(speeds[0] == 99999 and speeds[1] != 99999):
+        totalFrames = int(np.where(includeFrame == 1)[0][-1])
+        cframe = int(np.where(includeFrame == 1)[0][0])
+    elif(speeds[0] != 99999 and speeds[1] == 99999):
+        totalFrames = int(np.where(includeFrame == 0)[0][-1])
+        cframe = int(np.where(includeFrame == 0)[0][0])
+    else:
+        totalFrames = chunks[len(chunks) - 1][1]
+        cframe = 0
 
     beginTime = time.time()
-
+    starting = cframe
+    cap.set(cv2.CAP_PROP_POS_FRAMES, cframe)
     remander = 0
     framesWritten = 0
-    cframe = 0
 
     while cap.isOpened():
-        #cap.set()
         ret, frame = cap.read()
         if(not ret or cframe > totalFrames):
             break
@@ -72,7 +79,8 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
                 framesWritten += 1
             remander = doIt % 1
 
-        progressBar(cframe, totalFrames, beginTime, title='Creating new video')
+        progressBar(cframe - starting, totalFrames - starting, beginTime,
+            title='Creating new video')
 
     conwrite('Writing the output file.')
 
