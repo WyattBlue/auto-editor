@@ -259,9 +259,9 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
 
 
             # Linking for video blocks
-            for i in range(3):
+            for i in range(max(3, tracks + 1)):
                 outfile.write('\t\t\t\t\t\t<link>\n')
-                outfile.write(f'\t\t\t\t\t\t\t<linkclipref>clipitem-{(i*(len(clips)+1))+j}</linkclipref>\n')
+                outfile.write(f'\t\t\t\t\t\t\t<linkclipref>clipitem-{(i*(len(clips)))+j+1}</linkclipref>\n')
                 if(i == 0):
                     outfile.write('\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
                 else:
@@ -271,7 +271,7 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
                 else:
                     outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
                 outfile.write(f'\t\t\t\t\t\t\t<clipindex>{j+1}</clipindex>\n')
-                if(i == 1 or i == 2):
+                if(i > 0):
                     outfile.write('\t\t\t\t\t\t\t<groupindex>1</groupindex>\n')
                 outfile.write('\t\t\t\t\t\t</link>\n')
             outfile.write('\t\t\t\t\t</clipitem>\n')
@@ -295,7 +295,10 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
             outfile.write('\t\t\t\t<track currentExplodedTrackIndex="0" premiereTrackType="Stereo">\n')
 
             for j, clip in enumerate(clips):
-                outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{len(clips)+1+j}" premiereChannelType="stereo">\n')
+
+                clipItemNum = len(clips) + 1 + j + (t * len(clips))
+
+                outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{clipItemNum}" premiereChannelType="stereo">\n')
                 outfile.write(f'\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
                 outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
 
@@ -309,7 +312,7 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
                 outfile.write(f'\t\t\t\t\t\t<in>{int(clip[0] / (clip[2] / 100))}</in>\n')
                 outfile.write(f'\t\t\t\t\t\t<out>{int(clip[1] / (clip[2] / 100))}</out>\n')
 
-                if(t > 1):
+                if(t > 0):
                     outfile.write(f'\t\t\t\t\t\t<file id="file-{t+1}">\n')
                     outfile.write(f'\t\t\t\t\t\t\t<name>{name}{t}</name>\n')
                     outfile.write(f'\t\t\t\t\t\t\t<pathurl>{trackurls[t]}</pathurl>\n')
@@ -333,66 +336,17 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
                 outfile.write('\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n')
                 outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
                 outfile.write('\t\t\t\t\t\t</sourcetrack>\n')
+                outfile.write('\t\t\t\t\t\t<labels>\n')
+                outfile.write('\t\t\t\t\t\t\t<label2>Iris</label2>\n')
+                outfile.write('\t\t\t\t\t\t</labels>\n')
 
                 # Add speed effect for audio blocks
                 if(clip[2] != 100):
                     outfile.write(speedup(clip[2]))
 
-                for i in range(3):
-                    outfile.write('\t\t\t\t\t\t<link>\n')
-                    outfile.write(f'\t\t\t\t\t\t\t<linkclipref>clipitem-{(i*(len(clips)+1))+j}</linkclipref>\n')
-                    if(i == 0):
-                        outfile.write('\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
-                    else:
-                        outfile.write('\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n')
-
-                    if(i == 2):
-                        outfile.write('\t\t\t\t\t\t\t<trackindex>2</trackindex>\n')
-                    else:
-                        outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
-
-                    outfile.write(f'\t\t\t\t\t\t\t<clipindex>{j+1}</clipindex>\n')
-
-                    if(i == 1 or i == 2):
-                        outfile.write('\t\t\t\t\t\t\t<groupindex>1</groupindex>\n')
-                    outfile.write('\t\t\t\t\t\t</link>\n')
                 outfile.write('\t\t\t\t\t</clipitem>\n')
             outfile.write('\t\t\t\t\t<outputchannelindex>1</outputchannelindex>\n')
             outfile.write('\t\t\t\t</track>\n')
-
-        # if(tracks > 1):
-        #     total = 0
-        #     startClip = len(clips) * 2
-        #     for j, clip in enumerate(clips):
-        #         outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{startClip+1+j}" premiereChannelType="stereo">\n')
-        #         outfile.write(f'\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
-        #         outfile.write(f'\t\t\t\t\t\t<name>{name}2</name>\n')
-
-        #         myStart = int(total)
-        #         total += (clip[1] - clip[0]) / (clip[2] / 100)
-        #         myEnd = int(total)
-
-        #         outfile.write(f'\t\t\t\t\t\t<start>{myStart}</start>\n')
-        #         outfile.write(f'\t\t\t\t\t\t<end>{myEnd}</end>\n')
-
-        #         outfile.write(f'\t\t\t\t\t\t<in>{int(clip[0] / (clip[2] / 100))}</in>\n')
-        #         outfile.write(f'\t\t\t\t\t\t<out>{int(clip[1] / (clip[2] / 100))}</out>\n')
-
-        #         outfile.write('\t\t\t\t\t\t<sourcetrack>\n')
-        #         outfile.write('\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n')
-        #         outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
-        #         outfile.write('\t\t\t\t\t\t</sourcetrack>\n')
-        #         outfile.write('\t\t\t\t\t\t<labels>\n')
-        #         outfile.write('\t\t\t\t\t\t\t<label2>Iris</label2>\n')
-        #         outfile.write('\t\t\t\t\t\t</labels>\n')
-
-        #         # Add speed effect for audio blocks
-        #         if(clip[2] != 100):
-        #             outfile.write(speedup(clip[2]))
-
-        #         outfile.write('\t\t\t\t\t</clipitem>\n')
-        #     outfile.write('\t\t\t\t\t<outputchannelindex>1</outputchannelindex>\n')
-        #     outfile.write('\t\t\t\t</track>\n')
 
         outfile.write('\t\t\t</audio>\n')
         outfile.write('\t\t</media>\n')
