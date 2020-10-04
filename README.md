@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg"></a>
 <img src="https://img.shields.io/badge/version-20w38a-blue.svg">
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/auto-editor_banner.png" width="700"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/resources/auto-editor_banner.png" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and making cuts based off that information.
 
@@ -9,13 +9,13 @@
 Auto-Editor has a powerful suite of features to make your life easy, including:
 
 <h3 align="center">Using URLs as input directly</h3>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/download_url.png" width="600" title="Supports other websites too! Not just YouTube."></p>
+<p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/resources/download_url.png" width="600" title="Supports other websites too! Not just YouTube."></p>
 
 <h3 align="center">Exporting to Adobe Premiere and DaVinci Resolve</h2>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/premiere_editing.png" width="700" title="Final Cut Pro and a few others might also work."></p>
+<p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/resources/premiere_editing.png" width="700" title="Final Cut Pro and a few others might also work."></p>
 
 <h3 align="center">Cross Platform Support</h3>
-<p align="center"><img src="https://github.com/WyattBlue/auto-editor/blob/master/resources/cross_platform.png" width="600" title="and chromeOS, but they are tricky to set up."></p>
+<p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/resources/cross_platform.png" width="600" title="and chromeOS, but they are tricky to set up."></p>
 
 ## New Features
 The help option has been changed so that it can be chained to any option and it will give more information about that option.
@@ -59,7 +59,9 @@ auto-editor example.mp4 --frame_margin 8
 * [See Changelog](https://github.com/WyattBlue/auto-editor/blob/master/resources/CHANGELOG.md) for all the differences between releases.
 
 ## Help
-The best way to contribute is to [fork auto-editor](https://github.com/WyattBlue/auto-editor/fork) and make changes there. Once you're happy with those changes, make a new pull request and type in a brief description on how you improved the code.
+The best way to help is to tell other people about this project. You may put something like Edited using auto-editor. (https://github.com/WyattBlue/auto-editor) in the video description.
+
+Auto-Editor is an open-source project so anyone can suggest changes, including you! Create a personal fork of the project, implement your fix/feature, then target the `experimental` branch if there is one, else go for `master`. 
 
 No change is too small whether that be a typo in the docs or a small improvement of code.
 

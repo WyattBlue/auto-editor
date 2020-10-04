@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w38a'
+version = '20w40a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -131,7 +131,7 @@ def main():
         help='set the number of bits per second for audio.')
     add_argument('--sample_rate', '-r', type=sample_rate_type,
         help='set the sample rate of the input and output videos.')
-    add_argument('--video_codec', '-vcodec',
+    add_argument('--video_codec', '-vcodec', default='uncompressed',
         help='set the video codec for the output file.')
     add_argument('--preset', '-p', default='medium',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
@@ -335,13 +335,16 @@ def main():
         elif(os.path.isfile(myInput)):
             inputList.append(myInput)
         elif(myInput.startswith('http://') or myInput.startswith('https://')):
-            print('URL detected, using youtube-dl to download from webpage.')
             basename = re.sub(r'\W+', '-', myInput)
-            cmd = ['youtube-dl', '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
-                   myInput, '--output', basename, '--no-check-certificate']
-            if(ffmpeg != 'ffmpeg'):
-                cmd.extend(['--ffmpeg-location', ffmpeg])
-            subprocess.call(cmd)
+
+            if(not os.path.isfile(basename + '.mp4')):
+                print('URL detected, using youtube-dl to download from webpage.')
+                cmd = ['youtube-dl', '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
+                       myInput, '--output', basename, '--no-check-certificate']
+                if(ffmpeg != 'ffmpeg'):
+                    cmd.extend(['--ffmpeg-location', ffmpeg])
+                subprocess.call(cmd)
+
             inputList.append(basename + '.mp4')
         else:
             log.error('Could not find file: ' + myInput)
@@ -436,19 +439,23 @@ def main():
                     f'There are only {tracks-1} tracks. (starting from 0)')
 
             vcodec = args.video_codec
-            if(vcodec is None):
+            if(vcodec == 'copy'):
                 output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
                 try:
                     matchDict = re.search(r'Video:\s(?P<video>\w+?)\s', output).groupdict()
                     vcodec = matchDict['video']
                     log.debug(vcodec)
                 except AttributeError:
-                    vcodec = 'copy'
-                    log.warning("Couldn't automatically detect the video codec.")
+                    vcodec = 'uncompressed'
+                    log.warning("Couldn't automatically detect video codec.")
 
-            if(args.video_bitrate is not None and vcodec == 'copy'):
+            if(args.video_bitrate is not None and vcodec == 'uncompressed'):
                 log.warning('Your bitrate will not be applied because' \
-                        ' the video codec is "copy".')
+                        ' the video codec is "uncompressed".')
+
+            if(vcodec == 'uncompressed'):
+                # FFmpeg copies the uncompressed output that cv2 spits out.
+                vcodec = 'copy'
 
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', args.audio_bitrate,
