@@ -58,8 +58,6 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
 
     audioFile = isAudioFile(myInput)
 
-
-    tracks = 3
     log.debug('tracks: ' + str(tracks))
     log.debug(os.path.dirname(os.path.abspath(myInput)))
 
@@ -73,18 +71,16 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
         hmm = name[:name.rfind('.')]
 
         newFolderName = os.path.join(inFolder, hmm + '_tracks')
-        # print(newFolderName)
-        # try:
-        #     os.mkdir(newFolderName)
-        # except OSError:
-        #     rmtree(newFolderName)
-        #     os.mkdir(newFolderName)
+        try:
+            os.mkdir(newFolderName)
+        except OSError:
+            rmtree(newFolderName)
+            os.mkdir(newFolderName)
 
         trackurls = [pathurl]
         for i in range(1, tracks):
-            print(i)
             trackurls.append(os.path.join(newFolderName, f'{i}.wav'))
-            # os.rename(trackurls[i], os.path.join(newFolderName, f'{i}.wav'))
+            os.rename(trackurls[i], os.path.join(newFolderName, f'{i}.wav'))
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
@@ -93,7 +89,6 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
     if(not audioFile):
         try:
             import cv2
-            conwrite('Grabbing video dimensions.')
 
             cap = cv2.VideoCapture(myInput)
             width = str(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))

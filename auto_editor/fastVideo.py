@@ -69,7 +69,11 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             break
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
-        state = includeFrame[cframe]
+        try:
+            state = includeFrame[cframe]
+        except IndexError:
+            state = 0
+
         mySpeed = speeds[state]
 
         if(mySpeed != 99999):
