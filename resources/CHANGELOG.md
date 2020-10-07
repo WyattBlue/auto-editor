@@ -1,5 +1,10 @@
 # Auto-Editor Change Log
 
+## Version 20w41a
+* Don't download video if video is already downloaded.
+* Changed how the copy codec works.
+* Added ability to add more than 2 audio tracks for Adobe Premiere Pro
+
 ## Version 20w38a
 * argparse has been replaced with a custom parser that can be expanded upon more easily one change that has is the ability for the help option to give specific instructions if it's next to another option.
 * the --preset, --tune, --ignore and --cut_out options have been added.
