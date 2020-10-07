@@ -15,12 +15,14 @@ def pip_version():
     # pip doesn't allow us to use standard version format (20w10a), so we have to
     # conform it to look like Semantic Versioning even though auto-editor does not
     # use that format.
-    return '20.38.1.1'
+    return '20.41.1.0'
 
 
 def changes():
     text = '''
-    *
+    * Don't download video if video is already downloaded.
+    * Changed how the copy codec works.
+    * Added ability to add more than 2 audio tracks for Adobe Premiere Pro
     '''
 
     text = text.replace('\n', '')
