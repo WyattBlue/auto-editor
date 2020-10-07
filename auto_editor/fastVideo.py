@@ -17,8 +17,9 @@ import tempfile
 import subprocess
 from shutil import rmtree, move
 
-def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, samplerate,
-    debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, preset, tune, log):
+def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, abitrate,
+    samplerate, debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate,
+    preset, tune, log):
 
     if(not os.path.isfile(vidFile)):
         log.error('Could not find file ' + vidFile)
@@ -45,35 +46,45 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, speeds, tracks, abitrate, sample
         return None
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
-    totalFrames = chunks[len(chunks) - 1][1]
-    beginTime = time.time()
 
+    if(speeds[0] == 99999 and speeds[1] != 99999):
+        totalFrames = int(np.where(includeFrame == 1)[0][-1])
+        cframe = int(np.where(includeFrame == 1)[0][0])
+    elif(speeds[0] != 99999 and speeds[1] == 99999):
+        totalFrames = int(np.where(includeFrame == 0)[0][-1])
+        cframe = int(np.where(includeFrame == 0)[0][0])
+    else:
+        totalFrames = chunks[len(chunks) - 1][1]
+        cframe = 0
+
+    beginTime = time.time()
+    starting = cframe
+    cap.set(cv2.CAP_PROP_POS_FRAMES, cframe)
     remander = 0
     framesWritten = 0
 
     while cap.isOpened():
         ret, frame = cap.read()
-        if(not ret):
+        if(not ret or cframe > totalFrames):
             break
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
-        state = None
-        for chunk in chunks:
-            if(cframe >= chunk[0] and cframe <= chunk[1]):
-                state = chunk[2]
-                break
+        try:
+            state = includeFrame[cframe]
+        except IndexError:
+            state = 0
 
-        if(state is not None):
-            mySpeed = speeds[state]
+        mySpeed = speeds[state]
 
-            if(mySpeed != 99999):
-                doIt = (1 / mySpeed) + remander
-                for __ in range(int(doIt)):
-                    out.write(frame)
-                    framesWritten += 1
-                remander = doIt % 1
+        if(mySpeed != 99999):
+            doIt = (1 / mySpeed) + remander
+            for __ in range(int(doIt)):
+                out.write(frame)
+                framesWritten += 1
+            remander = doIt % 1
 
-        progressBar(cframe, totalFrames, beginTime, title='Creating new video')
+        progressBar(cframe - starting, totalFrames - starting, beginTime,
+            title='Creating new video')
 
     conwrite('Writing the output file.')
 
