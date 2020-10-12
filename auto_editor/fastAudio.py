@@ -27,8 +27,6 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
         log.error('Could not find file ' + theFile)
 
     if(needConvert):
-        # Only print this here so other scripts can use this function.
-        print('Running from fastAudio.py')
 
         import tempfile
         from shutil import rmtree
