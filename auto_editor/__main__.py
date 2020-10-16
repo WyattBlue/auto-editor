@@ -401,17 +401,18 @@ def main():
         # Grab the audio bitrate from the input.
         abit = args.audio_bitrate
         if(abit is None):
-            output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                'a:0', '-show_entries', 'stream=bit_rate', '-of',
-                'compact=p=0:nk=1', INPUT_FILE])
-            try:
-                abit = int(output)
-            except:
-                log.warning("Couldn't automatically detect audio bitrate.")
-                abit = '500k'
-                log.debug('Setting audio bitrate to ' + abit)
-            else:
-                abit = str(round(abit / 1000)) + 'k'
+            if(not INPUT_FILE.endswith('.mkv')):
+                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
+                    'a:0', '-show_entries', 'stream=bit_rate', '-of',
+                    'compact=p=0:nk=1', INPUT_FILE])
+                try:
+                    abit = int(output)
+                except:
+                    log.warning("Couldn't automatically detect audio bitrate.")
+                    abit = '500k'
+                    log.debug('Setting audio bitrate to ' + abit)
+                else:
+                    abit = str(round(abit / 1000)) + 'k'
         else:
             abit = str(abit)
         args.audio_bitrate = abit
@@ -458,9 +459,12 @@ def main():
                 vcodec = 'copy'
 
             for trackNum in range(tracks):
-                cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', args.audio_bitrate,
-                '-ac', '2', '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
-                f'{TEMP}/{trackNum}.wav']
+
+                cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
+                if(args.audio_bitrate is not None):
+                    cmd.extend(['-ab', args.audio_bitrate])
+                cmd.extend(['-ac', '2', '-ar', str(args.sample_rate), '-map',
+                    f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:

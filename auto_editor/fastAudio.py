@@ -33,8 +33,10 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
 
         TEMP = tempfile.mkdtemp()
 
-        cmd = [ffmpeg, '-i', theFile, '-b:a', audioBit, '-ac', '2', '-ar',
-            str(samplerate), '-vn', f'{TEMP}/fastAud.wav']
+        cmd = [ffmpeg, '-i', theFile]
+        if(audioBit is not None):
+            cmd.extend(['-b:a', str(audioBit)])
+        cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{TEMP}/fastAud.wav'])
         if(not debug):
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
