@@ -24,7 +24,7 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
     needConvert, log, fps=30):
 
     if(not os.path.isfile(theFile)):
-        log.error('Could not find file ' + theFile)
+        log.error('fastAudio.py could not find file: ' + str(theFile))
 
     if(needConvert):
 

@@ -295,10 +295,13 @@ def main():
 
     if(args.debug):
         print('Python Version:', platform.python_version(), is64bit)
-        print('Platform:', platform.system())
+        print('Platform:', platform.system(), platform.release())
         # Platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
-
+        ffmpegVersion = pipeToConsole([ffmpeg, '-version']).split('\n')[0]
+        ffmpegVersion = ffmpegVersion.replace('ffmpeg version', '').strip()
+        ffmpegVersion = ffmpegVersion.split(' ')[0]
         print('FFmpeg path:', ffmpeg)
+        print('FFmpeg version:', ffmpegVersion)
         print('Auto-Editor version', version)
         if(args.input == []):
             sys.exit()
