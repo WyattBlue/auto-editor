@@ -7,6 +7,7 @@ python:
   - "3.6"
   - "3.7"
   - "3.8"
+  - "3.9"
 script:
  - python3 auto_editor/__main__.py --debug
  - python3 auto_editor/__main__.py --version

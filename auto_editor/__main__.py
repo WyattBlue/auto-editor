@@ -330,8 +330,7 @@ def main():
             def validFiles(path):
                 for f in os.listdir(path):
                     if(not f.startswith('.') and not f.endswith('.xml')
-                        and not f.endswith('.png') and not f.endswith('.md')
-                        and not os.path.isdir(f)):
+                        and not f.endswith('.png') and not f.endswith('.md')):
                         yield os.path.join(path, f)
 
             inputList += sorted(validFiles(myInput))
@@ -387,6 +386,8 @@ def main():
 
     numCuts = 0
     for i, INPUT_FILE in enumerate(inputList):
+        if(os.path.isdir(INPUT_FILE)):
+            continue
         newOutput = args.output_file[i]
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
