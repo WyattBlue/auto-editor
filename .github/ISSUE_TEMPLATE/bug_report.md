@@ -1,20 +1,22 @@
 ---
 name: Bug report
-about: Create a report to help us improve
+about: Create a report to help improve the program.
 title: ''
 labels: bug
 
 ---
 
-**Tell us what went wrong**
+**What went wrong**
 
-**Tell us if you were able to run the example video**
 
 ```
 Paste the terminal output here
 ```
 
-Run ``auto-editor.py --debug`` and paste the output.
+**Does the example video work? (if applicable)**
+
+
+**What does the program output when `--debug` is appended to your command/use case**
 
 ```
 output here:
