@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w41a'
+version = '20w42a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -140,7 +140,7 @@ def main():
     add_argument('--tune', default='none',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none'],
-        help='set the tune for ffmpeg to help compress video better.')
+        help='set the tune for ffmpeg to compress video better.')
 
     add_argument('--ignore', nargs='*',
         help="the range (in seconds) that shouldn't be edited at all. (uses range syntax)")
