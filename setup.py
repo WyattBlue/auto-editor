@@ -15,20 +15,7 @@ def pip_version():
     # pip doesn't allow us to use standard version format (20w10a), so we have to
     # conform it to look like Semantic Versioning even though auto-editor does not
     # use that format.
-    return '20.41.1.0'
-
-
-def changes():
-    text = '''
-    * Don't download video if video is already downloaded.
-    * Changed how the copy codec works.
-    * Added ability to add more than 2 audio tracks for Adobe Premiere Pro
-    '''
-
-    text = text.replace('\n', '')
-    text = text.replace('    ', '')
-    text = text.replace('*', '\n*')
-    return text
+    return '20.43.1.0'
 
 def numToNormal(text):
     """
@@ -44,8 +31,8 @@ def numToNormal(text):
         text += ' Hotfix'
     return text
 
-# Automatically replace outdated docs with correct one.
-if(sys.argv[-1] == 'makedocs'):
+if(sys.argv[-1] == 'publish'):
+
     vr = numToNormal(pip_version()) # proper version for docs
 
     lines = open('README.md').read().splitlines()
@@ -54,35 +41,12 @@ if(sys.argv[-1] == 'makedocs'):
         if(line.startswith('<img src="https://img.shields.io/badge/version-')):
             newDoc += '<img src="https://img.shields.io/badge/version-' + vr + '-blue.svg">\n'
             continue
-        if(line.startswith('## New in ')):
-            newDoc += '## New in ' + vr + changes() + '\n'
-            continue
         if(not line.startswith('* ')):
             newDoc += line + '\n'
 
     with open('README.md', 'w') as file:
         file.write(newDoc.rstrip('\n'))
 
-    lines = open('resources/CHANGELOG.md').read().splitlines()
-    newDoc = ''
-    checkNext = False
-    for line in lines:
-        if(checkNext):
-            if(line.startswith('## Version')):
-                checkNext = False
-                if(not line.startswith(f'## Version {vr}')):
-                    newDoc += f'## Version {vr}' + changes() + '\n\n'
-        newDoc += line + '\n'
-        if(line.startswith('# Auto-Editor Change Log')):
-            checkNext = True
-
-    with open('resources/CHANGELOG.md', 'w') as file:
-        file.write(newDoc.rstrip('\n'))
-
-    print(f'Done, rewritten docs to {vr}')
-    sys.exit()
-
-if(sys.argv[-1] == 'publish'):
     os.system('rm -rf build')
     os.system('rm -rf dist')
     os.system('python3 setup.py sdist bdist_wheel')
@@ -119,6 +83,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Programming Language :: Python :: Implementation :: IronPython',
