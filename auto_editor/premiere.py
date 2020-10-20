@@ -79,8 +79,10 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
 
         trackurls = [pathurl]
         for i in range(1, tracks):
-            trackurls.append(os.path.join(newFolderName, f'{i}.wav'))
-            os.rename(trackurls[i], os.path.join(newFolderName, f'{i}.wav'))
+            newtrack = os.path.join(newFolderName, f'{i}.wav')
+            os.rename(os.path.join(temp, f'{i}.wav'), newtrack)
+            trackurls.append(newtrack)
+
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic

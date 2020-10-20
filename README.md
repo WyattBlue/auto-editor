@@ -8,7 +8,7 @@
 
 Auto-Editor has a powerful set of features, including:
 
-<h3 align="center">Using URLs as input directly</h3>
+<h3 align="center">Download and Edit Videos in One Step</h3>
 <p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/resources/download_url.png" width="600" title="Supports other websites too! Not just YouTube."></p>
 
 <h3 align="center">Exporting to Adobe Premiere and DaVinci Resolve</h2>
@@ -32,13 +32,9 @@ auto-editor example.mp4 --frame_margin 8
 ## Installing
 [See Installing](https://github.com/WyattBlue/auto-editor/blob/master/resources/installing.md)
 
-## Documentation
-
 ## Help
 
-
-
-Auto-Editor is an open-source project so anyone can suggest changes, including you! Create a personal fork of the project, implement your fix/feature, then target the `experimental` branch if there is one, else go for `master`. 
+Auto-Editor is an open-source project so anyone can suggest changes, including you! Create a personal fork of the project, implement your fix/feature, then target the `experimental` branch if there is one, else go for `master`.
 
 No change is too small whether that be a typo in the docs or a small improvement of code.
 

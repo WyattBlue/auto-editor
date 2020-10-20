@@ -24,19 +24,19 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
     needConvert, log, fps=30):
 
     if(not os.path.isfile(theFile)):
-        log.error('Could not find file ' + theFile)
+        log.error('fastAudio.py could not find file: ' + str(theFile))
 
     if(needConvert):
-        # Only print this here so other scripts can use this function.
-        print('Running from fastAudio.py')
 
         import tempfile
         from shutil import rmtree
 
         TEMP = tempfile.mkdtemp()
 
-        cmd = [ffmpeg, '-i', theFile, '-b:a', audioBit, '-ac', '2', '-ar',
-            str(samplerate), '-vn', f'{TEMP}/fastAud.wav']
+        cmd = [ffmpeg, '-i', theFile]
+        if(audioBit is not None):
+            cmd.extend(['-b:a', str(audioBit)])
+        cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{TEMP}/fastAud.wav'])
         if(not debug):
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)

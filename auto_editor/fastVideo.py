@@ -22,7 +22,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
     preset, tune, log):
 
     if(not os.path.isfile(vidFile)):
-        log.error('Could not find file ' + vidFile)
+        log.error('fastVideo.py could not find file: ' + str(vidFile))
 
     cap = cv2.VideoCapture(vidFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
