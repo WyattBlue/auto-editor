@@ -106,13 +106,22 @@ def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, mi
 
 
     def setRange(includeFrame, syntaxRange, fps, with_):
+        end = len(includeFrame) - 1
         for item in syntaxRange:
             pair = []
+
             for num in item.split('-'):
                 if(num == 'start'):
                     pair.append(0)
                 elif(num == 'end'):
-                    pair.append(len(includeFrame) - 1)
+                    pair.append(end)
+                elif(float(num) < 0):
+                    # Negative numbers = frames from end.
+                    value = end - round(float(num) * fps)
+                    if(value < 0):
+                        value = 0
+                    pair.append(value)
+                    del value
                 else:
                     pair.append(round(float(num) * fps))
             includeFrame[pair[0]:pair[1]+1] = with_

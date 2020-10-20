@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w41a'
+version = '20w42a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -140,7 +140,7 @@ def main():
     add_argument('--tune', default='none',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none'],
-        help='set the tune for ffmpeg to help compress video better.')
+        help='set the tune for ffmpeg to compress video better.')
 
     add_argument('--ignore', nargs='*',
         help="the range (in seconds) that shouldn't be edited at all. (uses range syntax)")
@@ -295,10 +295,13 @@ def main():
 
     if(args.debug):
         print('Python Version:', platform.python_version(), is64bit)
-        print('Platform:', platform.system())
+        print('Platform:', platform.system(), platform.release())
         # Platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
-
+        ffmpegVersion = pipeToConsole([ffmpeg, '-version']).split('\n')[0]
+        ffmpegVersion = ffmpegVersion.replace('ffmpeg version', '').strip()
+        ffmpegVersion = ffmpegVersion.split(' ')[0]
         print('FFmpeg path:', ffmpeg)
+        print('FFmpeg version:', ffmpegVersion)
         print('Auto-Editor version', version)
         if(args.input == []):
             sys.exit()
@@ -327,8 +330,7 @@ def main():
             def validFiles(path):
                 for f in os.listdir(path):
                     if(not f.startswith('.') and not f.endswith('.xml')
-                        and not f.endswith('.png') and not f.endswith('.md')
-                        and not os.path.isdir(f)):
+                        and not f.endswith('.png') and not f.endswith('.md')):
                         yield os.path.join(path, f)
 
             inputList += sorted(validFiles(myInput))
@@ -384,6 +386,8 @@ def main():
 
     numCuts = 0
     for i, INPUT_FILE in enumerate(inputList):
+        if(os.path.isdir(INPUT_FILE)):
+            continue
         newOutput = args.output_file[i]
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
@@ -401,17 +405,18 @@ def main():
         # Grab the audio bitrate from the input.
         abit = args.audio_bitrate
         if(abit is None):
-            output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                'a:0', '-show_entries', 'stream=bit_rate', '-of',
-                'compact=p=0:nk=1', INPUT_FILE])
-            try:
-                abit = int(output)
-            except:
-                log.warning("Couldn't automatically detect audio bitrate.")
-                abit = '500k'
-                log.debug('Setting audio bitrate to ' + abit)
-            else:
-                abit = str(round(abit / 1000)) + 'k'
+            if(not INPUT_FILE.endswith('.mkv')):
+                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
+                    'a:0', '-show_entries', 'stream=bit_rate', '-of',
+                    'compact=p=0:nk=1', INPUT_FILE])
+                try:
+                    abit = int(output)
+                except:
+                    log.warning("Couldn't automatically detect audio bitrate.")
+                    abit = '500k'
+                    log.debug('Setting audio bitrate to ' + abit)
+                else:
+                    abit = str(round(abit / 1000)) + 'k'
         else:
             abit = str(abit)
         args.audio_bitrate = abit
@@ -458,9 +463,12 @@ def main():
                 vcodec = 'copy'
 
             for trackNum in range(tracks):
-                cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', args.audio_bitrate,
-                '-ac', '2', '-ar', str(args.sample_rate), '-map', f'0:a:{trackNum}',
-                f'{TEMP}/{trackNum}.wav']
+
+                cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
+                if(args.audio_bitrate is not None):
+                    cmd.extend(['-ab', args.audio_bitrate])
+                cmd.extend(['-ac', '2', '-ar', str(args.sample_rate), '-map',
+                    f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:
