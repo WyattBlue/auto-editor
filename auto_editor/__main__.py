@@ -103,7 +103,7 @@ def main():
     add_argument('--cut_by_this_audio', '-ca', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
     add_argument('--cut_by_this_track', '-ct', type=int, default=0,
-        range='0 to the number of audio tracks',
+        range='0 to the number of audio tracks minus one',
         help='base cuts by a different audio track in the video.')
     add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
