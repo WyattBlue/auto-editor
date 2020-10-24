@@ -15,38 +15,9 @@ def pip_version():
     # pip doesn't allow us to use standard version format (20w10a), so we have to
     # conform it to look like Semantic Versioning even though auto-editor does not
     # use that format.
-    return '20.43.1.0'
-
-def numToNormal(text):
-    """
-    convert semantic versioning to our preferred version format.
-    20.10.1.0 -> 20w10a
-    """
-    import string
-    alphabet = list(string.ascii_lowercase)
-    nums = text.split('.')
-
-    text = nums[0] + 'w' + nums[1] + alphabet[int(nums[2]) - 1]
-    if(nums[3] != '0'):
-        text += ' Hotfix'
-    return text
+    return '20.43.2.0'
 
 if(sys.argv[-1] == 'publish'):
-
-    vr = numToNormal(pip_version()) # proper version for docs
-
-    lines = open('README.md').read().splitlines()
-    newDoc = ''
-    for line in lines:
-        if(line.startswith('<img src="https://img.shields.io/badge/version-')):
-            newDoc += '<img src="https://img.shields.io/badge/version-' + vr + '-blue.svg">\n'
-            continue
-        if(not line.startswith('* ')):
-            newDoc += line + '\n'
-
-    with open('README.md', 'w') as file:
-        file.write(newDoc.rstrip('\n'))
-
     os.system('rm -rf build')
     os.system('rm -rf dist')
     os.system('python3 setup.py sdist bdist_wheel')
