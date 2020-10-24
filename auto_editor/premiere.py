@@ -88,6 +88,7 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
     ana = 'FALSE' # anamorphic
     alphatype = 'none'
     depth = '16'
+    timebase = '30'
     if(not audioFile):
         try:
             import cv2
@@ -114,7 +115,7 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
             outfile.write('<xmeml version="4">\n')
             outfile.write('\t<sequence>\n')
             outfile.write('\t<rate>\n')
-            outfile.write('\t\t<timebase>30</timebase>\n')
+            outfile.write(f'\t\t<timebase>{timebase}</timebase>\n')
             outfile.write('\t\t<ntsc>TRUE</ntsc>\n')
             outfile.write('\t</rate>\n')
             outfile.write(f'\t\t<name>{groupName}</name>\n')
@@ -148,7 +149,7 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
                     outfile.write(f'\t\t\t\t\t\t\t<name>{name}</name>\n')
                     outfile.write(f'\t\t\t\t\t\t\t<pathurl>{pathurl}</pathurl>\n')
                     outfile.write('\t\t\t\t\t\t\t<rate>\n')
-                    outfile.write('\t\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+                    outfile.write(f'\t\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
                     outfile.write(f'\t\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
                     outfile.write('\t\t\t\t\t\t\t</rate>\n')
                     outfile.write('\t\t\t\t\t\t\t<media>\n')
@@ -189,7 +190,7 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
         outfile.write('\t\t\t\t<format>\n')
         outfile.write('\t\t\t\t\t<samplecharacteristics>\n')
         outfile.write('\t\t\t\t\t\t<rate>\n')
-        outfile.write('\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+        outfile.write(f'\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
         outfile.write(f'\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
         outfile.write('\t\t\t\t\t\t</rate>\n')
         outfile.write(f'\t\t\t\t\t\t<width>{width}</width>\n')
@@ -222,14 +223,14 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
                 outfile.write(f'\t\t\t\t\t\t\t<name>{name}</name>\n')
                 outfile.write(f'\t\t\t\t\t\t\t<pathurl>{pathurl}</pathurl>\n')
                 outfile.write('\t\t\t\t\t\t\t<rate>\n')
-                outfile.write('\t\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
                 outfile.write(f'\t\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
                 outfile.write('\t\t\t\t\t\t\t</rate>\n')
                 outfile.write('\t\t\t\t\t\t\t<media>\n')
                 outfile.write('\t\t\t\t\t\t\t\t<video>\n')
                 outfile.write('\t\t\t\t\t\t\t\t\t<samplecharacteristics>\n')
                 outfile.write('\t\t\t\t\t\t\t\t\t\t<rate>\n')
-                outfile.write('\t\t\t\t\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
                 outfile.write(f'\t\t\t\t\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
                 outfile.write('\t\t\t\t\t\t\t\t\t\t</rate>\n')
                 outfile.write(f'\t\t\t\t\t\t\t\t\t\t<width>{width}</width>\n')
@@ -314,7 +315,7 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
                     outfile.write(f'\t\t\t\t\t\t\t<name>{name}{t}</name>\n')
                     outfile.write(f'\t\t\t\t\t\t\t<pathurl>{trackurls[t]}</pathurl>\n')
                     outfile.write('\t\t\t\t\t\t\t<rate>\n')
-                    outfile.write('\t\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+                    outfile.write(f'\t\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
                     outfile.write(f'\t\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
                     outfile.write('\t\t\t\t\t\t\t</rate>\n')
                     outfile.write('\t\t\t\t\t\t\t<media>\n')

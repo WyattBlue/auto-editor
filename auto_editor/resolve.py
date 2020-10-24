@@ -38,6 +38,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, log):
 
     pixelar = 'square' # pixel aspect ratio
     colordepth = '24'
+    timebase = '30'
     sr = sampleRate
 
     if(audioFile):
@@ -48,7 +49,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, log):
             outfile.write('\t\t<name>Auto-Editor Audio Group</name>\n')
             outfile.write(f'\t\t<duration>{duration}</duration>\n')
             outfile.write('\t\t<rate>\n')
-            outfile.write('\t\t\t<timebase>30</timebase>\n')
+            outfile.write(f'\t\t\t<timebase>{timebase}</timebase>\n')
             outfile.write(f'\t\t\t<ntsc>{ntsc}</ntsc>\n')
             outfile.write('\t\t</rate>\n')
             outfile.write('\t\t<in>-1</in>\n')
@@ -61,7 +62,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, log):
             outfile.write(f'\t\t\t\t\t\t<height>{height}</height>\n')
             outfile.write(f'\t\t\t\t\t\t<pixelaspectratio>{pixelar}</pixelaspectratio>\n')
             outfile.write('\t\t\t\t\t\t<rate>\n')
-            outfile.write('\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+            outfile.write(f'\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
             outfile.write(f'\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
             outfile.write('\t\t\t\t\t\t</rate>\n')
             outfile.write('\t\t\t\t\t</samplecharacteristics>\n')
@@ -89,7 +90,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, log):
                     outfile.write(f'\t\t\t\t\t\t\t<name>{name}</name>\n')
                     outfile.write(f'\t\t\t\t\t\t\t<pathurl>{pathurl}</pathurl>\n')
                     outfile.write('\t\t\t\t\t\t\t<rate>\n')
-                    outfile.write('\t\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+                    outfile.write(f'\t\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
                     outfile.write(f'\t\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
                     outfile.write('\t\t\t\t\t\t\t</rate>\n')
                     outfile.write('\t\t\t\t\t\t\t<media>\n')
@@ -122,7 +123,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, log):
         outfile.write('<xmeml version="4">\n')
         outfile.write('\t<sequence id="sequence-1" TL.SQAudioVisibleBase="0" TL.SQVideoVisibleBase="0" TL.SQVisibleBaseTime="0" TL.SQAVDividerPosition="0.5" TL.SQHideShyTracks="0" TL.SQHeaderWidth="236" TL.SQTimePerPixel="0.013085939262623341" MZ.EditLine="0" MZ.Sequence.PreviewFrameSizeHeight="720" MZ.Sequence.AudioTimeDisplayFormat="200" MZ.Sequence.PreviewRenderingClassID="1297106761" MZ.Sequence.PreviewRenderingPresetCodec="1297107278" MZ.Sequence.PreviewRenderingPresetPath="EncoderPresets/SequencePreview/795454d9-d3c2-429d-9474-923ab13b7018/I-Frame Only MPEG.epr" MZ.Sequence.PreviewUseMaxRenderQuality="false" MZ.Sequence.PreviewUseMaxBitDepth="false" MZ.Sequence.EditingModeGUID="795454d9-d3c2-429d-9474-923ab13b7018" MZ.Sequence.VideoTimeDisplayFormat="104" MZ.WorkOutPoint="10770278400000" MZ.WorkInPoint="0" explodedTracks="true">\n')
         outfile.write('\t\t<rate>\n')
-        outfile.write('\t\t\t<timebase>30</timebase>\n')
+        outfile.write(f'\t\t\t<timebase>{timebase}</timebase>\n')
         outfile.write(f'\t\t\t<ntsc>{ntsc}</ntsc>\n')
         outfile.write('\t\t</rate>\n')
         outfile.write('\t\t<name>Auto-Editor Video Group</name>\n')
@@ -131,7 +132,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, log):
         outfile.write('\t\t\t\t<format>\n')
         outfile.write('\t\t\t\t\t<samplecharacteristics>\n')
         outfile.write('\t\t\t\t\t\t<rate>\n')
-        outfile.write('\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+        outfile.write(f'\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
         outfile.write(f'\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
         outfile.write('\t\t\t\t\t\t</rate>\n')
         outfile.write(f'\t\t\t\t\t\t<width>{width}</width>\n')
@@ -164,7 +165,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, log):
                 outfile.write(f'\t\t\t\t\t\t\t<name>{name}</name>\n')
                 outfile.write(f'\t\t\t\t\t\t\t<pathurl>{pathurl}</pathurl>\n')
                 outfile.write('\t\t\t\t\t\t\t<rate>\n')
-                outfile.write('\t\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
                 outfile.write(f'\t\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
                 outfile.write('\t\t\t\t\t\t\t</rate>\n')
                 outfile.write(f'\t\t\t\t\t\t\t<duration>{duration}</duration>\n')
@@ -172,7 +173,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, log):
                 outfile.write('\t\t\t\t\t\t\t\t<video>\n')
                 outfile.write('\t\t\t\t\t\t\t\t\t<samplecharacteristics>\n')
                 outfile.write('\t\t\t\t\t\t\t\t\t\t<rate>\n')
-                outfile.write('\t\t\t\t\t\t\t\t\t\t\t<timebase>30</timebase>\n')
+                outfile.write(f'\t\t\t\t\t\t\t\t\t\t\t<timebase>{timebase}</timebase>\n')
                 outfile.write(f'\t\t\t\t\t\t\t\t\t\t\t<ntsc>{ntsc}</ntsc>\n')
                 outfile.write('\t\t\t\t\t\t\t\t\t\t</rate>\n')
                 outfile.write(f'\t\t\t\t\t\t\t\t\t\t<width>{width}</width>\n')
