@@ -575,7 +575,9 @@ def main():
                 timeSave = round(timeSave)
             units = 'minutes'
 
-        print(f'Auto-Editor made {numCuts} cuts', end='') # Don't add a newline.
+        plural = 's' if numCuts != 1 else ''
+
+        print(f'Auto-Editor made {numCuts} cut{plural}', end='') # Don't add a newline.
         if(numCuts > 4):
             print(f', which would have taken about {timeSave} {units} if edited manually.')
         else:
