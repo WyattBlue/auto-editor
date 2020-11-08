@@ -39,10 +39,17 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
     if(exportAsAudio):
         if(keepTracksSep):
             log.warning("Audio files can't have multiple tracks.")
-        else:
-            pass
-            # TODO: combine all the audio tracks
-        move(f'{temp}/0.wav', outFile)
+
+        if(tracks == 1):
+            move(f'{temp}/0.wav', outFile)
+            return None # Exit out early.
+
+        cmd = ['ffmpeg', '-y']
+        for trackNum in range(tracks):
+            cmd.extend(['-i', f'{temp}/{trackNum}.wav'])
+        cmd.extend(['-filter_complex', f'amix=inputs={tracks}:duration=longest', outFile])
+        log.debug(cmd)
+        subprocess.call(cmd)
         return None
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
@@ -110,7 +117,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             cmd.extend(['-b:v', vbitrate])
         if(tune != 'none'):
             cmd.extend(['-tune', tune])
-        cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile])
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2', outFile])
         if(debug):
             cmd.extend(['-hide_banner'])
         else:
@@ -131,13 +138,6 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         else:
             move(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
 
-
-        def pipeToConsole(myCommands):
-            process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT)
-            stdout, __ = process.communicate()
-            return stdout.decode()
-
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', vcodec]
         if(vbitrate is None):
@@ -146,21 +146,28 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             cmd.extend(['-b:v', vbitrate])
         if(tune != 'none'):
             cmd.extend(['-tune', tune])
-        cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile, '-hide_banner'])
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2',
+            outFile, '-hide_banner'])
 
+    log.debug(cmd)
+
+    def pipeToConsole(myCommands):
+        process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        stdout, __ = process.communicate()
+        return stdout.decode()
+
+    message = pipeToConsole(cmd)
+    log.debug('')
+    log.debug(message)
+
+    if('Conversion failed!' in message):
+        log.warning('The muxing/compression failed. '\
+            'This may be a problem with your ffmpeg, your codec, or your bitrate.'\
+            '\nTrying, again but not compressing.')
+        cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
+            f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
+            outFile, '-nostats', '-loglevel', '0']
         log.debug(cmd)
-        message = pipeToConsole(cmd)
-        log.debug('')
-        log.debug(message)
-
-        if('Conversion failed!' in message):
-            log.warning('The muxing/compression failed. '\
-                'This may be a problem with your ffmpeg, your codec, or your bitrate.'\
-                '\nTrying, again but using the "copy" video codec.')
-            cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-                f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
-                outFile, '-nostats', '-loglevel', '0']
-            subprocess.call(cmd)
-        log.debug(cmd)
-
+        subprocess.call(cmd)
     conwrite('')
