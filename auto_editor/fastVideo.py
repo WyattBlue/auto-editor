@@ -116,6 +116,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '0'])
+        cmd.extend(['-strict', '-2'])
     else:
         # Merge all the audio tracks into one.
         if(tracks > 1):
@@ -147,7 +148,8 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             cmd.extend(['-b:v', vbitrate])
         if(tune != 'none'):
             cmd.extend(['-tune', tune])
-        cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile, '-hide_banner'])
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', outFile, '-hide_banner',
+            '-strict', '-2'])
 
         log.debug(cmd)
         message = pipeToConsole(cmd)
