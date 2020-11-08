@@ -132,13 +132,6 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         else:
             move(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
 
-
-        def pipeToConsole(myCommands):
-            process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT)
-            stdout, __ = process.communicate()
-            return stdout.decode()
-
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', vcodec]
         if(vbitrate is None):
@@ -150,19 +143,26 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2',
             outFile, '-hide_banner'])
 
-        log.debug(cmd)
-        message = pipeToConsole(cmd)
-        log.debug('')
-        log.debug(message)
+    log.debug(cmd)
 
-        if('Conversion failed!' in message):
-            log.warning('The muxing/compression failed. '\
-                'This may be a problem with your ffmpeg, your codec, or your bitrate.'\
-                '\nTrying, again but not compressing.')
-            cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-                f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
-                outFile, '-nostats', '-loglevel', '0']
-            subprocess.call(cmd)
-        log.debug(cmd)
+    def pipeToConsole(myCommands):
+        process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        stdout, __ = process.communicate()
+        return stdout.decode()
+
+    message = pipeToConsole(cmd)
+    log.debug('')
+    log.debug(message)
+
+    if('Conversion failed!' in message):
+        log.warning('The muxing/compression failed. '\
+            'This may be a problem with your ffmpeg, your codec, or your bitrate.'\
+            '\nTrying, again but not compressing.')
+        cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
+            f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
+            outFile, '-nostats', '-loglevel', '0']
+        subprocess.call(cmd)
+    log.debug(cmd)
 
     conwrite('')
