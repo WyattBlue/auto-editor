@@ -39,11 +39,17 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
     if(exportAsAudio):
         if(keepTracksSep):
             log.warning("Audio files can't have multiple tracks.")
-        else:
-            pass
-            # TODO: combine all the audio tracks
-            # auto-editor resources/multi-track.mov --export_as_audio
-        move(f'{temp}/0.wav', outFile)
+
+        if(tracks == 1):
+            move(f'{temp}/0.wav', outFile)
+            return None # Exit out early.
+
+        cmd = ['ffmpeg', '-y']
+        for trackNum in range(tracks):
+            cmd.extend(['-i', f'{temp}/{trackNum}.wav'])
+        cmd.extend(['-filter_complex', f'amix=inputs={tracks}:duration=longest', outFile])
+        log.debug(cmd)
+        subprocess.call(cmd)
         return None
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
@@ -162,7 +168,6 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
             outFile, '-nostats', '-loglevel', '0']
+        log.debug(cmd)
         subprocess.call(cmd)
-    log.debug(cmd)
-
     conwrite('')
