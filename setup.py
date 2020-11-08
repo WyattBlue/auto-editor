@@ -3,8 +3,7 @@
 """
 This code should only be executed by developers, not users.
 
-The main purpose of this script is to create the build for pip. It also runs some
-automated docs updating.
+The purose of this script is to create the build for pip.
 """
 
 import os
@@ -12,10 +11,9 @@ import sys
 from setuptools import setup, find_packages
 
 def pip_version():
-    # pip doesn't allow us to use standard version format (20w10a), so we have to
-    # conform it to look like Semantic Versioning even though auto-editor does not
-    # use that format.
-    return '20.43.2.0'
+    # pip doesn't allow standard version format (20w10a), so we have to
+    # conform it to match Semantic Versioning.
+    return '20.45.1.0'
 
 if(sys.argv[-1] == 'publish'):
     os.system('rm -rf build')
@@ -49,6 +47,7 @@ setup(
         'Topic :: Multimedia :: Video',
         'License :: OSI Approved :: MIT License',
         'Environment :: Console',
+        'Development Status :: 6 - Mature',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
