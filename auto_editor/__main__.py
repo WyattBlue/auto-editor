@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w43b'
+version = '20w45a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -330,7 +330,8 @@ def main():
             def validFiles(path):
                 for f in os.listdir(path):
                     if(not f.startswith('.') and not f.endswith('.xml')
-                        and not f.endswith('.png') and not f.endswith('.md')):
+                        and not f.endswith('.png') and not f.endswith('.md')
+                        and not f.endswith('.txt') and not f.endswith('.prproj')):
                         yield os.path.join(path, f)
 
             inputList += sorted(validFiles(myInput))
@@ -574,7 +575,9 @@ def main():
                 timeSave = round(timeSave)
             units = 'minutes'
 
-        print(f'Auto-Editor made {numCuts} cuts', end='') # Don't add a newline.
+        plural = 's' if numCuts != 1 else ''
+
+        print(f'Auto-Editor made {numCuts} cut{plural}', end='') # Don't add a newline.
         if(numCuts > 4):
             print(f', which would have taken about {timeSave} {units} if edited manually.')
         else:

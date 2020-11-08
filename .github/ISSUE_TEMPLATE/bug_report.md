@@ -6,6 +6,8 @@ labels: bug
 
 ---
 
+(Make sure you're using the latest version)
+
 **What went wrong**
 
 
