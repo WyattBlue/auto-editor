@@ -42,6 +42,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         else:
             pass
             # TODO: combine all the audio tracks
+            # auto-editor resources/multi-track.mov --export_as_audio
         move(f'{temp}/0.wav', outFile)
         return None
 
@@ -156,7 +157,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         if('Conversion failed!' in message):
             log.warning('The muxing/compression failed. '\
                 'This may be a problem with your ffmpeg, your codec, or your bitrate.'\
-                '\nTrying, again but using the "copy" video codec.')
+                '\nTrying, again but not compressing.')
             cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
                 f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
                 outFile, '-nostats', '-loglevel', '0']
