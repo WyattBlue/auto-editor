@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/badge/discord-kMHAWJJ-brightgreen.svg"></a>
-<img src="https://img.shields.io/badge/version-20w45a-blue.svg">
+<img src="https://img.shields.io/badge/version-20w47a-blue.svg">
 <p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/resources/auto-editor_banner.png" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and cutting them up.

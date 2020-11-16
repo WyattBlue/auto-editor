@@ -13,7 +13,7 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w45a'
+version = '20w47a'
 
 def file_type(file):
     if(not os.path.isfile(file)):
@@ -153,7 +153,10 @@ def main():
 
     from usefulFunctions import Log
 
-    invalidExtensions = ['.txt', '.md', '.html', '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.prproj', '.py']
+    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga']
+    invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm', '.xml', '.json', '.yaml', '.png',
+        '.jpeg', '.jpg', '.gif', '.exe', '.doc', '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat',
+        '.dll', '.prproj', '.psd', '.ae', '.zip', '.java', '.class', '.js', '.c', '.cpp', '.csharp', '.py', '.app']
 
     class parse_options():
         def __init__(self, userArgs, log, *args):
@@ -262,7 +265,7 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    from usefulFunctions import isAudioFile, vidTracks, conwrite, getAudioChunks
+    from usefulFunctions import vidTracks, conwrite, getAudioChunks
     from wavfile import read, write
 
     if(not args.preview):
@@ -404,6 +407,8 @@ def main():
         if(fileFormat in invalidExtensions):
             log.error(f'Invalid file extension "{fileFormat}" for {INPUT_FILE}')
 
+        audioFile = fileFormat in audioExtensions
+
         # Get output file name.
         newOutput = args.output_file[i]
 
@@ -437,7 +442,7 @@ def main():
             abit = str(abit)
         args.audio_bitrate = abit
 
-        if(isAudioFile(INPUT_FILE)):
+        if(audioFile):
             fps = 30 # Audio files don't have frames, so give fps a dummy value.
             tracks = 1
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', args.audio_bitrate, '-ac', '2',
@@ -529,7 +534,7 @@ def main():
             else:
                 clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
 
-        if(fps is None and not isAudioFile(INPUT_FILE)):
+        if(fps is None and not audioFile):
             if(makingDataFile):
                 dotIndex = INPUT_FILE.rfind('.')
                 end = '_constantFPS' + oldFile[dotIndex:]
@@ -564,7 +569,7 @@ def main():
 
             exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate, log)
             continue
-        if(isAudioFile(INPUT_FILE) and not makingDataFile):
+        if(audioFile and not makingDataFile):
             from fastAudio import fastAudio
 
             fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
