@@ -153,10 +153,12 @@ def main():
 
     from usefulFunctions import Log
 
-    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga']
+    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga', '.acc', '.nfa', '.mka']
+
     invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm', '.xml', '.json', '.yaml', '.png',
         '.jpeg', '.jpg', '.gif', '.exe', '.doc', '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat',
-        '.dll', '.prproj', '.psd', '.ae', '.zip', '.java', '.class', '.js', '.c', '.cpp', '.csharp', '.py', '.app']
+        '.dll', '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js', '.c', '.cpp',
+        '.csharp', '.py', '.app', '.git', '.github', '.gitignore', '.db', '.ini', '.BIN']
 
     class parse_options():
         def __init__(self, userArgs, log, *args):
@@ -321,6 +323,19 @@ def main():
 
     if(args.input == []):
         log.error('You need the (input) argument so that auto-editor can do the work for you.')
+
+
+    try:
+        from requests import get
+        latestVersion = get('https://raw.githubusercontent.com/wyattblue/auto-editor/master/resources/version.txt')
+        if(latestVersion.text != version):
+            print('\nAuto-Editor is out of date. Run:\n')
+            print('    pip3 install -U auto-editor')
+            print('\nto upgrade to the latest version.\n')
+        del latestVersion
+    except Exception as err:
+        log.debug('Check for update error:', err)
+
 
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
@@ -560,14 +575,14 @@ def main():
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate, log)
+            exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate, audioFile, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
             duration = chunks[len(chunks) - 1][1]
             from resolve import exportToResolve
 
-            exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate, log)
+            exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate, audioFile, log)
             continue
         if(audioFile and not makingDataFile):
             from fastAudio import fastAudio
