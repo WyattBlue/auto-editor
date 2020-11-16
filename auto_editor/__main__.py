@@ -71,7 +71,6 @@ def main():
         options.append(newDic)
         option_names = option_names + list(names)
 
-
     add_argument('(input)', nargs='*',
         help='the path to a file, folder, or url you want edited.')
     add_argument('--help', '-h', action='store_true',
@@ -154,6 +153,8 @@ def main():
 
     from usefulFunctions import Log
 
+    invalidExtensions = ['.txt', '.md', '.html', '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.prproj', '.py']
+
     class parse_options():
         def __init__(self, userArgs, log, *args):
             # Set the default options.
@@ -198,7 +199,7 @@ def main():
 
                     key = option['names'][0].replace('-', '')
 
-                    # show help for specific option.
+                    # Show help for specific option.
                     if(nextItem == '-h' or nextItem == '--help'):
                         print(' ', ', '.join(option['names']))
                         print('   ', option['help'])
@@ -249,7 +250,7 @@ def main():
 
     args = parse_options(sys.argv[1:], Log(3), options)
 
-    # Print help screen for entire program.
+    # Print the help screen for the entire program.
     if(args.help):
         for option in options:
             print(' ', ', '.join(option['names']) + ':', option['help'])
@@ -309,7 +310,6 @@ def main():
     log = Log(3 if args.debug else 2)
 
     if(is64bit == '32-bit'):
-        # I should have put this warning a long time ago.
         log.warning("You have the 32-bit version of Python, which means you won't be " \
             'able to handle long videos.')
 
@@ -327,14 +327,12 @@ def main():
     inputList = []
     for myInput in args.input:
         if(os.path.isdir(myInput)):
-            def validFiles(path):
+            def validFiles(path, badExts):
                 for f in os.listdir(path):
-                    if(not f.startswith('.') and not f.endswith('.xml')
-                        and not f.endswith('.png') and not f.endswith('.md')
-                        and not f.endswith('.txt') and not f.endswith('.prproj')):
+                    if(not f[f.rfind('.'):] in badExts):
                         yield os.path.join(path, f)
 
-            inputList += sorted(validFiles(myInput))
+            inputList += sorted(validFiles(myInput, invalidExtensions))
         elif(os.path.isfile(myInput)):
             inputList.append(myInput)
         elif(myInput.startswith('http://') or myInput.startswith('https://')):
@@ -352,9 +350,12 @@ def main():
         else:
             log.error('Could not find file: ' + myInput)
 
+    startTime = time.time()
+
     if(args.output_file is None):
         args.output_file = []
 
+    # Figure out the output file names.
     if(len(args.output_file) < len(inputList)):
         for i in range(len(inputList) - len(args.output_file)):
             oldFile = inputList[i]
@@ -371,26 +372,40 @@ def main():
     TEMP = tempfile.mkdtemp()
 
     if(args.combine_files):
-        with open(f'{TEMP}/combines.txt', 'w') as outfile:
-            for fileref in inputList:
-                outfile.write(f"file '{fileref}'\n")
+        # Combine video files, then set input to 'combined.mp4'.
+        cmd = [ffmpeg, '-y']
+        for fileref in inputList:
+            cmd.extend(['-i', fileref])
+        cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
+            '-codec:v', 'h264', '-crf', '0', '-preset', 'veryslow', # Use lossless quality
+            f'{TEMP}/combined.mp4'])
+        if(args.debug):
+            cmd.extend(['-hide_banner'])
+        else:
+            cmd.extend(['-nostats', '-loglevel', '0'])
 
-        cmd = [ffmpeg, '-f', 'concat', '-safe', '0', '-i', f'{TEMP}/combines.txt',
-            '-c', 'copy', 'combined.mp4']
         subprocess.call(cmd)
-        inputList = ['combined.mp4']
-
+        inputList = [f'{TEMP}/combined.mp4']
 
     speeds = [args.silent_speed, args.video_speed]
-
-    startTime = time.time()
-
     numCuts = 0
     for i, INPUT_FILE in enumerate(inputList):
+        # Ignore folders
         if(os.path.isdir(INPUT_FILE)):
             continue
-        newOutput = args.output_file[i]
+
+        # Throw error if file referenced doesn't exist.
+        if(not os.path.isfile(INPUT_FILE)):
+            log.error(f"{INPUT_FILE} doesn't exist!")
+
+        # Check if the file format is valid.
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
+
+        if(fileFormat in invalidExtensions):
+            log.error(f'Invalid file extension "{fileFormat}" for {INPUT_FILE}')
+
+        # Get output file name.
+        newOutput = args.output_file[i]
 
         # Grab the sample rate from the input.
         sr = args.sample_rate
@@ -423,7 +438,7 @@ def main():
         args.audio_bitrate = abit
 
         if(isAudioFile(INPUT_FILE)):
-            fps = 30
+            fps = 30 # Audio files don't have frames, so give fps a dummy value.
             tracks = 1
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', args.audio_bitrate, '-ac', '2',
                 '-ar', str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
@@ -436,9 +451,13 @@ def main():
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
             if(args.export_to_premiere):
+                # This is the default fps value for Premiere Pro Projects.
                 fps = 29.97
             else:
+                # Grab fps to know what the output video's fps should be.
+                # DaVinci Resolve doesn't need fps, but grab it away just in case.
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
+
             tracks = vidTracks(INPUT_FILE, ffprobe, log)
             if(args.cut_by_this_track >= tracks):
                 log.error("You choose a track that doesn't exist.\n" \
@@ -463,20 +482,24 @@ def main():
                 # FFmpeg copies the uncompressed output that cv2 spits out.
                 vcodec = 'copy'
 
+            # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
-
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
                 if(args.audio_bitrate is not None):
                     cmd.extend(['-ab', args.audio_bitrate])
+
                 cmd.extend(['-ac', '2', '-ar', str(args.sample_rate), '-map',
                     f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
+
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:
                     cmd.extend(['-nostats', '-loglevel', '0'])
                 subprocess.call(cmd)
 
+            # Check if the `--cut_by_all_tracks` flag has been set or not.
             if(args.cut_by_all_tracks):
+                # Combine all audio tracks into one audio file, then read.
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
                     str(args.sample_rate), '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
@@ -489,6 +512,7 @@ def main():
 
                 sampleRate, audioData = read(f'{TEMP}/combined.wav')
             else:
+                # Read only one audio file.
                 if(os.path.isfile(f'{TEMP}/{args.cut_by_this_track}.wav')):
                     sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
                 else:
