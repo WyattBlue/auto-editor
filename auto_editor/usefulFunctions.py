@@ -42,10 +42,6 @@ class Log():
         if(self.level > 2):
             print(message)
 
-def isAudioFile(filePath):
-    fileFormat = filePath[filePath.rfind('.'):]
-    return fileFormat in ['.wav', '.mp3', '.m4a']
-
 
 def getNewLength(chunks, speeds, fps):
     timeInFrames = 0
