@@ -324,7 +324,6 @@ def main():
     if(args.input == []):
         log.error('You need the (input) argument so that auto-editor can do the work for you.')
 
-
     try:
         from requests import get
         latestVersion = get('https://raw.githubusercontent.com/wyattblue/auto-editor/master/resources/version.txt')
@@ -334,8 +333,7 @@ def main():
             print('\nto upgrade to the latest version.\n')
         del latestVersion
     except Exception as err:
-        log.debug('Check for update error: ' + str(err))
-
+        log.debug('Check for update Error: ' + str(err))
 
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
@@ -395,7 +393,7 @@ def main():
         for fileref in inputList:
             cmd.extend(['-i', fileref])
         cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
-            '-codec:v', 'h264', '-crf', '0', '-preset', 'veryslow', # Use lossless quality
+            '-codec:v', 'h264', '-pix_fmt', 'yuv420p', # Use lossless quality
             f'{TEMP}/combined.mp4'])
         if(args.debug):
             cmd.extend(['-hide_banner'])
