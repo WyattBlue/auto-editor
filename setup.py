@@ -13,7 +13,7 @@ from setuptools import setup, find_packages
 def pip_version():
     # pip doesn't allow standard version format (20w10a), so we have to
     # conform it to match Semantic Versioning.
-    return '20.45.1.0'
+    return '20.47.1.0'
 
 if(sys.argv[-1] == 'publish'):
     os.system('rm -rf build')
@@ -42,6 +42,7 @@ setup(
         'audiotsm2',
         'opencv-python',
         'youtube-dl',
+        'requests',
     ],
     classifiers=[
         'Topic :: Multimedia :: Video',
