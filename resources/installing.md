@@ -2,16 +2,14 @@
 
 > You probably have Python already installed on your computer, but install it again anyway. Modern Python has some important utilities like pip that need to be installed to.
 
-Download the [Python 3 Installer](https://www.python.org/downloads/) and install Python. If you are installing on Windows, make sure the "Add Python 3.8 to PATH" is checked.
-
-> Note: If you have brew or chocolatey already installed, you can use them instead of the installer.
+Download the [Python 3 Installer](https://www.python.org/downloads/) and install Python. If you are installing on Windows, make sure the "Add Python 3.9 to PATH" is checked.
 
 Once that's done, you should have pip on your PATH. That means when you run `pip3` on your console, you should get a list of commands and not `command not found`. If you don't have pip on your PATH, try reinstalling Python.
 
 Then run: `pip3 install --upgrade pip` to upgrade Pip to the latest version.
 
 
-> FFmpeg for Windows and MacOS is already installed, but Linux users will need to install it seperately. This command should work for most Distros: `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
+> FFmpeg for Windows and MacOS is already installed, but Linux users will need to install it seperately. This command should work for most distros: `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
 
 After upgrading pip, run `pip3 install auto-editor` and wait for pip to finish.
 
@@ -54,7 +52,7 @@ If running auto-editor causes an error message to appear like this:
                                  ^
 SyntaxError: invalid syntax
 ```
-It's because you're using a version of Python that's too old. Auto-Editor will on work on Python versions greater than or equal to 3.6 (Released in 2016). Anything else will cause weird invalid syntax error messages to pop up.
+It's because you're using a version of Python that's too old. Auto-Editor will on work on Python versions >=3.6 . Anything else will cause weird invalid syntax error messages to pop up.
 
 
 ## Installing from Source

@@ -5,16 +5,15 @@ Export an XML file that can be imported by DaVinci Resolve.
 """
 
 # Included functions
-from usefulFunctions import conwrite, isAudioFile
+from usefulFunctions import conwrite
 
 # Internal libraries
 import os
 
-def exportToResolve(myInput, output, clips, duration, sampleRate, log):
+def exportToResolve(myInput, output, clips, duration, sampleRate, audioFile, log):
     pathurl = 'file://localhost' + os.path.abspath(myInput)
 
     name = os.path.basename(myInput)
-    audioFile = isAudioFile(myInput)
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
