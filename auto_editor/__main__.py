@@ -334,7 +334,7 @@ def main():
             print('\nto upgrade to the latest version.\n')
         del latestVersion
     except Exception as err:
-        log.debug('Check for update error:', err)
+        log.debug('Check for update error: ' + str(err))
 
 
     if(args.silent_speed <= 0 or args.silent_speed > 99999):

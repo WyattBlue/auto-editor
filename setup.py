@@ -42,6 +42,7 @@ setup(
         'audiotsm2',
         'opencv-python',
         'youtube-dl',
+        'requests',
     ],
     classifiers=[
         'Topic :: Multimedia :: Video',
