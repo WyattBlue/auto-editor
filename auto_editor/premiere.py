@@ -5,12 +5,12 @@ Export an XML file that can be imported by Adobe Premiere.
 """
 
 # Included functions
-from usefulFunctions import conwrite, isAudioFile
+from usefulFunctions import conwrite
 
 # Internal libraries
 import os
 
-def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
+def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, audioFile, log):
 
     def makepath(filepath):
         return 'file://localhost' + os.path.abspath(filepath)
@@ -55,8 +55,6 @@ def exportToPremiere(myInput, temp, output, clips, tracks, sampleRate, log):
     pathurl = makepath(myInput)
 
     name = os.path.basename(myInput)
-
-    audioFile = isAudioFile(myInput)
 
     log.debug('tracks: ' + str(tracks))
     log.debug(os.path.dirname(os.path.abspath(myInput)))
