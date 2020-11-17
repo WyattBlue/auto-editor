@@ -38,8 +38,10 @@ Auto-Editor is an open-source project so anyone can suggest changes, including y
 
 No change is too small whether that be a typo in the docs or a small improvement of code.
 
-## Software Licensing
-[See Legal](https://github.com/WyattBlue/auto-editor/blob/master/resources/legalinfo.md)
+## Copyright
+Auto-Editor is under the Public Domain but contains non-free elements.
+
+[See This Page for More Info](https://github.com/WyattBlue/auto-editor/blob/master/resources/legalinfo.md)
 
 ## Issues
 If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this project, suggest new features, or chat with other users, do that in [the discord server](https://discord.com/invite/kMHAWJJ).
