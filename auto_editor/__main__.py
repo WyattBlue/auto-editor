@@ -566,7 +566,7 @@ def main():
             args.no_open = True
             from preview import preview
 
-            preview(INPUT_FILE, chunks, speeds, args.debug)
+            preview(INPUT_FILE, chunks, speeds, fps, audioFile, args.debug)
             continue
 
         if(args.export_to_premiere):

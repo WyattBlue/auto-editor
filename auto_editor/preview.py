@@ -6,28 +6,17 @@ selected options are used.
 """
 
 # Included functions
-from usefulFunctions import getNewLength, isAudioFile
+from usefulFunctions import getNewLength
 
 # Internal libraries
 import os
 from datetime import timedelta
 
-def preview(myInput, chunks, speeds, debug):
+def preview(myInput, chunks, speeds, fps, audioFile, debug):
 
     if(not os.path.isfile(myInput)):
         print('preview.py: Could not find file ', myInput)
         sys.exit(1)
-
-    audioFile = isAudioFile(myInput)
-    if(audioFile):
-        fps = 30
-    else:
-        import cv2
-
-        cap = cv2.VideoCapture(myInput)
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        cap.release()
-        cv2.destroyAllWindows()
 
     def printTimeFrame(title, frames, fps):
         inSec = round(frames / fps, 1)
