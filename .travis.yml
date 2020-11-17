@@ -39,5 +39,4 @@ script:
  - python3 auto_editor/__main__.py example.mp4 --preset faster
  - rm example_ALTERED.mp4
  - python3 auto_editor/__main__.py example.mp4 --cut_out 0-5.7 -o hmm.mp4
- - rm example_ALTERED.mp4
  - python3 auto_editor/__main__.py example.mp4 hmm.mp4 --combine_files --debug
