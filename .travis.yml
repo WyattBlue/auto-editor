@@ -1,14 +1,12 @@
 language: python
 before_install:
-  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
-  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
-  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg; fi
+ - sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg
 install:
  - pip3 install audiotsm2 opencv-python
 python:
-  - "3.6"
-  - "3.7"
-  - "3.8"
+ - "3.6"
+ - "3.7"
+ - "3.8"
 script:
  - python3 auto_editor/__main__.py --debug
  - python3 auto_editor/__main__.py --version
