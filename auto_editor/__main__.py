@@ -393,13 +393,14 @@ def main():
         for fileref in inputList:
             cmd.extend(['-i', fileref])
         cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
-            '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2'
+            '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2',
             f'{TEMP}/combined.mp4'])
         if(args.debug):
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '0'])
 
+        log.debug(cmd)
         subprocess.call(cmd)
         inputList = [f'{TEMP}/combined.mp4']
 
