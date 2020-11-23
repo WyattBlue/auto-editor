@@ -121,7 +121,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         if(debug):
             cmd.extend(['-hide_banner'])
         else:
-            cmd.extend(['-nostats', '-loglevel', '0'])
+            cmd.extend(['-nostats', '-loglevel', '8'])
     else:
         # Merge all the audio tracks into one.
         if(tracks > 1):
@@ -133,7 +133,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             if(debug):
                 cmd.extend(['-hide_banner'])
             else:
-                cmd.extend(['-nostats', '-loglevel', '0'])
+                cmd.extend(['-nostats', '-loglevel', '8'])
             subprocess.call(cmd)
         else:
             move(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
@@ -167,7 +167,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             '\nTrying, again but not compressing.')
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
-            outFile, '-nostats', '-loglevel', '0']
+            outFile, '-nostats', '-loglevel', '8']
         log.debug(cmd)
         subprocess.call(cmd)
     conwrite('')

@@ -1,42 +1,44 @@
-# import the necessary packages
-from imutils.video import VideoStream
+# Internal Packages
+import time
 import argparse
 import datetime
-import imutils
-import time
-import cv2
 
+# External Packages
+import cv2
+import imutils
 import numpy as np
+from imutils.video import VideoStream
+
+# Motion detection algorithm based on this blog post:
+# https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", help="path to the video file")
-ap.add_argument("-a", "--min-area", type=int, default=500, help="minimum area size")
-args = vars(ap.parse_args())
-if args.get("video", None) is None:
-    vs = VideoStream(src=0).start()
-else:
-    vs = cv2.VideoCapture(args["video"])
+args = ap.parse_args()
+
+cap = cv2.VideoCapture(args.video)
 prevFrame = None
 
 gray = None
 
-while True:
+difference = [0]
+total = None
+
+while cap.isOpened():
 
     if(gray is None):
         prevFrame = None
     else:
         prevFrame = gray
 
-    frame = vs.read()
-    frame = frame if args.get("video", None) is None else frame[1]
+    ret, frame = cap.read()
 
-    if frame is None:
+    if(not ret):
         break
     # resize the frame, convert it to grayscale, and blur it
     frame = imutils.resize(frame, width=500)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (21, 21), 0)
-
 
     if(prevFrame is not None):
         frameDelta = cv2.absdiff(prevFrame, gray)
@@ -46,15 +48,16 @@ while True:
 
         thresh = cv2.dilate(thresh, None, iterations=2)
 
-        print(np.count_nonzero(thresh))
-        cv2.imshow("Thresh", thresh)
+        if(total is None):
+            total = thresh.shape[0] * thresh.shape[1]
 
+        difference.append(np.count_nonzero(thresh) / total)
 
-    # cv2.imshow("Frame Delta", frameDelta)
-    key = cv2.waitKey(1) & 0xFF
-    # if the `q` key is pressed, break from the lop
-    if key == ord("q"):
-        break
 # cleanup the camera and close any open windows
-vs.stop() if args.get("video", None) is None else vs.release()
+cap.release()
 cv2.destroyAllWindows()
+
+print(difference)
+
+
+print(max(difference))

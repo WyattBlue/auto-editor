@@ -257,8 +257,12 @@ def main():
 
     # Print the help screen for the entire program.
     if(args.help):
+        print('')
         for option in options:
             print(' ', ', '.join(option['names']) + ':', option['help'])
+        print('\nThe help command can also be used on a specific option.')
+        print('example:')
+        print('    auto-editor --frame_margin --help')
         print('\nHave an issue? Make an issue. '\
             'Visit https://github.com/wyattblue/auto-editor/issues')
         sys.exit()
@@ -398,7 +402,7 @@ def main():
         if(args.debug):
             cmd.extend(['-hide_banner'])
         else:
-            cmd.extend(['-nostats', '-loglevel', '0'])
+            cmd.extend(['-nostats', '-loglevel', '8'])
 
         log.debug(cmd)
         subprocess.call(cmd)
@@ -464,7 +468,7 @@ def main():
             if(args.debug):
                 cmd.extend(['-hide_banner'])
             else:
-                cmd.extend(['-nostats', '-loglevel', '0'])
+                cmd.extend(['-nostats', '-loglevel', '8'])
             subprocess.call(cmd)
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
@@ -513,7 +517,7 @@ def main():
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:
-                    cmd.extend(['-nostats', '-loglevel', '0'])
+                    cmd.extend(['-nostats', '-loglevel', '8'])
                 subprocess.call(cmd)
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
@@ -525,7 +529,7 @@ def main():
                 if(args.debug):
                     cmd.extend(['-hide_banner'])
                 else:
-                    cmd.extend(['-nostats', '-loglevel', '0'])
+                    cmd.extend(['-nostats', '-loglevel', '8'])
 
                 subprocess.call(cmd)
 
@@ -559,7 +563,7 @@ def main():
             if(args.debug):
                 cmd.extend(['-hide_banner'])
             else:
-                cmd.extend(['-nostats', '-loglevel', '0'])
+                cmd.extend(['-nostats', '-loglevel', '8'])
             subprocess.call(cmd)
             INPUT_FILE = constancLoc
 
