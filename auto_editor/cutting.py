@@ -34,7 +34,7 @@ def audioToHasLoud(audioData, sampleRate, silentT, fps, log):
 
 # Motion detection algorithm based on this blog post:
 # https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
-def motionDetection(path, ffprobe, motionThreshold, width, dilates, blur):
+def motionDetection(path, ffprobe, motionThreshold, log, width, dilates, blur):
 
     import cv2
     import subprocess
@@ -120,7 +120,8 @@ def motionDetection(path, ffprobe, motionThreshold, width, dilates, blur):
 
     conwrite('')
 
-    hasMotion = np.array(hasMotion, dtype=np.uint8)
+    if(max(hasMotion) == 0):
+        log.error('Error, no motion detected.')
 
     return hasMotion
 

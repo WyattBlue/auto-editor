@@ -554,7 +554,7 @@ def main():
             audioList = audioToHasLoud(audioData, sampleRate, args.silent_threshold, fps, log)
 
         if(args.edit_based_on != 'audio'):
-            motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold,
+            motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold, log,
                 width=400, dilates=2, blur=True)
 
         if(args.edit_based_on == 'audio'):
