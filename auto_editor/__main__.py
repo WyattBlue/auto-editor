@@ -131,7 +131,7 @@ def main():
     add_argument('--sample_rate', '-r', type=sample_rate_type,
         help='set the sample rate of the input and output videos.')
     add_argument('--video_codec', '-vcodec', default='uncompressed',
-        help='set the video codec for the output file.')
+        help='set the video codec for the output media file.')
     add_argument('--preset', '-p', default='medium',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
@@ -146,6 +146,12 @@ def main():
     add_argument('--cut_out', nargs='*',
         help='the range (in seconds) that should be cut out completely, '\
             'regardless of anything else. (uses range syntax)')
+    add_argument('--motion_threshold', type=float_type, default=0.04, range='0 to 1',
+        help='how much motion is required to be considered "moving"')
+    add_argument('--edit_based_on', default='audio',
+        choices=['audio', 'motion', 'audio_or_motion', 'audio_and_motion',
+            'audio_xor_motion', 'audio_and_not_motion'],
+        help='decide if to use audio/motion to consider when making edits.')
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # Fixes pip not able to find other included modules.
@@ -271,7 +277,7 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    from usefulFunctions import vidTracks, conwrite, getAudioChunks
+    from usefulFunctions import vidTracks, conwrite
     from wavfile import read, write
 
     if(not args.preview):
@@ -541,9 +547,23 @@ def main():
                 else:
                     log.error('Audio track not found!')
 
-        chunks, includeFrame = getAudioChunks(audioData, sampleRate, fps,
-            args.silent_threshold, args.frame_margin, args.min_clip_length,
-            args.min_cut_length, args.ignore, args.cut_out, log)
+        from cutting import audioToHasLoud, motionDetection, applySpacingRules
+        import numpy as np
+
+        if(args.define_loudness != 'motion'):
+            audioList = audioToHasLoud(audioData, sampleRate, args.silent_threshold, fps, log)
+
+        if(args.define_loudness != 'audio'):
+            motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold,
+                width=400, dilates=2, blur=True)
+
+        if(args.define_loudness == 'audio'):
+            hasLoud = audioList
+        if(args.define_loudness == 'motion'):
+            hasLoud = motionList
+
+        chunks, includeFrame = applySpacingRules(hasLoud, fps, args.frame_margin,
+            args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
 
         clips = []
         for chunk in chunks:

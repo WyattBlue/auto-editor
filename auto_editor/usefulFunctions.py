@@ -52,114 +52,6 @@ def getNewLength(chunks, speeds, fps):
     return timeInFrames / fps
 
 
-def getMaxVolume(s):
-    maxv = float(np.max(s))
-    minv = float(np.min(s))
-    return max(maxv, -minv)
-
-
-def getAudioChunks(audioData, sampleRate, fps, silentT, frameMargin, minClip, minCut,
-    ignore, cutOut, log):
-    import math
-
-    audioSampleCount = audioData.shape[0]
-    maxAudioVolume = getMaxVolume(audioData)
-
-    samplesPerFrame = sampleRate / fps
-    audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
-    hasLoudAudio = np.zeros((audioFrameCount), dtype=np.uint8)
-
-    if(maxAudioVolume == 0):
-        log.warning('The entire audio is silent')
-        return [[0, audioFrameCount, 1]]
-
-    # Calculate when the audio is loud or silent.
-    for i in range(audioFrameCount):
-        start = int(i * samplesPerFrame)
-        end = min(int((i+1) * samplesPerFrame), audioSampleCount)
-        audiochunks = audioData[start:end]
-        if(getMaxVolume(audiochunks) / maxAudioVolume >= silentT):
-            hasLoudAudio[i] = 1
-
-    def removeSmall(hasLoudAudio, limit, replace, with_):
-        startP = 0
-        active = False
-        for j, item in enumerate(hasLoudAudio):
-            if(item == replace):
-                if(not active):
-                    startP = j
-                    active = True
-                # Special case for end.
-                if(j == len(hasLoudAudio) - 1):
-                    if(j - startP < limit):
-                        hasLoudAudio[startP:j+1] = with_
-            else:
-                if(active):
-                    if(j - startP < limit):
-                        hasLoudAudio[startP:j] = with_
-                    active = False
-        return hasLoudAudio
-
-
-    def setRange(includeFrame, syntaxRange, fps, with_):
-        end = len(includeFrame) - 1
-        for item in syntaxRange:
-            pair = []
-
-            for num in item.split('-'):
-                if(num == 'start'):
-                    pair.append(0)
-                elif(num == 'end'):
-                    pair.append(end)
-                elif(float(num) < 0):
-                    # Negative numbers = frames from end.
-                    value = end - round(float(num) * fps)
-                    if(value < 0):
-                        value = 0
-                    pair.append(value)
-                    del value
-                else:
-                    pair.append(round(float(num) * fps))
-            includeFrame[pair[0]:pair[1]+1] = with_
-        return includeFrame
-
-
-    # Remove small loudness spikes
-    hasLoudAudio = removeSmall(hasLoudAudio, minClip, replace=1, with_=0)
-    # Remove small silences
-    hasLoudAudio = removeSmall(hasLoudAudio, minCut, replace=0, with_=1)
-
-    # Apply frame margin rules.
-    includeFrame = np.zeros((audioFrameCount), dtype=np.uint8)
-    for i in range(audioFrameCount):
-        start = int(max(0, i - frameMargin))
-        end = int(min(audioFrameCount, i+1+frameMargin))
-        includeFrame[i] = min(1, np.max(hasLoudAudio[start:end]))
-
-    # Apply ignore rules if applicable.
-    if(ignore != []):
-        includeFrame = setRange(includeFrame, ignore, fps, 1)
-
-    # Cut out ranges.
-    if(cutOut != []):
-        includeFrame = setRange(includeFrame, cutOut, fps, 0)
-
-    # Remove small clips created by applying other rules.
-    includeFrame = removeSmall(includeFrame, minClip, replace=1, with_=0)
-    # Remove small cuts created.
-    includeFrame = removeSmall(includeFrame, minCut, replace=0, with_=1)
-
-    # Convert long numpy array into properly formatted chunks list.
-    chunks = []
-    startP = 0
-    for j in range(1, audioFrameCount):
-        if(includeFrame[j] != includeFrame[j - 1]):
-            chunks.append([startP, j, includeFrame[j-1]])
-            startP = j
-    chunks.append([startP, audioFrameCount, includeFrame[j]])
-    return chunks, includeFrame
-
-
 def prettyTime(newTime):
     newTime = localtime(newTime)
     hours = newTime.tm_hour
@@ -197,9 +89,7 @@ def vidTracks(videoFile, ffprobe, log):
         return len(numbers) - 1
     except ValueError:
         log.warning('ffprobe had an invalid output.')
-        # Most of the time, there's only one track anyway,
-        # so just assume that's the case.
-        return 1
+        return 1 # Assume there's one audio track.
 
 
 def conwrite(message):
@@ -216,7 +106,7 @@ def progressBar(index, total, beginTime, title='Please wait'):
     doneStr = '█' * done
     togoStr = '░' * int(barLen - done)
 
-    if(percentDone == 0): # prevent dividing by zero
+    if(percentDone == 0): # Prevent dividing by zero.
         percentPerSec = 0
     else:
         percentPerSec = (time() - beginTime) / percentDone
