@@ -46,8 +46,10 @@ setup(
     ],
     classifiers=[
         'Topic :: Multimedia :: Video',
-        'License :: OSI Approved :: MIT License',
+        'License :: Public Domain',
+        'License :: OSI Approved :: The Unlicense (Unlicense)',
         'Environment :: Console',
+        'Natural Language :: English',
         'Development Status :: 6 - Mature',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
