@@ -550,16 +550,16 @@ def main():
         from cutting import audioToHasLoud, motionDetection, applySpacingRules
         import numpy as np
 
-        if(args.define_loudness != 'motion'):
+        if(args.edit_based_on != 'motion'):
             audioList = audioToHasLoud(audioData, sampleRate, args.silent_threshold, fps, log)
 
-        if(args.define_loudness != 'audio'):
+        if(args.edit_based_on != 'audio'):
             motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold,
                 width=400, dilates=2, blur=True)
 
-        if(args.define_loudness == 'audio'):
+        if(args.edit_based_on == 'audio'):
             hasLoud = audioList
-        if(args.define_loudness == 'motion'):
+        if(args.edit_based_on == 'motion'):
             hasLoud = motionList
 
         chunks, includeFrame = applySpacingRules(hasLoud, fps, args.frame_margin,

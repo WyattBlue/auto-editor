@@ -10,7 +10,7 @@ from audiotsm2 import phasevocoder
 from audiotsm2.io.array import ArrReader, ArrWriter
 
 # Included functions
-from usefulFunctions import getAudioChunks, progressBar, getNewLength, conwrite
+from usefulFunctions import progressBar, getNewLength, conwrite
 from wavfile import read, write
 
 # Internal libraries

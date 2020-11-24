@@ -1,4 +1,5 @@
 '''cutting.py'''
+import numpy as np
 
 def audioToHasLoud(audioData, sampleRate, silentT, fps, log):
 
@@ -35,10 +36,8 @@ def audioToHasLoud(audioData, sampleRate, silentT, fps, log):
 # https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
 def motionDetection(path, ffprobe, motionThreshold, width, dilates, blur):
 
-    # External Packages
     import cv2
-    import numpy as np
-
+    import subprocess
     from usefulFunctions import progressBar, conwrite
 
     cap = cv2.VideoCapture(path)
@@ -58,8 +57,6 @@ def motionDetection(path, ffprobe, motionThreshold, width, dilates, blur):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     output = stdout.decode()
-    print(output)
-    print('')
 
     totalFrames = int(output)
     prevFrame = None
@@ -139,7 +136,7 @@ def applySpacingRules(hasLoud, fps, frameMargin, minClip, minCut, ignore, cutOut
                     startP = j
                     active = True
                 # Special case for end.
-                if(j == len(hasLoudAudio) - 1):
+                if(j == len(hasLoud) - 1):
                     if(j - startP < limit):
                         hasLoud[startP:j+1] = with_
             else:
