@@ -13,33 +13,33 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w47a'
+version = '20w48a'
 
-def file_type(file):
+def file_type(file) -> str:
     if(not os.path.isfile(file)):
         print('Auto-Editor could not find the file: ' + file)
         sys.exit(1)
     return file
 
-def float_type(num):
+def float_type(num) -> float:
     if(num.endswith('%')):
         return float(num[:-1]) / 100
     return float(num)
 
-def sample_rate_type(num):
+def sample_rate_type(num) -> int:
     if(num.endswith(' Hz')):
         return int(num[:-3])
     if(num.endswith(' kHz')):
         return int(float(num[:-4]) * 1000)
     return int(num)
 
-def pipeToConsole(myCommands):
+def pipeToConsole(myCommands) -> str:
     process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     return stdout.decode()
 
-def ffmpegFPS(ffmpeg, path, log):
+def ffmpegFPS(ffmpeg, path, log) -> float:
     output = pipeToConsole([ffmpeg, '-i', path, '-hide_banner'])
     try:
         matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
@@ -47,7 +47,7 @@ def ffmpegFPS(ffmpeg, path, log):
     except AttributeError:
         log.warning('frame rate detection failed.\n' \
             'If your video has a variable frame rate, ignore this message.')
-        return 30
+        return 30.0
 
 def main():
     options = []

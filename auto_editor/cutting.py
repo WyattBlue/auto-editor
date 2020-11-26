@@ -1,13 +1,14 @@
 '''cutting.py'''
 import numpy as np
 
-def audioToHasLoud(audioData, sampleRate, silentT, fps, log):
+def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
+    fps: float, log) -> np.ndarray:
 
     import math
 
     audioSampleCount = audioData.shape[0]
 
-    def getMaxVolume(s):
+    def getMaxVolume(s: np.ndarray) -> float:
         maxv = float(np.max(s))
         minv = float(np.min(s))
         return max(maxv, -minv)
@@ -34,7 +35,8 @@ def audioToHasLoud(audioData, sampleRate, silentT, fps, log):
 
 # Motion detection algorithm based on this blog post:
 # https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
-def motionDetection(path, ffprobe, motionThreshold, log, width, dilates, blur):
+def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
+    width, dilates, blur) -> np.ndarray:
 
     import cv2
     import subprocess
