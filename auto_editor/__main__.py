@@ -326,6 +326,7 @@ def main():
         sys.exit()
 
     log = Log(args.debug, args.show_ffmpeg_debug)
+    log.debug('')
 
     if(is64bit == '32-bit'):
         log.warning('You have the 32-bit version of Python, which may lead to memory crashes.')
@@ -397,6 +398,7 @@ def main():
                 args.output_file.append(oldFile[:dotIndex] + end)
 
     TEMP = tempfile.mkdtemp()
+    log.debug(f'\n   - Temp Directory: {TEMP}')
 
     if(args.combine_files):
         # Combine video files, then set input to 'combined.mp4'.
@@ -648,7 +650,7 @@ def main():
             from fastAudio import fastAudio
 
             fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
-                sampleRate, True, log)
+                sampleRate, True, TEMP, log)
             continue
 
         from fastVideo import fastVideo

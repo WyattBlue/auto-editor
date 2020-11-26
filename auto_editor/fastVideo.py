@@ -31,7 +31,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
 
     for trackNum in range(tracks):
         fastAudio(ffmpeg, f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
-            speeds, abitrate, samplerate, False, log, fps=fps)
+            speeds, abitrate, samplerate, False, temp, log, fps=fps)
 
         if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
             log.error('Audio file not created.')
