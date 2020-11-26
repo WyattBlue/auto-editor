@@ -15,7 +15,7 @@ from datetime import timedelta
 def preview(myInput, chunks, speeds, fps, audioFile, log):
 
     if(not os.path.isfile(myInput)):
-        log.error('preview.py: Could not find file ', myInput)
+        log.error('preview.py: Could not find file ' + str(myInput))
 
     def printTimeFrame(title, frames, fps):
         inSec = round(frames / fps, 1)

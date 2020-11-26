@@ -37,8 +37,8 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate,
         if(audioBit is not None):
             cmd.extend(['-b:a', str(audioBit)])
         cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{TEMP}/fastAud.wav'])
-        if(not log.ffmpeg()):
-            cmd.extend(['-nostats', '-loglevel', '0'])
+        if(log.is_ffmpeg):
+            cmd.extend(['-nostats', '-loglevel', '8'])
         subprocess.call(cmd)
 
         theFile = f'{TEMP}/fastAud.wav'
