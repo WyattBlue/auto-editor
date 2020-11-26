@@ -114,7 +114,9 @@ def main():
     add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
     add_argument('--debug', '--verbose', action='store_true',
-        help='show helpful debugging values.')
+        help='show debugging messages and values.')
+    add_argument('--show_ffmpeg_debug', action='store_true',
+        help='show ffmpeg progress and output.')
 
     # TODO: add export_as_video
     add_argument('--export_as_audio', '-exa', action='store_true',
@@ -142,10 +144,9 @@ def main():
         help='set the tune for ffmpeg to compress video better.')
 
     add_argument('--ignore', nargs='*',
-        help="the range (in seconds) that shouldn't be edited at all. (uses range syntax)")
+        help='the range that will be marked as "loud"')
     add_argument('--cut_out', nargs='*',
-        help='the range (in seconds) that should be cut out completely, '\
-            'regardless of anything else. (uses range syntax)')
+        help='the range that will be marked as "silent"')
     add_argument('--motion_threshold', type=float_type, default=0.04, range='0 to 1',
         help='how much motion is required to be considered "moving"')
     add_argument('--edit_based_on', default='audio',
@@ -240,7 +241,10 @@ def main():
                             log.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
                         if(option['choices'] is not None):
                             if(value not in option['choices']):
-                                log.error(f'{value} is not a choice for {option}')
+                                optionName = option['names'][0]
+                                myChoices = ', '.join(option['choices'])
+                                log.error(f'{value} is not a choice for {optionName}' \
+                                    f'\nchoices are:\n  {myChoices}')
                         i += 1
                     setattr(self, key, value)
                 else:
@@ -309,7 +313,7 @@ def main():
 
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
-    if(args.debug):
+    if(args.debug and args.input == []):
         print('Python Version:', platform.python_version(), is64bit)
         print('Platform:', platform.system(), platform.release())
         # Platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
@@ -319,15 +323,12 @@ def main():
         print('FFmpeg path:', ffmpeg)
         print('FFmpeg version:', ffmpegVersion)
         print('Auto-Editor version', version)
-        if(args.input == []):
-            sys.exit()
+        sys.exit()
 
-    log = Log(3 if args.debug else 2)
+    log = Log(args.debug, args.show_ffmpeg_debug)
 
     if(is64bit == '32-bit'):
-        log.warning("You have the 32-bit version of Python, which means you won't be " \
-            'able to handle long videos.')
-
+        log.warning('You have the 32-bit version of Python, which may lead to memory crashes.')
     if(args.frame_margin < 0):
         log.error('Frame margin cannot be negative.')
 
@@ -405,12 +406,11 @@ def main():
         cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
             '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2',
             f'{TEMP}/combined.mp4'])
-        if(args.debug):
+        if(log.ffmpeg):
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '8'])
 
-        log.debug(cmd)
         subprocess.call(cmd)
         inputList = [f'{TEMP}/combined.mp4']
 
@@ -471,7 +471,7 @@ def main():
             tracks = 1
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', args.audio_bitrate, '-ac', '2',
                 '-ar', str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
-            if(args.debug):
+            if(log.ffmpeg):
                 cmd.extend(['-hide_banner'])
             else:
                 cmd.extend(['-nostats', '-loglevel', '8'])
@@ -520,7 +520,7 @@ def main():
                 cmd.extend(['-ac', '2', '-ar', str(args.sample_rate), '-map',
                     f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
 
-                if(args.debug):
+                if(log.is_ffmpeg):
                     cmd.extend(['-hide_banner'])
                 else:
                     cmd.extend(['-nostats', '-loglevel', '8'])
@@ -532,7 +532,7 @@ def main():
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
                     str(args.sample_rate), '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
-                if(args.debug):
+                if(log.is_ffmpeg):
                     cmd.extend(['-hide_banner'])
                 else:
                     cmd.extend(['-nostats', '-loglevel', '8'])
@@ -550,17 +550,54 @@ def main():
         from cutting import audioToHasLoud, motionDetection, applySpacingRules
         import numpy as np
 
+        audioList = None
+        motionList = None
         if(args.edit_based_on != 'motion'):
+            log.debug('Analyzing audio volume.')
             audioList = audioToHasLoud(audioData, sampleRate, args.silent_threshold, fps, log)
 
         if(args.edit_based_on != 'audio'):
+            log.debug('Analyzing video motion.')
             motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold, log,
                 width=400, dilates=2, blur=True)
 
+            if(audioList is not None):
+                if(len(audioList) > len(motionList)):
+                    log.debug('Reducing the size of audioList to match motionList')
+                    log.debug(f'audioList Length:  {len(audioList)}')
+                    log.debug(f'motionList Length: {len(motionList)}')
+                    audioList = audioList[:len(motionList)]
+
         if(args.edit_based_on == 'audio'):
             hasLoud = audioList
+            if(max(audioList) == 0):
+                log.error('There was no place where audio exceeded the threshold.')
         if(args.edit_based_on == 'motion'):
             hasLoud = motionList
+            if(max(motionList) == 0):
+                log.error('There was no place where motion exceeded the threshold.')
+
+        # Only raise a warning for other cases.
+        if(audioList is not None and max(audioList) == 0):
+            log.warning('There was no place where audio exceeded the threshold.')
+        if(motionList is not None and max(motionList) == 0):
+            log.warning('There was no place where motion exceeded the threshold.')
+
+        if(args.edit_based_on == 'audio_and_motion'):
+            log.debug('Applying "Python bitwise and" on arrays.')
+            hasLoud = audioList & motionList
+
+        if(args.edit_based_on == 'audio_or_motion'):
+            log.debug('Applying "Python bitwise or" on arrays.')
+            hasLoud = audioList | motionList
+
+        if(args.edit_based_on == 'audio_xor_motion'):
+            log.debug('Applying "numpy bitwise_xor" on arrays')
+            hasLoud = np.bitwise_xor(audioList, motionList)
+
+        if(args.edit_based_on == 'audio_and_not_motion'):
+            log.debug('Applying "Python bitwise and" with "numpy bitwise not" on arrays.')
+            hasLoud = audioList & np.invert(motionList)
 
         chunks, includeFrame = applySpacingRules(hasLoud, fps, args.frame_margin,
             args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
@@ -580,7 +617,7 @@ def main():
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', f'fps=fps=30', constantLoc]
-            if(args.debug):
+            if(log.is_ffmpeg):
                 cmd.extend(['-hide_banner'])
             else:
                 cmd.extend(['-nostats', '-loglevel', '8'])
@@ -591,7 +628,7 @@ def main():
             args.no_open = True
             from preview import preview
 
-            preview(INPUT_FILE, chunks, speeds, fps, audioFile, args.debug)
+            preview(INPUT_FILE, chunks, speeds, fps, audioFile, log)
             continue
 
         if(args.export_to_premiere):
@@ -611,14 +648,13 @@ def main():
             from fastAudio import fastAudio
 
             fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
-            sampleRate, args.debug, True, log)
+                sampleRate, True, log)
             continue
 
         from fastVideo import fastVideo
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, includeFrame, speeds, tracks,
-            args.audio_bitrate, sampleRate, args.debug, TEMP,
-            args.keep_tracks_seperate, vcodec, fps, args.export_as_audio,
-            args.video_bitrate, args.preset, args.tune, log)
+            args.audio_bitrate, sampleRate, TEMP, args.keep_tracks_seperate, vcodec, fps,
+            args.export_as_audio, args.video_bitrate, args.preset, args.tune, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'The file {newOutput} was not created.')

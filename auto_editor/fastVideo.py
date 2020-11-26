@@ -18,8 +18,8 @@ import subprocess
 from shutil import rmtree, move
 
 def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, abitrate,
-    samplerate, debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate,
-    preset, tune, log):
+    samplerate, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, preset,
+    tune, log):
 
     if(not os.path.isfile(vidFile)):
         log.error('fastVideo.py could not find file: ' + str(vidFile))
@@ -31,7 +31,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
 
     for trackNum in range(tracks):
         fastAudio(ffmpeg, f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
-            speeds, abitrate, samplerate, debug, False, log, fps=fps)
+            speeds, abitrate, samplerate, False, log, fps=fps)
 
         if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
             log.error('Audio file not created.')
@@ -93,13 +93,18 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         progressBar(cframe - starting, totalFrames - starting, beginTime,
             title='Creating new video')
 
-    conwrite('Writing the output file.')
+    log.debug(f'\n   - Frames Written: {framesWritten}')
+    log.debug(f'   - Starting: {starting}')
+    log.debug(f'   - Total Frames: {totalFrames}')
+
+    if(log.is_debug):
+        log.debug('Writing the output file.')
+    else:
+        conwrite('Writing the output file.')
 
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-
-    log.debug('Frames written ' + str(framesWritten))
 
     # Now mix new audio(s) and the new video.
     if(keepTracksSep):
@@ -118,7 +123,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         if(tune != 'none'):
             cmd.extend(['-tune', tune])
         cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2', outFile])
-        if(debug):
+        if(log.is_ffmpeg):
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '8'])
@@ -130,7 +135,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
                 cmd.extend(['-i', f'{temp}/new{i}.wav'])
             cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
                 f'{temp}/newAudioFile.wav'])
-            if(debug):
+            if(log.is_ffmpeg):
                 cmd.extend(['-hide_banner'])
             else:
                 cmd.extend(['-nostats', '-loglevel', '8'])
@@ -146,10 +151,11 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             cmd.extend(['-b:v', vbitrate])
         if(tune != 'none'):
             cmd.extend(['-tune', tune])
-        cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2',
-            outFile, '-hide_banner'])
-
-    log.debug(cmd)
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2', outFile])
+        if(log.is_ffmpeg):
+            cmd.extend(['-hide_banner'])
+        else:
+            cmd.extend(['-nostats', '-loglevel', '8'])
 
     def pipeToConsole(myCommands):
         process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
@@ -158,7 +164,6 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         return stdout.decode()
 
     message = pipeToConsole(cmd)
-    log.debug('')
     log.debug(message)
 
     if('Conversion failed!' in message):
@@ -167,7 +172,10 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             '\nTrying, again but not compressing.')
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
-            outFile, '-nostats', '-loglevel', '8']
-        log.debug(cmd)
+            outFile]
+        if(log.is_ffmpeg):
+            cmd.extend(['-hide_banner'])
+        else:
+            cmd.extend(['-nostats', '-loglevel', '8'])
         subprocess.call(cmd)
     conwrite('')

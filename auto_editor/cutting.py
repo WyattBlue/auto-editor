@@ -120,9 +120,6 @@ def motionDetection(path, ffprobe, motionThreshold, log, width, dilates, blur):
 
     conwrite('')
 
-    if(max(hasMotion) == 0):
-        log.error('Error, no motion detected.')
-
     return hasMotion
 
 

@@ -20,7 +20,7 @@ import time
 import tempfile
 import subprocess
 
-def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, debug,
+def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate,
     needConvert, log, fps=30):
 
     if(not os.path.isfile(theFile)):
@@ -37,7 +37,7 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
         if(audioBit is not None):
             cmd.extend(['-b:a', str(audioBit)])
         cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{TEMP}/fastAud.wav'])
-        if(not debug):
+        if(not log.ffmpeg()):
             cmd.extend(['-nostats', '-loglevel', '0'])
         subprocess.call(cmd)
 
@@ -91,9 +91,9 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
 
         progressBar(chunkNum, totalChunks, beginTime, title='Creating new audio')
 
-    log.debug('\nyPointer: ' + str(yPointer))
-    log.debug('samples per frame: ' + str(samplerate / fps))
-    log.debug('Expected video length: ' + str(yPointer / (samplerate / fps)))
+    log.debug('\n   - Total Samples: ' + str(yPointer))
+    log.debug('   - Samples per Frame: ' + str(samplerate / fps))
+    log.debug('   - Expected video length: ' + str(yPointer / (samplerate / fps)))
     newAudio = newAudio[:yPointer]
     write(outFile, samplerate, newAudio)
 

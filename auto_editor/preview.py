@@ -12,11 +12,10 @@ from usefulFunctions import getNewLength
 import os
 from datetime import timedelta
 
-def preview(myInput, chunks, speeds, fps, audioFile, debug):
+def preview(myInput, chunks, speeds, fps, audioFile, log):
 
     if(not os.path.isfile(myInput)):
-        print('preview.py: Could not find file ', myInput)
-        sys.exit(1)
+        log.error('preview.py: Could not find file ', myInput)
 
     def printTimeFrame(title, frames, fps):
         inSec = round(frames / fps, 1)
@@ -63,6 +62,4 @@ def preview(myInput, chunks, speeds, fps, audioFile, debug):
     print('')
     if(not audioFile):
         print('Video framerate:', fps)
-    if(debug):
-        print('Chunks:')
-        print(chunks)
+    log.debug(f'Chunks:\n{chunks}')

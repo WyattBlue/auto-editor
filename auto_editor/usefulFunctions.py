@@ -5,41 +5,29 @@ To prevent duplicate code being pasted between scripts, common functions should 
 put here. No code here should modify or create video/audio files.
 """
 
-# External libraries
-import numpy as np
-
 # Internal libraries
-import os
-import subprocess
 from shutil import get_terminal_size
 from time import time, localtime
 
-
 class Log():
-    """
-    Log(0), print nothing
-    Log(1), print errors
-    Log(2), print errors and warnings.
-    Log(3), print errors, warnings, and debug.
-
-    Log(-1), don't crash when errors happen
-    """
-    def __init__(self, level=3):
-        self.level = level
+    def __init__(self, show_debug=False, ffmpeg=False):
+        self.is_debug = show_debug
+        self.is_ffmpeg = ffmpeg
 
     def error(self, message):
-        if(self.level > 0):
-            print('Error!', message)
-        if(self.level != -1):
-            import sys
-            sys.exit(1)
+        print('Error!', message)
+        import sys
+        sys.exit(1)
 
     def warning(self, message):
-        if(self.level > 1):
-            print('Warning!', message)
+        print('Warning!', message)
 
     def debug(self, message):
-        if(self.level > 2):
+        if(self.is_debug):
+            print(message)
+
+    def ffmpeg(self, message):
+        if(self.is_ffmpeg):
             print(message)
 
 
@@ -70,10 +58,11 @@ def prettyTime(newTime):
     return f'{hours:02}:{minutes:02} {ampm}'
 
 
-def vidTracks(videoFile, ffprobe, log):
+def vidTracks(videoFile, ffprobe, log) -> int:
     """
     Return the number of audio tracks in a video file.
     """
+    import subprocess
 
     cmd = [ffprobe, videoFile, '-hide_banner', '-loglevel', 'panic',
         '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
