@@ -40,7 +40,7 @@ def getNewLength(chunks, speeds, fps):
     return timeInFrames / fps
 
 
-def prettyTime(newTime):
+def prettyTime(newTime) -> str:
     newTime = localtime(newTime)
     hours = newTime.tm_hour
 

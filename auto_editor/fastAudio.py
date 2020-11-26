@@ -27,15 +27,15 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate,
         log.error('fastAudio.py could not find file: ' + str(theFile))
 
     if(needConvert):
-        cmd = [ffmpeg, '-i', theFile]
+        cmd = [ffmpeg, '-y', '-i', theFile]
         if(audioBit is not None):
             cmd.extend(['-b:a', str(audioBit)])
-        cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{temp}/fastAud.wav'])
+        cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{temp}/faAudio.wav'])
         if(log.is_ffmpeg):
             cmd.extend(['-nostats', '-loglevel', '8'])
         subprocess.call(cmd)
 
-        theFile = f'{temp}/fastAud.wav'
+        theFile = f'{temp}/faAudio.wav'
 
     samplerate, audioData = read(theFile)
 
