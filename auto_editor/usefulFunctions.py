@@ -14,12 +14,12 @@ class Log():
         self.is_debug = show_debug
         self.is_ffmpeg = ffmpeg
 
-    def error(self, message):
+    def error(message):
         print('Error!', message)
         import sys
         sys.exit(1)
 
-    def warning(self, message):
+    def warning(message):
         print('Warning!', message)
 
     def debug(self, message):
@@ -29,6 +29,27 @@ class Log():
     def ffmpeg(self, message):
         if(self.is_ffmpeg):
             print(message)
+
+
+def getBinaries(plat, dirPath, myFFmpeg: bool):
+
+    from os import path
+
+    newF = None
+    newP = None
+    if(plat == 'Windows' and not myFFmpeg):
+        newF = path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
+        newP = path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
+    if(plat == 'Darwin' and not myFFmpeg):
+        newF = path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
+        newP = path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
+    if(newF is not None and path.isfile(newF)):
+        ffmpeg = newF
+        ffprobe = newP
+    else:
+        ffmpeg = 'ffmpeg'
+        ffprobe = 'ffprobe'
+    return ffmpeg, ffprobe
 
 
 def getNewLength(chunks: list, speeds: list, fps: float) -> float:

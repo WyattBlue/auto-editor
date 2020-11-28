@@ -126,28 +126,51 @@ def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
     return hasMotion
 
 
+def removeSmall(hasLoud: np.ndarray, lim: int, replace: bool, with_: bool) -> np.ndarray:
+    startP = 0
+    active = False
+    for j, item in enumerate(hasLoud):
+        if(item == replace):
+            if(not active):
+                startP = j
+                active = True
+            # Special case for end.
+            if(j == len(hasLoud) - 1):
+                if(j - startP < lim):
+                    hasLoud[startP:j+1] = with_
+        else:
+            if(active):
+                if(j - startP < lim):
+                    hasLoud[startP:j] = with_
+                active = False
+    return hasLoud
+
+
+def setRange(includeFrame: np.ndarray, syntaxRange, fps: float, with_: bool) -> np.ndarray:
+    end = len(includeFrame) - 1
+    for item in syntaxRange:
+        pair = []
+
+        for num in item.split('-'):
+            if(num == 'start'):
+                pair.append(0)
+            elif(num == 'end'):
+                pair.append(end)
+            elif(float(num) < 0):
+                # Negative numbers = frames from end.
+                value = end - round(float(num) * fps)
+                if(value < 0):
+                    value = 0
+                pair.append(value)
+                del value
+            else:
+                pair.append(round(float(num) * fps))
+        includeFrame[pair[0]:pair[1]+1] = with_
+    return includeFrame
+
+
 def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
     minClip: int, minCut: int, ignore, cutOut, log):
-
-    def removeSmall(hasLoud: np.ndarray, limit: int, replace: bool,
-            with_: bool) -> np.ndarray:
-        startP = 0
-        active = False
-        for j, item in enumerate(hasLoud):
-            if(item == replace):
-                if(not active):
-                    startP = j
-                    active = True
-                # Special case for end.
-                if(j == len(hasLoud) - 1):
-                    if(j - startP < limit):
-                        hasLoud[startP:j+1] = with_
-            else:
-                if(active):
-                    if(j - startP < limit):
-                        hasLoud[startP:j] = with_
-                    active = False
-        return hasLoud
 
     def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
         # Remove small loudness spikes
@@ -168,29 +191,6 @@ def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
         includeFrame[i] = min(1, np.max(hasLoud[start:end]))
 
     del hasLoud
-
-    def setRange(includeFrame: np.ndarray, syntaxRange, fps: float,
-            with_: bool) -> np.ndarray:
-        end = len(includeFrame) - 1
-        for item in syntaxRange:
-            pair = []
-
-            for num in item.split('-'):
-                if(num == 'start'):
-                    pair.append(0)
-                elif(num == 'end'):
-                    pair.append(end)
-                elif(float(num) < 0):
-                    # Negative numbers = frames from end.
-                    value = end - round(float(num) * fps)
-                    if(value < 0):
-                        value = 0
-                    pair.append(value)
-                    del value
-                else:
-                    pair.append(round(float(num) * fps))
-            includeFrame[pair[0]:pair[1]+1] = with_
-        return includeFrame
 
     # Apply ignore rules if applicable.
     if(ignore != []):

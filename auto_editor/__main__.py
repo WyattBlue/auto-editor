@@ -286,7 +286,7 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    from usefulFunctions import vidTracks, conwrite
+    from usefulFunctions import vidTracks, conwrite, getBinaries
     from wavfile import read, write
 
     if(not args.preview):
@@ -299,23 +299,8 @@ def main():
         else:
             conwrite('Starting.')
 
-    newF = None
-    newP = None
-    if(platform.system() == 'Windows' and not args.my_ffmpeg):
-        newF = os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
-        newP = os.path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
-    if(platform.system() == 'Darwin' and not args.my_ffmpeg):
-        newF = os.path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
-        newP = os.path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
-    if(newF is not None and os.path.isfile(newF)):
-        ffmpeg = newF
-        ffprobe = newP
-    else:
-        ffmpeg = 'ffmpeg'
-        ffprobe = 'ffprobe'
-
+    ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
     makingDataFile = args.export_to_premiere or args.export_to_resolve
-
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
     if(args.debug and args.input == []):

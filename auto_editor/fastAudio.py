@@ -15,9 +15,7 @@ from wavfile import read, write
 
 # Internal libraries
 import os
-import sys
 import time
-import tempfile
 import subprocess
 
 def fastAudio(ffmpeg: str, theFile: str, outFile: str, chunks: list, speeds: list,
