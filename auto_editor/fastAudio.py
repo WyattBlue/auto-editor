@@ -1,9 +1,5 @@
 '''fastAudio.py'''
 
-"""
-This script is for handling audio files ONLY.
-"""
-
 # External libraries
 import numpy as np
 from audiotsm2 import phasevocoder
