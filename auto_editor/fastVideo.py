@@ -54,8 +54,11 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
         return None
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
-
     if(speeds[0] == 99999 and speeds[1] != 99999):
+        if(len(np.where(includeFrame == True)) == 1):
+            print('')
+            log.error('Trying to create empty video.')
+
         totalFrames = int(np.where(includeFrame == True)[0][-1])
         cframe = int(np.where(includeFrame == True)[0][0])
     elif(speeds[0] != 99999 and speeds[1] == 99999):

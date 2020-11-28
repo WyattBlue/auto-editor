@@ -17,7 +17,7 @@ def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
 
     samplesPerFrame = sampleRate / fps
     audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
-    hasLoudAudio = np.zeros((audioFrameCount), dtype=np.uint8)
+    hasLoudAudio = np.zeros((audioFrameCount), dtype=np.bool_)
 
     if(maxAudioVolume == 0):
         log.error('The entire audio is completely silent.')
@@ -28,7 +28,7 @@ def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
         end = min(int((i+1) * samplesPerFrame), audioSampleCount)
         audiochunks = audioData[start:end]
         if(getMaxVolume(audiochunks) / maxAudioVolume >= silentT):
-            hasLoudAudio[i] = 1
+            hasLoudAudio[i] = True
 
     return hasLoudAudio
 
