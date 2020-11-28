@@ -21,19 +21,19 @@ def file_type(file: str) -> str:
         sys.exit(1)
     return file
 
-def float_type(num) -> float:
+def float_type(num: str) -> float:
     if(num.endswith('%')):
         return float(num[:-1]) / 100
     return float(num)
 
-def sample_rate_type(num) -> int:
+def sample_rate_type(num: str) -> int:
     if(num.endswith(' Hz')):
         return int(num[:-3])
     if(num.endswith(' kHz')):
         return int(float(num[:-4]) * 1000)
     return int(num)
 
-def pipeToConsole(myCommands) -> str:
+def pipeToConsole(myCommands: list) -> str:
     process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
@@ -163,6 +163,8 @@ def main():
     audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
         '.acc', '.nfa', '.mka']
 
+    videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
+
     invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
         '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
         '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
@@ -184,7 +186,7 @@ def main():
                         value = option['default']
                     setattr(self, key, value)
 
-            def get_option(item, the_args):
+            def get_option(item, the_args: list):
                 for options in the_args:
                     for option in options:
                         if(item in option['names']):
@@ -422,6 +424,7 @@ def main():
     speeds = [args.silent_speed, args.video_speed]
     numCuts = 0
     for i, INPUT_FILE in enumerate(inputList):
+        log.debug(f'   - INPUT_FILE: {INPUT_FILE}')
         # Ignore folders
         if(os.path.isdir(INPUT_FILE)):
             continue
@@ -440,6 +443,7 @@ def main():
 
         # Get output file name.
         newOutput = args.output_file[i]
+        log.debug(f'   - newOutput: {newOutput}')
 
         # Grab the sample rate from the input.
         sr = args.sample_rate
@@ -476,7 +480,7 @@ def main():
             tracks = 1
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', args.audio_bitrate, '-ac', '2',
                 '-ar', str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
-            if(log.ffmpeg):
+            if(log.is_ffmpeg):
                 cmd.extend(['-hide_banner'])
             else:
                 cmd.extend(['-nostats', '-loglevel', '8'])
@@ -564,7 +568,7 @@ def main():
         if('motion' in args.edit_based_on):
             log.debug('Analyzing video motion.')
             motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold, log,
-                width=400, dilates=2, blur=True)
+                width=400, dilates=2, blur=21)
 
             if(audioList is not None):
                 if(len(audioList) > len(motionList)):
@@ -632,7 +636,8 @@ def main():
                 constantLoc = oldFile[:dotIndex] + end
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
-            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', f'fps=fps=30', constantLoc]
+            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
+                constantLoc]
             if(log.is_ffmpeg):
                 cmd.extend(['-hide_banner'])
             else:
