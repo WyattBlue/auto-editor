@@ -147,11 +147,11 @@ def main():
         help='the range that will be marked as "loud"')
     add_argument('--cut_out', nargs='*',
         help='the range that will be marked as "silent"')
-    add_argument('--motion_threshold', type=float_type, default=0.04, range='0 to 1',
+    add_argument('--motion_threshold', type=float_type, default=0.02, range='0 to 1',
         help='how much motion is required to be considered "moving"')
     add_argument('--edit_based_on', default='audio',
-        choices=['audio', 'motion', 'audio_or_motion', 'audio_and_motion',
-            'audio_xor_motion', 'audio_and_not_motion', 'not_audio', 'not_motion'],
+        choices=['audio', 'motion', 'not_audio', 'not_motion', 'audio_or_motion',
+            'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion'],
         help='decide which method to use when making edits.')
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
