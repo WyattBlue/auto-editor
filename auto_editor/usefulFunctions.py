@@ -14,12 +14,14 @@ class Log():
         self.is_debug = show_debug
         self.is_ffmpeg = ffmpeg
 
-    def error(self, message):
+    @staticmethod
+    def error(message):
         print('Error!', message)
         import sys
         sys.exit(1)
 
-    def warning(self, message):
+    @staticmethod
+    def warning(message):
         print('Warning!', message)
 
     def debug(self, message):

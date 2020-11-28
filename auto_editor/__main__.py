@@ -370,8 +370,6 @@ def main():
 
     startTime = time.time()
 
-    log.warning('Test Warning')
-
     if(args.output_file is None):
         args.output_file = []
 

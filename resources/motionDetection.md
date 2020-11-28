@@ -17,15 +17,12 @@ Frame 2:
 
 You might not quite know the difference between `audio` and `not_motion`, so these charts might help you.
 
-<img src="/example.png">
-
-blah blah balh
+<img src="example.png">
 
 
+<img src="audio.png">
 
-<img src="/audio.png">
-
-<img src="/no_audio.png">
+<img src="no_audio.png">
 
 Audio is based on
 
