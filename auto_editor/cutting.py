@@ -203,14 +203,15 @@ def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
     # Remove small clips/cuts created by applying other rules.
     includeFrame = cook(includeFrame, minClip, minCut)
 
-    # Convert long numpy array into properly formatted chunks list.
+    # Turn long silent/loud array to formatted chunk list.
+    # Example: [True, True, True, False, False] => [[0, 3, 1], [3, 5, 0]]
     chunks = []
     startP = 0
     for j in range(1, arrayLen):
         if(includeFrame[j] != includeFrame[j - 1]):
-            chunks.append([startP, j, includeFrame[j-1]])
+            chunks.append([startP, j, int(includeFrame[j-1])])
             startP = j
-    chunks.append([startP, arrayLen, includeFrame[j]])
+    chunks.append([startP, arrayLen, int(includeFrame[j])])
 
-    # Return formatted chunk list and long silent/loud array.
+    # Return both formatted and long numpy array.
     return chunks, includeFrame
