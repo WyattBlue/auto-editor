@@ -20,8 +20,8 @@ import time
 import tempfile
 import subprocess
 
-def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate,
-    needConvert, temp, log, fps=30):
+def fastAudio(ffmpeg: str, theFile: str, outFile: str, chunks: list, speeds: list,
+    audioBit, samplerate, needConvert: bool, temp: str, log, fps: float):
 
     if(not os.path.isfile(theFile)):
         log.error('fastAudio.py could not find file: ' + str(theFile))

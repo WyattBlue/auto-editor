@@ -15,14 +15,15 @@ import sys
 import time
 import tempfile
 import subprocess
-from shutil import rmtree, move
+from shutil import move
 
-def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, abitrate,
-    samplerate, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate, preset,
+def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFrame:
+    np.ndarray, speeds: list, tracks: int, abitrate: str, samplerate, temp: str,
+    keepTracksSep: bool, vcodec, fps: float, exportAsAudio: bool, vbitrate, preset,
     tune, log):
 
     if(not os.path.isfile(vidFile)):
-        log.error('fastVideo.py could not find file: ' + str(vidFile))
+        log.error('fastVideo.py could not find file: ' + vidFile)
 
     cap = cv2.VideoCapture(vidFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -55,11 +56,11 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
 
     if(speeds[0] == 99999 and speeds[1] != 99999):
-        totalFrames = int(np.where(includeFrame == 1)[0][-1])
-        cframe = int(np.where(includeFrame == 1)[0][0])
+        totalFrames = int(np.where(includeFrame == True)[0][-1])
+        cframe = int(np.where(includeFrame == True)[0][0])
     elif(speeds[0] != 99999 and speeds[1] == 99999):
-        totalFrames = int(np.where(includeFrame == 0)[0][-1])
-        cframe = int(np.where(includeFrame == 0)[0][0])
+        totalFrames = int(np.where(includeFrame == False)[0][-1])
+        cframe = int(np.where(includeFrame == False)[0][0])
     else:
         totalFrames = chunks[len(chunks) - 1][1]
         cframe = 0
@@ -79,7 +80,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         try:
             state = includeFrame[cframe]
         except IndexError:
-            state = 0
+            state = False
 
         mySpeed = speeds[state]
 

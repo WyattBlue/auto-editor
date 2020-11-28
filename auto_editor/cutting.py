@@ -20,7 +20,7 @@ def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
     hasLoudAudio = np.zeros((audioFrameCount), dtype=np.uint8)
 
     if(maxAudioVolume == 0):
-        log.error('The entire audio is silent.')
+        log.error('The entire audio is completely silent.')
 
     # Calculate when the audio is loud or silent.
     for i in range(audioFrameCount):
@@ -34,9 +34,9 @@ def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
 
 
 # Motion detection algorithm based on this blog post:
-# https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
+# https://pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
 def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
-    width, dilates, blur) -> np.ndarray:
+    width: int, dilates: int, blur: int) -> np.ndarray:
 
     import cv2
     import subprocess
@@ -60,10 +60,11 @@ def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
     stdout, __ = process.communicate()
     output = stdout.decode()
 
-    totalFrames = int(output)
+    totalFrames = int(output) + 1
+    log.debug(f'   - Cutting totalFrames: {totalFrames}')
     prevFrame = None
     gray = None
-    hasMotion = np.zeros((totalFrames), dtype=np.uint8)
+    hasMotion = np.zeros((totalFrames), dtype=np.bool_)
     total = None
 
     def resize(image, width=None, height=None, inter=cv2.INTER_AREA):
@@ -98,8 +99,8 @@ def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
 
         frame = resize(frame, width=width)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # Convert frame to grayscale.
-        if(blur):
-            gray = cv2.GaussianBlur(gray, (21, 21), 0)
+        if(blur > 0):
+            gray = cv2.GaussianBlur(gray, (blur, blur), 0)
 
         if(prevFrame is not None):
             frameDelta = cv2.absdiff(prevFrame, gray)
@@ -113,7 +114,7 @@ def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
                 total = thresh.shape[0] * thresh.shape[1]
 
             if(np.count_nonzero(thresh) / total >= motionThreshold):
-                hasMotion[cframe] = 1
+                hasMotion[cframe] = True
 
         progressBar(cframe, totalFrames, beginTime, title='Detecting motion')
 
@@ -125,9 +126,11 @@ def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
     return hasMotion
 
 
-def applySpacingRules(hasLoud, fps, frameMargin, minClip, minCut, ignore, cutOut, log):
+def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
+    minClip: int, minCut: int, ignore, cutOut, log):
 
-    def removeSmall(hasLoud, limit, replace, with_):
+    def removeSmall(hasLoud: np.ndarray, limit: int, replace: bool,
+            with_: bool) -> np.ndarray:
         startP = 0
         active = False
         for j, item in enumerate(hasLoud):
@@ -146,15 +149,19 @@ def applySpacingRules(hasLoud, fps, frameMargin, minClip, minCut, ignore, cutOut
                     active = False
         return hasLoud
 
-    # Remove small loudness spikes
-    hasLoud = removeSmall(hasLoud, minClip, replace=1, with_=0)
-    # Remove small silences
-    hasLoud = removeSmall(hasLoud, minCut, replace=0, with_=1)
+    def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
+        # Remove small loudness spikes
+        hasLoud = removeSmall(hasLoud, minClip, replace=True, with_=False)
+        # Remove small silences
+        hasLoud = removeSmall(hasLoud, minCut, replace=False, with_=True)
+        return hasLoud
+
+    hasLoud = cook(hasLoud, minClip, minCut)
 
     arrayLen = len(hasLoud)
 
     # Apply frame margin rules.
-    includeFrame = np.zeros((arrayLen), dtype=np.uint8)
+    includeFrame = np.zeros((arrayLen), dtype=np.bool_)
     for i in range(arrayLen):
         start = int(max(0, i - frameMargin))
         end = int(min(arrayLen, i+1+frameMargin))
@@ -162,7 +169,8 @@ def applySpacingRules(hasLoud, fps, frameMargin, minClip, minCut, ignore, cutOut
 
     del hasLoud
 
-    def setRange(includeFrame, syntaxRange, fps, with_):
+    def setRange(includeFrame: np.ndarray, syntaxRange, fps: float,
+            with_: bool) -> np.ndarray:
         end = len(includeFrame) - 1
         for item in syntaxRange:
             pair = []
@@ -186,16 +194,14 @@ def applySpacingRules(hasLoud, fps, frameMargin, minClip, minCut, ignore, cutOut
 
     # Apply ignore rules if applicable.
     if(ignore != []):
-        includeFrame = setRange(includeFrame, ignore, fps, 1)
+        includeFrame = setRange(includeFrame, ignore, fps, True)
 
     # Cut out ranges.
     if(cutOut != []):
-        includeFrame = setRange(includeFrame, cutOut, fps, 0)
+        includeFrame = setRange(includeFrame, cutOut, fps, False)
 
-    # Remove small clips created by applying other rules.
-    includeFrame = removeSmall(includeFrame, minClip, replace=1, with_=0)
-    # Remove small cuts created.
-    includeFrame = removeSmall(includeFrame, minCut, replace=0, with_=1)
+    # Remove small clips/cuts created by applying other rules.
+    includeFrame = cook(includeFrame, minClip, minCut)
 
     # Convert long numpy array into properly formatted chunks list.
     chunks = []

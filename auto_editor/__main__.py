@@ -15,7 +15,7 @@ from datetime import timedelta
 
 version = '20w48a'
 
-def file_type(file) -> str:
+def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
         print('Auto-Editor could not find the file: ' + file)
         sys.exit(1)
@@ -39,7 +39,7 @@ def pipeToConsole(myCommands) -> str:
     stdout, __ = process.communicate()
     return stdout.decode()
 
-def ffmpegFPS(ffmpeg, path, log) -> float:
+def ffmpegFPS(ffmpeg: str, path: str, log) -> float:
     output = pipeToConsole([ffmpeg, '-i', path, '-hide_banner'])
     try:
         matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
@@ -151,8 +151,8 @@ def main():
         help='how much motion is required to be considered "moving"')
     add_argument('--edit_based_on', default='audio',
         choices=['audio', 'motion', 'audio_or_motion', 'audio_and_motion',
-            'audio_xor_motion', 'audio_and_not_motion'],
-        help='decide if to use audio/motion to consider when making edits.')
+            'audio_xor_motion', 'audio_and_not_motion', 'not_audio', 'not_motion'],
+        help='decide which method to use when making edits.')
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # Fixes pip not able to find other included modules.
@@ -160,12 +160,15 @@ def main():
 
     from usefulFunctions import Log
 
-    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga', '.acc', '.nfa', '.mka']
+    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
+        '.acc', '.nfa', '.mka']
 
-    invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm', '.xml', '.json', '.yaml', '.png',
-        '.jpeg', '.jpg', '.gif', '.exe', '.doc', '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat',
-        '.dll', '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js', '.c', '.cpp',
-        '.csharp', '.py', '.app', '.git', '.github', '.gitignore', '.db', '.ini', '.BIN']
+    invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
+        '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
+        '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
+        '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
+        '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
+        '.db', '.ini', '.BIN']
 
     class parse_options():
         def __init__(self, userArgs, log, *args):
@@ -355,7 +358,7 @@ def main():
     inputList = []
     for myInput in args.input:
         if(os.path.isdir(myInput)):
-            def validFiles(path, badExts):
+            def validFiles(path: str, badExts: list):
                 for f in os.listdir(path):
                     if(not f[f.rfind('.'):] in badExts):
                         yield os.path.join(path, f)
@@ -554,11 +557,11 @@ def main():
 
         audioList = None
         motionList = None
-        if(args.edit_based_on != 'motion'):
+        if('audio' in args.edit_based_on):
             log.debug('Analyzing audio volume.')
             audioList = audioToHasLoud(audioData, sampleRate, args.silent_threshold, fps, log)
 
-        if(args.edit_based_on != 'audio'):
+        if('motion' in args.edit_based_on):
             log.debug('Analyzing video motion.')
             motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold, log,
                 width=400, dilates=2, blur=True)
@@ -570,12 +573,10 @@ def main():
                     log.debug(f'motionList Length: {len(motionList)}')
                     audioList = audioList[:len(motionList)]
 
-        if(args.edit_based_on == 'audio'):
-            hasLoud = audioList
+        if(args.edit_based_on == 'audio' or args.edit_based_on == 'not_audio'):
             if(max(audioList) == 0):
                 log.error('There was no place where audio exceeded the threshold.')
-        if(args.edit_based_on == 'motion'):
-            hasLoud = motionList
+        if(args.edit_based_on == 'motion' or args.edit_based_on == 'not_motion'):
             if(max(motionList) == 0):
                 log.error('There was no place where motion exceeded the threshold.')
 
@@ -584,6 +585,19 @@ def main():
             log.warning('There was no place where audio exceeded the threshold.')
         if(motionList is not None and max(motionList) == 0):
             log.warning('There was no place where motion exceeded the threshold.')
+
+
+        if(args.edit_based_on == 'audio'):
+            hasLoud = audioList
+
+        if(args.edit_based_on == 'motion'):
+            hasLoud = motionList
+
+        if(args.edit_based_on == 'not_audio'):
+            hasLoud = np.invert(audioList)
+
+        if(args.edit_based_on == 'not_motion'):
+            hasLoud = np.invert(motionList)
 
         if(args.edit_based_on == 'audio_and_motion'):
             log.debug('Applying "Python bitwise and" on arrays.')
@@ -637,20 +651,22 @@ def main():
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate, audioFile, log)
+            exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate,
+                audioFile, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
             duration = chunks[len(chunks) - 1][1]
             from resolve import exportToResolve
 
-            exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate, audioFile, log)
+            exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate,
+                audioFile, log)
             continue
         if(audioFile and not makingDataFile):
             from fastAudio import fastAudio
 
-            fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
-                sampleRate, True, TEMP, log)
+            fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds,
+                args.audio_bitrate, sampleRate, True, TEMP, log, fps)
             continue
 
         from fastVideo import fastVideo
@@ -682,9 +698,10 @@ def main():
 
         plural = 's' if numCuts != 1 else ''
 
-        print(f'Auto-Editor made {numCuts} cut{plural}', end='') # Don't add a newline.
+        print(f'Auto-Editor made {numCuts} cut{plural}', end='')
         if(numCuts > 4):
-            print(f', which would have taken about {timeSave} {units} if edited manually.')
+            print(f', which would have taken about {timeSave} {units} if' \
+                ' edited manually.')
         else:
             print('.')
 

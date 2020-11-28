@@ -31,7 +31,7 @@ class Log():
             print(message)
 
 
-def getNewLength(chunks, speeds, fps):
+def getNewLength(chunks: list, speeds: list, fps: float) -> float:
     timeInFrames = 0
     for chunk in chunks:
         leng = chunk[1] - chunk[0]
@@ -40,7 +40,7 @@ def getNewLength(chunks, speeds, fps):
     return timeInFrames / fps
 
 
-def prettyTime(newTime) -> str:
+def prettyTime(newTime: float) -> str:
     newTime = localtime(newTime)
     hours = newTime.tm_hour
 
@@ -58,7 +58,7 @@ def prettyTime(newTime) -> str:
     return f'{hours:02}:{minutes:02} {ampm}'
 
 
-def vidTracks(videoFile, ffprobe, log) -> int:
+def vidTracks(videoFile: str, ffprobe: str, log) -> int:
     """
     Return the number of audio tracks in a video file.
     """
@@ -81,7 +81,7 @@ def vidTracks(videoFile, ffprobe, log) -> int:
         return 1 # Assume there's one audio track.
 
 
-def conwrite(message):
+def conwrite(message: str):
     numSpaces = get_terminal_size().columns - len(message) - 3
     print('  ' + message + ' ' * numSpaces, end='\r', flush=True)
 
