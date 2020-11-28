@@ -163,7 +163,7 @@ def main():
     audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
         '.acc', '.nfa', '.mka']
 
-    videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
+    # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
 
     invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
         '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
