@@ -636,7 +636,7 @@ def main():
                 constantLoc = oldFile[:dotIndex] + end
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
-            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', f'fps=fps=30',
+            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', 'fps=fps=30',
                 constantLoc]
             if(log.is_ffmpeg):
                 cmd.extend(['-hide_banner'])

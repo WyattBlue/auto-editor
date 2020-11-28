@@ -85,7 +85,6 @@ def exportToPremiere(myInput: str, temp: str, output, clips, tracks, sampleRate,
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
-    alphatype = 'none'
     depth = '16'
     timebase = '30'
     if(not audioFile):
@@ -160,7 +159,7 @@ def exportToPremiere(myInput: str, temp: str, output, clips, tracks, sampleRate,
                     outfile.write('\t\t\t\t\t\t\t</media>\n')
                     outfile.write('\t\t\t\t\t\t</file>\n')
                 else:
-                    outfile.write(f'\t\t\t\t\t\t<file id="file-1"/>\n')
+                    outfile.write('\t\t\t\t\t\t<file id="file-1"/>\n')
                 outfile.write('\t\t\t\t\t</clipitem>\n')
 
             outfile.write('\t\t\t\t</track>\n')

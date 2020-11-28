@@ -4,7 +4,7 @@
 It's simple, just add `--edit_based_on motion`.
 
 
-### How Does Motion Detection Work?
+### How Does Motion Detection Work
 
 Frame 1:
 
