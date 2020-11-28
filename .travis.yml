@@ -43,4 +43,3 @@ script:
  - python3 auto_editor/__main__.py example.mp4 --cut_out 0-5.7 -o hmm.mp4
  - python3 auto_editor/__main__.py example.mp4 hmm.mp4 --combine_files --debug
  - python3 auto_editor/__main__.py resources/man_on_green_screen.mp4  --edit_based_on motion --debug --frame_margin 0 -mcut 0 -mclip 0
-
