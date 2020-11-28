@@ -3,7 +3,6 @@
 # External libraries
 import cv2
 import numpy as np
-from audiotsm2 import phasevocoder
 
 # Included functions
 from fastAudio import fastAudio
@@ -11,9 +10,7 @@ from usefulFunctions import progressBar, conwrite
 
 # Internal libraries
 import os
-import sys
 import time
-import tempfile
 import subprocess
 from shutil import move
 

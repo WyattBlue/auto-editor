@@ -229,7 +229,7 @@ def main():
                             if(option['choices'] is not None):
                                 print('    choices:', ', '.join(option['choices']))
                         else:
-                            print(f'    type: flag')
+                            print('    type: flag')
                         sys.exit()
 
                     if(option['nargs'] != 1):
