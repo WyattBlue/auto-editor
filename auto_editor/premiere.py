@@ -10,48 +10,48 @@ from usefulFunctions import conwrite
 # Internal libraries
 import os
 
-def exportToPremiere(myInput: str, temp: str, output, clips, tracks, sampleRate,
+def speedup(speed) -> str:
+    r = '\t\t\t\t\t\t<filter>\n'
+    r += '\t\t\t\t\t\t\t<effect>\n'
+    r += '\t\t\t\t\t\t\t\t<name>Time Remap</name>\n'
+    r += '\t\t\t\t\t\t\t\t<effectid>timeremap</effectid>\n'
+    r += '\t\t\t\t\t\t\t\t<effectcategory>motion</effectcategory>\n'
+    r += '\t\t\t\t\t\t\t\t<effecttype>motion</effecttype>\n'
+    r += '\t\t\t\t\t\t\t\t<mediatype>video</mediatype>\n'
+    r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
+    r += '\t\t\t\t\t\t\t\t\t<parameterid>variablespeed</parameterid>\n'
+    r += '\t\t\t\t\t\t\t\t\t<name>variablespeed</name>\n'
+    r += '\t\t\t\t\t\t\t\t\t<valuemin>0</valuemin>\n'
+    r += '\t\t\t\t\t\t\t\t\t<valuemax>1</valuemax>\n'
+    r += '\t\t\t\t\t\t\t\t\t<value>0</value>\n'
+    r += '\t\t\t\t\t\t\t\t</parameter>\n'
+    r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
+    r += '\t\t\t\t\t\t\t\t\t<parameterid>speed</parameterid>\n'
+    r += '\t\t\t\t\t\t\t\t\t<name>speed</name>\n'
+    r += '\t\t\t\t\t\t\t\t\t<valuemin>-100000</valuemin>\n'
+    r += '\t\t\t\t\t\t\t\t\t<valuemax>100000</valuemax>\n'
+    r += f'\t\t\t\t\t\t\t\t\t<value>{speed}</value>\n'
+    r += '\t\t\t\t\t\t\t\t</parameter>\n'
+    r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
+    r += '\t\t\t\t\t\t\t\t\t<parameterid>reverse</parameterid>\n'
+    r += '\t\t\t\t\t\t\t\t\t<name>reverse</name>\n'
+    r += '\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n'
+    r += '\t\t\t\t\t\t\t\t</parameter>\n'
+    r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
+    r += '\t\t\t\t\t\t\t\t\t<parameterid>frameblending</parameterid>\n'
+    r += '\t\t\t\t\t\t\t\t\t<name>frameblending</name>\n'
+    r += '\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n'
+    r += '\t\t\t\t\t\t\t\t</parameter>\n'
+    r += '\t\t\t\t\t\t\t</effect>\n'
+    r += '\t\t\t\t\t\t</filter>\n'
+    return r
+
+
+def exportToPremiere(myInput: str, temp: str, output, clips, tracks: int, sampleRate,
     audioFile, log):
 
     def makepath(filepath: str) -> str:
         return 'file://localhost' + os.path.abspath(filepath)
-
-
-    def speedup(speed) -> str:
-        r = '\t\t\t\t\t\t<filter>\n'
-        r += '\t\t\t\t\t\t\t<effect>\n'
-        r += '\t\t\t\t\t\t\t\t<name>Time Remap</name>\n'
-        r += '\t\t\t\t\t\t\t\t<effectid>timeremap</effectid>\n'
-        r += '\t\t\t\t\t\t\t\t<effectcategory>motion</effectcategory>\n'
-        r += '\t\t\t\t\t\t\t\t<effecttype>motion</effecttype>\n'
-        r += '\t\t\t\t\t\t\t\t<mediatype>video</mediatype>\n'
-        r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
-        r += '\t\t\t\t\t\t\t\t\t<parameterid>variablespeed</parameterid>\n'
-        r += '\t\t\t\t\t\t\t\t\t<name>variablespeed</name>\n'
-        r += '\t\t\t\t\t\t\t\t\t<valuemin>0</valuemin>\n'
-        r += '\t\t\t\t\t\t\t\t\t<valuemax>1</valuemax>\n'
-        r += '\t\t\t\t\t\t\t\t\t<value>0</value>\n'
-        r += '\t\t\t\t\t\t\t\t</parameter>\n'
-        r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
-        r += '\t\t\t\t\t\t\t\t\t<parameterid>speed</parameterid>\n'
-        r += '\t\t\t\t\t\t\t\t\t<name>speed</name>\n'
-        r += '\t\t\t\t\t\t\t\t\t<valuemin>-100000</valuemin>\n'
-        r += '\t\t\t\t\t\t\t\t\t<valuemax>100000</valuemax>\n'
-        r += f'\t\t\t\t\t\t\t\t\t<value>{speed}</value>\n'
-        r += '\t\t\t\t\t\t\t\t</parameter>\n'
-        r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
-        r += '\t\t\t\t\t\t\t\t\t<parameterid>reverse</parameterid>\n'
-        r += '\t\t\t\t\t\t\t\t\t<name>reverse</name>\n'
-        r += '\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n'
-        r += '\t\t\t\t\t\t\t\t</parameter>\n'
-        r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
-        r += '\t\t\t\t\t\t\t\t\t<parameterid>frameblending</parameterid>\n'
-        r += '\t\t\t\t\t\t\t\t\t<name>frameblending</name>\n'
-        r += '\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n'
-        r += '\t\t\t\t\t\t\t\t</parameter>\n'
-        r += '\t\t\t\t\t\t\t</effect>\n'
-        r += '\t\t\t\t\t\t</filter>\n'
-        return r
 
     pathurl = makepath(myInput)
 
@@ -81,7 +81,6 @@ def exportToPremiere(myInput: str, temp: str, output, clips, tracks, sampleRate,
             newtrack = os.path.join(newFolderName, f'{i}.wav')
             os.rename(os.path.join(temp, f'{i}.wav'), newtrack)
             trackurls.append(newtrack)
-
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
@@ -243,7 +242,7 @@ def exportToPremiere(myInput: str, temp: str, output, clips, tracks, sampleRate,
                 outfile.write('\t\t\t\t\t\t\t</media>\n')
                 outfile.write('\t\t\t\t\t\t</file>\n')
             else:
-                outfile.write(f'\t\t\t\t\t\t<file id="file-1"/>\n')
+                outfile.write('\t\t\t\t\t\t<file id="file-1"/>\n')
 
             if(clip[2] != 100):
                 outfile.write(speedup(clip[2]))
@@ -290,7 +289,7 @@ def exportToPremiere(myInput: str, temp: str, output, clips, tracks, sampleRate,
                 clipItemNum = len(clips) + 1 + j + (t * len(clips))
 
                 outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{clipItemNum}" premiereChannelType="stereo">\n')
-                outfile.write(f'\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
+                outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
                 outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
 
                 myStart = int(total)
