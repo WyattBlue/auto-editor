@@ -50,7 +50,7 @@ setup(
         'License :: OSI Approved :: The Unlicense (Unlicense)',
         'Environment :: Console',
         'Natural Language :: English',
-        'Development Status :: 5 - Stable',
+        'Development Status :: 5 - Production/Stable',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
