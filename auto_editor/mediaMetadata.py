@@ -1,4 +1,3 @@
-import subprocess
 from usefulFunctions import pipeToConsole
 import re
 

@@ -1,10 +1,37 @@
 import difflib
+import sys
+
+def printHelp(option):
+    print(' ', ', '.join(option['names']))
+    print('   ', option['help'])
+    print('   ', option['extra'])
+    if(option['action'] == 'default'):
+        print('    type:', option['type'].__name__)
+        print('    default:', option['default'])
+        if(option['range'] is not None):
+            print('    range:', option['range'])
+        if(option['choices'] is not None):
+            print('    choices:', ', '.join(option['choices']))
+    else:
+        print('    type: flag')
+
+
+def get_option(item, the_args: list):
+    for options in the_args:
+        for option in options:
+            if(item in option['names']):
+                return option
+    return None
 
 class parse_options():
     def __init__(self, userArgs, log, *args):
         # Set the default options.
+
+        option_names = []
+
         for options in args:
             for option in options:
+                option_names.append(option['names'][0])
                 key = option['names'][0].replace('-', '')
                 if(option['action'] == 'store_true'):
                     value = False
@@ -13,13 +40,6 @@ class parse_options():
                 else:
                     value = option['default']
                 setattr(self, key, value)
-
-        def get_option(item, the_args: list):
-            for options in the_args:
-                for option in options:
-                    if(item in option['names']):
-                        return option
-            return None
 
         # Figure out attributes changed by user.
         myList = []
@@ -44,20 +64,8 @@ class parse_options():
 
                 key = option['names'][0].replace('-', '')
 
-                # Show help for specific option.
                 if(nextItem == '-h' or nextItem == '--help'):
-                    print(' ', ', '.join(option['names']))
-                    print('   ', option['help'])
-                    print('   ', option['extra'])
-                    if(option['action'] == 'default'):
-                        print('    type:', option['type'].__name__)
-                        print('    default:', option['default'])
-                        if(option['range'] is not None):
-                            print('    range:', option['range'])
-                        if(option['choices'] is not None):
-                            print('    choices:', ', '.join(option['choices']))
-                    else:
-                        print('    type: flag')
+                    printHelp(option)
                     sys.exit()
 
                 if(option['nargs'] != 1):

@@ -5,7 +5,6 @@
 import os
 import re
 import sys
-import time
 import platform
 import tempfile
 import subprocess
@@ -33,12 +32,10 @@ def sample_rate_type(num: str) -> int:
 
 def main():
     options = []
-    option_names = []
 
     def add_argument(*names, nargs=1, type=str, default=None,
         action='default', range=None, choices=None, help='', extra=''):
         nonlocal options
-        nonlocal option_names
 
         newDic = {}
         newDic['names'] = names
@@ -51,7 +48,6 @@ def main():
         newDic['range'] = range
         newDic['choices'] = choices
         options.append(newDic)
-        option_names = option_names + list(names)
 
     add_argument('(input)', nargs='*',
         help='the path to a file, folder, or url you want edited.')
@@ -469,7 +465,7 @@ def main():
             exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate,
                 audioFile, log)
             continue
-        if(audioFile and not makingDataFile):
+        if(audioFile):
             from fastAudio import fastAudio
 
             fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds,
