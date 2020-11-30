@@ -287,7 +287,7 @@ def main():
         sys.exit()
 
     from usefulFunctions import vidTracks, conwrite, getBinaries
-    from wavfile import read, write
+    from wavfile import read
 
     if(not args.preview):
         if(args.export_to_premiere):
@@ -628,7 +628,7 @@ def main():
             else:
                 cmd.extend(['-nostats', '-loglevel', '8'])
             subprocess.call(cmd)
-            INPUT_FILE = constancLoc
+            INPUT_FILE = constantLoc
 
         if(args.preview):
             args.no_open = True
