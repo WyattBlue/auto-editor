@@ -488,6 +488,7 @@ def main():
         timer.stop()
 
     if(not args.preview and makingDataFile):
+        from usefulFunctions import humanReadableTime
         # Assume making each cut takes about 2 seconds.
         timeSave = humanReadableTime(numCuts * 2)
 
