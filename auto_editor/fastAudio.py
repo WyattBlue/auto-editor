@@ -1,47 +1,40 @@
 '''fastAudio.py'''
 
-"""
-This script is for handling audio files ONLY.
-"""
-
 # External libraries
 import numpy as np
 from audiotsm2 import phasevocoder
 from audiotsm2.io.array import ArrReader, ArrWriter
 
 # Included functions
-from usefulFunctions import getAudioChunks, progressBar, getNewLength, conwrite
+from usefulFunctions import progressBar, getNewLength, conwrite
 from wavfile import read, write
 
 # Internal libraries
 import os
-import sys
 import time
-import tempfile
 import subprocess
 
-def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, debug,
-    needConvert, log, fps=30):
+def fastAudio(ffmpeg: str, theFile: str, outFile: str, chunks: list, speeds: list,
+    audioBit, samplerate, needConvert: bool, temp: str, log, fps: float):
+
+    if(len(chunks) == 1 and chunks[0][2] == 0):
+        log.error('Trying to create empty audio.')
 
     if(not os.path.isfile(theFile)):
-        log.error('fastAudio.py could not find file: ' + str(theFile))
+        log.error('fastAudio.py could not find file: ' + theFile)
 
     if(needConvert):
-
-        import tempfile
-        from shutil import rmtree
-
-        TEMP = tempfile.mkdtemp()
-
-        cmd = [ffmpeg, '-i', theFile]
+        cmd = [ffmpeg, '-y', '-i', theFile]
         if(audioBit is not None):
             cmd.extend(['-b:a', str(audioBit)])
-        cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{TEMP}/fastAud.wav'])
-        if(not debug):
-            cmd.extend(['-nostats', '-loglevel', '0'])
+        cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{temp}/faAudio.wav'])
+        if(log.is_ffmpeg):
+            cmd.extend(['-hide_banner'])
+        else:
+            cmd.extend(['-nostats', '-loglevel', '8'])
         subprocess.call(cmd)
 
-        theFile = f'{TEMP}/fastAud.wav'
+        theFile = f'{temp}/faAudio.wav'
 
     samplerate, audioData = read(theFile)
 
@@ -91,14 +84,11 @@ def fastAudio(ffmpeg, theFile, outFile, chunks, speeds, audioBit, samplerate, de
 
         progressBar(chunkNum, totalChunks, beginTime, title='Creating new audio')
 
-    log.debug('\nyPointer: ' + str(yPointer))
-    log.debug('samples per frame: ' + str(samplerate / fps))
-    log.debug('Expected video length: ' + str(yPointer / (samplerate / fps)))
+    log.debug('\n   - Total Samples: ' + str(yPointer))
+    log.debug('   - Samples per Frame: ' + str(samplerate / fps))
+    log.debug('   - Expected video length: ' + str(yPointer / (samplerate / fps)))
     newAudio = newAudio[:yPointer]
     write(outFile, samplerate, newAudio)
-
-    if('TEMP' in locals()):
-        rmtree(TEMP)
 
     if(needConvert):
         conwrite('')

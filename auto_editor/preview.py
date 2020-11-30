@@ -1,10 +1,5 @@
 '''preview.py'''
 
-"""
-This script is only meant to output info about how the video will be cut if the
-selected options are used.
-"""
-
 # Included functions
 from usefulFunctions import getNewLength
 
@@ -12,21 +7,19 @@ from usefulFunctions import getNewLength
 import os
 from datetime import timedelta
 
-def preview(myInput, chunks, speeds, fps, audioFile, debug):
+def printTimeFrame(title: str, frames, fps: float):
+    inSec = round(frames / fps, 1)
+    fps = round(fps)
+    if(inSec < 1):
+        minutes = f'{int(frames)}/{fps} frames'
+    else:
+        minutes = timedelta(seconds=round(inSec))
+    print(f'{title}: {inSec} secs ({minutes})')
 
+
+def preview(myInput, chunks: list, speeds: list, fps: float, audioFile, log):
     if(not os.path.isfile(myInput)):
-        print('preview.py: Could not find file ', myInput)
-        sys.exit(1)
-
-    def printTimeFrame(title, frames, fps):
-        inSec = round(frames / fps, 1)
-        fps = round(fps)
-        if(inSec < 1):
-            minutes = f'{int(frames)}/{fps} frames'
-        else:
-            minutes = timedelta(seconds=round(inSec))
-        print(f'{title}: {inSec} secs ({minutes})')
-
+        log.error('preview.py: Could not find file ' + myInput)
 
     oldTime = chunks[len(chunks)-1][1]
     print('')
@@ -55,14 +48,11 @@ def preview(myInput, chunks, speeds, fps, audioFile, debug):
     printTimeFrame('Smallest clip length', min(clipLengths), fps)
     printTimeFrame('Largest clip length', max(clipLengths), fps)
     printTimeFrame('Average clip length', sum(clipLengths) / len(clipLengths), fps)
-    print('')
-    print('Number of cuts:', cuts)
+    print('\nNumber of cuts:', cuts)
     printTimeFrame('Smallest cut length', min(cutL), fps)
     printTimeFrame('Largest cut length', max(cutL), fps)
     printTimeFrame('Average cut length', sum(cutL) / len(cutL), fps)
     print('')
     if(not audioFile):
         print('Video framerate:', fps)
-    if(debug):
-        print('Chunks:')
-        print(chunks)
+    log.debug(f'Chunks:\n{chunks}')
