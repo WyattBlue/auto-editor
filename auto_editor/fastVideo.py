@@ -3,26 +3,24 @@
 # External libraries
 import cv2
 import numpy as np
-from audiotsm2 import phasevocoder
 
 # Included functions
 from fastAudio import fastAudio
-from usefulFunctions import getAudioChunks, progressBar, conwrite
+from usefulFunctions import progressBar, conwrite
 
 # Internal libraries
 import os
-import sys
 import time
-import tempfile
 import subprocess
-from shutil import rmtree, move
+from shutil import move
 
-def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, abitrate,
-    samplerate, debug, temp, keepTracksSep, vcodec, fps, exportAsAudio, vbitrate,
-    preset, tune, log):
+def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFrame:
+    np.ndarray, speeds: list, tracks: int, abitrate: str, samplerate, temp: str,
+    keepTracksSep: bool, vcodec, fps: float, exportAsAudio: bool, vbitrate, preset,
+    tune, log):
 
     if(not os.path.isfile(vidFile)):
-        log.error('fastVideo.py could not find file: ' + str(vidFile))
+        log.error('fastVideo.py could not find file: ' + vidFile)
 
     cap = cv2.VideoCapture(vidFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -31,7 +29,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
 
     for trackNum in range(tracks):
         fastAudio(ffmpeg, f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
-            speeds, abitrate, samplerate, debug, False, log, fps=fps)
+            speeds, abitrate, samplerate, False, temp, log, fps=fps)
 
         if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
             log.error('Audio file not created.')
@@ -53,13 +51,12 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         return None
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
-
     if(speeds[0] == 99999 and speeds[1] != 99999):
-        totalFrames = int(np.where(includeFrame == 1)[0][-1])
-        cframe = int(np.where(includeFrame == 1)[0][0])
+        totalFrames = int(np.where(includeFrame == True)[0][-1])
+        cframe = int(np.where(includeFrame == True)[0][0])
     elif(speeds[0] != 99999 and speeds[1] == 99999):
-        totalFrames = int(np.where(includeFrame == 0)[0][-1])
-        cframe = int(np.where(includeFrame == 0)[0][0])
+        totalFrames = int(np.where(includeFrame == False)[0][-1])
+        cframe = int(np.where(includeFrame == False)[0][0])
     else:
         totalFrames = chunks[len(chunks) - 1][1]
         cframe = 0
@@ -79,7 +76,7 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         try:
             state = includeFrame[cframe]
         except IndexError:
-            state = 0
+            state = False
 
         mySpeed = speeds[state]
 
@@ -93,13 +90,18 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         progressBar(cframe - starting, totalFrames - starting, beginTime,
             title='Creating new video')
 
-    conwrite('Writing the output file.')
+    log.debug(f'\n   - Frames Written: {framesWritten}')
+    log.debug(f'   - Starting: {starting}')
+    log.debug(f'   - Total Frames: {totalFrames}')
+
+    if(log.is_debug):
+        log.debug('Writing the output file.')
+    else:
+        conwrite('Writing the output file.')
 
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-
-    log.debug('Frames written ' + str(framesWritten))
 
     # Now mix new audio(s) and the new video.
     if(keepTracksSep):
@@ -118,10 +120,10 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         if(tune != 'none'):
             cmd.extend(['-tune', tune])
         cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2', outFile])
-        if(debug):
+        if(log.is_ffmpeg):
             cmd.extend(['-hide_banner'])
         else:
-            cmd.extend(['-nostats', '-loglevel', '0'])
+            cmd.extend(['-nostats', '-loglevel', '8'])
     else:
         # Merge all the audio tracks into one.
         if(tracks > 1):
@@ -130,10 +132,10 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
                 cmd.extend(['-i', f'{temp}/new{i}.wav'])
             cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
                 f'{temp}/newAudioFile.wav'])
-            if(debug):
+            if(log.is_ffmpeg):
                 cmd.extend(['-hide_banner'])
             else:
-                cmd.extend(['-nostats', '-loglevel', '0'])
+                cmd.extend(['-nostats', '-loglevel', '8'])
             subprocess.call(cmd)
         else:
             move(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
@@ -146,10 +148,11 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             cmd.extend(['-b:v', vbitrate])
         if(tune != 'none'):
             cmd.extend(['-tune', tune])
-        cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2',
-            outFile, '-hide_banner'])
-
-    log.debug(cmd)
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2', outFile])
+        if(log.is_ffmpeg):
+            cmd.extend(['-hide_banner'])
+        else:
+            cmd.extend(['-nostats', '-loglevel', '8'])
 
     def pipeToConsole(myCommands):
         process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
@@ -158,7 +161,6 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
         return stdout.decode()
 
     message = pipeToConsole(cmd)
-    log.debug('')
     log.debug(message)
 
     if('Conversion failed!' in message):
@@ -167,7 +169,10 @@ def fastVideo(ffmpeg, vidFile, outFile, chunks, includeFrame, speeds, tracks, ab
             '\nTrying, again but not compressing.')
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
-            outFile, '-nostats', '-loglevel', '0']
-        log.debug(cmd)
+            outFile]
+        if(log.is_ffmpeg):
+            cmd.extend(['-hide_banner'])
+        else:
+            cmd.extend(['-nostats', '-loglevel', '8'])
         subprocess.call(cmd)
     conwrite('')
