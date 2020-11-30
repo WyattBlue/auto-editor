@@ -99,7 +99,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, audioFile, log
                     outfile.write('\t\t\t\t\t\t\t</media>\n')
                     outfile.write('\t\t\t\t\t\t</file>\n')
                 else:
-                    outfile.write(f'\t\t\t\t\t\t<file id="file-1"/>\n')
+                    outfile.write('\t\t\t\t\t\t<file id="file-1"/>\n')
                 outfile.write('\t\t\t\t\t\t<sourcetrack>\n')
                 outfile.write('\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n')
                 outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
@@ -192,7 +192,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, audioFile, log
                 outfile.write('\t\t\t\t\t\t\t</media>\n')
                 outfile.write('\t\t\t\t\t\t</file>\n')
             else:
-                outfile.write(f'\t\t\t\t\t\t<file id="file-2"/>\n')
+                outfile.write('\t\t\t\t\t\t<file id="file-2"/>\n')
 
             # Add the speed effect if nessecary
             if(clip[2] != 100):
@@ -263,7 +263,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, audioFile, log
         total = 0
         for j, clip in enumerate(clips):
             outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{len(clips)+8+j}" premiereChannelType="stereo">\n')
-            outfile.write(f'\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
+            outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
             outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
 
             myStart = int(total)
