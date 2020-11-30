@@ -6,7 +6,7 @@ import numpy as np
 
 # Included functions
 from fastAudio import fastAudio
-from usefulFunctions import progressBar, conwrite
+from usefulFunctions import progressBar, conwrite, pipeToConsole
 
 # Internal libraries
 import os
@@ -153,12 +153,6 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '8'])
-
-    def pipeToConsole(myCommands):
-        process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-        stdout, __ = process.communicate()
-        return stdout.decode()
 
     message = pipeToConsole(cmd)
     log.debug(message)

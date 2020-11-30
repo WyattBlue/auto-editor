@@ -43,6 +43,14 @@ import struct
 import warnings
 from enum import IntEnum
 
+
+__all__ = [
+    'WavFileWarning',
+    'read',
+    'write'
+]
+
+
 class WavFileWarning(UserWarning):
     pass
 
@@ -321,6 +329,16 @@ class WAVE_FORMAT(IntEnum):
 KNOWN_WAVE_FORMATS = {WAVE_FORMAT.PCM, WAVE_FORMAT.IEEE_FLOAT}
 
 
+def _raise_bad_format(format_tag):
+    try:
+        format_name = WAVE_FORMAT(format_tag).name
+    except ValueError:
+        format_name = f'{format_tag:#06x}'
+    raise ValueError(f"Unknown wave file format: {format_name}. Supported "
+                     "formats: " +
+                     ', '.join(x.name for x in KNOWN_WAVE_FORMATS))
+
+
 def _read_fmt_chunk(fid, is_big_endian):
     if is_big_endian:
         fmt = '>'
@@ -357,13 +375,7 @@ def _read_fmt_chunk(fid, is_big_endian):
             raise ValueError("Binary structure of wave file is not compliant")
 
     if format_tag not in KNOWN_WAVE_FORMATS:
-        try:
-            format_name = WAVE_FORMAT(format_tag).name
-        except ValueError:
-            format_name = f'{format_tag:#06x}'
-        raise ValueError(f"Unknown wave file format: {format_name}. Supported "
-                         "formats: " +
-                         ', '.join(x.name for x in KNOWN_WAVE_FORMATS))
+        _raise_bad_format(format_tag)
 
     # move file pointer to next chunk
     if size > bytes_read:
@@ -376,9 +388,8 @@ def _read_fmt_chunk(fid, is_big_endian):
             bit_depth)
 
 
-def _read_data_chunk(fid, format_tag, channels, bit_depth, is_big_endian, block_align,
-    mmap=False):
-
+def _read_data_chunk(fid, format_tag, channels, bit_depth, is_big_endian,
+                     block_align, mmap=False):
     if is_big_endian:
         fmt = '>'
     else:
@@ -390,25 +401,53 @@ def _read_data_chunk(fid, format_tag, channels, bit_depth, is_big_endian, block_
     # Number of bytes per sample (sample container size)
     bytes_per_sample = block_align // channels
     n_samples = size // bytes_per_sample
-    if bit_depth == 8:
-        dtype = 'u1'
-    else:
-        if format_tag == WAVE_FORMAT.PCM:
+
+    if format_tag == WAVE_FORMAT.PCM:
+        if 1 <= bit_depth <= 8:
+            dtype = 'u1'  # WAV of 8-bit integer or less are unsigned
+        elif bytes_per_sample in {3, 5, 6, 7}:
+            # No compatible dtype.  Load as raw bytes for reshaping later.
+            dtype = 'V1'
+        elif bit_depth <= 64:
+            # Remaining bit depths can map directly to signed numpy dtypes
             dtype = f'{fmt}i{bytes_per_sample}'
         else:
+            raise ValueError("Unsupported bit depth: the WAV file "
+                             f"has {bit_depth}-bit integer data.")
+    elif format_tag == WAVE_FORMAT.IEEE_FLOAT:
+        if bit_depth in {32, 64}:
             dtype = f'{fmt}f{bytes_per_sample}'
+        else:
+            raise ValueError("Unsupported bit depth: the WAV file "
+                             f"has {bit_depth}-bit floating-point data.")
+    else:
+        _raise_bad_format(format_tag)
 
     start = fid.tell()
     if not mmap:
         try:
-            data = numpy.fromfile(fid, dtype=dtype, count=n_samples)
+            count = size if dtype == 'V1' else n_samples
+            data = numpy.fromfile(fid, dtype=dtype, count=count)
         except io.UnsupportedOperation:  # not a C-like file
             fid.seek(start, 0)  # just in case it seeked, though it shouldn't
             data = numpy.frombuffer(fid.read(size), dtype=dtype)
+
+        if dtype == 'V1':
+            # Rearrange raw bytes into smallest compatible numpy dtype
+            dt = numpy.int32 if bytes_per_sample == 3 else numpy.int64
+            a = numpy.zeros((len(data) // bytes_per_sample, dt().itemsize),
+                            dtype='V1')
+            a[:, -bytes_per_sample:] = data.reshape((-1, bytes_per_sample))
+            data = a.view(dt).reshape(a.shape[:-1])
     else:
-        data = numpy.memmap(fid, dtype=dtype, mode='c', offset=start,
-                            shape=(n_samples,))
-        fid.seek(start + size)
+        if bytes_per_sample in {1, 2, 4, 8}:
+            start = fid.tell()
+            data = numpy.memmap(fid, dtype=dtype, mode='c', offset=start,
+                                shape=(n_samples,))
+            fid.seek(start + size)
+        else:
+            raise ValueError("mmap=True not compatible with "
+                             f"{bytes_per_sample}-byte container size.")
 
     _handle_pad_byte(fid, size)
 
@@ -424,6 +463,10 @@ def _skip_unknown_chunk(fid, is_big_endian):
         fmt = '<I'
 
     data = fid.read(4)
+    # call unpack() and seek() only if we have really read data from file
+    # otherwise empty read at the end of the file would trigger
+    # unnecessary exception at unpack() call
+    # in case data equals somehow to 0, there is no need for seek() anyway
     if data:
         size = struct.unpack(fmt, data)[0]
         fid.seek(size, 1)
@@ -501,9 +544,6 @@ def read(filename, mmap=False):
                 format_tag, channels, fs = fmt_chunk[1:4]
                 bit_depth = fmt_chunk[6]
                 block_align = fmt_chunk[5]
-                if bit_depth not in {8, 16, 32, 64, 96, 128}:
-                    raise ValueError("Unsupported bit depth: the wav file "
-                                     "has {}-bit data.".format(bit_depth))
             elif chunk_id == b'fact':
                 _skip_unknown_chunk(fid, is_big_endian)
             elif chunk_id == b'data':

@@ -33,8 +33,27 @@ class Log():
             print(message)
 
 
-def getBinaries(plat, dirPath, myFFmpeg: bool):
+class Timer():
+    def __init__(self):
+        self.start_time = time()
 
+    def stop(self):
+        from datetime import timedelta
+
+        timeLength = round(time() - self.start_time, 2)
+        minutes = timedelta(seconds=round(timeLength))
+        print(f'Finished. took {timeLength} seconds ({minutes})')
+
+
+def pipeToConsole(myCommands: list) -> str:
+    import subprocess
+    process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT)
+    stdout, __ = process.communicate()
+    return stdout.decode()
+
+
+def getBinaries(plat, dirPath, myFFmpeg: bool):
     from os import path
 
     newF = None
@@ -63,9 +82,11 @@ def getNewLength(chunks: list, speeds: list, fps: float) -> float:
     return timeInFrames / fps
 
 
-def prettyTime(newTime: float) -> str:
-    newTime = localtime(newTime)
+def prettyTime(myTime: float) -> str:
+    newTime = localtime(myTime)
+
     hours = newTime.tm_hour
+    minutes = newTime.tm_min
 
     if(hours == 0):
         hours = 12
@@ -77,31 +98,7 @@ def prettyTime(newTime: float) -> str:
     else:
         ampm = 'AM'
 
-    minutes = newTime.tm_min
     return f'{hours:02}:{minutes:02} {ampm}'
-
-
-def vidTracks(videoFile: str, ffprobe: str, log) -> int:
-    """
-    Return the number of audio tracks in a video file.
-    """
-    import subprocess
-
-    cmd = [ffprobe, videoFile, '-hide_banner', '-loglevel', 'panic',
-        '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
-        'compact=p=0:nk=1']
-
-    # Read what ffprobe piped in.
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    output = stdout.decode()
-    numbers = output.split('\n')
-    try:
-        test = int(numbers[0])
-        return len(numbers) - 1
-    except ValueError:
-        log.warning('ffprobe had an invalid output.')
-        return 1 # Assume there's one audio track.
 
 
 def conwrite(message: str):
@@ -134,3 +131,33 @@ def progressBar(index, total, beginTime, title='Please wait'):
         print(bar, end='\r', flush=True)
     except UnicodeEncodeError:
         print(f'   {percentDone}% done ETA {newTime}')
+
+
+def humanReadableTime(rawTime: float) -> str:
+    units = 'seconds'
+    if(rawTime >= 3600):
+        rawTime = round(rawTime / 3600, 1)
+        if(rawTime % 1 == 0):
+            rawTime = round(rawTime)
+        units = 'hours'
+    if(rawTime >= 60):
+        rawTime = round(rawTime / 60, 1)
+        if(rawTime >= 10 or rawTime % 1 == 0):
+            rawTime = round(rawTime)
+        units = 'minutes'
+    return f'{rawTime} {units}'
+
+
+def smartOpen(newOutput: str, log):
+    from subprocess import call
+    try:  # should work on Windows
+        from os import startfile
+        startfile(newOutput)
+    except (AttributeError, ImportError):
+        try:  # should work on MacOS and most Linux versions
+            call(['open', newOutput])
+        except:
+            try: # should work on WSL2
+                call(['cmd.exe', '/C', 'start', newOutput])
+            except:
+                log.warning('Could not open output file.')

@@ -6,12 +6,10 @@ import os
 import re
 import sys
 import time
-import difflib
 import platform
 import tempfile
 import subprocess
 from shutil import rmtree
-from datetime import timedelta
 
 version = '20w48a'
 
@@ -32,22 +30,6 @@ def sample_rate_type(num: str) -> int:
     if(num.endswith(' kHz')):
         return int(float(num[:-4]) * 1000)
     return int(num)
-
-def pipeToConsole(myCommands: list) -> str:
-    process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    return stdout.decode()
-
-def ffmpegFPS(ffmpeg: str, path: str, log) -> float:
-    output = pipeToConsole([ffmpeg, '-i', path, '-hide_banner'])
-    try:
-        matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
-        return float(matchDict['fps'])
-    except AttributeError:
-        log.warning('frame rate detection failed.\n' \
-            'If your video has a variable frame rate, ignore this message.')
-        return 30.0
 
 def main():
     options = []
@@ -158,117 +140,10 @@ def main():
     # Fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
 
-    from usefulFunctions import Log
+    from usefulFunctions import Log, Timer
+    from parser import parse_options
 
-    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
-        '.acc', '.nfa', '.mka']
-
-    # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
-
-    invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
-        '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
-        '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
-        '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
-        '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
-        '.db', '.ini', '.BIN']
-
-    class parse_options():
-        def __init__(self, userArgs, log, *args):
-            # Set the default options.
-            for options in args:
-                for option in options:
-                    key = option['names'][0].replace('-', '')
-                    if(option['action'] == 'store_true'):
-                        value = False
-                    elif(option['nargs'] != 1):
-                        value = []
-                    else:
-                        value = option['default']
-                    setattr(self, key, value)
-
-            def get_option(item, the_args: list):
-                for options in the_args:
-                    for option in options:
-                        if(item in option['names']):
-                            return option
-                return None
-
-            # Figure out attributes changed by user.
-            myList = []
-            settingInputs = True
-            optionList = 'input'
-            i = 0
-            while i < len(userArgs):
-                item = userArgs[i]
-                if(i == len(userArgs) - 1):
-                    nextItem = None
-                else:
-                    nextItem = userArgs[i+1]
-
-                option = get_option(item, args)
-
-                if(option is not None):
-                    if(optionList is not None):
-                        setattr(self, optionList, myList)
-                    settingInputs = False
-                    optionList = None
-                    myList = []
-
-                    key = option['names'][0].replace('-', '')
-
-                    # Show help for specific option.
-                    if(nextItem == '-h' or nextItem == '--help'):
-                        print(' ', ', '.join(option['names']))
-                        print('   ', option['help'])
-                        print('   ', option['extra'])
-                        if(option['action'] == 'default'):
-                            print('    type:', option['type'].__name__)
-                            print('    default:', option['default'])
-                            if(option['range'] is not None):
-                                print('    range:', option['range'])
-                            if(option['choices'] is not None):
-                                print('    choices:', ', '.join(option['choices']))
-                        else:
-                            print('    type: flag')
-                        sys.exit()
-
-                    if(option['nargs'] != 1):
-                        settingInputs = True
-                        optionList = key
-                    elif(option['action'] == 'store_true'):
-                        value = True
-                    else:
-                        try:
-                            # Convert to correct type.
-                            value = option['type'](nextItem)
-                        except:
-                            typeName = option['type'].__name__
-                            log.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
-                        if(option['choices'] is not None):
-                            if(value not in option['choices']):
-                                optionName = option['names'][0]
-                                myChoices = ', '.join(option['choices'])
-                                log.error(f'{value} is not a choice for {optionName}' \
-                                    f'\nchoices are:\n  {myChoices}')
-                        i += 1
-                    setattr(self, key, value)
-                else:
-                    if(settingInputs and not item.startswith('-')):
-                        # Input file names
-                        myList.append(item)
-                    else:
-                        # Unknown Option!
-                        hmm = difflib.get_close_matches(item, option_names)
-                        potential_options = ', '.join(hmm)
-                        append = ''
-                        if(hmm != []):
-                            append = f'\n\n    Did you mean:\n        {potential_options}'
-                        log.error(f'Unknown option: {item}{append}')
-                i += 1
-            if(settingInputs):
-                setattr(self, optionList, myList)
-
-    args = parse_options(sys.argv[1:], Log(3), options)
+    args = parse_options(sys.argv[1:], Log(), options)
 
     # Print the help screen for the entire program.
     if(args.help):
@@ -286,7 +161,21 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    from usefulFunctions import vidTracks, conwrite, getBinaries
+    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
+        '.acc', '.nfa', '.mka']
+
+    # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
+
+    invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
+        '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
+        '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
+        '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
+        '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
+        '.db', '.ini', '.BIN']
+
+    from usefulFunctions import conwrite, getBinaries, pipeToConsole
+    from mediaMetadata import vidTracks, getSampleRate, getAudioBitrate
+    from mediaMetadata import getVideoCodec, ffmpegFPS
     from wavfile import read
 
     if(not args.preview):
@@ -335,7 +224,7 @@ def main():
             print('\nto upgrade to the latest version.\n')
         del latestVersion
     except Exception as err:
-        log.debug('Check for update Error: ' + str(err))
+        log.debug('Connection Error: ' + str(err))
 
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
@@ -368,7 +257,7 @@ def main():
         else:
             log.error('Could not find file: ' + myInput)
 
-    startTime = time.time()
+    timer = Timer()
 
     if(args.output_file is None):
         args.output_file = []
@@ -424,47 +313,19 @@ def main():
         if(fileFormat in invalidExtensions):
             log.error(f'Invalid file extension "{fileFormat}" for {INPUT_FILE}')
 
-        audioFile = fileFormat in audioExtensions
-
         # Get output file name.
         newOutput = args.output_file[i]
         log.debug(f'   - newOutput: {newOutput}')
 
-        # Grab the sample rate from the input.
-        sr = args.sample_rate
-        if(sr is None):
-            output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
-            try:
-                matchDict = re.search(r'\s(?P<grp>\w+?)\sHz', output).groupdict()
-                sr = matchDict['grp']
-            except AttributeError:
-                sr = 48000
-        args.sample_rate = sr
+        sampleRate = getSampleRate(INPUT_FILE, ffmpeg, args.sample_rate)
+        audioBitrate = getAudioBitrate(INPUT_FILE, ffprobe, log, args.audio_bitrate)
 
-        # Grab the audio bitrate from the input.
-        abit = args.audio_bitrate
-        if(abit is None):
-            if(not INPUT_FILE.endswith('.mkv')):
-                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                    'a:0', '-show_entries', 'stream=bit_rate', '-of',
-                    'compact=p=0:nk=1', INPUT_FILE])
-                try:
-                    abit = int(output)
-                except:
-                    log.warning("Couldn't automatically detect audio bitrate.")
-                    abit = '500k'
-                    log.debug('Setting audio bitrate to ' + abit)
-                else:
-                    abit = str(round(abit / 1000)) + 'k'
-        else:
-            abit = str(abit)
-        args.audio_bitrate = abit
-
+        audioFile = fileFormat in audioExtensions
         if(audioFile):
             fps = 30 # Audio files don't have frames, so give fps a dummy value.
             tracks = 1
-            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', args.audio_bitrate, '-ac', '2',
-                '-ar', str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
+            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', audioBitrate, '-ac', '2',
+                '-ar', sampleRate, '-vn', f'{TEMP}/fastAud.wav']
             if(log.is_ffmpeg):
                 cmd.extend(['-hide_banner'])
             else:
@@ -483,36 +344,29 @@ def main():
 
             tracks = vidTracks(INPUT_FILE, ffprobe, log)
             if(args.cut_by_this_track >= tracks):
+                allTracks = ''
+                for trackNum in range(tracks):
+                    allTracks += f'Track {trackNum}\n'
+
+                if(tracks == 1):
+                    message = f'is only {tracks} track'
+                else:
+                    message = f'are only {tracks} tracks'
                 log.error("You choose a track that doesn't exist.\n" \
-                    f'There are only {tracks-1} tracks. (starting from 0)')
+                    f'There {message}.\n {allTracks}')
 
-            vcodec = args.video_codec
-            if(vcodec == 'copy'):
-                output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
-                try:
-                    matchDict = re.search(r'Video:\s(?P<video>\w+?)\s', output).groupdict()
-                    vcodec = matchDict['video']
-                    log.debug(vcodec)
-                except AttributeError:
-                    vcodec = 'uncompressed'
-                    log.warning("Couldn't automatically detect video codec.")
+            # Get video codec
+            vcodec = getVideoCodec(INPUT_FILE, ffmpeg, log, args.video_codec)
 
-            if(args.video_bitrate is not None and vcodec == 'uncompressed'):
-                log.warning('Your bitrate will not be applied because' \
-                        ' the video codec is "uncompressed".')
-
-            if(vcodec == 'uncompressed'):
-                # FFmpeg copies the uncompressed output that cv2 spits out.
-                vcodec = 'copy'
+            if(args.video_bitrate is not None and vcodec == 'copy'):
+                log.warning('Your bitrate will not be applied because the video' \
+                    ' codec is "uncompressed".')
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
-                cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
-                if(args.audio_bitrate is not None):
-                    cmd.extend(['-ab', args.audio_bitrate])
-
-                cmd.extend(['-ac', '2', '-ar', str(args.sample_rate), '-map',
-                    f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
+                cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', audioBitrate,
+                    '-ac', '2', '-ar', sampleRate, '-map', f'0:a:{trackNum}',
+                    f'{TEMP}/{trackNum}.wav']
 
                 if(log.is_ffmpeg):
                     cmd.extend(['-hide_banner'])
@@ -541,8 +395,7 @@ def main():
                 else:
                     log.error('Audio track not found!')
 
-        from cutting import audioToHasLoud, motionDetection, applySpacingRules
-        import numpy as np
+        from cutting import audioToHasLoud, motionDetection
 
         audioList = None
         motionList = None
@@ -562,50 +415,14 @@ def main():
                     log.debug(f'motionList Length: {len(motionList)}')
                     audioList = audioList[:len(motionList)]
 
-        if(args.edit_based_on == 'audio' or args.edit_based_on == 'not_audio'):
-            if(max(audioList) == 0):
-                log.error('There was no place where audio exceeded the threshold.')
-        if(args.edit_based_on == 'motion' or args.edit_based_on == 'not_motion'):
-            if(max(motionList) == 0):
-                log.error('There was no place where motion exceeded the threshold.')
+        from cutting import combineArrs, applySpacingRules
 
-        # Only raise a warning for other cases.
-        if(audioList is not None and max(audioList) == 0):
-            log.warning('There was no place where audio exceeded the threshold.')
-        if(motionList is not None and max(motionList) == 0):
-            log.warning('There was no place where motion exceeded the threshold.')
-
-
-        if(args.edit_based_on == 'audio'):
-            hasLoud = audioList
-
-        if(args.edit_based_on == 'motion'):
-            hasLoud = motionList
-
-        if(args.edit_based_on == 'not_audio'):
-            hasLoud = np.invert(audioList)
-
-        if(args.edit_based_on == 'not_motion'):
-            hasLoud = np.invert(motionList)
-
-        if(args.edit_based_on == 'audio_and_motion'):
-            log.debug('Applying "Python bitwise and" on arrays.')
-            hasLoud = audioList & motionList
-
-        if(args.edit_based_on == 'audio_or_motion'):
-            log.debug('Applying "Python bitwise or" on arrays.')
-            hasLoud = audioList | motionList
-
-        if(args.edit_based_on == 'audio_xor_motion'):
-            log.debug('Applying "numpy bitwise_xor" on arrays')
-            hasLoud = np.bitwise_xor(audioList, motionList)
-
-        if(args.edit_based_on == 'audio_and_not_motion'):
-            log.debug('Applying "Python bitwise and" with "numpy bitwise not" on arrays.')
-            hasLoud = audioList & np.invert(motionList)
+        hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
+        del audioList, motionList
 
         chunks, includeFrame = applySpacingRules(hasLoud, fps, args.frame_margin,
             args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
+        del hasLoud
 
         clips = []
         for chunk in chunks:
@@ -668,44 +485,23 @@ def main():
         log.error(f'The file {newOutput} was not created.')
 
     if(not args.preview and not makingDataFile):
-        timeLength = round(time.time() - startTime, 2)
-        minutes = timedelta(seconds=round(timeLength))
-        print(f'Finished. took {timeLength} seconds ({minutes})')
+        timer.stop()
 
     if(not args.preview and makingDataFile):
-        timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
-        units = 'seconds'
-        if(timeSave >= 3600):
-            timeSave = round(timeSave / 3600, 1)
-            if(timeSave % 1 == 0):
-                timeSave = round(timeSave)
-            units = 'hours'
-        if(timeSave >= 60):
-            timeSave = round(timeSave / 60, 1)
-            if(timeSave >= 10 or timeSave % 1 == 0):
-                timeSave = round(timeSave)
-            units = 'minutes'
+        # Assume making each cut takes about 2 seconds.
+        timeSave = humanReadableTime(numCuts * 2)
 
-        plural = 's' if numCuts != 1 else ''
-
-        print(f'Auto-Editor made {numCuts} cut{plural}', end='')
+        s = 's' if numCuts != 1 else ''
+        print(f'Auto-Editor made {numCuts} cut{s}', end='')
         if(numCuts > 4):
-            print(f', which would have taken about {timeSave} {units} if' \
-                ' edited manually.')
+            print(f', which would have taken about {timeSave} if edited manually.')
         else:
             print('.')
 
     if(not args.no_open):
-        try:  # should work on Windows
-            os.startfile(newOutput)
-        except AttributeError:
-            try:  # should work on MacOS and most Linux versions
-                subprocess.call(['open', newOutput])
-            except:
-                try: # should work on WSL2
-                    subprocess.call(['cmd.exe', '/C', 'start', newOutput])
-                except:
-                    log.warning('Could not open output file.')
+        from usefulFunctions import smartOpen
+        smartOpen(newOutput, log)
+
     rmtree(TEMP)
 
 if(__name__ == '__main__'):
