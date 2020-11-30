@@ -13,33 +13,33 @@ import subprocess
 from shutil import rmtree
 from datetime import timedelta
 
-version = '20w47a'
+version = '20w48a'
 
-def file_type(file):
+def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
         print('Auto-Editor could not find the file: ' + file)
         sys.exit(1)
     return file
 
-def float_type(num):
+def float_type(num: str) -> float:
     if(num.endswith('%')):
         return float(num[:-1]) / 100
     return float(num)
 
-def sample_rate_type(num):
+def sample_rate_type(num: str) -> int:
     if(num.endswith(' Hz')):
         return int(num[:-3])
     if(num.endswith(' kHz')):
         return int(float(num[:-4]) * 1000)
     return int(num)
 
-def pipeToConsole(myCommands):
+def pipeToConsole(myCommands: list) -> str:
     process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     return stdout.decode()
 
-def ffmpegFPS(ffmpeg, path, log):
+def ffmpegFPS(ffmpeg: str, path: str, log) -> float:
     output = pipeToConsole([ffmpeg, '-i', path, '-hide_banner'])
     try:
         matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
@@ -47,7 +47,7 @@ def ffmpegFPS(ffmpeg, path, log):
     except AttributeError:
         log.warning('frame rate detection failed.\n' \
             'If your video has a variable frame rate, ignore this message.')
-        return 30
+        return 30.0
 
 def main():
     options = []
@@ -114,7 +114,9 @@ def main():
     add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
     add_argument('--debug', '--verbose', action='store_true',
-        help='show helpful debugging values.')
+        help='show debugging messages and values.')
+    add_argument('--show_ffmpeg_debug', action='store_true',
+        help='show ffmpeg progress and output.')
 
     # TODO: add export_as_video
     add_argument('--export_as_audio', '-exa', action='store_true',
@@ -131,7 +133,7 @@ def main():
     add_argument('--sample_rate', '-r', type=sample_rate_type,
         help='set the sample rate of the input and output videos.')
     add_argument('--video_codec', '-vcodec', default='uncompressed',
-        help='set the video codec for the output file.')
+        help='set the video codec for the output media file.')
     add_argument('--preset', '-p', default='medium',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
@@ -142,10 +144,15 @@ def main():
         help='set the tune for ffmpeg to compress video better.')
 
     add_argument('--ignore', nargs='*',
-        help="the range (in seconds) that shouldn't be edited at all. (uses range syntax)")
+        help='the range that will be marked as "loud"')
     add_argument('--cut_out', nargs='*',
-        help='the range (in seconds) that should be cut out completely, '\
-            'regardless of anything else. (uses range syntax)')
+        help='the range that will be marked as "silent"')
+    add_argument('--motion_threshold', type=float_type, default=0.02, range='0 to 1',
+        help='how much motion is required to be considered "moving"')
+    add_argument('--edit_based_on', default='audio',
+        choices=['audio', 'motion', 'not_audio', 'not_motion', 'audio_or_motion',
+            'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion'],
+        help='decide which method to use when making edits.')
 
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # Fixes pip not able to find other included modules.
@@ -153,12 +160,17 @@ def main():
 
     from usefulFunctions import Log
 
-    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga', '.acc', '.nfa', '.mka']
+    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
+        '.acc', '.nfa', '.mka']
 
-    invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm', '.xml', '.json', '.yaml', '.png',
-        '.jpeg', '.jpg', '.gif', '.exe', '.doc', '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat',
-        '.dll', '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js', '.c', '.cpp',
-        '.csharp', '.py', '.app', '.git', '.github', '.gitignore', '.db', '.ini', '.BIN']
+    # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
+
+    invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
+        '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
+        '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
+        '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
+        '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
+        '.db', '.ini', '.BIN']
 
     class parse_options():
         def __init__(self, userArgs, log, *args):
@@ -174,7 +186,7 @@ def main():
                         value = option['default']
                     setattr(self, key, value)
 
-            def get_option(item, the_args):
+            def get_option(item, the_args: list):
                 for options in the_args:
                     for option in options:
                         if(item in option['names']):
@@ -217,7 +229,7 @@ def main():
                             if(option['choices'] is not None):
                                 print('    choices:', ', '.join(option['choices']))
                         else:
-                            print(f'    type: flag')
+                            print('    type: flag')
                         sys.exit()
 
                     if(option['nargs'] != 1):
@@ -234,7 +246,10 @@ def main():
                             log.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
                         if(option['choices'] is not None):
                             if(value not in option['choices']):
-                                log.error(f'{value} is not a choice for {option}')
+                                optionName = option['names'][0]
+                                myChoices = ', '.join(option['choices'])
+                                log.error(f'{value} is not a choice for {optionName}' \
+                                    f'\nchoices are:\n  {myChoices}')
                         i += 1
                     setattr(self, key, value)
                 else:
@@ -257,8 +272,12 @@ def main():
 
     # Print the help screen for the entire program.
     if(args.help):
+        print('')
         for option in options:
             print(' ', ', '.join(option['names']) + ':', option['help'])
+        print('\nThe help command can also be used on a specific option.')
+        print('example:')
+        print('    auto-editor --frame_margin --help')
         print('\nHave an issue? Make an issue. '\
             'Visit https://github.com/wyattblue/auto-editor/issues')
         sys.exit()
@@ -267,8 +286,8 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    from usefulFunctions import vidTracks, conwrite, getAudioChunks
-    from wavfile import read, write
+    from usefulFunctions import vidTracks, conwrite, getBinaries
+    from wavfile import read
 
     if(not args.preview):
         if(args.export_to_premiere):
@@ -280,26 +299,11 @@ def main():
         else:
             conwrite('Starting.')
 
-    newF = None
-    newP = None
-    if(platform.system() == 'Windows' and not args.my_ffmpeg):
-        newF = os.path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
-        newP = os.path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
-    if(platform.system() == 'Darwin' and not args.my_ffmpeg):
-        newF = os.path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
-        newP = os.path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
-    if(newF is not None and os.path.isfile(newF)):
-        ffmpeg = newF
-        ffprobe = newP
-    else:
-        ffmpeg = 'ffmpeg'
-        ffprobe = 'ffprobe'
-
+    ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
     makingDataFile = args.export_to_premiere or args.export_to_resolve
-
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
-    if(args.debug):
+    if(args.debug and args.input == []):
         print('Python Version:', platform.python_version(), is64bit)
         print('Platform:', platform.system(), platform.release())
         # Platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
@@ -309,15 +313,13 @@ def main():
         print('FFmpeg path:', ffmpeg)
         print('FFmpeg version:', ffmpegVersion)
         print('Auto-Editor version', version)
-        if(args.input == []):
-            sys.exit()
+        sys.exit()
 
-    log = Log(3 if args.debug else 2)
+    log = Log(args.debug, args.show_ffmpeg_debug)
+    log.debug('')
 
     if(is64bit == '32-bit'):
-        log.warning("You have the 32-bit version of Python, which means you won't be " \
-            'able to handle long videos.')
-
+        log.warning('You have the 32-bit version of Python, which may lead to memory crashes.')
     if(args.frame_margin < 0):
         log.error('Frame margin cannot be negative.')
 
@@ -343,7 +345,7 @@ def main():
     inputList = []
     for myInput in args.input:
         if(os.path.isdir(myInput)):
-            def validFiles(path, badExts):
+            def validFiles(path: str, badExts: list):
                 for f in os.listdir(path):
                     if(not f[f.rfind('.'):] in badExts):
                         yield os.path.join(path, f)
@@ -386,6 +388,7 @@ def main():
                 args.output_file.append(oldFile[:dotIndex] + end)
 
     TEMP = tempfile.mkdtemp()
+    log.debug(f'\n   - Temp Directory: {TEMP}')
 
     if(args.combine_files):
         # Combine video files, then set input to 'combined.mp4'.
@@ -395,18 +398,18 @@ def main():
         cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
             '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2',
             f'{TEMP}/combined.mp4'])
-        if(args.debug):
+        if(log.ffmpeg):
             cmd.extend(['-hide_banner'])
         else:
-            cmd.extend(['-nostats', '-loglevel', '0'])
+            cmd.extend(['-nostats', '-loglevel', '8'])
 
-        log.debug(cmd)
         subprocess.call(cmd)
         inputList = [f'{TEMP}/combined.mp4']
 
     speeds = [args.silent_speed, args.video_speed]
     numCuts = 0
     for i, INPUT_FILE in enumerate(inputList):
+        log.debug(f'   - INPUT_FILE: {INPUT_FILE}')
         # Ignore folders
         if(os.path.isdir(INPUT_FILE)):
             continue
@@ -425,6 +428,7 @@ def main():
 
         # Get output file name.
         newOutput = args.output_file[i]
+        log.debug(f'   - newOutput: {newOutput}')
 
         # Grab the sample rate from the input.
         sr = args.sample_rate
@@ -461,10 +465,10 @@ def main():
             tracks = 1
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', args.audio_bitrate, '-ac', '2',
                 '-ar', str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
-            if(args.debug):
+            if(log.is_ffmpeg):
                 cmd.extend(['-hide_banner'])
             else:
-                cmd.extend(['-nostats', '-loglevel', '0'])
+                cmd.extend(['-nostats', '-loglevel', '8'])
             subprocess.call(cmd)
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
@@ -510,10 +514,10 @@ def main():
                 cmd.extend(['-ac', '2', '-ar', str(args.sample_rate), '-map',
                     f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
 
-                if(args.debug):
+                if(log.is_ffmpeg):
                     cmd.extend(['-hide_banner'])
                 else:
-                    cmd.extend(['-nostats', '-loglevel', '0'])
+                    cmd.extend(['-nostats', '-loglevel', '8'])
                 subprocess.call(cmd)
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
@@ -522,10 +526,10 @@ def main():
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
                     str(args.sample_rate), '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
-                if(args.debug):
+                if(log.is_ffmpeg):
                     cmd.extend(['-hide_banner'])
                 else:
-                    cmd.extend(['-nostats', '-loglevel', '0'])
+                    cmd.extend(['-nostats', '-loglevel', '8'])
 
                 subprocess.call(cmd)
 
@@ -537,9 +541,71 @@ def main():
                 else:
                     log.error('Audio track not found!')
 
-        chunks, includeFrame = getAudioChunks(audioData, sampleRate, fps,
-            args.silent_threshold, args.frame_margin, args.min_clip_length,
-            args.min_cut_length, args.ignore, args.cut_out, log)
+        from cutting import audioToHasLoud, motionDetection, applySpacingRules
+        import numpy as np
+
+        audioList = None
+        motionList = None
+        if('audio' in args.edit_based_on):
+            log.debug('Analyzing audio volume.')
+            audioList = audioToHasLoud(audioData, sampleRate, args.silent_threshold, fps, log)
+
+        if('motion' in args.edit_based_on):
+            log.debug('Analyzing video motion.')
+            motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold, log,
+                width=400, dilates=2, blur=21)
+
+            if(audioList is not None):
+                if(len(audioList) > len(motionList)):
+                    log.debug('Reducing the size of audioList to match motionList')
+                    log.debug(f'audioList Length:  {len(audioList)}')
+                    log.debug(f'motionList Length: {len(motionList)}')
+                    audioList = audioList[:len(motionList)]
+
+        if(args.edit_based_on == 'audio' or args.edit_based_on == 'not_audio'):
+            if(max(audioList) == 0):
+                log.error('There was no place where audio exceeded the threshold.')
+        if(args.edit_based_on == 'motion' or args.edit_based_on == 'not_motion'):
+            if(max(motionList) == 0):
+                log.error('There was no place where motion exceeded the threshold.')
+
+        # Only raise a warning for other cases.
+        if(audioList is not None and max(audioList) == 0):
+            log.warning('There was no place where audio exceeded the threshold.')
+        if(motionList is not None and max(motionList) == 0):
+            log.warning('There was no place where motion exceeded the threshold.')
+
+
+        if(args.edit_based_on == 'audio'):
+            hasLoud = audioList
+
+        if(args.edit_based_on == 'motion'):
+            hasLoud = motionList
+
+        if(args.edit_based_on == 'not_audio'):
+            hasLoud = np.invert(audioList)
+
+        if(args.edit_based_on == 'not_motion'):
+            hasLoud = np.invert(motionList)
+
+        if(args.edit_based_on == 'audio_and_motion'):
+            log.debug('Applying "Python bitwise and" on arrays.')
+            hasLoud = audioList & motionList
+
+        if(args.edit_based_on == 'audio_or_motion'):
+            log.debug('Applying "Python bitwise or" on arrays.')
+            hasLoud = audioList | motionList
+
+        if(args.edit_based_on == 'audio_xor_motion'):
+            log.debug('Applying "numpy bitwise_xor" on arrays')
+            hasLoud = np.bitwise_xor(audioList, motionList)
+
+        if(args.edit_based_on == 'audio_and_not_motion'):
+            log.debug('Applying "Python bitwise and" with "numpy bitwise not" on arrays.')
+            hasLoud = audioList & np.invert(motionList)
+
+        chunks, includeFrame = applySpacingRules(hasLoud, fps, args.frame_margin,
+            args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
 
         clips = []
         for chunk in chunks:
@@ -555,46 +621,48 @@ def main():
                 constantLoc = oldFile[:dotIndex] + end
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
-            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', f'fps=fps=30', constantLoc]
-            if(args.debug):
+            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', 'fps=fps=30',
+                constantLoc]
+            if(log.is_ffmpeg):
                 cmd.extend(['-hide_banner'])
             else:
-                cmd.extend(['-nostats', '-loglevel', '0'])
+                cmd.extend(['-nostats', '-loglevel', '8'])
             subprocess.call(cmd)
-            INPUT_FILE = constancLoc
+            INPUT_FILE = constantLoc
 
         if(args.preview):
             args.no_open = True
             from preview import preview
 
-            preview(INPUT_FILE, chunks, speeds, fps, audioFile, args.debug)
+            preview(INPUT_FILE, chunks, speeds, fps, audioFile, log)
             continue
 
         if(args.export_to_premiere):
             args.no_open = True
             from premiere import exportToPremiere
 
-            exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate, audioFile, log)
+            exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate,
+                audioFile, log)
             continue
         if(args.export_to_resolve):
             args.no_open = True
             duration = chunks[len(chunks) - 1][1]
             from resolve import exportToResolve
 
-            exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate, audioFile, log)
+            exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate,
+                audioFile, log)
             continue
         if(audioFile and not makingDataFile):
             from fastAudio import fastAudio
 
-            fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, args.audio_bitrate,
-            sampleRate, args.debug, True, log)
+            fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds,
+                args.audio_bitrate, sampleRate, True, TEMP, log, fps)
             continue
 
         from fastVideo import fastVideo
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, includeFrame, speeds, tracks,
-            args.audio_bitrate, sampleRate, args.debug, TEMP,
-            args.keep_tracks_seperate, vcodec, fps, args.export_as_audio,
-            args.video_bitrate, args.preset, args.tune, log)
+            args.audio_bitrate, sampleRate, TEMP, args.keep_tracks_seperate, vcodec, fps,
+            args.export_as_audio, args.video_bitrate, args.preset, args.tune, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'The file {newOutput} was not created.')
@@ -620,9 +688,10 @@ def main():
 
         plural = 's' if numCuts != 1 else ''
 
-        print(f'Auto-Editor made {numCuts} cut{plural}', end='') # Don't add a newline.
+        print(f'Auto-Editor made {numCuts} cut{plural}', end='')
         if(numCuts > 4):
-            print(f', which would have taken about {timeSave} {units} if edited manually.')
+            print(f', which would have taken about {timeSave} {units} if' \
+                ' edited manually.')
         else:
             print('.')
 

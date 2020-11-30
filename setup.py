@@ -13,7 +13,7 @@ from setuptools import setup, find_packages
 def pip_version():
     # pip doesn't allow standard version format (20w10a), so we have to
     # conform it to match Semantic Versioning.
-    return '20.47.1.0'
+    return '20.48.1.0'
 
 if(sys.argv[-1] == 'publish'):
     os.system('rm -rf build')
@@ -46,9 +46,11 @@ setup(
     ],
     classifiers=[
         'Topic :: Multimedia :: Video',
-        'License :: OSI Approved :: MIT License',
+        'License :: Public Domain',
+        'License :: OSI Approved :: The Unlicense (Unlicense)',
         'Environment :: Console',
-        'Development Status :: 6 - Mature',
+        'Natural Language :: English',
+        'Development Status :: 5 - Production/Stable',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
