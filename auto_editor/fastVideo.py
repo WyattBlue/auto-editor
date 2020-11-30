@@ -103,6 +103,21 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
     out.release()
     cv2.destroyAllWindows()
 
+    def extender(cmd, vbitrate, tune, preset, outFile, isFFmpeg):
+        if(vbitrate is None):
+            cmd.extend(['-crf', '15'])
+        else:
+            cmd.extend(['-b:v', vbitrate])
+        if(tune != 'none'):
+            cmd.extend(['-tune', tune])
+        cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2',
+            outFile])
+        if(isFFmpeg):
+            cmd.extend(['-hide_banner'])
+        else:
+            cmd.extend(['-nostats', '-loglevel', '8'])
+        return cmd
+
     # Now mix new audio(s) and the new video.
     if(keepTracksSep):
         cmd = [ffmpeg, '-y']
@@ -113,17 +128,7 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
             cmd.extend(['-map', f'{i}:a:0'])
 
         cmd.extend(['-map', f'{tracks}:v:0', '-c:v', vcodec])
-        if(vbitrate is None):
-            cmd.extend(['-crf', '15'])
-        else:
-            cmd.extend(['-b:v', vbitrate])
-        if(tune != 'none'):
-            cmd.extend(['-tune', tune])
-        cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2', outFile])
-        if(log.is_ffmpeg):
-            cmd.extend(['-hide_banner'])
-        else:
-            cmd.extend(['-nostats', '-loglevel', '8'])
+        cmd = extender(cmd, vbitrate, tune, preset, outFile, log.is_ffmpeg)
     else:
         # Merge all the audio tracks into one.
         if(tracks > 1):
@@ -142,17 +147,7 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', vcodec]
-        if(vbitrate is None):
-            cmd.extend(['-crf', '15'])
-        else:
-            cmd.extend(['-b:v', vbitrate])
-        if(tune != 'none'):
-            cmd.extend(['-tune', tune])
-        cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2', outFile])
-        if(log.is_ffmpeg):
-            cmd.extend(['-hide_banner'])
-        else:
-            cmd.extend(['-nostats', '-loglevel', '8'])
+        cmd = extender(cmd, vbitrate, tune, preset, outFile, log.is_ffmpeg)
 
     message = pipeToConsole(cmd)
     log.debug(message)

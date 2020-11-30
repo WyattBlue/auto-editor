@@ -46,14 +46,12 @@ def getAudioBitrate(file: str, ffprobe: str, log, abit: str) -> str:
             output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
                 'a:0', '-show_entries', 'stream=bit_rate', '-of',
                 'compact=p=0:nk=1', file])
-            try:
-                abit = int(output)
-            except:
+            if(output.isnumeric()):
+                return str(round(int(output) / 1000)) + 'k'
+            else:
                 log.warning("Couldn't automatically detect audio bitrate.")
                 log.debug('Setting audio bitrate to 500k')
                 return '500k'
-            else:
-                return str(round(abit / 1000)) + 'k'
     return str(abit)
 
 
