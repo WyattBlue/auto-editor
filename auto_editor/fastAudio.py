@@ -6,7 +6,7 @@ from audiotsm2 import phasevocoder
 from audiotsm2.io.array import ArrReader, ArrWriter
 
 # Included functions
-from usefulFunctions import progressBar, getNewLength, conwrite
+from usefulFunctions import progressBar, getNewLength, conwrite, ffAddDebug
 from wavfile import read, write
 
 # Internal libraries
@@ -23,15 +23,18 @@ def fastAudio(ffmpeg: str, theFile: str, outFile: str, chunks: list, speeds: lis
     if(not os.path.isfile(theFile)):
         log.error('fastAudio.py could not find file: ' + theFile)
 
+    if(type(audioBit) != str):
+        log.error('Audiobit not a str.' + str(type(audioBit)))
+
+    if(type(samplerate) != str):
+        log.error('samplerate not a str.' + str(type(samplerate)))
+
     if(needConvert):
         cmd = [ffmpeg, '-y', '-i', theFile]
         if(audioBit is not None):
             cmd.extend(['-b:a', audioBit])
         cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}/faAudio.wav'])
-        if(log.is_ffmpeg):
-            cmd.extend(['-hide_banner'])
-        else:
-            cmd.extend(['-nostats', '-loglevel', '8'])
+        cmd = ffAddDebug(cmd, log.is_ffmpeg)
         subprocess.call(cmd)
 
         theFile = f'{temp}/faAudio.wav'

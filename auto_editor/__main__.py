@@ -169,7 +169,7 @@ def main():
         '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
         '.db', '.ini', '.BIN']
 
-    from usefulFunctions import conwrite, getBinaries, pipeToConsole
+    from usefulFunctions import conwrite, getBinaries, pipeToConsole, ffAddDebug
     from mediaMetadata import vidTracks, getSampleRate, getAudioBitrate
     from mediaMetadata import getVideoCodec, ffmpegFPS
     from wavfile import read
@@ -322,10 +322,7 @@ def main():
             tracks = 1
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', audioBitrate, '-ac', '2',
                 '-ar', sampleRate, '-vn', f'{TEMP}/fastAud.wav']
-            if(log.is_ffmpeg):
-                cmd.extend(['-hide_banner'])
-            else:
-                cmd.extend(['-nostats', '-loglevel', '8'])
+            cmd = ffAddDebug(cmd, log.is_ffmpeg)
             subprocess.call(cmd)
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
@@ -363,11 +360,7 @@ def main():
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', audioBitrate,
                     '-ac', '2', '-ar', sampleRate, '-map', f'0:a:{trackNum}',
                     f'{TEMP}/{trackNum}.wav']
-
-                if(log.is_ffmpeg):
-                    cmd.extend(['-hide_banner'])
-                else:
-                    cmd.extend(['-nostats', '-loglevel', '8'])
+                cmd = ffAddDebug(cmd, log.is_ffmpeg)
                 subprocess.call(cmd)
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
@@ -376,11 +369,7 @@ def main():
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
                     sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
-                if(log.is_ffmpeg):
-                    cmd.extend(['-hide_banner'])
-                else:
-                    cmd.extend(['-nostats', '-loglevel', '8'])
-
+                cmd = ffAddDebug(cmd, log.is_ffmpeg)
                 subprocess.call(cmd)
 
                 sampleRate, audioData = read(f'{TEMP}/combined.wav')
@@ -436,10 +425,7 @@ def main():
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', 'fps=fps=30',
                 constantLoc]
-            if(log.is_ffmpeg):
-                cmd.extend(['-hide_banner'])
-            else:
-                cmd.extend(['-nostats', '-loglevel', '8'])
+            cmd = ffAddDebug(cmd, log.is_ffmpeg)
             subprocess.call(cmd)
             INPUT_FILE = constantLoc
 
@@ -468,8 +454,8 @@ def main():
         if(audioFile):
             from fastAudio import fastAudio
 
-            fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds,
-                args.audio_bitrate, sampleRate, True, TEMP, log, fps)
+            fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, audioBitrate,
+                str(sampleRate), True, TEMP, log, fps)
             continue
 
         from fastVideo import fastVideo

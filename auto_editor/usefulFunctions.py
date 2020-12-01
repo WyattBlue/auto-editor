@@ -73,6 +73,14 @@ def getBinaries(plat, dirPath, myFFmpeg: bool):
     return ffmpeg, ffprobe
 
 
+def ffAddDebug(cmd: list, isFF: bool) -> list:
+    if(isFF):
+        cmd.extend(['-hide_banner'])
+    else:
+        cmd.extend(['-nostats', '-loglevel', '8'])
+    return cmd
+
+
 def getNewLength(chunks: list, speeds: list, fps: float) -> float:
     timeInFrames = 0
     for chunk in chunks:

@@ -45,12 +45,13 @@ def getAudioBitrate(file: str, ffprobe: str, log, abit: str) -> str:
         if(not file.endswith('.mkv')):
             output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
                 'a:0', '-show_entries', 'stream=bit_rate', '-of',
-                'compact=p=0:nk=1', file])
+                'compact=p=0:nk=1', file]).strip()
             if(output.isnumeric()):
                 return str(round(int(output) / 1000)) + 'k'
             else:
                 log.warning("Couldn't automatically detect audio bitrate.")
                 log.debug('Setting audio bitrate to 500k')
+                log.debug(f'Output: {output}')
                 return '500k'
     return str(abit)
 
