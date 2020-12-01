@@ -283,11 +283,7 @@ def main():
         cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
             '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2',
             f'{TEMP}/combined.mp4'])
-        if(log.ffmpeg):
-            cmd.extend(['-hide_banner'])
-        else:
-            cmd.extend(['-nostats', '-loglevel', '8'])
-
+        cmd = ffAddDebug(cmd, log.is_ffmpeg)
         subprocess.call(cmd)
         inputList = [f'{TEMP}/combined.mp4']
 
@@ -452,16 +448,17 @@ def main():
                 audioFile, log)
             continue
         if(audioFile):
-            from fastAudio import fastAudio
+            from fastAudio import fastAudio, handleAudio
 
-            fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds, audioBitrate,
-                str(sampleRate), True, TEMP, log, fps)
+            theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
+                TEMP, log)
+            fastAudio(ffmpeg, theFile, newOutput, chunks, speeds, log, fps)
             continue
 
         from fastVideo import fastVideo
         fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, includeFrame, speeds, tracks,
-            args.audio_bitrate, sampleRate, TEMP, args.keep_tracks_seperate, vcodec, fps,
-            args.export_as_audio, args.video_bitrate, args.preset, args.tune, log)
+            TEMP, args.keep_tracks_seperate, vcodec, fps, args.export_as_audio,
+            args.video_bitrate, args.preset, args.tune, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'The file {newOutput} was not created.')

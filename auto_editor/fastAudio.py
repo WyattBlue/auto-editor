@@ -14,28 +14,28 @@ import os
 import time
 import subprocess
 
-def fastAudio(ffmpeg: str, theFile: str, outFile: str, chunks: list, speeds: list,
-    audioBit, samplerate, needConvert: bool, temp: str, log, fps: float):
+
+def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
+    if(type(samplerate) != str):
+        log.error('samplerate not a str.' + str(type(samplerate)))
+    cmd = [ffmpeg, '-y', '-i', theFile]
+    if(audioBit is not None):
+        cmd.extend(['-b:a', audioBit])
+        if(type(audioBit) != str):
+            log.error('Audiobit not a str.' + str(type(audioBit)))
+    cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}/faAudio.wav'])
+    cmd = ffAddDebug(cmd, log.is_ffmpeg)
+    subprocess.call(cmd)
+
+    return f'{temp}/faAudio.wav'
+
+def fastAudio(theFile: str, outFile: str, chunks: list, speeds: list, log, fps: float):
 
     if(len(chunks) == 1 and chunks[0][2] == 0):
         log.error('Trying to create empty audio.')
 
     if(not os.path.isfile(theFile)):
         log.error('fastAudio.py could not find file: ' + theFile)
-
-    if(needConvert):
-        if(type(samplerate) != str):
-            log.error('samplerate not a str.' + str(type(samplerate)))
-        cmd = [ffmpeg, '-y', '-i', theFile]
-        if(audioBit is not None):
-            cmd.extend(['-b:a', audioBit])
-            if(type(audioBit) != str):
-                log.error('Audiobit not a str.' + str(type(audioBit)))
-        cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}/faAudio.wav'])
-        cmd = ffAddDebug(cmd, log.is_ffmpeg)
-        subprocess.call(cmd)
-
-        theFile = f'{temp}/faAudio.wav'
 
     samplerate, audioData = read(theFile)
 

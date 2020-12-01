@@ -6,7 +6,7 @@ import numpy as np
 
 # Included functions
 from fastAudio import fastAudio
-from usefulFunctions import progressBar, conwrite, pipeToConsole
+from usefulFunctions import progressBar, conwrite, pipeToConsole, ffAddDebug
 
 # Internal libraries
 import os
@@ -15,9 +15,8 @@ import subprocess
 from shutil import move
 
 def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFrame:
-    np.ndarray, speeds: list, tracks: int, abitrate: str, samplerate, temp: str,
-    keepTracksSep: bool, vcodec, fps: float, exportAsAudio: bool, vbitrate, preset,
-    tune, log):
+    np.ndarray, speeds: list, tracks: int, temp: str, keepTracksSep: bool, vcodec,
+    fps: float, exportAsAudio: bool, vbitrate, preset, tune, log):
 
     if(not os.path.isfile(vidFile)):
         log.error('fastVideo.py could not find file: ' + vidFile)
@@ -28,8 +27,8 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
     for trackNum in range(tracks):
-        fastAudio(ffmpeg, f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
-            speeds, abitrate, samplerate, False, temp, log, fps=fps)
+        fastAudio(f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
+            speeds, log, fps=fps)
 
         if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
             log.error('Audio file not created.')
@@ -42,7 +41,7 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
             move(f'{temp}/0.wav', outFile)
             return None # Exit out early.
 
-        cmd = ['ffmpeg', '-y']
+        cmd = [ffmpeg, '-y']
         for trackNum in range(tracks):
             cmd.extend(['-i', f'{temp}/{trackNum}.wav'])
         cmd.extend(['-filter_complex', f'amix=inputs={tracks}:duration=longest', outFile])
@@ -112,10 +111,7 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
             cmd.extend(['-tune', tune])
         cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2',
             outFile])
-        if(isFFmpeg):
-            cmd.extend(['-hide_banner'])
-        else:
-            cmd.extend(['-nostats', '-loglevel', '8'])
+        cmd = ffAddDebug(cdm, isFFmpeg)
         return cmd
 
     # Now mix new audio(s) and the new video.
@@ -159,9 +155,6 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
             outFile]
-        if(log.is_ffmpeg):
-            cmd.extend(['-hide_banner'])
-        else:
-            cmd.extend(['-nostats', '-loglevel', '8'])
+        cmd = ffAddDebug(cmd, log.is_ffmpeg)
         subprocess.call(cmd)
     conwrite('')
