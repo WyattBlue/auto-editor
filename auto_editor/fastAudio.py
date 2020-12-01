@@ -23,10 +23,9 @@ def fastAudio(ffmpeg: str, theFile: str, outFile: str, chunks: list, speeds: lis
     if(not os.path.isfile(theFile)):
         log.error('fastAudio.py could not find file: ' + theFile)
 
-    if(type(samplerate) != str):
-        log.error('samplerate not a str.' + str(type(samplerate)))
-
     if(needConvert):
+        if(type(samplerate) != str):
+            log.error('samplerate not a str.' + str(type(samplerate)))
         cmd = [ffmpeg, '-y', '-i', theFile]
         if(audioBit is not None):
             cmd.extend(['-b:a', audioBit])
