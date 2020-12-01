@@ -111,7 +111,7 @@ def fastVideo(ffmpeg: str, vidFile: str, outFile: str, chunks: list, includeFram
             cmd.extend(['-tune', tune])
         cmd.extend(['-preset', preset, '-movflags', '+faststart', '-strict', '-2',
             outFile])
-        cmd = ffAddDebug(cdm, isFFmpeg)
+        cmd = ffAddDebug(cmd, isFFmpeg)
         return cmd
 
     # Now mix new audio(s) and the new video.
