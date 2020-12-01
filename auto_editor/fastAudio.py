@@ -26,8 +26,8 @@ def fastAudio(ffmpeg: str, theFile: str, outFile: str, chunks: list, speeds: lis
     if(needConvert):
         cmd = [ffmpeg, '-y', '-i', theFile]
         if(audioBit is not None):
-            cmd.extend(['-b:a', str(audioBit)])
-        cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{temp}/faAudio.wav'])
+            cmd.extend(['-b:a', audioBit])
+        cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}/faAudio.wav'])
         if(log.is_ffmpeg):
             cmd.extend(['-hide_banner'])
         else:

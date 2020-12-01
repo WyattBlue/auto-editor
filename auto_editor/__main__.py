@@ -375,7 +375,7 @@ def main():
                 # Combine all audio tracks into one audio file, then read.
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
-                    str(args.sample_rate), '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
+                    sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
                 if(log.is_ffmpeg):
                     cmd.extend(['-hide_banner'])
                 else:
