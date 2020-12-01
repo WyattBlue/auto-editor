@@ -26,6 +26,7 @@ def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
     cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}/faAudio.wav'])
     cmd = ffAddDebug(cmd, log.is_ffmpeg)
     subprocess.call(cmd)
+    conwrite('')
 
     return f'{temp}/faAudio.wav'
 
@@ -90,6 +91,3 @@ def fastAudio(theFile: str, outFile: str, chunks: list, speeds: list, log, fps: 
     log.debug('   - Expected video length: ' + str(yPointer / (samplerate / fps)))
     newAudio = newAudio[:yPointer]
     write(outFile, samplerate, newAudio)
-
-    if(needConvert):
-        conwrite('')
