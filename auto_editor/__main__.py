@@ -452,13 +452,18 @@ def main():
 
             theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
                 TEMP, log)
-            fastAudio(ffmpeg, theFile, newOutput, chunks, speeds, log, fps)
+            fastAudio(theFile, newOutput, chunks, speeds, log, fps)
             continue
 
-        from fastVideo import fastVideo
-        fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, includeFrame, speeds, tracks,
-            TEMP, args.keep_tracks_seperate, vcodec, fps, args.export_as_audio,
-            args.video_bitrate, args.preset, args.tune, log)
+        from fastVideo import handleAudioTracks, fastVideo, muxVideo
+
+        continueVid = handleAudioTracks(ffmpeg, newOutput, args.export_as_audio,
+            tracks, args.keep_tracks_seperate, chunks, speeds, fps, TEMP, log)
+        if(continueVid):
+            fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps, TEMP, log)
+            muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
+                args.video_bitrate, args.tune, args.preset, args.video_codec,
+                TEMP, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'The file {newOutput} was not created.')
