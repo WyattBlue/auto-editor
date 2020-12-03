@@ -118,7 +118,7 @@ def options():
             'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
 
-    add_argument('exportMediaOps', nargs=0, action='folder')
+    add_argument('exportMediaOps', nargs=0, action='grouping')
     add_argument('--video_bitrate', '-vb', parent='exportMediaOps',
         help='set the number of bits per second for video.')
     add_argument('--audio_bitrate', '-ab', parent='exportMediaOps',
@@ -132,10 +132,18 @@ def options():
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
         help='set the preset for ffmpeg to help save file size or increase quality.')
-    add_argument('--tune', default='none', parent='exportMediaOps',
+    add_argument('--tune', '-t', default='none', parent='exportMediaOps',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none'],
         help='set the tune for ffmpeg to compress video better.')
+
+    add_argument('motionOps', nargs=0, action='grouping')
+    add_argument('--dilates', '-d', type=int, default=2, range='0 to 5', parent='motionOps',
+        help='determine how many times an image is dilated before being compared.')
+    add_argument('--width', '-w', type=int, default=400, range='1 to Infinity', parent='motionOps',
+        help="set the image's new width (in pixels) before being compared.")
+    add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity', parent='motionOps',
+        help='set the strength of the blur applied to the image before being compared.')
     return option_data
 
 def main():
@@ -156,7 +164,7 @@ def main():
         for option in option_data:
             if(option['parent'] == 'auto-editor'):
                 print(' ', ', '.join(option['names']) + ':', option['help'])
-                if(option['action'] == 'folder'):
+                if(option['action'] == 'grouping'):
                     print('     ...')
         print('\nThe help command can also be used on a specific option:')
         print('    auto-editor --frame_margin --help')
@@ -400,7 +408,7 @@ def main():
         if('motion' in args.edit_based_on):
             log.debug('Analyzing video motion.')
             motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold, log,
-                width=400, dilates=2, blur=21)
+                width=args.width, dilates=args.dilates, blur=args.blur)
 
             if(audioList is not None):
                 if(len(audioList) > len(motionList)):

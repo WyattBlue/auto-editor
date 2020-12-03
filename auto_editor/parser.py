@@ -3,7 +3,7 @@ import sys
 
 def printHelp(option, args):
     print(' ', ', '.join(option['names']))
-    if(option['action'] == 'folder'):
+    if(option['action'] == 'grouping'):
         print('   |')
     else:
         print('   ', option['help'])
@@ -15,12 +15,12 @@ def printHelp(option, args):
             print('    range:', option['range'])
         if(option['choices'] is not None):
             print('    choices:', ', '.join(option['choices']))
-    elif(option['action'] == 'folder'):
+    elif(option['action'] == 'grouping'):
         for options in args:
             for op in options:
                 if(op['parent'] == option['names'][0]):
                     print(' ', ', '.join(op['names']) + ':', op['help'])
-                    if(op['action'] == 'folder'):
+                    if(op['action'] == 'grouping'):
                         print('     ...')
 
     elif(option['action'] == 'store_true'):
@@ -106,7 +106,7 @@ class parse_options():
 
                 key = option['names'][0].replace('-', '')
 
-                if(option['action'] == 'folder'):
+                if(option['action'] == 'grouping'):
                     parent = key
 
                 if(nextItem == '-h' or nextItem == '--help'):
