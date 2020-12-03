@@ -129,7 +129,8 @@ def main():
         help='how much motion is required to be considered "moving"')
     add_argument('--edit_based_on', default='audio',
         choices=['audio', 'motion', 'not_audio', 'not_motion', 'audio_or_motion',
-            'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion'],
+            'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
+            'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
 
     dirPath = os.path.dirname(os.path.realpath(__file__))

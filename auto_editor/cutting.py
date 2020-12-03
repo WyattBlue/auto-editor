@@ -31,20 +31,22 @@ def combineArrs(audioList: np.ndarray, motionList: np.ndarray, based: str,
         hasLoud = np.invert(motionList)
 
     if(based == 'audio_and_motion'):
-        log.debug('Applying "Python bitwise and" on arrays.')
         hasLoud = audioList & motionList
 
     if(based == 'audio_or_motion'):
-        log.debug('Applying "Python bitwise or" on arrays.')
         hasLoud = audioList | motionList
 
     if(based == 'audio_xor_motion'):
-        log.debug('Applying "numpy bitwise_xor" on arrays')
         hasLoud = np.bitwise_xor(audioList, motionList)
 
     if(based == 'audio_and_not_motion'):
-        log.debug('Applying "Python bitwise and" with "numpy bitwise not" on arrays.')
         hasLoud = audioList & np.invert(motionList)
+
+    if(based == 'not_audio_and_motion'):
+        hasLoud = np.invert(audioList) & motionList
+
+    if(based == 'not_audio_and_not_motion'):
+        hasLoud = np.invert(audioList) & np.invert(motionList)
     return hasLoud
 
 
