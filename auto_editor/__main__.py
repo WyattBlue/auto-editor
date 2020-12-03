@@ -106,23 +106,6 @@ def options():
     add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
-    add_argument('--video_bitrate', '-vb',
-        help='set the number of bits per second for video.')
-    add_argument('--audio_bitrate', '-ab',
-        help='set the number of bits per second for audio.')
-    add_argument('--sample_rate', '-r', type=sample_rate_type,
-        help='set the sample rate of the input and output videos.')
-    add_argument('--video_codec', '-vcodec', default='uncompressed',
-        help='set the video codec for the output media file.')
-    add_argument('--preset', '-p', default='medium',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
-            'slow', 'slower', 'veryslow'],
-        help='set the preset for ffmpeg to help save file size or increase quality.')
-    add_argument('--tune', default='none',
-        choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
-            'zerolatency', 'none'],
-        help='set the tune for ffmpeg to compress video better.')
-
     add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')
     add_argument('--cut_out', nargs='*',
@@ -134,6 +117,25 @@ def options():
             'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
             'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
+
+    add_argument('exportMediaOps', nargs=0, action='folder')
+    add_argument('--video_bitrate', '-vb', parent='exportMediaOps',
+        help='set the number of bits per second for video.')
+    add_argument('--audio_bitrate', '-ab', parent='exportMediaOps',
+        help='set the number of bits per second for audio.')
+    add_argument('--sample_rate', '-r', type=sample_rate_type, parent='exportMediaOps',
+        help='set the sample rate of the input and output videos.')
+    add_argument('--video_codec', '-vcodec', default='uncompressed',
+        parent='exportMediaOps',
+        help='set the video codec for the output media file.')
+    add_argument('--preset', '-p', default='medium', parent='exportMediaOps',
+        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
+            'slow', 'slower', 'veryslow'],
+        help='set the preset for ffmpeg to help save file size or increase quality.')
+    add_argument('--tune', default='none', parent='exportMediaOps',
+        choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
+            'zerolatency', 'none'],
+        help='set the tune for ffmpeg to compress video better.')
     return option_data
 
 def main():
@@ -144,19 +146,25 @@ def main():
     from usefulFunctions import Log, Timer
     from parser import parse_options
 
-    args = parse_options(sys.argv[1:], Log(), options())
+    option_data = options()
+
+    args = parse_options(sys.argv[1:], Log(), option_data)
 
     # Print the help screen for the entire program.
     if(args.help):
         print('')
-        for option in options:
-            print(' ', ', '.join(option['names']) + ':', option['help'])
-        print('\nThe help command can also be used on a specific option.')
-        print('example:')
+        for option in option_data:
+            if(option['parent'] == 'auto-editor'):
+                print(' ', ', '.join(option['names']) + ':', option['help'])
+                if(option['action'] == 'folder'):
+                    print('     ...')
+        print('\nThe help command can also be used on a specific option:')
         print('    auto-editor --frame_margin --help')
         print('\nHave an issue? Make an issue. '\
             'Visit https://github.com/wyattblue/auto-editor/issues')
         sys.exit()
+
+    del option_data
 
     if(args.version):
         print('Auto-Editor version', version)

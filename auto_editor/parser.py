@@ -1,10 +1,13 @@
 import difflib
 import sys
 
-def printHelp(option):
+def printHelp(option, args):
     print(' ', ', '.join(option['names']))
-    print('   ', option['help'])
-    print('   ', option['extra'])
+    if(option['action'] == 'folder'):
+        print('   |')
+    else:
+        print('   ', option['help'])
+        print('   ', option['extra'])
     if(option['action'] == 'default'):
         print('    type:', option['type'].__name__)
         print('    default:', option['default'])
@@ -12,21 +15,33 @@ def printHelp(option):
             print('    range:', option['range'])
         if(option['choices'] is not None):
             print('    choices:', ', '.join(option['choices']))
-    else:
+    elif(option['action'] == 'folder'):
+        for options in args:
+            for op in options:
+                if(op['parent'] == option['names'][0]):
+                    print(' ', ', '.join(op['names']) + ':', op['help'])
+                    if(op['action'] == 'folder'):
+                        print('     ...')
+
+    elif(option['action'] == 'store_true'):
         print('    type: flag')
+    else:
+        print('    type: unknown')
 
 
-def get_option(item, the_args: list):
+def get_option(item, parent, the_args: list):
     for options in the_args:
         for option in options:
             if(item in option['names']):
-                return option
+                if(parent == 'global' or option['parent'] == parent):
+                    return option
     return None
+
+# auto_editor/__main__.py example.mp4 exportMediaOps --preset veryfast --frame_margin 10
 
 class parse_options():
     def __init__(self, userArgs, log, *args):
         # Set the default options.
-
         option_names = []
 
         for options in args:
@@ -46,6 +61,7 @@ class parse_options():
         settingInputs = True
         optionList = 'input'
         i = 0
+        parent = 'auto-editor'
         while i < len(userArgs):
             item = userArgs[i]
             if(i == len(userArgs) - 1):
@@ -53,9 +69,35 @@ class parse_options():
             else:
                 nextItem = userArgs[i+1]
 
-            option = get_option(item, args)
+            option = get_option(item, parent, args)
 
-            if(option is not None):
+            if(option is None and parent != 'auto-editor'):
+                parent = 'auto-editor'
+                option = get_option(item, parent, args)
+
+            if(option is None):
+                if(settingInputs and not item.startswith('-')):
+                    # Input file names
+                    myList.append(item)
+                else:
+                    # Unknown Option!
+                    hmm = difflib.get_close_matches(item, option_names)
+                    append = ''
+
+                    # If there's an exact match.
+                    if(len(hmm) > 0 and hmm[0] == item):
+                        option = get_option(item, 'global', args)
+                        parent = option['parent']
+                        myDefault = option['default'] if option['action'] != 'store_true' else ''
+                        append = f'\n\nExample:\n    auto-editor {parent} {item} {myDefault}'
+                        log.error(f'Option {item} needs to have parent: {parent}{append}')
+
+                    potential_options = ', '.join(hmm)
+
+                    if(hmm != []):
+                        append = f'\n\n    Did you mean:\n        {potential_options}'
+                    log.error(f'Unknown option: {item}{append}')
+            else:
                 if(optionList is not None):
                     setattr(self, optionList, myList)
                 settingInputs = False
@@ -64,8 +106,11 @@ class parse_options():
 
                 key = option['names'][0].replace('-', '')
 
+                if(option['action'] == 'folder'):
+                    parent = key
+
                 if(nextItem == '-h' or nextItem == '--help'):
-                    printHelp(option)
+                    printHelp(option, args)
                     sys.exit()
 
                 if(option['nargs'] != 1):
@@ -89,18 +134,7 @@ class parse_options():
                                 f'\nchoices are:\n  {myChoices}')
                     i += 1
                 setattr(self, key, value)
-            else:
-                if(settingInputs and not item.startswith('-')):
-                    # Input file names
-                    myList.append(item)
-                else:
-                    # Unknown Option!
-                    hmm = difflib.get_close_matches(item, option_names)
-                    potential_options = ', '.join(hmm)
-                    append = ''
-                    if(hmm != []):
-                        append = f'\n\n    Did you mean:\n        {potential_options}'
-                    log.error(f'Unknown option: {item}{append}')
+
             i += 1
         if(settingInputs):
             setattr(self, optionList, myList)
