@@ -10,7 +10,7 @@ import tempfile
 import subprocess
 from shutil import rmtree
 
-version = '20w48a'
+version = '20w49a'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
