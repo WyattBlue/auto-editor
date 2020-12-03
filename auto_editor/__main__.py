@@ -30,12 +30,13 @@ def sample_rate_type(num: str) -> int:
         return int(float(num[:-4]) * 1000)
     return int(num)
 
-def main():
-    options = []
 
-    def add_argument(*names, nargs=1, type=str, default=None,
-        action='default', range=None, choices=None, help='', extra=''):
-        nonlocal options
+def options():
+    option_data = []
+
+    def add_argument(*names, nargs=1, type=str, default=None, action='default',
+        range=None, choices=None, parent='auto-editor', help='', extra=''):
+        nonlocal option_data
 
         newDic = {}
         newDic['names'] = names
@@ -47,7 +48,8 @@ def main():
         newDic['extra'] = extra
         newDic['range'] = range
         newDic['choices'] = choices
-        options.append(newDic)
+        newDic['parent'] = parent
+        option_data.append(newDic)
 
     add_argument('(input)', nargs='*',
         help='the path to a file, folder, or url you want edited.')
@@ -132,7 +134,9 @@ def main():
             'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
             'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
+    return option_data
 
+def main():
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # Fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
@@ -140,7 +144,7 @@ def main():
     from usefulFunctions import Log, Timer
     from parser import parse_options
 
-    args = parse_options(sys.argv[1:], Log(), options)
+    args = parse_options(sys.argv[1:], Log(), options())
 
     # Print the help screen for the entire program.
     if(args.help):
