@@ -135,15 +135,18 @@ def options():
     add_argument('--tune', '-t', default='none', parent='exportMediaOps',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none'],
-        help='set the tune for ffmpeg to compress video better.')
+        help='set the tune for ffmpeg to compress video better in certain circumstances.')
+    add_argument('--constant_rate_factor', '-crf', type=int, default=15,
+        parent='exportMediaOps', range='0 to 51',
+        help='set the quality for video using the crf method.')
 
     add_argument('motionOps', nargs=0, action='grouping')
     add_argument('--dilates', '-d', type=int, default=2, range='0 to 5', parent='motionOps',
-        help='determine how many times an image is dilated before being compared.')
+        help='set how many times a frame is dilated before being compared.')
     add_argument('--width', '-w', type=int, default=400, range='1 to Infinity', parent='motionOps',
-        help="set the image's new width (in pixels) before being compared.")
+        help="set the frame's new width (in pixels) before being compared.")
     add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity', parent='motionOps',
-        help='set the strength of the blur applied to the image before being compared.')
+        help='set the strength of the blur applied to a frame before being compared.')
     return option_data
 
 def main():
@@ -226,11 +229,12 @@ def main():
 
     if(is64bit == '32-bit'):
         log.warning('You have the 32-bit version of Python, which may lead to memory crashes.')
-    if(args.frame_margin < 0):
-        log.error('Frame margin cannot be negative.')
 
     if(args.input == []):
         log.error('You need the (input) argument so that auto-editor can do the work for you.')
+    if(args.frame_margin < 0):
+        log.error('Frame margin cannot be negative.')
+
 
     try:
         from requests import get
@@ -243,10 +247,31 @@ def main():
     except Exception as err:
         log.debug('Connection Error: ' + str(err))
 
+    # Input validation and sanitization.
+    if(args.constant_rate_factor < 0 or args.constant_rate_factor > 51):
+        log.error('Constant rate factor (crf) is out of range.')
+    if(args.width < 1):
+        log.error('motionOps --width cannot be less than 1.')
+    if(args.dilates < 0):
+        log.error('motionOps --dilates cannot be less than 0')
+    if(args.video_codec == 'uncompressed'):
+        if(args.constant_rate_factor != 15): # default value.
+            log.error('Cannot apply constant rate factor if video codec is "uncompressed".')
+        if(args.tune != 'none'):
+            log.error('Cannot apply tune if video codec is "uncompressed".')
+        if(args.preset != 'medium'):
+            log.error('Cannot apply preset if video codec is "uncompressed".')
+
+
+    args.constant_rate_factor = str(args.constant_rate_factor)
+    if(args.blur < 0):
+        args.blur = 0
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
     if(args.video_speed <= 0 or args.video_speed > 99999):
         args.video_speed = 99999
+    if(args.output_file is None):
+        args.output_file = []
 
     inputList = []
     for myInput in args.input:
@@ -275,9 +300,6 @@ def main():
             log.error('Could not find file: ' + myInput)
 
     timer = Timer()
-
-    if(args.output_file is None):
-        args.output_file = []
 
     # Figure out the output file names.
     if(len(args.output_file) < len(inputList)):
@@ -367,10 +389,6 @@ def main():
 
             # Get video codec
             vcodec = getVideoCodec(INPUT_FILE, ffmpeg, log, args.video_codec)
-
-            if(args.video_bitrate is not None and vcodec == 'copy'):
-                log.warning('Your bitrate will not be applied because the video' \
-                    ' codec is "uncompressed".')
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
@@ -484,7 +502,7 @@ def main():
             fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps, TEMP, log)
             muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
                 args.video_bitrate, args.tune, args.preset, args.video_codec,
-                TEMP, log)
+                args.constant_rate_factor, TEMP, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'The file {newOutput} was not created.')

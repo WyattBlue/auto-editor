@@ -40,13 +40,13 @@ def handleAudioTracks(ffmpeg, outFile, exportAsAudio, tracks, keepTracksSep,
     return True
 
 def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vcodec,
-    temp, log):
+    crf, temp, log):
 
     if(vcodec == 'uncompressed'):
         vcodec = 'copy'
     def extender(cmd, vbitrate, tune, preset, outFile, isFFmpeg):
         if(vbitrate is None):
-            cmd.extend(['-crf', '15'])
+            cmd.extend(['-crf', crf])
         else:
             cmd.extend(['-b:v', vbitrate])
         if(tune != 'none'):
