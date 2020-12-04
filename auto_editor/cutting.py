@@ -1,6 +1,55 @@
 '''cutting.py'''
 import numpy as np
 
+
+def combineArrs(audioList: np.ndarray, motionList: np.ndarray, based: str,
+    log) -> np.ndarray:
+
+    if(based == 'audio' or based == 'not_audio'):
+        if(max(audioList) == 0):
+            log.error('There was no place where audio exceeded the threshold.')
+    if(based == 'motion' or based == 'not_motion'):
+        if(max(motionList) == 0):
+            log.error('There was no place where motion exceeded the threshold.')
+
+    # Only raise a warning for other cases.
+    if(audioList is not None and max(audioList) == 0):
+        log.warning('There was no place where audio exceeded the threshold.')
+    if(motionList is not None and max(motionList) == 0):
+        log.warning('There was no place where motion exceeded the threshold.')
+
+    if(based == 'audio'):
+        hasLoud = audioList
+
+    if(based == 'motion'):
+        hasLoud = motionList
+
+    if(based == 'not_audio'):
+        hasLoud = np.invert(audioList)
+
+    if(based == 'not_motion'):
+        hasLoud = np.invert(motionList)
+
+    if(based == 'audio_and_motion'):
+        hasLoud = audioList & motionList
+
+    if(based == 'audio_or_motion'):
+        hasLoud = audioList | motionList
+
+    if(based == 'audio_xor_motion'):
+        hasLoud = np.bitwise_xor(audioList, motionList)
+
+    if(based == 'audio_and_not_motion'):
+        hasLoud = audioList & np.invert(motionList)
+
+    if(based == 'not_audio_and_motion'):
+        hasLoud = np.invert(audioList) & motionList
+
+    if(based == 'not_audio_and_not_motion'):
+        hasLoud = np.invert(audioList) & np.invert(motionList)
+    return hasLoud
+
+
 def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
     fps: float, log) -> np.ndarray:
 

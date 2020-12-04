@@ -1,40 +1,39 @@
 '''fastAudio.py'''
 
-# External libraries
-import numpy as np
-from audiotsm2 import phasevocoder
-from audiotsm2.io.array import ArrReader, ArrWriter
+from usefulFunctions import progressBar, getNewLength, conwrite, ffAddDebug
 
-# Included functions
-from usefulFunctions import progressBar, getNewLength, conwrite
-from wavfile import read, write
+def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
+    import subprocess
 
-# Internal libraries
-import os
-import time
-import subprocess
+    if(not isinstance(samplerate, str)):
+        log.error('samplerate not a str. ' + str(type(samplerate)))
+    cmd = [ffmpeg, '-y', '-i', theFile]
+    if(audioBit is not None):
+        cmd.extend(['-b:a', audioBit])
+        if(not isinstance(audioBit, str)):
+            log.error('audioBit not a str. ' + str(type(audioBit)))
+    cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}/faAudio.wav'])
+    cmd = ffAddDebug(cmd, log.is_ffmpeg)
+    subprocess.call(cmd)
+    conwrite('')
 
-def fastAudio(ffmpeg: str, theFile: str, outFile: str, chunks: list, speeds: list,
-    audioBit, samplerate, needConvert: bool, temp: str, log, fps: float):
+    return f'{temp}/faAudio.wav'
+
+def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float):
+    from wavfile import read, write
+
+    import os
+    import time
+
+    import numpy as np
+    from audiotsm2 import phasevocoder
+    from audiotsm2.io.array import ArrReader, ArrWriter
 
     if(len(chunks) == 1 and chunks[0][2] == 0):
         log.error('Trying to create empty audio.')
 
     if(not os.path.isfile(theFile)):
         log.error('fastAudio.py could not find file: ' + theFile)
-
-    if(needConvert):
-        cmd = [ffmpeg, '-y', '-i', theFile]
-        if(audioBit is not None):
-            cmd.extend(['-b:a', str(audioBit)])
-        cmd.extend(['-ac', '2', '-ar', str(samplerate), '-vn', f'{temp}/faAudio.wav'])
-        if(log.is_ffmpeg):
-            cmd.extend(['-hide_banner'])
-        else:
-            cmd.extend(['-nostats', '-loglevel', '8'])
-        subprocess.call(cmd)
-
-        theFile = f'{temp}/faAudio.wav'
 
     samplerate, audioData = read(theFile)
 
@@ -89,6 +88,3 @@ def fastAudio(ffmpeg: str, theFile: str, outFile: str, chunks: list, speeds: lis
     log.debug('   - Expected video length: ' + str(yPointer / (samplerate / fps)))
     newAudio = newAudio[:yPointer]
     write(outFile, samplerate, newAudio)
-
-    if(needConvert):
-        conwrite('')

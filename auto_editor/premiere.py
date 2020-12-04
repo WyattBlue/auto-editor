@@ -10,41 +10,40 @@ from usefulFunctions import conwrite
 # Internal libraries
 import os
 
-def speedup(speed) -> str:
-    r = '\t\t\t\t\t\t<filter>\n'
-    r += '\t\t\t\t\t\t\t<effect>\n'
-    r += '\t\t\t\t\t\t\t\t<name>Time Remap</name>\n'
-    r += '\t\t\t\t\t\t\t\t<effectid>timeremap</effectid>\n'
-    r += '\t\t\t\t\t\t\t\t<effectcategory>motion</effectcategory>\n'
-    r += '\t\t\t\t\t\t\t\t<effecttype>motion</effecttype>\n'
-    r += '\t\t\t\t\t\t\t\t<mediatype>video</mediatype>\n'
-    r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
-    r += '\t\t\t\t\t\t\t\t\t<parameterid>variablespeed</parameterid>\n'
-    r += '\t\t\t\t\t\t\t\t\t<name>variablespeed</name>\n'
-    r += '\t\t\t\t\t\t\t\t\t<valuemin>0</valuemin>\n'
-    r += '\t\t\t\t\t\t\t\t\t<valuemax>1</valuemax>\n'
-    r += '\t\t\t\t\t\t\t\t\t<value>0</value>\n'
-    r += '\t\t\t\t\t\t\t\t</parameter>\n'
-    r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
-    r += '\t\t\t\t\t\t\t\t\t<parameterid>speed</parameterid>\n'
-    r += '\t\t\t\t\t\t\t\t\t<name>speed</name>\n'
-    r += '\t\t\t\t\t\t\t\t\t<valuemin>-100000</valuemin>\n'
-    r += '\t\t\t\t\t\t\t\t\t<valuemax>100000</valuemax>\n'
-    r += f'\t\t\t\t\t\t\t\t\t<value>{speed}</value>\n'
-    r += '\t\t\t\t\t\t\t\t</parameter>\n'
-    r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
-    r += '\t\t\t\t\t\t\t\t\t<parameterid>reverse</parameterid>\n'
-    r += '\t\t\t\t\t\t\t\t\t<name>reverse</name>\n'
-    r += '\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n'
-    r += '\t\t\t\t\t\t\t\t</parameter>\n'
-    r += '\t\t\t\t\t\t\t\t<parameter authoringApp="PremierePro">\n'
-    r += '\t\t\t\t\t\t\t\t\t<parameterid>frameblending</parameterid>\n'
-    r += '\t\t\t\t\t\t\t\t\t<name>frameblending</name>\n'
-    r += '\t\t\t\t\t\t\t\t\t<value>FALSE</value>\n'
-    r += '\t\t\t\t\t\t\t\t</parameter>\n'
-    r += '\t\t\t\t\t\t\t</effect>\n'
-    r += '\t\t\t\t\t\t</filter>\n'
+def formatXML(base: int, *args: str) -> str:
+    r = ''
+    for line in args:
+        r += ('\t' * base) + line + '\n'
     return r
+
+
+def speedup(speed) -> str:
+    return formatXML(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
+        '\t\t<effectid>timeremap</effectid>',
+        '\t\t<effectcategory>motion</effectcategory>',
+        '\t\t<effecttype>motion</effecttype>',
+        '\t\t<mediatype>video</mediatype>',
+        '\t\t<parameter authoringApp="PremierePro">',
+        '\t\t\t<parameterid>variablespeed</parameterid>',
+        '\t\t\t<name>variablespeed</name>', '\t\t\t<valuemin>0</valuemin>',
+        '\t\t\t<valuemax>1</valuemax>',
+        '\t\t\t<value>0</value>',
+        '\t\t</parameter>',
+        '\t\t<parameter authoringApp="PremierePro">',
+        '\t\t\t<parameterid>speed</parameterid>',  '\t\t\t<name>speed</name>',
+        '\t\t\t<valuemin>-100000</valuemin>', '\t\t\t<valuemax>100000</valuemax>',
+        f'\t\t\t<value>{speed}</value>',
+        '\t\t</parameter>',
+        '\t\t<parameter authoringApp="PremierePro">',
+        '\t\t\t<parameterid>reverse</parameterid>',
+        '\t\t\t<name>reverse</name>', '\t\t\t<value>FALSE</value>',
+        '\t\t</parameter>',
+        '\t\t<parameter authoringApp="PremierePro">',
+        '\t\t\t<parameterid>frameblending</parameterid>',
+        '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
+        '\t\t</parameter>',
+        '\t</effect>',
+        '</filter>')
 
 
 def exportToPremiere(myInput: str, temp: str, output, clips, tracks: int, sampleRate,
