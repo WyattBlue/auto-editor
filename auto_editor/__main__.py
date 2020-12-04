@@ -5,15 +5,12 @@
 import os
 import re
 import sys
-import time
-import difflib
 import platform
 import tempfile
 import subprocess
 from shutil import rmtree
-from datetime import timedelta
 
-version = '20w48a'
+version = '20w49a'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -33,30 +30,13 @@ def sample_rate_type(num: str) -> int:
         return int(float(num[:-4]) * 1000)
     return int(num)
 
-def pipeToConsole(myCommands: list) -> str:
-    process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    return stdout.decode()
 
-def ffmpegFPS(ffmpeg: str, path: str, log) -> float:
-    output = pipeToConsole([ffmpeg, '-i', path, '-hide_banner'])
-    try:
-        matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
-        return float(matchDict['fps'])
-    except AttributeError:
-        log.warning('frame rate detection failed.\n' \
-            'If your video has a variable frame rate, ignore this message.')
-        return 30.0
+def options():
+    option_data = []
 
-def main():
-    options = []
-    option_names = []
-
-    def add_argument(*names, nargs=1, type=str, default=None,
-        action='default', range=None, choices=None, help='', extra=''):
-        nonlocal options
-        nonlocal option_names
+    def add_argument(*names, nargs=1, type=str, default=None, action='default',
+        range=None, choices=None, parent='auto-editor', help='', extra=''):
+        nonlocal option_data
 
         newDic = {}
         newDic['names'] = names
@@ -68,8 +48,8 @@ def main():
         newDic['extra'] = extra
         newDic['range'] = range
         newDic['choices'] = choices
-        options.append(newDic)
-        option_names = option_names + list(names)
+        newDic['parent'] = parent
+        option_data.append(newDic)
 
     add_argument('(input)', nargs='*',
         help='the path to a file, folder, or url you want edited.')
@@ -126,23 +106,6 @@ def main():
     add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
 
-    add_argument('--video_bitrate', '-vb',
-        help='set the number of bits per second for video.')
-    add_argument('--audio_bitrate', '-ab',
-        help='set the number of bits per second for audio.')
-    add_argument('--sample_rate', '-r', type=sample_rate_type,
-        help='set the sample rate of the input and output videos.')
-    add_argument('--video_codec', '-vcodec', default='uncompressed',
-        help='set the video codec for the output media file.')
-    add_argument('--preset', '-p', default='medium',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
-            'slow', 'slower', 'veryslow'],
-        help='set the preset for ffmpeg to help save file size or increase quality.')
-    add_argument('--tune', default='none',
-        choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
-            'zerolatency', 'none'],
-        help='set the tune for ffmpeg to compress video better.')
-
     add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')
     add_argument('--cut_out', nargs='*',
@@ -151,14 +114,73 @@ def main():
         help='how much motion is required to be considered "moving"')
     add_argument('--edit_based_on', default='audio',
         choices=['audio', 'motion', 'not_audio', 'not_motion', 'audio_or_motion',
-            'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion'],
+            'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
+            'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
 
+    add_argument('exportMediaOps', nargs=0, action='grouping')
+    add_argument('--video_bitrate', '-vb', parent='exportMediaOps',
+        help='set the number of bits per second for video.')
+    add_argument('--audio_bitrate', '-ab', parent='exportMediaOps',
+        help='set the number of bits per second for audio.')
+    add_argument('--sample_rate', '-r', type=sample_rate_type, parent='exportMediaOps',
+        help='set the sample rate of the input and output videos.')
+    add_argument('--video_codec', '-vcodec', default='uncompressed',
+        parent='exportMediaOps',
+        help='set the video codec for the output media file.')
+    add_argument('--preset', '-p', default='medium', parent='exportMediaOps',
+        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
+            'slow', 'slower', 'veryslow'],
+        help='set the preset for ffmpeg to help save file size or increase quality.')
+    add_argument('--tune', '-t', default='none', parent='exportMediaOps',
+        choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
+            'zerolatency', 'none'],
+        help='set the tune for ffmpeg to compress video better in certain circumstances.')
+    add_argument('--constant_rate_factor', '-crf', type=int, default=15,
+        parent='exportMediaOps', range='0 to 51',
+        help='set the quality for video using the crf method.')
+
+    add_argument('motionOps', nargs=0, action='grouping')
+    add_argument('--dilates', '-d', type=int, default=2, range='0 to 5', parent='motionOps',
+        help='set how many times a frame is dilated before being compared.')
+    add_argument('--width', '-w', type=int, default=400, range='1 to Infinity', parent='motionOps',
+        help="set the frame's new width (in pixels) before being compared.")
+    add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity', parent='motionOps',
+        help='set the strength of the blur applied to a frame before being compared.')
+    return option_data
+
+def main():
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # Fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
 
-    from usefulFunctions import Log
+    from usefulFunctions import Log, Timer
+
+    option_data = options()
+
+    from parser import ParseOptions
+
+    args = ParseOptions(sys.argv[1:], Log(), option_data)
+
+    # Print the help screen for the entire program.
+    if(args.help):
+        print('')
+        for option in option_data:
+            if(option['parent'] == 'auto-editor'):
+                print(' ', ', '.join(option['names']) + ':', option['help'])
+                if(option['action'] == 'grouping'):
+                    print('     ...')
+        print('\nThe help command can also be used on a specific option:')
+        print('    auto-editor --frame_margin --help')
+        print('\nHave an issue? Make an issue. '\
+            'Visit https://github.com/wyattblue/auto-editor/issues')
+        sys.exit()
+
+    del option_data
+
+    if(args.version):
+        print('Auto-Editor version', version)
+        sys.exit()
 
     audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
         '.acc', '.nfa', '.mka']
@@ -172,121 +194,9 @@ def main():
         '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
         '.db', '.ini', '.BIN']
 
-    class parse_options():
-        def __init__(self, userArgs, log, *args):
-            # Set the default options.
-            for options in args:
-                for option in options:
-                    key = option['names'][0].replace('-', '')
-                    if(option['action'] == 'store_true'):
-                        value = False
-                    elif(option['nargs'] != 1):
-                        value = []
-                    else:
-                        value = option['default']
-                    setattr(self, key, value)
-
-            def get_option(item, the_args: list):
-                for options in the_args:
-                    for option in options:
-                        if(item in option['names']):
-                            return option
-                return None
-
-            # Figure out attributes changed by user.
-            myList = []
-            settingInputs = True
-            optionList = 'input'
-            i = 0
-            while i < len(userArgs):
-                item = userArgs[i]
-                if(i == len(userArgs) - 1):
-                    nextItem = None
-                else:
-                    nextItem = userArgs[i+1]
-
-                option = get_option(item, args)
-
-                if(option is not None):
-                    if(optionList is not None):
-                        setattr(self, optionList, myList)
-                    settingInputs = False
-                    optionList = None
-                    myList = []
-
-                    key = option['names'][0].replace('-', '')
-
-                    # Show help for specific option.
-                    if(nextItem == '-h' or nextItem == '--help'):
-                        print(' ', ', '.join(option['names']))
-                        print('   ', option['help'])
-                        print('   ', option['extra'])
-                        if(option['action'] == 'default'):
-                            print('    type:', option['type'].__name__)
-                            print('    default:', option['default'])
-                            if(option['range'] is not None):
-                                print('    range:', option['range'])
-                            if(option['choices'] is not None):
-                                print('    choices:', ', '.join(option['choices']))
-                        else:
-                            print('    type: flag')
-                        sys.exit()
-
-                    if(option['nargs'] != 1):
-                        settingInputs = True
-                        optionList = key
-                    elif(option['action'] == 'store_true'):
-                        value = True
-                    else:
-                        try:
-                            # Convert to correct type.
-                            value = option['type'](nextItem)
-                        except:
-                            typeName = option['type'].__name__
-                            log.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
-                        if(option['choices'] is not None):
-                            if(value not in option['choices']):
-                                optionName = option['names'][0]
-                                myChoices = ', '.join(option['choices'])
-                                log.error(f'{value} is not a choice for {optionName}' \
-                                    f'\nchoices are:\n  {myChoices}')
-                        i += 1
-                    setattr(self, key, value)
-                else:
-                    if(settingInputs and not item.startswith('-')):
-                        # Input file names
-                        myList.append(item)
-                    else:
-                        # Unknown Option!
-                        hmm = difflib.get_close_matches(item, option_names)
-                        potential_options = ', '.join(hmm)
-                        append = ''
-                        if(hmm != []):
-                            append = f'\n\n    Did you mean:\n        {potential_options}'
-                        log.error(f'Unknown option: {item}{append}')
-                i += 1
-            if(settingInputs):
-                setattr(self, optionList, myList)
-
-    args = parse_options(sys.argv[1:], Log(3), options)
-
-    # Print the help screen for the entire program.
-    if(args.help):
-        print('')
-        for option in options:
-            print(' ', ', '.join(option['names']) + ':', option['help'])
-        print('\nThe help command can also be used on a specific option.')
-        print('example:')
-        print('    auto-editor --frame_margin --help')
-        print('\nHave an issue? Make an issue. '\
-            'Visit https://github.com/wyattblue/auto-editor/issues')
-        sys.exit()
-
-    if(args.version):
-        print('Auto-Editor version', version)
-        sys.exit()
-
-    from usefulFunctions import vidTracks, conwrite, getBinaries
+    from usefulFunctions import conwrite, getBinaries, pipeToConsole, ffAddDebug
+    from mediaMetadata import vidTracks, getSampleRate, getAudioBitrate
+    from mediaMetadata import getVideoCodec, ffmpegFPS
     from wavfile import read
 
     if(not args.preview):
@@ -320,11 +230,12 @@ def main():
 
     if(is64bit == '32-bit'):
         log.warning('You have the 32-bit version of Python, which may lead to memory crashes.')
-    if(args.frame_margin < 0):
-        log.error('Frame margin cannot be negative.')
 
     if(args.input == []):
         log.error('You need the (input) argument so that auto-editor can do the work for you.')
+    if(args.frame_margin < 0):
+        log.error('Frame margin cannot be negative.')
+
 
     try:
         from requests import get
@@ -335,12 +246,33 @@ def main():
             print('\nto upgrade to the latest version.\n')
         del latestVersion
     except Exception as err:
-        log.debug('Check for update Error: ' + str(err))
+        log.debug('Connection Error: ' + str(err))
 
+    # Input validation and sanitization.
+    if(args.constant_rate_factor < 0 or args.constant_rate_factor > 51):
+        log.error('Constant rate factor (crf) is out of range.')
+    if(args.width < 1):
+        log.error('motionOps --width cannot be less than 1.')
+    if(args.dilates < 0):
+        log.error('motionOps --dilates cannot be less than 0')
+    if(args.video_codec == 'uncompressed'):
+        if(args.constant_rate_factor != 15): # default value.
+            log.error('Cannot apply constant rate factor if video codec is "uncompressed".')
+        if(args.tune != 'none'):
+            log.error('Cannot apply tune if video codec is "uncompressed".')
+        if(args.preset != 'medium'):
+            log.error('Cannot apply preset if video codec is "uncompressed".')
+
+
+    args.constant_rate_factor = str(args.constant_rate_factor)
+    if(args.blur < 0):
+        args.blur = 0
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
         args.silent_speed = 99999
     if(args.video_speed <= 0 or args.video_speed > 99999):
         args.video_speed = 99999
+    if(args.output_file is None):
+        args.output_file = []
 
     inputList = []
     for myInput in args.input:
@@ -368,10 +300,7 @@ def main():
         else:
             log.error('Could not find file: ' + myInput)
 
-    startTime = time.time()
-
-    if(args.output_file is None):
-        args.output_file = []
+    timer = Timer()
 
     # Figure out the output file names.
     if(len(args.output_file) < len(inputList)):
@@ -398,11 +327,7 @@ def main():
         cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
             '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2',
             f'{TEMP}/combined.mp4'])
-        if(log.ffmpeg):
-            cmd.extend(['-hide_banner'])
-        else:
-            cmd.extend(['-nostats', '-loglevel', '8'])
-
+        cmd = ffAddDebug(cmd, log.is_ffmpeg)
         subprocess.call(cmd)
         inputList = [f'{TEMP}/combined.mp4']
 
@@ -424,51 +349,20 @@ def main():
         if(fileFormat in invalidExtensions):
             log.error(f'Invalid file extension "{fileFormat}" for {INPUT_FILE}')
 
-        audioFile = fileFormat in audioExtensions
-
         # Get output file name.
         newOutput = args.output_file[i]
         log.debug(f'   - newOutput: {newOutput}')
 
-        # Grab the sample rate from the input.
-        sr = args.sample_rate
-        if(sr is None):
-            output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
-            try:
-                matchDict = re.search(r'\s(?P<grp>\w+?)\sHz', output).groupdict()
-                sr = matchDict['grp']
-            except AttributeError:
-                sr = 48000
-        args.sample_rate = sr
+        sampleRate = getSampleRate(INPUT_FILE, ffmpeg, args.sample_rate)
+        audioBitrate = getAudioBitrate(INPUT_FILE, ffprobe, log, args.audio_bitrate)
 
-        # Grab the audio bitrate from the input.
-        abit = args.audio_bitrate
-        if(abit is None):
-            if(not INPUT_FILE.endswith('.mkv')):
-                output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                    'a:0', '-show_entries', 'stream=bit_rate', '-of',
-                    'compact=p=0:nk=1', INPUT_FILE])
-                try:
-                    abit = int(output)
-                except:
-                    log.warning("Couldn't automatically detect audio bitrate.")
-                    abit = '500k'
-                    log.debug('Setting audio bitrate to ' + abit)
-                else:
-                    abit = str(round(abit / 1000)) + 'k'
-        else:
-            abit = str(abit)
-        args.audio_bitrate = abit
-
+        audioFile = fileFormat in audioExtensions
         if(audioFile):
             fps = 30 # Audio files don't have frames, so give fps a dummy value.
             tracks = 1
-            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', args.audio_bitrate, '-ac', '2',
-                '-ar', str(args.sample_rate), '-vn', f'{TEMP}/fastAud.wav']
-            if(log.is_ffmpeg):
-                cmd.extend(['-hide_banner'])
-            else:
-                cmd.extend(['-nostats', '-loglevel', '8'])
+            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', audioBitrate, '-ac', '2',
+                '-ar', sampleRate, '-vn', f'{TEMP}/fastAud.wav']
+            cmd = ffAddDebug(cmd, log.is_ffmpeg)
             subprocess.call(cmd)
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
@@ -483,41 +377,26 @@ def main():
 
             tracks = vidTracks(INPUT_FILE, ffprobe, log)
             if(args.cut_by_this_track >= tracks):
+                allTracks = ''
+                for trackNum in range(tracks):
+                    allTracks += f'Track {trackNum}\n'
+
+                if(tracks == 1):
+                    message = f'is only {tracks} track'
+                else:
+                    message = f'are only {tracks} tracks'
                 log.error("You choose a track that doesn't exist.\n" \
-                    f'There are only {tracks-1} tracks. (starting from 0)')
+                    f'There {message}.\n {allTracks}')
 
-            vcodec = args.video_codec
-            if(vcodec == 'copy'):
-                output = pipeToConsole([ffmpeg, '-i', INPUT_FILE, '-hide_banner'])
-                try:
-                    matchDict = re.search(r'Video:\s(?P<video>\w+?)\s', output).groupdict()
-                    vcodec = matchDict['video']
-                    log.debug(vcodec)
-                except AttributeError:
-                    vcodec = 'uncompressed'
-                    log.warning("Couldn't automatically detect video codec.")
-
-            if(args.video_bitrate is not None and vcodec == 'uncompressed'):
-                log.warning('Your bitrate will not be applied because' \
-                        ' the video codec is "uncompressed".')
-
-            if(vcodec == 'uncompressed'):
-                # FFmpeg copies the uncompressed output that cv2 spits out.
-                vcodec = 'copy'
+            # Get video codec
+            vcodec = getVideoCodec(INPUT_FILE, ffmpeg, log, args.video_codec)
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
-                cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
-                if(args.audio_bitrate is not None):
-                    cmd.extend(['-ab', args.audio_bitrate])
-
-                cmd.extend(['-ac', '2', '-ar', str(args.sample_rate), '-map',
-                    f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
-
-                if(log.is_ffmpeg):
-                    cmd.extend(['-hide_banner'])
-                else:
-                    cmd.extend(['-nostats', '-loglevel', '8'])
+                cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', audioBitrate,
+                    '-ac', '2', '-ar', sampleRate, '-map', f'0:a:{trackNum}',
+                    f'{TEMP}/{trackNum}.wav']
+                cmd = ffAddDebug(cmd, log.is_ffmpeg)
                 subprocess.call(cmd)
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
@@ -525,12 +404,8 @@ def main():
                 # Combine all audio tracks into one audio file, then read.
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
-                    str(args.sample_rate), '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
-                if(log.is_ffmpeg):
-                    cmd.extend(['-hide_banner'])
-                else:
-                    cmd.extend(['-nostats', '-loglevel', '8'])
-
+                    sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
+                cmd = ffAddDebug(cmd, log.is_ffmpeg)
                 subprocess.call(cmd)
 
                 sampleRate, audioData = read(f'{TEMP}/combined.wav')
@@ -541,8 +416,7 @@ def main():
                 else:
                     log.error('Audio track not found!')
 
-        from cutting import audioToHasLoud, motionDetection, applySpacingRules
-        import numpy as np
+        from cutting import audioToHasLoud, motionDetection
 
         audioList = None
         motionList = None
@@ -553,7 +427,7 @@ def main():
         if('motion' in args.edit_based_on):
             log.debug('Analyzing video motion.')
             motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold, log,
-                width=400, dilates=2, blur=21)
+                width=args.width, dilates=args.dilates, blur=args.blur)
 
             if(audioList is not None):
                 if(len(audioList) > len(motionList)):
@@ -562,50 +436,14 @@ def main():
                     log.debug(f'motionList Length: {len(motionList)}')
                     audioList = audioList[:len(motionList)]
 
-        if(args.edit_based_on == 'audio' or args.edit_based_on == 'not_audio'):
-            if(max(audioList) == 0):
-                log.error('There was no place where audio exceeded the threshold.')
-        if(args.edit_based_on == 'motion' or args.edit_based_on == 'not_motion'):
-            if(max(motionList) == 0):
-                log.error('There was no place where motion exceeded the threshold.')
+        from cutting import combineArrs, applySpacingRules
 
-        # Only raise a warning for other cases.
-        if(audioList is not None and max(audioList) == 0):
-            log.warning('There was no place where audio exceeded the threshold.')
-        if(motionList is not None and max(motionList) == 0):
-            log.warning('There was no place where motion exceeded the threshold.')
-
-
-        if(args.edit_based_on == 'audio'):
-            hasLoud = audioList
-
-        if(args.edit_based_on == 'motion'):
-            hasLoud = motionList
-
-        if(args.edit_based_on == 'not_audio'):
-            hasLoud = np.invert(audioList)
-
-        if(args.edit_based_on == 'not_motion'):
-            hasLoud = np.invert(motionList)
-
-        if(args.edit_based_on == 'audio_and_motion'):
-            log.debug('Applying "Python bitwise and" on arrays.')
-            hasLoud = audioList & motionList
-
-        if(args.edit_based_on == 'audio_or_motion'):
-            log.debug('Applying "Python bitwise or" on arrays.')
-            hasLoud = audioList | motionList
-
-        if(args.edit_based_on == 'audio_xor_motion'):
-            log.debug('Applying "numpy bitwise_xor" on arrays')
-            hasLoud = np.bitwise_xor(audioList, motionList)
-
-        if(args.edit_based_on == 'audio_and_not_motion'):
-            log.debug('Applying "Python bitwise and" with "numpy bitwise not" on arrays.')
-            hasLoud = audioList & np.invert(motionList)
+        hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
+        del audioList, motionList
 
         chunks, includeFrame = applySpacingRules(hasLoud, fps, args.frame_margin,
             args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
+        del hasLoud
 
         clips = []
         for chunk in chunks:
@@ -623,10 +461,7 @@ def main():
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', 'fps=fps=30',
                 constantLoc]
-            if(log.is_ffmpeg):
-                cmd.extend(['-hide_banner'])
-            else:
-                cmd.extend(['-nostats', '-loglevel', '8'])
+            cmd = ffAddDebug(cmd, log.is_ffmpeg)
             subprocess.call(cmd)
             INPUT_FILE = constantLoc
 
@@ -652,60 +487,46 @@ def main():
             exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate,
                 audioFile, log)
             continue
-        if(audioFile and not makingDataFile):
-            from fastAudio import fastAudio
+        if(audioFile):
+            from fastAudio import fastAudio, handleAudio
 
-            fastAudio(ffmpeg, INPUT_FILE, newOutput, chunks, speeds,
-                args.audio_bitrate, sampleRate, True, TEMP, log, fps)
+            theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
+                TEMP, log)
+            fastAudio(theFile, newOutput, chunks, speeds, log, fps)
             continue
 
-        from fastVideo import fastVideo
-        fastVideo(ffmpeg, INPUT_FILE, newOutput, chunks, includeFrame, speeds, tracks,
-            args.audio_bitrate, sampleRate, TEMP, args.keep_tracks_seperate, vcodec, fps,
-            args.export_as_audio, args.video_bitrate, args.preset, args.tune, log)
+        from fastVideo import handleAudioTracks, fastVideo, muxVideo
+
+        continueVid = handleAudioTracks(ffmpeg, newOutput, args.export_as_audio,
+            tracks, args.keep_tracks_seperate, chunks, speeds, fps, TEMP, log)
+        if(continueVid):
+            fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps, TEMP, log)
+            muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
+                args.video_bitrate, args.tune, args.preset, args.video_codec,
+                args.constant_rate_factor, TEMP, log)
 
     if(not os.path.isfile(newOutput)):
         log.error(f'The file {newOutput} was not created.')
 
     if(not args.preview and not makingDataFile):
-        timeLength = round(time.time() - startTime, 2)
-        minutes = timedelta(seconds=round(timeLength))
-        print(f'Finished. took {timeLength} seconds ({minutes})')
+        timer.stop()
 
     if(not args.preview and makingDataFile):
-        timeSave = numCuts * 2 # assuming making each cut takes about 2 seconds.
-        units = 'seconds'
-        if(timeSave >= 3600):
-            timeSave = round(timeSave / 3600, 1)
-            if(timeSave % 1 == 0):
-                timeSave = round(timeSave)
-            units = 'hours'
-        if(timeSave >= 60):
-            timeSave = round(timeSave / 60, 1)
-            if(timeSave >= 10 or timeSave % 1 == 0):
-                timeSave = round(timeSave)
-            units = 'minutes'
+        from usefulFunctions import humanReadableTime
+        # Assume making each cut takes about 2 seconds.
+        timeSave = humanReadableTime(numCuts * 2)
 
-        plural = 's' if numCuts != 1 else ''
-
-        print(f'Auto-Editor made {numCuts} cut{plural}', end='')
+        s = 's' if numCuts != 1 else ''
+        print(f'Auto-Editor made {numCuts} cut{s}', end='')
         if(numCuts > 4):
-            print(f', which would have taken about {timeSave} {units} if' \
-                ' edited manually.')
+            print(f', which would have taken about {timeSave} if edited manually.')
         else:
             print('.')
 
     if(not args.no_open):
-        try:  # should work on Windows
-            os.startfile(newOutput)
-        except AttributeError:
-            try:  # should work on MacOS and most Linux versions
-                subprocess.call(['open', newOutput])
-            except:
-                try: # should work on WSL2
-                    subprocess.call(['cmd.exe', '/C', 'start', newOutput])
-                except:
-                    log.warning('Could not open output file.')
+        from usefulFunctions import smartOpen
+        smartOpen(newOutput, log)
+
     rmtree(TEMP)
 
 if(__name__ == '__main__'):
