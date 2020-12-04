@@ -14,7 +14,9 @@ not_motion,
 audio_or_motion,
 audio_and_motion,
 audio_xor_motion,
-audio_and_not_motion
+audio_and_not_motion,
+not_audio_and_motion,
+not_audio_and_not_motion,
 ```
 
 All of these choices are ones you can choice to change how Auto-Editor edits videos. For example `auto-editor my_video.mp4 --edit_based_on audio_or_motion` would tell auto-editor to create a new video, my_video_ALTERED.mp4, that has only non-silent sections or parts where the video moves a lot.
@@ -52,5 +54,9 @@ Here are other choices that may or may not be useful.
 <img src="audio_xor_motion.png" width="500">
 
 <img src="audio_and_not_motion.png" width="500">
+
+<img src="not_audio_and_motion.png" width="500">
+
+<img src="not_audio_and_not_motion.png" width="500">
 
 This feature is still very new so expect some new features/changes down the line.
