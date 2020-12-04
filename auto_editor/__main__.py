@@ -155,11 +155,12 @@ def main():
     sys.path.append(os.path.abspath(dirPath))
 
     from usefulFunctions import Log, Timer
-    from parser import parse_options
 
     option_data = options()
 
-    args = parse_options(sys.argv[1:], Log(), option_data)
+    from parser import ParseOptions
+
+    args = ParseOptions(sys.argv[1:], Log(), option_data)
 
     # Print the help screen for the entire program.
     if(args.help):

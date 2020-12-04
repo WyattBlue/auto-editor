@@ -37,9 +37,8 @@ def get_option(item, parent, the_args: list):
                     return option
     return None
 
-# auto_editor/__main__.py example.mp4 exportMediaOps --preset veryfast --frame_margin 10
 
-class parse_options():
+class ParseOptions():
     def __init__(self, userArgs, log, *args):
         # Set the default options.
         option_names = []
