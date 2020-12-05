@@ -4,9 +4,6 @@
 Export an XML file that can be imported by DaVinci Resolve.
 """
 
-# Included functions
-from usefulFunctions import conwrite
-
 # Internal libraries
 import os
 
@@ -347,4 +344,4 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, audioFile, log
         outfile.write('\t</sequence>\n')
         outfile.write('</xmeml>')
 
-    conwrite('')
+    log.conwrite('')

@@ -1,3 +1,5 @@
+'''vanparse.py'''
+
 import difflib
 import sys
 
@@ -86,10 +88,10 @@ class ParseOptions():
                     # If there's an exact match.
                     if(len(hmm) > 0 and hmm[0] == item):
                         option = get_option(item, 'global', args)
-                        parent = option['parent']
+                        parent = option['grouping']
                         myDefault = option['default'] if option['action'] != 'store_true' else ''
                         append = f'\n\nExample:\n    auto-editor {parent} {item} {myDefault}'
-                        log.error(f'Option {item} needs to have parent: {parent}{append}')
+                        log.error(f'Option {item} needs to be in group: {parent}{append}')
 
                     potential_options = ', '.join(hmm)
 
