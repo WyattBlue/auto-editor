@@ -224,7 +224,7 @@ def setRange(includeFrame: np.ndarray, syntaxRange, fps: float, with_: bool) -> 
 def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
     minClip: int, minCut: int, ignore, cutOut, log):
 
-    log.checkType(frameMargin 'frameMargin', int)
+    log.checkType(frameMargin, 'frameMargin', int)
 
     def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
         # Remove small loudness spikes

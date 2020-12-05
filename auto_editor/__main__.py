@@ -257,14 +257,12 @@ def main():
     if(args.frame_margin < 0):
         log.error('Frame margin cannot be negative.')
 
-    try:
-        from requests import get
-        if(latestVersion.text != version):
-            log.print('\nAuto-Editor is out of date. Run:\n')
-            log.print('    pip3 install -U auto-editor')
-            log.print('\nto upgrade to the latest version.\n')
-        del latestVersion, get
-    except Exception as err:
+    from usefulFunctions import isLatestVersion
+
+    if(isLatestVersion(version, log)):
+        log.print('\nAuto-Editor is out of date. Run:\n')
+        log.print('    pip3 install -U auto-editor')
+        log.print('\nto upgrade to the latest version.\n')
 
     # Input validation and sanitization.
     if(args.constant_rate_factor < 0 or args.constant_rate_factor > 51):

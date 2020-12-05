@@ -160,7 +160,7 @@ def isLatestVersion(version, log) -> bool:
         from requests import get
         latestVersion = get('https://raw.githubusercontent.com/' \
             'wyattblue/auto-editor/master/resources/version.txt')
-
+        return latestVersion == version
     except ImportError:
         pass
     except Exception as err:
