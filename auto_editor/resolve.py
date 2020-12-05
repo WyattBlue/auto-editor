@@ -18,7 +18,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, audioFile, log
     if(not audioFile):
         try:
             import cv2
-            conwrite('Grabbing video dimensions.')
+            log.conwrite('Grabbing video dimensions.')
 
             cap = cv2.VideoCapture(myInput)
             width = str(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
