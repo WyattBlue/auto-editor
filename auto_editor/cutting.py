@@ -1,6 +1,6 @@
 '''cutting.py'''
-import numpy as np
 
+import numpy as np
 
 def combineArrs(audioList: np.ndarray, motionList: np.ndarray, based: str,
     log) -> np.ndarray:
@@ -18,6 +18,7 @@ def combineArrs(audioList: np.ndarray, motionList: np.ndarray, based: str,
     if(motionList is not None and max(motionList) == 0):
         log.warning('There was no place where motion exceeded the threshold.')
 
+    hasLoud = None
     if(based == 'audio'):
         hasLoud = audioList
 
@@ -47,6 +48,8 @@ def combineArrs(audioList: np.ndarray, motionList: np.ndarray, based: str,
 
     if(based == 'not_audio_and_not_motion'):
         hasLoud = np.invert(audioList) & np.invert(motionList)
+
+    log.checkType(hasLoud, 'hasLoud', np.ndarray)
     return hasLoud
 
 
@@ -89,7 +92,7 @@ def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
 
     import cv2
     import subprocess
-    from usefulFunctions import progressBar, conwrite
+    from usefulFunctions import ProgressBar
 
     cap = cv2.VideoCapture(path)
 
@@ -130,8 +133,7 @@ def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
 
         return cv2.resize(image, dim, interpolation=inter)
 
-    import time
-    beginTime = time.time()
+    progress = ProgressBar(totalFrames, 'Detecting motion')
 
     while cap.isOpened():
         if(gray is None):
@@ -165,12 +167,12 @@ def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
             if(np.count_nonzero(thresh) / total >= motionThreshold):
                 hasMotion[cframe] = True
 
-        progressBar(cframe, totalFrames, beginTime, title='Detecting motion')
+        progress.tick(cframe)
 
     cap.release()
     cv2.destroyAllWindows()
 
-    conwrite('')
+    log.conwrite('')
 
     return hasMotion
 
@@ -220,6 +222,8 @@ def setRange(includeFrame: np.ndarray, syntaxRange, fps: float, with_: bool) -> 
 
 def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
     minClip: int, minCut: int, ignore, cutOut, log):
+
+    log.checkType(frameMargin, 'frameMargin', int)
 
     def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
         # Remove small loudness spikes

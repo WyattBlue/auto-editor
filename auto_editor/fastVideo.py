@@ -4,10 +4,9 @@ import numpy as np
 
 # Included functions
 from fastAudio import fastAudio
-from usefulFunctions import progressBar, conwrite, pipeToConsole, ffAddDebug
+from usefulFunctions import ProgressBar, pipeToConsole, ffAddDebug
 
 # Internal libraries
-import time
 import subprocess
 from shutil import move
 
@@ -15,12 +14,15 @@ def handleAudioTracks(ffmpeg, outFile, exportAsAudio, tracks, keepTracksSep,
     chunks, speeds, fps, temp, log):
     import os
 
+    log.checkType(tracks, 'tracks', int)
+    log.checkType(outFile, 'outFile', str)
+
     for trackNum in range(tracks):
         fastAudio(f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
             speeds, log, fps=fps)
 
         if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
-            log.error('Audio file not created.')
+            log.bug('Audio file not created.')
 
     if(exportAsAudio):
         if(keepTracksSep):
@@ -99,7 +101,7 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
             outFile]
         cmd = ffAddDebug(cmd, log.is_ffmpeg)
         subprocess.call(cmd)
-    conwrite('')
+    log.conwrite('')
 
 
 def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list,
@@ -113,6 +115,10 @@ def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
     out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
+
+    log.checkType(vidFile, 'vidFile', str)
+    log.checkType(includeFrame, 'includeFrame', np.ndarray)
+
     if(speeds[0] == 99999 and speeds[1] != 99999):
         totalFrames = int(np.where(includeFrame == True)[0][-1])
         cframe = int(np.where(includeFrame == True)[0][0])
@@ -123,11 +129,12 @@ def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list
         totalFrames = chunks[len(chunks) - 1][1]
         cframe = 0
 
-    beginTime = time.time()
     starting = cframe
     cap.set(cv2.CAP_PROP_POS_FRAMES, cframe)
     remander = 0
     framesWritten = 0
+
+    videoProgress = ProgressBar(totalFrames - starting, 'Creating new video')
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -149,9 +156,7 @@ def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list
                 framesWritten += 1
             remander = doIt % 1
 
-        progressBar(cframe - starting, totalFrames - starting, beginTime,
-            title='Creating new video')
-
+        videoProgress.tick(cframe - starting)
     log.debug(f'\n   - Frames Written: {framesWritten}')
     log.debug(f'   - Starting: {starting}')
     log.debug(f'   - Total Frames: {totalFrames}')
@@ -159,7 +164,7 @@ def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list
     if(log.is_debug):
         log.debug('Writing the output file.')
     else:
-        conwrite('Writing the output file.')
+        log.conwrite('Writing the output file.')
 
     cap.release()
     out.release()

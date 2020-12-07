@@ -4,9 +4,6 @@
 Export an XML file that can be imported by Adobe Premiere.
 """
 
-# Included functions
-from usefulFunctions import conwrite
-
 # Internal libraries
 import os
 
@@ -342,4 +339,4 @@ def exportToPremiere(myInput: str, temp: str, output, clips, tracks: int, sample
         outfile.write('\t</sequence>\n')
         outfile.write('</xmeml>')
 
-    conwrite('')
+    log.conwrite('')
