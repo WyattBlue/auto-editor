@@ -1,33 +1,32 @@
 '''fastAudio.py'''
 
-from usefulFunctions import progressBar, getNewLength, conwrite, ffAddDebug
+from usefulFunctions import ProgressBar, getNewLength, ffAddDebug
 
 def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
     import subprocess
 
-    if(not isinstance(samplerate, str)):
-        log.error('samplerate not a str. ' + str(type(samplerate)))
+    log.checkType(samplerate, 'samplerate', str)
     cmd = [ffmpeg, '-y', '-i', theFile]
     if(audioBit is not None):
         cmd.extend(['-b:a', audioBit])
-        if(not isinstance(audioBit, str)):
-            log.error('audioBit not a str. ' + str(type(audioBit)))
+        log.checkType(audioBit, 'audioBit', str)
     cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}/faAudio.wav'])
     cmd = ffAddDebug(cmd, log.is_ffmpeg)
     subprocess.call(cmd)
-    conwrite('')
+    log.conwrite('')
 
     return f'{temp}/faAudio.wav'
 
 def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float):
     from wavfile import read, write
-
     import os
-    import time
 
     import numpy as np
     from audiotsm2 import phasevocoder
     from audiotsm2.io.array import ArrReader, ArrWriter
+
+    log.checkType(chunks, 'chunks', list)
+    log.checkType(speeds, 'speeds', list)
 
     if(len(chunks) == 1 and chunks[0][2] == 0):
         log.error('Trying to create empty audio.')
@@ -46,8 +45,8 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float):
 
     channels = 2
     yPointer = 0
-    totalChunks = len(chunks)
-    beginTime = time.time()
+
+    audioProgress = ProgressBar(len(chunks), 'Creating new audio')
 
     for chunkNum, chunk in enumerate(chunks):
         audioSampleStart = int(chunk[0] / fps * samplerate)
@@ -81,7 +80,7 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float):
             # Speed is too high so skip this section.
             yPointerEnd = yPointer
 
-        progressBar(chunkNum, totalChunks, beginTime, title='Creating new audio')
+        audioProgress.tick(chunkNum)
 
     log.debug('\n   - Total Samples: ' + str(yPointer))
     log.debug('   - Samples per Frame: ' + str(samplerate / fps))

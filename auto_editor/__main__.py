@@ -10,11 +10,11 @@ import tempfile
 import subprocess
 from shutil import rmtree
 
-version = '20w49a'
+version = '20w50a'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
-        print('Auto-Editor could not find the file: ' + file)
+        print('Auto-Editor could not find the file: ' + file, file=sys.stderr)
         sys.exit(1)
     return file
 
@@ -29,7 +29,6 @@ def sample_rate_type(num: str) -> int:
     if(num.endswith(' kHz')):
         return int(float(num[:-4]) * 1000)
     return int(num)
-
 
 def options():
     option_data = []
@@ -51,72 +50,11 @@ def options():
         newDic['parent'] = parent
         option_data.append(newDic)
 
-    add_argument('(input)', nargs='*',
-        help='the path to a file, folder, or url you want edited.')
-    add_argument('--help', '-h', action='store_true',
-        help='print this message and exit.')
-
-    add_argument('--frame_margin', '-m', type=int, default=6, range='0 to Infinity',
-        help='set how many "silent" frames of on either side of "loud" sections be included.')
-    add_argument('--silent_threshold', '-t', type=float_type, default=0.04, range='0 to 1',
-        help='set the volume that frames audio needs to surpass to be "loud".')
-    add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
-        range='0 to 999999',
-        help='set the speed that "loud" sections should be played at.')
-    add_argument('--silent_speed', '-s', type=float_type, default=99999, range='0 to 99999',
-        help='set the speed that "silent" sections should be played at.')
-    add_argument('--output_file', '-o', nargs='*',
-        help='set the name(s) of the new output.')
-
-    add_argument('--no_open', action='store_true',
-        help='do not open the file after editing is done.')
-    add_argument('--min_clip_length', '-mclip', type=int, default=3, range='0 to Infinity',
-        help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    add_argument('--min_cut_length', '-mcut', type=int, default=6, range='0 to Infinity',
-        help="set the minimum length a cut can be. If a cut is too short, don't cut")
-    add_argument('--combine_files', action='store_true',
-        help='combine all input files into one before editing.')
-    add_argument('--preview', action='store_true',
-        help='show stats on how the input will be cut.')
-
-    add_argument('--cut_by_this_audio', '-ca', type=file_type,
-        help="base cuts by this audio file instead of the video's audio.")
-    add_argument('--cut_by_this_track', '-ct', type=int, default=0,
-        range='0 to the number of audio tracks minus one',
-        help='base cuts by a different audio track in the video.')
-    add_argument('--cut_by_all_tracks', '-cat', action='store_true',
-        help='combine all audio tracks into one before basing cuts.')
-    add_argument('--keep_tracks_seperate', action='store_true',
-        help="don't combine audio tracks when exporting.")
-
-    add_argument('--my_ffmpeg', action='store_true',
-        help='use your ffmpeg and other binaries instead of the ones packaged.')
-    add_argument('--version', action='store_true',
-        help='show which auto-editor you have.')
-    add_argument('--debug', '--verbose', action='store_true',
-        help='show debugging messages and values.')
-    add_argument('--show_ffmpeg_debug', action='store_true',
-        help='show ffmpeg progress and output.')
-
-    # TODO: add export_as_video
-    add_argument('--export_as_audio', '-exa', action='store_true',
-        help='export as a WAV audio file.')
-    add_argument('--export_to_premiere', '-exp', action='store_true',
-        help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
-    add_argument('--export_to_resolve', '-exr', action='store_true',
-        help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
-
-    add_argument('--ignore', nargs='*',
-        help='the range that will be marked as "loud"')
-    add_argument('--cut_out', nargs='*',
-        help='the range that will be marked as "silent"')
-    add_argument('--motion_threshold', type=float_type, default=0.02, range='0 to 1',
-        help='how much motion is required to be considered "moving"')
-    add_argument('--edit_based_on', default='audio',
-        choices=['audio', 'motion', 'not_audio', 'not_motion', 'audio_or_motion',
-            'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
-            'not_audio_and_motion', 'not_audio_and_not_motion'],
-        help='decide which method to use when making edits.')
+    add_argument('metadataOps', nargs=0, action='grouping')
+    add_argument('--force_fps_to', type=float, parent='metadataOps',
+        help='manually set the fps value for the input video if detection fails.')
+    add_argument('--force_tracks_to', type=int, parent='metadataOps',
+        help='manually set the number of tracks auto-editor thinks there are.')
 
     add_argument('exportMediaOps', nargs=0, action='grouping')
     add_argument('--video_bitrate', '-vb', parent='exportMediaOps',
@@ -147,6 +85,76 @@ def options():
         help="set the frame's new width (in pixels) before being compared.")
     add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity', parent='motionOps',
         help='set the strength of the blur applied to a frame before being compared.')
+
+    # TODO: add export_as_video
+    add_argument('--export_as_audio', '-exa', action='store_true',
+        help='export as a WAV audio file.')
+    add_argument('--export_to_premiere', '-exp', action='store_true',
+        help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
+    add_argument('--export_to_resolve', '-exr', action='store_true',
+        help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
+
+    add_argument('--ignore', nargs='*',
+        help='the range that will be marked as "loud"')
+    add_argument('--cut_out', nargs='*',
+        help='the range that will be marked as "silent"')
+    add_argument('--motion_threshold', type=float_type, default=0.02, range='0 to 1',
+        help='how much motion is required to be considered "moving"')
+    add_argument('--edit_based_on', default='audio',
+        choices=['audio', 'motion', 'not_audio', 'not_motion', 'audio_or_motion',
+            'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
+            'not_audio_and_motion', 'not_audio_and_not_motion'],
+        help='decide which method to use when making edits.')
+
+    add_argument('--frame_margin', '-m', type=int, default=6, range='0 to Infinity',
+        help='set how many "silent" frames of on either side of "loud" sections be included.')
+    add_argument('--silent_threshold', '-t', type=float_type, default=0.04, range='0 to 1',
+        help='set the volume that frames audio needs to surpass to be "loud".')
+    add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
+        range='0 to 999999',
+        help='set the speed that "loud" sections should be played at.')
+    add_argument('--silent_speed', '-s', type=float_type, default=99999, range='0 to 99999',
+        help='set the speed that "silent" sections should be played at.')
+    add_argument('--output_file', '--output', '-o', nargs='*',
+        help='set the name(s) of the new output.')
+
+    add_argument('--no_open', action='store_true',
+        help='do not open the file after editing is done.')
+    add_argument('--min_clip_length', '-mclip', type=int, default=3, range='0 to Infinity',
+        help='set the minimum length a clip can be. If a clip is too short, cut it.')
+    add_argument('--min_cut_length', '-mcut', type=int, default=6, range='0 to Infinity',
+        help="set the minimum length a cut can be. If a cut is too short, don't cut")
+    add_argument('--combine_files', action='store_true',
+        help='combine all input files into one before editing.')
+    add_argument('--preview', action='store_true',
+        help='show stats on how the input will be cut.')
+
+    add_argument('--cut_by_this_audio', '-ca', type=file_type,
+        help="base cuts by this audio file instead of the video's audio.")
+    add_argument('--cut_by_this_track', '-ct', type=int, default=0,
+        range='0 to the number of audio tracks minus one',
+        help='base cuts by a different audio track in the video.')
+    add_argument('--cut_by_all_tracks', '-cat', action='store_true',
+        help='combine all audio tracks into one before basing cuts.')
+    add_argument('--keep_tracks_seperate', action='store_true',
+        help="don't combine audio tracks when exporting.")
+
+    add_argument('--my_ffmpeg', action='store_true',
+        help='use your ffmpeg and other binaries instead of the ones packaged.')
+    add_argument('--version', action='store_true',
+        help='show which auto-editor you have.')
+    add_argument('--debug', '--verbose', '-d', action='store_true',
+        help='show debugging messages and values.')
+    add_argument('--show_ffmpeg_debug', action='store_true',
+        help='show ffmpeg progress and output.')
+    add_argument('--quiet', '-q', action='store_true',
+        help='display less output.')
+
+    add_argument('--help', '-h', action='store_true',
+        help='print info about the program or an option and exit.')
+    add_argument('(input)', nargs='*',
+        help='the path to a file, folder, or url you want edited.')
+
     return option_data
 
 def main():
@@ -158,22 +166,42 @@ def main():
 
     option_data = options()
 
-    from parser import ParseOptions
+    # Print the version if only the -v option is added.
+    if(sys.argv[1:] == ['-v'] or sys.argv[1:] == ['-V']):
+        print(f'Auto-Editor version {version}\nPlease use --version instead.')
+        sys.exit()
 
+    # If the users just runs: $ auto-editor
+    if(sys.argv[1:] == []):
+        # Print
+        print('\nAuto-Editor is an automatic video/audio creator and editor.\n')
+        print('By default, it will detect silence and create a new video with ')
+        print('those sections cut out. By changing some of the options, you can')
+        print('export to a traditional editor like Premiere Pro and adjust the')
+        print('edits there, adjust the pacing of the cuts, and change the method')
+        print('of editing like using audio loudness and video motion to judge')
+        print('making cuts.')
+        print('\nRun:\n    auto-editor --help\n\nTo get the list of options.\n')
+        sys.exit()
+
+    from vanparse import ParseOptions
     args = ParseOptions(sys.argv[1:], Log(), option_data)
+
+    log = Log(args.debug, args.show_ffmpeg_debug, args.quiet)
+    log.debug('')
 
     # Print the help screen for the entire program.
     if(args.help):
-        print('')
+        print('\n  Have an issue? Make an issue. '\
+            'Visit https://github.com/wyattblue/auto-editor/issues\n')
+        print('  The help option can also be used on a specific option:')
+        print('      auto-editor --frame_margin --help\n')
         for option in option_data:
             if(option['parent'] == 'auto-editor'):
                 print(' ', ', '.join(option['names']) + ':', option['help'])
                 if(option['action'] == 'grouping'):
                     print('     ...')
-        print('\nThe help command can also be used on a specific option:')
-        print('    auto-editor --frame_margin --help')
-        print('\nHave an issue? Make an issue. '\
-            'Visit https://github.com/wyattblue/auto-editor/issues')
+        print('')
         sys.exit()
 
     del option_data
@@ -194,20 +222,20 @@ def main():
         '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
         '.db', '.ini', '.BIN']
 
-    from usefulFunctions import conwrite, getBinaries, pipeToConsole, ffAddDebug
+    from usefulFunctions import getBinaries, pipeToConsole, ffAddDebug
     from mediaMetadata import vidTracks, getSampleRate, getAudioBitrate
     from mediaMetadata import getVideoCodec, ffmpegFPS
     from wavfile import read
 
     if(not args.preview):
         if(args.export_to_premiere):
-            conwrite('Exporting to Adobe Premiere Pro XML file.')
+            log.conwrite('Exporting to Adobe Premiere Pro XML file.')
         elif(args.export_to_resolve):
-            conwrite('Exporting to DaVinci Resolve XML file.')
+            log.conwrite('Exporting to DaVinci Resolve XML file.')
         elif(args.export_as_audio):
-            conwrite('Exporting as audio.')
+            log.conwrite('Exporting as audio.')
         else:
-            conwrite('Starting.')
+            log.conwrite('Starting.')
 
     ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
     makingDataFile = args.export_to_premiere or args.export_to_resolve
@@ -225,28 +253,22 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    log = Log(args.debug, args.show_ffmpeg_debug)
-    log.debug('')
-
     if(is64bit == '32-bit'):
-        log.warning('You have the 32-bit version of Python, which may lead to memory crashes.')
+        log.warning('You have the 32-bit version of Python, which may lead to' \
+            'memory crashes.')
 
     if(args.input == []):
-        log.error('You need the (input) argument so that auto-editor can do the work for you.')
+        log.error('You need to give auto-editor an input file or folder so it can' \
+            'do the work for you.')
     if(args.frame_margin < 0):
         log.error('Frame margin cannot be negative.')
 
+    from usefulFunctions import isLatestVersion
 
-    try:
-        from requests import get
-        latestVersion = get('https://raw.githubusercontent.com/wyattblue/auto-editor/master/resources/version.txt')
-        if(latestVersion.text != version):
-            print('\nAuto-Editor is out of date. Run:\n')
-            print('    pip3 install -U auto-editor')
-            print('\nto upgrade to the latest version.\n')
-        del latestVersion
-    except Exception as err:
-        log.debug('Connection Error: ' + str(err))
+    if(isLatestVersion(version, log)):
+        log.print('\nAuto-Editor is out of date. Run:\n')
+        log.print('    pip3 install -U auto-editor')
+        log.print('\nto upgrade to the latest version.\n')
 
     # Input validation and sanitization.
     if(args.constant_rate_factor < 0 or args.constant_rate_factor > 51):
@@ -262,7 +284,6 @@ def main():
             log.error('Cannot apply tune if video codec is "uncompressed".')
         if(args.preset != 'medium'):
             log.error('Cannot apply preset if video codec is "uncompressed".')
-
 
     args.constant_rate_factor = str(args.constant_rate_factor)
     if(args.blur < 0):
@@ -300,7 +321,7 @@ def main():
         else:
             log.error('Could not find file: ' + myInput)
 
-    timer = Timer()
+    timer = Timer(args.quiet)
 
     # Figure out the output file names.
     if(len(args.output_file) < len(inputList)):
@@ -353,21 +374,38 @@ def main():
         newOutput = args.output_file[i]
         log.debug(f'   - newOutput: {newOutput}')
 
+        if(os.path.isfile(newOutput) and INPUT_FILE != newOutput):
+            log.debug(f'  Removing already existing file: {newOutput}')
+            os.remove(newOutput)
+
         sampleRate = getSampleRate(INPUT_FILE, ffmpeg, args.sample_rate)
         audioBitrate = getAudioBitrate(INPUT_FILE, ffprobe, log, args.audio_bitrate)
 
+        log.debug(f'   - sampleRate: {sampleRate}')
+        log.debug(f'   - audioBitrate: {audioBitrate}')
+
         audioFile = fileFormat in audioExtensions
         if(audioFile):
-            fps = 30 # Audio files don't have frames, so give fps a dummy value.
-            tracks = 1
-            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', audioBitrate, '-ac', '2',
-                '-ar', sampleRate, '-vn', f'{TEMP}/fastAud.wav']
+            if(args.force_fps_to is None):
+                fps = 30 # Audio files don't have frames, so give fps a dummy value.
+            else:
+                fps = args.force_fps_to
+            if(args.force_tracks_to is None):
+                tracks = 1
+            else:
+                tracks = args.force_tracks_to
+            cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
+            if(audioBitrate is not None):
+                cmd.extend(['-b:a', audioBitrate])
+            cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', f'{TEMP}/fastAud.wav'])
             cmd = ffAddDebug(cmd, log.is_ffmpeg)
             subprocess.call(cmd)
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
-            if(args.export_to_premiere):
+            if(args.force_fps_to is not None):
+                fps = args.force_fps_to
+            elif(args.export_to_premiere):
                 # This is the default fps value for Premiere Pro Projects.
                 fps = 29.97
             else:
@@ -375,7 +413,10 @@ def main():
                 # DaVinci Resolve doesn't need fps, but grab it away just in case.
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
 
-            tracks = vidTracks(INPUT_FILE, ffprobe, log)
+            tracks = args.force_tracks_to
+            if(tracks is None):
+                tracks = vidTracks(INPUT_FILE, ffprobe, log)
+
             if(args.cut_by_this_track >= tracks):
                 allTracks = ''
                 for trackNum in range(tracks):
@@ -393,9 +434,11 @@ def main():
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
-                cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', audioBitrate,
-                    '-ac', '2', '-ar', sampleRate, '-map', f'0:a:{trackNum}',
-                    f'{TEMP}/{trackNum}.wav']
+                cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
+                if(audioBitrate is not None):
+                    cmd.extend(['-ab', audioBitrate])
+                cmd.extend(['-ac', '2', '-ar', sampleRate, '-map',
+                    f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
                 cmd = ffAddDebug(cmd, log.is_ffmpeg)
                 subprocess.call(cmd)
 
@@ -447,7 +490,7 @@ def main():
 
         clips = []
         for chunk in chunks:
-            if(speeds[chunk[2]] == 99999):
+            if(speeds[chunk[2]] != 1):
                 numCuts += 1
             else:
                 clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
@@ -467,6 +510,7 @@ def main():
 
         if(args.preview):
             args.no_open = True
+            newOutput = None
             from preview import preview
 
             preview(INPUT_FILE, chunks, speeds, fps, audioFile, log)
@@ -505,23 +549,20 @@ def main():
                 args.video_bitrate, args.tune, args.preset, args.video_codec,
                 args.constant_rate_factor, TEMP, log)
 
-    if(not os.path.isfile(newOutput)):
-        log.error(f'The file {newOutput} was not created.')
+    if(newOutput is not None and not os.path.isfile(newOutput)):
+        log.bug(f'The file {newOutput} was not created.')
 
     if(not args.preview and not makingDataFile):
         timer.stop()
 
     if(not args.preview and makingDataFile):
         from usefulFunctions import humanReadableTime
-        # Assume making each cut takes about 2 seconds.
-        timeSave = humanReadableTime(numCuts * 2)
+        # Assume making each cut takes about 30 seconds.
+        timeSave = humanReadableTime(numCuts * 30)
 
         s = 's' if numCuts != 1 else ''
-        print(f'Auto-Editor made {numCuts} cut{s}', end='')
-        if(numCuts > 4):
-            print(f', which would have taken about {timeSave} if edited manually.')
-        else:
-            print('.')
+        log.print(f'Auto-Editor made {numCuts} cut{s}', end='')
+        log.print(f', which would have taken about {timeSave} if edited manually.')
 
     if(not args.no_open):
         from usefulFunctions import smartOpen
