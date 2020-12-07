@@ -52,7 +52,7 @@ def options():
 
     add_argument('metadataOps', nargs=0, action='grouping')
     add_argument('--force_fps_to', type=float, parent='metadataOps',
-        help='manually set the fps value for the video.')
+        help='manually set the fps value for the input video if detection fails.')
     add_argument('--force_tracks_to', type=int, parent='metadataOps',
         help='manually set the number of tracks auto-editor thinks there are.')
 
@@ -386,8 +386,14 @@ def main():
 
         audioFile = fileFormat in audioExtensions
         if(audioFile):
-            fps = 30 # Audio files don't have frames, so give fps a dummy value.
-            tracks = 1
+            if(args.force_fps_to is None):
+                fps = 30 # Audio files don't have frames, so give fps a dummy value.
+            else:
+                fps = args.force_fps_to
+            if(args.force_tracks_to is None):
+                tracks = 1
+            else:
+                tracks = args.force_tracks_to
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
             if(audioBitrate is not None):
                 cmd.extend(['-b:a', audioBitrate])
@@ -397,7 +403,9 @@ def main():
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
-            if(args.export_to_premiere):
+            if(args.force_fps_to is not None):
+                fps = args.force_fps_to
+            elif(args.export_to_premiere):
                 # This is the default fps value for Premiere Pro Projects.
                 fps = 29.97
             else:
