@@ -368,15 +368,24 @@ def main():
         newOutput = args.output_file[i]
         log.debug(f'   - newOutput: {newOutput}')
 
+        if(os.path.isfile(newOutput) and INPUT_FILE != newOutput):
+            log.debug(f' Removed {newOutput}')
+            os.remove(newOutput)
+
         sampleRate = getSampleRate(INPUT_FILE, ffmpeg, args.sample_rate)
         audioBitrate = getAudioBitrate(INPUT_FILE, ffprobe, log, args.audio_bitrate)
+
+        log.debug(f'   - sampleRate: {sampleRate}')
+        log.debug(f'   - audioBitrate: {audioBitrate}')
 
         audioFile = fileFormat in audioExtensions
         if(audioFile):
             fps = 30 # Audio files don't have frames, so give fps a dummy value.
             tracks = 1
-            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-b:a', audioBitrate, '-ac', '2',
-                '-ar', sampleRate, '-vn', f'{TEMP}/fastAud.wav']
+            cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
+            if(audioBitrate is not None):
+                cmd.extend(['-b:a', audioBitrate])
+            cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', f'{TEMP}/fastAud.wav'])
             cmd = ffAddDebug(cmd, log.is_ffmpeg)
             subprocess.call(cmd)
 
@@ -408,9 +417,11 @@ def main():
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
-                cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-ab', audioBitrate,
-                    '-ac', '2', '-ar', sampleRate, '-map', f'0:a:{trackNum}',
-                    f'{TEMP}/{trackNum}.wav']
+                cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
+                if(audioBitrate is not None):
+                    cmd.extend(['-ab', audioBitrate])
+                cmd.extend(['-ac', '2', '-ar', sampleRate, '-map',
+                    f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
                 cmd = ffAddDebug(cmd, log.is_ffmpeg)
                 subprocess.call(cmd)
 

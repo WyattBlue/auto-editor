@@ -10,6 +10,7 @@ def vidTracks(videoFile: str, ffprobe: str, log) -> int:
     numbers = pipeToConsole([ffprobe, videoFile, '-hide_banner', '-loglevel',
         'panic', '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
         'compact=p=0:nk=1']).split('\n')
+    log.ffmpeg(numbers)
     if(numbers[0].isnumeric()):
         return len(numbers) - 1
     else:
@@ -44,7 +45,9 @@ def getSampleRate(file: str, ffmpeg: str, sr) -> str:
 
 def getAudioBitrate(file: str, ffprobe: str, log, abit: str) -> str:
     if(abit is None):
-        if(not file.endswith('.mkv')):
+        if(file.endswith('.mkv')):
+            return None
+        else:
             output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
                 'a:0', '-show_entries', 'stream=bit_rate', '-of',
                 'compact=p=0:nk=1', file]).strip()
