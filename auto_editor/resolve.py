@@ -4,9 +4,6 @@
 Export an XML file that can be imported by DaVinci Resolve.
 """
 
-# Included functions
-from usefulFunctions import conwrite
-
 # Internal libraries
 import os
 
@@ -21,7 +18,7 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, audioFile, log
     if(not audioFile):
         try:
             import cv2
-            conwrite('Grabbing video dimensions.')
+            log.conwrite('Grabbing video dimensions.')
 
             cap = cv2.VideoCapture(myInput)
             width = str(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
@@ -347,4 +344,4 @@ def exportToResolve(myInput, output, clips, duration, sampleRate, audioFile, log
         outfile.write('\t</sequence>\n')
         outfile.write('</xmeml>')
 
-    conwrite('')
+    log.conwrite('')

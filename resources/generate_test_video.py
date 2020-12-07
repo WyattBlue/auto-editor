@@ -21,7 +21,10 @@ parser.add_argument('-ffmpeg', type=str, default='ffmpeg')
 
 args = parser.parse_args()
 
-os.remove(args.output)
+try:
+	os.remove(args.output)
+except:
+	pass
 
 # Create sine wav.
 subprocess.call([args.ffmpeg, '-y', '-f', 'lavfi', '-i',
