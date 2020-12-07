@@ -58,15 +58,17 @@ class Log():
 
 
 class Timer():
-    def __init__(self):
+    def __init__(self, quiet=False):
         self.start_time = time()
+        self.quiet = quiet
 
     def stop(self):
         from datetime import timedelta
 
         timeLength = round(time() - self.start_time, 2)
         minutes = timedelta(seconds=round(timeLength))
-        print(f'Finished. took {timeLength} seconds ({minutes})')
+        if(not self.quiet):
+            print(f'Finished. took {timeLength} seconds ({minutes})')
 
 
 def pipeToConsole(myCommands: list) -> str:
@@ -128,31 +130,51 @@ def prettyTime(myTime: float) -> str:
     return f'{hours:02}:{minutes:02} {ampm}'
 
 
-def progressBar(index, total, beginTime, title='Please wait'):
-    termsize = get_terminal_size().columns
-    barLen = max(1, termsize - (len(title) + 50))
-
-    percentDone = round((index+1) / total * 100, 1)
-    done = round(percentDone / (100 / barLen))
-    doneStr = '█' * done
-    togoStr = '░' * int(barLen - done)
-
-    if(percentDone == 0): # Prevent dividing by zero.
-        percentPerSec = 0
-    else:
-        percentPerSec = (time() - beginTime) / percentDone
-
-    newTime = prettyTime(beginTime + (percentPerSec * 100))
-
+def bar(termsize, title, doneStr, togoStr, percentDone, newTime):
     bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
     if(len(bar) > termsize - 2):
         bar = bar[:termsize - 2]
     else:
         bar += ' ' * (termsize - len(bar) - 4)
-    try:
-        print(bar, end='\r', flush=True)
-    except UnicodeEncodeError:
-        print(f'   {percentDone}% done ETA {newTime}')
+    print(bar, end='\r', flush=True)
+
+
+class ProgressBar():
+    def __init__(self, total, title='Please wait'):
+        self.total = total
+        self.beginTime = time()
+        self.title = title
+        self.len_title = len(title)
+
+        try:
+            termsize = get_terminal_size().columns
+            barLen = max(1, termsize - (self.len_title + 50))
+            bar(termsize, title, '', '░' * int(barLen), 0,
+                prettyTime(self.beginTime))
+        except UnicodeEncodeError:
+            print(f'   {percentDone}% done ETA {newTime}')
+            self.allow_unicode = False
+        else:
+            self.allow_unicode = True
+
+    def tick(self, index):
+        termsize = get_terminal_size().columns
+
+        percentDone = round((index+1) / self.total * 100, 1)
+        if(percentDone == 0): # Prevent dividing by zero.
+            percentPerSec = 0
+        else:
+            percentPerSec = (time() - self.beginTime) / percentDone
+
+        newTime = prettyTime(self.beginTime + (percentPerSec * 100))
+        if(self.allow_unicode):
+            barLen = max(1, termsize - (self.len_title + 50))
+            done = round(percentDone / (100 / barLen))
+            doneStr = '█' * done
+            togoStr = '░' * int(barLen - done)
+            bar(termsize, self.title, doneStr, togoStr, percentDone, newTime)
+        else:
+            print(f'   {percentDone}% done ETA {newTime}')
 
 
 def isLatestVersion(version, log) -> bool:

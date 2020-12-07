@@ -1,6 +1,6 @@
 '''fastAudio.py'''
 
-from usefulFunctions import progressBar, getNewLength, ffAddDebug
+from usefulFunctions import ProgressBar, getNewLength, ffAddDebug
 
 def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
     import subprocess
@@ -19,9 +19,7 @@ def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
 
 def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float):
     from wavfile import read, write
-
     import os
-    import time
 
     import numpy as np
     from audiotsm2 import phasevocoder
@@ -47,8 +45,8 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float):
 
     channels = 2
     yPointer = 0
-    totalChunks = len(chunks)
-    beginTime = time.time()
+
+    audioProgress = ProgressBar(len(chunks), 'Creating new audio')
 
     for chunkNum, chunk in enumerate(chunks):
         audioSampleStart = int(chunk[0] / fps * samplerate)
@@ -82,7 +80,7 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float):
             # Speed is too high so skip this section.
             yPointerEnd = yPointer
 
-        progressBar(chunkNum, totalChunks, beginTime, title='Creating new audio')
+        audioProgress.tick(chunkNum)
 
     log.debug('\n   - Total Samples: ' + str(yPointer))
     log.debug('   - Samples per Frame: ' + str(samplerate / fps))

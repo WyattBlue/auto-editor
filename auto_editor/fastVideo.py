@@ -4,10 +4,9 @@ import numpy as np
 
 # Included functions
 from fastAudio import fastAudio
-from usefulFunctions import progressBar, pipeToConsole, ffAddDebug
+from usefulFunctions import ProgressBar, pipeToConsole, ffAddDebug
 
 # Internal libraries
-import time
 import subprocess
 from shutil import move
 
@@ -130,11 +129,12 @@ def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list
         totalFrames = chunks[len(chunks) - 1][1]
         cframe = 0
 
-    beginTime = time.time()
     starting = cframe
     cap.set(cv2.CAP_PROP_POS_FRAMES, cframe)
     remander = 0
     framesWritten = 0
+
+    videoProgress = ProgressBar(totalFrames - starting, 'Creating new video')
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -156,9 +156,7 @@ def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list
                 framesWritten += 1
             remander = doIt % 1
 
-        progressBar(cframe - starting, totalFrames - starting, beginTime,
-            title='Creating new video')
-
+        videoProgress.tick(cframe - starting)
     log.debug(f'\n   - Frames Written: {framesWritten}')
     log.debug(f'   - Starting: {starting}')
     log.debug(f'   - Total Frames: {totalFrames}')

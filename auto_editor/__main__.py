@@ -10,7 +10,7 @@ import tempfile
 import subprocess
 from shutil import rmtree
 
-version = '20w49a'
+version = '20w50a'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -49,6 +49,12 @@ def options():
         newDic['choices'] = choices
         newDic['parent'] = parent
         option_data.append(newDic)
+
+    add_argument('metadataOps', nargs=0, action='grouping')
+    add_argument('--force_fps_to', type=float, parent='metadataOps',
+        help='manually set the fps value for the video.')
+    add_argument('--force_tracks_to', type=int, parent='metadataOps',
+        help='manually set the number of tracks auto-editor thinks there are.')
 
     add_argument('exportMediaOps', nargs=0, action='grouping')
     add_argument('--video_bitrate', '-vb', parent='exportMediaOps',
@@ -181,7 +187,7 @@ def main():
     from vanparse import ParseOptions
     args = ParseOptions(sys.argv[1:], Log(), option_data)
 
-    log = Log(args.debug, args.show_ffmpeg_debug)
+    log = Log(args.debug, args.show_ffmpeg_debug, args.quiet)
     log.debug('')
 
     # Print the help screen for the entire program.
@@ -315,7 +321,7 @@ def main():
         else:
             log.error('Could not find file: ' + myInput)
 
-    timer = Timer()
+    timer = Timer(args.quiet)
 
     # Figure out the output file names.
     if(len(args.output_file) < len(inputList)):
@@ -369,7 +375,7 @@ def main():
         log.debug(f'   - newOutput: {newOutput}')
 
         if(os.path.isfile(newOutput) and INPUT_FILE != newOutput):
-            log.debug(f' Removed {newOutput}')
+            log.debug(f'  Removing already existing file: {newOutput}')
             os.remove(newOutput)
 
         sampleRate = getSampleRate(INPUT_FILE, ffmpeg, args.sample_rate)
@@ -399,7 +405,10 @@ def main():
                 # DaVinci Resolve doesn't need fps, but grab it away just in case.
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
 
-            tracks = vidTracks(INPUT_FILE, ffprobe, log)
+            tracks = args.force_tracks_to
+            if(tracks is None):
+                tracks = vidTracks(INPUT_FILE, ffprobe, log)
+
             if(args.cut_by_this_track >= tracks):
                 allTracks = ''
                 for trackNum in range(tracks):
@@ -473,7 +482,7 @@ def main():
 
         clips = []
         for chunk in chunks:
-            if(speeds[chunk[2]] == 99999):
+            if(speeds[chunk[2]] != 1):
                 numCuts += 1
             else:
                 clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
