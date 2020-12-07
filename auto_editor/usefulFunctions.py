@@ -36,7 +36,7 @@ class Log():
 
     # When something's definitely wrong with the program.
     @staticmethod
-    def bug(message, bug_type):
+    def bug(message, bug_type='bug report'):
         print('Error!', message, f'\n\nCreate a {bug_type} at',
             'https://github.com/WyattBlue/auto-editor/issues/\n', file=sys.stderr)
         sys.exit(1)

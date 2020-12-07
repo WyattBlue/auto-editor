@@ -493,6 +493,7 @@ def main():
 
         if(args.preview):
             args.no_open = True
+            newOutput = None
             from preview import preview
 
             preview(INPUT_FILE, chunks, speeds, fps, audioFile, log)
@@ -531,7 +532,7 @@ def main():
                 args.video_bitrate, args.tune, args.preset, args.video_codec,
                 args.constant_rate_factor, TEMP, log)
 
-    if(not os.path.isfile(newOutput)):
+    if(newOutput is not None and not os.path.isfile(newOutput)):
         log.bug(f'The file {newOutput} was not created.')
 
     if(not args.preview and not makingDataFile):
@@ -539,15 +540,12 @@ def main():
 
     if(not args.preview and makingDataFile):
         from usefulFunctions import humanReadableTime
-        # Assume making each cut takes about 2 seconds.
-        timeSave = humanReadableTime(numCuts * 2)
+        # Assume making each cut takes about 30 seconds.
+        timeSave = humanReadableTime(numCuts * 30)
 
         s = 's' if numCuts != 1 else ''
         log.print(f'Auto-Editor made {numCuts} cut{s}', end='')
-        if(numCuts > 4):
-            log.print(f', which would have taken about {timeSave} if edited manually.')
-        else:
-            log.print('.')
+        log.print(f', which would have taken about {timeSave} if edited manually.')
 
     if(not args.no_open):
         from usefulFunctions import smartOpen

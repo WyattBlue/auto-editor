@@ -11,7 +11,7 @@ script:
  - python3 auto_editor/__main__.py --debug
  - python3 auto_editor/__main__.py --version
  - python3 auto_editor/__main__.py example.mp4 --verbose
- - python3 auto_editor/__main__.py test.mkv --show_ffmpeg_debug --verbose
+ - python3 auto_editor/__main__.py resources/test.mkv --show_ffmpeg_debug --verbose
  - python3 auto_editor/__main__.py example.mp4 -s 2 -mcut 10
  - python3 auto_editor/__main__.py example.mp4 -v 2 -mclip 4
  - python3 auto_editor/__main__.py example.mp4 --sounded_speed 0.5
