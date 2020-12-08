@@ -146,13 +146,13 @@ class ProgressBar():
         self.title = title
         self.len_title = len(title)
 
+        newTime =  prettyTime(self.beginTime)
+        termsize = get_terminal_size().columns
         try:
-            termsize = get_terminal_size().columns
             barLen = max(1, termsize - (self.len_title + 50))
-            bar(termsize, title, '', '░' * int(barLen), 0,
-                prettyTime(self.beginTime))
+            bar(termsize, title, '', '░' * int(barLen), 0, newTime)
         except UnicodeEncodeError:
-            print(f'   {percentDone}% done ETA {newTime}')
+            print(f'   0% done ETA {newTime}')
             self.allow_unicode = False
         else:
             self.allow_unicode = True
@@ -160,7 +160,7 @@ class ProgressBar():
     def tick(self, index):
         termsize = get_terminal_size().columns
 
-        percentDone = round((index+1) / self.total * 100, 1)
+        percentDone = min(100, round((index+1) / self.total * 100, 1))
         if(percentDone == 0): # Prevent dividing by zero.
             percentPerSec = 0
         else:
