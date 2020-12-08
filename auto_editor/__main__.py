@@ -9,7 +9,7 @@ import tempfile
 import subprocess
 from shutil import rmtree
 
-version = '20w50a'
+version = '20w50b'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -409,10 +409,9 @@ def main():
         del hasLoud
 
         clips = []
+        numCuts = len(chunks)
         for chunk in chunks:
-            if(speeds[chunk[2]] != 1):
-                numCuts += 1
-            else:
+            if(speeds[chunk[2]] != 99999):
                 clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
 
         if(fps is None and not audioFile):

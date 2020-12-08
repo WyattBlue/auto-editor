@@ -152,7 +152,7 @@ class ProgressBar():
             bar(termsize, title, '', '░' * int(barLen), 0,
                 prettyTime(self.beginTime))
         except UnicodeEncodeError:
-            print(f'   {percentDone}% done ETA {newTime}')
+            print(f'   0% done ETA {newTime}')
             self.allow_unicode = False
         else:
             self.allow_unicode = True
