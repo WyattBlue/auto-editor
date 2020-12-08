@@ -146,11 +146,11 @@ class ProgressBar():
         self.title = title
         self.len_title = len(title)
 
+        newTime =  prettyTime(self.beginTime)
+        termsize = get_terminal_size().columns
         try:
-            termsize = get_terminal_size().columns
             barLen = max(1, termsize - (self.len_title + 50))
-            bar(termsize, title, '', '░' * int(barLen), 0,
-                prettyTime(self.beginTime))
+            bar(termsize, title, '', '░' * int(barLen), 0, newTime)
         except UnicodeEncodeError:
             print(f'   0% done ETA {newTime}')
             self.allow_unicode = False
