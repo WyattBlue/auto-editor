@@ -47,7 +47,7 @@ def options():
         newDic['extra'] = extra
         newDic['range'] = range
         newDic['choices'] = choices
-        newDic['parent'] = parent
+        newDic['grouping'] = parent
         option_data.append(newDic)
 
     add_argument('metadataOps', nargs=0, action='grouping')
@@ -210,18 +210,6 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
-        '.acc', '.nfa', '.mka']
-
-    # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
-
-    invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
-        '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
-        '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
-        '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
-        '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
-        '.db', '.ini', '.BIN']
-
     from usefulFunctions import getBinaries, pipeToConsole, ffAddDebug
     from mediaMetadata import vidTracks, getSampleRate, getAudioBitrate
     from mediaMetadata import getVideoCodec, ffmpegFPS
@@ -260,17 +248,17 @@ def main():
     if(args.input == []):
         log.error('You need to give auto-editor an input file or folder so it can' \
             'do the work for you.')
-    if(args.frame_margin < 0):
-        log.error('Frame margin cannot be negative.')
 
     from usefulFunctions import isLatestVersion
 
-    if(isLatestVersion(version, log)):
+    if(not args.quiet and isLatestVersion(version, log)):
         log.print('\nAuto-Editor is out of date. Run:\n')
         log.print('    pip3 install -U auto-editor')
         log.print('\nto upgrade to the latest version.\n')
 
-    # Input validation and sanitization.
+    # Value validation and sanitization.
+    if(args.frame_margin < 0):
+        log.error('Frame margin cannot be negative.')
     if(args.constant_rate_factor < 0 or args.constant_rate_factor > 51):
         log.error('Constant rate factor (crf) is out of range.')
     if(args.width < 1):
@@ -295,31 +283,8 @@ def main():
     if(args.output_file is None):
         args.output_file = []
 
-    inputList = []
-    for myInput in args.input:
-        if(os.path.isdir(myInput)):
-            def validFiles(path: str, badExts: list):
-                for f in os.listdir(path):
-                    if(not f[f.rfind('.'):] in badExts):
-                        yield os.path.join(path, f)
-
-            inputList += sorted(validFiles(myInput, invalidExtensions))
-        elif(os.path.isfile(myInput)):
-            inputList.append(myInput)
-        elif(myInput.startswith('http://') or myInput.startswith('https://')):
-            basename = re.sub(r'\W+', '-', myInput)
-
-            if(not os.path.isfile(basename + '.mp4')):
-                print('URL detected, using youtube-dl to download from webpage.')
-                cmd = ['youtube-dl', '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
-                       myInput, '--output', basename, '--no-check-certificate']
-                if(ffmpeg != 'ffmpeg'):
-                    cmd.extend(['--ffmpeg-location', ffmpeg])
-                subprocess.call(cmd)
-
-            inputList.append(basename + '.mp4')
-        else:
-            log.error('Could not find file: ' + myInput)
+    from validateInput import validInput
+    inputList = validInput(args.input, ffmpeg, log)
 
     timer = Timer(args.quiet)
 
@@ -353,24 +318,17 @@ def main():
         inputList = [f'{TEMP}/combined.mp4']
 
     speeds = [args.silent_speed, args.video_speed]
+    log.debug(f'   - Speeds: {speeds}')
     numCuts = 0
+
+    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
+        '.acc', '.nfa', '.mka']
+
+    # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
+
     for i, INPUT_FILE in enumerate(inputList):
         log.debug(f'   - INPUT_FILE: {INPUT_FILE}')
-        # Ignore folders
-        if(os.path.isdir(INPUT_FILE)):
-            continue
 
-        # Throw error if file referenced doesn't exist.
-        if(not os.path.isfile(INPUT_FILE)):
-            log.error(f"{INPUT_FILE} doesn't exist!")
-
-        # Check if the file format is valid.
-        fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
-
-        if(fileFormat in invalidExtensions):
-            log.error(f'Invalid file extension "{fileFormat}" for {INPUT_FILE}')
-
-        # Get output file name.
         newOutput = args.output_file[i]
         log.debug(f'   - newOutput: {newOutput}')
 
@@ -384,7 +342,8 @@ def main():
         log.debug(f'   - sampleRate: {sampleRate}')
         log.debug(f'   - audioBitrate: {audioBitrate}')
 
-        audioFile = fileFormat in audioExtensions
+        fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
+        audioFile =  fileFormat in audioExtensions
         if(audioFile):
             if(args.force_fps_to is None):
                 fps = 30 # Audio files don't have frames, so give fps a dummy value.
@@ -457,7 +416,7 @@ def main():
                 if(os.path.isfile(f'{TEMP}/{args.cut_by_this_track}.wav')):
                     sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
                 else:
-                    log.error('Audio track not found!')
+                    log.bug('Audio track not found!')
 
         from cutting import audioToHasLoud, motionDetection
 

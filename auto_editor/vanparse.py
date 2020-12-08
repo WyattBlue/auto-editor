@@ -20,7 +20,7 @@ def printHelp(option, args):
     elif(option['action'] == 'grouping'):
         for options in args:
             for op in options:
-                if(op['parent'] == option['names'][0]):
+                if(op['grouping'] == option['names'][0]):
                     print(' ', ', '.join(op['names']) + ':', op['help'])
                     if(op['action'] == 'grouping'):
                         print('     ...')
@@ -31,11 +31,11 @@ def printHelp(option, args):
         print('    type: unknown')
 
 
-def get_option(item, parent, the_args: list):
+def get_option(item, group, the_args: list):
     for options in the_args:
         for option in options:
             if(item in option['names']):
-                if(parent == 'global' or option['parent'] == parent):
+                if(group == 'global' or option['grouping'] == group):
                     return option
     return None
 
@@ -62,7 +62,7 @@ class ParseOptions():
         settingInputs = True
         optionList = 'input'
         i = 0
-        parent = 'auto-editor'
+        group = 'auto-editor'
         while i < len(userArgs):
             item = userArgs[i]
             if(i == len(userArgs) - 1):
@@ -70,11 +70,11 @@ class ParseOptions():
             else:
                 nextItem = userArgs[i+1]
 
-            option = get_option(item, parent, args)
+            option = get_option(item, group, args)
 
-            if(option is None and parent != 'auto-editor'):
-                parent = 'auto-editor'
-                option = get_option(item, parent, args)
+            if(option is None and group != 'auto-editor'):
+                group = 'auto-editor'
+                option = get_option(item, group, args)
 
             if(option is None):
                 if(settingInputs and not item.startswith('-')):
@@ -88,10 +88,10 @@ class ParseOptions():
                     # If there's an exact match.
                     if(len(hmm) > 0 and hmm[0] == item):
                         option = get_option(item, 'global', args)
-                        parent = option['grouping']
+                        group = option['grouping']
                         myDefault = option['default'] if option['action'] != 'store_true' else ''
-                        append = f'\n\nExample:\n    auto-editor {parent} {item} {myDefault}'
-                        log.error(f'Option {item} needs to be in group: {parent}{append}')
+                        append = f'\n\nExample:\n    auto-editor {group} {item} {myDefault}'
+                        log.error(f'Option {item} needs to be in group: {group}{append}')
 
                     potential_options = ', '.join(hmm)
 
@@ -108,7 +108,7 @@ class ParseOptions():
                 key = option['names'][0].replace('-', '')
 
                 if(option['action'] == 'grouping'):
-                    parent = key
+                    group = key
 
                 if(nextItem == '-h' or nextItem == '--help'):
                     printHelp(option, args)

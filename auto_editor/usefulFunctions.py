@@ -160,7 +160,7 @@ class ProgressBar():
     def tick(self, index):
         termsize = get_terminal_size().columns
 
-        percentDone = round((index+1) / self.total * 100, 1)
+        percentDone = min(100, round((index+1) / self.total * 100, 1))
         if(percentDone == 0): # Prevent dividing by zero.
             percentPerSec = 0
         else:
