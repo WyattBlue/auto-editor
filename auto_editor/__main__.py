@@ -3,7 +3,6 @@
 
 # Internal python libraries
 import os
-import re
 import sys
 import platform
 import tempfile
@@ -505,7 +504,7 @@ def main():
         if(continueVid):
             fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps, TEMP, log)
             muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
-                args.video_bitrate, args.tune, args.preset, args.video_codec,
+                args.video_bitrate, args.tune, args.preset, vcodec,
                 args.constant_rate_factor, TEMP, log)
 
     if(newOutput is not None and not os.path.isfile(newOutput)):

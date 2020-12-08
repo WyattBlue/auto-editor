@@ -14,15 +14,21 @@ def validFiles(path: str, badExts: list):
             yield os.path.join(path, f)
 
 
-def validInput(inputs:list, ffmpeg, log) -> list:
-    class MyLogger(object):
-        def debug(self, msg):
-            pass
-        def warning(self, msg):
-            log.warning(msg)
-        def error(self, msg):
-            log.error(msg)
+class MyLogger(object):
+    @staticmethod
+    def debug(msg):
+        pass
 
+    @staticmethod
+    def warning(msg):
+        log.warning(msg)
+
+    @staticmethod
+    def error(msg):
+        log.error(msg)
+
+
+def validInput(inputs: list, ffmpeg, log) -> list:
     inputList = []
     for myInput in inputs:
         if(os.path.isdir(myInput)):
