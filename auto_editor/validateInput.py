@@ -22,7 +22,7 @@ class MyLogger(object):
 
     @staticmethod
     def warning(msg):
-        log.warning(msg, file=sys.stderr)
+        print(msg, file=sys.stderr)
 
     @staticmethod
     def error(msg):
