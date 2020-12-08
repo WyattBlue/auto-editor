@@ -280,7 +280,6 @@ def main():
 
     speeds = [args.silent_speed, args.video_speed]
     log.debug(f'   - Speeds: {speeds}')
-    numCuts = 0
 
     audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
         '.acc', '.nfa', '.mka']
