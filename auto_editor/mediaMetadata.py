@@ -10,7 +10,7 @@ def vidTracks(videoFile: str, ffprobe: str, log) -> int:
     numbers = pipeToConsole([ffprobe, videoFile, '-hide_banner', '-loglevel',
         'panic', '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
         'compact=p=0:nk=1']).split('\n')
-    log.ffmpeg('Track data' + str(numbers))
+    log.ffmpeg('Track data: ' + str(numbers))
     if(numbers[0].isnumeric()):
         return len(numbers) - 1
     else:

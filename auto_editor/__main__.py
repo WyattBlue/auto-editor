@@ -3,14 +3,13 @@
 
 # Internal python libraries
 import os
-import re
 import sys
 import platform
 import tempfile
 import subprocess
 from shutil import rmtree
 
-version = '20w50a'
+version = '20w50b'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -47,7 +46,7 @@ def options():
         newDic['extra'] = extra
         newDic['range'] = range
         newDic['choices'] = choices
-        newDic['parent'] = parent
+        newDic['grouping'] = parent
         option_data.append(newDic)
 
     add_argument('metadataOps', nargs=0, action='grouping')
@@ -210,32 +209,10 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
-    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
-        '.acc', '.nfa', '.mka']
-
-    # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
-
-    invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
-        '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
-        '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
-        '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
-        '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
-        '.db', '.ini', '.BIN']
-
     from usefulFunctions import getBinaries, pipeToConsole, ffAddDebug
     from mediaMetadata import vidTracks, getSampleRate, getAudioBitrate
     from mediaMetadata import getVideoCodec, ffmpegFPS
     from wavfile import read
-
-    if(not args.preview):
-        if(args.export_to_premiere):
-            log.conwrite('Exporting to Adobe Premiere Pro XML file.')
-        elif(args.export_to_resolve):
-            log.conwrite('Exporting to DaVinci Resolve XML file.')
-        elif(args.export_as_audio):
-            log.conwrite('Exporting as audio.')
-        else:
-            log.conwrite('Starting.')
 
     ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
     makingDataFile = args.export_to_premiere or args.export_to_resolve
@@ -257,69 +234,18 @@ def main():
         log.warning('You have the 32-bit version of Python, which may lead to' \
             'memory crashes.')
 
-    if(args.input == []):
-        log.error('You need to give auto-editor an input file or folder so it can' \
-            'do the work for you.')
-    if(args.frame_margin < 0):
-        log.error('Frame margin cannot be negative.')
-
     from usefulFunctions import isLatestVersion
-
-    if(isLatestVersion(version, log)):
+    if(not args.quiet and isLatestVersion(version, log)):
         log.print('\nAuto-Editor is out of date. Run:\n')
         log.print('    pip3 install -U auto-editor')
         log.print('\nto upgrade to the latest version.\n')
 
-    # Input validation and sanitization.
-    if(args.constant_rate_factor < 0 or args.constant_rate_factor > 51):
-        log.error('Constant rate factor (crf) is out of range.')
-    if(args.width < 1):
-        log.error('motionOps --width cannot be less than 1.')
-    if(args.dilates < 0):
-        log.error('motionOps --dilates cannot be less than 0')
-    if(args.video_codec == 'uncompressed'):
-        if(args.constant_rate_factor != 15): # default value.
-            log.error('Cannot apply constant rate factor if video codec is "uncompressed".')
-        if(args.tune != 'none'):
-            log.error('Cannot apply tune if video codec is "uncompressed".')
-        if(args.preset != 'medium'):
-            log.error('Cannot apply preset if video codec is "uncompressed".')
+    from argsCheck import hardArgsCheck, softArgsCheck
+    hardArgsCheck(args, log)
+    args = softArgsCheck(args, log)
 
-    args.constant_rate_factor = str(args.constant_rate_factor)
-    if(args.blur < 0):
-        args.blur = 0
-    if(args.silent_speed <= 0 or args.silent_speed > 99999):
-        args.silent_speed = 99999
-    if(args.video_speed <= 0 or args.video_speed > 99999):
-        args.video_speed = 99999
-    if(args.output_file is None):
-        args.output_file = []
-
-    inputList = []
-    for myInput in args.input:
-        if(os.path.isdir(myInput)):
-            def validFiles(path: str, badExts: list):
-                for f in os.listdir(path):
-                    if(not f[f.rfind('.'):] in badExts):
-                        yield os.path.join(path, f)
-
-            inputList += sorted(validFiles(myInput, invalidExtensions))
-        elif(os.path.isfile(myInput)):
-            inputList.append(myInput)
-        elif(myInput.startswith('http://') or myInput.startswith('https://')):
-            basename = re.sub(r'\W+', '-', myInput)
-
-            if(not os.path.isfile(basename + '.mp4')):
-                print('URL detected, using youtube-dl to download from webpage.')
-                cmd = ['youtube-dl', '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
-                       myInput, '--output', basename, '--no-check-certificate']
-                if(ffmpeg != 'ffmpeg'):
-                    cmd.extend(['--ffmpeg-location', ffmpeg])
-                subprocess.call(cmd)
-
-            inputList.append(basename + '.mp4')
-        else:
-            log.error('Could not find file: ' + myInput)
+    from validateInput import validInput
+    inputList = validInput(args.input, ffmpeg, log)
 
     timer = Timer(args.quiet)
 
@@ -353,24 +279,16 @@ def main():
         inputList = [f'{TEMP}/combined.mp4']
 
     speeds = [args.silent_speed, args.video_speed]
-    numCuts = 0
+    log.debug(f'   - Speeds: {speeds}')
+
+    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
+        '.acc', '.nfa', '.mka']
+
+    # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
+
     for i, INPUT_FILE in enumerate(inputList):
         log.debug(f'   - INPUT_FILE: {INPUT_FILE}')
-        # Ignore folders
-        if(os.path.isdir(INPUT_FILE)):
-            continue
 
-        # Throw error if file referenced doesn't exist.
-        if(not os.path.isfile(INPUT_FILE)):
-            log.error(f"{INPUT_FILE} doesn't exist!")
-
-        # Check if the file format is valid.
-        fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
-
-        if(fileFormat in invalidExtensions):
-            log.error(f'Invalid file extension "{fileFormat}" for {INPUT_FILE}')
-
-        # Get output file name.
         newOutput = args.output_file[i]
         log.debug(f'   - newOutput: {newOutput}')
 
@@ -384,7 +302,8 @@ def main():
         log.debug(f'   - sampleRate: {sampleRate}')
         log.debug(f'   - audioBitrate: {audioBitrate}')
 
-        audioFile = fileFormat in audioExtensions
+        fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
+        audioFile =  fileFormat in audioExtensions
         if(audioFile):
             if(args.force_fps_to is None):
                 fps = 30 # Audio files don't have frames, so give fps a dummy value.
@@ -457,7 +376,7 @@ def main():
                 if(os.path.isfile(f'{TEMP}/{args.cut_by_this_track}.wav')):
                     sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
                 else:
-                    log.error('Audio track not found!')
+                    log.bug('Audio track not found!')
 
         from cutting import audioToHasLoud, motionDetection
 
@@ -489,10 +408,9 @@ def main():
         del hasLoud
 
         clips = []
+        numCuts = len(chunks)
         for chunk in chunks:
-            if(speeds[chunk[2]] != 1):
-                numCuts += 1
-            else:
+            if(speeds[chunk[2]] != 99999):
                 clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
 
         if(fps is None and not audioFile):
@@ -546,7 +464,7 @@ def main():
         if(continueVid):
             fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps, TEMP, log)
             muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
-                args.video_bitrate, args.tune, args.preset, args.video_codec,
+                args.video_bitrate, args.tune, args.preset, vcodec,
                 args.constant_rate_factor, TEMP, log)
 
     if(newOutput is not None and not os.path.isfile(newOutput)):
