@@ -38,7 +38,7 @@ def validInput(inputs:list, ffmpeg, log) -> list:
                 log.error(f"{myInput} doesn't exist!")
 
             # Check if the file format is valid.
-            fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
+            fileFormat = myInput[myInput.rfind('.'):]
 
             if(fileFormat in invalidExtensions):
                 log.error(f'Invalid file extension "{fileFormat}" for {myInput}')
