@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 
 invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
     '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
@@ -21,11 +22,11 @@ class MyLogger(object):
 
     @staticmethod
     def warning(msg):
-        log.warning(msg)
+        log.warning(msg, file=sys.stderr)
 
     @staticmethod
     def error(msg):
-        log.error(msg)
+        print(msg, file=sys.stderr)
 
 
 def validInput(inputs: list, ffmpeg, log) -> list:

@@ -214,16 +214,6 @@ def main():
     from mediaMetadata import getVideoCodec, ffmpegFPS
     from wavfile import read
 
-    if(not args.preview):
-        if(args.export_to_premiere):
-            log.conwrite('Exporting to Adobe Premiere Pro XML file.')
-        elif(args.export_to_resolve):
-            log.conwrite('Exporting to DaVinci Resolve XML file.')
-        elif(args.export_as_audio):
-            log.conwrite('Exporting as audio.')
-        else:
-            log.conwrite('Starting.')
-
     ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
     makingDataFile = args.export_to_premiere or args.export_to_resolve
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
@@ -244,43 +234,15 @@ def main():
         log.warning('You have the 32-bit version of Python, which may lead to' \
             'memory crashes.')
 
-    if(args.input == []):
-        log.error('You need to give auto-editor an input file or folder so it can' \
-            'do the work for you.')
-
     from usefulFunctions import isLatestVersion
-
     if(not args.quiet and isLatestVersion(version, log)):
         log.print('\nAuto-Editor is out of date. Run:\n')
         log.print('    pip3 install -U auto-editor')
         log.print('\nto upgrade to the latest version.\n')
 
-    # Value validation and sanitization.
-    if(args.frame_margin < 0):
-        log.error('Frame margin cannot be negative.')
-    if(args.constant_rate_factor < 0 or args.constant_rate_factor > 51):
-        log.error('Constant rate factor (crf) is out of range.')
-    if(args.width < 1):
-        log.error('motionOps --width cannot be less than 1.')
-    if(args.dilates < 0):
-        log.error('motionOps --dilates cannot be less than 0')
-    if(args.video_codec == 'uncompressed'):
-        if(args.constant_rate_factor != 15): # default value.
-            log.error('Cannot apply constant rate factor if video codec is "uncompressed".')
-        if(args.tune != 'none'):
-            log.error('Cannot apply tune if video codec is "uncompressed".')
-        if(args.preset != 'medium'):
-            log.error('Cannot apply preset if video codec is "uncompressed".')
-
-    args.constant_rate_factor = str(args.constant_rate_factor)
-    if(args.blur < 0):
-        args.blur = 0
-    if(args.silent_speed <= 0 or args.silent_speed > 99999):
-        args.silent_speed = 99999
-    if(args.video_speed <= 0 or args.video_speed > 99999):
-        args.video_speed = 99999
-    if(args.output_file is None):
-        args.output_file = []
+    from argsCheck import hardArgsCheck, softArgsCheck
+    hardArgsCheck(args, log)
+    args = softArgsCheck(args, log)
 
     from validateInput import validInput
     inputList = validInput(args.input, ffmpeg, log)
