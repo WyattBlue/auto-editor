@@ -1,8 +1,5 @@
 import os
 import re
-import youtube_dl
-
-from usefulFunctions import ProgressBar
 
 invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
     '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
@@ -11,23 +8,18 @@ invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
     '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
     '.db', '.ini', '.BIN']
 
-
 def validFiles(path: str, badExts: list):
     for f in os.listdir(path):
         if(f[f.rfind('.'):] not in badExts and not os.path.isdir(f)):
             yield os.path.join(path, f)
 
 
-
 def validInput(inputs:list, ffmpeg, log) -> list:
-
     class MyLogger(object):
         def debug(self, msg):
             pass
-
         def warning(self, msg):
             log.warning(msg)
-
         def error(self, msg):
             log.error(msg)
 
@@ -55,13 +47,19 @@ def validInput(inputs:list, ffmpeg, log) -> list:
         elif(myInput.startswith('http://') or myInput.startswith('https://')):
             basename = re.sub(r'\W+', '-', myInput)
 
+            try:
+                import youtube_dl
+            except ImportError:
+                log.error('Download the youtube-dl pip library to download URLs.')
+
+            from usefulFunctions import ProgressBar
+
             if(not os.path.isfile(basename + '.mp4')):
 
                 ytbar = ProgressBar(100, 'Downloading')
                 def my_hook(d):
                     nonlocal ytbar
-
-                    if d['status'] == 'downloading':
+                    if(d['status'] == 'downloading'):
                         p = d['_percent_str']
                         p = p.replace('%','')
                         ytbar.tick(float(p))
