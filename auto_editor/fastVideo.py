@@ -44,8 +44,6 @@ def handleAudioTracks(ffmpeg, outFile, exportAsAudio, tracks, keepTracksSep,
 def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vcodec,
     crf, temp, log):
 
-    if(vcodec == 'uncompressed'):
-        vcodec = 'copy'
     def extender(cmd, vbitrate, tune, preset, outFile, isFFmpeg):
         if(vbitrate is None):
             cmd.extend(['-crf', crf])
