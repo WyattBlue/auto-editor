@@ -8,29 +8,34 @@ python:
  - "3.7"
  - "3.8"
 script:
- - python3 auto_editor/__main__.py --debug
- - python3 auto_editor/__main__.py --version
- - python3 auto_editor/__main__.py example.mp4 --verbose
- - python3 auto_editor/__main__.py resources/test.mkv --show_ffmpeg_debug --verbose
- - python3 auto_editor/__main__.py example.mp4 -s 2 -mcut 10
- - python3 auto_editor/__main__.py example.mp4 -v 2 -mclip 4
- - python3 auto_editor/__main__.py example.mp4 --sounded_speed 0.5
- - python3 auto_editor/__main__.py example.mp4 --silent_speed 0.5
- - python3 auto_editor/__main__.py resources/newCommentary.mp3 --silent_threshold 0.1
- - python3 auto_editor/__main__.py resources/multi-track.mov --cut_by_all_tracks
- - python3 auto_editor/__main__.py resources/multi-track.mov --keep_tracks_seperate
- - python3 auto_editor/__main__.py example.mp4 --cut_by_this_audio resources/newCommentary.mp3
+ - python3 -m auto_editor --debug
+ - python3 -m auto_editor --version
+ - python3 -m auto_editor --help
+ - python3 -m auto_editor --frame_margin --help
+ - python3 -m auto_editor exportMediaOps --help
+ - python3 -m auto_editor example.mp4 --verbose
+ - python3 -m auto_editor example.mp4 --export_as_json
+ - python3 -m auto_editor example.json
+ - python3 -m auto_editor resources/test.mkv --show_ffmpeg_debug --verbose
+ - python3 -m auto_editor example.mp4 -s 2 -mcut 10
+ - python3 -m auto_editor example.mp4 -v 2 -mclip 4
+ - python3 -m auto_editor example.mp4 --sounded_speed 0.5
+ - python3 -m auto_editor example.mp4 --silent_speed 0.5
+ - python3 -m auto_editor resources/newCommentary.mp3 --silent_threshold 0.1
+ - python3 -m auto_editor resources/multi-track.mov --cut_by_all_tracks
+ - python3 -m auto_editor resources/multi-track.mov --keep_tracks_seperate
+ - python3 -m auto_editor example.mp4 --cut_by_this_audio resources/newCommentary.mp3
  - mv resources/man_on_green_screen.mp4 man_on_green_screen.mp4
- - python3 auto_editor/__main__.py resources --debug
+ - python3 -m auto_editor resources --debug
  - mv man_on_green_screen.mp4 resources/man_on_green_screen.mp4
- - python3 auto_editor/__main__.py example.mp4 -exp
- - python3 auto_editor/__main__.py example.mp4 -exr
- - python3 auto_editor/__main__.py resources/multi-track.mov -exp
- - python3 auto_editor/__main__.py resources/newCommentary.mp3 -exp
- - python3 auto_editor/__main__.py resources/newCommentary.mp3 -exr
- - python3 auto_editor/__main__.py example.mp4 --preview
- - python3 auto_editor/__main__.py example.mp4 exportMediaOps --video_codec h264
- - python3 auto_editor/__main__.py example.mp4 exportMediaOps -vcodec h264 --preset faster
- - python3 auto_editor/__main__.py example.mp4 --cut_out 0-5.7 -o hmm.mp4
- - python3 auto_editor/__main__.py example.mp4 hmm.mp4 --combine_files --debug
- - python3 auto_editor/__main__.py resources/man_on_green_screen.mp4  --edit_based_on motion --debug --frame_margin 0 -mcut 0 -mclip 0
+ - python3 -m auto_editor example.mp4 -exp
+ - python3 -m auto_editor example.mp4 -exr
+ - python3 -m auto_editor resources/multi-track.mov -exp
+ - python3 -m auto_editor resources/newCommentary.mp3 -exp
+ - python3 -m auto_editor resources/newCommentary.mp3 -exr
+ - python3 -m auto_editor example.mp4 --preview
+ - python3 -m auto_editor example.mp4 exportMediaOps --video_codec h264
+ - python3 -m auto_editor example.mp4 exportMediaOps -vcodec h264 --preset faster
+ - python3 -m auto_editor example.mp4 --cut_out 0-5.7 -o hmm.mp4
+ - python3 -m auto_editor example.mp4 hmm.mp4 --combine_files --debug
+ - python3 -m auto_editor resources/man_on_green_screen.mp4  --edit_based_on motion --debug --frame_margin 0 -mcut 0 -mclip 0
