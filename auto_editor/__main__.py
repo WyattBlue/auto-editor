@@ -256,10 +256,10 @@ def main():
 
     def newOutputName(oldFile: str, exa=False, data=False, exc=False) -> str:
         dotIndex = oldFile.rfind('.')
-        if(data):
-            return oldFile[:dotIndex] + '.xml'
-        elif(exc):
+        if(exc):
             return oldFile[:dotIndex] + '.json'
+        elif(data):
+            return oldFile[:dotIndex] + '.xml'
         ext = oldFile[dotIndex:]
         if(exa):
             ext = '.wav'

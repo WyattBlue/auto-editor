@@ -29,6 +29,9 @@ def readCutList(jsonFile, version, log) -> list:
 
 def makeCutList(vidFile, out, version, chunks, speeds, log):
 
+    if(not out.endswith('.json')):
+        log.error('Output extension must be .json')
+
     data = {}
     data['presets'] = {
         'version': version,
@@ -40,4 +43,4 @@ def makeCutList(vidFile, out, version, chunks, speeds, log):
     }
 
     with open(out, 'w') as outfile:
-        json.dump(data, outfile)
+        json.dump(data, outfile, indent=4)
