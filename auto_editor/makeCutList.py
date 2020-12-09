@@ -12,17 +12,17 @@ def readCutList(jsonFile, version, log) -> list:
     with open(jsonFile, 'r') as f:
         data = json.load(f)
 
-    if(data['presets'][0]['version'] != version):
+    if(data['presets']['version'] != version):
         log.warning('This json file was generated using a different version of auto-editor.')
 
-    INPUT_FILE = data['timeline'][0]['media_file']
+    INPUT_FILE = data['timeline']['media_file']
 
     if(not os.path.isfile(INPUT_FILE)):
         log.error('Could not locate file: ' + INPUT_FILE)
 
-    speeds = data['presets'][0]['speeds']
+    speeds = data['presets']['speeds']
 
-    chunks = data['timeline'][0]['chunks']
+    chunks = data['timeline']['chunks']
 
     return INPUT_FILE, chunks, speeds
 
