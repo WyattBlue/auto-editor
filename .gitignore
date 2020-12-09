@@ -7,6 +7,7 @@
 *_tracks
 *.webm
 *.xml
+*.json
 *.pyc
 *.pyo
 *~
