@@ -9,7 +9,7 @@ import tempfile
 import subprocess
 from shutil import rmtree
 
-version = '20w50b'
+version = '20w50c'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -92,6 +92,8 @@ def options():
         help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
     add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
+    add_argument('--export_as_json', action='store_true',
+        help='export as a JSON file that can be read by auto-editor later. (experimental)')
 
     add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')
@@ -104,29 +106,6 @@ def options():
             'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
             'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
-
-    add_argument('--frame_margin', '-m', type=int, default=6, range='0 to Infinity',
-        help='set how many "silent" frames of on either side of "loud" sections be included.')
-    add_argument('--silent_threshold', '-t', type=float_type, default=0.04, range='0 to 1',
-        help='set the volume that frames audio needs to surpass to be "loud".')
-    add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
-        range='0 to 999999',
-        help='set the speed that "loud" sections should be played at.')
-    add_argument('--silent_speed', '-s', type=float_type, default=99999, range='0 to 99999',
-        help='set the speed that "silent" sections should be played at.')
-    add_argument('--output_file', '--output', '-o', nargs='*',
-        help='set the name(s) of the new output.')
-
-    add_argument('--no_open', action='store_true',
-        help='do not open the file after editing is done.')
-    add_argument('--min_clip_length', '-mclip', type=int, default=3, range='0 to Infinity',
-        help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    add_argument('--min_cut_length', '-mcut', type=int, default=6, range='0 to Infinity',
-        help="set the minimum length a cut can be. If a cut is too short, don't cut")
-    add_argument('--combine_files', action='store_true',
-        help='combine all input files into one before editing.')
-    add_argument('--preview', action='store_true',
-        help='show stats on how the input will be cut.')
 
     add_argument('--cut_by_this_audio', '-ca', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
@@ -148,6 +127,29 @@ def options():
         help='show ffmpeg progress and output.')
     add_argument('--quiet', '-q', action='store_true',
         help='display less output.')
+
+    add_argument('--no_open', action='store_true',
+        help='do not open the file after editing is done.')
+    add_argument('--min_clip_length', '-mclip', type=int, default=3, range='0 to Infinity',
+        help='set the minimum length a clip can be. If a clip is too short, cut it.')
+    add_argument('--min_cut_length', '-mcut', type=int, default=6, range='0 to Infinity',
+        help="set the minimum length a cut can be. If a cut is too short, don't cut")
+    add_argument('--combine_files', action='store_true',
+        help='combine all input files into one before editing.')
+    add_argument('--preview', action='store_true',
+        help='show stats on how the input will be cut.')
+
+    add_argument('--frame_margin', '-m', type=int, default=6, range='0 to Infinity',
+        help='set how many "silent" frames of on either side of "loud" sections be included.')
+    add_argument('--silent_threshold', '-t', type=float_type, default=0.04, range='0 to 1',
+        help='set the volume that frames audio needs to surpass to be "loud".')
+    add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
+        range='0 to 999999',
+        help='set the speed that "loud" sections should be played at.')
+    add_argument('--silent_speed', '-s', type=float_type, default=99999, range='0 to 99999',
+        help='set the speed that "silent" sections should be played at.')
+    add_argument('--output_file', '--output', '-o', nargs='*',
+        help='set the name(s) of the new output.')
 
     add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
@@ -196,7 +198,7 @@ def main():
         print('  The help option can also be used on a specific option:')
         print('      auto-editor --frame_margin --help\n')
         for option in option_data:
-            if(option['parent'] == 'auto-editor'):
+            if(option['grouping'] == 'auto-editor'):
                 print(' ', ', '.join(option['names']) + ':', option['help'])
                 if(option['action'] == 'grouping'):
                     print('     ...')
@@ -215,7 +217,8 @@ def main():
     from wavfile import read
 
     ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
-    makingDataFile = args.export_to_premiere or args.export_to_resolve
+    makingDataFile = (args.export_to_premiere or args.export_to_resolve or
+        args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
     if(args.debug and args.input == []):
@@ -250,18 +253,22 @@ def main():
     timer = Timer(args.quiet)
 
     # Figure out the output file names.
+
+    def newOutputName(oldFile: str, exa=False, data=False, exc=False) -> str:
+        dotIndex = oldFile.rfind('.')
+        if(exc):
+            return oldFile[:dotIndex] + '.json'
+        elif(data):
+            return oldFile[:dotIndex] + '.xml'
+        ext = oldFile[dotIndex:]
+        if(exa):
+            ext = '.wav'
+        return oldFile[:dotIndex] + '_ALTERED' + ext
+
     if(len(args.output_file) < len(inputList)):
         for i in range(len(inputList) - len(args.output_file)):
-            oldFile = inputList[i]
-            dotIndex = oldFile.rfind('.')
-            if(args.export_to_premiere or args.export_to_resolve):
-                args.output_file.append(oldFile[:dotIndex] + '.xml')
-            else:
-                ext = oldFile[dotIndex:]
-                if(args.export_as_audio):
-                    ext = '.wav'
-                end = '_ALTERED' + ext
-                args.output_file.append(oldFile[:dotIndex] + end)
+            args.output_file.append(newOutputName(inputList[i],
+                args.export_as_audio, makingDataFile, args.export_as_json))
 
     TEMP = tempfile.mkdtemp()
     log.debug(f'\n   - Temp Directory: {TEMP}')
@@ -287,9 +294,22 @@ def main():
     # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
 
     for i, INPUT_FILE in enumerate(inputList):
-        log.debug(f'   - INPUT_FILE: {INPUT_FILE}')
+        fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
-        newOutput = args.output_file[i]
+        chunks = None
+        if(fileFormat == '.json'):
+            log.debug('Reading .json file')
+            from makeCutList import readCutList
+            INPUT_FILE, chunks, speeds = readCutList(INPUT_FILE, version, log)
+
+            newOutput = newOutputName(INPUT_FILE, args.export_as_audio,
+                makingDataFile, False)
+
+            fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
+        else:
+            newOutput = args.output_file[i]
+
+        log.debug(f'   - INPUT_FILE: {INPUT_FILE}')
         log.debug(f'   - newOutput: {newOutput}')
 
         if(os.path.isfile(newOutput) and INPUT_FILE != newOutput):
@@ -302,7 +322,7 @@ def main():
         log.debug(f'   - sampleRate: {sampleRate}')
         log.debug(f'   - audioBitrate: {audioBitrate}')
 
-        fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
+
         audioFile =  fileFormat in audioExtensions
         if(audioFile):
             if(args.force_fps_to is None):
@@ -378,34 +398,43 @@ def main():
                 else:
                     log.bug('Audio track not found!')
 
-        from cutting import audioToHasLoud, motionDetection
 
-        audioList = None
-        motionList = None
-        if('audio' in args.edit_based_on):
-            log.debug('Analyzing audio volume.')
-            audioList = audioToHasLoud(audioData, sampleRate, args.silent_threshold, fps, log)
+        if(chunks is None):
+            from cutting import audioToHasLoud, motionDetection
 
-        if('motion' in args.edit_based_on):
-            log.debug('Analyzing video motion.')
-            motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold, log,
-                width=args.width, dilates=args.dilates, blur=args.blur)
+            audioList = None
+            motionList = None
+            if('audio' in args.edit_based_on):
+                log.debug('Analyzing audio volume.')
+                audioList = audioToHasLoud(audioData, sampleRate,
+                    args.silent_threshold,  fps, log)
 
-            if(audioList is not None):
-                if(len(audioList) > len(motionList)):
-                    log.debug('Reducing the size of audioList to match motionList')
-                    log.debug(f'audioList Length:  {len(audioList)}')
-                    log.debug(f'motionList Length: {len(motionList)}')
-                    audioList = audioList[:len(motionList)]
+            if('motion' in args.edit_based_on):
+                log.debug('Analyzing video motion.')
+                motionList = motionDetection(INPUT_FILE, ffprobe,
+                    args.motion_threshold, log, width=args.width,
+                    dilates=args.dilates, blur=args.blur)
 
-        from cutting import combineArrs, applySpacingRules
+                if(audioList is not None):
+                    if(len(audioList) > len(motionList)):
+                        log.debug('Reducing the size of audioList to match motionList')
+                        log.debug(f'audioList Length:  {len(audioList)}')
+                        log.debug(f'motionList Length: {len(motionList)}')
+                        audioList = audioList[:len(motionList)]
 
-        hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
-        del audioList, motionList
+            from cutting import combineArrs, applySpacingRules
 
-        chunks, includeFrame = applySpacingRules(hasLoud, fps, args.frame_margin,
-            args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
-        del hasLoud
+            hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
+            del audioList, motionList
+
+            chunks, includeFrame = applySpacingRules(hasLoud, fps,
+                args.frame_margin, args.min_clip_length, args.min_cut_length,
+                args.ignore, args.cut_out, log)
+            del hasLoud
+        else:
+            from cutting import generateIncludes
+
+            includeFrame = generateIncludes(chunks, log)
 
         clips = []
         numCuts = len(chunks)
@@ -416,8 +445,8 @@ def main():
         if(fps is None and not audioFile):
             if(makingDataFile):
                 dotIndex = INPUT_FILE.rfind('.')
-                end = '_constantFPS' + oldFile[dotIndex:]
-                constantLoc = oldFile[:dotIndex] + end
+                end = '_constantFPS' + INPUT_FILE[dotIndex:]
+                constantLoc = INPUT_FILE[:dotIndex] + end
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', 'fps=fps=30',
@@ -426,39 +455,36 @@ def main():
             subprocess.call(cmd)
             INPUT_FILE = constantLoc
 
+        if(args.export_as_json):
+            from makeCutList import makeCutList
+            makeCutList(INPUT_FILE, newOutput, version, chunks, speeds, log)
+            continue
+
         if(args.preview):
-            args.no_open = True
             newOutput = None
             from preview import preview
-
             preview(INPUT_FILE, chunks, speeds, fps, audioFile, log)
             continue
 
         if(args.export_to_premiere):
-            args.no_open = True
             from premiere import exportToPremiere
-
             exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate,
                 audioFile, log)
             continue
         if(args.export_to_resolve):
-            args.no_open = True
             duration = chunks[len(chunks) - 1][1]
             from resolve import exportToResolve
-
             exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate,
                 audioFile, log)
             continue
         if(audioFile):
             from fastAudio import fastAudio, handleAudio
-
             theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
                 TEMP, log)
             fastAudio(theFile, newOutput, chunks, speeds, log, fps)
             continue
 
         from fastVideo import handleAudioTracks, fastVideo, muxVideo
-
         continueVid = handleAudioTracks(ffmpeg, newOutput, args.export_as_audio,
             tracks, args.keep_tracks_seperate, chunks, speeds, fps, TEMP, log)
         if(continueVid):

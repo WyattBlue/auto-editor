@@ -3,7 +3,7 @@ import re
 import sys
 
 invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
-    '.xml', '.json', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
+    '.xml', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
     '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
     '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
     '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
