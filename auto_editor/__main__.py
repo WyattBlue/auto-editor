@@ -196,7 +196,7 @@ def main():
         print('  The help option can also be used on a specific option:')
         print('      auto-editor --frame_margin --help\n')
         for option in option_data:
-            if(option['parent'] == 'auto-editor'):
+            if(option['grouping'] == 'auto-editor'):
                 print(' ', ', '.join(option['names']) + ':', option['help'])
                 if(option['action'] == 'grouping'):
                     print('     ...')
