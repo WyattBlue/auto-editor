@@ -47,6 +47,9 @@ def hardArgsCheck(args, log):
 
 # Quietly modify values without throwing error.
 def softArgsCheck(args, log):
+    if(args.preview or args.export_to_premiere or args.export_to_resolve or
+        args.export_as_json):
+        args.no_open = True
     args.constant_rate_factor = str(args.constant_rate_factor)
     if(args.blur < 0):
         args.blur = 0
