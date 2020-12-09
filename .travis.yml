@@ -11,9 +11,11 @@ script:
  - python3 -m auto_editor --debug
  - python3 -m auto_editor --version
  - python3 -m auto_editor --help
- - python3 -m auto_editor --frmae_margin --help
+ - python3 -m auto_editor --frame_margin --help
  - python3 -m auto_editor exportMediaOps --help
  - python3 -m auto_editor example.mp4 --verbose
+ - python3 -m auto_editor example.mp4 --export_as_json
+ - python3 -m auto_editor example.json
  - python3 -m auto_editor resources/test.mkv --show_ffmpeg_debug --verbose
  - python3 -m auto_editor example.mp4 -s 2 -mcut 10
  - python3 -m auto_editor example.mp4 -v 2 -mclip 4

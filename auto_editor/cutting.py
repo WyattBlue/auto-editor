@@ -2,6 +2,16 @@
 
 import numpy as np
 
+def generateIncludes(chunks: list, log) -> np.ndarray:
+    arrayLen = chunks[-1][1]
+    includeFrame = np.zeros((arrayLen), dtype=np.bool_)
+
+    for item in chunks:
+        if(item[2] == 1):
+            includeFrame[item[0]:item[1]] = True
+    return includeFrame
+
+
 def combineArrs(audioList: np.ndarray, motionList: np.ndarray, based: str,
     log) -> np.ndarray:
 
