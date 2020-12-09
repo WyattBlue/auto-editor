@@ -445,8 +445,8 @@ def main():
         if(fps is None and not audioFile):
             if(makingDataFile):
                 dotIndex = INPUT_FILE.rfind('.')
-                end = '_constantFPS' + oldFile[dotIndex:]
-                constantLoc = oldFile[:dotIndex] + end
+                end = '_constantFPS' + INPUT_FILE[dotIndex:]
+                constantLoc = INPUT_FILE[:dotIndex] + end
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
             cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', 'fps=fps=30',
