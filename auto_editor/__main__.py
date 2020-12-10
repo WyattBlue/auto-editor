@@ -416,11 +416,15 @@ def main():
                     dilates=args.dilates, blur=args.blur)
 
                 if(audioList is not None):
-                    if(len(audioList) > len(motionList)):
-                        log.debug('Reducing the size of audioList to match motionList')
+                    if(len(audioList) != len(motionList)):
                         log.debug(f'audioList Length:  {len(audioList)}')
                         log.debug(f'motionList Length: {len(motionList)}')
+                    if(len(audioList) > len(motionList)):
+                        log.debug('Reducing the size of audioList to match motionList.')
                         audioList = audioList[:len(motionList)]
+                    elif(len(motionList) > len(audioList)):
+                        log.debug('Reducing the size of motionList to match audioList.')
+                        motionList = motionList[:len(audioList)]
 
             from cutting import combineArrs, applySpacingRules
 
