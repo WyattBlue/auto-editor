@@ -322,7 +322,6 @@ def main():
         log.debug(f'   - sampleRate: {sampleRate}')
         log.debug(f'   - audioBitrate: {audioBitrate}')
 
-
         audioFile =  fileFormat in audioExtensions
         if(audioFile):
             if(args.force_fps_to is None):
@@ -398,7 +397,7 @@ def main():
                 else:
                     log.bug('Audio track not found!')
 
-
+        log.debug(f'   - Frame Rate: {fps}')
         if(chunks is None):
             from cutting import audioToHasLoud, motionDetection
 
