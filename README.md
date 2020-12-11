@@ -1,4 +1,3 @@
-[![Build Status](https://travis-ci.com/WyattBlue/auto-editor.svg?branch=master)](https://travis-ci.com/WyattBlue/auto-editor)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/discord/711767814821773372?label=Discord"></a>
 <img src="https://img.shields.io/badge/version-20w50d-blue.svg">
 <p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/resources/auto-editor_banner.png" width="700"></p>
