@@ -1,0 +1,95 @@
+
+name: Test Program
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.6', '3.7', '3.8']
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install FFmpeg
+      run: |
+        sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg
+    - name: Install Pip Packages
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install opencv-python audiotsm2
+    - name: Test Help Commands
+      run: |
+        python3 -m auto_editor --debug
+        python3 -m auto_editor --version
+        python3 -m auto_editor --help
+        python3 -m auto_editor --frame_margin --help
+        python3 -m auto_editor exportMediaOps --help
+    - name: Test Example Vid
+      run: |
+        python3 -m auto_editor example.mp4 --verbose
+    - name: Test JSON
+      run: |
+        python3 -m auto_editor example.mp4 --export_as_json
+        python3 -m auto_editor example.json
+    - name: Test MKV Files
+      run: |
+        python3 -m auto_editor resources/test.mkv --show_ffmpeg_debug --verbose
+    - name: Test speed settings
+      run: |
+        python3 -m auto_editor example.mp4 -s 2 -mcut 10
+        python3 -m auto_editor example.mp4 -v 2 -mclip 4
+        python3 -m auto_editor example.mp4 --sounded_speed 0.5
+        python3 -m auto_editor example.mp4 --silent_speed 0.5
+    - name: Test Audio Files
+      run: |
+        python3 -m auto_editor resources/newCommentary.mp3 --silent_threshold 0.1
+    - name: Test Cut by All Tracks
+      run: |
+        python3 -m auto_editor resources/multi-track.mov --cut_by_all_tracks
+    - name: Test Keep Tracks Seperate
+      run: |
+        python3 -m auto_editor resources/multi-track.mov --keep_tracks_seperate
+    - name: Test Cut By This Audio
+      run: |
+        python3 -m auto_editor example.mp4 --cut_by_this_audio resources/newCommentary.mp3
+    - name: Test Folder Inputs
+      run: |
+        mv resources/man_on_green_screen.mp4 man_on_green_screen.mp4
+        python3 -m auto_editor resources --debug
+        mv man_on_green_screen.mp4 resources/man_on_green_screen.mp4
+    - name: Test Export to Editors for video Files
+      run: |
+        python3 -m auto_editor example.mp4 -exp
+        python3 -m auto_editor example.mp4 -exr
+        python3 -m auto_editor resources/multi-track.mov -exp
+    - name: Test Export to Editors for audio files
+      run: |
+        python3 -m auto_editor resources/newCommentary.mp3 -exp
+        python3 -m auto_editor resources/newCommentary.mp3 -exr
+    - name: Test Preview
+      run: |
+        python3 -m auto_editor example.mp4 --preview
+    - name: Test exportMediaOps
+      run: |
+        python3 -m auto_editor example.mp4 exportMediaOps --video_codec h264
+        python3 -m auto_editor example.mp4 exportMediaOps -vcodec h264 --preset faster
+    - name: Test Cut outs
+      run: |
+        python3 -m auto_editor example.mp4 --cut_out 0-5.7 -o hmm.mp4
+    - name: Test Combine Files
+      run: |
+        python3 -m auto_editor example.mp4 hmm.mp4 --combine_files --debug
+    - name: Test Motion Cutting
+      run: |
+        python3 -m auto_editor resources/man_on_green_screen.mp4  --edit_based_on motion --debug --frame_margin 0 -mcut 0 -mclip 0

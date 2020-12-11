@@ -9,7 +9,7 @@ import tempfile
 import subprocess
 from shutil import rmtree
 
-version = '20w50c'
+version = '20w50d'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -322,7 +322,6 @@ def main():
         log.debug(f'   - sampleRate: {sampleRate}')
         log.debug(f'   - audioBitrate: {audioBitrate}')
 
-
         audioFile =  fileFormat in audioExtensions
         if(audioFile):
             if(args.force_fps_to is None):
@@ -398,7 +397,7 @@ def main():
                 else:
                     log.bug('Audio track not found!')
 
-
+        log.debug(f'   - Frame Rate: {fps}')
         if(chunks is None):
             from cutting import audioToHasLoud, motionDetection
 
@@ -416,11 +415,15 @@ def main():
                     dilates=args.dilates, blur=args.blur)
 
                 if(audioList is not None):
-                    if(len(audioList) > len(motionList)):
-                        log.debug('Reducing the size of audioList to match motionList')
+                    if(len(audioList) != len(motionList)):
                         log.debug(f'audioList Length:  {len(audioList)}')
                         log.debug(f'motionList Length: {len(motionList)}')
+                    if(len(audioList) > len(motionList)):
+                        log.debug('Reducing the size of audioList to match motionList.')
                         audioList = audioList[:len(motionList)]
+                    elif(len(motionList) > len(audioList)):
+                        log.debug('Reducing the size of motionList to match audioList.')
+                        motionList = motionList[:len(audioList)]
 
             from cutting import combineArrs, applySpacingRules
 
