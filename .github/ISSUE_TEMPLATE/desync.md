@@ -7,9 +7,9 @@ labels: desync
 ---
 
 You're Exporting to:
- [x] Media File
- [ ] Premiere Pro
- [ ] DaVinci Resolve
+-  [x] Media File (Video or Audio)
+-  [ ] Premiere Pro
+-  [ ] DaVinci Resolve
 
 What is the frame rate and length of your video?
 
