@@ -103,7 +103,7 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
 
 
 def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list,
-    fps, temp, log):
+    fps, writeFile, fileLoc, temp, log):
 
     import cv2
 
@@ -132,7 +132,8 @@ def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list
     remander = 0
     framesWritten = 0
 
-    videoProgress = ProgressBar(totalFrames - starting, 'Creating new video')
+    videoProgress = ProgressBar(totalFrames - starting, 'Creating new video',
+        writeFile, fileLoc, vidFile)
 
     while cap.isOpened():
         ret, frame = cap.read()

@@ -140,25 +140,37 @@ def bar(termsize, title, doneStr, togoStr, percentDone, newTime):
 
 
 class ProgressBar():
-    def __init__(self, total, title='Please wait'):
+    def __init__(self, total, title='Please wait', writeFile=False,
+        fileLoc='progress.txt', fileName='none'):
+
         self.total = total
         self.beginTime = time()
         self.title = title
         self.len_title = len(title)
+        self.writeFile = writeFile
+        self.fileLoc = fileLoc
+        self.fileName = fileName
 
         newTime =  prettyTime(self.beginTime)
         termsize = get_terminal_size().columns
-        try:
-            barLen = max(1, termsize - (self.len_title + 50))
-            bar(termsize, title, '', '░' * int(barLen), 0, newTime)
-        except UnicodeEncodeError:
-            print(f'   0% done ETA {newTime}')
-            self.allow_unicode = False
+
+        if(writeFile):
+            with open(fileLoc, 'w') as file:
+                file.write(fileName + '\n')
+                file.write(f'0 / {total}\n')
+                file.write(newTime)
+            print(' ' * (termsize -4), end='\r', flush=True)
         else:
-            self.allow_unicode = True
+            try:
+                barLen = max(1, termsize - (self.len_title + 50))
+                bar(termsize, title, '', '░' * int(barLen), 0, newTime)
+            except UnicodeEncodeError:
+                print(f'   0% done ETA {newTime}')
+                self.allow_unicode = False
+            else:
+                self.allow_unicode = True
 
     def tick(self, index):
-        termsize = get_terminal_size().columns
 
         percentDone = min(100, round((index+1) / self.total * 100, 1))
         if(percentDone == 0): # Prevent dividing by zero.
@@ -167,6 +179,16 @@ class ProgressBar():
             percentPerSec = (time() - self.beginTime) / percentDone
 
         newTime = prettyTime(self.beginTime + (percentPerSec * 100))
+
+        if(self.writeFile):
+            with open(self.fileLoc, 'w') as file:
+                file.write(self.fileName + '\n')
+                file.write(f'{index} / {self.total}\n')
+                file.write(newTime)
+            return
+
+        termsize = get_terminal_size().columns
+
         if(self.allow_unicode):
             barLen = max(1, termsize - (self.len_title + 50))
             done = round(percentDone / (100 / barLen))

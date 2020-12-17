@@ -49,6 +49,13 @@ def options():
         newDic['grouping'] = parent
         option_data.append(newDic)
 
+
+    add_argument('progressOps', nargs=0, action='grouping')
+    add_argument('--write_to_file', action='store_true', parent='progressOps',
+        help='write progress data to file instead of displaying on console.')
+    add_argument('--file_location', parent='progressOps', default='progress.txt',
+        help='set the file location to write progress data.')
+
     add_argument('metadataOps', nargs=0, action='grouping')
     add_argument('--force_fps_to', type=float, parent='metadataOps',
         help='manually set the fps value for the input video if detection fails.')
@@ -491,7 +498,8 @@ def main():
         continueVid = handleAudioTracks(ffmpeg, newOutput, args.export_as_audio,
             tracks, args.keep_tracks_seperate, chunks, speeds, fps, TEMP, log)
         if(continueVid):
-            fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps, TEMP, log)
+            fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps,
+            args.write_to_file, args.file_location, TEMP, log)
             muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
                 args.video_bitrate, args.tune, args.preset, vcodec,
                 args.constant_rate_factor, TEMP, log)
