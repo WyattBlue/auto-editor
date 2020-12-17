@@ -6,6 +6,7 @@ Export an XML file that can be imported by Adobe Premiere.
 
 # Internal libraries
 import os
+from shutil import move
 
 def formatXML(base: int, *args: str) -> str:
     r = ''
@@ -75,7 +76,7 @@ def exportToPremiere(myInput: str, temp: str, output, clips, tracks: int, sample
         trackurls = [pathurl]
         for i in range(1, tracks):
             newtrack = os.path.join(newFolderName, f'{i}.wav')
-            os.rename(os.path.join(temp, f'{i}.wav'), newtrack)
+            move(os.path.join(temp, f'{i}.wav'), newtrack)
             trackurls.append(newtrack)
 
     ntsc = 'FALSE'
