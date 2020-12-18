@@ -392,7 +392,8 @@ def main():
                 # Combine all audio tracks into one audio file, then read.
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
-                    sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
+                    sampleRate, '-ac', '2', '-f', 'wav', '-acodec', 'pcm_s16le',
+                    f'{TEMP}/combined.wav']
                 cmd = ffAddDebug(cmd, log.is_ffmpeg)
                 subprocess.call(cmd)
 
