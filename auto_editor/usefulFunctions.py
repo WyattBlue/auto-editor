@@ -146,13 +146,13 @@ class ProgressBar():
         self.beginTime = time()
         self.title = title
         self.len_title = len(title)
-        self.writeFile = writeFile
         self.machine = machineReadable
 
-        newTime =  prettyTime(self.beginTime)
+        newTime = prettyTime(self.beginTime)
         termsize = get_terminal_size().columns
 
         if(machineReadable):
+            self.beginTime = round(self.beginTime)
             print(f'{title}~0~{total}~{self.beginTime}~{self.beginTime}')
         else:
             try:
@@ -175,9 +175,9 @@ class ProgressBar():
         newTime = prettyTime(self.beginTime + (percentPerSec * 100))
 
         if(self.machine):
-            index = min(index, total)
-            raw = self.beginTime + (percentPerSec * 100)
-            print(f'{self.title}~{index}~{total}~{self.beginTime}~{raw}')
+            index = min(index, self.total)
+            raw = int(self.beginTime + (percentPerSec * 100))
+            print(f'{self.title}~{index}~{self.total}~{self.beginTime}~{raw}')
             return
 
         termsize = get_terminal_size().columns
