@@ -3,7 +3,7 @@ name: Test Program
 
 on:
   push:
-    branches: [ master ]
+    branches: [ experimental ]
   pull_request:
     branches: [ master ]
 
