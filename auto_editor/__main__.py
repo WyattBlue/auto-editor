@@ -477,17 +477,12 @@ def main():
             preview(INPUT_FILE, chunks, speeds, fps, audioFile, log)
             continue
 
-        if(args.export_to_premiere):
-            from premiere import exportToPremiere
-            exportToPremiere(INPUT_FILE, TEMP, newOutput, clips, tracks, sampleRate,
+        if(args.export_to_premiere or args.export_to_resolve):
+            from editor import editorXML
+            editorXML(INPUT_FILE, TEMP, newOutput, clips, chunks, tracks, sampleRate,
                 audioFile, log)
             continue
-        if(args.export_to_resolve):
-            duration = chunks[len(chunks) - 1][1]
-            from resolve import exportToResolve
-            exportToResolve(INPUT_FILE, newOutput, clips, duration, sampleRate,
-                audioFile, log)
-            continue
+
         if(audioFile):
             from fastAudio import fastAudio, handleAudio
             theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
