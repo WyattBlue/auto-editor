@@ -140,26 +140,20 @@ def bar(termsize, title, doneStr, togoStr, percentDone, newTime):
 
 
 class ProgressBar():
-    def __init__(self, total, title='Please wait', writeFile=False,
-        fileLoc='progress.txt', fileName='none'):
+    def __init__(self, total, title='Please wait', machineReadable=False):
 
         self.total = total
         self.beginTime = time()
         self.title = title
         self.len_title = len(title)
         self.writeFile = writeFile
-        self.fileLoc = fileLoc
-        self.fileName = fileName
+        self.machine = machineReadable
 
         newTime =  prettyTime(self.beginTime)
         termsize = get_terminal_size().columns
 
-        if(writeFile):
-            with open(fileLoc, 'w') as file:
-                file.write(fileName + '\n')
-                file.write(f'0 / {total}\n')
-                file.write(newTime)
-            print(' ' * (termsize -4), end='\r', flush=True)
+        if(machineReadable):
+            print(f'{title}~0~{total}~{self.beginTime}~{self.beginTime}')
         else:
             try:
                 barLen = max(1, termsize - (self.len_title + 50))
@@ -180,11 +174,10 @@ class ProgressBar():
 
         newTime = prettyTime(self.beginTime + (percentPerSec * 100))
 
-        if(self.writeFile):
-            with open(self.fileLoc, 'w') as file:
-                file.write(self.fileName + '\n')
-                file.write(f'{index} / {self.total}\n')
-                file.write(newTime)
+        if(self.machine):
+            index = min(index, total)
+            raw = self.beginTime + (percentPerSec * 100)
+            print(f'{self.title}~{index}~{total}~{self.beginTime}~{raw}')
             return
 
         termsize = get_terminal_size().columns
