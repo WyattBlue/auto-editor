@@ -140,18 +140,21 @@ def bar(termsize, title, doneStr, togoStr, percentDone, newTime):
 
 
 class ProgressBar():
-    def __init__(self, total, title='Please wait', machineReadable=False):
+    def __init__(self, total, title='Please wait', machineReadable=False, hide=False):
 
         self.total = total
         self.beginTime = time()
         self.title = title
         self.len_title = len(title)
         self.machine = machineReadable
+        self.hide = hide
 
         newTime = prettyTime(self.beginTime)
         termsize = get_terminal_size().columns
 
-        if(machineReadable):
+        if(hide):
+            pass
+        elif(machineReadable):
             self.beginTime = round(self.beginTime)
             print(f'{title}~0~{total}~{self.beginTime}~{self.beginTime}')
         else:
@@ -165,6 +168,9 @@ class ProgressBar():
                 self.allow_unicode = True
 
     def tick(self, index):
+
+        if(self.hide):
+            return
 
         percentDone = min(100, round((index+1) / self.total * 100, 1))
         if(percentDone == 0): # Prevent dividing by zero.

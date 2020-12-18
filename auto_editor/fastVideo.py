@@ -11,7 +11,7 @@ import subprocess
 from shutil import move
 
 def handleAudioTracks(ffmpeg, outFile, exportAsAudio, tracks, keepTracksSep,
-    chunks, speeds, fps, temp, machineReadable, log):
+    chunks, speeds, fps, temp, machineReadable, hideBar, log):
     import os
 
     log.checkType(tracks, 'tracks', int)
@@ -19,7 +19,7 @@ def handleAudioTracks(ffmpeg, outFile, exportAsAudio, tracks, keepTracksSep,
 
     for trackNum in range(tracks):
         fastAudio(f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
-            speeds, log, fps, machineReadable)
+            speeds, log, fps, machineReadable, hideBar)
 
         if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
             log.bug('Audio file not created.')
@@ -103,7 +103,7 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
 
 
 def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list,
-    fps, machineReadable, temp, log):
+    fps, machineReadable, hideBar, temp, log):
 
     import cv2
 
@@ -133,7 +133,7 @@ def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list
     framesWritten = 0
 
     videoProgress = ProgressBar(totalFrames - starting, 'Creating new video',
-        machineReadable)
+        machineReadable, hideBar)
 
     while cap.isOpened():
         ret, frame = cap.read()

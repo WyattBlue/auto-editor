@@ -51,8 +51,10 @@ def options():
 
 
     add_argument('progressOps', nargs=0, action='grouping')
-    add_argument('--machine_readable_progress', action='store_ture', parent='progressOps',
+    add_argument('--machine_readable_progress', action='store_true', parent='progressOps',
         help='set progress bar that is easier to parse.')
+    add_argument('--no_progress', action='store_true', parent='progressOps',
+        help='do not display any progress at all.')
 
     add_argument('metadataOps', nargs=0, action='grouping')
     add_argument('--force_fps_to', type=float, parent='metadataOps',
@@ -490,16 +492,16 @@ def main():
             theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
                 TEMP, log)
             fastAudio(theFile, newOutput, chunks, speeds, log, fps,
-                args.machine_readable_progress)
+                args.machine_readable_progress, args.no_progress)
             continue
 
         from fastVideo import handleAudioTracks, fastVideo, muxVideo
         continueVid = handleAudioTracks(ffmpeg, newOutput, args.export_as_audio,
             tracks, args.keep_tracks_seperate, chunks, speeds, fps, TEMP,
-            args.machine_readable_progress, log)
+            args.machine_readable_progress, args.no_progress, log)
         if(continueVid):
             fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps,
-            args.machine_readable_progress, TEMP, log)
+            args.machine_readable_progress, args.no_progress, TEMP, log)
             muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
                 args.video_bitrate, args.tune, args.preset, vcodec,
                 args.constant_rate_factor, TEMP, log)
