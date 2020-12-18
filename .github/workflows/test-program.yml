@@ -46,7 +46,7 @@ jobs:
         python3 -m auto_editor resources/newCommentary.mp3 --silent_threshold 0.1
     - name: Test Cut by All Tracks
       run: |
-        python3 -m auto_editor resources/multi-track.mov --cut_by_all_tracks --show_ffmpeg_debug
+        python3 -m auto_editor resources/multi-track.mov --show_ffmpeg_debug --cut_by_all_tracks
     - name: Test Keep Tracks Seperate
       run: |
         python3 -m auto_editor resources/multi-track.mov --keep_tracks_seperate
