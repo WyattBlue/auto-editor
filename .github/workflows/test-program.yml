@@ -1,19 +1,34 @@
 
-name: Test Program
+name: test-program
 
 on:
   push:
-    branches: [ master ]
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '**.png'
+      - '**.yml'
+      - 'setup.py'
+    branches:
+      - master
+      - experimental
   pull_request:
-    branches: [ master ]
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '**.png'
+      - '**.yml'
+      - 'setup.py'
+    branches:
+      - master
+      - experimental
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.6', '3.7', '3.8']
+        python-version: ['3.8']
 
     steps:
     - uses: actions/checkout@v2
@@ -38,6 +53,22 @@ jobs:
     - name: Test Example Vid
       run: |
         python3 -m auto_editor example.mp4 --verbose
+    - name: Test ProgressOps
+      run: |
+        python3 -m auto_editor example.mp4 progressOps --machine_readable_progress
+        python3 -m auto_editor example.mp4 progressOps --no_progress
+    - name: Test Audio Files
+      run: |
+        python3 -m auto_editor resources/newCommentary.mp3 --silent_threshold 0.1
+    - name: Test Cut by All Tracks
+      run: |
+        python3 -m auto_editor resources/multi-track.mov --show_ffmpeg_debug --cut_by_all_tracks
+    - name: Test Keep Tracks Seperate
+      run: |
+        python3 -m auto_editor resources/multi-track.mov --keep_tracks_seperate
+    - name: Test Cut By This Audio
+      run: |
+        python3 -m auto_editor example.mp4 --cut_by_this_audio resources/newCommentary.mp3
     - name: Test JSON
       run: |
         python3 -m auto_editor example.mp4 --export_as_json
@@ -51,18 +82,6 @@ jobs:
         python3 -m auto_editor example.mp4 -v 2 -mclip 4
         python3 -m auto_editor example.mp4 --sounded_speed 0.5
         python3 -m auto_editor example.mp4 --silent_speed 0.5
-    - name: Test Audio Files
-      run: |
-        python3 -m auto_editor resources/newCommentary.mp3 --silent_threshold 0.1
-    - name: Test Cut by All Tracks
-      run: |
-        python3 -m auto_editor resources/multi-track.mov --cut_by_all_tracks
-    - name: Test Keep Tracks Seperate
-      run: |
-        python3 -m auto_editor resources/multi-track.mov --keep_tracks_seperate
-    - name: Test Cut By This Audio
-      run: |
-        python3 -m auto_editor example.mp4 --cut_by_this_audio resources/newCommentary.mp3
     - name: Test Folder Inputs
       run: |
         mv resources/man_on_green_screen.mp4 man_on_green_screen.mp4
