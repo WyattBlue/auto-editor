@@ -6,6 +6,9 @@ on:
     paths-ignore:
       - '**.md'
       - '**.txt'
+      - '**.png'
+      - '**.yml'
+      - 'setup.py'
     branches:
       - master
       - experimental
@@ -13,6 +16,9 @@ on:
     paths-ignore:
       - '**.md'
       - '**.txt'
+      - '**.png'
+      - '**.yml'
+      - 'setup.py'
     branches:
       - master
       - experimental
