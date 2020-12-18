@@ -9,7 +9,7 @@ import tempfile
 import subprocess
 from shutil import rmtree
 
-version = '20w50d'
+version = '20w51a'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -48,6 +48,13 @@ def options():
         newDic['choices'] = choices
         newDic['grouping'] = parent
         option_data.append(newDic)
+
+
+    add_argument('progressOps', nargs=0, action='grouping')
+    add_argument('--machine_readable_progress', action='store_true', parent='progressOps',
+        help='set progress bar that is easier to parse.')
+    add_argument('--no_progress', action='store_true', parent='progressOps',
+        help='do not display any progress at all.')
 
     add_argument('metadataOps', nargs=0, action='grouping')
     add_argument('--force_fps_to', type=float, parent='metadataOps',
@@ -384,8 +391,9 @@ def main():
             if(args.cut_by_all_tracks):
                 # Combine all audio tracks into one audio file, then read.
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
-                    f'[0:a]amerge=inputs={tracks}', '-map', 'a', '-ar',
-                    sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
+                    f'[0:a]amix=inputs={tracks}:duration=longest', '-ar',
+                    sampleRate, '-ac', '2', '-f', 'wav', #'-acodec', 'pcm_s16le',
+                    f'{TEMP}/combined.wav']
                 cmd = ffAddDebug(cmd, log.is_ffmpeg)
                 subprocess.call(cmd)
 
@@ -484,14 +492,17 @@ def main():
             from fastAudio import fastAudio, handleAudio
             theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
                 TEMP, log)
-            fastAudio(theFile, newOutput, chunks, speeds, log, fps)
+            fastAudio(theFile, newOutput, chunks, speeds, log, fps,
+                args.machine_readable_progress, args.no_progress)
             continue
 
         from fastVideo import handleAudioTracks, fastVideo, muxVideo
         continueVid = handleAudioTracks(ffmpeg, newOutput, args.export_as_audio,
-            tracks, args.keep_tracks_seperate, chunks, speeds, fps, TEMP, log)
+            tracks, args.keep_tracks_seperate, chunks, speeds, fps, TEMP,
+            args.machine_readable_progress, args.no_progress, log)
         if(continueVid):
-            fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps, TEMP, log)
+            fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps,
+            args.machine_readable_progress, args.no_progress, TEMP, log)
             muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
                 args.video_bitrate, args.tune, args.preset, vcodec,
                 args.constant_rate_factor, TEMP, log)

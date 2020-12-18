@@ -140,25 +140,37 @@ def bar(termsize, title, doneStr, togoStr, percentDone, newTime):
 
 
 class ProgressBar():
-    def __init__(self, total, title='Please wait'):
+    def __init__(self, total, title='Please wait', machineReadable=False, hide=False):
+
         self.total = total
         self.beginTime = time()
         self.title = title
         self.len_title = len(title)
+        self.machine = machineReadable
+        self.hide = hide
 
-        newTime =  prettyTime(self.beginTime)
+        newTime = prettyTime(self.beginTime)
         termsize = get_terminal_size().columns
-        try:
-            barLen = max(1, termsize - (self.len_title + 50))
-            bar(termsize, title, '', '░' * int(barLen), 0, newTime)
-        except UnicodeEncodeError:
-            print(f'   0% done ETA {newTime}')
-            self.allow_unicode = False
+
+        if(hide):
+            pass
+        elif(machineReadable):
+            self.beginTime = round(self.beginTime)
+            print(f'{title}~0~{total}~{self.beginTime}~{self.beginTime}')
         else:
-            self.allow_unicode = True
+            try:
+                barLen = max(1, termsize - (self.len_title + 50))
+                bar(termsize, title, '', '░' * int(barLen), 0, newTime)
+            except UnicodeEncodeError:
+                print(f'   0% done ETA {newTime}')
+                self.allow_unicode = False
+            else:
+                self.allow_unicode = True
 
     def tick(self, index):
-        termsize = get_terminal_size().columns
+
+        if(self.hide):
+            return
 
         percentDone = min(100, round((index+1) / self.total * 100, 1))
         if(percentDone == 0): # Prevent dividing by zero.
@@ -167,6 +179,15 @@ class ProgressBar():
             percentPerSec = (time() - self.beginTime) / percentDone
 
         newTime = prettyTime(self.beginTime + (percentPerSec * 100))
+
+        if(self.machine):
+            index = min(index, self.total)
+            raw = int(self.beginTime + (percentPerSec * 100))
+            print(f'{self.title}~{index}~{self.total}~{self.beginTime}~{raw}')
+            return
+
+        termsize = get_terminal_size().columns
+
         if(self.allow_unicode):
             barLen = max(1, termsize - (self.len_title + 50))
             done = round(percentDone / (100 / barLen))
