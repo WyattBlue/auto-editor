@@ -17,7 +17,8 @@ def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
 
     return f'{temp}/faAudio.wav'
 
-def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float):
+def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
+    machineReadable, hideBar):
     from wavfile import read, write
     import os
 
@@ -46,7 +47,8 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float):
     channels = 2
     yPointer = 0
 
-    audioProgress = ProgressBar(len(chunks), 'Creating new audio')
+    audioProgress = ProgressBar(len(chunks), 'Creating new audio', machineReadable,
+        hideBar)
 
     for chunkNum, chunk in enumerate(chunks):
         audioSampleStart = int(chunk[0] / fps * samplerate)
