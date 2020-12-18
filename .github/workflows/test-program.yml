@@ -1,11 +1,21 @@
 
-name: Test Program
+name: test-program
 
 on:
   push:
-    branches: [ experimental ]
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+    branches:
+      - master
+      - experimental
   pull_request:
-    branches: [ master ]
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+    branches:
+      - master
+      - experimental
 
 jobs:
   build:
