@@ -1,9 +1,5 @@
 '''editor.py'''
 
-"""
-Export an XML file that can be imported by Adobe Premiere.
-"""
-
 # Internal libraries
 import os
 from shutil import move
@@ -13,7 +9,6 @@ def formatXML(base: int, *args: str) -> str:
     for line in args:
         r += ('\t' * base) + line + '\n'
     return r
-
 
 def speedup(speed) -> str:
     return formatXML(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
@@ -39,10 +34,7 @@ def speedup(speed) -> str:
         '\t\t<parameter authoringApp="PremierePro">',
         '\t\t\t<parameterid>frameblending</parameterid>',
         '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
-        '\t\t</parameter>',
-        '\t</effect>',
-        '</filter>')
-
+        '\t\t</parameter>', '\t</effect>', '</filter>')
 
 def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
     sampleRate, audioFile, log):
