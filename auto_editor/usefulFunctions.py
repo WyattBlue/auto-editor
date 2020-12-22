@@ -156,7 +156,8 @@ class ProgressBar():
             pass
         elif(machineReadable):
             self.beginTime = round(self.beginTime)
-            print(f'{title}~0~{total}~{self.beginTime}~{self.beginTime}')
+            print(f'{title}~0~{total}~{self.beginTime}~{self.beginTime}', end='\r',
+                flush=True)
         else:
             try:
                 barLen = max(1, termsize - (self.len_title + 50))
@@ -183,7 +184,8 @@ class ProgressBar():
         if(self.machine):
             index = min(index, self.total)
             raw = int(self.beginTime + (percentPerSec * 100))
-            print(f'{self.title}~{index}~{self.total}~{self.beginTime}~{raw}')
+            print(f'{self.title}~{index}~{self.total}~{self.beginTime}~{raw}',
+                end='\r', flush=True)
             return
 
         termsize = get_terminal_size().columns
