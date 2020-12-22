@@ -10,6 +10,10 @@ def vidTracks(videoFile: str, ffprobe: str, log) -> int:
     numbers = pipeToConsole([ffprobe, videoFile, '-hide_banner', '-loglevel',
         'panic', '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
         'compact=p=0:nk=1']).split('\n')
+
+    # Remove all \r chars that can appear in certain environments
+    numbers = [s.replace('\r', '') for s in numbers]
+
     log.ffmpeg('Track data: ' + str(numbers))
     if(numbers[0].isnumeric()):
         return len(numbers) - 1
@@ -24,7 +28,7 @@ def getVideoCodec(file: str, ffmpeg: str, log, vcodec: str) -> str:
         try:
             matchDict = re.search(r'Video:\s(?P<grp>\w+?)\s', output).groupdict()
             vcodec = matchDict['grp']
-            log.debug(vcodec)
+            log.debug('Video Codec: ' + str(vcodec))
         except AttributeError:
             log.warning("Couldn't automatically detect video codec.")
     if(vcodec is None or vcodec == 'uncompressed'):
