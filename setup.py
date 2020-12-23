@@ -31,11 +31,12 @@ setup(
     description='Auto-Editor: Effort free video editing!',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    license='MIT',
+    license='Unlicense',
     url='https://github.com/WyattBlue/auto-editor',
     author='WyattBlue',
     author_email='wyattbluesandbox@gmail.com',
-    keywords='video editing editor audio processing nonlinear automatic',
+    keywords='video audio media editor editing processing nonlinear automatic ' \
+     'silence-detect silence-removal silence-speedup motion-detection',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[

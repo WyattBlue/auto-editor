@@ -9,15 +9,17 @@ When editing videos, before you do the real editing, you first cut out the "dead
 
 Luckily, this can be automated with software. [Once you'll installed auto-editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md), you can run:
 
-`auto-editor path/to/your/video.mp4`
+```
+auto-editor path/to/your/video.mp4
+```
 
 from your console and it will generate a **brand new video** with all the silent sections cut off. Generating a new video **takes a while** so instead, you can export the new video to your editor directly. For example, running:
 
-`auto-editor path/to/your/video.mp4 --export_to_premiere`
+```
+auto-editor path/to/your/video.mp4 --export_to_premiere
+```
 
-Will create an XML file that can be imported to Adobe Premiere Pro. This is **much much faster** than generating a new video (takes usually seconds).
-
-Final Cut Pro, DaVinici Resolve,
+Will create an XML file that can be imported to Adobe Premiere Pro. This is **much much faster** than generating a new video (takes usually seconds). DaVinici Resolve and Final Cut Pro are also supported.
 
 Auto-Editor has a powerful set of features, including:
 
@@ -42,10 +44,8 @@ You can change the **pace** of a video by changing by including frames that are 
 auto-editor example.mp4 --frame_margin 8
 ```
 
-## Installing
-[See Installing](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md)
-
 ## Articles
+ - [How to Install Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md)
  - [How to Use Motion Detection in Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/motionDetection.md)
 
 ## Contributing
@@ -57,7 +57,7 @@ Auto-Editor is an open to all levels of contributions. Learn how to make a contr
 No change is too small whether that be a typo in the docs or a small improvement of code.
 
 ## Copyright
-Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) but contains non-free elements. See [This Page](https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md) for more info.
+Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) but contains non-free elements. See [this page](https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md) for more info.
 
 ## Issues
-If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) on this github page. If you'll like to discuss this project, suggest new features, or chat with other users, do that in [the discord server](https://discord.com/invite/kMHAWJJ).
+If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) here. If you'll like to discuss this project, suggest new features, or chat with other users, you can use [the discord server](https://discord.com/invite/kMHAWJJ).
