@@ -40,6 +40,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
+        'numpy==1.19.3',
         'audiotsm2',
         'opencv-python',
         'youtube-dl',
