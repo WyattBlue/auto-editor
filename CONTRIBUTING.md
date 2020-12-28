@@ -4,4 +4,4 @@
 
 1. Once you've made your changes, click "propose changes" at the bottom of the page.
 
-1. Wait for feedback or
+1. Wait for feedback.
