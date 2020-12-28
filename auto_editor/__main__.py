@@ -480,7 +480,7 @@ def main():
         if(args.export_to_premiere or args.export_to_resolve):
             from editor import editorXML
             editorXML(INPUT_FILE, TEMP, newOutput, clips, chunks, tracks, sampleRate,
-                audioFile, log)
+                audioFile, fps, log)
             continue
 
         if(audioFile):
