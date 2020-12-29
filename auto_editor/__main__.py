@@ -246,6 +246,23 @@ def main():
             args.width, args.height)
 
         sys.exit()
+    elif(len(sys.argv) > 1 and sys.argv[1] == 'info'):
+        option_data = info_options()
+        args = ParseOptions(sys.argv[2:], Log(), option_data)
+
+        if(args.help):
+            genHelp(option_data)
+            sys.exit()
+
+        from generateTestMedia import generateTestMedia
+        from usefulFunctions import getBinaries
+
+        ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
+
+        generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
+            args.width, args.height)
+
+        sys.exit()
     else:
         option_data = main_options()
         args = ParseOptions(sys.argv[1:], Log(), option_data)

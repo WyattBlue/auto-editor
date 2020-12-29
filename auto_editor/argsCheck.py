@@ -5,8 +5,8 @@ def hardArgsCheck(args, log):
         log.error('You need to give auto-editor an input file or folder so it can' \
             'do the work for you.')
 
-    if(max([args.export_to_premiere, args.export_to_resolve,
-        args.export_to_final_cut_pro, args.export_as_audio]) == True):
+    if([args.export_to_premiere, args.export_to_resolve,
+        args.export_to_final_cut_pro, args.export_as_audio].count(True) > 1):
         log.error('You must choose only one export option.')
 
     if(args.export_to_resolve or args.export_to_premiere or args.export_to_final_cut_pro):
