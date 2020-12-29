@@ -16,17 +16,17 @@ auto-editor path/to/your/video.mp4
 from your console and it will generate a **brand new video** with all the silent sections cut off. Generating a new video **takes a while** so instead, you can export the new video to your editor directly. For example, running:
 
 ```
-auto-editor path/to/your/video.mp4 --export_to_premiere
+auto-editor example.mp4 --export_to_premiere
 ```
 
 Will create an XML file that can be imported to Adobe Premiere Pro. This is **much much faster** than generating a new video (takes usually seconds). DaVinici Resolve and Final Cut Pro are also supported.
 
 ```
-auto-editor path/to/your/video.mp4 --export_to_resolve
+auto-editor example.mp4 --export_to_resolve
 ```
 
 ```
-auto-editor path/to/your/video.mp4 --export_to_final_cut_pro
+auto-editor example.mp4 --export_to_final_cut_pro
 ```
 
 
