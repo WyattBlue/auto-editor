@@ -24,7 +24,7 @@ def getInfo(files, ffmpeg, ffprobe, log):
             print(f' - resolution: {res.strip()}')
 
             raw_data = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                f'v:0', '-show_entries', 'stream=codec_name,bit_rate', '-of',
+                'v:0', '-show_entries', 'stream=codec_name,bit_rate', '-of',
                 'compact=p=0:nk=1', file]).split('|')
 
             vcod = raw_data[0]
@@ -62,7 +62,7 @@ def getInfo(files, ffmpeg, ffprobe, log):
                 print(' - audio tracks: 0')
         elif(hasAud):
             raw_data = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                f'a:0', '-show_entries', 'stream=codec_name,sample_rate', '-of',
+                'a:0', '-show_entries', 'stream=codec_name,sample_rate', '-of',
                 'compact=p=0:nk=1', file]).split('|')
 
             acod = raw_data[0]

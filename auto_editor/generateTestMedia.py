@@ -7,7 +7,7 @@ import subprocess
 def generateTestMedia(ffmpeg, output, fps, duration, width, height):
     try:
         os.remove(output)
-    except:
+    except FileNotFoundError:
         pass
 
     # Create sine wav.

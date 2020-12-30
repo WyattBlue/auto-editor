@@ -594,7 +594,7 @@ def main():
         from usefulFunctions import smartOpen
         smartOpen(newOutput, log)
 
-    log.debug(f'Deleting temp dir')
+    log.debug('Deleting temp dir')
     rmtree(TEMP)
 
 if(__name__ == '__main__'):
