@@ -191,8 +191,17 @@ def generate_options():
 
     ops += add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
+    return ops
+
+def info_options():
+    ops = []
+
+    ops += add_argument('--my_ffmpeg', action='store_true',
+        help='use your ffmpeg and other binaries instead of the ones packaged.')
     ops += add_argument('(input)', nargs='*',
         help='the path to a file you want inspected.')
+    ops += add_argument('--help', '-h', action='store_true',
+        help='print info about the program or an option and exit.')
     return ops
 
 def genHelp(option_data):
@@ -241,10 +250,8 @@ def main():
         from usefulFunctions import getBinaries
 
         ffmpeg, __ = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
-
         generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
             args.width, args.height)
-
         sys.exit()
     elif(len(sys.argv) > 1 and sys.argv[1] == 'info'):
         option_data = info_options()
@@ -254,14 +261,12 @@ def main():
             genHelp(option_data)
             sys.exit()
 
-        from generateTestMedia import generateTestMedia
+        log = Log(False, False, False)
+
+        from info import getInfo
         from usefulFunctions import getBinaries
-
         ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
-
-        generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
-            args.width, args.height)
-
+        getInfo(args.input, ffmpeg, ffprobe, log)
         sys.exit()
     else:
         option_data = main_options()
