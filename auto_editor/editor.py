@@ -37,7 +37,7 @@ def speedup(speed) -> str:
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
 def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
-    sampleRate, audioFile, log):
+    sampleRate, audioFile, fps, log):
 
     def makepath(filepath: str) -> str:
         return 'file://localhost' + os.path.abspath(filepath)
@@ -96,7 +96,7 @@ def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
     pixelar = 'square' # pixel aspect ratio
     colordepth = '24'
     sr = sampleRate
-    timebase = '30'
+    timebase = str(int(fps))
 
     if(audioFile):
         groupName = 'Auto-Editor Audio Group'

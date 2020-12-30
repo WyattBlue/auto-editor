@@ -9,7 +9,7 @@ import tempfile
 import subprocess
 from shutil import rmtree
 
-version = '20w52a'
+version = '20w53a'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -29,150 +29,193 @@ def sample_rate_type(num: str) -> int:
         return int(float(num[:-4]) * 1000)
     return int(num)
 
-def options():
-    option_data = []
+def add_argument(*names, nargs=1, type=str, default=None, action='default',
+    range=None, choices=None, parent='auto-editor', help='', extra=''):
+    newDic = {}
+    newDic['names'] = names
+    newDic['nargs'] = nargs
+    newDic['type'] = type
+    newDic['default'] = default
+    newDic['action'] = action
+    newDic['help'] = help
+    newDic['extra'] = extra
+    newDic['range'] = range
+    newDic['choices'] = choices
+    newDic['grouping'] = parent
+    return [newDic]
 
-    def add_argument(*names, nargs=1, type=str, default=None, action='default',
-        range=None, choices=None, parent='auto-editor', help='', extra=''):
-        nonlocal option_data
-
-        newDic = {}
-        newDic['names'] = names
-        newDic['nargs'] = nargs
-        newDic['type'] = type
-        newDic['default'] = default
-        newDic['action'] = action
-        newDic['help'] = help
-        newDic['extra'] = extra
-        newDic['range'] = range
-        newDic['choices'] = choices
-        newDic['grouping'] = parent
-        option_data.append(newDic)
-
-
-    add_argument('progressOps', nargs=0, action='grouping')
-    add_argument('--machine_readable_progress', action='store_true', parent='progressOps',
+def main_options():
+    ops = []
+    ops += add_argument('progressOps', nargs=0, action='grouping')
+    ops += add_argument('--machine_readable_progress', action='store_true',
+        parent='progressOps',
         help='set progress bar that is easier to parse.')
-    add_argument('--no_progress', action='store_true', parent='progressOps',
+    ops += add_argument('--no_progress', action='store_true',
+        parent='progressOps',
         help='do not display any progress at all.')
 
-    add_argument('metadataOps', nargs=0, action='grouping')
-    add_argument('--force_fps_to', type=float, parent='metadataOps',
+    ops += add_argument('metadataOps', nargs=0, action='grouping')
+    ops += add_argument('--force_fps_to', type=float, parent='metadataOps',
         help='manually set the fps value for the input video if detection fails.')
-    add_argument('--force_tracks_to', type=int, parent='metadataOps',
+    ops += add_argument('--force_tracks_to', type=int, parent='metadataOps',
         help='manually set the number of tracks auto-editor thinks there are.')
 
-    add_argument('exportMediaOps', nargs=0, action='grouping')
-    add_argument('--video_bitrate', '-vb', parent='exportMediaOps',
+    ops += add_argument('exportMediaOps', nargs=0, action='grouping')
+    ops += add_argument('--video_bitrate', '-vb', parent='exportMediaOps',
         help='set the number of bits per second for video.')
-    add_argument('--audio_bitrate', '-ab', parent='exportMediaOps',
+    ops += add_argument('--audio_bitrate', '-ab', parent='exportMediaOps',
         help='set the number of bits per second for audio.')
-    add_argument('--sample_rate', '-r', type=sample_rate_type, parent='exportMediaOps',
+    ops += add_argument('--sample_rate', '-r', type=sample_rate_type,
+        parent='exportMediaOps',
         help='set the sample rate of the input and output videos.')
-    add_argument('--video_codec', '-vcodec', default='uncompressed',
+    ops += add_argument('--video_codec', '-vcodec', default='uncompressed',
         parent='exportMediaOps',
         help='set the video codec for the output media file.')
-    add_argument('--preset', '-p', default='medium', parent='exportMediaOps',
+    ops += add_argument('--preset', '-p', default='medium', parent='exportMediaOps',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
         help='set the preset for ffmpeg to help save file size or increase quality.')
-    add_argument('--tune', '-t', default='none', parent='exportMediaOps',
+    ops += add_argument('--tune', '-t', default='none', parent='exportMediaOps',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none'],
         help='set the tune for ffmpeg to compress video better in certain circumstances.')
-    add_argument('--constant_rate_factor', '-crf', type=int, default=15,
+    ops += add_argument('--constant_rate_factor', '-crf', type=int, default=15,
         parent='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
 
-    add_argument('motionOps', nargs=0, action='grouping')
-    add_argument('--dilates', '-d', type=int, default=2, range='0 to 5', parent='motionOps',
+    ops += add_argument('motionOps', nargs=0, action='grouping')
+    ops += add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
+        parent='motionOps',
         help='set how many times a frame is dilated before being compared.')
-    add_argument('--width', '-w', type=int, default=400, range='1 to Infinity', parent='motionOps',
+    ops += add_argument('--width', '-w', type=int, default=400, range='1 to Infinity',
+        parent='motionOps',
         help="set the frame's new width (in pixels) before being compared.")
-    add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity', parent='motionOps',
+    ops += add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity',
+        parent='motionOps',
         help='set the strength of the blur applied to a frame before being compared.')
 
     # TODO: add export_as_video
-    add_argument('--export_as_audio', '-exa', action='store_true',
+    ops += add_argument('--export_as_audio', '-exa', action='store_true',
         help='export as a WAV audio file.')
-    add_argument('--export_to_premiere', '-exp', action='store_true',
+    ops += add_argument('--export_to_premiere', '-exp', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
-    add_argument('--export_to_resolve', '-exr', action='store_true',
+    ops += add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
-    add_argument('--export_as_json', action='store_true',
+    ops += add_argument('--export_to_final_cut_pro', '-exf', action='store_true',
+        help='export as an XML file for Final Cut Pro instead of outputting a media file.')
+    ops += add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later. (experimental)')
 
-    add_argument('--ignore', nargs='*',
+    ops += add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')
-    add_argument('--cut_out', nargs='*',
+    ops += add_argument('--cut_out', nargs='*',
         help='the range that will be marked as "silent"')
-    add_argument('--motion_threshold', type=float_type, default=0.02, range='0 to 1',
+    ops += add_argument('--motion_threshold', type=float_type, default=0.02,
+        range='0 to 1',
         help='how much motion is required to be considered "moving"')
-    add_argument('--edit_based_on', default='audio',
+    ops += add_argument('--edit_based_on', default='audio',
         choices=['audio', 'motion', 'not_audio', 'not_motion', 'audio_or_motion',
             'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
             'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
 
-    add_argument('--cut_by_this_audio', '-ca', type=file_type,
+    ops += add_argument('--cut_by_this_audio', '-ca', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
-    add_argument('--cut_by_this_track', '-ct', type=int, default=0,
+    ops += add_argument('--cut_by_this_track', '-ct', type=int, default=0,
         range='0 to the number of audio tracks minus one',
         help='base cuts by a different audio track in the video.')
-    add_argument('--cut_by_all_tracks', '-cat', action='store_true',
+    ops += add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
-    add_argument('--keep_tracks_seperate', action='store_true',
+    ops += add_argument('--keep_tracks_seperate', action='store_true',
         help="don't combine audio tracks when exporting.")
 
-    add_argument('--my_ffmpeg', action='store_true',
+    ops += add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
-    add_argument('--version', action='store_true',
+    ops += add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
-    add_argument('--debug', '--verbose', '-d', action='store_true',
+    ops += add_argument('--debug', '--verbose', '-d', action='store_true',
         help='show debugging messages and values.')
-    add_argument('--show_ffmpeg_debug', action='store_true',
+    ops += add_argument('--show_ffmpeg_debug', action='store_true',
         help='show ffmpeg progress and output.')
-    add_argument('--quiet', '-q', action='store_true',
+    ops += add_argument('--quiet', '-q', action='store_true',
         help='display less output.')
 
-    add_argument('--no_open', action='store_true',
+    ops += add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    add_argument('--min_clip_length', '-mclip', type=int, default=3, range='0 to Infinity',
+    ops += add_argument('--min_clip_length', '-mclip', type=int, default=3,
+        range='0 to Infinity',
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    add_argument('--min_cut_length', '-mcut', type=int, default=6, range='0 to Infinity',
+    ops += add_argument('--min_cut_length', '-mcut', type=int, default=6,
+        range='0 to Infinity',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
-    add_argument('--combine_files', action='store_true',
+    ops += add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
-    add_argument('--preview', action='store_true',
+    ops += add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
 
-    add_argument('--frame_margin', '-m', type=int, default=6, range='0 to Infinity',
+    ops += add_argument('--frame_margin', '-m', type=int, default=6,
+        range='0 to Infinity',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
-    add_argument('--silent_threshold', '-t', type=float_type, default=0.04, range='0 to 1',
+    ops += add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
+        range='0 to 1',
         help='set the volume that frames audio needs to surpass to be "loud".')
-    add_argument('--video_speed', '--sounded_speed', '-v', type=float_type, default=1.00,
-        range='0 to 999999',
+    ops += add_argument('--video_speed', '--sounded_speed', '-v', type=float_type,
+        default=1.00, range='0 to 999999',
         help='set the speed that "loud" sections should be played at.')
-    add_argument('--silent_speed', '-s', type=float_type, default=99999, range='0 to 99999',
+    ops += add_argument('--silent_speed', '-s', type=float_type, default=99999,
+        range='0 to 99999',
         help='set the speed that "silent" sections should be played at.')
-    add_argument('--output_file', '--output', '-o', nargs='*',
+    ops += add_argument('--output_file', '--output', '-o', nargs='*',
         help='set the name(s) of the new output.')
 
-    add_argument('--help', '-h', action='store_true',
+    ops += add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
-    add_argument('(input)', nargs='*',
+    ops += add_argument('(input)', nargs='*',
         help='the path to a file, folder, or url you want edited.')
+    return ops
 
-    return option_data
+def generate_options():
+    ops = []
+    ops += add_argument('--fps', type=float, default=30.0,
+        help='set the framerate for the output video.')
+    ops += add_argument('--duration', type=int, default=10,
+        help='set the length of the video (in seconds).')
+    ops += add_argument('--width', type=int, default=640,
+        help='set the pixel width of the video.')
+    ops += add_argument('--height', type=int, default=360,
+        help='set the pixel height of the video.')
+    ops += add_argument('--output_file', '--output', '-o', type=str,
+        default='testsrc.mp4')
+    ops += add_argument('--my_ffmpeg', action='store_true',
+        help='use your ffmpeg and other binaries instead of the ones packaged.')
+
+    ops += add_argument('--help', '-h', action='store_true',
+        help='print info about the program or an option and exit.')
+    return ops
+
+def info_options():
+    ops = []
+
+    ops += add_argument('--my_ffmpeg', action='store_true',
+        help='use your ffmpeg and other binaries instead of the ones packaged.')
+    ops += add_argument('(input)', nargs='*',
+        help='the path to a file you want inspected.')
+    ops += add_argument('--help', '-h', action='store_true',
+        help='print info about the program or an option and exit.')
+    return ops
+
+def genHelp(option_data):
+    for option in option_data:
+        if(option['grouping'] == 'auto-editor'):
+            print(' ', ', '.join(option['names']) + ':', option['help'])
+            if(option['action'] == 'grouping'):
+                print('     ...')
+    print('')
 
 def main():
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # Fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
-
-    from usefulFunctions import Log, Timer
-
-    option_data = options()
 
     # Print the version if only the -v option is added.
     if(sys.argv[1:] == ['-v'] or sys.argv[1:] == ['-V']):
@@ -193,7 +236,41 @@ def main():
         sys.exit()
 
     from vanparse import ParseOptions
-    args = ParseOptions(sys.argv[1:], Log(), option_data)
+    from usefulFunctions import Log, Timer
+
+    if(len(sys.argv) > 1 and sys.argv[1] == 'generate_test'):
+        option_data = generate_options()
+        args = ParseOptions(sys.argv[2:], Log(), option_data)
+
+        if(args.help):
+            genHelp(option_data)
+            sys.exit()
+
+        from generateTestMedia import generateTestMedia
+        from usefulFunctions import getBinaries
+
+        ffmpeg, __ = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
+        generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
+            args.width, args.height)
+        sys.exit()
+    elif(len(sys.argv) > 1 and sys.argv[1] == 'info'):
+        option_data = info_options()
+        args = ParseOptions(sys.argv[2:], Log(), option_data)
+
+        if(args.help):
+            genHelp(option_data)
+            sys.exit()
+
+        log = Log(False, False, False)
+
+        from info import getInfo
+        from usefulFunctions import getBinaries
+        ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
+        getInfo(args.input, ffmpeg, ffprobe, log)
+        sys.exit()
+    else:
+        option_data = main_options()
+        args = ParseOptions(sys.argv[1:], Log(), option_data)
 
     log = Log(args.debug, args.show_ffmpeg_debug, args.quiet)
     log.debug('')
@@ -204,12 +281,7 @@ def main():
             'Visit https://github.com/wyattblue/auto-editor/issues\n')
         print('  The help option can also be used on a specific option:')
         print('      auto-editor --frame_margin --help\n')
-        for option in option_data:
-            if(option['grouping'] == 'auto-editor'):
-                print(' ', ', '.join(option['names']) + ':', option['help'])
-                if(option['action'] == 'grouping'):
-                    print('     ...')
-        print('')
+        genHelp(option_data)
         sys.exit()
 
     del option_data
@@ -225,7 +297,7 @@ def main():
 
     ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
     makingDataFile = (args.export_to_premiere or args.export_to_resolve or
-        args.export_as_json)
+        args.export_to_final_cut_pro or args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
     if(args.debug and args.input == []):
@@ -329,7 +401,7 @@ def main():
         log.debug(f'   - sampleRate: {sampleRate}')
         log.debug(f'   - audioBitrate: {audioBitrate}')
 
-        audioFile =  fileFormat in audioExtensions
+        audioFile = fileFormat in audioExtensions
         if(audioFile):
             if(args.force_fps_to is None):
                 fps = 30 # Audio files don't have frames, so give fps a dummy value.
@@ -350,13 +422,14 @@ def main():
         else:
             if(args.force_fps_to is not None):
                 fps = args.force_fps_to
-            elif(args.export_to_premiere):
+            elif(args.export_to_premiere or args.export_to_final_cut_pro):
                 # This is the default fps value for Premiere Pro Projects.
                 fps = 29.97
             else:
                 # Grab fps to know what the output video's fps should be.
                 # DaVinci Resolve doesn't need fps, but grab it away just in case.
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
+            log.debug(f'ffmpeg fps: {fps}')
 
             tracks = args.force_tracks_to
             if(tracks is None):
@@ -480,7 +553,7 @@ def main():
         if(args.export_to_premiere or args.export_to_resolve):
             from editor import editorXML
             editorXML(INPUT_FILE, TEMP, newOutput, clips, chunks, tracks, sampleRate,
-                audioFile, log)
+                audioFile, fps, log)
             continue
 
         if(audioFile):
@@ -521,6 +594,7 @@ def main():
         from usefulFunctions import smartOpen
         smartOpen(newOutput, log)
 
+    log.debug('Deleting temp dir')
     rmtree(TEMP)
 
 if(__name__ == '__main__'):

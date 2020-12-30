@@ -13,7 +13,7 @@ from setuptools import setup, find_packages
 def pip_version():
     # pip doesn't allow standard version format (20w10a), so we have to
     # conform it to match Semantic Versioning.
-    return '20.52.1'
+    return '20.53.1'
 
 if(sys.argv[-1] == 'publish'):
     os.system('rm -rf build')
@@ -31,14 +31,16 @@ setup(
     description='Auto-Editor: Effort free video editing!',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    license='MIT',
+    license='Unlicense',
     url='https://github.com/WyattBlue/auto-editor',
     author='WyattBlue',
     author_email='wyattbluesandbox@gmail.com',
-    keywords='video editing editor audio processing nonlinear automatic',
+    keywords='video audio media editor editing processing nonlinear automatic ' \
+     'silence-detect silence-removal silence-speedup motion-detection',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
+        'numpy==1.19.3',
         'audiotsm2',
         'opencv-python',
         'youtube-dl',

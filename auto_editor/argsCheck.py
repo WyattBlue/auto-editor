@@ -1,23 +1,20 @@
 '''argsCheck.py'''
 
-def twoOrMore(a: bool, b: bool, c: bool) -> bool:
-    return a and (b or c) or (b and c)
-
-
 def hardArgsCheck(args, log):
     if(args.input == []):
         log.error('You need to give auto-editor an input file or folder so it can' \
             'do the work for you.')
 
-    if(twoOrMore(args.export_to_premiere, args.export_to_resolve, args.export_as_audio)):
+    if([args.export_to_premiere, args.export_to_resolve,
+        args.export_to_final_cut_pro, args.export_as_audio].count(True) > 1):
         log.error('You must choose only one export option.')
 
-    if(args.export_to_resolve or args.export_to_premiere):
+    if(args.export_to_resolve or args.export_to_premiere or args.export_to_final_cut_pro):
         if(args.video_codec != 'uncompressed' or args.constant_rate_factor != 15 or
             args.tune != 'none' or args.sample_rate is not None or
             args.audio_bitrate is not None or args.video_bitrate is not None):
                 log.warning('exportMediaOps options are not used when exporting ' \
-                    ' to Premiere Pro or DaVinci Resolve.')
+                    ' as an XML.')
 
     if(args.frame_margin < 0):
         log.error('Frame margin cannot be negative.')
@@ -39,6 +36,8 @@ def hardArgsCheck(args, log):
         if(args.export_to_premiere):
             log.conwrite('Exporting to Adobe Premiere Pro XML file.')
         elif(args.export_to_resolve):
+            log.conwrite('Exporting to Final Cut Pro XML file.')
+        elif(args.export_to_resolve):
             log.conwrite('Exporting to DaVinci Resolve XML file.')
         elif(args.export_as_audio):
             log.conwrite('Exporting as audio.')
@@ -48,7 +47,7 @@ def hardArgsCheck(args, log):
 # Quietly modify values without throwing error.
 def softArgsCheck(args, log):
     if(args.preview or args.export_to_premiere or args.export_to_resolve or
-        args.export_as_json):
+        args.export_to_final_cut_pro or args.export_as_json):
         args.no_open = True
     args.constant_rate_factor = str(args.constant_rate_factor)
     if(args.blur < 0):
