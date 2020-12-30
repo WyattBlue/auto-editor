@@ -1,6 +1,4 @@
-
-name: test-program
-
+name: build
 on:
   push:
     paths-ignore:
@@ -22,14 +20,12 @@ on:
     branches:
       - master
       - experimental
-
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ['3.8']
-
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
