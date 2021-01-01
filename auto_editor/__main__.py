@@ -27,7 +27,18 @@ def sample_rate_type(num: str) -> int:
         return int(num[:-3])
     if(num.endswith(' kHz')):
         return int(float(num[:-4]) * 1000)
+    if(num.endswith('kHz')):
+        return int(float(num[:-3]) * 1000)
+    if(num.endswith('Hz')):
+        return int(num[:-2])
     return int(num)
+
+def frame_type(inp: str):
+    if(inp.endswith('sec')):
+        return inp[:-3]
+    if(inp.endswith('secs')):
+        return inp[:-4]
+    return int(inp)
 
 def add_argument(*names, nargs=1, type=str, default=None, action='default',
     range=None, choices=None, parent='auto-editor', help='', extra=''):
@@ -142,10 +153,10 @@ def main_options():
 
     ops += add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    ops += add_argument('--min_clip_length', '-mclip', type=int, default=3,
+    ops += add_argument('--min_clip_length', '-mclip', type=frame_type, default=3,
         range='0 to Infinity',
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    ops += add_argument('--min_cut_length', '-mcut', type=int, default=6,
+    ops += add_argument('--min_cut_length', '-mcut', type=frame_type, default=6,
         range='0 to Infinity',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
     ops += add_argument('--combine_files', action='store_true',
@@ -153,7 +164,7 @@ def main_options():
     ops += add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
 
-    ops += add_argument('--frame_margin', '-m', type=int, default=6,
+    ops += add_argument('--frame_margin', '-m', type=frame_type, default=6,
         range='0 to Infinity',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
     ops += add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
@@ -270,7 +281,7 @@ def main():
         sys.exit()
     else:
         option_data = main_options()
-        args = ParseOptions(sys.argv[1:], Log(), option_data)
+        args = ParseOptions(sys.argv[1:], Log(True), option_data)
 
     log = Log(args.debug, args.show_ffmpeg_debug, args.quiet)
     log.debug('')

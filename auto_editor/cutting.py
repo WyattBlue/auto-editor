@@ -233,6 +233,15 @@ def setRange(includeFrame: np.ndarray, syntaxRange, fps: float, with_: bool) -> 
 def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
     minClip: int, minCut: int, ignore, cutOut, log):
 
+    def secToFrames(value, fps):
+        if(isinstance(value, str)):
+            return int(float(value) * fps)
+        return value
+
+    frameMargin = secToFrames(frameMargin, fps)
+    minClip = secToFrames(minClip, fps)
+    minCut = secToFrames(minCut, fps)
+
     log.checkType(frameMargin, 'frameMargin', int)
 
     def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
