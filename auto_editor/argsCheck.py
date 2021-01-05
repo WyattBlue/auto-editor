@@ -16,7 +16,13 @@ def hardArgsCheck(args, log):
                 log.warning('exportMediaOps options are not used when exporting ' \
                     ' as an XML.')
 
-    if(args.frame_margin < 0):
+    if(isinstance(args.frame_margin, str)):
+        try:
+            if(float(args.frame_margin) < 0):
+                log.error('Frame margin cannot be negative.')
+        except ValueError:
+            log.error(f'Frame margin {args.frame_margin}, is not valid.')
+    elif(args.frame_margin < 0):
         log.error('Frame margin cannot be negative.')
     if(args.constant_rate_factor < 0 or args.constant_rate_factor > 51):
         log.error('Constant rate factor (crf) must be between 0-51.')
