@@ -105,7 +105,6 @@ def main_options():
         parent='motionOps',
         help='set the strength of the blur applied to a frame before being compared.')
 
-    # TODO: add export_as_video
     ops += add_argument('--export_as_audio', '-exa', action='store_true',
         help='export as a WAV audio file.')
     ops += add_argument('--export_to_premiere', '-exp', action='store_true',
@@ -437,8 +436,7 @@ def main():
                 # This is the default fps value for Premiere Pro Projects.
                 fps = 29.97
             else:
-                # Grab fps to know what the output video's fps should be.
-                # DaVinci Resolve doesn't need fps, but grab it away just in case.
+                # Don't know the correct fps to set so get the input's
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
             log.debug(f'ffmpeg fps: {fps}')
 
@@ -458,7 +456,6 @@ def main():
                 log.error("You choose a track that doesn't exist.\n" \
                     f'There {message}.\n {allTracks}')
 
-            # Get video codec
             vcodec = getVideoCodec(INPUT_FILE, ffmpeg, log, args.video_codec)
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
