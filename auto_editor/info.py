@@ -27,11 +27,10 @@ def getInfo(files, ffmpeg, ffprobe, log):
                 'v:0', '-show_entries', 'stream=codec_name,bit_rate', '-of',
                 'compact=p=0:nk=1', file]).split('|')
 
-            vcod = raw_data[0]
-            vbit = str(int(int(raw_data[1]) / 1000)) + 'k'
-
-            print(f' - video codec: {vcod}')
-            print(f' - video bitrate: {vbit}')
+            print(f' - video codec: {raw_data[0]}')
+            if(raw_data[1].isnumeric()):
+                vbit = str(int(int(raw_data[1]) / 1000)) + 'k'
+                print(f' - video bitrate: {vbit}')
 
             if(hasAud):
                 tracks = vidTracks(file, ffprobe, log)
