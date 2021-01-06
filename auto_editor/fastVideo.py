@@ -42,9 +42,11 @@ def handleAudioTracks(ffmpeg, outFile, exportAsAudio, tracks, keepTracksSep,
     return True
 
 def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vcodec,
-    crf, temp, log):
+    acodec, crf, temp, log):
 
-    def extender(cmd, vbitrate, tune, preset, outFile, isFFmpeg):
+    def extender(cmd, vbitrate, tune, preset, acodec, outFile, isFFmpeg):
+        if(acodec is not None):
+            cmd.extend(['-acodec', acodec])
         if(vbitrate is None):
             cmd.extend(['-crf', crf])
         else:
@@ -66,7 +68,7 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
             cmd.extend(['-map', f'{i}:a:0'])
 
         cmd.extend(['-map', f'{tracks}:v:0', '-c:v', vcodec])
-        cmd = extender(cmd, vbitrate, tune, preset, outFile, log.is_ffmpeg)
+        cmd = extender(cmd, vbitrate, tune, preset, acodec, outFile, log.is_ffmpeg)
     else:
         # Merge all the audio tracks into one.
         if(tracks > 1):
@@ -85,7 +87,7 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', vcodec]
-        cmd = extender(cmd, vbitrate, tune, preset, outFile, log.is_ffmpeg)
+        cmd = extender(cmd, vbitrate, tune, preset, acodec, outFile, log.is_ffmpeg)
 
     message = pipeToConsole(cmd)
     log.debug(message)
