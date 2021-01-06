@@ -89,3 +89,6 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
     log.debug('   - Expected video length: ' + str(yPointer / (samplerate / fps)))
     newAudio = newAudio[:yPointer]
     write(outFile, samplerate, newAudio)
+
+    import subprocess
+    subprocess.call(f'auto-editor info {outFile}', shell=True)
