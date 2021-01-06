@@ -36,7 +36,7 @@ You can change the **pace** of a video by changing by including frames that are 
 auto-editor example.mp4 --frame_margin 8
 ```
 
-<h3 align="center">Auto-Editor works on all platforms</h3>
+<h3 align="center">Auto-Editor is available on all platforms</h3>
 <p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/articles/imgs/cross_platform.png" width="500" title="and chromeOS, but they are tricky to set up."></p>
 
 
