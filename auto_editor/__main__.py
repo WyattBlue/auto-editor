@@ -82,6 +82,8 @@ def main_options():
     ops += add_argument('--video_codec', '-vcodec', default='uncompressed',
         parent='exportMediaOps',
         help='set the video codec for the output media file.')
+    ops += add_argument('--audio_codec', '-acodec', parent='exportMediaOps',
+        help='set the audio codec for the output media file.')
     ops += add_argument('--preset', '-p', default='medium', parent='exportMediaOps',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
@@ -100,7 +102,7 @@ def main_options():
         help='set how many times a frame is dilated before being compared.')
     ops += add_argument('--width', '-w', type=int, default=400, range='1 to Infinity',
         parent='motionOps',
-        help="set the frame's new width (in pixels) before being compared.")
+        help="scale the frame to this width before being compared.")
     ops += add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity',
         parent='motionOps',
         help='set the strength of the blur applied to a frame before being compared.')
@@ -208,10 +210,10 @@ def info_options():
 
     ops += add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
-    ops += add_argument('(input)', nargs='*',
-        help='the path to a file you want inspected.')
     ops += add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
+    ops += add_argument('(input)', nargs='*',
+        help='the path to a file you want inspected.')
     return ops
 
 def genHelp(option_data):
@@ -473,8 +475,7 @@ def main():
                 # Combine all audio tracks into one audio file, then read.
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amix=inputs={tracks}:duration=longest', '-ar',
-                    sampleRate, '-ac', '2', '-f', 'wav', #'-acodec', 'pcm_s16le',
-                    f'{TEMP}/combined.wav']
+                    sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
                 cmd = ffAddDebug(cmd, log.is_ffmpeg)
                 subprocess.call(cmd)
 
