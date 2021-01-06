@@ -92,8 +92,8 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
 
     if('Conversion failed!' in message):
         log.warning('The muxing/compression failed. '\
-            'This may be a problem with your ffmpeg, your codec, or your bitrate.'\
-            '\nTrying, again but not compressing.')
+            'This may be a problem with FFmpeg, your video codec, '\
+            'or your video bitrate. \nTrying, again but not compressing.')
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
             f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
             outFile]
