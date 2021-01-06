@@ -581,7 +581,7 @@ def main():
             fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps,
             args.machine_readable_progress, args.no_progress, TEMP, log)
             muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
-                args.video_bitrate, args.tune, args.preset, vcodec,
+                args.video_bitrate, args.tune, args.preset, vcodec, args.audio_codec,
                 args.constant_rate_factor, TEMP, log)
 
     if(newOutput is not None and not os.path.isfile(newOutput)):
