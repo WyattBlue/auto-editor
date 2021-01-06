@@ -28,7 +28,10 @@ class MyLogger(object):
 
     @staticmethod
     def error(msg):
-        print(msg, file=sys.stderr)
+        if("'Connection refused'" in msg):
+            pass
+        else:
+            print(msg, file=sys.stderr)
 
 
 def validInput(inputs: list, ffmpeg, log) -> list:
@@ -83,7 +86,12 @@ def validInput(inputs: list, ffmpeg, log) -> list:
                 }
 
                 with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([myInput])
+                    try:
+                        ydl.download([myInput])
+                    except youtube_dl.utils.DownloadError:
+                        log.conwrite('')
+                        log.error('YouTube-dl: Connection Refused.')
+
                 log.conwrite('')
 
             inputList.append(basename + '.mp4')
