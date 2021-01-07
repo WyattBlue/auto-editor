@@ -23,3 +23,15 @@ Paste the terminal output here
 ```
 output here:
 ```
+
+**What's your platform? (if applicable)**
+
+```
+output here, run: `auto-editor --debug` if possible.
+```
+
+**What's your input? (if applicable)**
+
+```
+output here, run: `auto-editor info path/to/video
+```
