@@ -30,7 +30,9 @@ def getInfo(files, ffmpeg, ffprobe, log):
             print(f' - video codec: {raw_data[0]}')
             if(raw_data[1].isnumeric()):
                 vbit = str(int(int(raw_data[1]) / 1000)) + 'k'
-                print(f' - video bitrate: {vbit}')
+            else:
+                vbit = 'N/A'
+            print(f' - video bitrate: {vbit}')
 
             if(hasAud):
                 tracks = vidTracks(file, ffprobe, log)
