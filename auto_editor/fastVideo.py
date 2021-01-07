@@ -46,7 +46,7 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
 
     def extender(cmd, vbitrate, tune, preset, acodec, outFile, isFFmpeg):
         if(acodec is not None):
-            cmd.extend(['-acodec', acodec])
+            cmd.extend(['-c:a', acodec])
         if(vbitrate is None):
             cmd.extend(['-crf', crf])
         else:
@@ -89,6 +89,7 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
             f'{temp}/spedup.mp4', '-c:v', vcodec]
         cmd = extender(cmd, vbitrate, tune, preset, acodec, outFile, log.is_ffmpeg)
 
+    log.debug(cmd)
     message = pipeToConsole(cmd)
     log.debug(message)
 
