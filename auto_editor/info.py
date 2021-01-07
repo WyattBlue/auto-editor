@@ -45,10 +45,13 @@ def getInfo(files, ffmpeg, ffprobe, log):
                         f'a:{track}', '-show_entries', 'stream=codec_name,sample_rate', '-of',
                         'compact=p=0:nk=1', file])
 
-                    raw_data = raw_data.split('|')
+                    raw_data = raw_data.replace('\n', '').split('|')
 
                     acod = raw_data[0]
-                    sr = str(int(raw_data[1]) / 1000) + ' kHz'
+                    if(len(raw_data) > 1 and raw_data[1].isnumeric()):
+                        sr = str(int(raw_data[1]) / 1000) + ' kHz'
+                    else:
+                        sr = 'N/A'
 
                     print(f'     - codec: {acod}')
                     print(f'     - samplerate: {sr}')
