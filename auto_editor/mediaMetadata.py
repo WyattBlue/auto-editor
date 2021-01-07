@@ -11,12 +11,14 @@ def vidTracks(videoFile: str, ffprobe: str, log) -> int:
         'panic', '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
         'compact=p=0:nk=1']).split('\n')
 
+    # Remove all blanks
+    numbers = [s for s in numbers if s != '']
     # Remove all \r chars that can appear in certain environments
     numbers = [s.replace('\r', '') for s in numbers]
 
     log.ffmpeg('Track data: ' + str(numbers))
     if(numbers[0].isnumeric()):
-        return len(numbers) - 1
+        return len(numbers)
     else:
         log.warning('ffprobe had an invalid output.')
         return 1 # Assume there's one audio track.
