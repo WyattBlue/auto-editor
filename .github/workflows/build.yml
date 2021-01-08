@@ -40,6 +40,11 @@ jobs:
     - name: Test Example Vid
       run: |
         python3 -m auto_editor example.mp4 --verbose
+    - name: Test Info Subcommand
+      run: |
+        python3 -m auto_editor info example.mp4
+        python3 -m auto_editor info resources/multi-track.mov
+        python3 -m auto_editor info resources/newCommentary.mp3
     - name: Test ProgressOps
       run: |
         python3 -m auto_editor example.mp4 progressOps --machine_readable_progress
