@@ -98,6 +98,10 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset,
 def fastVideo(vidFile: str, chunks: list, speeds: list, codec, machineReadable,
     hideBar, temp, log):
 
+    totalFrames = chunks[len(chunks) - 1][1]
+    videoProgress = ProgressBar(totalFrames, 'Creating new video',
+        machineReadable, hideBar)
+
     import av
 
     input_ = av.open(vidFile)
@@ -107,15 +111,11 @@ def fastVideo(vidFile: str, chunks: list, speeds: list, codec, machineReadable,
     width = inputVideoStream.width
     height = inputVideoStream.height
     pix_fmt = inputVideoStream.pix_fmt
-    averageFramerate = float(inputVideoStream.average_rate)
-
-    totalFrames = chunks[len(chunks) - 1][1]
-    videoProgress = ProgressBar(totalFrames, 'Creating new video',
-        machineReadable, hideBar)
+    fps = float(inputVideoStream.average_rate)
 
     process2 = subprocess.Popen(['ffmpeg', '-y', '-f', 'rawvideo', '-vcodec',
         'rawvideo', '-pix_fmt', pix_fmt, '-s', f'{width}*{height}',
-        '-framerate', f'{averageFramerate}', '-i', '-', '-pix_fmt', pix_fmt,
+        '-framerate', f'{fps}', '-i', '-', '-pix_fmt', pix_fmt,
         '-vcodec', codec, '-qscale:v', '3', f'{temp}/spedup.mp4'],
         stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
