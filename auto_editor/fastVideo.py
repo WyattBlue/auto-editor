@@ -41,7 +41,7 @@ def handleAudioTracks(ffmpeg, outFile, exportAsAudio, tracks, keepTracksSep,
         return False
     return True
 
-def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vcodec,
+def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset,
     acodec, crf, temp, log):
 
     def extender(cmd, vbitrate, tune, preset, acodec, outFile, isFFmpeg):
@@ -67,7 +67,7 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
         for i in range(tracks):
             cmd.extend(['-map', f'{i}:a:0'])
 
-        cmd.extend(['-map', f'{tracks}:v:0', '-c:v', vcodec])
+        cmd.extend(['-map', f'{tracks}:v:0', '-c:v', 'copy'])
         cmd = extender(cmd, vbitrate, tune, preset, acodec, outFile, log.is_ffmpeg)
     else:
         # Merge all the audio tracks into one.
@@ -86,88 +86,66 @@ def muxVideo(ffmpeg, outFile, keepTracksSep, tracks, vbitrate, tune, preset, vco
             move(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
 
         cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-c:v', vcodec]
+            f'{temp}/spedup.mp4', '-c:v', 'copy']
         cmd = extender(cmd, vbitrate, tune, preset, acodec, outFile, log.is_ffmpeg)
 
     log.debug(cmd)
     message = pipeToConsole(cmd)
     log.debug(message)
-
-    if('Conversion failed!' in message):
-        log.warning('The muxing/compression failed. '\
-            'This may be a problem with FFmpeg, your video codec, '\
-            'or your video bitrate. \nTrying, again but not compressing.')
-        cmd = [ffmpeg, '-y', '-i', f'{temp}/newAudioFile.wav', '-i',
-            f'{temp}/spedup.mp4', '-c:v', 'copy', '-movflags', '+faststart',
-            outFile]
-        cmd = ffAddDebug(cmd, log.is_ffmpeg)
-        subprocess.call(cmd)
     log.conwrite('')
 
 
-def fastVideo(vidFile: str, chunks: list, includeFrame: np.ndarray, speeds: list,
-    fps, machineReadable, hideBar, temp, log):
+def fastVideo(vidFile: str, chunks: list, speeds: list, codec, machineReadable,
+    hideBar, temp, log):
 
-    import cv2
+    import av
 
-    cap = cv2.VideoCapture(vidFile)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    input_ = av.open(vidFile)
+    inputVideoStream = input_.streams.video[0]
+    inputVideoStream.thread_type = 'AUTO'
 
-    out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
+    width = inputVideoStream.width
+    height = inputVideoStream.height
+    pix_fmt = inputVideoStream.pix_fmt
+    averageFramerate = float(inputVideoStream.average_rate)
 
-    log.checkType(vidFile, 'vidFile', str)
-    log.checkType(includeFrame, 'includeFrame', np.ndarray)
-
-    if(speeds[0] == 99999 and speeds[1] != 99999):
-        totalFrames = int(np.where(includeFrame == True)[0][-1])
-        cframe = int(np.where(includeFrame == True)[0][0])
-    elif(speeds[0] != 99999 and speeds[1] == 99999):
-        totalFrames = int(np.where(includeFrame == False)[0][-1])
-        cframe = int(np.where(includeFrame == False)[0][0])
-    else:
-        totalFrames = chunks[len(chunks) - 1][1]
-        cframe = 0
-
-    starting = cframe
-    cap.set(cv2.CAP_PROP_POS_FRAMES, cframe)
-    remander = 0
-    framesWritten = 0
-
-    videoProgress = ProgressBar(totalFrames - starting, 'Creating new video',
+    totalFrames = chunks[len(chunks) - 1][1]
+    videoProgress = ProgressBar(totalFrames, 'Creating new video',
         machineReadable, hideBar)
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if(not ret or cframe > totalFrames):
-            break
+    process2 = subprocess.Popen(['ffmpeg', '-y', '-f', 'rawvideo', '-vcodec',
+        'rawvideo', '-pix_fmt', pix_fmt, '-s', f'{width}*{height}',
+        '-framerate', f'{averageFramerate}', '-i', '-', '-pix_fmt', pix_fmt,
+        '-vcodec', codec, '-qscale:v', '3', f'{temp}/spedup.mp4'],
+        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
-        try:
-            state = includeFrame[cframe]
-        except IndexError:
-            state = False
+    inputEquavalentNumber = 0
+    outputEquavalentNumber = 0
 
-        mySpeed = speeds[state]
+    index = 0
+    chunk = chunks.pop(0)
+    for packet in input_.demux(inputVideoStream):
+        for frame in packet.decode():
+            index += 1
+            if(len(chunks) > 0 and index >= chunk[1] + 1):
+                chunk = chunks.pop(0)
 
-        if(mySpeed != 99999):
-            doIt = (1 / mySpeed) + remander
-            for __ in range(int(doIt)):
-                out.write(frame)
-                framesWritten += 1
-            remander = doIt % 1
+            if(speeds[chunk[2]] != 99999):
+                inputEquavalentNumber += (1 / speeds[chunk[2]])
 
-        videoProgress.tick(cframe - starting)
-    log.debug(f'\n   - Frames Written: {framesWritten}')
-    log.debug(f'   - Starting: {starting}')
-    log.debug(f'   - Total Frames: {totalFrames}')
+            while inputEquavalentNumber > outputEquavalentNumber:
+                in_bytes = frame.to_ndarray().astype(np.uint8).tobytes()
+                process2.stdin.write(in_bytes)
+                outputEquavalentNumber += 1
+
+            videoProgress.tick(index - 1)
+    process2.stdin.close()
+    process2.wait()
 
     if(log.is_debug):
         log.debug('Writing the output file.')
     else:
         log.conwrite('Writing the output file.')
 
-    cap.release()
-    out.release()
-    cv2.destroyAllWindows()
+
+

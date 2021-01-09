@@ -520,14 +520,10 @@ def main():
             hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
             del audioList, motionList
 
-            chunks, includeFrame = applySpacingRules(hasLoud, fps,
-                args.frame_margin, args.min_clip_length, args.min_cut_length,
-                args.ignore, args.cut_out, log)
+            chunks = applySpacingRules(hasLoud, fps, args.frame_margin,
+                args.min_clip_length, args.min_cut_length, args.ignore,
+                args.cut_out, log)
             del hasLoud
-        else:
-            from cutting import generateIncludes
-
-            includeFrame = generateIncludes(chunks, log)
 
         clips = []
         numCuts = len(chunks)
@@ -578,10 +574,10 @@ def main():
             tracks, args.keep_tracks_seperate, chunks, speeds, fps, TEMP,
             args.machine_readable_progress, args.no_progress, log)
         if(continueVid):
-            fastVideo(INPUT_FILE, chunks, includeFrame, speeds, fps,
-            args.machine_readable_progress, args.no_progress, TEMP, log)
+            fastVideo(INPUT_FILE, chunks, speeds, vcodec,
+                args.machine_readable_progress, args.no_progress, TEMP, log)
             muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
-                args.video_bitrate, args.tune, args.preset, vcodec, args.audio_codec,
+                args.video_bitrate, args.tune, args.preset, args.audio_codec,
                 args.constant_rate_factor, TEMP, log)
 
     if(newOutput is not None and not os.path.isfile(newOutput)):
