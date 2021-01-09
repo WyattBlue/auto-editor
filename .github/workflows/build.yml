@@ -25,11 +25,12 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install FFmpeg
       run: |
-        sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg
+        sudo apt update
+        sudo apt install ffmpeg
     - name: Install Pip Packages
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install opencv-python audiotsm2
+        python3 -m pip install av opencv-python audiotsm2
     - name: Test Help Commands
       run: |
         python3 -m auto_editor --debug
