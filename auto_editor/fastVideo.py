@@ -146,6 +146,3 @@ def fastVideo(vidFile: str, chunks: list, speeds: list, codec, machineReadable,
         log.debug('Writing the output file.')
     else:
         log.conwrite('Writing the output file.')
-
-
-
