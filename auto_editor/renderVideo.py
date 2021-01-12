@@ -14,10 +14,10 @@ def properties(cmd, args):
     if(args.video_codec == 'uncompressed'):
         cmd.extend(['-vcodec', 'mpeg4', '-qscale:v', '1'])
     else:
-        cmd.extend(['-vcodec', args.vide_codec])
+        cmd.extend(['-vcodec', args.video_codec])
 
         if(args.video_bitrate is None):
-            cmd.extend(['-crf', crf])
+            cmd.extend(['-crf', args.constant_rate_factor])
         else:
             cmd.extend(['-b:v', args.video_bitrate])
 
@@ -83,8 +83,7 @@ def renderAv(vidFile: str, args, chunks: list, speeds: list, temp, log):
     else:
         log.conwrite('Writing the output file.')
 
-def renderOpencv(vidFile: str, chunks: list, speeds: list, fps, machine, hideBar, temp,
-    log):
+def renderOpencv(vidFile: str, args, chunks: list, speeds: list, fps, temp, log):
 
     cap = cv2.VideoCapture(vidFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -128,13 +127,16 @@ def renderOpencv(vidFile: str, chunks: list, speeds: list, fps, machine, hideBar
     log.debug(f'   - Starting: {starting}')
     log.debug(f'   - Total Frames: {totalFrames}')
 
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+
+    if()
+
+
     if(log.is_debug):
         log.debug('Writing the output file.')
     else:
         log.conwrite('Writing the output file.')
-
-    cap.release()
-    out.release()
-    cv2.destroyAllWindows()
 
 
