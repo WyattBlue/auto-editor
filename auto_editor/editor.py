@@ -40,6 +40,11 @@ def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
     sampleRate, audioFile, fps, log):
 
     def makepath(filepath: str) -> str:
+
+        import platform
+
+        if(platform.system() == 'Windows'):
+            return 'file://localhost/' + os.path.abspath(filepath).replace(':', f'%3a')
         return 'file://localhost' + os.path.abspath(filepath)
 
     duration = chunks[len(chunks) - 1][1]
