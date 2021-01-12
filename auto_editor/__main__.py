@@ -461,8 +461,6 @@ def main():
                 log.error("You choose a track that doesn't exist.\n" \
                     f'There {message}.\n {allTracks}')
 
-            vcodec = getVideoCodec(INPUT_FILE, ffmpeg, log, args.video_codec)
-
             # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
                 cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
@@ -577,6 +575,10 @@ def main():
         continueVid = handleAudioTracks(ffmpeg, newOutput, args, tracks, chunks, speeds,
             fps, TEMP, log)
         if(continueVid):
+
+            save_vcodec = args.video_codec
+            args.video_codec = getVideoCodec(INPUT_FILE, ffmpeg, log, args.video_codec)
+
             if(args.render == 'auto'):
                 try:
                     import av
@@ -587,13 +589,15 @@ def main():
             if(args.render == 'av'):
                 from renderVideo import renderAv
                 renderAv(ffmpeg, INPUT_FILE, args, chunks, speeds, TEMP, log)
+
             if(args.render == 'opencv'):
                 from renderVideo import renderOpencv
-
                 renderOpencv(ffmpeg, INPUT_FILE, args, chunks, speeds, fps, TEMP, log)
 
             # Now mix new audio(s) and the new video.
             muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)
+
+            args.video_codec = save_vcodec
 
     if(newOutput is not None and not os.path.isfile(newOutput)):
         log.bug(f'The file {newOutput} was not created.')
