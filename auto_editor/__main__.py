@@ -95,6 +95,9 @@ def main_options():
     ops += add_argument('--constant_rate_factor', '-crf', type=int, default=15,
         parent='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
+    ops += add_argument('--render', default='auto',
+        choices=['av', 'opencv', 'auto'],
+        help='choice which rendering method to use. (experimental)')
 
     ops += add_argument('motionOps', nargs=0, action='grouping')
     ops += add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
@@ -569,16 +572,27 @@ def main():
                 args.machine_readable_progress, args.no_progress)
             continue
 
-        from fastVideo import handleAudioTracks, fastVideo, muxVideo
-        continueVid = handleAudioTracks(ffmpeg, newOutput, args.export_as_audio,
-            tracks, args.keep_tracks_seperate, chunks, speeds, fps, TEMP,
-            args.machine_readable_progress, args.no_progress, log)
+        from videoUtils import handleAudioTracks, muxVideo
+
+        continueVid = handleAudioTracks(ffmpeg, newOutput, args, tracks, chunks, speeds,
+            fps, TEMP, log)
         if(continueVid):
-            fastVideo(INPUT_FILE, chunks, speeds, vcodec,
-                args.machine_readable_progress, args.no_progress, TEMP, log)
-            muxVideo(ffmpeg, newOutput, args.keep_tracks_seperate, tracks,
-                args.video_bitrate, args.tune, args.preset, args.audio_codec,
-                args.constant_rate_factor, TEMP, log)
+            if(args.render == 'auto'):
+                try:
+                    import av
+                    args.render = 'av'
+                except ImportError:
+                    render = 'opencv'
+
+            if(args.render == 'av'):
+                from renderVideo import renderAv
+
+                renderAv(INPUT_FILE, args, chunks, speeds, TEMP, log)
+            if(args.render == 'opencv'):
+                from renderVideo import renderOpencv
+
+            # Now mix new audio(s) and the new video.
+            muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)
 
     if(newOutput is not None and not os.path.isfile(newOutput)):
         log.bug(f'The file {newOutput} was not created.')
