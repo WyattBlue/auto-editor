@@ -70,7 +70,9 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
                 inputEquavalent += (1 / speeds[chunk[2]])
 
             while inputEquavalent > outputEquavalent:
-                in_bytes = frame.to_ndarray().astype(np.uint8).tobytes()
+
+                #in_bytes = frame.to_ndarray().astype(np.uint8).tobytes()
+                in_bytes = frame.to_ndarray().tobytes()
                 process2.stdin.write(in_bytes)
                 outputEquavalent += 1
 
