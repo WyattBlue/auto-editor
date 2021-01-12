@@ -1,9 +1,9 @@
 '''setup.py'''
 
 """
-This code should only be executed by developers, not users.
+Create a build for pip
 
-The purose of this script is to create the build for pip.
+This code should only be executed by developers, not users.
 """
 
 import os
@@ -11,9 +11,7 @@ import sys
 from setuptools import setup, find_packages
 
 def pip_version():
-    # pip doesn't allow standard version format (20w10a), so we have to
-    # conform it to match Semantic Versioning.
-    return '21.1.1'
+    return '21.2.1'
 
 if(sys.argv[-1] == 'publish'):
     os.system('rm -rf build')
