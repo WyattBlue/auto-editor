@@ -30,7 +30,7 @@ class Log():
             return
 
         if(self.is_debug):
-            self.debug(f'Temp Dir: {self.temp}')
+            self.debug(f'Temp dir: {self.temp}')
 
         from shutil import rmtree
         rmtree(self.temp)
@@ -41,7 +41,6 @@ class Log():
         sys.exit(1)
 
     # When something's definitely wrong with the program.
-    @staticmethod
     def bug(message, bug_type='bug report'):
         print('Error!', message, f'\n\nCreate a {bug_type} at',
             'https://github.com/WyattBlue/auto-editor/issues/\n', file=sys.stderr)
