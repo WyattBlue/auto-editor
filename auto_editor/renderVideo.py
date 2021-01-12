@@ -28,7 +28,7 @@ def properties(cmd, args):
     return cmd
 
 
-def renderAv(vidFile: str, args, chunks: list, speeds: list, temp, log):
+def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
 
     import av
 
@@ -47,7 +47,7 @@ def renderAv(vidFile: str, args, chunks: list, speeds: list, temp, log):
 
     log.debug(f'   - pix_fmt: {pix_fmt}')
 
-    cmd = ['ffmpeg', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo', '-pix_fmt', pix_fmt,
+    cmd = [ffmpeg, '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo', '-pix_fmt', pix_fmt,
     '-s', f'{width}*{height}', '-framerate', f'{fps}', '-i', '-', '-pix_fmt', pix_fmt]
 
     cmd = properties(cmd, args)
@@ -83,7 +83,7 @@ def renderAv(vidFile: str, args, chunks: list, speeds: list, temp, log):
     else:
         log.conwrite('Writing the output file.')
 
-def renderOpencv(vidFile: str, args, chunks: list, speeds: list, fps, temp, log):
+def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, temp, log):
 
     cap = cv2.VideoCapture(vidFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -131,7 +131,12 @@ def renderOpencv(vidFile: str, args, chunks: list, speeds: list, fps, temp, log)
     out.release()
     cv2.destroyAllWindows()
 
-    if()
+    if(args.video_codec != 'uncompressed'):
+        cmd = ['ffmepg', '-y']
+        cmd = properties(cmd, args)
+        cmd.append(f'{temp}/spedup.mp4')
+
+        subprocess.call(cmd)
 
 
     if(log.is_debug):
