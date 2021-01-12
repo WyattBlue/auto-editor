@@ -66,6 +66,7 @@ def muxVideo(ffmpeg, outFile, args, tracks, temp, log):
     if(args.audio_codec is not None):
         cmd.extend(['-c:a', args.audio_codec])
     cmd = ffAddDebug(cmd, log.is_ffmpeg)
+    cmd.append(outFile)
 
     log.debug(cmd)
     message = pipeToConsole(cmd)
