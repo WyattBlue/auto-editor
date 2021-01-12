@@ -11,14 +11,41 @@ from shutil import get_terminal_size
 from time import time, localtime
 
 class Log():
-    def __init__(self, show_debug=False, ffmpeg=False, quiet=False):
+    def __init__(self, show_debug=False, ffmpeg=False, quiet=False, temp=None):
         self.is_debug = show_debug
         self.is_ffmpeg = ffmpeg
         self.quiet = quiet
+        self.temp = temp
 
-    @staticmethod
-    def error(message):
+    def debug(self, message):
+        if(self.is_debug):
+            print(message)
+
+    def ffmpeg(self, message):
+        if(self.is_ffmpeg):
+            print(message)
+
+    def cleanup(self):
+        if(self.temp is None):
+            return
+
+        if(self.is_debug):
+            self.debug(f'Temp Dir: {self.temp}')
+
+        from shutil import rmtree
+        rmtree(self.temp)
+
+    def error(self, message):
         print('Error!', message, file=sys.stderr)
+        self.cleanup()
+        sys.exit(1)
+
+    # When something's definitely wrong with the program.
+    @staticmethod
+    def bug(message, bug_type='bug report'):
+        print('Error!', message, f'\n\nCreate a {bug_type} at',
+            'https://github.com/WyattBlue/auto-editor/issues/\n', file=sys.stderr)
+        self.cleanup()
         sys.exit(1)
 
     def warning(self, message):
@@ -34,27 +61,12 @@ class Log():
             numSpaces = get_terminal_size().columns - len(message) - 3
             print('  ' + message + ' ' * numSpaces, end='\r', flush=True)
 
-    # When something's definitely wrong with the program.
-    @staticmethod
-    def bug(message, bug_type='bug report'):
-        print('Error!', message, f'\n\nCreate a {bug_type} at',
-            'https://github.com/WyattBlue/auto-editor/issues/\n', file=sys.stderr)
-        sys.exit(1)
-
     def checkType(self, data, name, correct_type):
         if(not isinstance(data, correct_type)):
             badtype = type(data).__name__
             goodtype = correct_type.__name__
             self.bug(f'Variable "{name}" was not a {goodtype}, but a {badtype}',
                 'bug report')
-
-    def debug(self, message):
-        if(self.is_debug):
-            print(message)
-
-    def ffmpeg(self, message):
-        if(self.is_ffmpeg):
-            print(message)
 
 
 class Timer():
