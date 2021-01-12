@@ -580,16 +580,18 @@ def main():
             if(args.render == 'auto'):
                 try:
                     import av
-                    args.render = 'av'
+                    from renderVideo import renderAv
+                    renderAv(INPUT_FILE, args, chunks, speeds, TEMP, log)
                 except ImportError:
-                    render = 'opencv'
+                    args.render = 'opencv'
 
             if(args.render == 'av'):
                 from renderVideo import renderAv
-
                 renderAv(INPUT_FILE, args, chunks, speeds, TEMP, log)
             if(args.render == 'opencv'):
                 from renderVideo import renderOpencv
+
+                renderOpencv(INPUT_FILE, args, chunks, speeds, TEMP, log)
 
             # Now mix new audio(s) and the new video.
             muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)
