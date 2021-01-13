@@ -41,7 +41,7 @@ class Log():
         sys.exit(1)
 
     # When something's definitely wrong with the program.
-    def bug(message, bug_type='bug report'):
+    def bug(self, message, bug_type='bug report'):
         print('Error!', message, f'\n\nCreate a {bug_type} at',
             'https://github.com/WyattBlue/auto-editor/issues/\n', file=sys.stderr)
         self.cleanup()
