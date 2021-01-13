@@ -10,7 +10,6 @@ from usefulFunctions import ProgressBar
 import subprocess
 
 def properties(cmd, args):
-
     if(args.video_codec == 'uncompressed'):
         cmd.extend(['-vcodec', 'mpeg4', '-qscale:v', '1'])
     else:
@@ -29,7 +28,6 @@ def properties(cmd, args):
 
 
 def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
-
     import av
 
     totalFrames = chunks[len(chunks) - 1][1]
@@ -63,15 +61,14 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
     for packet in input_.demux(inputVideoStream):
         for frame in packet.decode():
             index += 1
-            if(len(chunks) > 0 and index >= chunk[1] + 1):
+            if(len(chunks) > 0 and index >= chunk[1]):
                 chunk = chunks.pop(0)
 
             if(speeds[chunk[2]] != 99999):
                 inputEquavalent += (1 / speeds[chunk[2]])
 
             while inputEquavalent > outputEquavalent:
-
-                #in_bytes = frame.to_ndarray().astype(np.uint8).tobytes()
+                # add astype(np.uint8) if code breaks.
                 in_bytes = frame.to_ndarray().tobytes()
                 process2.stdin.write(in_bytes)
                 outputEquavalent += 1
@@ -86,6 +83,7 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
         log.conwrite('Writing the output file.')
 
 def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, temp, log):
+    import cv2
 
     cap = cv2.VideoCapture(vidFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -101,8 +99,26 @@ def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, te
     remander = 0
     framesWritten = 0
 
-    videoProgress = ProgressBar(totalFrames - starting, 'Creating new video',
+    videoProgress = ProgressBar(totalFrames, 'Creating new video',
         args.machine_readable_progress, args.no_progress)
+
+
+    def findState(chunks, cframe) -> int:
+        low = 0
+        high = len(chunks) - 1
+
+        while low <= high:
+            mid = low + (high - low) // 2
+
+            if(cframe >= chunks[mid][0] and cframe < chunks[mid][1]):
+                return chunks[mid][2]
+            elif(cframe > chunks[mid][0]):
+                low = mid + 1
+            else:
+                high = mid - 1
+
+        # cframe not in chunks
+        return 0
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -110,10 +126,8 @@ def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, te
             break
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
-        try:
-            state = includeFrame[cframe]
-        except IndexError:
-            state = False
+
+        state = findState(chunks, cframe)
 
         mySpeed = speeds[state]
 
@@ -126,7 +140,6 @@ def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, te
 
         videoProgress.tick(cframe)
     log.debug(f'\n   - Frames Written: {framesWritten}')
-    log.debug(f'   - Starting: {starting}')
     log.debug(f'   - Total Frames: {totalFrames}')
 
     cap.release()

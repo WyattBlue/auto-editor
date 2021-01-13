@@ -576,9 +576,6 @@ def main():
             fps, TEMP, log)
         if(continueVid):
 
-            save_vcodec = args.video_codec
-            args.video_codec = getVideoCodec(INPUT_FILE, ffmpeg, log, args.video_codec)
-
             if(args.render == 'auto'):
                 try:
                     import av
@@ -596,8 +593,6 @@ def main():
 
             # Now mix new audio(s) and the new video.
             muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)
-
-            args.video_codec = save_vcodec
 
     if(newOutput is not None and not os.path.isfile(newOutput)):
         log.bug(f'The file {newOutput} was not created.')
