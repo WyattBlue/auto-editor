@@ -287,8 +287,11 @@ def main():
         option_data = main_options()
         args = ParseOptions(sys.argv[1:], Log(True), option_data)
 
-    log = Log(args.debug, args.show_ffmpeg_debug, args.quiet)
-    log.debug('')
+    TEMP = tempfile.mkdtemp()
+    log = Log(args.debug, args.show_ffmpeg_debug, args.quiet, temp=TEMP)
+    log.debug(f'\n   - Temp Directory: {TEMP}')
+
+    timer = Timer(args.quiet)
 
     # Print the help screen for the entire program.
     if(args.help):
@@ -344,10 +347,7 @@ def main():
     from validateInput import validInput
     inputList = validInput(args.input, ffmpeg, log)
 
-    timer = Timer(args.quiet)
-
     # Figure out the output file names.
-
     def newOutputName(oldFile: str, exa=False, data=False, exc=False) -> str:
         dotIndex = oldFile.rfind('.')
         if(exc):
@@ -363,9 +363,6 @@ def main():
         for i in range(len(inputList) - len(args.output_file)):
             args.output_file.append(newOutputName(inputList[i],
                 args.export_as_audio, makingDataFile, args.export_as_json))
-
-    TEMP = tempfile.mkdtemp()
-    log.debug(f'\n   - Temp Directory: {TEMP}')
 
     if(args.combine_files):
         # Combine video files, then set input to 'combined.mp4'.
