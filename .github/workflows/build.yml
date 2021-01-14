@@ -41,6 +41,7 @@ jobs:
     - name: Test Example Vid
       run: |
         python3 -m auto_editor example.mp4 --verbose
+        python3 -m auto_editor example.mp4 -m 0.3sec
     - name: Test Info Subcommand
       run: |
         python3 -m auto_editor info example.mp4
