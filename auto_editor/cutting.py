@@ -197,10 +197,15 @@ def removeSmall(hasLoud: np.ndarray, lim: int, replace: bool, with_: bool) -> np
     return hasLoud
 
 
-def setRange(includeFrame: np.ndarray, syntaxRange, fps: float, with_: bool) -> np.ndarray:
+def setRange(includeFrame: np.ndarray, syntaxRange, fps: float, with_: bool, log) -> np.ndarray:
     end = len(includeFrame) - 1
     for item in syntaxRange:
         pair = []
+
+        if(item.count('-') > 1):
+            log.error('Too many deliminators!')
+        if(item.count('-') < 1):
+            log.error('Invalid range. Use range syntax. ex: 5-10')
 
         for num in item.split('-'):
             if(num == 'start'):
@@ -256,11 +261,11 @@ def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
 
     # Apply ignore rules if applicable.
     if(ignore != []):
-        includeFrame = setRange(includeFrame, ignore, fps, True)
+        includeFrame = setRange(includeFrame, ignore, fps, True, log)
 
     # Cut out ranges.
     if(cutOut != []):
-        includeFrame = setRange(includeFrame, cutOut, fps, False)
+        includeFrame = setRange(includeFrame, cutOut, fps, False, log)
 
     # Remove small clips/cuts created by applying other rules.
     includeFrame = cook(includeFrame, minClip, minCut)
