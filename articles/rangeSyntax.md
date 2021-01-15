@@ -45,13 +45,13 @@ or used byitself.
 auto-editor example.mp4 --ignore 20-30
 ```
 
-both `--cut_out` and `--ignore` use range syntax so any range that is recognized by `--cut_out` will be recongized `--ignore` or any future option that uses it.
+both `--cut_out` and `--ignore` use range syntax so any range that is recognized by `--cut_out` will be recognize `--ignore` or any future option that uses it.
 
 ## Range Syntax
 
 Range syntax is a special data type for declaring ranges.
 
-It follows the pattern: `{float}-{float} ...` using a hythen to delimate between the start and end point, and is in seconds instead of the usual "frames" unit.
+It follows the pattern: `{float}-{float} ...` using a hyphen to deliminate between the start and end point, and is in seconds instead of the usual "frames" unit.
 
 It can be repeated infinitely. So
 
@@ -59,12 +59,16 @@ It can be repeated infinitely. So
 auto-editor example.mp4 --cut_out 0-10 20-30 40-45
 ```
 
-is possible.
+is possible. In addition, the special values `start` and `end` can be used instead of floats. `end` represents the total length of the video in seconds while `start` is just equivalent to `0`.
 
 
 ### Out-of-bounds and Edge Cases.
 
-Range syntax is gracious on what it allows.
+Going out-of-bounds don't cause an error.
 
-You can go out of bounds.
+```
+auto-editor example.mp4 --cut_out 10-500
+```
+
+Using an invalid range, ex (`10-5`) is Undefined Behavior.
 
