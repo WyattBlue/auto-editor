@@ -580,6 +580,7 @@ def main():
                 except ImportError:
                     args.render = 'opencv'
 
+            log.debug(f'Using {args.render} method')
             if(args.render == 'av'):
                 from renderVideo import renderAv
                 renderAv(ffmpeg, INPUT_FILE, args, chunks, speeds, TEMP, log)
