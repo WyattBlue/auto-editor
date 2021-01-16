@@ -40,10 +40,10 @@ setup(
     install_requires=[
         'numpy==1.19.3',
         'audiotsm2',
-        'av==8.0.2',
         'opencv-python',
         'youtube-dl',
         'requests',
+        'av',
     ],
     classifiers=[
         'Topic :: Multimedia :: Video',
