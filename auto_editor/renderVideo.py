@@ -158,5 +158,3 @@ def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, te
         log.debug('Writing the output file.')
     else:
         log.conwrite('Writing the output file.')
-
-
