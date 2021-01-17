@@ -19,6 +19,10 @@ def getInfo(files, ffmpeg, ffprobe, log):
             fps = ffmpegFPS(ffmpeg, file, log)
             print(f' - fps: {fps}')
 
+            dur = pipeToConsole([ffprobe, '-v', 'error', '-i', file, '-show_entries',
+                'format=duration', '-of', 'csv=p=0'])
+            print(f' - duration: {dur.strip()}')
+
             res = pipeToConsole([ffprobe, '-v', 'error', '-select_streams', 'v:0',
                 '-show_entries', 'stream=height,width', '-of', 'csv=s=x:p=0', file])
             print(f' - resolution: {res.strip()}')
@@ -28,7 +32,8 @@ def getInfo(files, ffmpeg, ffprobe, log):
                 'compact=p=0:nk=1', file]).split('|')
 
             print(f' - video codec: {raw_data[0]}')
-            if(raw_data[1].isnumeric()):
+
+            if(raw_data[1].strip().isnumeric()):
                 vbit = str(int(int(raw_data[1]) / 1000)) + 'k'
             else:
                 vbit = 'N/A'
@@ -42,8 +47,8 @@ def getInfo(files, ffmpeg, ffprobe, log):
                     print(f'   - Track #{track}')
 
                     raw_data = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
-                        f'a:{track}', '-show_entries', 'stream=codec_name,sample_rate', '-of',
-                        'compact=p=0:nk=1', file])
+                        f'a:{track}', '-show_entries', 'stream=codec_name,sample_rate',
+                        '-of', 'compact=p=0:nk=1', file])
 
                     raw_data = raw_data.replace('\n', '').split('|')
 
