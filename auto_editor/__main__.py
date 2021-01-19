@@ -121,6 +121,8 @@ def main_options():
     ops += add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later. (experimental)')
 
+    ops += add_argument('--zoom')
+
     ops += add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')
     ops += add_argument('--cut_out', nargs='*',
