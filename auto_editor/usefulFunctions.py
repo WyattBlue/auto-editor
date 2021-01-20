@@ -2,7 +2,7 @@
 
 """
 To prevent duplicate code being pasted between scripts, common functions should be
-put here. No code here should modify or create video/audio files.
+put here. No function should modify or create video/audio files on its own.
 """
 
 # Internal libraries
@@ -29,11 +29,11 @@ class Log():
         if(self.temp is None):
             return
 
-        if(self.is_debug):
-            self.debug(f'Temp dir: {self.temp}')
-
         from shutil import rmtree
         rmtree(self.temp)
+
+        if(self.is_debug):
+            self.debug(f'   - Removed Temp Directory.')
 
     def error(self, message):
         print('Error!', message, file=sys.stderr)
@@ -90,32 +90,73 @@ def pipeToConsole(myCommands: list) -> str:
     return stdout.decode()
 
 
-def getBinaries(plat, dirPath, myFFmpeg: bool):
-    from os import path
+class FFprobe():
+    def __init__(self, plat, dirPath, myFFmpeg: bool):
+        from os import path
 
-    newF = None
-    newP = None
-    if(plat == 'Windows' and not myFFmpeg):
-        newF = path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
-        newP = path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
-    if(plat == 'Darwin' and not myFFmpeg):
-        newF = path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
-        newP = path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
-    if(newF is not None and path.isfile(newF)):
-        ffmpeg = newF
-        ffprobe = newP
-    else:
-        ffmpeg = 'ffmpeg'
-        ffprobe = 'ffprobe'
-    return ffmpeg, ffprobe
+        newF = None
+        if(plat == 'Windows' and not myFFmpeg):
+            newF = path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
+        if(plat == 'Darwin' and not myFFmpeg):
+            newF = path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
+
+        if(newF is not None and path.isfile(newF)):
+            self.myPath = newF
+        else:
+            self.myPath = 'ffprobe'
+
+    def getPath(self) -> str:
+        return self.myPath
+
+    def run(self, cmd: list):
+        import subprocess
+        subprocess.call([self.myPath] + cmd)
+
+    def pipe(self, cmd: list) -> str:
+        return pipeToConsole([self.myPath, '-v', 'error'] + cmd)
 
 
-def ffAddDebug(cmd: list, isFF: bool) -> list:
-    if(isFF):
-        cmd.extend(['-hide_banner'])
-    else:
-        cmd.extend(['-nostats', '-loglevel', '8'])
-    return cmd
+class FFmpeg():
+    def __init__(self, plat, dirPath, myFFmpeg: bool, show: bool):
+        from os import path
+
+        self.show = show
+        newF = None
+        if(plat == 'Windows' and not myFFmpeg):
+            newF = path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
+        if(plat == 'Darwin' and not myFFmpeg):
+            newF = path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
+
+        if(newF is not None and path.isfile(newF)):
+            self.myPath = newF
+        else:
+            self.myPath = 'ffmpeg'
+
+    def getPath(self) -> str:
+        return self.myPath
+
+    def run(self, cmd: list):
+        cmd = [self.myPath, '-y'] + cmd
+        if(self.show):
+            cmd.extend(['-hide_banner'])
+        else:
+            cmd.extend(['-nostats', '-loglevel', '8'])
+        if(self.show):
+            print(cmd)
+
+        import subprocess
+        subprocess.call(cmd)
+
+    def pipe(self, cmd: list) -> str:
+        cmd = [self.myPath, '-y'] + cmd
+
+        if(self.show):
+            print(cmd)
+        output = pipeToConsole(cmd)
+        if(self.show):
+            print(output)
+
+        return output
 
 
 def getNewLength(chunks: list, speeds: list, fps: float) -> float:

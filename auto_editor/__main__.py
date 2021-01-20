@@ -6,7 +6,6 @@ import os
 import sys
 import platform
 import tempfile
-import subprocess
 from shutil import rmtree
 
 version = '21w02a'
@@ -121,7 +120,7 @@ def main_options():
     ops += add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later. (experimental)')
 
-    ops += add_argument('--zoom')
+    #ops += add_argument('--zoom')
 
     ops += add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')
@@ -264,9 +263,9 @@ def main():
             sys.exit()
 
         from generateTestMedia import generateTestMedia
-        from usefulFunctions import getBinaries
+        from usefulFunctions import FFmpeg
 
-        ffmpeg, __ = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
+        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, False)
         generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
             args.width, args.height)
         sys.exit()
@@ -281,17 +280,16 @@ def main():
         log = Log(False, False, False)
 
         from info import getInfo
-        from usefulFunctions import getBinaries
-        ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
+        from usefulFunctions import FFmpeg, FFprobe
+
+        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, False)
+        ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg)
+
         getInfo(args.input, ffmpeg, ffprobe, log)
         sys.exit()
     else:
         option_data = main_options()
         args = ParseOptions(sys.argv[1:], Log(True), option_data)
-
-    TEMP = tempfile.mkdtemp()
-    log = Log(args.debug, args.show_ffmpeg_debug, args.quiet, temp=TEMP)
-    log.debug(f'\n   - Temp Directory: {TEMP}')
 
     timer = Timer(args.quiet)
 
@@ -306,16 +304,10 @@ def main():
 
     del option_data
 
-    if(args.version):
-        print('Auto-Editor version', version)
-        sys.exit()
+    from usefulFunctions import FFmpeg, FFprobe
+    ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, args.show_ffmpeg_debug)
+    ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg)
 
-    from usefulFunctions import getBinaries, pipeToConsole, ffAddDebug
-    from mediaMetadata import vidTracks, getSampleRate, getAudioBitrate
-    from mediaMetadata import getVideoCodec, ffmpegFPS
-    from wavfile import read
-
-    ffmpeg, ffprobe = getBinaries(platform.system(), dirPath, args.my_ffmpeg)
     makingDataFile = (args.export_to_premiere or args.export_to_resolve or
         args.export_to_final_cut_pro or args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
@@ -323,11 +315,10 @@ def main():
     if(args.debug and args.input == []):
         print('Python Version:', platform.python_version(), is64bit)
         print('Platform:', platform.system(), platform.release())
-        # Platform can be 'Linux', 'Darwin' (macOS), 'Java', 'Windows'
-        ffmpegVersion = pipeToConsole([ffmpeg, '-version']).split('\n')[0]
+        print('FFmpeg path:', ffmpeg.getPath())
+        ffmpegVersion = ffmpeg.pipe(['-version']).split('\n')[0]
         ffmpegVersion = ffmpegVersion.replace('ffmpeg version', '').strip()
         ffmpegVersion = ffmpegVersion.split(' ')[0]
-        print('FFmpeg path:', ffmpeg)
         print('FFmpeg version:', ffmpegVersion)
         print('Auto-Editor version', version)
         sys.exit()
@@ -336,7 +327,20 @@ def main():
         log.warning('You have the 32-bit version of Python, which may lead to' \
             'memory crashes.')
 
+    if(args.version):
+        print('Auto-Editor version', version)
+        sys.exit()
+
+    TEMP = tempfile.mkdtemp()
+    log = Log(args.debug, args.show_ffmpeg_debug, args.quiet, temp=TEMP)
+    log.debug(f'\n   - Temp Directory: {TEMP}')
+
+    from mediaMetadata import vidTracks, getSampleRate, getAudioBitrate
+    from mediaMetadata import getVideoCodec, ffmpegFPS
+    from wavfile import read
+
     from usefulFunctions import isLatestVersion
+
     if(not args.quiet and isLatestVersion(version, log)):
         log.print('\nAuto-Editor is out of date. Run:\n')
         log.print('    pip3 install -U auto-editor')
@@ -368,14 +372,14 @@ def main():
 
     if(args.combine_files):
         # Combine video files, then set input to 'combined.mp4'.
-        cmd = [ffmpeg, '-y']
+        cmd = []
         for fileref in inputList:
             cmd.extend(['-i', fileref])
         cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
             '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2',
             f'{TEMP}/combined.mp4'])
-        cmd = ffAddDebug(cmd, log.is_ffmpeg)
-        subprocess.call(cmd)
+        ffmpeg.run(cmd)
+        del cmd
         inputList = [f'{TEMP}/combined.mp4']
 
     speeds = [args.silent_speed, args.video_speed]
@@ -425,12 +429,12 @@ def main():
                 tracks = 1
             else:
                 tracks = args.force_tracks_to
-            cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
+            cmd = ['-i', INPUT_FILE]
             if(audioBitrate is not None):
                 cmd.extend(['-b:a', audioBitrate])
             cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', f'{TEMP}/fastAud.wav'])
-            cmd = ffAddDebug(cmd, log.is_ffmpeg)
-            subprocess.call(cmd)
+            ffmpeg.run(cmd)
+            del cmd
 
             sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
         else:
@@ -462,24 +466,23 @@ def main():
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
-                cmd = [ffmpeg, '-y', '-i', INPUT_FILE]
+                cmd = ['-i', INPUT_FILE]
                 if(audioBitrate is not None):
                     cmd.extend(['-ab', audioBitrate])
                 cmd.extend(['-ac', '2', '-ar', sampleRate, '-map',
                     f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
-                cmd = ffAddDebug(cmd, log.is_ffmpeg)
-                subprocess.call(cmd)
+                ffmpeg.run(cmd)
+                del cmd
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
             if(args.cut_by_all_tracks):
                 # Combine all audio tracks into one audio file, then read.
-                cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter_complex',
+                cmd = ['-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amix=inputs={tracks}:duration=longest', '-ar',
                     sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
-                cmd = ffAddDebug(cmd, log.is_ffmpeg)
-                subprocess.call(cmd)
-
+                ffmpeg.run(cmd)
                 sampleRate, audioData = read(f'{TEMP}/combined.wav')
+                del cmd
             else:
                 # Read only one audio file.
                 if(os.path.isfile(f'{TEMP}/{args.cut_by_this_track}.wav')):
@@ -538,10 +541,7 @@ def main():
                 constantLoc = INPUT_FILE[:dotIndex] + end
             else:
                 constantLoc = f'{TEMP}/constantVid{fileFormat}'
-            cmd = [ffmpeg, '-y', '-i', INPUT_FILE, '-filter:v', 'fps=fps=30',
-                constantLoc]
-            cmd = ffAddDebug(cmd, log.is_ffmpeg)
-            subprocess.call(cmd)
+            ffmpeg.run(['-i', INPUT_FILE, '-filter:v', 'fps=fps=30', constantLoc])
             INPUT_FILE = constantLoc
 
         if(args.export_as_json):
