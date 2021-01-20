@@ -436,11 +436,11 @@ def main():
         else:
             if(args.force_fps_to is not None):
                 fps = args.force_fps_to
-            elif(args.export_to_premiere or args.export_to_final_cut_pro):
-                # This is the default fps value for Premiere Pro Projects.
-                fps = 29.97
+            elif(args.export_to_premiere or args.export_to_final_cut_pro or
+                args.export_to_resolve):
+                # Based on timebase.
+                fps = int(ffmpegFPS(ffmpeg, INPUT_FILE, log))
             else:
-                # Don't know the correct fps to set so get the input's
                 fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
             log.debug(f'ffmpeg fps: {fps}')
 
