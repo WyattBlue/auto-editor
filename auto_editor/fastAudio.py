@@ -1,18 +1,17 @@
 '''fastAudio.py'''
 
-from usefulFunctions import ProgressBar, getNewLength, ffAddDebug
+from usefulFunctions import ProgressBar, getNewLength
 
 def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
     import subprocess
 
     log.checkType(samplerate, 'samplerate', str)
-    cmd = [ffmpeg, '-y', '-i', theFile]
+    cmd = ['-i', theFile]
     if(audioBit is not None):
         cmd.extend(['-b:a', audioBit])
         log.checkType(audioBit, 'audioBit', str)
     cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}/faAudio.wav'])
-    cmd = ffAddDebug(cmd, log.is_ffmpeg)
-    subprocess.call(cmd)
+    ffmpeg.run(cmd)
     log.conwrite('')
 
     return f'{temp}/faAudio.wav'

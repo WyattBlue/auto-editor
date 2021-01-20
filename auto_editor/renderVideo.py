@@ -23,7 +23,6 @@ def properties(cmd, args):
     if(args.tune != 'none'):
         cmd.extend(['-tune', args.tune])
     cmd.extend(['-preset', args.preset, '-movflags', '+faststart', '-strict', '-2'])
-
     return cmd
 
 
@@ -45,8 +44,9 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
 
     log.debug(f'   - pix_fmt: {pix_fmt}')
 
-    cmd = [ffmpeg, '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo', '-pix_fmt', pix_fmt,
-    '-s', f'{width}*{height}', '-framerate', f'{fps}', '-i', '-', '-pix_fmt', pix_fmt]
+    cmd = [ffmpeg.getPath(), '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo', '-pix_fmt',
+        pix_fmt, '-s', f'{width}*{height}', '-framerate', f'{fps}', '-i', '-', '-pix_fmt',
+        pix_fmt]
 
     cmd = properties(cmd, args)
     cmd.append(f'{temp}/spedup.mp4')
@@ -147,12 +147,9 @@ def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, te
     cv2.destroyAllWindows()
 
     if(args.video_codec != 'uncompressed'):
-        cmd = ['ffmepg', '-y']
-        cmd = properties(cmd, args)
+        cmd = properties([], args)
         cmd.append(f'{temp}/spedup.mp4')
-
-        subprocess.call(cmd)
-
+        ffmpeg.run(cmd)
 
     if(log.is_debug):
         log.debug('Writing the output file.')
