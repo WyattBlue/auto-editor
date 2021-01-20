@@ -3,13 +3,12 @@
 from usefulFunctions import pipeToConsole
 import re
 
-def vidTracks(videoFile: str, ffprobe: str, log) -> int:
+def vidTracks(videoFile: str, ffprobe, log) -> int:
     """
     Return the number of audio tracks in a video file.
     """
-    numbers = pipeToConsole([ffprobe, videoFile, '-hide_banner', '-loglevel',
-        'panic', '-show_entries', 'stream=index', '-select_streams', 'a', '-of',
-        'compact=p=0:nk=1']).split('\n')
+    numbers = ffprobe.pipe([videoFile, '-hide_banner', '-show_entries', 'stream=index',
+        '-select_streams', 'a', '-of', 'compact=p=0:nk=1']).split('\n')
 
     # Remove all \r chars that can appear in certain environments
     numbers = [s.replace('\r', '') for s in numbers]
@@ -24,9 +23,9 @@ def vidTracks(videoFile: str, ffprobe: str, log) -> int:
         return 1 # Assume there's one audio track.
 
 
-def getVideoCodec(file: str, ffmpeg: str, log, vcodec: str) -> str:
+def getVideoCodec(file: str, ffmpeg, log, vcodec: str) -> str:
     if(vcodec == 'copy'):
-        output = pipeToConsole([ffmpeg, '-i', file, '-hide_banner'])
+        output = ffmpeg.pipe(['-i', file, '-hide_banner'])
         try:
             matchDict = re.search(r'Video:\s(?P<grp>\w+?)\s', output).groupdict()
             vcodec = matchDict['grp']
@@ -38,9 +37,9 @@ def getVideoCodec(file: str, ffmpeg: str, log, vcodec: str) -> str:
     return vcodec
 
 
-def getSampleRate(file: str, ffmpeg: str, sr) -> str:
+def getSampleRate(file: str, ffmpeg, sr) -> str:
     if(sr is None):
-        output = pipeToConsole([ffmpeg, '-i', file, '-hide_banner'])
+        output = ffmpeg.pipe(['-i', file, '-hide_banner'])
         try:
             matchDict = re.search(r'\s(?P<grp>\w+?)\sHz', output).groupdict()
             return matchDict['grp']
@@ -49,12 +48,12 @@ def getSampleRate(file: str, ffmpeg: str, sr) -> str:
     return str(sr)
 
 
-def getAudioBitrate(file: str, ffprobe: str, log, abit: str) -> str:
+def getAudioBitrate(file: str, ffprobe, log, abit: str) -> str:
     if(abit is None):
         if(file.endswith('.mkv')):
             return None
         else:
-            output = pipeToConsole([ffprobe, '-v', 'error', '-select_streams',
+            output = ffprobe.pipe(['-select_streams',
                 'a:0', '-show_entries', 'stream=bit_rate', '-of',
                 'compact=p=0:nk=1', file]).strip()
             if(output.isnumeric()):
@@ -67,8 +66,8 @@ def getAudioBitrate(file: str, ffprobe: str, log, abit: str) -> str:
     return str(abit)
 
 
-def ffmpegFPS(ffmpeg: str, path: str, log) -> float:
-    output = pipeToConsole([ffmpeg, '-i', path, '-hide_banner'])
+def ffmpegFPS(ffmpeg, path: str, log) -> float:
+    output = ffmpeg.pipe(['-i', path, '-hide_banner'])
     try:
         matchDict = re.search(r'\s(?P<fps>[\d\.]+?)\stbr', output).groupdict()
         return float(matchDict['fps'])
