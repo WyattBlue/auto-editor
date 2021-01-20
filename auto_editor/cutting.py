@@ -87,7 +87,7 @@ def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
 
 # Motion detection algorithm based on this blog post:
 # https://pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
-def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
+def motionDetection(path: str, ffprobe, motionThreshold: float, log,
     width: int, dilates: int, blur: int) -> np.ndarray:
 
     import cv2
@@ -99,11 +99,11 @@ def motionDetection(path: str, ffprobe: str, motionThreshold: float, log,
     # Find total frames
     if(path.endswith('.mp4') or path.endswith('.mov')):
         # Query Container
-        cmd = [ffprobe, '-v', 'error', '-select_streams', 'v:0', '-show_entries',
+        cmd = [ffprobe.getPath(), '-v', 'error', '-select_streams', 'v:0', '-show_entries',
             'stream=nb_frames', '-of', 'default=nokey=1:noprint_wrappers=1', path]
     else:
         # Count the number of frames (slow)
-        cmd = [ffprobe, '-v', 'error', '-count_frames', '-select_streams', 'v:0',
+        cmd = [ffprobe.getPath(), '-v', 'error', '-count_frames', '-select_streams', 'v:0',
             '-show_entries', 'stream=nb_read_frames', '-of',
             'default=nokey=1:noprint_wrappers=1', path]
 
