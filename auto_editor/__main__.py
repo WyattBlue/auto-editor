@@ -562,11 +562,13 @@ def main():
             continue
 
         if(audioFile):
-            from fastAudio import fastAudio, handleAudio
+            from fastAudio import fastAudio, handleAudio, convertAudio
             theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
                 TEMP, log)
-            fastAudio(theFile, newOutput, chunks, speeds, log, fps,
+            fastAudio(theFile, f'{TEMP}/convert.wav', chunks, speeds, log, fps,
                 args.machine_readable_progress, args.no_progress)
+            convertAudio(ffmpeg, ffprobe, f'{TEMP}/convert.wav', INPUT_FILE, newOutput,
+                args, log)
             continue
 
         from videoUtils import handleAudioTracks, muxVideo
