@@ -37,6 +37,11 @@ def getVideoCodec(file: str, ffmpeg, log, vcodec: str) -> str:
     return vcodec
 
 
+def getAudioCodec(ffprobe, file):
+    return ffprobe.pipe(['-select_streams', 'a:0', '-show_entries', 'stream=codec_name',
+        '-of', 'compact=p=0:nk=1', file]).strip()
+
+
 def getSampleRate(file: str, ffmpeg, sr) -> str:
     if(sr is None):
         output = ffmpeg.pipe(['-i', file, '-hide_banner'])

@@ -2,9 +2,14 @@
 
 from mediaMetadata import ffmpegFPS, vidTracks
 
+import os
+
 def getInfo(files, ffmpeg, ffprobe, log):
     for file in files:
-        print(f'file: {file}')
+        if(os.path.exists(file)):
+            print(f'file: {file}')
+        else:
+            log.error(f'Could not find file: {file}')
 
         hasVid = ffprobe.pipe(['-show_streams', '-select_streams', 'v', file])
         hasAud = ffprobe.pipe(['-show_streams', '-select_streams', 'a', file])
