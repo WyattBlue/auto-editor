@@ -10,7 +10,7 @@ def convertAudio(ffmpeg, ffprobe, theFile, INPUT_FILE, outFile, args, log):
     if(realCodec is None):
         realCodec = getAudioCodec(ffprobe, INPUT_FILE)
     if(realCodec == "pcm_s16le" and outFile.endswith('.m4a')):
-        log.error(f'Codec: {pcm_s16le} is not supported in the m4a container.')
+        log.error(f'Codec: {realCodec} is not supported in the m4a container.')
 
     ffmpeg.run(['-i', theFile, '-acodec', realCodec, outFile])
 
