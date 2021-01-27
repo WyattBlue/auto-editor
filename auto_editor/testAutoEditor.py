@@ -102,7 +102,7 @@ def testAutoEditor():
 
     for item in os.listdir('resources'):
 
-        if('man_on_green_screen' in item or item.endswith('.txt')):
+        if('man_on_green_screen' in item or item.startswith('.') or item.endswith('.txt')):
             continue
 
         item = f'resources/{item}'

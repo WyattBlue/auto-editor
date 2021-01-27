@@ -1,7 +1,5 @@
 '''info.py'''
 
-from mediaMetadata import ffmpegFPS, vidTracks
-
 import os
 
 def getInfo(files, ffmpeg, ffprobe, log):
@@ -15,8 +13,7 @@ def getInfo(files, ffmpeg, ffprobe, log):
         hasAud = len(ffprobe.pipe(['-show_streams', '-select_streams', 'a', file])) > 5
 
         if(hasVid):
-            fps = ffmpegFPS(ffmpeg, file, log)
-            print(f' - fps: {fps}')
+            print(f' - fps: {ffprobe.getFrameRate(file)}')
             print(f' - duration: {ffprobe.getDuration(file)}')
             print(f' - resolution: {ffprobe.getResolution(file)}')
 
@@ -33,7 +30,7 @@ def getInfo(files, ffmpeg, ffprobe, log):
             print(f' - video bitrate: {vbit}')
 
             if(hasAud):
-                tracks = vidTracks(file, ffprobe, log)
+                tracks = ffprobe.getAudioTracks(file)
                 print(f' - audio tracks: {tracks}')
 
                 for track in range(tracks):
