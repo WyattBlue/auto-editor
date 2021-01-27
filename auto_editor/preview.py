@@ -49,10 +49,13 @@ def preview(myInput, chunks: list, speeds: list, fps: float, audioFile, log):
     printTimeFrame('Largest clip length', max(clipLengths), fps)
     printTimeFrame('Average clip length', sum(clipLengths) / len(clipLengths), fps)
     print('\nNumber of cuts:', cuts)
-    printTimeFrame('Smallest cut length', min(cutL), fps)
-    printTimeFrame('Largest cut length', max(cutL), fps)
-    printTimeFrame('Average cut length', sum(cutL) / len(cutL), fps)
-    print('')
+
+    if(cutL != []):
+        printTimeFrame('Smallest cut length', min(cutL), fps)
+        printTimeFrame('Largest cut length', max(cutL), fps)
+        printTimeFrame('Average cut length', sum(cutL) / len(cutL), fps)
+        print('')
+
     if(not audioFile):
         print('Video framerate:', fps)
     log.debug(f'Chunks:\n{chunks}')
