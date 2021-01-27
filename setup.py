@@ -38,7 +38,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'numpy==1.19.3',
+        'numpy', # numpy devs fixed package for Windows users, 1.19.5 and onward.
         'audiotsm2',
         'opencv-python',
         'youtube-dl',
