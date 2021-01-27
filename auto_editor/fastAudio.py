@@ -1,14 +1,13 @@
 '''fastAudio.py'''
 
 from usefulFunctions import ProgressBar, getNewLength
-from mediaMetadata import getAudioCodec
 
 def convertAudio(ffmpeg, ffprobe, theFile, INPUT_FILE, outFile, args, log):
     log.debug(f'Convering internal audio file: {theFile} to {outFile}')
 
     realCodec = args.audio_codec
     if(realCodec is None):
-        realCodec = getAudioCodec(ffprobe, INPUT_FILE)
+        realCodec = ffprobe.getAudioCodec(INPUT_FILE)
     if(realCodec == "pcm_s16le" and outFile.endswith('.m4a')):
         log.error(f'Codec: {realCodec} is not supported in the m4a container.')
 
