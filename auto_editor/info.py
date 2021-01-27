@@ -11,23 +11,14 @@ def getInfo(files, ffmpeg, ffprobe, log):
         else:
             log.error(f'Could not find file: {file}')
 
-        hasVid = ffprobe.pipe(['-show_streams', '-select_streams', 'v', file])
-        hasAud = ffprobe.pipe(['-show_streams', '-select_streams', 'a', file])
-
-        hasAud = len(hasAud) > 5
-        hasVid = len(hasVid) > 5
+        hasVid = len(ffprobe.pipe(['-show_streams', '-select_streams', 'v', file])) > 5
+        hasAud = len(ffprobe.pipe(['-show_streams', '-select_streams', 'a', file])) > 5
 
         if(hasVid):
             fps = ffmpegFPS(ffmpeg, file, log)
             print(f' - fps: {fps}')
-
-            dur = ffprobe.pipe(['-i', file, '-show_entries', 'format=duration', '-of',
-                'csv=p=0']).strip()
-            print(f' - duration: {dur}')
-
-            res = ffprobe.pipe(['-select_streams', 'v:0', '-show_entries',
-                'stream=height,width', '-of', 'csv=s=x:p=0', file]).strip()
-            print(f' - resolution: {res}')
+            print(f' - duration: {ffprobe.getDuration(file)}')
+            print(f' - resolution: {ffprobe.getResolution(file)}')
 
             raw_data = ffprobe.pipe(['-select_streams', 'v:0', '-show_entries',
                 'stream=codec_name,bit_rate', '-of',
@@ -47,47 +38,15 @@ def getInfo(files, ffmpeg, ffprobe, log):
 
                 for track in range(tracks):
                     print(f'   - Track #{track}')
-
-                    raw_data = ffprobe.pipe(['-select_streams', f'a:{track}',
-                        '-show_entries', 'stream=codec_name,sample_rate',
-                        '-of', 'compact=p=0:nk=1', file])
-
-                    raw_data = raw_data.replace('\n', '').split('|')
-
-                    acod = raw_data[0]
-                    if(len(raw_data) > 1 and raw_data[1].isnumeric()):
-                        sr = str(int(raw_data[1]) / 1000) + ' kHz'
-                    else:
-                        sr = 'N/A'
-
-                    print(f'     - codec: {acod}')
-                    print(f'     - samplerate: {sr}')
-
-                    output = ffprobe.pipe(['-select_streams', f'a:{track}',
-                        '-show_entries', 'stream=bit_rate', '-of', 'compact=p=0:nk=1',
-                        file]).strip()
-                    if(output.isnumeric()):
-                        abit = str(round(int(output) / 1000)) + 'k'
-                        print(f'     - bitrate: {abit}')
+                    print(f'     - codec: {ffprobe.getAudioCodec(file, track)}')
+                    print(f'     - samplerate: {ffprobe.getPrettySampleRate(file, track)}')
+                    print(f'     - bitrate: {ffprobe.getPrettyABitrate(file, track)}')
             else:
                 print(' - audio tracks: 0')
         elif(hasAud):
-            raw_data = ffprobe.pipe(['-select_streams', 'a:0', '-show_entries',
-                'stream=codec_name,sample_rate', '-of',
-                'compact=p=0:nk=1', file]).split('|')
-
-            acod = raw_data[0]
-            sr = str(int(raw_data[1]) / 1000) + ' kHz'
-
-            print(f' - codec: {acod}')
-            print(f' - samplerate: {sr}')
-
-            output = ffprobe.pipe(['-select_streams',
-                'a:0', '-show_entries', 'stream=bit_rate', '-of',
-                'compact=p=0:nk=1', file]).strip()
-            if(output.isnumeric()):
-                abit = str(round(int(output) / 1000)) + 'k'
-                print(f' - bitrate: {abit}')
+            print(f' - codec: {ffprobe.getAudioCodec(file, track=0)}')
+            print(f' - samplerate: {ffprobe.getPrettySampleRate(file, track=0)}')
+            print(f' - bitrate: {ffprobe.getPrettyABitrate(file, track=0)}')
         else:
             print('Invalid media.')
     print('')

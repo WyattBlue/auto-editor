@@ -269,6 +269,13 @@ def main():
         generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
             args.width, args.height)
         sys.exit()
+
+    elif(len(sys.argv) > 1 and sys.argv[1] == 'test'):
+
+        from testAutoEditor import testAutoEditor
+        testAutoEditor()
+        sys.exit()
+
     elif(len(sys.argv) > 1 and sys.argv[1] == 'info'):
         option_data = info_options()
         args = ParseOptions(sys.argv[2:], Log(), option_data)
@@ -335,8 +342,7 @@ def main():
     log = Log(args.debug, args.show_ffmpeg_debug, args.quiet, temp=TEMP)
     log.debug(f'\n   - Temp Directory: {TEMP}')
 
-    from mediaMetadata import vidTracks, getSampleRate, getAudioBitrate
-    from mediaMetadata import getVideoCodec, ffmpegFPS
+    from mediaMetadata import vidTracks, ffmpegFPS
     from wavfile import read
 
     from usefulFunctions import isLatestVersion
@@ -413,10 +419,27 @@ def main():
             log.debug(f'  Removing already existing file: {newOutput}')
             os.remove(newOutput)
 
-        sampleRate = getSampleRate(INPUT_FILE, ffmpeg, args.sample_rate)
-        audioBitrate = getAudioBitrate(INPUT_FILE, ffprobe, log, args.audio_bitrate)
-
+        if(args.sample_rate is None):
+            sampleRate = ffprobe.getSampleRate(INPUT_FILE)
+            if(sampleRate == 'N/A'):
+                sampleRate = '48000'
+                log.warning(f"Samplerate couldn't be detected, using {sampleRate}.")
+        else:
+            sampleRate = str(args.sample_rate)
         log.debug(f'   - sampleRate: {sampleRate}')
+
+        if(args.audio_bitrate is None):
+            if(INPUT_FILE.endswith('.mkv')):
+                # audio bitrate not supported in the mkv container.
+                audioBitrate = None
+            else:
+                audioBitrate = ffprobe.getPrettyABitrate(INPUT_FILE)
+                if(audioBitrate == 'N/A'):
+                    log.warning("Couldn't automatically detect audio bitrate.")
+                    audioBitrate = None
+        else:
+            audioBitrate = args.audio_bitrate
+
         log.debug(f'   - audioBitrate: {audioBitrate}')
 
         audioFile = fileFormat in audioExtensions

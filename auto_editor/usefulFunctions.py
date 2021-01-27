@@ -40,10 +40,12 @@ class Log():
         self.cleanup()
         sys.exit(1)
 
-    # When something's definitely wrong with the program.
     def bug(self, message, bug_type='bug report'):
-        print('Error!', message, f'\n\nCreate a {bug_type} at',
-            'https://github.com/WyattBlue/auto-editor/issues/\n', file=sys.stderr)
+        URL = 'https://github.com/WyattBlue/auto-editor/issues/'
+        print('Error!', message,
+            "\n\nThis is not a normal error.\n This message will only show up if there's",
+            'something definitely wrong with the program.',
+            f'\nCreate a {bug_type} at:\n  {URL}', file=sys.stderr)
         self.cleanup()
         sys.exit(1)
 
@@ -115,6 +117,37 @@ class FFprobe():
     def pipe(self, cmd: list) -> str:
         return pipeToConsole([self.myPath, '-v', 'error'] + cmd)
 
+    def _get(self, file, stream, the_type, track, of='compact=p=0:nk=1') -> str:
+        return self.pipe(['-select_streams', f'{the_type}:{track}', '-show_entries',
+            f'stream={stream}', '-of', of, file]).strip()
+
+    def getResolution(self, file):
+        return self._get(file, 'height,width', 'v', 0, of='csv=s=x:p=0')
+
+    def getDuration(self, file):
+        return self._get(file, 'duration', 'v', 0)
+
+    def getAudioCodec(self, file, track=0):
+        return self._get(file, 'codec_name', 'a', track)
+
+    def getSampleRate(self, file, track=0):
+        return self._get(file, 'sample_rate', 'a', track)
+
+    def getAudioBitrate(self, file, track=0):
+        return self._get(file, 'bit_rate', 'a', track)
+
+    def getPrettySampleRate(self, file, track=0) -> str:
+        output = self.getSampleRate(file, track)
+        if(output.isnumeric()):
+            return str(int(output) / 1000) + ' kHz'
+        return 'N/A'
+
+    def getPrettyABitrate(self, file, track=0) -> str:
+        output = self.getAudioBitrate(file, track)
+        if(output.isnumeric()):
+            # This does get used by ffmpeg so be careful.
+            return str(round(int(output) / 1000)) + 'k'
+        return 'N/A'
 
 class FFmpeg():
     def __init__(self, plat, dirPath, myFFmpeg: bool, show: bool):
