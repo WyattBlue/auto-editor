@@ -265,7 +265,7 @@ def main():
         from generateTestMedia import generateTestMedia
         from usefulFunctions import FFmpeg
 
-        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, False)
+        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, Log())
         generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
             args.width, args.height)
         sys.exit()
@@ -289,8 +289,8 @@ def main():
         from info import getInfo
         from usefulFunctions import FFmpeg, FFprobe
 
-        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, False)
-        ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg)
+        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, Log())
+        ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg, Log())
 
         getInfo(args.input, ffmpeg, ffprobe, log)
         sys.exit()
@@ -312,8 +312,8 @@ def main():
     del option_data
 
     from usefulFunctions import FFmpeg, FFprobe
-    ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, args.show_ffmpeg_debug)
-    ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg)
+    ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, Log())
+    ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg, Log())
 
     makingDataFile = (args.export_to_premiere or args.export_to_resolve or
         args.export_to_final_cut_pro or args.export_as_json)
@@ -342,9 +342,10 @@ def main():
     log = Log(args.debug, args.show_ffmpeg_debug, args.quiet, temp=TEMP)
     log.debug(f'\n   - Temp Directory: {TEMP}')
 
-    from mediaMetadata import vidTracks, ffmpegFPS
-    from wavfile import read
+    ffmpeg.updateLog(log)
+    ffprobe.updateLog(log)
 
+    from wavfile import read
     from usefulFunctions import isLatestVersion
 
     if(not args.quiet and isLatestVersion(version, log)):
@@ -466,14 +467,14 @@ def main():
             elif(args.export_to_premiere or args.export_to_final_cut_pro or
                 args.export_to_resolve):
                 # Based on timebase.
-                fps = int(ffmpegFPS(ffmpeg, INPUT_FILE, log))
+                fps = int(ffprobe.getFrameRate(INPUT_FILE))
             else:
-                fps = ffmpegFPS(ffmpeg, INPUT_FILE, log)
-            log.debug(f'ffmpeg fps: {fps}')
+                fps = ffprobe.getFrameRate(INPUT_FILE)
+            log.debug(f'Frame rate: {fps}')
 
             tracks = args.force_tracks_to
             if(tracks is None):
-                tracks = vidTracks(INPUT_FILE, ffprobe, log)
+                tracks = ffprobe.getAudioTracks(INPUT_FILE)
 
             if(args.cut_by_this_track >= tracks):
                 allTracks = ''

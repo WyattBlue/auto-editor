@@ -93,8 +93,10 @@ def pipeToConsole(myCommands: list) -> str:
 
 
 class FFprobe():
-    def __init__(self, plat, dirPath, myFFmpeg: bool):
+    def __init__(self, plat, dirPath, myFFmpeg: bool, log):
         from os import path
+
+        self.mylog = log
 
         newF = None
         if(plat == 'Windows' and not myFFmpeg):
@@ -106,16 +108,45 @@ class FFprobe():
             self.myPath = newF
         else:
             self.myPath = 'ffprobe'
+            try:
+                pipeToConsole([self.myPath, '-h'])
+            except FileNotFoundError:
+                if(plat == 'Darwin'):
+                    self.log.error('No ffprobe found, download via homebrew or restore' \
+                        ' the included binary.')
+                elif(plat == 'Windows'):
+                    self.log.error('No ffprobe found, download ffprobe with your' \
+                        ' favorite package manager (ex chocolatey), or restore the' \
+                        ' included binary.')
+                else:
+                    self.log.error('ffprobe must be on PATH. Download ffprobe by running:\n' \
+                        '  sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg' \
+                        '\nOr something similar depending on your distro.')
+
+    def log(self, message):
+        self.mylog.ffmpeg(message)
 
     def getPath(self) -> str:
         return self.myPath
 
+    def updateLog(self, log):
+        self.mylog = log
+
     def run(self, cmd: list):
         import subprocess
-        subprocess.call([self.myPath] + cmd)
+        full_cmd = [self.myPath] + cmd
+
+        self.log(full_cmd)
+        subprocess.call(full_cmd)
 
     def pipe(self, cmd: list) -> str:
-        return pipeToConsole([self.myPath, '-v', 'error'] + cmd)
+        full_cmd = [self.myPath, '-v', 'error'] + cmd
+
+        self.log(full_cmd)
+        output = pipeToConsole(full_cmd)
+        self.log(output)
+
+        return output
 
     def _get(self, file, stream, the_type, track, of='compact=p=0:nk=1') -> str:
         return self.pipe(['-select_streams', f'{the_type}:{track}', '-show_entries',
@@ -126,6 +157,29 @@ class FFprobe():
 
     def getDuration(self, file):
         return self._get(file, 'duration', 'v', 0)
+
+    def getFrameRate(self, file):
+        output = self.pipe(['-select_streams', 'v', '-show_entries',
+            'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
+        nums = output.split('/')
+        return int(nums[0]) / int(nums[1])
+
+    def getAudioTracks(self, file):
+        output = self.pipe(['-select_streams', 'a', '-show_entries', 'stream=index',
+            '-of', 'compact=p=0:nk=1', file]).strip()
+
+        numbers = output.split('\n')
+        # Remove all \r chars that can appear in certain environments
+        numbers = [s.replace('\r', '') for s in numbers]
+        # Remove all blanks
+        numbers = [s for s in numbers if s != '']
+
+        self.log('Track data: ' + str(numbers))
+        if(numbers[0].isnumeric()):
+            return len(numbers)
+        else:
+            self.mylog.warning('ffprobe had an invalid output.')
+            return 1 # Assume there's one audio track.
 
     def getAudioCodec(self, file, track=0):
         return self._get(file, 'codec_name', 'a', track)
@@ -150,10 +204,11 @@ class FFprobe():
         return 'N/A'
 
 class FFmpeg():
-    def __init__(self, plat, dirPath, myFFmpeg: bool, show: bool):
+    def __init__(self, plat, dirPath, myFFmpeg: bool, log):
         from os import path
 
-        self.show = show
+        self.mylog = log
+
         newF = None
         if(plat == 'Windows' and not myFFmpeg):
             newF = path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
@@ -164,18 +219,37 @@ class FFmpeg():
             self.myPath = newF
         else:
             self.myPath = 'ffmpeg'
+            try:
+                pipeToConsole([self.myPath, '-h'])
+            except FileNotFoundError:
+                if(plat == 'Darwin'):
+                    self.log.error('No ffmpeg found, download via homebrew or restore' \
+                        ' the included binaries.')
+                elif(plat == 'Windows'):
+                    self.log.error('No ffmpeg found, download ffmpeg with your' \
+                        ' favorite package manager (ex chocolatey), or restore the' \
+                        ' included binaries.')
+                else:
+                    self.log.error('FFmpeg must be on PATH. Download ffmpeg by running:\n' \
+                        '  sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg' \
+                        '\nOr something similar depending on your distro.')
+
+    def log(self, message):
+        self.mylog.ffmpeg(message)
 
     def getPath(self) -> str:
         return self.myPath
 
+    def updateLog(self, log):
+        self.mylog = log
+
     def run(self, cmd: list):
         cmd = [self.myPath, '-y'] + cmd
-        if(self.show):
+        if(self.mylog.is_ffmpeg):
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '8'])
-        if(self.show):
-            print(cmd)
+        self.log(cmd)
 
         import subprocess
         subprocess.call(cmd)
@@ -183,11 +257,9 @@ class FFmpeg():
     def pipe(self, cmd: list) -> str:
         cmd = [self.myPath, '-y'] + cmd
 
-        if(self.show):
-            print(cmd)
+        self.log(cmd)
         output = pipeToConsole(cmd)
-        if(self.show):
-            print(output)
+        self.log(output)
 
         return output
 
@@ -309,7 +381,6 @@ def humanReadableTime(rawTime: float) -> str:
             rawTime = round(rawTime)
         units = 'minutes'
     return f'{rawTime} {units}'
-
 
 def smartOpen(newOutput: str, log):
     from subprocess import call
