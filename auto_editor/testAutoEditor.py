@@ -6,6 +6,7 @@ Test auto-editor and make sure everything is working.
 
 import os
 import sys
+import shutil
 import subprocess
 
 def runTest(cmd):
@@ -26,6 +27,15 @@ def runTest(cmd):
         sys.exit(1)
     else:
         print('Test Succeeded.\n')
+
+
+def cleanup(the_dir):
+    for item in os.listdir(the_dir):
+        item = f'{the_dir}/{item}'
+        if('_ALTERED' in item or item.endswith('.xml') or item.endswith('.json')):
+            os.remove(item)
+        if(item.endswith('_tracks')):
+            shutil.rmtree(item)
 
 def testAutoEditor():
     # Test Help Command
@@ -65,9 +75,6 @@ def testAutoEditor():
 
     runTest(['example.mp4', '-m', '3'])
     runTest(['example.mp4', '-m', '0.3sec'])
-    runTest(['example.mp4', '--frame_margin', '10'])
-    runTest(['example.mp4', '--frame_margin', '2sec'])
-
     # Test ProgressOps
     runTest(['example.mp4', 'progressOps', '--machine_readable_progress'])
     runTest(['example.mp4', 'progressOps', '--no_progress'])
@@ -76,7 +83,7 @@ def testAutoEditor():
     runTest(['resources/newCommentary.mp3', '--silent_threshold', '0.1'])
 
     # Test Cut by All Tracks
-    runTest(['resources/multi-track.mov', '--show_ffmpeg_debug', '--cut_by_all_tracks'])
+    runTest(['resources/multi-track.mov', '--cut_by_all_tracks'])
 
     runTest(['resources/multi-track.mov', '--keep_tracks_seperate'])
 
@@ -90,7 +97,14 @@ def testAutoEditor():
     runTest(['example.mp4', '--sounded_speed', '0.5'])
     runTest(['example.mp4', '--silent_speed', '0.5'])
 
+    cleanup(os.getcwd())
+    cleanup('resources')
+
     for item in os.listdir('resources'):
+
+        if('man_on_green_screen' in item or item.endswith('.txt')):
+            continue
+
         item = f'resources/{item}'
         runTest([item])
         runTest([item, '-exp'])
@@ -105,7 +119,11 @@ def testAutoEditor():
     runTest(['example.mp4', '--cut_out', '0-5.7', '-o', 'hmm.mp4'])
     runTest(['example.mp4', 'hmm.mp4', '--combine_files', '--debug'])
 
-    runTest(['resources/man_on_green_screen.mp4', '--edit_based_on motion', '--debug', '--frame_margin', '0', '-mcut', '0', '-mclip', '0'])
+    os.remove('hmm.mp4')
 
+    runTest(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion', '--debug', '--frame_margin', '0', '-mcut', '0', '-mclip', '0'])
+
+    cleanup('resources')
+    cleanup(os.getcwd())
 if(__name__ == '__main__'):
     testAutoEditor()
