@@ -43,7 +43,8 @@ setup(
         'opencv-python',
         'youtube-dl',
         'requests',
-        'av',
+        # 'av', failed for too many users.
+        # Failing here causes auto-editor not to install.
     ],
     classifiers=[
         'Topic :: Multimedia :: Video',

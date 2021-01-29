@@ -33,8 +33,10 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
     import os
 
     import numpy as np
-    from audiotsm2 import phasevocoder
-    from audiotsm2.io.array import ArrReader, ArrWriter
+
+    if((speeds[0] != 1 and speeds[0] != 99999) or (speeds[1] != 1 and speeds[1] != 99999)):
+        from audiotsm2 import phasevocoder
+        from audiotsm2.io.array import ArrReader, ArrWriter
 
     log.checkType(chunks, 'chunks', list)
     log.checkType(speeds, 'speeds', list)
