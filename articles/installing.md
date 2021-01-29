@@ -57,6 +57,23 @@ Installing the av module will make rendering videos go faster.
 pip3 install av
 ```
 
+
+## Installing from Source
+
+Use git to download the repository:
+
+```terminal
+git clone https://github.com/WyattBlue/auto-editor.git
+cd auto-editor
+```
+
+Then run the local version using `python` or `python3`
+```
+python -m auto_editor example.mp4 --frame_margin 7
+```
+
+----
+
 ## Dependencies
 
 If auto-editor could not be installed because a dependency couldn't be installed. Run:
@@ -82,19 +99,22 @@ Foundational math module needed for handling large data. Must be installed for a
 
 The lead developer's own fork of audiotsm. Used for making new audio files at a different speed. Recommended to be installed by all users but not required if `--video_speed` or `--silent_speed` are never used.
 
-## Installing from Source
+### Opencv-Python
 
-Use git to download the repository:
+Sometimes referred to as opencv or cv2. This module is used to determine where motion happens and is used to generate new videos.
 
-```terminal
-git clone https://github.com/WyattBlue/auto-editor.git
-cd auto-editor
-```
+### Youtube-dl
 
-Then run the local verison using `python` or `python3`
-```
-python -m auto_editor example.mp4 --frame_margin 7
-```
+Public domain module used to download videos off of websites. When installed, always auto-editor to support URL inputs. i.e
+
+### Requests
+
+https module used to check there's a new version of auto-editor. Not necessary for anything else.
+
+### Av
+
+Retrieve video data in form python can natively use. Allows for very fast rendering of videos and be used instead of opencv-python.
+
 
 ----
 
