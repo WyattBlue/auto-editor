@@ -79,7 +79,7 @@ def validInput(inputs: list, ffmpeg, log) -> list:
                 ydl_opts = {
                     'nocheckcertificate': True,
                     'outtmpl': basename,
-                    'ffmpeg_location': ffmpeg,
+                    'ffmpeg_location': ffmpeg.getPath(),
                     'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
                     'logger': MyLogger(),
                     'progress_hooks': [my_hook],
