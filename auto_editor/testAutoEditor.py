@@ -29,6 +29,34 @@ def runTest(cmd):
         print('Test Succeeded.\n')
 
 
+def pipeToConsole(myCommands: list):
+    import subprocess
+    process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    return process.returncode, stdout.decode(), stderr.decode()
+
+
+def checkForError(cmd):
+    runner = ['python3', 'auto_editor/__main__.py']
+
+    pretty_cmd = ' '.join(cmd)
+    print(f'Running Error Test: {pretty_cmd}')
+
+    returncode, stdout, stderr = pipeToConsole(runner + cmd)
+    if(returncode > 0):
+        if('Error!' in stderr):
+            print('Test Succeeded.')
+        else:
+            print('Test Failed.\n')
+            print(f'Program crashed.\n{e}')
+            sys.exit(1)
+    else:
+        print('Test Failed.\n')
+        print('Program responsed with a code 0, but should have failed.')
+        sys.exit(1)
+
+
 def cleanup(the_dir):
     for item in os.listdir(the_dir):
         item = f'{the_dir}/{item}'
@@ -75,6 +103,12 @@ def testAutoEditor():
 
     runTest(['example.mp4', '-m', '3'])
     runTest(['example.mp4', '-m', '0.3sec'])
+
+
+    shutil.copy('example.mp4', 'example')
+
+    checkForError(['example', '--no_open'])
+
     # Test ProgressOps
     runTest(['example.mp4', 'progressOps', '--machine_readable_progress'])
     runTest(['example.mp4', 'progressOps', '--no_progress'])
