@@ -8,7 +8,7 @@ invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
       '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
       '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
       '.db', '.ini', '.BIN', '.svg', '.in', '.pyc', '.log', '.xsd', '.ffpreset',
-      '.kys', '.essentialsound', '']
+      '.kys', '.essentialsound']
 
 def validFiles(path: str, badExts: list):
     for f in os.listdir(path):
@@ -51,6 +51,9 @@ def validInput(inputs: list, ffmpeg, log) -> list:
 
             # Check if the file format is valid.
             fileFormat = myInput[myInput.rfind('.'):]
+
+            if('.' not in fileFormat):
+                log.error('File must have extension.')
 
             if(fileFormat in invalidExtensions):
                 log.error(f'Invalid file extension "{fileFormat}" for {myInput}')
