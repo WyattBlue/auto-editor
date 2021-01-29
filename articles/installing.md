@@ -15,10 +15,15 @@ pip3 install --upgrade pip
 
 to upgrade pip to the latest version.
 
+
 :warning: | Windows users need to install [Visual Code Studio](https://visualstudio.microsoft.com/vs/features/cplusplus/) to compile the C program, opencv.
 :---: | :---
 
-After upgrading pip, run `pip3 install auto-editor` and wait for pip to finish.
+After upgrading pip, run:
+
+```
+pip3 install auto-editor
+```
 
 > Linux users will need to install FFmpeg. This command should work for most distros: `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
 
@@ -44,6 +49,38 @@ Run this to uninstall auto-editor:
 pip3 uninstall auto-editor
 ```
 
+## Increasing speed.
+
+Installing the av module will make rendering videos go faster.
+
+```
+pip3 install av
+```
+
+## Dependencies
+
+If auto-editor could not be installed because a dependency couldn't be installed. Run:
+
+```
+pip3 install auto-editor --no-deps
+```
+
+```
+pip3 install numpy
+pip3 install audiotsm2
+pip3 install opencv-python
+pip3 install youtube-dl
+pip3 install requests
+pip3 install av
+```
+
+### Numpy
+
+Foundational math module needed for handling large data. Must be installed for any use with auto-editor.
+
+### Audiotsm2
+
+The lead developer's own fork of audiotsm. Used for making new audio files at a different speed. Recommended to be installed by all users but not required if `--video_speed` or `--silent_speed` are never used.
 
 ## Installing from Source
 
