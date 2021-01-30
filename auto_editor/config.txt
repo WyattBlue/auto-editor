@@ -1,0 +1,40 @@
+# Auto-Editor default configuration file
+
+# metadataOps
+auto-editor.metadataOps.force_fps_to = None               # None
+auto-editor.metadataOps.force_tracks_to = None            # None
+
+# exportMediaOps
+auto-editor.exportMediaOps.video_bitrate = None           # None
+auto-editor.exportMediaOps.audio_bitrate = None           # None
+auto-editor.exportMediaOps.sample_rate = None             # None
+auto-editor.exportMediaOps.video_codec = 'uncompressed'   # 'uncompressed'
+auto-editor.exportMediaOps.audio_codec = None             # None
+auto-editor.exportMediaOps.preset = 'medium'              # 'medium'
+auto-editor.exportMediaOps.tune = 'none'                  # 'none'
+auto-editor.exportMediaOps.constant_rate_factor = 15      # 15
+auto-editor.render = 'auto'                               # 'auto'
+
+# motionOps
+auto-editor.motionOps.dilates = 2                         # 2
+auto-editor.motionOps.width = 400                         # 400
+auto-editor.motionOps.blur = 21                           # 21
+
+auto-editor.motion_threshold = 0.02                       # 0.02
+auto-editor.edit_based_on = 'audio'                       # 'audio'
+auto-editor.cut_by_this_audio = None                      # None
+auto-editor.cut_by_this_track = 0                         # 0
+auto-editor.min_clip_length = 3                           # 3
+auto-editor.min_cut_length = 6                            # 6
+auto-editor.frame_margin = 6                              # 6
+auto-editor.silent_threshold = 0.04                       # 0.04
+auto-editor.video_speed = 1.0                             # 1.0
+auto-editor.silent_speed = 99999                          # 99999
+auto-editor.output_file = None                            # None
+
+# generate_test subcommand
+generate_test.fps = 30.0                                  # 30.0
+generate_test.duration = 10                               # 10
+generate_test.width = 640                                 # 640
+generate_test.height = 360                                # 360
+generate_test.output_file = 'testsrc.mp4'                 # 'testsrc.mp4'
