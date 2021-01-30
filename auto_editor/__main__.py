@@ -227,48 +227,10 @@ def genHelp(option_data):
                 print('     ...')
     print('')
 
-
-def configtext(ops, namespace) -> str:
-    f = ''
-    for op in ops:
-        name = (op['names'][0]).replace('-', '')
-
-        if(name == '(input)'):
-            continue
-
-        if(op['action'] == 'store_true'):
-            continue
-
-        value = op['default']
-
-        if(type(value) == str):
-            value = f"'{value}'"
-        group = op['grouping']
-
-        if(op['action'] == 'grouping'):
-            f += f'\n# {name}\n'
-            continue
-
-        if(group is None):
-            statement = '{:<55}'.format(f'{namespace}.{name} = {value}')
-        else:
-            statement = '{:<55}'.format(f'{namespace}.{group}.{name} = {value}')
-        f += f'{statement}   # {value}\n'
-
-    return f
-
 def main():
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # Fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
-
-    # with open(dirPath + '/config.txt', 'w') as file:
-
-    #     file.write('# Auto-Editor default configuration file\n')
-    #     file.write(configtext(main_options(), 'auto-editor'))
-
-    #     file.write('\n# generate_test subcommand\n')
-    #     file.write(configtext(generate_options(), 'generate_test'))
 
     # Print the version if only the -v option is added.
     if(sys.argv[1:] == ['-v'] or sys.argv[1:] == ['-V']):
