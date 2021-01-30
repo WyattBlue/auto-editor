@@ -306,15 +306,15 @@ class ProgressBar():
         self.hide = hide
         self.ampm = True
 
-        import platform
-
-        if(platform.system() == 'Darwin'):
-            try:
-                dateFormat = pipeToConsole(['defaults', 'read',
-                    'com.apple.menuextra.clock', 'DateFormat'])
-                self.ampm = 'a' in dateFormat
-            except FileNotFoundError:
-                pass
+        if(not self.machine):
+            import platform
+            if(platform.system() == 'Darwin'):
+                try:
+                    dateFormat = pipeToConsole(['defaults', 'read',
+                        'com.apple.menuextra.clock', 'DateFormat'])
+                    self.ampm = 'a' in dateFormat
+                except FileNotFoundError:
+                    pass
 
         newTime = prettyTime(self.beginTime, self.ampm)
         termsize = get_terminal_size().columns
