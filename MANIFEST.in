@@ -1,7 +1,7 @@
-include auto_editor/win-ffmpeg/bin/ffmpeg.exe
-include auto_editor/win-ffmpeg/bin/ffprobe.exe
+include auto_editor/win-ffmpeg/bin/*
 include auto_editor/win-ffmpeg/LICENSE.txt
 
-include auto_editor/mac-ffmpeg/bin/ffmpeg
-include auto_editor/mac-ffmpeg/bin/ffprobe
+include auto_editor/mac-ffmpeg/bin/*
 include auto_editor/mac-ffmpeg/LICENSE.txt
+
+include auto_editor/config.txt
