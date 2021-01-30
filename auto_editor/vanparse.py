@@ -87,7 +87,6 @@ class ParseOptions():
 
             key = key[key.rfind('.')+1:]
 
-            print(key, value)
             setattr(self, key, value)
 
 
