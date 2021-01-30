@@ -31,9 +31,7 @@ class Log():
 
         from shutil import rmtree
         rmtree(self.temp)
-
-        if(self.is_debug):
-            self.debug(f'   - Removed Temp Directory.')
+        self.debug(f'   - Removed Temp Directory.')
 
     def error(self, message):
         print('Error!', message, file=sys.stderr)
@@ -273,19 +271,20 @@ def getNewLength(chunks: list, speeds: list, fps: float) -> float:
     return timeInFrames / fps
 
 
-def prettyTime(myTime: float) -> str:
+def prettyTime(myTime: float, ampm: bool) -> str:
     newTime = localtime(myTime)
 
     hours = newTime.tm_hour
     minutes = newTime.tm_min
 
-    if(hours == 0):
-        hours = 12
-    if(hours > 12):
-        hours -= 12
-    ampm = 'PM' if newTime.tm_hour >= 12 else 'AM'
-    return f'{hours:02}:{minutes:02} {ampm}'
-
+    if(ampm):
+        if(hours == 0):
+            hours = 12
+        if(hours > 12):
+            hours -= 12
+        ampm = 'PM' if newTime.tm_hour >= 12 else 'AM'
+        return f'{hours:02}:{minutes:02} {ampm}'
+    return f'{hours:02}:{minutes:02}'
 
 def bar(termsize, title, doneStr, togoStr, percentDone, newTime):
     bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
@@ -305,8 +304,19 @@ class ProgressBar():
         self.len_title = len(title)
         self.machine = machineReadable
         self.hide = hide
+        self.ampm = True
 
-        newTime = prettyTime(self.beginTime)
+        import platform
+
+        if(platform.system() == 'Darwin'):
+            try:
+                dateFormat = pipeToConsole(['defaults', 'read',
+                    'com.apple.menuextra.clock', 'DateFormat'])
+                self.ampm = 'a' in dateFormat
+            except FileNotFoundError:
+                pass
+
+        newTime = prettyTime(self.beginTime, self.ampm)
         termsize = get_terminal_size().columns
 
         if(hide):
@@ -336,7 +346,7 @@ class ProgressBar():
         else:
             percentPerSec = (time() - self.beginTime) / percentDone
 
-        newTime = prettyTime(self.beginTime + (percentPerSec * 100))
+        newTime = prettyTime(self.beginTime + (percentPerSec * 100), self.ampm)
 
         if(self.machine):
             index = min(index, self.total)
