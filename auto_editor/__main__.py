@@ -40,7 +40,7 @@ def frame_type(inp: str):
     return int(inp)
 
 def add_argument(*names, nargs=1, type=str, default=None, action='default',
-    range=None, choices=None, parent='auto-editor', help='', extra=''):
+    range=None, choices=None, group=None, help='', extra=''):
     newDic = {}
     newDic['names'] = names
     newDic['nargs'] = nargs
@@ -51,48 +51,48 @@ def add_argument(*names, nargs=1, type=str, default=None, action='default',
     newDic['extra'] = extra
     newDic['range'] = range
     newDic['choices'] = choices
-    newDic['grouping'] = parent
+    newDic['grouping'] = group
     return [newDic]
 
 def main_options():
     ops = []
     ops += add_argument('progressOps', nargs=0, action='grouping')
     ops += add_argument('--machine_readable_progress', action='store_true',
-        parent='progressOps',
+        group='progressOps',
         help='set progress bar that is easier to parse.')
     ops += add_argument('--no_progress', action='store_true',
-        parent='progressOps',
+        group='progressOps',
         help='do not display any progress at all.')
 
     ops += add_argument('metadataOps', nargs=0, action='grouping')
-    ops += add_argument('--force_fps_to', type=float, parent='metadataOps',
+    ops += add_argument('--force_fps_to', type=float, group='metadataOps',
         help='manually set the fps value for the input video if detection fails.')
-    ops += add_argument('--force_tracks_to', type=int, parent='metadataOps',
+    ops += add_argument('--force_tracks_to', type=int, group='metadataOps',
         help='manually set the number of tracks auto-editor thinks there are.')
 
     ops += add_argument('exportMediaOps', nargs=0, action='grouping')
-    ops += add_argument('--video_bitrate', '-vb', parent='exportMediaOps',
+    ops += add_argument('--video_bitrate', '-vb', group='exportMediaOps',
         help='set the number of bits per second for video.')
-    ops += add_argument('--audio_bitrate', '-ab', parent='exportMediaOps',
+    ops += add_argument('--audio_bitrate', '-ab', group='exportMediaOps',
         help='set the number of bits per second for audio.')
     ops += add_argument('--sample_rate', '-r', type=sample_rate_type,
-        parent='exportMediaOps',
+        group='exportMediaOps',
         help='set the sample rate of the input and output videos.')
     ops += add_argument('--video_codec', '-vcodec', default='uncompressed',
-        parent='exportMediaOps',
+        group='exportMediaOps',
         help='set the video codec for the output media file.')
-    ops += add_argument('--audio_codec', '-acodec', parent='exportMediaOps',
+    ops += add_argument('--audio_codec', '-acodec', group='exportMediaOps',
         help='set the audio codec for the output media file.')
-    ops += add_argument('--preset', '-p', default='medium', parent='exportMediaOps',
+    ops += add_argument('--preset', '-p', default='medium', group='exportMediaOps',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
         help='set the preset for ffmpeg to help save file size or increase quality.')
-    ops += add_argument('--tune', '-t', default='none', parent='exportMediaOps',
+    ops += add_argument('--tune', '-t', default='none', group='exportMediaOps',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none'],
         help='set the tune for ffmpeg to compress video better in certain circumstances.')
     ops += add_argument('--constant_rate_factor', '-crf', type=int, default=15,
-        parent='exportMediaOps', range='0 to 51',
+        group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
     ops += add_argument('--render', default='auto',
         choices=['av', 'opencv', 'auto'],
@@ -100,13 +100,13 @@ def main_options():
 
     ops += add_argument('motionOps', nargs=0, action='grouping')
     ops += add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
-        parent='motionOps',
+        group='motionOps',
         help='set how many times a frame is dilated before being compared.')
     ops += add_argument('--width', '-w', type=int, default=400, range='1 to Infinity',
-        parent='motionOps',
+        group='motionOps',
         help="scale the frame to this width before being compared.")
     ops += add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity',
-        parent='motionOps',
+        group='motionOps',
         help='set the strength of the blur applied to a frame before being compared.')
 
     ops += add_argument('--export_as_audio', '-exa', action='store_true',
@@ -119,8 +119,6 @@ def main_options():
         help='export as an XML file for Final Cut Pro instead of outputting a media file.')
     ops += add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later. (experimental)')
-
-    #ops += add_argument('--zoom')
 
     ops += add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')
@@ -188,6 +186,7 @@ def main_options():
         help='print info about the program or an option and exit.')
     ops += add_argument('(input)', nargs='*',
         help='the path to a file, folder, or url you want edited.')
+
     return ops
 
 def generate_options():
@@ -222,16 +221,54 @@ def info_options():
 
 def genHelp(option_data):
     for option in option_data:
-        if(option['grouping'] == 'auto-editor'):
+        if(option['grouping'] is None):
             print(' ', ', '.join(option['names']) + ':', option['help'])
             if(option['action'] == 'grouping'):
                 print('     ...')
     print('')
 
+
+def configtext(ops, namespace) -> str:
+    f = ''
+    for op in ops:
+        name = (op['names'][0]).replace('-', '')
+
+        if(name == '(input)'):
+            continue
+
+        if(op['action'] == 'store_true'):
+            continue
+
+        value = op['default']
+
+        if(type(value) == str):
+            value = f"'{value}'"
+        group = op['grouping']
+
+        if(op['action'] == 'grouping'):
+            f += f'\n# {name}\n'
+            continue
+
+        if(group is None):
+            statement = '{:<55}'.format(f'{namespace}.{name} = {value}')
+        else:
+            statement = '{:<55}'.format(f'{namespace}.{group}.{name} = {value}')
+        f += f'{statement}   # {value}\n'
+
+    return f
+
 def main():
     dirPath = os.path.dirname(os.path.realpath(__file__))
     # Fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
+
+    # with open(dirPath + '/config.txt', 'w') as file:
+
+    #     file.write('# Auto-Editor default configuration file\n')
+    #     file.write(configtext(main_options(), 'auto-editor'))
+
+    #     file.write('\n# generate_test subcommand\n')
+    #     file.write(configtext(generate_options(), 'generate_test'))
 
     # Print the version if only the -v option is added.
     if(sys.argv[1:] == ['-v'] or sys.argv[1:] == ['-V']):
@@ -256,7 +293,7 @@ def main():
 
     if(len(sys.argv) > 1 and sys.argv[1] == 'generate_test'):
         option_data = generate_options()
-        args = ParseOptions(sys.argv[2:], Log(), option_data)
+        args = ParseOptions(sys.argv[2:], Log(), 'generate_test', option_data)
 
         if(args.help):
             genHelp(option_data)
@@ -278,25 +315,24 @@ def main():
 
     elif(len(sys.argv) > 1 and sys.argv[1] == 'info'):
         option_data = info_options()
-        args = ParseOptions(sys.argv[2:], Log(), option_data)
+        args = ParseOptions(sys.argv[2:], Log(), 'info', option_data)
 
         if(args.help):
             genHelp(option_data)
             sys.exit()
 
-        log = Log(False, False, False)
-
         from info import getInfo
         from usefulFunctions import FFmpeg, FFprobe
 
-        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, Log())
-        ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg, Log())
+        log = Log()
+        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, log)
+        ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg, log)
 
         getInfo(args.input, ffmpeg, ffprobe, log)
         sys.exit()
     else:
         option_data = main_options()
-        args = ParseOptions(sys.argv[1:], Log(True), option_data)
+        args = ParseOptions(sys.argv[1:], Log(True), 'auto-editor', option_data)
 
     timer = Timer(args.quiet)
 
