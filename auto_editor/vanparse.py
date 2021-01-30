@@ -41,7 +41,7 @@ def get_option(item, group, the_args: list):
 
 
 class ParseOptions():
-    def __init__(self, userArgs, log, *args):
+    def __init__(self, userArgs, log, root, *args):
         # Set the default options.
         option_names = []
 
@@ -57,12 +57,46 @@ class ParseOptions():
                     value = option['default']
                 setattr(self, key, value)
 
+
+        # parse config file
+        import os
+
+        dirPath = os.path.dirname(os.path.realpath(__file__))
+
+        with open(dirPath + '/config.txt', 'r') as file:
+            lines = file.readlines()
+
+        for item in lines:
+            if('#' in item):
+                item = item[: item.index('#')]
+            item = item.replace(' ', '')
+            if(item.strip() == '' or (not item.startswith(root))):
+                continue
+            value = item[item.index('=')+1 :]
+
+            if(value[0] == "'" and value[-1] == "'"): # detect string value
+                value = value[1:-1]
+            elif(value == "None"):
+                value = None
+            elif('.' in value):
+                value = float(value)
+            else:
+                value = int(value)
+
+            key = item[: item.index('=')]
+
+            key = key[key.rfind('.')+1:]
+
+            print(key, value)
+            setattr(self, key, value)
+
+
         # Figure out attributes changed by user.
         myList = []
         settingInputs = True
         optionList = 'input'
         i = 0
-        group = 'auto-editor'
+        group = None
         while i < len(userArgs):
             item = userArgs[i]
             if(i == len(userArgs) - 1):
@@ -72,8 +106,8 @@ class ParseOptions():
 
             option = get_option(item, group, args)
 
-            if(option is None and group != 'auto-editor'):
-                group = 'auto-editor'
+            if(option is None and (group is not None)):
+                group = None
                 option = get_option(item, group, args)
 
             if(option is None):
