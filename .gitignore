@@ -5,6 +5,8 @@
 *_ALTERED.wav
 *_ALTERED
 
+*.png
+
 *src.mp4
 *example
 
@@ -17,8 +19,6 @@
 *~
 
 __pycache__/
-*.py[cod]
-*$py.class
 
 build/
 dist/
@@ -29,22 +29,7 @@ dist/
 .DS_Store?
 ._*
 
-
 MANIFEST
-
 *.manifest
 *.spec
 
-.pybuilder/
-
-__pypackages__/
-
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
