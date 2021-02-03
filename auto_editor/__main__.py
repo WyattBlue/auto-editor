@@ -317,9 +317,12 @@ def main():
         args.export_to_final_cut_pro or args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
+    sep = '\\' if platform.system() == 'Windows' else '/'
+
     if(args.debug and args.input == []):
         print('Python Version:', platform.python_version(), is64bit)
         print('Platform:', platform.system(), platform.release())
+        print('Config File path:', dirPath + sep + 'config.txt')
         print('FFmpeg path:', ffmpeg.getPath())
         ffmpegVersion = ffmpeg.pipe(['-version']).split('\n')[0]
         ffmpegVersion = ffmpegVersion.replace('ffmpeg version', '').strip()

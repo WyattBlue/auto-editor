@@ -98,7 +98,7 @@ class FFprobe():
 
         newF = None
         if(plat == 'Windows' and not myFFmpeg):
-            newF = path.join(dirPath, 'win-ffmpeg/bin/ffprobe.exe')
+            newF = path.join(dirPath, 'win-ffmpeg\\bin\\ffprobe.exe')
         if(plat == 'Darwin' and not myFFmpeg):
             newF = path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
 
