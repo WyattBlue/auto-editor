@@ -9,25 +9,6 @@ import sys
 import shutil
 import subprocess
 
-def runTest(cmd):
-    runner = ['python3', 'auto_editor/__main__.py']
-
-    pretty_cmd = ' '.join(cmd)
-    print(f'Running test: {pretty_cmd}')
-
-    try:
-        hmm = runner + cmd
-        if('.' in cmd[0]):
-            hmm += ['--no_open']
-
-        subprocess.check_output(hmm)
-    except subprocess.CalledProcessError as e:
-        print('Test Failed.\n')
-        print(e)
-        sys.exit(1)
-    else:
-        print('Test Succeeded.\n')
-
 
 def pipeToConsole(myCommands: list):
     import subprocess
@@ -37,8 +18,29 @@ def pipeToConsole(myCommands: list):
     return process.returncode, stdout.decode(), stderr.decode()
 
 
+def runTest(cmd):
+    runner = [sys.argv[0], 'auto_editor/__main__.py']
+
+    pretty_cmd = ' '.join(cmd)
+    print(f'Running test: {pretty_cmd}')
+
+    try:
+        hmm = runner + cmd
+        if('.' in cmd[0]):
+            hmm += ['--no_open']
+
+    returncode, stdout, stderr = pipeToConsole(hmm)
+    if(returncode > 0):
+        print('Test Failed.\n')
+        print(stdout)
+        print(stderr)
+        sys.exit(1)
+    else:
+        print('Test Succeeded.\n')
+
+
 def checkForError(cmd):
-    runner = ['python3', 'auto_editor/__main__.py']
+    runner = [sys.argv[0], 'auto_editor/__main__.py']
 
     pretty_cmd = ' '.join(cmd)
     print(f'Running Error Test: {pretty_cmd}')

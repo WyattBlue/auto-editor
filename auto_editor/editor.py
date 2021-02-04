@@ -37,19 +37,27 @@ def speedup(speed) -> str:
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
 def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
-    sampleRate, audioFile, fps, log):
+    sampleRate, audioFile, resolve: bool, fps, log):
 
     def makepath(filepath: str) -> str:
 
-        import platform
 
-        if(platform.system() == 'Windows'):
-            return 'file://localhost/' + os.path.abspath(filepath).replace(':', f'%3a')
-        return 'file://localhost' + os.path.abspath(filepath)
 
     duration = chunks[len(chunks) - 1][1]
 
     pathurl = makepath(myInput)
+
+
+
+    import platform
+
+    if(platform.system() == 'Windows'):
+        if(resolve):
+            pathurl = 'file:///' + os.path.abspath(filepath)
+        else:
+            pathurl = 'file://localhost/' + os.path.abspath(filepath).replace(':', f'%3a')
+    else:
+        pathurl = 'file://localhost' + os.path.abspath(filepath)
 
     name = os.path.basename(myInput)
 
