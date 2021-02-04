@@ -7,10 +7,18 @@ Test auto-editor and make sure everything is working.
 import os
 import sys
 import shutil
+import platform
 import subprocess
 
 
+def getRunner():
+    if(platform.system() == 'Windows'):
+        return ['py', 'auto_editor/__main__.py']
+    return ['python3', 'auto_editor/__main__.py']
+
+
 def pipeToConsole(myCommands: list):
+    print(myCommands)
     import subprocess
     process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
@@ -19,13 +27,11 @@ def pipeToConsole(myCommands: list):
 
 
 def runTest(cmd):
-    runner = [sys.argv[0], 'auto_editor/__main__.py']
-
     pretty_cmd = ' '.join(cmd)
     print(f'Running test: {pretty_cmd}')
 
     add_no_open = '.' in cmd[0]
-    cmd += runner
+    cmd = getRunner() + cmd
     if(add_no_open):
         cmd += ['--no_open']
 
@@ -40,12 +46,10 @@ def runTest(cmd):
 
 
 def checkForError(cmd):
-    runner = [sys.argv[0], 'auto_editor/__main__.py']
-
     pretty_cmd = ' '.join(cmd)
     print(f'Running Error Test: {pretty_cmd}')
 
-    returncode, stdout, stderr = pipeToConsole(runner + cmd)
+    returncode, stdout, stderr = pipeToConsole(getRunner() + cmd)
     if(returncode > 0):
         if('Error!' in stderr):
             print('Test Succeeded.')
