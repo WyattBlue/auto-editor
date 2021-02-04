@@ -24,12 +24,12 @@ def runTest(cmd):
     pretty_cmd = ' '.join(cmd)
     print(f'Running test: {pretty_cmd}')
 
-    try:
-        hmm = runner + cmd
-        if('.' in cmd[0]):
-            hmm += ['--no_open']
+    add_no_open = '.' in cmd[0]
+    cmd += runner
+    if(add_no_open):
+        cmd += ['--no_open']
 
-    returncode, stdout, stderr = pipeToConsole(hmm)
+    returncode, stdout, stderr = pipeToConsole(cmd)
     if(returncode > 0):
         print('Test Failed.\n')
         print(stdout)
