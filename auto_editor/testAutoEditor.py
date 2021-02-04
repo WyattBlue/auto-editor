@@ -109,6 +109,8 @@ def testAutoEditor():
 
     checkForError(['example', '--no_open'])
 
+    os.remove('example')
+
     # Test ProgressOps
     runTest(['example.mp4', 'progressOps', '--machine_readable_progress'])
     runTest(['example.mp4', 'progressOps', '--no_progress'])
