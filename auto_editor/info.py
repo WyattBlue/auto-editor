@@ -41,6 +41,7 @@ def getInfo(files, ffmpeg, ffprobe, log):
             else:
                 print(' - audio tracks: 0')
         elif(hasAud):
+            print(f' - duration: {ffprobe.getAudioDuration(file)}')
             print(f' - codec: {ffprobe.getAudioCodec(file, track=0)}')
             print(f' - samplerate: {ffprobe.getPrettySampleRate(file, track=0)}')
             print(f' - bitrate: {ffprobe.getPrettyABitrate(file, track=0)}')
