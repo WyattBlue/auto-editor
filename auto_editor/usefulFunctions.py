@@ -156,6 +156,9 @@ class FFprobe():
     def getDuration(self, file):
         return self._get(file, 'duration', 'v', 0)
 
+    def getAudioDuration(self, file):
+        return self._get(file, 'duration', 'a', 0)
+
     def getFrameRate(self, file):
         output = self.pipe(['-select_streams', 'v', '-show_entries',
             'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
