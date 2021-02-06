@@ -34,7 +34,7 @@ class MyLogger(object):
             print(msg, file=sys.stderr)
 
 
-def validInput(inputs: list, ffmpeg, log) -> list:
+def validInput(inputs: list, ffmpeg, args, log) -> list:
     inputList = []
     for myInput in inputs:
         if(os.path.isdir(myInput)):
@@ -62,14 +62,20 @@ def validInput(inputs: list, ffmpeg, log) -> list:
         elif(myInput.startswith('http://') or myInput.startswith('https://')):
             basename = re.sub(r'\W+', '-', myInput)
 
+            outtmpl = basename
+            if(args.output_dir is not None):
+                from usefulFunctions import sep
+                outtmpl = args.output_dir + sep() + basename
+
             try:
                 import youtube_dl
             except ImportError:
-                log.error('Download the youtube-dl pip library to download URLs.')
+                log.error('Download the youtube-dl python library to download URLs.\n' \
+                    '   pip3 install youtube-dl')
 
             from usefulFunctions import ProgressBar
 
-            if(not os.path.isfile(basename + '.mp4')):
+            if(not os.path.isfile(outtmpl + '.mp4')):
 
                 ytbar = ProgressBar(100, 'Downloading')
                 def my_hook(d):
@@ -80,10 +86,10 @@ def validInput(inputs: list, ffmpeg, log) -> list:
                         ytbar.tick(float(p))
 
                 ydl_opts = {
-                    'nocheckcertificate': True,
-                    'outtmpl': basename,
+                    'nocheckcertificate': not args.check_certificate,
+                    'outtmpl': outtmpl,
                     'ffmpeg_location': ffmpeg.getPath(),
-                    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
+                    'format': args.format,
                     'logger': MyLogger(),
                     'progress_hooks': [my_hook],
                 }
@@ -97,7 +103,7 @@ def validInput(inputs: list, ffmpeg, log) -> list:
 
                 log.conwrite('')
 
-            inputList.append(basename + '.mp4')
+            inputList.append(outtmpl + '.mp4')
         else:
             log.error('Could not find file: ' + myInput)
 

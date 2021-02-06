@@ -4,7 +4,6 @@
 # Internal python libraries
 import os
 import sys
-import platform
 import tempfile
 from shutil import rmtree
 
@@ -56,6 +55,17 @@ def add_argument(*names, nargs=1, type=str, default=None, action='default',
 
 def main_options():
     ops = []
+
+    ops += add_argument('urlOps', nargs=0, action='grouping')
+    ops += add_argument('--format', type=str, group='urlOps',
+        default='bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
+        help='the format youtube-dl uses to when downloading a url.')
+    ops += add_argument('--output_dir', type=str, group='urlOps',
+        default=None,
+        help='the directory where the downloaded file is placed.')
+    ops += add_argument('--check_certificate', action='store_true', group='urlOps',
+        help='check the website certificate before downloading.')
+
     ops += add_argument('progressOps', nargs=0, action='grouping')
     ops += add_argument('--machine_readable_progress', action='store_true',
         group='progressOps',
@@ -264,7 +274,7 @@ def main():
         from generateTestMedia import generateTestMedia
         from usefulFunctions import FFmpeg
 
-        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, Log())
+        ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, Log())
         generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
             args.width, args.height)
         sys.exit()
@@ -287,8 +297,8 @@ def main():
         from usefulFunctions import FFmpeg, FFprobe
 
         log = Log()
-        ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, log)
-        ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg, log)
+        ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, log)
+        ffprobe = FFprobe(dirPath, args.my_ffmpeg, log)
 
         getInfo(args.input, ffmpeg, ffprobe, log)
         sys.exit()
@@ -309,20 +319,21 @@ def main():
 
     del option_data
 
-    from usefulFunctions import FFmpeg, FFprobe
-    ffmpeg = FFmpeg(platform.system(), dirPath, args.my_ffmpeg, Log())
-    ffprobe = FFprobe(platform.system(), dirPath, args.my_ffmpeg, Log())
+    from usefulFunctions import FFmpeg, FFprobe, sep
+    ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, Log())
+    ffprobe = FFprobe(dirPath, args.my_ffmpeg, Log())
 
     makingDataFile = (args.export_to_premiere or args.export_to_resolve or
         args.export_to_final_cut_pro or args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
-    sep = '\\' if platform.system() == 'Windows' else '/'
 
     if(args.debug and args.input == []):
+        import platform
+
         print('Python Version:', platform.python_version(), is64bit)
         print('Platform:', platform.system(), platform.release())
-        print('Config File path:', dirPath + sep + 'config.txt')
+        print('Config File path:', dirPath + sep() + 'config.txt')
         print('FFmpeg path:', ffmpeg.getPath())
         ffmpegVersion = ffmpeg.pipe(['-version']).split('\n')[0]
         ffmpegVersion = ffmpegVersion.replace('ffmpeg version', '').strip()
@@ -359,7 +370,7 @@ def main():
     args = softArgsCheck(args, log)
 
     from validateInput import validInput
-    inputList = validInput(args.input, ffmpeg, log)
+    inputList = validInput(args.input, ffmpeg, args, log)
 
     # Figure out the output file names.
     def newOutputName(oldFile: str, exa=False, data=False, exc=False) -> str:
@@ -385,10 +396,10 @@ def main():
             cmd.extend(['-i', fileref])
         cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
             '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2',
-            f'{TEMP}/combined.mp4'])
+            f'{TEMP}{sep()}combined.mp4'])
         ffmpeg.run(cmd)
         del cmd
-        inputList = [f'{TEMP}/combined.mp4']
+        inputList = [f'{TEMP}{sep()}combined.mp4']
 
     speeds = [args.silent_speed, args.video_speed]
     log.debug(f'   - Speeds: {speeds}')
@@ -457,11 +468,11 @@ def main():
             cmd = ['-i', INPUT_FILE]
             if(audioBitrate is not None):
                 cmd.extend(['-b:a', audioBitrate])
-            cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', f'{TEMP}/fastAud.wav'])
+            cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', f'{TEMP}{sep()}fastAud.wav'])
             ffmpeg.run(cmd)
             del cmd
 
-            sampleRate, audioData = read(f'{TEMP}/fastAud.wav')
+            sampleRate, audioData = read(f'{TEMP}{sep()}fastAud.wav')
         else:
             if(args.force_fps_to is not None):
                 fps = args.force_fps_to
@@ -495,7 +506,7 @@ def main():
                 if(audioBitrate is not None):
                     cmd.extend(['-ab', audioBitrate])
                 cmd.extend(['-ac', '2', '-ar', sampleRate, '-map',
-                    f'0:a:{trackNum}', f'{TEMP}/{trackNum}.wav'])
+                    f'0:a:{trackNum}', f'{TEMP}{sep()}{trackNum}.wav'])
                 ffmpeg.run(cmd)
                 del cmd
 
@@ -504,14 +515,14 @@ def main():
                 # Combine all audio tracks into one audio file, then read.
                 cmd = ['-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amix=inputs={tracks}:duration=longest', '-ar',
-                    sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}/combined.wav']
+                    sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}{sep()}combined.wav']
                 ffmpeg.run(cmd)
-                sampleRate, audioData = read(f'{TEMP}/combined.wav')
+                sampleRate, audioData = read(f'{TEMP}{sep()}combined.wav')
                 del cmd
             else:
                 # Read only one audio file.
-                if(os.path.isfile(f'{TEMP}/{args.cut_by_this_track}.wav')):
-                    sampleRate, audioData = read(f'{TEMP}/{args.cut_by_this_track}.wav')
+                if(os.path.isfile(f'{TEMP}{sep()}{args.cut_by_this_track}.wav')):
+                    sampleRate, audioData = read(f'{TEMP}{sep()}{args.cut_by_this_track}.wav')
                 else:
                     log.bug('Audio track not found!')
 
@@ -565,7 +576,7 @@ def main():
                 end = '_constantFPS' + INPUT_FILE[dotIndex:]
                 constantLoc = INPUT_FILE[:dotIndex] + end
             else:
-                constantLoc = f'{TEMP}/constantVid{fileFormat}'
+                constantLoc = f'{TEMP}{sep()}constantVid{fileFormat}'
             ffmpeg.run(['-i', INPUT_FILE, '-filter:v', 'fps=fps=30', constantLoc])
             INPUT_FILE = constantLoc
 
@@ -590,10 +601,10 @@ def main():
             from fastAudio import fastAudio, handleAudio, convertAudio
             theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
                 TEMP, log)
-            fastAudio(theFile, f'{TEMP}/convert.wav', chunks, speeds, log, fps,
+            fastAudio(theFile, f'{TEMP}{sep()}convert.wav', chunks, speeds, log, fps,
                 args.machine_readable_progress, args.no_progress)
-            convertAudio(ffmpeg, ffprobe, f'{TEMP}/convert.wav', INPUT_FILE, newOutput,
-                args, log)
+            convertAudio(ffmpeg, ffprobe, f'{TEMP}{sep()}convert.wav', INPUT_FILE,
+                newOutput, args, log)
             continue
 
         from videoUtils import handleAudioTracks, muxVideo

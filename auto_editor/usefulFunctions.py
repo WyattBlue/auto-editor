@@ -7,6 +7,7 @@ put here. No function should modify or create video/audio files on its own.
 
 # Internal libraries
 import sys
+from platform import system
 from shutil import get_terminal_size
 from time import time, localtime
 
@@ -90,16 +91,24 @@ def pipeToConsole(myCommands: list) -> str:
     return stdout.decode()
 
 
+def sep() -> str:
+    if(system() == 'Windows'):
+        return '\\'
+    return '/'
+
+
 class FFprobe():
-    def __init__(self, plat, dirPath, myFFmpeg: bool, log):
+    def __init__(self, dirPath, myFFmpeg: bool, log):
         from os import path
 
         self.mylog = log
 
         newF = None
-        if(plat == 'Windows' and not myFFmpeg):
-            newF = path.join(dirPath, 'win-ffmpeg\\bin\\ffprobe.exe')
-        if(plat == 'Darwin' and not myFFmpeg):
+
+
+        if(system() == 'Windows' and not myFFmpeg):
+            newF = path.join(dirPath, '\\win-ffmpeg\\bin\\ffprobe.exe')
+        if(system() == 'Darwin' and not myFFmpeg):
             newF = path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
 
         if(newF is not None and path.isfile(newF)):
@@ -109,10 +118,10 @@ class FFprobe():
             try:
                 pipeToConsole([self.myPath, '-h'])
             except FileNotFoundError:
-                if(plat == 'Darwin'):
+                if(system() == 'Darwin'):
                     self.log.error('No ffprobe found, download via homebrew or restore' \
                         ' the included binary.')
-                elif(plat == 'Windows'):
+                elif(system() == 'Windows'):
                     self.log.error('No ffprobe found, download ffprobe with your' \
                         ' favorite package manager (ex chocolatey), or restore the' \
                         ' included binary.')
@@ -205,15 +214,16 @@ class FFprobe():
         return 'N/A'
 
 class FFmpeg():
-    def __init__(self, plat, dirPath, myFFmpeg: bool, log):
+    def __init__(self, dirPath, myFFmpeg: bool, log):
+
         from os import path
 
         self.mylog = log
 
         newF = None
-        if(plat == 'Windows' and not myFFmpeg):
-            newF = path.join(dirPath, 'win-ffmpeg/bin/ffmpeg.exe')
-        if(plat == 'Darwin' and not myFFmpeg):
+        if(system() == 'Windows' and not myFFmpeg):
+            newF = path.join(dirPath, '\\win-ffmpeg\\bin\\ffmpeg.exe')
+        if(system() == 'Darwin' and not myFFmpeg):
             newF = path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
 
         if(newF is not None and path.isfile(newF)):
@@ -223,10 +233,10 @@ class FFmpeg():
             try:
                 pipeToConsole([self.myPath, '-h'])
             except FileNotFoundError:
-                if(plat == 'Darwin'):
+                if(system() == 'Darwin'):
                     self.log.error('No ffmpeg found, download via homebrew or restore' \
                         ' the included binaries.')
-                elif(plat == 'Windows'):
+                elif(system() == 'Windows'):
                     self.log.error('No ffmpeg found, download ffmpeg with your' \
                         ' favorite package manager (ex chocolatey), or restore the' \
                         ' included binaries.')
@@ -310,8 +320,7 @@ class ProgressBar():
         self.ampm = True
 
         if(not self.machine):
-            import platform
-            if(platform.system() == 'Darwin'):
+            if(system() == 'Darwin'):
                 try:
                     dateFormat = pipeToConsole(['defaults', 'read',
                         'com.apple.menuextra.clock', 'DateFormat'])
