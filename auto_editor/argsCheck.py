@@ -41,7 +41,7 @@ def hardArgsCheck(args, log):
     if(not args.preview):
         if(args.export_to_premiere):
             log.conwrite('Exporting to Adobe Premiere Pro XML file.')
-        elif(args.export_to_resolve):
+        elif(args.export_to_final_cut_pro):
             log.conwrite('Exporting to Final Cut Pro XML file.')
         elif(args.export_to_resolve):
             log.conwrite('Exporting to DaVinci Resolve XML file.')
