@@ -43,8 +43,7 @@ setup(
         'opencv-python',
         'youtube-dl',
         'requests',
-        # 'av', failed for too many users.
-        # Failing here causes auto-editor not to install.
+        'av', # pyav team finally added support for amd Windows.
     ],
     classifiers=[
         'Topic :: Multimedia :: Video',
