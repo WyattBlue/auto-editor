@@ -652,7 +652,16 @@ def main():
         smartOpen(newOutput, log)
 
     log.debug('Deleting temp dir')
-    rmtree(TEMP)
+
+    try:
+        rmtree(TEMP)
+    except PermissionError:
+        from time import sleep
+        sleep(1)
+        try:
+            rmtree(TEMP)
+        except PermissionError:
+            pass
 
 if(__name__ == '__main__'):
     main()
