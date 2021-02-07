@@ -107,9 +107,9 @@ class FFprobe():
 
 
         if(system() == 'Windows' and not myFFmpeg):
-            newF = path.join(dirPath, '\\win-ffmpeg\\bin\\ffprobe.exe')
+            newF = path.join(dirPath, f'win-ffmpeg{sep()}bin{sep()}ffprobe.exe')
         if(system() == 'Darwin' and not myFFmpeg):
-            newF = path.join(dirPath, 'mac-ffmpeg/bin/ffprobe')
+            newF = path.join(dirPath, f'mac-ffmpeg{sep()}bin{sep()}ffprobe')
 
         if(newF is not None and path.isfile(newF)):
             self.myPath = newF
@@ -222,9 +222,9 @@ class FFmpeg():
 
         newF = None
         if(system() == 'Windows' and not myFFmpeg):
-            newF = path.join(dirPath, '\\win-ffmpeg\\bin\\ffmpeg.exe')
+            newF = path.join(dirPath, f'win-ffmpeg{sep()}bin{sep()}ffmpeg.exe')
         if(system() == 'Darwin' and not myFFmpeg):
-            newF = path.join(dirPath, 'mac-ffmpeg/bin/ffmpeg')
+            newF = path.join(dirPath, f'mac-ffmpeg{sep()}bin{sep()}ffmpeg')
 
         if(newF is not None and path.isfile(newF)):
             self.myPath = newF
