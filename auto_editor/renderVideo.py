@@ -4,7 +4,7 @@
 import numpy as np
 
 # Included functions
-from usefulFunctions import ProgressBar
+from usefulFunctions import ProgressBar, sep
 
 # Internal libraries
 import subprocess
@@ -49,7 +49,7 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
         pix_fmt]
 
     cmd = properties(cmd, args)
-    cmd.append(f'{temp}/spedup.mp4')
+    cmd.append(f'{temp}{sep()}spedup.mp4')
 
     process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL)
@@ -90,7 +90,7 @@ def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, te
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
-    out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
+    out = cv2.VideoWriter(f'{temp}{sep()}spedup.mp4', fourcc, fps, (width, height))
 
     totalFrames = chunks[len(chunks) - 1][1]
     cframe = 0
@@ -148,7 +148,7 @@ def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, te
 
     if(args.video_codec != 'uncompressed'):
         cmd = properties([], args)
-        cmd.append(f'{temp}/spedup.mp4')
+        cmd.append(f'{temp}{sep()}spedup.mp4')
         ffmpeg.run(cmd)
 
     if(log.is_debug):
