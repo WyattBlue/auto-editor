@@ -10,6 +10,8 @@ import shutil
 import platform
 import subprocess
 
+from usefulFunctions import sep
+
 
 def getRunner():
     if(platform.system() == 'Windows'):
@@ -65,7 +67,7 @@ def checkForError(cmd):
 
 def cleanup(the_dir):
     for item in os.listdir(the_dir):
-        item = f'{the_dir}/{item}'
+        item = f'{the_dir}{sep()}{item}'
         if('_ALTERED' in item or item.endswith('.xml') or item.endswith('.json')):
             os.remove(item)
         if(item.endswith('_tracks')):

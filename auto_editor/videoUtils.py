@@ -2,6 +2,8 @@
 
 from shutil import move
 
+from usefulFunctions import sep
+
 def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, log) -> bool:
     import os
     from fastAudio import fastAudio
@@ -10,10 +12,10 @@ def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, 
     log.checkType(outFile, 'outFile', str)
 
     for trackNum in range(tracks):
-        fastAudio(f'{temp}/{trackNum}.wav', f'{temp}/new{trackNum}.wav', chunks,
-            speeds, log, fps, args.machine_readable_progress, args.no_progress)
+        fastAudio(f'{temp}{sep()}{trackNum}.wav', f'{temp}{sep()}new{trackNum}.wav',
+            chunks, speeds, log, fps, args.machine_readable_progress, args.no_progress)
 
-        if(not os.path.isfile(f'{temp}/new{trackNum}.wav')):
+        if(not os.path.isfile(f'{temp}{sep()}new{trackNum}.wav')):
             log.bug('Audio file not created.')
 
     if(args.export_as_audio):
@@ -21,12 +23,12 @@ def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, 
             log.warning("Audio files can't have multiple tracks.")
 
         if(tracks == 1):
-            move(f'{temp}/0.wav', outFile)
+            move(f'{temp}{sep()}0.wav', outFile)
             return False
 
         cmd = []
         for trackNum in range(tracks):
-            cmd.extend(['-i', f'{temp}/{trackNum}.wav'])
+            cmd.extend(['-i', f'{temp}{sep()}{trackNum}.wav'])
         cmd.extend(['-filter_complex', f'amix=inputs={tracks}:duration=longest', outFile])
         ffmpeg.run(cmd)
 
@@ -37,8 +39,8 @@ def muxVideo(ffmpeg, outFile, args, tracks, temp, log):
     cmd = []
     if(args.keep_tracks_seperate):
         for i in range(tracks):
-            cmd.extend(['-i', f'{temp}/new{i}.wav'])
-        cmd.extend(['-i', f'{temp}/spedup.mp4'])
+            cmd.extend(['-i', f'{temp}{sep()}new{i}.wav'])
+        cmd.extend(['-i', f'{temp}{sep()}spedup.mp4'])
         for i in range(tracks):
             cmd.extend(['-map', f'{i}:a:0'])
         cmd.extend(['-map', f'{tracks}:v:0'])
@@ -46,13 +48,13 @@ def muxVideo(ffmpeg, outFile, args, tracks, temp, log):
         # Merge all the audio tracks into one.
         if(tracks > 1):
             for i in range(tracks):
-                cmd.extend(['-i', f'{temp}/new{i}.wav'])
+                cmd.extend(['-i', f'{temp}{sep()}new{i}.wav'])
             cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
-                f'{temp}/newAudioFile.wav'])
+                f'{temp}{sep()}newAudioFile.wav'])
             ffmpeg.run(cmd)
         else:
-            move(f'{temp}/new0.wav', f'{temp}/newAudioFile.wav')
-        cmd = ['-i', f'{temp}/newAudioFile.wav', '-i', f'{temp}/spedup.mp4']
+            move(f'{temp}{sep()}new0.wav', f'{temp}{sep()}newAudioFile.wav')
+        cmd = ['-i', f'{temp}{sep()}newAudioFile.wav', '-i', f'{temp}{sep()}spedup.mp4']
 
     cmd.extend(['-c:v', 'copy'])
     if(args.audio_codec is not None):
