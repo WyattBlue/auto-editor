@@ -45,7 +45,7 @@ def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
 
     if(platform.system() == 'Windows'):
         if(resolve):
-            pathurl = 'file:///' + os.path.normpath(myInput)
+            pathurl = 'file:///' + os.path.abspath(myInput).replace(os.sep, '/')
         else:
             pathurl = 'file://localhost/' + os.path.abspath(myInput).replace(':', f'%3a')
     else:
