@@ -43,11 +43,13 @@ def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
 
     import platform
 
+    from urllib.parse import quote
+
     if(platform.system() == 'Windows'):
         if(resolve):
-            pathurl = 'file:///' + os.path.abspath(myInput).replace(os.sep, '/')
+            pathurl = 'file:///' + quote(os.path.abspath(myInput)).replace('%5C', '/')
         else:
-            pathurl = 'file://localhost/' + os.path.abspath(myInput).replace(':', f'%3a')
+            pathurl = 'file://localhost/' + quote(os.path.abspath(myInput)).replace('%5C', '/')
     else:
         pathurl = 'file://localhost' + os.path.abspath(myInput)
 
