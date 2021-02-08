@@ -25,7 +25,7 @@ def generateTestMedia(ffmpeg, output, fps, duration, width, height):
         '-i', output, '-c:v', 'copy', '-c:a', 'aac', '-shortest', 'pre' + output])
 
     # Mux Video with repeating audio.
-    ffmpeg,run(['-i', 'pre' + output, '-filter_complex',
+    ffmpeg.run(['-i', 'pre' + output, '-filter_complex',
         'amovie=beep.wav:loop=0,asetpts=N/SR/TB[aud];[0:a][aud]amix[a]',
         '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '256k',
         '-shortest', output])
