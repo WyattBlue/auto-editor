@@ -31,21 +31,21 @@ jobs:
     - name: Test
       run: |
         python3 -m auto_editor test
-  build2:
-    strategy:
-      matrix:
-        python-version: ['3.8']
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install Pip Packages
-      run: |
-        py -m pip install --upgrade pip
-        py -m pip install av opencv-python audiotsm2
-    - name: Test
-      run: |
-        py -m auto_editor test
+  # build2:
+  #   strategy:
+  #     matrix:
+  #       python-version: ['3.8']
+  #   runs-on: windows-latest
+  #   steps:
+  #   - uses: actions/checkout@v2
+  #   - name: Set up Python ${{ matrix.python-version }}
+  #     uses: actions/setup-python@v2
+  #     with:
+  #       python-version: ${{ matrix.python-version }}
+  #   - name: Install Pip Packages
+  #     run: |
+  #       py -m pip install --upgrade pip
+  #       py -m pip install av opencv-python audiotsm2
+  #   - name: Test
+  #     run: |
+  #       py -m auto_editor test
