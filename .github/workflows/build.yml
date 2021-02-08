@@ -15,20 +15,20 @@ jobs:
         python-version: ['3.8']
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-      steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install FFmpeg
-        run: |
-          sudo apt update
-          sudo apt install ffmpeg
-      - name: Install Pip Packages
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install av opencv-python audiotsm2
-      - name: Test
-        run: |
-          python3 -m auto_editor test
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install FFmpeg
+      run: |
+        sudo apt update
+        sudo apt install ffmpeg
+    - name: Install Pip Packages
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install av opencv-python audiotsm2
+    - name: Test
+      run: |
+        python3 -m auto_editor test
