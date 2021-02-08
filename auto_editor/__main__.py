@@ -38,6 +38,9 @@ def frame_type(inp: str):
         return inp[:-4]
     return int(inp)
 
+def zoom_type(inp: str) -> list:
+    return inp.split(',')
+
 def add_argument(*names, nargs=1, type=str, default=None, action='default',
     range=None, choices=None, group=None, help='', extra=''):
     newDic = {}
@@ -129,6 +132,9 @@ def main_options():
 
     ops += add_argument('--scale', type=float_type, default=1,
         help='scale output.')
+
+    ops += add_argument('--zoom', type=zoom_type, default=None, nargs='*',
+        help='set when and how a zoom will occur.')
 
     ops += add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')
