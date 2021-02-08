@@ -5,12 +5,11 @@ on:
       - '**.md'
       - '**.txt'
       - '**.png'
-      - '**.yml'
       - 'setup.py'
     branches:
       - master
 jobs:
-  test:
+  runs-on:
     strategy:
       matrix:
         platform: [ubuntu-latest, windows-latest]
