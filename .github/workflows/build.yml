@@ -10,10 +10,10 @@ on:
     branches:
       - master
 jobs:
-  build:
-    runs-on: ['ubuntu-latest', 'windows-latest']
+  test:
     strategy:
       matrix:
+        platform: [ubuntu-latest, windows-latest]
         python-version: ['3.8']
     steps:
     - uses: actions/checkout@v2
