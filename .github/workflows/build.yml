@@ -9,44 +9,25 @@ on:
     branches:
       - master
 jobs:
-  job1:
-    runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          python-version: ['3.8']
-      steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install FFmpeg
-        run: |
-          sudo apt update
-          sudo apt install ffmpeg
-      - name: Install Pip Packages
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install av opencv-python audiotsm2
-      - name: Test
-        run: |
-          python3 -m auto_editor test
-
-  job2:
-    runs-on: windows-latest
-      strategy:
-        matrix:
-          python-version: ['3.8']
-      steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install Pip Packages
-        run: |
-          py -m pip install --upgrade pip
-          py -m pip install av opencv-python audiotsm2
-      - name: Test
-        run: |
-          py -m auto_editor test
+  build:
+    strategy:
+      matrix:
+        python-version: ['3.8']
+        os: [ubuntu-latest, windows-latest]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install FFmpeg
+      run: |
+        sudo apt update
+        sudo apt install ffmpeg
+    - name: Install Pip Packages
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install av opencv-python audiotsm2
+    - name: Test
+      run: |
+        python3 -m auto_editor test
