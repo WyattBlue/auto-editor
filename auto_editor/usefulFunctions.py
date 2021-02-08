@@ -27,7 +27,7 @@ class Log():
 
         from shutil import rmtree
         rmtree(self.temp)
-        self.debug(f'   - Removed Temp Directory.')
+        self.debug('   - Removed Temp Directory.')
 
     def error(self, message):
         print('Error!', message, file=sys.stderr)

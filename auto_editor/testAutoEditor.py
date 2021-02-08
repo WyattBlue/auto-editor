@@ -20,7 +20,6 @@ def getRunner():
 
 def pipeToConsole(myCommands: list):
     print(myCommands)
-    import subprocess
     process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
@@ -56,7 +55,7 @@ def checkForError(cmd):
             print('Test Succeeded.')
         else:
             print('Test Failed.\n')
-            print(f'Program crashed.\n{e}')
+            print(f'Program crashed.\n{stdout}\n{stderr}')
             sys.exit(1)
     else:
         print('Test Failed.\n')
