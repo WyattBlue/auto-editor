@@ -12,18 +12,13 @@ from shutil import get_terminal_size
 from time import time, localtime
 
 class Log():
-    def __init__(self, show_debug=False, ffmpeg=False, quiet=False, temp=None):
+    def __init__(self, show_debug=False, quiet=False, temp=None):
         self.is_debug = show_debug
-        self.is_ffmpeg = ffmpeg
         self.quiet = quiet
         self.temp = temp
 
     def debug(self, message):
         if(self.is_debug):
-            print(message)
-
-    def ffmpeg(self, message):
-        if(self.is_ffmpeg):
             print(message)
 
     def cleanup(self):
@@ -98,14 +93,13 @@ def sep() -> str:
 
 
 class FFprobe():
-    def __init__(self, dirPath, myFFmpeg: bool, log):
+    def __init__(self, dirPath, myFFmpeg: bool, FFdebug, log):
         from os import path
 
         self.mylog = log
+        self.FFdebug = FFdebug
 
         newF = None
-
-
         if(system() == 'Windows' and not myFFmpeg):
             newF = path.join(dirPath, f'win-ffmpeg{sep()}bin{sep()}ffprobe.exe')
         if(system() == 'Darwin' and not myFFmpeg):
@@ -119,19 +113,20 @@ class FFprobe():
                 pipeToConsole([self.myPath, '-h'])
             except FileNotFoundError:
                 if(system() == 'Darwin'):
-                    self.log.error('No ffprobe found, download via homebrew or restore' \
+                    self.mylog.error('No ffprobe found, download via homebrew or restore' \
                         ' the included binary.')
                 elif(system() == 'Windows'):
-                    self.log.error('No ffprobe found, download ffprobe with your' \
+                    self.mylog.error('No ffprobe found, download ffprobe with your' \
                         ' favorite package manager (ex chocolatey), or restore the' \
                         ' included binary.')
                 else:
-                    self.log.error('ffprobe must be on PATH. Download ffprobe by running:\n' \
+                    self.mylog.error('ffprobe must be on PATH. Download ffprobe by running:\n' \
                         '  sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg' \
                         '\nOr something similar depending on your distro.')
 
     def log(self, message):
-        self.mylog.ffmpeg(message)
+        if(self.FFdebug):
+            print(message)
 
     def getPath(self) -> str:
         return self.myPath
@@ -214,11 +209,12 @@ class FFprobe():
         return 'N/A'
 
 class FFmpeg():
-    def __init__(self, dirPath, myFFmpeg: bool, log):
+    def __init__(self, dirPath, myFFmpeg: bool, FFdebug, log):
 
         from os import path
 
         self.mylog = log
+        self.FFdebug = FFdebug
 
         newF = None
         if(system() == 'Windows' and not myFFmpeg):
@@ -234,19 +230,20 @@ class FFmpeg():
                 pipeToConsole([self.myPath, '-h'])
             except FileNotFoundError:
                 if(system() == 'Darwin'):
-                    self.log.error('No ffmpeg found, download via homebrew or restore' \
+                    self.mylog.error('No ffmpeg found, download via homebrew or restore' \
                         ' the included binaries.')
                 elif(system() == 'Windows'):
-                    self.log.error('No ffmpeg found, download ffmpeg with your' \
+                    self.mylog.error('No ffmpeg found, download ffmpeg with your' \
                         ' favorite package manager (ex chocolatey), or restore the' \
                         ' included binaries.')
                 else:
-                    self.log.error('FFmpeg must be on PATH. Download ffmpeg by running:\n' \
+                    self.mylog.error('FFmpeg must be on PATH. Download ffmpeg by running:\n' \
                         '  sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg' \
                         '\nOr something similar depending on your distro.')
 
     def log(self, message):
-        self.mylog.ffmpeg(message)
+        if(self.FFdebug):
+            print(message)
 
     def getPath(self) -> str:
         return self.myPath
@@ -256,7 +253,7 @@ class FFmpeg():
 
     def run(self, cmd: list):
         cmd = [self.myPath, '-y'] + cmd
-        if(self.mylog.is_ffmpeg):
+        if(self.FFdebug):
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '8'])
