@@ -1,6 +1,6 @@
 '''fastAudio.py'''
 
-from usefulFunctions import ProgressBar, getNewLength
+from usefulFunctions import ProgressBar, getNewLength, sep
 
 def convertAudio(ffmpeg, ffprobe, theFile, INPUT_FILE, outFile, args, log):
     log.debug(f'Convering internal audio file: {theFile} to {outFile}')
@@ -21,11 +21,11 @@ def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
     if(audioBit is not None):
         cmd.extend(['-b:a', audioBit])
         log.checkType(audioBit, 'audioBit', str)
-    cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}/faAudio.wav'])
+    cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}{sep()}faAudio.wav'])
     ffmpeg.run(cmd)
     log.conwrite('')
 
-    return f'{temp}/faAudio.wav'
+    return f'{temp}{sep()}faAudio.wav'
 
 def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
     machineReadable, hideBar):
