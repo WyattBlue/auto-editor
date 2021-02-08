@@ -22,10 +22,12 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install FFmpeg
-        if: matrix.os == 'ubuntu-latest'
-          run: |
-            sudo apt update
-            sudo apt install ffmpeg
+      run:   |
+             if [ "$RUNNER_OS" == "Linux" ]; then
+                  sudo apt update
+                  sudo apt install ffmpeg
+             fi
+      shell: bash
     - name: Install Pip Packages
       run: |
         python3 -m pip install --upgrade pip
