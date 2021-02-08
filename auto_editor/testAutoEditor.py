@@ -12,7 +12,6 @@ import subprocess
 
 from usefulFunctions import sep
 
-
 def getRunner():
     if(platform.system() == 'Windows'):
         return ['py', 'auto_editor/__main__.py']
@@ -72,6 +71,7 @@ def cleanup(the_dir):
             os.remove(item)
         if(item.endswith('_tracks')):
             shutil.rmtree(item)
+
 
 def testAutoEditor():
     # Test Help Command
@@ -141,6 +141,9 @@ def testAutoEditor():
     runTest(['example.mp4', '--sounded_speed', '0.5'])
     runTest(['example.mp4', '--silent_speed', '0.5'])
 
+    runTest(['example.mp4', '--scale', '1.5'])
+    runTest(['example.mp4', '--scale', '0.2'])
+
     cleanup(os.getcwd())
     cleanup('resources')
 
@@ -165,9 +168,11 @@ def testAutoEditor():
 
     os.remove('hmm.mp4')
 
-    runTest(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion', '--debug', '--frame_margin', '0', '-mcut', '0', '-mclip', '0'])
+    runTest(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion', '--debug',
+        '--frame_margin', '0', '-mcut', '0', '-mclip', '0'])
 
     cleanup('resources')
     cleanup(os.getcwd())
+
 if(__name__ == '__main__'):
     testAutoEditor()
