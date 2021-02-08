@@ -130,6 +130,9 @@ def main_options():
     ops += add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later. (experimental)')
 
+    ops += add_argument('--scale', type=float_type, default=1,
+        help='scale output.')
+
     ops += add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')
     ops += add_argument('--cut_out', nargs='*',
@@ -274,7 +277,7 @@ def main():
         from generateTestMedia import generateTestMedia
         from usefulFunctions import FFmpeg
 
-        ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, Log())
+        ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, True, Log())
         generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
             args.width, args.height)
         sys.exit()
@@ -297,8 +300,8 @@ def main():
         from usefulFunctions import FFmpeg, FFprobe
 
         log = Log()
-        ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, log)
-        ffprobe = FFprobe(dirPath, args.my_ffmpeg, log)
+        ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, False, log)
+        ffprobe = FFprobe(dirPath, args.my_ffmpeg, False, log)
 
         getInfo(args.input, ffmpeg, ffprobe, log)
         sys.exit()
@@ -320,8 +323,8 @@ def main():
     del option_data
 
     from usefulFunctions import FFmpeg, FFprobe, sep
-    ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, Log())
-    ffprobe = FFprobe(dirPath, args.my_ffmpeg, Log())
+    ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
+    ffprobe = FFprobe(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
 
     makingDataFile = (args.export_to_premiere or args.export_to_resolve or
         args.export_to_final_cut_pro or args.export_as_json)
@@ -351,7 +354,7 @@ def main():
         sys.exit()
 
     TEMP = tempfile.mkdtemp()
-    log = Log(args.debug, args.show_ffmpeg_debug, args.quiet, temp=TEMP)
+    log = Log(args.debug, args.quiet, temp=TEMP)
     log.debug(f'\n   - Temp Directory: {TEMP}')
 
     ffmpeg.updateLog(log)
