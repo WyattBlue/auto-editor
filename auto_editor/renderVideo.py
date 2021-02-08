@@ -48,6 +48,9 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
         pix_fmt, '-s', f'{width}*{height}', '-framerate', f'{fps}', '-i', '-', '-pix_fmt',
         pix_fmt]
 
+    if(args.scale != 1):
+        cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}'])
+
     cmd = properties(cmd, args)
     cmd.append(f'{temp}{sep()}spedup.mp4')
 
