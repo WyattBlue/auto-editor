@@ -49,14 +49,8 @@ Run this to uninstall auto-editor:
 pip3 uninstall auto-editor
 ```
 
-## Increasing speed.
 
-Installing the av module will make rendering videos go faster.
-
-```
-pip3 install av
-```
-
+----
 
 ## Installing from Source
 
@@ -85,15 +79,19 @@ pip3 install auto-editor --no-deps
 ```
 pip3 install numpy
 pip3 install audiotsm2
+pip3 install av
 pip3 install opencv-python
 pip3 install youtube-dl
 pip3 install requests
-pip3 install av
 ```
 
 ### Numpy
 
 Foundational math module needed for handling large data. Must be installed for any use with auto-editor.
+
+### Av
+
+Retrieve video data in a form Python can natively use. Allows for very fast rendering of videos.
 
 ### Audiotsm2
 
@@ -101,7 +99,7 @@ The lead developer's own fork of audiotsm. Used for making new audio files at a 
 
 ### Opencv-Python
 
-Sometimes referred to as opencv or cv2. This module is used to determine where motion happens and is used to generate new videos.
+Sometimes referred to as opencv or cv2. This module is used to determine where motion happens.
 
 ### Youtube-dl
 
@@ -111,9 +109,7 @@ Public domain module used to download videos off of websites. When installed, al
 
 https module used to check there's a new version of auto-editor. Not necessary for anything else.
 
-### Av
 
-Retrieve video data in form python can natively use. Allows for very fast rendering of videos and be used instead of opencv-python.
 
 
 ----
