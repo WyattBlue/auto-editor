@@ -104,9 +104,6 @@ def main_options():
     ops += add_argument('--constant_rate_factor', '-crf', type=int, default=15,
         group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
-    ops += add_argument('--render', default='auto',
-        choices=['av', 'opencv', 'auto'],
-        help='choice which rendering method to use. (experimental)')
 
     ops += add_argument('motionOps', nargs=0, action='grouping')
     ops += add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
@@ -128,7 +125,7 @@ def main_options():
     ops += add_argument('--export_to_final_cut_pro', '-exf', action='store_true',
         help='export as an XML file for Final Cut Pro instead of outputting a media file.')
     ops += add_argument('--export_as_json', action='store_true',
-        help='export as a JSON file that can be read by auto-editor later. (experimental)')
+        help='export as a JSON file that can be read by auto-editor later.')
 
     ops += add_argument('--scale', type=float_type, default=1,
         help='scale output.')
@@ -439,7 +436,7 @@ def main():
             sampleRate = ffprobe.getSampleRate(INPUT_FILE)
             if(sampleRate == 'N/A'):
                 sampleRate = '48000'
-                log.warning(f"Samplerate couldn't be detected, using {sampleRate}.")
+                log.warning(f"Samplerate wasn't detected, so it will be set to {sampleRate}.")
         else:
             sampleRate = str(args.sample_rate)
         log.debug(f'   - sampleRate: {sampleRate}')
@@ -615,23 +612,8 @@ def main():
         continueVid = handleAudioTracks(ffmpeg, newOutput, args, tracks, chunks, speeds,
             fps, TEMP, log)
         if(continueVid):
-
-            if(args.render == 'auto'):
-                try:
-                    import av
-                    args.render = 'av'
-                except ImportError:
-                    args.render = 'opencv'
-
-            log.debug(f'Using {args.render} method')
-            if(args.render == 'av'):
-                from renderVideo import renderAv
-                renderAv(ffmpeg, INPUT_FILE, args, chunks, speeds, TEMP, log)
-
-            if(args.render == 'opencv'):
-                from renderVideo import renderOpencv
-                renderOpencv(ffmpeg, INPUT_FILE, args, chunks, speeds, fps, TEMP, log)
-
+            from renderVideo import renderAv
+            renderAv(ffmpeg, INPUT_FILE, args, chunks, speeds, TEMP, log)
             # Now mix new audio(s) and the new video.
             muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)
 
@@ -664,7 +646,7 @@ def main():
         try:
             rmtree(TEMP)
         except PermissionError:
-            pass
+            log.debug('Failed to delete temp dir.')
 
 if(__name__ == '__main__'):
     main()
