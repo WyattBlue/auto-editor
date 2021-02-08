@@ -51,8 +51,11 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
     cmd = properties(cmd, args)
     cmd.append(f'{temp}{sep()}spedup.mp4')
 
-    process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL)
+    if(args.show_ffmpeg_debug):
+        process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    else:
+        process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
 
     inputEquavalent = 0.0
     outputEquavalent = 0
