@@ -2,7 +2,9 @@
 
 # Internal libraries
 import os
-from shutil import move
+import platform
+from shutil import move, rmtree
+from urllib.parse import quote
 
 def formatXML(base: int, *args: str) -> str:
     r = ''
@@ -36,14 +38,10 @@ def speedup(speed) -> str:
         '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
-def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
+def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
     sampleRate, audioFile, resolve: bool, fps, log):
 
     duration = chunks[len(chunks) - 1][1]
-
-    import platform
-
-    from urllib.parse import quote
 
     if(platform.system() == 'Windows'):
         if(resolve):
@@ -51,6 +49,7 @@ def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
         else:
             pathurl = 'file://localhost/' + quote(os.path.abspath(myInput)).replace('%5C', '/')
     else:
+        # Resolve is suprisingly resilient on MacOS.
         pathurl = 'file://localhost' + os.path.abspath(myInput)
 
     name = os.path.basename(myInput)
@@ -61,7 +60,6 @@ def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
     if(tracks > 1):
         # XML's don't support multiple audio tracks so
         # we need to do some stupid things to get it working.
-        from shutil import rmtree
 
         inFolder = os.path.dirname(os.path.abspath(myInput))
 
@@ -84,18 +82,7 @@ def editorXML(myInput: str, temp: str, output, clips, chunks, tracks: int,
     ana = 'FALSE' # anamorphic
     depth = '16'
     if(not audioFile):
-        try:
-            import cv2
-            log.conwrite('Grabbing video dimensions.')
-
-            cap = cv2.VideoCapture(myInput)
-            width = str(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
-            height = str(int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-            cap.release()
-            cv2.destroyAllWindows()
-        except ImportError:
-            width = '1920'
-            height = '1080'
+        width, height = ffprobe.getResolution(myInput).split('x')
     else:
         width = '1920'
         height = '1080'
