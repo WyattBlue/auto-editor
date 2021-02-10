@@ -195,8 +195,8 @@ class FFprobe():
     def getSampleRate(self, file, track=0):
         return self._get(file, 'sample_rate', 'a', track)
 
-    def getAudioBitrate(self, file, track=0):
-        return self._get(file, 'bit_rate', 'a', track)
+    def getBitrate(self, file, the_type='v', track=0):
+        return self._get(file, 'bit_rate', the_type, track)
 
     def getPrettySampleRate(self, file, track=0) -> str:
         output = self.getSampleRate(file, track)
@@ -204,8 +204,8 @@ class FFprobe():
             return str(int(output) / 1000) + ' kHz'
         return 'N/A'
 
-    def getPrettyABitrate(self, file, track=0) -> str:
-        output = self.getAudioBitrate(file, track)
+    def getPrettyBitrate(self, file, the_type='v', track=0) -> str:
+        output = self.getBitrate(file, the_type, track)
         if(output.isnumeric()):
             # This does get used by ffmpeg so be careful.
             return str(round(int(output) / 1000)) + 'k'
