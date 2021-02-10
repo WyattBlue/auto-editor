@@ -186,7 +186,7 @@ def testAutoEditor():
     runTest(['example.mp4', '--sounded_speed', '0.5'])
     runTest(['example.mp4', '--silent_speed', '0.5'])
 
-    runTest(['example.mp4', '--scale', '1.5'])
+    runTest(['example.mp4', '--scale', '1.5', '--render', 'av'])
     fullInspect(
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
@@ -194,7 +194,23 @@ def testAutoEditor():
         [ffprobe.getSampleRate, '48000'],
     )
 
-    runTest(['example.mp4', '--scale', '0.2'])
+    runTest(['example.mp4', '--scale', '0.2', '--render', 'av'])
+    fullInspect(
+        'example_ALTERED.mp4',
+        [ffprobe.getFrameRate, 30.0],
+        [ffprobe.getResolution, '256x144'],
+        [ffprobe.getSampleRate, '48000'],
+    )
+
+    runTest(['example.mp4', '--scale', '1.5', '--render', 'opencv'])
+    fullInspect(
+        'example_ALTERED.mp4',
+        [ffprobe.getFrameRate, 30.0],
+        [ffprobe.getResolution, '1920x1080'],
+        [ffprobe.getSampleRate, '48000'],
+    )
+
+    runTest(['example.mp4', '--scale', '0.2', '--render', 'opencv'])
     fullInspect(
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
