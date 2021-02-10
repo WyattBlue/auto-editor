@@ -4,7 +4,6 @@
 Make a pre-edited file reference that can be inputted back into auto-editor.
 """
 
-# Internal libraries
 import os
 import json
 
