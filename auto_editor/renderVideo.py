@@ -83,3 +83,78 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
         log.debug('Writing the output file.')
     else:
         log.conwrite('Writing the output file.')
+
+
+def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, temp, log):
+    import cv2
+
+    cap = cv2.VideoCapture(vidFile)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+
+    out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
+
+    totalFrames = chunks[len(chunks) - 1][1]
+    cframe = 0
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, cframe)
+    remander = 0
+    framesWritten = 0
+
+    videoProgress = ProgressBar(totalFrames, 'Creating new video',
+        args.machine_readable_progress, args.no_progress)
+
+
+    def findState(chunks, cframe) -> int:
+        low = 0
+        high = len(chunks) - 1
+
+        while low <= high:
+            mid = low + (high - low) // 2
+
+            if(cframe >= chunks[mid][0] and cframe < chunks[mid][1]):
+                return chunks[mid][2]
+            elif(cframe > chunks[mid][0]):
+                low = mid + 1
+            else:
+                high = mid - 1
+
+        # cframe not in chunks
+        return 0
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if(not ret or cframe > totalFrames):
+            break
+
+        cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
+
+        state = findState(chunks, cframe)
+
+        mySpeed = speeds[state]
+
+        if(mySpeed != 99999):
+            doIt = (1 / mySpeed) + remander
+            for __ in range(int(doIt)):
+                out.write(frame)
+                framesWritten += 1
+            remander = doIt % 1
+
+        videoProgress.tick(cframe)
+    log.debug(f'\n   - Frames Written: {framesWritten}')
+    log.debug(f'   - Total Frames: {totalFrames}')
+
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+
+    if(args.video_codec != 'uncompressed'):
+        cmd = properties([], args)
+        cmd.append(f'{temp}/spedup.mp4')
+        ffmpeg.run(cmd)
+
+    if(log.is_debug):
+        log.debug('Writing the output file.')
+    else:
+        log.conwrite('Writing the output file.')
