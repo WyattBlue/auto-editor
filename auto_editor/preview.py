@@ -1,9 +1,9 @@
 '''preview.py'''
 
-# Included functions
+# Included Libraries
 from usefulFunctions import getNewLength
 
-# Internal libraries
+# Internal Libraries
 import os
 from datetime import timedelta
 

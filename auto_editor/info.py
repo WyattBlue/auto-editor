@@ -1,8 +1,16 @@
 '''info.py'''
 
 import os
+import sys
 
 def getInfo(files, ffmpeg, ffprobe, log):
+
+    if(len(files) == 0):
+        print('info: subcommand for inspecting media contents.')
+        print('Add a file to inspect. Example:')
+        print('    auto-editor info example.mp4')
+        sys.exit()
+
     for file in files:
         if(os.path.exists(file)):
             print(f'file: {file}')
