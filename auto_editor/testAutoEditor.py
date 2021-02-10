@@ -77,7 +77,6 @@ def cleanup(the_dir):
 dirPath = os.path.dirname(os.path.realpath(__file__))
 ffprobe = FFprobe(dirPath, True, False, Log())
 
-
 def fullInspect(fileName, *args):
     for item in args:
         func = item[0]
@@ -85,9 +84,10 @@ def fullInspect(fileName, *args):
 
         if(func(fileName) != expectedOutput):
 
-            # Cheating on fps to allow 29.99944409236961
+            # Cheating on fps to allow 30 to equal 29.99944409236961
             if(isinstance(expectedOutput, float)):
-                if(round(func(fileName)) == expectedOutput):
+                from math import ceil
+                if(ceil(func(fileName) * 100) == expectedOutput * 100):
                     continue
 
             print('Inspection Failed.')
@@ -138,7 +138,7 @@ def testAutoEditor():
         [ffprobe.getVideoCodec, 'mpeg4'], # Changed because "uncompressed video codec"
     )
 
-    runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'copy'])
+    runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'copy', '--show_ffmpeg_debug'])
     fullInspect(
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
