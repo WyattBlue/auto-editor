@@ -14,8 +14,11 @@ def pip_version():
     return '21.5.3'
 
 if(sys.argv[-1] == 'publish'):
-    os.system('rm -rf build')
-    os.system('rm -rf dist')
+
+    from shutil import rmtree
+    rmtree('build')
+    rmtree('dist')
+
     os.system('python3 setup.py sdist bdist_wheel')
     os.system('twine upload dist/*')
     sys.exit()
