@@ -25,7 +25,8 @@ def properties(cmd, args, vidFile, ffprobe):
     return cmd
 
 
-def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, temp, log):
+def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
+    temp, log):
     import av
 
     totalFrames = chunks[len(chunks) - 1][1]
@@ -39,7 +40,6 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, te
     width = inputVideoStream.width
     height = inputVideoStream.height
     pix_fmt = inputVideoStream.pix_fmt
-    fps = float(inputVideoStream.average_rate)
 
     log.debug(f'   - pix_fmt: {pix_fmt}')
 
