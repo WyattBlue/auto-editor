@@ -135,7 +135,8 @@ def testAutoEditor():
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
         [ffprobe.getResolution, '1280x720'],
-        [ffprobe.getVideoCodec, 'mpeg4'], # Changed because "uncompressed video codec"
+        [ffprobe.getVideoCodec, 'mpeg4'],
+        [ffprobe.getSampleRate, '48000'],
     )
 
     runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'copy', '--show_ffmpeg_debug'])
@@ -144,13 +145,14 @@ def testAutoEditor():
         [ffprobe.getFrameRate, 30.0],
         [ffprobe.getResolution, '1280x720'],
         [ffprobe.getVideoCodec, 'h264'],
+        [ffprobe.getSampleRate, '48000'],
     )
 
     runTest(['example.mp4', '-m', '3'])
     runTest(['example.mp4', '-m', '0.3sec'])
 
+    # Test rejecting files with no extension.
     shutil.copy('example.mp4', 'example')
-
     checkForError(['example', '--no_open'])
     os.remove('example')
 
