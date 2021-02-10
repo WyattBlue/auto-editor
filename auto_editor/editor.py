@@ -12,6 +12,7 @@ def formatXML(base: int, *args: str) -> str:
         r += ('\t' * base) + line + '\n'
     return r
 
+
 def speedup(speed) -> str:
     return formatXML(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
         '\t\t<effectid>timeremap</effectid>',
@@ -37,6 +38,7 @@ def speedup(speed) -> str:
         '\t\t\t<parameterid>frameblending</parameterid>',
         '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
         '\t\t</parameter>', '\t</effect>', '</filter>')
+
 
 def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
     sampleRate, audioFile, resolve: bool, fps, log):

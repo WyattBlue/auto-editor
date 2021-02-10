@@ -13,6 +13,7 @@ def convertAudio(ffmpeg, ffprobe, theFile, INPUT_FILE, outFile, args, log):
 
     ffmpeg.run(['-i', theFile, '-acodec', realCodec, outFile])
 
+
 def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
     log.checkType(samplerate, 'samplerate', str)
     cmd = ['-i', theFile]
@@ -24,6 +25,7 @@ def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
     log.conwrite('')
 
     return f'{temp}{sep()}faAudio.wav'
+
 
 def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
     machineReadable, hideBar):

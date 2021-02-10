@@ -1,13 +1,15 @@
 '''renderVideo.py'''
 
-# Included functions
+# Included Libaries
 from usefulFunctions import ProgressBar, sep
 
-# Internal libraries
+# Internal Libraries
 import subprocess
 
-def properties(cmd, args):
-    if(args.video_codec == 'uncompressed'):
+def properties(cmd, args, vidFile, ffprobe):
+    if(args.video_codec == 'copy'):
+        cmd.extend(['-vcodec', ffprobe.getVideoCodec(vidFile)])
+    elif(args.video_codec == 'uncompressed'):
         cmd.extend(['-vcodec', 'mpeg4', '-qscale:v', '1'])
     else:
         cmd.extend(['-vcodec', args.video_codec])
@@ -23,7 +25,7 @@ def properties(cmd, args):
     return cmd
 
 
-def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
+def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, temp, log):
     import av
 
     totalFrames = chunks[len(chunks) - 1][1]
@@ -48,7 +50,7 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
     if(args.scale != 1):
         cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}'])
 
-    cmd = properties(cmd, args)
+    cmd = properties(cmd, args, vidFile, ffprobe)
     cmd.append(f'{temp}{sep()}spedup.mp4')
 
     if(args.show_ffmpeg_debug):
@@ -85,7 +87,8 @@ def renderAv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, temp, log):
         log.conwrite('Writing the output file.')
 
 
-def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, temp, log):
+def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
+    temp, log):
     import cv2
 
     cap = cv2.VideoCapture(vidFile)
@@ -150,7 +153,7 @@ def renderOpencv(ffmpeg, vidFile: str, args, chunks: list, speeds: list, fps, te
     cv2.destroyAllWindows()
 
     if(args.video_codec != 'uncompressed'):
-        cmd = properties([], args)
+        cmd = properties([], args, vidFile, ffprobe)
         cmd.append(f'{temp}/spedup.mp4')
         ffmpeg.run(cmd)
 

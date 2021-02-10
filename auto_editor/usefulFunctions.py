@@ -5,7 +5,7 @@ To prevent duplicate code being pasted between scripts, common functions should 
 put here. No function should modify or create video/audio files on its own.
 """
 
-# Internal libraries
+# Internal Libraries
 import sys
 from platform import system
 from shutil import get_terminal_size
@@ -188,6 +188,9 @@ class FFprobe():
 
     def getAudioCodec(self, file, track=0):
         return self._get(file, 'codec_name', 'a', track)
+
+    def getVideoCodec(self, file, track=0):
+        return self._get(file, 'codec_name', 'v', track)
 
     def getSampleRate(self, file, track=0):
         return self._get(file, 'sample_rate', 'a', track)
