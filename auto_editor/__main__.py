@@ -631,7 +631,8 @@ def main():
             log.debug(f'Using {args.render} method')
             if(args.render == 'av'):
                 from renderVideo import renderAv
-                renderAv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, TEMP, log)
+                renderAv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, fps,
+                    TEMP, log)
 
             if(args.render == 'opencv'):
                 from renderVideo import renderOpencv
