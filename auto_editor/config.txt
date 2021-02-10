@@ -13,12 +13,15 @@ auto-editor.exportMediaOps.audio_codec = None             # None
 auto-editor.exportMediaOps.preset = 'medium'              # 'medium'
 auto-editor.exportMediaOps.tune = 'none'                  # 'none'
 auto-editor.exportMediaOps.constant_rate_factor = 15      # 15
-auto-editor.exportMediaOps.render = 'auto'                # 'auto'
 
 # motionOps
 auto-editor.motionOps.dilates = 2                         # 2
 auto-editor.motionOps.width = 400                         # 400
 auto-editor.motionOps.blur = 21                           # 21
+
+   # choices=['av', 'opencv', 'auto']
+auto-editor.render = 'auto'                               # 'auto'
+auto-editor.scale = 1                                     # 1
 
 auto-editor.motion_threshold = 0.02                       # 0.02
 auto-editor.edit_based_on = 'audio'                       # 'audio'
@@ -31,7 +34,6 @@ auto-editor.frame_margin = 6                              # 6
 auto-editor.silent_threshold = 0.04                       # 0.04
 auto-editor.video_speed = 1.0                             # 1.0
 auto-editor.silent_speed = 99999                          # 99999
-auto-editor.output_file = None                            # None
 
 # generate_test subcommand
 generate_test.fps = 30.0                                  # 30.0

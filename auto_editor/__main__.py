@@ -107,9 +107,6 @@ def main_options():
     ops += add_argument('--constant_rate_factor', '-crf', type=int, default=15,
         group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
-    ops += add_argument('--render', default='auto', group='exportMediaOps',
-        choices=['av', 'opencv', 'auto'],
-        help='choice which rendering method to use.')
 
     ops += add_argument('motionOps', nargs=0, action='grouping')
     ops += add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
@@ -133,6 +130,8 @@ def main_options():
     ops += add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later.')
 
+    ops += add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
+        help='choice which method to render video.')
     ops += add_argument('--scale', type=float_type, default=1,
         help='scale output.')
 
