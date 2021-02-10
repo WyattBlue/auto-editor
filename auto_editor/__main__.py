@@ -455,7 +455,7 @@ def main():
                 # audio bitrate not supported in the mkv container.
                 audioBitrate = None
             else:
-                audioBitrate = ffprobe.getPrettyABitrate(INPUT_FILE)
+                audioBitrate = ffprobe.getPrettyBitrate(INPUT_FILE, 'a')
                 if(audioBitrate == 'N/A'):
                     log.warning("Couldn't automatically detect audio bitrate.")
                     audioBitrate = None
@@ -632,7 +632,7 @@ def main():
             if(args.render == 'av'):
                 from renderVideo import renderAv
                 renderAv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, fps,
-                    TEMP, log)
+                TEMP, log)
 
             if(args.render == 'opencv'):
                 from renderVideo import renderOpencv
