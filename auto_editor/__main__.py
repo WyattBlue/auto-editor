@@ -107,6 +107,9 @@ def main_options():
     ops += add_argument('--constant_rate_factor', '-crf', type=int, default=15,
         group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
+    ops += add_argument('--render', default='auto', group='exportMediaOps',
+        choices=['av', 'opencv', 'auto'],
+        help='choice which rendering method to use.')
 
     ops += add_argument('motionOps', nargs=0, action='grouping')
     ops += add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
@@ -618,8 +621,23 @@ def main():
         continueVid = handleAudioTracks(ffmpeg, newOutput, args, tracks, chunks, speeds,
             fps, TEMP, log)
         if(continueVid):
-            from renderVideo import renderAv
-            renderAv(ffmpeg, INPUT_FILE, args, chunks, speeds, TEMP, log)
+            if(args.render == 'auto'):
+                try:
+                    import av
+                    args.render = 'av'
+                except ImportError:
+                    args.render = 'opencv'
+
+            log.debug(f'Using {args.render} method')
+            if(args.render == 'av'):
+                from renderVideo import renderAv
+                renderAv(ffmpeg, INPUT_FILE, args, chunks, speeds, TEMP, log)
+
+            if(args.render == 'opencv'):
+                from renderVideo import renderOpencv
+                renderOpencv(ffmpeg, INPUT_FILE, args, chunks, speeds, fps, TEMP, log)
+
+
             # Now mix new audio(s) and the new video.
             muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)
 
