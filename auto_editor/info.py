@@ -24,17 +24,9 @@ def getInfo(files, ffmpeg, ffprobe, log):
             print(f' - fps: {ffprobe.getFrameRate(file)}')
             print(f' - duration: {ffprobe.getDuration(file)}')
             print(f' - resolution: {ffprobe.getResolution(file)}')
+            print(f' - video codec: {ffprobe.getVideoCodec(file)}')
 
-            raw_data = ffprobe.pipe(['-select_streams', 'v:0', '-show_entries',
-                'stream=codec_name,bit_rate', '-of',
-                'compact=p=0:nk=1', file]).split('|')
-
-            print(f' - video codec: {raw_data[0]}')
-
-            if(raw_data[1].strip().isnumeric()):
-                vbit = str(int(int(raw_data[1]) / 1000)) + 'k'
-            else:
-                vbit = 'N/A'
+            vbit = ffprobe.getPrettyBitrate(file, 'v', track=0)
             print(f' - video bitrate: {vbit}')
 
             if(hasAud):
@@ -45,14 +37,17 @@ def getInfo(files, ffmpeg, ffprobe, log):
                     print(f'   - Track #{track}')
                     print(f'     - codec: {ffprobe.getAudioCodec(file, track)}')
                     print(f'     - samplerate: {ffprobe.getPrettySampleRate(file, track)}')
-                    print(f'     - bitrate: {ffprobe.getPrettyABitrate(file, track)}')
+
+                    abit = ffprobe.getPrettyBitrate(file, 'a', track)
+                    print(f'     - bitrate: {abit}')
             else:
                 print(' - audio tracks: 0')
         elif(hasAud):
             print(f' - duration: {ffprobe.getAudioDuration(file)}')
             print(f' - codec: {ffprobe.getAudioCodec(file, track=0)}')
             print(f' - samplerate: {ffprobe.getPrettySampleRate(file, track=0)}')
-            print(f' - bitrate: {ffprobe.getPrettyABitrate(file, track=0)}')
+            abit = ffprobe.getPrettyBitrate(file, 'a', track=0)
+            print(f' - bitrate: {abit}')
         else:
             print('Invalid media.')
     print('')
