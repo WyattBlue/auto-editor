@@ -96,7 +96,18 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
-    out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
+    if(args.scale != 1):
+        new_width = int(width * args.scale)
+        new_height = int(height * args.scale)
+
+        log.debug(f'\n Resolution {new_width}x{new_height}')
+
+        if(new_width < 2 or new_height < 2):
+            log.error('New resolution too small.')
+
+        out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (new_width, new_height))
+    else:
+        out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
 
     totalFrames = chunks[len(chunks) - 1][1]
     cframe = 0
@@ -107,7 +118,6 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
     videoProgress = ProgressBar(totalFrames, 'Creating new video',
         args.machine_readable_progress, args.no_progress)
-
 
     def findState(chunks, cframe) -> int:
         low = 0
@@ -130,6 +140,10 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         ret, frame = cap.read()
         if(not ret or cframe > totalFrames):
             break
+
+        if(args.scale != 1):
+            frame = cv2.resize(frame, (new_width, new_height),
+                interpolation=cv2.INTER_AREA)
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
 
