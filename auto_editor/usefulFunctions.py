@@ -167,6 +167,7 @@ class FFprobe():
         output = self.pipe(['-select_streams', 'v', '-show_entries',
             'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
         nums = output.split('/')
+        print(output)
         return int(nums[0]) / int(nums[1])
 
     def getAudioTracks(self, file):
