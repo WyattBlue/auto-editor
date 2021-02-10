@@ -3,6 +3,27 @@
 import os
 import sys
 
+def aspectRatio(w, h) -> str:
+
+    def gcd(a, b) -> int:
+        while b:
+            a, b = b, a % b
+        return a
+
+    w = int(w)
+    h = int(h)
+
+    if(h == 0):
+        return ''
+
+    c = gcd(w, h)
+
+    sw = int(w / c)
+    sh = int(h / c)
+
+    return f'{sw}:{sh}'
+
+
 def getInfo(files, ffmpeg, ffprobe, log):
 
     if(len(files) == 0):
@@ -23,7 +44,11 @@ def getInfo(files, ffmpeg, ffprobe, log):
         if(hasVid):
             print(f' - fps: {ffprobe.getFrameRate(file)}')
             print(f' - duration: {ffprobe.getDuration(file)}')
-            print(f' - resolution: {ffprobe.getResolution(file)}')
+
+            res = ffprobe.getResolution(file)
+            width, height = res.split('x')
+            print(f' - resolution: {res} ({aspectRatio(width, height)})')
+
             print(f' - video codec: {ffprobe.getVideoCodec(file)}')
 
             vbit = ffprobe.getPrettyBitrate(file, 'v', track=0)
