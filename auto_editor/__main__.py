@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 '''__main__.py'''
 
-# Internal python libraries
+# Internal Libraries
 import os
 import sys
 import tempfile
@@ -631,12 +631,12 @@ def main():
             log.debug(f'Using {args.render} method')
             if(args.render == 'av'):
                 from renderVideo import renderAv
-                renderAv(ffmpeg, INPUT_FILE, args, chunks, speeds, TEMP, log)
+                renderAv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, TEMP, log)
 
             if(args.render == 'opencv'):
                 from renderVideo import renderOpencv
-                renderOpencv(ffmpeg, INPUT_FILE, args, chunks, speeds, fps, TEMP, log)
-
+                renderOpencv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, fps,
+                    TEMP, log)
 
             # Now mix new audio(s) and the new video.
             muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)

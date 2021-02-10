@@ -1,13 +1,14 @@
 '''videoUtils.py'''
 
+# Internal Libraries
+import os
 from shutil import move
 
+# Included Libraries
 from usefulFunctions import sep
+from fastAudio import fastAudio
 
 def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, log) -> bool:
-    import os
-    from fastAudio import fastAudio
-
     log.checkType(tracks, 'tracks', int)
     log.checkType(outFile, 'outFile', str)
 
@@ -20,7 +21,7 @@ def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, 
 
     if(args.export_as_audio):
         if(args.keep_tracks_seperate):
-            log.warning("Audio files can't have multiple tracks.")
+            log.warning("Audio files don't have multiple tracks.")
 
         if(tracks == 1):
             move(f'{temp}{sep()}0.wav', outFile)

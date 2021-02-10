@@ -1,16 +1,18 @@
-'''test.py'''
+'''testAutoEditor.py'''
 
 """
 Test auto-editor and make sure everything is working.
 """
 
+# Internal Libraries
 import os
 import sys
 import shutil
 import platform
 import subprocess
 
-from usefulFunctions import sep
+# Included Libraries
+from usefulFunctions import Log, FFprobe, sep
 
 def getRunner():
     if(platform.system() == 'Windows'):
@@ -72,6 +74,22 @@ def cleanup(the_dir):
             shutil.rmtree(item)
 
 
+dirPath = os.path.dirname(os.path.realpath(__file__))
+ffprobe = FFprobe(dirPath, True, False, Log())
+
+
+def fullInspect(fileName, *args):
+    for item in args:
+        func = item[0]
+        expectedOutput = item[1]
+
+        if(func(fileName) != expectedOutput):
+            print('Inspection Failed.')
+            print(f'Expected Value: {expectedOutput} {type(expectedOutput)}')
+            print(f'Actual Value: {func(fileName)} {type(func(fileName))}')
+            sys.exit(1)
+    print('Inspection Passed.')
+
 def testAutoEditor():
     # Test Help Command
     runTest(['--help'])
@@ -106,21 +124,41 @@ def testAutoEditor():
 
     # Test example video.
     runTest(['example.mp4'])
-    runTest(['example.mp4', '--verbose'])
+
+    fullInspect(
+        'example_ALTERED.mp4',
+        [ffprobe.getFrameRate, 30.0],
+        [ffprobe.getResolution, '1280x720'],
+        [ffprobe.getVideoCodec, 'mpeg4'], # Changed because "uncompressed video codec"
+    )
+
+    runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'copy'])
+    fullInspect(
+        'example_ALTERED.mp4',
+        [ffprobe.getFrameRate, 30.0],
+        [ffprobe.getResolution, '1280x720'],
+        [ffprobe.getVideoCodec, 'h264'],
+    )
 
     runTest(['example.mp4', '-m', '3'])
     runTest(['example.mp4', '-m', '0.3sec'])
 
-
     shutil.copy('example.mp4', 'example')
 
     checkForError(['example', '--no_open'])
-
     os.remove('example')
 
     # Test ProgressOps
     runTest(['example.mp4', 'progressOps', '--machine_readable_progress'])
     runTest(['example.mp4', 'progressOps', '--no_progress'])
+
+    # Test mp4 to mkv
+    runTest(['example.mp4', '-o', 'example.mkv'])
+    os.remove('example.mkv')
+
+    # Test mkv to mp4
+    runTest(['resources/test.mkv', '-o', 'test.mp4'])
+    os.remove('test.mp4')
 
     # Test Audio File Input and Exporting
     runTest(['resources/newCommentary.mp3', '--silent_threshold', '0.1'])
@@ -157,7 +195,9 @@ def testAutoEditor():
         runTest([item, '-exr'])
         runTest([item, '--preview'])
 
-    runTest(['example.mp4', 'exportMediaOps', '--video_codec', 'h264'])
+    runTest(['example.mp4', 'exportMediaOps', '--video_codec', 'h264',
+        '--show_ffmpeg_debug'])
+
     runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'h264', '--preset', 'faster'])
     runTest(['example.mp4', 'exportMediaOps', '--audio_codec', 'ac3'])
     runTest(['resources/newCommentary.mp3', 'exportMediaOps', '-acodec', 'pcm_s16le'])
