@@ -97,17 +97,14 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
     if(args.scale != 1):
-        new_width = int(width * args.scale)
-        new_height = int(height * args.scale)
+        width = int(width * args.scale)
+        height = int(height * args.scale)
 
-        log.debug(f'\n Resolution {new_width}x{new_height}')
+    if(width < 2 or height < 2):
+        log.error('Resolution too small.')
 
-        if(new_width < 2 or new_height < 2):
-            log.error('New resolution too small.')
-
-        out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (new_width, new_height))
-    else:
-        out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
+    log.debug(f'\n Resolution {width}x{height}')
+    out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
 
     totalFrames = chunks[len(chunks) - 1][1]
     cframe = 0
@@ -136,14 +133,40 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         # cframe not in chunks
         return 0
 
+    # zoom sheet
+    import numpy as np
+    from interpolate import linear
+
+    zoom_sheet = np.ones((totalFrames + 1), dtype=float)
+
+    zooms = [
+        [0, 60, 1, 1.5, 'linear'],
+        [60, 120, 1.5, 0.5, 'linear'],
+    ]
+
+    for z in zooms:
+        zoom_sheet[z[0]:z[1]] = linear(z[2], z[3], z[1] - z[0])
+
+    if(len(zooms) > 0):
+        log.debug(zoom_sheet)
+
     while cap.isOpened():
         ret, frame = cap.read()
         if(not ret or cframe > totalFrames):
             break
 
-        if(args.scale != 1):
-            frame = cv2.resize(frame, (new_width, new_height),
-                interpolation=cv2.INTER_AREA)
+        if(zoom_sheet[cframe] != 1):
+
+            zoom = zoom_sheet[cframe]
+            new_size = (int(width * zoom), int(height * zoom))
+            blown = cv2.resize(frame, new_size,
+                interpolation=cv2.INTER_CUBIC)
+
+            frame = blown[0:height+1, 0:width+1]
+
+        elif(args.scale != 1):
+            frame = cv2.resize(frame, (width, height),
+                interpolation=cv2.INTER_CUBIC)
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
 
