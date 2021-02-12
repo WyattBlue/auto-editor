@@ -133,19 +133,38 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         # cframe not in chunks
         return 0
 
-    # zoom sheet
     import numpy as np
     from interpolate import interpolate
 
-    zoom_sheet = np.ones((totalFrames + 1), dtype=float)
+    def XY_Values(val, log, centerX, centerY):
+
+        if(val == 'centerX'):
+            return centerX
+        if(val == 'centerY'):
+            return centerY
+        if(isinstance(val, str)):
+            log.error(f'XY variable {val} not implemented.')
+        return val
+
+    zoom_sheet = np.ones((3, totalFrames + 1), dtype=float)
 
     zooms = [
-        [0, 60, 1, 1.5, 'linear'],
-        [60, 120, 1.5, 0.5, 'linear'],
+        [0, 60, 1, 1.5, 'centerX', 'centerY', 'linear'],
+        [60, 120, 1.5, 1, 'centerX', 'centerY', 'linear'],
     ]
 
+    centerX = width / 2
+    centerY = height / 2
+
     for z in zooms:
-        zoom_sheet[z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[4])
+
+        # Scaling Values
+        zoom_sheet[0][z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])
+
+        # X Values
+        zoom_sheet[1][z[0]:z[1]] = XY_Values(z[4], log, centerX, centerY)
+        # Y Values
+        zoom_sheet[2][z[0]:z[1]] = XY_Values(z[5], log, centerX, centerY)
 
     if(len(zooms) > 0):
         log.debug(zoom_sheet)
@@ -155,14 +174,25 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         if(not ret or cframe > totalFrames):
             break
 
-        if(zoom_sheet[cframe] != 1):
+        if(zoom_sheet[0][cframe] != 1):
 
-            zoom = zoom_sheet[cframe]
+            zoom = zoom_sheet[0][cframe]
+            xPos = zoom_sheet[1][cframe]
+            yPos = zoom_sheet[2][cframe]
+
             new_size = (int(width * zoom), int(height * zoom))
             blown = cv2.resize(frame, new_size,
                 interpolation=cv2.INTER_CUBIC)
 
-            frame = blown[0:height+1, 0:width+1]
+            x1 = int((xPos * zoom) - (width / 2))
+            x2 = int((xPos * zoom) + (width / 2))
+
+            y1 = int((yPos * zoom) - (height / 2))
+            y2 = int((yPos * zoom) + (height / 2))
+
+
+            frame = blown[y1:y2+1, x1:x2+1]
+
 
         elif(args.scale != 1):
             frame = cv2.resize(frame, (width, height),
