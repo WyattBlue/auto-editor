@@ -88,7 +88,7 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
 
 
 def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
-    temp, log):
+    zoom_sheet, temp, log):
     import cv2
 
     cap = cv2.VideoCapture(vidFile)
@@ -150,7 +150,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
     zooms = [
         [0, 60, 1, 1.5, 'centerX', 'centerY', 'linear'],
-        [60, 120, 1.5, 1, 'centerX', 'centerY', 'linear'],
+        [60, 30*10, 1.5, 0.01, 'centerX', 'centerY', 'linear'],
     ]
 
     centerX = width / 2
@@ -180,20 +180,39 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             xPos = zoom_sheet[1][cframe]
             yPos = zoom_sheet[2][cframe]
 
+            # Resize Frame
             new_size = (int(width * zoom), int(height * zoom))
             blown = cv2.resize(frame, new_size,
                 interpolation=cv2.INTER_CUBIC)
 
-            x1 = int((xPos * zoom) - (width / 2))
-            x2 = int((xPos * zoom) + (width / 2))
+            x1 = int((xPos * zoom)) - int((width / 2))
+            x2 = int((xPos * zoom)) + int((width / 2))
 
-            y1 = int((yPos * zoom) - (height / 2))
-            y2 = int((yPos * zoom) + (height / 2))
+            y1 = int((yPos * zoom)) - int((height / 2))
+            y2 = int((yPos * zoom)) + int((height / 2))
 
+            # Doesn't work for all cases!
+            yoffset, xoffset = 0, 0
+            if(y1 < 0):
+                yoffset = -y1
+                y1 = 0
+            if(x1 < 0):
+                xoffset = -x1
+                x1 = 0
 
+            # Crop frame
             frame = blown[y1:y2+1, x1:x2+1]
 
-
+            if(frame.shape != (height+1, width+1, 3)):
+                frame = cv2.copyMakeBorder(
+                    frame,
+                    top=yoffset,
+                    bottom=yoffset,
+                    left=xoffset,
+                    right=xoffset,
+                    borderType=cv2.BORDER_CONSTANT,
+                    value=[255, 255, 255]
+                )
         elif(args.scale != 1):
             frame = cv2.resize(frame, (width, height),
                 interpolation=cv2.INTER_CUBIC)
