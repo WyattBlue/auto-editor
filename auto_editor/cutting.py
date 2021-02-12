@@ -236,7 +236,7 @@ def applyZooms(cmdZooms, log):
             # Add more description later!
             log.error('Too little comma arguments for zoom option.')
 
-        start, end = map(int, ms[:2])
+        start, end = ms[:2]
         start_zoom, end_zoom = map(float, ms[2:4])
 
         x = 'centerX'

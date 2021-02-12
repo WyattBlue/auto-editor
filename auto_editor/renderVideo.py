@@ -136,15 +136,23 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     import numpy as np
     from interpolate import interpolate
 
-    def XY_Values(val, log, centerX, centerY):
+    def values(val, log, _type, centerX, centerY, totalFrames, width, height):
         if(val == 'centerX'):
             return centerX
         if(val == 'centerY'):
             return centerY
+        if(val == 'start'):
+            return 0
+        if(val == 'end'):
+            return totalFrames - 1
+        if(val == 'width'):
+            return width
+        if(val == 'height'):
+            return height
 
         if(not val.replace('.', '', 1).isdigit()):
             log.error(f'XY variable {val} not implemented.')
-        return float(val)
+        return _type(val)
 
     if(zooms is not None):
         centerX = width / 2
@@ -153,15 +161,17 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
         for z in zooms:
 
-            z[0] = int(z[0])
-            z[1] = int(z[1])
+            z[0] = values(z[0], log, int, centerY, centerY, totalFrames, width, height)
+            z[1] = values(z[1], log, int, centerY, centerY, totalFrames, width, height)
             # Scaling Values
             zoom_sheet[0][z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])
 
             # X Values
-            zoom_sheet[1][z[0]:z[1]] = XY_Values(z[4], log, centerX, centerY)
+            zoom_sheet[1][z[0]:z[1]] = values(z[4], log, float, centerX, centerY,
+                totalFrames, width, height)
             # Y Values
-            zoom_sheet[2][z[0]:z[1]] = XY_Values(z[5], log, centerX, centerY)
+            zoom_sheet[2][z[0]:z[1]] = values(z[5], log, float, centerX, centerY,
+                totalFrames, width, height)
 
         log.debug(zoom_sheet)
 
@@ -178,8 +188,13 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
             # Resize Frame
             new_size = (int(width * zoom), int(height * zoom))
-            blown = cv2.resize(frame, new_size,
-                interpolation=cv2.INTER_CUBIC)
+
+            if(new_size[0] < 1 or new_size[1] < 1):
+                blown = cv2.resize(frame, (1, 1), interpolation=cv2.INTER_AREA)
+            else:
+                inter = cv2.INTER_CUBIC if zoom > 1 else cv2.INTER_AREA
+                blown = cv2.resize(frame, new_size,
+                    interpolation=inter)
 
             x1 = int((xPos * zoom)) - int((width / 2))
             x2 = int((xPos * zoom)) + int((width / 2))
@@ -188,13 +203,16 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             y2 = int((yPos * zoom)) + int((height / 2))
 
             # Doesn't work for all cases!
-            yoffset, xoffset = 0, 0
+            top, bottom, left, right = 0, 0, 0, 0
             if(y1 < 0):
-                yoffset = -y1
+                bottom = -y1
                 y1 = 0
             if(x1 < 0):
-                xoffset = -x1
+                left = -x1
                 x1 = 0
+
+            # print('')
+            # print(top, bottom, left, right)
 
             # Crop frame
             frame = blown[y1:y2+1, x1:x2+1]
@@ -202,12 +220,12 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             if(frame.shape != (height+1, width+1, 3)):
                 frame = cv2.copyMakeBorder(
                     frame,
-                    top=yoffset,
-                    bottom=yoffset,
-                    left=xoffset,
-                    right=xoffset,
-                    borderType=cv2.BORDER_CONSTANT,
-                    value=[255, 255, 255]
+                    top = bottom,
+                    bottom = bottom,
+                    left = left,
+                    right = left,
+                    borderType = cv2.BORDER_CONSTANT,
+                    value = [0, 0, 0] # Black
                 )
         elif(args.scale != 1):
             frame = cv2.resize(frame, (width, height),
