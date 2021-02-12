@@ -135,7 +135,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
     # zoom sheet
     import numpy as np
-    from interpolate import linear
+    from interpolate import interpolate
 
     zoom_sheet = np.ones((totalFrames + 1), dtype=float)
 
