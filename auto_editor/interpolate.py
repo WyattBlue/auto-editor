@@ -36,7 +36,7 @@ def start_sine(x, y, n: int) -> list:
     b = [x]
     incre = 0
     for _ in range(n - 2):
-        incre += (math.pi) / n
+        incre += math.pi / n
         val = ((y - x)/2) * math.sin(incre - (math.pi / 2)) + ((y - x)/2) + x
         b.append(val)
 
@@ -68,4 +68,3 @@ def interpolate(x, y, n, log, method='linear') -> list:
         return end_sine(x, y, n)
     else:
         log.error(f"Method: {method} isn't implemented.")
-
