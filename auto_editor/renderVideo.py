@@ -88,7 +88,7 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
 
 
 def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
-    zoom_sheet, temp, log):
+    zooms, temp, log):
     import cv2
 
     cap = cv2.VideoCapture(vidFile)
@@ -137,36 +137,32 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     from interpolate import interpolate
 
     def XY_Values(val, log, centerX, centerY):
-
         if(val == 'centerX'):
             return centerX
         if(val == 'centerY'):
             return centerY
-        if(isinstance(val, str)):
+
+        if(not val.replace('.', '', 1).isdigit()):
             log.error(f'XY variable {val} not implemented.')
-        return val
+        return float(val)
 
-    zoom_sheet = np.ones((3, totalFrames + 1), dtype=float)
+    if(zooms is not None):
+        centerX = width / 2
+        centerY = height / 2
+        zoom_sheet = np.ones((3, totalFrames + 1), dtype=float)
 
-    zooms = [
-        [0, 60, 1, 1.5, 'centerX', 'centerY', 'linear'],
-        [60, 30*10, 1.5, 0.01, 'centerX', 'centerY', 'linear'],
-    ]
+        for z in zooms:
 
-    centerX = width / 2
-    centerY = height / 2
+            z[0] = int(z[0])
+            z[1] = int(z[1])
+            # Scaling Values
+            zoom_sheet[0][z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])
 
-    for z in zooms:
+            # X Values
+            zoom_sheet[1][z[0]:z[1]] = XY_Values(z[4], log, centerX, centerY)
+            # Y Values
+            zoom_sheet[2][z[0]:z[1]] = XY_Values(z[5], log, centerX, centerY)
 
-        # Scaling Values
-        zoom_sheet[0][z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])
-
-        # X Values
-        zoom_sheet[1][z[0]:z[1]] = XY_Values(z[4], log, centerX, centerY)
-        # Y Values
-        zoom_sheet[2][z[0]:z[1]] = XY_Values(z[5], log, centerX, centerY)
-
-    if(len(zooms) > 0):
         log.debug(zoom_sheet)
 
     while cap.isOpened():
@@ -174,7 +170,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         if(not ret or cframe > totalFrames):
             break
 
-        if(zoom_sheet[0][cframe] != 1):
+        if(zooms is not None and zoom_sheet[0][cframe] != 1):
 
             zoom = zoom_sheet[0][cframe]
             xPos = zoom_sheet[1][cframe]
