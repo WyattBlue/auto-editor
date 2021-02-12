@@ -145,7 +145,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     ]
 
     for z in zooms:
-        zoom_sheet[z[0]:z[1]] = linear(z[2], z[3], z[1] - z[0])
+        zoom_sheet[z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[4])
 
     if(len(zooms) > 0):
         log.debug(zoom_sheet)
