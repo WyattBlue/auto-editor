@@ -415,8 +415,6 @@ def main():
     audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
         '.acc', '.nfa', '.mka']
 
-    # videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.ogv']
-
     for i, INPUT_FILE in enumerate(inputList):
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
@@ -567,6 +565,11 @@ def main():
             hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
             del audioList, motionList
 
+            zooms = None
+            if(args.zoom is not None):
+                from cutting import applyZooms
+                zooms = applyZooms(args.zoom, log)
+
             chunks = applySpacingRules(hasLoud, fps, args.frame_margin,
                 args.min_clip_length, args.min_cut_length, args.ignore,
                 args.cut_out, log)
@@ -621,14 +624,21 @@ def main():
             fps, TEMP, log)
         if(continueVid):
             if(args.render == 'auto'):
-                try:
-                    import av
-                    args.render = 'av'
-                except ImportError:
+                if(args.zoom is not None):
                     args.render = 'opencv'
+                else:
+                    try:
+                        import av
+                        args.render = 'av'
+                    except ImportError:
+                        args.render = 'opencv'
 
             log.debug(f'Using {args.render} method')
             if(args.render == 'av'):
+
+                if(args.zoom is not None):
+                    log.error('Zoom is not supported on the av render method')
+
                 from renderVideo import renderAv
                 renderAv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, fps,
                 TEMP, log)
@@ -636,7 +646,7 @@ def main():
             if(args.render == 'opencv'):
                 from renderVideo import renderOpencv
                 renderOpencv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, fps,
-                    TEMP, log)
+                    zooms, TEMP, log)
 
             # Now mix new audio(s) and the new video.
             muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)

@@ -225,6 +225,38 @@ def setRange(includeFrame: np.ndarray, syntaxRange, fps: float, with_: bool, log
     return includeFrame
 
 
+def applyZooms(cmdZooms, log):
+
+    zooms = []
+
+    for item in cmdZooms:
+        ms = item.split(',')
+
+        if(len(ms) < 4):
+            # Add more description later!
+            log.error('Too little comma arguments for zoom option.')
+
+        start, end = map(int, ms[:2])
+        start_zoom, end_zoom = map(float, ms[2:4])
+
+        x = 'centerX'
+        y = 'centerY'
+        inter = 'linear'
+
+        if(len(ms) > 4):
+            x, y = ms[4:6]
+
+        if(len(ms) > 6):
+            inter = ms[6]
+
+        if(len(ms) > 7):
+            log.error('Too many comma arguments for zoom option.')
+
+        zooms.append([start, end, start_zoom, end_zoom, x, y, inter])
+
+    return zooms
+
+
 def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
     minClip: int, minCut: int, ignore, cutOut, log):
 
