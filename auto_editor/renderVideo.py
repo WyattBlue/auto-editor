@@ -157,34 +157,43 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     if(zooms is not None):
         centerX = width / 2
         centerY = height / 2
-        zoom_sheet = np.ones((3, totalFrames + 1), dtype=float)
+
+        zoom_sheet = np.ones((1, totalFrames + 1), dtype=float)
+        x_sheet = np.full((1, totalFrames + 1), width, dtype=float)
+        y_sheet = np.full((1, totalFrames + 1), height, dtype=float)
 
         for z in zooms:
 
+            print(z)
+
             z[0] = values(z[0], log, int, centerX, centerY, totalFrames, width, height)
             z[1] = values(z[1], log, int, centerX, centerY, totalFrames, width, height)
-            # Scaling Values
-            zoom_sheet[0][z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])
 
-            # X Values
-            zoom_sheet[1][z[0]:z[1]] = values(z[4], log, float, centerX, centerY,
+            print(z)
+
+            print(len(interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])))
+
+            zoom_sheet[z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])
+
+            x_sheet[z[0]:z[1]] = values(z[4], log, float, centerX, centerY,
                 totalFrames, width, height)
-            # Y Values
-            zoom_sheet[2][z[0]:z[1]] = values(z[5], log, float, centerX, centerY,
+            y_sheet[z[0]:z[1]] = values(z[5], log, float, centerX, centerY,
                 totalFrames, width, height)
 
         log.debug(zoom_sheet)
+        log.debug(x_sheet)
+        log.debug(y_sheet)
 
     while cap.isOpened():
         ret, frame = cap.read()
         if(not ret or cframe > totalFrames):
             break
 
-        if(zooms is not None and zoom_sheet[0][cframe] != 1):
+        if(zooms is not None):
 
-            zoom = zoom_sheet[0][cframe]
-            xPos = zoom_sheet[1][cframe]
-            yPos = zoom_sheet[2][cframe]
+            zoom = zoom_sheet[cframe]
+            xPos = x_sheet[cframe]
+            yPos = y_sheet[cframe]
 
             # Resize Frame
             new_size = (int(width * zoom), int(height * zoom))
@@ -219,12 +228,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             bottom = (height +1) - (frame.shape[0]) - top
             right = (width + 1) - frame.shape[1] - left
 
-
-            print('')
-            print(f'bottom: {bottom}')
-            print(f'top: {top}')
-
-
+            # Pad frame so opencv doesn't drop a frame
             frame = cv2.copyMakeBorder(
                 frame,
                 top = top,
@@ -236,10 +240,10 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             )
 
             if(frame.shape != (height+1, width+1, 3)):
+                # Crash so that opencv dropped frames don't go unnoticed.
                 print(f'cframe {cframe}')
                 log.error(f'Wrong frame shape. was {frame.shape}, should be {(height+1, width+1, 3)} ')
 
-            print(frame.shape)
         elif(args.scale != 1):
             frame = cv2.resize(frame, (width, height),
                 interpolation=cv2.INTER_CUBIC)
