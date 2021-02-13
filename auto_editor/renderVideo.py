@@ -158,20 +158,14 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         centerX = width / 2
         centerY = height / 2
 
-        zoom_sheet = np.ones((1, totalFrames + 1), dtype=float)
-        x_sheet = np.full((1, totalFrames + 1), width, dtype=float)
-        y_sheet = np.full((1, totalFrames + 1), height, dtype=float)
+        zoom_sheet = np.ones((totalFrames + 1), dtype=float)
+        x_sheet = np.full((totalFrames + 1), centerX, dtype=float)
+        y_sheet = np.full((totalFrames + 1), centerY, dtype=float)
 
         for z in zooms:
 
-            print(z)
-
             z[0] = values(z[0], log, int, centerX, centerY, totalFrames, width, height)
             z[1] = values(z[1], log, int, centerX, centerY, totalFrames, width, height)
-
-            print(z)
-
-            print(len(interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])))
 
             zoom_sheet[z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])
 
@@ -198,7 +192,9 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             # Resize Frame
             new_size = (int(width * zoom), int(height * zoom))
 
-            if(new_size[0] < 1 or new_size[1] < 1):
+            if(zoom == 1):
+                blown = frame
+            elif(new_size[0] < 1 or new_size[1] < 1):
                 blown = cv2.resize(frame, (1, 1), interpolation=cv2.INTER_AREA)
             else:
                 inter = cv2.INTER_CUBIC if zoom > 1 else cv2.INTER_AREA
