@@ -266,7 +266,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     cv2.destroyAllWindows()
 
     if(args.video_codec != 'uncompressed'):
-        cmd = properties([], args, vidFile, ffprobe)
+        cmd = properties(['-i', vidFile], args, vidFile, ffprobe)
         cmd.append(f'{temp}/spedup.mp4')
         ffmpeg.run(cmd)
 
