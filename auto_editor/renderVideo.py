@@ -161,8 +161,8 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
         for z in zooms:
 
-            z[0] = values(z[0], log, int, centerY, centerY, totalFrames, width, height)
-            z[1] = values(z[1], log, int, centerY, centerY, totalFrames, width, height)
+            z[0] = values(z[0], log, int, centerX, centerY, totalFrames, width, height)
+            z[1] = values(z[1], log, int, centerX, centerY, totalFrames, width, height)
             # Scaling Values
             zoom_sheet[0][z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])
 
@@ -202,31 +202,44 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             y1 = int((yPos * zoom)) - int((height / 2))
             y2 = int((yPos * zoom)) + int((height / 2))
 
-            # Doesn't work for all cases!
+
             top, bottom, left, right = 0, 0, 0, 0
+
             if(y1 < 0):
-                bottom = -y1
+                top = -y1
                 y1 = 0
+
             if(x1 < 0):
                 left = -x1
                 x1 = 0
 
-            # print('')
-            # print(top, bottom, left, right)
-
-            # Crop frame
             frame = blown[y1:y2+1, x1:x2+1]
 
+
+            bottom = (height +1) - (frame.shape[0]) - top
+            right = (width + 1) - frame.shape[1] - left
+
+
+            print('')
+            print(f'bottom: {bottom}')
+            print(f'top: {top}')
+
+
+            frame = cv2.copyMakeBorder(
+                frame,
+                top = top,
+                bottom = bottom,
+                left = left,
+                right = right,
+                borderType = cv2.BORDER_CONSTANT,
+                value = [0, 0, 0] # Black
+            )
+
             if(frame.shape != (height+1, width+1, 3)):
-                frame = cv2.copyMakeBorder(
-                    frame,
-                    top = bottom,
-                    bottom = bottom,
-                    left = left,
-                    right = left,
-                    borderType = cv2.BORDER_CONSTANT,
-                    value = [0, 0, 0] # Black
-                )
+                print(f'cframe {cframe}')
+                log.error(f'Wrong frame shape. was {frame.shape}, should be {(height+1, width+1, 3)} ')
+
+            print(frame.shape)
         elif(args.scale != 1):
             frame = cv2.resize(frame, (width, height),
                 interpolation=cv2.INTER_CUBIC)
