@@ -135,7 +135,7 @@ def main_options():
     ops += add_argument('--scale', type=float_type, default=1,
         help='scale output.')
 
-    ops += add_argument('--zoom', type=zoom_type, default=None, nargs='*',
+    ops += add_argument('--zoom', type=zoom_type, default=[], nargs='*',
         help='set when and how a zoom will occur.')
 
     ops += add_argument('--ignore', nargs='*',
@@ -566,7 +566,7 @@ def main():
             del audioList, motionList
 
             zooms = None
-            if(args.zoom is not None):
+            if(args.zoom != []):
                 from cutting import applyZooms
                 zooms = applyZooms(args.zoom, log)
 
@@ -624,7 +624,7 @@ def main():
             fps, TEMP, log)
         if(continueVid):
             if(args.render == 'auto'):
-                if(args.zoom is not None):
+                if(args.zoom != []):
                     args.render = 'opencv'
                 else:
                     try:
@@ -636,7 +636,7 @@ def main():
             log.debug(f'Using {args.render} method')
             if(args.render == 'av'):
 
-                if(args.zoom is not None):
+                if(args.zoom != []):
                     log.error('Zoom is not supported on the av render method')
 
                 from renderVideo import renderAv
