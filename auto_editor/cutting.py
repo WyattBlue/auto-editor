@@ -229,15 +229,25 @@ def applyZooms(cmdZooms, log):
 
     zooms = []
 
+    from usefulFunctions import cleanList
+
     for item in cmdZooms:
         ms = item.split(',')
 
-        if(len(ms) < 4):
+        ms = cleanList(ms, '\r\n\t')
+
+        if(len(ms) < 3):
             # Add more description later!
-            log.error('Too little comma arguments for zoom option.')
+            log.error('Too few comma arguments for zoom option.')
 
         start, end = ms[:2]
-        start_zoom, end_zoom = map(float, ms[2:4])
+
+        start_zoom = float(ms[3])
+
+        if(len(ms) == 3):
+            end_zoom = start_zoom
+        else:
+            end_zoom = float(ms[3])
 
         x = 'centerX'
         y = 'centerY'
