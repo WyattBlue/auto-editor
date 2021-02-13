@@ -92,6 +92,15 @@ def sep() -> str:
     return '/'
 
 
+def cleanList(x: list, rm_chars: str) -> list:
+
+    no = str.maketrans('', '', rm_chars)
+    x = [s.translate(no) for s in x]
+    x = [s for s in x if s != '']
+
+    return x
+
+
 class FFprobe():
     def __init__(self, dirPath, myFFmpeg: bool, FFdebug, log):
         from os import path
@@ -167,17 +176,20 @@ class FFprobe():
         output = self.pipe(['-select_streams', 'v', '-show_entries',
             'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
         nums = output.split('/')
-        return int(nums[0]) / int(nums[1])
+        nums = cleanList(numbers, '\r\t\nn')
+
+        try:
+            return int(nums[0]) / int(nums[1])
+        except (ZeroDivisionError, IndexError, ValueError):
+            self.mylog.error(f'getFrameRate had an invalid output: {output}')
 
     def getAudioTracks(self, file):
         output = self.pipe(['-select_streams', 'a', '-show_entries', 'stream=index',
             '-of', 'compact=p=0:nk=1', file]).strip()
 
         numbers = output.split('\n')
-        # Remove all \r chars that can appear in certain environments
-        numbers = [s.replace('\r', '') for s in numbers]
-        # Remove all blanks
-        numbers = [s for s in numbers if s != '']
+        # Remove extra characters that can appear in certain environments
+        numbers = cleanList(numbers, '\r\t')
 
         self.log('Track data: ' + str(numbers))
         if(numbers[0].isnumeric()):
