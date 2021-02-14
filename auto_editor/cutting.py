@@ -242,7 +242,7 @@ def applyZooms(cmdZooms, log):
 
         start, end = ms[:2]
 
-        start_zoom = float(ms[3])
+        start_zoom = float(ms[2])
 
         if(len(ms) == 3):
             end_zoom = start_zoom
