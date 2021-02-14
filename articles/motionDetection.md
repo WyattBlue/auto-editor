@@ -23,40 +23,40 @@ All of these choices are ones you can choice to change how Auto-Editor edits vid
 
 Some of the options may seem a bit arcane at first, so here are some visuals to help see better what each choice does.
 
-<img src="example.png" width="500">
+<img src="imgs/example.png" width="500">
 
 Think of audio and motion like a Venn diagram where the intercept is where the program detects both loudness and motion.
 
 Audio by itself, (the default) would mean only leave in the parts where it is not silent. It's just a circle on the diagram.
 
-<img src="audio.png" width="500">
+<img src="imgs/audio.png" width="500">
 
 and Not Audio would mean leave in the parts only where it is silent. Everywhere is colored except the audio circle.
 
-<img src="not_audio.png" width="500">
+<img src="imgs/not_audio.png" width="500">
 
 Motion works the same way.
 
-<img src="motion.png" width="500">
+<img src="imgs/motion.png" width="500">
 
-<img src="not_motion.png" width="500">
+<img src="imgs/not_motion.png" width="500">
 
 And if you want to leave in the parts with only loud parts and moving parts.
 
-<img src="audio_and_motion.png" width="500">
+<img src="imgs/audio_and_motion.png" width="500">
 
 And the or operator.
 
-<img src="audio_or_motion.png" width="500">
+<img src="imgs/audio_or_motion.png" width="500">
 
 Here are other choices that may or may not be useful.
 
-<img src="audio_xor_motion.png" width="500">
+<img src="imgs/audio_xor_motion.png" width="500">
 
-<img src="audio_and_not_motion.png" width="500">
+<img src="imgs/audio_and_not_motion.png" width="500">
 
-<img src="not_audio_and_motion.png" width="500">
+<img src="imgs/not_audio_and_motion.png" width="500">
 
-<img src="not_audio_and_not_motion.png" width="500">
+<img src="imgs/not_audio_and_not_motion.png" width="500">
 
 This feature is still very new so expect some new features/changes down the line.
