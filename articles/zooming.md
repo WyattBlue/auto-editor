@@ -7,11 +7,24 @@ The `--zoom` option allows auto-editor to zoom in or out in any place. In order 
 
  1. when to start applying the zoom
  1. when to stop applying the zoom
- 1. the zoom level
+ 1. the starting zoom level
+
+This is entered in as:
+
+```
+--zoom {start},{end},{start_level}
+```
+
+or using real numbers,
+
+```
+--zoom 0,20,1.5
+```
 
 
 
-## Examples
+
+## Additional Examples Commands
 
 
 ```
@@ -22,7 +35,25 @@ auto-editor testsrc.mp4 --ignore start-end --zoom start,end,1,2
 auto-editor testsrc.mp4 --ignore start-end --zoom 0,30,5,0.5,centerX,centerY,sine 30,60,0.5,1,centerX,centerY,sine
 ```
 
+```
+auto-editor testsrc.mp4 --ignore start-end --zoom 20,60,0.8,1.5,100,height,start_sine
+```
 
+```
+auto-editor testsrc.mp4 --ignore start-end --zoom start,60,0.8,1.5,width,height,sine
+```
+
+```
+auto-editor testsrc.mp4 --ignore start-end --zoom 20,60,0.001,1.5,centerX,width,linear
+```
+
+```
+auto-editor testsrc.mp4 --ignore start-end --zoom 20,60,0.5,3,centerY,centerX,end_sine
+```
+
+```
+auto-editor testsrc.mp4 --zoom start,end,0.5,3,centerX,centerY,linear
+```
 
 
 ### Notes
@@ -37,3 +68,7 @@ auto-editor generate_test -o 'testsrc.mp4'
 ```
 
 `testsrc.mp4` is used instead of `example.mp4` because it provides more clarity.
+
+---
+
+Zooming is not implemented in the av render method, and will not be used when exporting to other editors until 21w07a or greater.
