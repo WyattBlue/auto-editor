@@ -637,6 +637,7 @@ def main():
             if(args.render == 'av'):
 
                 if(args.zoom != []):
+                    log.conwrite('')
                     log.error('Zoom is not supported on the av render method')
 
                 from renderVideo import renderAv

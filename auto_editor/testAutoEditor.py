@@ -121,6 +121,10 @@ def testAutoEditor():
     runTest(['--debug'])
     # --verbose by itself is UB.
 
+    if(ffprobe.getFrameRate('example.mp4') != 30.0):
+        print(f'getFrameRate did not equal 30.0')
+        sys.exit(1)
+
     # Test info subcommand.
     runTest(['info', 'example.mp4'])
     runTest(['info', 'resources/man_on_green_screen.mp4'])
@@ -227,6 +231,30 @@ def testAutoEditor():
         [ffprobe.getSampleRate, '48000'],
     )
 
+    checkForError(['example.mp4', '--zoom', '0,60,1.5', '--render', 'av'])
+    checkForError(['example.mp4', '--zoom', '0'])
+    checkForError(['example.mp4', '--zoom', '0,60'])
+
+    runTest(['generate_test', '-o', 'testsrc.mp4'])
+    fullInspect(
+        'testsrc.mp4',
+        [ffprobe.getFrameRate, 30.0],
+        [ffprobe.getResolution, '640x360'],
+    )
+
+    runTest(['testsrc.mp4', '--ignore', 'start-end', '--zoom', '10,60,2'])
+
+    runTest(['testsrc.mp4', '--ignore', 'start-end', '--zoom',
+        'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
+    fullInspect(
+        'testsrc_ALTERED.mp4',
+        [ffprobe.getFrameRate, 30.0],
+        [ffprobe.getResolution, '320x180'],
+    )
+
+    os.remove('testsrc_ALTERED.mp4')
+    os.remove('testsrc.mp4')
+
     cleanup(os.getcwd())
     cleanup('resources')
 
@@ -240,9 +268,6 @@ def testAutoEditor():
         runTest([item, '-exp'])
         runTest([item, '-exr'])
         runTest([item, '--preview'])
-
-    runTest(['example.mp4', 'exportMediaOps', '--video_codec', 'h264',
-        '--show_ffmpeg_debug'])
 
     runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'h264', '--preset', 'faster'])
     runTest(['example.mp4', 'exportMediaOps', '--audio_codec', 'ac3'])
