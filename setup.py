@@ -11,7 +11,7 @@ import sys
 from setuptools import setup, find_packages
 
 def pip_version():
-    return '21.5.3'
+    return '21.6.1'
 
 if(sys.argv[-1] == 'publish'):
 
