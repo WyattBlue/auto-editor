@@ -184,7 +184,6 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             break
 
         if(zooms is not None):
-
             zoom = zoom_sheet[cframe]
             xPos = x_sheet[cframe]
             yPos = y_sheet[cframe]
@@ -192,9 +191,9 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             # Resize Frame
             new_size = (int(width * zoom), int(height * zoom))
 
-            if(zoom == 1):
+            if(zoom == 1 and args.scale == 1):
                 blown = frame
-            elif(new_size[0] < 1 or new_size[1] < 1):
+            if(new_size[0] < 1 or new_size[1] < 1):
                 blown = cv2.resize(frame, (1, 1), interpolation=cv2.INTER_AREA)
             else:
                 inter = cv2.INTER_CUBIC if zoom > 1 else cv2.INTER_AREA
@@ -241,8 +240,9 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
                 log.error(f'Wrong frame shape. was {frame.shape}, should be {(height+1, width+1, 3)} ')
 
         elif(args.scale != 1):
+            inter = cv2.INTER_CUBIC if args.scale > 1 else cv2.INTER_AREA
             frame = cv2.resize(frame, (width, height),
-                interpolation=cv2.INTER_CUBIC)
+                interpolation=inter)
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
 
