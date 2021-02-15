@@ -1,8 +1,7 @@
 # Zooming
-last modified February 13, 2021.
-This command will be available in release 21w06a.
+last modified February 14, 2021. 21w06a.
 
-
+## Introduction
 The `--zoom` option allows auto-editor to zoom in or out in any place. In order for the `--zoom` option to work, it needs at least 3 values:
 
  1. when to start applying the zoom
@@ -21,11 +20,47 @@ or using real numbers,
 --zoom 0,20,1.5
 ```
 
+Which means: start the zoom on the 0th frame, end on the 20th frame, and set the zoom level to 1.5x the original size.
+
+To apply to a video, use this command:
+
+```
+auto-editor example.mp4 --zoom 0,20,1.5
+```
+
+The start and end parameters can also take in variables like... well, `start` and `end`.
+
+```
+auto-editor example.mp4 --zoom start,end,1.5
+```
+
+and it will evaulate to the starting and ending frames respectedly.
+(A bit like [Range Syntax](https://github.com/WyattBlue/auto-editor/blob/master/articles/rangeSyntax.md) but uses frames instead of seconds.)
 
 
+The zoom option can take another command argument, the ending level.
+
+```
+--zoom {start},{end},{start_level},{end_level}
+```
+
+This will change the zoom over time, allowing auto-editor to create "zoom ins" or "zoom outs". Example:
+
+```
+auto-editor example.mp4 --zoom 0,20,0.5,1.5
+```
+
+The zoom option can take more comma arguments, such as:
+
+```
+--zoom {start},{end},{start_level},{end_level},{x_pos},{y_pos},{interpolate_method}
+```
+
+`x_pos` and `y_pos` can be variables like `centerX`, `centerY`, `width`, and `height`, or just regular numbers.
+
+`interpolate_method` is `linear` by default but can be changed `sine`, `start_sine` and `end_sine`.
 
 ## Additional Examples Commands
-
 
 ```
 auto-editor testsrc.mp4 --ignore start-end --zoom start,end,1,2
@@ -57,7 +92,6 @@ auto-editor testsrc.mp4 --zoom start,end,0.5,3,centerX,centerY,linear
 
 
 ### Notes
-
 `--ignore start-end` simply tells auto-editor to not cut anywhere, this is not needed for zoom, but not putting can allow auto-editor to cut while a zoom is happening so it is useful for demonstration purposes.
 
 
@@ -66,8 +100,6 @@ You can generate `testsrc.mp4` with this command.
 ```
 auto-editor generate_test -o 'testsrc.mp4'
 ```
-
-`testsrc.mp4` is used instead of `example.mp4` because it provides more clarity.
 
 ---
 
