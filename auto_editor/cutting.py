@@ -225,7 +225,95 @@ def setRange(includeFrame: np.ndarray, syntaxRange, fps: float, with_: bool, log
     return includeFrame
 
 
-def applyZooms(cmdZooms, log):
+def secToFrames(value, fps):
+    if(isinstance(value, str)):
+        return int(float(value) * fps)
+    return value
+
+def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
+    # Remove small loudness spikes
+    hasLoud = removeSmall(hasLoud, minClip, replace=True, with_=False)
+    # Remove small silences
+    hasLoud = removeSmall(hasLoud, minCut, replace=False, with_=True)
+    return hasLoud
+
+
+# Turn long silent/loud array to formatted chunk list.
+# Example: [True, True, True, False, False] => [[0, 3, 1], [3, 5, 0]]
+def chunkify(includeFrame, arrayLen=None) -> list:
+    if(arrayLen is None):
+        arrayLen = len(includeFrame)
+
+    chunks = []
+    startP = 0
+    for j in range(1, arrayLen):
+        if(includeFrame[j] != includeFrame[j - 1]):
+            chunks.append([startP, j, int(includeFrame[j-1])])
+            startP = j
+    chunks.append([startP, arrayLen, int(includeFrame[j])])
+    return chunks
+
+
+def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
+    minClip: int, minCut: int, ignore, cutOut, log):
+
+    frameMargin = secToFrames(frameMargin, fps)
+    minClip = secToFrames(minClip, fps)
+    minCut = secToFrames(minCut, fps)
+
+    log.checkType(frameMargin, 'frameMargin', int)
+
+    hasLoud = cook(hasLoud, minClip, minCut)
+
+    arrayLen = len(hasLoud)
+
+    # Apply frame margin rules.
+    includeFrame = np.zeros((arrayLen), dtype=np.bool_)
+    for i in range(arrayLen):
+        start = int(max(0, i - frameMargin))
+        end = int(min(arrayLen, i+1+frameMargin))
+        includeFrame[i] = min(1, np.max(hasLoud[start:end]))
+
+    del hasLoud
+
+    # Apply ignore rules if applicable.
+    if(ignore != []):
+        includeFrame = setRange(includeFrame, ignore, fps, True, log)
+
+    # Cut out ranges.
+    if(cutOut != []):
+        includeFrame = setRange(includeFrame, cutOut, fps, False, log)
+
+    # Remove small clips/cuts created by applying other rules.
+    includeFrame = cook(includeFrame, minClip, minCut)
+
+    return chunkify(includeFrame, arrayLen)
+
+
+def applyBasicSpacing(hasLoud: np.ndarray, fps: float, minClip: int, minCut: int, log):
+
+    minClip = secToFrames(minClip, fps)
+    minCut = secToFrames(minCut, fps)
+
+    includeFrame = cook(hasLoud, minClip, minCut)
+    return chunkify(includeFrame)
+
+
+def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
+    merge = np.zeros((len(start_list)), dtype=np.bool_)
+
+    startP = 0
+    active = 0
+    for item in start_list:
+        if(item == True):
+            where_list = np.where(end_list[startP:])[0]
+            if(len(where_list) > 0):
+                merge[startP:where_list[0]] = True
+        startP += 1
+    return merge
+
+
+def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
 
     zooms = []
 
@@ -262,63 +350,58 @@ def applyZooms(cmdZooms, log):
         if(len(ms) > 7):
             log.error('Too many comma arguments for zoom option.')
 
-        zooms.append([start, end, start_zoom, end_zoom, x, y, inter])
 
+        if('<' in start):
+            log.error('Less than sign not implemented.')
+
+
+        def handleBoolExp(val, audioData, sampleRate, fps, log) -> list:
+
+            invert = False
+            if('>' in val):
+                exp = val.split('>')
+
+            elif('<' in val):
+                exp = val.split('<')
+                invert = True
+            else:
+                log.error('audio array needs ">" or "<".')
+
+            if(len(exp) != 2):
+                log.error(f'Only one expression supported, not {len(exp)-1}.')
+
+            if(audioData is None or sampleRate is None):
+                log.error('No audio data found.')
+
+            new_list = audioToHasLoud(audioData, sampleRate, float(exp[1]), fps, log)
+
+            if(invert):
+                new_list = np.invert(new_list)
+
+            return new_list
+
+        start_list, end_list = None, None
+        if(start.startswith('audio>')):
+            start_list = handleBoolExp(start, audioData, sampleRate, fps, log)
+
+        if(end.startswith('audio')):
+            if(start_list is None):
+                log.error('The start parameter must also have a boolean expression.')
+            end_list = handleBoolExp(end, audioData, sampleRate, fps, log)
+
+
+        # TODO: add handling of +7 end values.
+
+        if(start_list is None):
+            zooms.append([start, end, start_zoom, end_zoom, x, y, inter])
+        else:
+            chunks = applyBasicSpacing(merge(start_list, end_list), fps, 0, 0, log)
+            for item in chunks:
+                if(item[2] == 1):
+                    zooms.append([str(item[0]), str(item[1]), start_zoom, end_zoom,
+                        x, y, inter])
+            if(zooms == []):
+                log.warning('No zooms applied.')
+
+    log.debug(zooms)
     return zooms
-
-
-def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
-    minClip: int, minCut: int, ignore, cutOut, log):
-
-    def secToFrames(value, fps):
-        if(isinstance(value, str)):
-            return int(float(value) * fps)
-        return value
-
-    frameMargin = secToFrames(frameMargin, fps)
-    minClip = secToFrames(minClip, fps)
-    minCut = secToFrames(minCut, fps)
-
-    log.checkType(frameMargin, 'frameMargin', int)
-
-    def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
-        # Remove small loudness spikes
-        hasLoud = removeSmall(hasLoud, minClip, replace=True, with_=False)
-        # Remove small silences
-        hasLoud = removeSmall(hasLoud, minCut, replace=False, with_=True)
-        return hasLoud
-
-    hasLoud = cook(hasLoud, minClip, minCut)
-
-    arrayLen = len(hasLoud)
-
-    # Apply frame margin rules.
-    includeFrame = np.zeros((arrayLen), dtype=np.bool_)
-    for i in range(arrayLen):
-        start = int(max(0, i - frameMargin))
-        end = int(min(arrayLen, i+1+frameMargin))
-        includeFrame[i] = min(1, np.max(hasLoud[start:end]))
-
-    del hasLoud
-
-    # Apply ignore rules if applicable.
-    if(ignore != []):
-        includeFrame = setRange(includeFrame, ignore, fps, True, log)
-
-    # Cut out ranges.
-    if(cutOut != []):
-        includeFrame = setRange(includeFrame, cutOut, fps, False, log)
-
-    # Remove small clips/cuts created by applying other rules.
-    includeFrame = cook(includeFrame, minClip, minCut)
-
-    # Turn long silent/loud array to formatted chunk list.
-    # Example: [True, True, True, False, False] => [[0, 3, 1], [3, 5, 0]]
-    chunks = []
-    startP = 0
-    for j in range(1, arrayLen):
-        if(includeFrame[j] != includeFrame[j - 1]):
-            chunks.append([startP, j, int(includeFrame[j-1])])
-            startP = j
-    chunks.append([startP, arrayLen, int(includeFrame[j])])
-    return chunks

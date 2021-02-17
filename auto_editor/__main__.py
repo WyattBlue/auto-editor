@@ -414,6 +414,8 @@ def main():
 
     audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
         '.acc', '.nfa', '.mka']
+    sampleRate = None
+
 
     for i, INPUT_FILE in enumerate(inputList):
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
@@ -461,6 +463,7 @@ def main():
 
         log.debug(f'   - audioBitrate: {audioBitrate}')
 
+        audioData = None
         audioFile = fileFormat in audioExtensions
         if(audioFile):
             if(args.force_fps_to is None):
@@ -568,11 +571,11 @@ def main():
             zooms = None
             if(args.zoom != []):
                 from cutting import applyZooms
-                zooms = applyZooms(args.zoom, log)
+                zooms = applyZooms(args.zoom, audioData, sampleRate, args.min_clip_length,
+                    args.min_cut_length, fps, log)
 
             chunks = applySpacingRules(hasLoud, fps, args.frame_margin,
-                args.min_clip_length, args.min_cut_length, args.ignore,
-                args.cut_out, log)
+                args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
             del hasLoud
 
         clips = []
