@@ -147,6 +147,9 @@ class FFprobe():
         import subprocess
         full_cmd = [self.myPath] + cmd
 
+        if(None in cmd):
+            self.mylog.bug(f'None in cmd. {cmd}')
+
         self.log(full_cmd)
         subprocess.call(full_cmd)
 
