@@ -43,7 +43,7 @@ setup(
     install_requires=[
         'numpy', # numpy devs fixed package for Windows users, 1.19.5 and onward.
         'audiotsm2',
-        'opencv-python',
+        'opencv-python>=4.3',
         'youtube-dl',
         'requests',
         'av', # pyav team finally added support for amd Windows.
