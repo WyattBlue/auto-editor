@@ -176,8 +176,9 @@ class FFprobe():
         return self._get(file, 'duration', 'a', 0)
 
     def getFrameRate(self, file) -> float:
+        # r_frame_rate is better than avg_frame_rate for getting constant frame rate.
         output = self.pipe(['-select_streams', 'v', '-show_entries',
-            'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
+            'stream=r_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
         nums = output.split('/')
         nums = cleanList(nums, '\r\t\n')
 
