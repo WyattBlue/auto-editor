@@ -303,7 +303,6 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
     merge = np.zeros((len(start_list)), dtype=np.bool_)
 
     startP = 0
-    active = 0
     for item in start_list:
         if(item == True):
             where_list = np.where(end_list[startP:])[0]
@@ -311,6 +310,32 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
                 merge[startP:where_list[0]] = True
         startP += 1
     return merge
+
+
+def handleBoolExp(val, audioData, sampleRate, fps, log) -> list:
+
+    invert = False
+    if('>' in val):
+        exp = val.split('>')
+
+    elif('<' in val):
+        exp = val.split('<')
+        invert = True
+    else:
+        log.error('audio array needs ">" or "<".')
+
+    if(len(exp) != 2):
+        log.error(f'Only one expression supported, not {len(exp)-1}.')
+
+    if(audioData is None or sampleRate is None):
+        log.error('No audio data found.')
+
+    new_list = audioToHasLoud(audioData, sampleRate, float(exp[1]), fps, log)
+
+    if(invert):
+        new_list = np.invert(new_list)
+
+    return new_list
 
 
 def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
@@ -340,6 +365,7 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
         x = 'centerX'
         y = 'centerY'
         inter = 'linear'
+        tail = None
 
         if(len(ms) > 4):
             x, y = ms[4:6]
@@ -348,40 +374,14 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
             inter = ms[6]
 
         if(len(ms) > 7):
+            hold = ms[7]
+
+        if(len(ms) > 8):
             log.error('Too many comma arguments for zoom option.')
 
 
-        if('<' in start):
-            log.error('Less than sign not implemented.')
-
-
-        def handleBoolExp(val, audioData, sampleRate, fps, log) -> list:
-
-            invert = False
-            if('>' in val):
-                exp = val.split('>')
-
-            elif('<' in val):
-                exp = val.split('<')
-                invert = True
-            else:
-                log.error('audio array needs ">" or "<".')
-
-            if(len(exp) != 2):
-                log.error(f'Only one expression supported, not {len(exp)-1}.')
-
-            if(audioData is None or sampleRate is None):
-                log.error('No audio data found.')
-
-            new_list = audioToHasLoud(audioData, sampleRate, float(exp[1]), fps, log)
-
-            if(invert):
-                new_list = np.invert(new_list)
-
-            return new_list
-
         start_list, end_list = None, None
-        if(start.startswith('audio>')):
+        if(start.startswith('audio')):
             start_list = handleBoolExp(start, audioData, sampleRate, fps, log)
 
         if(end.startswith('audio')):
@@ -389,11 +389,16 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
                 log.error('The start parameter must also have a boolean expression.')
             end_list = handleBoolExp(end, audioData, sampleRate, fps, log)
 
-
         # TODO: add handling of +7 end values.
 
         if(start_list is None):
             zooms.append([start, end, start_zoom, end_zoom, x, y, inter])
+
+        elif(end_list is None):
+            # Handle if end is not a boolean expression.
+            indexs = np.where(start_list)[0]
+            if(indexs != []):
+                zooms.append([str(indexs[0]), end, start_zoom, end_zoom, x, y, inter])
         else:
             chunks = applyBasicSpacing(merge(start_list, end_list), fps, 0, 0, log)
             for item in chunks:
@@ -402,6 +407,8 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
                         x, y, inter])
             if(zooms == []):
                 log.warning('No zooms applied.')
+            else:
+                log.print(f' {len(zooms)} applied.')
 
     log.debug(zooms)
     return zooms
