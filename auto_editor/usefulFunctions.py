@@ -433,3 +433,12 @@ def smartOpen(newOutput: str, log):
                 call(['cmd.exe', '/C', 'start', newOutput])
             except:
                 log.warning('Could not open output file.')
+
+def hex_to_bgr(inp: str, log) -> list:
+    import re
+    if(re.compile(r'#[a-fA-F0-9]{3}(?:[a-fA-F0-9]{3})?$').match(inp)):
+        if(len(inp) < 5):
+            return [int(inp[i]*2, 16) for i in (3, 2, 1)]
+        return [int(inp[i:i+2], 16) for i in (5, 3, 1)]
+    else:
+        log.error(f'Invalid hex code: {inp}')

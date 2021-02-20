@@ -235,6 +235,8 @@ def testAutoEditor():
     checkForError(['example.mp4', '--zoom', '0'])
     checkForError(['example.mp4', '--zoom', '0,60'])
 
+    checkForError(['example.mp4', '--background', '000'])
+
     runTest(['generate_test', '-o', 'testsrc.mp4'])
     fullInspect(
         'testsrc.mp4',

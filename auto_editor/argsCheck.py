@@ -1,5 +1,7 @@
 '''argsCheck.py'''
 
+from usefulFunctions import hex_to_bgr
+
 def hardArgsCheck(args, log):
     if(args.input == []):
         log.error('You need to give auto-editor an input file or folder so it can' \
@@ -56,6 +58,7 @@ def softArgsCheck(args, log):
         args.export_to_final_cut_pro or args.export_as_json):
         args.no_open = True
     args.constant_rate_factor = str(args.constant_rate_factor)
+    args.background = hex_to_bgr(args.background, log)
     if(args.blur < 0):
         args.blur = 0
     if(args.silent_speed <= 0 or args.silent_speed > 99999):
