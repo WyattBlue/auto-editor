@@ -7,11 +7,23 @@ This code should only be executed by developers, not users.
 """
 
 import os
+import re
 import sys
 from setuptools import setup, find_packages
 
 def pip_version():
-    return '21.6.1'
+    with open(os.path.abspath('auto_editor/__init__.py')) as f:
+        version_content = f.read()
+
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
+        version_content, re.M)
+
+    if(version_match):
+        print(version_match)
+        return version_match.group(1)
+
+    raise ValueError('Unable to find version string.')
+
 
 if(sys.argv[-1] == 'publish'):
 
