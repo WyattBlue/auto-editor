@@ -38,11 +38,11 @@ def frame_type(inp: str):
         return inp[:-4]
     return int(inp)
 
-def zoom_type(inp: str) -> list:
+def comma_type(inp: str) -> list:
     return inp.split(',')
 
 def add_argument(*names, nargs=1, type=str, default=None, action='default',
-    range=None, choices=None, group=None, help='', extra=''):
+    range=None, choices=None, group=None, stack=None, help='', extra=''):
     newDic = {}
     newDic['names'] = names
     newDic['nargs'] = nargs
@@ -54,6 +54,7 @@ def add_argument(*names, nargs=1, type=str, default=None, action='default',
     newDic['range'] = range
     newDic['choices'] = choices
     newDic['grouping'] = group
+    newDic['stack'] = stack
     return [newDic]
 
 def main_options():
@@ -135,8 +136,11 @@ def main_options():
     ops += add_argument('--scale', type=float_type, default=1,
         help='scale output.')
 
-    ops += add_argument('--zoom', type=zoom_type, default=[], nargs='*',
+    ops += add_argument('--zoom', type=comma_type, nargs='*',
         help='set when and how a zoom will occur.')
+    ops += add_argument('--rectange', type=comma_type, nargs='*',
+        help='overlay a rectangle shape on a video.')
+
     ops += add_argument('--background', type=str, default='#000000',
         help='set the color of the background when the video is moved.')
 
@@ -174,6 +178,10 @@ def main_options():
     ops += add_argument('--quiet', '-q', action='store_true',
         help='display less output.')
 
+    ops += add_argument('--combine_files', action='store_true',
+        help='combine all input files into one before editing.')
+    ops += add_argument('--preview', action='store_true',
+        help='show stats on how the input will be cut.')
     ops += add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
     ops += add_argument('--min_clip_length', '-mclip', type=frame_type, default=3,
@@ -182,31 +190,26 @@ def main_options():
     ops += add_argument('--min_cut_length', '-mcut', type=frame_type, default=6,
         range='0 to Infinity',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
-    ops += add_argument('--combine_files', action='store_true',
-        help='combine all input files into one before editing.')
-    ops += add_argument('--preview', action='store_true',
-        help='show stats on how the input will be cut.')
 
-    ops += add_argument('--frame_margin', '-m', type=frame_type, default=6,
-        range='0 to Infinity',
-        help='set how many "silent" frames of on either side of "loud" sections be included.')
+    ops += add_argument('--output_file', '--output', '-o', nargs='*',
+        help='set the name(s) of the new output.')
     ops += add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
         range='0 to 1',
         help='set the volume that frames audio needs to surpass to be "loud".')
-    ops += add_argument('--video_speed', '--sounded_speed', '-v', type=float_type,
-        default=1.00, range='0 to 999999',
-        help='set the speed that "loud" sections should be played at.')
     ops += add_argument('--silent_speed', '-s', type=float_type, default=99999,
         range='0 to 99999',
         help='set the speed that "silent" sections should be played at.')
-    ops += add_argument('--output_file', '--output', '-o', nargs='*',
-        help='set the name(s) of the new output.')
+    ops += add_argument('--video_speed', '--sounded_speed', '-v', type=float_type,
+        default=1.00, range='0 to 999999',
+        help='set the speed that "loud" sections should be played at.')
+    ops += add_argument('--frame_margin', '-m', type=frame_type, default=6,
+        range='0 to Infinity',
+        help='set how many "silent" frames of on either side of "loud" sections be included.')
 
     ops += add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
     ops += add_argument('(input)', nargs='*',
         help='the path to a file, folder, or url you want edited.')
-
     return ops
 
 def generate_options():
@@ -320,11 +323,11 @@ def main():
 
     # Print the help screen for the entire program.
     if(args.help):
+        genHelp(option_data)
         print('\n  Have an issue? Make an issue. '\
             'Visit https://github.com/wyattblue/auto-editor/issues\n')
         print('  The help option can also be used on a specific option:')
         print('      auto-editor --frame_margin --help\n')
-        genHelp(option_data)
         sys.exit()
 
     del option_data
@@ -336,7 +339,6 @@ def main():
     makingDataFile = (args.export_to_premiere or args.export_to_resolve or
         args.export_to_final_cut_pro or args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
-
 
     if(args.debug and args.input == []):
         import platform
