@@ -1,7 +1,7 @@
 '''renderVideo.py'''
 
 # Included Libaries
-from usefulFunctions import ProgressBar, sep, hex_to_bgr
+from usefulFunctions import ProgressBar, sep
 
 # Internal Libraries
 import subprocess
