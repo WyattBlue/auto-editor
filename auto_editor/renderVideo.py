@@ -1,7 +1,7 @@
 '''renderVideo.py'''
 
 # Included Libaries
-from usefulFunctions import ProgressBar, sep
+from usefulFunctions import ProgressBar, sep, hex_to_bgr
 
 # Internal Libraries
 import subprocess
@@ -88,7 +88,7 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
 
 
 def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
-    zooms, temp, log):
+    effects, temp, log):
     import cv2
 
     cap = cv2.VideoCapture(vidFile)
@@ -136,11 +136,11 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     import numpy as np
     from interpolate import interpolate
 
-    def values(val, log, _type, centerX, centerY, totalFrames, width, height):
+    def values(val, log, _type, totalFrames, width, height):
         if(val == 'centerX'):
-            return centerX
+            return int(width / 2)
         if(val == 'centerY'):
-            return centerY
+            return int(height / 2)
         if(val == 'start'):
             return 0
         if(val == 'end'):
@@ -154,97 +154,95 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             log.error(f'XY variable {val} not implemented.')
         return _type(val)
 
-    if(zooms is not None):
-        centerX = width / 2
-        centerY = height / 2
+    effect_sheet = []
+    for effect in effects:
+        if(effect[0] == 'zoom'):
 
-        zoom_sheet = np.ones((totalFrames + 1), dtype=float)
-        x_sheet = np.full((totalFrames + 1), centerX, dtype=float)
-        y_sheet = np.full((totalFrames + 1), centerY, dtype=float)
+            zoom_sheet = np.ones((totalFrames + 1), dtype=float)
+            zoomx_sheet = np.full((totalFrames + 1), int(width / 2), dtype=float)
+            zoomy_sheet = np.full((totalFrames + 1), int(height / 2), dtype=float)
 
-        for z in zooms:
-            z[0] = values(z[0], log, int, centerX, centerY, totalFrames, width, height)
-            z[1] = values(z[1], log, int, centerX, centerY, totalFrames, width, height)
+            z = effect[1:]
+            z[0] = values(z[0], log, int, totalFrames, width, height)
+            z[1] = values(z[1], log, int, totalFrames, width, height)
 
             if(z[7] is None):
                 zoom_sheet[z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log,
                     method=z[6])
             else:
-                z[7] = values(z[7], log, int, centerX, centerY, totalFrames, width, height)
+                z[7] = values(z[7], log, int, totalFrames, width, height)
                 zoom_sheet[z[0]:z[0]+z[7]] = interpolate(z[2], z[3], z[7], log,
                     method=z[6])
                 zoom_sheet[z[0]+z[7]:z[1]] = z[3]
 
-            x_sheet[z[0]:z[1]] = values(z[4], log, float, centerX, centerY,
-                totalFrames, width, height)
-            y_sheet[z[0]:z[1]] = values(z[5], log, float, centerX, centerY,
-                totalFrames, width, height)
+            zoomx_sheet[z[0]:z[1]] = values(z[4], log, float, totalFrames, width, height)
+            zoomy_sheet[z[0]:z[1]] = values(z[5], log, float, totalFrames, width, height)
 
-        log.debug(zoom_sheet)
-        log.debug(x_sheet)
-        log.debug(y_sheet)
+            effect_sheet.append(
+                ['zoom', zoom_sheet, zoomx_sheet, zoomy_sheet]
+            )
 
     while cap.isOpened():
         ret, frame = cap.read()
         if(not ret or cframe > totalFrames):
             break
 
-        if(zooms is not None):
-            zoom = zoom_sheet[cframe]
-            xPos = x_sheet[cframe]
-            yPos = y_sheet[cframe]
+        for effect in effect_sheet:
+            if(effect[0] == 'zoom'):
 
-            # Resize Frame
-            new_size = (int(width * zoom), int(height * zoom))
+                zoom = effect[1][cframe]
+                zoom_x = effect[2][cframe]
+                zoom_y = effect[3][cframe]
 
-            if(zoom == 1 and args.scale == 1):
-                blown = frame
-            if(new_size[0] < 1 or new_size[1] < 1):
-                blown = cv2.resize(frame, (1, 1), interpolation=cv2.INTER_AREA)
-            else:
-                inter = cv2.INTER_CUBIC if zoom > 1 else cv2.INTER_AREA
-                blown = cv2.resize(frame, new_size, interpolation=inter)
+                # Resize Frame
+                new_size = (int(width * zoom), int(height * zoom))
 
-            x1 = int((xPos * zoom)) - int((width / 2))
-            x2 = int((xPos * zoom)) + int((width / 2))
+                if(zoom == 1 and args.scale == 1):
+                    blown = frame
+                elif(new_size[0] < 1 or new_size[1] < 1):
+                    blown = cv2.resize(frame, (1, 1), interpolation=cv2.INTER_AREA)
+                else:
+                    inter = cv2.INTER_CUBIC if zoom > 1 else cv2.INTER_AREA
+                    blown = cv2.resize(frame, new_size, interpolation=inter)
 
-            y1 = int((yPos * zoom)) - int((height / 2))
-            y2 = int((yPos * zoom)) + int((height / 2))
+                x1 = int((zoom_x * zoom)) - int((width / 2))
+                x2 = int((zoom_x * zoom)) + int((width / 2))
 
+                y1 = int((zoom_y * zoom)) - int((height / 2))
+                y2 = int((zoom_y * zoom)) + int((height / 2))
 
-            top, bottom, left, right = 0, 0, 0, 0
+                top, bottom, left, right = 0, 0, 0, 0
 
-            if(y1 < 0):
-                top = -y1
-                y1 = 0
+                if(y1 < 0):
+                    top = -y1
+                    y1 = 0
+                if(x1 < 0):
+                    left = -x1
+                    x1 = 0
 
-            if(x1 < 0):
-                left = -x1
-                x1 = 0
+                frame = blown[y1:y2+1, x1:x2+1]
 
-            frame = blown[y1:y2+1, x1:x2+1]
+                bottom = (height +1) - (frame.shape[0]) - top
+                right = (width + 1) - frame.shape[1] - left
 
+                # Pad frame so opencv doesn't drop a frame
+                frame = cv2.copyMakeBorder(
+                    frame,
+                    top = top,
+                    bottom = bottom,
+                    left = left,
+                    right = right,
+                    borderType = cv2.BORDER_CONSTANT,
+                    value = args.background
+                )
 
-            bottom = (height +1) - (frame.shape[0]) - top
-            right = (width + 1) - frame.shape[1] - left
+                if(frame.shape != (height+1, width+1, 3)):
+                    # Crash so that opencv dropped frames don't go unnoticed.
+                    print(f'cframe {cframe}')
+                    log.error(f'Wrong frame shape. was {frame.shape},' \
+                        f' should be {(height+1, width+1, 3)} ')
 
-            # Pad frame so opencv doesn't drop a frame
-            frame = cv2.copyMakeBorder(
-                frame,
-                top = top,
-                bottom = bottom,
-                left = left,
-                right = right,
-                borderType = cv2.BORDER_CONSTANT,
-                value = [0, 0, 0] # Black
-            )
-
-            if(frame.shape != (height+1, width+1, 3)):
-                # Crash so that opencv dropped frames don't go unnoticed.
-                print(f'cframe {cframe}')
-                log.error(f'Wrong frame shape. was {frame.shape}, should be {(height+1, width+1, 3)} ')
-
-        elif(args.scale != 1):
+        if(effects == [] and args.scale != 1):
             inter = cv2.INTER_CUBIC if args.scale > 1 else cv2.INTER_AREA
             frame = cv2.resize(frame, (width, height),
                 interpolation=inter)
@@ -252,7 +250,6 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
 
         state = findState(chunks, cframe)
-
         mySpeed = speeds[state]
 
         if(mySpeed != 99999):
