@@ -137,6 +137,8 @@ def main_options():
 
     ops += add_argument('--zoom', type=zoom_type, default=[], nargs='*',
         help='set when and how a zoom will occur.')
+    ops += add_argument('--background', type=str, default='#000000',
+        help='set the color of the background when the video is moved.')
 
     ops += add_argument('--ignore', nargs='*',
         help='the range that will be marked as "loud"')

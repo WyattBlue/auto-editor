@@ -392,19 +392,19 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
 
 
         if(start_list is None):
-            zooms.append([start, end, start_zoom, end_zoom, x, y, inter, hold])
+            zooms.append(['zoom', start, end, start_zoom, end_zoom, x, y, inter, hold])
 
         elif(end_list is None):
             # Handle if end is not a boolean expression.
             indexs = np.where(start_list)[0]
             if(indexs != []):
-                zooms.append([str(indexs[0]), end, start_zoom, end_zoom, x, y,
+                zooms.append(['zoom', str(indexs[0]), end, start_zoom, end_zoom, x, y,
                     inter, hold])
         else:
             chunks = applyBasicSpacing(merge(start_list, end_list), fps, 0, 0, log)
             for item in chunks:
                 if(item[2] == 1):
-                    zooms.append([str(item[0]), str(item[1]), start_zoom, end_zoom,
+                    zooms.append(['zoom', str(item[0]), str(item[1]), start_zoom, end_zoom,
                         x, y, inter, hold])
 
             if(zooms == []):
