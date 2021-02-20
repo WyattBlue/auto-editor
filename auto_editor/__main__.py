@@ -570,10 +570,10 @@ def main():
             hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
             del audioList, motionList
 
-            zooms = None
+            effects = []
             if(args.zoom != []):
                 from cutting import applyZooms
-                zooms = applyZooms(args.zoom, audioData, sampleRate, args.min_clip_length,
+                effects = applyZooms(args.zoom, audioData, sampleRate, args.min_clip_length,
                     args.min_cut_length, fps, log)
 
             chunks = applySpacingRules(hasLoud, fps, args.frame_margin,
@@ -652,7 +652,7 @@ def main():
             if(args.render == 'opencv'):
                 from renderVideo import renderOpencv
                 renderOpencv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, fps,
-                    zooms, TEMP, log)
+                    effects, TEMP, log)
 
             # Now mix new audio(s) and the new video.
             muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)
