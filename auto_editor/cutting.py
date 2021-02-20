@@ -351,7 +351,8 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
 
         if(len(ms) < 3):
             # Add more description later!
-            log.error('Too few comma arguments for zoom option.')
+            log.error('Too few comma arguments for zoom option.' \
+                " Make sure you're wrapping the values in quotes.")
 
         start, end = ms[:2]
 
@@ -365,7 +366,7 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
         x = 'centerX'
         y = 'centerY'
         inter = 'linear'
-        tail = None
+        hold = None
 
         if(len(ms) > 4):
             x, y = ms[4:6]
@@ -374,7 +375,7 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
             inter = ms[6]
 
         if(len(ms) > 7):
-            hold = ms[7]
+            hold = int(ms[7])
 
         if(len(ms) > 8):
             log.error('Too many comma arguments for zoom option.')
@@ -389,22 +390,23 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
                 log.error('The start parameter must also have a boolean expression.')
             end_list = handleBoolExp(end, audioData, sampleRate, fps, log)
 
-        # TODO: add handling of +7 end values.
 
         if(start_list is None):
-            zooms.append([start, end, start_zoom, end_zoom, x, y, inter])
+            zooms.append([start, end, start_zoom, end_zoom, x, y, inter, hold])
 
         elif(end_list is None):
             # Handle if end is not a boolean expression.
             indexs = np.where(start_list)[0]
             if(indexs != []):
-                zooms.append([str(indexs[0]), end, start_zoom, end_zoom, x, y, inter])
+                zooms.append([str(indexs[0]), end, start_zoom, end_zoom, x, y,
+                    inter, hold])
         else:
             chunks = applyBasicSpacing(merge(start_list, end_list), fps, 0, 0, log)
             for item in chunks:
                 if(item[2] == 1):
                     zooms.append([str(item[0]), str(item[1]), start_zoom, end_zoom,
-                        x, y, inter])
+                        x, y, inter, hold])
+
             if(zooms == []):
                 log.warning('No zooms applied.')
             else:
