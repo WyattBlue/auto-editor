@@ -1,7 +1,8 @@
 '''vanparse.py'''
 
-import difflib
+import os
 import sys
+import difflib
 
 def printHelp(option, args):
     print(' ', ', '.join(option['names']))
@@ -57,12 +58,8 @@ class ParseOptions():
                     value = option['default']
                 setattr(self, key, value)
 
-
-        # parse config file
-        import os
-
+        # Parse the configuration file.
         dirPath = os.path.dirname(os.path.realpath(__file__))
-
         with open(dirPath + '/config.txt', 'r') as file:
             lines = file.readlines()
 
@@ -84,13 +81,10 @@ class ParseOptions():
                 value = int(value)
 
             key = item[: item.index('=')]
-
             key = key[key.rfind('.')+1:]
-
             setattr(self, key, value)
 
-
-        # Figure out attributes changed by user.
+        # Figure out command line options changed by user.
         myList = []
         settingInputs = True
         optionList = 'input'
@@ -103,6 +97,7 @@ class ParseOptions():
             else:
                 nextItem = userArgs[i+1]
 
+            # Find the option.
             option = get_option(item, group, args)
 
             if(option is None and (group is not None)):
@@ -115,23 +110,32 @@ class ParseOptions():
                     myList.append(item)
                 else:
                     # Unknown Option!
-                    hmm = difflib.get_close_matches(item, option_names)
-                    append = ''
+                    if(not item.startswith('--')): # handle shorts
+                        log.error(f'Unknown short: {item}' \
+                            '\nIt may need to be in the right grouping.')
+
+                    close_matches = difflib.get_close_matches(item, option_names)
 
                     # If there's an exact match.
-                    if(len(hmm) > 0 and hmm[0] == item):
-                        option = get_option(item, 'global', args)
+                    if(close_matches and close_matches[0] == item):
+                        option = get_option(item, group='global', the_args=args)
                         group = option['grouping']
-                        myDefault = option['default'] if option['action'] != 'store_true' else ''
-                        append = f'\n\nExample:\n    auto-editor {group} {item} {myDefault}'
-                        log.error(f'Option {item} needs to be in group: {group}{append}')
 
-                    potential_options = ', '.join(hmm)
+                        # Get the default option value for demonstration purposes.
+                        myDefault = ''
+                        if(option['action'] != 'store_true'):
+                            myDefault = option['default']
 
-                    if(hmm != []):
-                        append = f'\n\n    Did you mean:\n        {potential_options}'
+                        log.error(f'Option {item} needs to be in group: {group}' \
+                            f'\n\nExample:\n\tauto-editor {group} {item} {myDefault}')
+
+                    # If not, check if there's a close option.
+                    append = ''
+                    if(close_matches):
+                        append = '\n\n\tDid you mean:\n\t\t' + ', '.join(close_matches)
                     log.error(f'Unknown option: {item}{append}')
             else:
+                # We found the option.
                 if(optionList is not None):
                     setattr(self, optionList, myList)
                 settingInputs = False
@@ -160,12 +164,13 @@ class ParseOptions():
                         typeName = option['type'].__name__
                         log.debug(f'Exact Error: {err}')
                         log.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
-                    if(option['choices'] is not None):
-                        if(value not in option['choices']):
-                            optionName = option['names'][0]
-                            myChoices = ', '.join(option['choices'])
-                            log.error(f'{value} is not a choice for {optionName}' \
-                                f'\nchoices are:\n  {myChoices}')
+
+                    # Handle when the option value is not in choices list.
+                    if(option['choices'] is not None and value not in option['choices']):
+                        optionName = option['names'][0]
+                        myChoices = ', '.join(option['choices'])
+                        log.error(f'{value} is not a choice for {optionName}' \
+                            f'\nchoices are:\n  {myChoices}')
                     i += 1
                 setattr(self, key, value)
 

@@ -30,6 +30,7 @@ class Log():
         self.debug('   - Removed Temp Directory.')
 
     def error(self, message):
+        message = message.replace('\t', '    ')
         print('Error!', message, file=sys.stderr)
         self.cleanup()
         sys.exit(1)
