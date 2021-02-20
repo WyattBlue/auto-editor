@@ -150,7 +150,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         if(val == 'height'):
             return height
 
-        if(not val.replace('.', '', 1).isdigit()):
+        if(not isinstance(val, int) and not val.replace('.', '', 1).isdigit()):
             log.error(f'XY variable {val} not implemented.')
         return _type(val)
 
@@ -163,11 +163,17 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         y_sheet = np.full((totalFrames + 1), centerY, dtype=float)
 
         for z in zooms:
-
             z[0] = values(z[0], log, int, centerX, centerY, totalFrames, width, height)
             z[1] = values(z[1], log, int, centerX, centerY, totalFrames, width, height)
 
-            zoom_sheet[z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log, method=z[6])
+            if(z[7] is None):
+                zoom_sheet[z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log,
+                    method=z[6])
+            else:
+                z[7] = values(z[7], log, int, centerX, centerY, totalFrames, width, height)
+                zoom_sheet[z[0]:z[0]+z[7]] = interpolate(z[2], z[3], z[7], log,
+                    method=z[6])
+                zoom_sheet[z[0]+z[7]:z[1]] = z[3]
 
             x_sheet[z[0]:z[1]] = values(z[4], log, float, centerX, centerY,
                 totalFrames, width, height)
@@ -197,8 +203,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
                 blown = cv2.resize(frame, (1, 1), interpolation=cv2.INTER_AREA)
             else:
                 inter = cv2.INTER_CUBIC if zoom > 1 else cv2.INTER_AREA
-                blown = cv2.resize(frame, new_size,
-                    interpolation=inter)
+                blown = cv2.resize(frame, new_size, interpolation=inter)
 
             x1 = int((xPos * zoom)) - int((width / 2))
             x2 = int((xPos * zoom)) + int((width / 2))
