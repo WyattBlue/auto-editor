@@ -139,7 +139,7 @@ def main_options():
     ops += add_argument('--zoom', type=comma_type, nargs='*',
         help='set when and how a zoom will occur.')
     ops += add_argument('--rectange', type=comma_type, nargs='*',
-        help='overlay a rectangle shape on a video.')
+        help='overlay a rectangle shape on the video.')
 
     ops += add_argument('--background', type=str, default='#000000',
         help='set the color of the background when the video is moved.')
@@ -496,6 +496,10 @@ def main():
             else:
                 fps = ffprobe.getFrameRate(INPUT_FILE)
             log.debug(f'Frame rate: {fps}')
+
+            if(fps < 1):
+                log.error(f"Frame rate cannot be below 1. fps: {fps}" \
+                    f"\nInput file: {INPUT_FILE}")
 
             tracks = args.force_tracks_to
             if(tracks is None):
