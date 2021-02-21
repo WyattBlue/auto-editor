@@ -43,7 +43,14 @@ def getInfo(files, ffmpeg, ffprobe, log):
 
         if(hasVid):
             print(f' - fps: {ffprobe.getFrameRate(file)}')
-            print(f' - duration: {ffprobe.getDuration(file)}')
+
+            dur = ffprobe.getDuration(file)
+            if(dur == 'N/A'):
+                dur = ffprobe.pipe(['-show_entries', 'format=duration', '-of',
+                    'default=noprint_wrappers=1:nokey=1', file]).strip()
+                print(f' - duration: {dur} (container)')
+            else:
+                print(f' - duration: {dur}')
 
             res = ffprobe.getResolution(file)
             width, height = res.split('x')
