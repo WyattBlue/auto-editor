@@ -495,7 +495,6 @@ def main():
                 fps = int(ffprobe.getFrameRate(INPUT_FILE))
             else:
                 fps = ffprobe.getFrameRate(INPUT_FILE)
-            log.debug(f'Frame rate: {fps}')
 
             if(fps < 1):
                 log.error(f"Frame rate cannot be below 1. fps: {fps}" \
