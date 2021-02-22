@@ -157,9 +157,9 @@ class FFprobe():
     def pipe(self, cmd: list) -> str:
         full_cmd = [self.myPath, '-v', 'error'] + cmd
 
-        self.log(full_cmd)
+        self.mylog.debug(full_cmd)
         output = pipeToConsole(full_cmd)
-        self.log(output)
+        self.mylog.debug(output)
 
         return output
 
@@ -277,7 +277,7 @@ class FFmpeg():
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', '8'])
-        self.log(cmd)
+        self.mylog.debug(cmd)
 
         import subprocess
         subprocess.call(cmd)
@@ -285,9 +285,9 @@ class FFmpeg():
     def pipe(self, cmd: list) -> str:
         cmd = [self.myPath, '-y'] + cmd
 
-        self.log(cmd)
+        self.mylog.debug(cmd)
         output = pipeToConsole(cmd)
-        self.log(output)
+        self.mylog.debug(output)
 
         return output
 
