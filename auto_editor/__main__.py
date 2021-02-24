@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w06a'
+version = '21w08a dev'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -369,10 +369,9 @@ def main():
     ffmpeg.updateLog(log)
     ffprobe.updateLog(log)
 
-    from wavfile import read
     from usefulFunctions import isLatestVersion
 
-    if(not args.quiet and isLatestVersion(version, log)):
+    if(not isLatestVersion(version, log)):
         log.print('\nAuto-Editor is out of date. Run:\n')
         log.print('    pip3 install -U auto-editor')
         log.print('\nto upgrade to the latest version.\n')
@@ -416,10 +415,10 @@ def main():
     speeds = [args.silent_speed, args.video_speed]
     log.debug(f'   - Speeds: {speeds}')
 
+    from wavfile import read
     audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
         '.acc', '.nfa', '.mka']
     sampleRate = None
-
 
     for i, INPUT_FILE in enumerate(inputList):
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
