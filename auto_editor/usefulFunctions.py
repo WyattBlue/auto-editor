@@ -396,16 +396,18 @@ class ProgressBar():
             print(f'   {percentDone}% done ETA {newTime}')
 
 
-def isLatestVersion(version, log) -> bool:
-    try:
-        from requests import get
-        latestVersion = get('https://raw.githubusercontent.com/' \
-            'wyattblue/auto-editor/master/resources/version.txt')
-        return latestVersion == version
-    except ImportError:
-        pass
-    except Exception as err:
-        log.debug('Connection Error: ' + str(err))
+def isLatestVersion(version: str, log) -> bool:
+    if('dev' not in version):
+        try:
+            from requests import get
+            latestVersion = get('https://raw.githubusercontent.com/' \
+                'wyattblue/auto-editor/master/resources/version.txt')
+            return latestVersion.text == version
+        except ImportError:
+            pass
+        except Exception as err:
+            log.debug('Connection Error: ' + str(err))
+    return True
 
 def humanReadableTime(rawTime: float) -> str:
     units = 'seconds'
@@ -433,7 +435,10 @@ def smartOpen(newOutput: str, log):
             try: # should work on WSL2
                 call(['cmd.exe', '/C', 'start', newOutput])
             except:
-                log.warning('Could not open output file.')
+                try: # should work on various other Linux distros
+                    call(['xdg-open', newOutput])
+                except:
+                    log.warning('Could not open output file.')
 
 def hex_to_bgr(inp: str, log) -> list:
     import re
