@@ -371,7 +371,7 @@ def main():
 
     from usefulFunctions import isLatestVersion
 
-    if(not isLatestVersion(version, log)):
+    if(not args.quiet and not isLatestVersion(version, log)):
         log.print('\nAuto-Editor is out of date. Run:\n')
         log.print('    pip3 install -U auto-editor')
         log.print('\nto upgrade to the latest version.\n')
