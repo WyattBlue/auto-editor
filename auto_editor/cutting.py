@@ -291,7 +291,6 @@ def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
 
 
 def applyBasicSpacing(hasLoud: np.ndarray, fps: float, minClip: int, minCut: int, log):
-
     minClip = secToFrames(minClip, fps)
     minCut = secToFrames(minCut, fps)
 
@@ -312,8 +311,7 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
     return merge
 
 
-def handleBoolExp(val, audioData, sampleRate, fps, log) -> list:
-
+def handleBoolExp(val: str, data, sampleRate, fps, log) -> list:
     invert = False
     if('>' in val):
         exp = val.split('>')
@@ -327,10 +325,10 @@ def handleBoolExp(val, audioData, sampleRate, fps, log) -> list:
     if(len(exp) != 2):
         log.error(f'Only one expression supported, not {len(exp)-1}.')
 
-    if(audioData is None or sampleRate is None):
+    if(data is None or sampleRate is None):
         log.error('No audio data found.')
 
-    new_list = audioToHasLoud(audioData, sampleRate, float(exp[1]), fps, log)
+    new_list = audioToHasLoud(data, sampleRate, float(exp[1]), fps, log)
 
     if(invert):
         new_list = np.invert(new_list)
@@ -339,16 +337,8 @@ def handleBoolExp(val, audioData, sampleRate, fps, log) -> list:
 
 
 def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
-
     zooms = []
-
-    from usefulFunctions import cleanList
-
-    for item in cmdZooms:
-        ms = item.split(',')
-
-        ms = cleanList(ms, '\r\n\t')
-
+    for ms in cmdZooms:
         if(len(ms) < 3):
             # Add more description later!
             log.error('Too few comma arguments for zoom option.' \
@@ -380,7 +370,6 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
         if(len(ms) > 8):
             log.error('Too many comma arguments for zoom option.')
 
-
         start_list, end_list = None, None
         if(start.startswith('audio')):
             start_list = handleBoolExp(start, audioData, sampleRate, fps, log)
@@ -389,7 +378,6 @@ def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
             if(start_list is None):
                 log.error('The start parameter must also have a boolean expression.')
             end_list = handleBoolExp(end, audioData, sampleRate, fps, log)
-
 
         if(start_list is None):
             zooms.append(['zoom', start, end, start_zoom, end_zoom, x, y, inter, hold])
