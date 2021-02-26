@@ -39,7 +39,10 @@ def frame_type(inp: str):
     return int(inp)
 
 def comma_type(inp: str) -> list:
-    return inp.split(',')
+    from usefulFunctions import cleanList
+    ms = inp.split(',')
+    ms = cleanList(ms, '\r\n\t')
+    return ms
 
 def add_argument(*names, nargs=1, type=str, default=None, action='default',
     range=None, choices=None, group=None, stack=None, help='', extra=''):
@@ -59,7 +62,6 @@ def add_argument(*names, nargs=1, type=str, default=None, action='default',
 
 def main_options():
     ops = []
-
     ops += add_argument('urlOps', nargs=0, action='grouping')
     ops += add_argument('--format', type=str, group='urlOps',
         default='bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
@@ -138,7 +140,7 @@ def main_options():
 
     ops += add_argument('--zoom', type=comma_type, nargs='*',
         help='set when and how a zoom will occur.')
-    ops += add_argument('--rectange', type=comma_type, nargs='*',
+    ops += add_argument('--rectangle', type=comma_type, nargs='*',
         help='overlay a rectangle shape on the video.')
 
     ops += add_argument('--background', type=str, default='#000000',
@@ -233,7 +235,6 @@ def generate_options():
 
 def info_options():
     ops = []
-
     ops += add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
     ops += add_argument('--help', '-h', action='store_true',
@@ -421,6 +422,10 @@ def main():
     sampleRate = None
 
     for i, INPUT_FILE in enumerate(inputList):
+
+        if(len(inputList) > 1):
+            log.conwrite(f'Working on {INPUT_FILE}')
+
         fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
 
         chunks = None
