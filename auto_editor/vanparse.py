@@ -32,7 +32,7 @@ def printHelp(option, args):
         print('    type: unknown')
 
 
-def get_option(item, group, the_args: list):
+def get_option(item: str, group: str, the_args: list) -> str:
     for options in the_args:
         for option in options:
             if(item in option['names']):
@@ -58,11 +58,12 @@ class ParseOptions():
                     value = option['default']
                 setattr(self, key, value)
 
-        # Parse the configuration file.
+        # Read the configuration file.
         dirPath = os.path.dirname(os.path.realpath(__file__))
         with open(dirPath + '/config.txt', 'r') as file:
             lines = file.readlines()
 
+        # Set attributes based on the config file to act as the new defaults.
         for item in lines:
             if('#' in item):
                 item = item[: item.index('#')]
@@ -92,48 +93,41 @@ class ParseOptions():
         group = None
         while i < len(userArgs):
             item = userArgs[i]
-            if(i == len(userArgs) - 1):
-                nextItem = None
-            else:
-                nextItem = userArgs[i+1]
+            label = 'option' if item.startswith('--') else 'short'
 
             # Find the option.
-            option = get_option(item, group, args)
-
-            if(option is None and (group is not None)):
-                group = None
-                option = get_option(item, group, args)
+            if(label == 'option'):
+                option = get_option(item, group='global', the_args=args)
+            else:
+                option = get_option(item, group=group, the_args=args)
+                if(option is None and (group is not None)):
+                    group = None # Don't consider the next option to be in a group.
+                    option = get_option(item, group=group, the_args=args)
 
             if(option is None):
+                # Unknown Option!
                 if(settingInputs and not item.startswith('-')):
-                    # Input file names
+                    # option is actually an input file, like example.mp4
                     myList.append(item)
                 else:
-                    # Unknown Option!
-                    if(not item.startswith('--')): # handle shorts
-                        log.error(f'Unknown short: {item}' \
-                            '\nIt may need to be in the right grouping.')
+                    # Get the names of all the options and groups.
+                    opt_list = []
+                    for options in args:
+                        for opt in options:
+                            for names in opt['names']:
+                                opt_list.append(names)
 
-                    close_matches = difflib.get_close_matches(item, option_names)
+                    close_matches = difflib.get_close_matches(item, opt_list)
 
-                    # If there's an exact match.
-                    if(close_matches and close_matches[0] == item):
-                        option = get_option(item, group='global', the_args=args)
-                        group = option['grouping']
-
-                        # Get the default option value for demonstration purposes.
-                        myDefault = ''
-                        if(option['action'] != 'store_true'):
-                            myDefault = option['default']
-
-                        log.error(f'Option {item} needs to be in group: {group}' \
-                            f'\n\nExample:\n\tauto-editor {group} {item} {myDefault}')
-
-                    # If not, check if there's a close option.
-                    append = ''
                     if(close_matches):
-                        append = '\n\n\tDid you mean:\n\t\t' + ', '.join(close_matches)
-                    log.error(f'Unknown option: {item}{append}')
+                        if(close_matches[0] == item):
+                            # Option exists but is not in the right group.
+                            log.error(f'{label.capitalize()} {item} needs to be in a group')
+                        else:
+                            log.error(f'Unknown {label}: {item}\n\n\t' \
+                                'Did you mean:\n\t\t' + ', '.join(close_matches))
+                    else:
+                        log.error(f'Unknown {label}: {item}')
             else:
                 # We found the option.
                 if(optionList is not None):
@@ -143,10 +137,10 @@ class ParseOptions():
                 myList = []
 
                 key = option['names'][0].replace('-', '')
-
                 if(option['action'] == 'grouping'):
                     group = key
 
+                nextItem = None if i == len(userArgs) - 1 else userArgs[i+1]
                 if(nextItem == '-h' or nextItem == '--help'):
                     printHelp(option, args)
                     sys.exit()
