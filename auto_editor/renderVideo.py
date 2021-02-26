@@ -156,6 +156,18 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
     effect_sheet = []
     for effect in effects:
+        if(effect[0] == 'rectangle'):
+
+            rectx1_sheet = np.zeros((totalFrames + 1), dtype=float)
+
+            r = effect[1:]
+
+            r[0] = values(z[0], log, int, totalFrames, width, height)
+
+            effect_sheet.append(
+                ['rectangle', ]
+            )
+
         if(effect[0] == 'zoom'):
 
             zoom_sheet = np.ones((totalFrames + 1), dtype=float)
@@ -188,6 +200,18 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             break
 
         for effect in effect_sheet:
+            if(effect[0] == 'rectangle'):
+
+                x1 = effect[1][cframe]
+                y1 = effect[2][cframe]
+                x2 = effect[3][cframe]
+                y2 = effect[4][cframe]
+                color = effect[5][cframe]
+                thickness = effect[6][cframe]
+
+                frame = cv2.rectangle(frame, pt1=(x1,y1), pt2=(x2,y2), color=color,
+                    thickness=thickness)
+
             if(effect[0] == 'zoom'):
 
                 zoom = effect[1][cframe]
@@ -237,7 +261,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
                 )
 
                 if(frame.shape != (height+1, width+1, 3)):
-                    # Crash so that opencv dropped frames don't go unnoticed.
+                    # Throw error so that opencv dropped frames don't go unnoticed.
                     print(f'cframe {cframe}')
                     log.error(f'Wrong frame shape. was {frame.shape},' \
                         f' should be {(height+1, width+1, 3)} ')
