@@ -89,6 +89,7 @@ class ParseOptions():
         myList = []
         settingInputs = True
         optionList = 'input'
+        listType = str
         i = 0
         group = None
         while i < len(userArgs):
@@ -131,7 +132,8 @@ class ParseOptions():
             else:
                 # We found the option.
                 if(optionList is not None):
-                    setattr(self, optionList, myList)
+                    setattr(self, optionList, list(map(listType, myList)))
+
                 settingInputs = False
                 optionList = None
                 myList = []
@@ -148,6 +150,7 @@ class ParseOptions():
                 if(option['nargs'] != 1):
                     settingInputs = True
                     optionList = key
+                    listType = option['type']
                 elif(option['action'] == 'store_true'):
                     value = True
                 else:
@@ -170,4 +173,4 @@ class ParseOptions():
 
             i += 1
         if(settingInputs):
-            setattr(self, optionList, myList)
+            setattr(self, optionList, list(map(listType, myList)))
