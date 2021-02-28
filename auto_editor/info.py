@@ -54,7 +54,7 @@ def getInfo(files, ffmpeg, ffprobe, log):
             fps_mode = cleanList(fps_mode.split('\n'), '\r\t')
             fps_mode = fps_mode.pop()
 
-            if(fps_mode.index('VFR:') != -1):
+            if('VFR:' in fps_mode):
                 fps_mode = (fps_mode[fps_mode.index('VFR:'):]).strip()
 
             print(f'   - mode: {fps_mode}')
