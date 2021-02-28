@@ -193,11 +193,13 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             z[0] = values(z[0], log, int, totalFrames, width, height)
             z[1] = values(z[1], log, int, totalFrames, width, height)
 
-            if(z[7] is None):
+            if(z[7] is not None): # hold value
+                z[7] = values(z[7], log, int, totalFrames, width, height)
+
+            if(z[7] is None or z[7] > z[1]):
                 zoom_sheet[z[0]:z[1]] = interpolate(z[2], z[3], z[1] - z[0], log,
                     method=z[6])
             else:
-                z[7] = values(z[7], log, int, totalFrames, width, height)
                 zoom_sheet[z[0]:z[0]+z[7]] = interpolate(z[2], z[3], z[7], log,
                     method=z[6])
                 zoom_sheet[z[0]+z[7]:z[1]] = z[3]
