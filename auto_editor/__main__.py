@@ -659,11 +659,9 @@ def main():
             if(args.render == 'av'):
 
                 if(args.zoom != []):
-                    log.conwrite('')
-                    log.error('Zoom is not supported on the av render method.')
+                    log.error('Zoom effect is not supported on the av render method.')
 
                 if(args.rectangle != []):
-                    log.conwrite('')
                     log.error('Rectangle effect is not supported on the av render method.')
 
                 from renderVideo import renderAv

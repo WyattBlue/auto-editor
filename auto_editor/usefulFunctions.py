@@ -29,13 +29,20 @@ class Log():
         rmtree(self.temp)
         self.debug('   - Removed Temp Directory.')
 
+    def conwrite(self, message: str):
+        if(not self.quiet):
+            numSpaces = get_terminal_size().columns - len(message) - 3
+            print('  ' + message + ' ' * numSpaces, end='\r', flush=True)
+
     def error(self, message):
+        self.conwrite('')
         message = message.replace('\t', '    ')
         print('Error!', message, file=sys.stderr)
         self.cleanup()
         sys.exit(1)
 
     def bug(self, message, bug_type='bug report'):
+        self.conwrite('')
         URL = 'https://github.com/WyattBlue/auto-editor/issues/'
         print('Error!', message,
             "\n\nThis is not a normal error.\n This message will only show up if there's",
@@ -51,11 +58,6 @@ class Log():
     def print(self, message, end='\n'):
         if(not self.quiet):
             print(message, end=end)
-
-    def conwrite(self, message: str):
-        if(not self.quiet):
-            numSpaces = get_terminal_size().columns - len(message) - 3
-            print('  ' + message + ' ' * numSpaces, end='\r', flush=True)
 
     def checkType(self, data, name, correct_type):
         if(not isinstance(data, correct_type)):
