@@ -313,9 +313,11 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
 
 def handleBoolExp(val: str, data, sampleRate, fps, log) -> list:
     invert = False
+
+    if('>' in val and '<' in val):
+        log.error('Cannot have both ">" and "<" in same expression.')
     if('>' in val):
         exp = val.split('>')
-
     elif('<' in val):
         exp = val.split('<')
         invert = True
@@ -337,14 +339,10 @@ def handleBoolExp(val: str, data, sampleRate, fps, log) -> list:
 
 
 def applyRects(cmdRects, audioData, sampleRate, fps, log):
-    rects = []
-
     from usefulFunctions import hex_to_bgr
 
+    rects = []
     for ms in cmdRects:
-
-        # --rectangle start,end,x1,y1,x2,y2,color,thickness
-
         if(len(ms) < 6):
             log.error('Too few comma arguments for rectangle option.')
 
@@ -353,7 +351,7 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
 
         start, end, x1, y1, x2, y2 = ms[:6]
 
-        color = '#000000'
+        color = '#000'
         thickness = -1
         if(len(ms) > 6):
             color = ms[6]
@@ -361,7 +359,36 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
             thickness = int(ms[7])
         color = hex_to_bgr(color, log)
 
-        rects.append(['rectangle', start, end, x1, y1, x2, y2, color, thickness])
+        # Handle Boolean Expressions. Mostly the same as zoom.
+        start_list, end_list = None, None
+        if(start.startswith('audio')):
+            start_list = handleBoolExp(start, audioData, sampleRate, fps, log)
+
+        if(end.startswith('audio')):
+            if(start_list is None):
+                log.error('The start parameter must also have a boolean expression.')
+            end_list = handleBoolExp(end, audioData, sampleRate, fps, log)
+
+        if(start_list is None):
+            rects.append(['rectangle', start, end, x1, y1, x2, y2, color, thickness])
+
+        elif(end_list is None):
+            # Handle if end is not a boolean expression.
+            indexs = np.where(start_list)[0]
+            if(indexs != []):
+                rects.append(['rectangle', str(indexs[0]), end, x1, y1, x2, y2, color,
+                    thickness])
+        else:
+            chunks = applyBasicSpacing(merge(start_list, end_list), fps, 0, 0, log)
+            for item in chunks:
+                if(item[2] == 1):
+                    rects.append(['rectangle', str(item[0]), str(item[1]), x1, y1, x2, y2,
+                        color, thickness])
+
+            if(rects == []):
+                log.warning('No rectangles applied.')
+            else:
+                log.print(f' {len(rects)} rectangles applied.')
 
     return rects
 
@@ -428,7 +455,7 @@ def applyZooms(cmdZooms, audioData, sampleRate, fps, log):
             if(zooms == []):
                 log.warning('No zooms applied.')
             else:
-                log.print(f' {len(zooms)} applied.')
+                log.print(f' {len(zooms)} zooms applied.')
 
     log.debug(zooms)
     return zooms
