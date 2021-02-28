@@ -336,7 +336,37 @@ def handleBoolExp(val: str, data, sampleRate, fps, log) -> list:
     return new_list
 
 
-def applyZooms(cmdZooms, audioData, sampleRate, mclip, mcut, fps, log):
+def applyRects(cmdRects, audioData, sampleRate, fps, log):
+    rects = []
+
+    from usefulFunctions import hex_to_bgr
+
+    for ms in cmdRects:
+
+        # --rectangle start,end,x1,y1,x2,y2,color,thickness
+
+        if(len(ms) < 6):
+            log.error('Too few comma arguments for rectangle option.')
+
+        if(len(ms) > 8):
+            log.error('Too many comma arguments for rectangle option.')
+
+        start, end, x1, y1, x2, y2 = ms[:6]
+
+        color = '#000000'
+        thickness = -1
+        if(len(ms) > 6):
+            color = ms[6]
+        if(len(ms) > 7):
+            thickness = int(ms[7])
+        color = hex_to_bgr(color, log)
+
+        rects.append(['rectangle', start, end, x1, y1, x2, y2, color, thickness])
+
+    return rects
+
+
+def applyZooms(cmdZooms, audioData, sampleRate, fps, log):
     zooms = []
     for ms in cmdZooms:
         if(len(ms) < 3):
