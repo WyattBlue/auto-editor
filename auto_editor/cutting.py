@@ -422,7 +422,7 @@ def applyZooms(cmdZooms, audioData, sampleRate, fps, log):
             inter = ms[6]
 
         if(len(ms) > 7):
-            hold = int(ms[7])
+            hold = ms[7]
 
         if(len(ms) > 8):
             log.error('Too many comma arguments for zoom option.')
