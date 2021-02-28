@@ -3,6 +3,9 @@
 import os
 import sys
 
+def removeZeroes(inp: float) -> str:
+    return '{0:.8f}'.format(inp).rstrip('0').rstrip('.')
+
 def aspectRatio(w, h) -> str:
 
     def gcd(a, b) -> int:
@@ -48,8 +51,10 @@ def getInfo(files, ffmpeg, ffprobe, log):
             if(dur == 'N/A'):
                 dur = ffprobe.pipe(['-show_entries', 'format=duration', '-of',
                     'default=noprint_wrappers=1:nokey=1', file]).strip()
+                dur = removeZeroes(float(dur))
                 print(f' - duration: {dur} (container)')
             else:
+                dur = removeZeroes(float(dur))
                 print(f' - duration: {dur}')
 
             res = ffprobe.getResolution(file)
