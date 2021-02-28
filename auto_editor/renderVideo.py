@@ -150,7 +150,8 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         if(val == 'height'):
             return height
 
-        if(not isinstance(val, int) and not val.replace('.', '', 1).isdigit()):
+        if(not isinstance(val, int)
+            and not (val.replace('.', '', 1)).replace('-', '', 1).isdigit()):
             log.error(f'Variable {val} not implemented.')
         return _type(val)
 
