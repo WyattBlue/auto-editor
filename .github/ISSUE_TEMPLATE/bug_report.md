@@ -18,7 +18,7 @@ Paste the terminal output here
 **Does the example video work? (if applicable)**
 
 
-**What does the program output when `--debug` is appended to your command/use case**
+**What does the program output when `--debug` or `--show_ffmpeg_debug` is appended to your command/use case**
 
 ```
 output here:
