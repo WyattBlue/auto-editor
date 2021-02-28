@@ -1,5 +1,5 @@
 # Zooming
-last modified February 14, 2021. 21w06a.
+last modified February 28, 2021. 21w08a.
 
 ## Introduction
 The `--zoom` option allows auto-editor to zoom in or out in any place. In order for the `--zoom` option to work, it needs at least 3 values:
@@ -11,7 +11,7 @@ The `--zoom` option allows auto-editor to zoom in or out in any place. In order 
 This is entered in as:
 
 ```
---zoom {start},{end},{start_level}
+--zoom {start},{end},{start_zoom}
 ```
 
 or using real numbers,
@@ -53,12 +53,27 @@ auto-editor example.mp4 --zoom 0,20,0.5,1.5
 The zoom option can take more comma arguments, such as:
 
 ```
---zoom {start},{end},{start_level},{end_level},{x_pos},{y_pos},{interpolate_method}
+--zoom {start},{end},{start_zoom},{end_zoom},{x_pos},{y_pos},{interpolate_method}
 ```
 
 `x_pos` and `y_pos` can be variables like `centerX`, `centerY`, `width`, and `height`, or just regular numbers.
 
 `interpolate_method` is `linear` by default but can be changed `sine`, `start_sine` and `end_sine`.
+
+## Boolean Expressions
+
+Zooming can start and end whenever an event happens. One event can be when the average audio loudness of a frame is higher than a certain point.
+
+Examples:
+
+```
+auto-editor example.mp4 --zoom audio>0.05,audio<0.03,1,1.2,centerX,centerY,sine
+```
+
+```
+auto-editor example.mp4 --zoom audio>0.05,120,1,1.2,centerX,centerY,sine
+```
+
 
 ## Additional Examples Commands
 
@@ -103,4 +118,4 @@ auto-editor generate_test -o 'testsrc.mp4'
 
 ---
 
-Zooming is not implemented in the av render method, and will not be used when exporting to other editors until 21w07a or greater.
+Support for zooming and other effects for Premiere Pro coming soon!
