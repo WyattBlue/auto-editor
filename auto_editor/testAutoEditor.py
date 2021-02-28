@@ -235,6 +235,9 @@ def testAutoEditor():
     checkForError(['example.mp4', '--zoom', '0'])
     checkForError(['example.mp4', '--zoom', '0,60'])
 
+    checkForError(['example.mp4', '--rectangle', '0,60,0,10,10,20', '--render', 'av'])
+    checkForError(['example.mp4', '--rectangle', '0,60'])
+
     checkForError(['example.mp4', '--background', '000'])
 
     runTest(['generate_test', '-o', 'testsrc.mp4'])
@@ -246,6 +249,9 @@ def testAutoEditor():
 
     runTest(['testsrc.mp4', '--ignore', 'start-end', '--zoom', '10,60,2'])
 
+    runTest(['example.mp4', '--ignore', 'start-end', '--rectangle',
+        'audio>0.05,audio<0.05,20,50,50,100', 'audio>0.1,audio<0.1,120,50,150,100'])
+
     runTest(['testsrc.mp4', '--ignore', 'start-end', '--zoom',
         'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
     fullInspect(
@@ -253,6 +259,9 @@ def testAutoEditor():
         [ffprobe.getFrameRate, 30.0],
         [ffprobe.getResolution, '320x180'],
     )
+
+    runTest(['testsrc.mp4', '--ignore', 'start-end', '--rectangle',
+        '0,30,0,200,100,300,#43FA56,10'])
 
     os.remove('testsrc_ALTERED.mp4')
     os.remove('testsrc.mp4')

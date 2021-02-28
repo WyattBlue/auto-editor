@@ -3,6 +3,8 @@
 import os
 import sys
 
+from usefulFunctions import cleanList
+
 def removeZeroes(inp: float) -> str:
     return '{0:.8f}'.format(inp).rstrip('0').rstrip('.')
 
@@ -46,6 +48,16 @@ def getInfo(files, ffmpeg, ffprobe, log):
 
         if(hasVid):
             print(f' - fps: {ffprobe.getFrameRate(file)}')
+
+            fps_mode = ffmpeg.pipe(['-i', file, '-hide_banner', '-vf', 'vfrdet', '-an',
+                '-f', 'null', '-'])
+            fps_mode = cleanList(fps_mode.split('\n'), '\r\t')
+            fps_mode = fps_mode.pop()
+
+            if(fps_mode.index('VFR:') != -1):
+                fps_mode = (fps_mode[fps_mode.index('VFR:'):]).strip()
+
+            print(f'   - mode: {fps_mode}')
 
             dur = ffprobe.getDuration(file)
             if(dur == 'N/A'):

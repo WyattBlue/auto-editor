@@ -87,6 +87,7 @@ class ParseOptions():
 
         # Figure out command line options changed by user.
         myList = []
+        used_options = []
         settingInputs = True
         optionList = 'input'
         listType = str
@@ -108,12 +109,12 @@ class ParseOptions():
             if(option is None):
                 # Unknown Option!
                 if(settingInputs and not item.startswith('-')):
-                    # option is actually an input file, like example.mp4
+                    # Option is actually an input file, like example.mp4
                     myList.append(item)
                 else:
-                    # Get the names of all the options and groups.
+                    # Throw an error of some kind.
                     opt_list = []
-                    for options in args:
+                    for options in args: # Get the names of all the options and groups.
                         for opt in options:
                             for names in opt['names']:
                                 opt_list.append(names)
@@ -137,6 +138,11 @@ class ParseOptions():
                 settingInputs = False
                 optionList = None
                 myList = []
+
+                if(option['names'][0] in used_options and option['stack'] is None):
+                    log.error(f'Cannot repeat option {option["names"][0]} twice.')
+
+                used_options.append(option['names'][0])
 
                 key = option['names'][0].replace('-', '')
                 if(option['action'] == 'grouping'):
