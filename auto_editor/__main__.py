@@ -582,8 +582,10 @@ def main():
             effects = []
             if(args.zoom != []):
                 from cutting import applyZooms
-                effects = applyZooms(args.zoom, audioData, sampleRate, args.min_clip_length,
-                    args.min_cut_length, fps, log)
+                effects = applyZooms(args.zoom, audioData, sampleRate, fps, log)
+            if(args.rectangle != []):
+                from cutting import applyRects
+                effects = applyRects(args.rectangle, audioData, sampleRate, fps, log)
 
             chunks = applySpacingRules(hasLoud, fps, args.frame_margin,
                 args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
