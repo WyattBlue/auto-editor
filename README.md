@@ -1,6 +1,6 @@
 [![Actions Status](https://github.com/wyattblue/auto-editor/workflows/build/badge.svg)](https://github.com/wyattblue/auto-editor/actions)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/discord/711767814821773372?color=%237289DA&label=chat&logo=discord&logoColor=white"></a>
-<img src="https://img.shields.io/badge/version-21w06a-blue.svg">
+<img src="https://img.shields.io/badge/version-21w08a-blue.svg">
 <p align="center"><img src="https://raw.githubusercontent.com/wyattblue/auto-editor/master/articles/imgs/auto-editor_banner.png" title="Auto-Editor" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and cutting them up.
@@ -46,6 +46,8 @@ auto-editor example.mp4 --frame_margin 8
  - [How to Use Motion Detection in Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/motionDetection.md)
  - [`--cut_out`, `--ignore`, and Range Syntax](https://github.com/WyattBlue/auto-editor/blob/master/articles/rangeSyntax.md)
  - [Zooming](https://github.com/WyattBlue/auto-editor/blob/master/articles/zooming.md)
+ - [The Rectangle Effect](https://github.com/WyattBlue/auto-editor/blob/master/articles/rectangleEffect.md)
+ - [Subcommands](https://github.com/WyattBlue/auto-editor/blob/master/articles/subcommands.md)
 
 ## Copyright
 Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) but contains non-free elements. See [this page](https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md) for more info.
