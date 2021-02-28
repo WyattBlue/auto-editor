@@ -139,11 +139,17 @@ def main_options():
         help='scale output.')
 
     ops += add_argument('--zoom', type=comma_type, nargs='*',
-        help='set when and how a zoom will occur.')
+        help='set when and how a zoom will occur.',
+        extra='\nThe arguments are: start,end,start_zoom,end_zoom,x,y,inter,hold' \
+            '\nThere must be at least 4 comma args. x and y default to centerX and centerY' \
+            '\nThe default interpolation is linear.\n')
     ops += add_argument('--rectangle', type=comma_type, nargs='*',
-        help='overlay a rectangle shape on the video.')
+        help='overlay a rectangle shape on the video.',
+        extra='\nThe arguments are: start,end,x1,y1,x2,y2,color,thickness' \
+            '\nThere must be at least 6 comma args. The rectangle is solid if' \
+            'thickness is not defined.\n The default color is #000.\n')
 
-    ops += add_argument('--background', type=str, default='#000000',
+    ops += add_argument('--background', type=str, default='#000',
         help='set the color of the background when the video is moved.')
 
     ops += add_argument('--ignore', nargs='*',
@@ -582,10 +588,10 @@ def main():
             effects = []
             if(args.zoom != []):
                 from cutting import applyZooms
-                effects = applyZooms(args.zoom, audioData, sampleRate, fps, log)
+                effects += applyZooms(args.zoom, audioData, sampleRate, fps, log)
             if(args.rectangle != []):
                 from cutting import applyRects
-                effects = applyRects(args.rectangle, audioData, sampleRate, fps, log)
+                effects += applyRects(args.rectangle, audioData, sampleRate, fps, log)
 
             chunks = applySpacingRules(hasLoud, fps, args.frame_margin,
                 args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
@@ -640,7 +646,7 @@ def main():
             fps, TEMP, log)
         if(continueVid):
             if(args.render == 'auto'):
-                if(args.zoom != []):
+                if(args.zoom != [] or args.rectangle != []):
                     args.render = 'opencv'
                 else:
                     try:
