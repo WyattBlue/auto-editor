@@ -151,21 +151,35 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             return height
 
         if(not isinstance(val, int) and not val.replace('.', '', 1).isdigit()):
-            log.error(f'XY variable {val} not implemented.')
+            log.error(f'Variable {val} not implemented.')
         return _type(val)
 
     effect_sheet = []
     for effect in effects:
         if(effect[0] == 'rectangle'):
 
-            rectx1_sheet = np.zeros((totalFrames + 1), dtype=float)
+            rectx1_sheet = np.zeros((totalFrames + 1), dtype=int)
+            recty1_sheet = np.zeros((totalFrames + 1), dtype=int)
+            rectx2_sheet = np.zeros((totalFrames + 1), dtype=int)
+            recty2_sheet = np.zeros((totalFrames + 1), dtype=int)
+            rectco_sheet = np.zeros((totalFrames + 1, 3), dtype=int)
+            rect_t_sheet = np.zeros((totalFrames + 1), dtype=int)
 
             r = effect[1:]
 
-            r[0] = values(z[0], log, int, totalFrames, width, height)
+            for i in range(6):
+                r[i] = values(r[i], log, int, totalFrames, width, height)
+
+            rectx1_sheet[r[0]:r[1]] = r[2]
+            recty1_sheet[r[0]:r[1]] = r[3]
+            rectx2_sheet[r[0]:r[1]] = r[4]
+            recty2_sheet[r[0]:r[1]] = r[5]
+            rectco_sheet[r[0]:r[1]] = r[6]
+            rect_t_sheet[r[0]:r[1]] = r[7]
 
             effect_sheet.append(
-                ['rectangle', ]
+                ['rectangle', rectx1_sheet, recty1_sheet, rectx2_sheet, recty2_sheet,
+                rectco_sheet, rect_t_sheet]
             )
 
         if(effect[0] == 'zoom'):
@@ -202,15 +216,20 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         for effect in effect_sheet:
             if(effect[0] == 'rectangle'):
 
-                x1 = effect[1][cframe]
-                y1 = effect[2][cframe]
-                x2 = effect[3][cframe]
-                y2 = effect[4][cframe]
-                color = effect[5][cframe]
-                thickness = effect[6][cframe]
+                x1 = int(effect[1][cframe])
+                y1 = int(effect[2][cframe])
+                x2 = int(effect[3][cframe])
+                y2 = int(effect[4][cframe])
 
-                frame = cv2.rectangle(frame, pt1=(x1,y1), pt2=(x2,y2), color=color,
-                    thickness=thickness)
+                if(x1 == y1 and y1 == x2 and x2 == y2 and y2 == 0):
+                    pass
+                else:
+                    np_color = effect[5][cframe]
+                    color = (int(np_color[0]), int(np_color[1]), int(np_color[2]))
+
+                    t = int(effect[6][cframe])
+
+                    frame = cv2.rectangle(frame, (x1,y1), (x2,y2), color, thickness=t)
 
             if(effect[0] == 'zoom'):
 
@@ -246,10 +265,8 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
                 frame = blown[y1:y2+1, x1:x2+1]
 
-                bottom = (height +1) - (frame.shape[0]) - top
+                bottom = (height + 1) - (frame.shape[0]) - top
                 right = (width + 1) - frame.shape[1] - left
-
-                # Pad frame so opencv doesn't drop a frame
                 frame = cv2.copyMakeBorder(
                     frame,
                     top = top,
