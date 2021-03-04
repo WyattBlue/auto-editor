@@ -47,14 +47,21 @@ def runTest(cmd):
         print('Test Succeeded.\n')
 
 
-def checkForError(cmd):
+def checkForError(cmd, match=None):
     pretty_cmd = ' '.join(cmd)
     print(f'Running Error Test: {pretty_cmd}')
 
     returncode, stdout, stderr = pipeToConsole(getRunner() + cmd)
     if(returncode > 0):
         if('Error!' in stderr):
-            print('Test Succeeded.')
+            if(match is not None):
+                if(match in stderr):
+                    print('Found match. Test Succeeded.')
+                else:
+                    print(f'Test Failed.\nCould\'t find "{match}"')
+                    sys.exit(1)
+            else:
+                print('Test Succeeded.')
         else:
             print('Test Failed.\n')
             print(f'Program crashed.\n{stdout}\n{stderr}')
@@ -152,7 +159,7 @@ def testAutoEditor():
         [ffprobe.getSampleRate, '48000'],
     )
 
-    runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'h264', '--render', 'opencv'])
+    runTest(['example.mp4', '--video_codec', 'h264', '--render', 'opencv'])
     fullInspect(
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
@@ -166,7 +173,7 @@ def testAutoEditor():
 
     # Test rejecting files with no extension.
     shutil.copy('example.mp4', 'example')
-    checkForError(['example', '--no_open'])
+    checkForError(['example', '--no_open'], 'must have extension.')
     os.remove('example')
 
     # Test ProgressOps
