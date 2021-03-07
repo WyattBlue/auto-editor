@@ -250,14 +250,6 @@ def info_options():
         help='the path to a file you want inspected.')
     return ops
 
-def genHelp(option_data):
-    for option in option_data:
-        if(option['action'] == 'grouping'):
-            print(f"\n  {option['names'][0]}:")
-        else:
-            print(' ', ', '.join(option['names']) + ':', option['help'])
-
-    print('')
 
 def main():
     dirPath = os.path.dirname(os.path.realpath(__file__))
@@ -285,59 +277,46 @@ def main():
     from vanparse import ParseOptions
     from usefulFunctions import Log, Timer
 
-    if(len(sys.argv) > 1 and sys.argv[1] == 'generate_test'):
-        option_data = generate_options()
-        args = ParseOptions(sys.argv[2:], Log(), 'generate_test', option_data)
+    subcommands = ['test', 'info', 'generate_test']
 
-        if(args.help):
-            genHelp(option_data)
-            sys.exit()
+    if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
+        if(sys.argv[1] == 'generate_test'):
+            option_data = generate_options()
+            args = ParseOptions(sys.argv[2:], Log(), 'generate_test', option_data)
 
-        from generateTestMedia import generateTestMedia
-        from usefulFunctions import FFmpeg
+            if(args.help):
+                genHelp(option_data)
+                sys.exit()
 
-        ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, True, Log())
-        generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
-            args.width, args.height)
-        sys.exit()
+            from generateTestMedia import generateTestMedia
+            from usefulFunctions import FFmpeg
 
-    elif(len(sys.argv) > 1 and sys.argv[1] == 'test'):
+            ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, True, Log())
+            generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
+                args.width, args.height)
 
-        from testAutoEditor import testAutoEditor
-        testAutoEditor()
-        sys.exit()
+        if(sys.argv[1] == 'test'):
+            from testAutoEditor import testAutoEditor
+            testAutoEditor()
 
-    elif(len(sys.argv) > 1 and sys.argv[1] == 'info'):
-        option_data = info_options()
-        args = ParseOptions(sys.argv[2:], Log(), 'info', option_data)
+        if(sys.argv[1] == 'info'):
+            option_data = info_options()
+            args = ParseOptions(sys.argv[2:], Log(), 'info', option_data)
 
-        if(args.help):
-            genHelp(option_data)
-            sys.exit()
+            from info import getInfo
+            from usefulFunctions import FFmpeg, FFprobe
 
-        from info import getInfo
-        from usefulFunctions import FFmpeg, FFprobe
+            log = Log()
+            ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, False, log)
+            ffprobe = FFprobe(dirPath, args.my_ffmpeg, False, log)
 
-        log = Log()
-        ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, False, log)
-        ffprobe = FFprobe(dirPath, args.my_ffmpeg, False, log)
-
-        getInfo(args.input, ffmpeg, ffprobe, log)
+            getInfo(args.input, ffmpeg, ffprobe, log)
         sys.exit()
     else:
         option_data = main_options()
         args = ParseOptions(sys.argv[1:], Log(True), 'auto-editor', option_data)
 
     timer = Timer(args.quiet)
-
-    # Print the help screen for the entire program.
-    if(args.help):
-        genHelp(option_data)
-        print('\n  Have an issue? Make an issue. '\
-            'Visit https://github.com/wyattblue/auto-editor/issues\n')
-        print('  The help option can also be used on a specific option:')
-        print('      auto-editor --frame_margin --help\n')
-        sys.exit()
 
     del option_data
 
