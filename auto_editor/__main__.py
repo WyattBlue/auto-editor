@@ -221,23 +221,24 @@ def main_options():
         help='the path to a file, folder, or url you want edited.')
     return ops
 
-def generate_options():
+def create_options():
     ops = []
-    ops += add_argument('--fps', type=float, default=30.0,
+    ops += add_argument('--frame_rate', '-fps', '-r', type=float, default=30.0,
         help='set the framerate for the output video.')
-    ops += add_argument('--duration', type=int, default=10,
+    ops += add_argument('--duration', '-d', type=int, default=10,
         help='set the length of the video (in seconds).')
-    ops += add_argument('--width', type=int, default=640,
+    ops += add_argument('--width', type=int, default=1280, #640
         help='set the pixel width of the video.')
-    ops += add_argument('--height', type=int, default=360,
+    ops += add_argument('--height', type=int, default=720, #360
         help='set the pixel height of the video.')
     ops += add_argument('--output_file', '--output', '-o', type=str,
         default='testsrc.mp4')
     ops += add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
-
     ops += add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
+    ops += add_argument('(input)', nargs='*',
+        help='the template')
     return ops
 
 def info_options():
@@ -261,9 +262,7 @@ def main():
         print(f'Auto-Editor version {version}\nPlease use --version instead.')
         sys.exit()
 
-    # If the users just runs: $ auto-editor
     if(sys.argv[1:] == []):
-        # Print
         print('\nAuto-Editor is an automatic video/audio creator and editor.\n')
         print('By default, it will detect silence and create a new video with ')
         print('those sections cut out. By changing some of the options, you can')
@@ -277,31 +276,25 @@ def main():
     from vanparse import ParseOptions
     from usefulFunctions import Log, Timer
 
-    subcommands = ['test', 'info', 'generate_test']
+    subcommands = ['create', 'test', 'info']
 
     if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
-        if(sys.argv[1] == 'generate_test'):
-            option_data = generate_options()
-            args = ParseOptions(sys.argv[2:], Log(), 'generate_test', option_data)
+        if(sys.argv[1] == 'create'):
+            args = ParseOptions(sys.argv[2:], Log(), 'create', create_options())
 
-            if(args.help):
-                genHelp(option_data)
-                sys.exit()
-
-            from generateTestMedia import generateTestMedia
+            from create import create
             from usefulFunctions import FFmpeg
 
             ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, True, Log())
-            generateTestMedia(ffmpeg, args.output_file, args.fps, args.duration,
-                args.width, args.height)
+            create(ffmpeg, args.input, args.output_file, args.frame_rate, args.duration,
+                args.width, args.height, Log())
 
         if(sys.argv[1] == 'test'):
             from testAutoEditor import testAutoEditor
             testAutoEditor()
 
         if(sys.argv[1] == 'info'):
-            option_data = info_options()
-            args = ParseOptions(sys.argv[2:], Log(), 'info', option_data)
+            args = ParseOptions(sys.argv[2:], Log(), 'info', info_options())
 
             from info import getInfo
             from usefulFunctions import FFmpeg, FFprobe
