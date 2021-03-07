@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w08b dev'
+version = '21w09a dev'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -136,18 +136,19 @@ def main_options():
     ops += add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
         help='choice which method to render video.')
     ops += add_argument('--scale', type=float_type, default=1,
-        help='scale output.')
+        help='scale the output media file by a certian size (change resolution by a factor)',
+        extra='Hello')
 
     ops += add_argument('--zoom', type=comma_type, nargs='*',
         help='set when and how a zoom will occur.',
-        extra='\nThe arguments are: start,end,start_zoom,end_zoom,x,y,inter,hold' \
+        extra='The arguments are: start,end,start_zoom,end_zoom,x,y,inter,hold' \
             '\nThere must be at least 4 comma args. x and y default to centerX and centerY' \
-            '\nThe default interpolation is linear.\n')
+            '\nThe default interpolation is linear.')
     ops += add_argument('--rectangle', type=comma_type, nargs='*',
         help='overlay a rectangle shape on the video.',
-        extra='\nThe arguments are: start,end,x1,y1,x2,y2,color,thickness' \
+        extra='The arguments are: start,end,x1,y1,x2,y2,color,thickness' \
             '\nThere must be at least 6 comma args. The rectangle is solid if' \
-            'thickness is not defined.\n The default color is #000.\n')
+            ' thickness is not defined.\n The default color is #000.')
 
     ops += add_argument('--background', type=str, default='#000',
         help='set the color of the background when the video is moved.')
@@ -251,10 +252,11 @@ def info_options():
 
 def genHelp(option_data):
     for option in option_data:
-        if(option['grouping'] is None):
+        if(option['action'] == 'grouping'):
+            print(f"\n  {option['names'][0]}:")
+        else:
             print(' ', ', '.join(option['names']) + ':', option['help'])
-            if(option['action'] == 'grouping'):
-                print('     ...')
+
     print('')
 
 def main():
