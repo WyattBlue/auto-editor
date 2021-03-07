@@ -4,14 +4,14 @@ import os
 import sys
 import difflib
 
-def printHelp(option, args):
-    print(' ', ', '.join(option['names']))
+def printHelp(args, option):
     if(option['action'] == 'grouping'):
-        print('   |')
+        print(f'  {option["names"][0]}:')
     else:
+        print(' ', ', '.join(option['names']))
         print('   ', option['help'])
         if(option['extra'] == ''):
-            print('   ')
+            print('')
         else:
             print(f"\n{option['extra']}\n")
     if(option['action'] == 'default'):
@@ -26,13 +26,13 @@ def printHelp(option, args):
             for op in options:
                 if(op['grouping'] == option['names'][0]):
                     print(' ', ', '.join(op['names']) + ':', op['help'])
-                    if(op['action'] == 'grouping'):
-                        print('     ...')
-
     elif(option['action'] == 'store_true'):
         print('    type: flag')
     else:
         print('    type: unknown')
+
+    if(option['grouping'] is not None):
+        print(f'    group: {option["grouping"]}')
 
 
 def get_option(item: str, group: str, the_args: list) -> str:
@@ -153,7 +153,7 @@ class ParseOptions():
 
                 nextItem = None if i == len(userArgs) - 1 else userArgs[i+1]
                 if(nextItem == '-h' or nextItem == '--help'):
-                    printHelp(option, args)
+                    printHelp(args, option)
                     sys.exit()
 
                 if(option['nargs'] != 1):
@@ -183,3 +183,19 @@ class ParseOptions():
             i += 1
         if(settingInputs):
             setattr(self, optionList, list(map(listType, myList)))
+
+        if(self.help):
+            for options in args:
+                for op in options:
+                    if(op['action'] == 'grouping'):
+                        print(f"\n  {op['names'][0]}:")
+                    else:
+                        print(' ', ', '.join(op['names']) + ':', op['help'])
+            print('')
+            if(root == 'auto-editor'):
+                print('  Have an issue? Make an issue. '\
+                    'Visit https://github.com/wyattblue/auto-editor/issues\n')
+                print('  The help option can also be used on a specific option:')
+                print('      auto-editor --frame_margin --help\n')
+            sys.exit()
+
