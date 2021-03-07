@@ -10,7 +10,10 @@ def printHelp(option, args):
         print('   |')
     else:
         print('   ', option['help'])
-        print('   ', option['extra'])
+        if(option['extra'] == ''):
+            print('   ')
+        else:
+            print(f"\n{option['extra']}\n")
     if(option['action'] == 'default'):
         print('    type:', option['type'].__name__)
         print('    default:', option['default'])
@@ -112,15 +115,15 @@ class ParseOptions():
                     # Option is actually an input file, like example.mp4
                     myList.append(item)
                 else:
-                    # Throw an error of some kind.
+                    # Get the names of all the options and groups.
                     opt_list = []
-                    for options in args: # Get the names of all the options and groups.
+                    for options in args:
                         for opt in options:
                             for names in opt['names']:
                                 opt_list.append(names)
 
                     close_matches = difflib.get_close_matches(item, opt_list)
-
+                    # Throw an error of some kind.
                     if(close_matches):
                         if(close_matches[0] == item):
                             # Option exists but is not in the right group.
