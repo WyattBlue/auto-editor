@@ -247,7 +247,7 @@ def testAutoEditor():
 
     checkForError(['example.mp4', '--background', '000'])
 
-    runTest(['generate_test', '-o', 'testsrc.mp4'])
+    runTest(['create', 'test', '--width', '640', '--height', '360', '-o', 'testsrc.mp4'])
     fullInspect(
         'testsrc.mp4',
         [ffprobe.getFrameRate, 30.0],
