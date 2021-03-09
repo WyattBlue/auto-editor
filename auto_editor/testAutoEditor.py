@@ -285,6 +285,7 @@ def testAutoEditor():
         runTest([item])
         runTest([item, '-exp'])
         runTest([item, '-exr'])
+        runTest([item, '-exf'])
         runTest([item, '--preview'])
 
     runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'h264', '--preset', 'faster'])
