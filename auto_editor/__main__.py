@@ -598,7 +598,8 @@ def main():
             preview(INPUT_FILE, chunks, speeds, fps, audioFile, log)
             continue
 
-        if(args.export_to_premiere or args.export_to_resolve):
+        if(args.export_to_premiere or args.export_to_resolve or
+            args.export_to_final_cut_pro):
             from editor import editorXML
             editorXML(INPUT_FILE, TEMP, newOutput, ffprobe, clips, chunks, tracks,
                 sampleRate, audioFile, args.export_to_resolve, fps, log)
