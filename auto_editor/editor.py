@@ -1,5 +1,8 @@
 '''editor.py'''
 
+# Included libraries
+from usefulFunctions import sep
+
 # Internal libraries
 import os
 import platform
@@ -76,9 +79,9 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
 
         trackurls = [pathurl]
         for i in range(1, tracks):
-            newtrack = os.path.join(newFolderName, f'{i}.wav')
-            move(os.path.join(temp, f'{i}.wav'), newtrack)
-            trackurls.append(pathurl(newtrack, resolve))
+            newtrack = f'{newFolderName}{sep()}{i}.wav'
+            move(f'{temp}{sep()}{i}.wav', newtrack)
+            trackurls.append(fixUrl(newtrack, resolve))
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
