@@ -12,7 +12,6 @@ def formatXML(base: int, *args: str) -> str:
         r += ('\t' * base) + line + '\n'
     return r
 
-
 def speedup(speed) -> str:
     return formatXML(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
         '\t\t<effectid>timeremap</effectid>',
@@ -39,21 +38,22 @@ def speedup(speed) -> str:
         '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
+def fixUrl(path: str, resolve: bool) -> str:
+    if(platform.system() == 'Windows'):
+        if(resolve):
+            pathurl = 'file:///' + quote(os.path.abspath(path)).replace('%5C', '/')
+        else:
+            pathurl = 'file://localhost/' + quote(os.path.abspath(path)).replace('%5C', '/')
+    else:
+        # Resolve is suprisingly resilient on MacOS.
+        pathurl = 'file://localhost' + os.path.abspath(path)
+    return pathurl
 
 def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
     sampleRate, audioFile, resolve: bool, fps, log):
 
     duration = chunks[len(chunks) - 1][1]
-
-    if(platform.system() == 'Windows'):
-        if(resolve):
-            pathurl = 'file:///' + quote(os.path.abspath(myInput)).replace('%5C', '/')
-        else:
-            pathurl = 'file://localhost/' + quote(os.path.abspath(myInput)).replace('%5C', '/')
-    else:
-        # Resolve is suprisingly resilient on MacOS.
-        pathurl = 'file://localhost' + os.path.abspath(myInput)
-
+    pathurl = fixUrl(myInput, resolve)
     name = os.path.basename(myInput)
 
     log.debug('tracks: ' + str(tracks))
@@ -78,7 +78,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
         for i in range(1, tracks):
             newtrack = os.path.join(newFolderName, f'{i}.wav')
             move(os.path.join(temp, f'{i}.wav'), newtrack)
-            trackurls.append(newtrack)
+            trackurls.append(pathurl(newtrack), resolve)
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
