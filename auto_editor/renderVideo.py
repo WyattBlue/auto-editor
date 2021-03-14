@@ -63,23 +63,28 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
     outputEquavalent = 0
     index = 0
     chunk = chunks.pop(0)
-    for packet in input_.demux(inputVideoStream):
-        for frame in packet.decode():
-            index += 1
-            if(len(chunks) > 0 and index >= chunk[1]):
-                chunk = chunks.pop(0)
 
-            if(speeds[chunk[2]] != 99999):
-                inputEquavalent += (1 / speeds[chunk[2]])
+    try:
+        for packet in input_.demux(inputVideoStream):
+            for frame in packet.decode():
+                index += 1
+                if(len(chunks) > 0 and index >= chunk[1]):
+                    chunk = chunks.pop(0)
 
-            while inputEquavalent > outputEquavalent:
-                in_bytes = frame.to_ndarray().tobytes()
-                process2.stdin.write(in_bytes)
-                outputEquavalent += 1
+                if(speeds[chunk[2]] != 99999):
+                    inputEquavalent += (1 / speeds[chunk[2]])
 
-            videoProgress.tick(index - 1)
-    process2.stdin.close()
-    process2.wait()
+                while inputEquavalent > outputEquavalent:
+                    in_bytes = frame.to_ndarray().tobytes()
+                    process2.stdin.write(in_bytes)
+                    outputEquavalent += 1
+
+                videoProgress.tick(index - 1)
+        process2.stdin.close()
+        process2.wait()
+    except BrokenPipeError:
+        process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
+        log.error('Broken Pipe Error!')
 
     if(log.is_debug):
         log.debug('Writing the output file.')
