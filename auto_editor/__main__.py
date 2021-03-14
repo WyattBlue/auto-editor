@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w09a dev'
+version = '21w10a dev'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -243,6 +243,8 @@ def create_options():
 
 def info_options():
     ops = []
+    ops += add_argument('--fast', action='store_true',
+        help='skip information that is very slow to get.')
     ops += add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
     ops += add_argument('--help', '-h', action='store_true',
@@ -303,7 +305,7 @@ def main():
             ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, False, log)
             ffprobe = FFprobe(dirPath, args.my_ffmpeg, False, log)
 
-            getInfo(args.input, ffmpeg, ffprobe, log)
+            getInfo(args.input, ffmpeg, ffprobe, args.fast, log)
         sys.exit()
     else:
         option_data = main_options()
