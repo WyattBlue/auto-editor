@@ -337,6 +337,10 @@ def main():
         print('Auto-Editor version', version)
         sys.exit()
 
+    TEMP = tempfile.mkdtemp()
+    log = Log(args.debug, args.quiet, temp=TEMP)
+    log.debug(f'\n   - Temp Directory: {TEMP}')
+
     if(is64bit == '32-bit'):
         log.warning('You have the 32-bit version of Python, which may lead to' \
             'memory crashes.')
@@ -344,10 +348,6 @@ def main():
     if(args.version):
         print('Auto-Editor version', version)
         sys.exit()
-
-    TEMP = tempfile.mkdtemp()
-    log = Log(args.debug, args.quiet, temp=TEMP)
-    log.debug(f'\n   - Temp Directory: {TEMP}')
 
     ffmpeg.updateLog(log)
     ffprobe.updateLog(log)
