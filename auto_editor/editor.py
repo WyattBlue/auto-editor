@@ -67,10 +67,8 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
         # we need to do some stupid things to get it working.
 
         inFolder = os.path.dirname(os.path.abspath(myInput))
-
-        hmm = name[:name.rfind('.')]
-
-        newFolderName = os.path.join(inFolder, hmm + '_tracks')
+        name_without_extension = name[:name.rfind(".")]
+        newFolderName = f'{inFolder}{sep()}{name_without_extension}_tracks'
         try:
             os.mkdir(newFolderName)
         except OSError:

@@ -96,11 +96,9 @@ def sep() -> str:
 
 
 def cleanList(x: list, rm_chars: str) -> list:
-
     no = str.maketrans('', '', rm_chars)
     x = [s.translate(no) for s in x]
     x = [s for s in x if s != '']
-
     return x
 
 
@@ -182,8 +180,7 @@ class FFprobe():
         # r_frame_rate is better than avg_frame_rate for getting constant frame rate.
         output = self.pipe(['-select_streams', 'v', '-show_entries',
             'stream=r_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
-        nums = output.split('/')
-        nums = cleanList(nums, '\r\t\n')
+        nums = cleanList(output.split('/'), '\r\t\n')
 
         try:
             return int(nums[0]) / int(nums[1])
@@ -194,16 +191,29 @@ class FFprobe():
         output = self.pipe(['-select_streams', 'a', '-show_entries', 'stream=index',
             '-of', 'compact=p=0:nk=1', file]).strip()
 
-        numbers = output.split('\n')
-        # Remove extra characters that can appear in certain environments
-        numbers = cleanList(numbers, '\r\t')
-
-        self.log('Track data: ' + str(numbers))
+        numbers = cleanList(output.split('\n'), '\r\t')
+        self.log(f'Track data: {numbers}')
         if(numbers[0].isnumeric()):
             return len(numbers)
         else:
             self.mylog.warning('ffprobe had an invalid output.')
             return 1 # Assume there's one audio track.
+
+    def getSubtitleTracks(self, file):
+        output = self.pipe(['-select_streams', 's', '-show_entries', 'stream=index',
+            '-of', 'compact=p=0:nk=1', file]).strip()
+
+        numbers = cleanList(output.split('\n'), '\r\t')
+        self.log(f'Track data: {numbers}')
+        if(numbers[0].isnumeric()):
+            return len(numbers)
+        else:
+            self.mylog.warning('Invalid output when detecting number of subtitle tracks.')
+            return 0
+
+    def getLang(self, file, track=0):
+        return self.pipe(['-select_streams', f's:{track}', '-show_entries',
+            'stream_tags=language', '-of', 'csv=p=0', file])
 
     def getAudioCodec(self, file, track=0):
         return self._get(file, 'codec_name', 'a', track)
