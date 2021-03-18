@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w10a'
+version = '21w11a dev'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -367,21 +367,24 @@ def main():
     inputList = validInput(args.input, ffmpeg, args, log)
 
     # Figure out the output file names.
-    def newOutputName(oldFile: str, exa=False, data=False, exc=False) -> str:
+    def newOutputName(oldFile: str, audio, final_cut_pro, data, json) -> str:
         dotIndex = oldFile.rfind('.')
-        if(exc):
+        print(oldFile)
+        if(json):
             return oldFile[:dotIndex] + '.json'
-        elif(data):
+        if(final_cut_pro):
+            return oldFile[:dotIndex] + '.fcpxml'
+        if(data):
             return oldFile[:dotIndex] + '.xml'
-        ext = oldFile[dotIndex:]
-        if(exa):
-            ext = '.wav'
-        return oldFile[:dotIndex] + '_ALTERED' + ext
+        if(audio):
+            return oldFile[:dotIndex] + '_ALTERED.wav'
+        return oldFile[:dotIndex] + '_ALTERED' + oldFile[dotIndex:]
 
     if(len(args.output_file) < len(inputList)):
         for i in range(len(inputList) - len(args.output_file)):
             args.output_file.append(newOutputName(inputList[i],
-                args.export_as_audio, makingDataFile, args.export_as_json))
+                args.export_as_audio, args.export_to_final_cut_pro, makingDataFile,
+                args.export_as_json))
 
     if(args.combine_files):
         # Combine video files, then set input to 'combined.mp4'.
@@ -417,7 +420,7 @@ def main():
             INPUT_FILE, chunks, speeds = readCutList(INPUT_FILE, version, log)
 
             newOutput = newOutputName(INPUT_FILE, args.export_as_audio,
-                makingDataFile, False)
+                args.export_to_final_cut_pro, makingDataFile, False)
 
             fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
         else:
@@ -600,11 +603,16 @@ def main():
             preview(INPUT_FILE, chunks, speeds, fps, audioFile, log)
             continue
 
-        if(args.export_to_premiere or args.export_to_resolve or
-            args.export_to_final_cut_pro):
+        if(args.export_to_premiere or args.export_to_resolve):
             from editor import editorXML
             editorXML(INPUT_FILE, TEMP, newOutput, ffprobe, clips, chunks, tracks,
                 sampleRate, audioFile, args.export_to_resolve, fps, log)
+            continue
+
+        if(args.export_to_final_cut_pro):
+            from editor import fcpXML
+            fcpXML(INPUT_FILE, TEMP, newOutput, ffprobe, clips, chunks, tracks,
+                sampleRate, audioFile, fps, log)
             continue
 
         if(audioFile):
