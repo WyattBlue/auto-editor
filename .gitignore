@@ -13,6 +13,7 @@
 *_tracks
 *.webm
 *.xml
+*.fcpxml
 *.json
 *.pyc
 *.pyo
@@ -24,12 +25,6 @@ build/
 dist/
 *.egg-info
 
-# OS generated files
 .DS_Store
 .DS_Store?
 ._*
-
-MANIFEST
-*.manifest
-*.spec
-

@@ -52,6 +52,73 @@ def fixUrl(path: str, resolve: bool) -> str:
         pathurl = 'file://localhost' + os.path.abspath(path)
     return pathurl
 
+
+def fcpXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
+    sampleRate, audioFile, fps, log):
+
+    duration = chunks[len(chunks) - 1][1]
+    pathurl = 'file:///' + os.path.abspath(myInput)
+    name = os.path.splitext(os.path.basename(myInput))[0]
+
+    def fraction(inp: float) -> str:
+        num, dem = inp.as_integer_ratio()
+        if(num == 0):
+            return '0s'
+        num *= 1000
+        dem *= 1000
+        return f'{num}/{dem}s'
+
+    if(not audioFile):
+        width, height = ffprobe.getResolution(myInput).split('x')
+    else:
+        width, height = '1920', '1080'
+
+    with open(output, 'w', encoding='utf-8') as outfile:
+        outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        outfile.write('<!DOCTYPE fcpxml>\n\n')
+        outfile.write('<fcpxml version="1.9">\n')
+        outfile.write('\t<resources>\n')
+        outfile.write(f'\t\t<format id="r1" name="FFVideoFormat{height}p{fps}" '\
+            f'frameDuration="100/3000s" width="{width}" height="{height}"'\
+            ' colorSpace="1-1-1 (Rec. 709)"/>\n')
+
+        outfile.write(f'\t\t<asset id="r2" name="{name}" start="0s" '\
+            'duration="3816000/90000s" hasVideo="1" format="r1" hasAudio="1" '\
+            f'audioSources="1" audioChannels="2" audioRate="{sampleRate}">\n')
+
+        outfile.write(f'\t\t\t<media-rep kind="original-media" '\
+            f'src="{pathurl}"></media-rep>\n')
+        outfile.write('\t\t</asset>\n')
+        outfile.write('\t</resources>\n')
+        outfile.write('\t<library location="file:///Users/wyattblue/Movies/Untitled.fcpbundle/">\n')
+        outfile.write('\t\t<event name="3-16-21">\n')
+        outfile.write(f'\t\t\t<project name="{name}">\n')
+        outfile.write(formatXML(4,
+            f'<sequence duration="{fraction(duration)}" format="r1" tcStart="0s" tcFormat="NDF" '\
+            'audioLayout="stereo" audioRate="48k">',
+            '\t<spine>'))
+
+        total = 0
+        for j, clip in enumerate(clips):
+            total += (clip[1] - clip[0])
+            off = fraction(clip[0] + total)
+
+            dur = fraction(clip[1] - clip[0])
+            if(j == 0):
+                outfile.write(formatXML(6, f'<asset-clip name="{name}" offset="{total}" ref="r2"'\
+                f' duration="{dur}" audioRole="dialogue" tcFormat="NDF"/>'))
+            else:
+                outfile.write(formatXML(6, f'<asset-clip name="{name}" offset="{total}" ref="r2"'\
+                f' duration="{dur}" audioRole="dialogue" tcFormat="NDF"/>'))
+
+        outfile.write('\t\t\t\t\t</spine>\n')
+        outfile.write('\t\t\t\t</sequence>\n')
+        outfile.write('\t\t\t</project>\n')
+        outfile.write('\t\t</event>\n')
+        outfile.write('\t</library>\n')
+        outfile.write('</fcpxml>')
+
+
 def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
     sampleRate, audioFile, resolve: bool, fps, log):
 
