@@ -577,10 +577,12 @@ def main():
             del hasLoud
 
         clips = []
-        numCuts = len(chunks)
+        numCuts = 0
         for chunk in chunks:
             if(speeds[chunk[2]] != 99999):
                 clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
+            else:
+                numCuts += 1
 
         if(fps is None and not audioFile):
             if(makingDataFile):
