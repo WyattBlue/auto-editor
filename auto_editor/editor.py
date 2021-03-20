@@ -70,18 +70,23 @@ def fcpXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
         if(isinstance(fps, float)):
             fps = Fraction(fps)
 
-
         frac = Fraction(inp, fps).limit_denominator()
         num = frac.numerator
         dem = frac.denominator
 
         if(dem < 3000):
             factor = int(3000 / dem)
-            print(3000 / dem)
-            print(f'{num}/{dem}')
-            num *= factor
-            dem *= factor
-            print(f'{num}/{dem}')
+
+            if(factor == 3000 / dem):
+                num *= factor
+                dem *= factor
+            else:
+                # Good enough but has some error that are impacted at speeds such as 150%.
+                total = 0
+                while(total < frac):
+                    total += Fraction(1, 30)
+                num = total.numerator
+                dem = total.denominator
 
         return f'{num}/{dem}s'
 
@@ -99,7 +104,6 @@ def fcpXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
     with open(output, 'w', encoding='utf-8') as outfile:
 
         frame_duration = fraction(1, fps)
-        new_duration = fraction(chunks[len(chunks) - 1][1], fps)
 
         outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n')
         outfile.write('<!DOCTYPE fcpxml>\n\n')
@@ -121,7 +125,7 @@ def fcpXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
         outfile.write('\t\t<event name="auto-editor output">\n')
         outfile.write(f'\t\t\t<project name="{name}">\n')
         outfile.write(formatXML(4,
-            f'<sequence duration="{new_duration}" format="r1" tcStart="0s" tcFormat="NDF" '\
+            f'<sequence format="r1" tcStart="0s" tcFormat="NDF" '\
             'audioLayout="stereo" audioRate="48k">',
             '\t<spine>')
         )
@@ -138,7 +142,7 @@ def fcpXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
                 outfile.write(formatXML(6, f'<asset-clip name="{name}" offset="0s" ref="r2"'\
                 f' duration="{dur}" audioRole="dialogue" tcFormat="NDF"{close}>'))
             else:
-                start = fraction(clip[0], fps)
+                start = fraction(clip[0] / (clip[2] / 100), fps)
                 off = fraction(last_dur, fps)
                 outfile.write(formatXML(6,
                     f'<asset-clip name="{name}" offset="{off}" ref="r2"'\
@@ -150,7 +154,6 @@ def fcpXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
 
                 frac_total = fraction(total_dur, fps)
                 total_dur_divided_by_speed = fraction((total_dur) / (clip[2] / 100), fps)
-
 
                 outfile.write(formatXML(6,
                     '\t<timeMap>',
