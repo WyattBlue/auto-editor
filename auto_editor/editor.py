@@ -94,22 +94,22 @@ def fcpXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
         outfile.write('\t\t<event name="3-16-21">\n')
         outfile.write(f'\t\t\t<project name="{name}">\n')
         outfile.write(formatXML(4,
-            f'<sequence duration="{fraction(duration)}" format="r1" tcStart="0s" tcFormat="NDF" '\
+            f'<sequence duration="{fraction(duration)}" format="r1" tcStart="0/1s" tcFormat="NDF" '\
             'audioLayout="stereo" audioRate="48k">',
             '\t<spine>'))
 
         total = 0
         for j, clip in enumerate(clips):
-            total += (clip[1] - clip[0])
-            off = fraction(clip[0] + total)
-
-            dur = fraction(clip[1] - clip[0])
+            dur = (clip[1] - clip[0])
+            mystart = clip[0]
+            total += (clip[1] - clip[0]) / (clip[2] / 100)
+            myoff = int(total) - dur
             if(j == 0):
-                outfile.write(formatXML(6, f'<asset-clip name="{name}" offset="{total}" ref="r2"'\
-                f' duration="{dur}" audioRole="dialogue" tcFormat="NDF"/>'))
+                outfile.write(formatXML(6, f'<asset-clip name="{name}" duration="{dur}/{fps}s" offset="{myoff}/{fps}s" start="{mystart}/{fps}s" ref="r2"'\
+                f'  audioRole="dialogue" tcFormat="NDF"/>'))
             else:
-                outfile.write(formatXML(6, f'<asset-clip name="{name}" offset="{total}" ref="r2"'\
-                f' duration="{dur}" audioRole="dialogue" tcFormat="NDF"/>'))
+                outfile.write(formatXML(6, f'<asset-clip name="{name}" duration="{dur}/{fps}s" offset="{myoff}/{fps}s" start="{mystart}/{fps}s" ref="r2"'\
+                f'  audioRole="dialogue" tcFormat="NDF"/>'))
 
         outfile.write('\t\t\t\t\t</spine>\n')
         outfile.write('\t\t\t\t</sequence>\n')
