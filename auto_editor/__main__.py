@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w11a dev'
+version = '21w11a'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
