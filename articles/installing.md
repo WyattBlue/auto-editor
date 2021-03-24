@@ -16,7 +16,7 @@ pip3 install --upgrade pip
 to upgrade pip to the latest version.
 
 
-:warning: | Windows users need to install [Visual Code Studio](https://visualstudio.microsoft.com/vs/features/cplusplus/) to compile the C program, opencv.
+:warning: | Windows users need to install [Visual Studio](https://visualstudio.microsoft.com/vs/features/cplusplus/) to compile the C program, opencv.
 :---: | :---
 
 After upgrading pip, run:
