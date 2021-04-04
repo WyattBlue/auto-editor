@@ -44,23 +44,8 @@ def comma_type(inp: str) -> list:
     ms = cleanList(ms, '\r\n\t')
     return ms
 
-def add_argument(*names, nargs=1, type=str, default=None, action='default',
-    range=None, choices=None, group=None, stack=None, help='', extra=''):
-    newDic = {}
-    newDic['names'] = names
-    newDic['nargs'] = nargs
-    newDic['type'] = type
-    newDic['default'] = default
-    newDic['action'] = action
-    newDic['help'] = help
-    newDic['extra'] = extra
-    newDic['range'] = range
-    newDic['choices'] = choices
-    newDic['grouping'] = group
-    newDic['stack'] = stack
-    return [newDic]
-
 def main_options():
+    from vanparse import add_argument
     ops = []
     ops += add_argument('urlOps', nargs=0, action='grouping')
     ops += add_argument('--format', type=str, group='urlOps',
@@ -223,38 +208,6 @@ def main_options():
         help='the path to a file, folder, or url you want edited.')
     return ops
 
-def create_options():
-    ops = []
-    ops += add_argument('--frame_rate', '-fps', '-r', type=float, default=30.0,
-        help='set the framerate for the output video.')
-    ops += add_argument('--duration', '-d', type=int, default=10,
-        help='set the length of the video (in seconds).')
-    ops += add_argument('--width', type=int, default=1280, #640
-        help='set the pixel width of the video.')
-    ops += add_argument('--height', type=int, default=720, #360
-        help='set the pixel height of the video.')
-    ops += add_argument('--output_file', '--output', '-o', type=str,
-        default='testsrc.mp4')
-    ops += add_argument('--my_ffmpeg', action='store_true',
-        help='use your ffmpeg and other binaries instead of the ones packaged.')
-    ops += add_argument('--help', '-h', action='store_true',
-        help='print info about the program or an option and exit.')
-    ops += add_argument('(input)', nargs='*',
-        help='the template')
-    return ops
-
-def info_options():
-    ops = []
-    ops += add_argument('--fast', action='store_true',
-        help='skip information that is very slow to get.')
-    ops += add_argument('--my_ffmpeg', action='store_true',
-        help='use your ffmpeg and other binaries instead of the ones packaged.')
-    ops += add_argument('--help', '-h', action='store_true',
-        help='print info about the program or an option and exit.')
-    ops += add_argument('(input)', nargs='*',
-        help='the path to a file you want inspected.')
-    return ops
-
 
 def main():
     dirPath = os.path.dirname(os.path.realpath(__file__))
@@ -280,14 +233,13 @@ def main():
     from vanparse import ParseOptions
     from usefulFunctions import Log, Timer
 
-    subcommands = ['create', 'test', 'info']
+    subcommands = ['create', 'test', 'info', 'levels']
 
     if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
         if(sys.argv[1] == 'create'):
-            args = ParseOptions(sys.argv[2:], Log(), 'create', create_options())
-
-            from create import create
+            from create import create, create_options
             from usefulFunctions import FFmpeg
+            args = ParseOptions(sys.argv[2:], Log(), 'create', create_options())
 
             ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, True, Log())
             create(ffmpeg, args.input, args.output_file, args.frame_rate, args.duration,
@@ -298,16 +250,25 @@ def main():
             testAutoEditor()
 
         if(sys.argv[1] == 'info'):
-            args = ParseOptions(sys.argv[2:], Log(), 'info', info_options())
-
-            from info import getInfo
+            from info import getInfo, info_options
             from usefulFunctions import FFmpeg, FFprobe
+
+            args = ParseOptions(sys.argv[2:], Log(), 'info', info_options())
 
             log = Log()
             ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, False, log)
             ffprobe = FFprobe(dirPath, args.my_ffmpeg, False, log)
-
             getInfo(args.input, ffmpeg, ffprobe, args.fast, log)
+        if(sys.argv[1] == 'levels'):
+            from levels import levels, levels_options
+            from usefulFunctions import FFmpeg, FFprobe
+            args = ParseOptions(sys.argv[2:], Log(), 'levels', levels_options())
+
+            TEMP = tempfile.mkdtemp()
+            log = Log(temp=TEMP)
+            ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, False, log)
+            ffprobe = FFprobe(dirPath, args.my_ffmpeg, False, log)
+            levels(args.input, args.track, args.output_file, ffmpeg, ffprobe, TEMP, log)
         sys.exit()
     else:
         option_data = main_options()

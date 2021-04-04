@@ -5,6 +5,19 @@ import sys
 
 from usefulFunctions import cleanList
 
+def info_options():
+    from vanparse import add_argument
+    ops = []
+    ops += add_argument('--fast', action='store_true',
+        help='skip information that is very slow to get.')
+    ops += add_argument('--my_ffmpeg', action='store_true',
+        help='use your ffmpeg and other binaries instead of the ones packaged.')
+    ops += add_argument('--help', '-h', action='store_true',
+        help='print info about the program or an option and exit.')
+    ops += add_argument('(input)', nargs='*',
+        help='the path to a file you want inspected.')
+    return ops
+
 def removeZeroes(inp: float) -> str:
     return '{0:.8f}'.format(inp).rstrip('0').rstrip('.')
 
