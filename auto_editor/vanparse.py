@@ -4,6 +4,22 @@ import os
 import sys
 import difflib
 
+def add_argument(*names, nargs=1, type=str, default=None, action='default',
+    range=None, choices=None, group=None, stack=None, help='', extra=''):
+    newDic = {}
+    newDic['names'] = names
+    newDic['nargs'] = nargs
+    newDic['type'] = type
+    newDic['default'] = default
+    newDic['action'] = action
+    newDic['help'] = help
+    newDic['extra'] = extra
+    newDic['range'] = range
+    newDic['choices'] = choices
+    newDic['grouping'] = group
+    newDic['stack'] = stack
+    return [newDic]
+
 def printHelp(args, option):
     if(option['action'] == 'grouping'):
         print(f'  {option["names"][0]}:')
