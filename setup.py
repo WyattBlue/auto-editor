@@ -47,18 +47,18 @@ setup(
     license='Unlicense',
     url='https://github.com/WyattBlue/auto-editor',
     author='WyattBlue',
-    author_email='wyattbluesandbox@gmail.com',
+    author_email='WyattBlue@protonmail.com',
     keywords='video audio media editor editing processing nonlinear automatic ' \
      'silence-detect silence-removal silence-speedup motion-detection',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'numpy', # numpy devs fixed package for Windows users, 1.19.5 and onward.
+        'numpy',
         'audiotsm2',
         'opencv-python>=4.3',
         'youtube-dl',
         'requests',
-        'av', # pyav team finally added support for amd Windows.
+        'av',
     ],
     classifiers=[
         'Topic :: Multimedia :: Video',
