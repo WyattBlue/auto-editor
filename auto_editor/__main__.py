@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w13a dev'
+version = '21w16a dev'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -117,8 +117,6 @@ def main_options():
         help='export as an XML file for Final Cut Pro instead of outputting a media file.')
     ops += add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later.')
-    ops += add_argument('--chunks', action='store_true',
-        help='only display speed and chunks values, skip exporting media.')
 
     ops += add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
         help='choice which method to render video.')
@@ -381,12 +379,6 @@ def main():
             log.debug('Reading .json file')
             from makeCutList import readCutList
             INPUT_FILE, chunks, speeds = readCutList(INPUT_FILE, version, log)
-
-            if(args.chunks):
-                print(speeds)
-                print(chunks)
-                sys.exit()
-
             newOutput = newOutputName(INPUT_FILE, args.export_as_audio,
                 args.export_to_final_cut_pro, makingDataFile, False)
 
@@ -543,11 +535,6 @@ def main():
             chunks = applySpacingRules(hasLoud, fps, args.frame_margin,
                 args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
             del hasLoud
-
-            if(args.chunks):
-                print(speeds)
-                print(chunks)
-                sys.exit()
 
         clips = []
         numCuts = 0
