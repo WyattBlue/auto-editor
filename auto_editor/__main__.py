@@ -49,6 +49,21 @@ def appendFileName(file_name, val):
     end = val + file_name[dotIndex:]
     return file_name[:dotIndex] + end
 
+# Pad so that the av method works.
+def padChunk(item, totalFrames):
+    start = None
+    end = None
+    if(item[0] != 0):
+        start = [0, item[0], 2]
+    if(item[1] != totalFrames -1):
+        end = [item[1], totalFrames -1, 2]
+
+    if(start is None):
+        return [item] + [end]
+    if(end is None):
+        return [start] + [item]
+    return [start] + [item] + [end]
+
 def main_options():
     from vanparse import add_argument
     ops = []
@@ -553,7 +568,7 @@ def main():
 
         if(fps is None and not audioFile):
             if(makingDataFile):
-                appendFileName(INPUT_FILE, '_constantFPS')
+                constantLoc = appendFileName(INPUT_FILE, '_constantFPS')
             else:
                 constantLoc = f'{TEMP}{sep()}constantVid{fileFormat}'
             ffmpeg.run(['-i', INPUT_FILE, '-filter:v', 'fps=fps=30', constantLoc])
@@ -583,9 +598,7 @@ def main():
             continue
 
         def makeAudioFile(input_, chunks, output):
-            print(chunks)
             from fastAudio import fastAudio, handleAudio, convertAudio
-            print(sampleRate)
             theFile = handleAudio(ffmpeg, input_, audioBitrate, str(sampleRate),
                 TEMP, log)
             fastAudio(theFile, f'{TEMP}{sep()}convert.wav', chunks, speeds, log, fps,
@@ -593,59 +606,69 @@ def main():
             convertAudio(ffmpeg, ffprobe, f'{TEMP}{sep()}convert.wav', input_,
                 output, args, log)
 
+        if(audioFile):
+            if(args.export_as_clip_sequence):
+                i = 1
+                for item in chunks:
+                    if(speeds[item[2]] == 99999):
+                        continue
+                    makeAudioFile(INPUT_FILE, [item], appendFileName(newOutput, f'-{i}'))
+                    i += 1
+            else:
+                makeAudioFile(INPUT_FILE, chunks, newOutput)
+            continue
+
+        def makeVideoFile(input_, chunks, output):
+            from videoUtils import handleAudioTracks, muxVideo
+            continueVid = handleAudioTracks(ffmpeg, output, args, tracks, chunks, speeds,
+                fps, TEMP, log)
+            if(continueVid):
+                if(args.render == 'auto'):
+                    if(args.zoom != [] or args.rectangle != []):
+                        args.render = 'opencv'
+                    else:
+                        try:
+                            import av
+                            args.render = 'av'
+                        except ImportError:
+                            args.render = 'opencv'
+
+                log.debug(f'Using {args.render} method')
+                if(args.render == 'av'):
+                    if(args.zoom != []):
+                        log.error('Zoom effect is not supported on the av render method.')
+
+                    if(args.rectangle != []):
+                        log.error('Rectangle effect is not supported on the av render method.')
+
+                    from renderVideo import renderAv
+                    renderAv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps,
+                    TEMP, log)
+
+                if(args.render == 'opencv'):
+                    from renderVideo import renderOpencv
+                    renderOpencv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps,
+                        effects, TEMP, log)
+
+                # Now mix new audio(s) and the new video.
+                muxVideo(ffmpeg, output, args, tracks, TEMP, log)
+
         if(args.export_as_clip_sequence):
             i = 1
+            totalFrames = chunks[len(chunks) - 1][1]
+            speeds.append(99999) # guarantee we have a cut speed to work with.
             for item in chunks:
                 if(speeds[item[2]] == 99999):
                     continue
-                if(audioFile):
-                    makeAudioFile(INPUT_FILE, [item], appendFileName(newOutput, f'-{i}'))
-                else:
-                    print('bad')
+
+                makeVideoFile(INPUT_FILE, padChunk(item, totalFrames),
+                    appendFileName(newOutput, f'-{i}'))
                 i += 1
-            continue
+        else:
+            makeVideoFile(INPUT_FILE, chunks, newOutput)
 
-        if(audioFile):
-            makeAudioFile(INPUT_FILE, chunks, newOutput)
-            continue
-
-        from videoUtils import handleAudioTracks, muxVideo
-
-        continueVid = handleAudioTracks(ffmpeg, newOutput, args, tracks, chunks, speeds,
-            fps, TEMP, log)
-        if(continueVid):
-            if(args.render == 'auto'):
-                if(args.zoom != [] or args.rectangle != []):
-                    args.render = 'opencv'
-                else:
-                    try:
-                        import av
-                        args.render = 'av'
-                    except ImportError:
-                        args.render = 'opencv'
-
-            log.debug(f'Using {args.render} method')
-            if(args.render == 'av'):
-
-                if(args.zoom != []):
-                    log.error('Zoom effect is not supported on the av render method.')
-
-                if(args.rectangle != []):
-                    log.error('Rectangle effect is not supported on the av render method.')
-
-                from renderVideo import renderAv
-                renderAv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, fps,
-                TEMP, log)
-
-            if(args.render == 'opencv'):
-                from renderVideo import renderOpencv
-                renderOpencv(ffmpeg, ffprobe, INPUT_FILE, args, chunks, speeds, fps,
-                    effects, TEMP, log)
-
-            # Now mix new audio(s) and the new video.
-            muxVideo(ffmpeg, newOutput, args, tracks, TEMP, log)
-
-    if(newOutput is not None and not os.path.isfile(newOutput)):
+    if(newOutput is not None and not os.path.isfile(newOutput)
+        and not args.export_as_clip_sequence):
         log.bug(f'The file {newOutput} was not created.')
 
     if(not args.preview and not makingDataFile):
