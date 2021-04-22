@@ -75,7 +75,8 @@ def checkForError(cmd, match=None):
 def cleanup(the_dir):
     for item in os.listdir(the_dir):
         item = f'{the_dir}{sep()}{item}'
-        if('_ALTERED' in item or item.endswith('.xml') or item.endswith('.json')):
+        if('_ALTERED' in item or item.endswith('.xml') or item.endswith('.json')
+            or item.endswith('.fcpxml')):
             os.remove(item)
         if(item.endswith('_tracks')):
             shutil.rmtree(item)
@@ -286,6 +287,7 @@ def testAutoEditor():
         runTest([item, '-exp'])
         runTest([item, '-exr'])
         runTest([item, '-exf'])
+        runTest([item, '--export_as_clip_sequence'])
         runTest([item, '--preview'])
 
     runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'h264', '--preset', 'faster'])
