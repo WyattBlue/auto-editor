@@ -2,7 +2,7 @@
 
 # Internal Libraries
 import os
-from shutil import move
+from shutil import move, copy
 
 # Included Libraries
 from usefulFunctions import sep
@@ -54,7 +54,7 @@ def muxVideo(ffmpeg, outFile, args, tracks, temp, log):
                 f'{temp}{sep()}newAudioFile.wav'])
             ffmpeg.run(cmd)
         else:
-            move(f'{temp}{sep()}new0.wav', f'{temp}{sep()}newAudioFile.wav')
+            copy(f'{temp}{sep()}new0.wav', f'{temp}{sep()}newAudioFile.wav')
         cmd = ['-i', f'{temp}{sep()}newAudioFile.wav', '-i', f'{temp}{sep()}spedup.mp4']
 
     cmd.extend(['-c:v', 'copy'])
