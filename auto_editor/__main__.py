@@ -44,6 +44,11 @@ def comma_type(inp: str) -> list:
     ms = cleanList(ms, '\r\n\t')
     return ms
 
+def appendFileName(file_name, val):
+    dotIndex = file_name.rfind('.')
+    end = val + file_name[dotIndex:]
+    return file_name[:dotIndex] + end
+
 def main_options():
     from vanparse import add_argument
     ops = []
@@ -117,6 +122,8 @@ def main_options():
         help='export as an XML file for Final Cut Pro instead of outputting a media file.')
     ops += add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later.')
+    ops += add_argument('--export_as_clip_sequence', action='store_true',
+        help='export as multiple numbered media files.')
 
     ops += add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
         help='choice which method to render video.')
@@ -546,9 +553,7 @@ def main():
 
         if(fps is None and not audioFile):
             if(makingDataFile):
-                dotIndex = INPUT_FILE.rfind('.')
-                end = '_constantFPS' + INPUT_FILE[dotIndex:]
-                constantLoc = INPUT_FILE[:dotIndex] + end
+                appendFileName(INPUT_FILE, '_constantFPS')
             else:
                 constantLoc = f'{TEMP}{sep()}constantVid{fileFormat}'
             ffmpeg.run(['-i', INPUT_FILE, '-filter:v', 'fps=fps=30', constantLoc])
@@ -577,14 +582,31 @@ def main():
                 sampleRate, audioFile, fps, log)
             continue
 
-        if(audioFile):
+        def makeAudioFile(input_, chunks, output):
+            print(chunks)
             from fastAudio import fastAudio, handleAudio, convertAudio
-            theFile = handleAudio(ffmpeg, INPUT_FILE, audioBitrate, str(sampleRate),
+            print(sampleRate)
+            theFile = handleAudio(ffmpeg, input_, audioBitrate, str(sampleRate),
                 TEMP, log)
             fastAudio(theFile, f'{TEMP}{sep()}convert.wav', chunks, speeds, log, fps,
                 args.machine_readable_progress, args.no_progress)
-            convertAudio(ffmpeg, ffprobe, f'{TEMP}{sep()}convert.wav', INPUT_FILE,
-                newOutput, args, log)
+            convertAudio(ffmpeg, ffprobe, f'{TEMP}{sep()}convert.wav', input_,
+                output, args, log)
+
+        if(args.export_as_clip_sequence):
+            i = 1
+            for item in chunks:
+                if(speeds[item[2]] == 99999):
+                    continue
+                if(audioFile):
+                    makeAudioFile(INPUT_FILE, [item], appendFileName(newOutput, f'-{i}'))
+                else:
+                    print('bad')
+                i += 1
+            continue
+
+        if(audioFile):
+            makeAudioFile(INPUT_FILE, chunks, newOutput)
             continue
 
         from videoUtils import handleAudioTracks, muxVideo
