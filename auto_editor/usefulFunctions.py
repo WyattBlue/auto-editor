@@ -288,7 +288,7 @@ class FFmpeg():
         if(self.FFdebug):
             cmd.extend(['-hide_banner'])
         else:
-            cmd.extend(['-nostats', '-loglevel', '8'])
+            cmd.extend(['-nostats', '-loglevel', 'error'])
         self.mylog.debug(cmd)
 
         import subprocess

@@ -302,6 +302,10 @@ def main():
     ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
     ffprobe = FFprobe(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
 
+    # Stops "The file {file} does not exist." from showing.
+    if(args.export_as_clip_sequence):
+        args.no_open = True
+
     makingDataFile = (args.export_to_premiere or args.export_to_resolve or
         args.export_to_final_cut_pro or args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
@@ -407,6 +411,8 @@ def main():
             fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
         else:
             newOutput = args.output_file[i]
+            if(not os.path.isdir(INPUT_FILE) and '.' not in newOutput):
+                newOutput += INPUT_FILE[INPUT_FILE.rfind('.'):]
 
         log.debug(f'   - INPUT_FILE: {INPUT_FILE}')
         log.debug(f'   - newOutput: {newOutput}')
@@ -652,6 +658,8 @@ def main():
 
                 # Now mix new audio(s) and the new video.
                 muxVideo(ffmpeg, output, args, tracks, TEMP, log)
+                if(output is not None and not os.path.isfile(output)):
+                    log.bug(f'The file {output} was not created.')
 
         if(args.export_as_clip_sequence):
             i = 1
@@ -666,10 +674,6 @@ def main():
                 i += 1
         else:
             makeVideoFile(INPUT_FILE, chunks, newOutput)
-
-    if(newOutput is not None and not os.path.isfile(newOutput)
-        and not args.export_as_clip_sequence):
-        log.bug(f'The file {newOutput} was not created.')
 
     if(not args.preview and not makingDataFile):
         timer.stop()
