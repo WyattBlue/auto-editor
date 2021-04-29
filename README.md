@@ -48,6 +48,7 @@ auto-editor example.mp4 --frame_margin 8
  - [Zooming](https://github.com/WyattBlue/auto-editor/blob/master/articles/zooming.md)
  - [The Rectangle Effect](https://github.com/WyattBlue/auto-editor/blob/master/articles/rectangleEffect.md)
  - [Subcommands](https://github.com/WyattBlue/auto-editor/blob/master/articles/subcommands.md)
+ - [Branding Guide](https://github.com/WyattBlue/auto-editor/blob/master/articles/branding.md)
 
 ## Donate
 Bitcoin (BTC)
