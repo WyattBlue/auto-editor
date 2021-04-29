@@ -49,6 +49,19 @@ auto-editor example.mp4 --frame_margin 8
  - [The Rectangle Effect](https://github.com/WyattBlue/auto-editor/blob/master/articles/rectangleEffect.md)
  - [Subcommands](https://github.com/WyattBlue/auto-editor/blob/master/articles/subcommands.md)
 
+## Donate
+Bitcoin (BTC)
+bc1qpf8xufyu9klawpy3eyxenn67tedahwpvsu8uyk
+
+Bitcoin Cash (BCH)
+qzdw2lg7llcyx5ergjv29e9d98kl89dsm5l47kklr0
+
+Monero (XMR)
+4At2qRKPnksfmmJG7QdJSwBsarrFiqMrgBjJbvkohaSLXSPzjYR3jCG4wueJxs2xfoBaEVyCToL8phRkCppTiNsJ55ETyZJ
+
+Pirate Chain (ARRR)
+zs19e04x5x52nfrj9yxy8s67zwxl6rn3hxyzz3jem0t5dpvc9d7tnjcqr6ltjpupquw2dykksnculm
+
 ## Copyright
 Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) but contains non-free elements. See [this page](https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md) for more info.
 
