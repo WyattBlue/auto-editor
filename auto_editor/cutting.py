@@ -214,7 +214,7 @@ def setRange(hasLoud: np.ndarray, syntaxRange, fps: float, with_: bool, log) -> 
             return len(hasLoud)
         if(item.startswith('sec')):
             log.error('Seconds unit not implemented in this function.')
-        log.error(f'Invalid variable {item} used in comma type.')
+        log.error(f'Variable {item} not avaiable in this context.')
 
     def ConvertToFrames(num) -> int:
         num = replaceVarsWithVals(num)

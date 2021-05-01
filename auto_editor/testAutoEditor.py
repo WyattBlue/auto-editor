@@ -255,12 +255,12 @@ def testAutoEditor():
         [ffprobe.getResolution, '640x360'],
     )
 
-    runTest(['testsrc.mp4', '--ignore', 'start-end', '--zoom', '10,60,2'])
+    runTest(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom', '10,60,2'])
 
-    runTest(['example.mp4', '--ignore', 'start-end', '--rectangle',
+    runTest(['example.mp4', '--mark_as_loud', 'start,end', '--rectangle',
         'audio>0.05,audio<0.05,20,50,50,100', 'audio>0.1,audio<0.1,120,50,150,100'])
 
-    runTest(['testsrc.mp4', '--ignore', 'start-end', '--zoom',
+    runTest(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
         'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
     fullInspect(
         'testsrc_ALTERED.mp4',
@@ -268,7 +268,7 @@ def testAutoEditor():
         [ffprobe.getResolution, '320x180'],
     )
 
-    runTest(['testsrc.mp4', '--ignore', 'start-end', '--rectangle',
+    runTest(['testsrc.mp4', '--mark_as_loud', 'start,end', '--rectangle',
         '0,30,0,200,100,300,#43FA56,10'])
 
     os.remove('testsrc_ALTERED.mp4')
@@ -294,7 +294,7 @@ def testAutoEditor():
     runTest(['example.mp4', 'exportMediaOps', '--audio_codec', 'ac3'])
     runTest(['resources/newCommentary.mp3', 'exportMediaOps', '-acodec', 'pcm_s16le'])
 
-    runTest(['example.mp4', '--cut_out', '0-5.7', '-o', 'hmm.mp4'])
+    runTest(['example.mp4', '--mark_as_silent', '0-5.7', '-o', 'hmm.mp4'])
     runTest(['example.mp4', 'hmm.mp4', '--combine_files', '--debug'])
 
     os.remove('hmm.mp4')
