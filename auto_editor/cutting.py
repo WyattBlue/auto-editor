@@ -240,62 +240,57 @@ def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
 
 # Turn long silent/loud array to formatted chunk list.
 # Example: [True, True, True, False, False] => [[0, 3, 1], [3, 5, 0]]
-def chunkify(includeFrame, arrayLen=None) -> list:
-    if(arrayLen is None):
-        arrayLen = len(includeFrame)
+def chunkify(hasLoud, hasLoudLengthCache=None) -> list:
+    if(hasLoudLengthCache is None):
+        hasLoudLengthCache = len(hasLoud)
 
     chunks = []
     startP = 0
-    for j in range(1, arrayLen):
-        if(includeFrame[j] != includeFrame[j - 1]):
-            chunks.append([startP, j, int(includeFrame[j-1])])
+    for j in range(1, hasLoudLengthCache):
+        if(hasLoud[j] != hasLoud[j - 1]):
+            chunks.append([startP, j, int(hasLoud[j-1])])
             startP = j
-    chunks.append([startP, arrayLen, int(includeFrame[j])])
+    chunks.append([startP, hasLoudLengthCache, int(hasLoud[j])])
     return chunks
 
 
-def applySpacingRules(hasLoud: np.ndarray, fps: float, frameMargin: int,
-    minClip: int, minCut: int, ignore, cutOut, log):
+def applySpacingRules(hasLoud: np.ndarray, fps: float, args, log):
 
-    frameMargin = secToFrames(frameMargin, fps)
-    minClip = secToFrames(minClip, fps)
-    minCut = secToFrames(minCut, fps)
-
-    log.checkType(frameMargin, 'frameMargin', int)
+    frameMargin = secToFrames(args.frame_margin, fps)
+    minClip = secToFrames(args.min_clip_length, fps)
+    minCut = secToFrames(args.min_cut_length, fps)
 
     hasLoud = cook(hasLoud, minClip, minCut)
+    hasLoudLengthCache = len(hasLoud)
 
-    arrayLen = len(hasLoud)
+    def applyFrameMargin(hasLoud, hasLoudLengthCache, frameMargin) -> np.ndarray:
+        new = np.zeros((hasLoudLengthCache), dtype=np.bool_)
+        for i in range(hasLoudLengthCache):
+            start = int(max(0, i - frameMargin))
+            end = int(min(hasLoudLengthCache, i+1+frameMargin))
+            new[i] = min(1, np.max(hasLoud[start:end]))
+        return new
 
-    # Apply frame margin rules.
-    includeFrame = np.zeros((arrayLen), dtype=np.bool_)
-    for i in range(arrayLen):
-        start = int(max(0, i - frameMargin))
-        end = int(min(arrayLen, i+1+frameMargin))
-        includeFrame[i] = min(1, np.max(hasLoud[start:end]))
+    hasLoud = applyFrameMargin(hasLoud, hasLoudLengthCache, frameMargin)
 
-    del hasLoud
+    if(args.add_in != []):
+        hasLoud = setRange(hasLoud, args.add_in, fps, True, log)
 
-    # Apply ignore rules if applicable.
-    if(ignore != []):
-        includeFrame = setRange(includeFrame, ignore, fps, True, log)
-
-    # Cut out ranges.
-    if(cutOut != []):
-        includeFrame = setRange(includeFrame, cutOut, fps, False, log)
+    if(args.cut_out != []):
+        hasLoud = setRange(hasLoud, args.cut_out, fps, False, log)
 
     # Remove small clips/cuts created by applying other rules.
-    includeFrame = cook(includeFrame, minClip, minCut)
+    hasLoud = cook(hasLoud, minClip, minCut)
 
-    return chunkify(includeFrame, arrayLen)
+    return chunkify(hasLoud, hasLoudLengthCache)
 
 
 def applyBasicSpacing(hasLoud: np.ndarray, fps: float, minClip: int, minCut: int, log):
     minClip = secToFrames(minClip, fps)
     minCut = secToFrames(minCut, fps)
 
-    includeFrame = cook(hasLoud, minClip, minCut)
-    return chunkify(includeFrame)
+    hasLoud = cook(hasLoud, minClip, minCut)
+    return chunkify(hasLoud)
 
 
 def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:

@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w16a'
+version = '21w17a dev'
 
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
@@ -158,12 +158,17 @@ def main_options():
             ' thickness is not defined.\n The default color is #000.')
 
     ops += add_argument('--background', type=str, default='#000',
-        help='set the color of the background when the video is moved.')
+        help='set the color of the background that is visible when the video is moved.')
 
-    ops += add_argument('--ignore', nargs='*',
-        help='the range that will be marked as "loud"')
-    ops += add_argument('--cut_out', nargs='*',
-        help='the range that will be marked as "silent"')
+    ops += add_argument('--mark_as_loud', type=comma_type, nargs='*',
+        help='the range that will be marked as "loud".')
+    ops += add_argument('--mark_as_silent', type=comma_type, nargs='*',
+        help='the range that will be marked as "silent".')
+    ops += add_argument('--cut_out', type=comma_type, nargs='*',
+        help='the range of media that will be removed completely, regardless of the value of silent speed.')
+    ops += add_argument('--add_in', type=comma_type, nargs='*',
+        help='the range of media that will be included at the normal speed, regardless of the video speed value.')
+
     ops += add_argument('--motion_threshold', type=float_type, default=0.02,
         range='0 to 1',
         help='how much motion is required to be considered "moving"')
@@ -213,10 +218,11 @@ def main_options():
         range='0 to 1',
         help='set the volume that frames audio needs to surpass to be "loud".')
     ops += add_argument('--silent_speed', '-s', type=float_type, default=99999,
-        range='0 to 99999',
+        range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='set the speed that "silent" sections should be played at.')
     ops += add_argument('--video_speed', '--sounded_speed', '-v', type=float_type,
-        default=1.00, range='0 to 999999',
+        default=1.00,
+        range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='set the speed that "loud" sections should be played at.')
     ops += add_argument('--frame_margin', '-m', type=frame_type, default=6,
         range='0 to Infinity',
@@ -309,6 +315,8 @@ def main():
     makingDataFile = (args.export_to_premiere or args.export_to_resolve or
         args.export_to_final_cut_pro or args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
+
+    print(args.cut_out)
 
     if(args.debug and args.input == []):
         import platform
@@ -474,8 +482,7 @@ def main():
                 fps = ffprobe.getFrameRate(INPUT_FILE)
 
             if(fps < 1):
-                log.error(f"Frame rate cannot be below 1. fps: {fps}" \
-                    f"\nInput file: {INPUT_FILE}")
+                log.error(f"{INPUT_FILE}: Frame rate cannot be below 1. fps: {fps}")
 
             tracks = args.force_tracks_to
             if(tracks is None):
@@ -560,17 +567,25 @@ def main():
                 from cutting import applyRects
                 effects += applyRects(args.rectangle, audioData, sampleRate, fps, log)
 
-            chunks = applySpacingRules(hasLoud, fps, args.frame_margin,
-                args.min_clip_length, args.min_cut_length, args.ignore, args.cut_out, log)
+            chunks = applySpacingRules(hasLoud, fps, args, log)
             del hasLoud
 
-        clips = []
-        numCuts = 0
-        for chunk in chunks:
-            if(speeds[chunk[2]] != 99999):
-                clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
-            else:
-                numCuts += 1
+        def getNumberOfCuts(chunks, speeds):
+            result = 0
+            for chunk in chunks:
+                if(speeds[chunk[2]] == 99999):
+                    result += 1
+            return result
+
+        def getClips(chunks, speeds):
+            clips = []
+            for chunk in chunks:
+                if(speeds[chunk[2]] != 99999):
+                    clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
+            return clips
+
+        numCuts, clips = getNumberOfCuts(chunks, speeds)
+        clips = getClips(chunks, speeds)
 
         if(fps is None and not audioFile):
             if(makingDataFile):
@@ -607,10 +622,11 @@ def main():
             from fastAudio import fastAudio, handleAudio, convertAudio
             theFile = handleAudio(ffmpeg, input_, audioBitrate, str(sampleRate),
                 TEMP, log)
-            fastAudio(theFile, f'{TEMP}{sep()}convert.wav', chunks, speeds, log, fps,
+
+            TEMP_FILE = f'{TEMP}{sep()}convert.wav'
+            fastAudio(theFile, TEMP_FILE, chunks, speeds, log, fps,
                 args.machine_readable_progress, args.no_progress)
-            convertAudio(ffmpeg, ffprobe, f'{TEMP}{sep()}convert.wav', input_,
-                output, args, log)
+            convertAudio(ffmpeg, ffprobe, TEMP_FILE, input_, output, args, log)
 
         if(audioFile):
             if(args.export_as_clip_sequence):
