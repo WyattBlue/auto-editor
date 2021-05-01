@@ -294,7 +294,7 @@ def testAutoEditor():
     runTest(['example.mp4', 'exportMediaOps', '--audio_codec', 'ac3'])
     runTest(['resources/newCommentary.mp3', 'exportMediaOps', '-acodec', 'pcm_s16le'])
 
-    runTest(['example.mp4', '--mark_as_silent', '0-5.7', '-o', 'hmm.mp4'])
+    runTest(['example.mp4', '--mark_as_silent', '0,171', '-o', 'hmm.mp4'])
     runTest(['example.mp4', 'hmm.mp4', '--combine_files', '--debug'])
 
     os.remove('hmm.mp4')
