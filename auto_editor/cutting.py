@@ -197,32 +197,35 @@ def removeSmall(hasLoud: np.ndarray, lim: int, replace: bool, with_: bool) -> np
     return hasLoud
 
 
-def setRange(includeFrame: np.ndarray, syntaxRange, fps: float, with_: bool, log) -> np.ndarray:
-    end = len(includeFrame) - 1
+def isNumber(val):
+    return val.replace('.','',1).isdigit()
+
+def setRange(hasLoud: np.ndarray, syntaxRange, fps: float, with_: bool, log) -> np.ndarray:
+
+    def replaceVarsWithVals(item) -> int:
+        nonlocal hasLoud
+        nonlocal log
+
+        if(isNumber(item)):
+            return int(item)
+        if(item == 'start'):
+            return 0
+        if(item == 'end'):
+            return len(hasLoud)
+        if(item.startswith('sec')):
+            log.error('Seconds unit not implemented in this function.')
+        log.error(f'Invalid variable {item} used in comma type.')
+
+    def ConvertToFrames(num) -> int:
+        num = replaceVarsWithVals(num)
+        if(num < 0):
+            num = len(hasLoud) - num
+        return num
+
     for item in syntaxRange:
-        pair = []
-
-        if(item.count('-') > 1):
-            log.error('Too many deliminators!')
-        if(item.count('-') < 1):
-            log.error('Invalid range. Use range syntax. ex: 5-10')
-
-        for num in item.split('-'):
-            if(num == 'start'):
-                pair.append(0)
-            elif(num == 'end'):
-                pair.append(end)
-            elif(float(num) < 0):
-                # Negative numbers = frames from end.
-                value = end - round(float(num) * fps)
-                if(value < 0):
-                    value = 0
-                pair.append(value)
-                del value
-            else:
-                pair.append(round(float(num) * fps))
-        includeFrame[pair[0]:pair[1]+1] = with_
-    return includeFrame
+        pair = list(map(ConvertToFrames, item))
+        hasLoud[pair[0]:pair[1]] = with_
+    return hasLoud
 
 
 def secToFrames(value, fps):
@@ -255,7 +258,6 @@ def chunkify(hasLoud, hasLoudLengthCache=None) -> list:
 
 
 def applySpacingRules(hasLoud: np.ndarray, fps: float, args, log):
-
     frameMargin = secToFrames(args.frame_margin, fps)
     minClip = secToFrames(args.min_clip_length, fps)
     minCut = secToFrames(args.min_cut_length, fps)
@@ -273,11 +275,11 @@ def applySpacingRules(hasLoud: np.ndarray, fps: float, args, log):
 
     hasLoud = applyFrameMargin(hasLoud, hasLoudLengthCache, frameMargin)
 
-    if(args.add_in != []):
-        hasLoud = setRange(hasLoud, args.add_in, fps, True, log)
+    if(args.mark_as_loud != []):
+        hasLoud = setRange(hasLoud, args.mark_as_loud, fps, True, log)
 
-    if(args.cut_out != []):
-        hasLoud = setRange(hasLoud, args.cut_out, fps, False, log)
+    if(args.mark_as_silent != []):
+        hasLoud = setRange(hasLoud, args.mark_as_silent, fps, False, log)
 
     # Remove small clips/cuts created by applying other rules.
     hasLoud = cook(hasLoud, minClip, minCut)

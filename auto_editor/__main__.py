@@ -584,7 +584,7 @@ def main():
                     clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
             return clips
 
-        numCuts, clips = getNumberOfCuts(chunks, speeds)
+        numCuts = getNumberOfCuts(chunks, speeds)
         clips = getClips(chunks, speeds)
 
         if(fps is None and not audioFile):
