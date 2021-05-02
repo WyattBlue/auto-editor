@@ -146,13 +146,12 @@ class FFprobe():
 
     def run(self, cmd: list):
         import subprocess
-        full_cmd = [self.myPath] + cmd
+        cmd.insert(0, self.myPath)
 
         if(None in cmd):
             self.mylog.bug(f'None in cmd. {cmd}')
-
-        self.log(full_cmd)
-        subprocess.call(full_cmd)
+        self.log(cmd)
+        subprocess.call(cmd)
 
     def pipe(self, cmd: list) -> str:
         full_cmd = [self.myPath, '-v', 'error'] + cmd
@@ -176,12 +175,12 @@ class FFprobe():
     def getAudioDuration(self, file):
         return self._get(file, 'duration', 'a', 0)
 
-    def getFrameRate(self, file) -> float:
-        # r_frame_rate is better than avg_frame_rate for getting constant frame rate.
-        output = self.pipe(['-select_streams', 'v', '-show_entries',
-            'stream=r_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
-        nums = cleanList(output.split('/'), '\r\t\n')
+    def getTimeBase(self, file):
+        return self.pipe(['-select_streams', 'v', '-show_entries',
+            'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
 
+    def getFrameRate(self, file) -> float:
+        nums = cleanList(self.getTimeBase(file).split('/'), '\r\t\n')
         try:
             return int(nums[0]) / int(nums[1])
         except (ZeroDivisionError, IndexError, ValueError):
@@ -302,6 +301,11 @@ class FFmpeg():
         self.mylog.debug(output)
 
         return output
+
+    def getVersion(self):
+        ffmpegVersion = self.pipe(['-version']).split('\n')[0]
+        ffmpegVersion = ffmpegVersion.replace('ffmpeg version', '').strip()
+        return ffmpegVersion.split(' ')[0]
 
 
 def getNewLength(chunks: list, speeds: list, fps: float) -> float:
@@ -435,7 +439,7 @@ def humanReadableTime(rawTime: float) -> str:
         units = 'minutes'
     return f'{rawTime} {units}'
 
-def smartOpen(newOutput: str, log):
+def openWithSystemDefault(newOutput: str, log):
     from subprocess import call
     try:  # should work on Windows
         from os import startfile
