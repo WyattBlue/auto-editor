@@ -46,7 +46,7 @@ def comma_type(inp: str, min_args=0, max_args=None, name='') -> list:
     inp = cleanList(inp.split(','), '\r\n\t')
     if(min_args > len(inp)):
         error(f'Too few comma arguments for {name}.')
-    if(max_args is not None and max_args > len(inp)):
+    if(max_args is not None and len(inp) > max_args):
         error(f'Too many values for {name}.')
     return inp
 
