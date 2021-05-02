@@ -9,10 +9,13 @@ from shutil import rmtree
 
 version = '21w17a dev'
 
+def error(message):
+    print('Error!', message, file=sys.stderr)
+    sys.exit(1)
+
 def file_type(file: str) -> str:
     if(not os.path.isfile(file)):
-        print('Auto-Editor could not find the file: ' + file, file=sys.stderr)
-        sys.exit(1)
+        error('Auto-Editor could not find the file: ' + file)
     return file
 
 def float_type(num: str) -> float:
@@ -38,11 +41,24 @@ def frame_type(inp: str):
         return inp[:-4]
     return int(inp)
 
-def comma_type(inp: str) -> list:
+def comma_type(inp: str, min_args=0, max_args=None, name='') -> list:
     from usefulFunctions import cleanList
-    ms = inp.split(',')
-    ms = cleanList(ms, '\r\n\t')
-    return ms
+    inp = cleanList(inp.split(','), '\r\n\t')
+    if(min_args > len(inp)):
+        error(f'Too few comma arguments for {name}.')
+    if(max_args is not None and max_args > len(inp)):
+        error(f'Too many values for {name}.')
+    return inp
+
+def zoom_type(inp):
+    return comma_type(inp, 3, 8, 'zoom_type')
+
+def rect_type(inp):
+    return comma_type(inp, 6, 8, 'rect_type')
+
+def range_type(inp):
+    return comma_type(inp, 2, 2, 'range_type')
+
 
 def appendFileName(file_name, val):
     dotIndex = file_name.rfind('.')
@@ -143,15 +159,14 @@ def main_options():
     ops += add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
         help='choice which method to render video.')
     ops += add_argument('--scale', type=float_type, default=1,
-        help='scale the output media file by a certian size (change resolution by a factor)',
-        extra='Hello')
+        help='scale the output media file by a certian factor.')
 
-    ops += add_argument('--zoom', type=comma_type, nargs='*',
+    ops += add_argument('--zoom', type=zoom_type, nargs='*',
         help='set when and how a zoom will occur.',
         extra='The arguments are: start,end,start_zoom,end_zoom,x,y,inter,hold' \
             '\nThere must be at least 4 comma args. x and y default to centerX and centerY' \
             '\nThe default interpolation is linear.')
-    ops += add_argument('--rectangle', type=comma_type, nargs='*',
+    ops += add_argument('--rectangle', type=rect_type, nargs='*',
         help='overlay a rectangle shape on the video.',
         extra='The arguments are: start,end,x1,y1,x2,y2,color,thickness' \
             '\nThere must be at least 6 comma args. The rectangle is solid if' \
@@ -160,13 +175,13 @@ def main_options():
     ops += add_argument('--background', type=str, default='#000',
         help='set the color of the background that is visible when the video is moved.')
 
-    ops += add_argument('--mark_as_loud', type=comma_type, nargs='*',
+    ops += add_argument('--mark_as_loud', type=range_type, nargs='*',
         help='the range that will be marked as "loud".')
-    ops += add_argument('--mark_as_silent', type=comma_type, nargs='*',
+    ops += add_argument('--mark_as_silent', type=range_type, nargs='*',
         help='the range that will be marked as "silent".')
-    ops += add_argument('--cut_out', type=comma_type, nargs='*',
+    ops += add_argument('--cut_out', type=range_type, nargs='*',
         help='the range of media that will be removed completely, regardless of the value of silent speed.')
-    ops += add_argument('--add_in', type=comma_type, nargs='*',
+    ops += add_argument('--add_in', type=range_type, nargs='*',
         help='the range of media that will be included at the normal speed, regardless of the video speed value.')
 
     ops += add_argument('--motion_threshold', type=float_type, default=0.02,
@@ -316,8 +331,6 @@ def main():
         args.export_to_final_cut_pro or args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
-    print(args.cut_out)
-
     if(args.debug and args.input == []):
         import platform
 
@@ -325,10 +338,7 @@ def main():
         print('Platform:', platform.system(), platform.release())
         print('Config File path:', dirPath + sep() + 'config.txt')
         print('FFmpeg path:', ffmpeg.getPath())
-        ffmpegVersion = ffmpeg.pipe(['-version']).split('\n')[0]
-        ffmpegVersion = ffmpegVersion.replace('ffmpeg version', '').strip()
-        ffmpegVersion = ffmpegVersion.split(' ')[0]
-        print('FFmpeg version:', ffmpegVersion)
+        print('FFmpeg version:', ffmpeg.getVersion())
         print('Auto-Editor version', version)
         sys.exit()
 
@@ -704,8 +714,8 @@ def main():
         log.print(f', which would have taken about {timeSave} if edited manually.')
 
     if(not args.no_open):
-        from usefulFunctions import smartOpen
-        smartOpen(newOutput, log)
+        from usefulFunctions import openWithSystemDefault
+        openWithSystemDefault(newOutput, log)
 
     log.debug('Deleting temp dir')
 

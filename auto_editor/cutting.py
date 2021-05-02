@@ -393,10 +393,6 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
 def applyZooms(cmdZooms, audioData, sampleRate, fps, log):
     zooms = []
     for ms in cmdZooms:
-        if(len(ms) < 3):
-            # Add more description later!
-            log.error('Too few comma arguments for zoom option.' \
-                " Make sure you're wrapping the values in quotes.")
 
         start, end = ms[:2]
 
@@ -420,9 +416,6 @@ def applyZooms(cmdZooms, audioData, sampleRate, fps, log):
 
         if(len(ms) > 7):
             hold = ms[7]
-
-        if(len(ms) > 8):
-            log.error('Too many comma arguments for zoom option.')
 
         start_list, end_list = None, None
         if(start.startswith('audio')):
