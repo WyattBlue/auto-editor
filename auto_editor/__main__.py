@@ -404,6 +404,11 @@ def main():
         inputList = [f'{TEMP}{sep()}combined.mp4']
 
     speeds = [args.silent_speed, args.video_speed]
+    if(args.cut_out != []):
+        speeds.append(99999)
+    if(args.add_in != []):
+        speeds.append(0)
+
     log.debug(f'   - Speeds: {speeds}')
 
     from wavfile import read
@@ -577,20 +582,21 @@ def main():
                 from cutting import applyRects
                 effects += applyRects(args.rectangle, audioData, sampleRate, fps, log)
 
-            chunks = applySpacingRules(hasLoud, fps, args, log)
+            chunks = applySpacingRules(hasLoud, speeds, fps, args, log)
             del hasLoud
 
+
+        def isClip(chunk):
+            nonlocal speeds
+            return speeds[chunk[2]] != 99999
+
         def getNumberOfCuts(chunks, speeds):
-            result = 0
-            for chunk in chunks:
-                if(speeds[chunk[2]] == 99999):
-                    result += 1
-            return result
+            return len(list(filter(isClip, chunks)))
 
         def getClips(chunks, speeds):
             clips = []
             for chunk in chunks:
-                if(speeds[chunk[2]] != 99999):
+                if(isClip(chunk)):
                     clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
             return clips
 

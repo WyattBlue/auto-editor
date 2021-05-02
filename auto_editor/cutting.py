@@ -235,9 +235,9 @@ def secToFrames(value, fps):
 
 def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
     # Remove small loudness spikes
-    hasLoud = removeSmall(hasLoud, minClip, replace=True, with_=False)
+    hasLoud = removeSmall(hasLoud, minClip, replace=1, with_=0)
     # Remove small silences
-    hasLoud = removeSmall(hasLoud, minCut, replace=False, with_=True)
+    hasLoud = removeSmall(hasLoud, minCut, replace=0, with_=1)
     return hasLoud
 
 
@@ -257,7 +257,7 @@ def chunkify(hasLoud, hasLoudLengthCache=None) -> list:
     return chunks
 
 
-def applySpacingRules(hasLoud: np.ndarray, fps: float, args, log):
+def applySpacingRules(hasLoud: np.ndarray, speeds, fps: float, args, log):
     frameMargin = secToFrames(args.frame_margin, fps)
     minClip = secToFrames(args.min_clip_length, fps)
     minCut = secToFrames(args.min_cut_length, fps)
@@ -266,7 +266,7 @@ def applySpacingRules(hasLoud: np.ndarray, fps: float, args, log):
     hasLoudLengthCache = len(hasLoud)
 
     def applyFrameMargin(hasLoud, hasLoudLengthCache, frameMargin) -> np.ndarray:
-        new = np.zeros((hasLoudLengthCache), dtype=np.bool_)
+        new = np.zeros((hasLoudLengthCache), dtype=np.uint8)
         for i in range(hasLoudLengthCache):
             start = int(max(0, i - frameMargin))
             end = int(min(hasLoudLengthCache, i+1+frameMargin))
@@ -276,13 +276,21 @@ def applySpacingRules(hasLoud: np.ndarray, fps: float, args, log):
     hasLoud = applyFrameMargin(hasLoud, hasLoudLengthCache, frameMargin)
 
     if(args.mark_as_loud != []):
-        hasLoud = setRange(hasLoud, args.mark_as_loud, fps, True, log)
+        hasLoud = setRange(hasLoud, args.mark_as_loud, fps, 1, log)
 
     if(args.mark_as_silent != []):
-        hasLoud = setRange(hasLoud, args.mark_as_silent, fps, False, log)
+        hasLoud = setRange(hasLoud, args.mark_as_silent, fps, 0, log)
 
     # Remove small clips/cuts created by applying other rules.
     hasLoud = cook(hasLoud, minClip, minCut)
+
+    if(args.cut_out != []):
+        cut_speed_index = speeds.index(99999)
+        hasLoud = setRange(hasLoud, args.cut_out, fps, cut_speed_index, log)
+
+    if(args.add_in != []):
+        normal_speed_index = speeds.index(1)
+        hasLoud = setRange(hasLoud, args.cut_out, fps, normal_speed_index, log)
 
     return chunkify(hasLoud, hasLoudLengthCache)
 
