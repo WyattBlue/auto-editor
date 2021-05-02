@@ -447,13 +447,13 @@ def openWithSystemDefault(newOutput: str, log):
     except (AttributeError, ImportError):
         try:  # should work on MacOS and most Linux versions
             call(['open', newOutput])
-        except:
+        except Exception as err:
             try: # should work on WSL2
                 call(['cmd.exe', '/C', 'start', newOutput])
-            except:
+            except Exception as err:
                 try: # should work on various other Linux distros
                     call(['xdg-open', newOutput])
-                except:
+                except Exception as err:
                     log.warning('Could not open output file.')
 
 def hex_to_bgr(inp: str, log) -> list:
