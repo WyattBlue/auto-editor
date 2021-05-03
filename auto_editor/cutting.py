@@ -200,7 +200,7 @@ def removeSmall(hasLoud: np.ndarray, lim: int, replace: bool, with_: bool) -> np
 def isNumber(val):
     return val.replace('.','',1).isdigit()
 
-def setRange(hasLoud: np.ndarray, syntaxRange, fps: float, with_: bool, log) -> np.ndarray:
+def setRange(hasLoud: np.ndarray, syntaxRange, fps: float, with_, log) -> np.ndarray:
 
     def replaceVarsWithVals(item) -> int:
         nonlocal hasLoud
@@ -257,7 +257,7 @@ def chunkify(hasLoud, hasLoudLengthCache=None) -> list:
     return chunks
 
 
-def applySpacingRules(hasLoud: np.ndarray, speeds, fps: float, args, log):
+def applySpacingRules(hasLoud: np.ndarray, speeds, fps: float, args, log) -> list:
     frameMargin = secToFrames(args.frame_margin, fps)
     minClip = secToFrames(args.min_clip_length, fps)
     minCut = secToFrames(args.min_cut_length, fps)
@@ -288,9 +288,10 @@ def applySpacingRules(hasLoud: np.ndarray, speeds, fps: float, args, log):
         cut_speed_index = speeds.index(99999)
         hasLoud = setRange(hasLoud, args.cut_out, fps, cut_speed_index, log)
 
-    if(args.add_in != []):
-        normal_speed_index = speeds.index(1)
-        hasLoud = setRange(hasLoud, args.cut_out, fps, normal_speed_index, log)
+    if(args.set_speed_for_range != []):
+        for item in args.set_speed_for_range:
+            my_speed_index = speeds.index(float(item[0]))
+            hasLoud = setRange(hasLoud, [item[1:]], fps, my_speed_index, log)
 
     return chunkify(hasLoud, hasLoudLengthCache)
 

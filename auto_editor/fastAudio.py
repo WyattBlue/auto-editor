@@ -34,15 +34,18 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
 
     import numpy as np
 
-    if((speeds[0] != 1 and speeds[0] != 99999) or (speeds[1] != 1 and speeds[1] != 99999)):
-        from audiotsm2 import phasevocoder
-        from audiotsm2.io.array import ArrReader, ArrWriter
-
     log.checkType(chunks, 'chunks', list)
     log.checkType(speeds, 'speeds', list)
 
+    def speedsOtherThan1And99999(a: list) -> bool:
+        return len([x for x in a if x != 1 and x != 99999]) > 0
+
+    if(speedsOtherThan1And99999(speeds)):
+        from audiotsm2 import phasevocoder
+        from audiotsm2.io.array import ArrReader, ArrWriter
+
     if(len(chunks) == 1 and chunks[0][2] == 0):
-        log.error('Trying to create empty audio.')
+        log.error('Trying to create an empty file.')
 
     if(not os.path.isfile(theFile)):
         log.error('fastAudio.py could not find file: ' + theFile)

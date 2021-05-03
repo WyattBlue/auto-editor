@@ -41,13 +41,13 @@ def frame_type(inp: str):
         return inp[:-4]
     return int(inp)
 
-def comma_type(inp: str, min_args=0, max_args=None, name='') -> list:
+def comma_type(inp: str, min_args=1, max_args=None, name='') -> list:
     from usefulFunctions import cleanList
     inp = cleanList(inp.split(','), '\r\n\t')
     if(min_args > len(inp)):
         error(f'Too few comma arguments for {name}.')
     if(max_args is not None and len(inp) > max_args):
-        error(f'Too many values for {name}.')
+        error(f'Too many comma arguments for {name}.')
     return inp
 
 def zoom_type(inp):
@@ -58,6 +58,9 @@ def rect_type(inp):
 
 def range_type(inp):
     return comma_type(inp, 2, 2, 'range_type')
+
+def speed_range_type(inp):
+    return comma_type(inp, 3, 3, 'speed_range_type')
 
 
 def appendFileName(file_name, val):
@@ -181,8 +184,9 @@ def main_options():
         help='the range that will be marked as "silent".')
     ops += add_argument('--cut_out', type=range_type, nargs='*',
         help='the range of media that will be removed completely, regardless of the value of silent speed.')
-    ops += add_argument('--add_in', type=range_type, nargs='*',
-        help='the range of media that will be included at the normal speed, regardless of the video speed value.')
+    ops += add_argument('--set_speed_for_range', type=speed_range_type, nargs='*',
+        help='set an arbitrary speed for a given range.',
+        extra='The arguments are: speed,start,end')
 
     ops += add_argument('--motion_threshold', type=float_type, default=0.02,
         range='0 to 1',
@@ -404,10 +408,12 @@ def main():
         inputList = [f'{TEMP}{sep()}combined.mp4']
 
     speeds = [args.silent_speed, args.video_speed]
-    if(args.cut_out != []):
+    if(args.cut_out != [] and 99999 not in speeds):
         speeds.append(99999)
-    if(args.add_in != []):
-        speeds.append(0)
+
+    for item in args.set_speed_for_range:
+        if(item[0] not in speeds):
+            speeds.append(float(item[0]))
 
     log.debug(f'   - Speeds: {speeds}')
 
