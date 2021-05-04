@@ -25,7 +25,7 @@ def properties(cmd, args, vidFile, ffprobe):
     return cmd
 
 
-def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
+def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps, has_vfr,
     temp, log):
     import av
 
@@ -33,7 +33,38 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
     videoProgress = ProgressBar(totalFrames, 'Creating new video',
         args.machine_readable_progress, args.no_progress)
 
-    input_ = av.open(vidFile)
+    if has_vfr:
+        class Wrapper:
+            """
+            Wrapper which only exposes the `read` method to avoid PyAV
+            trying to use `seek`.
+            this class is from https://github.com/PyAV-Org/PyAV/issues/578#issuecomment-621362337
+            """
+
+            name = "<wrapped>"
+
+            def __init__(self, fh):
+                self._fh = fh
+
+            def read(self, buf_size):
+                return self._fh.read(buf_size)
+
+        #this command creates a cfr stream on stdout
+        cmd = [ffmpeg.getPath(), '-i', f'{vidFile}', '-map', '0:v:0',
+            '-vf', f'fps=fps={fps}', '-r', f'{fps}', '-vsync', '1',
+            '-f','matroska', '-vcodec', 'rawvideo', 'pipe:1']
+
+        if(args.show_ffmpeg_debug):
+            cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        else:
+            cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+
+        wrapper = Wrapper(cfr_stream.stdout)
+        input_ = av.open(wrapper, "r")
+
+    else:
+        input_ = av.open(vidFile)
     inputVideoStream = input_.streams.video[0]
     inputVideoStream.thread_type = 'AUTO'
 
