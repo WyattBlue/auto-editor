@@ -539,7 +539,7 @@ def main():
                 #ie: [Parsed_vfrdet_0 @ 0x556a9b276c40] VFR:0.679155 (707/334) min: 33 max: 133)
                 #-> (707/334) -> 707
                 number_of_vfr_frames=int(vfr_info.split('\n')[-2].split(' ')[4][1:].split('/')[0])
-                has_vfr=number_of_vfr_frames is not 0
+                has_vfr=number_of_vfr_frames != 0
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
             if(args.cut_by_all_tracks):
