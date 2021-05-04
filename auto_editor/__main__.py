@@ -701,7 +701,7 @@ def main():
 
                 if(args.render == 'opencv'):
                     from renderVideo import renderOpencv
-                    renderOpencv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps,
+                    renderOpencv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps, has_vfr,
                         effects, TEMP, log)
 
                 # Now mix new audio(s) and the new video.

@@ -123,11 +123,26 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
         log.conwrite('Writing the output file.')
 
 
-def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
+def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps, has_vfr,
     effects, temp, log):
     import cv2
 
-    cap = cv2.VideoCapture(vidFile)
+    if has_vfr:
+
+        #this command creates a cfr stream on stdout
+        cmd = [ffmpeg.getPath(), '-i', f'{vidFile}', '-map', '0:v:0',
+            '-vf', f'fps=fps={fps}', '-r', f'{fps}', '-vsync', '1',
+            '-f','matroska', '-vcodec', 'rawvideo', 'pipe:1']
+
+        if(args.show_ffmpeg_debug):
+            cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        else:
+            cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+        cap = cv2.VideoCapture('pipe:{}'.format(cfr_stream.stdout.fileno()))
+
+    else:
+        cap = cv2.VideoCapture(vidFile)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
