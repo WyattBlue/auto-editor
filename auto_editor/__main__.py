@@ -528,8 +528,18 @@ def main():
                     cmd.extend(['-ab', audioBitrate])
                 cmd.extend(['-ac', '2', '-ar', sampleRate, '-map',
                     f'0:a:{trackNum}', f'{TEMP}{sep()}{trackNum}.wav'])
-                ffmpeg.run(cmd)
+                # detect if video stream 0 contains vfr
+                cmd.extend(['-map','0:v:0','-vf', 'vfrdet','-f', 'null', '-'])
+                vfr_info=ffmpeg.pipe(cmd)
                 del cmd
+
+                #Last line of output is output of vfrdet-filter.
+                #in the following line we skip the first elements until we get to the
+                #part with the fraction of vfr-frames/cfr-frames and take the integer of the vfr-frames.
+                #ie: [Parsed_vfrdet_0 @ 0x556a9b276c40] VFR:0.679155 (707/334) min: 33 max: 133)
+                #-> (707/334) -> 707
+                number_of_vfr_frames=int(vfr_info.split('\n')[-2].split(' ')[4][1:].split('/')[0])
+                has_vfr=number_of_vfr_frames != 0
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
             if(args.cut_by_all_tracks):
@@ -686,12 +696,12 @@ def main():
                         log.error('Rectangle effect is not supported on the av render method.')
 
                     from renderVideo import renderAv
-                    renderAv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps,
+                    renderAv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps, has_vfr,
                     TEMP, log)
 
                 if(args.render == 'opencv'):
                     from renderVideo import renderOpencv
-                    renderOpencv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps,
+                    renderOpencv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps, has_vfr,
                         effects, TEMP, log)
 
                 # Now mix new audio(s) and the new video.
