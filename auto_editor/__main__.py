@@ -521,6 +521,16 @@ def main():
                 log.error("You choose a track that doesn't exist.\n" \
                     f'There {message}.\n {allTracks}')
 
+            # Detect if video stream 0 contains vfr.
+            vfr_info = ffmpeg.pipe(['-i', INPUT_FILE, '-map', '0:v:0', '-vf', 'vfrdet',
+                '-f', 'null', '-'])
+
+            # Skip the first elements until we get to the part with the fraction of
+            # vfr-frames/cfr-frames and take the integer of the vfr-frames.
+            # i.e. VFR:0.679155 (707/334) min: 33 max: 133) -> (707/334) -> 707
+            number_of_vfr_frames = int(vfr_info.split('\n')[-2].split(' ')[4][1:].split('/')[0])
+            has_vfr = number_of_vfr_frames != 0
+
             # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
                 cmd = ['-i', INPUT_FILE]
@@ -528,18 +538,8 @@ def main():
                     cmd.extend(['-ab', audioBitrate])
                 cmd.extend(['-ac', '2', '-ar', sampleRate, '-map',
                     f'0:a:{trackNum}', f'{TEMP}{sep()}{trackNum}.wav'])
-
-                # Detect if video stream 0 contains vfr
-                cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
-                vfr_info = ffmpeg.pipe(cmd)
+                ffmpeg.run(cmd)
                 del cmd
-
-                # Last line of output is output of vfrdet-filter.
-                # in the following line we skip the first elements until we get to the
-                # part with the fraction of vfr-frames/cfr-frames and take the integer of the vfr-frames.
-                # i.e. VFR:0.679155 (707/334) min: 33 max: 133) -> (707/334) -> 707
-                number_of_vfr_frames = int(vfr_info.split('\n')[-2].split(' ')[4][1:].split('/')[0])
-                has_vfr = number_of_vfr_frames != 0
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
             if(args.cut_by_all_tracks):
