@@ -521,15 +521,18 @@ def main():
                 log.error("You choose a track that doesn't exist.\n" \
                     f'There {message}.\n {allTracks}')
 
-            # Detect if video stream 0 contains vfr.
-            vfr_info = ffmpeg.pipe(['-i', INPUT_FILE, '-map', '0:v:0', '-vf', 'vfrdet',
-                '-f', 'null', '-'])
+            def NumberOfVrfFrames(text):
+                # Skip the first elements until we get to the part with the fraction of
+                # vfr-frames/cfr-frames and take the integer of the vfr-frames.
+                # i.e. VFR:0.679155 (707/334) min: 33 max: 133) -> (707/334) -> 707
+                return int(text.split('\n')[-2].split(' ')[4][1:].split('/')[0])
 
-            # Skip the first elements until we get to the part with the fraction of
-            # vfr-frames/cfr-frames and take the integer of the vfr-frames.
-            # i.e. VFR:0.679155 (707/334) min: 33 max: 133) -> (707/334) -> 707
-            number_of_vfr_frames = int(vfr_info.split('\n')[-2].split(' ')[4][1:].split('/')[0])
-            has_vfr = number_of_vfr_frames != 0
+            def hasVFR(cmd):
+                return NumberOfVrfFrames(ffmpeg.pipe(cmd)) != 0
+
+            if(tracks != 1):
+                has_vfr = hasVFR(['-i', INPUT_FILE, '-map',  '0:v:0', '-vf', 'vfrdet',
+                    '-f', 'null', '-'])
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
             for trackNum in range(tracks):
@@ -538,7 +541,12 @@ def main():
                     cmd.extend(['-ab', audioBitrate])
                 cmd.extend(['-ac', '2', '-ar', sampleRate, '-map',
                     f'0:a:{trackNum}', f'{TEMP}{sep()}{trackNum}.wav'])
-                ffmpeg.run(cmd)
+                if(tracks == 1):
+                    # Save reading a potential huge file again.
+                    cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
+                    has_vfr = hasVFR(cmd)
+                else:
+                    ffmpeg.run(cmd)
                 del cmd
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
