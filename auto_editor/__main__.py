@@ -535,19 +535,15 @@ def main():
                     '-f', 'null', '-'])
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
+            cmd = ['-i', INPUT_FILE]
             for trackNum in range(tracks):
-                cmd = ['-i', INPUT_FILE]
+                cmd.extend(['-map', f'0:a:{trackNum}'])
                 if(audioBitrate is not None):
                     cmd.extend(['-ab', audioBitrate])
-                cmd.extend(['-ac', '2', '-ar', sampleRate, '-map',
-                    f'0:a:{trackNum}', f'{TEMP}{sep()}{trackNum}.wav'])
-                if(tracks == 1):
-                    # Save reading a potential huge file again.
-                    cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
-                    has_vfr = hasVFR(cmd)
-                else:
-                    ffmpeg.run(cmd)
-                del cmd
+                cmd.extend('-ac', '2', '-ar', sampleRate, f'{TEMP}{sep()}{trackNum}.wav'])
+            cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
+            has_vfr = hasVFR(cmd)
+            del cmd
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
             if(args.cut_by_all_tracks):
