@@ -50,16 +50,10 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
                 return self._fh.read(buf_size)
 
         # Create a cfr stream on stdout.
-        cmd = [ffmpeg.getPath(), '-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}',
-            '-r', str(fps), '-vsync', '1', '-f', 'matroska', '-vcodec', 'rawvideo',
-            'pipe:1']
+        cmd = ['-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}', '-r', str(fps),
+            '-vsync', '1', '-f', 'matroska', '-vcodec', 'rawvideo', 'pipe:1']
 
-        if(args.show_ffmpeg_debug):
-            cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        else:
-            cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-
-        wrapper = Wrapper(cfr_stream.stdout)
+        wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
         input_ = av.open(wrapper, 'r')
     else:
         input_ = av.open(vidFile)
@@ -127,16 +121,10 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     import cv2
 
     if(has_vfr):
-        cmd = [ffmpeg.getPath(), '-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}',
-            '-r', str(fps), '-vsync', '1', '-f','matroska', '-vcodec', 'rawvideo',
-            'pipe:1']
-
-        if(args.show_ffmpeg_debug):
-            cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        else:
-            cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-
-        cap = cv2.VideoCapture('pipe:{}'.format(cfr_stream.stdout.fileno()))
+        cmd = ['-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}', '-r', str(fps),
+            '-vsync', '1', '-f','matroska', '-vcodec', 'rawvideo', 'pipe:1']
+        fileno = ffmpeg.Popen(cmd).stdout.fileno()
+        cap = cv2.VideoCapture('pipe:{}'.format(fileno))
     else:
         cap = cv2.VideoCapture(vidFile)
 
