@@ -33,12 +33,12 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
     videoProgress = ProgressBar(totalFrames, 'Creating new video',
         args.machine_readable_progress, args.no_progress)
 
-    if has_vfr:
+    if(has_vfr):
         class Wrapper:
             """
             Wrapper which only exposes the `read` method to avoid PyAV
             trying to use `seek`.
-            this class is from https://github.com/PyAV-Org/PyAV/issues/578#issuecomment-621362337
+            From: github.com/PyAV-Org/PyAV/issues/578#issuecomment-621362337
             """
 
             name = "<wrapped>"
@@ -49,22 +49,21 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
             def read(self, buf_size):
                 return self._fh.read(buf_size)
 
-        #this command creates a cfr stream on stdout
-        cmd = [ffmpeg.getPath(), '-i', f'{vidFile}', '-map', '0:v:0',
-            '-vf', f'fps=fps={fps}', '-r', f'{fps}', '-vsync', '1',
-            '-f','matroska', '-vcodec', 'rawvideo', 'pipe:1']
+        # Create a cfr stream on stdout.
+        cmd = [ffmpeg.getPath(), '-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}',
+            '-r', str(fps), '-vsync', '1', '-f', 'matroska', '-vcodec', 'rawvideo',
+            'pipe:1']
 
         if(args.show_ffmpeg_debug):
             cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         else:
             cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
-
         wrapper = Wrapper(cfr_stream.stdout)
-        input_ = av.open(wrapper, "r")
-
+        input_ = av.open(wrapper, 'r')
     else:
         input_ = av.open(vidFile)
+
     inputVideoStream = input_.streams.video[0]
     inputVideoStream.thread_type = 'AUTO'
 
@@ -127,12 +126,10 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     effects, temp, log):
     import cv2
 
-    if has_vfr:
-
-        #this command creates a cfr stream on stdout
-        cmd = [ffmpeg.getPath(), '-i', f'{vidFile}', '-map', '0:v:0',
-            '-vf', f'fps=fps={fps}', '-r', f'{fps}', '-vsync', '1',
-            '-f','matroska', '-vcodec', 'rawvideo', 'pipe:1']
+    if(has_vfr):
+        cmd = [ffmpeg.getPath(), '-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}',
+            '-r', str(fps), '-vsync', '1', '-f','matroska', '-vcodec', 'rawvideo',
+            'pipe:1']
 
         if(args.show_ffmpeg_debug):
             cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -140,9 +137,9 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             cfr_stream = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
         cap = cv2.VideoCapture('pipe:{}'.format(cfr_stream.stdout.fileno()))
-
     else:
         cap = cv2.VideoCapture(vidFile)
+
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
