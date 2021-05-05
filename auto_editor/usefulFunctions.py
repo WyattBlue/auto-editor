@@ -293,6 +293,13 @@ class FFmpeg():
         import subprocess
         subprocess.call(cmd)
 
+    def Popen(self, cmd: list):
+        cmd = [self.myPath] + cmd
+        import subprocess
+        if(self.FFdebug):
+            return subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
     def pipe(self, cmd: list) -> str:
         cmd = [self.myPath, '-y'] + cmd
 
