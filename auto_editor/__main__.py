@@ -540,7 +540,8 @@ def main():
                 cmd.extend(['-map', f'0:a:{trackNum}'])
                 if(audioBitrate is not None):
                     cmd.extend(['-ab', audioBitrate])
-                cmd.extend('-ac', '2', '-ar', sampleRate, f'{TEMP}{sep()}{trackNum}.wav'])
+                cmd.extend('-ac', '2', '-ar', sampleRate,
+                    f'{TEMP}{sep()}{trackNum}.wav'])
             cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
             has_vfr = hasVFR(cmd)
             del cmd
