@@ -601,7 +601,6 @@ def main():
             chunks = applySpacingRules(hasLoud, speeds, fps, args, log)
             del hasLoud
 
-
         def isClip(chunk):
             nonlocal speeds
             return speeds[chunk[2]] != 99999
@@ -618,14 +617,6 @@ def main():
 
         numCuts = getNumberOfCuts(chunks, speeds)
         clips = getClips(chunks, speeds)
-
-        if(fps is None and not audioFile):
-            if(makingDataFile):
-                constantLoc = appendFileName(INPUT_FILE, '_constantFPS')
-            else:
-                constantLoc = f'{TEMP}{sep()}constantVid{fileFormat}'
-            ffmpeg.run(['-i', INPUT_FILE, '-filter:v', 'fps=fps=30', constantLoc])
-            INPUT_FILE = constantLoc
 
         if(args.export_as_json):
             from makeCutList import makeCutList
