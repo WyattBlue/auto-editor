@@ -534,7 +534,7 @@ def main():
                 del cmd
 
                 #Last line of output is output of vfrdet-filter.
-                #in the following line we skip the first elements until we get to the 
+                #in the following line we skip the first elements until we get to the
                 #part with the fraction of vfr-frames/cfr-frames and take the integer of the vfr-frames.
                 #ie: [Parsed_vfrdet_0 @ 0x556a9b276c40] VFR:0.679155 (707/334) min: 33 max: 133)
                 #-> (707/334) -> 707
