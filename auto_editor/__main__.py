@@ -521,21 +521,22 @@ def main():
                 log.error("You choose a track that doesn't exist.\n" \
                     f'There {message}.\n {allTracks}')
 
-            def NumberOfVrfFrames(text):
-                # Skip the first elements until we get to the part with the fraction of
-                # vfr-frames/cfr-frames and take the integer of the vfr-frames.
-                # i.e. VFR:0.679155 (707/334) min: 33 max: 133) -> (707/334) -> 707
-                return int(text.split('\n')[-2].split(' ')[4][1:].split('/')[0])
+            def NumberOfVrfFrames(text, log):
+                import re
+                search = re.search(r'VFR:[\d.]+ \(\d+\/\d+\)', text, re.M)
+                if(search is None):
+                    log.warning('Could not get number of VRF Frames.')
+                    return 0
+                else:
+                    nums = re.search(r'\d+\/\d+', search.group()).group(0)
+                    log.debug(nums)
+                    return int(nums.split('/')[0])
 
-            def hasVFR(cmd):
-                return NumberOfVrfFrames(ffmpeg.pipe(cmd)) != 0
-
-            if(tracks != 1):
-                has_vfr = hasVFR(['-i', INPUT_FILE, '-map',  '0:v:0', '-vf', 'vfrdet',
-                    '-f', 'null', '-'])
+            def hasVFR(cmd, log):
+                return NumberOfVrfFrames(ffmpeg.pipe(cmd), log) != 0
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
-            cmd = ['-i', INPUT_FILE]
+            cmd = ['-i', INPUT_FILE, '-hide_banner']
             for trackNum in range(tracks):
                 cmd.extend(['-map', f'0:a:{trackNum}'])
                 if(audioBitrate is not None):
@@ -543,7 +544,7 @@ def main():
                 cmd.extend(['-ac', '2', '-ar', sampleRate,
                     f'{TEMP}{sep()}{trackNum}.wav'])
             cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
-            has_vfr = hasVFR(cmd)
+            has_vfr = hasVFR(cmd, log)
             del cmd
 
             # Check if the `--cut_by_all_tracks` flag has been set or not.
