@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w17a dev'
+version = '21w18a dev'
 
 def error(message):
     print('Error!', message, file=sys.stderr)
@@ -712,11 +712,11 @@ def main():
             i = 1
             totalFrames = chunks[len(chunks) - 1][1]
             speeds.append(99999) # guarantee we have a cut speed to work with.
-            for item in chunks:
-                if(speeds[item[2]] == 99999):
+            for chunk in chunks:
+                if(speeds[chunk[2]] == 99999):
                     continue
 
-                makeVideoFile(INPUT_FILE, padChunk(item, totalFrames),
+                makeVideoFile(INPUT_FILE, padChunk(chunk, totalFrames),
                     appendFileName(newOutput, f'-{i}'))
                 i += 1
         else:
