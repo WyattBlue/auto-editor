@@ -15,16 +15,19 @@ def convertAudio(ffmpeg, ffprobe, theFile, INPUT_FILE, outFile, args, log):
 
 
 def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
+    TEMPFILE = f'{temp}{sep()}faAudio.wav'
+
     log.checkType(samplerate, 'samplerate', str)
     cmd = ['-i', theFile]
     if(audioBit is not None):
         cmd.extend(['-b:a', audioBit])
         log.checkType(audioBit, 'audioBit', str)
-    cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', f'{temp}{sep()}faAudio.wav'])
+    cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', TEMPFILE])
+
     ffmpeg.run(cmd)
     log.conwrite('')
 
-    return f'{temp}{sep()}faAudio.wav'
+    return TEMPFILE
 
 
 def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,

@@ -5,10 +5,10 @@ auto-editor.metadataOps.force_fps_to = None               # None
 auto-editor.metadataOps.force_tracks_to = None            # None
 
 # exportMediaOps
-auto-editor.exportMediaOps.video_bitrate = None           # None
-auto-editor.exportMediaOps.audio_bitrate = None           # None
+auto-editor.exportMediaOps.video_bitrate = 'unset'        # 'unset'
+auto-editor.exportMediaOps.audio_bitrate = 'unset'        # 'unset'
 auto-editor.exportMediaOps.sample_rate = None             # None
-auto-editor.exportMediaOps.video_codec = 'uncompressed'   # 'uncompressed'
+auto-editor.exportMediaOps.video_codec = 'copy'           # 'copy'
 auto-editor.exportMediaOps.audio_codec = None             # None
 auto-editor.exportMediaOps.preset = 'medium'              # 'medium'
 auto-editor.exportMediaOps.tune = 'none'                  # 'none'

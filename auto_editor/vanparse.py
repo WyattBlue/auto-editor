@@ -77,32 +77,40 @@ class ParseOptions():
                     value = option['default']
                 setattr(self, key, value)
 
-        # Read the configuration file.
+        def setConfig(configPath):
+            if(not os.path.isfile(configPath)):
+                return
+
+            with open(configPath, 'r') as file:
+                lines = file.readlines()
+
+            # Set attributes based on the config file to act as the new defaults.
+            for item in lines:
+                if('#' in item):
+                    item = item[: item.index('#')]
+                item = item.replace(' ', '')
+                if(item.strip() == '' or (not item.startswith(root))):
+                    continue
+                value = item[item.index('=')+1 :]
+
+                if(value[0] == "'" and value[-1] == "'"): # detect string value
+                    value = value[1:-1]
+                elif(value == "None"):
+                    value = None
+                elif('.' in value):
+                    value = float(value)
+                else:
+                    value = int(value)
+
+                key = item[: item.index('=')]
+                key = key[key.rfind('.')+1:]
+
+                if(getattr(self, key) != value):
+                    print(f'Setting {key} to {value}', file=sys.stderr)
+                setattr(self, key, value)
+
         dirPath = os.path.dirname(os.path.realpath(__file__))
-        with open(dirPath + '/config.txt', 'r') as file:
-            lines = file.readlines()
-
-        # Set attributes based on the config file to act as the new defaults.
-        for item in lines:
-            if('#' in item):
-                item = item[: item.index('#')]
-            item = item.replace(' ', '')
-            if(item.strip() == '' or (not item.startswith(root))):
-                continue
-            value = item[item.index('=')+1 :]
-
-            if(value[0] == "'" and value[-1] == "'"): # detect string value
-                value = value[1:-1]
-            elif(value == "None"):
-                value = None
-            elif('.' in value):
-                value = float(value)
-            else:
-                value = int(value)
-
-            key = item[: item.index('=')]
-            key = key[key.rfind('.')+1:]
-            setattr(self, key, value)
+        setConfig(dirPath + '/config.txt')
 
         # Figure out command line options changed by user.
         myList = []
