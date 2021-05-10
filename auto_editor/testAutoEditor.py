@@ -147,20 +147,20 @@ def testAutoEditor():
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
         [ffprobe.getResolution, '1280x720'],
-        [ffprobe.getVideoCodec, 'mpeg4'],
-        [ffprobe.getSampleRate, '48000'],
-    )
-
-    runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'copy', '--show_ffmpeg_debug'])
-    fullInspect(
-        'example_ALTERED.mp4',
-        [ffprobe.getFrameRate, 30.0],
-        [ffprobe.getResolution, '1280x720'],
         [ffprobe.getVideoCodec, 'h264'],
         [ffprobe.getSampleRate, '48000'],
     )
 
-    runTest(['example.mp4', '--video_codec', 'h264', '--render', 'opencv'])
+    runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'uncompressed', '--show_ffmpeg_debug'])
+    fullInspect(
+        'example_ALTERED.mp4',
+        [ffprobe.getFrameRate, 30.0],
+        [ffprobe.getResolution, '1280x720'],
+        [ffprobe.getVideoCodec, 'mpeg4'],
+        [ffprobe.getSampleRate, '48000'],
+    )
+
+    runTest(['example.mp4', '--render', 'opencv'])
     fullInspect(
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
