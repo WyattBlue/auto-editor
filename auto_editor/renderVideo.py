@@ -7,21 +7,27 @@ from usefulFunctions import ProgressBar, sep
 import subprocess
 
 def properties(cmd, args, vidFile, ffprobe):
-    if(args.video_codec == 'copy'):
-        cmd.extend(['-vcodec', ffprobe.getVideoCodec(vidFile)])
-    elif(args.video_codec == 'uncompressed'):
+
+    def fset(cmd, option, value):
+        if(value == 'none' or value == 'unset' or value is None):
+            return cmd
+        return cmd + [option] + [value]
+
+    if(args.video_codec == 'uncompressed'):
         cmd.extend(['-vcodec', 'mpeg4', '-qscale:v', '1'])
+        print('WHAT')
+    elif(args.video_codec == 'copy'):
+        print('HELLO')
+        cmd.extend(['-vcodec', ffprobe.getVideoCodec(vidFile)])
     else:
-        cmd.extend(['-vcodec', args.video_codec])
+        cmd = fset(cmd, '-vcodec', args.video_codec)
 
-        if(args.video_bitrate is None):
-            cmd.extend(['-crf', args.constant_rate_factor])
-        else:
-            cmd.extend(['-b:v', args.video_bitrate])
+    cmd = fset(cmd, '-crf', args.constant_rate_factor)
+    cmd = fset(cmd, '-b:v', args.video_bitrate)
+    cmd = fset(cmd, '-tune', args.tune)
+    cmd = fset(cmd, '-preset', args.preset)
 
-    if(args.tune != 'none'):
-        cmd.extend(['-tune', args.tune])
-    cmd.extend(['-preset', args.preset, '-movflags', '+faststart', '-strict', '-2'])
+    cmd.extend(['-movflags', '+faststart', '-strict', '-2'])
     return cmd
 
 

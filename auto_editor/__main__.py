@@ -111,14 +111,15 @@ def main_options():
         help='manually set the number of tracks auto-editor thinks there are.')
 
     ops += add_argument('exportMediaOps', nargs=0, action='grouping')
-    ops += add_argument('--video_bitrate', '-vb', group='exportMediaOps',
+    ops += add_argument('--video_bitrate', '-vb', default='unset', group='exportMediaOps',
         help='set the number of bits per second for video.')
-    ops += add_argument('--audio_bitrate', '-ab', group='exportMediaOps',
+    ops += add_argument('--audio_bitrate', '-ab', default='unset', group='exportMediaOps',
         help='set the number of bits per second for audio.')
+    # ops += add_argument('--video_quality', '-')
     ops += add_argument('--sample_rate', '-r', type=sample_rate_type,
         group='exportMediaOps',
         help='set the sample rate of the input and output videos.')
-    ops += add_argument('--video_codec', '-vcodec', default='uncompressed',
+    ops += add_argument('--video_codec', '-vcodec', default='copy',
         group='exportMediaOps',
         help='set the video codec for the output media file.')
     ops += add_argument('--audio_codec', '-acodec', group='exportMediaOps',
@@ -539,7 +540,7 @@ def main():
             cmd = ['-i', INPUT_FILE, '-hide_banner']
             for trackNum in range(tracks):
                 cmd.extend(['-map', f'0:a:{trackNum}'])
-                if(audioBitrate is not None):
+                if(audioBitrate is not None and audioBitrate != 'unset'):
                     cmd.extend(['-ab', audioBitrate])
                 cmd.extend(['-ac', '2', '-ar', sampleRate,
                     f'{TEMP}{sep()}{trackNum}.wav'])
