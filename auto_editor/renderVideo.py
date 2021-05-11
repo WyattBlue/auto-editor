@@ -17,7 +17,7 @@ def properties(cmd, args, vidFile, ffprobe):
         cmd.extend(['-vcodec', 'mpeg4', '-qscale:v', '1'])
     elif(args.video_codec == 'copy'):
         new_codec = ffprobe.getVideoCodec(vidFile)
-        if(new_codec != 'dvvideo'):
+        if(new_codec != 'dvvideo'): # This codec seems strange.
             cmd.extend(['-vcodec', new_codec])
     else:
         cmd = fset(cmd, '-vcodec', args.video_codec)
@@ -79,8 +79,9 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
 
     if(args.scale != 1):
         cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}'])
+    else: # TODO: get --scale option and video codecs working together.
+        cmd = properties(cmd, args, vidFile, ffprobe)
 
-    cmd = properties(cmd, args, vidFile, ffprobe)
     cmd.append(f'{temp}{sep()}spedup.mp4')
 
     if(args.show_ffmpeg_debug):
@@ -113,8 +114,8 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
         process2.stdin.close()
         process2.wait()
     except BrokenPipeError:
-        log.debug(cmd)
-        process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
+        log.print(cmd)
+        process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         log.error('Broken Pipe Error!')
 
     if(log.is_debug):
@@ -331,8 +332,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
         if(effects == [] and args.scale != 1):
             inter = cv2.INTER_CUBIC if args.scale > 1 else cv2.INTER_AREA
-            frame = cv2.resize(frame, (width, height),
-                interpolation=inter)
+            frame = cv2.resize(frame, (width, height), interpolation=inter)
 
         cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
 
@@ -354,10 +354,13 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     out.release()
     cv2.destroyAllWindows()
 
-    if(args.video_codec != 'uncompressed'):
+    # TODO: get --scale and video codecs to work together
+    if(args.scale == 1):
         cmd = properties(['-i', vidFile], args, vidFile, ffprobe)
-        cmd.append(f'{temp}/spedup.mp4')
-        ffmpeg.run(cmd)
+    else:
+        cmd = ['-i', vidFile]
+    cmd.append(f'{temp}/spedup.mp4')
+    ffmpeg.run(cmd)
 
     if(log.is_debug):
         log.debug('Writing the output file.')

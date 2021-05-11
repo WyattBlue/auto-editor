@@ -540,7 +540,7 @@ def main():
             cmd = ['-i', INPUT_FILE, '-hide_banner']
             for trackNum in range(tracks):
                 cmd.extend(['-map', f'0:a:{trackNum}'])
-                if(audioBitrate is not None and audioBitrate != 'unset'):
+                if(not fNone(audioBitrate)):
                     cmd.extend(['-ab', audioBitrate])
                 cmd.extend(['-ac', '2', '-ar', sampleRate,
                     f'{TEMP}{sep()}{trackNum}.wav'])
