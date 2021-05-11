@@ -471,3 +471,6 @@ def hex_to_bgr(inp: str, log) -> list:
         return [int(inp[i:i+2], 16) for i in (5, 3, 1)]
     else:
         log.error(f'Invalid hex code: {inp}')
+
+def fNone(val):
+    return val == 'none' or val == 'unset' or val is None
