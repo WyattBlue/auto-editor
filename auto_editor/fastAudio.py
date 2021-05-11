@@ -1,14 +1,14 @@
 '''fastAudio.py'''
 
-from usefulFunctions import ProgressBar, getNewLength, sep
+from usefulFunctions import ProgressBar, getNewLength, sep, fNone
 
 def convertAudio(ffmpeg, ffprobe, theFile, INPUT_FILE, outFile, args, log):
     log.debug(f'Convering internal audio file: {theFile} to {outFile}')
 
     realCodec = args.audio_codec
-    if(realCodec is None):
+    if(fNone(realCodec)):
         realCodec = ffprobe.getAudioCodec(INPUT_FILE)
-    if(realCodec == "pcm_s16le" and outFile.endswith('.m4a')):
+    if(realCodec == 'pcm_s16le' and outFile.endswith('.m4a')):
         log.error(f'Codec: {realCodec} is not supported in the m4a container.')
 
     ffmpeg.run(['-i', theFile, '-acodec', realCodec, outFile])
@@ -19,7 +19,7 @@ def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
 
     log.checkType(samplerate, 'samplerate', str)
     cmd = ['-i', theFile]
-    if(audioBit is not None):
+    if(not fNone(audioBit)):
         cmd.extend(['-b:a', audioBit])
         log.checkType(audioBit, 'audioBit', str)
     cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', TEMPFILE])
@@ -107,3 +107,5 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
     log.debug('   - Expected video length: ' + str(yPointer / (samplerate / fps)))
     newAudio = newAudio[:yPointer]
     write(outFile, samplerate, newAudio)
+
+    log.conwrite('')

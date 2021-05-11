@@ -362,7 +362,7 @@ def main():
     ffmpeg.updateLog(log)
     ffprobe.updateLog(log)
 
-    from usefulFunctions import isLatestVersion
+    from usefulFunctions import isLatestVersion, fNone
 
     if(not args.quiet and not isLatestVersion(version, log)):
         log.print('\nAuto-Editor is out of date. Run:\n')
@@ -486,7 +486,7 @@ def main():
             else:
                 tracks = args.force_tracks_to
             cmd = ['-i', INPUT_FILE]
-            if(audioBitrate is not None):
+            if(not fNone(audioBitrate)):
                 cmd.extend(['-b:a', audioBitrate])
             cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', f'{TEMP}{sep()}fastAud.wav'])
             ffmpeg.run(cmd)
