@@ -207,21 +207,21 @@ def testAutoEditor():
     runTest(['example.mp4', '--sounded_speed', '0.5'])
     runTest(['example.mp4', '--silent_speed', '0.5'])
 
-    runTest(['example.mp4', '--scale', '1.5', '--render', 'av'])
-    fullInspect(
-        'example_ALTERED.mp4',
-        [ffprobe.getFrameRate, 30.0],
-        [ffprobe.getResolution, '1920x1080'],
-        [ffprobe.getSampleRate, '48000'],
-    )
+    # runTest(['example.mp4', '--scale', '1.5', '--render', 'av'])
+    # fullInspect(
+    #     'example_ALTERED.mp4',
+    #     [ffprobe.getFrameRate, 30.0],
+    #     [ffprobe.getResolution, '1920x1080'],
+    #     [ffprobe.getSampleRate, '48000'],
+    # )
 
-    runTest(['example.mp4', '--scale', '0.2', '--render', 'av'])
-    fullInspect(
-        'example_ALTERED.mp4',
-        [ffprobe.getFrameRate, 30.0],
-        [ffprobe.getResolution, '256x144'],
-        [ffprobe.getSampleRate, '48000'],
-    )
+    # runTest(['example.mp4', '--scale', '0.2', '--render', 'av'])
+    # fullInspect(
+    #     'example_ALTERED.mp4',
+    #     [ffprobe.getFrameRate, 30.0],
+    #     [ffprobe.getResolution, '256x144'],
+    #     [ffprobe.getSampleRate, '48000'],
+    # )
 
     # runTest(['example.mp4', '--scale', '1.5', '--render', 'opencv'])
     # fullInspect(
@@ -260,13 +260,13 @@ def testAutoEditor():
     runTest(['example.mp4', '--mark_as_loud', 'start,end', '--rectangle',
         'audio>0.05,audio<0.05,20,50,50,100', 'audio>0.1,audio<0.1,120,50,150,100'])
 
-    runTest(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
-        'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
-    fullInspect(
-        'testsrc_ALTERED.mp4',
-        [ffprobe.getFrameRate, 30.0],
-        [ffprobe.getResolution, '320x180'],
-    )
+    # runTest(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
+    #     'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
+    # fullInspect(
+    #     'testsrc_ALTERED.mp4',
+    #     [ffprobe.getFrameRate, 30.0],
+    #     [ffprobe.getResolution, '320x180'],
+    # )
 
     runTest(['testsrc.mp4', '--mark_as_loud', 'start,end', '--rectangle',
         '0,30,0,200,100,300,#43FA56,10'])

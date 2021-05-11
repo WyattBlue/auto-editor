@@ -79,8 +79,7 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
 
     if(args.scale != 1):
         cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}'])
-    else: # TODO: get --scale option and video codecs working together.
-        cmd = properties(cmd, args, vidFile, ffprobe)
+    cmd = properties(cmd, args, vidFile, ffprobe)
 
     cmd.append(f'{temp}{sep()}spedup.mp4')
 
@@ -354,11 +353,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     out.release()
     cv2.destroyAllWindows()
 
-    # TODO: get --scale and video codecs to work together
-    if(args.scale == 1):
-        cmd = properties(['-i', vidFile], args, vidFile, ffprobe)
-    else:
-        cmd = ['-i', vidFile]
+    cmd = properties(['-i', vidFile], args, vidFile, ffprobe)
     cmd.append(f'{temp}/spedup.mp4')
     ffmpeg.run(cmd)
 
