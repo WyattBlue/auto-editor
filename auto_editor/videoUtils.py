@@ -5,7 +5,7 @@ import os
 from shutil import move, copy
 
 # Included Libraries
-from usefulFunctions import sep
+from usefulFunctions import sep, fNone
 from fastAudio import fastAudio
 
 def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, log) -> bool:
@@ -58,7 +58,7 @@ def muxVideo(ffmpeg, outFile, args, tracks, temp, log):
         cmd = ['-i', f'{temp}{sep()}newAudioFile.wav', '-i', f'{temp}{sep()}spedup.mp4']
 
     cmd.extend(['-c:v', 'copy'])
-    if(args.audio_codec is not None):
+    if(not fNone(args.audio_codec)):
         cmd.extend(['-c:a', args.audio_codec])
     cmd.append(outFile)
     ffmpeg.run(cmd)

@@ -15,10 +15,10 @@ def properties(cmd, args, vidFile, ffprobe):
 
     if(args.video_codec == 'uncompressed'):
         cmd.extend(['-vcodec', 'mpeg4', '-qscale:v', '1'])
-        print('WHAT')
     elif(args.video_codec == 'copy'):
-        print('HELLO')
-        cmd.extend(['-vcodec', ffprobe.getVideoCodec(vidFile)])
+        new_codec = ffprobe.getVideoCodec(vidFile)
+        if(new_codec != 'dvvideo'):
+            cmd.extend(['-vcodec', new_codec])
     else:
         cmd = fset(cmd, '-vcodec', args.video_codec)
 
@@ -31,8 +31,8 @@ def properties(cmd, args, vidFile, ffprobe):
     return cmd
 
 
-def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps, has_vfr,
-    temp, log):
+def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
+    has_vfr, temp, log):
     import av
 
     totalFrames = chunks[len(chunks) - 1][1]
@@ -73,9 +73,9 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
 
     log.debug(f'   - pix_fmt: {pix_fmt}')
 
-    cmd = [ffmpeg.getPath(), '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo', '-pix_fmt',
-        pix_fmt, '-s', f'{width}*{height}', '-framerate', f'{fps}', '-i', '-', '-pix_fmt',
-        pix_fmt]
+    cmd = [ffmpeg.getPath(), '-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
+        '-pix_fmt', pix_fmt, '-s', f'{width}*{height}', '-framerate', f'{fps}', '-i', '-',
+        '-pix_fmt', pix_fmt]
 
     if(args.scale != 1):
         cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}'])
@@ -113,6 +113,7 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
         process2.stdin.close()
         process2.wait()
     except BrokenPipeError:
+        log.debug(cmd)
         process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
         log.error('Broken Pipe Error!')
 
