@@ -223,21 +223,21 @@ def testAutoEditor():
         [ffprobe.getSampleRate, '48000'],
     )
 
-    runTest(['example.mp4', '--scale', '1.5', '--render', 'opencv'])
-    fullInspect(
-        'example_ALTERED.mp4',
-        [ffprobe.getFrameRate, 30.0],
-        [ffprobe.getResolution, '1920x1080'],
-        [ffprobe.getSampleRate, '48000'],
-    )
+    # runTest(['example.mp4', '--scale', '1.5', '--render', 'opencv'])
+    # fullInspect(
+    #     'example_ALTERED.mp4',
+    #     [ffprobe.getFrameRate, 30.0],
+    #     [ffprobe.getResolution, '1920x1080'],
+    #     [ffprobe.getSampleRate, '48000'],
+    # )
 
-    runTest(['example.mp4', '--scale', '0.2', '--render', 'opencv'])
-    fullInspect(
-        'example_ALTERED.mp4',
-        [ffprobe.getFrameRate, 30.0],
-        [ffprobe.getResolution, '256x144'],
-        [ffprobe.getSampleRate, '48000'],
-    )
+    # runTest(['example.mp4', '--scale', '0.2', '--render', 'opencv'])
+    # fullInspect(
+    #     'example_ALTERED.mp4',
+    #     [ffprobe.getFrameRate, 30.0],
+    #     [ffprobe.getResolution, '256x144'],
+    #     [ffprobe.getSampleRate, '48000'],
+    # )
 
     checkForError(['example.mp4', '--zoom', '0,60,1.5', '--render', 'av'])
     checkForError(['example.mp4', '--zoom', '0'])
