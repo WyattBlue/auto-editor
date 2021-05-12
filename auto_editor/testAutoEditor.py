@@ -12,7 +12,8 @@ import platform
 import subprocess
 
 # Included Libraries
-from usefulFunctions import Log, FFprobe, sep
+from usefulFunctions import Log, sep
+from ffwrapper import FFprobe
 
 def getRunner():
     if(platform.system() == 'Windows'):

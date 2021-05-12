@@ -277,14 +277,14 @@ def main():
         sys.exit()
 
     from vanparse import ParseOptions
-    from usefulFunctions import Log, Timer
+    from usefulFunctions import Log, Timer, isLatestVersion, fNone, sep
+    from ffwrapper import FFmpeg, FFprobe
 
     subcommands = ['create', 'test', 'info', 'levels']
 
     if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
         if(sys.argv[1] == 'create'):
             from create import create, create_options
-            from usefulFunctions import FFmpeg
             args = ParseOptions(sys.argv[2:], Log(), 'create', create_options())
 
             ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, True, Log())
@@ -297,8 +297,6 @@ def main():
 
         if(sys.argv[1] == 'info'):
             from info import getInfo, info_options
-            from usefulFunctions import FFmpeg, FFprobe
-
             args = ParseOptions(sys.argv[2:], Log(), 'info', info_options())
 
             log = Log()
@@ -307,7 +305,6 @@ def main():
             getInfo(args.input, ffmpeg, ffprobe, args.fast, log)
         if(sys.argv[1] == 'levels'):
             from levels import levels, levels_options
-            from usefulFunctions import FFmpeg, FFprobe
             args = ParseOptions(sys.argv[2:], Log(), 'levels', levels_options())
 
             TEMP = tempfile.mkdtemp()
@@ -320,11 +317,10 @@ def main():
         option_data = main_options()
         args = ParseOptions(sys.argv[1:], Log(True), 'auto-editor', option_data)
 
-    timer = Timer(args.quiet)
-
     del option_data
 
-    from usefulFunctions import FFmpeg, FFprobe, sep
+    timer = Timer(args.quiet)
+
     ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
     ffprobe = FFprobe(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
 
@@ -361,8 +357,6 @@ def main():
 
     ffmpeg.updateLog(log)
     ffprobe.updateLog(log)
-
-    from usefulFunctions import isLatestVersion, fNone
 
     if(not args.quiet and not isLatestVersion(version, log)):
         log.print('\nAuto-Editor is out of date. Run:\n')
