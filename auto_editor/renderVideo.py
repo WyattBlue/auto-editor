@@ -2,6 +2,7 @@
 
 # Internal Libraries
 import subprocess
+from platform import system
 
 # Included Libaries
 from usefulFunctions import ProgressBar, sep, fNone
@@ -19,7 +20,8 @@ def properties(cmd, args, vidFile, ffprobe):
         new_codec = ffprobe.getVideoCodec(vidFile)
         if(new_codec != 'dvvideo'): # This codec seems strange.
             cmd.extend(['-vcodec', new_codec])
-        if(new_codec == 'h264'):
+
+        if(new_codec == 'h264' and system() != 'Linux'):
             cmd.extend(['-allow_sw', '1'])
     else:
         cmd = fset(cmd, '-vcodec', args.video_codec)
