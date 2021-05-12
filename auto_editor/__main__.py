@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w19a dev'
+version = '21w19a'
 
 def error(message):
     print('Error!', message, file=sys.stderr)
@@ -130,7 +130,7 @@ def main_options():
         help='set the preset for ffmpeg to help save file size or increase quality.')
     ops += add_argument('--tune', '-t', default='none', group='exportMediaOps',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
-            'zerolatency', 'none'],
+            'zerolatency', 'none', 'unset'],
         help='set the tune for ffmpeg to compress video better in certain circumstances.')
     ops += add_argument('--constant_rate_factor', '-crf', type=int, default=15,
         group='exportMediaOps', range='0 to 51',
