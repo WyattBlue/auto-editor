@@ -1,15 +1,15 @@
 '''renderVideo.py'''
 
-# Included Libaries
-from usefulFunctions import ProgressBar, sep
-
 # Internal Libraries
 import subprocess
+
+# Included Libaries
+from usefulFunctions import ProgressBar, sep, fNone
 
 def properties(cmd, args, vidFile, ffprobe):
 
     def fset(cmd, option, value):
-        if(value == 'none' or value == 'unset' or value is None):
+        if(fNone(value)):
             return cmd
         return cmd + [option] + [value]
 
@@ -19,6 +19,8 @@ def properties(cmd, args, vidFile, ffprobe):
         new_codec = ffprobe.getVideoCodec(vidFile)
         if(new_codec != 'dvvideo'): # This codec seems strange.
             cmd.extend(['-vcodec', new_codec])
+        if(new_codec == 'h264'):
+            cmd.extend(['-allow_sw', '1'])
     else:
         cmd = fset(cmd, '-vcodec', args.video_codec)
 
@@ -78,10 +80,10 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
         '-pix_fmt', pix_fmt]
 
     if(args.scale != 1):
-        cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}'])
-    cmd = properties(cmd, args, vidFile, ffprobe)
-
-    cmd.append(f'{temp}{sep()}spedup.mp4')
+        cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}', f'{temp}{sep()}scale.mp4'])
+    else:
+        cmd = properties(cmd, args, vidFile, ffprobe)
+        cmd.append(f'{temp}{sep()}spedup.mp4')
 
     if(args.show_ffmpeg_debug):
         process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE)
@@ -116,6 +118,12 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
         log.print(cmd)
         process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         log.error('Broken Pipe Error!')
+
+    if(args.scale != 1):
+        cmd = ['-i', f'{temp}{sep()}scale.mp4']
+        cmd = properties(cmd, args, vidFile, ffprobe)
+        cmd.append(f'{temp}{sep()}spedup.mp4')
+        ffmpeg.run(cmd)
 
     if(log.is_debug):
         log.debug('Writing the output file.')
