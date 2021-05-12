@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w18a dev'
+version = '21w19a dev'
 
 def error(message):
     print('Error!', message, file=sys.stderr)
@@ -157,7 +157,7 @@ def main_options():
         help='export as an XML file for Final Cut Pro instead of outputting a media file.')
     ops += add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later.')
-    ops += add_argument('--export_as_clip_sequence', action='store_true',
+    ops += add_argument('--export_as_clip_sequence', '-excs', action='store_true',
         help='export as multiple numbered media files.')
 
     ops += add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
@@ -168,7 +168,7 @@ def main_options():
     ops += add_argument('--zoom', type=zoom_type, nargs='*',
         help='set when and how a zoom will occur.',
         extra='The arguments are: start,end,start_zoom,end_zoom,x,y,inter,hold' \
-            '\nThere must be at least 4 comma args. x and y default to centerX and centerY' \
+            '\nThere must be at least 3 comma args. x and y default to centerX and centerY' \
             '\nThe default interpolation is linear.')
     ops += add_argument('--rectangle', type=rect_type, nargs='*',
         help='overlay a rectangle shape on the video.',
