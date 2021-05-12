@@ -131,8 +131,8 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
         log.conwrite('Writing the output file.')
 
 
-def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps, has_vfr,
-    effects, temp, log):
+def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
+    has_vfr, effects, temp, log):
     import cv2
 
     if(has_vfr):
@@ -150,12 +150,15 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     if(args.scale != 1):
         width = int(width * args.scale)
         height = int(height * args.scale)
+        video_name = f'{temp}{sep()}resize.mp4'
+    else:
+        video_name = f'{temp}{sep()}spedup.mp4'
 
     if(width < 2 or height < 2):
         log.error('Resolution too small.')
-
     log.debug(f'\n Resolution {width}x{height}')
-    out = cv2.VideoWriter(f'{temp}/spedup.mp4', fourcc, fps, (width, height))
+
+    out = cv2.VideoWriter(video_name, fourcc, fps, (width, height))
 
     totalFrames = chunks[len(chunks) - 1][1]
     cframe = 0
@@ -361,9 +364,14 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     out.release()
     cv2.destroyAllWindows()
 
-    cmd = properties(['-i', vidFile], args, vidFile, ffprobe)
-    cmd.append(f'{temp}/spedup.mp4')
-    ffmpeg.run(cmd)
+    if(args.scale == 1):
+        cmd = properties(['-i', vidFile], args, vidFile, ffprobe)
+        cmd.append(f'{temp}{sep()}spedup.mp4')
+        ffmpeg.run(cmd)
+    else:
+        cmd = properties(['-i', f'{temp}{sep()}resize.mp4'], args, vidFile, ffprobe)
+        cmd.append(f'{temp}{sep()}spedup.mp4')
+        ffmpeg.run(cmd)
 
     if(log.is_debug):
         log.debug('Writing the output file.')
