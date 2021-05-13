@@ -1,6 +1,7 @@
 '''ffwrapper.py'''
 
 # Internal Libraries
+import subprocess
 from os import path
 from platform import system
 
@@ -49,7 +50,6 @@ class FFprobe():
         self.mylog = log
 
     def run(self, cmd: list):
-        import subprocess
         cmd.insert(0, self.myPath)
 
         if(None in cmd):
@@ -192,12 +192,10 @@ class FFmpeg():
             cmd.extend(['-nostats', '-loglevel', 'error'])
         self.mylog.debug(cmd)
 
-        import subprocess
         subprocess.call(cmd)
 
     def Popen(self, cmd: list):
         cmd = [self.myPath] + cmd
-        import subprocess
         if(self.FFdebug):
             return subprocess.Popen(cmd, stdout=subprocess.PIPE)
         return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
