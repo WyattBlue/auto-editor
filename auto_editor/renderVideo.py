@@ -21,9 +21,6 @@ def properties(cmd, args, vidFile, ffprobe):
         new_codec = ffprobe.getVideoCodec(vidFile)
         if(new_codec != 'dvvideo'): # This codec seems strange.
             cmd.extend(['-vcodec', new_codec])
-
-        # if(new_codec == 'h264' and system() != 'Linux'):
-        #     cmd.extend(['-allow_sw', '1'])
     else:
         cmd = fset(cmd, '-vcodec', args.video_codec)
 
@@ -36,7 +33,6 @@ def properties(cmd, args, vidFile, ffprobe):
     return cmd
 
 def scaleToSped(ffmpeg, ffprobe, vidFile, args, temp):
-
     SCALE = f'{temp}{sep()}scale.mp4'
     SPED = f'{temp}{sep()}spedup.mp4'
 
@@ -102,7 +98,8 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
         '-pix_fmt', pix_fmt]
 
     if(args.scale != 1):
-        cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}', f'{temp}{sep()}scale.mp4'])
+        cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}',
+            f'{temp}{sep()}scale.mp4'])
     else:
         cmd = properties(cmd, args, vidFile, ffprobe)
         cmd.append(f'{temp}{sep()}spedup.mp4')
@@ -153,6 +150,8 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
 def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
     has_vfr, effects, temp, log):
     import cv2
+    import numpy as np
+    from interpolate import interpolate
 
     if(has_vfr):
         cmd = ['-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}', '-r', str(fps),
@@ -205,9 +204,6 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
         # cframe not in chunks
         return 0
-
-    import numpy as np
-    from interpolate import interpolate
 
     def values(val, log, _type, totalFrames, width, height):
         if(val == 'centerX'):

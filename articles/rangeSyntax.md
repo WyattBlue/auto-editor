@@ -1,74 +1,46 @@
-# `--cut_out`, `--ignore`, and Range Syntax
+# What's New in Range Syntax
+last modified May 13, 2021. 21w19a.
 
+Range syntax is the common format used in:
 
-## `--cut_out`
+ - `--mark_as_loud`
+ - `--mark_as_silent`
+ - `--cut_out`
+ - `--set_speed_for_range`
 
-is used to remove any sections of the media specified. For example:
-
-```
-auto-editor example.mp4 --cut_out 0-5
-```
-
-Will remove the first five seconds of `example.mp4`
-
-And:
+and describes a range in time based on frames from 0, the first frame, all the way till the end.
 
 ```
-auto-editor example.mp4 --cut_out 20-end
+auto-editor example.mp4 --mark_as_silent 0,60
 ```
 
-Will remove all of `example.mp4` besides the first 20 seconds.
-
-
-You can also use decimals:
+It accepts any integer greater than and equal to 0 and can take strings (variables) like 'start' and 'end'.
 
 ```
-auto-editor example.mp4 --cut_out 10.7-23.4
+auto-editor example.mp4 --mark_as_loud 72,end
 ```
 
-and it will cut out the range from 10.7 seconds to 23.4 seconds.
-
-
-## `--ignore`
-
-Ignore does the inverse of `--cut_out`, it ensures that auto-editor does not cut out anything in that section (**Ignore** loudness).
-
-It can be used along with `--cut_out`.
+Range Syntax has a nargs value of '\*' meaning it can take any many ranges.
 
 ```
-auto-editor example.mp4 --ignore 0-20 --cut_out 20-end
+auto-editor example.mp4 --cut_out 0,20 45,60, 234,452
 ```
 
-or used byitself.
+---
+
+The `--set_speed_for_range` option has an additional argument for speed. The command:
 
 ```
-auto-editor example.mp4 --ignore 20-30
+auto-editor example.mp4 --set_speed_for_range 2,0,30
 ```
 
-both `--cut_out` and `--ignore` use range syntax so any range that is recognized by `--cut_out` will be recognize `--ignore` or any future option that uses it.
-
-## Range Syntax
-
-Range syntax is a special data type for declaring ranges.
-
-It follows the pattern: `{float}-{float} ...` using a hyphen to deliminate between the start and end point, and is in seconds instead of the usual "frames" unit.
-
-It can be repeated infinitely. So
-
-```
-auto-editor example.mp4 --cut_out 0-10 20-30 40-45
-```
-
-is possible. In addition, the special values `start` and `end` can be used instead of floats. `end` represents the total length of the video in seconds while `start` is just equivalent to `0`.
+means set the speed of the video to twice as fast (2x) from the 0th frame to the 30th frame.
 
 
-### Out-of-bounds and Edge Cases.
+## Notes
 
-Going out-of-bounds don't cause an error.
+before 21w19a. Range Syntax was second based and used hyphens as separators instead of commas.
 
-```
-auto-editor example.mp4 --cut_out 10-500
-```
+The `--ignore` has been renamed to the more accurately described `--mark_as_loud`.
 
-Using an invalid range, ex (`10-5`) is Undefined Behavior.
 
