@@ -2,6 +2,7 @@
 
 # Internal Libraries
 import subprocess
+from os import path
 from platform import system
 
 # Included Libaries
@@ -21,8 +22,8 @@ def properties(cmd, args, vidFile, ffprobe):
         if(new_codec != 'dvvideo'): # This codec seems strange.
             cmd.extend(['-vcodec', new_codec])
 
-        if(new_codec == 'h264' and system() != 'Linux'):
-            cmd.extend(['-allow_sw', '1'])
+        # if(new_codec == 'h264' and system() != 'Linux'):
+        #     cmd.extend(['-allow_sw', '1'])
     else:
         cmd = fset(cmd, '-vcodec', args.video_codec)
 
@@ -33,6 +34,25 @@ def properties(cmd, args, vidFile, ffprobe):
 
     cmd.extend(['-movflags', '+faststart', '-strict', '-2'])
     return cmd
+
+def scaleToSped(ffmpeg, ffprobe, vidFile, args, temp):
+
+    SCALE = f'{temp}{sep()}scale.mp4'
+    SPED = f'{temp}{sep()}spedup.mp4'
+
+    cmd = ['-i', SCALE]
+    cmd = properties(cmd, args, vidFile, ffprobe)
+    cmd.append(SPED)
+    check_errors = ffmpeg.pipe(cmd)
+
+    if('Error' in check_errors or 'failed' in check_errors):
+        cmd = ['-i', SCALE]
+        if('-allow_sw 1' in check_errors):
+            cmd.extend(['-allow_sw', '1'])
+
+        cmd = properties(cmd, args, vidFile, ffprobe)
+        cmd.append(SPED)
+        ffmpeg.run(cmd)
 
 
 def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
@@ -122,10 +142,7 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
         log.error('Broken Pipe Error!')
 
     if(args.scale != 1):
-        cmd = ['-i', f'{temp}{sep()}scale.mp4']
-        cmd = properties(cmd, args, vidFile, ffprobe)
-        cmd.append(f'{temp}{sep()}spedup.mp4')
-        ffmpeg.run(cmd)
+        scaleToSped(ffmpeg, ffprobe, vidFile, args, temp)
 
     if(log.is_debug):
         log.debug('Writing the output file.')
@@ -152,7 +169,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     if(args.scale != 1):
         width = int(width * args.scale)
         height = int(height * args.scale)
-        video_name = f'{temp}{sep()}resize.mp4'
+        video_name = f'{temp}{sep()}scale.mp4'
     else:
         video_name = f'{temp}{sep()}spedup.mp4'
 
@@ -371,9 +388,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         cmd.append(f'{temp}{sep()}spedup.mp4')
         ffmpeg.run(cmd)
     else:
-        cmd = properties(['-i', f'{temp}{sep()}resize.mp4'], args, vidFile, ffprobe)
-        cmd.append(f'{temp}{sep()}spedup.mp4')
-        ffmpeg.run(cmd)
+        scaleToSped(ffmpeg, ffprobe, vidFile, args, temp)
 
     if(log.is_debug):
         log.debug('Writing the output file.')
