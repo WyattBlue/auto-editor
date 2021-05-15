@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w19a'
+version = '21w19b'
 
 def error(message):
     print('Error!', message, file=sys.stderr)
