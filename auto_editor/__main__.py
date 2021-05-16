@@ -272,7 +272,7 @@ def main():
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
 
-    from usefulFunctions import Log, Timer, isLatestVersion, fNone, sep
+    from usefulFunctions import Log, Timer, fNone, sep
     from ffwrapper import FFmpeg, FFprobe
 
     subcommands = ['create', 'test', 'info', 'levels']
@@ -353,11 +353,6 @@ def main():
 
     ffmpeg.updateLog(log)
     ffprobe.updateLog(log)
-
-    if(not args.quiet and not isLatestVersion(version, log)):
-        log.print('\nAuto-Editor is out of date. Run:\n')
-        log.print('    pip3 install -U auto-editor')
-        log.print('\nto upgrade to the latest version.\n')
 
     from argsCheck import hardArgsCheck, softArgsCheck
     hardArgsCheck(args, log)

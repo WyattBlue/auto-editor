@@ -204,20 +204,6 @@ class ProgressBar():
         else:
             print(f'   {percentDone}% done ETA {newTime}')
 
-
-def isLatestVersion(version: str, log) -> bool:
-    if('dev' not in version):
-        try:
-            from requests import get
-            latestVersion = get('https://raw.githubusercontent.com/' \
-                'wyattblue/auto-editor/master/resources/version.txt')
-            return latestVersion.text.strip() == version
-        except ImportError:
-            pass
-        except Exception as err:
-            log.debug('Connection Error: ' + str(err))
-    return True
-
 def humanReadableTime(rawTime: float) -> str:
     units = 'seconds'
     if(rawTime >= 3600):
