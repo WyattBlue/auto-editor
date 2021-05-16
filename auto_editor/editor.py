@@ -125,14 +125,14 @@ def fcpXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
         outfile.write('\t\t<event name="auto-editor output">\n')
         outfile.write(f'\t\t\t<project name="{name}">\n')
         outfile.write(formatXML(4,
-            f'<sequence format="r1" tcStart="0s" tcFormat="NDF" '\
+            '<sequence format="r1" tcStart="0s" tcFormat="NDF" '\
             'audioLayout="stereo" audioRate="48k">',
             '\t<spine>')
         )
 
         last_dur = 0
 
-        for j, clip in enumerate(clips):
+        for _, clip in enumerate(clips):
             clip_dur = (clip[1] - clip[0]) / (clip[2] / 100)
             dur = fraction(clip_dur, fps)
 

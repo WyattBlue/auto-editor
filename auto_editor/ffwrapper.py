@@ -88,7 +88,7 @@ class FFprobe():
         try:
             return int(nums[0]) / int(nums[1])
         except (ZeroDivisionError, IndexError, ValueError):
-            self.mylog.error(f'getFrameRate had an invalid output: {output}')
+            self.mylog.error('getFrameRate had an error')
 
     def getAudioTracks(self, file):
         output = self.pipe(['-select_streams', 'a', '-show_entries', 'stream=index',
