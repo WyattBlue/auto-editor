@@ -112,7 +112,8 @@ class ArgumentParser():
             sys.exit()
 
         if(sys_args == ['-v'] or sys_args == ['-V']):
-            out(f'{self.program_name} version {self.version}\nPlease use --version instead.')
+            out(f'{self.program_name} version {self._version}'\
+                '\nPlease use --version instead.')
             sys.exit()
 
         return ParseOptions(sys_args, log, root, self.args)
