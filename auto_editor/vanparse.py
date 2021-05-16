@@ -4,22 +4,6 @@ import os
 import sys
 import difflib
 
-def add_argument(*names, nargs=1, type=str, default=None, action='default',
-    range=None, choices=None, group=None, stack=None, help='', extra=''):
-    newDic = {}
-    newDic['names'] = names
-    newDic['nargs'] = nargs
-    newDic['type'] = type
-    newDic['default'] = default
-    newDic['action'] = action
-    newDic['help'] = help
-    newDic['extra'] = extra
-    newDic['range'] = range
-    newDic['choices'] = choices
-    newDic['grouping'] = group
-    newDic['stack'] = stack
-    return [newDic]
-
 def out(text: str):
     import re
     import textwrap
@@ -94,6 +78,46 @@ def getOption(item: str, group: str, the_args: list) -> str:
                 return option
     return None
 
+
+
+class ArgumentParser():
+    def __init__(self, program_name, version, description):
+        self.program_name = program_name
+        self._version = version
+        self.description = description
+
+        self.args = []
+
+    def add_argument(self, *names, nargs=1, type=str, default=None, action='default',
+        range=None, choices=None, group=None, stack=None, help='', extra=''):
+        newDic = {}
+        newDic['names'] = names
+        newDic['nargs'] = nargs
+        newDic['type'] = type
+        newDic['default'] = default
+        newDic['action'] = action
+        newDic['help'] = help
+        newDic['extra'] = extra
+        newDic['range'] = range
+        newDic['choices'] = choices
+        newDic['grouping'] = group
+        newDic['stack'] = stack
+
+        self.args.append(newDic)
+
+    def parse_args(self, sys_args, log, root):
+
+        if(sys_args == []):
+            out(self.description)
+            sys.exit()
+
+        if(sys_args == ['-v'] or sys_args == ['-V']):
+            out(f'{self.program_name} version {self.version}\nPlease use --version instead.')
+            sys.exit()
+
+        return ParseOptions(sys_args, log, root, self.args)
+
+
 class ParseOptions():
     def setConfig(self, config_path, root):
         if(not os.path.isfile(config_path)):
@@ -127,10 +151,9 @@ class ParseOptions():
                 print(f'Setting {key} to {value}', file=sys.stderr)
             setattr(self, key, value)
 
-    def __init__(self, userArgs, log, root, *args):
+    def __init__(self, sys_args, log, root, *args):
         # Set the default options.
         option_names = []
-
         for options in args:
             for option in options:
                 option_names.append(option['names'][0])
@@ -154,8 +177,8 @@ class ParseOptions():
         list_type = str
         i = 0
         group = None
-        while i < len(userArgs):
-            item = userArgs[i]
+        while i < len(sys_args):
+            item = sys_args[i]
             label = 'option' if item.startswith('--') else 'short'
 
             # Find the option.
@@ -209,7 +232,7 @@ class ParseOptions():
                 if(option['action'] == 'grouping'):
                     group = key
 
-                nextItem = None if i == len(userArgs) - 1 else userArgs[i+1]
+                nextItem = None if i == len(sys_args) - 1 else sys_args[i+1]
                 if(nextItem == '-h' or nextItem == '--help'):
                     printOptionHelp(args, option)
                     sys.exit()
