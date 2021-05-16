@@ -20,9 +20,9 @@ def add_argument(*names, nargs=1, type=str, default=None, action='default',
     newDic['stack'] = stack
     return [newDic]
 
-def printHelp(args, option):
+def printOptionHelp(args, option):
     if(option['action'] == 'grouping'):
-        print(f'  {option["names"][0]}:')
+        print(f'  {option['names'][0]}:')
     else:
         print(' ', ', '.join(option['names']))
         print('   ', option['help'])
@@ -51,7 +51,7 @@ def printHelp(args, option):
         print(f'    group: {option["grouping"]}')
 
 
-def get_option(item: str, group: str, the_args: list) -> str:
+def getOption(item: str, group: str, the_args: list) -> str:
     for options in the_args:
         for option in options:
             if(item in option['names']):
@@ -61,6 +61,40 @@ def get_option(item: str, group: str, the_args: list) -> str:
 
 
 class ParseOptions():
+
+    def setConfig(self, config_path, root):
+        if(not os.path.isfile(config_path)):
+            return
+
+        with open(config_path, 'r') as file:
+            lines = file.readlines()
+
+        # Set attributes based on the config file to act as the new defaults.
+        for item in lines:
+            if('#' in item):
+                item = item[: item.index('#')]
+            item = item.replace(' ', '')
+            if(item.strip() == '' or (not item.startswith(root))):
+                continue
+            value = item[item.index('=')+1 :]
+
+            if(value[0] == "'" and value[-1] == "'"):
+                value = value[1:-1]
+            elif(value == "None"):
+                value = None
+            elif('.' in value):
+                value = float(value)
+            else:
+                value = int(value)
+
+            key = item[: item.index('=')]
+            key = key[key.rfind('.')+1:]
+
+            if(getattr(self, key) != value):
+                print(f'Setting {key} to {value}', file=sys.stderr)
+            setattr(self, key, value)
+
+
     def __init__(self, userArgs, log, root, *args):
         # Set the default options.
         option_names = []
@@ -77,47 +111,15 @@ class ParseOptions():
                     value = option['default']
                 setattr(self, key, value)
 
-        def setConfig(configPath):
-            if(not os.path.isfile(configPath)):
-                return
-
-            with open(configPath, 'r') as file:
-                lines = file.readlines()
-
-            # Set attributes based on the config file to act as the new defaults.
-            for item in lines:
-                if('#' in item):
-                    item = item[: item.index('#')]
-                item = item.replace(' ', '')
-                if(item.strip() == '' or (not item.startswith(root))):
-                    continue
-                value = item[item.index('=')+1 :]
-
-                if(value[0] == "'" and value[-1] == "'"): # detect string value
-                    value = value[1:-1]
-                elif(value == "None"):
-                    value = None
-                elif('.' in value):
-                    value = float(value)
-                else:
-                    value = int(value)
-
-                key = item[: item.index('=')]
-                key = key[key.rfind('.')+1:]
-
-                if(getattr(self, key) != value):
-                    print(f'Setting {key} to {value}', file=sys.stderr)
-                setattr(self, key, value)
-
         dirPath = os.path.dirname(os.path.realpath(__file__))
-        setConfig(dirPath + '/config.txt')
+        self.setConfig(dirPath + '/config.txt', root)
 
         # Figure out command line options changed by user.
-        myList = []
+        my_list = []
         used_options = []
-        settingInputs = True
-        optionList = 'input'
-        listType = str
+        setting_inputs = True
+        option_list = 'input'
+        list_type = str
         i = 0
         group = None
         while i < len(userArgs):
@@ -126,18 +128,18 @@ class ParseOptions():
 
             # Find the option.
             if(label == 'option'):
-                option = get_option(item, group='global', the_args=args)
+                option = getOption(item, group='global', the_args=args)
             else:
-                option = get_option(item, group=group, the_args=args)
+                option = getOption(item, group=group, the_args=args)
                 if(option is None and (group is not None)):
                     group = None # Don't consider the next option to be in a group.
-                    option = get_option(item, group=group, the_args=args)
+                    option = getOption(item, group=group, the_args=args)
 
             if(option is None):
                 # Unknown Option!
-                if(settingInputs and not item.startswith('-')):
+                if(setting_inputs and not item.startswith('-')):
                     # Option is actually an input file, like example.mp4
-                    myList.append(item)
+                    my_list.append(item)
                 else:
                     # Get the names of all the options and groups.
                     opt_list = []
@@ -159,12 +161,12 @@ class ParseOptions():
                         log.error(f'Unknown {label}: {item}')
             else:
                 # We found the option.
-                if(optionList is not None):
-                    setattr(self, optionList, list(map(listType, myList)))
+                if(option_list is not None):
+                    setattr(self, option_list, list(map(list_type, my_list)))
 
-                settingInputs = False
-                optionList = None
-                myList = []
+                setting_inputs = False
+                option_list = None
+                my_list = []
 
                 if(option['names'][0] in used_options and option['stack'] is None):
                     log.error(f'Cannot repeat option {option["names"][0]} twice.')
@@ -177,13 +179,13 @@ class ParseOptions():
 
                 nextItem = None if i == len(userArgs) - 1 else userArgs[i+1]
                 if(nextItem == '-h' or nextItem == '--help'):
-                    printHelp(args, option)
+                    printOptionHelp(args, option)
                     sys.exit()
 
                 if(option['nargs'] != 1):
-                    settingInputs = True
-                    optionList = key
-                    listType = option['type']
+                    setting_inputs = True
+                    option_list = key
+                    list_type = option['type']
                 elif(option['action'] == 'store_true'):
                     value = True
                 else:
@@ -197,16 +199,16 @@ class ParseOptions():
 
                     # Handle when the option value is not in choices list.
                     if(option['choices'] is not None and value not in option['choices']):
-                        optionName = option['names'][0]
-                        myChoices = ', '.join(option['choices'])
-                        log.error(f'{value} is not a choice for {optionName}' \
-                            f'\nchoices are:\n  {myChoices}')
+                        option_name = option['names'][0]
+                        my_choices = ', '.join(option['choices'])
+                        log.error(f'{value} is not a choice for {option_name}' \
+                            f'\nchoices are:\n  {my_choices}')
                     i += 1
                 setattr(self, key, value)
 
             i += 1
-        if(settingInputs):
-            setattr(self, optionList, list(map(listType, myList)))
+        if(setting_inputs):
+            setattr(self, option_list, list(map(list_type, my_list)))
 
         if(self.help):
             for options in args:
