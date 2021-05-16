@@ -20,38 +20,6 @@ def add_argument(*names, nargs=1, type=str, default=None, action='default',
     newDic['stack'] = stack
     return [newDic]
 
-def printOptionHelp(args, option):
-    if(option['action'] == 'grouping'):
-        print(f'  {option["names"][0]}:')
-    else:
-        print(' ', ', '.join(option['names']))
-        print('   ', option['help'])
-        if(option['extra'] == ''):
-            print('')
-        else:
-            print(f"\n{option['extra']}\n")
-    if(option['action'] == 'default'):
-        print('    type:', option['type'].__name__)
-        print('    default:', option['default'])
-        if(option['range'] is not None):
-            print('    range:', option['range'])
-        if(option['choices'] is not None):
-            print('    choices:', ', '.join(option['choices']))
-    elif(option['action'] == 'grouping'):
-        for options in args:
-            for op in options:
-                if(op['grouping'] == option['names'][0]):
-                    print(' ', ', '.join(op['names']) + ':', op['help'])
-    elif(option['action'] == 'store_true'):
-        print('    type: flag')
-    else:
-        print('    type: unknown')
-
-    if(option['grouping'] is not None):
-        print(f'    group: {option["grouping"]}')
-
-
-
 def out(text: str):
     import re
     import textwrap
@@ -71,6 +39,37 @@ def out(text: str):
         )
 
     print('\n'.join(wraped_lines))
+
+def printOptionHelp(args, option):
+    text = ''
+    if(option['action'] == 'grouping'):
+        text += f'  {option["names"][0]}:\n'
+    else:
+        text += '  ' + ', '.join(option['names']) + '\n    ' + option['help'] + '\n\n'
+        if(option['extra'] != ''):
+            text += f'\n{option["extra"]}\n\n'
+
+    if(option['action'] == 'default'):
+        text += '    type: ' + option['type'].__name__
+        text += f'\n    default: {option["default"]}\n'
+        if(option['range'] is not None):
+            text += '    range: ' +  option['range'] + '\n'
+
+        if(option['choices'] is not None):
+            text += '    choices: ' +  ', '.join(option['choices']) + '\n'
+    elif(option['action'] == 'grouping'):
+        for options in args:
+            for op in options:
+                if(op['grouping'] == option['names'][0]):
+                    text += '  ' + ', '.join(op['names']) + ': ' + op['help'] + '\n'
+    elif(option['action'] == 'store_true'):
+        text += '    type: flag\n'
+    else:
+        text += '    type: unknown\n'
+
+    if(option['grouping'] is not None):
+        text += '    group: ' + option['grouping'] + '\n'
+    out(text)
 
 def printProgramHelp(root, the_args: list):
     text = ''
