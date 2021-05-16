@@ -3,26 +3,22 @@
 import os
 import time
 
-def create_options():
-    from vanparse import add_argument
-    ops = []
-    ops += add_argument('--frame_rate', '-fps', '-r', type=float, default=30.0,
+def create_options(parser):
+    parser.add_argument('--frame_rate', '-fps', '-r', type=float, default=30.0,
         help='set the framerate for the output video.')
-    ops += add_argument('--duration', '-d', type=int, default=10,
+    parser.add_argument('--duration', '-d', type=int, default=10,
         help='set the length of the video (in seconds).')
-    ops += add_argument('--width', type=int, default=1280, #640
+    parser.add_argument('--width', type=int, default=1280,
         help='set the pixel width of the video.')
-    ops += add_argument('--height', type=int, default=720, #360
+    parser.add_argument('--height', type=int, default=720,
         help='set the pixel height of the video.')
-    ops += add_argument('--output_file', '--output', '-o', type=str,
+    parser.add_argument('--output_file', '--output', '-o', type=str,
         default='testsrc.mp4')
-    ops += add_argument('--my_ffmpeg', action='store_true',
+    parser.add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
-    ops += add_argument('--help', '-h', action='store_true',
-        help='print info about the program or an option and exit.')
-    ops += add_argument('(input)', nargs='*',
+    parser.add_argument('(input)', nargs='*',
         help='the template')
-    return ops
+    return parser
 
 def create(ffmpeg, theme, output, fps, duration, width, height, log):
 

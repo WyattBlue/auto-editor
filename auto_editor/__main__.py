@@ -7,7 +7,7 @@ import sys
 import tempfile
 from shutil import rmtree
 
-version = '21w19b'
+version = '21w19b dev'
 
 def error(message):
     print('Error!', message, file=sys.stderr)
@@ -83,176 +83,174 @@ def padChunk(item, totalFrames):
         return [start] + [item]
     return [start] + [item] + [end]
 
-def main_options():
-    from vanparse import add_argument
-    ops = []
-    ops += add_argument('urlOps', nargs=0, action='grouping')
-    ops += add_argument('--format', type=str, group='urlOps',
+def main_options(parser):
+    parser.add_argument('urlOps', nargs=0, action='grouping')
+    parser.add_argument('--format', type=str, group='urlOps',
         default='bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
         help='the format youtube-dl uses to when downloading a url.')
-    ops += add_argument('--output_dir', type=str, group='urlOps',
+    parser.add_argument('--output_dir', type=str, group='urlOps',
         default=None,
         help='the directory where the downloaded file is placed.')
-    ops += add_argument('--check_certificate', action='store_true', group='urlOps',
+    parser.add_argument('--check_certificate', action='store_true', group='urlOps',
         help='check the website certificate before downloading.')
 
-    ops += add_argument('progressOps', nargs=0, action='grouping')
-    ops += add_argument('--machine_readable_progress', action='store_true',
+    parser.add_argument('progressOps', nargs=0, action='grouping')
+    parser.add_argument('--machine_readable_progress', action='store_true',
         group='progressOps',
         help='set progress bar that is easier to parse.')
-    ops += add_argument('--no_progress', action='store_true',
+    parser.add_argument('--no_progress', action='store_true',
         group='progressOps',
         help='do not display any progress at all.')
 
-    ops += add_argument('metadataOps', nargs=0, action='grouping')
-    ops += add_argument('--force_fps_to', type=float, group='metadataOps',
+    parser.add_argument('metadataOps', nargs=0, action='grouping')
+    parser.add_argument('--force_fps_to', type=float, group='metadataOps',
         help='manually set the fps value for the input video if detection fails.')
-    ops += add_argument('--force_tracks_to', type=int, group='metadataOps',
+    parser.add_argument('--force_tracks_to', type=int, group='metadataOps',
         help='manually set the number of tracks auto-editor thinks there are.')
 
-    ops += add_argument('exportMediaOps', nargs=0, action='grouping')
-    ops += add_argument('--video_bitrate', '-vb', default='unset', group='exportMediaOps',
+    parser.add_argument('exportMediaOps', nargs=0, action='grouping')
+    parser.add_argument('--video_bitrate', '-vb', default='unset', group='exportMediaOps',
         help='set the number of bits per second for video.')
-    ops += add_argument('--audio_bitrate', '-ab', default='unset', group='exportMediaOps',
+    parser.add_argument('--audio_bitrate', '-ab', default='unset', group='exportMediaOps',
         help='set the number of bits per second for audio.')
-    # ops += add_argument('--video_quality', '-')
-    ops += add_argument('--sample_rate', '-r', type=sample_rate_type,
+    # parser.add_argument('--video_quality', '-')
+    parser.add_argument('--sample_rate', '-r', type=sample_rate_type,
         group='exportMediaOps',
         help='set the sample rate of the input and output videos.')
-    ops += add_argument('--video_codec', '-vcodec', default='copy',
+    parser.add_argument('--video_codec', '-vcodec', default='copy',
         group='exportMediaOps',
         help='set the video codec for the output media file.')
-    ops += add_argument('--audio_codec', '-acodec', group='exportMediaOps',
+    parser.add_argument('--audio_codec', '-acodec', group='exportMediaOps',
         help='set the audio codec for the output media file.')
-    ops += add_argument('--preset', '-p', default='medium', group='exportMediaOps',
+    parser.add_argument('--preset', '-p', default='medium', group='exportMediaOps',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow'],
         help='set the preset for ffmpeg to help save file size or increase quality.')
-    ops += add_argument('--tune', '-t', default='none', group='exportMediaOps',
+    parser.add_argument('--tune', '-t', default='none', group='exportMediaOps',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none', 'unset'],
         help='set the tune for ffmpeg to compress video better in certain circumstances.')
-    ops += add_argument('--constant_rate_factor', '-crf', type=int, default=15,
+    parser.add_argument('--constant_rate_factor', '-crf', type=int, default=15,
         group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
 
-    ops += add_argument('motionOps', nargs=0, action='grouping')
-    ops += add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
+    parser.add_argument('motionOps', nargs=0, action='grouping')
+    parser.add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
         group='motionOps',
         help='set how many times a frame is dilated before being compared.')
-    ops += add_argument('--width', '-w', type=int, default=400, range='1 to Infinity',
+    parser.add_argument('--width', '-w', type=int, default=400, range='1 to Infinity',
         group='motionOps',
         help="scale the frame to this width before being compared.")
-    ops += add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity',
+    parser.add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity',
         group='motionOps',
         help='set the strength of the blur applied to a frame before being compared.')
 
-    ops += add_argument('--export_as_audio', '-exa', action='store_true',
+    parser.add_argument('--export_as_audio', '-exa', action='store_true',
         help='export as a WAV audio file.')
-    ops += add_argument('--export_to_premiere', '-exp', action='store_true',
+    parser.add_argument('--export_to_premiere', '-exp', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
-    ops += add_argument('--export_to_resolve', '-exr', action='store_true',
+    parser.add_argument('--export_to_resolve', '-exr', action='store_true',
         help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
-    ops += add_argument('--export_to_final_cut_pro', '-exf', action='store_true',
+    parser.add_argument('--export_to_final_cut_pro', '-exf', action='store_true',
         help='export as an XML file for Final Cut Pro instead of outputting a media file.')
-    ops += add_argument('--export_as_json', action='store_true',
+    parser.add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later.')
-    ops += add_argument('--export_as_clip_sequence', '-excs', action='store_true',
+    parser.add_argument('--export_as_clip_sequence', '-excs', action='store_true',
         help='export as multiple numbered media files.')
 
-    ops += add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
+    parser.add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
         help='choice which method to render video.')
-    ops += add_argument('--scale', type=float_type, default=1,
+    parser.add_argument('--scale', type=float_type, default=1,
         help='scale the output media file by a certian factor.')
 
-    ops += add_argument('--zoom', type=zoom_type, nargs='*',
+    parser.add_argument('--zoom', type=zoom_type, nargs='*',
         help='set when and how a zoom will occur.',
         extra='The arguments are: start,end,start_zoom,end_zoom,x,y,inter,hold' \
             '\nThere must be at least 3 comma args. x and y default to centerX and centerY' \
             '\nThe default interpolation is linear.')
-    ops += add_argument('--rectangle', type=rect_type, nargs='*',
+    parser.add_argument('--rectangle', type=rect_type, nargs='*',
         help='overlay a rectangle shape on the video.',
         extra='The arguments are: start,end,x1,y1,x2,y2,color,thickness' \
             '\nThere must be at least 6 comma args. The rectangle is solid if' \
             ' thickness is not defined.\n The default color is #000.')
 
-    ops += add_argument('--background', type=str, default='#000',
+    parser.add_argument('--background', type=str, default='#000',
         help='set the color of the background that is visible when the video is moved.')
 
-    ops += add_argument('--mark_as_loud', type=range_type, nargs='*',
+    parser.add_argument('--mark_as_loud', type=range_type, nargs='*',
         help='the range that will be marked as "loud".')
-    ops += add_argument('--mark_as_silent', type=range_type, nargs='*',
+    parser.add_argument('--mark_as_silent', type=range_type, nargs='*',
         help='the range that will be marked as "silent".')
-    ops += add_argument('--cut_out', type=range_type, nargs='*',
+    parser.add_argument('--cut_out', type=range_type, nargs='*',
         help='the range of media that will be removed completely, regardless of the value of silent speed.')
-    ops += add_argument('--set_speed_for_range', type=speed_range_type, nargs='*',
+    parser.add_argument('--set_speed_for_range', type=speed_range_type, nargs='*',
         help='set an arbitrary speed for a given range.',
         extra='The arguments are: speed,start,end')
 
-    ops += add_argument('--motion_threshold', type=float_type, default=0.02,
+    parser.add_argument('--motion_threshold', type=float_type, default=0.02,
         range='0 to 1',
         help='how much motion is required to be considered "moving"')
-    ops += add_argument('--edit_based_on', default='audio',
+    parser.add_argument('--edit_based_on', default='audio',
         choices=['audio', 'motion', 'not_audio', 'not_motion', 'audio_or_motion',
             'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
             'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
 
-    ops += add_argument('--cut_by_this_audio', '-ca', type=file_type,
+    parser.add_argument('--cut_by_this_audio', '-ca', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
-    ops += add_argument('--cut_by_this_track', '-ct', type=int, default=0,
+    parser.add_argument('--cut_by_this_track', '-ct', type=int, default=0,
         range='0 to the number of audio tracks minus one',
         help='base cuts by a different audio track in the video.')
-    ops += add_argument('--cut_by_all_tracks', '-cat', action='store_true',
+    parser.add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
-    ops += add_argument('--keep_tracks_seperate', action='store_true',
+    parser.add_argument('--keep_tracks_seperate', action='store_true',
         help="don't combine audio tracks when exporting.")
 
-    ops += add_argument('--my_ffmpeg', action='store_true',
+    parser.add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
-    ops += add_argument('--version', action='store_true',
+    parser.add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
-    ops += add_argument('--debug', '--verbose', '-d', action='store_true',
+    parser.add_argument('--debug', '--verbose', '-d', action='store_true',
         help='show debugging messages and values.')
-    ops += add_argument('--show_ffmpeg_debug', action='store_true',
+    parser.add_argument('--show_ffmpeg_debug', action='store_true',
         help='show ffmpeg progress and output.')
-    ops += add_argument('--quiet', '-q', action='store_true',
+    parser.add_argument('--quiet', '-q', action='store_true',
         help='display less output.')
 
-    ops += add_argument('--combine_files', action='store_true',
+    parser.add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
-    ops += add_argument('--preview', action='store_true',
+    parser.add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
-    ops += add_argument('--no_open', action='store_true',
+    parser.add_argument('--no_open', action='store_true',
         help='do not open the file after editing is done.')
-    ops += add_argument('--min_clip_length', '-mclip', type=frame_type, default=3,
+    parser.add_argument('--min_clip_length', '-mclip', type=frame_type, default=3,
         range='0 to Infinity',
         help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    ops += add_argument('--min_cut_length', '-mcut', type=frame_type, default=6,
+    parser.add_argument('--min_cut_length', '-mcut', type=frame_type, default=6,
         range='0 to Infinity',
         help="set the minimum length a cut can be. If a cut is too short, don't cut")
 
-    ops += add_argument('--output_file', '--output', '-o', nargs='*',
+    parser.add_argument('--output_file', '--output', '-o', nargs='*',
         help='set the name(s) of the new output.')
-    ops += add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
+    parser.add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
         range='0 to 1',
         help='set the volume that frames audio needs to surpass to be "loud".')
-    ops += add_argument('--silent_speed', '-s', type=float_type, default=99999,
+    parser.add_argument('--silent_speed', '-s', type=float_type, default=99999,
         range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='set the speed that "silent" sections should be played at.')
-    ops += add_argument('--video_speed', '--sounded_speed', '-v', type=float_type,
+    parser.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type,
         default=1.00,
         range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='set the speed that "loud" sections should be played at.')
-    ops += add_argument('--frame_margin', '-m', type=frame_type, default=6,
+    parser.add_argument('--frame_margin', '-m', type=frame_type, default=6,
         range='0 to Infinity',
         help='set how many "silent" frames of on either side of "loud" sections be included.')
 
-    ops += add_argument('--help', '-h', action='store_true',
+    parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
-    ops += add_argument('(input)', nargs='*',
+    parser.add_argument('(input)', nargs='*',
         help='the path to a file, folder, or url you want edited.')
-    return ops
+    return parser
 
 
 def main():
@@ -260,23 +258,20 @@ def main():
     # Fixes pip not able to find other included modules.
     sys.path.append(os.path.abspath(dirPath))
 
-    # Print the version if only the -v option is added.
-    if(sys.argv[1:] == ['-v'] or sys.argv[1:] == ['-V']):
-        print(f'Auto-Editor version {version}\nPlease use --version instead.')
-        sys.exit()
+    import vanparse
 
-    if(sys.argv[1:] == []):
-        print('\nAuto-Editor is an automatic video/audio creator and editor.\n')
-        print('By default, it will detect silence and create a new video with ')
-        print('those sections cut out. By changing some of the options, you can')
-        print('export to a traditional editor like Premiere Pro and adjust the')
-        print('edits there, adjust the pacing of the cuts, and change the method')
-        print('of editing like using audio loudness and video motion to judge')
-        print('making cuts.')
-        print('\nRun:\n    auto-editor --help\n\nTo get the list of options.\n')
-        sys.exit()
+    parser = vanparse.ArgumentParser('Auto-Editor', version,
+        description='\nAuto-Editor is an automatic video/audio creator and editor. '\
+            'By default, it will detect silence and create a new video with those '\
+            'sections cut out. By changing some of the options, you can export to a '\
+            'traditional editor like Premiere Pro and adjust the edits there, adjust '\
+            'the pacing of the cuts, and change the method of editing like using audio '\
+            'loudness and video motion to judge making cuts.\nRun:\n    auto-editor '\
+            '--help\n\nTo get the list of options.\n')
 
-    from vanparse import ParseOptions
+    parser.add_argument('--help', '-h', action='store_true',
+        help='print info about the program or an option and exit.')
+
     from usefulFunctions import Log, Timer, isLatestVersion, fNone, sep
     from ffwrapper import FFmpeg, FFprobe
 
@@ -285,7 +280,8 @@ def main():
     if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
         if(sys.argv[1] == 'create'):
             from create import create, create_options
-            args = ParseOptions(sys.argv[2:], Log(), 'create', create_options())
+            parser = create_options(parser)
+            args = parser.parse_args(sys.argv[2:], Log(), 'create')
 
             ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, True, Log())
             create(ffmpeg, args.input, args.output_file, args.frame_rate, args.duration,
@@ -297,7 +293,8 @@ def main():
 
         if(sys.argv[1] == 'info'):
             from info import getInfo, info_options
-            args = ParseOptions(sys.argv[2:], Log(), 'info', info_options())
+            parser = info_options(parser)
+            args = parser.parse_args(sys.argv[2:], Log(), 'info')
 
             log = Log()
             ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, False, log)
@@ -305,7 +302,8 @@ def main():
             getInfo(args.input, ffmpeg, ffprobe, args.fast, log)
         if(sys.argv[1] == 'levels'):
             from levels import levels, levels_options
-            args = ParseOptions(sys.argv[2:], Log(), 'levels', levels_options())
+            parser = levels_options(parser)
+            args = parser.parse_args(sys.argv[2:], Log(), 'levels')
 
             TEMP = tempfile.mkdtemp()
             log = Log(temp=TEMP)
@@ -314,10 +312,8 @@ def main():
             levels(args.input, args.track, args.output_file, ffmpeg, ffprobe, TEMP, log)
         sys.exit()
     else:
-        option_data = main_options()
-        args = ParseOptions(sys.argv[1:], Log(True), 'auto-editor', option_data)
-
-    del option_data
+        parser = main_options(parser)
+        args = parser.parse_args(sys.argv[1:], Log(True), 'auto-editor')
 
     timer = Timer(args.quiet)
 
@@ -689,12 +685,12 @@ def main():
 
                     from renderVideo import renderAv
                     renderAv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps, has_vfr,
-                    TEMP, log)
+                        TEMP, log)
 
                 if(args.render == 'opencv'):
                     from renderVideo import renderOpencv
-                    renderOpencv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps, has_vfr,
-                        effects, TEMP, log)
+                    renderOpencv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps,
+                        has_vfr, effects, TEMP, log)
 
                 # Now mix new audio(s) and the new video.
                 muxVideo(ffmpeg, output, args, tracks, TEMP, log)

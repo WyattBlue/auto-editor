@@ -8,20 +8,16 @@ import math
 from usefulFunctions import sep
 from wavfile import read
 
-def levels_options():
-    from vanparse import add_argument
-    ops = []
-    ops += add_argument('--output_file', '--output', '-o', type=str,
+def levels_options(parser):
+    parser.add_argument('--output_file', '--output', '-o', type=str,
         default='data.txt')
-    ops += add_argument('--track', type=int, default=0,
+    parser.add_argument('--track', type=int, default=0,
         help='which audio track to target.')
-    ops += add_argument('--my_ffmpeg', action='store_true',
+    parser.add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
-    ops += add_argument('--help', '-h', action='store_true',
-        help='print info about the program or an option and exit.')
-    ops += add_argument('(input)', nargs='*',
+    parser.add_argument('(input)', nargs='*',
         help='the template')
-    return ops
+    return parser
 
 def levels(inputs: list, track, outfile, ffmpeg, ffprobe, temp, log):
 
