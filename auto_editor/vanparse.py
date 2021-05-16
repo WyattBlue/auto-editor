@@ -51,17 +51,51 @@ def printOptionHelp(args, option):
         print(f'    group: {option["grouping"]}')
 
 
+
+def out(text: str):
+    import re
+    import textwrap
+    from shutil import get_terminal_size
+
+    indent_regex = re.compile(r'^(\s+)')
+    width = get_terminal_size().columns
+
+    wraped_lines = []
+
+    for line in text.split('\n'):
+        exist_indent = re.search(indent_regex, line)
+        pre_indent = exist_indent.groups()[0] if exist_indent else ''
+
+        wraped_lines.append(
+            textwrap.fill(line, width=width, subsequent_indent=pre_indent)
+        )
+
+    print('\n'.join(wraped_lines))
+
+def printProgramHelp(root, the_args: list):
+    text = ''
+    for options in the_args:
+        for option in options:
+            if(option['action'] == 'grouping'):
+                text += f"\n  {option['names'][0]}:\n"
+            else:
+                text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
+    text += '\n'
+    if(root == 'auto-editor'):
+        text += '  Have an issue? Make an issue. Visit '\
+            'https://github.com/wyattblue/auto-editor/issues\n\n  The help option can '\
+            'also be used on a specific option:\n      auto-editor --frame_margin '\
+            '--help\n'
+    out(text)
+
 def getOption(item: str, group: str, the_args: list) -> str:
     for options in the_args:
         for option in options:
-            if(item in option['names']):
-                if(group == 'global' or option['grouping'] == group):
-                    return option
+            if(item in option['names'] and group in ['global', option['grouping']]):
+                return option
     return None
 
-
 class ParseOptions():
-
     def setConfig(self, config_path, root):
         if(not os.path.isfile(config_path)):
             return
@@ -93,7 +127,6 @@ class ParseOptions():
             if(getattr(self, key) != value):
                 print(f'Setting {key} to {value}', file=sys.stderr)
             setattr(self, key, value)
-
 
     def __init__(self, userArgs, log, root, *args):
         # Set the default options.
@@ -190,7 +223,6 @@ class ParseOptions():
                     value = True
                 else:
                     try:
-                        # Convert to correct type.
                         value = option['type'](nextItem)
                     except Exception as err:
                         typeName = option['type'].__name__
@@ -211,17 +243,5 @@ class ParseOptions():
             setattr(self, option_list, list(map(list_type, my_list)))
 
         if(self.help):
-            for options in args:
-                for op in options:
-                    if(op['action'] == 'grouping'):
-                        print(f"\n  {op['names'][0]}:")
-                    else:
-                        print(' ', ', '.join(op['names']) + ':', op['help'])
-            print('')
-            if(root == 'auto-editor'):
-                print('  Have an issue? Make an issue. '\
-                    'Visit https://github.com/wyattblue/auto-editor/issues\n')
-                print('  The help option can also be used on a specific option:')
-                print('      auto-editor --frame_margin --help\n')
+            printProgramHelp(root, args)
             sys.exit()
-
