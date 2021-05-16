@@ -22,7 +22,7 @@ def add_argument(*names, nargs=1, type=str, default=None, action='default',
 
 def printOptionHelp(args, option):
     if(option['action'] == 'grouping'):
-        print(f'  {option['names'][0]}:')
+        print(f'  {option["names"][0]}:')
     else:
         print(' ', ', '.join(option['names']))
         print('   ', option['help'])
