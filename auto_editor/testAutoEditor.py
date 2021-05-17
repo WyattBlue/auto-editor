@@ -175,7 +175,7 @@ def testAutoEditor():
 
     # Test rejecting files with no extension.
     shutil.copy('example.mp4', 'example')
-    checkForError(['example', '--no_open'], 'must have extension.')
+    checkForError(['example', '--no_open'], 'must have an extension.')
     os.remove('example')
 
     # Test ProgressOps
