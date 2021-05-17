@@ -55,19 +55,21 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
             fileFormat = myInput[myInput.rfind('.'):]
 
             if('.' not in fileFormat):
-                log.error('File must have extension.')
+                log.error('File must have an extension.')
 
             if(fileFormat in invalidExtensions):
                 log.error(f'Invalid file extension "{fileFormat}" for {myInput}')
             inputList.append(myInput)
 
         elif(myInput.startswith('http://') or myInput.startswith('https://')):
-            basename = re.sub(r'\W+', '-', myInput)
+            outtmpl = re.sub(r'\W+', '-', myInput)
 
-            outtmpl = basename
+            if(outtmpl.endswith('-mp4')):
+                outtmpl = outtmpl[:-4]
+            outtmpl += '.mp4'
+
             if(args.output_dir is not None):
-                from usefulFunctions import sep
-                outtmpl = args.output_dir + sep() + basename
+                outtmpl = os.path.join(args.output_dir, outtmpl)
 
             try:
                 import youtube_dl
@@ -77,15 +79,13 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
 
             from usefulFunctions import ProgressBar
 
-            if(not os.path.isfile(outtmpl + '.mp4')):
+            if(not os.path.isfile(outtmpl)):
 
                 ytbar = ProgressBar(100, 'Downloading')
                 def my_hook(d):
                     nonlocal ytbar
                     if(d['status'] == 'downloading'):
-                        p = d['_percent_str']
-                        p = p.replace('%','')
-                        ytbar.tick(float(p))
+                        ytbar.tick(float(d['_percent_str'].replace('%','')))
 
                 ydl_opts = {
                     'nocheckcertificate': not args.check_certificate,
@@ -105,7 +105,7 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
 
                 log.conwrite('')
 
-            inputList.append(outtmpl + '.mp4')
+            inputList.append(outtmpl)
         else:
             log.error('Could not find file: ' + myInput)
 
