@@ -151,7 +151,7 @@ def testAutoEditor():
         [ffprobe.getSampleRate, '48000'],
     )
 
-    runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'uncompressed', '--show_ffmpeg_debug'])
+    runTest(['example.mp4', '--video_codec', 'uncompressed', '--show_ffmpeg_debug'])
     fullInspect(
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
@@ -290,8 +290,8 @@ def testAutoEditor():
         runTest([item, '--export_as_clip_sequence'])
         runTest([item, '--preview'])
 
-    runTest(['example.mp4', 'exportMediaOps', '-vcodec', 'h264', '--preset', 'faster'])
-    runTest(['example.mp4', 'exportMediaOps', '--audio_codec', 'ac3'])
+    runTest(['example.mp4', '--video_codec', 'h264', '--preset', 'faster'])
+    runTest(['example.mp4', '--audio_codec', 'ac3'])
     runTest(['resources/newCommentary.mp3', 'exportMediaOps', '-acodec', 'pcm_s16le'])
 
     runTest(['example.mp4', '--mark_as_silent', '0,171', '-o', 'hmm.mp4'])

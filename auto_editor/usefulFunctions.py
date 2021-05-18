@@ -152,13 +152,11 @@ class ProgressBar():
                 except FileNotFoundError:
                     pass
 
-        newTime = prettyTime(self.beginTime, self.ampm)
-        termsize = get_terminal_size().columns
-
         self.allow_unicode = True
         try:
             self.tick(0)
         except UnicodeEncodeError:
+            newTime = prettyTime(self.beginTime, self.ampm)
             print(f'   0% done ETA {newTime}')
             self.allow_unicode = False
 
