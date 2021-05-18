@@ -5,18 +5,17 @@ import os
 from shutil import move, copy
 
 # Included Libraries
-from usefulFunctions import sep, fNone
+from usefulFunctions import fNone
 from fastAudio import fastAudio
 
-def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, log) -> bool:
-    log.checkType(tracks, 'tracks', int)
-    log.checkType(outFile, 'outFile', str)
+def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, log):
+    for t in range(tracks):
+        temp_file = os.path.join(temp, f'{t}.wav')
+        new_file = os.path.join(temp, f'new{t}.wav')
+        fastAudio(temp_file, new_file, chunks, speeds, log, fps,
+            args.machine_readable_progress, args.no_progress)
 
-    for trackNum in range(tracks):
-        fastAudio(f'{temp}{sep()}{trackNum}.wav', f'{temp}{sep()}new{trackNum}.wav',
-            chunks, speeds, log, fps, args.machine_readable_progress, args.no_progress)
-
-        if(not os.path.isfile(f'{temp}{sep()}new{trackNum}.wav')):
+        if(not os.path.isfile(new_file)):
             log.bug('Audio file not created.')
 
     if(args.export_as_audio):
@@ -24,12 +23,12 @@ def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, 
             log.warning("Audio files don't have multiple tracks.")
 
         if(tracks == 1):
-            move(f'{temp}{sep()}0.wav', outFile)
+            move(os.path.join(temp, '0.wav'), outFile)
             return False
 
         cmd = []
-        for trackNum in range(tracks):
-            cmd.extend(['-i', f'{temp}{sep()}{trackNum}.wav'])
+        for t in range(tracks):
+            cmd.extend(['-i', os.path.join(temp, f'{t}.wav')])
         cmd.extend(['-filter_complex', f'amix=inputs={tracks}:duration=longest', outFile])
         ffmpeg.run(cmd)
 
@@ -39,23 +38,24 @@ def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, 
 def muxVideo(ffmpeg, outFile, args, tracks, temp, log):
     cmd = []
     if(args.keep_tracks_seperate):
-        for i in range(tracks):
-            cmd.extend(['-i', f'{temp}{sep()}new{i}.wav'])
-        cmd.extend(['-i', f'{temp}{sep()}spedup.mp4'])
-        for i in range(tracks):
-            cmd.extend(['-map', f'{i}:a:0'])
+        for t in range(tracks):
+            cmd.extend(['-i', os.path.join(temp, f'new{t}.wav')])
+        cmd.extend(['-i', os.path.join(temp, 'spedup.mp4')])
+        for t in range(tracks):
+            cmd.extend(['-map', f'{t}:a:0'])
         cmd.extend(['-map', f'{tracks}:v:0'])
     else:
         # Merge all the audio tracks into one.
+        new_a_file = os.path.join(temp, 'newAudioFile.wav')
         if(tracks > 1):
-            for i in range(tracks):
-                cmd.extend(['-i', f'{temp}{sep()}new{i}.wav'])
+            for t in range(tracks):
+                cmd.extend(['-i', os.path.join(temp, f'new{t}.wav')])
             cmd.extend(['-filter_complex', f'amerge=inputs={tracks}', '-ac', '2',
-                f'{temp}{sep()}newAudioFile.wav'])
+                new_a_file])
             ffmpeg.run(cmd)
         else:
-            copy(f'{temp}{sep()}new0.wav', f'{temp}{sep()}newAudioFile.wav')
-        cmd = ['-i', f'{temp}{sep()}newAudioFile.wav', '-i', f'{temp}{sep()}spedup.mp4']
+            copy(os.path.join(temp, 'new0.wav'), new_a_file)
+        cmd = ['-i', new_a_file, '-i', os.path.join(temp, 'spedup.mp4')]
 
     cmd.extend(['-c:v', 'copy'])
     if(not fNone(args.audio_codec)):

@@ -1,8 +1,5 @@
 '''editor.py'''
 
-# Included libraries
-from usefulFunctions import sep
-
 # Internal libraries
 import os
 import platform
@@ -189,7 +186,8 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
 
         inFolder = os.path.dirname(os.path.abspath(myInput))
         name_without_extension = name[:name.rfind(".")]
-        newFolderName = f'{inFolder}{sep()}{name_without_extension}_tracks'
+
+        newFolderName = os.path.join(inFolder, f'{name_without_extension}_tracks')
         try:
             os.mkdir(newFolderName)
         except OSError:
@@ -198,8 +196,8 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
 
         trackurls = [pathurl]
         for i in range(1, tracks):
-            newtrack = f'{newFolderName}{sep()}{i}.wav'
-            move(f'{temp}{sep()}{i}.wav', newtrack)
+            newtrack = os.path.join(newFolderName, f'{i}.wav')
+            move(os.path.join(temp, f'{i}.wav'), newtrack)
             trackurls.append(fixUrl(newtrack, resolve))
 
     ntsc = 'FALSE'
