@@ -271,7 +271,7 @@ def main():
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
 
-    from usefulFunctions import Log, Timer, fNone, sep
+    from usefulFunctions import Log, Timer, fNone
     from ffwrapper import FFmpeg, FFprobe
 
     subcommands = ['create', 'test', 'info', 'levels']

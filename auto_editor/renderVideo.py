@@ -1,10 +1,11 @@
 '''renderVideo.py'''
 
 # Internal Libraries
+import os
 import subprocess
 
 # Included Libaries
-from usefulFunctions import ProgressBar, sep, fNone
+from usefulFunctions import ProgressBar, fNone
 
 def properties(cmd, args, vidFile, ffprobe):
 
@@ -31,8 +32,8 @@ def properties(cmd, args, vidFile, ffprobe):
     return cmd
 
 def scaleToSped(ffmpeg, ffprobe, vidFile, args, temp):
-    SCALE = f'{temp}{sep()}scale.mp4'
-    SPED = f'{temp}{sep()}spedup.mp4'
+    SCALE = os.path.join(temp, 'scale.mp4')
+    SPED = os.path.join(temp, 'spedup.mp4')
 
     cmd = ['-i', SCALE]
     cmd = properties(cmd, args, vidFile, ffprobe)
@@ -97,10 +98,10 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
 
     if(args.scale != 1):
         cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}',
-            f'{temp}{sep()}scale.mp4'])
+            os.path.join(temp, 'scale.mp4')])
     else:
         cmd = properties(cmd, args, vidFile, ffprobe)
-        cmd.append(f'{temp}{sep()}spedup.mp4')
+        cmd.append(os.path.join(temp, 'spedup.mp4'))
 
     if(args.show_ffmpeg_debug):
         process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE)
@@ -161,13 +162,13 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     if(args.scale != 1):
         width = int(width * args.scale)
         height = int(height * args.scale)
-        video_name = f'{temp}{sep()}scale.mp4'
+        video_name = os.path.join(temp, 'scale.mp4')
     else:
-        video_name = f'{temp}{sep()}spedup.mp4'
+        video_name = os.path.join(temp, 'spedup.mp4')
 
     if(width < 2 or height < 2):
         log.error('Resolution too small.')
-    log.debug(f'\n Resolution {width}x{height}')
+    log.debug(f'Resolution: {width}x{height}')
 
     out = cv2.VideoWriter(video_name, fourcc, fps, (width, height))
 
@@ -365,7 +366,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             remander = doIt % 1
 
         videoProgress.tick(cframe)
-    log.debug(f'\nFrames Written: {framesWritten}')
+    log.debug(f'Frames Written: {framesWritten}')
     log.debug(f'Total Frames: {totalFrames}')
 
     cap.release()
@@ -374,7 +375,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
     if(args.scale == 1):
         cmd = properties(['-i', vidFile], args, vidFile, ffprobe)
-        cmd.append(f'{temp}{sep()}spedup.mp4')
+        cmd.append(os.path.join(temp, 'spedup.mp4'))
         ffmpeg.run(cmd)
     else:
         scaleToSped(ffmpeg, ffprobe, vidFile, args, temp)

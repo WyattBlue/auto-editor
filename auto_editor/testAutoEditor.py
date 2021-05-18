@@ -12,7 +12,7 @@ import platform
 import subprocess
 
 # Included Libraries
-from usefulFunctions import Log, sep
+from usefulFunctions import Log
 from ffwrapper import FFprobe
 
 def getRunner():
@@ -21,10 +21,9 @@ def getRunner():
     return ['python3', 'auto_editor/__main__.py']
 
 
-def pipeToConsole(myCommands: list):
-    print(myCommands)
-    process = subprocess.Popen(myCommands, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
+def pipeToConsole(cmd: list):
+    print(cmd)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     return process.returncode, stdout.decode(), stderr.decode()
 
@@ -75,7 +74,7 @@ def checkForError(cmd, match=None):
 
 def cleanup(the_dir):
     for item in os.listdir(the_dir):
-        item = f'{the_dir}{sep()}{item}'
+        item = os.path.join(the_dir, item)
         if('_ALTERED' in item or item.endswith('.xml') or item.endswith('.json')
             or item.endswith('.fcpxml')):
             os.remove(item)

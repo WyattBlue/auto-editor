@@ -18,8 +18,8 @@ class Log():
         self.temp = temp
 
     def debug(self, message):
-        self.conwrite('')
         if(self.is_debug):
+            self.conwrite('')
             print('debug', message)
 
     def cleanup(self):
@@ -95,13 +95,6 @@ def pipeToConsole(myCommands: list) -> str:
     stdout, __ = process.communicate()
     return stdout.decode()
 
-
-def sep() -> str:
-    if(system() == 'Windows'):
-        return '\\'
-    return '/'
-
-
 def cleanList(x: list, rm_chars: str) -> list:
     no = str.maketrans('', '', rm_chars)
     x = [s.translate(no) for s in x]
@@ -114,7 +107,6 @@ def getNewLength(chunks: list, speeds: list, fps: float) -> float:
         if(speeds[chunk[2]] < 99999):
             timeInFrames += leng * (1 / speeds[chunk[2]])
     return timeInFrames / fps
-
 
 def prettyTime(myTime: float, ampm: bool) -> str:
     newTime = localtime(myTime)

@@ -5,7 +5,6 @@ import numpy as np
 import os
 import math
 
-from usefulFunctions import sep
 from wavfile import read
 
 def levels_options(parser):
@@ -27,18 +26,11 @@ def levels(inputs: list, track, outfile, ffmpeg, ffprobe, temp, log):
     fps = ffprobe.getFrameRate(file)
 
     # Split audio tracks into: 0.wav, 1.wav, etc.
-    for trackNum in range(tracks):
-        ffmpeg.run(['-i', file, '-ac', '2', '-map', f'0:a:{trackNum}',
-            f'{temp}{sep()}{trackNum}.wav'])
+    for t in range(tracks):
+        ffmpeg.run(['-i', file, '-ac', '2', '-map', f'0:a:{t}',
+            os.path.join(temp, f'{t}.wav')])
 
-    track = 0
-
-    # Read only one audio file.
-    if(os.path.isfile(f'{temp}{sep()}{track}.wav')):
-        sampleRate, audioData = read(f'{temp}{sep()}{track}.wav')
-    else:
-        log.error('Audio track not found!')
-
+    sampleRate, audioData = read(os.path.join(temp, f'0.wav'))
     audioSampleCount = audioData.shape[0]
 
     def getMaxVolume(s: np.ndarray) -> float:
@@ -58,15 +50,4 @@ def levels(inputs: list, track, outfile, ffmpeg, ffprobe, temp, log):
             audiochunks = audioData[start:end]
             out.write(f'{getMaxVolume(audiochunks) / maxAudioVolume}\n')
 
-    log.debug('Deleting temp dir')
-
-    from shutil import rmtree
-    try:
-        rmtree(temp)
-    except PermissionError:
-        from time import sleep
-        sleep(1)
-        try:
-            rmtree(temp)
-        except PermissionError:
-            log.debug('Failed to delete temp dir.')
+    log.cleanup()
