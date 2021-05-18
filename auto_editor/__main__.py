@@ -124,13 +124,13 @@ def main_options(parser):
         help='set the audio codec for the output media file.')
     parser.add_argument('--preset', '-p', default='medium', group='exportMediaOps',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
-            'slow', 'slower', 'veryslow'],
+            'slow', 'slower', 'veryslow', 'unset'],
         help='set the preset for ffmpeg to help save file size or increase quality.')
     parser.add_argument('--tune', '-t', default='none', group='exportMediaOps',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none', 'unset'],
         help='set the tune for ffmpeg to compress video better in certain circumstances.')
-    parser.add_argument('--constant_rate_factor', '-crf', type=int, default=15,
+    parser.add_argument('--constant_rate_factor', '-crf', default='15',
         group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
 
@@ -320,10 +320,6 @@ def main():
     ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
     ffprobe = FFprobe(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
 
-    # Stops "The file {file} does not exist." from showing.
-    if(args.export_as_clip_sequence):
-        args.no_open = True
-
     makingDataFile = (args.export_to_premiere or args.export_to_resolve or
         args.export_to_final_cut_pro or args.export_as_json)
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
@@ -344,7 +340,7 @@ def main():
     log.debug(f'\n   - Temp Directory: {TEMP}')
 
     if(is64bit == '32-bit'):
-        log.warning('You have the 32-bit version of Python, which may lead to' \
+        log.warning('You have the 32-bit version of Python, which may lead to ' \
             'memory crashes.')
 
     if(args.version):
@@ -354,9 +350,38 @@ def main():
     ffmpeg.updateLog(log)
     ffprobe.updateLog(log)
 
-    from argsCheck import hardArgsCheck, softArgsCheck
+    from argsCheck import hardArgsCheck
     hardArgsCheck(args, log)
-    args = softArgsCheck(args, log)
+
+    if(args.preview):
+        pass
+    elif(args.export_to_premiere):
+        log.conwrite('Exporting to Adobe Premiere Pro XML file.')
+    elif(args.export_to_final_cut_pro):
+        log.conwrite('Exporting to Final Cut Pro XML file.')
+    elif(args.export_to_resolve):
+        log.conwrite('Exporting to DaVinci Resolve XML file.')
+    elif(args.export_as_audio):
+        log.conwrite('Exporting as audio.')
+    else:
+        log.conwrite('Starting.')
+
+    if(args.preview or args.export_as_clip_sequence or makingDataFile):
+        args.no_open = True
+
+    from usefulFunctions import hex_to_bgr
+    args.background = hex_to_bgr(args.background, log)
+    if(args.blur < 0):
+        args.blur = 0
+
+    if(args.silent_speed <= 0 or args.silent_speed > 99999):
+        args.silent_speed = 99999
+
+    if(args.video_speed <= 0 or args.video_speed > 99999):
+        args.video_speed = 99999
+
+    if(args.output_file is None):
+        args.output_file = []
 
     from validateInput import validInput
     inputList = validInput(args.input, ffmpeg, args, log)
@@ -364,7 +389,6 @@ def main():
     # Figure out the output file names.
     def newOutputName(oldFile: str, audio, final_cut_pro, data, json) -> str:
         dotIndex = oldFile.rfind('.')
-        print(oldFile)
         if(json):
             return oldFile[:dotIndex] + '.json'
         if(final_cut_pro):
