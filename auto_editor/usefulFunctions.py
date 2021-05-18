@@ -8,8 +8,8 @@ put here. No function should modify or create video/audio files on its own.
 # Internal Libraries
 import sys
 from platform import system
-from shutil import get_terminal_size
-from time import time, localtime
+from shutil import rmtree, get_terminal_size
+from time import time, localtime, sleep
 
 class Log():
     def __init__(self, show_debug=False, quiet=False, temp=None):
@@ -24,9 +24,15 @@ class Log():
     def cleanup(self):
         if(self.temp is None):
             return
+        try:
+            rmtree(self.temp)
+        except PermissionError:
+            sleep(0.1)
+            try:
+                rmtree(self.temp)
+            except PermissionError:
+                log.debug('Failed to delete temp dir.')
 
-        from shutil import rmtree
-        rmtree(self.temp)
         self.debug('   - Removed Temp Directory.')
 
     def conwrite(self, message: str):
@@ -98,8 +104,7 @@ def sep() -> str:
 def cleanList(x: list, rm_chars: str) -> list:
     no = str.maketrans('', '', rm_chars)
     x = [s.translate(no) for s in x]
-    x = [s for s in x if s != '']
-    return x
+    return [s for s in x if s != '']
 
 def getNewLength(chunks: list, speeds: list, fps: float) -> float:
     timeInFrames = 0

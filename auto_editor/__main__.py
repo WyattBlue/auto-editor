@@ -317,11 +317,17 @@ def main():
 
     timer = Timer(args.quiet)
 
-    ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
-    ffprobe = FFprobe(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, Log())
+    TEMP = tempfile.mkdtemp()
+    log = Log(args.debug, args.quiet, temp=TEMP)
+    log.debug(f'\n   - Temp Directory: {TEMP}')
 
-    makingDataFile = (args.export_to_premiere or args.export_to_resolve or
-        args.export_to_final_cut_pro or args.export_as_json)
+    ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, log)
+    ffprobe = FFprobe(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, log)
+
+    exporting_to_editor = (args.export_to_premiere or args.export_to_resolve or
+        args.export_to_final_cut_pro)
+    making_data_file = exporting_to_editor or args.export_as_json
+
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
     if(args.debug and args.input == []):
@@ -333,11 +339,8 @@ def main():
         print('FFmpeg path:', ffmpeg.getPath())
         print('FFmpeg version:', ffmpeg.getVersion())
         print('Auto-Editor version', version)
+        log.cleanup()
         sys.exit()
-
-    TEMP = tempfile.mkdtemp()
-    log = Log(args.debug, args.quiet, temp=TEMP)
-    log.debug(f'\n   - Temp Directory: {TEMP}')
 
     if(is64bit == '32-bit'):
         log.warning('You have the 32-bit version of Python, which may lead to ' \
@@ -345,10 +348,8 @@ def main():
 
     if(args.version):
         print('Auto-Editor version', version)
+        log.cleanup()
         sys.exit()
-
-    ffmpeg.updateLog(log)
-    ffprobe.updateLog(log)
 
     from argsCheck import hardArgsCheck
     hardArgsCheck(args, log)
@@ -366,7 +367,7 @@ def main():
     else:
         log.conwrite('Starting.')
 
-    if(args.preview or args.export_as_clip_sequence or makingDataFile):
+    if(args.preview or args.export_as_clip_sequence or making_data_file):
         args.no_open = True
 
     from usefulFunctions import hex_to_bgr
@@ -402,7 +403,7 @@ def main():
     if(len(args.output_file) < len(inputList)):
         for i in range(len(inputList) - len(args.output_file)):
             args.output_file.append(newOutputName(inputList[i],
-                args.export_as_audio, args.export_to_final_cut_pro, makingDataFile,
+                args.export_as_audio, args.export_to_final_cut_pro, making_data_file,
                 args.export_as_json))
 
     if(args.combine_files):
@@ -445,7 +446,7 @@ def main():
             from makeCutList import readCutList
             INPUT_FILE, chunks, speeds = readCutList(INPUT_FILE, version, log)
             newOutput = newOutputName(INPUT_FILE, args.export_as_audio,
-                args.export_to_final_cut_pro, makingDataFile, False)
+                args.export_to_final_cut_pro, making_data_file, False)
 
             fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
         else:
@@ -494,26 +495,27 @@ def main():
                 tracks = 1
             else:
                 tracks = args.force_tracks_to
-            cmd = ['-i', INPUT_FILE]
-            if(not fNone(audioBitrate)):
-                cmd.extend(['-b:a', audioBitrate])
-            cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', f'{TEMP}{sep()}fastAud.wav'])
-            ffmpeg.run(cmd)
-            del cmd
 
-            sampleRate, audioData = read(f'{TEMP}{sep()}fastAud.wav')
+            output = os.path.join(TEMP, 'fastAud.wav')
+            def convert_audio(input_file, output_file, sample_rate, audio_bitrate):
+                cmd = ['-i', input_file]
+                if(not fNone(audio_bitrate)):
+                    cmd.extend(['-b:a', audio_bitrate])
+                cmd.extend(['-ac', '2', '-ar', sample_rate, '-vn', output_file])
+                ffmpeg.run(cmd)
+
+            convert_audio(INPUT_FILE, output, sampleRate, audioBitrate)
+            sampleRate, audioData = read(output)
         else:
             if(args.force_fps_to is not None):
                 fps = args.force_fps_to
-            elif(args.export_to_premiere or args.export_to_final_cut_pro or
-                args.export_to_resolve):
-                # Based on timebase.
-                fps = int(ffprobe.getFrameRate(INPUT_FILE))
             else:
                 fps = ffprobe.getFrameRate(INPUT_FILE)
+                if(exporting_to_editor):
+                    fps = int(fps)
 
             if(fps < 1):
-                log.error(f"{INPUT_FILE}: Frame rate cannot be below 1. fps: {fps}")
+                log.error(f'{INPUT_FILE}: Frame rate cannot be below 1. fps: {fps}')
 
             tracks = args.force_tracks_to
             if(tracks is None):
@@ -662,7 +664,7 @@ def main():
             theFile = handleAudio(ffmpeg, input_, audioBitrate, str(sampleRate),
                 TEMP, log)
 
-            TEMP_FILE = f'{TEMP}{sep()}convert.wav'
+            TEMP_FILE = os.path.join(TEMP, 'convert.wav')
             fastAudio(theFile, TEMP_FILE, chunks, speeds, log, fps,
                 args.machine_readable_progress, args.no_progress)
             convertAudio(ffmpeg, ffprobe, TEMP_FILE, input_, output, args, log)
@@ -730,10 +732,10 @@ def main():
         else:
             makeVideoFile(INPUT_FILE, chunks, newOutput)
 
-    if(not args.preview and not makingDataFile):
+    if(not args.preview and not making_data_file):
         timer.stop()
 
-    if(not args.preview and makingDataFile):
+    if(not args.preview and making_data_file):
         from usefulFunctions import humanReadableTime
         # Assume making each cut takes about 30 seconds.
         timeSave = humanReadableTime(numCuts * 30)
@@ -746,17 +748,7 @@ def main():
         from usefulFunctions import openWithSystemDefault
         openWithSystemDefault(newOutput, log)
 
-    log.debug('Deleting temp dir')
-
-    try:
-        rmtree(TEMP)
-    except PermissionError:
-        from time import sleep
-        sleep(1)
-        try:
-            rmtree(TEMP)
-        except PermissionError:
-            log.debug('Failed to delete temp dir.')
+    log.cleanup()
 
 if(__name__ == '__main__'):
     main()
