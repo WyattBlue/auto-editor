@@ -1,6 +1,7 @@
 '''fastAudio.py'''
 
 from usefulFunctions import ProgressBar, getNewLength, fNone
+import os
 
 def convertAudio(ffmpeg, ffprobe, in_file, INPUT_FILE, out_file, args, log):
     log.debug(f'Converting internal audio file: {in_file} to {out_file}')
@@ -32,8 +33,6 @@ def handleAudio(ffmpeg, in_file, audioBit, samplerate: str, temp, log) -> str:
 def fastAudio(in_file, out_file, chunks: list, speeds: list, log, fps: float,
     machineReadable, hideBar):
     from wavfile import read, write
-    import os
-
     import numpy as np
 
     log.checkType(chunks, 'chunks', list)
