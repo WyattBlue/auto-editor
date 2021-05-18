@@ -36,6 +36,7 @@ class Log():
                 self.debug('Failed to delete temp dir.')
 
     def conwrite(self, message: str):
+        self.conwrite('')
         if(not self.quiet):
             numSpaces = get_terminal_size().columns - len(message) - 3
             print('  ' + message + ' ' * numSpaces, end='\r', flush=True)
@@ -200,19 +201,19 @@ class ProgressBar():
         else:
             print(f'   {percentDone}% done ETA {newTime}')
 
-def humanReadableTime(rawTime: float) -> str:
+def humanReadableTime(time_in_secs: float) -> str:
     units = 'seconds'
-    if(rawTime >= 3600):
-        rawTime = round(rawTime / 3600, 1)
-        if(rawTime % 1 == 0):
-            rawTime = round(rawTime)
+    if(time_in_secs >= 3600):
+        time_in_secs = round(time_in_secs / 3600, 1)
+        if(time_in_secs % 1 == 0):
+            time_in_secs = round(time_in_secs)
         units = 'hours'
-    if(rawTime >= 60):
-        rawTime = round(rawTime / 60, 1)
-        if(rawTime >= 10 or rawTime % 1 == 0):
-            rawTime = round(rawTime)
+    if(time_in_secs >= 60):
+        time_in_secs = round(time_in_secs / 60, 1)
+        if(time_in_secs >= 10 or time_in_secs % 1 == 0):
+            time_in_secs = round(time_in_secs)
         units = 'minutes'
-    return f'{rawTime} {units}'
+    return f'{time_in_secs} {units}'
 
 def openWithSystemDefault(newOutput: str, log):
     from subprocess import call

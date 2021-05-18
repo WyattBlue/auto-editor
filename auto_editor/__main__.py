@@ -5,9 +5,8 @@
 import os
 import sys
 import tempfile
-from shutil import rmtree
 
-version = '21w19b dev'
+version = '21w20a'
 
 def error(message):
     print('Error!', message, file=sys.stderr)
@@ -335,7 +334,7 @@ def main():
 
         print('Python Version:', platform.python_version(), is64bit)
         print('Platform:', platform.system(), platform.release())
-        print('Config File path:', dirPath + sep() + 'config.txt')
+        print('Config File path:', os.path.join(dirPath, 'config.txt'))
         print('FFmpeg path:', ffmpeg.getPath())
         print('FFmpeg version:', ffmpeg.getVersion())
         print('Auto-Editor version', version)
@@ -370,8 +369,9 @@ def main():
     if(args.preview or args.export_as_clip_sequence or making_data_file):
         args.no_open = True
 
-    from usefulFunctions import hex_to_bgr
-    args.background = hex_to_bgr(args.background, log)
+    import usefulFunctions
+
+    args.background = usefulFunctions.hex_to_bgr(args.background, log)
     if(args.blur < 0):
         args.blur = 0
 
@@ -407,16 +407,15 @@ def main():
                 args.export_as_json))
 
     if(args.combine_files):
-        # Combine video files, then set input to 'combined.mp4'.
+        temp_file = os.path.join(TEMP, 'combined.mp4')
         cmd = []
         for fileref in inputList:
             cmd.extend(['-i', fileref])
         cmd.extend(['-filter_complex', f'[0:v]concat=n={len(inputList)}:v=1:a=1',
-            '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2',
-            f'{TEMP}{sep()}combined.mp4'])
+            '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2', temp_file])
         ffmpeg.run(cmd)
         del cmd
-        inputList = [f'{TEMP}{sep()}combined.mp4']
+        inputList = [temp_file]
 
     speeds = [args.silent_speed, args.video_speed]
     if(args.cut_out != [] and 99999 not in speeds):
@@ -497,9 +496,9 @@ def main():
                 cmd.extend(['-ac', '2', '-ar', sample_rate, '-vn', output_file])
                 ffmpeg.run(cmd)
 
-            fast_aud = os.path.join(TEMP, 'fastAud.wav')
-            convertAudio(INPUT_FILE, fast_aud, sampleRate, audioBitrate)
-            sampleRate, audioData = read(fast_aud)
+            temp_file = os.path.join(TEMP, 'fastAud.wav')
+            convertAudio(INPUT_FILE, temp_file, sampleRate, audioBitrate)
+            sampleRate, audioData = read(temp_file)
         else:
             if(args.force_fps_to is not None):
                 fps = args.force_fps_to
@@ -516,16 +515,14 @@ def main():
                 tracks = ffprobe.getAudioTracks(INPUT_FILE)
 
             if(args.cut_by_this_track >= tracks):
-                allTracks = ''
-                for trackNum in range(tracks):
-                    allTracks += f'Track {trackNum}\n'
-
+                message = "You choose a track that doesn't exist.\nThere "
                 if(tracks == 1):
-                    message = f'is only {tracks} track'
+                    message += f'is only {tracks} track.\n'
                 else:
-                    message = f'are only {tracks} tracks'
-                log.error("You choose a track that doesn't exist.\n" \
-                    f'There {message}.\n {allTracks}')
+                    message += f'are only {tracks} tracks.\n'
+                for t in range(tracks):
+                    message += f' Track {t}\n'
+                log.error(message)
 
             def NumberOfVrfFrames(text, log):
                 import re
@@ -543,31 +540,27 @@ def main():
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
             cmd = ['-i', INPUT_FILE, '-hide_banner']
-            for trackNum in range(tracks):
-                cmd.extend(['-map', f'0:a:{trackNum}'])
+            for t in range(tracks):
+                cmd.extend(['-map', f'0:a:{t}'])
                 if(not fNone(audioBitrate)):
                     cmd.extend(['-ab', audioBitrate])
                 cmd.extend(['-ac', '2', '-ar', sampleRate,
-                    f'{TEMP}{sep()}{trackNum}.wav'])
+                    os.path.join(TEMP, f'{t}.wav')])
             cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
             has_vfr = hasVFR(cmd, log)
             del cmd
 
-            # Check if the `--cut_by_all_tracks` flag has been set or not.
             if(args.cut_by_all_tracks):
-                # Combine all audio tracks into one audio file, then read.
+                temp_file = os.path.join(TEMP, 'combined.wav')
                 cmd = ['-i', INPUT_FILE, '-filter_complex',
                     f'[0:a]amix=inputs={tracks}:duration=longest', '-ar',
-                    sampleRate, '-ac', '2', '-f', 'wav', f'{TEMP}{sep()}combined.wav']
+                    sampleRate, '-ac', '2', '-f', 'wav', temp_file]
                 ffmpeg.run(cmd)
-                sampleRate, audioData = read(f'{TEMP}{sep()}combined.wav')
                 del cmd
             else:
-                # Read only one audio file.
-                if(os.path.isfile(f'{TEMP}{sep()}{args.cut_by_this_track}.wav')):
-                    sampleRate, audioData = read(f'{TEMP}{sep()}{args.cut_by_this_track}.wav')
-                else:
-                    log.bug('Audio track not found!')
+                temp_file = os.path.join(TEMP, f'{args.cut_by_this_track}.wav')
+
+            sampleRate, audioData = read(temp_file)
 
         log.debug(f'Frame Rate: {fps}')
         if(chunks is None):
@@ -582,9 +575,8 @@ def main():
 
             if('motion' in args.edit_based_on):
                 log.debug('Analyzing video motion.')
-                motionList = motionDetection(INPUT_FILE, ffprobe,
-                    args.motion_threshold, log, width=args.width,
-                    dilates=args.dilates, blur=args.blur)
+                motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold,
+                    log, width=args.width, dilates=args.dilates, blur=args.blur)
 
                 if(audioList is not None):
                     if(len(audioList) != len(motionList)):
@@ -658,10 +650,10 @@ def main():
             theFile = handleAudio(ffmpeg, input_, audioBitrate, str(sampleRate),
                 TEMP, log)
 
-            TEMP_FILE = os.path.join(TEMP, 'convert.wav')
-            fastAudio(theFile, TEMP_FILE, chunks, speeds, log, fps,
+            temp_file = os.path.join(TEMP, 'convert.wav')
+            fastAudio(theFile, temp_file, chunks, speeds, log, fps,
                 args.machine_readable_progress, args.no_progress)
-            convertAudio(ffmpeg, ffprobe, TEMP_FILE, input_, output, args, log)
+            convertAudio(ffmpeg, ffprobe, temp_file, input_, output, args, log)
 
         if(audioFile):
             if(args.export_as_clip_sequence):
@@ -707,6 +699,12 @@ def main():
                     renderOpencv(ffmpeg, ffprobe, input_, args, chunks, speeds, fps,
                         has_vfr, effects, TEMP, log)
 
+                if(log.is_debug):
+                    log.conwrite('')
+                    log.debug('Writing the output file.')
+                else:
+                    log.conwrite('Writing the output file.')
+
                 # Now mix new audio(s) and the new video.
                 muxVideo(ffmpeg, output, args, tracks, TEMP, log)
                 if(output is not None and not os.path.isfile(output)):
@@ -730,17 +728,15 @@ def main():
         timer.stop()
 
     if(not args.preview and making_data_file):
-        from usefulFunctions import humanReadableTime
         # Assume making each cut takes about 30 seconds.
-        timeSave = humanReadableTime(numCuts * 30)
+        timeSave = usefulFunctions.humanReadableTime(numCuts * 30)
 
         s = 's' if numCuts != 1 else ''
         log.print(f'Auto-Editor made {numCuts} cut{s}', end='')
         log.print(f', which would have taken about {timeSave} if edited manually.')
 
     if(not args.no_open):
-        from usefulFunctions import openWithSystemDefault
-        openWithSystemDefault(newOutput, log)
+        usefulFunctions.openWithSystemDefault(newOutput, log)
 
     log.cleanup()
 
