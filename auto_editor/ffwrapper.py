@@ -48,7 +48,7 @@ class FFprobe():
 
     def run(self, cmd: list):
         cmd.insert(0, self.path)
-        self.log(cmd)
+        self.log.debug(cmd)
         subprocess.call(cmd)
 
     def pipe(self, cmd: list) -> str:

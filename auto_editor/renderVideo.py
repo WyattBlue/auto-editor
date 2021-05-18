@@ -89,7 +89,7 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
     height = inputVideoStream.height
     pix_fmt = inputVideoStream.pix_fmt
 
-    log.debug(f'   - pix_fmt: {pix_fmt}')
+    log.debug(f'pix_fmt: {pix_fmt}')
 
     cmd = [ffmpeg.getPath(), '-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
         '-pix_fmt', pix_fmt, '-s', f'{width}*{height}', '-framerate', f'{fps}', '-i', '-',
@@ -370,8 +370,8 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             remander = doIt % 1
 
         videoProgress.tick(cframe)
-    log.debug(f'\n   - Frames Written: {framesWritten}')
-    log.debug(f'   - Total Frames: {totalFrames}')
+    log.debug(f'\nFrames Written: {framesWritten}')
+    log.debug(f'Total Frames: {totalFrames}')
 
     cap.release()
     out.release()
