@@ -1,10 +1,8 @@
 '''argsCheck.py'''
 
-from usefulFunctions import hex_to_bgr
-
 def hardArgsCheck(args, log):
     if(args.input == []):
-        log.error('You need to give auto-editor an input file or folder so it can' \
+        log.error('You need to give auto-editor an input file or folder so it can ' \
             'do the work for you.')
 
     if([args.export_to_premiere, args.export_to_resolve,
@@ -16,7 +14,7 @@ def hardArgsCheck(args, log):
             args.tune != 'none' or args.sample_rate is not None or
             args.audio_bitrate is not None or args.video_bitrate is not None):
                 log.warning('exportMediaOps options are not used when exporting ' \
-                    ' as an XML.')
+                    'as an XML.')
 
     if(isinstance(args.frame_margin, str)):
         try:

@@ -6,19 +6,19 @@ from os import path
 from platform import system
 
 # Included Libraries
-from usefulFunctions import pipeToConsole, cleanList, sep
+from usefulFunctions import pipeToConsole, cleanList
 
 class FFprobe():
-    def __init__(self, dirPath, myFFmpeg: bool, FFdebug, log):
+    def __init__(self, dirpath, myFFmpeg: bool, FFdebug, log):
 
         self.mylog = log
         self.FFdebug = FFdebug
 
         newF = None
         if(system() == 'Windows' and not myFFmpeg):
-            newF = path.join(dirPath, f'win-ffmpeg{sep()}bin{sep()}ffprobe.exe')
+            newF = path.join(dirpath, 'win-ffmpeg', 'bin', 'ffprobe.exe')
         if(system() == 'Darwin' and not myFFmpeg):
-            newF = path.join(dirPath, f'mac-ffmpeg{sep()}bin{sep()}ffprobe')
+            newF = path.join(dirpath, 'mac-ffmpeg', 'bin', 'ffprobe')
 
         if(newF is not None and path.isfile(newF)):
             self.myPath = newF
@@ -28,14 +28,14 @@ class FFprobe():
                 pipeToConsole([self.myPath, '-h'])
             except FileNotFoundError:
                 if(system() == 'Darwin'):
-                    self.mylog.error('No ffprobe found, download via homebrew or restore' \
-                        ' the included binary.')
+                    self.mylog.error('No ffprobe found, download via homebrew or '\
+                        'restore the included binary.')
                 elif(system() == 'Windows'):
-                    self.mylog.error('No ffprobe found, download ffprobe with your' \
-                        ' favorite package manager (ex chocolatey), or restore the' \
-                        ' included binary.')
+                    self.mylog.error('No ffprobe found, download ffprobe with your '\
+                        'favorite package manager (ex chocolatey), or restore the '\
+                        'included binary.')
                 else:
-                    self.mylog.error('ffprobe must be on PATH. Download ffprobe by running:\n' \
+                    self.mylog.error('ffprobe must be on PATH. Download ffprobe by running:\n'\
                         '  sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg' \
                         '\nOr something similar depending on your distro.')
 
@@ -46,14 +46,8 @@ class FFprobe():
     def getPath(self) -> str:
         return self.myPath
 
-    def updateLog(self, log):
-        self.mylog = log
-
     def run(self, cmd: list):
         cmd.insert(0, self.myPath)
-
-        if(None in cmd):
-            self.mylog.bug(f'None in cmd. {cmd}')
         self.log(cmd)
         subprocess.call(cmd)
 
@@ -144,16 +138,16 @@ class FFprobe():
         return 'N/A'
 
 class FFmpeg():
-    def __init__(self, dirPath, myFFmpeg: bool, FFdebug, log):
+    def __init__(self, dirpath, myFFmpeg: bool, FFdebug, log):
 
         self.mylog = log
         self.FFdebug = FFdebug
 
         newF = None
         if(system() == 'Windows' and not myFFmpeg):
-            newF = path.join(dirPath, f'win-ffmpeg{sep()}bin{sep()}ffmpeg.exe')
+            newF = path.join(dirpath, 'win-ffmpeg', 'bin', 'ffmpeg.exe')
         if(system() == 'Darwin' and not myFFmpeg):
-            newF = path.join(dirPath, f'mac-ffmpeg{sep()}bin{sep()}ffmpeg')
+            newF = path.join(dirpath, 'mac-ffmpeg', 'bin', 'ffmpeg')
 
         if(newF is not None and path.isfile(newF)):
             self.myPath = newF
@@ -163,16 +157,17 @@ class FFmpeg():
                 pipeToConsole([self.myPath, '-h'])
             except FileNotFoundError:
                 if(system() == 'Darwin'):
-                    self.mylog.error('No ffmpeg found, download via homebrew or restore' \
-                        ' the included binaries.')
+                    self.mylog.error('No ffmpeg found, download via homebrew or restore '\
+                        'the included binaries.')
                 elif(system() == 'Windows'):
-                    self.mylog.error('No ffmpeg found, download ffmpeg with your' \
-                        ' favorite package manager (ex chocolatey), or restore the' \
-                        ' included binaries.')
+                    self.mylog.error('No ffmpeg found, download ffmpeg with your '\
+                        'favorite package manager (ex chocolatey), or restore the '\
+                        'included binaries.')
                 else:
-                    self.mylog.error('FFmpeg must be on PATH. Download ffmpeg by running:\n' \
-                        '  sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg' \
-                        '\nOr something similar depending on your distro.')
+                    self.mylog.error('FFmpeg must be on PATH. Download ffmpeg by '\
+                        'running:\n  sudo apt-get install libavformat-dev libavfilter-dev '\
+                        'libavdevice-dev ffmpeg\nOr something similar depending on your '\
+                        'distro.')
 
     def log(self, message):
         if(self.FFdebug):
@@ -181,9 +176,6 @@ class FFmpeg():
     def getPath(self) -> str:
         return self.myPath
 
-    def updateLog(self, log):
-        self.mylog = log
-
     def run(self, cmd: list):
         cmd = [self.myPath, '-y'] + cmd
         if(self.FFdebug):
@@ -191,7 +183,6 @@ class FFmpeg():
         else:
             cmd.extend(['-nostats', '-loglevel', 'error'])
         self.mylog.debug(cmd)
-
         subprocess.call(cmd)
 
     def Popen(self, cmd: list):
@@ -210,7 +201,7 @@ class FFmpeg():
         return output
 
     def getVersion(self):
-        ffmpegVersion = self.pipe(['-version']).split('\n')[0]
-        ffmpegVersion = ffmpegVersion.replace('ffmpeg version', '').strip()
-        return ffmpegVersion.split(' ')[0]
+        _version = self.pipe(['-version']).split('\n')[0]
+        _version = _version.replace('ffmpeg version', '').strip()
+        return _version.split(' ')[0]
 
