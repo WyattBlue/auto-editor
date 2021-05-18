@@ -17,30 +17,28 @@ def setPath(dirpath, my_ffmpeg, name):
         return path.join(dirpath, 'mac-ffmpeg', 'bin', name)
     return name
 
-def testPath(dirpath, my_ffmpeg, name):
+def testPath(dirpath, my_ffmpeg, name, log):
     path = setPath(dirpath, my_ffmpeg, name)
     try:
         pipeToConsole([path, '-h'])
     except FileNotFoundError:
         if(system() == 'Darwin'):
-            self.log.error(f'No {name} found, download via homebrew or '\
-                'restore the included binary.')
+            log.error(f'No {name} found, download via homebrew or restore the included '\
+                'binary.')
         if(system() == 'Windows'):
-            self.log.error(f'No {name} found, download {name} with your '\
-                'favorite package manager (ex chocolatey), or restore the '\
-                'included binary.')
+            log.error(f'No {name} found, download {name} with your favorite package '\
+                'manager (ex chocolatey), or restore the included binary.')
 
-        self.log.error(f'{name} must be on PATH. Download {name} by '\
-            'running:\n  sudo apt-get install libavformat-dev '\
-            'libavfilter-dev libavdevice-dev ffmpeg\nOr something similar '\
-            'depending on your distro.')
+        log.error(f'{name} must be on PATH. Download {name} by running:\n'\
+        '  sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg'\
+        '\nOr something similar depending on your distro.')
     return path
 
 class FFprobe():
     def __init__(self, dirpath, myFFmpeg: bool, FFdebug, log):
 
         self.log = log
-        self.path = testPath(dirpath, myFFmpeg, 'ffprobe')
+        self.path = testPath(dirpath, myFFmpeg, 'ffprobe', log)
         self.FFdebug = FFdebug
 
     def getPath(self) -> str:
@@ -141,7 +139,7 @@ class FFmpeg():
     def __init__(self, dirpath, myFFmpeg: bool, FFdebug, log):
 
         self.log = log
-        self.path = testPath(dirpath, myFFmpeg, 'ffmpeg')
+        self.path = testPath(dirpath, myFFmpeg, 'ffmpeg', log)
         self.FFdebug = FFdebug
 
     def getPath(self) -> str:

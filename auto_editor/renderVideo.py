@@ -139,11 +139,6 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
     if(args.scale != 1):
         scaleToSped(ffmpeg, ffprobe, vidFile, args, temp)
 
-    if(log.is_debug):
-        log.debug('Writing the output file.')
-    else:
-        log.conwrite('Writing the output file.')
-
 
 def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
     has_vfr, effects, temp, log):
@@ -383,8 +378,3 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
         ffmpeg.run(cmd)
     else:
         scaleToSped(ffmpeg, ffprobe, vidFile, args, temp)
-
-    if(log.is_debug):
-        log.debug('Writing the output file.')
-    else:
-        log.conwrite('Writing the output file.')

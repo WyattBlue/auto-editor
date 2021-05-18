@@ -1,36 +1,35 @@
 '''fastAudio.py'''
 
-from usefulFunctions import ProgressBar, getNewLength, sep, fNone
+from usefulFunctions import ProgressBar, getNewLength, fNone
 
-def convertAudio(ffmpeg, ffprobe, theFile, INPUT_FILE, outFile, args, log):
-    log.debug(f'Convering internal audio file: {theFile} to {outFile}')
+def convertAudio(ffmpeg, ffprobe, in_file, INPUT_FILE, out_file, args, log):
+    log.debug(f'Converting internal audio file: {in_file} to {out_file}')
 
     realCodec = args.audio_codec
     if(fNone(realCodec)):
         realCodec = ffprobe.getAudioCodec(INPUT_FILE)
-    if(realCodec == 'pcm_s16le' and outFile.endswith('.m4a')):
+    if(realCodec == 'pcm_s16le' and out_file.endswith('.m4a')):
         log.error(f'Codec: {realCodec} is not supported in the m4a container.')
 
-    ffmpeg.run(['-i', theFile, '-acodec', realCodec, outFile])
+    ffmpeg.run(['-i', in_file, '-acodec', realCodec, out_file])
 
 
-def handleAudio(ffmpeg, theFile, audioBit, samplerate: str, temp, log) -> str:
-    TEMPFILE = f'{temp}{sep()}faAudio.wav'
+def handleAudio(ffmpeg, in_file, audioBit, samplerate: str, temp, log) -> str:
+    temp_file = os.path.join(temp, 'faAudio.wav')
 
     log.checkType(samplerate, 'samplerate', str)
-    cmd = ['-i', theFile]
+    cmd = ['-i', in_file]
     if(not fNone(audioBit)):
         cmd.extend(['-b:a', audioBit])
-        log.checkType(audioBit, 'audioBit', str)
-    cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', TEMPFILE])
+    cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', temp_file])
 
     ffmpeg.run(cmd)
     log.conwrite('')
 
-    return TEMPFILE
+    return temp_file
 
 
-def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
+def fastAudio(in_file, out_file, chunks: list, speeds: list, log, fps: float,
     machineReadable, hideBar):
     from wavfile import read, write
     import os
@@ -50,10 +49,7 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
     if(len(chunks) == 1 and chunks[0][2] == 0):
         log.error('Trying to create an empty file.')
 
-    if(not os.path.isfile(theFile)):
-        log.error('fastAudio.py could not find file: ' + theFile)
-
-    samplerate, audioData = read(theFile)
+    samplerate, audioData = read(in_file)
 
     newL = getNewLength(chunks, speeds, fps)
     # Get the new length in samples with some extra leeway.
@@ -102,10 +98,10 @@ def fastAudio(theFile, outFile, chunks: list, speeds: list, log, fps: float,
 
         audioProgress.tick(chunkNum)
 
-    log.debug('\n   - Total Samples: ' + str(yPointer))
-    log.debug('   - Samples per Frame: ' + str(samplerate / fps))
-    log.debug('   - Expected video length: ' + str(yPointer / (samplerate / fps)))
+    log.debug(f'Total Samples: {yPointer}')
+    log.debug(f'Samples per Frame: {samplerate / fps}')
+    log.debug(f'Expected video length: {yPointer / (samplerate / fps)}')
     newAudio = newAudio[:yPointer]
-    write(outFile, samplerate, newAudio)
+    write(out_file, samplerate, newAudio)
 
     log.conwrite('')
