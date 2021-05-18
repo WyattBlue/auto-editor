@@ -1,11 +1,5 @@
 '''setup.py'''
 
-"""
-Create a build for pip
-
-This code should only be executed by developers, not users.
-"""
-
 import os
 import re
 import sys
