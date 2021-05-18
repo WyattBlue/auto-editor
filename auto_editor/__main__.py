@@ -487,25 +487,19 @@ def main():
         audioData = None
         audioFile = fileFormat in audioExtensions
         if(audioFile):
-            if(args.force_fps_to is None):
-                fps = 30 # Audio files don't have frames, so give fps a dummy value.
-            else:
-                fps = args.force_fps_to
-            if(args.force_tracks_to is None):
-                tracks = 1
-            else:
-                tracks = args.force_tracks_to
+            fps = 30 if args.force_fps_to is None else args.force_fps_to
+            tracks = 1 if args.force_tracks_to is None else args.force_tracks_to
 
-            output = os.path.join(TEMP, 'fastAud.wav')
-            def convert_audio(input_file, output_file, sample_rate, audio_bitrate):
+            def convertAudio(input_file, output_file, sample_rate, audio_bitrate):
                 cmd = ['-i', input_file]
                 if(not fNone(audio_bitrate)):
                     cmd.extend(['-b:a', audio_bitrate])
                 cmd.extend(['-ac', '2', '-ar', sample_rate, '-vn', output_file])
                 ffmpeg.run(cmd)
 
-            convert_audio(INPUT_FILE, output, sampleRate, audioBitrate)
-            sampleRate, audioData = read(output)
+            fast_aud = os.path.join(TEMP, 'fastAud.wav')
+            convertAudio(INPUT_FILE, fast_aud, sampleRate, audioBitrate)
+            sampleRate, audioData = read(fast_aud)
         else:
             if(args.force_fps_to is not None):
                 fps = args.force_fps_to
