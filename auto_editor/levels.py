@@ -30,7 +30,7 @@ def levels(inputs: list, track, outfile, ffmpeg, ffprobe, temp, log):
         ffmpeg.run(['-i', file, '-ac', '2', '-map', f'0:a:{t}',
             os.path.join(temp, f'{t}.wav')])
 
-    sampleRate, audioData = read(os.path.join(temp, f'0.wav'))
+    sampleRate, audioData = read(os.path.join(temp, '0.wav'))
     audioSampleCount = audioData.shape[0]
 
     def getMaxVolume(s: np.ndarray) -> float:
