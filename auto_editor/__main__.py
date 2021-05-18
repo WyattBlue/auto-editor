@@ -319,7 +319,7 @@ def main():
 
     TEMP = tempfile.mkdtemp()
     log = Log(args.debug, args.quiet, temp=TEMP)
-    log.debug(f'\n   - Temp Directory: {TEMP}')
+    log.debug(f'\nTemp Directory: {TEMP}')
 
     ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, log)
     ffprobe = FFprobe(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, log)
@@ -426,7 +426,7 @@ def main():
         if(item[0] not in speeds):
             speeds.append(float(item[0]))
 
-    log.debug(f'   - Speeds: {speeds}')
+    log.debug(f'Speeds: {speeds}')
 
     from wavfile import read
     audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
@@ -454,11 +454,11 @@ def main():
             if(not os.path.isdir(INPUT_FILE) and '.' not in newOutput):
                 newOutput += INPUT_FILE[INPUT_FILE.rfind('.'):]
 
-        log.debug(f'   - INPUT_FILE: {INPUT_FILE}')
-        log.debug(f'   - newOutput: {newOutput}')
+        log.debug(f'Input File: {INPUT_FILE}')
+        log.debug(f'Output File: {newOutput}')
 
         if(os.path.isfile(newOutput) and INPUT_FILE != newOutput):
-            log.debug(f'  Removing already existing file: {newOutput}')
+            log.debug(f'Removing already existing file: {newOutput}')
             os.remove(newOutput)
 
         if(args.sample_rate is None):
@@ -468,7 +468,7 @@ def main():
                 log.warning(f"Samplerate wasn't detected, so it will be set to {sampleRate}.")
         else:
             sampleRate = str(args.sample_rate)
-        log.debug(f'   - sampleRate: {sampleRate}')
+        log.debug(f'Samplerate: {sampleRate}')
 
         if(args.audio_bitrate is None):
             if(INPUT_FILE.endswith('.mkv')):
@@ -482,7 +482,7 @@ def main():
         else:
             audioBitrate = args.audio_bitrate
 
-        log.debug(f'   - audioBitrate: {audioBitrate}')
+        log.debug(f'Audio Bitrate: {audioBitrate}')
 
         audioData = None
         audioFile = fileFormat in audioExtensions
@@ -569,7 +569,7 @@ def main():
                 else:
                     log.bug('Audio track not found!')
 
-        log.debug(f'   - Frame Rate: {fps}')
+        log.debug(f'Frame Rate: {fps}')
         if(chunks is None):
             from cutting import audioToHasLoud, motionDetection
 

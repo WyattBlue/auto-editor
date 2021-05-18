@@ -19,21 +19,21 @@ class Log():
 
     def debug(self, message):
         if(self.is_debug):
-            print(message)
+            print('debug', message)
 
     def cleanup(self):
         if(self.temp is None):
             return
         try:
             rmtree(self.temp)
+            self.debug('Removed Temp Directory.')
         except PermissionError:
             sleep(0.1)
             try:
                 rmtree(self.temp)
+                self.debug('Removed Temp Directory.')
             except PermissionError:
-                log.debug('Failed to delete temp dir.')
-
-        self.debug('   - Removed Temp Directory.')
+                self.debug('Failed to delete temp dir.')
 
     def conwrite(self, message: str):
         if(not self.quiet):
@@ -162,21 +162,12 @@ class ProgressBar():
         newTime = prettyTime(self.beginTime, self.ampm)
         termsize = get_terminal_size().columns
 
-        if(hide):
-            pass
-        elif(machineReadable):
-            self.beginTime = round(self.beginTime)
-            print(f'{title}~0~{total}~{self.beginTime}~{self.beginTime}', end='\r',
-                flush=True)
-        else:
-            try:
-                barLen = max(1, termsize - (self.len_title + 50))
-                bar(termsize, title, '', '░' * int(barLen), 0, newTime)
-            except UnicodeEncodeError:
-                print(f'   0% done ETA {newTime}')
-                self.allow_unicode = False
-            else:
-                self.allow_unicode = True
+        self.allow_unicode = True
+        try:
+            self.tick(0)
+        except UnicodeEncodeError:
+            print(f'   0% done ETA {newTime}')
+            self.allow_unicode = False
 
     def tick(self, index):
 
