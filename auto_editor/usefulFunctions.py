@@ -18,6 +18,7 @@ class Log():
         self.temp = temp
 
     def debug(self, message):
+        self.conwrite('')
         if(self.is_debug):
             print('debug', message)
 
@@ -36,7 +37,6 @@ class Log():
                 self.debug('Failed to delete temp dir.')
 
     def conwrite(self, message: str):
-        self.conwrite('')
         if(not self.quiet):
             numSpaces = get_terminal_size().columns - len(message) - 3
             print('  ' + message + ' ' * numSpaces, end='\r', flush=True)
