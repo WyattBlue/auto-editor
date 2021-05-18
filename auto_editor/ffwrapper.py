@@ -8,55 +8,55 @@ from platform import system
 # Included Libraries
 from usefulFunctions import pipeToConsole, cleanList
 
+def setPath(dirpath, my_ffmpeg, name):
+    if(my_ffmpeg):
+        return name
+    if(system() == 'Windows'):
+        return path.join(dirpath, 'win-ffmpeg', 'bin', f'{name}.exe')
+    if(system() == 'Darwin'):
+        return path.join(dirpath, 'mac-ffmpeg', 'bin', name)
+    return name
+
+def testPath(dirpath, my_ffmpeg, name):
+    path = setPath(dirpath, my_ffmpeg, name)
+    try:
+        pipeToConsole([path, '-h'])
+    except FileNotFoundError:
+        if(system() == 'Darwin'):
+            self.log.error(f'No {name} found, download via homebrew or '\
+                'restore the included binary.')
+        if(system() == 'Windows'):
+            self.log.error(f'No {name} found, download {name} with your '\
+                'favorite package manager (ex chocolatey), or restore the '\
+                'included binary.')
+
+        self.log.error(f'{name} must be on PATH. Download {name} by '\
+            'running:\n  sudo apt-get install libavformat-dev '\
+            'libavfilter-dev libavdevice-dev ffmpeg\nOr something similar '\
+            'depending on your distro.')
+    return path
+
 class FFprobe():
     def __init__(self, dirpath, myFFmpeg: bool, FFdebug, log):
 
-        self.mylog = log
+        self.log = log
+        self.path = testPath(dirpath, myFFmpeg, 'ffprobe')
         self.FFdebug = FFdebug
 
-        newF = None
-        if(system() == 'Windows' and not myFFmpeg):
-            newF = path.join(dirpath, 'win-ffmpeg', 'bin', 'ffprobe.exe')
-        if(system() == 'Darwin' and not myFFmpeg):
-            newF = path.join(dirpath, 'mac-ffmpeg', 'bin', 'ffprobe')
-
-        if(newF is not None and path.isfile(newF)):
-            self.myPath = newF
-        else:
-            self.myPath = 'ffprobe'
-            try:
-                pipeToConsole([self.myPath, '-h'])
-            except FileNotFoundError:
-                if(system() == 'Darwin'):
-                    self.mylog.error('No ffprobe found, download via homebrew or '\
-                        'restore the included binary.')
-                elif(system() == 'Windows'):
-                    self.mylog.error('No ffprobe found, download ffprobe with your '\
-                        'favorite package manager (ex chocolatey), or restore the '\
-                        'included binary.')
-                else:
-                    self.mylog.error('ffprobe must be on PATH. Download ffprobe by running:\n'\
-                        '  sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg' \
-                        '\nOr something similar depending on your distro.')
-
-    def log(self, message):
-        if(self.FFdebug):
-            print(message)
-
     def getPath(self) -> str:
-        return self.myPath
+        return self.path
 
     def run(self, cmd: list):
-        cmd.insert(0, self.myPath)
+        cmd.insert(0, self.path)
         self.log(cmd)
         subprocess.call(cmd)
 
     def pipe(self, cmd: list) -> str:
-        full_cmd = [self.myPath, '-v', 'error'] + cmd
+        full_cmd = [self.path, '-v', 'error'] + cmd
 
-        self.mylog.debug(full_cmd)
+        self.log.debug(full_cmd)
         output = pipeToConsole(full_cmd)
-        self.mylog.debug(output)
+        self.log.debug(output)
 
         return output
 
@@ -82,18 +82,18 @@ class FFprobe():
         try:
             return int(nums[0]) / int(nums[1])
         except (ZeroDivisionError, IndexError, ValueError):
-            self.mylog.error('getFrameRate had an error')
+            self.log.error('getFrameRate had an error')
 
     def getAudioTracks(self, file):
         output = self.pipe(['-select_streams', 'a', '-show_entries', 'stream=index',
             '-of', 'compact=p=0:nk=1', file]).strip()
 
         numbers = cleanList(output.split('\n'), '\r\t')
-        self.log(f'Track data: {numbers}')
+        self.log.debug(f'Track data: {numbers}')
         if(numbers[0].isnumeric()):
             return len(numbers)
         else:
-            self.mylog.warning('ffprobe had an invalid output.')
+            self.log.warning('ffprobe had an invalid output.')
             return 1 # Assume there's one audio track.
 
     def getSubtitleTracks(self, file):
@@ -101,11 +101,11 @@ class FFprobe():
             '-of', 'compact=p=0:nk=1', file]).strip()
 
         numbers = cleanList(output.split('\n'), '\r\t')
-        self.log(f'Track data: {numbers}')
+        self.log.debug(f'Track data: {numbers}')
         if(numbers[0].isnumeric()):
             return len(numbers)
         else:
-            self.mylog.warning('Invalid output when detecting number of subtitle tracks.')
+            self.log.warning('Invalid output when detecting number of subtitle tracks.')
             return 0
 
     def getLang(self, file, track=0):
@@ -131,72 +131,43 @@ class FFprobe():
         return 'N/A'
 
     def getPrettyBitrate(self, file, the_type='v', track=0) -> str:
+        # This result gets used by ffmpeg so be careful.
         output = self.getBitrate(file, the_type, track)
         if(output.isnumeric()):
-            # This does get used by ffmpeg so be careful.
             return str(round(int(output) / 1000)) + 'k'
         return 'N/A'
 
 class FFmpeg():
     def __init__(self, dirpath, myFFmpeg: bool, FFdebug, log):
 
-        self.mylog = log
+        self.log = log
+        self.path = testPath(dirpath, myFFmpeg, 'ffmpeg')
         self.FFdebug = FFdebug
 
-        newF = None
-        if(system() == 'Windows' and not myFFmpeg):
-            newF = path.join(dirpath, 'win-ffmpeg', 'bin', 'ffmpeg.exe')
-        if(system() == 'Darwin' and not myFFmpeg):
-            newF = path.join(dirpath, 'mac-ffmpeg', 'bin', 'ffmpeg')
-
-        if(newF is not None and path.isfile(newF)):
-            self.myPath = newF
-        else:
-            self.myPath = 'ffmpeg'
-            try:
-                pipeToConsole([self.myPath, '-h'])
-            except FileNotFoundError:
-                if(system() == 'Darwin'):
-                    self.mylog.error('No ffmpeg found, download via homebrew or restore '\
-                        'the included binaries.')
-                elif(system() == 'Windows'):
-                    self.mylog.error('No ffmpeg found, download ffmpeg with your '\
-                        'favorite package manager (ex chocolatey), or restore the '\
-                        'included binaries.')
-                else:
-                    self.mylog.error('FFmpeg must be on PATH. Download ffmpeg by '\
-                        'running:\n  sudo apt-get install libavformat-dev libavfilter-dev '\
-                        'libavdevice-dev ffmpeg\nOr something similar depending on your '\
-                        'distro.')
-
-    def log(self, message):
-        if(self.FFdebug):
-            print(message)
-
     def getPath(self) -> str:
-        return self.myPath
+        return self.path
 
     def run(self, cmd: list):
-        cmd = [self.myPath, '-y'] + cmd
+        cmd = [self.path, '-y'] + cmd
         if(self.FFdebug):
             cmd.extend(['-hide_banner'])
         else:
             cmd.extend(['-nostats', '-loglevel', 'error'])
-        self.mylog.debug(cmd)
+        self.log.debug(cmd)
         subprocess.call(cmd)
 
     def Popen(self, cmd: list):
-        cmd = [self.myPath] + cmd
+        cmd = [self.path] + cmd
         if(self.FFdebug):
             return subprocess.Popen(cmd, stdout=subprocess.PIPE)
         return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     def pipe(self, cmd: list) -> str:
-        cmd = [self.myPath, '-y'] + cmd
+        cmd = [self.path, '-y'] + cmd
 
-        self.mylog.debug(cmd)
+        self.log.debug(cmd)
         output = pipeToConsole(cmd)
-        self.mylog.debug(output)
+        self.log.debug(output)
 
         return output
 
@@ -204,4 +175,3 @@ class FFmpeg():
         _version = self.pipe(['-version']).split('\n')[0]
         _version = _version.replace('ffmpeg version', '').strip()
         return _version.split(' ')[0]
-
