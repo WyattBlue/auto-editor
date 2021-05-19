@@ -121,15 +121,15 @@ def main_options(parser):
         help='set the video codec for the output media file.')
     parser.add_argument('--audio_codec', '-acodec', group='exportMediaOps',
         help='set the audio codec for the output media file.')
-    parser.add_argument('--preset', '-p', default='medium', group='exportMediaOps',
+    parser.add_argument('--preset', '-p', default='unset', group='exportMediaOps',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow', 'unset'],
         help='set the preset for ffmpeg to help save file size or increase quality.')
-    parser.add_argument('--tune', '-t', default='none', group='exportMediaOps',
+    parser.add_argument('--tune', '-t', default='unset', group='exportMediaOps',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none', 'unset'],
         help='set the tune for ffmpeg to compress video better in certain circumstances.')
-    parser.add_argument('--constant_rate_factor', '-crf', default='15',
+    parser.add_argument('--constant_rate_factor', '-crf', default='unset',
         group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
 
