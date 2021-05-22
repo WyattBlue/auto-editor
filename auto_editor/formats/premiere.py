@@ -1,19 +1,12 @@
-'''editor.py'''
+'''premiere.py'''
 
-# Internal libraries
 import os
-import platform
 from shutil import move, rmtree
-from urllib.parse import quote
 
-def formatXML(base: int, *args: str) -> str:
-    r = ''
-    for line in args:
-        r += ('\t' * base) + line + '\n'
-    return r
+from auto_editor.formats.utils import fix_url, indent
 
 def speedup(speed) -> str:
-    return formatXML(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
+    return indent(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
         '\t\t<effectid>timeremap</effectid>',
         '\t\t<effectcategory>motion</effectcategory>',
         '\t\t<effecttype>motion</effecttype>',
@@ -27,7 +20,7 @@ def speedup(speed) -> str:
         '\t\t<parameter authoringApp="PremierePro">',
         '\t\t\t<parameterid>speed</parameterid>',  '\t\t\t<name>speed</name>',
         '\t\t\t<valuemin>-100000</valuemin>', '\t\t\t<valuemax>100000</valuemax>',
-        f'\t\t\t<value>{speed}</value>',
+        '\t\t\t<value>{}</value>'.format(speed),
         '\t\t</parameter>',
         '\t\t<parameter authoringApp="PremierePro">',
         '\t\t\t<parameterid>reverse</parameterid>',
@@ -38,146 +31,14 @@ def speedup(speed) -> str:
         '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
-def fixUrl(path: str, resolve: bool) -> str:
-    if(platform.system() == 'Windows'):
-        if(resolve):
-            pathurl = 'file:///' + quote(os.path.abspath(path)).replace('%5C', '/')
-        else:
-            pathurl = 'file://localhost/' + quote(os.path.abspath(path)).replace('%5C', '/')
-    else:
-        # Resolve is suprisingly resilient on MacOS.
-        pathurl = 'file://localhost' + os.path.abspath(path)
-    return pathurl
-
-
-def fcpXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
-    sampleRate, audioFile, fps, log):
-
-    pathurl = 'file://' + os.path.abspath(myInput)
-    name = os.path.splitext(os.path.basename(myInput))[0]
-
-    def fraction(inp, fps) -> str:
-        from fractions import Fraction
-
-        if(inp == 0):
-            return '0s'
-
-        if(isinstance(inp, float)):
-            inp = Fraction(inp)
-        if(isinstance(fps, float)):
-            fps = Fraction(fps)
-
-        frac = Fraction(inp, fps).limit_denominator()
-        num = frac.numerator
-        dem = frac.denominator
-
-        if(dem < 3000):
-            factor = int(3000 / dem)
-
-            if(factor == 3000 / dem):
-                num *= factor
-                dem *= factor
-            else:
-                # Good enough but has some error that are impacted at speeds such as 150%.
-                total = 0
-                while(total < frac):
-                    total += Fraction(1, 30)
-                num = total.numerator
-                dem = total.denominator
-
-        return f'{num}/{dem}s'
-
-    if(not audioFile):
-        width, height = ffprobe.getResolution(myInput).split('x')
-        total_dur = ffprobe.getDuration(myInput)
-        if(total_dur == 'N/A'):
-            total_dur = ffprobe.pipe(['-show_entries', 'format=duration', '-of',
-                'default=noprint_wrappers=1:nokey=1', myInput]).strip()
-    else:
-        width, height = '1920', '1080'
-        total_dur = ffprobe.getAudioDuration(myInput)
-    total_dur = float(total_dur) * fps
-
-    with open(output, 'w', encoding='utf-8') as outfile:
-
-        frame_duration = fraction(1, fps)
-
-        outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-        outfile.write('<!DOCTYPE fcpxml>\n\n')
-        outfile.write('<fcpxml version="1.9">\n')
-        outfile.write('\t<resources>\n')
-        outfile.write(f'\t\t<format id="r1" name="FFVideoFormat{height}p{fps}" '\
-            f'frameDuration="{frame_duration}" width="{width}" height="{height}"'\
-            ' colorSpace="1-1-1 (Rec. 709)"/>\n')
-
-        outfile.write(f'\t\t<asset id="r2" name="{name}" start="0s" '\
-            'hasVideo="1" format="r1" hasAudio="1" '\
-            f'audioSources="1" audioChannels="2" audioRate="{sampleRate}">\n')
-
-        outfile.write(f'\t\t\t<media-rep kind="original-media" '\
-            f'src="{pathurl}"></media-rep>\n')
-        outfile.write('\t\t</asset>\n')
-        outfile.write('\t</resources>\n')
-        outfile.write('\t<library>\n')
-        outfile.write('\t\t<event name="auto-editor output">\n')
-        outfile.write(f'\t\t\t<project name="{name}">\n')
-        outfile.write(formatXML(4,
-            '<sequence format="r1" tcStart="0s" tcFormat="NDF" '\
-            'audioLayout="stereo" audioRate="48k">',
-            '\t<spine>')
-        )
-
-        last_dur = 0
-
-        for _, clip in enumerate(clips):
-            clip_dur = (clip[1] - clip[0]) / (clip[2] / 100)
-            dur = fraction(clip_dur, fps)
-
-            close = '/' if clip[2] == 100 else ''
-
-            if(last_dur == 0):
-                outfile.write(formatXML(6, f'<asset-clip name="{name}" offset="0s" ref="r2"'\
-                f' duration="{dur}" audioRole="dialogue" tcFormat="NDF"{close}>'))
-            else:
-                start = fraction(clip[0] / (clip[2] / 100), fps)
-                off = fraction(last_dur, fps)
-                outfile.write(formatXML(6,
-                    f'<asset-clip name="{name}" offset="{off}" ref="r2"'\
-                    f' duration="{dur}" start="{start}" audioRole="dialogue" tcFormat="NDF"{close}>',
-                ))
-
-            if(clip[2] != 100):
-                # See "Time Maps" in developer.apple.com/library/archive/documentation/FinalCutProX/Reference/FinalCutProXXMLFormat/StoryElements/StoryElements.html
-
-                frac_total = fraction(total_dur, fps)
-                total_dur_divided_by_speed = fraction((total_dur) / (clip[2] / 100), fps)
-
-                outfile.write(formatXML(6,
-                    '\t<timeMap>',
-                    '\t\t<timept time="0s" value="0s" interp="smooth2"/>',
-                    f'\t\t<timept time="{total_dur_divided_by_speed}" value="{frac_total}" interp="smooth2"/>',
-                    '\t</timeMap>',
-                    '</asset-clip>'
-                ))
-
-            last_dur += clip_dur
-
-        outfile.write('\t\t\t\t\t</spine>\n')
-        outfile.write('\t\t\t\t</sequence>\n')
-        outfile.write('\t\t\t</project>\n')
-        outfile.write('\t\t</event>\n')
-        outfile.write('\t</library>\n')
-        outfile.write('</fcpxml>')
-
-
-def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
+def premiere_xml(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
     sampleRate, audioFile, resolve: bool, fps, log):
 
     duration = chunks[len(chunks) - 1][1]
-    pathurl = fixUrl(myInput, resolve)
+    pathurl = fix_url(myInput, resolve)
     name = os.path.basename(myInput)
 
-    log.debug('tracks: ' + str(tracks))
+    log.debug('tracks: {}'.format(tracks))
     log.debug(os.path.dirname(os.path.abspath(myInput)))
 
     if(tracks > 1):
@@ -198,7 +59,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
         for i in range(1, tracks):
             newtrack = os.path.join(newFolderName, f'{i}.wav')
             move(os.path.join(temp, f'{i}.wav'), newtrack)
-            trackurls.append(fixUrl(newtrack, resolve))
+            trackurls.append(fix_url(newtrack, resolve))
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
@@ -228,7 +89,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
             outfile.write('\t\t</rate>\n')
             outfile.write('\t\t<media>\n')
 
-            outfile.write(formatXML(3, '<video>', '\t<format>',
+            outfile.write(indent(3, '<video>', '\t<format>',
                 '\t\t<samplecharacteristics>',
                 f'\t\t\t<width>{width}</width>',
                 f'\t\t\t<height>{height}</height>',
@@ -240,11 +101,11 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
                 '\t\t</samplecharacteristics>',
                 '\t</format>', '</video>'))
 
-            outfile.write(formatXML(3, '<audio>',
+            outfile.write(indent(3, '<audio>',
                 '\t<numOutputChannels>2</numOutputChannels>', '\t<format>',
                 '\t\t<samplecharacteristics>',
-                '\t\t\t<depth>{depth}</depth>',
-                '\t\t\t<samplerate>{sr}</samplerate>',
+                f'\t\t\t<depth>{depth}</depth>',
+                f'\t\t\t<samplerate>{sr}</samplerate>',
                 '\t\t</samplecharacteristics>',
                 '\t</format>'))
 
@@ -256,7 +117,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
                 total += (clip[1] - clip[0]) / (clip[2] / 100)
                 myEnd = int(total)
 
-                outfile.write(formatXML(5, f'<clipitem id="clipitem-{j+1}">',
+                outfile.write(indent(5, f'<clipitem id="clipitem-{j+1}">',
                     '\t<masterclipid>masterclip-1</masterclipid>',
                     f'\t<name>{name}</name>',
                     f'\t<start>{myStart}</start>',
@@ -266,7 +127,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
 
                 if(j == 0):
                     # Define file-1
-                    outfile.write(formatXML(6, '<file id="file-1">',
+                    outfile.write(indent(6, '<file id="file-1">',
                         f'\t<name>{name}</name>',
                         f'\t<pathurl>{pathurl}</pathurl>',
                         '\t<rate>',
@@ -311,7 +172,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
         outfile.write('\t\t</rate>\n')
         outfile.write('\t\t<media>\n')
 
-        outfile.write(formatXML(3, '<video>', '\t<format>',
+        outfile.write(indent(3, '<video>', '\t<format>',
             '\t\t<samplecharacteristics>',
             '\t\t\t<rate>',
             f'\t\t\t\t<timebase>{timebase}</timebase>',
@@ -334,7 +195,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
             total += (clip[1] - clip[0]) / (clip[2] / 100)
             myEnd = int(total)
 
-            outfile.write(formatXML(5, f'<clipitem id="clipitem-{j+1}">',
+            outfile.write(indent(5, f'<clipitem id="clipitem-{j+1}">',
                 '\t<masterclipid>masterclip-2</masterclipid>',
                 f'\t<name>{name}</name>',
                 f'\t<start>{myStart}</start>',
@@ -343,7 +204,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
                 f'\t<out>{int(clip[1] / (clip[2] / 100))}</out>'))
 
             if(j == 0):
-                outfile.write(formatXML(6, '<file id="file-1">',
+                outfile.write(indent(6, '<file id="file-1">',
                     f'\t<name>{name}</name>',
                     f'\t<pathurl>{pathurl}</pathurl>',
                     '\t<rate>',
@@ -396,7 +257,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
             outfile.write('\t\t\t\t\t</clipitem>\n')
 
         # End Video; Start Audio
-        outfile.write(formatXML(3, '\t</track>', '</video>', '<audio>',
+        outfile.write(indent(3, '\t</track>', '</video>', '<audio>',
             '\t<numOutputChannels>2</numOutputChannels>',
             '\t<format>',
             '\t\t<samplecharacteristics>',
@@ -433,7 +294,7 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
 
                 if(t > 0):
                     # Define arbitrary file
-                    outfile.write(formatXML(6, f'<file id="file-{t+1}">',
+                    outfile.write(indent(6, f'<file id="file-{t+1}">',
                         f'\t<name>{name}{t}</name>',
                         f'\t<pathurl>{trackurls[t]}</pathurl>',
                         '\t<rate>',
@@ -469,6 +330,6 @@ def editorXML(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: i
         outfile.write('\t\t\t</audio>\n')
         outfile.write('\t\t</media>\n')
         outfile.write('\t</sequence>\n')
-        outfile.write('</xmeml>')
+        outfile.write('</xmeml>\n')
 
     log.conwrite('')

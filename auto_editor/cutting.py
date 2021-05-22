@@ -92,7 +92,7 @@ def motionDetection(path: str, ffprobe, motionThreshold: float, log,
 
     import cv2
     import subprocess
-    from usefulFunctions import ProgressBar
+    from auto_editor.usefulFunctions import ProgressBar
 
     cap = cv2.VideoCapture(path)
 
@@ -113,7 +113,7 @@ def motionDetection(path: str, ffprobe, motionThreshold: float, log,
     output = stdout.decode()
 
     totalFrames = int(output) + 1
-    log.debug(f'   - Cutting totalFrames: {totalFrames}')
+    log.debug('   - Cutting totalFrames: {}'.format(totalFrames))
     prevFrame = None
     gray = None
     hasMotion = np.zeros((totalFrames), dtype=np.bool_)
@@ -198,7 +198,7 @@ def removeSmall(hasLoud: np.ndarray, lim: int, replace: bool, with_: bool) -> np
 
 
 def isNumber(val):
-    return val.replace('.','',1).isdigit()
+    return val.replace('.', '', 1).isdigit()
 
 def setRange(hasLoud: np.ndarray, syntaxRange, fps: float, with_, log) -> np.ndarray:
 
@@ -214,7 +214,7 @@ def setRange(hasLoud: np.ndarray, syntaxRange, fps: float, with_, log) -> np.nda
             return len(hasLoud)
         if(item.startswith('sec')):
             log.error('Seconds unit not implemented in this function.')
-        log.error(f'Variable {item} not avaiable in this context.')
+        log.error('Variable {} not avaiable in this context.'.format(item))
 
     def ConvertToFrames(num) -> int:
         num = replaceVarsWithVals(num)
@@ -345,7 +345,7 @@ def handleBoolExp(val: str, data, sampleRate, fps, log) -> list:
 
 
 def applyRects(cmdRects, audioData, sampleRate, fps, log):
-    from usefulFunctions import hex_to_bgr
+    from auto_editor.usefulFunctions import hex_to_bgr
 
     rects = []
     for ms in cmdRects:
@@ -448,8 +448,8 @@ def applyZooms(cmdZooms, audioData, sampleRate, fps, log):
             chunks = applyBasicSpacing(merge(start_list, end_list), fps, 0, 0, log)
             for item in chunks:
                 if(item[2] == 1):
-                    zooms.append(['zoom', str(item[0]), str(item[1]), start_zoom, end_zoom,
-                        x, y, inter, hold])
+                    zooms.append(['zoom', str(item[0]), str(item[1]), start_zoom,
+                        end_zoom, x, y, inter, hold])
 
             if(zooms == []):
                 log.warning('No zooms applied.')

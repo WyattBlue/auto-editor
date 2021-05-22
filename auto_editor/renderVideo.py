@@ -5,7 +5,7 @@ import os
 import subprocess
 
 # Included Libaries
-from usefulFunctions import ProgressBar, fNone
+from auto_editor.usefulFunctions import ProgressBar, fNone
 
 def properties(cmd, args, vidFile, ffprobe):
 
@@ -75,8 +75,8 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
                 return self._fh.read(buf_size)
 
         # Create a cfr stream on stdout.
-        cmd = ['-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}', '-r', str(fps),
-            '-vsync', '1', '-f', 'matroska', '-vcodec', 'rawvideo', 'pipe:1']
+        cmd = ['-i', vidFile, '-map', '0:v:0', '-vf', 'fps=fps={}'.format(fps), '-r',
+            str(fps), '-vsync', '1', '-f', 'matroska', '-vcodec', 'rawvideo', 'pipe:1']
 
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
         input_ = av.open(wrapper, 'r')
@@ -90,14 +90,14 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
     height = inputVideoStream.height
     pix_fmt = inputVideoStream.pix_fmt
 
-    log.debug(f'pix_fmt: {pix_fmt}')
+    log.debug('pix_fmt: {}'.format(pix_fmt))
 
     cmd = [ffmpeg.getPath(), '-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
         '-pix_fmt', pix_fmt, '-s', f'{width}*{height}', '-framerate', f'{fps}', '-i', '-',
         '-pix_fmt', pix_fmt]
 
     if(args.scale != 1):
-        cmd.extend(['-vf', f'scale=iw*{args.scale}:ih*{args.scale}',
+        cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale),
             os.path.join(temp, 'scale.mp4')])
     else:
         cmd = properties(cmd, args, vidFile, ffprobe)
@@ -145,7 +145,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     has_vfr, effects, temp, log):
     import cv2
     import numpy as np
-    from interpolate import interpolate
+    from auto_editor.interpolate import interpolate
 
     if(has_vfr):
         cmd = ['-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}', '-r', str(fps),
@@ -168,7 +168,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
     if(width < 2 or height < 2):
         log.error('Resolution too small.')
-    log.debug(f'Resolution: {width}x{height}')
+    log.debug('Resolution: {}x{}'.format(width, height))
 
     out = cv2.VideoWriter(video_name, fourcc, fps, (width, height))
 
@@ -215,7 +215,7 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
         if(not isinstance(val, int)
             and not (val.replace('.', '', 1)).replace('-', '', 1).isdigit()):
-            log.error(f'Variable {val} not implemented.')
+            log.error('Variable {} not implemented.'.format(val))
         return _type(val)
 
     effect_sheet = []
@@ -345,9 +345,9 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
 
                 if(frame.shape != (height+1, width+1, 3)):
                     # Throw error so that opencv dropped frames don't go unnoticed.
-                    print(f'cframe {cframe}')
-                    log.error(f'Wrong frame shape. was {frame.shape},' \
-                        f' should be {(height+1, width+1, 3)} ')
+                    print('cframe {}'.format(cframe))
+                    log.error('Wrong frame shape. Is {}, should be {}'.format(
+                        frame.shape, (height+1, width+1, 3)))
 
         if(effects == [] and args.scale != 1):
             inter = cv2.INTER_CUBIC if args.scale > 1 else cv2.INTER_AREA
@@ -366,8 +366,8 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
             remander = doIt % 1
 
         videoProgress.tick(cframe)
-    log.debug(f'Frames Written: {framesWritten}')
-    log.debug(f'Total Frames: {totalFrames}')
+    log.debug('Frames Written: {}'.format(framesWritten))
+    log.debug('Total Frames: {}'.format(totalFrames))
 
     cap.release()
     out.release()

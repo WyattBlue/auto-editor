@@ -10,16 +10,15 @@ auto-editor.exportMediaOps.audio_bitrate = 'unset'        # 'unset'
 auto-editor.exportMediaOps.sample_rate = None             # None
 auto-editor.exportMediaOps.video_codec = 'copy'           # 'copy'
 auto-editor.exportMediaOps.audio_codec = None             # None
-auto-editor.exportMediaOps.preset = 'medium'              # 'medium'
-auto-editor.exportMediaOps.tune = 'none'                  # 'none'
-auto-editor.exportMediaOps.constant_rate_factor = '15'    # '15'
+auto-editor.exportMediaOps.preset = 'unset'               # 'unset'
+auto-editor.exportMediaOps.tune = 'unset'                 # 'unset'
+auto-editor.exportMediaOps.constant_rate_factor = 'unset' # 'unset'
 
 # motionOps
 auto-editor.motionOps.dilates = 2                         # 2
 auto-editor.motionOps.width = 400                         # 400
 auto-editor.motionOps.blur = 21                           # 21
 
-   # choices=['av', 'opencv', 'auto']
 auto-editor.render = 'auto'                               # 'auto'
 auto-editor.scale = 1                                     # 1
 

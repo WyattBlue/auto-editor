@@ -6,13 +6,13 @@ from os import path
 from platform import system
 
 # Included Libraries
-from usefulFunctions import pipeToConsole, cleanList
+from auto_editor.usefulFunctions import pipeToConsole, cleanList
 
 def setPath(dirpath, my_ffmpeg, name):
     if(my_ffmpeg):
         return name
     if(system() == 'Windows'):
-        return path.join(dirpath, 'win-ffmpeg', 'bin', f'{name}.exe')
+        return path.join(dirpath, 'win-ffmpeg', 'bin', '{}.exe'.format(name))
     if(system() == 'Darwin'):
         return path.join(dirpath, 'mac-ffmpeg', 'bin', name)
     return name
@@ -23,8 +23,8 @@ def testPath(dirpath, my_ffmpeg, name, log):
         pipeToConsole([path, '-h'])
     except FileNotFoundError:
         if(system() == 'Darwin'):
-            log.error(f'No {name} found, download via homebrew or restore the included '\
-                'binary.')
+            log.error('No {} found, download via homebrew or restore the '\
+                'included binary.'.format(name))
         if(system() == 'Windows'):
             log.error(f'No {name} found, download {name} with your favorite package '\
                 'manager (ex chocolatey), or restore the included binary.')
@@ -125,14 +125,14 @@ class FFprobe():
     def getPrettySampleRate(self, file, track=0) -> str:
         output = self.getSampleRate(file, track)
         if(output.isnumeric()):
-            return str(int(output) / 1000) + ' kHz'
+            return '{} kHz'.format(int(output) / 1000)
         return 'N/A'
 
     def getPrettyBitrate(self, file, the_type='v', track=0) -> str:
         # This result gets used by ffmpeg so be careful.
         output = self.getBitrate(file, the_type, track)
         if(output.isnumeric()):
-            return str(round(int(output) / 1000)) + 'k'
+            return '{}k'.format(round(int(output) / 1000))
         return 'N/A'
 
 class FFmpeg():

@@ -1,11 +1,11 @@
-'''levels.py'''
+'''subcommands/levels.py'''
 
 import numpy as np
 
 import os
 import math
 
-from wavfile import read
+from auto_editor.wavfile import read
 
 def levels_options(parser):
     parser.add_argument('--output_file', '--output', '-o', type=str,
@@ -27,8 +27,8 @@ def levels(inputs: list, track, outfile, ffmpeg, ffprobe, temp, log):
 
     # Split audio tracks into: 0.wav, 1.wav, etc.
     for t in range(tracks):
-        ffmpeg.run(['-i', file, '-ac', '2', '-map', f'0:a:{t}',
-            os.path.join(temp, f'{t}.wav')])
+        ffmpeg.run(['-i', file, '-ac', '2', '-map', '0:a:{}'.format(t),
+            os.path.join(temp, '{}.wav'.format(t))])
 
     sampleRate, audioData = read(os.path.join(temp, '0.wav'))
     audioSampleCount = audioData.shape[0]
@@ -48,6 +48,6 @@ def levels(inputs: list, track, outfile, ffmpeg, ffprobe, temp, log):
             start = int(i * samplesPerFrame)
             end = min(int((i+1) * samplesPerFrame), audioSampleCount)
             audiochunks = audioData[start:end]
-            out.write(f'{getMaxVolume(audiochunks) / maxAudioVolume}\n')
+            out.write('{}\n'.format(getMaxVolume(audiochunks) / maxAudioVolume))
 
     log.cleanup()

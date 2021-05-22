@@ -20,7 +20,7 @@ class Log():
     def debug(self, message):
         if(self.is_debug):
             self.conwrite('')
-            print('debug', message)
+            print('debug {}'.format(message))
 
     def cleanup(self):
         if(self.temp is None):
@@ -54,13 +54,13 @@ class Log():
         print('Error!', message,
             "\n\nThis is not a normal error.\n This message will only show up if there's",
             'something definitely wrong with the program.',
-            f'\nCreate a {bug_type} at:\n  {URL}', file=sys.stderr)
+            '\nCreate a {} at:\n  {}'.format(bug_type, URL), file=sys.stderr)
         self.cleanup()
         sys.exit(1)
 
     def warning(self, message):
         if(not self.quiet):
-            print('Warning!', message, file=sys.stderr)
+            print('Warning! {}'.format(message), file=sys.stderr)
 
     def print(self, message, end='\n'):
         if(not self.quiet):
@@ -70,8 +70,8 @@ class Log():
         if(not isinstance(data, correct_type)):
             badtype = type(data).__name__
             goodtype = correct_type.__name__
-            self.bug(f'Variable "{name}" was not a {goodtype}, but a {badtype}',
-                'bug report')
+            self.bug('Variable "{}" was not a {}, but a {}'.format(
+                name, goodtype, badtype), 'bug report')
 
 
 class Timer():
@@ -82,10 +82,10 @@ class Timer():
     def stop(self):
         from datetime import timedelta
 
-        timeLength = round(time() - self.start_time, 2)
-        minutes = timedelta(seconds=round(timeLength))
+        second_len = round(time() - self.start_time, 2)
+        minute_len = timedelta(seconds=round(second_len))
         if(not self.quiet):
-            print(f'Finished. took {timeLength} seconds ({minutes})')
+            print('Finished. took {} seconds ({})'.format(second_len, minute_len))
 
 
 def pipeToConsole(myCommands: list) -> str:
@@ -108,23 +108,23 @@ def getNewLength(chunks: list, speeds: list, fps: float) -> float:
             timeInFrames += leng * (1 / speeds[chunk[2]])
     return timeInFrames / fps
 
-def prettyTime(myTime: float, ampm: bool) -> str:
-    newTime = localtime(myTime)
+def prettyTime(my_time: float, ampm: bool) -> str:
+    new_time = localtime(my_time)
 
-    hours = newTime.tm_hour
-    minutes = newTime.tm_min
+    hours = new_time.tm_hour
+    minutes = new_time.tm_min
 
     if(ampm):
         if(hours == 0):
             hours = 12
         if(hours > 12):
             hours -= 12
-        ampm = 'PM' if newTime.tm_hour >= 12 else 'AM'
-        return f'{hours:02}:{minutes:02} {ampm}'
-    return f'{hours:02}:{minutes:02}'
+        ampm = 'PM' if new_time.tm_hour >= 12 else 'AM'
+        return '{:02}:{:02} {}'.format(hours, minutes, ampm)
+    return '{:02}:{:02}'.format(hours, minutes)
 
-def bar(termsize, title, doneStr, togoStr, percentDone, newTime):
-    bar = f'  ⏳{title}: [{doneStr}{togoStr}] {percentDone}% done ETA {newTime}'
+def bar(termsize, title, done, togo, percent, new_time):
+    bar = '  ⏳{}: [{}{}] {}% done ETA {}'.format(title, done, togo, percent, new_time)
     if(len(bar) > termsize - 2):
         bar = bar[:termsize - 2]
     else:
@@ -157,7 +157,7 @@ class ProgressBar():
             self.tick(0)
         except UnicodeEncodeError:
             newTime = prettyTime(self.beginTime, self.ampm)
-            print(f'   0% done ETA {newTime}')
+            print('   0% done ETA {}'.format(newTime))
             self.allow_unicode = False
 
     def tick(self, index):
@@ -171,25 +171,25 @@ class ProgressBar():
         else:
             percentPerSec = (time() - self.beginTime) / percentDone
 
-        newTime = prettyTime(self.beginTime + (percentPerSec * 100), self.ampm)
+        new_time = prettyTime(self.beginTime + (percentPerSec * 100), self.ampm)
 
         if(self.machine):
             index = min(index, self.total)
             raw = int(self.beginTime + (percentPerSec * 100))
-            print(f'{self.title}~{index}~{self.total}~{self.beginTime}~{raw}',
+            print('{}~{}~{}~{}~{}'.format(
+                self.title, index, self.total, self.beginTime, raw),
                 end='\r', flush=True)
             return
 
         termsize = get_terminal_size().columns
 
         if(self.allow_unicode):
-            barLen = max(1, termsize - (self.len_title + 50))
-            done = round(percentDone / (100 / barLen))
-            doneStr = '█' * done
-            togoStr = '░' * int(barLen - done)
-            bar(termsize, self.title, doneStr, togoStr, percentDone, newTime)
+            bar_len = max(1, termsize - (self.len_title + 50))
+            done = round(percentDone / (100 / bar_len))
+            togo = '░' * int(bar_len - done)
+            bar(termsize, self.title, '█' * done, togo, percentDone, new_time)
         else:
-            print(f'   {percentDone}% done ETA {newTime}')
+            print('   {}% done ETA {}'.format(percentDone, new_time))
 
 def humanReadableTime(time_in_secs: float) -> str:
     units = 'seconds'
@@ -203,22 +203,22 @@ def humanReadableTime(time_in_secs: float) -> str:
         if(time_in_secs >= 10 or time_in_secs % 1 == 0):
             time_in_secs = round(time_in_secs)
         units = 'minutes'
-    return f'{time_in_secs} {units}'
+    return '{} {}'.format(time_in_secs, units)
 
-def openWithSystemDefault(newOutput: str, log):
+def openWithSystemDefault(path: str, log):
     from subprocess import call
     try:  # should work on Windows
         from os import startfile
-        startfile(newOutput)
-    except (AttributeError, ImportError):
+        startfile(path)
+    except ImportError:
         try:  # should work on MacOS and most Linux versions
-            call(['open', newOutput])
+            call(['open', path])
         except Exception as err:
             try: # should work on WSL2
-                call(['cmd.exe', '/C', 'start', newOutput])
+                call(['cmd.exe', '/C', 'start', path])
             except Exception as err:
                 try: # should work on various other Linux distros
-                    call(['xdg-open', newOutput])
+                    call(['xdg-open', path])
                 except Exception as err:
                     log.warning('Could not open output file.')
 
@@ -229,7 +229,7 @@ def hex_to_bgr(inp: str, log) -> list:
             return [int(inp[i]*2, 16) for i in (3, 2, 1)]
         return [int(inp[i:i+2], 16) for i in (5, 3, 1)]
     else:
-        log.error(f'Invalid hex code: {inp}')
+        log.error('Invalid hex code: {}'.format(inp))
 
 def fNone(val):
     return val == 'none' or val == 'unset' or val is None

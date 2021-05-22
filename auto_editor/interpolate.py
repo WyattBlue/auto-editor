@@ -67,4 +67,4 @@ def interpolate(x, y, n, log, method='linear') -> list:
     elif(method == 'end_sine'):
         return end_sine(x, y, n)
     else:
-        log.error(f"Method: {method} isn't implemented.")
+        log.error("Method: {} isn't implemented.".format(method))
