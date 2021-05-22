@@ -360,9 +360,9 @@ def main():
         args.export_as_clip_sequence].count(True) > 1):
         log.error('You must choose only one export option.')
 
-    if(making_data_file and (args.video_codec != 'unset' or
+    if(making_data_file and (args.video_codec != 'copy' or
         args.constant_rate_factor != 'unset' or args.tune != 'unset')):
-        log.warning('exportMediaOps options are not used when making a data file .')
+        log.warning('exportMediaOps options are not used when making a data file.')
 
     if(isinstance(args.frame_margin, str)):
         try:
