@@ -1,4 +1,4 @@
-'''testAutoEditor.py'''
+'''subcommands/test.py'''
 
 """
 Test auto-editor and make sure everything is working.
@@ -12,25 +12,23 @@ import platform
 import subprocess
 
 # Included Libraries
-from usefulFunctions import Log
-from ffwrapper import FFprobe
+from auto_editor.usefulFunctions import Log
+from auto_editor.ffwrapper import FFprobe
 
 def getRunner():
     if(platform.system() == 'Windows'):
-        return ['py', 'auto_editor/__main__.py']
-    return ['python3', 'auto_editor/__main__.py']
+        return ['py', '-m', 'auto_editor']
+    return ['python3', '-m', 'auto_editor']
 
 
-def pipeToConsole(cmd: list):
-    print(cmd)
+def pipeToConsole(cmd):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     return process.returncode, stdout.decode(), stderr.decode()
 
 
 def runTest(cmd):
-    pretty_cmd = ' '.join(cmd)
-    print(f'Running test: {pretty_cmd}')
+    print('\nRunning: {}'.format(' '.join(cmd)))
 
     add_no_open = '.' in cmd[0]
     cmd = getRunner() + cmd
@@ -44,12 +42,12 @@ def runTest(cmd):
         print(stderr)
         sys.exit(1)
     else:
-        print('Test Succeeded.\n')
+        print('Test Succeeded.')
 
 
 def checkForError(cmd, match=None):
     pretty_cmd = ' '.join(cmd)
-    print(f'Running Error Test: {pretty_cmd}')
+    print('\nRunning Error Test: {}'.format(pretty_cmd))
 
     returncode, stdout, stderr = pipeToConsole(getRunner() + cmd)
     if(returncode > 0):
@@ -58,13 +56,13 @@ def checkForError(cmd, match=None):
                 if(match in stderr):
                     print('Found match. Test Succeeded.')
                 else:
-                    print(f'Test Failed.\nCould\'t find "{match}"')
+                    print('Test Failed.\nCould\'t find "{}"'.format(match))
                     sys.exit(1)
             else:
                 print('Test Succeeded.')
         else:
             print('Test Failed.\n')
-            print(f'Program crashed.\n{stdout}\n{stderr}')
+            print('Program crashed.\n{}\n{}'.format(stdout, stderr))
             sys.exit(1)
     else:
         print('Test Failed.\n')
@@ -99,13 +97,12 @@ def fullInspect(fileName, *args):
                     continue
 
             print('Inspection Failed.')
-            print(f'Expected Value: {expectedOutput} {type(expectedOutput)}')
-            print(f'Actual Value: {func(fileName)} {type(func(fileName))}')
+            print('Expected Value: {} {}'.format(expectedOutput, type(expectedOutput)))
+            print('Actual Value: {} {}'.format(func(fileName), type(func(fileName))))
             sys.exit(1)
     print('Inspection Passed.')
 
-def testAutoEditor():
-    # Test Help Command
+def test():
     runTest(['--help'])
     runTest(['-h'])
     runTest(['--frame_margin', '--help'])
@@ -114,33 +111,27 @@ def testAutoEditor():
     runTest(['exportMediaOps', '-h'])
     runTest(['progressOps', '-h'])
 
-    # Test the Help Command on itself.
     runTest(['--help', '--help'])
     runTest(['-h', '--help'])
     runTest(['--help', '-h'])
     runTest(['-h', '--help'])
 
-    # Test version info
     runTest(['--version'])
     runTest(['-v'])
     runTest(['-V'])
 
-    # Test debug info
     runTest(['--debug'])
-    # --verbose by itself is UB.
 
     if(ffprobe.getFrameRate('example.mp4') != 30.0):
         print('getFrameRate did not equal 30.0')
         sys.exit(1)
 
-    # Test info subcommand.
     runTest(['info', 'example.mp4'])
     runTest(['info', 'resources/man_on_green_screen.mp4'])
     runTest(['info', 'resources/multi-track.mov'])
     runTest(['info', 'resources/newCommentary.mp3'])
     runTest(['info', 'resources/test.mkv'])
 
-    # Test example video.
     runTest(['example.mp4'])
 
     fullInspect(
@@ -172,27 +163,21 @@ def testAutoEditor():
     runTest(['example.mp4', '-m', '3'])
     runTest(['example.mp4', '-m', '0.3sec'])
 
-    # Test rejecting files with no extension.
     shutil.copy('example.mp4', 'example')
     checkForError(['example', '--no_open'], 'must have an extension.')
     os.remove('example')
 
-    # Test ProgressOps
     runTest(['example.mp4', 'progressOps', '--machine_readable_progress'])
     runTest(['example.mp4', 'progressOps', '--no_progress'])
 
-    # Test mp4 to mkv
     runTest(['example.mp4', '-o', 'example.mkv'])
     os.remove('example.mkv')
 
-    # Test mkv to mp4
     runTest(['resources/test.mkv', '-o', 'test.mp4'])
     os.remove('test.mp4')
 
-    # Test Audio File Input and Exporting
     runTest(['resources/newCommentary.mp3', '--silent_threshold', '0.1'])
 
-    # Test Cut by All Tracks
     runTest(['resources/multi-track.mov', '--cut_by_all_tracks'])
 
     runTest(['resources/multi-track.mov', '--keep_tracks_seperate'])
@@ -282,7 +267,7 @@ def testAutoEditor():
         if('man_on_green_screen' in item or item.startswith('.')):
             continue
 
-        item = f'resources/{item}'
+        item = 'resources/{}'.format(item)
         runTest([item])
         runTest([item, '-exp'])
         runTest([item, '-exr'])
@@ -306,4 +291,4 @@ def testAutoEditor():
     cleanup(os.getcwd())
 
 if(__name__ == '__main__'):
-    testAutoEditor()
+    test()

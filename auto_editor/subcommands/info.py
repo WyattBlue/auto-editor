@@ -1,9 +1,9 @@
-'''info.py'''
+'''subcommands/info.py'''
 
 import os
 import sys
 
-from usefulFunctions import cleanList
+from auto_editor.usefulFunctions import cleanList
 
 def info_options(parser):
     parser.add_argument('--fast', action='store_true',
@@ -32,13 +32,9 @@ def aspectRatio(w, h) -> str:
 
     c = gcd(w, h)
 
-    sw = int(w / c)
-    sh = int(h / c)
+    return '{}:{}'.format(int(w / c), int(h / c))
 
-    return f'{sw}:{sh}'
-
-
-def getInfo(files, ffmpeg, ffprobe, fast, log):
+def info(files, ffmpeg, ffprobe, fast, log):
 
     if(len(files) == 0):
         print('info: subcommand for inspecting media contents.')
@@ -48,9 +44,9 @@ def getInfo(files, ffmpeg, ffprobe, fast, log):
 
     for file in files:
         if(os.path.exists(file)):
-            print(f'file: {file}')
+            print('file: {}'.format(file))
         else:
-            log.error(f'Could not find file: {file}')
+            log.error('Could not find file: {}'.format(file))
 
         hasVid = len(ffprobe.pipe(['-show_streams', '-select_streams', 'v', file])) > 5
         hasAud = len(ffprobe.pipe(['-show_streams', '-select_streams', 'a', file])) > 5
@@ -61,17 +57,6 @@ def getInfo(files, ffmpeg, ffprobe, fast, log):
 
         if(hasVid):
             print(f' - fps: {ffprobe.getFrameRate(file)}')
-
-            if(not fast):
-                fps_mode = ffmpeg.pipe(['-i', file, '-hide_banner', '-vf', 'vfrdet',
-                    '-an', '-f', 'null', '-'])
-                fps_mode = cleanList(fps_mode.split('\n'), '\r\t')
-                fps_mode = fps_mode.pop()
-
-                if('VFR:' in fps_mode):
-                    fps_mode = (fps_mode[fps_mode.index('VFR:'):]).strip()
-
-                print(f'   - {fps_mode}')
 
             dur = ffprobe.getDuration(file)
             if(dur == 'N/A'):
@@ -90,7 +75,7 @@ def getInfo(files, ffmpeg, ffprobe, fast, log):
             print(f' - video codec: {ffprobe.getVideoCodec(file)}')
 
             vbit = ffprobe.getPrettyBitrate(file, 'v', track=0)
-            print(f' - video bitrate: {vbit}')
+            print(' - video bitrate: {}'.format(vbit))
 
             if(hasAud):
                 tracks = ffprobe.getAudioTracks(file)
@@ -112,6 +97,17 @@ def getInfo(files, ffmpeg, ffprobe, fast, log):
                 for track in range(tracks):
                     print(f'   - Track #{track}')
                     print(f'     - lang: {ffprobe.getLang(file, track)}')
+
+            if(not fast):
+                fps_mode = ffmpeg.pipe(['-i', file, '-hide_banner', '-vf', 'vfrdet',
+                    '-an', '-f', 'null', '-'])
+                fps_mode = cleanList(fps_mode.split('\n'), '\r\t')
+                fps_mode = fps_mode.pop()
+
+                if('VFR:' in fps_mode):
+                    fps_mode = (fps_mode[fps_mode.index('VFR:'):]).strip()
+
+                print(' - {}'.format(fps_mode))
 
         elif(hasAud):
             print(f' - duration: {ffprobe.getAudioDuration(file)}')

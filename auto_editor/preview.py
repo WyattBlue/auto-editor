@@ -1,32 +1,29 @@
 '''preview.py'''
 
-# Included Libraries
-from usefulFunctions import getNewLength
-
 # Internal Libraries
 import os
 from datetime import timedelta
 
+# Included Libraries
+from auto_editor.usefulFunctions import getNewLength
+
 def printTimeFrame(title: str, frames, fps: float):
-    inSec = round(frames / fps, 1)
+    in_sec = round(frames / fps, 1)
     fps = round(fps)
-    if(inSec < 1):
-        minutes = f'{int(frames)}/{fps} frames'
+    if(in_sec < 1):
+        minutes = '{}/{} frames'.format(int(frames), fps)
     else:
-        minutes = timedelta(seconds=round(inSec))
-    print(f'{title}: {inSec} secs ({minutes})')
+        minutes = timedelta(seconds=round(in_sec))
+    print('{}: {} secs ({})'.format(title, in_sec, minutes))
 
 
 def preview(myInput, chunks: list, speeds: list, fps: float, audioFile, log):
-    if(not os.path.isfile(myInput)):
-        log.error('preview.py: Could not find file ' + myInput)
-
-    oldTime = chunks[len(chunks)-1][1]
+    old_time = chunks[len(chunks)-1][1]
     print('')
-    printTimeFrame('Old length', oldTime, fps)
+    printTimeFrame('Old length', old_time, fps)
 
-    newL = getNewLength(chunks, speeds, fps)
-    printTimeFrame('New length', newL * fps, fps)
+    new_length = getNewLength(chunks, speeds, fps)
+    printTimeFrame('New length', new_length * fps, fps)
     print('')
 
     clips = 0

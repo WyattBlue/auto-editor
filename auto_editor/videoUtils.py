@@ -5,8 +5,8 @@ import os
 from shutil import move, copy
 
 # Included Libraries
-from usefulFunctions import fNone
-from fastAudio import fastAudio
+from auto_editor.usefulFunctions import fNone
+from auto_editor.fastAudio import fastAudio
 
 def handleAudioTracks(ffmpeg, outFile, args, tracks, chunks, speeds, fps, temp, log):
     for t in range(tracks):

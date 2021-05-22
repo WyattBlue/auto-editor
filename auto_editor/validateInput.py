@@ -49,7 +49,7 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
 
             # Throw error if file referenced doesn't exist.
             if(not os.path.isfile(myInput)):
-                log.error(f"{myInput} doesn't exist!")
+                log.error("{} doesn't exist!".format(myInput))
 
             # Check if the file format is valid.
             fileFormat = myInput[myInput.rfind('.'):]

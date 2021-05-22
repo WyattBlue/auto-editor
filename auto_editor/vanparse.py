@@ -4,38 +4,38 @@ import os
 import sys
 import difflib
 
-def out(text: str):
+def out(text):
     import re
     import textwrap
     from shutil import get_terminal_size
 
     indent_regex = re.compile(r'^(\s+)')
-    width = get_terminal_size().columns
+    width = get_terminal_size().columns - 3
 
-    wraped_lines = []
+    wrapped_lines = []
 
     for line in text.split('\n'):
         exist_indent = re.search(indent_regex, line)
         pre_indent = exist_indent.groups()[0] if exist_indent else ''
 
-        wraped_lines.append(
+        wrapped_lines.append(
             textwrap.fill(line, width=width, subsequent_indent=pre_indent)
         )
 
-    print('\n'.join(wraped_lines))
+    print('\n'.join(wrapped_lines))
 
-def printOptionHelp(args, option):
+def print_option_help(args, option):
     text = ''
     if(option['action'] == 'grouping'):
-        text += f'  {option["names"][0]}:\n'
+        text += '  {}:\n'.format(option['names'][0])
     else:
         text += '  ' + ', '.join(option['names']) + '\n    ' + option['help'] + '\n\n'
         if(option['extra'] != ''):
-            text += f'\n{option["extra"]}\n\n'
+            text += '\n{}\n\n'.format(option['extra'])
 
     if(option['action'] == 'default'):
         text += '    type: ' + option['type'].__name__
-        text += f'\n    default: {option["default"]}\n'
+        text += '\n    default: {}\n'.format(option['default'])
         if(option['range'] is not None):
             text += '    range: ' +  option['range'] + '\n'
 
@@ -55,29 +55,28 @@ def printOptionHelp(args, option):
         text += '    group: ' + option['grouping'] + '\n'
     out(text)
 
-def printProgramHelp(root, the_args: list):
+def print_program_help(root, the_args):
     text = ''
     for options in the_args:
         for option in options:
             if(option['action'] == 'grouping'):
-                text += f"\n  {option['names'][0]}:\n"
+                text += "\n  {}:\n".format(option['names'][0])
             else:
                 text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
     text += '\n'
     if(root == 'auto-editor'):
         text += '  Have an issue? Make an issue. Visit '\
-            'https://github.com/wyattblue/auto-editor/issues\n\n  The help option can '\
-            'also be used on a specific option:\n     auto-editor --frame_margin '\
-            '--help\n'
+            'https://github.com/wyattblue/auto-editor/issues\n\n  The help option '\
+            'can also be used on a specific option:\n     auto-editor '\
+            '--frame_margin --help\n'
     out(text)
 
-def getOption(item: str, group: str, the_args: list) -> str:
+def get_option(item, group, the_args):
     for options in the_args:
         for option in options:
             if(item in option['names'] and group in ['global', option['grouping']]):
                 return option
     return None
-
 
 
 class ArgumentParser():
@@ -90,20 +89,20 @@ class ArgumentParser():
 
     def add_argument(self, *names, nargs=1, type=str, default=None, action='default',
         range=None, choices=None, group=None, stack=None, help='', extra=''):
-        newDic = {}
-        newDic['names'] = names
-        newDic['nargs'] = nargs
-        newDic['type'] = type
-        newDic['default'] = default
-        newDic['action'] = action
-        newDic['help'] = help
-        newDic['extra'] = extra
-        newDic['range'] = range
-        newDic['choices'] = choices
-        newDic['grouping'] = group
-        newDic['stack'] = stack
 
-        self.args.append(newDic)
+        self.args.append({
+            'names': names,
+            'nargs': nargs,
+            'type': type,
+            'default': default,
+            'action': action,
+            'help': help,
+            'extra': extra,
+            'range': range,
+            'choices': choices,
+            'grouping': group,
+            'stack': stack,
+        })
 
     def parse_args(self, sys_args, log, root):
 
@@ -112,8 +111,8 @@ class ArgumentParser():
             sys.exit()
 
         if(sys_args == ['-v'] or sys_args == ['-V']):
-            out(f'{self.program_name} version {self._version}'\
-                '\nPlease use --version instead.')
+            out('{} version {}\nPlease use --version instead.'.format(
+                self.program_name, self._version))
             sys.exit()
 
         return ParseOptions(sys_args, log, root, self.args)
@@ -138,7 +137,7 @@ class ParseOptions():
 
             if(value[0] == "'" and value[-1] == "'"):
                 value = value[1:-1]
-            elif(value == "None"):
+            elif(value == 'None'):
                 value = None
             elif('.' in value):
                 value = float(value)
@@ -149,7 +148,7 @@ class ParseOptions():
             key = key[key.rfind('.')+1:]
 
             if(getattr(self, key) != value):
-                print(f'Setting {key} to {value}', file=sys.stderr)
+                print('Setting {} to {}'.format(key, value), file=sys.stderr)
             setattr(self, key, value)
 
     def __init__(self, sys_args, log, root, *args):
@@ -168,7 +167,7 @@ class ParseOptions():
                 setattr(self, key, value)
 
         dirPath = os.path.dirname(os.path.realpath(__file__))
-        self.setConfig(dirPath + '/config.txt', root)
+        self.setConfig(os.path.join(dirPath, 'config.txt'), root)
 
         # Figure out command line options changed by user.
         my_list = []
@@ -184,12 +183,12 @@ class ParseOptions():
 
             # Find the option.
             if(label == 'option'):
-                option = getOption(item, group='global', the_args=args)
+                option = get_option(item, group='global', the_args=args)
             else:
-                option = getOption(item, group=group, the_args=args)
+                option = get_option(item, group=group, the_args=args)
                 if(option is None and (group is not None)):
                     group = None # Don't consider the next option to be in a group.
-                    option = getOption(item, group=group, the_args=args)
+                    option = get_option(item, group=group, the_args=args)
 
             if(option is None):
                 # Unknown Option!
@@ -205,16 +204,17 @@ class ParseOptions():
                                 opt_list.append(names)
 
                     close_matches = difflib.get_close_matches(item, opt_list)
-                    # Throw an error of some kind.
+
                     if(close_matches):
                         if(close_matches[0] == item):
-                            # Option exists but is not in the right group.
-                            log.error(f'{label.capitalize()} {item} needs to be in a group')
+                            log.error('{} {} needs to be in a group'.format(
+                                label.capitalize(), item))
                         else:
-                            log.error(f'Unknown {label}: {item}\n\n\t' \
-                                'Did you mean:\n\t\t' + ', '.join(close_matches))
+                            log.error('Unknown {}: {}\n\n    '\
+                                'Did you mean:\n        '.format(label, item)
+                                + ', '.join(close_matches))
                     else:
-                        log.error(f'Unknown {label}: {item}')
+                        log.error('Unknown {}: {}'.format(label, item))
             else:
                 # We found the option.
                 if(option_list is not None):
@@ -225,7 +225,7 @@ class ParseOptions():
                 my_list = []
 
                 if(option['names'][0] in used_options and option['stack'] is None):
-                    log.error(f'Cannot repeat option {option["names"][0]} twice.')
+                    log.error('Cannot repeat option {} twice.'.format(option['names'][0]))
 
                 used_options.append(option['names'][0])
 
@@ -235,7 +235,7 @@ class ParseOptions():
 
                 nextItem = None if i == len(sys_args) - 1 else sys_args[i+1]
                 if(nextItem == '-h' or nextItem == '--help'):
-                    printOptionHelp(args, option)
+                    print_option_help(args, option)
                     sys.exit()
 
                 if(option['nargs'] != 1):
@@ -249,15 +249,16 @@ class ParseOptions():
                         value = option['type'](nextItem)
                     except Exception as err:
                         typeName = option['type'].__name__
-                        log.debug(f'Exact Error: {err}')
-                        log.error(f'Couldn\'t convert "{nextItem}" to {typeName}')
+                        log.debug('Exact Error: {}'.format(err))
+                        log.error('Couldn\'t convert "{}" to {}'.format(
+                            nextItem, typeName))
 
                     # Handle when the option value is not in choices list.
                     if(option['choices'] is not None and value not in option['choices']):
                         option_name = option['names'][0]
                         my_choices = ', '.join(option['choices'])
-                        log.error(f'{value} is not a choice for {option_name}' \
-                            f'\nchoices are:\n  {my_choices}')
+                        log.error('{} is not a choice for {}\nchoices are:\n  {}'.format(
+                            value, option_name, my_choices))
                     i += 1
                 setattr(self, key, value)
 
@@ -266,5 +267,5 @@ class ParseOptions():
             setattr(self, option_list, list(map(list_type, my_list)))
 
         if(self.help):
-            printProgramHelp(root, args)
+            print_program_help(root, args)
             sys.exit()

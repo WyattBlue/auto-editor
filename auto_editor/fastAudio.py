@@ -1,19 +1,18 @@
 '''fastAudio.py'''
 
-from usefulFunctions import ProgressBar, getNewLength, fNone
 import os
 
+from auto_editor.usefulFunctions import ProgressBar, getNewLength, fNone
+from auto_editor.wavfile import read, write
+
 def convertAudio(ffmpeg, ffprobe, in_file, INPUT_FILE, out_file, args, log):
-    log.debug(f'Converting internal audio file: {in_file} to {out_file}')
+    r = args.audio_codec
+    if(fNone(r)):
+        r = ffprobe.getAudioCodec(INPUT_FILE)
+    if(r == 'pcm_s16le' and out_file.endswith('.m4a')):
+        log.error('Codec: {} is not supported in the m4a container.'.format(r))
 
-    realCodec = args.audio_codec
-    if(fNone(realCodec)):
-        realCodec = ffprobe.getAudioCodec(INPUT_FILE)
-    if(realCodec == 'pcm_s16le' and out_file.endswith('.m4a')):
-        log.error(f'Codec: {realCodec} is not supported in the m4a container.')
-
-    ffmpeg.run(['-i', in_file, '-acodec', realCodec, out_file])
-
+    ffmpeg.run(['-i', in_file, '-acodec', r, out_file])
 
 def handleAudio(ffmpeg, in_file, audioBit, samplerate: str, temp, log) -> str:
     temp_file = os.path.join(temp, 'faAudio.wav')
@@ -29,19 +28,17 @@ def handleAudio(ffmpeg, in_file, audioBit, samplerate: str, temp, log) -> str:
 
     return temp_file
 
-
 def fastAudio(in_file, out_file, chunks: list, speeds: list, log, fps: float,
     machineReadable, hideBar):
-    from wavfile import read, write
     import numpy as np
 
     log.checkType(chunks, 'chunks', list)
     log.checkType(speeds, 'speeds', list)
 
-    def speedsOtherThan1And99999(a: list) -> bool:
+    def custom_speeds(a: list) -> bool:
         return len([x for x in a if x != 1 and x != 99999]) > 0
 
-    if(speedsOtherThan1And99999(speeds)):
+    if(custom_speeds(speeds)):
         from audiotsm2 import phasevocoder
         from audiotsm2.io.array import ArrReader, ArrWriter
 
@@ -97,9 +94,9 @@ def fastAudio(in_file, out_file, chunks: list, speeds: list, log, fps: float,
 
         audioProgress.tick(chunkNum)
 
-    log.debug(f'Total Samples: {yPointer}')
-    log.debug(f'Samples per Frame: {samplerate / fps}')
-    log.debug(f'Expected video length: {yPointer / (samplerate / fps)}')
+    log.debug('Total Samples: {}'.format(yPointer))
+    log.debug('Samples per Frame: {}'.format(samplerate / fps))
+    log.debug('Expected video length: {}'.format(yPointer / (samplerate / fps)))
     newAudio = newAudio[:yPointer]
     write(out_file, samplerate, newAudio)
 
