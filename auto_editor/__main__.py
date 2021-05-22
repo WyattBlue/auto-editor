@@ -6,7 +6,7 @@ import os
 import sys
 import tempfile
 
-version = '21w20a dev'
+version = '21w20b'
 
 def error(message):
     print('Error! {}'.format(message), file=sys.stderr)
