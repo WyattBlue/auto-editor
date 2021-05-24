@@ -116,7 +116,7 @@ def main_options(parser):
     parser.add_argument('--sample_rate', '-r', type=sample_rate_type,
         group='exportMediaOps',
         help='set the sample rate of the input and output videos.')
-    parser.add_argument('--video_codec', '-vcodec', default='copy',
+    parser.add_argument('--video_codec', '-vcodec', default='uncompressed',
         group='exportMediaOps',
         help='set the video codec for the output media file.')
     parser.add_argument('--audio_codec', '-acodec', group='exportMediaOps',
