@@ -58,6 +58,23 @@ class FFprobe():
 
         return output
 
+    # def getInfo(path):
+    #     import os
+    #     import re
+
+    #     file = {}
+    #     file['path'] = path
+    #     file['basename'] = os.path.basename(path)
+    #     file['name'], file['ext'] = os.path.splitext([path])
+
+
+    #     info = pipeToConsole([self.path, '-hide_banner', '-i', path])
+
+    #     print(info)
+
+
+    #     return file
+
     def _get(self, file, stream, the_type, track, of='compact=p=0:nk=1') -> str:
         return self.pipe(['-select_streams', f'{the_type}:{track}', '-show_entries',
             f'stream={stream}', '-of', of, file]).strip()
