@@ -77,7 +77,7 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
                 log.error('Download the youtube-dl python library to download URLs.\n' \
                     '   pip3 install youtube-dl')
 
-            from usefulFunctions import ProgressBar
+            from auto_editor.usefulFunctions import ProgressBar
 
             if(not os.path.isfile(outtmpl)):
 
