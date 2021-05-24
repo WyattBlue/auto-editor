@@ -138,7 +138,6 @@ def test():
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
         [ffprobe.getResolution, '1280x720'],
-        [ffprobe.getVideoCodec, 'h264'],
         [ffprobe.getSampleRate, '48000'],
     )
 
@@ -156,7 +155,6 @@ def test():
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
         [ffprobe.getResolution, '1280x720'],
-        [ffprobe.getVideoCodec, 'h264'],
         [ffprobe.getSampleRate, '48000'],
     )
 
