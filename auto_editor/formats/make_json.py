@@ -7,7 +7,7 @@ Make a pre-edited file reference that can be inputted back into auto-editor.
 import os
 import json
 
-def read_json_cutlist(json_file, version, log) -> tuple:
+def read_json_cutlist(json_file, version, log):
     with open(json_file, 'r') as f:
         data = json.load(f)
 

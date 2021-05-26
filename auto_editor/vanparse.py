@@ -88,7 +88,7 @@ class ArgumentParser():
         self.args = []
 
     def add_argument(self, *names, nargs=1, type=str, default=None, action='default',
-        range=None, choices=None, group=None, stack=None, help='', extra=''):
+        range=None, choices=None, group=None, help='', extra=''):
 
         self.args.append({
             'names': names,
@@ -101,7 +101,6 @@ class ArgumentParser():
             'range': range,
             'choices': choices,
             'grouping': group,
-            'stack': stack,
         })
 
     def parse_args(self, sys_args, log, root):
@@ -111,8 +110,7 @@ class ArgumentParser():
             sys.exit()
 
         if(sys_args == ['-v'] or sys_args == ['-V']):
-            out('{} version {}\nPlease use --version instead.'.format(
-                self.program_name, self._version))
+            out('{} version {}'.format(self.program_name, self._version))
             sys.exit()
 
         return ParseOptions(sys_args, log, root, self.args)
@@ -249,7 +247,6 @@ class ParseOptions():
                         value = option['type'](nextItem)
                     except Exception as err:
                         typeName = option['type'].__name__
-                        log.debug('Exact Error: {}'.format(err))
                         log.error('Couldn\'t convert "{}" to {}'.format(
                             nextItem, typeName))
 

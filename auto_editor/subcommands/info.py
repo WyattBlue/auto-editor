@@ -1,104 +1,94 @@
 '''subcommands/info.py'''
 
-import os
-import sys
-
-from auto_editor.usefulFunctions import cleanList
-
 def info_options(parser):
-    parser.add_argument('--fast', action='store_true',
+    parser.add_argument('--include_vfr', action='store_true',
         help='skip information that is very slow to get.')
     parser.add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
+    parser.add_argument('--help', '-h', action='store_true',
+        help='print info about the program or an option and exit.')
     parser.add_argument('(input)', nargs='*',
         help='the path to a file you want inspected.')
     return parser
 
-def removeZeroes(inp: float) -> str:
-    return '{0:.8f}'.format(inp).rstrip('0').rstrip('.')
+def info(sys_args=None):
+    import os
+    import sys
 
-def aspectRatio(w, h) -> str:
+    import auto_editor
+    import auto_editor.vanparse as vanparse
 
-    def gcd(a, b) -> int:
-        while b:
-            a, b = b, a % b
-        return a
+    from auto_editor.usefulFunctions import Log, cleanList
+    from auto_editor.ffwrapper import FFmpeg
 
-    w = int(w)
-    h = int(h)
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
-    if(h == 0):
-        return ''
+    parser = vanparse.ArgumentParser('info', auto_editor.version,
+        description='Get basic information about media files.')
+    parser = info_options(parser)
 
-    c = gcd(w, h)
+    if(sys_args is None):
+        sys_args = sys.args[1:]
 
-    return '{}:{}'.format(int(w / c), int(h / c))
+    log = Log()
+    args = parser.parse_args(sys_args, log, 'info')
 
-def info(files, ffmpeg, ffprobe, fast, log):
+    ffmpeg = FFmpeg(dir_path, args.my_ffmpeg, False, log)
 
-    if(len(files) == 0):
-        print('info: subcommand for inspecting media contents.')
-        print('Add a file to inspect. Example:')
-        print('    auto-editor info example.mp4')
-        sys.exit()
+    def aspect_ratio(w, h):
+        def gcd(a, b):
+            while b:
+                a, b = b, a % b
+            return a
 
-    for file in files:
+        w = int(w)
+        h = int(h)
+        if(h == 0):
+            return ''
+
+        c = gcd(w, h)
+        return '{}:{}'.format(w // c, h // c)
+
+    for file in args.input:
+        text = ''
         if(os.path.exists(file)):
-            print('file: {}'.format(file))
+            text += 'file: {}\n'.format(file)
         else:
             log.error('Could not find file: {}'.format(file))
 
-        hasVid = len(ffprobe.pipe(['-show_streams', '-select_streams', 'v', file])) > 5
-        hasAud = len(ffprobe.pipe(['-show_streams', '-select_streams', 'a', file])) > 5
+        inp = ffmpeg.file_info(file)
 
-        # Detect if subtitles are present.
-        sub_text = ffprobe.pipe(['-show_streams', '-select_streams', 's', file])
-        hasSub = len(sub_text) > 5 and 'Invalid data' not in sub_text
+        if(len(inp.video_streams) > 0):
+            text += ' - fps: {}\n'.format(inp.fps)
+            text += ' - duration: {}\n'.format(inp.duration)
 
-        if(hasVid):
-            print(f' - fps: {ffprobe.getFrameRate(file)}')
+            w = inp.video_streams[0]['width']
+            h = inp.video_streams[0]['height']
 
-            dur = ffprobe.getDuration(file)
-            if(dur == 'N/A'):
-                dur = ffprobe.pipe(['-show_entries', 'format=duration', '-of',
-                    'default=noprint_wrappers=1:nokey=1', file]).strip()
-                dur = removeZeroes(float(dur))
-                print(f' - duration: {dur} (container)')
-            else:
-                dur = removeZeroes(float(dur))
-                print(f' - duration: {dur}')
+            text += ' - resolution: {}x{} ({})\n'.format(w, h, aspect_ratio(w, h))
+            text += ' - video codec: {}\n'.format(inp.video_streams[0]['codec'])
+            text += ' - video bitrate: {}\n'.format(inp.video_streams[0]['bitrate'])
 
-            res = ffprobe.getResolution(file)
-            width, height = res.split('x')
-            print(f' - resolution: {res} ({aspectRatio(width, height)})')
+            tracks = len(inp.audio_streams)
+            text += ' - audio tracks: {}\n'.format(tracks)
 
-            print(f' - video codec: {ffprobe.getVideoCodec(file)}')
+            for track in range(tracks):
+                text += '   - Track #{}\n'.format(track)
+                text += '     - codec: {}\n'.format(inp.audio_streams[track]['codec'])
+                text += '     - samplerate: {}\n'.format(
+                    inp.audio_streams[track]['samplerate'])
+                text += '     - bitrate: {}\n'.format(inp.audio_streams[track]['bitrate'])
 
-            vbit = ffprobe.getPrettyBitrate(file, 'v', track=0)
-            print(' - video bitrate: {}'.format(vbit))
-
-            if(hasAud):
-                tracks = ffprobe.getAudioTracks(file)
-                print(f' - audio tracks: {tracks}')
-
+            sub_tracks = len(inp.subtitle_streams)
+            if(sub_tracks > 0):
+                text += ' - subtitle tracks: {}\n'.format(sub_tracks)
                 for track in range(tracks):
-                    print(f'   - Track #{track}')
-                    print(f'     - codec: {ffprobe.getAudioCodec(file, track)}')
-                    print(f'     - samplerate: {ffprobe.getPrettySampleRate(file, track)}')
+                    text += '   - Track #{}\n'.format(track)
+                    text += '     - lang: {}\n'.format(inp.subtitle_streams[track]['lang'])
 
-                    abit = ffprobe.getPrettyBitrate(file, 'a', track)
-                    print(f'     - bitrate: {abit}')
-            else:
-                print(' - audio tracks: 0')
-
-            if(hasSub):
-                tracks = ffprobe.getSubtitleTracks(file)
-                print(f' - subtitle tracks: {tracks}')
-                for track in range(tracks):
-                    print(f'   - Track #{track}')
-                    print(f'     - lang: {ffprobe.getLang(file, track)}')
-
-            if(not fast):
+            if(args.include_vfr):
+                print(text, end='')
+                text = ''
                 fps_mode = ffmpeg.pipe(['-i', file, '-hide_banner', '-vf', 'vfrdet',
                     '-an', '-f', 'null', '-'])
                 fps_mode = cleanList(fps_mode.split('\n'), '\r\t')
@@ -107,14 +97,16 @@ def info(files, ffmpeg, ffprobe, fast, log):
                 if('VFR:' in fps_mode):
                     fps_mode = (fps_mode[fps_mode.index('VFR:'):]).strip()
 
-                print(' - {}'.format(fps_mode))
+                text += ' - {}\n'.format(fps_mode)
 
-        elif(hasAud):
-            print(f' - duration: {ffprobe.getAudioDuration(file)}')
-            print(f' - codec: {ffprobe.getAudioCodec(file, track=0)}')
-            print(f' - samplerate: {ffprobe.getPrettySampleRate(file, track=0)}')
-            abit = ffprobe.getPrettyBitrate(file, 'a', track=0)
-            print(f' - bitrate: {abit}')
+        elif(len(inp.audio_streams) > 0):
+            text += ' - duration: {}\n'.format(inp.duration)
+            text += ' - codec: {}\n'.format(inp.audio_streams[0]['codec'])
+            text += ' - samplerate: {}\n'.format(inp.audio_streams[0]['samplerate'])
+            text += ' - bitrate: {}\n'.format(inp.audio_streams[0]['bitrate'])
         else:
-            print('Invalid media.')
-    print('')
+            text += 'Invalid media.\n'
+        print(text)
+
+if(__name__ == '__main__'):
+    info()

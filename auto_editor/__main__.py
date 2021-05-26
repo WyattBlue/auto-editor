@@ -6,8 +6,6 @@ import os
 import sys
 import tempfile
 
-version = '21w21a'
-
 def error(message):
     print('Error! {}'.format(message), file=sys.stderr)
     sys.exit(1)
@@ -255,6 +253,7 @@ def main_options(parser):
 
 
 def main():
+    import auto_editor
     import auto_editor.vanparse as vanparse
     import auto_editor.usefulFunctions as usefulFunctions
 
@@ -262,9 +261,9 @@ def main():
     from auto_editor.ffwrapper import FFmpeg, FFprobe
     from auto_editor.wavfile import read
 
-    dirPath = os.path.dirname(os.path.realpath(__file__))
+    dir_path = os.path.dirname(os.path.realpath(__file__))
 
-    parser = vanparse.ArgumentParser('Auto-Editor', version,
+    parser = vanparse.ArgumentParser('Auto-Editor', auto_editor.version,
         description='\nAuto-Editor is an automatic video/audio creator and editor. '\
             'By default, it will detect silence and create a new video with those '\
             'sections cut out. By changing some of the options, you can export to a '\
@@ -272,44 +271,26 @@ def main():
             'the pacing of the cuts, and change the method of editing like using audio '\
             'loudness and video motion to judge making cuts.\nRun:\n    auto-editor '\
             '--help\n\nTo get the list of options.\n')
-    parser.add_argument('--help', '-h', action='store_true',
-        help='print info about the program or an option and exit.')
 
     subcommands = ['create', 'test', 'info', 'levels']
 
     if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
         if(sys.argv[1] == 'create'):
-            from auto_editor.subcommands.create import create, create_options
-            parser = create_options(parser)
-            args = parser.parse_args(sys.argv[2:], Log(), 'create')
-
-            ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, True, Log())
-            create(ffmpeg, args.input, args.output_file, args.frame_rate, args.duration,
-                args.width, args.height, Log())
+            from auto_editor.subcommands.create import create
+            create(sys.argv[2:])
 
         if(sys.argv[1] == 'test'):
             from auto_editor.subcommands.test import test
             test()
 
         if(sys.argv[1] == 'info'):
-            from auto_editor.subcommands.info import info, info_options
-            parser = info_options(parser)
-            args = parser.parse_args(sys.argv[2:], Log(), 'info')
+            from auto_editor.subcommands.info import info
+            info(sys.argv[2:])
 
-            log = Log()
-            ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, False, log)
-            ffprobe = FFprobe(dirPath, args.my_ffmpeg, False, log)
-            info(args.input, ffmpeg, ffprobe, args.fast, log)
         if(sys.argv[1] == 'levels'):
-            from auto_editor.subcommands.levels import levels, levels_options
-            parser = levels_options(parser)
-            args = parser.parse_args(sys.argv[2:], Log(), 'levels')
+            from auto_editor.subcommands.levels import levels
+            levels(sys.argv[2:])
 
-            TEMP = tempfile.mkdtemp()
-            log = Log(temp=TEMP)
-            ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, False, log)
-            ffprobe = FFprobe(dirPath, args.my_ffmpeg, False, log)
-            levels(args.input, args.track, args.output_file, ffmpeg, ffprobe, TEMP, log)
         sys.exit()
     else:
         parser = main_options(parser)
@@ -321,8 +302,8 @@ def main():
     log = Log(args.debug, args.quiet, temp=TEMP)
     log.debug('\nTemp Directory: {}'.format(TEMP))
 
-    ffmpeg = FFmpeg(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, log)
-    ffprobe = FFprobe(dirPath, args.my_ffmpeg, args.show_ffmpeg_debug, log)
+    ffmpeg = FFmpeg(dir_path, args.my_ffmpeg, args.show_ffmpeg_debug, log)
+    ffprobe = FFprobe(dir_path, args.my_ffmpeg, args.show_ffmpeg_debug, log)
 
     exporting_to_editor = (args.export_to_premiere or args.export_to_resolve or
         args.export_to_final_cut_pro)
@@ -335,10 +316,10 @@ def main():
 
         print('Python Version: {} {}'.format(platform.python_version(), is64bit))
         print('Platform: {} {}'.format(platform.system(), platform.release()))
-        print('Config File path: {}'.format(os.path.join(dirPath, 'config.txt')))
+        print('Config File path: {}'.format(os.path.join(dir_path, 'config.txt')))
         print('FFmpeg path: {}'.format(ffmpeg.getPath()))
         print('FFmpeg version: {}'.format(ffmpeg.getVersion()))
-        print('Auto-Editor version {}'.format(version))
+        print('Auto-Editor version {}'.format(auto_editor.version))
         log.cleanup()
         sys.exit()
 
@@ -347,7 +328,7 @@ def main():
             'memory crashes.')
 
     if(args.version):
-        print('Auto-Editor version {}'.format(version))
+        print('Auto-Editor version {}'.format(auto_editor.version))
         log.cleanup()
         sys.exit()
 
@@ -458,34 +439,35 @@ def main():
 
     for i, INPUT_FILE in enumerate(inputList):
 
-        if(len(inputList) > 1):
-            log.conwrite('Working on {}'.format(INPUT_FILE))
+        inp = ffmpeg.file_info(INPUT_FILE)
 
-        fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
+        if(len(inputList) > 1):
+            log.conwrite('Working on {}'.format(inp.basename))
 
         chunks = None
-        if(fileFormat == '.json'):
-            log.debug('Reading .json file')
+        if(inp.ext == '.json'):
             from auto_editor.formats.make_json import read_json_cutlist
-            INPUT_FILE, chunks, speeds = read_json_cutlist(INPUT_FILE, version, log)
-            newOutput = newOutputName(INPUT_FILE, args.export_as_audio,
-                args.export_to_final_cut_pro, making_data_file, False)
 
-            fileFormat = INPUT_FILE[INPUT_FILE.rfind('.'):]
+            INPUT_FILE, chunks, speeds = read_json_cutlist(inp.path, auto_editor.version, log)
+
+            inp = ffmpeg.file_info(INPUT_FILE)
+
+            newOutput = newOutputName(inp.path, args.export_as_audio,
+                args.export_to_final_cut_pro, making_data_file, False)
         else:
             newOutput = args.output_file[i]
-            if(not os.path.isdir(INPUT_FILE) and '.' not in newOutput):
-                newOutput += INPUT_FILE[INPUT_FILE.rfind('.'):]
+            if(not os.path.isdir(inp.path) and '.' not in newOutput):
+                newOutput += inp.ext
 
-        log.debug('Input File: {}'.format(INPUT_FILE))
+        log.debug('Input File: {}'.format(inp.path))
         log.debug('Output File: {}'.format(newOutput))
 
-        if(os.path.isfile(newOutput) and INPUT_FILE != newOutput):
+        if(os.path.isfile(newOutput) and inp.path != newOutput):
             log.debug('Removing already existing file: {}'.format(newOutput))
             os.remove(newOutput)
 
         if(args.sample_rate is None):
-            sampleRate = ffprobe.getSampleRate(INPUT_FILE)
+            sampleRate = ffprobe.getSampleRate(inp.path)
             if(sampleRate == 'N/A'):
                 sampleRate = '48000'
                 log.warning("Samplerate wasn't detected, so it will be set "\
@@ -495,11 +477,11 @@ def main():
         log.debug('Samplerate: {}'.format(sampleRate))
 
         if(args.audio_bitrate is None):
-            if(INPUT_FILE.endswith('.mkv')):
+            if(inp.ext == '.mkv'):
                 # audio bitrate not supported in the mkv container.
                 audioBitrate = None
             else:
-                audioBitrate = ffprobe.getPrettyBitrate(INPUT_FILE, 'a')
+                audioBitrate = ffprobe.getPrettyBitrate(inp.path, 'a')
                 if(audioBitrate == 'N/A'):
                     log.warning("Couldn't automatically detect audio bitrate.")
                     audioBitrate = None
@@ -509,7 +491,7 @@ def main():
         log.debug('Audio Bitrate: {}'.format(audioBitrate))
 
         audioData = None
-        audioFile = fileFormat in audioExtensions
+        audioFile = inp.ext in audioExtensions
         if(audioFile):
             fps = 30 if args.force_fps_to is None else args.force_fps_to
             tracks = 1 if args.force_tracks_to is None else args.force_tracks_to
@@ -522,23 +504,23 @@ def main():
                 ffmpeg.run(cmd)
 
             temp_file = os.path.join(TEMP, 'fastAud.wav')
-            convertAudio(INPUT_FILE, temp_file, sampleRate, audioBitrate)
+            convertAudio(inp.path, temp_file, sampleRate, audioBitrate)
             sampleRate, audioData = read(temp_file)
         else:
             if(args.force_fps_to is not None):
                 fps = args.force_fps_to
             else:
-                fps = ffprobe.getFrameRate(INPUT_FILE)
+                fps = float(inp.fps)
                 if(exporting_to_editor):
                     fps = int(fps)
 
             if(fps < 1):
                 log.error('{}: Frame rate cannot be below 1. fps: {}'.format(
-                    INPUT_FILE, fps))
+                    inp.basename, fps))
 
             tracks = args.force_tracks_to
             if(tracks is None):
-                tracks = ffprobe.getAudioTracks(INPUT_FILE)
+                tracks = ffprobe.getAudioTracks(inp.path)
 
             if(args.cut_by_this_track >= tracks):
                 message = "You choose a track that doesn't exist.\nThere "
@@ -565,7 +547,7 @@ def main():
                 return NumberOfVrfFrames(ffmpeg.pipe(cmd), log) != 0
 
             # Split audio tracks into: 0.wav, 1.wav, etc.
-            cmd = ['-i', INPUT_FILE, '-hide_banner']
+            cmd = ['-i', inp.path, '-hide_banner']
             for t in range(tracks):
                 cmd.extend(['-map', '0:a:{}'.format(t)])
                 if(not fNone(audioBitrate)):
@@ -578,7 +560,7 @@ def main():
 
             if(args.cut_by_all_tracks):
                 temp_file = os.path.join(TEMP, 'combined.wav')
-                cmd = ['-i', INPUT_FILE, '-filter_complex',
+                cmd = ['-i', inp.path, '-filter_complex',
                     '[0:a]amix=inputs={}:duration=longest'.format(tracks), '-ar',
                     sampleRate, '-ac', '2', '-f', 'wav', temp_file]
                 ffmpeg.run(cmd)
@@ -602,7 +584,7 @@ def main():
 
             if('motion' in args.edit_based_on):
                 log.debug('Analyzing video motion.')
-                motionList = motionDetection(INPUT_FILE, ffprobe, args.motion_threshold,
+                motionList = motionDetection(inp.path, ffprobe, args.motion_threshold,
                     log, width=args.width, dilates=args.dilates, blur=args.blur)
 
                 if(audioList is not None):
@@ -648,24 +630,24 @@ def main():
 
         if(args.export_as_json):
             from auto_editor.formats.make_json import make_json_cutlist
-            make_json_cutlist(INPUT_FILE, newOutput, version, chunks, speeds, log)
+            make_json_cutlist(inp.path, newOutput, auto_editor.version, chunks, speeds, log)
             continue
 
         if(args.preview):
             newOutput = None
             from auto_editor.preview import preview
-            preview(INPUT_FILE, chunks, speeds, fps, audioFile, log)
+            preview(inp.path, chunks, speeds, fps, audioFile, log)
             continue
 
         if(args.export_to_premiere or args.export_to_resolve):
             from auto_editor.formats.premiere import premiere_xml
-            premiere_xml(INPUT_FILE, TEMP, newOutput, ffprobe, clips, chunks, tracks,
+            premiere_xml(inp.path, TEMP, newOutput, ffprobe, clips, chunks, tracks,
                 sampleRate, audioFile, args.export_to_resolve, fps, log)
             continue
 
         if(args.export_to_final_cut_pro):
             from auto_editor.formats.final_cut_pro import fcp_xml
-            fcp_xml(INPUT_FILE, TEMP, newOutput, ffprobe, clips, chunks, tracks,
+            fcp_xml(inp.path, TEMP, newOutput, ffprobe, clips, chunks, tracks,
                 sampleRate, audioFile, fps, log)
             continue
 
@@ -685,11 +667,11 @@ def main():
                 for item in chunks:
                     if(speeds[item[2]] == 99999):
                         continue
-                    makeAudioFile(INPUT_FILE, [item],
+                    makeAudioFile(inp.path, [item],
                         appendFileName(newOutput, '-{}'.format(i)))
                     i += 1
             else:
-                makeAudioFile(INPUT_FILE, chunks, newOutput)
+                makeAudioFile(inp.path, chunks, newOutput)
             continue
 
         def makeVideoFile(input_, chunks, output):
@@ -745,11 +727,11 @@ def main():
                 if(speeds[chunk[2]] == 99999):
                     continue
 
-                makeVideoFile(INPUT_FILE, padChunk(chunk, totalFrames),
+                makeVideoFile(inp.path, padChunk(chunk, totalFrames),
                     appendFileName(newOutput, '-{}'.format(i)))
                 i += 1
         else:
-            makeVideoFile(INPUT_FILE, chunks, newOutput)
+            makeVideoFile(inp.path, chunks, newOutput)
 
     if(not args.preview and not making_data_file):
         timer.stop()
