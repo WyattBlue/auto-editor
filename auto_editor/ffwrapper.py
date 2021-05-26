@@ -58,23 +58,6 @@ class FFprobe():
 
         return output
 
-    # def getInfo(path):
-    #     import os
-    #     import re
-
-    #     file = {}
-    #     file['path'] = path
-    #     file['basename'] = os.path.basename(path)
-    #     file['name'], file['ext'] = os.path.splitext([path])
-
-
-    #     info = pipeToConsole([self.path, '-hide_banner', '-i', path])
-
-    #     print(info)
-
-
-    #     return file
-
     def _get(self, file, stream, the_type, track, of='compact=p=0:nk=1') -> str:
         return self.pipe(['-select_streams', f'{the_type}:{track}', '-show_entries',
             f'stream={stream}', '-of', of, file]).strip()
@@ -159,7 +142,7 @@ class FFmpeg():
         self.path = testPath(dirpath, myFFmpeg, 'ffmpeg', log)
         self.FFdebug = FFdebug
 
-    def getPath(self) -> str:
+    def getPath(self):
         return self.path
 
     def run(self, cmd: list):
@@ -170,6 +153,71 @@ class FFmpeg():
             cmd.extend(['-nostats', '-loglevel', 'error'])
         self.log.debug(cmd)
         subprocess.call(cmd)
+
+    def file_info(self, path):
+        import os
+        import re
+
+        class File:
+            def __repr__(self):
+                return str(self.__dict__)
+
+        file = File()
+
+        setattr(file, 'path', path)
+        setattr(file, 'abspath', os.path.abspath(path))
+        setattr(file, 'basename', os.path.basename(path))
+        setattr(file, 'dirname', os.path.dirname(path))
+
+        f_name, f_ext = os.path.splitext(path)
+
+        setattr(file, 'name', f_name)
+        setattr(file, 'ext', f_ext)
+
+        def regex_match(regex, text):
+            match = re.search(regex, text)
+            if(match):
+                return match.groupdict()['match']
+            return None
+
+        info = pipeToConsole([self.path, '-hide_banner', '-i', path])
+
+        setattr(file, 'duration', regex_match(r'Duration:\s(?P<match>[\d:.]+),', info))
+        setattr(file, 'bitrate', regex_match(r'bitrate:\s(?P<match>\d+\skb\/s)', info))
+
+        video_streams = []
+        audio_streams = []
+        subtitle_streams = []
+        fps = None
+
+        for line in info.split('\n'):
+            if(re.search(r'Stream #', line)):
+                s_data = {}
+                if(re.search(r'Video:', line)):
+                    s_data['width'] = regex_match(r'(?P<match>\d+)x\d+\s', line)
+                    s_data['height'] = regex_match(r'\d+x(?P<match>\d+)\s', line)
+                    s_data['codec'] = regex_match(r'Video:\s(?P<match>\w+)\s', line)
+                    s_data['bitrate'] = regex_match(r'\s(?P<match>\d+\skb\/s)', line)
+                    fps = regex_match(r'\s(?P<match>[\d\.]+)\stbr', line)
+                    video_streams.append(s_data)
+
+                elif(re.search(r'Audio:', line)):
+                    s_data['codec'] = regex_match(r'Audio:\s(?P<match>\w+)\s', line)
+                    s_data['samplerate'] = regex_match(r'(?P<match>\d+)\sHz', line)
+                    s_data['bitrate'] = regex_match(r'\s(?P<match>\d+\skb\/s)', line)
+                    audio_streams.append(s_data)
+
+                elif(re.search(r'Subtitle:', line)):
+                    s_data['lang'] = regex_match(r'Stream #\d:\d\((?P<match>\w+)\)', line)
+                    subtitle_streams.append(s_data)
+
+        setattr(file, 'fps', fps)
+
+        setattr(file, 'video_streams', video_streams)
+        setattr(file, 'audio_streams', audio_streams)
+        setattr(file, 'subtitle_streams', subtitle_streams)
+
+        return file
 
     def Popen(self, cmd: list):
         cmd = [self.path] + cmd

@@ -1,8 +1,5 @@
 '''subcommands/create.py'''
 
-import os
-import time
-
 def create_options(parser):
     parser.add_argument('--frame_rate', '-fps', '-r', type=float, default=30.0,
         help='set the framerate for the output video.')
@@ -16,18 +13,42 @@ def create_options(parser):
         default='testsrc.mp4')
     parser.add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
+    parser.add_argument('--help', '-h', action='store_true',
+        help='print info about the program or an option and exit.')
     parser.add_argument('(input)', nargs='*',
         help='the template')
     return parser
 
-def create(ffmpeg, theme, output, fps, duration, width, height, log):
+def create(sys_args=None):
+    import os
+    import sys
+    import time
 
-    if(theme == []):
+    import auto_editor
+    import auto_editor.vanparse as vanparse
+
+    from auto_editor.usefulFunctions import Log
+    from auto_editor.ffwrapper import FFmpeg
+
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+    parser = vanparse.ArgumentParser('create', auto_editor.version,
+        description='Generate simple media.')
+    parser = create_options(parser)
+
+    log = Log()
+    args = parser.parse_args(sys.argv[2:], Log(), 'create')
+
+    ffmpeg = FFmpeg(dir_path, args.my_ffmpeg, False, log)
+
+    theme = args.input
+    output = args.output_file
+    fps = args.frame_rate
+
+    if(len(theme) == 0):
         log.error('You must put a theme!')
-
     if(len(theme) > 1):
         log.error('Only one theme at a time.')
-
     theme = theme[0]
 
     try:
@@ -41,9 +62,8 @@ def create(ffmpeg, theme, output, fps, duration, width, height, log):
         ffmpeg.run(['-i', 'short.wav', '-af', 'apad', '-t', '1', 'beep.wav']) # Pad audio.
 
         # Generate video with no audio.
-        ffmpeg.run(['-f', 'lavfi', '-i',
-            f'testsrc=duration={duration}:size={width}x{height}:rate={fps}', '-pix_fmt',
-            'yuv420p', output])
+        ffmpeg.run(['-f', 'lavfi', '-i', 'testsrc=duration={}:size={}x{}:rate={}'.format(
+            args.duration, args.width, args.height, fps), '-pix_fmt', 'yuv420p', output])
 
         # Add empty audio channel to video.
         ffmpeg.run(['-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
@@ -61,7 +81,8 @@ def create(ffmpeg, theme, output, fps, duration, width, height, log):
         os.remove('pre' + output)
 
     if(theme in ['white', 'black']):
-        ffmpeg.run(['-f', 'lavfi', '-i',
-            f'color=size={width}x{height}:rate={fps}:color={theme}', '-t', str(duration),
-                output])
+        ffmpeg.run(['-f', 'lavfi', '-i', 'color=size={}x{}:rate={}:color={}'.format(
+            args.width, args.height, fps, theme), '-t', str(args.duration), output])
 
+if(__name__ == '__main__'):
+    create()
