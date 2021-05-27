@@ -2,7 +2,6 @@
 
 # metadataOps
 auto-editor.metadataOps.force_fps_to = None               # None
-auto-editor.metadataOps.force_tracks_to = None            # None
 
 # exportMediaOps
 auto-editor.exportMediaOps.video_bitrate = 'unset'        # 'unset'

@@ -4,11 +4,11 @@ import os
 
 from auto_editor.formats.utils import indent
 
-def fcp_xml(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
-    sampleRate, audioFile, fps, log):
+def fcp_xml(inp, temp, output, clips, chunks, tracks, total_dur, sampleRate,
+    audioFile, fps, log):
 
-    pathurl = 'file://' + os.path.abspath(myInput)
-    name = os.path.splitext(os.path.basename(myInput))[0]
+    pathurl = 'file://' + inp.abspath
+    name = inp.name
 
     def fraction(inp, fps) -> str:
         from fractions import Fraction
@@ -39,18 +39,13 @@ def fcp_xml(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int
                 num = total.numerator
                 dem = total.denominator
 
-        return f'{num}/{dem}s'
+        return '{}/{}s'.format(num, dem)
 
     if(not audioFile):
-        width, height = ffprobe.getResolution(myInput).split('x')
-        total_dur = ffprobe.getDuration(myInput)
-        if(total_dur == 'N/A'):
-            total_dur = ffprobe.pipe(['-show_entries', 'format=duration', '-of',
-                'default=noprint_wrappers=1:nokey=1', myInput]).strip()
+        width = inp.video_streams[0]['width']
+        height = inp.video_streams[0]['height']
     else:
         width, height = '1920', '1080'
-        total_dur = ffprobe.getAudioDuration(myInput)
-    total_dur = float(total_dur) * fps
 
     with open(output, 'w', encoding='utf-8') as outfile:
 

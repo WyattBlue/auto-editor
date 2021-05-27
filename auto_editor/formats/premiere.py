@@ -31,24 +31,21 @@ def speedup(speed) -> str:
         '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
-def premiere_xml(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks: int,
-    sampleRate, audioFile, resolve: bool, fps, log):
+def premiere_xml(inp, temp: str, output, clips, chunks, sampleRate, audioFile,
+    resolve: bool, fps, log):
 
     duration = chunks[len(chunks) - 1][1]
-    pathurl = fix_url(myInput, resolve)
-    name = os.path.basename(myInput)
+    pathurl = fix_url(inp.path, resolve)
+
+    tracks = len(inp.audio_streams)
+    name = inp.name
 
     log.debug('tracks: {}'.format(tracks))
-    log.debug(os.path.dirname(os.path.abspath(myInput)))
+    log.debug(inp.dirname)
 
     if(tracks > 1):
-        # XML's don't support multiple audio tracks so
-        # we need to do some stupid things to get it working.
-
-        inFolder = os.path.dirname(os.path.abspath(myInput))
-        name_without_extension = name[:name.rfind(".")]
-
-        newFolderName = os.path.join(inFolder, f'{name_without_extension}_tracks')
+        name_without_extension = inp.basename[:inp.basename.rfind(".")]
+        newFolderName = os.path.join(inp.dirname, f'{name_without_extension}_tracks')
         try:
             os.mkdir(newFolderName)
         except OSError:
@@ -65,7 +62,8 @@ def premiere_xml(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks
     ana = 'FALSE' # anamorphic
     depth = '16'
     if(not audioFile):
-        width, height = ffprobe.getResolution(myInput).split('x')
+        width = inp.video_streams[0]['width']
+        height = inp.video_streams[0]['height']
     else:
         width = '1920'
         height = '1080'
@@ -104,8 +102,8 @@ def premiere_xml(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks
             outfile.write(indent(3, '<audio>',
                 '\t<numOutputChannels>2</numOutputChannels>', '\t<format>',
                 '\t\t<samplecharacteristics>',
-                f'\t\t\t<depth>{depth}</depth>',
-                f'\t\t\t<samplerate>{sr}</samplerate>',
+                '\t\t\t<depth>{}</depth>'.format(depth),
+                '\t\t\t<samplerate>{}</samplerate>'.format(sr),
                 '\t\t</samplecharacteristics>',
                 '\t</format>'))
 
@@ -119,16 +117,16 @@ def premiere_xml(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks
 
                 outfile.write(indent(5, f'<clipitem id="clipitem-{j+1}">',
                     '\t<masterclipid>masterclip-1</masterclipid>',
-                    f'\t<name>{name}</name>',
-                    f'\t<start>{myStart}</start>',
-                    f'\t<end>{myEnd}</end>',
+                    '\t<name>{}</name>'.format(inp.name),
+                    '\t<start>{}</start>'.format(myStart),
+                    '\t<end>{}</end>'.format(myEnd),
                     f'\t<in>{int(clip[0] / (clip[2] / 100))}</in>',
                     f'\t<out>{int(clip[1] / (clip[2] / 100))}</out>'))
 
                 if(j == 0):
                     # Define file-1
                     outfile.write(indent(6, '<file id="file-1">',
-                        f'\t<name>{name}</name>',
+                        f'\t<name>{inp.name}</name>',
                         f'\t<pathurl>{pathurl}</pathurl>',
                         '\t<rate>',
                         f'\t\t<timebase>{timebase}</timebase>',
@@ -197,7 +195,7 @@ def premiere_xml(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks
 
             outfile.write(indent(5, f'<clipitem id="clipitem-{j+1}">',
                 '\t<masterclipid>masterclip-2</masterclipid>',
-                f'\t<name>{name}</name>',
+                f'\t<name>{inp.name}</name>',
                 f'\t<start>{myStart}</start>',
                 f'\t<end>{myEnd}</end>',
                 f'\t<in>{int(clip[0] / (clip[2] / 100))}</in>',
@@ -205,7 +203,7 @@ def premiere_xml(myInput: str, temp: str, output, ffprobe, clips, chunks, tracks
 
             if(j == 0):
                 outfile.write(indent(6, '<file id="file-1">',
-                    f'\t<name>{name}</name>',
+                    f'\t<name>{inp.name}</name>',
                     f'\t<pathurl>{pathurl}</pathurl>',
                     '\t<rate>',
                     f'\t\t<timebase>{timebase}</timebase>',

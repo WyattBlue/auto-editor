@@ -12,8 +12,49 @@ import platform
 import subprocess
 
 # Included Libraries
-from auto_editor.usefulFunctions import Log
-from auto_editor.ffwrapper import FFprobe
+from auto_editor.usefulFunctions import Log, cleanList
+
+class FFprobe():
+    def __init__(self, path):
+        self.path = path
+
+    def run(self, cmd):
+        cmd.insert(0, self.path)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        stdout, __ = process.communicate()
+        return stdout.decode()
+
+    def pipe(self, cmd: list) -> str:
+        full_cmd = [self.path, '-v', 'error'] + cmd
+        process = subprocess.Popen(full_cmd, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        stdout, __ = process.communicate()
+        return stdout.decode()
+
+    def _get(self, file, stream, the_type, track, of='compact=p=0:nk=1') -> str:
+        return self.pipe(['-select_streams', f'{the_type}:{track}', '-show_entries',
+            f'stream={stream}', '-of', of, file]).strip()
+
+    def getResolution(self, file):
+        return self._get(file, 'height,width', 'v', 0, of='csv=s=x:p=0')
+
+    def getTimeBase(self, file):
+        return self.pipe(['-select_streams', 'v', '-show_entries',
+            'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
+
+    def getFrameRate(self, file) -> float:
+        nums = cleanList(self.getTimeBase(file).split('/'), '\r\t\n')
+        return int(nums[0]) / int(nums[1])
+
+    def getAudioCodec(self, file, track=0):
+        return self._get(file, 'codec_name', 'a', track)
+
+    def getVideoCodec(self, file, track=0):
+        return self._get(file, 'codec_name', 'v', track)
+
+    def getSampleRate(self, file, track=0):
+        return self._get(file, 'sample_rate', 'a', track)
 
 def getRunner():
     if(platform.system() == 'Windows'):
@@ -80,8 +121,7 @@ def cleanup(the_dir):
             shutil.rmtree(item)
 
 
-dirPath = os.path.dirname(os.path.realpath(__file__))
-ffprobe = FFprobe(dirPath, True, False, Log())
+ffprobe = FFprobe('ffprobe')
 
 def fullInspect(fileName, *args):
     for item in args:
