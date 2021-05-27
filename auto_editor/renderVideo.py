@@ -7,7 +7,7 @@ import subprocess
 # Included Libaries
 from auto_editor.usefulFunctions import ProgressBar, fNone
 
-def properties(cmd, args, vidFile, ffprobe):
+def properties(cmd, args, inp):
 
     def fset(cmd, option, value):
         if(fNone(value)):
@@ -17,7 +17,7 @@ def properties(cmd, args, vidFile, ffprobe):
     if(args.video_codec == 'uncompressed'):
         cmd.extend(['-vcodec', 'mpeg4', '-qscale:v', '1'])
     elif(args.video_codec == 'copy'):
-        new_codec = ffprobe.getVideoCodec(vidFile)
+        new_codec = inp.video_streams[0]['codec']
         if(new_codec != 'dvvideo'): # This codec seems strange.
             cmd.extend(['-vcodec', new_codec])
     else:
@@ -31,12 +31,12 @@ def properties(cmd, args, vidFile, ffprobe):
     cmd.extend(['-movflags', '+faststart', '-strict', '-2'])
     return cmd
 
-def scaleToSped(ffmpeg, ffprobe, vidFile, args, temp):
+def scaleToSped(ffmpeg, inp, args, temp):
     SCALE = os.path.join(temp, 'scale.mp4')
     SPED = os.path.join(temp, 'spedup.mp4')
 
     cmd = ['-i', SCALE]
-    cmd = properties(cmd, args, vidFile, ffprobe)
+    cmd = properties(cmd, args, inp)
     cmd.append(SPED)
     check_errors = ffmpeg.pipe(cmd)
 
@@ -45,13 +45,12 @@ def scaleToSped(ffmpeg, ffprobe, vidFile, args, temp):
         if('-allow_sw 1' in check_errors):
             cmd.extend(['-allow_sw', '1'])
 
-        cmd = properties(cmd, args, vidFile, ffprobe)
+        cmd = properties(cmd, args, inp)
         cmd.append(SPED)
         ffmpeg.run(cmd)
 
 
-def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
-    has_vfr, temp, log):
+def renderAv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
     import av
 
     totalFrames = chunks[len(chunks) - 1][1]
@@ -75,13 +74,13 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
                 return self._fh.read(buf_size)
 
         # Create a cfr stream on stdout.
-        cmd = ['-i', vidFile, '-map', '0:v:0', '-vf', 'fps=fps={}'.format(fps), '-r',
+        cmd = ['-i', inp.path, '-map', '0:v:0', '-vf', 'fps=fps={}'.format(fps), '-r',
             str(fps), '-vsync', '1', '-f', 'matroska', '-vcodec', 'rawvideo', 'pipe:1']
 
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
         input_ = av.open(wrapper, 'r')
     else:
-        input_ = av.open(vidFile)
+        input_ = av.open(inp.path)
 
     inputVideoStream = input_.streams.video[0]
     inputVideoStream.thread_type = 'AUTO'
@@ -93,14 +92,14 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
     log.debug('pix_fmt: {}'.format(pix_fmt))
 
     cmd = [ffmpeg.getPath(), '-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
-        '-pix_fmt', pix_fmt, '-s', f'{width}*{height}', '-framerate', f'{fps}', '-i', '-',
-        '-pix_fmt', pix_fmt]
+        '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
+        '-i', '-', '-pix_fmt', pix_fmt]
 
     if(args.scale != 1):
         cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale),
             os.path.join(temp, 'scale.mp4')])
     else:
-        cmd = properties(cmd, args, vidFile, ffprobe)
+        cmd = properties(cmd, args, inp)
         cmd.append(os.path.join(temp, 'spedup.mp4'))
 
     if(args.show_ffmpeg_debug):
@@ -138,22 +137,21 @@ def renderAv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fp
         log.error('Broken Pipe Error!')
 
     if(args.scale != 1):
-        scaleToSped(ffmpeg, ffprobe, vidFile, args, temp)
+        scaleToSped(ffmpeg, inp, args, temp)
 
 
-def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list, fps,
-    has_vfr, effects, temp, log):
+def renderOpencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, effects, temp, log):
     import cv2
     import numpy as np
     from auto_editor.interpolate import interpolate
 
     if(has_vfr):
-        cmd = ['-i', vidFile, '-map', '0:v:0', '-vf', f'fps=fps={fps}', '-r', str(fps),
+        cmd = ['-i', inp.path, '-map', '0:v:0', '-vf', f'fps=fps={fps}', '-r', str(fps),
             '-vsync', '1', '-f','matroska', '-vcodec', 'rawvideo', 'pipe:1']
         fileno = ffmpeg.Popen(cmd).stdout.fileno()
         cap = cv2.VideoCapture('pipe:{}'.format(fileno))
     else:
-        cap = cv2.VideoCapture(vidFile)
+        cap = cv2.VideoCapture(inp.path)
 
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -374,8 +372,8 @@ def renderOpencv(ffmpeg, ffprobe, vidFile: str, args, chunks: list, speeds: list
     cv2.destroyAllWindows()
 
     if(args.scale == 1):
-        cmd = properties(['-i', vidFile], args, vidFile, ffprobe)
+        cmd = properties(['-i', inp.path], args, inp)
         cmd.append(os.path.join(temp, 'spedup.mp4'))
         ffmpeg.run(cmd)
     else:
-        scaleToSped(ffmpeg, ffprobe, vidFile, args, temp)
+        scaleToSped(ffmpeg, inp, args, temp)

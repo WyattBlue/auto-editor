@@ -1,7 +1,4 @@
-include auto_editor/win-ffmpeg/bin/*
-include auto_editor/win-ffmpeg/LICENSE.txt
-
-include auto_editor/mac-ffmpeg/bin/*
-include auto_editor/mac-ffmpeg/LICENSE.txt
-
+include auto_editor/ffmpeg/LICENSE.txt
+include auto_editor/ffmpeg/Windows/*
+include auto_editor/ffmpeg/Darwin/*
 include auto_editor/config.txt

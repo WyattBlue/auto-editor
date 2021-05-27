@@ -5,14 +5,13 @@ import os
 from auto_editor.usefulFunctions import ProgressBar, getNewLength, fNone
 from auto_editor.wavfile import read, write
 
-def convertAudio(ffmpeg, ffprobe, in_file, INPUT_FILE, out_file, args, log):
-    r = args.audio_codec
-    if(fNone(r)):
-        r = ffprobe.getAudioCodec(INPUT_FILE)
-    if(r == 'pcm_s16le' and out_file.endswith('.m4a')):
-        log.error('Codec: {} is not supported in the m4a container.'.format(r))
+def convertAudio(ffmpeg, in_file, inp, out_file, codec, log):
+    if(fNone(codec)):
+        codec = inp.audio_streams[0]['codec']
+    if(codec == 'pcm_s16le' and out_file.endswith('.m4a')):
+        log.error('Codec: {} is not supported in the m4a container.'.format(codec))
 
-    ffmpeg.run(['-i', in_file, '-acodec', r, out_file])
+    ffmpeg.run(['-i', in_file, '-acodec', codec, out_file])
 
 def handleAudio(ffmpeg, in_file, audioBit, samplerate: str, temp, log) -> str:
     temp_file = os.path.join(temp, 'faAudio.wav')
@@ -32,10 +31,7 @@ def fastAudio(in_file, out_file, chunks: list, speeds: list, log, fps: float,
     machineReadable, hideBar):
     import numpy as np
 
-    log.checkType(chunks, 'chunks', list)
-    log.checkType(speeds, 'speeds', list)
-
-    def custom_speeds(a: list) -> bool:
+    def custom_speeds(a):
         return len([x for x in a if x != 1 and x != 99999]) > 0
 
     if(custom_speeds(speeds)):

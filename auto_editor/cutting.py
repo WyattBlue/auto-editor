@@ -87,32 +87,17 @@ def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
 
 # Motion detection algorithm based on this blog post:
 # https://pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
-def motionDetection(path: str, ffprobe, motionThreshold: float, log,
-    width: int, dilates: int, blur: int) -> np.ndarray:
+def motionDetection(inp, motionThreshold: float, log, width: int, dilates: int,
+    blur: int) -> np.ndarray:
 
     import cv2
     import subprocess
     from auto_editor.usefulFunctions import ProgressBar
 
-    cap = cv2.VideoCapture(path)
+    cap = cv2.VideoCapture(inp.path)
 
-    # Find total frames
-    if(path.endswith('.mp4') or path.endswith('.mov')):
-        # Query Container
-        cmd = [ffprobe.getPath(), '-v', 'error', '-select_streams', 'v:0', '-show_entries',
-            'stream=nb_frames', '-of', 'default=nokey=1:noprint_wrappers=1', path]
-    else:
-        # Count the number of frames (slow)
-        cmd = [ffprobe.getPath(), '-v', 'error', '-count_frames', '-select_streams', 'v:0',
-            '-show_entries', 'stream=nb_read_frames', '-of',
-            'default=nokey=1:noprint_wrappers=1', path]
+    totalFrames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) + 1
 
-    # Read what ffprobe piped in.
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    stdout, __ = process.communicate()
-    output = stdout.decode()
-
-    totalFrames = int(output) + 1
     log.debug('   - Cutting totalFrames: {}'.format(totalFrames))
     prevFrame = None
     gray = None

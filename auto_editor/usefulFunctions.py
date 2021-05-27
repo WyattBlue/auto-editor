@@ -20,7 +20,7 @@ class Log():
     def debug(self, message):
         if(self.is_debug):
             self.conwrite('')
-            print('debug {}'.format(message))
+            print('Debug: {}'.format(message))
 
     def cleanup(self):
         if(self.temp is None):
