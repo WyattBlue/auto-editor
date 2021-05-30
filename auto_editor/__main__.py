@@ -142,12 +142,15 @@ def main_options(parser):
 
     parser.add_argument('--export_as_audio', '-exa', action='store_true',
         help='export as a WAV audio file.')
+
     parser.add_argument('--export_to_premiere', '-exp', action='store_true',
-        help='export as an XML file for Adobe Premiere Pro instead of outputting a media file.')
+        help='export as an XML file for Adobe Premiere Pro instead of making a media file.')
     parser.add_argument('--export_to_resolve', '-exr', action='store_true',
-        help='export as an XML file for DaVinci Resolve instead of outputting a media file.')
+        help='export as an XML file for DaVinci Resolve instead of making a media file.')
     parser.add_argument('--export_to_final_cut_pro', '-exf', action='store_true',
-        help='export as an XML file for Final Cut Pro instead of outputting a media file.')
+        help='export as an XML file for Final Cut Pro instead of making a media file.')
+    parser.add_argument('--export_to_shotcut', '-exs', action='store_true',
+        help='export as an XML timeline file for Shotcut instead of making a media file.')
     parser.add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later.')
     parser.add_argument('--export_as_clip_sequence', '-excs', action='store_true',
@@ -255,9 +258,9 @@ def main():
     import auto_editor.vanparse as vanparse
     import auto_editor.usefulFunctions as usefulFunctions
 
-    from auto_editor.usefulFunctions import Log, Timer, fNone
+    from auto_editor.usefulFunctions import fNone
+    from auto_editor.utils.log import Log, Timer
     from auto_editor.ffwrapper import FFmpeg
-    from auto_editor.wavfile import read
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -297,7 +300,7 @@ def main():
     timer = Timer(args.quiet)
 
     exporting_to_editor = (args.export_to_premiere or args.export_to_resolve or
-        args.export_to_final_cut_pro)
+        args.export_to_final_cut_pro or args.export_to_shotcut)
     making_data_file = exporting_to_editor or args.export_as_json
 
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
@@ -338,7 +341,7 @@ def main():
         args.export_as_clip_sequence].count(True) > 1):
         log.error('You must choose only one export option.')
 
-    if(making_data_file and (args.video_codec != 'copy' or
+    if(making_data_file and (args.video_codec != 'uncompressed' or
         args.constant_rate_factor != 'unset' or args.tune != 'unset')):
         log.warning('exportMediaOps options are not used when making a data file.')
 
@@ -366,6 +369,8 @@ def main():
         log.conwrite('Exporting to Final Cut Pro XML file.')
     elif(args.export_to_resolve):
         log.conwrite('Exporting to DaVinci Resolve XML file.')
+    elif(args.export_to_shotcut):
+        log.conwrite('Exporting to Shotcut XML Timeline file.')
     elif(args.export_as_audio):
         log.conwrite('Exporting as audio.')
     else:
@@ -390,24 +395,27 @@ def main():
     from auto_editor.validateInput import validInput
     inputList = validInput(args.input, ffmpeg, args, log)
 
-    # Figure out the output file names.
-    def newOutputName(oldFile, audio, final_cut_pro, data, json):
-        dotIndex = oldFile.rfind('.')
-        if(json):
-            return oldFile[:dotIndex] + '.json'
-        if(final_cut_pro):
-            return oldFile[:dotIndex] + '.fcpxml'
-        if(data):
-            return oldFile[:dotIndex] + '.xml'
-        if(audio):
-            return oldFile[:dotIndex] + '_ALTERED.wav'
-        return oldFile[:dotIndex] + '_ALTERED' + oldFile[dotIndex:]
+    def set_output_name(path, args):
+        dot_index = path.rfind('.')
+        root = path[:dot_index]
+
+        if(args.export_as_json):
+            return root + '.json'
+        if(args.export_to_final_cut_pro):
+            return root + '.fcpxml'
+        if(args.export_to_shotcut):
+            return root + '.mlt'
+        if(making_data_file):
+            return root + '.xml'
+        if(args.export_as_audio):
+            return root + '_ALTERED.wav'
+
+        ext = path[dot_index:]
+        return root + '_ALTERED' + ext
 
     if(len(args.output_file) < len(inputList)):
         for i in range(len(inputList) - len(args.output_file)):
-            args.output_file.append(newOutputName(inputList[i],
-                args.export_as_audio, args.export_to_final_cut_pro, making_data_file,
-                args.export_as_json))
+            args.output_file.append(set_output_name(inputList[i], args))
 
     if(args.combine_files):
         temp_file = os.path.join(TEMP, 'combined.mp4')
@@ -434,6 +442,8 @@ def main():
         '.acc', '.nfa', '.mka']
     sampleRate = None
 
+    from auto_editor.scipy.wavfile import read
+
     for i, INPUT_FILE in enumerate(inputList):
 
         inp = ffmpeg.file_info(INPUT_FILE)
@@ -449,8 +459,7 @@ def main():
 
             inp = ffmpeg.file_info(INPUT_FILE)
 
-            newOutput = newOutputName(inp.path, args.export_as_audio,
-                args.export_to_final_cut_pro, making_data_file, False)
+            newOutput = set_output_name(inp.path, args)
         else:
             newOutput = args.output_file[i]
             if(not os.path.isdir(inp.path) and '.' not in newOutput):
@@ -629,6 +638,12 @@ def main():
             totalFrames = chunks[len(chunks) - 1][1]
             fcp_xml(inp, TEMP, newOutput, clips, chunks, tracks, totalFrames,
                 sampleRate, audioFile, fps, log)
+            continue
+
+        if(args.export_to_shotcut):
+            from auto_editor.formats.shotcut import shotcut_xml
+
+            shotcut_xml(inp, TEMP, newOutput, clips, chunks, fps, log)
             continue
 
         def makeAudioFile(inp, chunks, output):

@@ -22,7 +22,7 @@ def levels(sys_args=None):
     import auto_editor
     import auto_editor.vanparse as vanparse
 
-    from auto_editor.usefulFunctions import Log
+    from auto_editor.utils.log import Log
     from auto_editor.ffwrapper import FFmpeg
     from auto_editor.wavfile import read
 

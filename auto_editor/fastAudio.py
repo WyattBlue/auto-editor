@@ -2,8 +2,9 @@
 
 import os
 
-from auto_editor.usefulFunctions import ProgressBar, getNewLength, fNone
-from auto_editor.wavfile import read, write
+from auto_editor.usefulFunctions import getNewLength, fNone
+from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.scipy.wavfile import read, write
 
 def convertAudio(ffmpeg, in_file, inp, out_file, codec, log):
     if(fNone(codec)):

@@ -2,7 +2,7 @@
 
 import os
 
-from auto_editor.formats.utils import indent
+from auto_editor.formats.utils import indent, get_width_height
 
 def fcp_xml(inp, temp, output, clips, chunks, tracks, total_dur, sampleRate,
     audioFile, fps, log):
@@ -41,11 +41,7 @@ def fcp_xml(inp, temp, output, clips, chunks, tracks, total_dur, sampleRate,
 
         return '{}/{}s'.format(num, dem)
 
-    if(not audioFile):
-        width = inp.video_streams[0]['width']
-        height = inp.video_streams[0]['height']
-    else:
-        width, height = '1920', '1080'
+    width, height = get_width_height(inp)
 
     with open(output, 'w', encoding='utf-8') as outfile:
 

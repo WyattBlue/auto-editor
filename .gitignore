@@ -1,30 +1,27 @@
+# Auto-Editor Generated Files
 *_ALTERED.mp4
 *_ALTERED.mp3
 *_ALTERED.mkv
 *_ALTERED.mov
 *_ALTERED.wav
 *_ALTERED
-
-*.png
-
+*_tracks
 *src.mp4
 *example
-
-*_tracks
-*.webm
 *.xml
+*.mlt
 *.fcpxml
 *.json
+
+# Python Generated Files
+__pycache__/
 *.pyc
 *.pyo
-*~
 
-__pycache__/
-
+# Setup.py Generated Files
 build/
 dist/
-*.egg-info
 
+# OS Generated Files
 .DS_Store
-.DS_Store?
-._*
+

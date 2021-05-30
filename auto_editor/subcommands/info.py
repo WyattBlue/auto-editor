@@ -18,7 +18,9 @@ def info(sys_args=None):
     import auto_editor
     import auto_editor.vanparse as vanparse
 
-    from auto_editor.usefulFunctions import Log, cleanList
+    from auto_editor.usefulFunctions import cleanList, aspect_ratio
+    from auto_editor.utils.log import Log
+
     from auto_editor.ffwrapper import FFmpeg
 
     dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -35,19 +37,11 @@ def info(sys_args=None):
 
     ffmpeg = FFmpeg(dir_path, args.my_ffmpeg, False, log)
 
-    def aspect_ratio(w, h):
-        def gcd(a, b):
-            while b:
-                a, b = b, a % b
-            return a
-
-        w = int(w)
-        h = int(h)
-        if(h == 0):
+    def aspect_str(w, h):
+        w, h = aspect_ratio(int(w), int(h))
+        if(w is None):
             return ''
-
-        c = gcd(w, h)
-        return '{}:{}'.format(w // c, h // c)
+        return '{}:{}'.format(w, h)
 
     for file in args.input:
         text = ''
@@ -65,7 +59,7 @@ def info(sys_args=None):
             w = inp.video_streams[0]['width']
             h = inp.video_streams[0]['height']
 
-            text += ' - resolution: {}x{} ({})\n'.format(w, h, aspect_ratio(w, h))
+            text += ' - resolution: {}x{} ({})\n'.format(w, h, aspect_str(w, h))
             text += ' - video codec: {}\n'.format(inp.video_streams[0]['codec'])
             text += ' - video bitrate: {}\n'.format(inp.video_streams[0]['bitrate'])
 

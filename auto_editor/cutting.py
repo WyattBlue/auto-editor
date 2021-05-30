@@ -92,7 +92,7 @@ def motionDetection(inp, motionThreshold: float, log, width: int, dilates: int,
 
     import cv2
     import subprocess
-    from auto_editor.usefulFunctions import ProgressBar
+    from auto_editor.utils.progressbar import ProgressBar
 
     cap = cv2.VideoCapture(inp.path)
 

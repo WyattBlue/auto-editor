@@ -8,14 +8,14 @@ from platform import system
 # Included Libraries
 from auto_editor.usefulFunctions import pipeToConsole, cleanList
 
-def setPath(dirpath, my_ffmpeg):
+def _set_path(dirpath, my_ffmpeg):
     if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
         return 'ffmpeg'
     program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
     return os.path.join(dirpath, 'ffmpeg', system(), program)
 
-def testPath(dirpath, my_ffmpeg, log):
-    path = setPath(dirpath, my_ffmpeg)
+def _test_path(dirpath, my_ffmpeg, log):
+    path = _set_path(dirpath, my_ffmpeg)
     try:
         pipeToConsole([path, '-h'])
     except FileNotFoundError:
@@ -34,7 +34,7 @@ def testPath(dirpath, my_ffmpeg, log):
 class FFmpeg():
     def __init__(self, dirpath, myFFmpeg, FFdebug, log):
         self.log = log
-        self.path = testPath(dirpath, myFFmpeg, log)
+        self.path = _test_path(dirpath, myFFmpeg, log)
         self.FFdebug = FFdebug
 
     def getPath(self):
@@ -112,13 +112,13 @@ class FFmpeg():
 
         return file
 
-    def Popen(self, cmd: list):
+    def Popen(self, cmd):
         cmd = [self.path] + cmd
         if(self.FFdebug):
             return subprocess.Popen(cmd, stdout=subprocess.PIPE)
         return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
-    def pipe(self, cmd: list) -> str:
+    def pipe(self, cmd):
         cmd = [self.path, '-y'] + cmd
 
         if(self.FFdebug):
