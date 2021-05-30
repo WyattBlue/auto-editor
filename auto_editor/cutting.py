@@ -91,7 +91,6 @@ def motionDetection(inp, motionThreshold: float, log, width: int, dilates: int,
     blur: int) -> np.ndarray:
 
     import cv2
-    import subprocess
     from auto_editor.utils.progressbar import ProgressBar
 
     cap = cv2.VideoCapture(inp.path)

@@ -245,7 +245,7 @@ class ParseOptions():
                 else:
                     try:
                         value = option['type'](nextItem)
-                    except Exception as err:
+                    except Exception:
                         typeName = option['type'].__name__
                         log.error('Couldn\'t convert "{}" to {}'.format(
                             nextItem, typeName))

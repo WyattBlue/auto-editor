@@ -6,7 +6,7 @@ import os.path
 from platform import system
 
 # Included Libraries
-from auto_editor.usefulFunctions import pipeToConsole, cleanList
+from auto_editor.usefulFunctions import pipeToConsole
 
 def _set_path(dirpath, my_ffmpeg):
     if(my_ffmpeg or system() not in ['Windows', 'Darwin']):

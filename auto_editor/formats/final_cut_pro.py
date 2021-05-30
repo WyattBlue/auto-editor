@@ -1,7 +1,5 @@
 '''final_cut_pro.py'''
 
-import os
-
 from auto_editor.formats.utils import indent, get_width_height
 
 def fcp_xml(inp, temp, output, clips, chunks, tracks, total_dur, sampleRate,
