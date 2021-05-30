@@ -5,7 +5,8 @@ import os
 import subprocess
 
 # Included Libaries
-from auto_editor.usefulFunctions import ProgressBar, fNone
+from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.usefulFunctions import fNone
 
 def properties(cmd, args, inp):
 
@@ -146,8 +147,8 @@ def renderOpencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, effects, temp,
     from auto_editor.interpolate import interpolate
 
     if(has_vfr):
-        cmd = ['-i', inp.path, '-map', '0:v:0', '-vf', f'fps=fps={fps}', '-r', str(fps),
-            '-vsync', '1', '-f','matroska', '-vcodec', 'rawvideo', 'pipe:1']
+        cmd = ['-i', inp.path, '-map', '0:v:0', '-vf', 'fps=fps={}'.format(fps), '-r',
+            str(fps), '-vsync', '1', '-f','matroska', '-vcodec', 'rawvideo', 'pipe:1']
         fileno = ffmpeg.Popen(cmd).stdout.fileno()
         cap = cv2.VideoCapture('pipe:{}'.format(fileno))
     else:
@@ -180,7 +181,7 @@ def renderOpencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, effects, temp,
     videoProgress = ProgressBar(totalFrames, 'Creating new video',
         args.machine_readable_progress, args.no_progress)
 
-    def findState(chunks, cframe) -> int:
+    def findState(chunks, cframe):
         low = 0
         high = len(chunks) - 1
 

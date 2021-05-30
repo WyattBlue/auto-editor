@@ -27,7 +27,7 @@ def create(sys_args=None):
     import auto_editor
     import auto_editor.vanparse as vanparse
 
-    from auto_editor.usefulFunctions import Log
+    from auto_editor.utils.log import Log
     from auto_editor.ffwrapper import FFmpeg
 
     dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))

@@ -12,7 +12,8 @@ import platform
 import subprocess
 
 # Included Libraries
-from auto_editor.usefulFunctions import Log, cleanList
+from auto_editor.usefulFunctions import cleanList
+from auto_editor.utils.log import Log
 
 class FFprobe():
     def __init__(self, path):

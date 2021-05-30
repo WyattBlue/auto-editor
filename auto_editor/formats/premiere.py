@@ -3,9 +3,9 @@
 import os
 from shutil import move, rmtree
 
-from auto_editor.formats.utils import fix_url, indent
+from auto_editor.formats.utils import fix_url, indent, get_width_height, safe_mkdir
 
-def speedup(speed) -> str:
+def speedup(speed):
     return indent(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
         '\t\t<effectid>timeremap</effectid>',
         '\t\t<effectcategory>motion</effectcategory>',
@@ -31,8 +31,8 @@ def speedup(speed) -> str:
         '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
-def premiere_xml(inp, temp: str, output, clips, chunks, sampleRate, audioFile,
-    resolve: bool, fps, log):
+def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
+    resolve, fps, log):
 
     duration = chunks[len(chunks) - 1][1]
     pathurl = fix_url(inp.path, resolve)
@@ -44,29 +44,21 @@ def premiere_xml(inp, temp: str, output, clips, chunks, sampleRate, audioFile,
     log.debug(inp.dirname)
 
     if(tracks > 1):
-        name_without_extension = inp.basename[:inp.basename.rfind(".")]
-        newFolderName = os.path.join(inp.dirname, f'{name_without_extension}_tracks')
-        try:
-            os.mkdir(newFolderName)
-        except OSError:
-            rmtree(newFolderName)
-            os.mkdir(newFolderName)
+        name_without_extension = inp.basename[:inp.basename.rfind('.')]
+
+        fold = safe_mkdir(os.path.join(inp.dirname, f'{name_without_extension}_tracks'))
 
         trackurls = [pathurl]
         for i in range(1, tracks):
-            newtrack = os.path.join(newFolderName, f'{i}.wav')
+            newtrack = os.path.join(fold, f'{i}.wav')
             move(os.path.join(temp, f'{i}.wav'), newtrack)
             trackurls.append(fix_url(newtrack, resolve))
 
     ntsc = 'FALSE'
     ana = 'FALSE' # anamorphic
     depth = '16'
-    if(not audioFile):
-        width = inp.video_streams[0]['width']
-        height = inp.video_streams[0]['height']
-    else:
-        width = '1920'
-        height = '1080'
+
+    width, height = get_width_height(inp)
 
     pixelar = 'square' # pixel aspect ratio
     colordepth = '24'
