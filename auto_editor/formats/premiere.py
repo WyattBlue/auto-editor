@@ -1,7 +1,7 @@
 '''premiere.py'''
 
 import os
-from shutil import move, rmtree
+from shutil import move
 
 from auto_editor.formats.utils import fix_url, indent, get_width_height, safe_mkdir
 

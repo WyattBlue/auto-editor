@@ -13,7 +13,6 @@ import subprocess
 
 # Included Libraries
 from auto_editor.usefulFunctions import cleanList
-from auto_editor.utils.log import Log
 
 class FFprobe():
     def __init__(self, path):
@@ -26,7 +25,7 @@ class FFprobe():
         stdout, __ = process.communicate()
         return stdout.decode()
 
-    def pipe(self, cmd: list) -> str:
+    def pipe(self, cmd: list):
         full_cmd = [self.path, '-v', 'error'] + cmd
         process = subprocess.Popen(full_cmd, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT)
@@ -44,7 +43,7 @@ class FFprobe():
         return self.pipe(['-select_streams', 'v', '-show_entries',
             'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
 
-    def getFrameRate(self, file) -> float:
+    def getFrameRate(self, file):
         nums = cleanList(self.getTimeBase(file).split('/'), '\r\t\n')
         return int(nums[0]) / int(nums[1])
 

@@ -5,8 +5,6 @@ To prevent duplicate code being pasted between scripts, common functions should 
 put here. No function should modify or create video/audio files on its own.
 """
 
-import sys
-
 def pipeToConsole(cmd):
     import subprocess
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
