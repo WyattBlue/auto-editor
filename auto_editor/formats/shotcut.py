@@ -48,6 +48,21 @@ def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
         out.write('\t\t<property name="xml_retain">1</property>\n')
         out.write('\t</playlist>\n')
 
+        # out was the new video length in the original xml
+        out.write('\t<producer id="black" in="00:00:00.000" out="{}">\n'.format(global_out))
+        out.write('\t\t<property name="length">00:00:21.500</property>\n')
+        out.write('\t\t<property name="eof">pause</property>\n')
+        out.write('\t\t<property name="resource">0</property>\n')
+        out.write('\t\t<property name="aspect_ratio">1</property>\n')
+        out.write('\t\t<property name="mlt_service">color</property>\n')
+        out.write('\t\t<property name="mlt_image_format">rgba</property>\n')
+        out.write('\t\t<property name="set.test_audio">0</property>\n')
+        out.write('\t</producer>\n')
+
+        out.write('\t<playlist id="background">\n') # same for this out too.
+        out.write('\t\t<entry producer="black" in="00:00:00.000" out="{}"/>\n'.format(global_out))
+        out.write('\t</playlist>\n')
+
         for i, clip in enumerate(clips):
             _out = frames_to_timecode(clip[1], fps)
             out.write('\t<chain id="chain{}" out="{}">\n'.format(i, _out))
@@ -82,6 +97,7 @@ def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
         out.write('\t\t<property name="shotcut">1</property>\n')
         out.write('\t\t<property name="shotcut:projectAudioChannels">2</property>\n')
         out.write('\t\t<property name="shotcut:projectFolder">0</property>\n')
+        out.write('\t\t<track producer="background"/>\n')
         out.write('\t\t<track producer="playlist0"/>\n')
         out.write('\t\t<transition id="transition0">\n')
         out.write('\t\t\t<property name="a_track">0</property>\n')
