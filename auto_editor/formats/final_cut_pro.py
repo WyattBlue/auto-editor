@@ -49,21 +49,21 @@ def fcp_xml(inp, temp, output, clips, chunks, tracks, total_dur, sampleRate,
         outfile.write('<!DOCTYPE fcpxml>\n\n')
         outfile.write('<fcpxml version="1.9">\n')
         outfile.write('\t<resources>\n')
-        outfile.write(f'\t\t<format id="r1" name="FFVideoFormat{height}p{fps}" '\
-            f'frameDuration="{frame_duration}" width="{width}" height="{height}"'\
+        outfile.write('\t\t<format id="r1" name="FFVideoFormat{}p{}" '.format(height, fps)+\
+            'frameDuration="{}" width="{}" height="{}"'.format(frame_duration, width, height)+\
             ' colorSpace="1-1-1 (Rec. 709)"/>\n')
 
-        outfile.write(f'\t\t<asset id="r2" name="{name}" start="0s" '\
+        outfile.write('\t\t<asset id="r2" name="{}" start="0s" '.format(name)+\
             'hasVideo="1" format="r1" hasAudio="1" '\
-            f'audioSources="1" audioChannels="2" audioRate="{sampleRate}">\n')
+            'audioSources="1" audioChannels="2" audioRate="{}">\n'.format(sampleRate))
 
-        outfile.write(f'\t\t\t<media-rep kind="original-media" '\
-            f'src="{pathurl}"></media-rep>\n')
+        outfile.write('\t\t\t<media-rep kind="original-media" '.format()+\
+            'src="{}"></media-rep>\n'.format(pathurl))
         outfile.write('\t\t</asset>\n')
         outfile.write('\t</resources>\n')
         outfile.write('\t<library>\n')
         outfile.write('\t\t<event name="auto-editor output">\n')
-        outfile.write(f'\t\t\t<project name="{name}">\n')
+        outfile.write('\t\t\t<project name="{}">\n'.format(name))
         outfile.write(indent(4,
             '<sequence format="r1" tcStart="0s" tcFormat="NDF" '\
             'audioLayout="stereo" audioRate="48k">',
@@ -79,15 +79,15 @@ def fcp_xml(inp, temp, output, clips, chunks, tracks, total_dur, sampleRate,
             close = '/' if clip[2] == 100 else ''
 
             if(last_dur == 0):
-                outfile.write(indent(6, f'<asset-clip name="{name}" offset="0s" ref="r2"'\
-                f' duration="{dur}" audioRole="dialogue" tcFormat="NDF"{close}>'))
+                outfile.write(indent(6, '<asset-clip name="{}" offset="0s" ref="r2"'.format(name)+\
+                ' duration="{}" audioRole="dialogue" tcFormat="NDF"{}>'.format(dur, close)))
             else:
                 start = fraction(clip[0] / (clip[2] / 100), fps)
                 off = fraction(last_dur, fps)
                 outfile.write(indent(6,
-                    f'<asset-clip name="{name}" offset="{off}" ref="r2" '\
-                    f'duration="{dur}" start="{start}" audioRole="dialogue" '\
-                    f'tcFormat="NDF"{close}>',
+                    '<asset-clip name="{}" offset="{}" ref="r2" '.format(name, off)+\
+                    'duration="{}" start="{}" audioRole="dialogue" '.format(dur, start)+\
+                    'tcFormat="NDF"{}>'.format(close),
                 ))
 
             if(clip[2] != 100):
@@ -101,7 +101,7 @@ def fcp_xml(inp, temp, output, clips, chunks, tracks, total_dur, sampleRate,
                 outfile.write(indent(6,
                     '\t<timeMap>',
                     '\t\t<timept time="0s" value="0s" interp="smooth2"/>',
-                    f'\t\t<timept time="{total_dur_divided_by_speed}" value="{frac_total}" interp="smooth2"/>',
+                    '\t\t<timept time="{}" value="{}" interp="smooth2"/>'.format(total_dur_divided_by_speed, frac_total),
                     '\t</timeMap>',
                     '</asset-clip>'
                 ))

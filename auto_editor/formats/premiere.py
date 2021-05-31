@@ -46,7 +46,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
     if(tracks > 1):
         name_without_extension = inp.basename[:inp.basename.rfind('.')]
 
-        fold = safe_mkdir(os.path.join(inp.dirname, f'{name_without_extension}_tracks'))
+        fold = safe_mkdir(os.path.join(inp.dirname, '{}_tracks'.format(name_without_extension)))
 
         trackurls = [pathurl]
         for i in range(1, tracks):
@@ -71,22 +71,22 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
             outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n')
             outfile.write('<xmeml version="4">\n')
             outfile.write('\t<sequence>\n')
-            outfile.write(f'\t\t<name>{groupName}</name>\n')
-            outfile.write(f'\t\t<duration>{duration}</duration>\n')
+            outfile.write('\t\t<name>{}</name>\n'.format(groupName))
+            outfile.write('\t\t<duration>{}</duration>\n'.format(duration))
             outfile.write('\t\t<rate>\n')
-            outfile.write(f'\t\t\t<timebase>{timebase}</timebase>\n')
-            outfile.write(f'\t\t\t<ntsc>{ntsc}</ntsc>\n')
+            outfile.write('\t\t\t<timebase>{}</timebase>\n'.format(timebase))
+            outfile.write('\t\t\t<ntsc>{}</ntsc>\n'.format(ntsc))
             outfile.write('\t\t</rate>\n')
             outfile.write('\t\t<media>\n')
 
             outfile.write(indent(3, '<video>', '\t<format>',
                 '\t\t<samplecharacteristics>',
-                f'\t\t\t<width>{width}</width>',
-                f'\t\t\t<height>{height}</height>',
-                f'\t\t\t<pixelaspectratio>{pixelar}</pixelaspectratio>',
+                '\t\t\t<width>{}</width>'.format(width),
+                '\t\t\t<height>{}</height>'.format(height),
+                '\t\t\t<pixelaspectratio>{}</pixelaspectratio>'.format(pixelar),
                 '\t\t\t<rate>',
-                f'\t\t\t\t<timebase>{timebase}</timebase>',
-                f'\t\t\t\t<ntsc>{ntsc}</ntsc>',
+                '\t\t\t\t<timebase>{}</timebase>'.format(timebase),
+                '\t\t\t\t<ntsc>{}</ntsc>'.format(ntsc),
                 '\t\t\t</rate>',
                 '\t\t</samplecharacteristics>',
                 '\t</format>', '</video>'))
@@ -107,28 +107,28 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
                 total += (clip[1] - clip[0]) / (clip[2] / 100)
                 myEnd = int(total)
 
-                outfile.write(indent(5, f'<clipitem id="clipitem-{j+1}">',
+                outfile.write(indent(5, '<clipitem id="clipitem-{}">'.format(j+1),
                     '\t<masterclipid>masterclip-1</masterclipid>',
                     '\t<name>{}</name>'.format(inp.name),
                     '\t<start>{}</start>'.format(myStart),
                     '\t<end>{}</end>'.format(myEnd),
-                    f'\t<in>{int(clip[0] / (clip[2] / 100))}</in>',
-                    f'\t<out>{int(clip[1] / (clip[2] / 100))}</out>'))
+                    '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
+                    '\t<out>{}</out>'.format(int(clip[1] / (clip[2] / 100)))))
 
                 if(j == 0):
                     # Define file-1
                     outfile.write(indent(6, '<file id="file-1">',
                         f'\t<name>{inp.name}</name>',
-                        f'\t<pathurl>{pathurl}</pathurl>',
+                        '\t<pathurl>{}</pathurl>'.format(pathurl),
                         '\t<rate>',
-                        f'\t\t<timebase>{timebase}</timebase>',
-                        f'\t\t<ntsc>{ntsc}</ntsc>',
+                        '\t\t<timebase>{}</timebase>'.format(timebase),
+                        '\t\t<ntsc>{}</ntsc>'.format(ntsc),
                         '\t</rate>',
                         '\t<media>',
                         '\t\t<audio>',
                         '\t\t\t<samplecharacteristics>',
-                        f'\t\t\t\t<depth>{depth}</depth>',
-                        f'\t\t\t\t<samplerate>{sr}</samplerate>',
+                        '\t\t\t\t<depth>{}</depth>'.format(depth),
+                        '\t\t\t\t<samplerate>{}</samplerate>'.format(sr),
                         '\t\t\t</samplecharacteristics>',
                         '\t\t\t<channelcount>2</channelcount>',
                         '\t\t</audio>', '\t</media>', '</file>'))
@@ -154,25 +154,25 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
         outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n')
         outfile.write('<xmeml version="4">\n')
         outfile.write('\t<sequence>\n')
-        outfile.write(f'\t\t<name>{groupName}</name>\n')
+        outfile.write('\t\t<name>{}</name>\n'.format(groupName))
         outfile.write('\t\t<rate>\n')
-        outfile.write(f'\t\t\t<timebase>{timebase}</timebase>\n')
-        outfile.write(f'\t\t\t<ntsc>{ntsc}</ntsc>\n')
+        outfile.write('\t\t\t<timebase>{}</timebase>\n'.format(timebase))
+        outfile.write('\t\t\t<ntsc>{}</ntsc>\n'.format(ntsc))
         outfile.write('\t\t</rate>\n')
         outfile.write('\t\t<media>\n')
 
         outfile.write(indent(3, '<video>', '\t<format>',
             '\t\t<samplecharacteristics>',
             '\t\t\t<rate>',
-            f'\t\t\t\t<timebase>{timebase}</timebase>',
-            f'\t\t\t\t<ntsc>{ntsc}</ntsc>',
+            '\t\t\t\t<timebase>{}</timebase>'.format(timebase),
+            '\t\t\t\t<ntsc>{}</ntsc>'.format(ntsc),
             '\t\t\t</rate>',
-            f'\t\t\t<width>{width}</width>',
-            f'\t\t\t<height>{height}</height>',
-            f'\t\t\t<anamorphic>{ana}</anamorphic>',
-            f'\t\t\t<pixelaspectratio>{pixelar}</pixelaspectratio>',
+            '\t\t\t<width>{}</width>'.format(width),
+            '\t\t\t<height>{}</height>'.format(height),
+            '\t\t\t<anamorphic>{}</anamorphic>'.format(ana),
+            '\t\t\t<pixelaspectratio>{}</pixelaspectratio>'.format(pixelar),
             '\t\t\t<fielddominance>none</fielddominance>',
-            f'\t\t\t<colordepth>{colordepth}</colordepth>',
+            '\t\t\t<colordepth>{}</colordepth>'.format(colordepth),
             '\t\t</samplecharacteristics>',
             '\t</format>',
             '\t<track>'))
@@ -184,39 +184,39 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
             total += (clip[1] - clip[0]) / (clip[2] / 100)
             myEnd = int(total)
 
-            outfile.write(indent(5, f'<clipitem id="clipitem-{j+1}">',
+            outfile.write(indent(5, '<clipitem id="clipitem-{}">'.format(j+1),
                 '\t<masterclipid>masterclip-2</masterclipid>',
                 f'\t<name>{inp.name}</name>',
-                f'\t<start>{myStart}</start>',
-                f'\t<end>{myEnd}</end>',
-                f'\t<in>{int(clip[0] / (clip[2] / 100))}</in>',
-                f'\t<out>{int(clip[1] / (clip[2] / 100))}</out>'))
+                '\t<start>{}</start>'.format(myStart),
+                '\t<end>{}</end>'.format(myEnd),
+                '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
+                '\t<out>{}</out>'.format(int(clip[1] / (clip[2] / 100)))))
 
             if(j == 0):
                 outfile.write(indent(6, '<file id="file-1">',
                     f'\t<name>{inp.name}</name>',
-                    f'\t<pathurl>{pathurl}</pathurl>',
+                    '\t<pathurl>{}</pathurl>'.format(pathurl),
                     '\t<rate>',
-                    f'\t\t<timebase>{timebase}</timebase>',
-                    f'\t\t<ntsc>{ntsc}</ntsc>',
+                    '\t\t<timebase>{}</timebase>'.format(timebase),
+                    '\t\t<ntsc>{}</ntsc>'.format(ntsc),
                     '\t</rate>',
-                    f'\t<duration>{duration}</duration>',
+                    '\t<duration>{}</duration>'.format(duration),
                     '\t<media>', '\t\t<video>',
                     '\t\t\t<samplecharacteristics>',
                     '\t\t\t\t<rate>',
-                    f'\t\t\t\t\t<timebase>{timebase}</timebase>',
-                    f'\t\t\t\t\t<ntsc>{ntsc}</ntsc>',
+                    '\t\t\t\t\t<timebase>{}</timebase>'.format(timebase),
+                    '\t\t\t\t\t<ntsc>{}</ntsc>'.format(ntsc),
                     '\t\t\t\t</rate>',
-                    f'\t\t\t\t<width>{width}</width>',
-                    f'\t\t\t\t<height>{height}</height>',
-                    f'\t\t\t\t<anamorphic>{ana}</anamorphic>',
-                    f'\t\t\t\t<pixelaspectratio>{pixelar}</pixelaspectratio>',
+                    '\t\t\t\t<width>{}</width>'.format(width),
+                    '\t\t\t\t<height>{}</height>'.format(height),
+                    '\t\t\t\t<anamorphic>{}</anamorphic>'.format(ana),
+                    '\t\t\t\t<pixelaspectratio>{}</pixelaspectratio>'.format(pixelar),
                     '\t\t\t\t<fielddominance>none</fielddominance>',
                     '\t\t\t</samplecharacteristics>',
                     '\t\t</video>', '\t\t<audio>',
                     '\t\t\t<samplecharacteristics>',
-                    f'\t\t\t\t<depth>{depth}</depth>',
-                    f'\t\t\t\t<samplerate>{sr}</samplerate>',
+                    '\t\t\t\t<depth>{}</depth>'.format(depth),
+                    '\t\t\t\t<samplerate>{}</samplerate>'.format(sr),
                     '\t\t\t</samplecharacteristics>',
                     '\t\t\t<channelcount>2</channelcount>',
                     '\t\t</audio>', '\t</media>', '</file>'))
@@ -229,7 +229,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
             # Linking for video blocks
             for i in range(max(3, tracks + 1)):
                 outfile.write('\t\t\t\t\t\t<link>\n')
-                outfile.write(f'\t\t\t\t\t\t\t<linkclipref>clipitem-{(i*(len(clips)))+j+1}</linkclipref>\n')
+                outfile.write('\t\t\t\t\t\t\t<linkclipref>clipitem-{}</linkclipref>\n'.format((i*(len(clips)))+j+1))
                 if(i == 0):
                     outfile.write('\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
                 else:
@@ -238,7 +238,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
                     outfile.write('\t\t\t\t\t\t\t<trackindex>2</trackindex>\n')
                 else:
                     outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
-                outfile.write(f'\t\t\t\t\t\t\t<clipindex>{j+1}</clipindex>\n')
+                outfile.write('\t\t\t\t\t\t\t<clipindex>{}</clipindex>\n'.format(j+1))
                 if(i > 0):
                     outfile.write('\t\t\t\t\t\t\t<groupindex>1</groupindex>\n')
                 outfile.write('\t\t\t\t\t\t</link>\n')
@@ -250,8 +250,8 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
             '\t<numOutputChannels>2</numOutputChannels>',
             '\t<format>',
             '\t\t<samplecharacteristics>',
-            f'\t\t\t<depth>{depth}</depth>',
-            f'\t\t\t<samplerate>{sr}</samplerate>',
+            '\t\t\t<depth>{}</depth>'.format(depth),
+            '\t\t\t<samplerate>{}</samplerate>'.format(sr),
             '\t\t</samplecharacteristics>',
             '\t</format>'))
 
@@ -266,7 +266,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
 
                 clipItemNum = len(clips) + 1 + j + (t * len(clips))
 
-                outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{clipItemNum}" premiereChannelType="stereo">\n')
+                outfile.write('\t\t\t\t\t<clipitem id="clipitem-{}" premiereChannelType="stereo">\n'.format(clipItemNum))
                 outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
                 outfile.write('\t\t\t\t\t\t<name>{}</name>\n'.format(name))
 
@@ -282,7 +282,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
                 ))
 
                 if(t > 0):
-                    outfile.write(indent(6, f'<file id="file-{t+1}">',
+                    outfile.write(indent(6, '<file id="file-{}">'.format(t+1),
                         '\t<name>{}{}</name>'.format(name, t),
                         '\t<pathurl>{}</pathurl>'.format(trackurls[t]),
                         '\t<rate>',
