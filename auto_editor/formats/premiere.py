@@ -118,7 +118,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
                 if(j == 0):
                     # Define file-1
                     outfile.write(indent(6, '<file id="file-1">',
-                        f'\t<name>{inp.name}</name>',
+                        '\t<name>{}</name>'.format(inp.name),
                         '\t<pathurl>{}</pathurl>'.format(pathurl),
                         '\t<rate>',
                         '\t\t<timebase>{}</timebase>'.format(timebase),
@@ -186,7 +186,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
 
             outfile.write(indent(5, '<clipitem id="clipitem-{}">'.format(j+1),
                 '\t<masterclipid>masterclip-2</masterclipid>',
-                f'\t<name>{inp.name}</name>',
+                '\t<name>{}</name>'.format(inp.name),
                 '\t<start>{}</start>'.format(myStart),
                 '\t<end>{}</end>'.format(myEnd),
                 '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
@@ -194,7 +194,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
 
             if(j == 0):
                 outfile.write(indent(6, '<file id="file-1">',
-                    f'\t<name>{inp.name}</name>',
+                    '\t<name>{}</name>'.format(inp.name),
                     '\t<pathurl>{}</pathurl>'.format(pathurl),
                     '\t<rate>',
                     '\t\t<timebase>{}</timebase>'.format(timebase),
