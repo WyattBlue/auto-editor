@@ -146,7 +146,6 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
             outfile.write('\t</sequence>\n')
             outfile.write('</xmeml>')
 
-            # Exit out of this function prematurely.
             return None
 
     groupName = 'Auto-Editor Video Group'
@@ -260,7 +259,6 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
         for t in range(tracks):
             if(t == 0):
                 print('')
-            log.debug('t variable: ' + str(t))
             total = 0
             outfile.write('\t\t\t\t<track currentExplodedTrackIndex="0" premiereTrackType="Stereo">\n')
 
@@ -270,44 +268,42 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
 
                 outfile.write(f'\t\t\t\t\t<clipitem id="clipitem-{clipItemNum}" premiereChannelType="stereo">\n')
                 outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
-                outfile.write(f'\t\t\t\t\t\t<name>{name}</name>\n')
+                outfile.write('\t\t\t\t\t\t<name>{}</name>\n'.format(name))
 
                 myStart = int(total)
                 total += (clip[1] - clip[0]) / (clip[2] / 100)
                 myEnd = int(total)
 
-                outfile.write(f'\t\t\t\t\t\t<start>{myStart}</start>\n')
-                outfile.write(f'\t\t\t\t\t\t<end>{myEnd}</end>\n')
-
-                outfile.write(f'\t\t\t\t\t\t<in>{int(clip[0] / (clip[2] / 100))}</in>\n')
-                outfile.write(f'\t\t\t\t\t\t<out>{int(clip[1] / (clip[2] / 100))}</out>\n')
+                outfile.write(indent(6,
+                    '<start>{}</start>'.format(myStart),
+                    '<end>{}</end>'.format(myEnd),
+                    '<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
+                    '<out>{}</out>'.format(int(clip[1] / (clip[2] / 100))),
+                ))
 
                 if(t > 0):
-                    # Define arbitrary file
                     outfile.write(indent(6, f'<file id="file-{t+1}">',
-                        f'\t<name>{name}{t}</name>',
-                        f'\t<pathurl>{trackurls[t]}</pathurl>',
+                        '\t<name>{}{}</name>'.format(name, t),
+                        '\t<pathurl>{}</pathurl>'.format(trackurls[t]),
                         '\t<rate>',
-                        f'\t\t<timebase>{timebase}</timebase>',
-                        f'\t\t<ntsc>{ntsc}</ntsc>',
+                        '\t\t<timebase>{}</timebase>'.format(timebase),
+                        '\t\t<ntsc>{}</ntsc>'.format(ntsc),
                         '\t</rate>',
                         '\t<media>',
                         '\t\t<audio>',
                         '\t\t\t<samplecharacteristics>',
-                        f'\t\t\t\t<depth>{depth}</depth>',
-                        f'\t\t\t\t<samplerate>{sr}</samplerate>',
+                        '\t\t\t\t<depth>{}</depth>'.format(depth),
+                        '\t\t\t\t<samplerate>{}</samplerate>'.format(sr),
                         '\t\t\t</samplecharacteristics>',
                         '\t\t\t<channelcount>2</channelcount>',
                         '\t\t</audio>', '\t</media>', '</file>'))
                 else:
-                    outfile.write(f'\t\t\t\t\t\t<file id="file-{t+1}"/>\n')
-                outfile.write('\t\t\t\t\t\t<sourcetrack>\n')
-                outfile.write('\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n')
-                outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
-                outfile.write('\t\t\t\t\t\t</sourcetrack>\n')
-                outfile.write('\t\t\t\t\t\t<labels>\n')
-                outfile.write('\t\t\t\t\t\t\t<label2>Iris</label2>\n')
-                outfile.write('\t\t\t\t\t\t</labels>\n')
+                    outfile.write('\t\t\t\t\t\t<file id="file-{}"/>\n'.format(t+1))
+
+                outfile.write(indent(6, '<sourcetrack>',
+                    '\t<mediatype>audio</mediatype>', '\t<trackindex>1</trackindex>',
+                    '</sourcetrack>', '<labels>', '\t<label2>Iris</label2>', '</labels>',
+                ))
 
                 # Add speed effect for audio blocks
                 if(clip[2] != 100):

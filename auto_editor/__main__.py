@@ -702,7 +702,6 @@ def main():
                         effects, TEMP, log)
 
                 if(log.is_debug):
-                    log.conwrite('')
                     log.debug('Writing the output file.')
                 else:
                     log.conwrite('Writing the output file.')
