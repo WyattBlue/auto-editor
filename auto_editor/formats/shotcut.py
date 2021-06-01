@@ -31,9 +31,6 @@ def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
 
     version = '21.05.18'
 
-    print('\n')
-    print(clips)
-
     with open(output, 'w', encoding='utf-8') as out:
         out.write('<?xml version="1.0" standalone="no"?>\n')
         out.write('<mlt LC_NUMERIC="C" version="7.1.0" ' +
@@ -84,9 +81,10 @@ def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
         out.write('\t<playlist id="playlist0">\n')
         out.write('\t\t<property name="shotcut:video">1</property>\n')
         out.write('\t\t<property name="shotcut:name">V1</property>\n')
+
         for i, clip in enumerate(clips):
-            _in = frames_to_timecode(clip[0], fps)
-            _out = frames_to_timecode(clip[1], fps)
+            _in = frames_to_timecode(max(clip[0] -1, 0), fps)
+            _out = frames_to_timecode(max(clip[1] -2, 0), fps)
             out.write('\t\t<entry producer="chain{}" in="{}" out="{}"/>\n'.format(
                 i, _in, _out))
 
