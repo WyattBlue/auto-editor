@@ -397,7 +397,11 @@ def main():
 
     def set_output_name(path, args):
         dot_index = path.rfind('.')
-        root = path[:dot_index]
+
+        if(dot_index == -1):
+            root = path
+        else:
+            root = path[:dot_index]
 
         if(args.export_as_json):
             return root + '.json'
@@ -463,7 +467,7 @@ def main():
         else:
             newOutput = args.output_file[i]
             if(not os.path.isdir(inp.path) and '.' not in newOutput):
-                newOutput += inp.ext
+                newOutput = set_output_name(newOutput, args)
 
         log.debug('Input File: {}'.format(inp.path))
         log.debug('Output File: {}'.format(newOutput))
