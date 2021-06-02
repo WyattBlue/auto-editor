@@ -310,6 +310,7 @@ def test():
         runTest([item, '-exp'])
         runTest([item, '-exr'])
         runTest([item, '-exf'])
+        runTest([item, '-exs'])
         runTest([item, '--export_as_clip_sequence'])
         runTest([item, '--preview'])
 
