@@ -47,7 +47,7 @@ def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
 
         # out was the new video length in the original xml
         out.write('\t<producer id="black" in="00:00:00.000" out="{}">\n'.format(global_out))
-        out.write('\t\t<property name="length">00:00:21.500</property>\n')
+        out.write('\t\t<property name="length">{}</property>\n'.format(global_out))
         out.write('\t\t<property name="eof">pause</property>\n')
         out.write('\t\t<property name="resource">0</property>\n')
         out.write('\t\t<property name="aspect_ratio">1</property>\n')
@@ -57,36 +57,92 @@ def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
         out.write('\t</producer>\n')
 
         out.write('\t<playlist id="background">\n') # same for this out too.
-        out.write('\t\t<entry producer="black" in="00:00:00.000" out="{}"/>\n'.format(global_out))
+        out.write('\t\t<entry producer="black" in="00:00:00.000" out="{}"/>\n'.format(
+            global_out))
         out.write('\t</playlist>\n')
 
-        for i, clip in enumerate(clips):
-            _out = frames_to_timecode(clip[1], fps)
-            out.write('\t<chain id="chain{}" out="{}">\n'.format(i, _out))
+        chains = 0
+        producers = 0
 
-            length = frames_to_timecode(clip[1] + 1, fps)
+        # Speeds like [1.5, 3] don't work because of duration issues, too bad!
+
+        for clip in clips:
+            speed = clip[2] / 100
+            if(int(speed) == speed):
+                speed = int(speed)
+
+            _out = frames_to_timecode(clip[1] / speed, fps)
+            length = frames_to_timecode((clip[1] / speed) + 1, fps)
+
+            if(speed == 1):
+                resource = inp.path
+                caption = inp.basename
+                out.write('\t<chain id="chain{}" out="{}">\n'.format(
+                    chains, _out))
+                chains += 1
+            else:
+                resource = '{}:{}'.format(speed, inp.path)
+                caption = '{} ({}x)'.format(inp.basename, speed)
+                out.write('\t<producer id="producer{}" in="00:00:00.000" out="{}">\n'.format(
+                    producers, _out))
+                producers += 1
+                chains += 1 # yes, Shotcut does this.
+
             out.write('\t\t<property name="length">{}</property>\n'.format(length))
             out.write('\t\t<property name="eof">pause</property>\n')
-            out.write('\t\t<property name="resource">{}</property>\n'.format(inp.abspath))
-            out.write('\t\t<property name="mlt_service">avformat-novalidate</property>\n')
-            out.write('\t\t<property name="seekable">1</property>\n')
-            out.write('\t\t<property name="audio_index">1</property>\n')
-            out.write('\t\t<property name="video_index">0</property>\n')
-            out.write('\t\t<property name="mute_on_pause">0</property>\n')
-            out.write('\t\t<property name="ignore_points">0</property>\n')
-            out.write('\t\t<property name="shotcut:caption">{}</property>\n'.format(inp.basename))
-            out.write('\t\t<property name="xml">was here</property>\n')
-            out.write('\t</chain>\n')
+            out.write('\t\t<property name="resource">{}</property>\n'.format(resource))
+
+            if(speed == 1):
+                out.write('\t\t<property name="mlt_service">avformat-novalidate</property>\n')
+                out.write('\t\t<property name="seekable">1</property>\n')
+                out.write('\t\t<property name="audio_index">1</property>\n')
+                out.write('\t\t<property name="video_index">0</property>\n')
+                out.write('\t\t<property name="mute_on_pause">0</property>\n')
+                out.write('\t\t<property name="shotcut:caption">{}</property>\n'.format(
+                    caption))
+                out.write('\t\t<property name="xml">was here</property>\n')
+            else:
+                out.write('\t\t<property name="aspect_ratio">1</property>\n')
+                out.write('\t\t<property name="seekable">1</property>\n')
+                out.write('\t\t<property name="audio_index">1</property>\n')
+                out.write('\t\t<property name="video_index">0</property>\n')
+                out.write('\t\t<property name="mute_on_pause">1</property>\n')
+                out.write('\t\t<property name="warp_speed">{}</property>\n'.format(speed))
+                out.write('\t\t<property name="warp_resource">{}</property>\n'.format(
+                    inp.path))
+                out.write('\t\t<property name="mlt_service">timewarp</property>\n')
+                out.write('\t\t<property name="shotcut:producer">avformat</property>\n')
+                out.write('\t\t<property name="video_delay">0</property>\n')
+                out.write('\t\t<property name="shotcut:caption">{}</property>\n'.format(caption))
+                out.write('\t\t<property name="xml">was here</property>\n')
+                out.write('\t\t<property name="warp_pitch">1</property>\n')
+
+            out.write('\t</chain>\n' if speed == 1 else '\t</producer>\n')
 
         out.write('\t<playlist id="playlist0">\n')
         out.write('\t\t<property name="shotcut:video">1</property>\n')
         out.write('\t\t<property name="shotcut:name">V1</property>\n')
 
+        producers = 0
         for i, clip in enumerate(clips):
-            _in = frames_to_timecode(max(clip[0] -1, 0), fps)
-            _out = frames_to_timecode(max(clip[1] -2, 0), fps)
-            out.write('\t\t<entry producer="chain{}" in="{}" out="{}"/>\n'.format(
-                i, _in, _out))
+
+            if(speed == 1):
+                in_len = clip[0] - 1
+            else:
+                in_len = max(clip[0] / speed, 0)
+
+            out_len = max((clip[1] - 2) / speed, 0)
+
+            _in = frames_to_timecode(in_len, fps)
+            _out = frames_to_timecode(out_len, fps)
+
+            tag_name = 'chain{}'.format(i)
+            if(speed != 1):
+                tag_name = 'producer{}'.format(producers)
+                producers += 1
+
+            out.write('\t\t<entry producer="{}" in="{}" out="{}"/>\n'.format(
+                tag_name, _in, _out))
 
         out.write('\t</playlist>\n')
 
