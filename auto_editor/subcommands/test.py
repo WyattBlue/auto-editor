@@ -25,16 +25,16 @@ class FFprobe():
         stdout, __ = process.communicate()
         return stdout.decode()
 
-    def pipe(self, cmd: list):
+    def pipe(self, cmd):
         full_cmd = [self.path, '-v', 'error'] + cmd
         process = subprocess.Popen(full_cmd, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT)
         stdout, __ = process.communicate()
         return stdout.decode()
 
-    def _get(self, file, stream, the_type, track, of='compact=p=0:nk=1') -> str:
-        return self.pipe(['-select_streams', f'{the_type}:{track}', '-show_entries',
-            f'stream={stream}', '-of', of, file]).strip()
+    def _get(self, file, stream, the_type, track, of='compact=p=0:nk=1'):
+        return self.pipe(['-select_streams', '{}:{}'.format(the_type, track),
+            '-show_entries', 'stream={}'.format(stream), '-of', of, file]).strip()
 
     def getResolution(self, file):
         return self._get(file, 'height,width', 'v', 0, of='csv=s=x:p=0')
@@ -67,6 +67,18 @@ def pipeToConsole(cmd):
     stdout, stderr = process.communicate()
     return process.returncode, stdout.decode(), stderr.decode()
 
+def cleanup(the_dir):
+    for item in os.listdir(the_dir):
+        item = os.path.join(the_dir, item)
+        if('_ALTERED' in item or item.endswith('.xml') or item.endswith('.json')
+            or item.endswith('.fcpxml') or item.endswith('.mlt')):
+            os.remove(item)
+        if(item.endswith('_tracks')):
+            shutil.rmtree(item)
+
+def clean_all():
+    cleanup('resources')
+    cleanup(os.getcwd())
 
 def runTest(cmd):
     print('\nRunning: {}'.format(' '.join(cmd)))
@@ -81,6 +93,7 @@ def runTest(cmd):
         print('Test Failed.\n')
         print(stdout)
         print(stderr)
+        clean_all()
         sys.exit(1)
     else:
         print('Test Succeeded.')
@@ -98,30 +111,20 @@ def checkForError(cmd, match=None):
                     print('Found match. Test Succeeded.')
                 else:
                     print('Test Failed.\nCould\'t find "{}"'.format(match))
+                    clean_all()
                     sys.exit(1)
             else:
                 print('Test Succeeded.')
         else:
             print('Test Failed.\n')
             print('Program crashed.\n{}\n{}'.format(stdout, stderr))
+            clean_all()
             sys.exit(1)
     else:
         print('Test Failed.\n')
         print('Program responsed with a code 0, but should have failed.')
+        clean_all()
         sys.exit(1)
-
-
-def cleanup(the_dir):
-    for item in os.listdir(the_dir):
-        item = os.path.join(the_dir, item)
-        if('_ALTERED' in item or item.endswith('.xml') or item.endswith('.json')
-            or item.endswith('.fcpxml')):
-            os.remove(item)
-        if(item.endswith('_tracks')):
-            shutil.rmtree(item)
-
-
-ffprobe = FFprobe('ffprobe')
 
 def fullInspect(fileName, *args):
     for item in args:
@@ -130,7 +133,7 @@ def fullInspect(fileName, *args):
 
         if(func(fileName) != expectedOutput):
 
-            # Cheating on fps to allow 30 to equal 29.99944409236961
+            # Cheating on float numbers to allow 30 to equal 29.99944409236961
             if(isinstance(expectedOutput, float)):
                 from math import ceil
                 if(ceil(func(fileName) * 100) == expectedOutput * 100):
@@ -139,10 +142,13 @@ def fullInspect(fileName, *args):
             print('Inspection Failed.')
             print('Expected Value: {} {}'.format(expectedOutput, type(expectedOutput)))
             print('Actual Value: {} {}'.format(func(fileName), type(func(fileName))))
+            clean_all()
             sys.exit(1)
     print('Inspection Passed.')
 
-def test():
+def test(sys_args=None):
+    ffprobe = FFprobe('ffprobe')
+
     runTest(['--help'])
     runTest(['-h'])
     runTest(['--frame_margin', '--help'])
@@ -181,7 +187,7 @@ def test():
         [ffprobe.getSampleRate, '48000'],
     )
 
-    runTest(['example.mp4', '--video_codec', 'uncompressed', '--show_ffmpeg_debug'])
+    runTest(['example.mp4', '--video_codec', 'uncompressed'])
     fullInspect(
         'example_ALTERED.mp4',
         [ffprobe.getFrameRate, 30.0],
@@ -296,9 +302,7 @@ def test():
 
     os.remove('testsrc_ALTERED.mp4')
     os.remove('testsrc.mp4')
-
-    cleanup(os.getcwd())
-    cleanup('resources')
+    clean_all()
 
     for item in os.listdir('resources'):
 
@@ -314,6 +318,8 @@ def test():
         runTest([item, '--export_as_clip_sequence'])
         runTest([item, '--preview'])
 
+        cleanup('resources')
+
     runTest(['example.mp4', '--video_codec', 'h264', '--preset', 'faster'])
     runTest(['example.mp4', '--audio_codec', 'ac3'])
     runTest(['resources/newCommentary.mp3', 'exportMediaOps', '-acodec', 'pcm_s16le'])
@@ -326,8 +332,7 @@ def test():
     runTest(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion', '--debug',
         '--frame_margin', '0', '-mcut', '0', '-mclip', '0'])
 
-    cleanup('resources')
-    cleanup(os.getcwd())
+    clean_all()
 
 if(__name__ == '__main__'):
     test()

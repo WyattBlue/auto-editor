@@ -273,24 +273,21 @@ def main():
             'loudness and video motion to judge making cuts.\nRun:\n    auto-editor '\
             '--help\n\nTo get the list of options.\n')
 
-    subcommands = ['create', 'test', 'info', 'levels']
+    subcommands = ['create', 'test', 'info', 'levels', 'grep']
 
     if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
         if(sys.argv[1] == 'create'):
-            from auto_editor.subcommands.create import create
-            create(sys.argv[2:])
-
+            from auto_editor.subcommands.create import create as sub
         if(sys.argv[1] == 'test'):
-            from auto_editor.subcommands.test import test
-            test()
-
+            from auto_editor.subcommands.test import test as sub
         if(sys.argv[1] == 'info'):
-            from auto_editor.subcommands.info import info
-            info(sys.argv[2:])
-
+            from auto_editor.subcommands.info import info as sub
         if(sys.argv[1] == 'levels'):
-            from auto_editor.subcommands.levels import levels
-            levels(sys.argv[2:])
+            from auto_editor.subcommands.levels import levels as sub
+        if(sys.argv[1] == 'grep'):
+            from auto_editor.subcommands.grep import grep as sub
+
+        sub(sys.argv[2:])
 
         sys.exit()
     else:
