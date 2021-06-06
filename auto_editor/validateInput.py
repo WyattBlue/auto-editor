@@ -58,7 +58,7 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
                 log.error('File must have an extension.')
 
             if(fileFormat in invalidExtensions):
-                log.error(f'Invalid file extension "{fileFormat}" for {myInput}')
+                log.error('Invalid file extension "{}" for {}'.format(fileFormat, myInput))
             inputList.append(myInput)
 
         elif(myInput.startswith('http://') or myInput.startswith('https://')):
