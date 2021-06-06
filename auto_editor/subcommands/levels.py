@@ -24,7 +24,7 @@ def levels(sys_args=None):
 
     from auto_editor.utils.log import Log
     from auto_editor.ffwrapper import FFmpeg
-    from auto_editor.wavfile import read
+    from auto_editor.scipy.wavfile import read
 
     dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
