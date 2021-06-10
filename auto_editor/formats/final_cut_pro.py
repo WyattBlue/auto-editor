@@ -1,6 +1,6 @@
-'''final_cut_pro.py'''
+'''formats/final_cut_pro.py'''
 
-from auto_editor.formats.utils import indent, get_width_height
+from .utils import indent, get_width_height
 
 def fcp_xml(inp, temp, output, clips, chunks, tracks, total_dur, sampleRate,
     audioFile, fps, log):
@@ -53,11 +53,11 @@ def fcp_xml(inp, temp, output, clips, chunks, tracks, total_dur, sampleRate,
             'frameDuration="{}" width="{}" height="{}"'.format(frame_duration, width, height)+\
             ' colorSpace="1-1-1 (Rec. 709)"/>\n')
 
-        outfile.write('\t\t<asset id="r2" name="{}" start="0s" '.format(name)+\
+        outfile.write('\t\t<asset id="r2" name="{}" start="0s" '.format(name) +\
             'hasVideo="1" format="r1" hasAudio="1" '\
             'audioSources="1" audioChannels="2" audioRate="{}">\n'.format(sampleRate))
 
-        outfile.write('\t\t\t<media-rep kind="original-media" '.format()+\
+        outfile.write('\t\t\t<media-rep kind="original-media" ' +\
             'src="{}"></media-rep>\n'.format(pathurl))
         outfile.write('\t\t</asset>\n')
         outfile.write('\t</resources>\n')

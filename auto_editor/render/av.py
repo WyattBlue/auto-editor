@@ -6,7 +6,6 @@ import subprocess
 
 # Included Libaries
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.func import fnone
 from .utils import properties, scale_to_sped
 
 def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):

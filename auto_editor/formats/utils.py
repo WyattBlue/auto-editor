@@ -1,4 +1,4 @@
-'''utils.py'''
+'''formats/utils.py'''
 
 def safe_mkdir(path):
     from shutil import rmtree
