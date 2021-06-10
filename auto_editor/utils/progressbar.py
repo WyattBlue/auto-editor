@@ -4,7 +4,7 @@ from time import time, localtime
 from platform import system
 from shutil import get_terminal_size
 
-from auto_editor.usefulFunctions import pipeToConsole
+from .func import get_stdout
 
 def _pretty_time(my_time: float, ampm: bool) -> str:
     new_time = localtime(my_time)
@@ -43,7 +43,7 @@ class ProgressBar():
 
         if(system() == 'Darwin' and not self.machine):
             try:
-                dateFormat = pipeToConsole(['defaults', 'read',
+                dateFormat = get_stdout(['defaults', 'read',
                     'com.apple.menuextra.clock', 'DateFormat'])
                 self.ampm = 'a' in dateFormat
             except FileNotFoundError:

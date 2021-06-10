@@ -6,6 +6,15 @@ import os
 import sys
 import tempfile
 
+# Included Libraries
+import auto_editor
+import auto_editor.vanparse as vanparse
+import auto_editor.utils.func as usefulfunctions
+
+from auto_editor.utils.func import fnone, clean_list
+from auto_editor.utils.log import Log, Timer
+from auto_editor.ffwrapper import FFmpeg
+
 def error(message):
     print('Error! {}'.format(message), file=sys.stderr)
     sys.exit(1)
@@ -39,8 +48,7 @@ def frame_type(num):
     return int(num)
 
 def comma_type(inp, min_args=1, max_args=None, name=''):
-    from auto_editor.usefulFunctions import cleanList
-    inp = cleanList(inp.split(','), '\r\n\t')
+    inp = clean_list(inp.split(','), '\r\n\t')
     if(min_args > len(inp)):
         error('Too few comma arguments for {}.'.format(name))
     if(max_args is not None and len(inp) > max_args):
@@ -254,14 +262,6 @@ def main_options(parser):
 
 
 def main():
-    import auto_editor
-    import auto_editor.vanparse as vanparse
-    import auto_editor.usefulFunctions as usefulFunctions
-
-    from auto_editor.usefulFunctions import fNone
-    from auto_editor.utils.log import Log, Timer
-    from auto_editor.ffwrapper import FFmpeg
-
     dir_path = os.path.dirname(os.path.realpath(__file__))
 
     parser = vanparse.ArgumentParser('Auto-Editor', auto_editor.version,
@@ -376,7 +376,7 @@ def main():
     if(args.preview or args.export_as_clip_sequence or making_data_file):
         args.no_open = True
 
-    args.background = usefulFunctions.hex_to_bgr(args.background, log)
+    args.background = usefulfunctions.hex_to_bgr(args.background, log)
     if(args.blur < 0):
         args.blur = 0
 
@@ -490,7 +490,7 @@ def main():
             temp_file = os.path.join(TEMP, 'fastAud.wav')
 
             cmd = ['-i', inp.path]
-            if(not fNone(args.audio_bitrate)):
+            if(not fnone(args.audio_bitrate)):
                 cmd.extend(['-b:a', args.audio_bitrate])
             cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', temp_file])
             ffmpeg.run(cmd)
@@ -538,7 +538,7 @@ def main():
             cmd = ['-i', inp.path, '-hide_banner']
             for t in range(tracks):
                 cmd.extend(['-map', '0:a:{}'.format(t)])
-                if(not fNone(args.audio_bitrate)):
+                if(not fnone(args.audio_bitrate)):
                     cmd.extend(['-ab', args.audio_bitrate])
                 cmd.extend(['-ac', '2', '-ar', sampleRate,
                     os.path.join(TEMP, '{}.wav'.format(t))])
@@ -648,7 +648,7 @@ def main():
             continue
 
         def makeAudioFile(inp, chunks, output):
-            from auto_editor.fastAudio import fastAudio, handleAudio, convertAudio
+            from auto_editor.render.audio import fastAudio, handleAudio, convertAudio
             theFile = handleAudio(ffmpeg, inp.path, args.audio_bitrate, str(sampleRate),
                 TEMP, log)
 
@@ -670,7 +670,7 @@ def main():
             continue
 
         def makeVideoFile(inp, chunks, output):
-            from auto_editor.videoUtils import handleAudioTracks, muxVideo
+            from auto_editor.utils.video import handleAudioTracks, muxVideo
             continueVid = handleAudioTracks(ffmpeg, output, args, tracks, chunks,
                 speeds, fps, TEMP, log)
             if(continueVid):
@@ -694,12 +694,12 @@ def main():
                         log.error('Rectangle effect is not supported on the '\
                             'av render method.')
 
-                    from auto_editor.renderVideo import renderAv
-                    renderAv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, TEMP, log)
+                    from auto_editor.render.av import render_av
+                    render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, TEMP, log)
 
                 if(args.render == 'opencv'):
-                    from auto_editor.renderVideo import renderOpencv
-                    renderOpencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
+                    from auto_editor.render.opencv import render_opencv
+                    render_opencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
                         effects, TEMP, log)
 
                 if(log.is_debug):
@@ -731,14 +731,14 @@ def main():
 
     if(not args.preview and making_data_file):
         # Assume making each cut takes about 30 seconds.
-        time_save = usefulFunctions.humanReadableTime(num_cuts * 30)
+        time_save = usefulfunctions.human_readable_time(num_cuts * 30)
         s = 's' if num_cuts != 1 else ''
 
         log.print('Auto-Editor made {} cut{}, which would have taken about {} if '\
             'edited manually.'.format(num_cuts, s, time_save))
 
     if(not args.no_open):
-        usefulFunctions.openWithSystemDefault(newOutput, log)
+        usefulfunctions.open_with_system_default(newOutput, log)
 
     log.cleanup()
 

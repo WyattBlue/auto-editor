@@ -18,7 +18,7 @@ def info(sys_args=None):
     import auto_editor
     import auto_editor.vanparse as vanparse
 
-    from auto_editor.usefulFunctions import cleanList, aspect_ratio
+    from auto_editor.utils.func import clean_list, aspect_ratio
     from auto_editor.utils.log import Log
 
     from auto_editor.ffwrapper import FFmpeg
@@ -85,7 +85,7 @@ def info(sys_args=None):
                 text = ''
                 fps_mode = ffmpeg.pipe(['-i', file, '-hide_banner', '-vf', 'vfrdet',
                     '-an', '-f', 'null', '-'])
-                fps_mode = cleanList(fps_mode.split('\n'), '\r\t')
+                fps_mode = clean_list(fps_mode.split('\n'), '\r\t')
                 fps_mode = fps_mode.pop()
 
                 if('VFR:' in fps_mode):

@@ -1,18 +1,18 @@
-'''usefulFunctions.py'''
+'''utils/func.py'''
 
 """
 To prevent duplicate code being pasted between scripts, common functions should be
 put here. No function should modify or create video/audio files on its own.
 """
 
-def pipeToConsole(cmd):
+def get_stdout(cmd):
     import subprocess
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
     stdout, __ = process.communicate()
     return stdout.decode()
 
-def cleanList(x: list, rm_chars: str):
+def clean_list(x: list, rm_chars: str):
     no = str.maketrans('', '', rm_chars)
     x = [s.translate(no) for s in x]
     return [s for s in x if s != '']
@@ -29,7 +29,7 @@ def aspect_ratio(width: int, height: int):
     c = gcd(width, height)
     return width // c, height // c
 
-def getNewLength(chunks: list, speeds: list, fps: float):
+def get_new_length(chunks: list, speeds: list, fps: float):
     timeInFrames = 0
     for chunk in chunks:
         leng = chunk[1] - chunk[0]
@@ -37,7 +37,7 @@ def getNewLength(chunks: list, speeds: list, fps: float):
             timeInFrames += leng * (1 / speeds[chunk[2]])
     return timeInFrames / fps
 
-def humanReadableTime(time_in_secs):
+def human_readable_time(time_in_secs):
     units = 'seconds'
     if(time_in_secs >= 3600):
         time_in_secs = round(time_in_secs / 3600, 1)
@@ -51,7 +51,7 @@ def humanReadableTime(time_in_secs):
         units = 'minutes'
     return '{} {}'.format(time_in_secs, units)
 
-def openWithSystemDefault(path, log):
+def open_with_system_default(path, log):
     from subprocess import call
     try:  # should work on Windows
         from os import startfile
@@ -76,5 +76,5 @@ def hex_to_bgr(hex_str, log):
         return [int(hex_str[i:i+2], 16) for i in (5, 3, 1)]
     log.error('Invalid hex code: {}'.format(hex_str))
 
-def fNone(val):
+def fnone(val):
     return val == 'none' or val == 'unset' or val is None

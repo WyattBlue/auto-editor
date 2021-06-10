@@ -4,7 +4,7 @@
 from datetime import timedelta
 
 # Included Libraries
-from auto_editor.usefulFunctions import getNewLength
+from auto_editor.utils.func import get_new_length
 
 def printTimeFrame(title, frames, fps):
     in_sec = round(frames / fps, 1)
@@ -23,7 +23,7 @@ def preview(inp, chunks, speeds, log):
     print('')
     printTimeFrame('Old length', old_time, fps)
 
-    new_length = getNewLength(chunks, speeds, fps)
+    new_length = get_new_length(chunks, speeds, fps)
     printTimeFrame('New length', new_length * fps, fps)
     print('')
 

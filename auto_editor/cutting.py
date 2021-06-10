@@ -329,7 +329,7 @@ def handleBoolExp(val: str, data, sampleRate, fps, log) -> list:
 
 
 def applyRects(cmdRects, audioData, sampleRate, fps, log):
-    from auto_editor.usefulFunctions import hex_to_bgr
+    from auto_editor.utils.func import hex_to_bgr
 
     rects = []
     for ms in cmdRects:

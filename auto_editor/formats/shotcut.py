@@ -1,7 +1,7 @@
 '''shotcut.py'''
 
 from auto_editor.formats.utils import get_width_height
-from auto_editor.usefulFunctions import aspect_ratio
+from auto_editor.utils.func import aspect_ratio
 
 def frames_to_timecode(frames, fps):
     seconds = frames / fps
