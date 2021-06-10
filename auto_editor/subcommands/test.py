@@ -12,7 +12,7 @@ import platform
 import subprocess
 
 # Included Libraries
-from auto_editor.usefulFunctions import cleanList
+from auto_editor.utils.func import clean_list
 
 class FFprobe():
     def __init__(self, path):
@@ -44,7 +44,7 @@ class FFprobe():
             'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
 
     def getFrameRate(self, file):
-        nums = cleanList(self.getTimeBase(file).split('/'), '\r\t\n')
+        nums = clean_list(self.getTimeBase(file).split('/'), '\r\t\n')
         return int(nums[0]) / int(nums[1])
 
     def getAudioCodec(self, file, track=0):
@@ -62,7 +62,7 @@ def getRunner():
     return ['python3', '-m', 'auto_editor']
 
 
-def pipeToConsole(cmd):
+def pipe_to_console(cmd):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     return process.returncode, stdout.decode(), stderr.decode()
@@ -88,7 +88,7 @@ def runTest(cmd):
     if(add_no_open):
         cmd += ['--no_open']
 
-    returncode, stdout, stderr = pipeToConsole(cmd)
+    returncode, stdout, stderr = pipe_to_console(cmd)
     if(returncode > 0):
         print('Test Failed.\n')
         print(stdout)
@@ -103,7 +103,7 @@ def checkForError(cmd, match=None):
     pretty_cmd = ' '.join(cmd)
     print('\nRunning Error Test: {}'.format(pretty_cmd))
 
-    returncode, stdout, stderr = pipeToConsole(getRunner() + cmd)
+    returncode, stdout, stderr = pipe_to_console(getRunner() + cmd)
     if(returncode > 0):
         if('Error!' in stderr):
             if(match is not None):
@@ -177,6 +177,9 @@ def test(sys_args=None):
     runTest(['info', 'resources/multi-track.mov'])
     runTest(['info', 'resources/newCommentary.mp3'])
     runTest(['info', 'resources/test.mkv'])
+
+    runTest(['levels', 'example.mp4'])
+    os.remove('data.txt')
 
     runTest(['example.mp4'])
 

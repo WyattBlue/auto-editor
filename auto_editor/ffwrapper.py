@@ -6,7 +6,7 @@ import os.path
 from platform import system
 
 # Included Libraries
-from auto_editor.usefulFunctions import pipeToConsole
+from auto_editor.utils.func import get_stdout
 
 def _set_path(dirpath, my_ffmpeg):
     if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
@@ -17,7 +17,7 @@ def _set_path(dirpath, my_ffmpeg):
 def _test_path(dirpath, my_ffmpeg, log):
     path = _set_path(dirpath, my_ffmpeg)
     try:
-        pipeToConsole([path, '-h'])
+        get_stdout([path, '-h'])
     except FileNotFoundError:
         if(system() == 'Darwin'):
             log.error('No ffmpeg found, download via homebrew or restore the '\
@@ -74,7 +74,7 @@ class FFmpeg():
                 return match.groupdict()['match']
             return None
 
-        info = pipeToConsole([self.path, '-hide_banner', '-i', path])
+        info = get_stdout([self.path, '-hide_banner', '-i', path])
 
         setattr(file, 'duration', regex_match(r'Duration:\s(?P<match>[\d:.]+),', info))
         setattr(file, 'bitrate', regex_match(r'bitrate:\s(?P<match>\d+\skb\/s)', info))
@@ -123,7 +123,7 @@ class FFmpeg():
 
         if(self.FFdebug):
             print(cmd)
-        output = pipeToConsole(cmd)
+        output = get_stdout(cmd)
         if(self.FFdebug):
             print(output)
 

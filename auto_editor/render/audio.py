@@ -2,12 +2,12 @@
 
 import os
 
-from auto_editor.usefulFunctions import getNewLength, fNone
+from auto_editor.utils.func import get_new_length, fnone
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.scipy.wavfile import read, write
 
 def convertAudio(ffmpeg, in_file, inp, out_file, codec, log):
-    if(fNone(codec)):
+    if(fnone(codec)):
         codec = inp.audio_streams[0]['codec']
     if(codec == 'pcm_s16le' and out_file.endswith('.m4a')):
         log.error('Codec: {} is not supported in the m4a container.'.format(codec))
@@ -19,7 +19,7 @@ def handleAudio(ffmpeg, in_file, audioBit, samplerate: str, temp, log) -> str:
 
     log.checkType(samplerate, 'samplerate', str)
     cmd = ['-i', in_file]
-    if(not fNone(audioBit)):
+    if(not fnone(audioBit)):
         cmd.extend(['-b:a', audioBit])
     cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', temp_file])
 
@@ -44,7 +44,7 @@ def fastAudio(in_file, out_file, chunks: list, speeds: list, log, fps: float,
 
     samplerate, audioData = read(in_file)
 
-    newL = getNewLength(chunks, speeds, fps)
+    newL = get_new_length(chunks, speeds, fps)
     # Get the new length in samples with some extra leeway.
     estLeng = int(newL * samplerate * 1.5) + int(samplerate * 2)
 
