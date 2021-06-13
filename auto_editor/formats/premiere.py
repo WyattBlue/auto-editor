@@ -11,7 +11,6 @@ ntsc = 'FALSE'
 ana = 'FALSE' # anamorphic
 depth = '16'
 
-
 def speedup(speed):
     return indent(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
         '\t\t<effectid>timeremap</effectid>',
@@ -38,28 +37,28 @@ def speedup(speed):
         '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
-def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, sr, pathurl):
+def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, sr, pathurls):
 
     tracks = len(inp.audio_streams)
 
     total = 0
     for j, clip in enumerate(clips):
-        myStart = int(total)
+        my_start = int(total)
         total += (clip[1] - clip[0]) / (clip[2] / 100)
-        myEnd = int(total)
+        my_end = int(total)
 
         outfile.write(indent(5, '<clipitem id="clipitem-{}">'.format(j+1),
             '\t<masterclipid>masterclip-2</masterclipid>',
             '\t<name>{}</name>'.format(inp.name),
-            '\t<start>{}</start>'.format(myStart),
-            '\t<end>{}</end>'.format(myEnd),
+            '\t<start>{}</start>'.format(my_start),
+            '\t<end>{}</end>'.format(my_end),
             '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
             '\t<out>{}</out>'.format(int(clip[1] / (clip[2] / 100)))))
 
         if(j == 0):
             outfile.write(indent(6, '<file id="file-1">',
                 '\t<name>{}</name>'.format(inp.name),
-                '\t<pathurl>{}</pathurl>'.format(pathurl),
+                '\t<pathurl>{}</pathurl>'.format(pathurls[0]),
                 '\t<rate>',
                 '\t\t<timebase>{}</timebase>'.format(timebase),
                 '\t\t<ntsc>{}</ntsc>'.format(ntsc),
@@ -110,66 +109,38 @@ def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, s
         outfile.write('\t\t\t\t\t</clipitem>\n')
     outfile.write(indent(3, '\t</track>', '</video>'))
 
-def handle_audio_clips(t, outfile, audioFile, clips, inp, timebase, sr, pathurl, trackurls):
-    outfile.write('\t\t\t\t<track currentExplodedTrackIndex="0" premiereTrackType="Stereo">\n')
-    total = 0
-    for j, clip in enumerate(clips):
+def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pathurls):
 
-        myStart = int(total)
-        total += (clip[1] - clip[0]) / (clip[2] / 100)
-        myEnd = int(total)
+    channel_type = '' if audioFile else 'premiereChannelType="stereo"'
+    for t in range(tracks):
+        outfile.write('\t\t\t\t<track currentExplodedTrackIndex="0" premiereTrackType="Stereo">\n')
+        total = 0
+        for j, clip in enumerate(clips):
 
-        if(audioFile):
-            outfile.write(indent(5, '<clipitem id="clipitem-{}">'.format(j+1),
-                '\t<masterclipid>masterclip-1</masterclipid>',
+            my_start = int(total)
+            total += (clip[1] - clip[0]) / (clip[2] / 100)
+            my_end = int(total)
+
+            if(audioFile):
+                clip_item_num = j + 1
+                master_id = '1'
+            else:
+                clip_item_num = len(clips) + 1 + j + (t * len(clips))
+                master_id = '2'
+
+            outfile.write(indent(5,
+                '<clipitem id="clipitem-{}"{}>'.format(clip_item_num, channel_type),
+                '\t<masterclipid>masterclip-{}</masterclipid>'.format(master_id),
                 '\t<name>{}</name>'.format(inp.name),
-                '\t<start>{}</start>'.format(myStart),
-                '\t<end>{}</end>'.format(myEnd),
+                '\t<start>{}</start>'.format(my_start),
+                '\t<end>{}</end>'.format(my_end),
                 '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
                 '\t<out>{}</out>'.format(int(clip[1] / (clip[2] / 100)))))
 
-            if(j == 0):
-                # Define file-1
-                outfile.write(indent(6, '<file id="file-1">',
-                    '\t<name>{}</name>'.format(inp.name),
-                    '\t<pathurl>{}</pathurl>'.format(pathurl),
-                    '\t<rate>',
-                    '\t\t<timebase>{}</timebase>'.format(timebase),
-                    '\t\t<ntsc>{}</ntsc>'.format(ntsc),
-                    '\t</rate>',
-                    '\t<media>',
-                    '\t\t<audio>',
-                    '\t\t\t<samplecharacteristics>',
-                    '\t\t\t\t<depth>{}</depth>'.format(depth),
-                    '\t\t\t\t<samplerate>{}</samplerate>'.format(sr),
-                    '\t\t\t</samplecharacteristics>',
-                    '\t\t\t<channelcount>2</channelcount>',
-                    '\t\t</audio>', '\t</media>', '</file>'))
-            else:
-                outfile.write('\t\t\t\t\t\t<file id="file-1"/>\n')
-            outfile.write('\t\t\t\t\t\t<sourcetrack>\n')
-            outfile.write('\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n')
-            outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
-            outfile.write('\t\t\t\t\t\t</sourcetrack>\n')
-            outfile.write('\t\t\t\t\t</clipitem>\n')
-        else:
-            clipItemNum = len(clips) + 1 + j + (t * len(clips))
-
-            outfile.write('\t\t\t\t\t<clipitem id="clipitem-{}" premiereChannelType="stereo">\n'.format(clipItemNum))
-            outfile.write('\t\t\t\t\t\t<masterclipid>masterclip-2</masterclipid>\n')
-            outfile.write('\t\t\t\t\t\t<name>{}</name>\n'.format(inp.name))
-
-            outfile.write(indent(6,
-                '<start>{}</start>'.format(myStart),
-                '<end>{}</end>'.format(myEnd),
-                '<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
-                '<out>{}</out>'.format(int(clip[1] / (clip[2] / 100))),
-            ))
-
-            if(t > 0):
+            if(audioFile and j == 0):
                 outfile.write(indent(6, '<file id="file-{}">'.format(t+1),
-                    '\t<name>{}{}</name>'.format(inp.name, t),
-                    '\t<pathurl>{}</pathurl>'.format(trackurls[t]),
+                    '\t<name>{}</name>'.format(inp.name),
+                    '\t<pathurl>{}</pathurl>'.format(pathurls[t]),
                     '\t<rate>',
                     '\t\t<timebase>{}</timebase>'.format(timebase),
                     '\t\t<ntsc>{}</ntsc>'.format(ntsc),
@@ -185,30 +156,30 @@ def handle_audio_clips(t, outfile, audioFile, clips, inp, timebase, sr, pathurl,
             else:
                 outfile.write('\t\t\t\t\t\t<file id="file-{}"/>\n'.format(t+1))
 
-        outfile.write(indent(6, '<sourcetrack>',
-            '\t<mediatype>audio</mediatype>',
-            '\t<trackindex>1</trackindex>',
-            '</sourcetrack>',
-        ))
+            outfile.write(indent(6, '<sourcetrack>',
+                '\t<mediatype>audio</mediatype>',
+                '\t<trackindex>1</trackindex>',
+                '</sourcetrack>'))
 
+            if(audioFile):
+                outfile.write('\t\t\t\t\t</clipitem>\n')
+            else:
+                outfile.write(indent(6, '<labels>', '\t<label2>Iris</label2>', '</labels>'))
+
+            # Add speed effect for audio blocks
+            if(clip[2] != 100):
+                outfile.write(speedup(clip[2]))
+
+            outfile.write('\t\t\t\t\t</clipitem>\n')
         if(not audioFile):
-            outfile.write(indent(6, '<labels>', '\t<label2>Iris</label2>', '</labels>'))
-
-        # Add speed effect for audio blocks
-        if(clip[2] != 100):
-            outfile.write(speedup(clip[2]))
-
-        outfile.write('\t\t\t\t\t</clipitem>\n')
-    if(not audioFile):
-        outfile.write('\t\t\t\t\t<outputchannelindex>1</outputchannelindex>\n')
-    outfile.write('\t\t\t\t</track>\n')
+            outfile.write('\t\t\t\t\t<outputchannelindex>1</outputchannelindex>\n')
+        outfile.write('\t\t\t\t</track>\n')
 
 def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
     resolve, fps, log):
 
     duration = chunks[len(chunks) - 1][1]
-    pathurl = fix_url(inp.path, resolve)
-    trackurls = [pathurl]
+    pathurls = [fix_url(inp.path, resolve)]
 
     tracks = len(inp.audio_streams)
 
@@ -224,7 +195,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
         for i in range(1, tracks):
             newtrack = os.path.join(fold, '{}.wav'.format(i))
             move(os.path.join(temp, '{}.wav'.format(i)), newtrack)
-            trackurls.append(fix_url(newtrack, resolve))
+            pathurls.append(fix_url(newtrack, resolve))
 
     width, height = get_width_height(inp)
     timebase = str(int(fps))
@@ -274,10 +245,8 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
                 '\t\t</samplecharacteristics>',
                 '\t</format>',
                 '\t<track>'))
-
-        if(not audioFile):
             handle_video_clips(outfile, clips, inp, timebase, duration, width, height,
-                sampleRate, pathurl)
+                sampleRate, pathurls)
 
         # Audio Clips
         outfile.write(indent(3, '<audio>',
@@ -290,9 +259,8 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
             '\t</format>'))
 
         print('')
-        for t in range(tracks):
-            handle_audio_clips(t, outfile, audioFile, clips, inp, timebase, sampleRate,
-                pathurl, trackurls)
+        handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sampleRate,
+            pathurls)
 
         outfile.write('\t\t\t</audio>\n')
         outfile.write('\t\t</media>\n')
