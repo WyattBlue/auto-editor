@@ -3,7 +3,7 @@
 import os
 from shutil import move
 
-from .utils import fix_url, indent, get_width_height, safe_mkdir
+from .utils import indent, get_width_height, safe_mkdir
 
 pixelar = 'square' # pixel aspect ratio
 colordepth = '24'
@@ -11,7 +11,16 @@ ntsc = 'FALSE'
 ana = 'FALSE' # anamorphic
 depth = '16'
 
-def speedup(speed):
+def fix_url(path: str) -> str:
+    from urllib.parse import quote
+    from platform import system
+    from os.path import abspath
+
+    if(system() == 'Windows'):
+        return'file://localhost/' + quote(abspath(path)).replace('%5C', '/')
+    return 'file://localhost' + abspath(path)
+
+def speedup(speed) -> str:
     return indent(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
         '\t\t<effectid>timeremap</effectid>',
         '\t\t<effectcategory>motion</effectcategory>',
@@ -38,9 +47,7 @@ def speedup(speed):
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
 def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, sr, pathurls):
-
     tracks = len(inp.audio_streams)
-
     total = 0
     for j, clip in enumerate(clips):
         my_start = int(total)
@@ -110,8 +117,6 @@ def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, s
     outfile.write(indent(3, '\t</track>', '</video>'))
 
 def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pathurls):
-
-    channel_type = '' if audioFile else 'premiereChannelType="stereo"'
     for t in range(tracks):
         outfile.write('\t\t\t\t<track currentExplodedTrackIndex="0" premiereTrackType="Stereo">\n')
         total = 0
@@ -129,7 +134,7 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
                 master_id = '2'
 
             outfile.write(indent(5,
-                '<clipitem id="clipitem-{}"{}>'.format(clip_item_num, channel_type),
+                '<clipitem id="clipitem-{}">'.format(clip_item_num),
                 '\t<masterclipid>masterclip-{}</masterclipid>'.format(master_id),
                 '\t<name>{}</name>'.format(inp.name),
                 '\t<start>{}</start>'.format(my_start),
@@ -175,11 +180,10 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
             outfile.write('\t\t\t\t\t<outputchannelindex>1</outputchannelindex>\n')
         outfile.write('\t\t\t\t</track>\n')
 
-def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
-    resolve, fps, log):
+def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile, fps, log):
 
     duration = chunks[len(chunks) - 1][1]
-    pathurls = [fix_url(inp.path, resolve)]
+    pathurls = [fix_url(inp.path)]
 
     tracks = len(inp.audio_streams)
 
@@ -195,7 +199,7 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile,
         for i in range(1, tracks):
             newtrack = os.path.join(fold, '{}.wav'.format(i))
             move(os.path.join(temp, '{}.wav'.format(i)), newtrack)
-            pathurls.append(fix_url(newtrack, resolve))
+            pathurls.append(fix_url(newtrack))
 
     width, height = get_width_height(inp)
     timebase = str(int(fps))
