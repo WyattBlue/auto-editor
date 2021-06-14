@@ -4,6 +4,8 @@ import os
 import re
 import sys
 
+from auto_editor.utils.progressbar import ProgressBar
+
 invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
       '.xml', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
       '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
@@ -76,8 +78,6 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
             except ImportError:
                 log.error('Download the youtube-dl python library to download URLs.\n' \
                     '   pip3 install youtube-dl')
-
-            from auto_editor.usefulFunctions import ProgressBar
 
             if(not os.path.isfile(outtmpl)):
 
