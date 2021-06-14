@@ -618,7 +618,8 @@ def main():
 
         if(args.export_as_json):
             from auto_editor.formats.make_json import make_json_cutlist
-            make_json_cutlist(inp.path, newOutput, auto_editor.version, chunks, speeds, log)
+            make_json_cutlist(inp.path, newOutput, auto_editor.version, chunks, speeds,
+                log)
             continue
 
         if(args.preview):
@@ -627,18 +628,17 @@ def main():
             preview(inp, chunks, speeds, log)
             continue
 
-        if(args.export_to_premiere or args.export_to_resolve):
+        if(args.export_to_premiere):
             from auto_editor.formats.premiere import premiere_xml
             premiere_xml(inp, TEMP, newOutput, clips, chunks, sampleRate, audioFile,
-                args.export_to_resolve, fps, log)
+                fps, log)
             continue
 
-        if(args.export_to_final_cut_pro):
+        if(args.export_to_final_cut_pro or args.export_to_resolve):
             from auto_editor.formats.final_cut_pro import fcp_xml
 
             totalFrames = chunks[len(chunks) - 1][1]
-            fcp_xml(inp, TEMP, newOutput, clips, chunks, tracks, totalFrames,
-                sampleRate, audioFile, fps, log)
+            fcp_xml(inp, TEMP, newOutput, clips, tracks, totalFrames, audioFile, fps, log)
             continue
 
         if(args.export_to_shotcut):
