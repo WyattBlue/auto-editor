@@ -78,3 +78,7 @@ def hex_to_bgr(hex_str, log):
 
 def fnone(val):
     return val == 'none' or val == 'unset' or val is None
+
+def append_filename(name, val):
+    dot_index = name.rfind('.')
+    return name[:dot_index] + val + name[dot_index:]

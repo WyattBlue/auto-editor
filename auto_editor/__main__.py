@@ -11,84 +11,37 @@ import auto_editor
 import auto_editor.vanparse as vanparse
 import auto_editor.utils.func as usefulfunctions
 
-from auto_editor.utils.func import fnone, clean_list
+from auto_editor.utils.func import fnone, append_filename
 from auto_editor.utils.log import Log, Timer
 from auto_editor.ffwrapper import FFmpeg
 
-def error(message):
-    print('Error! {}'.format(message), file=sys.stderr)
-    sys.exit(1)
+def set_output_name(path, making_data_file, args):
+    dot_index = path.rfind('.')
 
-def file_type(path):
-    if(not os.path.isfile(path)):
-        error('Auto-Editor could not find the file: {}'.format(path))
-    return path
+    if(dot_index == -1):
+        root = path
+    else:
+        root = path[:dot_index]
 
-def float_type(num):
-    if(num.endswith('%')):
-        return float(num[:-1]) / 100
-    return float(num)
+    if(args.export_as_json):
+        return root + '.json'
+    if(args.export_to_final_cut_pro):
+        return root + '.fcpxml'
+    if(args.export_to_shotcut):
+        return root + '.mlt'
+    if(making_data_file):
+        return root + '.xml'
+    if(args.export_as_audio):
+        return root + '_ALTERED.wav'
 
-def sample_rate_type(num):
-    if(num.endswith(' Hz')):
-        return int(num[:-3])
-    if(num.endswith(' kHz')):
-        return int(float(num[:-4]) * 1000)
-    if(num.endswith('kHz')):
-        return int(float(num[:-3]) * 1000)
-    if(num.endswith('Hz')):
-        return int(num[:-2])
-    return int(num)
+    ext = path[dot_index:]
+    return root + '_ALTERED' + ext
 
-def frame_type(num):
-    if(num.endswith('sec')):
-        return num[:-3]
-    if(num.endswith('secs')):
-        return num[:-4]
-    return int(num)
-
-def comma_type(inp, min_args=1, max_args=None, name=''):
-    inp = clean_list(inp.split(','), '\r\n\t')
-    if(min_args > len(inp)):
-        error('Too few comma arguments for {}.'.format(name))
-    if(max_args is not None and len(inp) > max_args):
-        error('Too many comma arguments for {}.'.format(name))
-    return inp
-
-def zoom_type(inp):
-    return comma_type(inp, 3, 8, 'zoom_type')
-
-def rect_type(inp):
-    return comma_type(inp, 6, 8, 'rect_type')
-
-def range_type(inp):
-    return comma_type(inp, 2, 2, 'range_type')
-
-def speed_range_type(inp):
-    return comma_type(inp, 3, 3, 'speed_range_type')
-
-
-def appendFileName(file_name, val):
-    dotIndex = file_name.rfind('.')
-    end = val + file_name[dotIndex:]
-    return file_name[:dotIndex] + end
-
-# Pad so that the av method works.
-def padChunk(item, totalFrames):
-    start = None
-    end = None
-    if(item[0] != 0):
-        start = [0, item[0], 2]
-    if(item[1] != totalFrames -1):
-        end = [item[1], totalFrames -1, 2]
-
-    if(start is None):
-        return [item] + [end]
-    if(end is None):
-        return [start] + [item]
-    return [start] + [item] + [end]
 
 def main_options(parser):
+    from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
+        frame_type, zoom_type, rect_type, range_type, speed_range_type)
+
     parser.add_argument('urlOps', nargs=0, action='grouping')
     parser.add_argument('--format', type=str, group='urlOps',
         default='bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
@@ -261,6 +214,300 @@ def main_options(parser):
     return parser
 
 
+def edit_media(i, inp, ffmpeg, args, speeds, exporting_to_editor, data_file, TEMP, log):
+    chunks = None
+    if(inp.ext == '.json'):
+        from auto_editor.formats.make_json import read_json_cutlist
+
+        INPUT_FILE, chunks, speeds = read_json_cutlist(inp.path, auto_editor.version, log)
+
+        inp = ffmpeg.file_info(INPUT_FILE)
+
+        newOutput = set_output_name(inp.path, data_file, args)
+    else:
+        newOutput = args.output_file[i]
+        if(not os.path.isdir(inp.path) and '.' not in newOutput):
+            newOutput = set_output_name(newOutput, data_file, args)
+
+    log.debug('Input File: {}'.format(inp.path))
+    log.debug('Output File: {}'.format(newOutput))
+
+    if(os.path.isfile(newOutput) and inp.path != newOutput):
+        log.debug('Removing already existing file: {}'.format(newOutput))
+        os.remove(newOutput)
+
+    if(args.sample_rate is None):
+        sampleRate = inp.audio_streams[0]['samplerate']
+        if(sampleRate is None):
+            sampleRate = '48000'
+    else:
+        sampleRate = str(args.sample_rate)
+    log.debug('Samplerate: {}'.format(sampleRate))
+
+    audioData = None
+    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
+        '.acc', '.nfa', '.mka']
+    audioFile = inp.ext in audioExtensions
+    if(audioFile):
+        fps = 30 if args.force_fps_to is None else args.force_fps_to
+        tracks = 1
+
+        temp_file = os.path.join(TEMP, 'fastAud.wav')
+
+        cmd = ['-i', inp.path]
+        if(not fnone(args.audio_bitrate)):
+            cmd.extend(['-b:a', args.audio_bitrate])
+        cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', temp_file])
+        ffmpeg.run(cmd)
+
+        from auto_editor.scipy.wavfile import read
+        sampleRate, audioData = read(temp_file)
+    else:
+        if(args.force_fps_to is not None):
+            fps = args.force_fps_to
+        else:
+            fps = float(inp.fps)
+            if(exporting_to_editor):
+                fps = int(fps)
+
+        if(fps < 1):
+            log.error('{}: Frame rate cannot be below 1. fps: {}'.format(
+                inp.basename, fps))
+
+        tracks = len(inp.audio_streams)
+
+        if(args.cut_by_this_track >= tracks):
+            message = "You choose a track that doesn't exist.\nThere "
+            if(tracks == 1):
+                message += 'is only {} track.\n'.format(tracks)
+            else:
+                message += 'are only {} tracks.\n'.format(tracks)
+            for t in range(tracks):
+                message += ' Track {}\n'.format(t)
+            log.error(message)
+
+        def NumberOfVrfFrames(text, log):
+            import re
+            search = re.search(r'VFR:[\d.]+ \(\d+\/\d+\)', text, re.M)
+            if(search is None):
+                log.warning('Could not get number of VFR Frames.')
+                return 0
+            else:
+                nums = re.search(r'\d+\/\d+', search.group()).group(0)
+                log.debug(nums)
+                return int(nums.split('/')[0])
+
+        def hasVFR(cmd, log):
+            return NumberOfVrfFrames(ffmpeg.pipe(cmd), log) != 0
+
+        # Split audio tracks into: 0.wav, 1.wav, etc.
+        cmd = ['-i', inp.path, '-hide_banner']
+        for t in range(tracks):
+            cmd.extend(['-map', '0:a:{}'.format(t)])
+            if(not fnone(args.audio_bitrate)):
+                cmd.extend(['-ab', args.audio_bitrate])
+            cmd.extend(['-ac', '2', '-ar', sampleRate,
+                os.path.join(TEMP, '{}.wav'.format(t))])
+        cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
+        has_vfr = hasVFR(cmd, log)
+        del cmd
+
+        if(args.cut_by_all_tracks):
+            temp_file = os.path.join(TEMP, 'combined.wav')
+            cmd = ['-i', inp.path, '-filter_complex',
+                '[0:a]amix=inputs={}:duration=longest'.format(tracks), '-ar',
+                sampleRate, '-ac', '2', '-f', 'wav', temp_file]
+            ffmpeg.run(cmd)
+            del cmd
+        else:
+            temp_file = os.path.join(TEMP, '{}.wav'.format(args.cut_by_this_track))
+
+        from auto_editor.scipy.wavfile import read
+        sampleRate, audioData = read(temp_file)
+
+    log.debug('Frame Rate: {}'.format(fps))
+    if(chunks is None):
+        from auto_editor.cutting import audioToHasLoud, motionDetection
+        from auto_editor.cutting import combineArrs, applySpacingRules
+
+        audioList = None
+        motionList = None
+        if('audio' in args.edit_based_on):
+            log.debug('Analyzing audio volume.')
+            audioList = audioToHasLoud(audioData, sampleRate,
+                args.silent_threshold,  fps, log)
+
+        if('motion' in args.edit_based_on):
+            log.debug('Analyzing video motion.')
+            motionList = motionDetection(inp, args.motion_threshold, log,
+                width=args.width, dilates=args.dilates, blur=args.blur)
+
+            if(audioList is not None):
+                if(len(audioList) != len(motionList)):
+                    log.debug('audioList Length:  {}'.format(len(audioList)))
+                    log.debug('motionList Length: {}'.format(len(motionList)))
+                if(len(audioList) > len(motionList)):
+                    log.debug('Reducing the size of audioList to match motionList.')
+                    audioList = audioList[:len(motionList)]
+                elif(len(motionList) > len(audioList)):
+                    log.debug('Reducing the size of motionList to match audioList.')
+                    motionList = motionList[:len(audioList)]
+
+        hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
+        del audioList, motionList
+
+        effects = []
+        if(args.zoom != []):
+            from auto_editor.cutting import applyZooms
+            effects += applyZooms(args.zoom, audioData, sampleRate, fps, log)
+        if(args.rectangle != []):
+            from auto_editor.cutting import applyRects
+            effects += applyRects(args.rectangle, audioData, sampleRate, fps, log)
+
+        chunks = applySpacingRules(hasLoud, speeds, fps, args, log)
+        del hasLoud
+
+    def isClip(chunk):
+        return speeds[chunk[2]] != 99999
+
+    def getNumberOfCuts(chunks, speeds):
+        return len(list(filter(isClip, chunks)))
+
+    def getClips(chunks, speeds):
+        clips = []
+        for chunk in chunks:
+            if(isClip(chunk)):
+                clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
+        return clips
+
+    num_cuts = getNumberOfCuts(chunks, speeds)
+    clips = getClips(chunks, speeds)
+
+    if(args.export_as_json):
+        from auto_editor.formats.make_json import make_json_cutlist
+        make_json_cutlist(inp.path, newOutput, auto_editor.version, chunks, speeds,
+            log)
+        return num_cuts, newOutput
+
+    if(args.preview):
+        from auto_editor.preview import preview
+        preview(inp, chunks, speeds, log)
+        return num_cuts, None
+
+    if(args.export_to_premiere):
+        from auto_editor.formats.premiere import premiere_xml
+        premiere_xml(inp, TEMP, newOutput, clips, chunks, sampleRate, audioFile,
+            fps, log)
+        return num_cuts, newOutput
+
+    if(args.export_to_final_cut_pro or args.export_to_resolve):
+        from auto_editor.formats.final_cut_pro import fcp_xml
+
+        totalFrames = chunks[len(chunks) - 1][1]
+        fcp_xml(inp, TEMP, newOutput, clips, tracks, totalFrames, audioFile, fps, log)
+        return num_cuts, newOutput
+
+    if(args.export_to_shotcut):
+        from auto_editor.formats.shotcut import shotcut_xml
+
+        shotcut_xml(inp, TEMP, newOutput, clips, chunks, fps, log)
+        return num_cuts, newOutput
+
+    def makeAudioFile(inp, chunks, output):
+        from auto_editor.render.audio import fastAudio, handleAudio, convertAudio
+        theFile = handleAudio(ffmpeg, inp.path, args.audio_bitrate, str(sampleRate),
+            TEMP, log)
+
+        temp_file = os.path.join(TEMP, 'convert.wav')
+        fastAudio(theFile, temp_file, chunks, speeds, log, fps,
+            args.machine_readable_progress, args.no_progress)
+        convertAudio(ffmpeg, temp_file, inp, output, args.audio_codec, log)
+
+    if(audioFile):
+        if(args.export_as_clip_sequence):
+            i = 1
+            for item in chunks:
+                if(speeds[item[2]] == 99999):
+                    continue
+                makeAudioFile(inp, [item], append_filename(newOutput, '-{}'.format(i)))
+                i += 1
+        else:
+            makeAudioFile(inp, chunks, newOutput)
+        return num_cuts, newOutput
+
+    def makeVideoFile(inp, chunks, output):
+        from auto_editor.utils.video import handleAudioTracks, muxVideo
+        continueVid = handleAudioTracks(ffmpeg, output, args, tracks, chunks,
+            speeds, fps, TEMP, log)
+        if(continueVid):
+            if(args.render == 'auto'):
+                if(args.zoom != [] or args.rectangle != []):
+                    args.render = 'opencv'
+                else:
+                    try:
+                        import av
+                        args.render = 'av'
+                    except ImportError:
+                        args.render = 'opencv'
+
+            log.debug('Using {} method'.format(args.render))
+            if(args.render == 'av'):
+                if(args.zoom != []):
+                    log.error('Zoom effect is not supported on the '\
+                        'av render method.')
+
+                if(args.rectangle != []):
+                    log.error('Rectangle effect is not supported on the '\
+                        'av render method.')
+
+                from auto_editor.render.av import render_av
+                render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, TEMP, log)
+
+            if(args.render == 'opencv'):
+                from auto_editor.render.opencv import render_opencv
+                render_opencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
+                    effects, TEMP, log)
+
+            if(log.is_debug):
+                log.debug('Writing the output file.')
+            else:
+                log.conwrite('Writing the output file.')
+
+            muxVideo(ffmpeg, output, args, tracks, TEMP, log)
+            if(output is not None and not os.path.isfile(output)):
+                log.bug('The file {} was not created.'.format(output))
+
+    if(args.export_as_clip_sequence):
+
+        def pad_chunk(item, totalFrames):
+            start = None
+            end = None
+            if(item[0] != 0):
+                start = [0, item[0], 2]
+            if(item[1] != totalFrames -1):
+                end = [item[1], totalFrames -1, 2]
+
+            if(start is None):
+                return [item] + [end]
+            if(end is None):
+                return [start] + [item]
+            return [start] + [item] + [end]
+
+        i = 1
+        totalFrames = chunks[len(chunks) - 1][1]
+        speeds.append(99999) # guarantee we have a cut speed to work with.
+        for chunk in chunks:
+            if(speeds[chunk[2]] == 99999):
+                continue
+
+            makeVideoFile(inp, pad_chunk(chunk, totalFrames),
+                append_filename(newOutput, '-{}'.format(i)))
+            i += 1
+    else:
+        makeVideoFile(inp, chunks, newOutput)
+    return num_cuts, newOutput
+
+
 def main():
     dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -335,7 +582,7 @@ def main():
 
     if([args.export_to_premiere, args.export_to_resolve,
         args.export_to_final_cut_pro, args.export_as_audio,
-        args.export_as_clip_sequence].count(True) > 1):
+        args.export_to_shotcut, args.export_as_clip_sequence].count(True) > 1):
         log.error('You must choose only one export option.')
 
     if(making_data_file and (args.video_codec != 'uncompressed' or
@@ -358,20 +605,24 @@ def main():
     if(args.dilates < 0):
         log.error('motionOps --dilates cannot be less than 0')
 
-    if(args.preview):
-        pass
-    elif(args.export_to_premiere):
-        log.conwrite('Exporting to Adobe Premiere Pro XML file.')
-    elif(args.export_to_final_cut_pro):
-        log.conwrite('Exporting to Final Cut Pro XML file.')
-    elif(args.export_to_resolve):
-        log.conwrite('Exporting to DaVinci Resolve XML file.')
-    elif(args.export_to_shotcut):
-        log.conwrite('Exporting to Shotcut XML Timeline file.')
-    elif(args.export_as_audio):
-        log.conwrite('Exporting as audio.')
-    else:
-        log.conwrite('Starting.')
+
+    def write_starting_message(args, log):
+        if(args.preview):
+            pass
+        elif(args.export_to_premiere):
+            log.conwrite('Exporting to Adobe Premiere Pro XML file.')
+        elif(args.export_to_final_cut_pro):
+            log.conwrite('Exporting to Final Cut Pro XML file.')
+        elif(args.export_to_resolve):
+            log.conwrite('Exporting to DaVinci Resolve XML file.')
+        elif(args.export_to_shotcut):
+            log.conwrite('Exporting to Shotcut XML Timeline file.')
+        elif(args.export_as_audio):
+            log.conwrite('Exporting as audio.')
+        else:
+            log.conwrite('Starting.')
+
+    write_starting_message(args, log)
 
     if(args.preview or args.export_as_clip_sequence or making_data_file):
         args.no_open = True
@@ -392,31 +643,9 @@ def main():
     from auto_editor.validateInput import validInput
     inputList = validInput(args.input, ffmpeg, args, log)
 
-    def set_output_name(path, args):
-        dot_index = path.rfind('.')
-
-        if(dot_index == -1):
-            root = path
-        else:
-            root = path[:dot_index]
-
-        if(args.export_as_json):
-            return root + '.json'
-        if(args.export_to_final_cut_pro):
-            return root + '.fcpxml'
-        if(args.export_to_shotcut):
-            return root + '.mlt'
-        if(making_data_file):
-            return root + '.xml'
-        if(args.export_as_audio):
-            return root + '_ALTERED.wav'
-
-        ext = path[dot_index:]
-        return root + '_ALTERED' + ext
-
     if(len(args.output_file) < len(inputList)):
         for i in range(len(inputList) - len(args.output_file)):
-            args.output_file.append(set_output_name(inputList[i], args))
+            args.output_file.append(set_output_name(inputList[i], making_data_file, args))
 
     if(args.combine_files):
         temp_file = os.path.join(TEMP, 'combined.mp4')
@@ -439,307 +668,37 @@ def main():
 
     log.debug('Speeds: {}'.format(speeds))
 
-    audioExtensions = ['.wav', '.mp3', '.m4a', '.aiff', '.flac', '.ogg', '.oga',
-        '.acc', '.nfa', '.mka']
-    sampleRate = None
+    def main_loop(inputList, ffmpeg, args, speeds, log):
+        num_cuts = 0
 
-    from auto_editor.scipy.wavfile import read
-
-    for i, INPUT_FILE in enumerate(inputList):
-
-        inp = ffmpeg.file_info(INPUT_FILE)
-
-        if(len(inputList) > 1):
-            log.conwrite('Working on {}'.format(inp.basename))
-
-        chunks = None
-        if(inp.ext == '.json'):
-            from auto_editor.formats.make_json import read_json_cutlist
-
-            INPUT_FILE, chunks, speeds = read_json_cutlist(inp.path, auto_editor.version, log)
-
+        for i, INPUT_FILE in enumerate(inputList):
             inp = ffmpeg.file_info(INPUT_FILE)
 
-            newOutput = set_output_name(inp.path, args)
-        else:
-            newOutput = args.output_file[i]
-            if(not os.path.isdir(inp.path) and '.' not in newOutput):
-                newOutput = set_output_name(newOutput, args)
+            if(len(inputList) > 1):
+                log.conwrite('Working on {}'.format(inp.basename))
 
-        log.debug('Input File: {}'.format(inp.path))
-        log.debug('Output File: {}'.format(newOutput))
+            cuts, newOutput = edit_media(i, inp, ffmpeg, args, speeds,
+                exporting_to_editor, making_data_file, TEMP, log)
+            num_cuts += cuts
 
-        if(os.path.isfile(newOutput) and inp.path != newOutput):
-            log.debug('Removing already existing file: {}'.format(newOutput))
-            os.remove(newOutput)
+        if(not args.preview and not making_data_file):
+            timer.stop()
 
-        if(args.sample_rate is None):
-            sampleRate = inp.audio_streams[0]['samplerate']
-            if(sampleRate is None):
-                sampleRate = '48000'
-        else:
-            sampleRate = str(args.sample_rate)
-        log.debug('Samplerate: {}'.format(sampleRate))
+        if(not args.preview and making_data_file):
+            # Assume making each cut takes about 30 seconds.
+            time_save = usefulfunctions.human_readable_time(num_cuts * 30)
+            s = 's' if num_cuts != 1 else ''
 
-        audioData = None
-        audioFile = inp.ext in audioExtensions
-        if(audioFile):
-            fps = 30 if args.force_fps_to is None else args.force_fps_to
-            tracks = 1
+            log.print('Auto-Editor made {} cut{}, which would have taken about {} if '\
+                'edited manually.'.format(num_cuts, s, time_save))
 
-            temp_file = os.path.join(TEMP, 'fastAud.wav')
+        if(not args.no_open):
+            usefulfunctions.open_with_system_default(newOutput, log)
 
-            cmd = ['-i', inp.path]
-            if(not fnone(args.audio_bitrate)):
-                cmd.extend(['-b:a', args.audio_bitrate])
-            cmd.extend(['-ac', '2', '-ar', sampleRate, '-vn', temp_file])
-            ffmpeg.run(cmd)
-
-            sampleRate, audioData = read(temp_file)
-        else:
-            if(args.force_fps_to is not None):
-                fps = args.force_fps_to
-            else:
-                fps = float(inp.fps)
-                if(exporting_to_editor):
-                    fps = int(fps)
-
-            if(fps < 1):
-                log.error('{}: Frame rate cannot be below 1. fps: {}'.format(
-                    inp.basename, fps))
-
-            tracks = len(inp.audio_streams)
-
-            if(args.cut_by_this_track >= tracks):
-                message = "You choose a track that doesn't exist.\nThere "
-                if(tracks == 1):
-                    message += 'is only {} track.\n'.format(tracks)
-                else:
-                    message += 'are only {} tracks.\n'.format(tracks)
-                for t in range(tracks):
-                    message += ' Track {}\n'.format(t)
-                log.error(message)
-
-            def NumberOfVrfFrames(text, log):
-                import re
-                search = re.search(r'VFR:[\d.]+ \(\d+\/\d+\)', text, re.M)
-                if(search is None):
-                    log.warning('Could not get number of VFR Frames.')
-                    return 0
-                else:
-                    nums = re.search(r'\d+\/\d+', search.group()).group(0)
-                    log.debug(nums)
-                    return int(nums.split('/')[0])
-
-            def hasVFR(cmd, log):
-                return NumberOfVrfFrames(ffmpeg.pipe(cmd), log) != 0
-
-            # Split audio tracks into: 0.wav, 1.wav, etc.
-            cmd = ['-i', inp.path, '-hide_banner']
-            for t in range(tracks):
-                cmd.extend(['-map', '0:a:{}'.format(t)])
-                if(not fnone(args.audio_bitrate)):
-                    cmd.extend(['-ab', args.audio_bitrate])
-                cmd.extend(['-ac', '2', '-ar', sampleRate,
-                    os.path.join(TEMP, '{}.wav'.format(t))])
-            cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
-            has_vfr = hasVFR(cmd, log)
-            del cmd
-
-            if(args.cut_by_all_tracks):
-                temp_file = os.path.join(TEMP, 'combined.wav')
-                cmd = ['-i', inp.path, '-filter_complex',
-                    '[0:a]amix=inputs={}:duration=longest'.format(tracks), '-ar',
-                    sampleRate, '-ac', '2', '-f', 'wav', temp_file]
-                ffmpeg.run(cmd)
-                del cmd
-            else:
-                temp_file = os.path.join(TEMP, '{}.wav'.format(args.cut_by_this_track))
-
-            sampleRate, audioData = read(temp_file)
-
-        log.debug('Frame Rate: {}'.format(fps))
-        if(chunks is None):
-            from auto_editor.cutting import audioToHasLoud, motionDetection
-            from auto_editor.cutting import combineArrs, applySpacingRules
-
-            audioList = None
-            motionList = None
-            if('audio' in args.edit_based_on):
-                log.debug('Analyzing audio volume.')
-                audioList = audioToHasLoud(audioData, sampleRate,
-                    args.silent_threshold,  fps, log)
-
-            if('motion' in args.edit_based_on):
-                log.debug('Analyzing video motion.')
-                motionList = motionDetection(inp, args.motion_threshold, log,
-                    width=args.width, dilates=args.dilates, blur=args.blur)
-
-                if(audioList is not None):
-                    if(len(audioList) != len(motionList)):
-                        log.debug('audioList Length:  {}'.format(len(audioList)))
-                        log.debug('motionList Length: {}'.format(len(motionList)))
-                    if(len(audioList) > len(motionList)):
-                        log.debug('Reducing the size of audioList to match motionList.')
-                        audioList = audioList[:len(motionList)]
-                    elif(len(motionList) > len(audioList)):
-                        log.debug('Reducing the size of motionList to match audioList.')
-                        motionList = motionList[:len(audioList)]
-
-            hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
-            del audioList, motionList
-
-            effects = []
-            if(args.zoom != []):
-                from auto_editor.cutting import applyZooms
-                effects += applyZooms(args.zoom, audioData, sampleRate, fps, log)
-            if(args.rectangle != []):
-                from auto_editor.cutting import applyRects
-                effects += applyRects(args.rectangle, audioData, sampleRate, fps, log)
-
-            chunks = applySpacingRules(hasLoud, speeds, fps, args, log)
-            del hasLoud
-
-        def isClip(chunk):
-            return speeds[chunk[2]] != 99999
-
-        def getNumberOfCuts(chunks, speeds):
-            return len(list(filter(isClip, chunks)))
-
-        def getClips(chunks, speeds):
-            clips = []
-            for chunk in chunks:
-                if(isClip(chunk)):
-                    clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
-            return clips
-
-        num_cuts = getNumberOfCuts(chunks, speeds)
-        clips = getClips(chunks, speeds)
-
-        if(args.export_as_json):
-            from auto_editor.formats.make_json import make_json_cutlist
-            make_json_cutlist(inp.path, newOutput, auto_editor.version, chunks, speeds,
-                log)
-            continue
-
-        if(args.preview):
-            newOutput = None
-            from auto_editor.preview import preview
-            preview(inp, chunks, speeds, log)
-            continue
-
-        if(args.export_to_premiere):
-            from auto_editor.formats.premiere import premiere_xml
-            premiere_xml(inp, TEMP, newOutput, clips, chunks, sampleRate, audioFile,
-                fps, log)
-            continue
-
-        if(args.export_to_final_cut_pro or args.export_to_resolve):
-            from auto_editor.formats.final_cut_pro import fcp_xml
-
-            totalFrames = chunks[len(chunks) - 1][1]
-            fcp_xml(inp, TEMP, newOutput, clips, tracks, totalFrames, audioFile, fps, log)
-            continue
-
-        if(args.export_to_shotcut):
-            from auto_editor.formats.shotcut import shotcut_xml
-
-            shotcut_xml(inp, TEMP, newOutput, clips, chunks, fps, log)
-            continue
-
-        def makeAudioFile(inp, chunks, output):
-            from auto_editor.render.audio import fastAudio, handleAudio, convertAudio
-            theFile = handleAudio(ffmpeg, inp.path, args.audio_bitrate, str(sampleRate),
-                TEMP, log)
-
-            temp_file = os.path.join(TEMP, 'convert.wav')
-            fastAudio(theFile, temp_file, chunks, speeds, log, fps,
-                args.machine_readable_progress, args.no_progress)
-            convertAudio(ffmpeg, temp_file, inp, output, args.audio_codec, log)
-
-        if(audioFile):
-            if(args.export_as_clip_sequence):
-                i = 1
-                for item in chunks:
-                    if(speeds[item[2]] == 99999):
-                        continue
-                    makeAudioFile(inp, [item], appendFileName(newOutput, '-{}'.format(i)))
-                    i += 1
-            else:
-                makeAudioFile(inp, chunks, newOutput)
-            continue
-
-        def makeVideoFile(inp, chunks, output):
-            from auto_editor.utils.video import handleAudioTracks, muxVideo
-            continueVid = handleAudioTracks(ffmpeg, output, args, tracks, chunks,
-                speeds, fps, TEMP, log)
-            if(continueVid):
-                if(args.render == 'auto'):
-                    if(args.zoom != [] or args.rectangle != []):
-                        args.render = 'opencv'
-                    else:
-                        try:
-                            import av
-                            args.render = 'av'
-                        except ImportError:
-                            args.render = 'opencv'
-
-                log.debug('Using {} method'.format(args.render))
-                if(args.render == 'av'):
-                    if(args.zoom != []):
-                        log.error('Zoom effect is not supported on the '\
-                            'av render method.')
-
-                    if(args.rectangle != []):
-                        log.error('Rectangle effect is not supported on the '\
-                            'av render method.')
-
-                    from auto_editor.render.av import render_av
-                    render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, TEMP, log)
-
-                if(args.render == 'opencv'):
-                    from auto_editor.render.opencv import render_opencv
-                    render_opencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
-                        effects, TEMP, log)
-
-                if(log.is_debug):
-                    log.debug('Writing the output file.')
-                else:
-                    log.conwrite('Writing the output file.')
-
-                # Now mix new audio(s) and the new video.
-                muxVideo(ffmpeg, output, args, tracks, TEMP, log)
-                if(output is not None and not os.path.isfile(output)):
-                    log.bug('The file {} was not created.'.format(output))
-
-        if(args.export_as_clip_sequence):
-            i = 1
-            totalFrames = chunks[len(chunks) - 1][1]
-            speeds.append(99999) # guarantee we have a cut speed to work with.
-            for chunk in chunks:
-                if(speeds[chunk[2]] == 99999):
-                    continue
-
-                makeVideoFile(inp, padChunk(chunk, totalFrames),
-                    appendFileName(newOutput, '-{}'.format(i)))
-                i += 1
-        else:
-            makeVideoFile(inp, chunks, newOutput)
-
-    if(not args.preview and not making_data_file):
-        timer.stop()
-
-    if(not args.preview and making_data_file):
-        # Assume making each cut takes about 30 seconds.
-        time_save = usefulfunctions.human_readable_time(num_cuts * 30)
-        s = 's' if num_cuts != 1 else ''
-
-        log.print('Auto-Editor made {} cut{}, which would have taken about {} if '\
-            'edited manually.'.format(num_cuts, s, time_save))
-
-    if(not args.no_open):
-        usefulfunctions.open_with_system_default(newOutput, log)
-
+    try:
+        main_loop(inputList, ffmpeg, args, speeds, log)
+    except KeyboardInterrupt:
+        log.error('Keyboard Interrupt')
     log.cleanup()
 
 if(__name__ == '__main__'):

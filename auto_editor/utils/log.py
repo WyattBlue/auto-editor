@@ -39,7 +39,7 @@ class Log():
             try:
                 rmtree(self.temp)
                 self.debug('Removed Temp Directory.')
-            except PermissionError:
+            except Exception:
                 self.debug('Failed to delete temp dir.')
 
     def conwrite(self, message):
@@ -52,7 +52,11 @@ class Log():
         message = message.replace('\t', '    ')
         print('Error! {}'.format(message), file=sys.stderr)
         self.cleanup()
-        sys.exit(1)
+        try:
+            sys.exit(1)
+        except SystemExit:
+            import os
+            os._exit(1)
 
     def bug(self, message, bug_type='bug report'):
         self.conwrite('')
