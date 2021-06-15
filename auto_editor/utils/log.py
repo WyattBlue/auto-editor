@@ -52,11 +52,17 @@ class Log():
         message = message.replace('\t', '    ')
         print('Error! {}'.format(message), file=sys.stderr)
         self.cleanup()
-        try:
+
+        from platform import system
+
+        if(system() == 'Linux'): # Is this why my tests are failing?
             sys.exit(1)
-        except SystemExit:
-            import os
-            os._exit(1)
+        else:
+            try:
+                sys.exit(1)
+            except SystemExit:
+                import os
+                os._exit(1)
 
     def bug(self, message, bug_type='bug report'):
         self.conwrite('')
