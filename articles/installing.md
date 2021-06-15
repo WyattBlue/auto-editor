@@ -1,7 +1,5 @@
 # Installing Auto-Editor
 
-> You probably have Python already on your computer, but install it again anyway. Modern Python has important utilities like pip that need to be installed too.
-
 Download and Install [Python 3](https://www.python.org/downloads/).
 
 > If you are installing on Windows, make sure "Add Python 3.9 to PATH" is checked.
@@ -39,7 +37,8 @@ If that works then congratulations, you have successfully installed auto-editor.
 auto-editor C:path\to\your\video.mp4
 ```
 
-Upgrading is simple, just run:
+About every 1 or 2 weeks, a new version will be avaiable. It's recommanded that you stay up to date so you always get the latest improvements and bug fixes. Upgrade by running:
+
 ```
 pip3 install auto-editor --upgrade
 ```
@@ -61,9 +60,9 @@ git clone https://github.com/WyattBlue/auto-editor.git
 cd auto-editor
 ```
 
-Then run the local version using `python` or `python3`
+Then run the local version using `py` or `python3`
 ```
-python -m auto_editor example.mp4 --frame_margin 7
+python3 -m auto_editor example.mp4 --frame_margin 7
 ```
 
 ----
