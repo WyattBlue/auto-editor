@@ -45,18 +45,8 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
             inputList += sorted(validFiles(myInput, invalidExtensions))
         elif(os.path.isfile(myInput)):
 
-            # Ignore folders
-            if(os.path.isdir(myInput)):
-                continue
-
-            # Throw error if file referenced doesn't exist.
-            if(not os.path.isfile(myInput)):
-                log.error("{} doesn't exist!".format(myInput))
-
-            # Check if the file format is valid.
-            fileFormat = myInput[myInput.rfind('.'):]
-
-            if('.' not in fileFormat):
+            _, fileFormat = os.path.splitext(myInput)
+            if(fileFormat == ''):
                 log.error('File must have an extension.')
 
             if(fileFormat in invalidExtensions):
@@ -107,6 +97,6 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
 
             inputList.append(outtmpl)
         else:
-            log.error('Could not find file: ' + myInput)
+            log.error('Could not find file: {}'.format(myInput))
 
     return inputList
