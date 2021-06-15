@@ -81,7 +81,6 @@ pip3 install audiotsm2
 pip3 install av
 pip3 install opencv-python
 pip3 install youtube-dl
-pip3 install requests
 ```
 
 ### Numpy
@@ -103,10 +102,6 @@ Sometimes referred to as opencv or cv2. This module is used to determine where m
 ### Youtube-dl
 
 Public domain module used to download videos off of websites. When installed, always auto-editor to support URL inputs. i.e
-
-### Requests
-
-https module used to check there's a new version of auto-editor. Not necessary for anything else.
 
 
 
