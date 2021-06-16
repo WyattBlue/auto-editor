@@ -1,11 +1,11 @@
 '''utils/func.py'''
 
+from __future__ import division
+
 """
 To prevent duplicate code being pasted between scripts, common functions should be
 put here. No function should modify or create video/audio files on its own.
 """
-
-from __future__ import division
 
 def get_stdout(cmd):
     import subprocess
