@@ -1,14 +1,15 @@
+# -*- coding: utf-8 -*-
 '''utils/progressbar.py'''
 
-from __future__ import print_function
+from __future__ import print_function, division
 
 from time import time, localtime
 from platform import system
-from shutil import get_terminal_size
 
-from .func import get_stdout
+from .func import get_stdout, term_size
 
-def _pretty_time(my_time: float, ampm: bool) -> str:
+def _pretty_time(my_time, ampm):
+    # (my_time: float, ampm: bool) -> str:
     new_time = localtime(my_time)
 
     hours = new_time.tm_hour
@@ -29,7 +30,10 @@ def bar(termsize, title, done, togo, percent, new_time):
         bar = bar[:termsize - 2]
     else:
         bar += ' ' * (termsize - len(bar) - 4)
-    print(bar, end='\r', flush=True)
+    try:
+        print(bar, end='\r', flush=True)
+    except TypeError:
+        print(bar, end='\r')
 
 
 class ProgressBar():
@@ -80,11 +84,11 @@ class ProgressBar():
                 end='\r', flush=True)
             return
 
-        termsize = get_terminal_size().columns
+        termsize = term_size().columns
 
         if(self.allow_unicode):
             bar_len = max(1, termsize - (self.len_title + 50))
-            done = round(percentDone / (100 / bar_len))
+            done = int(round(percentDone / (100 / bar_len)))
             togo = '░' * int(bar_len - done)
             bar(termsize, self.title, '█' * done, togo, percentDone, new_time)
         else:

@@ -1,5 +1,7 @@
 '''validateInput.py'''
 
+from __future__ import print_function
+
 import os
 import re
 import sys
@@ -14,7 +16,8 @@ invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
       '.db', '.ini', '.BIN', '.svg', '.in', '.pyc', '.log', '.xsd', '.ffpreset',
       '.kys', '.essentialsound']
 
-def validFiles(path: str, badExts: list):
+def validFiles(path, badExts):
+    # (path: str, badExts: list)
     for f in os.listdir(path):
         if(f[f.rfind('.'):] not in badExts and not os.path.isdir(f)
             and not f.startswith('.')):
@@ -38,7 +41,8 @@ class MyLogger(object):
             print(msg, file=sys.stderr)
 
 
-def validInput(inputs: list, ffmpeg, args, log) -> list:
+def validInput(inputs, ffmpeg, args, log):
+    # (inputs: list, ffmpeg, args, log) -> list:
     inputList = []
     for myInput in inputs:
         if(os.path.isdir(myInput)):
@@ -73,7 +77,6 @@ def validInput(inputs: list, ffmpeg, args, log) -> list:
 
                 ytbar = ProgressBar(100, 'Downloading')
                 def my_hook(d):
-                    nonlocal ytbar
                     if(d['status'] == 'downloading'):
                         ytbar.tick(float(d['_percent_str'].replace('%','')))
 

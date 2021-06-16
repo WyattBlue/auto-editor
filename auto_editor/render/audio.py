@@ -1,4 +1,6 @@
-'''fastAudio.py'''
+'''render/audio.py'''
+
+from __future__ import division
 
 import os
 
@@ -14,7 +16,8 @@ def convertAudio(ffmpeg, in_file, inp, out_file, codec, log):
 
     ffmpeg.run(['-i', in_file, '-acodec', codec, out_file])
 
-def handleAudio(ffmpeg, in_file, audioBit, samplerate: str, temp, log) -> str:
+def handleAudio(ffmpeg, in_file, audioBit, samplerate, temp, log):
+    # () -> str:
     temp_file = os.path.join(temp, 'faAudio.wav')
 
     log.checkType(samplerate, 'samplerate', str)
@@ -28,8 +31,7 @@ def handleAudio(ffmpeg, in_file, audioBit, samplerate: str, temp, log) -> str:
 
     return temp_file
 
-def fastAudio(in_file, out_file, chunks: list, speeds: list, log, fps: float,
-    machineReadable, hideBar):
+def fastAudio(in_file, out_file, chunks, speeds, log, fps, machineReadable, hideBar):
     import numpy as np
 
     def custom_speeds(a):

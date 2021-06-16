@@ -33,7 +33,7 @@ def aspect_ratio(width, height):
     c = gcd(width, height)
     return width // c, height // c
 
-def get_new_length(chunks: list, speeds: list, fps: float):
+def get_new_length(chunks, speeds, fps):
     # (chunks: list, speeds: list, fps: float) -> float
     timeInFrames = 0
     for chunk in chunks:
@@ -87,3 +87,13 @@ def fnone(val):
 def append_filename(name, val):
     dot_index = name.rfind('.')
     return name[:dot_index] + val + name[dot_index:]
+
+def term_size():
+    try:
+        from shutil import get_terminal_size
+        return get_terminal_size()
+    except ImportError:
+        class Terminal:
+            def __init__(self):
+                self.columns = 80
+        return Terminal()
