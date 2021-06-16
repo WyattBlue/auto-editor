@@ -39,12 +39,14 @@ If that works then congratulations, you have successfully installed auto-editor.
 auto-editor C:path\to\your\video.mp4
 ```
 
-Upgrading is simple, just run:
+About every 1 or 2 weeks, a new version will be available. It's recommended that you stay up to date so you always get the latest improvements and bug fixes. Upgrade by running:
+
 ```
 pip3 install auto-editor --upgrade
 ```
 
 Run this to uninstall auto-editor:
+
 ```
 pip3 uninstall auto-editor
 ```
@@ -111,7 +113,6 @@ https module used to check there's a new version of auto-editor. Not necessary f
 
 
 
-
 ----
 
 ## Pitfalls to Avoid
@@ -124,7 +125,7 @@ If you get an error like this:
 SyntaxError: invalid syntax
 ```
 
-It means you are incorrectly running pip in the Python interpretor. Run `quit()` to go back to the regular console.
+It means you are incorrectly running pip in the Python interpreter. Run `quit()` to go back to the regular console.
 
 
 If running auto-editor causes an error message to appear like this:

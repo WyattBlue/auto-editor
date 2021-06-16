@@ -5,6 +5,8 @@ To prevent duplicate code being pasted between scripts, common functions should 
 put here. No function should modify or create video/audio files on its own.
 """
 
+from __future__ import division
+
 def get_stdout(cmd):
     import subprocess
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
@@ -12,12 +14,14 @@ def get_stdout(cmd):
     stdout, __ = process.communicate()
     return stdout.decode()
 
-def clean_list(x: list, rm_chars: str):
+def clean_list(x, rm_chars):
+    # (x: list, rm_chars: str) -> list
     no = str.maketrans('', '', rm_chars)
     x = [s.translate(no) for s in x]
     return [s for s in x if s != '']
 
-def aspect_ratio(width: int, height: int):
+def aspect_ratio(width, height):
+    # (width: int, height: int) -> tuple(2)
     if(height == 0):
         return None, None
 
@@ -30,6 +34,7 @@ def aspect_ratio(width: int, height: int):
     return width // c, height // c
 
 def get_new_length(chunks: list, speeds: list, fps: float):
+    # (chunks: list, speeds: list, fps: float) -> float
     timeInFrames = 0
     for chunk in chunks:
         leng = chunk[1] - chunk[0]

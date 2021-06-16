@@ -1,5 +1,7 @@
 '''utils/progressbar.py'''
 
+from __future__ import print_function
+
 from time import time, localtime
 from platform import system
 from shutil import get_terminal_size

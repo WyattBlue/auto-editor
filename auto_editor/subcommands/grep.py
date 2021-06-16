@@ -1,5 +1,7 @@
 '''subcommands/grep.py'''
 
+from __future__ import print_function
+
 def grep_options(parser):
     parser.add_argument('--max_count', '-m', type=int, default=float('inf'),
         help='Stop reading a file after NUM matching lines')

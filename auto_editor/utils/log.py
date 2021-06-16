@@ -1,5 +1,7 @@
 '''utils/log.py'''
 
+from __future__ import print_function
+
 import sys
 from shutil import rmtree, get_terminal_size
 from time import time, sleep
