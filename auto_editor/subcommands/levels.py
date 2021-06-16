@@ -1,5 +1,7 @@
 '''subcommands/levels.py'''
 
+from __future__ import print_function
+
 def levels_options(parser):
     parser.add_argument('--output_file', '--output', '-o', type=str,
         default='data.txt')

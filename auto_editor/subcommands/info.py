@@ -1,5 +1,7 @@
 '''subcommands/info.py'''
 
+from __future__ import print_function
+
 def info_options(parser):
     parser.add_argument('--include_vfr', action='store_true',
         help='skip information that is very slow to get.')

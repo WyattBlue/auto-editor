@@ -1,5 +1,7 @@
 '''ffwrapper.py'''
 
+from __future__ import print_function
+
 # Internal Libraries
 import subprocess
 import os.path
@@ -40,7 +42,7 @@ class FFmpeg():
     def getPath(self):
         return self.path
 
-    def run(self, cmd: list):
+    def run(self, cmd):
         cmd = [self.path, '-y'] + cmd
         if(self.FFdebug):
             cmd.extend(['-hide_banner'])
