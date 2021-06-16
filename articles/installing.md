@@ -37,11 +37,8 @@ If that works then congratulations, you have successfully installed auto-editor.
 auto-editor C:path\to\your\video.mp4
 ```
 
-<<<<<<< HEAD
 About every 1 or 2 weeks, a new version will be available. It's recommended that you stay up to date so you always get the latest improvements and bug fixes. Upgrade by running:
-=======
-About every 1 or 2 weeks, a new version will be avaiable. It's recommanded that you stay up to date so you always get the latest improvements and bug fixes. Upgrade by running:
->>>>>>> 9cc7c9432aab6d0a25bb7feb2bc50a1a5f824b21
+
 
 ```
 pip3 install auto-editor --upgrade
