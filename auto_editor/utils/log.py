@@ -3,8 +3,10 @@
 from __future__ import print_function
 
 import sys
-from shutil import rmtree, get_terminal_size
+from shutil import rmtree
 from time import time, sleep
+
+from .func import term_size
 
 class Timer():
     def __init__(self, quiet=False):
@@ -46,8 +48,11 @@ class Log():
 
     def conwrite(self, message):
         if(not self.quiet):
-            buffer = get_terminal_size().columns - len(message) - 3
-            print('  ' + message + ' ' * buffer, end='\r', flush=True)
+            buffer = term_size().columns - len(message) - 3
+            try:
+                print('  ' + message + ' ' * buffer, end='\r', flush=True)
+            except TypeError:
+                print('  ' + message + ' ' * buffer, end='\r')
 
     def error(self, message):
         self.conwrite('')
@@ -57,7 +62,7 @@ class Log():
 
         from platform import system
 
-        if(system() == 'Linux'): # Is this why my tests are failing?
+        if(system() == 'Linux'):
             sys.exit(1)
         else:
             try:

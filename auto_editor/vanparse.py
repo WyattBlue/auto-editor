@@ -9,11 +9,14 @@ import difflib
 def out(text):
     import re
     import textwrap
-    from shutil import get_terminal_size
+
+    try:
+        from shutil import get_terminal_size
+        width = get_terminal_size().columns - 3
+    except ImportError:
+        width = 77
 
     indent_regex = re.compile(r'^(\s+)')
-    width = get_terminal_size().columns - 3
-
     wrapped_lines = []
 
     for line in text.split('\n'):
@@ -46,15 +49,15 @@ def print_option_help(args, option):
     elif(option['action'] == 'grouping'):
         for options in args:
             for op in options:
-                if(op['grouping'] == option['names'][0]):
+                if(op['group'] == option['names'][0]):
                     text += '  ' + ', '.join(op['names']) + ': ' + op['help'] + '\n'
     elif(option['action'] == 'store_true'):
         text += '    type: flag\n'
     else:
         text += '    type: unknown\n'
 
-    if(option['grouping'] is not None):
-        text += '    group: ' + option['grouping'] + '\n'
+    if(option['group'] is not None):
+        text += '    group: ' + option['group'] + '\n'
     out(text)
 
 def print_program_help(root, the_args):
@@ -76,7 +79,7 @@ def print_program_help(root, the_args):
 def get_option(item, group, the_args):
     for options in the_args:
         for option in options:
-            if(item in option['names'] and group in ['global', option['grouping']]):
+            if(item in option['names'] and group in ['global', option['group']]):
                 return option
     return None
 
@@ -88,25 +91,34 @@ class ArgumentParser():
         self.description = description
 
         self.args = []
+        self.kwarg_defaults = {
+            'nargs': 1,
+            'type': str,
+            'default': None,
+            'action': 'default',
+            'range': None,
+            'choices': None,
+            'group': None,
+            'help': '',
+            'extra': '',
+        }
 
-    def add_argument(self, *names, nargs=1, type=str, default=None, action='default',
-        range=None, choices=None, group=None, help='', extra=''):
+    def add_argument(self, *args, **kwargs):
+        my_dict = {
+            'names': list(args),
+        }
 
-        self.args.append({
-            'names': names,
-            'nargs': nargs,
-            'type': type,
-            'default': default,
-            'action': action,
-            'help': help,
-            'extra': extra,
-            'range': range,
-            'choices': choices,
-            'grouping': group,
-        })
+        for key, item in self.kwarg_defaults.items():
+            my_dict[key] = item
+
+        for key, item in kwargs.items():
+            if(key not in self.kwarg_defaults):
+                raise ValueError('key {} not found.'.format(key))
+            my_dict[key] = item
+
+        self.args.append(my_dict)
 
     def parse_args(self, sys_args, log, root):
-
         if(sys_args == []):
             out(self.description)
             sys.exit()

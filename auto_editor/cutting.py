@@ -1,9 +1,11 @@
 '''cutting.py'''
 
+from __future__ import print_function
+
 import numpy as np
 
-def combineArrs(audioList: np.ndarray, motionList: np.ndarray, based: str,
-    log) -> np.ndarray:
+def combineArrs(audioList, motionList, based, log):
+    # (audioList: np.ndarray, motionList: np.ndarray, based: str, log) -> np.ndarray:
 
     if(based == 'audio' or based == 'not_audio'):
         if(max(audioList) == 0):
@@ -12,55 +14,51 @@ def combineArrs(audioList: np.ndarray, motionList: np.ndarray, based: str,
         if(max(motionList) == 0):
             log.error('There was no place where motion exceeded the threshold.')
 
-    # Only raise a warning for other cases.
     if(audioList is not None and max(audioList) == 0):
         log.warning('There was no place where audio exceeded the threshold.')
     if(motionList is not None and max(motionList) == 0):
         log.warning('There was no place where motion exceeded the threshold.')
 
-    hasLoud = None
     if(based == 'audio'):
-        hasLoud = audioList
+        return audioList
 
     if(based == 'motion'):
-        hasLoud = motionList
+        return motionList
 
     if(based == 'not_audio'):
-        hasLoud = np.invert(audioList)
+        return np.invert(audioList)
 
     if(based == 'not_motion'):
-        hasLoud = np.invert(motionList)
+        return np.invert(motionList)
 
     if(based == 'audio_and_motion'):
-        hasLoud = audioList & motionList
+        return audioList & motionList
 
     if(based == 'audio_or_motion'):
-        hasLoud = audioList | motionList
+        return audioList | motionList
 
     if(based == 'audio_xor_motion'):
-        hasLoud = np.bitwise_xor(audioList, motionList)
+        return np.bitwise_xor(audioList, motionList)
 
     if(based == 'audio_and_not_motion'):
-        hasLoud = audioList & np.invert(motionList)
+        return audioList & np.invert(motionList)
 
     if(based == 'not_audio_and_motion'):
-        hasLoud = np.invert(audioList) & motionList
+        return np.invert(audioList) & motionList
 
     if(based == 'not_audio_and_not_motion'):
-        hasLoud = np.invert(audioList) & np.invert(motionList)
+        return np.invert(audioList) & np.invert(motionList)
+    return None
 
-    log.checkType(hasLoud, 'hasLoud', np.ndarray)
-    return hasLoud
-
-
-def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
-    fps: float, log) -> np.ndarray:
+def audioToHasLoud(audioData, sampleRate, silentT, fps, log):
+    # (audioData: np.ndarray, sampleRate: int, silentT: float, fps: float, log) -> np.ndarray:
 
     import math
 
     audioSampleCount = audioData.shape[0]
 
-    def getMaxVolume(s: np.ndarray) -> float:
+    def getMaxVolume(s):
+        # (s: np.ndarray) -> float:
         maxv = float(np.max(s))
         minv = float(np.min(s))
         return max(maxv, -minv)
@@ -87,8 +85,8 @@ def audioToHasLoud(audioData: np.ndarray, sampleRate: int, silentT: float,
 
 # Motion detection algorithm based on this blog post:
 # https://pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
-def motionDetection(inp, motionThreshold: float, log, width: int, dilates: int,
-    blur: int) -> np.ndarray:
+def motionDetection(inp, motionThreshold, log, width, dilates, blur):
+    # (inp, motionThreshold: float, log, width: int, dilates: int, blur: int) -> np.ndarray:
 
     import cv2
     from auto_editor.utils.progressbar import ProgressBar
@@ -161,7 +159,8 @@ def motionDetection(inp, motionThreshold: float, log, width: int, dilates: int,
     return hasMotion
 
 
-def removeSmall(hasLoud: np.ndarray, lim: int, replace: bool, with_: bool) -> np.ndarray:
+def removeSmall(hasLoud, lim, replace, with_):
+    # (hasLoud: np.ndarray, lim: int, replace: bool, with_: bool) -> np.ndarray:
     startP = 0
     active = False
     for j, item in enumerate(hasLoud):
@@ -184,12 +183,10 @@ def removeSmall(hasLoud: np.ndarray, lim: int, replace: bool, with_: bool) -> np
 def isNumber(val):
     return val.replace('.', '', 1).isdigit()
 
-def setRange(hasLoud: np.ndarray, syntaxRange, fps: float, with_, log) -> np.ndarray:
+def setRange(hasLoud, syntaxRange, fps, with_, log):
+    # (hasLoud: np.ndarray, syntaxRange, fps: float, with_, log) -> np.ndarray:
 
-    def replaceVarsWithVals(item) -> int:
-        nonlocal hasLoud
-        nonlocal log
-
+    def replaceVarsWithVals(item):
         if(isNumber(item)):
             return int(item)
         if(item == 'start'):
@@ -200,7 +197,8 @@ def setRange(hasLoud: np.ndarray, syntaxRange, fps: float, with_, log) -> np.nda
             log.error('Seconds unit not implemented in this function.')
         log.error('Variable {} not avaiable in this context.'.format(item))
 
-    def ConvertToFrames(num) -> int:
+    def ConvertToFrames(num):
+        # (num) -> int:
         num = replaceVarsWithVals(num)
         if(num < 0):
             num = len(hasLoud) - num
@@ -217,17 +215,17 @@ def secToFrames(value, fps):
         return int(float(value) * fps)
     return value
 
-def cook(hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
-    # Remove small loudness spikes
+def cook(hasLoud, minClip, minCut):
+    # (hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
     hasLoud = removeSmall(hasLoud, minClip, replace=1, with_=0)
-    # Remove small silences
     hasLoud = removeSmall(hasLoud, minCut, replace=0, with_=1)
     return hasLoud
 
 
 # Turn long silent/loud array to formatted chunk list.
 # Example: [True, True, True, False, False] => [[0, 3, 1], [3, 5, 0]]
-def chunkify(hasLoud, hasLoudLengthCache=None) -> list:
+def chunkify(hasLoud, hasLoudLengthCache=None):
+    # () -> list:
     if(hasLoudLengthCache is None):
         hasLoudLengthCache = len(hasLoud)
 
@@ -241,7 +239,8 @@ def chunkify(hasLoud, hasLoudLengthCache=None) -> list:
     return chunks
 
 
-def applySpacingRules(hasLoud: np.ndarray, speeds, fps: float, args, log) -> list:
+def applySpacingRules(hasLoud, speeds, fps, args, log):
+    # (hasLoud: np.ndarray, speeds: list, fps: float, args, log) -> list:
     frameMargin = secToFrames(args.frame_margin, fps)
     minClip = secToFrames(args.min_clip_length, fps)
     minCut = secToFrames(args.min_cut_length, fps)
@@ -249,7 +248,8 @@ def applySpacingRules(hasLoud: np.ndarray, speeds, fps: float, args, log) -> lis
     hasLoud = cook(hasLoud, minClip, minCut)
     hasLoudLengthCache = len(hasLoud)
 
-    def applyFrameMargin(hasLoud, hasLoudLengthCache, frameMargin) -> np.ndarray:
+    def applyFrameMargin(hasLoud, hasLoudLengthCache, frameMargin):
+        # () -> np.ndarray:
         new = np.zeros((hasLoudLengthCache), dtype=np.uint8)
         for i in range(hasLoudLengthCache):
             start = int(max(0, i - frameMargin))
@@ -280,7 +280,8 @@ def applySpacingRules(hasLoud: np.ndarray, speeds, fps: float, args, log) -> lis
     return chunkify(hasLoud, hasLoudLengthCache)
 
 
-def applyBasicSpacing(hasLoud: np.ndarray, fps: float, minClip: int, minCut: int, log):
+def applyBasicSpacing(hasLoud, fps, minClip, minCut, log):
+    # (hasLoud: np.ndarray, fps: float, minClip: int, minCut: int, log)
     minClip = secToFrames(minClip, fps)
     minCut = secToFrames(minCut, fps)
 
@@ -288,7 +289,8 @@ def applyBasicSpacing(hasLoud: np.ndarray, fps: float, minClip: int, minCut: int
     return chunkify(hasLoud)
 
 
-def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
+def merge(start_list, end_list):
+    # (start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
     merge = np.zeros((len(start_list)), dtype=np.bool_)
 
     startP = 0
@@ -301,7 +303,8 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
     return merge
 
 
-def handleBoolExp(val: str, data, sampleRate, fps, log) -> list:
+def handleBoolExp(val, data, sampleRate, fps, log):
+    # (val: str, data, sampleRate, fps, log) -> list:
     invert = False
 
     if('>' in val and '<' in val):
@@ -315,7 +318,7 @@ def handleBoolExp(val: str, data, sampleRate, fps, log) -> list:
         log.error('audio array needs ">" or "<".')
 
     if(len(exp) != 2):
-        log.error(f'Only one expression supported, not {len(exp)-1}.')
+        log.error('Only one expression supported, not {}.'.format(len(exp)-1))
 
     if(data is None or sampleRate is None):
         log.error('No audio data found.')
@@ -378,7 +381,7 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
             if(rects == []):
                 log.warning('No rectangles applied.')
             else:
-                log.print(f' {len(rects)} rectangles applied.')
+                log.print(' {} rectangles applied.'.format(len(rects)))
 
     return rects
 
@@ -438,7 +441,7 @@ def applyZooms(cmdZooms, audioData, sampleRate, fps, log):
             if(zooms == []):
                 log.warning('No zooms applied.')
             else:
-                log.print(f' {len(zooms)} zooms applied.')
+                log.print(' {} zooms applied.'.format(len(zooms)))
 
     log.debug(zooms)
     return zooms
