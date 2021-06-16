@@ -1,7 +1,5 @@
 # Installing Auto-Editor
 
-> You probably have Python already on your computer, but install it again anyway. Modern Python has important utilities like pip that need to be installed too.
-
 Download and Install [Python 3](https://www.python.org/downloads/).
 
 > If you are installing on Windows, make sure "Add Python 3.9 to PATH" is checked.
@@ -39,7 +37,11 @@ If that works then congratulations, you have successfully installed auto-editor.
 auto-editor C:path\to\your\video.mp4
 ```
 
+<<<<<<< HEAD
 About every 1 or 2 weeks, a new version will be available. It's recommended that you stay up to date so you always get the latest improvements and bug fixes. Upgrade by running:
+=======
+About every 1 or 2 weeks, a new version will be avaiable. It's recommanded that you stay up to date so you always get the latest improvements and bug fixes. Upgrade by running:
+>>>>>>> 9cc7c9432aab6d0a25bb7feb2bc50a1a5f824b21
 
 ```
 pip3 install auto-editor --upgrade
@@ -63,9 +65,9 @@ git clone https://github.com/WyattBlue/auto-editor.git
 cd auto-editor
 ```
 
-Then run the local version using `python` or `python3`
+Then run the local version using `py` or `python3`
 ```
-python -m auto_editor example.mp4 --frame_margin 7
+python3 -m auto_editor example.mp4 --frame_margin 7
 ```
 
 ----
@@ -84,7 +86,6 @@ pip3 install audiotsm2
 pip3 install av
 pip3 install opencv-python
 pip3 install youtube-dl
-pip3 install requests
 ```
 
 ### Numpy
@@ -106,10 +107,6 @@ Sometimes referred to as opencv or cv2. This module is used to determine where m
 ### Youtube-dl
 
 Public domain module used to download videos off of websites. When installed, always auto-editor to support URL inputs. i.e
-
-### Requests
-
-https module used to check there's a new version of auto-editor. Not necessary for anything else.
 
 
 
