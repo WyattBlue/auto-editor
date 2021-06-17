@@ -16,9 +16,12 @@ def get_stdout(cmd):
 
 def clean_list(x, rm_chars):
     # (x: list, rm_chars: str) -> list
-    no = str.maketrans('', '', rm_chars)
-    x = [s.translate(no) for s in x]
-    return [s for s in x if s != '']
+    new_list = []
+    for item in x:
+        for char in rm_chars:
+            item = item.replace(char, '')
+        new_list.append(item)
+    return new_list
 
 def aspect_ratio(width, height):
     # (width: int, height: int) -> tuple(2)
