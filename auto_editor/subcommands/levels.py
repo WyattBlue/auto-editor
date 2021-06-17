@@ -61,7 +61,7 @@ def levels(sys_args=None):
     max_volume = get_max_volume(audio_data)
 
     samples_per_frame = sample_rate / fps
-    audio_frame_count = math.ceil(audio_sample_count / samples_per_frame)
+    audio_frame_count = int(math.ceil(audio_sample_count / samples_per_frame))
 
     with open(args.output_file, 'w') as out:
         for i in range(audio_frame_count):

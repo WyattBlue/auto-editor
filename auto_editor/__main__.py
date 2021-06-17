@@ -45,16 +45,6 @@ def main_options(parser):
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
         frame_type, zoom_type, rect_type, range_type, speed_range_type)
 
-    parser.add_argument('urlOps', nargs=0, action='grouping')
-    parser.add_argument('--format', type=str, group='urlOps',
-        default='bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
-        help='the format youtube-dl uses to when downloading a url.')
-    parser.add_argument('--output_dir', type=str, group='urlOps',
-        default=None,
-        help='the directory where the downloaded file is placed.')
-    parser.add_argument('--check_certificate', action='store_true', group='urlOps',
-        help='check the website certificate before downloading.')
-
     parser.add_argument('progressOps', nargs=0, action='grouping')
     parser.add_argument('--machine_readable_progress', action='store_true',
         group='progressOps',
@@ -66,6 +56,30 @@ def main_options(parser):
     parser.add_argument('metadataOps', nargs=0, action='grouping')
     parser.add_argument('--force_fps_to', type=float, group='metadataOps',
         help='manually set the fps value for the input video if detection fails.')
+
+    parser.add_argument('motionOps', nargs=0, action='grouping')
+    parser.add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
+        group='motionOps',
+        help='set how many times a frame is dilated before being compared.')
+    parser.add_argument('--width', '-w', type=int, default=400, range='1 to Infinity',
+        group='motionOps',
+        help="scale the frame to this width before being compared.")
+    parser.add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity',
+        group='motionOps',
+        help='set the strength of the blur applied to a frame before being compared.')
+
+    parser.add_argument('urlOps', nargs=0, action='grouping')
+    parser.add_argument('--format', type=str, group='urlOps',
+        default='bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
+        help='the format youtube-dl uses to when downloading a url.')
+    parser.add_argument('--output_dir', type=str, group='urlOps',
+        default=None,
+        help='the directory where the downloaded file is placed.')
+    parser.add_argument('--block_sponsors', action='store_true', group='urlOps',
+        help='mark all sponsors sections as silent.',
+        extra='Only for YouTube. This uses the SponsorBlock api.')
+    parser.add_argument('--check_certificate', action='store_true', group='urlOps',
+        help='check the website certificate before downloading.')
 
     parser.add_argument('exportMediaOps', nargs=0, action='grouping')
     parser.add_argument('--video_bitrate', '-vb', default='unset', group='exportMediaOps',
@@ -93,37 +107,12 @@ def main_options(parser):
         group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
 
-    parser.add_argument('motionOps', nargs=0, action='grouping')
-    parser.add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
-        group='motionOps',
-        help='set how many times a frame is dilated before being compared.')
-    parser.add_argument('--width', '-w', type=int, default=400, range='1 to Infinity',
-        group='motionOps',
-        help="scale the frame to this width before being compared.")
-    parser.add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity',
-        group='motionOps',
-        help='set the strength of the blur applied to a frame before being compared.')
-
-    parser.add_argument('--export_as_audio', '-exa', action='store_true',
-        help='export as a WAV audio file.')
-
-    parser.add_argument('--export_to_premiere', '-exp', action='store_true',
-        help='export as an XML file for Adobe Premiere Pro instead of making a media file.')
-    parser.add_argument('--export_to_resolve', '-exr', action='store_true',
-        help='export as an XML file for DaVinci Resolve instead of making a media file.')
-    parser.add_argument('--export_to_final_cut_pro', '-exf', action='store_true',
-        help='export as an XML file for Final Cut Pro instead of making a media file.')
-    parser.add_argument('--export_to_shotcut', '-exs', action='store_true',
-        help='export as an XML timeline file for Shotcut instead of making a media file.')
-    parser.add_argument('--export_as_json', action='store_true',
-        help='export as a JSON file that can be read by auto-editor later.')
-    parser.add_argument('--export_as_clip_sequence', '-excs', action='store_true',
-        help='export as multiple numbered media files.')
-
     parser.add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
         help='choice which method to render video.')
     parser.add_argument('--scale', type=float_type, default=1,
         help='scale the output media file by a certian factor.')
+    parser.add_argument('--combine_files', action='store_true',
+        help='combine all input files into one before editing.')
 
     parser.add_argument('--zoom', type=zoom_type, nargs='*',
         help='set when and how a zoom will occur.',
@@ -169,6 +158,22 @@ def main_options(parser):
     parser.add_argument('--keep_tracks_seperate', action='store_true',
         help="don't combine audio tracks when exporting.")
 
+    parser.add_argument('--export_as_audio', '-exa', action='store_true',
+        help='export as a WAV audio file.')
+
+    parser.add_argument('--export_to_premiere', '-exp', action='store_true',
+        help='export as an XML file for Adobe Premiere Pro instead of making a media file.')
+    parser.add_argument('--export_to_resolve', '-exr', action='store_true',
+        help='export as an XML file for DaVinci Resolve instead of making a media file.')
+    parser.add_argument('--export_to_final_cut_pro', '-exf', action='store_true',
+        help='export as an XML file for Final Cut Pro instead of making a media file.')
+    parser.add_argument('--export_to_shotcut', '-exs', action='store_true',
+        help='export as an XML timeline file for Shotcut instead of making a media file.')
+    parser.add_argument('--export_as_json', action='store_true',
+        help='export as a JSON file that can be read by auto-editor later.')
+    parser.add_argument('--export_as_clip_sequence', '-excs', action='store_true',
+        help='export as multiple numbered media files.')
+
     parser.add_argument('--my_ffmpeg', action='store_true',
         help='use your ffmpeg and other binaries instead of the ones packaged.')
     parser.add_argument('--version', action='store_true',
@@ -180,8 +185,6 @@ def main_options(parser):
     parser.add_argument('--quiet', '-q', action='store_true',
         help='display less output.')
 
-    parser.add_argument('--combine_files', action='store_true',
-        help='combine all input files into one before editing.')
     parser.add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
     parser.add_argument('--no_open', action='store_true',
@@ -216,6 +219,42 @@ def main_options(parser):
         help='the path to a file, folder, or url you want edited.')
     return parser
 
+
+def get_chunks(inp, speeds, fps, args, log, audioData=None, sampleRate=None):
+    from auto_editor.cutting import combineArrs, applySpacingRules
+
+    audioList, motionList = None, None
+    if('audio' in args.edit_based_on):
+        log.debug('Analyzing audio volume.')
+        from auto_editor.analyze import audio_detection
+        audioList = audio_detection(audioData, sampleRate, args.silent_threshold,
+            fps, log)
+
+    if('motion' in args.edit_based_on):
+        log.debug('Analyzing video motion.')
+        from auto_editor.analyze import motion_detection
+        motionList = motion_detection(inp, args.motion_threshold, log,
+            width=args.width, dilates=args.dilates, blur=args.blur)
+
+        if(audioList is not None):
+            if(len(audioList) > len(motionList)):
+                audioList = audioList[:len(motionList)]
+            elif(len(motionList) > len(audioList)):
+                motionList = motionList[:len(audioList)]
+
+    hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
+    return applySpacingRules(hasLoud, speeds, fps, args, log)
+
+
+def get_effects(audioData, sampleRate, fps, args, log):
+    effects = []
+    if(args.zoom != []):
+        from auto_editor.cutting import applyZooms
+        effects += applyZooms(args.zoom, audioData, sampleRate, fps, log)
+    if(args.rectangle != []):
+        from auto_editor.cutting import applyRects
+        effects += applyRects(args.rectangle, audioData, sampleRate, fps, log)
+    return effects
 
 def edit_media(i, inp, ffmpeg, args, speeds, exporting_to_editor, data_file, TEMP, log):
     chunks = None
@@ -330,45 +369,8 @@ def edit_media(i, inp, ffmpeg, args, speeds, exporting_to_editor, data_file, TEM
 
     log.debug('Frame Rate: {}'.format(fps))
     if(chunks is None):
-        from auto_editor.cutting import audioToHasLoud, motionDetection
-        from auto_editor.cutting import combineArrs, applySpacingRules
-
-        audioList = None
-        motionList = None
-        if('audio' in args.edit_based_on):
-            log.debug('Analyzing audio volume.')
-            audioList = audioToHasLoud(audioData, sampleRate,
-                args.silent_threshold,  fps, log)
-
-        if('motion' in args.edit_based_on):
-            log.debug('Analyzing video motion.')
-            motionList = motionDetection(inp, args.motion_threshold, log,
-                width=args.width, dilates=args.dilates, blur=args.blur)
-
-            if(audioList is not None):
-                if(len(audioList) != len(motionList)):
-                    log.debug('audioList Length:  {}'.format(len(audioList)))
-                    log.debug('motionList Length: {}'.format(len(motionList)))
-                if(len(audioList) > len(motionList)):
-                    log.debug('Reducing the size of audioList to match motionList.')
-                    audioList = audioList[:len(motionList)]
-                elif(len(motionList) > len(audioList)):
-                    log.debug('Reducing the size of motionList to match audioList.')
-                    motionList = motionList[:len(audioList)]
-
-        hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
-        del audioList, motionList
-
-        effects = []
-        if(args.zoom != []):
-            from auto_editor.cutting import applyZooms
-            effects += applyZooms(args.zoom, audioData, sampleRate, fps, log)
-        if(args.rectangle != []):
-            from auto_editor.cutting import applyRects
-            effects += applyRects(args.rectangle, audioData, sampleRate, fps, log)
-
-        chunks = applySpacingRules(hasLoud, speeds, fps, args, log)
-        del hasLoud
+        chunks = get_chunks(inp, speeds, fps, args, log, audioData, sampleRate)
+        effects = get_effects(audioData, sampleRate, fps, args, log)
 
     def isClip(chunk):
         return speeds[chunk[2]] != 99999
@@ -643,8 +645,8 @@ def main():
     if(args.output_file is None):
         args.output_file = []
 
-    from auto_editor.validateInput import validInput
-    inputList = validInput(args.input, ffmpeg, args, log)
+    from auto_editor.validateInput import valid_input
+    inputList, segments = valid_input(args.input, ffmpeg, args, log)
 
     if(len(args.output_file) < len(inputList)):
         for i in range(len(inputList) - len(args.output_file)):

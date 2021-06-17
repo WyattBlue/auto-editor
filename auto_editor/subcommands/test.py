@@ -1,5 +1,7 @@
 '''subcommands/test.py'''
 
+from __future__ import print_function
+
 """
 Test auto-editor and make sure everything is working.
 """
@@ -23,14 +25,14 @@ class FFprobe():
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT)
         stdout, __ = process.communicate()
-        return stdout.decode()
+        return stdout.decode('utf-8')
 
     def pipe(self, cmd):
         full_cmd = [self.path, '-v', 'error'] + cmd
         process = subprocess.Popen(full_cmd, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT)
         stdout, __ = process.communicate()
-        return stdout.decode()
+        return stdout.decode('utf-8')
 
     def _get(self, file, stream, the_type, track, of='compact=p=0:nk=1'):
         return self.pipe(['-select_streams', '{}:{}'.format(the_type, track),
@@ -65,7 +67,7 @@ def getRunner():
 def pipe_to_console(cmd):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
-    return process.returncode, stdout.decode(), stderr.decode()
+    return process.returncode, stdout.decode('utf-8'), stderr.decode('utf-8')
 
 def cleanup(the_dir):
     for item in os.listdir(the_dir):
