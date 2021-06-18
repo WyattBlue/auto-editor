@@ -33,6 +33,16 @@ class MyLogger(object):
             print(msg, file=sys.stderr)
 
 
+def parse_bytes(bytestr):
+    # Parse a string indicating a byte quantity into an integer.
+    matchobj = re.match(r'(?i)^(\d+(?:\.\d+)?)([kMGTPEZY]?)$', bytestr)
+    if(matchobj is None):
+        return None
+    number = float(matchobj.group(1))
+    multiplier = 1024.0 ** 'bkmgtpezy'.index(matchobj.group(2).lower())
+    return int(round(number * multiplier))
+
+
 def sponsor_block_api(_id, categories, log):
     # (_id: str, categories: list, log) -> dict
     from urllib import request as request
@@ -88,6 +98,7 @@ def download_video(my_input, args, ffmpeg, log):
             'outtmpl': outtmpl,
             'ffmpeg_location': ffmpeg.getPath(),
             'format': args.format,
+            'ratelimit': parse_bytes(args.limit_rate),
             'logger': MyLogger(),
             'progress_hooks': [my_hook],
         }
