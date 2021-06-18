@@ -75,6 +75,8 @@ def main_options(parser):
     parser.add_argument('--output_dir', type=str, group='urlOps',
         default=None,
         help='the directory where the downloaded file is placed.')
+    parser.add_argument('--limit_rate', '-rate', default='3m',
+        help='maximum download rate in bytes per second (50k, 4.2m)')
     parser.add_argument('--block', type=block_type, group='urlOps',
         help='mark all sponsors sections as silent.',
         extra='Only for YouTube urls. This uses the SponsorBlock api.\n'\
@@ -223,7 +225,7 @@ def main_options(parser):
 
 def get_chunks(inp, speeds, segment, fps, args, log, audioData=None, sampleRate=None):
     from auto_editor.cutting import (combine_audio_motion, combine_segment,
-        applySpacingRules)
+        apply_spacing_rules, apply_frame_margin, seconds_to_frames, cook, chunkify)
 
     audioList, motionList = None, None
     if('audio' in args.edit_based_on):
@@ -244,11 +246,20 @@ def get_chunks(inp, speeds, segment, fps, args, log, audioData=None, sampleRate=
             elif(len(motionList) > len(audioList)):
                 motionList = motionList[:len(audioList)]
 
-    hasLoud = combine_audio_motion(audioList, motionList, args.edit_based_on, log)
+    has_loud = combine_audio_motion(audioList, motionList, args.edit_based_on, log)
+
+    frame_margin = seconds_to_frames(args.frame_margin, fps)
+    min_clip = seconds_to_frames(args.min_clip_length, fps)
+    min_cut = seconds_to_frames(args.min_cut_length, fps)
+
+    has_loud = cook(has_loud, min_clip, min_cut)
+    has_loud_length = len(has_loud)
+    has_loud = apply_frame_margin(has_loud, has_loud_length, frame_margin)
 
     if(segment is not None):
-        hasLoud = combine_segment(hasLoud, segment, fps)
-    return applySpacingRules(hasLoud, speeds, fps, args, log)
+        has_loud = combine_segment(has_loud, segment, fps)
+    return apply_spacing_rules(has_loud, has_loud_length, min_clip, min_cut, speeds,
+        fps, args, log)
 
 
 def get_effects(audioData, sampleRate, fps, args, log):

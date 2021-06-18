@@ -51,143 +51,135 @@ def combine_audio_motion(audioList, motionList, based, log):
     return None
 
 
-def combine_segment(hasLoud, segment, fps):
+def combine_segment(has_loud, segment, fps):
     for item in segment:
         start, end = item['segment']
         start = int(start * fps)
         end = int(end * fps)
-        hasLoud[start:end] = False
-    return hasLoud
+        has_loud[start:end] = False
+    return has_loud
 
 
-def removeSmall(hasLoud, lim, replace, with_):
-    # (hasLoud: np.ndarray, lim: int, replace: bool, with_: bool) -> np.ndarray:
+def removeSmall(has_loud, lim, replace, with_):
+    # (has_loud: np.ndarray, lim: int, replace: bool, with_: bool) -> np.ndarray:
     startP = 0
     active = False
-    for j, item in enumerate(hasLoud):
+    for j, item in enumerate(has_loud):
         if(item == replace):
             if(not active):
                 startP = j
                 active = True
             # Special case for end.
-            if(j == len(hasLoud) - 1):
+            if(j == len(has_loud) - 1):
                 if(j - startP < lim):
-                    hasLoud[startP:j+1] = with_
+                    has_loud[startP:j+1] = with_
         else:
             if(active):
                 if(j - startP < lim):
-                    hasLoud[startP:j] = with_
+                    has_loud[startP:j] = with_
                 active = False
-    return hasLoud
+    return has_loud
 
 
-def isNumber(val):
+def is_number(val):
     return val.replace('.', '', 1).isdigit()
 
-def setRange(hasLoud, syntaxRange, fps, with_, log):
-    # (hasLoud: np.ndarray, syntaxRange, fps: float, with_, log) -> np.ndarray:
+def setRange(has_loud, syntaxRange, fps, with_, log):
+    # (has_loud: np.ndarray, syntaxRange, fps: float, with_, log) -> np.ndarray:
 
-    def replaceVarsWithVals(item):
-        if(isNumber(item)):
+    def replace_variables_to_values(item):
+        if(is_number(item)):
             return int(item)
         if(item == 'start'):
             return 0
         if(item == 'end'):
-            return len(hasLoud)
+            return len(has_loud)
         if(item.startswith('sec')):
             log.error('Seconds unit not implemented in this function.')
         log.error('Variable {} not avaiable in this context.'.format(item))
 
-    def ConvertToFrames(num):
+    def var_val_to_frames(num):
         # (num) -> int:
-        num = replaceVarsWithVals(num)
+        num = replace_variables_to_values(num)
         if(num < 0):
-            num = len(hasLoud) - num
+            num = len(has_loud) - num
         return num
 
     for item in syntaxRange:
-        pair = list(map(ConvertToFrames, item))
-        hasLoud[pair[0]:pair[1]] = with_
-    return hasLoud
+        pair = list(map(var_val_to_frames, item))
+        has_loud[pair[0]:pair[1]] = with_
+    return has_loud
 
 
-def secToFrames(value, fps):
+def seconds_to_frames(value, fps):
+    # (int | str, float) -> int:
     if(isinstance(value, str)):
         return int(float(value) * fps)
     return value
 
-def cook(hasLoud, minClip, minCut):
-    # (hasLoud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
-    hasLoud = removeSmall(hasLoud, minClip, replace=1, with_=0)
-    hasLoud = removeSmall(hasLoud, minCut, replace=0, with_=1)
-    return hasLoud
+def cook(has_loud, minClip, minCut):
+    # (has_loud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
+    has_loud = removeSmall(has_loud, minClip, replace=1, with_=0)
+    has_loud = removeSmall(has_loud, minCut, replace=0, with_=1)
+    return has_loud
 
 
 # Turn long silent/loud array to formatted chunk list.
 # Example: [True, True, True, False, False] => [[0, 3, 1], [3, 5, 0]]
-def chunkify(hasLoud, hasLoudLengthCache=None):
-    # () -> list:
-    if(hasLoudLengthCache is None):
-        hasLoudLengthCache = len(hasLoud)
+def chunkify(has_loud, has_loud_length=None):
+    # (np.ndarray, int) -> list:
+    if(has_loud_length is None):
+        has_loud_length = len(has_loud)
 
     chunks = []
     startP = 0
-    for j in range(1, hasLoudLengthCache):
-        if(hasLoud[j] != hasLoud[j - 1]):
-            chunks.append([startP, j, int(hasLoud[j-1])])
+    for j in range(1, has_loud_length):
+        if(has_loud[j] != has_loud[j - 1]):
+            chunks.append([startP, j, int(has_loud[j-1])])
             startP = j
-    chunks.append([startP, hasLoudLengthCache, int(hasLoud[j])])
+    chunks.append([startP, has_loud_length, int(has_loud[j])])
     return chunks
 
 
-def applySpacingRules(hasLoud, speeds, fps, args, log):
-    # (hasLoud: np.ndarray, speeds: list, fps: float, args, log) -> list:
-    frameMargin = secToFrames(args.frame_margin, fps)
-    minClip = secToFrames(args.min_clip_length, fps)
-    minCut = secToFrames(args.min_cut_length, fps)
+def apply_frame_margin(has_loud, has_loud_length, frame_margin):
+    # (np.ndarray, int, int) -> np.ndarray:
+    new = np.zeros((has_loud_length), dtype=np.uint8)
+    for i in range(has_loud_length):
+        start = int(max(0, i - frame_margin))
+        end = int(min(has_loud_length, i+1+frame_margin))
+        new[i] = min(1, np.max(has_loud[start:end]))
+    return new
 
-    hasLoud = cook(hasLoud, minClip, minCut)
-    hasLoudLengthCache = len(hasLoud)
-
-    def applyFrameMargin(hasLoud, hasLoudLengthCache, frameMargin):
-        # () -> np.ndarray:
-        new = np.zeros((hasLoudLengthCache), dtype=np.uint8)
-        for i in range(hasLoudLengthCache):
-            start = int(max(0, i - frameMargin))
-            end = int(min(hasLoudLengthCache, i+1+frameMargin))
-            new[i] = min(1, np.max(hasLoud[start:end]))
-        return new
-
-    hasLoud = applyFrameMargin(hasLoud, hasLoudLengthCache, frameMargin)
-
+def apply_spacing_rules(has_loud, has_loud_length, minClip, minCut, speeds, fps, args, log):
+    # (has_loud: np.ndarray, speeds: list, fps: float, args, log) -> list:
     if(args.mark_as_loud != []):
-        hasLoud = setRange(hasLoud, args.mark_as_loud, fps, 1, log)
+        has_loud = setRange(has_loud, args.mark_as_loud, fps, 1, log)
 
     if(args.mark_as_silent != []):
-        hasLoud = setRange(hasLoud, args.mark_as_silent, fps, 0, log)
+        has_loud = setRange(has_loud, args.mark_as_silent, fps, 0, log)
 
     # Remove small clips/cuts created by applying other rules.
-    hasLoud = cook(hasLoud, minClip, minCut)
+    has_loud = cook(has_loud, minClip, minCut)
 
     if(args.cut_out != []):
         cut_speed_index = speeds.index(99999)
-        hasLoud = setRange(hasLoud, args.cut_out, fps, cut_speed_index, log)
+        has_loud = setRange(has_loud, args.cut_out, fps, cut_speed_index, log)
 
     if(args.set_speed_for_range != []):
         for item in args.set_speed_for_range:
             my_speed_index = speeds.index(float(item[0]))
-            hasLoud = setRange(hasLoud, [item[1:]], fps, my_speed_index, log)
+            has_loud = setRange(has_loud, [item[1:]], fps, my_speed_index, log)
 
-    return chunkify(hasLoud, hasLoudLengthCache)
+    return chunkify(has_loud, has_loud_length)
 
 
-def applyBasicSpacing(hasLoud, fps, minClip, minCut, log):
-    # (hasLoud: np.ndarray, fps: float, minClip: int, minCut: int, log)
-    minClip = secToFrames(minClip, fps)
-    minCut = secToFrames(minCut, fps)
+def apply_basic_spacing(has_loud, fps, minClip, minCut, log):
+    # (has_loud: np.ndarray, fps: float, minClip: int, minCut: int, log) -> list:
+    minClip = seconds_to_frames(minClip, fps)
+    minCut = seconds_to_frames(minCut, fps)
 
-    hasLoud = cook(hasLoud, minClip, minCut)
-    return chunkify(hasLoud)
+    has_loud = cook(has_loud, minClip, minCut)
+    return chunkify(has_loud)
 
 
 def merge(start_list, end_list):
@@ -274,7 +266,7 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
                 rects.append(['rectangle', str(indexs[0]), end, x1, y1, x2, y2, color,
                     thickness])
         else:
-            chunks = applyBasicSpacing(merge(start_list, end_list), fps, 0, 0, log)
+            chunks = apply_basic_spacing(merge(start_list, end_list), fps, 0, 0, log)
             for item in chunks:
                 if(item[2] == 1):
                     rects.append(['rectangle', str(item[0]), str(item[1]), x1, y1, x2, y2,
@@ -334,7 +326,7 @@ def applyZooms(cmdZooms, audioData, sampleRate, fps, log):
                 zooms.append(['zoom', str(indexs[0]), end, start_zoom, end_zoom, x, y,
                     inter, hold])
         else:
-            chunks = applyBasicSpacing(merge(start_list, end_list), fps, 0, 0, log)
+            chunks = apply_basic_spacing(merge(start_list, end_list), fps, 0, 0, log)
             for item in chunks:
                 if(item[2] == 1):
                     zooms.append(['zoom', str(item[0]), str(item[1]), start_zoom,
