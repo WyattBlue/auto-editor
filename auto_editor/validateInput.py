@@ -33,34 +33,34 @@ class MyLogger(object):
             print(msg, file=sys.stderr)
 
 
-def sponsor_block_api(_id, log):
-    # All categories:
-    # ['sponsor', 'intro', 'outro', 'selfpromo', 'interaction', 'music_offtopic']
+def sponsor_block_api(_id, categories, log):
+    # (_id: str, categories: list, log) -> dict
     from urllib import request as request
     from urllib.error import HTTPError
     import json
+
+    cat_url = 'categories=['
+    for i, cat in enumerate(categories):
+        if(i == 0):
+            cat_url += '"{}"'.format(cat)
+        else:
+            cat_url += ',"{}"'.format(cat)
+    cat_url += ']'
+
     try:
         contents = request.urlopen(
-            'https://sponsor.ajay.app/api/skipSegments?videoID={}'.format(_id))
+            'https://sponsor.ajay.app/api/skipSegments?videoID={}&{}'.format(_id, cat_url))
         return json.loads(contents.read())
     except HTTPError:
         log.error("Couldn't find skipSegments for id: {}".format(_id))
 
-    """
-    Example output:
-
-    [
-    {'category': 'sponsor', 'segment': [82.253, 99.75], 'UUID': 'db0f799...', 'videoDuration': 586},
-    {'category': 'sponsor', 'segment': [525.1, 571.378], 'UUID': '5d1a16b...', 'videoDuration': 586}
-    ]
-    """
-
-def download_video(my_input, args, log):
-    if(args.block_sponsors):
+def download_video(my_input, args, ffmpeg, log):
+    segment = None
+    if(args.block is not None):
         match = re.search(r'youtube\.com/watch\?v=(?P<match>[A-Za-z0-9_-]{11})', my_input)
         if(match):
             youtube_id =  match.groupdict()['match']
-            sponsor_block_api(youtube_id, log)
+            segment = sponsor_block_api(youtube_id, args.block, log)
 
     outtmpl = re.sub(r'\W+', '-', my_input)
 
@@ -100,7 +100,7 @@ def download_video(my_input, args, log):
                 log.error('YouTube-dl: Connection Refused.')
 
         log.conwrite('')
-    return outtmpl
+    return outtmpl, segment
 
 
 def _valid_files(path, bad_exts):
@@ -129,7 +129,7 @@ def valid_input(inputs, ffmpeg, args, log):
             segments.append(None)
 
         elif(my_input.startswith('http://') or my_input.startswith('https://')):
-            output_template, segment = download_video(my_input, args, log)
+            output_template, segment = download_video(my_input, args, ffmpeg, log)
             new_inputs.append(output_template)
             segments.append(segment)
         else:

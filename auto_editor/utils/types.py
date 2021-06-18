@@ -1,6 +1,6 @@
 '''utils/types.py'''
 
-from __future__ import print_function
+from __future__ import print_function, division
 
 import os.path
 import sys
@@ -63,3 +63,6 @@ def range_type(inp):
 
 def speed_range_type(inp):
     return comma_type(inp, 3, 3, 'speed_range_type')
+
+def block_type(inp):
+    return comma_type(inp, 1, None, 'block_type')

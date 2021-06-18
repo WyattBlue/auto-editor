@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import numpy as np
 
-def combineArrs(audioList, motionList, based, log):
+def combine_audio_motion(audioList, motionList, based, log):
     # (audioList: np.ndarray, motionList: np.ndarray, based: str, log) -> np.ndarray:
 
     if(based == 'audio' or based == 'not_audio'):
@@ -49,6 +49,15 @@ def combineArrs(audioList, motionList, based, log):
     if(based == 'not_audio_and_not_motion'):
         return np.invert(audioList) & np.invert(motionList)
     return None
+
+
+def combine_segment(hasLoud, segment, fps):
+    for item in segment:
+        start, end = item['segment']
+        start = int(start * fps)
+        end = int(end * fps)
+        hasLoud[start:end] = False
+    return hasLoud
 
 
 def removeSmall(hasLoud, lim, replace, with_):
