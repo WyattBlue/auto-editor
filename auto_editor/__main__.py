@@ -43,7 +43,7 @@ def set_output_name(path, making_data_file, args):
 
 def main_options(parser):
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
-        frame_type, zoom_type, rect_type, range_type, speed_range_type)
+        frame_type, zoom_type, rect_type, range_type, speed_range_type, block_type)
 
     parser.add_argument('progressOps', nargs=0, action='grouping')
     parser.add_argument('--machine_readable_progress', action='store_true',
@@ -75,9 +75,10 @@ def main_options(parser):
     parser.add_argument('--output_dir', type=str, group='urlOps',
         default=None,
         help='the directory where the downloaded file is placed.')
-    parser.add_argument('--block_sponsors', action='store_true', group='urlOps',
+    parser.add_argument('--block', type=block_type, group='urlOps',
         help='mark all sponsors sections as silent.',
-        extra='Only for YouTube. This uses the SponsorBlock api.')
+        extra='Only for YouTube urls. This uses the SponsorBlock api.\n'\
+            'Choices are: sponsor intro outro selfpromo interaction music_offtopic')
     parser.add_argument('--check_certificate', action='store_true', group='urlOps',
         help='check the website certificate before downloading.')
 
@@ -220,8 +221,9 @@ def main_options(parser):
     return parser
 
 
-def get_chunks(inp, speeds, fps, args, log, audioData=None, sampleRate=None):
-    from auto_editor.cutting import combineArrs, applySpacingRules
+def get_chunks(inp, speeds, segment, fps, args, log, audioData=None, sampleRate=None):
+    from auto_editor.cutting import (combine_audio_motion, combine_segment,
+        applySpacingRules)
 
     audioList, motionList = None, None
     if('audio' in args.edit_based_on):
@@ -242,7 +244,10 @@ def get_chunks(inp, speeds, fps, args, log, audioData=None, sampleRate=None):
             elif(len(motionList) > len(audioList)):
                 motionList = motionList[:len(audioList)]
 
-    hasLoud = combineArrs(audioList, motionList, args.edit_based_on, log)
+    hasLoud = combine_audio_motion(audioList, motionList, args.edit_based_on, log)
+
+    if(segment is not None):
+        hasLoud = combine_segment(hasLoud, segment, fps)
     return applySpacingRules(hasLoud, speeds, fps, args, log)
 
 
@@ -256,7 +261,8 @@ def get_effects(audioData, sampleRate, fps, args, log):
         effects += applyRects(args.rectangle, audioData, sampleRate, fps, log)
     return effects
 
-def edit_media(i, inp, ffmpeg, args, speeds, exporting_to_editor, data_file, TEMP, log):
+def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_file,
+    TEMP, log):
     chunks = None
     if(inp.ext == '.json'):
         from auto_editor.formats.make_json import read_json_cutlist
@@ -369,7 +375,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, exporting_to_editor, data_file, TEM
 
     log.debug('Frame Rate: {}'.format(fps))
     if(chunks is None):
-        chunks = get_chunks(inp, speeds, fps, args, log, audioData, sampleRate)
+        chunks = get_chunks(inp, speeds, segment, fps, args, log, audioData, sampleRate)
         effects = get_effects(audioData, sampleRate, fps, args, log)
 
     def isClip(chunk):
@@ -673,7 +679,7 @@ def main():
 
     log.debug('Speeds: {}'.format(speeds))
 
-    def main_loop(inputList, ffmpeg, args, speeds, log):
+    def main_loop(inputList, ffmpeg, args, speeds, segments, log):
         num_cuts = 0
 
         for i, INPUT_FILE in enumerate(inputList):
@@ -682,7 +688,7 @@ def main():
             if(len(inputList) > 1):
                 log.conwrite('Working on {}'.format(inp.basename))
 
-            cuts, newOutput = edit_media(i, inp, ffmpeg, args, speeds,
+            cuts, newOutput = edit_media(i, inp, ffmpeg, args, speeds, segments[i],
                 exporting_to_editor, making_data_file, TEMP, log)
             num_cuts += cuts
 
@@ -701,7 +707,7 @@ def main():
             usefulfunctions.open_with_system_default(newOutput, log)
 
     try:
-        main_loop(inputList, ffmpeg, args, speeds, log)
+        main_loop(inputList, ffmpeg, args, speeds, segments, log)
     except KeyboardInterrupt:
         log.error('Keyboard Interrupt')
     log.cleanup()
