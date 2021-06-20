@@ -10,14 +10,7 @@ from platform import system
 # Included Libraries
 from auto_editor.utils.func import get_stdout
 
-def _set_path(dirpath, my_ffmpeg):
-    if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
-        return 'ffmpeg'
-    program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
-    return os.path.join(dirpath, 'ffmpeg', system(), program)
-
-def _test_path(dirpath, my_ffmpeg, log):
-    path = _set_path(dirpath, my_ffmpeg)
+def _test_path(path, log):
     try:
         get_stdout([path, '-h'])
     except FileNotFoundError:
@@ -34,9 +27,9 @@ def _test_path(dirpath, my_ffmpeg, log):
     return path
 
 class FFmpeg():
-    def __init__(self, dirpath, myFFmpeg, FFdebug, log):
+    def __init__(self, path, FFdebug, log):
         self.log = log
-        self.path = _test_path(dirpath, myFFmpeg, log)
+        self.path = _test_path(path, log)
         self.FFdebug = FFdebug
 
     def getPath(self):
