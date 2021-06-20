@@ -9,8 +9,10 @@ def grep_options(parser):
         help='Suppress normal output; instead print count of matching lines for each file.')
     parser.add_argument('--ignore_case', '-i', action='store_true',
         help='Ignore case distinctions for the PATTERN.')
+    parser.add_argument('--ffmpeg_location', default=None,
+        help='point to your custom ffmpeg file.')
     parser.add_argument('--my_ffmpeg', action='store_true',
-        help='use your ffmpeg and other binaries instead of the ones packaged.')
+        help='use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
     parser.add_argument('input', nargs='*',
@@ -42,7 +44,7 @@ def grep(sys_args=None):
     args = parser.parse_args(sys_args, log, 'grep')
 
     dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    ffmpeg = FFmpeg(dir_path, args.my_ffmpeg, False, log)
+    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False, log)
 
     regex = args.input[0]
     media_files = args.input[1:]

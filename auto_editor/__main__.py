@@ -181,7 +181,7 @@ def main_options(parser):
         help='set a custom path to the ffmpeg location.',
         extra='This takes precedence over --my_ffmpeg.')
     parser.add_argument('--my_ffmpeg', action='store_true',
-        help='use the ffmpeg on the PATH instead of the ones packaged.',
+        help='use the ffmpeg on your PATH instead of the one packaged.',
         extra='this is equivalent to --ffmpeg_location ffmpeg.')
     parser.add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
@@ -575,20 +575,11 @@ def main():
 
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
-    def set_ff_path(dirpath, ff_location, my_ffmpeg):
-        from platform import system
-        if(ff_location is not None):
-            return ff_location
-        if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
-            return 'ffmpeg'
-        program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
-        return os.path.join(dirpath, 'ffmpeg', system(), program)
-
     if(args.debug and args.input == []):
         import platform
         log = Log()
-        ff_path = set_ff_path(dir_path, args.ffmpeg_location, args.my_ffmpeg)
-        ffmpeg = FFmpeg(ff_path, args.show_ffmpeg_debug, log)
+        ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg,
+            args.show_ffmpeg_debug, log)
 
         print('Python Version: {} {}'.format(platform.python_version(), is64bit))
         print('Platform: {} {}'.format(platform.system(), platform.release()))
@@ -609,8 +600,8 @@ def main():
     TEMP = tempfile.mkdtemp()
     log = Log(args.debug, args.quiet, temp=TEMP)
 
-    ff_path = set_ff_path(dir_path, args.ffmpeg_location, args.my_ffmpeg)
-    ffmpeg = FFmpeg(ff_path, args.show_ffmpeg_debug, log)
+    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg,
+        args.show_ffmpeg_debug, log)
 
     log.debug('Temp Directory: {}'.format(TEMP))
 

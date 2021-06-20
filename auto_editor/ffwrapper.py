@@ -10,6 +10,15 @@ from platform import system
 # Included Libraries
 from auto_editor.utils.func import get_stdout
 
+def _set_ff_path(dirpath, ff_location, my_ffmpeg):
+        from platform import system
+        if(ff_location is not None):
+            return ff_location
+        if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
+            return 'ffmpeg'
+        program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
+        return os.path.join(dirpath, 'ffmpeg', system(), program)
+
 def _test_path(path, log):
     try:
         get_stdout([path, '-h'])
@@ -27,10 +36,11 @@ def _test_path(path, log):
     return path
 
 class FFmpeg():
-    def __init__(self, path, FFdebug, log):
+    def __init__(self, dirpath, ff_location, my_ffmpeg, debug, log):
+        _path = _set_ff_path(dirpath, ff_location, my_ffmpeg)
         self.log = log
-        self.path = _test_path(path, log)
-        self.FFdebug = FFdebug
+        self.path = _test_path(_path, log)
+        self.FFdebug = debug
 
     def getPath(self):
         return self.path

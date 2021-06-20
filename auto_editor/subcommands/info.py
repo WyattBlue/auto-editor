@@ -5,8 +5,10 @@ from __future__ import print_function
 def info_options(parser):
     parser.add_argument('--include_vfr', action='store_true',
         help='skip information that is very slow to get.')
+    parser.add_argument('--ffmpeg_location', default=None,
+        help='point to your custom ffmpeg file.')
     parser.add_argument('--my_ffmpeg', action='store_true',
-        help='use your ffmpeg and other binaries instead of the ones packaged.')
+        help='use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
     parser.add_argument('(input)', nargs='*',
@@ -25,8 +27,6 @@ def info(sys_args=None):
 
     from auto_editor.ffwrapper import FFmpeg
 
-    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-
     parser = vanparse.ArgumentParser('info', auto_editor.version,
         description='Get basic information about media files.')
     parser = info_options(parser)
@@ -37,7 +37,8 @@ def info(sys_args=None):
     log = Log()
     args = parser.parse_args(sys_args, log, 'info')
 
-    ffmpeg = FFmpeg(dir_path, args.my_ffmpeg, False, log)
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False, log)
 
     def aspect_str(w, h):
         w, h = aspect_ratio(int(w), int(h))
