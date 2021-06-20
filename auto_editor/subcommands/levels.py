@@ -5,8 +5,10 @@ from __future__ import print_function
 def levels_options(parser):
     parser.add_argument('--output_file', '--output', '-o', type=str,
         default='data.txt')
+    parser.add_argument('--ffmpeg_location', default=None,
+        help='point to your custom ffmpeg file.')
     parser.add_argument('--my_ffmpeg', action='store_true',
-        help='use your ffmpeg and other binaries instead of the ones packaged.')
+        help='use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
     parser.add_argument('(input)', nargs='*',
@@ -28,8 +30,6 @@ def levels(sys_args=None):
     from auto_editor.ffwrapper import FFmpeg
     from auto_editor.scipy.wavfile import read
 
-    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-
     parser = vanparse.ArgumentParser('levels', auto_editor.version,
         description='Get loudness of audio over time.')
     parser = levels_options(parser)
@@ -42,7 +42,9 @@ def levels(sys_args=None):
 
     args = parser.parse_args(sys_args, log, 'levels')
 
-    ffmpeg = FFmpeg(dir_path, args.my_ffmpeg, False, log)
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False, log)
+
     inp = ffmpeg.file_info(args.input[0])
 
     fps = 30 if inp.fps is None else float(inp.fps)

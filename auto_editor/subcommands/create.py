@@ -11,8 +11,10 @@ def create_options(parser):
         help='set the pixel height of the video.')
     parser.add_argument('--output_file', '--output', '-o', type=str,
         default='testsrc.mp4')
+    parser.add_argument('--ffmpeg_location', default=None,
+        help='point to your custom ffmpeg file.')
     parser.add_argument('--my_ffmpeg', action='store_true',
-        help='use your ffmpeg and other binaries instead of the ones packaged.')
+        help='use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
     parser.add_argument('(input)', nargs='*',
@@ -30,8 +32,6 @@ def create(sys_args=None):
     from auto_editor.utils.log import Log
     from auto_editor.ffwrapper import FFmpeg
 
-    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-
     parser = vanparse.ArgumentParser('create', auto_editor.version,
         description='Generate simple media.')
     parser = create_options(parser)
@@ -39,7 +39,8 @@ def create(sys_args=None):
     log = Log()
     args = parser.parse_args(sys.argv[2:], Log(), 'create')
 
-    ffmpeg = FFmpeg(dir_path, args.my_ffmpeg, False, log)
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False, log)
 
     theme = args.input
     output = args.output_file
