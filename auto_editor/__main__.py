@@ -80,7 +80,12 @@ def main_options(parser):
     parser.add_argument('--block', type=block_type, group='urlOps',
         help='mark all sponsors sections as silent.',
         extra='Only for YouTube urls. This uses the SponsorBlock api.\n'\
-            'Choices are: sponsor intro outro selfpromo interaction music_offtopic')
+            'Choices can include: sponsor intro outro selfpromo interaction music_offtopic')
+    parser.add_argument('--download_archive', type=file_type, default=None, group='urlOps',
+        help='Download only videos not listed in the archive file. Record the IDs of' \
+             ' all downloaded videos in it')
+    parser.add_argument('--cookies', type=file_type, default=None, group='urlOps',
+        help='The file to read cookies from and dump the cookie jar in.')
     parser.add_argument('--check_certificate', action='store_true', group='urlOps',
         help='check the website certificate before downloading.')
 
