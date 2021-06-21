@@ -100,6 +100,8 @@ def download_video(my_input, args, ffmpeg, log):
             'format': args.format,
             'ratelimit': parse_bytes(args.limit_rate),
             'logger': MyLogger(),
+            'cookies': args.cookies,
+            'download_archive': args.download_archive,
             'progress_hooks': [my_hook],
         }
 
