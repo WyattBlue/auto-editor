@@ -77,6 +77,8 @@ def main_options(parser):
         help='the directory where the downloaded file is placed.')
     parser.add_argument('--limit_rate', '-rate', default='3m',
         help='maximum download rate in bytes per second (50k, 4.2m)')
+    parser.add_argument('--id', type=str, default=None, group='urlOps',
+        help='manually set the YouTube ID the video belongs to.')
     parser.add_argument('--block', type=block_type, group='urlOps',
         help='mark all sponsors sections as silent.',
         extra='Only for YouTube urls. This uses the SponsorBlock api.\n'\

@@ -9,7 +9,7 @@ import sys
 from auto_editor.utils.progressbar import ProgressBar
 
 invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
-      '.xml', '.yaml', '.png', '.jpeg', '.jpg', '.gif', '.exe', '.doc',
+      '.xml', '.yaml', '.png', '.jpeg', '.jpg', '.exe', '.doc',
       '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
       '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
       '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
@@ -45,7 +45,7 @@ def parse_bytes(bytestr):
 
 def sponsor_block_api(_id, categories, log):
     # (_id: str, categories: list, log) -> dict
-    from urllib import request as request
+    from urllib import request
     from urllib.error import HTTPError
     import json
 
@@ -62,18 +62,11 @@ def sponsor_block_api(_id, categories, log):
             'https://sponsor.ajay.app/api/skipSegments?videoID={}&{}'.format(_id, cat_url))
         return json.loads(contents.read())
     except HTTPError:
-        log.error("Couldn't find skipSegments for id: {}".format(_id))
+        log.warning("Couldn't find skipSegments for id: {}".format(_id))
+        return None
 
 def download_video(my_input, args, ffmpeg, log):
-    segment = None
-    if(args.block is not None):
-        match = re.search(r'youtube\.com/watch\?v=(?P<match>[A-Za-z0-9_-]{11})', my_input)
-        if(match):
-            youtube_id =  match.groupdict()['match']
-            segment = sponsor_block_api(youtube_id, args.block, log)
-
     outtmpl = re.sub(r'\W+', '-', my_input)
-
     if(outtmpl.endswith('-mp4')):
         outtmpl = outtmpl[:-4]
     outtmpl += '.mp4'
@@ -100,8 +93,8 @@ def download_video(my_input, args, ffmpeg, log):
             'format': args.format,
             'ratelimit': parse_bytes(args.limit_rate),
             'logger': MyLogger(),
-            'cookies': args.cookies,
-            'download_archive': args.download_archive,
+            'cookiefile': os.path.abspath(args.cookies),
+            'download_archive': os.path.abspath(args.download_archive),
             'progress_hooks': [my_hook],
         }
 
@@ -113,8 +106,7 @@ def download_video(my_input, args, ffmpeg, log):
                 log.error('YouTube-dl: Connection Refused.')
 
         log.conwrite('')
-    return outtmpl, segment
-
+    return outtmpl
 
 def _valid_files(path, bad_exts):
     # (path: str, badExts: list)
@@ -123,6 +115,16 @@ def _valid_files(path, bad_exts):
             and not f.startswith('.')):
             yield os.path.join(path, f)
 
+def get_segment(args, my_input, log):
+    if(args.block is not None):
+        if(args.id is not None):
+            return sponsor_block_api(args.id, args.block, log)
+        match = re.search(r'youtube\.com/watch\?v=(?P<match>[A-Za-z0-9_-]{11})',
+            my_input)
+        if(match):
+            youtube_id =  match.groupdict()['match']
+            return sponsor_block_api(youtube_id, args.block, log)
+    return None
 
 def valid_input(inputs, ffmpeg, args, log):
     # (inputs: list, ffmpeg, args, log) -> list:
@@ -131,6 +133,7 @@ def valid_input(inputs, ffmpeg, args, log):
     for my_input in inputs:
         if(os.path.isdir(my_input)):
             new_inputs += sorted(_valid_files(my_input, invalidExtensions))
+            segments += [None] * (len(new_inputs) - len(segments))
         elif(os.path.isfile(my_input)):
             _, ext = os.path.splitext(my_input)
             if(ext == ''):
@@ -139,12 +142,11 @@ def valid_input(inputs, ffmpeg, args, log):
             if(ext in invalidExtensions):
                 log.error('Invalid file extension "{}" for {}'.format(ext, my_input))
             new_inputs.append(my_input)
-            segments.append(None)
+            segments.append(get_segment(args, my_input, log))
 
         elif(my_input.startswith('http://') or my_input.startswith('https://')):
-            output_template, segment = download_video(my_input, args, ffmpeg, log)
-            new_inputs.append(output_template)
-            segments.append(segment)
+            new_inputs.append(download_video(my_input, args, ffmpeg, log))
+            segments.append(get_segment(args, my_input, log))
         else:
             log.error('Could not find file: {}'.format(my_input))
 
