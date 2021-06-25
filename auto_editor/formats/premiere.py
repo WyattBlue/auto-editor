@@ -56,7 +56,7 @@ def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, s
 
         outfile.write(indent(5, '<clipitem id="clipitem-{}">'.format(j+1),
             '\t<masterclipid>masterclip-2</masterclipid>',
-            '\t<name>{}</name>'.format(inp.name),
+            '\t<name>{}</name>'.format(inp.basename),
             '\t<start>{}</start>'.format(my_start),
             '\t<end>{}</end>'.format(my_end),
             '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
@@ -64,7 +64,7 @@ def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, s
 
         if(j == 0):
             outfile.write(indent(6, '<file id="file-1">',
-                '\t<name>{}</name>'.format(inp.name),
+                '\t<name>{}</name>'.format(inp.basename),
                 '\t<pathurl>{}</pathurl>'.format(pathurls[0]),
                 '\t<rate>',
                 '\t\t<timebase>{}</timebase>'.format(timebase),
@@ -136,7 +136,7 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
             outfile.write(indent(5,
                 '<clipitem id="clipitem-{}" premiereChannelType="stereo">'.format(clip_item_num),
                 '\t<masterclipid>masterclip-{}</masterclipid>'.format(master_id),
-                '\t<name>{}</name>'.format(inp.name),
+                '\t<name>{}</name>'.format(inp.basename),
                 '\t<start>{}</start>'.format(my_start),
                 '\t<end>{}</end>'.format(my_end),
                 '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
@@ -144,7 +144,7 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
 
             if((audioFile and j == 0) or (t > 0 and j == 0)):
                 outfile.write(indent(6, '<file id="file-{}">'.format(t+1),
-                    '\t<name>{}</name>'.format(inp.name),
+                    '\t<name>{}</name>'.format(inp.basename),
                     '\t<pathurl>{}</pathurl>'.format(pathurls[t]),
                     '\t<rate>',
                     '\t\t<timebase>{}</timebase>'.format(timebase),
