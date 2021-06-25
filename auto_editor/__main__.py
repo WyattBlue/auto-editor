@@ -306,12 +306,16 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         log.debug('Removing already existing file: {}'.format(newOutput))
         os.remove(newOutput)
 
-    if(args.sample_rate is None):
-        sampleRate = inp.audio_streams[0]['samplerate']
-        if(sampleRate is None):
-            sampleRate = '48000'
-    else:
-        sampleRate = str(args.sample_rate)
+    def user_sample_rate(args_sample, inp):
+        # (args_sample: int | str | None, inp) -> str | None:
+        if(args_sample is None):
+            if(len(inp.audio_streams) > 0):
+                return inp.audio_streams[0]['samplerate']
+            return None
+        return str(args_sample)
+
+
+    sampleRate = user_sample_rate(args.sample_rate, inp)
     log.debug('Samplerate: {}'.format(sampleRate))
 
     audioData = None
@@ -346,7 +350,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
 
         tracks = len(inp.audio_streams)
 
-        if(args.cut_by_this_track >= tracks):
+        if(args.cut_by_this_track >= tracks and 'cut_by_this_track' in args._set):
             message = "You choose a track that doesn't exist.\nThere "
             if(tracks == 1):
                 message += 'is only {} track.\n'.format(tracks)
@@ -382,18 +386,19 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         has_vfr = hasVFR(cmd, log)
         del cmd
 
-        if(args.cut_by_all_tracks):
-            temp_file = os.path.join(TEMP, 'combined.wav')
-            cmd = ['-i', inp.path, '-filter_complex',
-                '[0:a]amix=inputs={}:duration=longest'.format(tracks), '-ar',
-                sampleRate, '-ac', '2', '-f', 'wav', temp_file]
-            ffmpeg.run(cmd)
-            del cmd
-        else:
-            temp_file = os.path.join(TEMP, '{}.wav'.format(args.cut_by_this_track))
+        if(tracks != 0):
+            if(args.cut_by_all_tracks):
+                temp_file = os.path.join(TEMP, 'combined.wav')
+                cmd = ['-i', inp.path, '-filter_complex',
+                    '[0:a]amix=inputs={}:duration=longest'.format(tracks), '-ar',
+                    sampleRate, '-ac', '2', '-f', 'wav', temp_file]
+                ffmpeg.run(cmd)
+                del cmd
+            else:
+                temp_file = os.path.join(TEMP, '{}.wav'.format(args.cut_by_this_track))
 
-        from auto_editor.scipy.wavfile import read
-        sampleRate, audioData = read(temp_file)
+            from auto_editor.scipy.wavfile import read
+            sampleRate, audioData = read(temp_file)
 
     log.debug('Frame Rate: {}'.format(fps))
     if(chunks is None):

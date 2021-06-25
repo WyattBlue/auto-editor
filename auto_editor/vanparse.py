@@ -51,7 +51,7 @@ def print_option_help(args, option):
             for op in options:
                 if(op['group'] == option['names'][0]):
                     text += '  ' + ', '.join(op['names']) + ': ' + op['help'] + '\n'
-    elif(option['action'] == 'store_true'):
+    elif(option['action'] in ['store_true', 'store_false']):
         text += '    type: flag\n'
     else:
         text += '    type: unknown\n'
@@ -83,6 +83,9 @@ def get_option(item, group, the_args):
                 return option
     return None
 
+def _to_key(val):
+    # (val: dict) -> str
+    return val['names'][0].replace('-', '')
 
 class ArgumentParser():
     def __init__(self, program_name, version, description):
@@ -131,6 +134,7 @@ class ArgumentParser():
 
 
 class ParseOptions():
+
     def setConfig(self, config_path, root):
         if(not os.path.isfile(config_path)):
             return
@@ -169,9 +173,11 @@ class ParseOptions():
         for options in args:
             for option in options:
                 option_names.append(option['names'][0])
-                key = option['names'][0].replace('-', '')
+                key = _to_key(option)
                 if(option['action'] == 'store_true'):
                     value = False
+                elif(option['action'] == 'store_false'):
+                    value = True
                 elif(option['nargs'] != 1):
                     value = []
                 else:
@@ -184,6 +190,7 @@ class ParseOptions():
         # Figure out command line options changed by user.
         my_list = []
         used_options = []
+        _set = []
         setting_inputs = True
         option_list = 'input'
         list_type = str
@@ -202,31 +209,33 @@ class ParseOptions():
                     group = None # Don't consider the next option to be in a group.
                     option = get_option(item, group=group, the_args=args)
 
+            def error_message(args, item, label):
+
+                def all_names(args):
+                    name_set = set()
+                    for options in args:
+                        for opt in options:
+                            for names in opt['names']:
+                                name_set.add(names)
+                    return name_set
+
+                opt_list = all_names(args)
+                close_matches = difflib.get_close_matches(item, opt_list)
+                if(close_matches):
+                    if(close_matches[0] == item):
+                        return '{} {} needs to be in a group'.format(label.capitalize(),
+                            item)
+                    return 'Unknown {}: {}\n\n    Did you mean:\n        '.format(
+                        label, item) + ', '.join(close_matches)
+                return 'Unknown {}: {}'.format(label, item)
+
             if(option is None):
                 # Unknown Option!
                 if(setting_inputs and not item.startswith('-')):
                     # Option is actually an input file, like example.mp4
                     my_list.append(item)
                 else:
-                    # Get the names of all the options and groups.
-                    opt_list = []
-                    for options in args:
-                        for opt in options:
-                            for names in opt['names']:
-                                opt_list.append(names)
-
-                    close_matches = difflib.get_close_matches(item, opt_list)
-
-                    if(close_matches):
-                        if(close_matches[0] == item):
-                            log.error('{} {} needs to be in a group'.format(
-                                label.capitalize(), item))
-                        else:
-                            log.error('Unknown {}: {}\n\n    '\
-                                'Did you mean:\n        '.format(label, item)
-                                + ', '.join(close_matches))
-                    else:
-                        log.error('Unknown {}: {}'.format(label, item))
+                    log.error(error_message(args, item, label))
             else:
                 # We found the option.
                 if(option_list is not None):
@@ -236,12 +245,14 @@ class ParseOptions():
                 option_list = None
                 my_list = []
 
-                if(option['names'][0] in used_options and option['stack'] is None):
+                if(option['names'][0] in used_options):
                     log.error('Cannot repeat option {} twice.'.format(option['names'][0]))
 
                 used_options.append(option['names'][0])
 
-                key = option['names'][0].replace('-', '')
+                key = _to_key(option)
+                _set.append(key)
+
                 if(option['action'] == 'grouping'):
                     group = key
 
@@ -256,12 +267,14 @@ class ParseOptions():
                     list_type = option['type']
                 elif(option['action'] == 'store_true'):
                     value = True
+                elif(option['action'] == 'store_false'):
+                    value = False
                 else:
                     try:
                         value = option['type'](nextItem)
                     except Exception:
                         typeName = option['type'].__name__
-                        log.error('Couldn\'t convert "{}" to {}'.format(
+                        log.error('Couldn\'t convert {} to {}'.format(
                             nextItem, typeName))
 
                     # Handle when the option value is not in choices list.
@@ -276,7 +289,7 @@ class ParseOptions():
             i += 1
         if(setting_inputs):
             setattr(self, option_list, list(map(list_type, my_list)))
-
+        setattr(self, '_set', _set)
         if(self.help):
             print_program_help(root, args)
             sys.exit()
