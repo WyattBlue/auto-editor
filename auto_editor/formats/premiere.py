@@ -134,7 +134,7 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
                 master_id = '2'
 
             outfile.write(indent(5,
-                '<clipitem id="clipitem-{}">'.format(clip_item_num),
+                '<clipitem id="clipitem-{}" premiereChannelType="stereo">'.format(clip_item_num),
                 '\t<masterclipid>masterclip-{}</masterclipid>'.format(master_id),
                 '\t<name>{}</name>'.format(inp.name),
                 '\t<start>{}</start>'.format(my_start),
@@ -142,7 +142,7 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
                 '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
                 '\t<out>{}</out>'.format(int(clip[1] / (clip[2] / 100)))))
 
-            if(audioFile and j == 0):
+            if((audioFile and j == 0) or (t > 0 and j == 0)):
                 outfile.write(indent(6, '<file id="file-{}">'.format(t+1),
                     '\t<name>{}</name>'.format(inp.name),
                     '\t<pathurl>{}</pathurl>'.format(pathurls[t]),
