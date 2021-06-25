@@ -39,6 +39,8 @@ def fcp_xml(inp, temp, output, clips, tracks, total_dur, audioFile, fps, log):
         return '{}/{}s'.format(num, dem)
 
     width, height = get_width_height(inp)
+    if(width is None or height is None):
+        width, height = '1280', '720'
     frame_duration = fraction(1, fps)
 
     with open(output, 'w', encoding='utf-8') as outfile:

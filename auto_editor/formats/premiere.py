@@ -202,6 +202,9 @@ def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile, fps, l
             pathurls.append(fix_url(newtrack))
 
     width, height = get_width_height(inp)
+    if(width is None or height is None):
+        width, height = '1280', '720'
+
     timebase = str(int(fps))
 
     groupName = 'Auto-Editor {} Group'.format('Audio' if audioFile else 'Video')
