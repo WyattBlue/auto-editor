@@ -25,6 +25,8 @@ def timecode_to_frames(timecode, fps):
 
 def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
     width, height = get_width_height(inp)
+    if(width is None or height is None):
+        width, height = '1280', '720'
     num, den = aspect_ratio(int(width), int(height))
 
     global_out = inp.duration

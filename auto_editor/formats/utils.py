@@ -12,7 +12,7 @@ def safe_mkdir(path):
 
 def get_width_height(inp):
     if(len(inp.video_streams) == 0):
-        return '1280', '720'
+        return None, None
     else:
         return inp.video_streams[0]['width'], inp.video_streams[0]['height']
 
