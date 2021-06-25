@@ -1,19 +1,19 @@
 [![Actions Status](https://github.com/wyattblue/auto-editor/workflows/build/badge.svg)](https://github.com/wyattblue/auto-editor/actions)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/discord/711767814821773372?color=%237289DA&label=chat&logo=discord&logoColor=white"></a>
-<img src="https://img.shields.io/badge/version-21w24a-blue.svg">
+<img src="https://img.shields.io/badge/version-21w25a-blue.svg">
 <p align="center"><img src="https://raw.githubusercontent.com/wyattblue/auto-editor/master/articles/imgs/auto-editor_banner.png" title="Auto-Editor" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and cutting them up.
 
-Before doing the real editing, you first cut out the "dead space" which is typically just silence. This is typically known as a "first pass". Cutting all these dead spaces is a boring task, especially if the video is 15 minutes, 30 minutes, or even an hour long.
+Before doing the real editing, you first cut out the "dead space" which is typically silence. This is known as a "first pass". Cutting these is a boring task, especially if the video is very long.
 
-Luckily, this can be automated with software. [Once you'll installed auto-editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md), you can run:
+Luckily, auto-editor can do this for you. [Once you'll installed auto-editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md), you can run:
 
 ```
 auto-editor path/to/your/video.mp4
 ```
 
-from your console and it will generate a **brand new video** with all the silent sections cut off. Generating a new video **takes a while** so instead, you can export the new video to your editor directly. For example, running:
+from the terminal and it will generate a **brand new video** with all the silent sections cut off. Generating a new video **takes a while** so instead, you can export the new video to your editor directly. For example, running:
 
 ```
 auto-editor example.mp4 --export_to_premiere

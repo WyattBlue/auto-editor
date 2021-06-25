@@ -170,6 +170,7 @@ def test(sys_args=None):
 
     runTest(['--debug'])
 
+    # sanity check for example.mp4/ffprobe
     if(ffprobe.getFrameRate('example.mp4') != 30.0):
         print('getFrameRate did not equal 30.0')
         sys.exit(1)
