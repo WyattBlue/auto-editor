@@ -93,8 +93,8 @@ class FFmpeg():
             if(re.search(r'Stream #', line)):
                 s_data = {}
                 if(re.search(r'Video:', line)):
-                    s_data['width'] = regex_match(r'(?P<match>\d+)x\d+\s', line)
-                    s_data['height'] = regex_match(r'\d+x(?P<match>\d+)\s', line)
+                    s_data['width'] = regex_match(r'(?P<match>\d+)x\d+[\s,]', line)
+                    s_data['height'] = regex_match(r'\d+x(?P<match>\d+)[\s,]', line)
                     s_data['codec'] = regex_match(r'Video:\s(?P<match>\w+)', line)
                     s_data['bitrate'] = regex_match(r'\s(?P<match>\d+\skb\/s)', line)
                     fps = regex_match(r'\s(?P<match>[\d\.]+)\stbr', line)
