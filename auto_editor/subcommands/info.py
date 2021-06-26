@@ -44,7 +44,7 @@ def info(sys_args=None):
         w, h = aspect_ratio(int(w), int(h))
         if(w is None):
             return ''
-        return '{}:{}'.format(w, h)
+        return ' ({}:{})'.format(w, h)
 
     for file in args.input:
         text = ''
@@ -62,7 +62,9 @@ def info(sys_args=None):
             w = inp.video_streams[0]['width']
             h = inp.video_streams[0]['height']
 
-            text += ' - resolution: {}x{} ({})\n'.format(w, h, aspect_str(w, h))
+            if(w is not None and h is not None):
+                text += ' - resolution: {}x{}{}\n'.format(w, h, aspect_str(w, h))
+
             text += ' - video codec: {}\n'.format(inp.video_streams[0]['codec'])
             text += ' - video bitrate: {}\n'.format(inp.video_streams[0]['bitrate'])
 
