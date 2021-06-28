@@ -5,6 +5,8 @@ from __future__ import print_function
 def levels_options(parser):
     parser.add_argument('--output_file', '--output', '-o', type=str,
         default='data.txt')
+    parser.add_argument('--track', type=int, default=0,
+        help='what audio/video track to get. If --kind is set to motion, track will look at video streams.')
     parser.add_argument('--ffmpeg_location', default=None,
         help='point to your custom ffmpeg file.')
     parser.add_argument('--my_ffmpeg', action='store_true',
@@ -49,12 +51,15 @@ def levels(sys_args=None):
 
     fps = 30 if inp.fps is None else float(inp.fps)
 
+    if(args.track > len(inp.audio_streams)):
+        log.error('Audio track {} does not exist.'.format(args.track))
+
     # Split audio tracks into: 0.wav, 1.wav, etc.
     for t in range(len(inp.audio_streams)):
         ffmpeg.run(['-i', inp.path, '-ac', '2', '-map', '0:a:{}'.format(t),
             os.path.join(temp, '{}.wav'.format(t))])
 
-    sample_rate, audio_data = read(os.path.join(temp, '0.wav'))
+    sample_rate, audio_data = read(os.path.join(temp, '{}.wav'.format(args.track)))
     audio_sample_count = audio_data.shape[0]
 
     def get_max_volume(s):
