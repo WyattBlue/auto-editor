@@ -11,13 +11,13 @@ from platform import system
 from auto_editor.utils.func import get_stdout
 
 def _set_ff_path(dirpath, ff_location, my_ffmpeg):
-        from platform import system
-        if(ff_location is not None):
-            return ff_location
-        if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
-            return 'ffmpeg'
-        program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
-        return os.path.join(dirpath, 'ffmpeg', system(), program)
+    from platform import system
+    if(ff_location is not None):
+        return ff_location
+    if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
+        return 'ffmpeg'
+    program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
+    return os.path.join(dirpath, 'ffmpeg', system(), program)
 
 def _test_path(path, log):
     try:
@@ -97,7 +97,8 @@ class FFmpeg():
                     s_data['height'] = regex_match(r'\d+x(?P<match>\d+)[\s,]', line)
                     s_data['codec'] = regex_match(r'Video:\s(?P<match>\w+)', line)
                     s_data['bitrate'] = regex_match(r'\s(?P<match>\d+\skb\/s)', line)
-                    fps = regex_match(r'\s(?P<match>[\d\.]+)\stbr', line)
+                    if(fps is None):
+                        fps = regex_match(r'\s(?P<match>[\d\.]+)\stbr', line)
                     video_streams.append(s_data)
 
                 elif(re.search(r'Audio:', line)):
@@ -114,7 +115,6 @@ class FFmpeg():
         setattr(file, 'video_streams', video_streams)
         setattr(file, 'audio_streams', audio_streams)
         setattr(file, 'subtitle_streams', subtitle_streams)
-
         return file
 
     def Popen(self, cmd):
