@@ -3,38 +3,71 @@
 <img src="https://img.shields.io/badge/version-21w25a-blue.svg">
 <p align="center"><img src="https://raw.githubusercontent.com/wyattblue/auto-editor/master/articles/imgs/auto-editor_banner.png" title="Auto-Editor" width="700"></p>
 
-**Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing where sections are silent and cutting them up.
+**Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing a variety of methods, most notability audio loudness.
+
+---
 
 Before doing the real editing, you first cut out the "dead space" which is typically silence. This is known as a "first pass". Cutting these is a boring task, especially if the video is very long.
 
-Luckily, auto-editor can do this for you. [Once you'll installed auto-editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md), you can run:
 
 ```
 auto-editor path/to/your/video.mp4
 ```
 
-from the terminal and it will generate a **brand new video** with all the silent sections cut off. Generating a new video **takes a while** so instead, you can export the new video to your editor directly. For example, running:
+<h2 align="center">Cutting</h2>
+
+Change the **pace** of the edited video by using `--frame_margin`.
+
+`--frame_margin` will including small sections that are next to loud parts. A frame margin of 8 will add up to 8 frames before and 8 frames after the loud part.
+
+```
+auto-editor example.mp4 --frame_margin 8
+```
+
+
+<h2 align="center">Installing</h2>
+
+```
+pip3 install auto-editor
+```
+
+See [Installing](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md) more additional instructions.
+
+<h2 align="center">Exporting</h2>
+
+Create an XML file that can be imported to Adobe Premiere Pro using this command:
 
 ```
 auto-editor example.mp4 --export_to_premiere
 ```
 
-Will create an XML file that can be imported to Adobe Premiere Pro. This is **much much faster** than generating a new video (takes usually seconds). DaVinici Resolve and Final Cut Pro are also supported.
+Similar flags exist also for:
 
-```
-auto-editor example.mp4 --export_to_resolve
-```
-
-```
-auto-editor example.mp4 --export_to_final_cut_pro
-```
+- `--export_to_resolve` for DaVinci Resolve.
+- `--export_to_final_cut_pro` for Final Cut Pro.
+- `--export_to_shot_cut` for ShotCut.
 
 
-You can change the **pace** of a video by changing by including frames that are silent but are next to loud parts. A frame margin of 8 will add up to 8 frames before and 8 frames after the loud part.
+<h2 align="center">More Options</h2>
+
+List all available options:
 
 ```
-auto-editor example.mp4 --frame_margin 8
+auto-editor --help
 ```
+
+Use `--help` with a specific option for more information:
+
+```
+$ auto-editor --scale --help
+  --scale
+    scale the output media file by a certain factor.
+
+    type: float_type
+    default: 1
+
+```
+
 
 <h3 align="center">Auto-Editor is available on all platforms</h3>
 <p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/articles/imgs/cross_platform.png" width="500" title="Windows, MacOS, and Linux"></p>
@@ -52,22 +85,6 @@ auto-editor example.mp4 --frame_margin 8
 
 ## Copyright
 Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) but contains non-free elements. See [this page](https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md) for more info.
-
-## Donate
-Paypal
-wyattblue@protonmail.com
-
-Bitcoin (BTC)
-`bc1qpf8xufyu9klawpy3eyxenn67tedahwpvsu8uyk`
-
-Bitcoin Cash (BCH)
-`qzdw2lg7llcyx5ergjv29e9d98kl89dsm5l47kklr0`
-
-Monero (XMR)
-`4At2qRKPnksfmmJG7QdJSwBsarrFiqMrgBjJbvkohaSLXSPzjYR3jCG4wueJxs2xfoBaEVyCToL8phRkCppTiNsJ55ETyZJ`
-
-Pirate Chain (ARRR)
-`zs19e04x5x52nfrj9yxy8s67zwxl6rn3hxyzz3jem0t5dpvc9d7tnjcqr6ltjpupquw2dykksnculm`
 
 
 ## Issues
