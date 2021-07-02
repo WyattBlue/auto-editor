@@ -96,7 +96,6 @@ def main_options(parser):
         help='set the number of bits per second for video.')
     parser.add_argument('--audio_bitrate', '-ab', default='unset', group='exportMediaOps',
         help='set the number of bits per second for audio.')
-    # parser.add_argument('--video_quality', '-')
     parser.add_argument('--sample_rate', '-r', type=sample_rate_type,
         group='exportMediaOps',
         help='set the sample rate of the input and output videos.')
@@ -120,7 +119,7 @@ def main_options(parser):
     parser.add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
         help='choice which method to render video.')
     parser.add_argument('--scale', type=float_type, default=1,
-        help='scale the output media file by a certian factor.')
+        help='scale the output media file by a certain factor.')
     parser.add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
 
@@ -222,7 +221,7 @@ def main_options(parser):
         default=1.00,
         range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='set the speed that "loud" sections should be played at.')
-    parser.add_argument('--frame_margin', '-m', type=frame_type, default=6,
+    parser.add_argument('--frame_margin', '--margin', '-m', type=frame_type, default=6,
         range='0 to Infinity',
         help='set how many "silent" frames of on either side of "loud" sections '\
             'be included.')

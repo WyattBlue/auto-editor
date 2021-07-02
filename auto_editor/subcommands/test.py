@@ -16,6 +16,10 @@ import subprocess
 # Included Libraries
 from auto_editor.utils.func import clean_list
 
+total_tests = 0
+passed_tests = 0
+halt_on_fail = False
+
 class FFprobe():
     def __init__(self, path):
         self.path = path
@@ -82,6 +86,27 @@ def clean_all():
     cleanup('resources')
     cleanup(os.getcwd())
 
+def passed(msg=None):
+    global passed_tests
+    global total_tests
+    passed_tests += 1
+    total_tests += 1
+    if(msg is None):
+        print('Test Succeeded')
+    else:
+        print(msg)
+
+def failed(msg=None):
+    global total_tests
+    total_tests += 1
+    if(msg is None):
+        print('Test Failed.')
+    else:
+        print(msg)
+    if(halt_on_fail):
+        clean_all()
+        sys.exit(1)
+
 def runTest(cmd):
     print('\nRunning: {}'.format(' '.join(cmd)))
 
@@ -92,13 +117,9 @@ def runTest(cmd):
 
     returncode, stdout, stderr = pipe_to_console(cmd)
     if(returncode > 0):
-        print('Test Failed.\n')
-        print(stdout)
-        print(stderr)
-        clean_all()
-        sys.exit(1)
+        failed('Test Failed.\n{}\n{}\n'.format(stdout, stderr))
     else:
-        print('Test Succeeded.')
+        passed()
 
 
 def checkForError(cmd, match=None):
@@ -110,23 +131,15 @@ def checkForError(cmd, match=None):
         if('Error!' in stderr):
             if(match is not None):
                 if(match in stderr):
-                    print('Found match. Test Succeeded.')
+                    passed('Found match. Test Succeeded.')
                 else:
-                    print('Test Failed.\nCould\'t find "{}"'.format(match))
-                    clean_all()
-                    sys.exit(1)
+                    failed('Test Failed.\nCould\'t find "{}"'.format(match))
             else:
-                print('Test Succeeded.')
+                passed()
         else:
-            print('Test Failed.\n')
-            print('Program crashed.\n{}\n{}'.format(stdout, stderr))
-            clean_all()
-            sys.exit(1)
+            failed('Test Failed.\nProgram crashed.\n{}\n{}'.format(stdout, stderr))
     else:
-        print('Test Failed.\n')
-        print('Program responsed with a code 0, but should have failed.')
-        clean_all()
-        sys.exit(1)
+        failed('Test Failed.\nProgram should not responsed with a code 0.')
 
 def fullInspect(fileName, *args):
     for item in args:
@@ -144,9 +157,8 @@ def fullInspect(fileName, *args):
             print('Inspection Failed.')
             print('Expected Value: {} {}'.format(expectedOutput, type(expectedOutput)))
             print('Actual Value: {} {}'.format(func(fileName), type(func(fileName))))
-            clean_all()
-            sys.exit(1)
-    print('Inspection Passed.')
+            failed()
+    passed('Inspection Passed.')
 
 def test(sys_args=None):
     ffprobe = FFprobe('ffprobe')
@@ -211,6 +223,7 @@ def test(sys_args=None):
     )
 
     runTest(['example.mp4', '-m', '3'])
+    runTest(['example.mp4', '--margin', '3'])
     runTest(['example.mp4', '-m', '0.3sec'])
 
     shutil.copy('example.mp4', 'example')
@@ -338,6 +351,7 @@ def test(sys_args=None):
     runTest(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion', '--debug',
         '--frame_margin', '0', '-mcut', '0', '-mclip', '0'])
 
+    print('{}/{}'.format(passed_tests, total_tests))
     clean_all()
 
 if(__name__ == '__main__'):
