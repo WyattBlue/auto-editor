@@ -88,7 +88,7 @@ def _to_key(val):
     return val['names'][0].replace('-', '')
 
 class ArgumentParser():
-    def __init__(self, program_name, version, description):
+    def __init__(self, program_name, version, description=None):
         self.program_name = program_name
         self._version = version
         self.description = description
@@ -122,7 +122,7 @@ class ArgumentParser():
         self.args.append(my_dict)
 
     def parse_args(self, sys_args, log, root):
-        if(sys_args == []):
+        if(sys_args == [] and self.description):
             out(self.description)
             sys.exit()
 
