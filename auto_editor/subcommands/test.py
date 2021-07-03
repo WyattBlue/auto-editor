@@ -18,13 +18,10 @@ from auto_editor.utils.func import clean_list
 from auto_editor.utils.log import Log
 import auto_editor.vanparse as vanparse
 
-passed_tests = 0
-failed_tests = 0
-allowable_fails = 1
-
 def test_options(parser):
     parser.add_argument('--ffprobe_location', default='ffprobe',
         help='point to your custom ffmpeg file.')
+    parser.add_argument('--only', '-n', nargs='*')
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
     return parser
@@ -71,11 +68,6 @@ class FFprobe():
     def getSampleRate(self, file, track=0):
         return self._get(file, 'sample_rate', 'a', track)
 
-def getRunner():
-    if(platform.system() == 'Windows'):
-        return ['py', '-m', 'auto_editor']
-    return ['python3', '-m', 'auto_editor']
-
 
 def pipe_to_console(cmd):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -96,10 +88,15 @@ def clean_all():
     cleanup(os.getcwd())
 
 
+def getRunner():
+    if(platform.system() == 'Windows'):
+        return ['py', '-m', 'auto_editor']
+    return ['python3', '-m', 'auto_editor']
+
+
 def run_program(cmd):
-    add_no_open = '.' in cmd[0]
     cmd = getRunner() + cmd
-    if(add_no_open):
+    if('.' in cmd[0]):
         cmd += ['--no_open']
 
     returncode, stdout, stderr = pipe_to_console(cmd)
@@ -133,22 +130,37 @@ def fullInspect(fileName, *args):
             raise Exception('Inspection Failed.')
 
 
-def run_test(name, func, description='', cleanup=None):
-    global failed_tests
-    global passed_tests
-    try:
-        func()
-    except Exception as e:
-        failed_tests += 1
-        print('{} Failed.'.format(name))
-        print(e)
-        if(failed_tests > allowable_fails):
-            clean_all()
+class Tester():
+    def __init__(self, args):
+        self.passed_tests = 0
+        self.failed_tests = 0
+        self.allowable_fails = 0
+        self.args = args
+
+    def run_test(self, name, func, description='', cleanup=None):
+        if(self.args.only != [] and name not in self.args.only):
+            return
+        try:
+            func()
+        except Exception as e:
+            self.failed_tests += 1
+            print('{} Failed.'.format(name))
+            print(e)
+            if(self.failed_tests > self.allowable_fails):
+                clean_all()
+                sys.exit(1)
+        else:
+            self.passed_tests += 1
+            print('{} Passed.'.format(name))
+            if(cleanup is not None):
+                cleanup()
+
+    def end(self):
+        print('{}/{}'.format(tester.passed_tests, tester.passed_tests + tester.failed_tests))
+        clean_all()
+        if(self.failed_tests > self.allowable_fails):
             sys.exit(1)
-    passed_tests += 1
-    print('{} Passed.'.format(name))
-    if(cleanup is not None):
-        cleanup()
+        sys.exit(0)
 
 def test(sys_args=None):
     parser = vanparse.ArgumentParser('test', 'version')
@@ -159,6 +171,8 @@ def test(sys_args=None):
 
     args = parser.parse_args(sys_args, Log(), 'levels')
     ffprobe = FFprobe(args.ffprobe_location)
+
+    tester = Tester(args)
 
     def help_tests():
         run_program(['--help'])
@@ -173,7 +187,7 @@ def test(sys_args=None):
         run_program(['-h', '--help'])
         run_program(['--help', '-h'])
         run_program(['-h', '--help'])
-    run_test('help_tests', help_tests, description='check the help option, '\
+    tester.run_test('help_tests', help_tests, description='check the help option, '\
         'its short, and help on options and groups.')
 
     def version_debug():
@@ -187,7 +201,7 @@ def test(sys_args=None):
         if(ffprobe.getFrameRate('example.mp4') != 30.0):
             print('getFrameRate did not equal 30.0')
             sys.exit(1)
-    run_test('version_tests', version_debug)
+    tester.run_test('version_tests', version_debug)
 
     def info_tests():
         run_program(['info', 'example.mp4'])
@@ -195,13 +209,12 @@ def test(sys_args=None):
         run_program(['info', 'resources/multi-track.mov'])
         run_program(['info', 'resources/newCommentary.mp3'])
         run_program(['info', 'resources/test.mkv'])
-    run_test('info_tests', info_tests)
+    tester.run_test('info_tests', info_tests)
 
-    def level_subcommand_tests():
+    def level_tests():
         run_program(['levels', 'example.mp4'])
         run_program(['levels', 'resources/newCommentary.mp3'])
-
-    run_test('level_tests', level_subcommand_tests, lambda a: os.remove('data.txt'))
+    tester.run_test('level_tests', level_tests, lambda a: os.remove('data.txt'))
 
     def example_tests():
         run_program(['example.mp4'])
@@ -219,7 +232,11 @@ def test(sys_args=None):
             [ffprobe.getVideoCodec, 'mpeg4'],
             [ffprobe.getSampleRate, '48000'],
         )
-    run_test('example_tests', example_tests)
+    tester.run_test('example_tests', example_tests)
+
+    def gif_test():
+        run_program(['resources/man_on_green_screen.gif', '--edit', 'none'])
+    tester.run_test('gif_test', gif_test, description='run gif files', cleanup=clean_all)
 
     def render_tests():
         run_program(['example.mp4', '--render', 'opencv'])
@@ -229,13 +246,13 @@ def test(sys_args=None):
             [ffprobe.getResolution, '1280x720'],
             [ffprobe.getSampleRate, '48000'],
         )
-    run_test('render_tests', render_tests)
+    tester.run_test('render_tests', render_tests)
 
     def margin_tests():
         run_program(['example.mp4', '-m', '3'])
         run_program(['example.mp4', '--margin', '3'])
         run_program(['example.mp4', '-m', '0.3sec'])
-    run_test('margin_tests', margin_tests)
+    tester.run_test('margin_tests', margin_tests)
 
     def extension_tests():
         shutil.copy('example.mp4', 'example')
@@ -248,34 +265,34 @@ def test(sys_args=None):
         run_program(['resources/test.mkv', '-o', 'test.mp4'])
         os.remove('test.mp4')
 
-    run_test('extension_tests', extension_tests)
+    tester.run_test('extension_tests', extension_tests)
 
     def progress_ops_test():
         run_program(['example.mp4', 'progressOps', '--machine_readable_progress'])
         run_program(['example.mp4', 'progressOps', '--no_progress'])
-    run_test('progress_ops_test', extension_tests)
+    tester.run_test('progress_ops_test', progress_ops_test)
 
     def silent_threshold():
         run_program(['resources/newCommentary.mp3', '--silent_threshold', '0.1'])
-    run_test('silent_threshold', silent_threshold)
+    tester.run_test('silent_threshold', silent_threshold)
 
     def track_tests():
         run_program(['resources/multi-track.mov', '--cut_by_all_tracks'])
         run_program(['resources/multi-track.mov', '--keep_tracks_seperate'])
         run_program(['example.mp4', '--cut_by_this_audio', 'resources/newCommentary.mp3'])
-    run_test('track_tests', track_tests)
+    tester.run_test('track_tests', track_tests)
 
     def json_tests():
         run_program(['example.mp4', '--export_as_json'])
         run_program(['example.json'])
-    run_test('json_tests', json_tests)
+    tester.run_test('json_tests', json_tests)
 
     def speed_tests():
         run_program(['example.mp4', '-s', '2', '-mcut', '10'])
         run_program(['example.mp4', '-v', '2', '-mclip', '4'])
         run_program(['example.mp4', '--sounded_speed', '0.5'])
         run_program(['example.mp4', '--silent_speed', '0.5'])
-    run_test('speed_tests', speed_tests)
+    tester.run_test('speed_tests', speed_tests)
 
     def scale_tests():
         run_program(['example.mp4', '--scale', '1.5', '--render', 'av'])
@@ -309,7 +326,7 @@ def test(sys_args=None):
             [ffprobe.getResolution, '256x144'],
             [ffprobe.getSampleRate, '48000'],
         )
-    run_test('scale_tests', scale_tests)
+    tester.run_test('scale_tests', scale_tests)
 
     def various_errors_test():
         checkForError(['example.mp4', '--zoom', '0,60,1.5', '--render', 'av'])
@@ -318,7 +335,7 @@ def test(sys_args=None):
         checkForError(['example.mp4', '--rectangle', '0,60,0,10,10,20', '--render', 'av'])
         checkForError(['example.mp4', '--rectangle', '0,60'])
         checkForError(['example.mp4', '--background', '000'])
-    run_test('various_errors_test', various_errors_test)
+    tester.run_test('various_errors_test', various_errors_test)
 
     def create_sub_test():
         run_program(['create', 'test', '--width', '640', '--height', '360', '-o',
@@ -328,7 +345,7 @@ def test(sys_args=None):
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '640x360'],
         )
-    run_test('create_sub_test', create_sub_test)
+    tester.run_test('create_sub_test', create_sub_test)
 
     def effect_tests():
         run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom', '10,60,2'])
@@ -347,7 +364,8 @@ def test(sys_args=None):
             '0,30,0,200,100,300,#43FA56,10'])
         os.remove('testsrc_ALTERED.mp4')
         os.remove('testsrc.mp4')
-    run_test('effect_tests', effect_tests, description='test the zoom and rectangle options',
+    tester.run_test('effect_tests', effect_tests,
+        description='test the zoom and rectangle options',
         cleanup=clean_all)
 
     def export_tests():
@@ -363,26 +381,26 @@ def test(sys_args=None):
             run_program([item, '--export_as_clip_sequence'])
             run_program([item, '--preview'])
             cleanup('resources')
-    run_test('export_tests', export_tests)
+    tester.run_test('export_tests', export_tests)
 
     def codec_tests():
         run_program(['example.mp4', '--video_codec', 'h264', '--preset', 'faster'])
         run_program(['example.mp4', '--audio_codec', 'ac3'])
         run_program(['resources/newCommentary.mp3', 'exportMediaOps', '-acodec', 'pcm_s16le'])
-    run_test('codec_tests', codec_tests)
+    tester.run_test('codec_tests', codec_tests)
 
     def combine_tests():
         run_program(['example.mp4', '--mark_as_silent', '0,171', '-o', 'hmm.mp4'])
         run_program(['example.mp4', 'hmm.mp4', '--combine_files', '--debug'])
         os.remove('hmm.mp4')
-    run_test('combine_tests', combine_tests)
+    tester.run_test('combine_tests', combine_tests)
 
-
-    run_program(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion', '--debug',
-        '--frame_margin', '0', '-mcut', '0', '-mclip', '0'])
-
-    print('{}/{}'.format(passed_tests, passed_tests + failed_tests))
-    clean_all()
+    def motion_tests():
+        run_program(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion',
+         '--debug', '--frame_margin', '0', '-mcut', '0', '-mclip', '0'])
+        run_program(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion',
+            '--motion_threshold', '0'])
+    tester.run_test('motion_tests', motion_tests)
 
 if(__name__ == '__main__'):
     test()

@@ -6,9 +6,22 @@ import math
 
 import numpy as np
 
+def get_blank_list(inp, audioData, sampleRate, fps):
+    if(audioData is not None):
+        audioSampleCount = audioData.shape[0]
+        samplesPerFrame = sampleRate / fps
+        audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
+        return np.ones((audioFrameCount), dtype=np.bool_)
+
+    import cv2
+    cap = cv2.VideoCapture(inp.path)
+    totalFrames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) + 1
+    return np.ones((totalFrames), dtype=np.bool_)
+
 def audio_detection(audioData, sampleRate, silent_threshold, fps, log):
     # (audioData: np.ndarray, sampleRate: int, silent_threshold: float,
     #    fps: float, log) -> np.ndarray:
+    log.debug('Analyzing audio volume.')
 
     def getMaxVolume(s):
         # (s: np.ndarray) -> float:
@@ -45,6 +58,8 @@ def motion_detection(inp, motionThreshold, log, width, dilates, blur):
 
     import cv2
     from auto_editor.utils.progressbar import ProgressBar
+
+    log.debug('Analyzing video motion.')
 
     cap = cv2.VideoCapture(inp.path)
 

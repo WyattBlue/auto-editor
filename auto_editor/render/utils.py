@@ -12,6 +12,8 @@ def fset(cmd, option, value):
 def properties(cmd, args, inp):
     if(args.video_codec == 'uncompressed'):
         cmd.extend(['-vcodec', 'mpeg4', '-qscale:v', '1'])
+    elif(inp.ext == '.gif'):
+        cmd.extend(['-vcodec', 'gif'])
     elif(args.video_codec == 'copy'):
         new_codec = inp.video_streams[0]['codec']
         if(new_codec != 'dvvideo'): # This codec seems strange.

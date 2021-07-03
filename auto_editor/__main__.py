@@ -151,8 +151,8 @@ def main_options(parser):
     parser.add_argument('--motion_threshold', type=float_type, default=0.02,
         range='0 to 1',
         help='how much motion is required to be considered "moving"')
-    parser.add_argument('--edit_based_on', default='audio',
-        choices=['audio', 'motion', 'not_audio', 'not_motion', 'audio_or_motion',
+    parser.add_argument('--edit_based_on', '--edit', default='audio',
+        choices=['audio', 'motion', 'none', 'not_audio', 'not_motion', 'audio_or_motion',
             'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
             'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
@@ -237,31 +237,34 @@ def get_chunks(inp, speeds, segment, fps, args, log, audioData=None, sampleRate=
     from auto_editor.cutting import (combine_audio_motion, combine_segment,
         apply_spacing_rules, apply_frame_margin, seconds_to_frames, cook, chunkify)
 
-    audioList, motionList = None, None
-    if('audio' in args.edit_based_on):
-        log.debug('Analyzing audio volume.')
-        from auto_editor.analyze import audio_detection
-        audioList = audio_detection(audioData, sampleRate, args.silent_threshold,
-            fps, log)
+    frame_margin = seconds_to_frames(args.frame_margin, fps)
+    min_clip = seconds_to_frames(args.min_clip_length, fps)
+    min_cut = seconds_to_frames(args.min_cut_length, fps)
 
-    if('motion' in args.edit_based_on):
-        log.debug('Analyzing video motion.')
-        from auto_editor.analyze import motion_detection
-        motionList = motion_detection(inp, args.motion_threshold, log,
-            width=args.width, dilates=args.dilates, blur=args.blur)
+    def get_has_loud(inp, args, fps, audioData, sampleRate, log):
+        from auto_editor.analyze import get_blank_list, audio_detection, motion_detection
+        if(args.edit_based_on == 'none'):
+            return get_blank_list(inp, audioData, sampleRate, fps)
 
-        if(audioList is not None):
+        audioList, motionList = None, None
+
+        if('audio' in args.edit_based_on):
+            audioList = audio_detection(audioData, sampleRate,
+                args.silent_threshold, fps, log)
+
+        if('motion' in args.edit_based_on):
+            motionList = motion_detection(inp, args.motion_threshold, log,
+                width=args.width, dilates=args.dilates, blur=args.blur)
+
+        if(audioList is not None and motionList is not None):
             if(len(audioList) > len(motionList)):
                 audioList = audioList[:len(motionList)]
             elif(len(motionList) > len(audioList)):
                 motionList = motionList[:len(audioList)]
 
-    has_loud = combine_audio_motion(audioList, motionList, args.edit_based_on, log)
+        return combine_audio_motion(audioList, motionList, args.edit_based_on, log)
 
-    frame_margin = seconds_to_frames(args.frame_margin, fps)
-    min_clip = seconds_to_frames(args.min_clip_length, fps)
-    min_cut = seconds_to_frames(args.min_cut_length, fps)
-
+    has_loud = get_has_loud(inp, args, fps, audioData, sampleRate, log)
     has_loud = cook(has_loud, min_clip, min_cut)
     has_loud_length = len(has_loud)
     has_loud = apply_frame_margin(has_loud, has_loud_length, frame_margin)
@@ -385,6 +388,10 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         has_vfr = hasVFR(cmd, log)
         del cmd
 
+        if(len(inp.video_streams) > 0 and tracks == 0):
+            # Doesn't matter because we don't need to align to an audio track.
+            has_vfr = False
+
         if(tracks != 0):
             if(args.cut_by_all_tracks):
                 temp_file = os.path.join(TEMP, 'combined.wav')
@@ -473,7 +480,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         return num_cuts, newOutput
 
     def makeVideoFile(inp, chunks, output):
-        from auto_editor.utils.video import handleAudioTracks, muxVideo
+        from auto_editor.utils.video import handleAudioTracks, mux_rename_video
         continueVid = handleAudioTracks(ffmpeg, output, args, tracks, chunks,
             speeds, fps, TEMP, log)
         if(continueVid):
@@ -510,7 +517,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
             else:
                 log.conwrite('Writing the output file.')
 
-            muxVideo(ffmpeg, output, args, tracks, TEMP, log)
+            mux_rename_video(ffmpeg, output, args, tracks, TEMP, log)
             if(output is not None and not os.path.isfile(output)):
                 log.bug('The file {} was not created.'.format(output))
 

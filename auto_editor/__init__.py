@@ -1,4 +1,4 @@
 '''__init__.py'''
 
-__version__ = '21.25.1'
-version = '21w25a'
+__version__ = '21.26.1'
+version = '21w26a'
