@@ -36,7 +36,13 @@ def handleAudioTracks(ffmpeg, write_file, args, tracks, chunks, speeds, fps, tem
         return False
     return True
 
-def muxVideo(ffmpeg, write_file, args, tracks, temp, log):
+def mux_rename_video(ffmpeg, write_file, args, tracks, temp, log):
+
+    if(tracks == 0):
+        move(os.path.join(temp, 'spedup.mp4'), write_file)
+        log.conwrite('')
+        return
+
     cmd = []
     if(args.keep_tracks_seperate):
         for t in range(tracks):
