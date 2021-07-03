@@ -146,8 +146,8 @@ class Tester():
             self.failed_tests += 1
             print('{} Failed.'.format(name))
             print(e)
+            clean_all()
             if(self.failed_tests > self.allowable_fails):
-                clean_all()
                 sys.exit(1)
         else:
             self.passed_tests += 1
@@ -156,7 +156,7 @@ class Tester():
                 cleanup()
 
     def end(self):
-        print('{}/{}'.format(tester.passed_tests, tester.passed_tests + tester.failed_tests))
+        print('{}/{}'.format(self.passed_tests, self.passed_tests + self.failed_tests))
         clean_all()
         if(self.failed_tests > self.allowable_fails):
             sys.exit(1)
@@ -169,7 +169,7 @@ def test(sys_args=None):
     if(sys_args is None):
         sys_args = sys.args[1:]
 
-    args = parser.parse_args(sys_args, Log(), 'levels')
+    args = parser.parse_args(sys_args, Log(), 'test')
     ffprobe = FFprobe(args.ffprobe_location)
 
     tester = Tester(args)
@@ -401,6 +401,8 @@ def test(sys_args=None):
         run_program(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion',
             '--motion_threshold', '0'])
     tester.run_test('motion_tests', motion_tests)
+
+    tester.end()
 
 if(__name__ == '__main__'):
     test()

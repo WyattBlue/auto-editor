@@ -249,12 +249,18 @@ def get_chunks(inp, speeds, segment, fps, args, log, audioData=None, sampleRate=
         audioList, motionList = None, None
 
         if('audio' in args.edit_based_on):
-            audioList = audio_detection(audioData, sampleRate,
-                args.silent_threshold, fps, log)
+            if(audioData is None):
+                audioList = get_blank_list(inp, audioData, sampleRate, fps)
+            else:
+                audioList = audio_detection(audioData, sampleRate, args.silent_threshold,
+                    fps, log)
 
         if('motion' in args.edit_based_on):
-            motionList = motion_detection(inp, args.motion_threshold, log,
-                width=args.width, dilates=args.dilates, blur=args.blur)
+            if(len(inp.video_streams) == 0):
+                motionList = get_blank_list(inp, audioData, sampleRate, fps)
+            else:
+                motionList = motion_detection(inp, args.motion_threshold, log,
+                    width=args.width, dilates=args.dilates, blur=args.blur)
 
         if(audioList is not None and motionList is not None):
             if(len(audioList) > len(motionList)):
