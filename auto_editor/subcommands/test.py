@@ -68,6 +68,19 @@ class FFprobe():
     def getSampleRate(self, file, track=0):
         return self._get(file, 'sample_rate', 'a', track)
 
+    def AudioBitRate(self, file):
+
+        def bitrate_format(num):
+            magnitude = 0
+            while abs(num) >= 1000:
+                magnitude += 1
+                num /= 1000.0
+            num = int(round(num))
+            return '%d%s' % (num, ['', 'k', 'm', 'g', 't', 'p'][magnitude])
+
+        exact_bitrate = self._get(file, 'bit_rate', 'a', 0)
+        return bitrate_format(int(exact_bitrate))
+
 
 def pipe_to_console(cmd):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -95,8 +108,10 @@ def getRunner():
 
 
 def run_program(cmd):
+    no_open = '.' in cmd[0]
     cmd = getRunner() + cmd
-    if('.' in cmd[0]):
+
+    if(no_open):
         cmd += ['--no_open']
 
     returncode, stdout, stderr = pipe_to_console(cmd)
@@ -125,16 +140,15 @@ def fullInspect(fileName, *args):
                 from math import ceil
                 if(ceil(func(fileName) * 100) == expectedOutput * 100):
                     continue
-            print('Expected Value: {} {}'.format(expectedOutput, type(expectedOutput)))
-            print('Actual Value: {} {}'.format(func(fileName), type(func(fileName))))
-            raise Exception('Inspection Failed.')
+            raise Exception('Inspection Failed. Was {}, Expected {}.'.format(
+                expectedOutput, func(fileName)))
 
 
 class Tester():
     def __init__(self, args):
         self.passed_tests = 0
         self.failed_tests = 0
-        self.allowable_fails = 0
+        self.allowable_fails = 1
         self.args = args
 
     def run_test(self, name, func, description='', cleanup=None):
@@ -233,6 +247,14 @@ def test(sys_args=None):
             [ffprobe.getSampleRate, '48000'],
         )
     tester.run_test('example_tests', example_tests)
+
+    def output_settings_tests():
+        run_program(['example.mp4', '--audio_bitrate', '50k'])
+        fullInspect(
+            'example_ALTERED.mp4',
+            [ffprobe.AudioBitRate, '50k'],
+        )
+    tester.run_test('output_settings_tests', output_settings_tests)
 
     def gif_test():
         run_program(['resources/man_on_green_screen.gif', '--edit', 'none'])
