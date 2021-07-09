@@ -315,7 +315,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         os.remove(newOutput)
 
     def user_sample_rate(args_sample, inp):
-        # (args_sample: int | str | None, inp) -> str | None:
+        # type: (int | str | None, Any) -> str | None
         if(args_sample is None):
             if(len(inp.audio_streams) > 0):
                 return inp.audio_streams[0]['samplerate']

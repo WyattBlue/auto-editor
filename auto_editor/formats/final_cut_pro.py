@@ -7,7 +7,8 @@ def fcp_xml(inp, temp, output, clips, tracks, total_dur, audioFile, fps, log):
     pathurl = 'file://' + inp.abspath
     name = inp.basename
 
-    def fraction(a, fps) -> str:
+    def fraction(a, fps):
+        # type: (...) -> str
         from fractions import Fraction
 
         if(a == 0):

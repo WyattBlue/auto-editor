@@ -19,12 +19,11 @@ def get_blank_list(inp, audioData, sampleRate, fps):
     return np.ones((totalFrames), dtype=np.bool_)
 
 def audio_detection(audioData, sampleRate, silent_threshold, fps, log):
-    # (audioData: np.ndarray, sampleRate: int, silent_threshold: float,
-    #    fps: float, log) -> np.ndarray:
+    # type: (np.ndarray, int, float, float, Any) -> np.ndarray
     log.debug('Analyzing audio volume.')
 
     def getMaxVolume(s):
-        # (s: np.ndarray) -> float:
+        # type: (np.ndarray) -> float
         maxv = float(np.max(s))
         minv = float(np.min(s))
         return max(maxv, -minv)
@@ -51,7 +50,7 @@ def audio_detection(audioData, sampleRate, silent_threshold, fps, log):
 
 
 def motion_detection(inp, motionThreshold, log, width, dilates, blur):
-    # (inp, motionThreshold: float, log, width: int, dilates: int, blur: int) -> np.ndarray:
+    # type: (Any, float, Any, int, int, int) -> np.ndarray
 
     # Based on this post:
     # https://pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/

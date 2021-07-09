@@ -1,8 +1,11 @@
 '''interpolate.py'''
 
+from __future__ import division
+
 import math
 
-def linear(x: int, y: int, n: int) -> list:
+def linear(x, y, n):
+    # type: (float, int, int) -> list[int | float]
     b = [x]
     step = (y - x) / n
     incre = x
@@ -16,7 +19,8 @@ def linear(x: int, y: int, n: int) -> list:
 # See how these formulas are derived:
 # - https://www.desmos.com/calculator/jj4tociyb4
 
-def sine(x, y, n: int) -> list:
+def sine(x, y, n):
+    # type: (int, int, int) -> list[int | float]
     # slow -> fast -> slow
 
     b = [x]
@@ -30,7 +34,9 @@ def sine(x, y, n: int) -> list:
     b.append(y)
     return b
 
-def start_sine(x, y, n: int) -> list:
+# TODO: fix so it's not that same as sine()
+def start_sine(x, y, n):
+    # type: (int, int, int) -> list[int | float]
     # slow -> fast
 
     b = [x]
@@ -43,7 +49,8 @@ def start_sine(x, y, n: int) -> list:
     b.append(y)
     return b
 
-def end_sine(x, y, n: int) -> list:
+def end_sine(x, y, n):
+    # type: (int, int, int) -> list[int | float]
     # fast -> slow
 
     b = [x]
@@ -57,7 +64,8 @@ def end_sine(x, y, n: int) -> list:
     b.append(y)
     return b
 
-def interpolate(x, y, n, log, method='linear') -> list:
+def interpolate(x, y, n, log, method='linear'):
+    # type: (int, int, int, Any, str) -> list[int | float]
     if(method == 'linear'):
         return linear(x, y, n)
     elif(method == 'sine'):
