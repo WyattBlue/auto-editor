@@ -11,8 +11,6 @@ from auto_editor.scipy.wavfile import read, write
 def convertAudio(ffmpeg, in_file, inp, out_file, codec, log):
     if(fnone(codec)):
         codec = inp.audio_streams[0]['codec']
-    if(codec == 'pcm_s16le' and out_file.endswith('.m4a')):
-        log.error('Codec: {} is not supported in the m4a container.'.format(codec))
 
     ffmpeg.run(['-i', in_file, '-acodec', codec, out_file])
 
