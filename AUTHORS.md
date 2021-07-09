@@ -4,10 +4,14 @@
 @WyattBlue
 
 ### Contributions
+@OParczyk
 @m-rey
+@Saya47
+@Steffo99
+@mrioqueiroz
 @zoe1337
 @eykd
-@mlinje
+@mlinaje
 
 ### Early Testers
 Breadstick King#2906
