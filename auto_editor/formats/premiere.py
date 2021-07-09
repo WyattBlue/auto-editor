@@ -11,7 +11,8 @@ ntsc = 'FALSE'
 ana = 'FALSE' # anamorphic
 depth = '16'
 
-def fix_url(path: str) -> str:
+def fix_url(path):
+    # type: (str) -> str
     from urllib.parse import quote
     from platform import system
     from os.path import abspath
@@ -20,7 +21,8 @@ def fix_url(path: str) -> str:
         return'file://localhost/' + quote(abspath(path)).replace('%5C', '/')
     return 'file://localhost' + abspath(path)
 
-def speedup(speed) -> str:
+def speedup(speed):
+    # type: (...) -> str
     return indent(6, '<filter>', '\t<effect>', '\t\t<name>Time Remap</name>',
         '\t\t<effectid>timeremap</effectid>',
         '\t\t<effectcategory>motion</effectcategory>',
