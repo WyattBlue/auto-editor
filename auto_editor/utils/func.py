@@ -15,7 +15,7 @@ def get_stdout(cmd):
     return stdout.decode()
 
 def clean_list(x, rm_chars):
-    # (x: list, rm_chars: str) -> list
+    # type: (list, str) -> list
     new_list = []
     for item in x:
         for char in rm_chars:
@@ -24,7 +24,7 @@ def clean_list(x, rm_chars):
     return new_list
 
 def aspect_ratio(width, height):
-    # (width: int, height: int) -> tuple(2)
+    # type: (int, int) -> tuple(2)
     if(height == 0):
         return None, None
 
@@ -37,7 +37,7 @@ def aspect_ratio(width, height):
     return width // c, height // c
 
 def get_new_length(chunks, speeds, fps):
-    # (chunks: list, speeds: list, fps: float) -> float
+    # type: (list[list[int]], list[float | int], float) -> float
     timeInFrames = 0
     for chunk in chunks:
         leng = chunk[1] - chunk[0]

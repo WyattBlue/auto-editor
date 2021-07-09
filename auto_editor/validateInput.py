@@ -44,7 +44,7 @@ def parse_bytes(bytestr):
 
 
 def sponsor_block_api(_id, categories, log):
-    # (_id: str, categories: list, log) -> dict
+    # type: (str, list, Any) -> dict
     from urllib import request
     from urllib.error import HTTPError
     import json
@@ -109,7 +109,6 @@ def download_video(my_input, args, ffmpeg, log):
     return outtmpl
 
 def _valid_files(path, bad_exts):
-    # (path: str, badExts: list)
     for f in os.listdir(path):
         if(f[f.rfind('.'):] not in bad_exts and not os.path.isdir(f)
             and not f.startswith('.')):
@@ -127,7 +126,6 @@ def get_segment(args, my_input, log):
     return None
 
 def valid_input(inputs, ffmpeg, args, log):
-    # (inputs: list, ffmpeg, args, log) -> list:
     new_inputs = []
     segments = []
     for my_input in inputs:

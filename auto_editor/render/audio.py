@@ -15,7 +15,7 @@ def convertAudio(ffmpeg, in_file, inp, out_file, codec, log):
     ffmpeg.run(['-i', in_file, '-acodec', codec, out_file])
 
 def handleAudio(ffmpeg, in_file, audioBit, samplerate, temp, log):
-    # () -> str:
+    # type: (...) -> str
     temp_file = os.path.join(temp, 'faAudio.wav')
 
     log.checkType(samplerate, 'samplerate', str)

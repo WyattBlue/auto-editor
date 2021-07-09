@@ -5,7 +5,7 @@ from __future__ import print_function
 import numpy as np
 
 def combine_audio_motion(audioList, motionList, based, log):
-    # (audioList: np.ndarray, motionList: np.ndarray, based: str, log) -> np.ndarray:
+    # type: (np.ndarray, np.ndarray, str, Any) -> np.ndarray
 
     if(based == 'audio' or based == 'not_audio'):
         if(max(audioList) == 0):
@@ -61,7 +61,7 @@ def combine_segment(has_loud, segment, fps):
 
 
 def removeSmall(has_loud, lim, replace, with_):
-    # (has_loud: np.ndarray, lim: int, replace: bool, with_: bool) -> np.ndarray:
+    # type: (np.ndarray, int, int, int) -> np.ndarray
     startP = 0
     active = False
     for j, item in enumerate(has_loud):
@@ -82,12 +82,14 @@ def removeSmall(has_loud, lim, replace, with_):
 
 
 def is_number(val):
+    # type: (str) -> bool
     return val.replace('.', '', 1).isdigit()
 
 def setRange(has_loud, syntaxRange, fps, with_, log):
-    # (has_loud: np.ndarray, syntaxRange, fps: float, with_, log) -> np.ndarray:
+    # type: (...) -> np.ndarray
 
     def replace_variables_to_values(item):
+        # type: (str) -> int
         if(is_number(item)):
             return int(item)
         if(item == 'start'):
@@ -98,9 +100,9 @@ def setRange(has_loud, syntaxRange, fps, with_, log):
             log.error('Seconds unit not implemented in this function.')
         log.error('Variable {} not avaiable in this context.'.format(item))
 
-    def var_val_to_frames(num):
-        # (num) -> int:
-        num = replace_variables_to_values(num)
+    def var_val_to_frames(val):
+        # type: (str) -> int
+        num = replace_variables_to_values(val)
         if(num < 0):
             num = len(has_loud) - num
         return num
@@ -112,13 +114,13 @@ def setRange(has_loud, syntaxRange, fps, with_, log):
 
 
 def seconds_to_frames(value, fps):
-    # (int | str, float) -> int:
+    # type: (int | str, float) -> int
     if(isinstance(value, str)):
         return int(float(value) * fps)
     return value
 
 def cook(has_loud, minClip, minCut):
-    # (has_loud: np.ndarray, minClip: int, minCut: int) -> np.ndarray:
+    # type: (np.ndarray, int, int) -> np.ndarray
     has_loud = removeSmall(has_loud, minClip, replace=1, with_=0)
     has_loud = removeSmall(has_loud, minCut, replace=0, with_=1)
     return has_loud
@@ -127,7 +129,7 @@ def cook(has_loud, minClip, minCut):
 # Turn long silent/loud array to formatted chunk list.
 # Example: [True, True, True, False, False] => [[0, 3, 1], [3, 5, 0]]
 def chunkify(has_loud, has_loud_length=None):
-    # (np.ndarray, int) -> list:
+    # type: (np.ndarray, int | None) -> list[list[int]]
     if(has_loud_length is None):
         has_loud_length = len(has_loud)
 
@@ -142,7 +144,7 @@ def chunkify(has_loud, has_loud_length=None):
 
 
 def apply_frame_margin(has_loud, has_loud_length, frame_margin):
-    # (np.ndarray, int, int) -> np.ndarray:
+    # type: (np.ndarray, int, int) -> np.ndarray
     new = np.zeros((has_loud_length), dtype=np.uint8)
     for i in range(has_loud_length):
         start = int(max(0, i - frame_margin))
@@ -151,7 +153,7 @@ def apply_frame_margin(has_loud, has_loud_length, frame_margin):
     return new
 
 def apply_spacing_rules(has_loud, has_loud_length, minClip, minCut, speeds, fps, args, log):
-    # (has_loud: np.ndarray, speeds: list, fps: float, args, log) -> list:
+    # type: (...) -> list[list[int]]
     if(args.mark_as_loud != []):
         has_loud = setRange(has_loud, args.mark_as_loud, fps, 1, log)
 
@@ -174,7 +176,7 @@ def apply_spacing_rules(has_loud, has_loud_length, minClip, minCut, speeds, fps,
 
 
 def apply_basic_spacing(has_loud, fps, minClip, minCut, log):
-    # (has_loud: np.ndarray, fps: float, minClip: int, minCut: int, log) -> list:
+    # type: (np.ndarray, float, int, int, Any) -> list[list[int]]
     minClip = seconds_to_frames(minClip, fps)
     minCut = seconds_to_frames(minCut, fps)
 
@@ -183,7 +185,7 @@ def apply_basic_spacing(has_loud, fps, minClip, minCut, log):
 
 
 def merge(start_list, end_list):
-    # (start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
+    # type: (np.ndarray, np.ndarray) -> np.ndarray
     merge = np.zeros((len(start_list)), dtype=np.bool_)
 
     startP = 0
@@ -197,7 +199,7 @@ def merge(start_list, end_list):
 
 
 def handleBoolExp(val, data, sampleRate, fps, log):
-    # (val: str, data, sampleRate, fps, log) -> list:
+    # type: (...) -> np.ndarray
     invert = False
 
     if('>' in val and '<' in val):

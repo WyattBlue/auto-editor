@@ -33,7 +33,7 @@ def sample_rate_type(num):
     return int(num)
 
 def frame_type(num):
-    # (num: str) -> int | str:
+    # type: (str) -> int | str
     if(num.endswith('f')):
         return int(num[:-1])
     if(num.endswith('sec')):

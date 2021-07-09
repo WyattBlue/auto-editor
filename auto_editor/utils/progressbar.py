@@ -9,7 +9,7 @@ from platform import system
 from .func import get_stdout, term_size
 
 def _pretty_time(my_time, ampm):
-    # (my_time: float, ampm: bool) -> str:
+    # type: (float, bool) -> str
     new_time = localtime(my_time)
 
     hours = new_time.tm_hour

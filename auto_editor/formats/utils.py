@@ -16,7 +16,8 @@ def get_width_height(inp):
     else:
         return inp.video_streams[0]['width'], inp.video_streams[0]['height']
 
-def indent(base: int, *args: str) -> str:
+def indent(base, *args):
+    # type: (int, str) -> str
     r = ''
     for line in args:
         r += ('\t' * base) + line + '\n'
