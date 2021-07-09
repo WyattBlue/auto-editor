@@ -59,13 +59,12 @@ auto-editor --help
 Use `--help` with a specific option for more information:
 
 ```
-$ auto-editor --scale --help
+auto-editor --scale --help
   --scale
     scale the output media file by a certain factor.
 
     type: float_type
     default: 1
-
 ```
 
 
