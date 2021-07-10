@@ -4,6 +4,8 @@ from __future__ import print_function
 
 import numpy as np
 
+from auto_editor.utils.types import split_num_str
+
 def combine_audio_motion(audioList, motionList, based, log):
     # type: (np.ndarray, np.ndarray, str, Any) -> np.ndarray
 
@@ -81,34 +83,44 @@ def removeSmall(has_loud, lim, replace, with_):
     return has_loud
 
 
-def is_number(val):
+def str_is_number(val):
     # type: (str) -> bool
     return val.replace('.', '', 1).isdigit()
 
-def setRange(has_loud, syntaxRange, fps, with_, log):
+
+def setRange(has_loud, range_syntax, fps, with_, log):
     # type: (...) -> np.ndarray
 
-    def replace_variables_to_values(item):
-        # type: (str) -> int
-        if(is_number(item)):
+    def replace_variables_to_values(item, fps, log):
+        # type: (str, float | int, Any) -> int
+        if(str_is_number(item)):
             return int(item)
+        if(item[0].isdigit()):
+            value, unit = split_num_str(item, log.error)
+            if(unit in ['', 'f', 'frame', 'frames']):
+                if(isinstance(value, float)):
+                    log.error('float type cannot be used with frame unit')
+                return value
+            if(unit in ['s', 'sec', 'secs', 'second', 'seconds']):
+                return int(round(value * fps))
+            log.error('Unknown unit: {}'.format(unit))
         if(item == 'start'):
             return 0
         if(item == 'end'):
             return len(has_loud)
-        if(item.startswith('sec')):
-            log.error('Seconds unit not implemented in this function.')
-        log.error('Variable {} not avaiable in this context.'.format(item))
+        log.error('Variable {} not available.'.format(item))
 
-    def var_val_to_frames(val):
-        # type: (str) -> int
-        num = replace_variables_to_values(val)
+    def var_val_to_frames(val, fps, log):
+        # type: (str, float | int, Any) -> int
+        num = replace_variables_to_values(val, fps, log)
         if(num < 0):
             num = len(has_loud) - num
         return num
 
-    for item in syntaxRange:
-        pair = list(map(var_val_to_frames, item))
+    for item in range_syntax:
+        pair = []
+        for val in item:
+            pair.append(var_val_to_frames(val, fps, log))
         has_loud[pair[0]:pair[1]] = with_
     return has_loud
 
