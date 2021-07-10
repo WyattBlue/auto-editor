@@ -148,7 +148,7 @@ class Tester():
     def __init__(self, args):
         self.passed_tests = 0
         self.failed_tests = 0
-        self.allowable_fails = 1
+        self.allowable_fails = 2
         self.args = args
 
     def run_test(self, name, func, description='', cleanup=None):
@@ -248,17 +248,46 @@ def test(sys_args=None):
         )
     tester.run_test('example_tests', example_tests)
 
-    def output_settings_tests():
+    # Issue #172
+    def bitrate_test():
         run_program(['example.mp4', '--audio_bitrate', '50k'])
         fullInspect(
             'example_ALTERED.mp4',
             [ffprobe.AudioBitRate, '50k'],
         )
-    tester.run_test('output_settings_tests', output_settings_tests)
+    tester.run_test('bitrate_test', bitrate_test)
+
+    # Issue #184
+    def unit_tests():
+        run_program(['example.mp4', '--mark_as_loud', '20s,22sec', '25secs,26.5seconds'])
+        run_program(['example.mp4', '--sample_rate', '44100'])
+        run_program(['example.mp4', '--sample_rate', '44100 Hz'])
+        run_program(['example.mp4', '--sample_rate', '44.1 kHz'])
+        run_program(['example.mp4', '--silent_threshold', '4%'])
+    tester.run_test('unit_tests', unit_tests,
+        description='''
+        Make sure all units are working appropriately. That includes:
+         - Seconds units: s, sec, secs, second, seconds
+         - Frame units:   f, frame, frames
+         - Sample units:  Hz, kHz
+         - Percent:       %
+
+        ''')
+
+    def backwards_range_test():
+        run_program(['example.mp4', '--edit', 'none', '--cut_out', '-5secs,end'])
+    tester.run_test('backwards_range_test', backwards_range_test, description='''
+        Cut out the last 5 seconds of a media file by using negative number in the
+        range.
+        ''')
 
     def gif_test():
         run_program(['resources/man_on_green_screen.gif', '--edit', 'none'])
-    tester.run_test('gif_test', gif_test, description='run gif files', cleanup=clean_all)
+    tester.run_test('gif_test', gif_test, description='''
+        Feed auto-editor a gif file and make sure it can spit out a correctly formated
+        gif. No editing is requested.
+        ''',
+        cleanup=clean_all)
 
     def render_tests():
         run_program(['example.mp4', '--render', 'opencv'])
@@ -274,6 +303,9 @@ def test(sys_args=None):
         run_program(['example.mp4', '-m', '3'])
         run_program(['example.mp4', '--margin', '3'])
         run_program(['example.mp4', '-m', '0.3sec'])
+        run_program(['example.mp4', '-m', '6f'])
+        run_program(['example.mp4', '-m', '5 frames'])
+        run_program(['example.mp4', '-m', '0.4 seconds'])
     tester.run_test('margin_tests', margin_tests)
 
     def extension_tests():

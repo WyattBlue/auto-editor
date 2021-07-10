@@ -270,14 +270,8 @@ class ParseOptions():
                 elif(option['action'] == 'store_false'):
                     value = False
                 else:
-                    try:
-                        value = option['type'](nextItem)
-                    except Exception:
-                        typeName = option['type'].__name__
-                        log.error('Couldn\'t convert {} to {}'.format(
-                            nextItem, typeName))
+                    value = option['type'](nextItem)
 
-                    # Handle when the option value is not in choices list.
                     if(option['choices'] is not None and value not in option['choices']):
                         option_name = option['names'][0]
                         my_choices = ', '.join(option['choices'])
