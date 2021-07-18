@@ -6,6 +6,7 @@ on:
       - '**.txt'
       - '**.png'
       - 'setup.py'
+      - 'auto_editor/__init__.py'
     branches:
       - master
 jobs:
@@ -53,7 +54,7 @@ jobs:
   #   - name: Install Pip Packages
   #     run: |
   #       py -m pip install --upgrade pip
-  #       py -m pip install av opencv-python audiotsm2
+  #       py -m pip install av opencv-python audiotsm2 youtube-dl
   #   - name: Test
   #     run: |
   #       py -m auto_editor test
