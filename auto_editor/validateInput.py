@@ -104,7 +104,6 @@ def download_video(my_input, args, ffmpeg, log):
         }
 
         for item, key in ydl_opts.items():
-            print(item, key)
             if(item is None):
                 del ydl_opts[key]
 

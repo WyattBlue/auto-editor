@@ -16,7 +16,7 @@ def split_num_str(val, error_func):
     # type: (str, Any) -> tuple(2)
     index = 0
     for item in val:
-        if(not item.isdigit() and item != ' ' and item != '.'):
+        if(not item.isdigit() and item != ' ' and item != '.' and item != '-'):
             break
         index += 1
     num, unit = val[:index], val[index:]
@@ -25,8 +25,12 @@ def split_num_str(val, error_func):
             float(num)
         except ValueError:
             error_func('{} is not a valid number')
-
         return float(num), unit
+    if('-' in num):
+        try:
+            int(num)
+        except ValueError:
+            error_func('{} is not a valid number')
     return int(num), unit
 
 def file_type(path):
