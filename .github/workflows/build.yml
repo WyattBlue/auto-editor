@@ -27,7 +27,7 @@ jobs:
     - name: Install Pip Packages
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install av opencv-python audiotsm2
+        python3 -m pip install av opencv-python audiotsm2 youtube-dl
     - name: Test
       run: |
         python3 -m auto_editor test
