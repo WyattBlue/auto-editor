@@ -13,14 +13,4 @@ You're Exporting to:
 
 What is the frame rate and length of your video? (use `auto-editor info`)
 
-
-What is dysyncing and how bad is it?
-e.g.
-
-Every 30 minutes, the audio is one second behind of video.
-
-Paste the output when run appended with the `--debug` flag.
-
-```
-paste output here
-```
+What is desyncing and how bad is it? (exp. every 30 minutes, the audio is one second behind of video)
