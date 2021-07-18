@@ -231,7 +231,7 @@ class ParseOptions():
 
             if(option is None):
                 # Unknown Option!
-                if(setting_inputs and not item.startswith('-')):
+                if(setting_inputs and (option_list != 'input' or (option_list == 'input' and not item.startswith('-')))):
                     # Option is actually an input file, like example.mp4
                     my_list.append(item)
                 else:

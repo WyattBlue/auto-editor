@@ -68,11 +68,11 @@ def interpolate(x, y, n, log, method='linear'):
     # type: (int, int, int, Any, str) -> list[int | float]
     if(method == 'linear'):
         return linear(x, y, n)
-    elif(method == 'sine'):
+    if(method == 'sine'):
         return sine(x, y, n)
-    elif(method == 'start_sine'):
+    if(method == 'start_sine'):
         return start_sine(x, y, n)
-    elif(method == 'end_sine'):
+    if(method == 'end_sine'):
         return end_sine(x, y, n)
-    else:
-        log.error("Method: {} isn't implemented.".format(method))
+
+    log.error("Method: {} isn't implemented.".format(method))

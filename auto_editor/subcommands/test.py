@@ -148,7 +148,7 @@ class Tester():
     def __init__(self, args):
         self.passed_tests = 0
         self.failed_tests = 0
-        self.allowable_fails = 2
+        self.allowable_fails = 1
         self.args = args
 
     def run_test(self, name, func, description='', cleanup=None):

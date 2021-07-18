@@ -85,7 +85,15 @@ def removeSmall(has_loud, lim, replace, with_):
 
 def str_is_number(val):
     # type: (str) -> bool
-    return val.replace('.', '', 1).isdigit()
+    return val.replace('.', '', 1).replace('-', '', 1).isdigit()
+
+
+def str_starts_with_number(val):
+    # type: (str) -> bool
+    if(val.startswith('-')):
+        val = val[1:]
+    val = val.replace('.', '', 1)
+    return val[0].isdigit()
 
 
 def setRange(has_loud, range_syntax, fps, with_, log):
@@ -95,7 +103,7 @@ def setRange(has_loud, range_syntax, fps, with_, log):
         # type: (str, float | int, Any) -> int
         if(str_is_number(item)):
             return int(item)
-        if(item[0].isdigit()):
+        if(str_starts_with_number(item)):
             value, unit = split_num_str(item, log.error)
             if(unit in ['', 'f', 'frame', 'frames']):
                 if(isinstance(value, float)):
@@ -114,7 +122,7 @@ def setRange(has_loud, range_syntax, fps, with_, log):
         # type: (str, float | int, Any) -> int
         num = replace_variables_to_values(val, fps, log)
         if(num < 0):
-            num = len(has_loud) - num
+            num += len(has_loud)
         return num
 
     for item in range_syntax:
