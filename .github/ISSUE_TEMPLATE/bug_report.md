@@ -10,28 +10,23 @@ labels: bug
 
 **What went wrong**
 
-
 ```
-Paste the terminal output here
+Paste your command and it's output here.
 ```
 
 **Does the example video work? (if applicable)**
 
 
-**What does the program output when `--debug` or `--show_ffmpeg_debug` is appended to your command/use case**
-
-```
-output here:
-```
-
 **What's your platform? (if applicable)**
+Run: `auto-editor --debug`
 
 ```
-output here, run: `auto-editor --debug` if possible.
+Paste output here.
 ```
 
-**What's your input? (if applicable)**
+**What's your input file? (if applicable)**
+Run: `auto-editor info path/to/video` or `ffmpeg -hide_banner -i path/to/video`
 
 ```
-output here, run: `auto-editor info path/to/video
+Paste output here.
 ```
