@@ -86,6 +86,11 @@ def download_video(my_input, args, ffmpeg, log):
             if(d['status'] == 'downloading'):
                 ytbar.tick(float(d['_percent_str'].replace('%','')))
 
+        def abspath(path):
+            if(path is None):
+                return None
+            return os.path.abspath(path)
+
         ydl_opts = {
             'nocheckcertificate': not args.check_certificate,
             'outtmpl': outtmpl,
@@ -93,10 +98,15 @@ def download_video(my_input, args, ffmpeg, log):
             'format': args.format,
             'ratelimit': parse_bytes(args.limit_rate),
             'logger': MyLogger(),
-            'cookiefile': os.path.abspath(args.cookies),
-            'download_archive': os.path.abspath(args.download_archive),
+            'cookiefile': abspath(args.cookies),
+            'download_archive': abspath(args.download_archive),
             'progress_hooks': [my_hook],
         }
+
+        for item, key in ydl_opts.items():
+            print(item, key)
+            if(item is None):
+                del ydl_opts[key]
 
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             try:
@@ -121,7 +131,7 @@ def get_segment(args, my_input, log):
         match = re.search(r'youtube\.com/watch\?v=(?P<match>[A-Za-z0-9_-]{11})',
             my_input)
         if(match):
-            youtube_id =  match.groupdict()['match']
+            youtube_id = match.groupdict()['match']
             return sponsor_block_api(youtube_id, args.block, log)
     return None
 

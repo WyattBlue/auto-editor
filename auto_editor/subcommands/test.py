@@ -248,6 +248,11 @@ def test(sys_args=None):
         )
     tester.run_test('example_tests', example_tests)
 
+    # Issue #200
+    def url_test():
+        run_program(['https://github.com/WyattBlue/auto-editor/raw/master/example.mp4'])
+    tester.run_test('url_test', url_test)
+
     # Issue #172
     def bitrate_test():
         run_program(['example.mp4', '--audio_bitrate', '50k'])
