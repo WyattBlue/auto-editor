@@ -14,6 +14,15 @@ Before doing the real editing, you first cut out the "dead space" which is typic
 auto-editor path/to/your/video.mp4
 ```
 
+<h2 align="center">Installing</h2>
+
+```
+pip3 install auto-editor
+```
+
+See [Installing](https://auto-editor.com/cli/installing) for additional information.
+
+
 <h2 align="center">Cutting</h2>
 
 Change the **pace** of the edited video by using `--frame_margin`.
@@ -25,15 +34,7 @@ auto-editor example.mp4 --frame_margin 8
 ```
 
 
-<h2 align="center">Installing</h2>
-
-```
-pip3 install auto-editor
-```
-
-See [Installing](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md) more additional instructions.
-
-<h2 align="center">Exporting</h2>
+<h2 align="center">Exporting to Editors</h2>
 
 Create an XML file that can be imported to Adobe Premiere Pro using this command:
 
@@ -73,7 +74,7 @@ auto-editor --scale --help
 
 
 ## Articles
- - [How to Install Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md)
+ - [How to Install Auto-Editor](https://auto-editor.com/cli/installing) [[html]](https://auto-editor.com/cli/installing) [[markdown]](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md)
  - [How to Edit Videos With Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/editing.md)
  - [How to Use Motion Detection in Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/motionDetection.md)
  - [What's new in Range Syntax](https://github.com/WyattBlue/auto-editor/blob/master/articles/rangeSyntax.md)
