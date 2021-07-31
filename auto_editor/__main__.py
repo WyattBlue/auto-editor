@@ -115,6 +115,9 @@ def main_options(parser):
     parser.add_argument('--constant_rate_factor', '-crf', default='unset',
         group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
+    parser.add_argument('--has_vfr', default='unset', group='exportMediaOps',
+        choices=['unset', 'yes', 'no'],
+        help='skip variable frame rate scan, saving time for big video files.')
 
     parser.add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
         help='choice which method to render video.')
@@ -390,13 +393,20 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
                 cmd.extend(['-ab', args.audio_bitrate])
             cmd.extend(['-ac', '2', '-ar', sampleRate,
                 os.path.join(TEMP, '{}.wav'.format(t))])
-        cmd.extend(['-map', '0:v:0', '-vf', 'vfrdet', '-f', 'null', '-'])
-        has_vfr = hasVFR(cmd, log)
+        cmd.extend(['-map', '0:v:0'])
+        if(args.has_vfr == 'unset'):
+            cmd.extend(['-vf', 'vfrdet', '-f', 'null', '-'])
+            has_vfr = hasVFR(cmd, log)
+        else:
+            ffmpeg.run(cmd)
+            has_vfr = args.has_vfr == 'yes'
         del cmd
 
         if(len(inp.video_streams) > 0 and tracks == 0):
             # Doesn't matter because we don't need to align to an audio track.
             has_vfr = False
+
+        log.debug('Has VFR: {}'.format(has_vfr))
 
         if(tracks != 0):
             if(args.cut_by_all_tracks):
