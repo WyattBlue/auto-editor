@@ -3,20 +3,26 @@
 from __future__ import print_function
 
 def grep_options(parser):
+    parser.add_argument('--no_filename', action='store_true',
+        help='Never print filenames with output lines.')
     parser.add_argument('--max_count', '-m', type=int, default=float('inf'),
-        help='Stop reading a file after NUM matching lines')
+        help='Stop reading a file after NUM matching lines.')
     parser.add_argument('--count', '-c', action='store_true',
         help='Suppress normal output; instead print count of matching lines for each file.')
     parser.add_argument('--ignore_case', '-i', action='store_true',
         help='Ignore case distinctions for the PATTERN.')
+    parser.add_argument('--timecode', action='store_true',
+        help="Print the match's timecode.")
+    parser.add_argument('--time', action='store_true',
+        help="Print when the match happens. (Ignore ending).")
     parser.add_argument('--ffmpeg_location', default=None,
-        help='point to your custom ffmpeg file.')
+        help='Point to your custom ffmpeg file.')
     parser.add_argument('--my_ffmpeg', action='store_true',
-        help='use the ffmpeg on your PATH instead of the one packaged.')
+        help='Use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
-        help='print info about the program or an option and exit.')
+        help='Print info about the program or an option and exit.')
     parser.add_argument('input', nargs='*',
-        help='the path to a file you want inspected.')
+        help='The path to a file you want inspected.')
     return parser
 
 
@@ -77,32 +83,42 @@ def grep(sys_args=None):
         count = 0
 
         prefix = ''
-        if(len(media_files) > 1):
-            prefix = '{}:'.format(media_file)
+        if(len(media_files) > 1 and not args.no_filename):
+            prefix = '{}:'.format(os.path.splitext(os.path.basename(media_file))[0])
 
-        line_number = 0
+        timecode = ''
+        line_number = -1
         with open(out_file, 'r') as file:
             while True:
                 line = file.readline()
-
+                line_number += 1
                 if(line_number == 0):
-                    line_number += 1
                     continue
 
                 if(not line or count >= args.max_count):
                     break
 
-                if(line.strip() == '' or re.match(r'\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*', line)):
+                if(line.strip() == ''):
+                    continue
+
+                if(re.match(r'\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*', line)):
+                    if(args.time):
+                        timecode = line.split('-->')[0].strip() + ' '
+                    else:
+                        timecode = line.strip() + '; '
                     continue
 
                 line = cleanhtml(line)
                 match = re.search(regex, line, flags)
+                line = line.strip()
 
                 if(match):
                     count += 1
                     if(not args.count):
-                        print(prefix + line.strip())
-                line_number += 1
+                        if(args.timecode or args.time):
+                            print(prefix + timecode + line)
+                        else:
+                            print(prefix + line)
 
         if(args.count):
             print(prefix + str(count))
