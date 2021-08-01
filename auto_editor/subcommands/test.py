@@ -281,10 +281,18 @@ def test(sys_args=None):
 
     def backwards_range_test():
         run_program(['example.mp4', '--edit', 'none', '--cut_out', '-5secs,end'])
+        run_program(['example.mp4', '--edit', 'all', '--add_in', '-5secs,end'])
     tester.run_test('backwards_range_test', backwards_range_test, description='''
         Cut out the last 5 seconds of a media file by using negative number in the
         range.
         ''')
+
+    def cut_out_test():
+        run_program(['example.mp4', '--edit', 'none', '--video_speed', '2',
+            '--silent_speed', '3', '--cut_out', '2secs,10secs'])
+        run_program(['example.mp4', '--edit', 'all', '--video_speed', '2',
+            '--add_in', '2secs,10secs'])
+    tester.run_test('cut_out_test', cut_out_test)
 
     def gif_test():
         run_program(['resources/man_on_green_screen.gif', '--edit', 'none'])

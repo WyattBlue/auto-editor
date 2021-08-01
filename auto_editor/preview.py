@@ -43,15 +43,21 @@ def preview(inp, chunks, speeds, log):
             cut_lens.append(leng)
 
     print('Number of clips: {}'.format(clips))
-    printTimeFrame('Smallest clip length', min(clip_lens), fps)
-    printTimeFrame('Largest clip length', max(clip_lens), fps)
-    printTimeFrame('Average clip length', sum(clip_lens) / len(clip_lens), fps)
-    print('\nNumber of cuts: {}'.format(cuts))
+    if(len(clip_lens) == 1):
+        printTimeFrame('Clip length', clip_lens[0], fps)
+    else:
+        printTimeFrame('Smallest clip length', min(clip_lens), fps)
+        printTimeFrame('Largest clip length', max(clip_lens), fps)
+        printTimeFrame('Average clip length', sum(clip_lens) / len(clip_lens), fps)
+        print('\nNumber of cuts: {}'.format(cuts))
 
     if(cut_lens != []):
-        printTimeFrame('Smallest cut length', min(cut_lens), fps)
-        printTimeFrame('Largest cut length', max(cut_lens), fps)
-        printTimeFrame('Average cut length', sum(cut_lens) / len(cut_lens), fps)
+        if(len(cut_lens) == 1):
+            printTimeFrame('Cut length', cut_lens[0], fps)
+        else:
+            printTimeFrame('Smallest cut length', min(cut_lens), fps)
+            printTimeFrame('Largest cut length', max(cut_lens), fps)
+            printTimeFrame('Average cut length', sum(cut_lens) / len(cut_lens), fps)
         print('')
 
-    log.debug('Chunks:\n{}'.format(chunks))
+    log.debug('Chunks: {}'.format(chunks))

@@ -147,6 +147,8 @@ def main_options(parser):
     parser.add_argument('--cut_out', type=range_type, nargs='*',
         help='the range of media that will be removed completely, regardless of the '\
             'value of silent speed.')
+    parser.add_argument('--add_in', type=range_type, nargs='*',
+        help='the range of media that will be added in, opposite of --cut_out')
     parser.add_argument('--set_speed_for_range', type=speed_range_type, nargs='*',
         help='set an arbitrary speed for a given range.',
         extra='The arguments are: speed,start,end')
@@ -155,9 +157,9 @@ def main_options(parser):
         range='0 to 1',
         help='how much motion is required to be considered "moving"')
     parser.add_argument('--edit_based_on', '--edit', default='audio',
-        choices=['audio', 'motion', 'none', 'not_audio', 'not_motion', 'audio_or_motion',
-            'audio_and_motion', 'audio_xor_motion', 'audio_and_not_motion',
-            'not_audio_and_motion', 'not_audio_and_not_motion'],
+        choices=['audio', 'motion', 'none', 'all', 'not_audio', 'not_motion',
+            'audio_or_motion', 'audio_and_motion', 'audio_xor_motion',
+            'audio_and_not_motion', 'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
 
     parser.add_argument('--cut_by_this_audio', '-ca', type=file_type,
@@ -238,29 +240,32 @@ def main_options(parser):
 
 def get_chunks(inp, speeds, segment, fps, args, log, audioData=None, sampleRate=None):
     from auto_editor.cutting import (combine_audio_motion, combine_segment,
-        apply_spacing_rules, apply_frame_margin, seconds_to_frames, cook, chunkify)
+        apply_spacing_rules, apply_mark_as, apply_frame_margin, seconds_to_frames, cook, chunkify)
 
     frame_margin = seconds_to_frames(args.frame_margin, fps)
     min_clip = seconds_to_frames(args.min_clip_length, fps)
     min_cut = seconds_to_frames(args.min_cut_length, fps)
 
     def get_has_loud(inp, args, fps, audioData, sampleRate, log):
-        from auto_editor.analyze import get_blank_list, audio_detection, motion_detection
+        import numpy as np
+        from auto_editor.analyze import get_np_list, audio_detection, motion_detection
         if(args.edit_based_on == 'none'):
-            return get_blank_list(inp, audioData, sampleRate, fps)
+            return get_np_list(inp, audioData, sampleRate, fps, np.ones)
+        if(args.edit_based_on == 'all'):
+            return get_np_list(inp, audioData, sampleRate, fps, np.zeros)
 
         audioList, motionList = None, None
 
         if('audio' in args.edit_based_on):
             if(audioData is None):
-                audioList = get_blank_list(inp, audioData, sampleRate, fps)
+                audioList = get_np_list(inp, audioData, sampleRate, fps, np.ones)
             else:
                 audioList = audio_detection(audioData, sampleRate, args.silent_threshold,
                     fps, log)
 
         if('motion' in args.edit_based_on):
             if(len(inp.video_streams) == 0):
-                motionList = get_blank_list(inp, audioData, sampleRate, fps)
+                motionList = get_np_list(inp, audioData, sampleRate, fps, np.ones)
             else:
                 motionList = motion_detection(inp, args.motion_threshold, log,
                     width=args.width, dilates=args.dilates, blur=args.blur)
@@ -274,12 +279,15 @@ def get_chunks(inp, speeds, segment, fps, args, log, audioData=None, sampleRate=
         return combine_audio_motion(audioList, motionList, args.edit_based_on, log)
 
     has_loud = get_has_loud(inp, args, fps, audioData, sampleRate, log)
-    has_loud = cook(has_loud, min_clip, min_cut)
     has_loud_length = len(has_loud)
+    has_loud = apply_mark_as(has_loud, has_loud_length, fps, args, log)
+    has_loud = cook(has_loud, min_clip, min_cut)
     has_loud = apply_frame_margin(has_loud, has_loud_length, frame_margin)
 
     if(segment is not None):
         has_loud = combine_segment(has_loud, segment, fps)
+    # Remove small clips/cuts created by applying other rules.
+    has_loud = cook(has_loud, min_clip, min_cut)
     return apply_spacing_rules(has_loud, has_loud_length, min_clip, min_cut, speeds,
         fps, args, log)
 
@@ -310,8 +318,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         if(not os.path.isdir(inp.path) and '.' not in newOutput):
             newOutput = set_output_name(newOutput, data_file, args)
 
-    log.debug('Input File: {}'.format(inp.path))
-    log.debug('Output File: {}'.format(newOutput))
+    log.debug('{} -> {}'.format(inp.path, newOutput))
 
     if(os.path.isfile(newOutput) and inp.path != newOutput):
         log.debug('Removing already existing file: {}'.format(newOutput))
@@ -379,7 +386,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
                 return 0
             else:
                 nums = re.search(r'\d+\/\d+', search.group()).group(0)
-                log.debug(nums)
+                log.debug('VFR Frames: {}'.format(nums))
                 return int(nums.split('/')[0])
 
         def hasVFR(cmd, log):
