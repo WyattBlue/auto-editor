@@ -53,6 +53,13 @@ def grep(sys_args=None):
     if(args.ignore_case):
         flags = re.IGNORECASE
 
+    # stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string
+    def cleanhtml(raw_html):
+        # type: (str) -> str
+        cleanr = re.compile('<.*?>')
+        cleantext = re.sub(cleanr, '', raw_html)
+        return cleantext
+
     """
     we're using the WEBVTT subtitle format. It's better than srt
     because it doesn't emit line numbers and the time code is in
@@ -73,19 +80,29 @@ def grep(sys_args=None):
         if(len(media_files) > 1):
             prefix = '{}:'.format(media_file)
 
+        line_number = 0
         with open(out_file, 'r') as file:
             while True:
                 line = file.readline()
 
+                if(line_number == 0):
+                    line_number += 1
+                    continue
+
                 if(not line or count >= args.max_count):
                     break
 
+                if(line.strip() == '' or re.match(r'\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*', line)):
+                    continue
+
+                line = cleanhtml(line)
                 match = re.search(regex, line, flags)
 
                 if(match):
                     count += 1
                     if(not args.count):
                         print(prefix + line.strip())
+                line_number += 1
 
         if(args.count):
             print(prefix + str(count))
