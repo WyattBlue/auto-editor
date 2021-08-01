@@ -172,20 +172,23 @@ def apply_frame_margin(has_loud, has_loud_length, frame_margin):
         new[i] = min(1, np.max(has_loud[start:end]))
     return new
 
-def apply_spacing_rules(has_loud, has_loud_length, minClip, minCut, speeds, fps, args, log):
-    # type: (...) -> list[list[int]]
+
+def apply_mark_as(has_loud, has_loud_length, fps, args, log):
+    # type: (...) -> np.ndarray
     if(args.mark_as_loud != []):
         has_loud = setRange(has_loud, args.mark_as_loud, fps, 1, log)
 
     if(args.mark_as_silent != []):
         has_loud = setRange(has_loud, args.mark_as_silent, fps, 0, log)
+    return has_loud
 
-    # Remove small clips/cuts created by applying other rules.
-    has_loud = cook(has_loud, minClip, minCut)
-
+def apply_spacing_rules(has_loud, has_loud_length, minClip, minCut, speeds, fps, args, log):
+    # type: (...) -> list[list[int]]
     if(args.cut_out != []):
-        cut_speed_index = speeds.index(99999)
-        has_loud = setRange(has_loud, args.cut_out, fps, cut_speed_index, log)
+        has_loud = setRange(has_loud, args.cut_out, fps, speeds.index(99999), log)
+
+    if(args.add_in != []):
+        has_loud = setRange(has_loud, args.add_in, fps, speeds.index(args.video_speed), log)
 
     if(args.set_speed_for_range != []):
         for item in args.set_speed_for_range:

@@ -6,17 +6,19 @@ import math
 
 import numpy as np
 
-def get_blank_list(inp, audioData, sampleRate, fps):
+
+
+def get_np_list(inp, audioData, sampleRate, fps, func):
     if(audioData is not None):
         audioSampleCount = audioData.shape[0]
         samplesPerFrame = sampleRate / fps
         audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
-        return np.ones((audioFrameCount), dtype=np.bool_)
+        return func((audioFrameCount), dtype=np.bool_)
 
     import cv2
     cap = cv2.VideoCapture(inp.path)
     totalFrames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) + 1
-    return np.ones((totalFrames), dtype=np.bool_)
+    return func((totalFrames), dtype=np.bool_)
 
 def audio_detection(audioData, sampleRate, silent_threshold, fps, log):
     # type: (np.ndarray, int, float, float, Any) -> np.ndarray
