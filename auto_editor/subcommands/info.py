@@ -77,12 +77,14 @@ def info(sys_args=None):
                 text += '     - samplerate: {}\n'.format(
                     inp.audio_streams[track]['samplerate'])
                 text += '     - bitrate: {}\n'.format(inp.audio_streams[track]['bitrate'])
+                text += '     - lang: {}\n'.format(inp.audio_streams[track]['lang'])
 
             sub_tracks = len(inp.subtitle_streams)
             if(sub_tracks > 0):
                 text += ' - subtitle tracks: {}\n'.format(sub_tracks)
                 for track in range(tracks):
                     text += '   - Track #{}\n'.format(track)
+                    text += '     - codec: {}\n'.format(inp.subtitle_streams[track]['codec'])
                     text += '     - lang: {}\n'.format(inp.subtitle_streams[track]['lang'])
 
             if(args.include_vfr):
