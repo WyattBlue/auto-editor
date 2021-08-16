@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 def info_options(parser):
-    parser.add_argument('--include_vfr', action='store_true',
+    parser.add_argument('--include_vfr', '--has_vfr', action='store_true',
         help='skip information that is very slow to get.')
     parser.add_argument('--ffmpeg_location', default=None,
         help='point to your custom ffmpeg file.')
@@ -22,7 +22,7 @@ def info(sys_args=None):
     import auto_editor
     import auto_editor.vanparse as vanparse
 
-    from auto_editor.utils.func import clean_list, aspect_ratio
+    from auto_editor.utils.func import aspect_ratio
     from auto_editor.utils.log import Log
 
     from auto_editor.ffwrapper import FFmpeg
@@ -92,8 +92,7 @@ def info(sys_args=None):
                 text = ''
                 fps_mode = ffmpeg.pipe(['-i', file, '-hide_banner', '-vf', 'vfrdet',
                     '-an', '-f', 'null', '-'])
-                fps_mode = clean_list(fps_mode.split('\n'), '\r\t')
-                fps_mode = fps_mode.pop()
+                fps_mode = fps_mode.strip()
 
                 if('VFR:' in fps_mode):
                     fps_mode = (fps_mode[fps_mode.index('VFR:'):]).strip()

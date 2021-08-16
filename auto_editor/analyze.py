@@ -6,8 +6,6 @@ import math
 
 import numpy as np
 
-
-
 def get_np_list(inp, audioData, sampleRate, fps, func):
     if(audioData is not None):
         audioSampleCount = audioData.shape[0]
@@ -19,6 +17,7 @@ def get_np_list(inp, audioData, sampleRate, fps, func):
     cap = cv2.VideoCapture(inp.path)
     totalFrames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) + 1
     return func((totalFrames), dtype=np.bool_)
+
 
 def audio_detection(audioData, sampleRate, silent_threshold, fps, log):
     # type: (np.ndarray, int, float, float, Any) -> np.ndarray
