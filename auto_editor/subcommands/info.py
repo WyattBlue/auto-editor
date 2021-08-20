@@ -15,7 +15,7 @@ def info_options(parser):
         help='the path to a file you want inspected.')
     return parser
 
-def info(sys_args=None):
+def main(sys_args=None):
     import os
     import sys
 
@@ -109,4 +109,4 @@ def info(sys_args=None):
         print(text)
 
 if(__name__ == '__main__'):
-    info()
+    main()

@@ -26,7 +26,7 @@ def grep_options(parser):
     return parser
 
 
-def grep(sys_args=None):
+def main(sys_args=None):
     import os
     import re
     import sys
@@ -126,4 +126,4 @@ def grep(sys_args=None):
     log.cleanup()
 
 if(__name__ == '__main__'):
-    grep()
+    main()

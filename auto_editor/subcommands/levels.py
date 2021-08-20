@@ -17,7 +17,7 @@ def levels_options(parser):
         help='the template')
     return parser
 
-def levels(sys_args=None):
+def main(sys_args=None):
     import os
     import sys
     import math
@@ -80,4 +80,4 @@ def levels(sys_args=None):
     log.cleanup()
 
 if(__name__ == '__main__'):
-    levels()
+    main()
