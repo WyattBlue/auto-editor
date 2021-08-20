@@ -6,13 +6,13 @@ from shutil import move
 
 # Included Libraries
 from .func import fnone
-from auto_editor.render.audio import fastAudio
+from auto_editor.render.audio import make_new_audio
 
-def handleAudioTracks(ffmpeg, write_file, args, tracks, chunks, speeds, fps, temp, log):
+def handle_audio_tracks(ffmpeg, write_file, args, tracks, chunks, speeds, fps, temp, log):
     for t in range(tracks):
         temp_file = os.path.join(temp, '{}.wav'.format(t))
         new_file = os.path.join(temp, 'new{}.wav'.format(t))
-        fastAudio(temp_file, new_file, chunks, speeds, log, fps,
+        make_new_audio(temp_file, new_file, chunks, speeds, log, fps,
             args.machine_readable_progress, args.no_progress)
 
         if(not os.path.isfile(new_file)):

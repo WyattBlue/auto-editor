@@ -31,9 +31,7 @@ def _test_path(path, log):
             log.error('No ffmpeg found, download ffmpeg with your favorite package '\
                 'manager (ex chocolatey), or restore the included binary.')
 
-        log.error('ffmpeg must be on PATH. Download ffmpeg by running:\n'\
-        '  sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg'\
-        '\nOr something similar depending on your distro.')
+        log.error('ffmpeg must be installed and on PATH.')
     return path
 
 class FFmpeg():
@@ -127,6 +125,7 @@ class FFmpeg():
         return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     def pipe(self, cmd):
+        # type: (list[str]) -> str
         cmd = [self.path, '-y'] + cmd
 
         if(self.FFdebug):
@@ -138,6 +137,7 @@ class FFmpeg():
         return output
 
     def getVersion(self):
+        # type: () -> str
         _version = self.pipe(['-version']).split('\n')[0]
         _version = _version.replace('ffmpeg version', '').strip()
         return _version.split(' ')[0]
