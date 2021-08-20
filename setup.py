@@ -48,12 +48,13 @@ setup(
     include_package_data=True,
     install_requires=[
         'numpy',
-        'audiotsm2',
+        'audiotsm2~=0.2.1',
         'opencv-python>=4.3',
         'youtube-dl',
-        'av',
+        'av>=6.0.0',
     ],
     classifiers=[
+        'Topic :: Multimedia :: Sound/Audio',
         'Topic :: Multimedia :: Video',
         'License :: Public Domain',
         'License :: OSI Approved :: The Unlicense (Unlicense)',
