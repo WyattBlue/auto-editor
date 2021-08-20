@@ -48,7 +48,8 @@ def speedup(speed):
         '\t\t\t<name>frameblending</name>', '\t\t\t<value>FALSE</value>',
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
-def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, sr, pathurls):
+def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, sr,
+    pathurls):
     tracks = len(inp.audio_streams)
     total = 0
     for j, clip in enumerate(clips):

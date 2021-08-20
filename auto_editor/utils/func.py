@@ -8,6 +8,7 @@ put here. No function should modify or create video/audio files on its own.
 """
 
 def get_stdout(cmd):
+    # type: (list[str]) -> str
     import subprocess
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
@@ -46,6 +47,7 @@ def get_new_length(chunks, speeds, fps):
     return timeInFrames / fps
 
 def human_readable_time(time_in_secs):
+    # type(int | float) -> str
     units = 'seconds'
     if(time_in_secs >= 3600):
         time_in_secs = round(time_in_secs / 3600, 1)
@@ -85,9 +87,11 @@ def hex_to_bgr(hex_str, log):
     log.error('Invalid hex code: {}'.format(hex_str))
 
 def fnone(val):
+    # type: (Any) -> bool
     return val == 'none' or val == 'unset' or val is None
 
 def append_filename(name, val):
+    # type: (str, str) -> str
     dot_index = name.rfind('.')
     return name[:dot_index] + val + name[dot_index:]
 

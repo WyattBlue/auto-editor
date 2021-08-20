@@ -8,20 +8,20 @@ from auto_editor.utils.func import get_new_length, fnone
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.scipy.wavfile import read, write
 
-def convertAudio(ffmpeg, in_file, inp, out_file, codec, log):
+def convert_audio(ffmpeg, input_path, inp, output_path, codec, log):
     if(fnone(codec)):
         codec = inp.audio_streams[0]['codec']
 
-    ffmpeg.run(['-i', in_file, '-acodec', codec, out_file])
+    ffmpeg.run(['-i', input_path, '-acodec', codec, output_path])
 
-def handleAudio(ffmpeg, in_file, audioBit, samplerate, temp, log):
+def handle_audio(ffmpeg, input_path, bitrate, samplerate, temp, log):
     # type: (...) -> str
     temp_file = os.path.join(temp, 'faAudio.wav')
 
     log.checkType(samplerate, 'samplerate', str)
-    cmd = ['-i', in_file]
-    if(not fnone(audioBit)):
-        cmd.extend(['-b:a', audioBit])
+    cmd = ['-i', input_path]
+    if(not fnone(bitrate)):
+        cmd.extend(['-b:a', bitrate])
     cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', temp_file])
 
     ffmpeg.run(cmd)
@@ -29,10 +29,12 @@ def handleAudio(ffmpeg, in_file, audioBit, samplerate, temp, log):
 
     return temp_file
 
-def fastAudio(in_file, out_file, chunks, speeds, log, fps, machineReadable, hideBar):
+def make_new_audio(input_path, output_path, chunks, speeds, log, fps, machine_readable,
+    hide_bar):
     import numpy as np
 
     def custom_speeds(a):
+        # type: (list[int | float]) -> bool
         return len([x for x in a if x != 1 and x != 99999]) > 0
 
     if(custom_speeds(speeds)):
@@ -42,59 +44,58 @@ def fastAudio(in_file, out_file, chunks, speeds, log, fps, machineReadable, hide
     if(len(chunks) == 1 and chunks[0][2] == 0):
         log.error('Trying to create an empty file.')
 
-    samplerate, audioData = read(in_file)
+    samplerate, audio_samples = read(input_path)
 
-    newL = get_new_length(chunks, speeds, fps)
     # Get the new length in samples with some extra leeway.
-    estLeng = int(newL * samplerate * 1.5) + int(samplerate * 2)
+    new_length = get_new_length(chunks, speeds, fps)
+    estimated_length = int(new_length * samplerate * 1.5) + int(samplerate * 2)
 
     # Create an empty array for the new audio.
-    newAudio = np.zeros((estLeng, 2), dtype=np.int16)
+    new_audio = np.zeros((estimated_length, 2), dtype=np.int16)
 
     channels = 2
-    yPointer = 0
+    y_pointer = 0
 
-    audioProgress = ProgressBar(len(chunks), 'Creating new audio', machineReadable,
-        hideBar)
+    progress = ProgressBar(len(chunks), 'Creating new audio', machine_readable,
+        hide_bar)
 
-    for chunkNum, chunk in enumerate(chunks):
-        audioSampleStart = int(chunk[0] / fps * samplerate)
-        audioSampleEnd = int(audioSampleStart + (samplerate / fps) * (chunk[1] - chunk[0]))
+    for c, chunk in enumerate(chunks):
+        sample_start = int(chunk[0] / fps * samplerate)
+        sample_end = int(sample_start + (samplerate / fps) * (chunk[1] - chunk[0]))
 
-        theSpeed = speeds[chunk[2]]
-        if(theSpeed != 99999):
-            spedChunk = audioData[audioSampleStart:audioSampleEnd]
+        the_speed = speeds[chunk[2]]
+        if(the_speed != 99999):
+            sped_chunk = audio_samples[sample_start:sample_end]
 
-            if(theSpeed == 1):
-                yPointerEnd = yPointer + spedChunk.shape[0]
-                newAudio[yPointer:yPointerEnd] = spedChunk
+            if(the_speed == 1):
+                y_end_pointer = y_pointer + sped_chunk.shape[0]
+                new_audio[y_pointer:y_end_pointer] = sped_chunk
             else:
-                spedupAudio = np.zeros((0, 2), dtype=np.int16)
-                with ArrReader(spedChunk, channels, samplerate, 2) as reader:
-                    with ArrWriter(spedupAudio, channels, samplerate, 2) as writer:
-                        phasevocoder(reader.channels, speed=theSpeed).run(
+                spedup_audio = np.zeros((0, 2), dtype=np.int16)
+                with ArrReader(sped_chunk, channels, samplerate, 2) as reader:
+                    with ArrWriter(spedup_audio, channels, samplerate, 2) as writer:
+                        phasevocoder(reader.channels, speed=the_speed).run(
                             reader, writer
                         )
-                        spedupAudio = writer.output
+                        spedup_audio = writer.output
 
-                yPointerEnd = yPointer + spedupAudio.shape[0]
-                newAudio[yPointer:yPointerEnd] = spedupAudio
+                y_end_pointer = y_pointer + spedup_audio.shape[0]
+                new_audio[y_pointer:y_end_pointer] = spedup_audio
 
-            myL = chunk[1] - chunk[0]
-            mySamples = (myL / fps) * samplerate
-            newSamples = int(mySamples / theSpeed)
+            my_samples = ((chunk[1] - chunk[0]) / fps) * samplerate
+            new_samples = int(my_samples / the_speed)
 
-            yPointer = yPointer + newSamples
+            y_pointer = y_pointer + new_samples
         else:
             # Speed is too high so skip this section.
-            yPointerEnd = yPointer
+            y_end_pointer = y_pointer
 
-        audioProgress.tick(chunkNum)
+        progress.tick(c)
 
-    log.debug('Total Samples: {}'.format(yPointer))
+    log.debug('Total Samples: {}'.format(y_pointer))
     log.debug('Samples per Frame: {}'.format(samplerate / fps))
-    log.debug('Expected video length: {}'.format(yPointer / (samplerate / fps)))
-    newAudio = newAudio[:yPointer]
-    write(out_file, samplerate, newAudio)
+    log.debug('Expected video length: {}'.format(y_pointer / (samplerate / fps)))
+    new_audio = new_audio[:y_pointer]
+    write(output_path, samplerate, new_audio)
 
     log.conwrite('')
