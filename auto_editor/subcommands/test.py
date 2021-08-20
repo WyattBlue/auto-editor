@@ -176,7 +176,7 @@ class Tester():
             sys.exit(1)
         sys.exit(0)
 
-def test(sys_args=None):
+def main(sys_args=None):
     parser = vanparse.ArgumentParser('test', 'version')
     parser = test_options(parser)
 
@@ -472,4 +472,4 @@ def test(sys_args=None):
     tester.end()
 
 if(__name__ == '__main__'):
-    test()
+    main()

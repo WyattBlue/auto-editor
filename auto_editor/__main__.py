@@ -586,19 +586,9 @@ def main():
     subcommands = ['create', 'test', 'info', 'levels', 'grep']
 
     if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
-        if(sys.argv[1] == 'create'):
-            from auto_editor.subcommands.create import create as sub
-        if(sys.argv[1] == 'test'):
-            from auto_editor.subcommands.test import test as sub
-        if(sys.argv[1] == 'info'):
-            from auto_editor.subcommands.info import info as sub
-        if(sys.argv[1] == 'levels'):
-            from auto_editor.subcommands.levels import levels as sub
-        if(sys.argv[1] == 'grep'):
-            from auto_editor.subcommands.grep import grep as sub
-
-        sub(sys.argv[2:])
-
+        obj = __import__('auto_editor.subcommands.{}'.format(sys.argv[1]),
+            fromlist=['subcommands'])
+        obj.main(sys.argv[2:])
         sys.exit()
     else:
         parser = main_options(parser)
@@ -707,22 +697,22 @@ def main():
         args.output_file = []
 
     from auto_editor.validateInput import valid_input
-    inputList, segments = valid_input(args.input, ffmpeg, args, log)
+    input_list, segments = valid_input(args.input, ffmpeg, args, log)
 
-    if(len(args.output_file) < len(inputList)):
-        for i in range(len(inputList) - len(args.output_file)):
-            args.output_file.append(set_output_name(inputList[i], making_data_file, args))
+    if(len(args.output_file) < len(input_list)):
+        for i in range(len(input_list) - len(args.output_file)):
+            args.output_file.append(set_output_name(input_list[i], making_data_file, args))
 
     if(args.combine_files):
         temp_file = os.path.join(TEMP, 'combined.mp4')
         cmd = []
-        for fileref in inputList:
+        for fileref in input_list:
             cmd.extend(['-i', fileref])
-        cmd.extend(['-filter_complex', '[0:v]concat=n={}:v=1:a=1'.format(len(inputList)),
+        cmd.extend(['-filter_complex', '[0:v]concat=n={}:v=1:a=1'.format(len(input_list)),
             '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2', temp_file])
         ffmpeg.run(cmd)
         del cmd
-        inputList = [temp_file]
+        input_list = [temp_file]
 
     speeds = [args.silent_speed, args.video_speed]
     if(args.cut_out != [] and 99999 not in speeds):
@@ -734,13 +724,13 @@ def main():
 
     log.debug('Speeds: {}'.format(speeds))
 
-    def main_loop(inputList, ffmpeg, args, speeds, segments, log):
+    def main_loop(input_list, ffmpeg, args, speeds, segments, log):
         num_cuts = 0
 
-        for i, input_path in enumerate(inputList):
+        for i, input_path in enumerate(input_list):
             inp = ffmpeg.file_info(input_path)
 
-            if(len(inputList) > 1):
+            if(len(input_list) > 1):
                 log.conwrite('Working on {}'.format(inp.basename))
 
             cuts, newOutput = edit_media(i, inp, ffmpeg, args, speeds, segments[i],
@@ -762,7 +752,7 @@ def main():
             usefulfunctions.open_with_system_default(newOutput, log)
 
     try:
-        main_loop(inputList, ffmpeg, args, speeds, segments, log)
+        main_loop(input_list, ffmpeg, args, speeds, segments, log)
     except KeyboardInterrupt:
         log.error('Keyboard Interrupt')
     log.cleanup()

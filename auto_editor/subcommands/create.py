@@ -21,7 +21,7 @@ def create_options(parser):
         help='the template')
     return parser
 
-def create(sys_args=None):
+def main(sys_args=None):
     import os
     import sys
     import time
@@ -86,4 +86,4 @@ def create(sys_args=None):
             args.width, args.height, fps, theme), '-t', str(args.duration), output])
 
 if(__name__ == '__main__'):
-    create()
+    main()
