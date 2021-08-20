@@ -2,7 +2,7 @@
 
 # Internal Libraries
 import os
-from shutil import move, copy
+from shutil import move
 
 # Included Libraries
 from .func import fnone
