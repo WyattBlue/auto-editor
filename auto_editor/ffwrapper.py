@@ -136,7 +136,7 @@ class FFmpeg():
 
         return output
 
-    def getVersion(self):
+    def version(self):
         # type: () -> str
         _version = self.pipe(['-version']).split('\n')[0]
         _version = _version.replace('ffmpeg version', '').strip()

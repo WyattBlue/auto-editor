@@ -487,7 +487,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         temp_file = os.path.join(TEMP, 'convert.wav')
         make_new_audio(the_file, temp_file, chunks, speeds, log, fps,
             args.machine_readable_progress, args.no_progress)
-        convertAudio(ffmpeg, temp_file, inp, output_path, args.audio_codec, log)
+        convert_audio(ffmpeg, temp_file, inp, output_path, args.audio_codec, log)
 
     if(audio_file):
         if(args.export_as_clip_sequence):
@@ -615,7 +615,7 @@ def main():
         print('Platform: {} {}'.format(platform.system(), platform.release()))
         print('Config File path: {}'.format(os.path.join(dir_path, 'config.txt')))
         print('FFmpeg path: {}'.format(ffmpeg.getPath()))
-        print('FFmpeg version: {}'.format(ffmpeg.getVersion()))
+        print('FFmpeg version: {}'.format(ffmpeg.version()))
         print('Auto-Editor version {}'.format(auto_editor.version))
         sys.exit()
 
