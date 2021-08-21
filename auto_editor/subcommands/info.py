@@ -68,10 +68,10 @@ def main(sys_args=None):
             text += ' - video codec: {}\n'.format(inp.video_streams[0]['codec'])
             text += ' - video bitrate: {}\n'.format(inp.video_streams[0]['bitrate'])
 
-            tracks = len(inp.audio_streams)
-            text += ' - audio tracks: {}\n'.format(tracks)
+            audio_tracks = len(inp.audio_streams)
+            text += ' - audio tracks: {}\n'.format(audio_tracks)
 
-            for track in range(tracks):
+            for track in range(audio_tracks):
                 text += '   - Track #{}\n'.format(track)
                 text += '     - codec: {}\n'.format(inp.audio_streams[track]['codec'])
                 text += '     - samplerate: {}\n'.format(
@@ -82,7 +82,7 @@ def main(sys_args=None):
             sub_tracks = len(inp.subtitle_streams)
             if(sub_tracks > 0):
                 text += ' - subtitle tracks: {}\n'.format(sub_tracks)
-                for track in range(tracks):
+                for track in range(sub_tracks):
                     text += '   - Track #{}\n'.format(track)
                     text += '     - codec: {}\n'.format(inp.subtitle_streams[track]['codec'])
                     text += '     - lang: {}\n'.format(inp.subtitle_streams[track]['lang'])
