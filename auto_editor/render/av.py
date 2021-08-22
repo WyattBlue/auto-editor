@@ -2,6 +2,9 @@
 
 from __future__ import print_function, absolute_import
 
+# External Libraries
+import av
+
 # Internal Libraries
 import os.path
 import subprocess
@@ -10,12 +13,29 @@ import subprocess
 from auto_editor.utils.progressbar import ProgressBar
 from .utils import properties, scale_to_sped
 
-def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
-    import av
+def pix_fmt_allowed(pix_fmt):
+    # type: (str) -> bool
 
+    # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
+    allowed_formats = ['yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
+        'abgr', 'bgra', 'gray', 'gray8', 'rgb8', 'bgr8', 'pal8']
+
+    return pix_fmt in allowed_formats
+
+
+def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
     totalFrames = chunks[len(chunks) - 1][1]
     videoProgress = ProgressBar(totalFrames, 'Creating new video',
         args.machine_readable_progress, args.no_progress)
+
+    input_ = av.open(inp.path)
+    pix_fmt = input_.streams.video[0].pix_fmt
+
+    def throw_pix_fmt(inp, pix_fmt, log):
+        log.error('''pix_fmt {} is not supported.\n
+Convert your video to a supported pix_fmt. The following command might work for you:
+  ffmpeg -i "{}" -pix_fmt yuv420p converted{}
+'''.format(pix_fmt, inp.path, '' if inp.ext is None else inp.ext))
 
     if(has_vfr):
         class Wrapper:
@@ -35,23 +55,26 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
 
         # Create a cfr stream on stdout.
         cmd = ['-i', inp.path, '-map', '0:v:0', '-vf', 'fps=fps={}'.format(fps), '-r',
-            str(fps), '-vsync', '1', '-f', 'matroska', '-vcodec', 'rawvideo', 'pipe:1']
+            str(fps), '-vsync', '1', '-f', 'matroska']
+        if(not pix_fmt_allowed(pix_fmt)):
+            # If we have to make a new video anyway, why not fix the pixel format?
+            cmd.extend(['-pix_fmt', 'yuv420p'])
+        cmd.extend(['-vcodec', 'rawvideo', 'pipe:1'])
 
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
         input_ = av.open(wrapper, 'r')
-    else:
-        input_ = av.open(inp.path)
+    elif(not pix_fmt_allowed(pix_fmt)):
+        throw_pix_fmt(inp, pix_fmt, log)
 
     inputVideoStream = input_.streams.video[0]
     inputVideoStream.thread_type = 'AUTO'
 
     width = inputVideoStream.width
     height = inputVideoStream.height
-    pix_fmt = inputVideoStream.pix_fmt
 
     log.debug('pix_fmt: {}'.format(pix_fmt))
 
-    cmd = [ffmpeg.getPath(), '-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
+    cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
         '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
         '-i', '-', '-pix_fmt', pix_fmt]
 
@@ -62,11 +85,7 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
         cmd = properties(cmd, args, inp)
         cmd.append(os.path.join(temp, 'spedup.mp4'))
 
-    if(args.show_ffmpeg_debug):
-        process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    else:
-        process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL)
+    process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE)
 
     inputEquavalent = 0.0
     outputEquavalent = 0
@@ -93,7 +112,7 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
         process2.wait()
     except BrokenPipeError:
         log.print(cmd)
-        process2 = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE)
         log.error('Broken Pipe Error!')
 
     if(args.scale != 1):

@@ -109,7 +109,7 @@ class FFmpeg():
 
                 elif(re.search(r'Subtitle:', line)):
                     s_data['lang'] = regex_match(r'Stream #\d+:\d+\((?P<match>\w+)\)', line)
-                    s_data['codec'] = regex_match(r'Subtitle:\s(?P<match>\w+)\s', line)
+                    s_data['codec'] = regex_match(r'Subtitle:\s(?P<match>\w+)', line)
                     subtitle_streams.append(s_data)
 
         setattr(file, 'fps', fps)
@@ -118,11 +118,17 @@ class FFmpeg():
         setattr(file, 'subtitle_streams', subtitle_streams)
         return file
 
-    def Popen(self, cmd):
+    def Popen(self, cmd, stdin=None, stdout=subprocess.PIPE):
+        try:
+            from subprocess import DEVNULL
+        except ImportError:
+            import os
+            DEVNULL = open(os.devnull, 'wb')
+
+        stderr = None if self.FFdebug else DEVNULL
+
         cmd = [self.path] + cmd
-        if(self.FFdebug):
-            return subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        return subprocess.Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr)
 
     def pipe(self, cmd):
         # type: (list[str]) -> str
