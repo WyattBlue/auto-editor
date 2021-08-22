@@ -388,6 +388,15 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         def has_VFR(cmd, log):
             return number_of_VFR_frames(ffmpeg.pipe(cmd), log) != 0
 
+        # Extract subtitles in their native format.
+        if(len(inp.subtitle_streams) > 0):
+            cmd = ['-i', inp.path, '-hide_banner']
+            for s, sub in enumerate(inp.subtitle_streams):
+                cmd.extend(['-map', '0:s:{}'.format(s)])
+            for s, sub in enumerate(inp.subtitle_streams):
+                cmd.extend([os.path.join(TEMP, '{}s.{}'.format(s, sub['codec']))])
+            ffmpeg.run(cmd)
+
         # Split audio tracks into: 0.wav, 1.wav, etc.
         cmd = ['-i', inp.path, '-hide_banner']
         for t in range(tracks):
@@ -538,6 +547,10 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
                 log.debug('Writing the output file.')
             else:
                 log.conwrite('Writing the output file.')
+
+            if(len(inp.subtitle_streams) > 0):
+                from auto_editor.render.subtitle import cut_subtitles
+                cut_subtitles(ffmpeg, inp, chunks, speeds, log)
 
             mux_rename_video(ffmpeg, output_path, args, tracks, TEMP, log)
             if(output_path is not None and not os.path.isfile(output_path)):

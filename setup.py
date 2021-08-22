@@ -24,7 +24,7 @@ def replace_version():
 
     import datetime
     year, week_num, _ = datetime.date.today().isocalendar()
-    year = str(year)[-2:]
+    year = str(year - 2000)
 
     version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
         version_content, re.M)
@@ -46,6 +46,9 @@ def replace_version():
     with open(os.path.abspath('auto_editor/__init__.py'), 'w') as f:
         f.write(version_content)
 
+
+if(sys.argv[-1] == 'replace_version'):
+    replace_version()
 
 if(sys.argv[-1] == 'publish'):
     replace_version()
