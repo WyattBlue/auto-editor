@@ -512,6 +512,11 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
 
     def make_video_file(inp, chunks, output_path):
         from auto_editor.utils.video import handle_audio_tracks, mux_rename_video
+
+        if(len(inp.subtitle_streams) > 0):
+            from auto_editor.render.subtitle import cut_subtitles
+            cut_subtitles(ffmpeg, inp, chunks, speeds, fps, TEMP, log)
+
         continue_video = handle_audio_tracks(ffmpeg, output_path, args, tracks, chunks,
             speeds, fps, TEMP, log)
         if(continue_video):
@@ -548,11 +553,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
             else:
                 log.conwrite('Writing the output file.')
 
-            if(len(inp.subtitle_streams) > 0):
-                from auto_editor.render.subtitle import cut_subtitles
-                cut_subtitles(ffmpeg, inp, chunks, speeds, log)
-
-            mux_rename_video(ffmpeg, output_path, args, tracks, TEMP, log)
+            mux_rename_video(ffmpeg, output_path, args, inp, TEMP, log)
             if(output_path is not None and not os.path.isfile(output_path)):
                 log.bug('The file {} was not created.'.format(output_path))
 
