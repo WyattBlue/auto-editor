@@ -57,8 +57,9 @@ Convert your video to a supported pix_fmt. The following command might work for 
         cmd = ['-i', inp.path, '-map', '0:v:0', '-vf', 'fps=fps={}'.format(fps), '-r',
             str(fps), '-vsync', '1', '-f', 'matroska']
         if(not pix_fmt_allowed(pix_fmt)):
-            # If we have to make a new video anyway, why not fix the pixel format?
-            cmd.extend(['-pix_fmt', 'yuv420p'])
+            pix_fmt = 'yuv420p'
+            cmd.extend(['-pix_fmt', pix_fmt])
+
         cmd.extend(['-vcodec', 'rawvideo', 'pipe:1'])
 
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
