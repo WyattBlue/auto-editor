@@ -39,49 +39,53 @@ def handle_audio_tracks(ffmpeg, write_file, args, a_tracks, chunks, speeds, fps,
 
 def mux_rename_video(ffmpeg, write_file, args, inp, temp, log):
 
-    if(len(inp.subtitle_streams) > 0):
-        cmd = []
-        for s, sub in enumerate(inp.subtitle_streams):
-            new_path = os.path.join(temp, '{}s.{}'.format(s, sub['codec']))
-            cmd.extend(['-i', new_path])
-        cmd.extend(['-i', os.path.join(temp, 'spedup.mp4')])
-
-        for s, sub in enumerate(inp.subtitle_streams):
-            cmd.extend(['-map', '{}:s:0'.format(s)])
-        cmd.extend(['-map', '0:v:0'])
-        ffmpeg.run(cmd)
-
+    s_tracks = len(inp.subtitle_streams)
     a_tracks = len(inp.audio_streams)
 
-    if(a_tracks == 0):
+    if(a_tracks == 0 and s_tracks == 0):
         move(os.path.join(temp, 'spedup.mp4'), write_file)
         log.conwrite('')
         return
 
-    cmd = []
-    if(args.keep_tracks_seperate):
-        for t in range(a_tracks):
-            cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
-        cmd.extend(['-i', os.path.join(temp, 'spedup.mp4')])
-        for t in range(a_tracks):
-            cmd.extend(['-map', '{}:a:0'.format(t)])
-        cmd.extend(['-map', '{}:v:0'.format(a_tracks)])
-    else:
-        # Merge all the audio a_tracks into one.
-        new_a_file = os.path.join(temp, 'new_audio.wav')
-        if(a_tracks > 1):
+    cmd = ['-i', os.path.join(temp, 'spedup.mp4')]
+    if(a_tracks > 0):
+        if(args.keep_tracks_seperate):
             for t in range(a_tracks):
                 cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
-            cmd.extend(['-filter_complex', 'amerge=inputs={}'.format(a_tracks), '-ac', '2',
-                new_a_file])
-            ffmpeg.run(cmd)
+            cmd.extend(['-i', os.path.join(temp, 'spedup.mp4')])
+            for t in range(a_tracks):
+                cmd.extend(['-map', '{}:a:0'.format(t)])
+            cmd.extend(['-map', '{}:v:0'.format(a_tracks)])
         else:
-            new_a_file = os.path.join(temp, 'new0.wav')
-        cmd = ['-i', new_a_file, '-i', os.path.join(temp, 'spedup.mp4')]
+            # Merge all the audio a_tracks into one.
+            new_a_file = os.path.join(temp, 'new_audio.wav')
+            if(a_tracks > 1):
+                for t in range(a_tracks):
+                    cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
+                cmd.extend(['-filter_complex', 'amerge=inputs={}'.format(a_tracks),
+                    '-ac', '2', new_a_file])
+                ffmpeg.run(cmd)
+            else:
+                new_a_file = os.path.join(temp, 'new0.wav')
+            cmd.extend(['-i', new_a_file])
+
+    if(s_tracks > 0):
+        for s, sub in enumerate(inp.subtitle_streams):
+            new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
+            cmd.extend(['-i', new_path])
+
+        for s in range(s_tracks):
+            cmd.extend(['-map', '2:s:0'])
+
 
     cmd.extend(['-c:v', 'copy'])
+    if(s_tracks > 0):
+        codec = inp.subtitle_streams[0]['codec']
+        cmd.extend(['-c:s', codec])
+
     if(not fnone(args.audio_codec)):
         cmd.extend(['-c:a', args.audio_codec])
+
     cmd.append(write_file)
     ffmpeg.run(cmd)
     log.conwrite('')
