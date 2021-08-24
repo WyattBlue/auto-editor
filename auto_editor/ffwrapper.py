@@ -88,6 +88,8 @@ class FFmpeg():
         subtitle_streams = []
         fps = None
 
+        sub_exts = {'mov_text': 'srt', 'ass': 'ass', 'webvtt': 'vtt'}
+
         for line in info.split('\n'):
             if(re.search(r'Stream #', line)):
                 s_data = {}
@@ -110,6 +112,7 @@ class FFmpeg():
                 elif(re.search(r'Subtitle:', line)):
                     s_data['lang'] = regex_match(r'Stream #\d+:\d+\((?P<match>\w+)\)', line)
                     s_data['codec'] = regex_match(r'Subtitle:\s(?P<match>\w+)', line)
+                    s_data['ext'] = sub_exts.get(s_data['codec'], 'vtt')
                     subtitle_streams.append(s_data)
 
         setattr(file, 'fps', fps)

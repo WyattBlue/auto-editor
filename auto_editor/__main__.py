@@ -394,7 +394,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
             for s, sub in enumerate(inp.subtitle_streams):
                 cmd.extend(['-map', '0:s:{}'.format(s)])
             for s, sub in enumerate(inp.subtitle_streams):
-                cmd.extend([os.path.join(TEMP, '{}s.{}'.format(s, sub['codec']))])
+                cmd.extend([os.path.join(TEMP, '{}s.{}'.format(s, sub['ext']))])
             ffmpeg.run(cmd)
 
         # Split audio tracks into: 0.wav, 1.wav, etc.

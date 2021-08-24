@@ -39,7 +39,7 @@ class SubtitleParser:
 
     def write(self, file_path):
         with open(file_path, 'w') as file:
-            #file.write(self.header)
+            file.write(self.header)
             for item in self.contents:
                 file.write('{before}{start_time}{middle}{end_time}{after}'.format(
                     before=item[2],
@@ -48,7 +48,7 @@ class SubtitleParser:
                     end_time=self.to_timecode(item[1]),
                     after=item[4],
                 ))
-            #file.write(self.footer)
+            file.write(self.footer)
 
     # H:MM:SS.MM+
     def to_frame(self, text):
@@ -74,20 +74,14 @@ class SubtitleParser:
 
 def cut_subtitles(ffmpeg, inp, chunks, speeds, fps, temp, log):
     for s, sub in enumerate(inp.subtitle_streams):
-        file_path = os.path.join(temp, '{}s.{}'.format(s, sub['codec']))
-        new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['codec']))
+        file_path = os.path.join(temp, '{}s.{}'.format(s, sub['ext']))
+        new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
 
         with open(file_path, 'r') as file:
             parser = SubtitleParser()
             if(sub['codec'] in parser.supported_codecs):
                 parser.parse(file.read(), fps, sub['codec'])
                 parser.write(new_path)
-
-    # import sys
-    # with open(file_path, 'r') as file:
-    #     print(file.read())
-    # print('----------')
-    # with open(new_path, 'r') as file:
-    #     print(file.read())
-    # print('----------')
-    # log.error('done')
+            else:
+                import shutil
+                shutil.copy(file_path, new_path)
