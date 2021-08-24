@@ -53,18 +53,19 @@ def mux_rename_video(ffmpeg, write_file, args, inp, temp, log):
             for t in range(a_tracks):
                 cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
             cmd.extend(['-i', os.path.join(temp, 'spedup.mp4')])
-            for t in range(a_tracks):
-                cmd.extend(['-map', '{}:a:0'.format(t)])
-            cmd.extend(['-map', '{}:v:0'.format(a_tracks)])
+            for t in range(1, a_tracks+1):
+                cmd.extend(['-map', '{}:0'.format(t)])
+            cmd.extend(['-map', '0:v:0'])
         else:
             # Merge all the audio a_tracks into one.
             new_a_file = os.path.join(temp, 'new_audio.wav')
             if(a_tracks > 1):
+                new_cmd = []
                 for t in range(a_tracks):
-                    cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
-                cmd.extend(['-filter_complex', 'amerge=inputs={}'.format(a_tracks),
+                    new_cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
+                new_cmd.extend(['-filter_complex', 'amerge=inputs={}'.format(a_tracks),
                     '-ac', '2', new_a_file])
-                ffmpeg.run(cmd)
+                ffmpeg.run(new_cmd)
             else:
                 new_a_file = os.path.join(temp, 'new0.wav')
             cmd.extend(['-i', new_a_file])
