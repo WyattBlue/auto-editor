@@ -5,46 +5,37 @@ import re
 
 class SubtitleParser:
     def __init__(self):
-        self.supported_codecs = ['ass']
+        self.supported_codecs = ['ass', 'webvtt', 'mov_text']
 
     def parse(self, text, fps, codec):
+
+        if(codec not in self.supported_codecs):
+            raise ValueError('codec {} not supported.'.format(codec))
+
         self.fps = fps
         self.codec = codec
-        self.header = ''
-        self.footer = ''
         self.contents = []
 
-        is_footer = False
+        if(codec == 'ass'):
+            time_code = re.compile(r'(.*)(\d+:\d+:[\d.]+)(.*)(\d+:\d+:[\d.]+)(.*)')
+        if(codec == 'webvtt'):
+            time_code = re.compile(r'()(\d+:[\d.]+)( --> )(\d+:[\d.]+)\n(.*)')
+        if(codec == 'mov_text'):
+            time_code = re.compile(r'()(\d+:\d+:[\d,]+)( --> )(\d+:\d+:[\d,]+)\n(.*)')
 
-        for line in text.split('\n'):
-            anal = re.match(r'(.*)(\d+:\d+:[\d.]+)(.*)(\d+:\d+:[\d.]+)(.*)', line)
-            if(anal is None):
-                if(is_footer):
-                    self.footer += line + '\n'
-                else:
-                    self.header += line + '\n'
-            else:
-                is_footer = True
-                starting_str = anal.group(2)
-                ending_str = anal.group(4)
+        for i, item in enumerate(re.finditer(time_code, text)):
+            if(i == 0):
+                self.header = text[:item.span()[0]]
 
-                self.contents.append(
-                    [self.to_frame(starting_str), self.to_frame(ending_str),
-                    anal.group(1), anal.group(3), anal.group(5) + '\n'
-                    ]
-                )
+            self.contents.append(
+                [self.to_frame(item.group(2)), self.to_frame(item.group(4)),
+                item.group(1), item.group(3), item.group(5) + '\n']
+            )
 
-        # from operator import itemgetter
-        # self.contents = sorted(self.contents, key=itemgetter(0))
+        self.footer = text[item.span()[1]:]
 
-
-    #[[0, 26, 1], [26, 34, 0], [34, 396, 1], [396, 410, 0], [410, 522, 1], [522, 1192, 0], [1192, 1220, 1], [1220, 1273, 0]]
-
-    # chunk[start_inclusive, ending_exclusive, speed_index[]
 
     def edit(self, chunks, speeds):
-
-        # lexicon cuts
         lexicon_cuts = []
 
         for chunk in chunks:
@@ -57,7 +48,6 @@ class SubtitleParser:
 
         for cut in lexicon_cuts:
             i = 0
-            print(cut)
             while(i < len(self.contents)):
                 content = self.contents[i]
 
@@ -95,8 +85,14 @@ class SubtitleParser:
 
     def to_frame(self, text):
         # type: (str) -> int
-        nums = re.match(r'(\d+):(\d+):([\d.]+)', text)
+        if(self.codec == 'mov_text'):
+            time_format = r'(\d+):?(\d+):([\d,]+)'
+        else:
+            time_format = r'(\d+):?(\d+):([\d.]+)'
+
+        nums = re.match(time_format, text)
         hours, minutes, seconds = nums.groups()
+        seconds = seconds.replace(',', '.', 1)
         return round((int(hours) * 3600 + int(minutes) * 60 + float(seconds)) * self.fps)
 
     def to_timecode(self, frame):
@@ -106,12 +102,20 @@ class SubtitleParser:
         m, s = divmod(seconds, 60)
         h, m = divmod(m, 60)
 
-        if(len(str(int(s))) == 1):
-            s = '0' + str('{:.2f}'.format(round(s, 3)))
-        else:
-            s = str('{:.2f}'.format(round(s, 3)))
+        sig_fig = 2 if self.codec == 'ass' else 3
+        s = str(round(s, sig_fig)).zfill(2)
 
-        return '{:d}:{:02d}:{}'.format(int(h), int(m), s)
+        if(self.codec == 'webvtt'):
+            if(int(h) == 0):
+                return '{:02d}:{}'.format(int(m), s)
+            time_format = '{:02d}:{:02d}:{}'
+        elif(self.codec == 'mov_text'):
+            s = s.replace('.', ',', 1)
+            time_format = '{:02d}:{:02d}:{}'
+        else:
+            time_format = '{:d}:{:02d}:{}'
+
+        return time_format.format(int(h), int(m), s)
 
 
 if __name__ == '__main__':
@@ -136,12 +140,16 @@ def cut_subtitles(ffmpeg, inp, chunks, speeds, fps, temp, log):
         file_path = os.path.join(temp, '{}s.{}'.format(s, sub['ext']))
         new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
 
-        with open(file_path, 'r') as file:
-            parser = SubtitleParser()
-            if(sub['codec'] in parser.supported_codecs):
+        parser = SubtitleParser()
+
+        if(sub['codec'] in parser.supported_codecs):
+            with open(file_path, 'r') as file:
                 parser.parse(file.read(), fps, sub['codec'])
-                parser.edit(chunks, speeds)
-                parser.write(new_path)
-            else:
-                import shutil
-                shutil.copy(file_path, new_path)
+        else:
+            convert_path = os.path.join(temp, '{}s_convert.vtt'.format(s))
+            ffmpeg.run(['-i', file_path, convert_path])
+            with open(convert_path, 'r') as file:
+                parser.parse(file.read(), fps, 'webvtt')
+
+        parser.edit(chunks, speeds)
+        parser.write(new_path)
