@@ -53,9 +53,6 @@ def mux_rename_video(ffmpeg, write_file, args, inp, temp, log):
             for t in range(a_tracks):
                 cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
             cmd.extend(['-i', os.path.join(temp, 'spedup.mp4')])
-            for t in range(1, a_tracks+1):
-                cmd.extend(['-map', '{}:0'.format(t)])
-            cmd.extend(['-map', '0:v:0'])
         else:
             # Merge all the audio a_tracks into one.
             new_a_file = os.path.join(temp, 'new_audio.wav')
@@ -75,9 +72,9 @@ def mux_rename_video(ffmpeg, write_file, args, inp, temp, log):
             new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
             cmd.extend(['-i', new_path])
 
-        for s in range(s_tracks):
-            cmd.extend(['-map', '2:s:0'])
-
+    total_streams = 1 + s_tracks + (a_tracks if args.keep_tracks_seperate else 1)
+    for i in range(total_streams):
+        cmd.extend(['-map', '{}:0'.format(i)])
 
     cmd.extend(['-c:v', 'copy'])
     if(s_tracks > 0):
