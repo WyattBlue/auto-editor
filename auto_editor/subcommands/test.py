@@ -217,6 +217,28 @@ def main(sys_args=None):
             sys.exit(1)
     tester.run_test('version_tests', version_debug)
 
+    def subtitle_tests():
+        from auto_editor.render.subtitle import SubtitleParser
+        test = SubtitleParser()
+        test.contents = [
+            [0, 10, "A"],
+            [10, 20, "B"],
+            [20, 30, "C"],
+            [30, 40, "D"],
+            [40, 50, "E"],
+            [50, 60, "F"],
+        ]
+        speeds = [99999, 1]
+        chunks = [[0, 10, 1], [10, 20, 0], [20, 30, 1], [30, 40, 0], [40, 50, 1],
+            [50, 60, 0]]
+        test.edit(chunks, speeds)
+
+        if(test.contents != [[0, 10, "A"], [10, 20, "C"], [20, 30, "E"]]):
+            raise ValueError('Incorrect subtitle results.')
+
+
+    tester.run_test('subtitle_tests', subtitle_tests)
+
     def info_tests():
         run_program(['info', 'example.mp4'])
         run_program(['info', 'resources/man_on_green_screen.mp4'])
