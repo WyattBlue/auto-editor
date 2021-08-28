@@ -2,9 +2,15 @@
 
 from .utils import indent, get_width_height
 
+from platform import system
+
 def fcp_xml(inp, temp, output, clips, tracks, total_dur, audioFile, fps, log):
 
-    pathurl = 'file://' + inp.abspath
+    if(system() == 'Windows'):
+        import pathlib
+        pathurl = 'file://localhost/' + pathlib.PureWindowsPath(inp.abspath).as_posix()
+    else:
+        pathurl = 'file://' + inp.abspath
     name = inp.basename
 
     def fraction(a, fps):
