@@ -29,20 +29,17 @@ def properties(cmd, args, inp):
     cmd.extend(['-movflags', '+faststart', '-strict', '-2'])
     return cmd
 
-def scale_to_sped(ffmpeg, inp, args, temp):
-    SCALE = os.path.join(temp, 'scale{}'.format(inp.ext))
-    SPED = os.path.join(temp, 'spedup{}'.format(inp.ext))
-
-    cmd = ['-i', SCALE]
+def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
+    cmd = ['-i', scale]
     cmd = properties(cmd, args, inp)
-    cmd.append(SPED)
+    cmd.append(spedup)
     check_errors = ffmpeg.pipe(cmd)
 
     if('Error' in check_errors or 'failed' in check_errors):
-        cmd = ['-i', SCALE]
+        cmd = ['-i', scale]
         if('-allow_sw 1' in check_errors):
             cmd.extend(['-allow_sw', '1'])
 
         cmd = properties(cmd, args, inp)
-        cmd.append(SPED)
+        cmd.append(sped)
         ffmpeg.run(cmd)

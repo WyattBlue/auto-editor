@@ -541,11 +541,12 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
                         'av render method.')
 
                 from auto_editor.render.av import render_av
-                render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, TEMP, log)
+                spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
+                    TEMP, log)
 
             if(args.render == 'opencv'):
                 from auto_editor.render.opencv import render_opencv
-                render_opencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
+                spedup = render_opencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
                     effects, TEMP, log)
 
             if(log.is_debug):
@@ -553,7 +554,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
             else:
                 log.conwrite('Writing the output file.')
 
-            mux_rename_video(ffmpeg, output_path, args, inp, TEMP, log)
+            mux_rename_video(ffmpeg, spedup, output_path, args, inp, TEMP, log)
             if(output_path is not None and not os.path.isfile(output_path)):
                 log.bug('The file {} was not created.'.format(output_path))
 
