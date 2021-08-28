@@ -81,10 +81,10 @@ Convert your video to a supported pix_fmt. The following command might work for 
 
     if(args.scale != 1):
         cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale),
-            os.path.join(temp, 'scale.mp4')])
+            os.path.join(temp, 'scale{}'.format(inp.ext))])
     else:
         cmd = properties(cmd, args, inp)
-        cmd.append(os.path.join(temp, 'spedup.mp4'))
+        cmd.append(os.path.join(temp, 'spedup{}'.format(inp.ext)))
 
     process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE)
 

@@ -30,8 +30,8 @@ def properties(cmd, args, inp):
     return cmd
 
 def scale_to_sped(ffmpeg, inp, args, temp):
-    SCALE = os.path.join(temp, 'scale.mp4')
-    SPED = os.path.join(temp, 'spedup.mp4')
+    SCALE = os.path.join(temp, 'scale{}'.format(inp.ext))
+    SPED = os.path.join(temp, 'spedup{}'.format(inp.ext))
 
     cmd = ['-i', SCALE]
     cmd = properties(cmd, args, inp)

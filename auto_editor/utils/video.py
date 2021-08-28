@@ -43,16 +43,15 @@ def mux_rename_video(ffmpeg, write_file, args, inp, temp, log):
     a_tracks = len(inp.audio_streams)
 
     if(a_tracks == 0 and s_tracks == 0):
-        move(os.path.join(temp, 'spedup.mp4'), write_file)
+        move(os.path.join(temp, 'spedup{}'.format(inp.ext)), write_file)
         log.conwrite('')
         return
 
-    cmd = ['-i', os.path.join(temp, 'spedup.mp4')]
+    cmd = ['-i', os.path.join(temp, 'spedup{}'.format(inp.ext))]
     if(a_tracks > 0):
         if(args.keep_tracks_seperate):
             for t in range(a_tracks):
                 cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
-            cmd.extend(['-i', os.path.join(temp, 'spedup.mp4')])
         else:
             # Merge all the audio a_tracks into one.
             new_a_file = os.path.join(temp, 'new_audio.wav')
