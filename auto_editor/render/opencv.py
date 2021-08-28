@@ -118,12 +118,15 @@ def render_opencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, effects, temp
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
+    spedup = os.path.join(temp, 'spedup.mp4')
+    scale = os.path.join(temp, 'scale.mp4')
+
     if(args.scale != 1):
         width = int(width * args.scale)
         height = int(height * args.scale)
-        video_name = os.path.join(temp, 'scale.mp4')
+        video_name = scale
     else:
-        video_name = os.path.join(temp, 'spedup.mp4')
+        video_name = spedup
 
     if(width < 2 or height < 2):
         log.error('Resolution too small.')
@@ -244,7 +247,9 @@ def render_opencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, effects, temp
 
     if(args.scale == 1):
         cmd = properties(['-i', inp.path], args, inp)
-        cmd.append(os.path.join(temp, 'spedup.mp4'))
+        cmd.append(spedup)
         ffmpeg.run(cmd)
     else:
-        scale_to_sped(ffmpeg, inp, args, temp)
+        scale_to_sped(ffmpeg, spedup, scale, inp, args, temp)
+
+    return spedup

@@ -79,12 +79,16 @@ Convert your video to a supported pix_fmt. The following command might work for 
         '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
         '-i', '-', '-pix_fmt', pix_fmt]
 
+    correct_ext = '.mp4' if inp.ext == '.gif' else inp.ext
+
+    spedup = os.path.join(temp, 'spedup{}'.format(correct_ext))
+    scale = os.path.join(temp, 'scale{}'.format(correct_ext))
+
     if(args.scale != 1):
-        cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale),
-            os.path.join(temp, 'scale{}'.format(inp.ext))])
+        cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale), scale])
     else:
         cmd = properties(cmd, args, inp)
-        cmd.append(os.path.join(temp, 'spedup{}'.format(inp.ext)))
+        cmd.append(spedup)
 
     process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE)
 
@@ -117,5 +121,7 @@ Convert your video to a supported pix_fmt. The following command might work for 
         log.error('Broken Pipe Error!')
 
     if(args.scale != 1):
-        scale_to_sped(ffmpeg, inp, args, temp)
+        scale_to_sped(ffmpeg, spedup, scale, inp, args, temp)
+
+    return spedup
 
