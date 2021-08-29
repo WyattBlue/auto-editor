@@ -19,9 +19,9 @@ class SubtitleParser:
         if(codec == 'ass'):
             time_code = re.compile(r'(.*)(\d+:\d+:[\d.]+)(.*)(\d+:\d+:[\d.]+)(.*)')
         if(codec == 'webvtt'):
-            time_code = re.compile(r'()(\d+:[\d.]+)( --> )(\d+:[\d.]+)\n(.*)')
+            time_code = re.compile(r'()(\d+:[\d.]+)( --> )(\d+:[\d.]+)(\n.*)')
         if(codec == 'mov_text'):
-            time_code = re.compile(r'()(\d+:\d+:[\d,]+)( --> )(\d+:\d+:[\d,]+)\n(.*)')
+            time_code = re.compile(r'()(\d+:\d+:[\d,]+)( --> )(\d+:\d+:[\d,]+)(\n.*)')
 
         for i, item in enumerate(re.finditer(time_code, text)):
             if(i == 0):

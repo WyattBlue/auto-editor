@@ -49,7 +49,7 @@ def main(sys_args=None):
 
 
         for s, sub in enumerate(inp.subtitle_streams):
-            print('file: {} #{} ({})'.format(input_file, s, sub['lang']))
+            print('file: {} ({}:{}:{})'.format(input_file, s, sub['lang'], sub['ext']))
             with open(os.path.join(temp, '{}s{}.{}'.format(i, s, sub['ext']))) as file:
                 print(file.read())
             print('------')
