@@ -79,7 +79,9 @@ def print_program_help(root, the_args):
 def get_option(item, group, the_args):
     for options in the_args:
         for option in options:
-            if(item in option['names'] and group in ['global', option['group']]):
+            dash = list(map(lambda n: n.replace('_', '-'), option['names']))
+            if((item in option['names'] or item in dash)
+                and group in ['global', option['group']]):
                 return option
     return None
 
