@@ -74,15 +74,16 @@ auto-editor --scale --help
 
 
 ## Articles
+ - [How to Install Auto-Editor](https://auto-editor.com/cli/installing) [[html]](https://auto-editor.com/cli/installing) 
  - [How to Edit Videos With Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/editing.md)
  - [How to Use Motion Detection in Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/motionDetection.md)
  - [What's new in Range Syntax](https://github.com/WyattBlue/auto-editor/blob/master/articles/rangeSyntax.md)
+ - [Subcommands](https://github.com/WyattBlue/auto-editor/blob/master/articles/subcommands.md)
+ - [Branding Guide](https://github.com/WyattBlue/auto-editor/blob/master/articles/branding.md)
  - Effects
    - [Rectangles](https://github.com/WyattBlue/auto-editor/blob/master/articles/rectangleEffect.md)
    - [Zooming](https://github.com/WyattBlue/auto-editor/blob/master/articles/zooming.md)
- - [Subcommands](https://github.com/WyattBlue/auto-editor/blob/master/articles/subcommands.md)
- - [Branding Guide](https://github.com/WyattBlue/auto-editor/blob/master/articles/branding.md)
-
+ 
 ## Copyright
 Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) but contains non-free elements. See [this page](https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md) for more info.
 
