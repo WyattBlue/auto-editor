@@ -51,7 +51,6 @@ if(sys.argv[-1] == 'replace_version'):
     replace_version()
 
 if(sys.argv[-1] == 'publish'):
-    replace_version()
 
     from shutil import rmtree
     rmtree('build')
