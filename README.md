@@ -1,6 +1,6 @@
 [![Actions Status](https://github.com/wyattblue/auto-editor/workflows/build/badge.svg)](https://github.com/wyattblue/auto-editor/actions)
 <a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/discord/711767814821773372?color=%237289DA&label=chat&logo=discord&logoColor=white"></a>
-<img src="https://img.shields.io/badge/version-21w34a-blue.svg">
+<img src="https://img.shields.io/badge/version-21w35a-blue.svg">
 <p align="center"><img src="https://raw.githubusercontent.com/wyattblue/auto-editor/master/articles/imgs/auto-editor_banner.png" title="Auto-Editor" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing a variety of methods, most notability audio loudness.
@@ -74,7 +74,7 @@ auto-editor --scale --help
 
 
 ## Articles
- - [How to Install Auto-Editor](https://auto-editor.com/cli/installing) [[html]](https://auto-editor.com/cli/installing) 
+ - [How to Install Auto-Editor](https://auto-editor.com/cli/installing)
  - [How to Edit Videos With Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/editing.md)
  - [How to Use Motion Detection in Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/motionDetection.md)
  - [What's new in Range Syntax](https://github.com/WyattBlue/auto-editor/blob/master/articles/rangeSyntax.md)
