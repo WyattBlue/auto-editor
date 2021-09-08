@@ -1,0 +1,94 @@
+Time results:
+input file: example_long.mp4, which is the provided example.mp4 looped 50 times.
+
+
+default: time python3 -m auto_editor example_long.mp4 --no-open --video-codec libx264 --has_vfr no
+real	2m16.761s
+user	8m24.567s
+sys	0m34.021s
+
+with batch.sh: time ./batch.sh example_long.mp4
+real	1m8.001s
+user	11m16.031s
+sys	0m45.725s
+
+so far about a 50% drop in time.
+
+input file: random 3 hr interview I had on my computer, 1080p30 from youtube
+default:
+real	67m15.392s
+user	681m25.170s
+sys	12m42.006s
+
+with batch.sh: 12 slices, accidentally ran without threads=1
+real	64m10.072s
+user	722m13.047s
+sys	13m37.528s
+
+only about 3 min faster, ~4% drop in time.
+
+with batch.sh: 12 slices, proper threads=1
+real	63m22.855s
+user	705m25.999s
+sys	10m3.068s
+
+6% drop in time.
+
+with batch.sh: 1200 slices
+real	63m1.353s
+user	714m46.916s
+sys	24m56.398s
+
+6% drop in time.
+same as normal slices
+
+not looking too good, max 6% speedup.
+lets see if it will work with the gpu and multiple nvenc streams.
+
+with default: --video_codec h264_nvenc
+real	23m47.478s
+user	49m45.511s
+sys	10m11.117s
+
+with batch.sh: 2 slices
+real	13m19.598s
+user	58m37.736s
+sys	11m55.029s
+43 % drop in time, nice
+
+with batch.sh: 4 slices
+real	11m57.174s
+user	70m3.771s
+sys	13m58.105s
+52% drop in time, even better
+
+with batch.sh: 6 slices
+real	11m53.104s
+user	71m23.384s
+sys	14m19.434s
+52% drop in time, same as 4 slices, I wont bother with any more slices.
+
+
+MIT OpenCourseWare video: https://ia803000.us.archive.org/34/items/MIT6.034F10/MIT6_034F10_lec01_300k.mp4, 480x270
+re-encoded in handbrake to fix some issues with incompatible streams
+
+default: --video_codec libx264
+real	4m43.335s
+user	5m41.443s
+sys	0m12.308s
+
+
+batch.sh: 12 slices
+real	1m2.310s
+user	9m46.956s
+sys	0m20.960s
+
+78% redcution, woohoo
+
+
+other notes:
+RAM usage is quite a bit higher for the batch.sh version, but still around 12GB for 1080p video, likely within reach for most typical modern desktops.
+this figure could come down with a integrated python solution.
+currently it uses GNU parallel for the implementation
+currently no progress indicator, however integrated solution would likely solve this too.
+Acceleration of GPU encoding is entirely hardware dependant, some cards do not support multiple NVENC streams or have a limit to the number of concurrent streams. 

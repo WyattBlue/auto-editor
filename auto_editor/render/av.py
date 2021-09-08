@@ -23,7 +23,7 @@ def pix_fmt_allowed(pix_fmt):
     return pix_fmt in allowed_formats
 
 
-def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
+def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):    
     totalFrames = chunks[len(chunks) - 1][1]
     videoProgress = ProgressBar(totalFrames, 'Creating new video',
         args.machine_readable_progress, args.no_progress)
@@ -75,6 +75,10 @@ Convert your video to a supported pix_fmt. The following command might work for 
 
     log.debug('pix_fmt: {}'.format(pix_fmt))
 
+    # use only 1 thread for encoder process, in pratice it performs about the same without this flag
+    # cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
+    #     '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
+    #     '-i', '-', '-pix_fmt', pix_fmt, "-x264-params","threads=1"]
     cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
         '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
         '-i', '-', '-pix_fmt', pix_fmt]
