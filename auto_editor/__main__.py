@@ -53,6 +53,10 @@ def main_options(parser):
         group='progressOps',
         help='do not display any progress at all.')
 
+    parser.add_argument('multiOps', nargs=0, action='grouping')
+    parser.add_argument('--enable_multiprocessing', action='store_true', group='multiOps',
+        help='enable video rendering multiprocessing.')
+
     parser.add_argument('metadataOps', nargs=0, action='grouping')
     parser.add_argument('--force_fps_to', type=float, group='metadataOps',
         help='manually set the fps value for the input video if detection fails.')
@@ -540,7 +544,10 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
                     log.error('Rectangle effect is not supported on the '\
                         'av render method.')
 
-                from auto_editor.render.av import render_av
+                if(args.enable_multiprocessing):
+                    from auto_editor.render.av_parellel import render_av
+                else:
+                    from auto_editor.render.av import render_av
                 spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
                     TEMP, log)
 
