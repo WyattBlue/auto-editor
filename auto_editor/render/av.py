@@ -9,7 +9,7 @@ import av
 import os.path
 import subprocess
 
-# Included Libaries
+# Included Libraries
 from auto_editor.utils.progressbar import ProgressBar
 from .utils import properties, scale_to_sped
 

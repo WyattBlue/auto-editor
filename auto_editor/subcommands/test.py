@@ -239,6 +239,18 @@ def main(sys_args=None):
 
     tester.run_test('subtitle_tests', subtitle_tests)
 
+
+    def split_chunk_test():
+        from auto_editor.render.av_parellel import split_chunks
+
+        chunks = [[0, 5, 1], [5, 10, 2], [10, 15, 3], [15, 20, 4]]
+
+        assert split_chunks(chunks, split=5) == [[[0, 5, 1]], [[5, 10, 2]], [[10, 15, 3]], [[15, 20, 4]]]
+        assert split_chunks(chunks, split=10) == [[[0, 5, 1], [5, 10, 2]], [[10, 15, 3], [15, 20, 4]]]
+        assert split_chunks(chunks, split=20) == [[[0, 5, 1], [5, 10, 2], [10, 15, 3], [15, 20, 4]]]
+
+    tester.run_test('split_chunk_test', split_chunk_test)
+
     def info_tests():
         run_program(['info', 'example.mp4'])
         run_program(['info', 'resources/man_on_green_screen.mp4'])
