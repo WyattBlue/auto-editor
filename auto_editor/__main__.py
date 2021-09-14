@@ -8,6 +8,8 @@ from __future__ import print_function, absolute_import
 import os
 import sys
 import tempfile
+import multiprocessing
+import termios
 
 # Included Libraries
 import auto_editor
@@ -17,6 +19,7 @@ import auto_editor.utils.func as usefulfunctions
 from auto_editor.utils.func import fnone, append_filename
 from auto_editor.utils.log import Log, Timer
 from auto_editor.ffwrapper import FFmpeg
+
 
 def set_output_name(path, making_data_file, args):
     dot_index = path.rfind('.')
@@ -302,8 +305,12 @@ def get_effects(audio_samples, sample_rate, fps, args, log):
         effects += applyRects(args.rectangle, audio_samples, sample_rate, fps, log)
     return effects
 
-def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_file,
+def edit_media(i, input_path, ffmpeg, args, speeds, segment, exporting_to_editor, data_file,
     TEMP, log):
+    inp = ffmpeg.file_info(input_path)
+    
+    log.conwrite(f"Working on {inp.basename}")
+    
     chunks = None
     if(inp.ext == '.json'):
         from auto_editor.formats.make_json import read_json_cutlist
@@ -745,15 +752,19 @@ def main():
     def main_loop(input_list, ffmpeg, args, speeds, segments, log):
         num_cuts = 0
 
-        for i, input_path in enumerate(input_list):
-            inp = ffmpeg.file_info(input_path)
+        # for i, input_path in enumerate(input_list):
+        #     inp = ffmpeg.file_info(input_path)
+        #     cuts, output_path = edit_media(i, inp, ffmpeg, args, speeds, segments[i],
+        #         exporting_to_editor, making_data_file, TEMP, log)
+        #     num_cuts += cuts
 
-            if(len(input_list) > 1):
-                log.conwrite('Working on {}'.format(inp.basename))
-
-            cuts, output_path = edit_media(i, inp, ffmpeg, args, speeds, segments[i],
-                exporting_to_editor, making_data_file, TEMP, log)
-            num_cuts += cuts
+        # TODO: make number of jobs in pool have cli arg
+        with multiprocessing.Pool(6) as pool:
+            results = pool.starmap(edit_media,[(i, input_path, ffmpeg, args, speeds, segments[i],
+                exporting_to_editor, making_data_file, tempfile.mkdtemp(), log) for i,input_path in enumerate(input_list)])
+        num_cuts = sum(p[0] for p in results)
+        _,last_video_path = results[-1] 
+        
 
         if(not args.preview and not making_data_file):
             timer.stop()
@@ -767,13 +778,19 @@ def main():
                 'edited manually.'.format(num_cuts, s, time_save))
 
         if(not args.no_open):
-            usefulfunctions.open_with_system_default(output_path, log)
-
+            usefulfunctions.open_with_system_default(last_video_path, log)
+    
+    # get the terminal attributes so we can reset them in case they get messed up 
+    tcattributes = termios.tcgetattr(sys.stdin)
+   
     try:
         main_loop(input_list, ffmpeg, args, speeds, segments, log)
     except KeyboardInterrupt:
         log.error('Keyboard Interrupt')
     log.cleanup()
+
+    # reset the terminal attributes
+    termios.tcsetattr(sys.stdin,termios.TCSADRAIN,tcattributes)
 
 if(__name__ == '__main__'):
     main()

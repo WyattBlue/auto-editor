@@ -92,3 +92,26 @@ this figure could come down with a integrated python solution.
 currently it uses GNU parallel for the implementation
 currently no progress indicator, however integrated solution would likely solve this too.
 Acceleration of GPU encoding is entirely hardware dependant, some cards do not support multiple NVENC streams or have a limit to the number of concurrent streams. 
+
+
+
+Actual testing of python integration:
+simple pool.map() for each input clip.
+only works with multiple clips, we will implement slicing next
+
+clip: example.mp4, 1 job
+time:
+real    1m12.342s
+user    2m57.919s
+sys     0m17.667s
+
+clip: example.mp4: 6 jobs
+time:
+real    0m29.286s
+user    3m26.571s
+sys     0m20.583s
+
+60% redcution in time for 20 clip, nice!
+notes: progress bar gets completely screwed up.
+terminal gets borked afterwards too.
+
