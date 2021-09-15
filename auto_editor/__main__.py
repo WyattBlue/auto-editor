@@ -760,8 +760,11 @@ def main():
 
         # TODO: make number of jobs in pool have cli arg
         with multiprocessing.Pool(6) as pool:
-            results = pool.starmap(edit_media,[(i, input_path, ffmpeg, args, speeds, segments[i],
-                exporting_to_editor, making_data_file, tempfile.mkdtemp(), log) for i,input_path in enumerate(input_list)])
+            try:
+                results = pool.starmap(edit_media,[(i, input_path, ffmpeg, args, speeds, segments[i],
+                    exporting_to_editor, making_data_file, tempfile.mkdtemp(), log) for i,input_path in enumerate(input_list)])
+            except RuntimeError:
+                log.error("A child thread encountered an error",exit=True)
         num_cuts = sum(p[0] for p in results)
         _,last_video_path = results[-1] 
         

@@ -45,6 +45,9 @@ class Log():
                 self.debug('Removed Temp Directory.')
             except Exception:
                 self.debug('Failed to delete temp dir.')
+        except FileNotFoundError:
+            # that's ok, the folder we are trying to remove is already gone
+            pass
 
     def conwrite(self, message):
         if(not self.quiet):
@@ -53,8 +56,8 @@ class Log():
                 print('  ' + message + ' ' * buffer, end='\r', flush=True)
             except TypeError:
                 print('  ' + message + ' ' * buffer, end='\r')
-
-    def error(self, message):
+                                
+    def error(self, message, exit=False):
         self.conwrite('')
         message = message.replace('\t', '    ')
         print('Error! {}'.format(message), file=sys.stderr)
@@ -62,14 +65,18 @@ class Log():
 
         from platform import system
 
-        if(system() == 'Linux'):
-            sys.exit(1)
-        else:
-            try:
+        if exit:
+            if(system() == 'Linux'):
                 sys.exit(1)
-            except SystemExit:
-                import os
-                os._exit(1)
+            else:
+                try:
+                    sys.exit(1)
+                except SystemExit:
+                    import os
+                    os._exit(1)
+        else:
+            raise RuntimeError
+        
 
     def bug(self, message, bug_type='bug report'):
         self.conwrite('')
