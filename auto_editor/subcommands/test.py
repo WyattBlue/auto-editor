@@ -183,7 +183,12 @@ def main(sys_args=None):
     if(sys_args is None):
         sys_args = sys.args[1:]
 
-    args = parser.parse_args(sys_args, Log(), 'test')
+    # catch any exceptions thrown by the parser if it calls log.error()
+    try:
+        args = parser.parse_args(sys_args, Log(), 'test')
+    except RuntimeError:
+        exit(1)
+    
     ffprobe = FFprobe(args.ffprobe_location)
 
     tester = Tester(args)
@@ -490,6 +495,24 @@ def main(sys_args=None):
         run_program(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion',
             '--motion_threshold', '0'])
     tester.run_test('motion_tests', motion_tests)
+
+    def multi_processing_tests():
+        run_program(['example.mp4','--enable_multiprocessing'])
+        fullInspect(
+            'example_ALTERED.mp4',
+            [ffprobe.getFrameRate, 30.0],
+            [ffprobe.getResolution, '1280x720'],
+            [ffprobe.getSampleRate, '48000'],
+        )
+        run_program(['example.mp4', '--video_codec', 'uncompressed', '--enable_multiprocessing'])
+        fullInspect(
+            'example_ALTERED.mp4',
+            [ffprobe.getFrameRate, 30.0],
+            [ffprobe.getResolution, '1280x720'],
+            [ffprobe.getVideoCodec, 'mpeg4'],
+            [ffprobe.getSampleRate, '48000'],
+        )
+    tester.run_test('multi_processing_tests',multi_processing_tests)
 
     tester.end()
 
