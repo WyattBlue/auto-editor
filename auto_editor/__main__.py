@@ -318,9 +318,11 @@ def get_effects(audio_samples, sample_rate, fps, args, log):
         effects += applyRects(args.rectangle, audio_samples, sample_rate, fps, log)
     return effects
 
-def edit_media(i, input_path, ffmpeg, args, speeds, segment, exporting_to_editor, data_file,
+def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_file,
     TEMP, log):
-    inp = ffmpeg.file_info(input_path)
+    
+    if isinstance(inp,str):
+        inp = ffmpeg.file_info(inp)
     
     log.conwrite(f"Working on {inp.basename}")
     
