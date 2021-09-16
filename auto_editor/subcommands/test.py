@@ -17,6 +17,7 @@ import subprocess
 from auto_editor.utils.func import clean_list
 from auto_editor.utils.log import Log
 import auto_editor.vanparse as vanparse
+from auto_editor import version as auto_editor_version
 
 def test_options(parser):
     parser.add_argument('--ffprobe_location', default='ffprobe',
@@ -155,17 +156,18 @@ class Tester():
         if(self.args.only != [] and name not in self.args.only):
             return
         try:
+            print(name,end=" ",flush=True)
             func()
         except Exception as e:
             self.failed_tests += 1
-            print('{} Failed.'.format(name))
+            print('Failed.')
             print(e)
             clean_all()
             if(self.failed_tests > self.allowable_fails):
                 sys.exit(1)
         else:
             self.passed_tests += 1
-            print('{} Passed.'.format(name))
+            print('Passed.')
             if(cleanup is not None):
                 cleanup()
 
@@ -177,6 +179,9 @@ class Tester():
         sys.exit(0)
 
 def main(sys_args=None):
+
+    print("Testing auto-editor version",auto_editor_version)
+
     parser = vanparse.ArgumentParser('test', 'version')
     parser = test_options(parser)
 
