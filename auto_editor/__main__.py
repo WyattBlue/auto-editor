@@ -94,6 +94,14 @@ def main_options(parser):
     parser.add_argument('--check_certificate', action='store_true', group='urlOps',
         help='check the website certificate before downloading.')
 
+    parser.add_argument('experimentalOps', nargs=0, action='grouping')
+    parser.add_argument('--enable_multiprocessing', '-mp', action='store_true',
+        help='enable use of multiple processor cores to speed up processing')
+    parser.add_argument('--jobs', '-j', type=int, default=0,
+        help='number of jobs to spawn for multiprocessing. Only acrive when'\
+            '"--enable_multiprocessing" is also set. 0 will use all available processors.'\
+                ' N>1 will use N jobs, N<1 will use N less than the available processors.' )
+
     parser.add_argument('exportMediaOps', nargs=0, action='grouping')
     parser.add_argument('--video_bitrate', '-vb', default='unset', group='exportMediaOps',
         help='set the number of bits per second for video.')
@@ -233,11 +241,16 @@ def main_options(parser):
         range='0 to Infinity',
         help='set how many "silent" frames of on either side of "loud" sections '\
             'be included.')
+    
+    
 
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
     parser.add_argument('(input)', nargs='*',
         help='the path to a file, folder, or url you want edited.')
+
+
+    
     return parser
 
 
@@ -617,7 +630,10 @@ def main():
         sys.exit()
     else:
         parser = main_options(parser)
-        args = parser.parse_args(sys.argv[1:], Log(), 'auto-editor')
+        try:
+            args = parser.parse_args(sys.argv[1:], Log(), 'auto-editor')
+        except RuntimeError:
+            exit(1)
 
     timer = Timer(args.quiet)
 
@@ -752,21 +768,36 @@ def main():
     def main_loop(input_list, ffmpeg, args, speeds, segments, log):
         num_cuts = 0
 
-        # for i, input_path in enumerate(input_list):
-        #     inp = ffmpeg.file_info(input_path)
-        #     cuts, output_path = edit_media(i, inp, ffmpeg, args, speeds, segments[i],
-        #         exporting_to_editor, making_data_file, TEMP, log)
-        #     num_cuts += cuts
+        if args.enable_multiprocessing:
+            # TODO: implement cutting a single video into slices to parallize a single input
 
-        # TODO: make number of jobs in pool have cli arg
-        with multiprocessing.Pool(6) as pool:
-            try:
-                results = pool.starmap(edit_media,[(i, input_path, ffmpeg, args, speeds, segments[i],
-                    exporting_to_editor, making_data_file, tempfile.mkdtemp(), log) for i,input_path in enumerate(input_list)])
-            except RuntimeError:
-                log.error("A child thread encountered an error",exit=True)
-        num_cuts = sum(p[0] for p in results)
-        _,last_video_path = results[-1] 
+            num_jobs = os.cpu_count()
+            if args.jobs > 0:
+                num_jobs = args.jobs
+            elif args.jobs < 0:
+                num_jobs += args.jobs
+            num_jobs = max(1, num_jobs)
+            
+            if num_jobs > os.cpu_count():
+                log.warning("number of jobs higher than available processors, performance may suffer.")
+            log.debug(f"using {num_jobs} threads")
+            with multiprocessing.Pool(num_jobs) as pool:
+                try:
+                    results = pool.starmap(edit_media,[(i, input_path, ffmpeg, args, speeds, segments[i],
+                        exporting_to_editor, making_data_file, tempfile.mkdtemp(), log) for i,input_path in enumerate(input_list)])
+                except RuntimeError:
+                    log.error("A child thread encountered an error",exit=True)
+            num_cuts = sum(p[0] for p in results)
+            _,last_video_path = results[-1] 
+
+        else:
+            if args.jobs != 0:
+                log.warning("Number of jobs set but multiprocessing is not enabled. Use --enable_multiprocessing to enable.")
+            for i, input_path in enumerate(input_list):
+                inp = ffmpeg.file_info(input_path)
+                cuts, last_video_path = edit_media(i, inp, ffmpeg, args, speeds, segments[i],
+                    exporting_to_editor, making_data_file, TEMP, log)
+                num_cuts += cuts
         
 
         if(not args.preview and not making_data_file):
