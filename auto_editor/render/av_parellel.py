@@ -139,9 +139,6 @@ def multi_render(pickle_data):
         if(args.scale != 1):
             scale_to_sped(ffmpeg, spedup, scale, inp, args, temp)
 
-        print('hi')
-        import time
-        time.sleep(1)
     except Exception as e:
         print(e)
         raise e
@@ -161,11 +158,15 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
         args.machine_readable_progress, args.no_progress)
 
     pickle_data = []
+    concat_file = ''
     n = 0
     for i in range(0, total_seconds, SPLIT_DURATION):
         vid_file = os.path.join(vid_space, '{}{}'.format(n, inp.ext))
         ffmpeg.run(['-i', inp.path, '-vcodec', 'copy', '-ss', str(i), '-to',
             str(i + SPLIT_DURATION), vid_file])
+
+        hmm = os.path.join(temp, 'video', 'sped{}{}'.format(n, inp.ext))
+        concat_file += "file '{}'\n".format(hmm)
 
         pickle_data.append({
             'path': vid_file,
@@ -190,11 +191,11 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         executor.map(multi_render, pickle_data)
 
+    new_file = os.path.join(temp, 'joined{}'.format(inp.ext))
 
-    # TODO: add video concatenating script
+    joiner = os.path.join(temp, 'concat_list.txt')
+    with open(joiner, 'w') as file:
+        file.write(concat_file)
 
-    print(vid_space)
-    quit()
-
-    return spedup
-
+    ffmpeg.run(['-f', 'concat', '-safe', '0', '-i', joiner, '-c', 'copy', new_file])
+    return new_file
