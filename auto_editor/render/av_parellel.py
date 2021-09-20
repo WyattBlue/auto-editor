@@ -1,10 +1,5 @@
 '''render/av.py'''
 
-# NOTE: this is basically pseudo-code at this point.
-
-# External Libraries
-import av
-
 # Internal Libraries
 import os
 import subprocess
