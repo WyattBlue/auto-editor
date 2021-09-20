@@ -12,7 +12,6 @@ from auto_editor.utils.func import get_stdout
 
 def _set_ff_path(dirpath, ff_location, my_ffmpeg):
     # type: (str, str | None, bool) -> str
-    from platform import system
     if(ff_location is not None):
         return ff_location
     if(my_ffmpeg or system() not in ['Windows', 'Darwin']):

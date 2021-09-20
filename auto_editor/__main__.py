@@ -244,7 +244,7 @@ def main_options(parser):
 
 def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_rate=None):
     from auto_editor.cutting import (combine_audio_motion, combine_segment,
-        apply_spacing_rules, apply_mark_as, apply_frame_margin, seconds_to_frames, cook, chunkify)
+        apply_spacing_rules, apply_mark_as, apply_frame_margin, seconds_to_frames, cook)
 
     frame_margin = seconds_to_frames(args.frame_margin, fps)
     min_clip = seconds_to_frames(args.min_clip_length, fps)
