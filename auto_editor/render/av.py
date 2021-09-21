@@ -11,16 +11,7 @@ import subprocess
 
 # Included Libraries
 from auto_editor.utils.progressbar import ProgressBar
-from .utils import properties, scale_to_sped
-
-def pix_fmt_allowed(pix_fmt):
-    # type: (str) -> bool
-
-    # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
-    allowed_formats = ['yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
-        'abgr', 'bgra', 'gray', 'gray8', 'rgb8', 'bgr8', 'pal8']
-
-    return pix_fmt in allowed_formats
+from .utils import properties, scale_to_sped, pix_fmt_allowed
 
 
 def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):

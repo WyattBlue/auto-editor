@@ -1,8 +1,15 @@
 '''render/utils.py'''
 
-import os.path
-
 from auto_editor.utils.func import fnone
+
+def pix_fmt_allowed(pix_fmt):
+    # type: (str) -> bool
+
+    # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
+    allowed_formats = ['yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
+        'abgr', 'bgra', 'gray', 'gray8', 'rgb8', 'bgr8', 'pal8']
+
+    return pix_fmt in allowed_formats
 
 def fset(cmd, option, value):
     if(fnone(value)):

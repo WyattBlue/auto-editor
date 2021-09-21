@@ -147,7 +147,7 @@ def cook(has_loud, minClip, minCut):
 
 
 # Turn long silent/loud array to formatted chunk list.
-# Example: [True, True, True, False, False] => [[0, 3, 1], [3, 5, 0]]
+# Example: [1, 1, 1, 0, 0] => [[0, 3, 1], [3, 5, 0]]
 def chunkify(has_loud, has_loud_length=None):
     # type: (np.ndarray, int | None) -> list[list[int]]
     if(has_loud_length is None):
@@ -161,6 +161,19 @@ def chunkify(has_loud, has_loud_length=None):
             startP = j
     chunks.append([startP, has_loud_length, int(has_loud[j])])
     return chunks
+
+
+# Turn chunk list into silent/loud like array.
+# Example: [[0, 3, 1], [3, 5, 0]] => [1, 1, 1, 0, 0]
+def chunks_to_has_loud(chunks):
+    # type: (list[list[int]]) -> np.ndarray
+    duration = chunks[len(chunks) - 1][1]
+    has_loud = np.zeros((duration), dtype=np.uint8)
+
+    for chunk in chunks:
+        if(chunk[2] != 0):
+            has_loud[chunk[0]:chunk[1]] = chunk[2]
+    return has_loud
 
 
 def apply_frame_margin(has_loud, has_loud_length, frame_margin):
