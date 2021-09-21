@@ -6,46 +6,20 @@ import subprocess
 
 # Included Libraries
 from auto_editor.utils.progressbar import ProgressBar
-from .utils import properties, scale_to_sped
-
-def pix_fmt_allowed(pix_fmt):
-    # type: (str) -> bool
-
-    # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
-    allowed_formats = ['yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
-        'abgr', 'bgra', 'gray', 'gray8', 'rgb8', 'bgr8', 'pal8']
-
-    return pix_fmt in allowed_formats
-
+from auto_editor.cutting import chunkify, chunks_to_has_loud
+from .utils import properties, scale_to_sped, pix_fmt_allowed
 
 def split_chunks(chunks, split):
 
-    chunk_list = []
+    has_loud = chunks_to_has_loud(chunks)
     new_chunks = []
 
-    s_dir = split
+    duration = chunks[len(chunks) - 1][1]
+    for i in range(0, duration, split):
+        new_chunks.append(chunkify(has_loud[i:i+split]))
 
-    for chunk in chunks:
-        new_chunks.append(chunk)
+    return new_chunks
 
-        s_dir -= chunk[1] - chunk[0]
-        print(s_dir)
-
-        if(s_dir == 0):
-            chunk_list.append(new_chunks)
-            new_chunks = []
-            s_dir = split
-        elif(s_dir < 0):
-            pass
-
-    if(new_chunks != []):
-        chunk_list.append(new_chunks)
-    return chunk_list
-
-# if __name__ == '__main__':
-    #chunks = [[0, 26, 1], [26, 34, 0], [34, 396, 1], [396, 410, 0], [410, 522, 1], [522, 1192, 0], [1192, 1220, 1], [1220, 1273, 0]]
-    # chunks = [[0, 5, 1], [5, 10, 2], [10, 15, 3], [15, 20, 4]]
-    # print(split_chunks(chunks, split=2))
 
 def multi_render(pickle_data):
 
@@ -71,7 +45,6 @@ def multi_render(pickle_data):
         inp = AttrDict(pickle_data['inp'])
 
         inp.path = path
-        print(inp.path)
 
         input_ = av.open(path)
         pix_fmt = input_.streams.video[0].pix_fmt
@@ -152,29 +125,42 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
     split_prog = ProgressBar(total_seconds, 'Splitting video',
         args.machine_readable_progress, args.no_progress)
 
+    new_chunks = split_chunks(chunks, int(SPLIT_DURATION * fps))
+
     pickle_data = []
     concat_file = ''
     n = 0
     for i in range(0, total_seconds, SPLIT_DURATION):
+
         vid_file = os.path.join(vid_space, '{}{}'.format(n, inp.ext))
-        ffmpeg.run(['-i', inp.path, '-vcodec', 'copy', '-ss', str(i), '-to',
-            str(i + SPLIT_DURATION), vid_file])
 
-        hmm = os.path.join(temp, 'video', 'sped{}{}'.format(n, inp.ext))
-        concat_file += "file '{}'\n".format(hmm)
+        if(len(new_chunks[n]) == 1 and speeds[new_chunks[n][0][2]] == 99999):
+            pass
+        # elif(len(new_chunks[n]) == 1 and speeds[new_chunks[n][0][2]] == 1):
+        #     concat_file += "file '{}'\n".format(vid_file)
+        else:
+            cmd = ['-i', inp.path, '-vcodec', 'copy']
+            if(n != 0):
+                cmd.extend(['-ss', str(i)])
+            cmd.extend(['-to', str(i + SPLIT_DURATION), vid_file])
+            ffmpeg.run(cmd)
 
-        pickle_data.append({
-            'path': vid_file,
-            'log': log,
-            'n': n,
-            'inp': inp.__dict__,
-            'args': args,
-            'chunks': [[0, 75, 1], [75, 150, 0]],
-            'speeds': [99999, 1],
-            'fps': fps,
-            'temp': temp,
-            'ffmpeg': ffmpeg,
+            hmm = os.path.join(temp, 'video', 'sped{}{}'.format(n, inp.ext))
+            concat_file += "file '{}'\n".format(hmm)
+
+            pickle_data.append({
+                'path': vid_file,
+                'log': log,
+                'n': n,
+                'inp': inp.__dict__,
+                'args': args,
+                'chunks': new_chunks[n],
+                'speeds': speeds,
+                'fps': fps,
+                'temp': temp,
+                'ffmpeg': ffmpeg,
             })
+
         split_prog.tick(i)
         n += 1
 
