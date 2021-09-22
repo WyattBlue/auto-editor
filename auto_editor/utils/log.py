@@ -45,6 +45,9 @@ class Log():
                 self.debug('Removed Temp Directory.')
             except Exception:
                 self.debug('Failed to delete temp dir.')
+        except FileNotFoundError:
+            # that's ok, the folder we are trying to remove is already gone
+            pass
 
     def conwrite(self, message):
         if(not self.quiet):
