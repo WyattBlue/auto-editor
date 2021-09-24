@@ -2,6 +2,11 @@
 
 from __future__ import print_function
 
+import sys
+import os
+import re
+import tempfile
+
 def grep_options(parser):
     parser.add_argument('--no_filename', action='store_true',
         help='Never print filenames with output lines.')
@@ -25,13 +30,73 @@ def grep_options(parser):
         help='The path to a file you want inspected.')
     return parser
 
+# stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string
+def cleanhtml(raw_html):
+    # type: (str) -> str
+    cleanr = re.compile('<.*?>')
+    cleantext = re.sub(cleanr, '', raw_html)
+    return cleantext
 
-def main(sys_args=None):
-    import os
-    import re
-    import sys
-    import tempfile
+def grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP):
 
+    """
+    We're using the WEBVTT subtitle format. It's better than srt
+    because it doesn't emit line numbers and the time code is in
+    (hh:mm:ss.sss) instead of (dd:hh:mm:ss,sss)
+    """
+
+    out_file = os.path.join(TEMP, 'media.vtt')
+    ffmpeg.run(['-i', media_file, out_file])
+
+    count = 0
+
+    flags = 0
+    if(args.ignore_case):
+        flags = re.IGNORECASE
+
+    prefix = ''
+    if(add_prefix):
+        prefix = '{}:'.format(os.path.splitext(os.path.basename(media_file))[0])
+
+    timecode = ''
+    line_number = -1
+    with open(out_file, 'r') as file:
+        while True:
+            line = file.readline()
+            line_number += 1
+            if(line_number == 0):
+                continue
+
+            if(not line or count >= args.max_count):
+                break
+
+            if(line.strip() == ''):
+                continue
+
+            if(re.match(r'\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*', line)):
+                if(args.time):
+                    timecode = line.split('-->')[0].strip() + ' '
+                else:
+                    timecode = line.strip() + '; '
+                continue
+
+            line = cleanhtml(line)
+            match = re.search(args.input[0], line, flags)
+            line = line.strip()
+
+            if(match):
+                count += 1
+                if(not args.count):
+                    if(args.timecode or args.time):
+                        print(prefix + timecode + line)
+                    else:
+                        print(prefix + line)
+
+    if(args.count):
+        print(prefix + str(count))
+
+
+def main(sys_args=sys.argv[1:]):
     import auto_editor
     import auto_editor.vanparse as vanparse
 
@@ -42,9 +107,6 @@ def main(sys_args=None):
         description='Read and match subtitle tracks in media files.')
     parser = grep_options(parser)
 
-    if(sys_args is None):
-        sys_args = sys.args[1:]
-
     TEMP = tempfile.mkdtemp()
     log = Log(temp=TEMP)
     args = parser.parse_args(sys_args, log, 'grep')
@@ -52,76 +114,23 @@ def main(sys_args=None):
     dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False, log)
 
-    regex = args.input[0]
     media_files = args.input[1:]
 
-    flags = 0
-    if(args.ignore_case):
-        flags = re.IGNORECASE
-
-    # stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string
-    def cleanhtml(raw_html):
-        # type: (str) -> str
-        cleanr = re.compile('<.*?>')
-        cleantext = re.sub(cleanr, '', raw_html)
-        return cleantext
-
-    """
-    we're using the WEBVTT subtitle format. It's better than srt
-    because it doesn't emit line numbers and the time code is in
-    (hh:mm:ss.sss) instead of (dd:hh:mm:ss,sss)
-    """
+    add_prefix = (len(media_files) > 1 or os.path.isdir(media_files[0])) and not args.no_filename
 
     for media_file in media_files:
-
         if(not os.path.exists(media_file)):
             log.error('{}: File does not exist.'.format(media_file))
 
-        out_file = os.path.join(TEMP, 'media.vtt')
-        ffmpeg.run(['-i', media_file, out_file])
-
-        count = 0
-
-        prefix = ''
-        if(len(media_files) > 1 and not args.no_filename):
-            prefix = '{}:'.format(os.path.splitext(os.path.basename(media_file))[0])
-
-        timecode = ''
-        line_number = -1
-        with open(out_file, 'r') as file:
-            while True:
-                line = file.readline()
-                line_number += 1
-                if(line_number == 0):
-                    continue
-
-                if(not line or count >= args.max_count):
-                    break
-
-                if(line.strip() == ''):
-                    continue
-
-                if(re.match(r'\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*', line)):
-                    if(args.time):
-                        timecode = line.split('-->')[0].strip() + ' '
-                    else:
-                        timecode = line.strip() + '; '
-                    continue
-
-                line = cleanhtml(line)
-                match = re.search(regex, line, flags)
-                line = line.strip()
-
-                if(match):
-                    count += 1
-                    if(not args.count):
-                        if(args.timecode or args.time):
-                            print(prefix + timecode + line)
-                        else:
-                            print(prefix + line)
-
-        if(args.count):
-            print(prefix + str(count))
+        if(os.path.isdir(media_file)):
+            for subdir, dirs, files in os.walk(media_file):
+                for file in files:
+                    if(file == '.DS_Store'):
+                        continue
+                    grep_core(os.path.join(media_file, file),
+                        add_prefix, ffmpeg, args, log, TEMP)
+        else:
+            grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP)
 
     log.cleanup()
 

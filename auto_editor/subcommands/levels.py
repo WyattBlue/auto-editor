@@ -2,6 +2,8 @@
 
 from __future__ import print_function
 
+import sys
+
 def levels_options(parser):
     parser.add_argument('--output_file', '--output', '-o', type=str,
         default='data.txt')
@@ -17,9 +19,8 @@ def levels_options(parser):
         help='the template')
     return parser
 
-def main(sys_args=None):
+def main(sys_args=sys.argv[1:]):
     import os
-    import sys
     import math
     import tempfile
 
@@ -35,9 +36,6 @@ def main(sys_args=None):
     parser = vanparse.ArgumentParser('levels', auto_editor.version,
         description='Get loudness of audio over time.')
     parser = levels_options(parser)
-
-    if(sys_args is None):
-        sys_args = sys.args[1:]
 
     temp = tempfile.mkdtemp()
     log = Log(temp=temp)

@@ -2,6 +2,8 @@
 
 from __future__ import print_function
 
+import sys
+
 def info_options(parser):
     parser.add_argument('--include_vfr', '--has_vfr', action='store_true',
         help='skip information that is very slow to get.')
@@ -15,9 +17,8 @@ def info_options(parser):
         help='the path to a file you want inspected.')
     return parser
 
-def main(sys_args=None):
+def main(sys_args=sys.argv[1:]):
     import os
-    import sys
 
     import auto_editor
     import auto_editor.vanparse as vanparse
@@ -30,9 +31,6 @@ def main(sys_args=None):
     parser = vanparse.ArgumentParser('info', auto_editor.version,
         description='Get basic information about media files.')
     parser = info_options(parser)
-
-    if(sys_args is None):
-        sys_args = sys.args[1:]
 
     log = Log()
     args = parser.parse_args(sys_args, log, 'info')

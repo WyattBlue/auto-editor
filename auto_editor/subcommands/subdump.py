@@ -2,6 +2,8 @@
 
 from __future__ import print_function
 
+import sys
+
 def subdump_options(parser):
     parser.add_argument('--ffmpeg_location', default=None,
         help='Point to your custom ffmpeg file.')
@@ -14,7 +16,7 @@ def subdump_options(parser):
     return parser
 
 
-def main(sys_args=None):
+def main(sys_args=sys.args[1:]):
     import os
     import tempfile
 
@@ -27,9 +29,6 @@ def main(sys_args=None):
     parser = vanparse.ArgumentParser('subdump', auto_editor.version,
         description='Dump subtitle streams to stdout in text readable form.')
     parser = subdump_options(parser)
-
-    if(sys_args is None):
-        sys_args = sys.args[1:]
 
     temp = tempfile.mkdtemp()
     log = Log(temp=temp)
@@ -46,7 +45,6 @@ def main(sys_args=None):
             cmd.extend(['-map', '0:s:{}'.format(s),
                 os.path.join(temp, '{}s{}.{}'.format(i, s, sub['ext']))])
         ffmpeg.run(cmd)
-
 
         for s, sub in enumerate(inp.subtitle_streams):
             print('file: {} ({}:{}:{})'.format(input_file, s, sub['lang'], sub['ext']))
