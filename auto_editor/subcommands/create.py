@@ -1,5 +1,7 @@
 '''subcommands/create.py'''
 
+import sys
+
 def create_options(parser):
     parser.add_argument('--frame_rate', '-fps', '-r', type=float, default=30.0,
         help='set the framerate for the output video.')
@@ -21,9 +23,8 @@ def create_options(parser):
         help='the template')
     return parser
 
-def main(sys_args=None):
+def main(sys_args=sys.argv[1:]):
     import os
-    import sys
     import time
 
     import auto_editor

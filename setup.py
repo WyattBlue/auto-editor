@@ -106,6 +106,12 @@ setup(
         'Programming Language :: Python :: Implementation :: Jython',
     ],
     entry_points={
-        "console_scripts": ["auto-editor=auto_editor.__main__:main"]
+        "console_scripts": [
+            "auto-editor=auto_editor.__main__:main",
+            "aecreate=auto_editor.subcommands.create:main",
+            "aeinfo=auto_editor.subcommands.info:main",
+            "aesubdump=auto_editor.subcommands.subdump:main",
+            "aegrep=auto_editor.subcommands.grep:main",
+        ]
     }
 )
