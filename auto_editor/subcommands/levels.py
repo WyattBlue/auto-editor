@@ -42,8 +42,7 @@ def main(sys_args=sys.argv[1:]):
 
     args = parser.parse_args(sys_args, log, 'levels')
 
-    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False)
+    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
     inp = ffmpeg.file_info(args.input[0])
 

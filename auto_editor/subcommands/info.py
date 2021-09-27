@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import sys
+import os.path
 
 def info_options(parser):
     parser.add_argument('--include_vfr', '--has_vfr', action='store_true',
@@ -18,7 +19,6 @@ def info_options(parser):
     return parser
 
 def main(sys_args=sys.argv[1:]):
-    import os
 
     import auto_editor
     import auto_editor.vanparse as vanparse
@@ -35,8 +35,7 @@ def main(sys_args=sys.argv[1:]):
     log = Log()
     args = parser.parse_args(sys_args, log, 'info')
 
-    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False)
+    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
     def aspect_str(w, h):
         w, h = aspect_ratio(int(w), int(h))

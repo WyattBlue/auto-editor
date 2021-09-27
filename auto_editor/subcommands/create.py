@@ -1,6 +1,8 @@
 '''subcommands/create.py'''
 
+import os
 import sys
+import time
 
 def create_options(parser):
     parser.add_argument('--frame_rate', '-fps', '-r', type=float, default=30.0,
@@ -24,9 +26,6 @@ def create_options(parser):
     return parser
 
 def main(sys_args=sys.argv[1:]):
-    import os
-    import time
-
     import auto_editor
     import auto_editor.vanparse as vanparse
 
@@ -40,8 +39,7 @@ def main(sys_args=sys.argv[1:]):
     log = Log()
     args = parser.parse_args(sys.argv[2:], Log(), 'create')
 
-    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False)
+    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
 
     theme = args.input
     output = args.output_file

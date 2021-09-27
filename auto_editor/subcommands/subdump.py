@@ -34,8 +34,7 @@ def main(sys_args=sys.args[1:]):
     log = Log(temp=temp)
     args = parser.parse_args(sys_args, log, 'subdump')
 
-    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False)
+    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
 
     for i, input_file in enumerate(args.input):
         inp = ffmpeg.file_info(input_file)
