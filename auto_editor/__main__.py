@@ -192,6 +192,13 @@ def main_options(parser):
     parser.add_argument('--export_as_clip_sequence', '-excs', action='store_true',
         help='export as multiple numbered media files.')
 
+    parser.add_argument('--temp_dir', default=None,
+        help='set path to where temporary files are placed.',
+        extra='If not set, tempdir will be set with Python\'s tempfile module\n'
+            'For Windows users, this file will be in the C drive.\n'
+            'The temp file can get quite big if you\'re generating a huge video, so '
+            'make sure your Volume has enough space.\n'
+            'Also, the temp dir must already exist.')
     parser.add_argument('--ffmpeg_location', default=None,
         help='set a custom path to the ffmpeg location.',
         extra='This takes precedence over --my_ffmpeg.')
@@ -642,14 +649,22 @@ def main():
         sys.exit()
 
     if(is64bit == '32-bit'):
-        log.warning('You have the 32-bit version of Python, which may lead to '\
+        Log().warning('You have the 32-bit version of Python, which may lead to '
             'memory crashes.')
 
     if(args.version):
         print('Auto-Editor version {}'.format(auto_editor.version))
         sys.exit()
 
-    TEMP = tempfile.mkdtemp()
+    if(args.temp_dir is None):
+        TEMP = tempfile.mkdtemp()
+    else:
+        TEMP = args.temp_dir
+        if(os.path.isfile(TEMP)):
+            Log().error('Temp directory cannot be an already existing file.')
+        if(not os.path.isdir(TEMP)):
+            os.mkdir(TEMP)
+
     log = Log(args.debug, args.quiet, temp=TEMP)
 
     ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg,

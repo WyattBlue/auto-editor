@@ -9,6 +9,7 @@ from platform import system
 
 # Included Libraries
 from auto_editor.utils.func import get_stdout
+from auto_editor.utils.log import Log
 
 def _set_ff_path(dirpath, ff_location, my_ffmpeg):
     # type: (str, str | None, bool) -> str
@@ -19,25 +20,24 @@ def _set_ff_path(dirpath, ff_location, my_ffmpeg):
     program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
     return os.path.join(dirpath, 'ffmpeg', system(), program)
 
-def _test_path(path, log):
+def _test_path(path):
     try:
         get_stdout([path, '-h'])
     except FileNotFoundError:
         if(system() == 'Darwin'):
-            log.error('No ffmpeg found, download via homebrew or restore the '\
+            Log().error('No ffmpeg found, download via homebrew or restore the '\
                 'included binary.')
         if(system() == 'Windows'):
-            log.error('No ffmpeg found, download ffmpeg with your favorite package '\
+            Log().error('No ffmpeg found, download ffmpeg with your favorite package '\
                 'manager (ex chocolatey), or restore the included binary.')
 
-        log.error('ffmpeg must be installed and on PATH.')
+        Log().error('ffmpeg must be installed and on PATH.')
     return path
 
 class FFmpeg():
-    def __init__(self, dirpath, ff_location, my_ffmpeg, debug, log):
+    def __init__(self, dirpath, ff_location, my_ffmpeg, debug, log=None):
         _path = _set_ff_path(dirpath, ff_location, my_ffmpeg)
-        self.log = log
-        self.path = _test_path(_path, log)
+        self.path = _test_path(_path)
         self.FFdebug = debug
 
     def getPath(self):

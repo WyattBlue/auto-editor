@@ -6,6 +6,16 @@ import os
 import sys
 import difflib
 
+def indent(text, prefix, predicate=None):
+    if predicate is None:
+        def predicate(line):
+            return line.strip()
+
+    def prefixed_lines():
+        for line in text.splitlines(True):
+            yield (prefix + line if predicate(line) else line)
+    return ''.join(prefixed_lines())
+
 def out(text):
     import re
     import textwrap
@@ -36,7 +46,7 @@ def print_option_help(args, option):
     else:
         text += '  ' + ', '.join(option['names']) + '\n    ' + option['help'] + '\n\n'
         if(option['extra'] != ''):
-            text += '\n{}\n\n'.format(option['extra'])
+            text += '{}\n\n'.format(indent(option['extra'], '    '))
 
     if(option['action'] == 'default'):
         text += '    type: ' + option['type'].__name__
