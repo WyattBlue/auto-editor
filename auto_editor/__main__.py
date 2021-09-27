@@ -53,9 +53,9 @@ def main_options(parser):
         group='progressOps',
         help='do not display any progress at all.')
 
-    parser.add_argument('multiOps', nargs=0, action='grouping')
-    parser.add_argument('--multi_processing', action='store_true', group='multiOps',
-        help='enable video rendering multi-processing.')
+    # parser.add_argument('multiOps', nargs=0, action='grouping')
+    # parser.add_argument('--multi_processing', action='store_true', group='multiOps',
+    #     help='enable video rendering multi-processing.')
 
     parser.add_argument('metadataOps', nargs=0, action='grouping')
     parser.add_argument('--force_fps_to', type=float, group='metadataOps',
@@ -193,12 +193,11 @@ def main_options(parser):
         help='export as multiple numbered media files.')
 
     parser.add_argument('--temp_dir', default=None,
-        help='set path to where temporary files are placed.',
+        help='set a path to where temporary files are placed.',
         extra='If not set, tempdir will be set with Python\'s tempfile module\n'
             'For Windows users, this file will be in the C drive.\n'
             'The temp file can get quite big if you\'re generating a huge video, so '
-            'make sure your Volume has enough space.\n'
-            'Also, the temp dir must already exist.')
+            'make sure your location has enough space.')
     parser.add_argument('--ffmpeg_location', default=None,
         help='set a custom path to the ffmpeg location.',
         extra='This takes precedence over --my_ffmpeg.')
@@ -551,10 +550,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
                     log.error('Rectangle effect is not supported on the '\
                         'av render method.')
 
-                if(args.multi_processing):
-                    from auto_editor.render.av_parellel import render_av
-                else:
-                    from auto_editor.render.av import render_av
+                from auto_editor.render.av import render_av
                 spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
                     TEMP, log)
 
@@ -634,11 +630,11 @@ def main():
 
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
+    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg,
+        args.show_ffmpeg_debug)
+
     if(args.debug and args.input == []):
         import platform
-        log = Log()
-        ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg,
-            args.show_ffmpeg_debug, log)
 
         print('Python Version: {} {}'.format(platform.python_version(), is64bit))
         print('Platform: {} {}'.format(platform.system(), platform.release()))
@@ -666,10 +662,6 @@ def main():
             os.mkdir(TEMP)
 
     log = Log(args.debug, args.quiet, temp=TEMP)
-
-    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg,
-        args.show_ffmpeg_debug, log)
-
     log.debug('Temp Directory: {}'.format(TEMP))
 
     if(args.input == []):

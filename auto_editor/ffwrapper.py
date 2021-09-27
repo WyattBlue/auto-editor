@@ -34,8 +34,9 @@ def _test_path(path):
         Log().error('ffmpeg must be installed and on PATH.')
     return path
 
+
 class FFmpeg():
-    def __init__(self, dirpath, ff_location, my_ffmpeg, debug, log=None):
+    def __init__(self, dirpath, ff_location, my_ffmpeg, debug):
         _path = _set_ff_path(dirpath, ff_location, my_ffmpeg)
         self.path = _test_path(_path)
         self.FFdebug = debug
