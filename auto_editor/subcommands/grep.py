@@ -111,8 +111,7 @@ def main(sys_args=sys.argv[1:]):
     log = Log(temp=TEMP)
     args = parser.parse_args(sys_args, log, 'grep')
 
-    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg, False)
+    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
 
     media_files = args.input[1:]
 

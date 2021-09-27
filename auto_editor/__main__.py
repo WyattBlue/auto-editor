@@ -600,8 +600,6 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
 
 
 def main():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-
     parser = vanparse.ArgumentParser('Auto-Editor', auto_editor.version,
         description='\nAuto-Editor is an automatic video/audio creator and editor. '\
             'By default, it will detect silence and create a new video with those '\
@@ -630,15 +628,16 @@ def main():
 
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
-    ffmpeg = FFmpeg(dir_path, args.ffmpeg_location, args.my_ffmpeg,
-        args.show_ffmpeg_debug)
+    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, args.show_ffmpeg_debug)
 
     if(args.debug and args.input == []):
         import platform
 
+        dirpath = os.path.dirname(os.path.realpath(__file__))
+
         print('Python Version: {} {}'.format(platform.python_version(), is64bit))
         print('Platform: {} {}'.format(platform.system(), platform.release()))
-        print('Config File path: {}'.format(os.path.join(dir_path, 'config.txt')))
+        print('Config File path: {}'.format(os.path.join(dirpath, 'config.txt')))
         print('FFmpeg path: {}'.format(ffmpeg.getPath()))
         print('FFmpeg version: {}'.format(ffmpeg.version()))
         print('Auto-Editor version {}'.format(auto_editor.version))

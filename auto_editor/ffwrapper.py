@@ -11,13 +11,14 @@ from platform import system
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
-def _set_ff_path(dirpath, ff_location, my_ffmpeg):
-    # type: (str, str | None, bool) -> str
+def _set_ff_path(ff_location, my_ffmpeg):
+    # type: (str | None, bool) -> str
     if(ff_location is not None):
         return ff_location
     if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
         return 'ffmpeg'
     program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
+    dirpath = os.path.dirname(os.path.realpath(__file__))
     return os.path.join(dirpath, 'ffmpeg', system(), program)
 
 def _test_path(path):
@@ -36,8 +37,8 @@ def _test_path(path):
 
 
 class FFmpeg():
-    def __init__(self, dirpath, ff_location, my_ffmpeg, debug):
-        _path = _set_ff_path(dirpath, ff_location, my_ffmpeg)
+    def __init__(self, ff_location=None, my_ffmpeg=False, debug=False):
+        _path = _set_ff_path(ff_location, my_ffmpeg)
         self.path = _test_path(_path)
         self.FFdebug = debug
 
