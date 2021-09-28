@@ -193,7 +193,7 @@ def main_options(parser):
         help='export as multiple numbered media files.')
 
     parser.add_argument('--temp_dir', default=None,
-        help='set a path to where temporary files are placed.',
+        help='set where the temporary directory is located.',
         extra='If not set, tempdir will be set with Python\'s tempfile module\n'
             'For Windows users, this file will be in the C drive.\n'
             'The temp file can get quite big if you\'re generating a huge video, so '
@@ -657,7 +657,10 @@ def main():
         TEMP = args.temp_dir
         if(os.path.isfile(TEMP)):
             Log().error('Temp directory cannot be an already existing file.')
-        if(not os.path.isdir(TEMP)):
+        if(os.path.isdir(TEMP)):
+            if(len(os.listdir(TEMP)) != 0):
+                Log().error('Temp directory should be empty!')
+        else:
             os.mkdir(TEMP)
 
     log = Log(args.debug, args.quiet, temp=TEMP)
