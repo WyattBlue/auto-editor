@@ -79,7 +79,7 @@ auto-editor --scale --help
  - [How to Use Motion Detection in Auto-Editor](https://auto-editor.com/cli/motion_detection)
  - [What's new in Range Syntax](https://auto-editor.com/cli/range_syntax)
  - [Subcommands](https://auto-editor.com/cli/subcommands)
- - [Branding Guide](https://auto-editor.com/cli/branding)
+ - [Branding Guide](https://auto-editor.com/docs/branding)
  - [GPU Acceleration](https://auto-editor.com/docs/gpu_acceleration)
  - Effects
    - [Rectangles](https://auto-editor.com/cli/effects/rectangles)
