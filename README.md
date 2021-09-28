@@ -80,6 +80,7 @@ auto-editor --scale --help
  - [What's new in Range Syntax](https://auto-editor.com/cli/range_syntax)
  - [Subcommands](https://auto-editor.com/cli/subcommands)
  - [Branding Guide](https://auto-editor.com/cli/branding)
+ - [GPU Acceleration](https://auto-editor.com/docs/gpu_acceleration)
  - Effects
    - [Rectangles](https://auto-editor.com/cli/effects/rectangles)
    - [Zooming](https://auto-editor.com/cli/effects/zooming)
