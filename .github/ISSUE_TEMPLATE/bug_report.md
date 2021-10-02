@@ -6,16 +6,24 @@ labels: bug
 
 ---
 
-(Make sure you're using the latest version)
+**What version are you running?** 
+(Make sure you've tried the latest version)
 
 **What went wrong**
 
 ```
-Paste your command and it's output here.
+Paste the command you've tried. 
 ```
 
-**Does the example video work? (if applicable)**
+**Describe what went wrong**
 
+```
+Paste the terminal output here.
+```
+
+**What conditions must be met for it to be wrong** 
+
+**Does the example video work? (if applicable)**
 
 **What's your platform? (if applicable)**
 Run: `auto-editor --debug`
@@ -24,8 +32,8 @@ Run: `auto-editor --debug`
 Paste output here.
 ```
 
-**What's your input file? (if applicable)**
-Run: `auto-editor info path/to/video` or `ffmpeg -hide_banner -i path/to/video`
+**What properties your input file(s)? (if applicable)**
+You can use  `aeinfo ./path/to/video.mp4` or `ffmpeg -hide_banner -i ./path/to/video.mp4` to get standard info.
 
 ```
 Paste output here.
