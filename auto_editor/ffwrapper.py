@@ -1,7 +1,5 @@
 '''ffwrapper.py'''
 
-from __future__ import print_function
-
 # Internal Libraries
 import re
 import os.path
@@ -121,15 +119,7 @@ class FFmpeg():
     def file_info(self, path):
         return File(self, path)
 
-    def Popen(self, cmd, stdin=None, stdout=subprocess.PIPE):
-        try:
-            from subprocess import DEVNULL
-        except ImportError:
-            import os
-            DEVNULL = open(os.devnull, 'wb')
-
-        stderr = None if self.FFdebug else DEVNULL
-
+    def Popen(self, cmd, stdin=None, stdout=subprocess.PIPE, stderr=None):
         cmd = [self.path] + cmd
         return subprocess.Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr)
 

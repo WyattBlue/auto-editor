@@ -1,7 +1,5 @@
 '''subcommands/subdump.py'''
 
-from __future__ import print_function
-
 import sys
 
 def subdump_options(parser):

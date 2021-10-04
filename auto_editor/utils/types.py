@@ -1,7 +1,5 @@
 '''utils/types.py'''
 
-from __future__ import print_function, division
-
 import os.path
 import sys
 

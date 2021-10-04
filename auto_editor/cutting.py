@@ -1,7 +1,5 @@
 '''cutting.py'''
 
-from __future__ import print_function
-
 import numpy as np
 
 from auto_editor.utils.types import split_num_str
@@ -110,7 +108,7 @@ def setRange(has_loud, range_syntax, fps, with_, log):
                     log.error('float type cannot be used with frame unit')
                 return value
             if(unit in ['s', 'sec', 'secs', 'second', 'seconds']):
-                return int(round(value * fps))
+                return round(value * fps)
             log.error('Unknown unit: {}'.format(unit))
         if(item == 'start'):
             return 0

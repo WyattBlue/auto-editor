@@ -1,7 +1,5 @@
 '''render/audio.py'''
 
-from __future__ import division
-
 import os
 
 from auto_editor.utils.func import get_new_length, fnone

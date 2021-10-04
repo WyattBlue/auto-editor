@@ -1,7 +1,5 @@
 '''subcommands/levels.py'''
 
-from __future__ import print_function
-
 import sys
 
 def levels_options(parser):

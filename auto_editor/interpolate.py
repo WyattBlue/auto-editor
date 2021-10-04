@@ -1,7 +1,5 @@
 '''interpolate.py'''
 
-from __future__ import division
-
 import math
 
 def linear(x, y, n):
