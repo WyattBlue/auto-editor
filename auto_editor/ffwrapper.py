@@ -3,8 +3,9 @@
 from __future__ import print_function
 
 # Internal Libraries
-import subprocess
+import re
 import os.path
+import subprocess
 from platform import system
 
 # Included Libraries
@@ -35,54 +36,31 @@ def _test_path(path):
         Log().error('ffmpeg must be installed and on PATH.')
     return path
 
+def regex_match(regex, text):
+    match = re.search(regex, text)
+    if(match):
+        return match.groupdict()['match']
+    return None
 
-class FFmpeg():
-    def __init__(self, ff_location=None, my_ffmpeg=False, debug=False):
-        _path = _set_ff_path(ff_location, my_ffmpeg)
-        self.path = _test_path(_path)
-        self.FFdebug = debug
 
-    def getPath(self):
-        return self.path
+class File:
+    def __repr__(self):
+        return str(self.__dict__)
 
-    def run(self, cmd):
-        cmd = [self.path, '-y'] + cmd
-        if(self.FFdebug):
-            cmd.extend(['-hide_banner'])
-            print(cmd)
-        else:
-            cmd.extend(['-nostats', '-loglevel', 'error'])
-        subprocess.call(cmd)
-
-    def file_info(self, path):
-        import re
-
-        class File:
-            def __repr__(self):
-                return str(self.__dict__)
-
-        file = File()
-
-        setattr(file, 'path', path)
-        setattr(file, 'abspath', os.path.abspath(path))
-        setattr(file, 'basename', os.path.basename(path))
-        setattr(file, 'dirname', os.path.dirname(os.path.abspath(path)))
+    def __init__(self, ffmpeg, path):
+        self.path = path
+        self.abspath = os.path.abspath(path)
+        self.basename = os.path.basename(path)
+        self.dirname = os.path.dirname(os.path.abspath(path))
 
         f_name, f_ext = os.path.splitext(path)
+        self.name = f_name
+        self.ext = f_ext
 
-        setattr(file, 'name', f_name)
-        setattr(file, 'ext', f_ext)
+        info = get_stdout([ffmpeg.path, '-hide_banner', '-i', path])
 
-        def regex_match(regex, text):
-            match = re.search(regex, text)
-            if(match):
-                return match.groupdict()['match']
-            return None
-
-        info = get_stdout([self.path, '-hide_banner', '-i', path])
-
-        setattr(file, 'duration', regex_match(r'Duration:\s(?P<match>[\d:.]+),', info))
-        setattr(file, 'bitrate', regex_match(r'bitrate:\s(?P<match>\d+\skb\/s)', info))
+        self.duration = regex_match(r'Duration:\s(?P<match>[\d:.]+),', info)
+        self.bitrate = regex_match(r'bitrate:\s(?P<match>\d+\skb\/s)', info)
 
         video_streams = []
         audio_streams = []
@@ -116,11 +94,32 @@ class FFmpeg():
                     s_data['ext'] = sub_exts.get(s_data['codec'], 'vtt')
                     subtitle_streams.append(s_data)
 
-        setattr(file, 'fps', fps)
-        setattr(file, 'video_streams', video_streams)
-        setattr(file, 'audio_streams', audio_streams)
-        setattr(file, 'subtitle_streams', subtitle_streams)
-        return file
+        self.fps = fps
+        self.video_streams = video_streams
+        self.audio_streams = audio_streams
+        self.subtitle_streams = subtitle_streams
+
+
+class FFmpeg():
+    def __init__(self, ff_location=None, my_ffmpeg=False, debug=False):
+        _path = _set_ff_path(ff_location, my_ffmpeg)
+        self.path = _test_path(_path)
+        self.FFdebug = debug
+
+    def getPath(self):
+        return self.path
+
+    def run(self, cmd):
+        cmd = [self.path, '-y'] + cmd
+        if(self.FFdebug):
+            cmd.extend(['-hide_banner'])
+            print(cmd)
+        else:
+            cmd.extend(['-nostats', '-loglevel', 'error'])
+        subprocess.call(cmd)
+
+    def file_info(self, path):
+        return File(self, path)
 
     def Popen(self, cmd, stdin=None, stdout=subprocess.PIPE):
         try:
