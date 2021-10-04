@@ -1,7 +1,5 @@
 '''subcommands/test.py'''
 
-from __future__ import print_function
-
 """
 Test auto-editor and make sure everything is working.
 """
@@ -75,7 +73,7 @@ class FFprobe():
             while abs(num) >= 1000:
                 magnitude += 1
                 num /= 1000.0
-            num = int(round(num))
+            num = round(num)
             return '%d%s' % (num, ['', 'k', 'm', 'g', 't', 'p'][magnitude])
 
         exact_bitrate = self._get(file, 'bit_rate', 'a', 0)

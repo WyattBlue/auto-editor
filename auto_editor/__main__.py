@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 '''__main__.py'''
 
-# Python 2 Compatibility
-from __future__ import print_function, absolute_import
-
 # Internal Libraries
 import os
 import sys

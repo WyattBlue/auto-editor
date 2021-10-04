@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
 '''utils/progressbar.py'''
-
-from __future__ import print_function, division
 
 from time import time, localtime
 from platform import system
@@ -88,7 +85,7 @@ class ProgressBar():
 
         if(self.allow_unicode):
             bar_len = max(1, termsize - (self.len_title + 50))
-            done = int(round(percentDone / (100 / bar_len)))
+            done = round(percentDone / (100 / bar_len))
             togo = '░' * int(bar_len - done)
             bar(termsize, self.title, '█' * done, togo, percentDone, new_time)
         else:

@@ -1,7 +1,5 @@
 '''render/av.py'''
 
-from __future__ import print_function, absolute_import
-
 # External Libraries
 import av
 
@@ -12,7 +10,6 @@ import subprocess
 # Included Libraries
 from auto_editor.utils.progressbar import ProgressBar
 from .utils import properties, scale_to_sped, pix_fmt_allowed
-
 
 def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
     totalFrames = chunks[len(chunks) - 1][1]
@@ -81,7 +78,8 @@ Convert your video to a supported pix_fmt. The following command might work for 
         cmd = properties(cmd, args, inp)
         cmd.append(spedup)
 
-    process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE)
+    process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+        stderr=None if args.show_ffmpeg_debug else subprocess.DEVNULL)
 
     inputEquavalent = 0.0
     outputEquavalent = 0

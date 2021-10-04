@@ -1,7 +1,5 @@
 '''validateInput.py'''
 
-from __future__ import print_function
-
 import os
 import re
 import sys
@@ -40,7 +38,7 @@ def parse_bytes(bytestr):
         return None
     number = float(matchobj.group(1))
     multiplier = 1024.0 ** 'bkmgtpezy'.index(matchobj.group(2).lower())
-    return int(round(number * multiplier))
+    return round(number * multiplier)
 
 
 def sponsor_block_api(_id, categories, log):
