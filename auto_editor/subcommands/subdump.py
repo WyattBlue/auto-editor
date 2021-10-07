@@ -13,8 +13,7 @@ def subdump_options(parser):
         help='The path to a file you want inspected.')
     return parser
 
-
-def main(sys_args=sys.args[1:]):
+def main(sys_args=sys.argv[1:]):
     import os
     import tempfile
 

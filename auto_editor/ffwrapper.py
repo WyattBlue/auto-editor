@@ -60,6 +60,27 @@ class File:
         self.duration = regex_match(r'Duration:\s(?P<match>[\d:.]+),', info)
         self.bitrate = regex_match(r'bitrate:\s(?P<match>\d+\skb\/s)', info)
 
+        self.metadata = {}
+        active = False
+        active_key = None
+
+        for line in info.split('\n'):
+            if(active):
+                if(re.search(r'^\s*[A-Z][a-z_]*', line)):
+                    break
+
+                key = regex_match(r'^\s*(?P<match>[a-z_]+)', line)
+                body = regex_match(r'^\s*[a-z_]*\s*:\s(?P<match>[\w\W]*)', line)
+
+                if(key is None):
+                    self.metadata[active_key] += '\n' + body
+                else:
+                    self.metadata[key] = body
+                    active_key = key
+
+            if(re.search(r'^\s\sMetadata:', line)):
+                active = True
+
         video_streams = []
         audio_streams = []
         subtitle_streams = []

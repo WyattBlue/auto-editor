@@ -606,7 +606,7 @@ def main():
             'loudness and video motion to judge making cuts.\nRun:\n    auto-editor '\
             '--help\n\nTo get the list of options.\n')
 
-    subcommands = ['create', 'test', 'info', 'levels', 'grep', 'subdump']
+    subcommands = ['create', 'test', 'info', 'levels', 'grep', 'subdump', 'desc']
 
     if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
         obj = __import__('auto_editor.subcommands.{}'.format(sys.argv[1]),
