@@ -10,7 +10,8 @@ def fcp_xml(inp, temp, output, clips, tracks, total_dur, audioFile, fps, log):
         import pathlib
         pathurl = 'file://localhost/' + pathlib.PureWindowsPath(inp.abspath).as_posix()
     else:
-        pathurl = 'file://' + inp.abspath
+        from pathlib import Path
+        pathurl = Path(inp.abspath).as_uri()
     name = inp.basename
 
     def fraction(a, fps):
