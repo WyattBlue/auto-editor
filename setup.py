@@ -1,12 +1,10 @@
 '''setup.py'''
 
-import os
 import re
-import sys
 from setuptools import setup, find_packages
 
 def pip_version():
-    with open(os.path.abspath('auto_editor/__init__.py')) as f:
+    with open('auto_editor/__init__.py') as f:
         version_content = f.read()
 
     version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
@@ -16,15 +14,6 @@ def pip_version():
         return version_match.group(1)
 
     raise ValueError('Unable to find version string.')
-
-if(sys.argv[-1] == 'publish'):
-    from shutil import rmtree
-    rmtree('build')
-    rmtree('dist')
-
-    os.system('python3 setup.py sdist bdist_wheel')
-    os.system('twine upload dist/*')
-    sys.exit()
 
 with open('README.md', 'r') as f:
     long_description = f.read()
