@@ -735,7 +735,11 @@ def main():
             args.output_file.append(set_output_name(input_list[i], making_data_file, args))
 
     if(args.combine_files):
-        temp_file = os.path.join(TEMP, 'combined.mp4')
+        if(exporting_to_editor):
+            temp_file = 'combined.mp4'
+        else:
+            temp_file = os.path.join(TEMP, 'combined.mp4')
+
         cmd = []
         for fileref in input_list:
             cmd.extend(['-i', fileref])
