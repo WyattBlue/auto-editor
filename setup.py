@@ -73,17 +73,20 @@ setup(
     url='https://github.com/WyattBlue/auto-editor',
     author='WyattBlue',
     author_email='wyattblue@auto-editor.com',
-    keywords='video audio media editor editing processing nonlinear automatic ' \
+    keywords='video audio media editor editing processing nonlinear automatic '
      'silence-detect silence-removal silence-speedup motion-detection',
     packages=find_packages(),
     include_package_data=True,
+
+    # Latest that supports Python 3.6 or greater.
     install_requires=[
-        'numpy',
+        'numpy>=1.19.5',
         'audiotsm2~=0.2.1',
-        'opencv-python>=4.3',
-        'youtube-dl',
-        'av>=6.0.0',
+        'opencv-python>=4.4',
+        'youtube-dl>=2021.6.6',
+        'av>=8.0.3',
     ],
+    python_requires='>=3.5', # Unofficial version supported.
     classifiers=[
         'Topic :: Multimedia :: Sound/Audio',
         'Topic :: Multimedia :: Video',
