@@ -13,45 +13,11 @@ def pip_version():
         version_content, re.M)
 
     if(version_match):
-        return version_match.group(1).replace('dev', '')
+        return version_match.group(1)
 
     raise ValueError('Unable to find version string.')
 
-
-def replace_version():
-    with open(os.path.abspath('auto_editor/__init__.py')) as f:
-        version_content = f.read()
-
-    import datetime
-    year, week_num, _ = datetime.date.today().isocalendar()
-    year = str(year - 2000)
-
-    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
-        version_content, re.M)
-
-    informal_match = re.search(r"version = ['\"]([^'\"]*)['\"]",
-        version_content, re.M)
-
-    my_version = version_match.group(1)
-    informal_version = informal_match.group(1)
-
-    if(not my_version.startswith('{}.{}.'.format(year, week_num))):
-        raise ValueError('Pip version with wrong date.')
-
-    if(not informal_version.startswith('{}w{}'.format(year, week_num))):
-        raise ValueError('Informal version wrong date.')
-
-    version_content = version_content.replace('-dev', '').replace('dev', '')
-
-    with open(os.path.abspath('auto_editor/__init__.py'), 'w') as f:
-        f.write(version_content)
-
-
-if(sys.argv[-1] == 'replace_version'):
-    replace_version()
-
 if(sys.argv[-1] == 'publish'):
-
     from shutil import rmtree
     rmtree('build')
     rmtree('dist')
