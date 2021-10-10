@@ -25,14 +25,17 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     license='Unlicense',
-    url='https://github.com/WyattBlue/auto-editor',
+    url='https://auto-editor.com',
+    project_urls={
+        'Bug Tracker': 'https://github.com/WyattBlue/auto-editor/issues',
+        'Source Code': 'https://github.com/WyattBlue/auto-editor',
+    },
     author='WyattBlue',
     author_email='wyattblue@auto-editor.com',
     keywords='video audio media editor editing processing nonlinear automatic '
      'silence-detect silence-removal silence-speedup motion-detection',
     packages=find_packages(),
     include_package_data=True,
-
     # Latest that supports Python 3.6 or greater.
     install_requires=[
         'numpy>=1.19.5',
@@ -53,6 +56,7 @@ setup(
         'Development Status :: 5 - Production/Stable',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3 :: Only',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
@@ -60,8 +64,6 @@ setup(
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
-        'Programming Language :: Python :: Implementation :: IronPython',
-        'Programming Language :: Python :: Implementation :: Jython',
     ],
     entry_points={
         "console_scripts": [
