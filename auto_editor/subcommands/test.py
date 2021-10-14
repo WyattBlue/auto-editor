@@ -415,14 +415,14 @@ def main(sys_args=None):
         )
     tester.run_test('scale_tests', scale_tests)
 
-    def various_errors_test():
-        checkForError(['example.mp4', '--zoom', '0,60,1.5', '--render', 'av'])
-        checkForError(['example.mp4', '--zoom', '0'])
-        checkForError(['example.mp4', '--zoom', '0,60'])
-        checkForError(['example.mp4', '--rectangle', '0,60,0,10,10,20', '--render', 'av'])
-        checkForError(['example.mp4', '--rectangle', '0,60'])
-        checkForError(['example.mp4', '--background', '000'])
-    tester.run_test('various_errors_test', various_errors_test)
+    # def various_errors_test():
+    #     checkForError(['example.mp4', '--zoom', '0,60,1.5', '--render', 'av'])
+    #     checkForError(['example.mp4', '--zoom', '0'])
+    #     checkForError(['example.mp4', '--zoom', '0,60'])
+    #     checkForError(['example.mp4', '--rectangle', '0,60,0,10,10,20', '--render', 'av'])
+    #     checkForError(['example.mp4', '--rectangle', '0,60'])
+    #     checkForError(['example.mp4', '--background', '000'])
+    # tester.run_test('various_errors_test', various_errors_test)
 
     def create_sub_test():
         run_program(['create', 'test', '--width', '640', '--height', '360', '-o',
