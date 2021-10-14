@@ -120,8 +120,8 @@ def main_options(parser):
         choices=['unset', 'yes', 'no'],
         help='skip variable frame rate scan, saving time for big video files.')
 
-    parser.add_argument('--render', default='auto', choices=['av', 'opencv', 'auto'],
-        help='choice which method to render video.')
+    parser.add_argument('--render', default='auto', choices=['av', 'auto'],
+        help="defunct option. doesn't do anything.")
     parser.add_argument('--scale', type=float_type, default=1,
         help='scale the output media file by a certain factor.')
     parser.add_argument('--combine_files', action='store_true',
@@ -527,34 +527,16 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         continue_video = handle_audio_tracks(ffmpeg, output_path, args, tracks, chunks,
             speeds, fps, TEMP, log)
         if(continue_video):
-            if(args.render == 'auto'):
-                if(args.zoom != [] or args.rectangle != []):
-                    args.render = 'opencv'
-                else:
-                    try:
-                        import av
-                        args.render = 'av'
-                    except ImportError:
-                        args.render = 'opencv'
-
             log.debug('Using {} method'.format(args.render))
-            if(args.render == 'av'):
-                if(args.zoom != []):
-                    log.error('Zoom effect is not supported on the '\
-                        'av render method.')
+            if(args.zoom != []):
+                log.error('Zoom effect is not supported.')
 
-                if(args.rectangle != []):
-                    log.error('Rectangle effect is not supported on the '\
-                        'av render method.')
+            if(args.rectangle != []):
+                log.error('Rectangle effect is not supported.')
 
-                from auto_editor.render.av import render_av
-                spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
-                    TEMP, log)
-
-            if(args.render == 'opencv'):
-                from auto_editor.render.opencv import render_opencv
-                spedup = render_opencv(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
-                    effects, TEMP, log)
+            from auto_editor.render.av import render_av
+            spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
+                TEMP, log)
 
             if(log.is_debug):
                 log.debug('Writing the output file.')
