@@ -120,7 +120,7 @@ def main_options(parser):
         choices=['unset', 'yes', 'no'],
         help='skip variable frame rate scan, saving time for big video files.')
 
-    parser.add_argument('--render', default='auto', choices=['av', 'auto'],
+    parser.add_argument('--render', default='auto', type=str,
         help="defunct option. doesn't do anything.")
     parser.add_argument('--scale', type=float_type, default=1,
         help='scale the output media file by a certain factor.')
@@ -129,14 +129,12 @@ def main_options(parser):
 
     parser.add_argument('--zoom', type=zoom_type, nargs='*',
         help='set when and how a zoom will occur.',
-        extra='The arguments are: start,end,start_zoom,end_zoom,x,y,inter,hold' \
-            '\nThere must be at least 3 comma args. x and y default to centerX and centerY' \
-            '\nThe default interpolation is linear.')
+        extra='Arguments:\n{start},{end},{zoom},{end_zoom={zoom}},{x_pos=centerX},'
+            '{y_pos=centerY},{interpolate=linear}')
     parser.add_argument('--rectangle', type=rect_type, nargs='*',
         help='overlay a rectangle shape on the video.',
-        extra='The arguments are: start,end,x1,y1,x2,y2,color,thickness' \
-            '\nThere must be at least 6 comma args. The rectangle is solid if' \
-            ' thickness is not defined.\n The default color is #000.')
+        extra='Arguments:\n{start},{end},{x1},{y1},{x2},{y2},{color=#000},{thickness=None}'
+            '\n\nWhen thickness is None, the shape will be solid.')
 
     parser.add_argument('--background', type=str, default='#000',
         help='set the color of the background that is visible when the video is moved.')
@@ -235,7 +233,7 @@ def main_options(parser):
         help='set the speed that "loud" sections should be played at.')
     parser.add_argument('--frame_margin', '--margin', '-m', type=frame_type, default=6,
         range='0 to Infinity',
-        help='set how many "silent" frames of on either side of "loud" sections '\
+        help='set how many "silent" frames of on either side of "loud" sections '
             'be included.')
 
     parser.add_argument('--help', '-h', action='store_true',
