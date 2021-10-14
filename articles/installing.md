@@ -79,9 +79,8 @@ pip3 install auto-editor --no-deps
 
 ```
 pip3 install numpy
-pip3 install audiotsm2
 pip3 install av
-pip3 install opencv-python
+pip3 install audiotsm2
 pip3 install youtube-dl
 ```
 
@@ -96,10 +95,6 @@ Retrieve video data in a form Python can natively use. Allows for very fast rend
 ### Audiotsm2
 
 The lead developer's own fork of audiotsm. Used for making new audio files at a different speed. Recommended to be installed by all users but not required if `--video_speed` or `--silent_speed` are never used.
-
-### Opencv-Python
-
-Sometimes referred to as opencv or cv2. This module is used to determine where motion happens.
 
 ### Youtube-dl
 

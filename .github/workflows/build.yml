@@ -25,13 +25,12 @@ jobs:
       run: |
         sudo apt update
         sudo apt install ffmpeg
-    - name: Install Pip Packages
+    - name: Install Auto-Editor
       run: |
-        python3 -m pip install --upgrade pip
-        python3 -m pip install av opencv-python audiotsm2 youtube-dl
+        python3 setup.py install
     - name: Test
       run: |
-        python3 -m auto_editor test
+        auto-editor test
 
   # No Windows CI for now because of some DLL.
   # [h264_amf @ 0000026ace714340] DLL amfrt64.dll failed to open
@@ -51,10 +50,9 @@ jobs:
   #     run: |
   #       Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
   #       choco install ffmpeg
-  #   - name: Install Pip Packages
+  #   - name: Install Auto-Editor
   #     run: |
-  #       py -m pip install --upgrade pip
-  #       py -m pip install av opencv-python audiotsm2 youtube-dl
+  #       py setup.py install
   #   - name: Test
   #     run: |
-  #       py -m auto_editor test
+  #       auto-editor test
