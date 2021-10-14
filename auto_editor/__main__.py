@@ -525,13 +525,6 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
         continue_video = handle_audio_tracks(ffmpeg, output_path, args, tracks, chunks,
             speeds, fps, TEMP, log)
         if(continue_video):
-            log.debug('Using {} method'.format(args.render))
-            if(args.zoom != []):
-                log.error('Zoom effect is not supported.')
-
-            if(args.rectangle != []):
-                log.error('Rectangle effect is not supported.')
-
             from auto_editor.render.av import render_av
             spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
                 TEMP, log)
