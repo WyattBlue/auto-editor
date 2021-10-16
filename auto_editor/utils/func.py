@@ -76,19 +76,28 @@ def open_with_system_default(path, log):
                 except Exception:
                     log.warning('Could not open output file.')
 
-def hex_to_rgb(hex_str, log):
-    import re
-    if(re.compile(r'#[a-fA-F0-9]{3}(?:[a-fA-F0-9]{3})?$').match(hex_str)):
-        if(len(hex_str) < 5):
-            return [int(hex_str[i]*2, 16) for i in (1, 2, 3)]
-        return [int(hex_str[i:i+2], 16) for i in (1, 3, 5)]
-    log.error('Invalid hex code: {}'.format(hex_str))
-
 def fnone(val):
     # type: (Any) -> bool
     return val == 'none' or val == 'unset' or val is None
 
-def append_filename(name, val):
+def append_filename(path, val):
     # type: (str, str) -> str
-    dot_index = name.rfind('.')
-    return name[:dot_index] + val + name[dot_index:]
+    import os.path
+    root, ext = os.path.splitext(path)
+    return root + val + ext
+
+def set_output_name(path, making_data_file, args):
+    import os.path
+    root, ext = os.path.splitext(path)
+
+    if(args.export_as_json):
+        return root + '.json'
+    if(args.export_to_final_cut_pro):
+        return root + '.fcpxml'
+    if(args.export_to_shotcut):
+        return root + '.mlt'
+    if(making_data_file):
+        return root + '.xml'
+    if(args.export_as_audio):
+        return root + '_ALTERED.wav'
+    return root + '_ALTERED' + ext

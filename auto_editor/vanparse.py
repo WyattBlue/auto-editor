@@ -18,11 +18,8 @@ def out(text):
     import re
     import textwrap
 
-    try:
-        from shutil import get_terminal_size
-        width = get_terminal_size().columns - 3
-    except ImportError:
-        width = 77
+    from shutil import get_terminal_size
+    width = get_terminal_size().columns - 3
 
     indent_regex = re.compile(r'^(\s+)')
     wrapped_lines = []
