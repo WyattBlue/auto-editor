@@ -82,10 +82,10 @@ def main_options(parser):
         help='manually set the YouTube ID the video belongs to.')
     parser.add_argument('--block', type=block_type, group='urlOps',
         help='mark all sponsors sections as silent.',
-        extra='Only for YouTube urls. This uses the SponsorBlock api.\n'\
+        extra='Only for YouTube urls. This uses the SponsorBlock api.\n'
             'Choices can include: sponsor intro outro selfpromo interaction music_offtopic')
     parser.add_argument('--download_archive', type=file_type, default=None, group='urlOps',
-        help='Download only videos not listed in the archive file. Record the IDs of' \
+        help='Download only videos not listed in the archive file. Record the IDs of'
              ' all downloaded videos in it')
     parser.add_argument('--cookies', type=file_type, default=None, group='urlOps',
         help='The file to read cookies from and dump the cookie jar in.')
@@ -144,7 +144,7 @@ def main_options(parser):
     parser.add_argument('--mark_as_silent', type=range_type, nargs='*',
         help='the range that will be marked as "silent".')
     parser.add_argument('--cut_out', type=range_type, nargs='*',
-        help='the range of media that will be removed completely, regardless of the '\
+        help='the range of media that will be removed completely, regardless of the '
             'value of silent speed.')
     parser.add_argument('--add_in', type=range_type, nargs='*',
         help='the range of media that will be added in, opposite of --cut_out')
@@ -571,12 +571,12 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
 
 def main():
     parser = vanparse.ArgumentParser('Auto-Editor', auto_editor.version,
-        description='\nAuto-Editor is an automatic video/audio creator and editor. '\
-            'By default, it will detect silence and create a new video with those '\
-            'sections cut out. By changing some of the options, you can export to a '\
-            'traditional editor like Premiere Pro and adjust the edits there, adjust '\
-            'the pacing of the cuts, and change the method of editing like using audio '\
-            'loudness and video motion to judge making cuts.\nRun:\n    auto-editor '\
+        description='\nAuto-Editor is an automatic video/audio creator and editor. '
+            'By default, it will detect silence and create a new video with those '
+            'sections cut out. By changing some of the options, you can export to a '
+            'traditional editor like Premiere Pro and adjust the edits there, adjust '
+            'the pacing of the cuts, and change the method of editing like using audio '
+            'loudness and video motion to judge making cuts.\nRun:\n    auto-editor '
             '--help\n\nTo get the list of options.\n')
 
     subcommands = ['create', 'test', 'info', 'levels', 'grep', 'subdump', 'desc']
@@ -750,7 +750,7 @@ def main():
             time_save = usefulfunctions.human_readable_time(num_cuts * 30)
             s = 's' if num_cuts != 1 else ''
 
-            log.print('Auto-Editor made {} cut{}, which would have taken about {} if '\
+            log.print('Auto-Editor made {} cut{}, which would have taken about {} if '
                 'edited manually.'.format(num_cuts, s, time_save))
 
         if(not args.no_open):

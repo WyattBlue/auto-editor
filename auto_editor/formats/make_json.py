@@ -12,7 +12,7 @@ def read_json_cutlist(json_file, version, log):
         data = json.load(f)
 
     if(data['presets']['version'] != version):
-        log.warning('This json file was generated using a different '\
+        log.warning('This json file was generated using a different '
             'version of auto-editor.')
 
     media_file = data['timeline']['media_file']
