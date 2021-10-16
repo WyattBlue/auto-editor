@@ -97,21 +97,27 @@ def main_options(parser):
         choices=['unset', 'yes', 'no'],
         help='skip variable frame rate scan, saving time for big video files.')
 
-    parser.add_argument('--render', default='auto', type=str,
+    parser.add_argument('--render', default='auto', hidden=True,
         help="defunct option. doesn't do anything.")
     parser.add_argument('--scale', type=float_type, default=1,
         help='scale the output media file by a certain factor.')
     parser.add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
 
-    parser.add_argument('--zoom', type=zoom_type, nargs='*',
+    parser.add_argument('--zoom', nargs='*',
         help='set when and how a zoom will occur.',
-        extra='Arguments:\n{start},{end},{zoom},{end_zoom={zoom}},{x_pos=centerX},'
-            '{y_pos=centerY},{interpolate=linear}')
-    parser.add_argument('--rectangle', type=rect_type, nargs='*',
+        keywords=[
+            {'start': ''}, {'end': ''}, {'zoom': ''}, {'end_zoom': ''},
+            {'x': 'centerX'}, {'y': 'centerY'}, {'interpolate': 'linear'},
+        ],
+        extra=' ')
+    parser.add_argument('--rectangle', nargs='*',
+        keywords=[
+            {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
+            {'x2': ''}, {'y2': ''}, {'color': '#000'}, {'thickness': None},
+        ],
         help='overlay a rectangle shape on the video.',
-        extra='Arguments:\n{start},{end},{x1},{y1},{x2},{y2},{color=#000},{thickness=None}'
-            '\n\nWhen thickness is None, the shape will be solid.')
+        extra='\n\nWhen thickness is None, the shape will be solid.')
 
     parser.add_argument('--background', type=str, default='#000',
         help='set the color of the background that is visible when the video is moved.')
@@ -567,6 +573,8 @@ def main():
         parser = main_options(parser)
         args = parser.parse_args(sys.argv[1:], Log(), 'auto-editor')
 
+    print(args.rectangle)
+    quit()
     timer = Timer(args.quiet)
 
     exporting_to_editor = (args.export_to_premiere or args.export_to_resolve or

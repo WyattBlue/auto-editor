@@ -132,8 +132,6 @@ Convert your video to a supported pix_fmt. The following command might work for 
     index = 0
     chunk = chunks.pop(0)
 
-    font = ImageFont.truetype('/System/Library/Fonts/Supplemental/PlantagenetCherokee.ttf', 34)
-
     try:
         for packet in input_.demux(inputVideoStream):
             for frame in packet.decode():
@@ -149,7 +147,6 @@ Convert your video to a supported pix_fmt. The following command might work for 
                     img = frame.to_image()
                     draw = ImageDraw.Draw(img)
                     draw.rectangle([(20, 30,), (30, 40)], fill='#000')
-                    draw.text((100, 200), str(index), (0, 0, 0), font=font)
 
                     frame = frame.from_image(img).reformat(format='yuv420p')
 

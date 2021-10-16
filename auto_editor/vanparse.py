@@ -40,10 +40,20 @@ def print_option_help(args, option):
         text += '  {}:\n'.format(option['names'][0])
     else:
         text += '  ' + ', '.join(option['names']) + '\n    ' + option['help'] + '\n\n'
+        if(option['keywords'] != []):
+            text += '    Arguments:\n    '
+            for n, item in enumerate(option['keywords']):
+                [[k, v]] = item.items()
+                text += '{' + k
+                text += '' if v == '' else '=' + str(v)
+                text += '}' if n + 1 == len(option['keywords']) else '},'
+
         if(option['extra'] != ''):
             text += '{}\n\n'.format(indent(option['extra'], '    '))
 
-    if(option['action'] == 'default'):
+    if(option['keywords'] != []):
+        pass
+    elif(option['action'] == 'default'):
         text += '    type: ' + option['type'].__name__
         text += '\n    default: {}\n'.format(option['default'])
         if(option['range'] is not None):
@@ -69,10 +79,11 @@ def print_program_help(root, the_args):
     text = ''
     for options in the_args:
         for option in options:
-            if(option['action'] == 'grouping'):
-                text += "\n  {}:\n".format(option['names'][0])
-            else:
-                text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
+            if(not option['hidden']):
+                if(option['action'] == 'grouping'):
+                    text += "\n  {}:\n".format(option['names'][0])
+                else:
+                    text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
     text += '\n'
     if(root == 'auto-editor'):
         text += ('  Have an issue? Make an issue. Visit '
@@ -110,6 +121,8 @@ class ArgumentParser():
             'choices': None,
             'group': None,
             'help': '',
+            'keywords': [],
+            'hidden': False,
             'extra': '',
         }
 
