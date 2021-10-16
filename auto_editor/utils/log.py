@@ -1,10 +1,8 @@
 '''utils/log.py'''
 
 import sys
-from shutil import rmtree
+from shutil import rmtree, get_terminal_size
 from time import time, sleep
-
-from .func import term_size
 
 class Timer():
     def __init__(self, quiet=False):
@@ -49,7 +47,7 @@ class Log():
 
     def conwrite(self, message):
         if(not self.quiet):
-            buffer = term_size().columns - len(message) - 3
+            buffer = get_terminal_size().columns - len(message) - 3
             try:
                 print('  ' + message + ' ' * buffer, end='\r', flush=True)
             except TypeError:

@@ -267,10 +267,10 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
     rects = []
     for ms in cmdRects:
         if(len(ms) < 6):
-            log.error('Too few comma arguments for rectangle option.')
+            log.error('Too few arguments for rectangle option.')
 
         if(len(ms) > 8):
-            log.error('Too many comma arguments for rectangle option.')
+            log.error('Too many arguments for rectangle option.')
 
         start, end, x1, y1, x2, y2 = ms[:6]
 

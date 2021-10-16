@@ -92,13 +92,3 @@ def append_filename(name, val):
     # type: (str, str) -> str
     dot_index = name.rfind('.')
     return name[:dot_index] + val + name[dot_index:]
-
-def term_size():
-    try:
-        from shutil import get_terminal_size
-        return get_terminal_size()
-    except ImportError:
-        class Terminal:
-            def __init__(self):
-                self.columns = 80
-        return Terminal()
