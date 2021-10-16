@@ -2,8 +2,9 @@
 
 from time import time, localtime
 from platform import system
+from shutil import get_terminal_size
 
-from .func import get_stdout, term_size
+from .func import get_stdout
 
 def _pretty_time(my_time, ampm):
     # type: (float, bool) -> str
@@ -21,12 +22,12 @@ def _pretty_time(my_time, ampm):
         return '{:02}:{:02} {}'.format(hours, minutes, ampm)
     return '{:02}:{:02}'.format(hours, minutes)
 
-def bar(termsize, title, done, togo, percent, new_time):
+def bar(columns, title, done, togo, percent, new_time):
     bar = '  ⏳{}: [{}{}] {}% done ETA {}'.format(title, done, togo, percent, new_time)
-    if(len(bar) > termsize - 2):
-        bar = bar[:termsize - 2]
+    if(len(bar) > columns - 2):
+        bar = bar[:columns - 2]
     else:
-        bar += ' ' * (termsize - len(bar) - 4)
+        bar += ' ' * (columns - len(bar) - 4)
     try:
         print(bar, end='\r', flush=True)
     except TypeError:
@@ -81,12 +82,12 @@ class ProgressBar():
                 end='\r', flush=True)
             return
 
-        termsize = term_size().columns
+        columns = get_terminal_size().columns
 
         if(self.allow_unicode):
-            bar_len = max(1, termsize - (self.len_title + 50))
+            bar_len = max(1, columns - (self.len_title + 50))
             done = round(percentDone / (100 / bar_len))
             togo = '░' * int(bar_len - done)
-            bar(termsize, self.title, '█' * done, togo, percentDone, new_time)
+            bar(columns, self.title, '█' * done, togo, percentDone, new_time)
         else:
             print('   {}% done ETA {}'.format(percentDone, new_time))

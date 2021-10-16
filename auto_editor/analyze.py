@@ -48,7 +48,7 @@ def audio_detection(audioData, sampleRate, silent_threshold, fps, log):
     return hasLoudAudio
 
 
-def motion_detection(inp, motionThreshold, log, width, dilates, blur):
+def motion_detection(inp, threshold, log, width, dilates, blur):
     # type: (Any, float, Any, int, int, int) -> np.ndarray
 
     # Based on this post:
@@ -114,7 +114,7 @@ def motion_detection(inp, motionThreshold, log, width, dilates, blur):
             if(total is None):
                 total = thresh.shape[0] * thresh.shape[1]
 
-            if(np.count_nonzero(thresh) / total >= motionThreshold):
+            if(np.count_nonzero(thresh) / total >= threshold):
                 hasMotion[cframe] = True
 
         progress.tick(cframe)
