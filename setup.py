@@ -41,8 +41,12 @@ setup(
         'numpy>=1.19.5',
         'audiotsm2~=0.2.1',
         'youtube-dl>=2021.6.6',
+        'pillow',
         'av>=8.0.3',
     ],
+    extras_require={
+      'motion-detection': 'opencv-python>=4.3',
+    },
     python_requires='>=3.5', # Unofficial version supported.
     classifiers=[
         'Topic :: Multimedia :: Sound/Audio',
