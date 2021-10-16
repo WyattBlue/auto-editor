@@ -76,12 +76,12 @@ def open_with_system_default(path, log):
                 except Exception:
                     log.warning('Could not open output file.')
 
-def hex_to_bgr(hex_str, log):
+def hex_to_rgb(hex_str, log):
     import re
     if(re.compile(r'#[a-fA-F0-9]{3}(?:[a-fA-F0-9]{3})?$').match(hex_str)):
         if(len(hex_str) < 5):
-            return [int(hex_str[i]*2, 16) for i in (3, 2, 1)]
-        return [int(hex_str[i:i+2], 16) for i in (5, 3, 1)]
+            return [int(hex_str[i]*2, 16) for i in (1, 2, 3)]
+        return [int(hex_str[i:i+2], 16) for i in (1, 3, 5)]
     log.error('Invalid hex code: {}'.format(hex_str))
 
 def fnone(val):

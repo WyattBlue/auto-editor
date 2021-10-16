@@ -637,7 +637,7 @@ def main():
     log.debug('Temp Directory: {}'.format(TEMP))
 
     if(args.input == []):
-        log.error('You need to give auto-editor an input file or folder so it can ' \
+        log.error('You need to give auto-editor an input file or folder so it can '
             'do the work for you.')
 
     if([args.export_to_premiere, args.export_to_resolve,
@@ -665,29 +665,26 @@ def main():
     if(args.dilates < 0):
         log.error('motionOps --dilates cannot be less than 0')
 
+    def write_starting_message(args):
+        if(args.export_to_premiere):
+            return 'Exporting to Adobe Premiere Pro XML file.'
+        if(args.export_to_final_cut_pro):
+            return 'Exporting to Final Cut Pro XML file.'
+        if(args.export_to_resolve):
+            return 'Exporting to DaVinci Resolve XML file.'
+        if(args.export_to_shotcut):
+            return 'Exporting to Shotcut XML Timeline file.'
+        if(args.export_as_audio):
+            return 'Exporting as audio.'
+        return 'Starting.'
 
-    def write_starting_message(args, log):
-        if(args.preview):
-            pass
-        elif(args.export_to_premiere):
-            log.conwrite('Exporting to Adobe Premiere Pro XML file.')
-        elif(args.export_to_final_cut_pro):
-            log.conwrite('Exporting to Final Cut Pro XML file.')
-        elif(args.export_to_resolve):
-            log.conwrite('Exporting to DaVinci Resolve XML file.')
-        elif(args.export_to_shotcut):
-            log.conwrite('Exporting to Shotcut XML Timeline file.')
-        elif(args.export_as_audio):
-            log.conwrite('Exporting as audio.')
-        else:
-            log.conwrite('Starting.')
-
-    write_starting_message(args, log)
+    if(not args.preview):
+        log.conwrite(write_starting_message(args))
 
     if(args.preview or args.export_as_clip_sequence or making_data_file):
         args.no_open = True
 
-    args.background = usefulfunctions.hex_to_bgr(args.background, log)
+    args.background = usefulfunctions.hex_to_rgb(args.background, log)
     if(args.blur < 0):
         args.blur = 0
 
