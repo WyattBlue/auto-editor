@@ -78,9 +78,9 @@ def print_program_help(root, the_args):
                 text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
     text += '\n'
     if(root == 'auto-editor'):
-        text += '  Have an issue? Make an issue. Visit '\
-            'https://github.com/wyattblue/auto-editor/issues\n\n  The help option '\
-            'can also be used on a specific option:\n     auto-editor '\
+        text += '  Have an issue? Make an issue. Visit '
+            'https://github.com/wyattblue/auto-editor/issues\n\n  The help option '
+            'can also be used on a specific option:\n     auto-editor '
             '--frame_margin --help\n'
     out(text)
 

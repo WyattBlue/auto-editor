@@ -199,7 +199,7 @@ def main(sys_args=None):
         run_program(['-h', '--help'])
         run_program(['--help', '-h'])
         run_program(['-h', '--help'])
-    tester.run_test('help_tests', help_tests, description='check the help option, '\
+    tester.run_test('help_tests', help_tests, description='check the help option, '
         'its short, and help on options and groups.')
 
     def version_debug():

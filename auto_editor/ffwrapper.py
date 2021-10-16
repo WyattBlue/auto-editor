@@ -25,10 +25,10 @@ def _test_path(path):
         get_stdout([path, '-h'])
     except FileNotFoundError:
         if(system() == 'Darwin'):
-            Log().error('No ffmpeg found, download via homebrew or restore the '\
+            Log().error('No ffmpeg found, download via homebrew or restore the '
                 'included binary.')
         if(system() == 'Windows'):
-            Log().error('No ffmpeg found, download ffmpeg with your favorite package '\
+            Log().error('No ffmpeg found, download ffmpeg with your favorite package '
                 'manager (ex chocolatey), or restore the included binary.')
 
         Log().error('ffmpeg must be installed and on PATH.')

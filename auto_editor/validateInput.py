@@ -75,7 +75,7 @@ def download_video(my_input, args, ffmpeg, log):
     try:
         import youtube_dl
     except ImportError:
-        log.error('Download the youtube-dl python library to download URLs.\n' \
+        log.error('Download the youtube-dl python library to download URLs.\n'
             '   pip3 install youtube-dl')
 
     if(not os.path.isfile(outtmpl)):
