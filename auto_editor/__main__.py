@@ -11,32 +11,9 @@ import auto_editor
 import auto_editor.vanparse as vanparse
 import auto_editor.utils.func as usefulfunctions
 
-from auto_editor.utils.func import fnone, append_filename
+from auto_editor.utils.func import fnone, append_filename, set_output_name
 from auto_editor.utils.log import Log, Timer
 from auto_editor.ffwrapper import FFmpeg
-
-def set_output_name(path, making_data_file, args):
-    dot_index = path.rfind('.')
-
-    if(dot_index == -1):
-        root = path
-    else:
-        root = path[:dot_index]
-
-    if(args.export_as_json):
-        return root + '.json'
-    if(args.export_to_final_cut_pro):
-        return root + '.fcpxml'
-    if(args.export_to_shotcut):
-        return root + '.mlt'
-    if(making_data_file):
-        return root + '.xml'
-    if(args.export_as_audio):
-        return root + '_ALTERED.wav'
-
-    ext = path[dot_index:]
-    return root + '_ALTERED' + ext
-
 
 def main_options(parser):
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
@@ -684,7 +661,6 @@ def main():
     if(args.preview or args.export_as_clip_sequence or making_data_file):
         args.no_open = True
 
-    args.background = usefulfunctions.hex_to_rgb(args.background, log)
     if(args.blur < 0):
         args.blur = 0
 

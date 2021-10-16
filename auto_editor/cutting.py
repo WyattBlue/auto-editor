@@ -262,8 +262,6 @@ def handleBoolExp(val, data, sampleRate, fps, log):
 
 
 def applyRects(cmdRects, audioData, sampleRate, fps, log):
-    from auto_editor.utils.func import hex_to_rgb
-
     rects = []
     for ms in cmdRects:
         if(len(ms) < 6):
@@ -280,7 +278,6 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
             color = ms[6]
         if(len(ms) > 7):
             thickness = int(ms[7])
-        color = hex_to_rgb(color, log)
 
         # Handle Boolean Expressions. Mostly the same as zoom.
         start_list, end_list = None, None

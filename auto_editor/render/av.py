@@ -2,6 +2,7 @@
 
 # External Libraries
 import av
+from PIL import Image, ImageDraw, ImageFont
 
 # Internal Libraries
 import os.path
@@ -13,12 +14,7 @@ from auto_editor.utils.func import fnone
 
 def pix_fmt_allowed(pix_fmt):
     # type: (str) -> bool
-
-    # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
-    allowed_formats = ['yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
-        'abgr', 'bgra', 'gray', 'gray8', 'rgb8', 'bgr8', 'pal8']
-
-    return pix_fmt in allowed_formats
+    return pix_fmt in ['yuv420p']
 
 def fset(cmd, option, value):
     if(fnone(value)):
@@ -136,6 +132,8 @@ Convert your video to a supported pix_fmt. The following command might work for 
     index = 0
     chunk = chunks.pop(0)
 
+    font = ImageFont.truetype('/System/Library/Fonts/Supplemental/PlantagenetCherokee.ttf', 34)
+
     try:
         for packet in input_.demux(inputVideoStream):
             for frame in packet.decode():
@@ -147,6 +145,14 @@ Convert your video to a supported pix_fmt. The following command might work for 
                     inputEquavalent += (1 / speeds[chunk[2]])
 
                 while inputEquavalent > outputEquavalent:
+
+                    img = frame.to_image()
+                    draw = ImageDraw.Draw(img)
+                    draw.rectangle([(20, 30,), (30, 40)], fill='#000')
+                    draw.text((100, 200), str(index), (0, 0, 0), font=font)
+
+                    frame = frame.from_image(img).reformat(format='yuv420p')
+
                     in_bytes = frame.to_ndarray().tobytes()
                     process2.stdin.write(in_bytes)
                     outputEquavalent += 1
