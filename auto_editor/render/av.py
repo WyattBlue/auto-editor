@@ -14,7 +14,12 @@ from auto_editor.utils.func import fnone
 
 def pix_fmt_allowed(pix_fmt):
     # type: (str) -> bool
-    return pix_fmt in ['yuv420p']
+
+    # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
+    allowed_formats = ['yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
+        'abgr', 'bgra', 'gray', 'gray8', 'rgb8', 'bgr8', 'pal8']
+
+    return pix_fmt in allowed_formats
 
 def fset(cmd, option, value):
     if(fnone(value)):
@@ -167,7 +172,7 @@ Convert your video to a supported pix_fmt. The following command might work for 
                         draw = ImageDraw.Draw(img)
                         draw.rectangle([(20, 30,), (30, 40)], fill='#000')
 
-                        frame = frame.from_image(img).reformat(format='yuv420p')
+                        frame = frame.from_image(img).reformat(format=pix_fmt)
 
                     in_bytes = frame.to_ndarray().tobytes()
                     process2.stdin.write(in_bytes)
