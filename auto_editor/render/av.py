@@ -57,7 +57,25 @@ def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
         ffmpeg.run(cmd)
 
 
+
+def get_effects(audio_samples, sample_rate, fps, args, log):
+    effects = []
+    if(args.zoom != []):
+        from auto_editor.cutting import applyZooms
+        effects += applyZooms(args.zoom, audio_samples, sample_rate, fps, log)
+    if(args.rectangle != []):
+        from auto_editor.cutting import applyRects
+        effects += applyRects(args.rectangle, audio_samples, sample_rate, fps, log)
+    return effects
+
+
 def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
+
+    print(args.rectangle)
+    # effects = get_effects()
+
+    effects = []
+
     totalFrames = chunks[len(chunks) - 1][1]
     videoProgress = ProgressBar(totalFrames, 'Creating new video',
         args.machine_readable_progress, args.no_progress)
@@ -144,11 +162,12 @@ Convert your video to a supported pix_fmt. The following command might work for 
 
                 while inputEquavalent > outputEquavalent:
 
-                    img = frame.to_image()
-                    draw = ImageDraw.Draw(img)
-                    draw.rectangle([(20, 30,), (30, 40)], fill='#000')
+                    if(effects != []):
+                        img = frame.to_image()
+                        draw = ImageDraw.Draw(img)
+                        draw.rectangle([(20, 30,), (30, 40)], fill='#000')
 
-                    frame = frame.from_image(img).reformat(format='yuv420p')
+                        frame = frame.from_image(img).reformat(format='yuv420p')
 
                     in_bytes = frame.to_ndarray().tobytes()
                     process2.stdin.write(in_bytes)

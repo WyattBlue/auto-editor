@@ -153,7 +153,41 @@ class ArgumentParser():
         return ParseOptions(sys_args, log, root, self.args)
 
 
+"""
+    Positional Arguments
+        --rectangle 0,end,10,20,20,30,#000, ...
+
+    Keyword Arguments
+        --rectangle start=0,end=end,x1=10, ...
+
+"""
+
 class ParseOptions():
+
+    def parse_parameters(self, val, op):
+
+        # TODO: allow out-of-order arguments with keyword syntax.
+
+        dic = {}
+        keys = []
+        for key in op['keywords']:
+            [[k, v]] = key.items()
+            keys.append(k)
+            dic[k] = v
+
+        for i, item in enumerate(val.split(',')):
+            if(i+1 > len(keys)):
+                print(f"Error! Too many arguments, starting with '{item}'", file=sys.stderr)
+                sys.exit(1)
+
+            dic[keys[i]] = item
+
+        # Check if any positional args are not specified.
+        for key, item in dic.items():
+            if(item == ''):
+                print(f"Error! parameter '{key}' is required.", file=sys.stderr)
+                sys.exit(1)
+        return dic
 
     def setConfig(self, config_path, root):
         if(not os.path.isfile(config_path)):
@@ -253,6 +287,11 @@ class ParseOptions():
                 # Unknown Option!
                 if(setting_inputs and (option_list != 'input' or (option_list == 'input' and not item.startswith('-')))):
                     # Option is actually an input file, like example.mp4
+
+                    if(option_list != 'input'):
+                        _op = used_options[-1]
+                        if(_op['keywords'] != []):
+                            item = self.parse_parameters(item, _op)
                     my_list.append(item)
                 else:
                     log.error(error_message(args, item, label))
@@ -265,10 +304,10 @@ class ParseOptions():
                 option_list = None
                 my_list = []
 
-                if(option['names'][0] in used_options):
+                if(option in used_options):
                     log.error('Cannot repeat option {} twice.'.format(option['names'][0]))
 
-                used_options.append(option['names'][0])
+                used_options.append(option)
 
                 key = _to_key(option)
                 _set.append(key)

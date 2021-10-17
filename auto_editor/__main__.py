@@ -104,14 +104,13 @@ def main_options(parser):
     parser.add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
 
-    parser.add_argument('--zoom', nargs='*',
+    parser.add_argument('--zoom', nargs='*', type=dict,
         help='set when and how a zoom will occur.',
         keywords=[
             {'start': ''}, {'end': ''}, {'zoom': ''}, {'end_zoom': ''},
             {'x': 'centerX'}, {'y': 'centerY'}, {'interpolate': 'linear'},
-        ],
-        extra=' ')
-    parser.add_argument('--rectangle', nargs='*',
+        ])
+    parser.add_argument('--rectangle', nargs='*', type=dict,
         keywords=[
             {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
             {'x2': ''}, {'y2': ''}, {'color': '#000'}, {'thickness': None},
@@ -280,16 +279,6 @@ def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_
         fps, args, log)
 
 
-def get_effects(audio_samples, sample_rate, fps, args, log):
-    effects = []
-    if(args.zoom != []):
-        from auto_editor.cutting import applyZooms
-        effects += applyZooms(args.zoom, audio_samples, sample_rate, fps, log)
-    if(args.rectangle != []):
-        from auto_editor.cutting import applyRects
-        effects += applyRects(args.rectangle, audio_samples, sample_rate, fps, log)
-    return effects
-
 def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_file,
     TEMP, log):
     chunks = None
@@ -426,7 +415,6 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
     if(chunks is None):
         chunks = get_chunks(inp, speeds, segment, fps, args, log, audio_samples,
             sample_rate)
-        effects = get_effects(audio_samples, sample_rate, fps, args, log)
 
     def is_clip(chunk):
         # type: (list) -> bool
@@ -573,8 +561,6 @@ def main():
         parser = main_options(parser)
         args = parser.parse_args(sys.argv[1:], Log(), 'auto-editor')
 
-    print(args.rectangle)
-    quit()
     timer = Timer(args.quiet)
 
     exporting_to_editor = (args.export_to_premiere or args.export_to_resolve or
