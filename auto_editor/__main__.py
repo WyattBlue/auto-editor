@@ -107,7 +107,7 @@ def main_options(parser):
     parser.add_argument('--zoom', nargs='*', type=dict,
         help='set when and how a zoom will occur.',
         keywords=[
-            {'start': ''}, {'end': ''}, {'zoom': ''}, {'end_zoom': ''},
+            {'start': ''}, {'end': ''}, {'zoom': ''}, {'end_zoom': '{zoom}'},
             {'x': 'centerX'}, {'y': 'centerY'}, {'interpolate': 'linear'},
         ])
     parser.add_argument('--rectangle', nargs='*', type=dict,
