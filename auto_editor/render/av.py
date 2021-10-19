@@ -2,7 +2,6 @@
 
 # External Libraries
 import av
-from PIL import Image, ImageDraw, ImageFont
 
 # Internal Libraries
 import os.path
@@ -62,24 +61,112 @@ def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
         ffmpeg.run(cmd)
 
 
+class Effect():
+    def _values(self, val, _type):
+        if(_type is str):
+            return str(val)
 
-def get_effects(audio_samples, sample_rate, fps, args, log):
-    effects = []
-    if(args.zoom != []):
-        from auto_editor.cutting import applyZooms
-        effects += applyZooms(args.zoom, audio_samples, sample_rate, fps, log)
-    if(args.rectangle != []):
-        from auto_editor.cutting import applyRects
-        effects += applyRects(args.rectangle, audio_samples, sample_rate, fps, log)
-    return effects
+        for key, item in self._vars.items():
+            if(val == key):
+                return item
 
+        if(not isinstance(val, int)
+            and not (val.replace('.', '', 1)).replace('-', '', 1).isdigit()):
+            self.log.error("variable '{}' is not defined.".format(val))
+        return _type(val)
+
+    def set_all(self, effect, my_types):
+        for key, _type in my_types.items():
+            effect[key] = self._values(effect[key], _type)
+
+        self.all.append(effect)
+
+    def set_start_end(self, start, end, num_effects):
+        start = self._values(start, int)
+        end = self._values(end, int)
+
+        for i in range(start, end, 1):
+            if(i in self.sheet):
+                self.sheet[i].append(num_effects)
+            else:
+                self.sheet[i] = [num_effects]
+
+    def __init__(self, args, log, pix_fmt, _vars):
+        self.pix_fmt = pix_fmt
+
+        self.all = []
+        self.sheet = {}
+        self._vars = _vars
+        self.log = log
+
+        num_effects = 0
+
+        rect_types = {
+            'x1': int,
+            'y1': int,
+            'x2': int,
+            'y2': int,
+            'color': str,
+        }
+        for rect in args.rectangle:
+            effect = rect.copy()
+            effect['type'] = 'rectangle'
+
+            start = effect.pop('start', None)
+            end = effect.pop('end', None)
+
+            self.set_start_end(start, end, num_effects)
+            self.set_all(effect, rect_types)
+
+            num_effects += 1
+
+        zoom_types = {
+            'zoom': float,
+            'end_zoom': float,
+            'x': int,
+            'y': int,
+            'interpolate': str,
+        }
+
+        for zoom in args.zoom:
+            if(zoom['end_zoom'] == '{zoom}'):
+                zoom['end_zoom'] = zoom['zoom']
+
+            effect = zoom.copy()
+            effect['type'] = 'zoom'
+
+            start = effect.pop('start', None)
+            end = effect.pop('end', None)
+
+            self.set_start_end(start, end, num_effects)
+            self.set_all(effect, zoom_types)
+
+            num_effects += 1
+
+    def apply(self, index, frame, pix_fmt):
+        from PIL import Image, ImageDraw, ImageFont
+
+        img = frame.to_image()
+
+        for item in self.sheet[index]:
+            pars = self.all[item]
+
+            if(pars['type'] == 'rectangle'):
+                draw = ImageDraw.Draw(img)
+                draw.rectangle([(pars['x1'], pars['y1'],), (pars['x2'], pars['y2'])],
+                    fill=pars['color'])
+
+            if(pars['type'] == 'zoom'):
+                w, h = img.size
+
+                # img = img.crop((pars['x'] - w / pars['zoom'], pars['y'] - h / pars['zoom'],
+                #     pars['x'] + w / pars['zoom'], pars['y'] + h / pars['zoom']))
+                # img = img.resize((w, h), Image.LANCZOS)
+
+        frame = frame.from_image(img).reformat(format=self.pix_fmt)
+        return frame
 
 def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
-
-    print(args.rectangle)
-    # effects = get_effects()
-
-    effects = []
 
     totalFrames = chunks[len(chunks) - 1][1]
     videoProgress = ProgressBar(totalFrames, 'Creating new video',
@@ -124,13 +211,23 @@ Convert your video to a supported pix_fmt. The following command might work for 
     elif(not pix_fmt_allowed(pix_fmt)):
         throw_pix_fmt(inp, pix_fmt, log)
 
+    log.debug('pix_fmt: {}'.format(pix_fmt))
+
     inputVideoStream = input_.streams.video[0]
     inputVideoStream.thread_type = 'AUTO'
 
     width = inputVideoStream.width
     height = inputVideoStream.height
 
-    log.debug('pix_fmt: {}'.format(pix_fmt))
+    _vars = {
+        'width': width,
+        'height': height,
+        'start': 0,
+        'end': totalFrames - 1,
+        'centerX': width // 2,
+        'centerY': height // 2,
+    }
+    effects = Effect(args, log, pix_fmt=pix_fmt, _vars=_vars)
 
     cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
         '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
@@ -167,12 +264,8 @@ Convert your video to a supported pix_fmt. The following command might work for 
 
                 while inputEquavalent > outputEquavalent:
 
-                    if(effects != []):
-                        img = frame.to_image()
-                        draw = ImageDraw.Draw(img)
-                        draw.rectangle([(20, 30,), (30, 40)], fill='#000')
-
-                        frame = frame.from_image(img).reformat(format=pix_fmt)
+                    if(index-1 in effects.sheet):
+                        frame = effects.apply(index-1, frame, pix_fmt)
 
                     in_bytes = frame.to_ndarray().tobytes()
                     process2.stdin.write(in_bytes)

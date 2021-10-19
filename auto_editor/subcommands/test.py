@@ -114,7 +114,7 @@ def run_program(cmd):
 
     returncode, stdout, stderr = pipe_to_console(cmd)
     if(returncode > 0):
-        raise Exception('Test Failed.\n{}\n{}\n'.format(stdout, stderr))
+        raise Exception('{}\n{}\n'.format(stdout, stderr))
 
 
 def checkForError(cmd, match=None):
@@ -122,11 +122,11 @@ def checkForError(cmd, match=None):
     if(returncode > 0):
         if('Error!' in stderr):
             if(match is not None and match not in stderr):
-                raise Exception('Test Failed.\nCould\'t find "{}"'.format(match))
+                raise Exception('Could\'t find "{}"'.format(match))
         else:
-            raise Exception('Test Failed.\nProgram crashed.\n{}\n{}'.format(stdout, stderr))
+            raise Exception('Program crashed.\n{}\n{}'.format(stdout, stderr))
     else:
-        raise Exception('Test Failed.\nProgram should not responsed with a code 0.')
+        raise Exception('Program should not respond with a code 0.')
 
 def fullInspect(fileName, *args):
     for item in args:
@@ -156,7 +156,7 @@ class Tester():
             func()
         except Exception as e:
             self.failed_tests += 1
-            print('{} Failed.'.format(name))
+            print("Test '{}' failed.".format(name))
             print(e)
             clean_all()
             if(self.failed_tests > self.allowable_fails):
@@ -248,7 +248,7 @@ def main(sys_args=None):
     def level_tests():
         run_program(['levels', 'example.mp4'])
         run_program(['levels', 'resources/newCommentary.mp3'])
-    tester.run_test('level_tests', level_tests, lambda a: os.remove('data.txt'))
+    tester.run_test('level_tests', level_tests, cleanup=lambda: os.remove('data.txt'))
 
     def example_tests():
         run_program(['example.mp4'])
@@ -322,16 +322,6 @@ def main(sys_args=None):
         ''',
         cleanup=clean_all)
 
-    def render_tests():
-        run_program(['example.mp4', '--render', 'opencv'])
-        fullInspect(
-            'example_ALTERED.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '1280x720'],
-            [ffprobe.getSampleRate, '48000'],
-        )
-    tester.run_test('render_tests', render_tests)
-
     def margin_tests():
         run_program(['example.mp4', '-m', '3'])
         run_program(['example.mp4', '--margin', '3'])
@@ -382,7 +372,7 @@ def main(sys_args=None):
     tester.run_test('speed_tests', speed_tests)
 
     def scale_tests():
-        run_program(['example.mp4', '--scale', '1.5', '--render', 'av'])
+        run_program(['example.mp4', '--scale', '1.5'])
         fullInspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
@@ -390,23 +380,7 @@ def main(sys_args=None):
             [ffprobe.getSampleRate, '48000'],
         )
 
-        run_program(['example.mp4', '--scale', '0.2', '--render', 'av'])
-        fullInspect(
-            'example_ALTERED.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '256x144'],
-            [ffprobe.getSampleRate, '48000'],
-        )
-
-        run_program(['example.mp4', '--scale', '1.5', '--render', 'opencv'])
-        fullInspect(
-            'example_ALTERED.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '1920x1080'],
-            [ffprobe.getSampleRate, '48000'],
-        )
-
-        run_program(['example.mp4', '--scale', '0.2', '--render', 'opencv'])
+        run_program(['example.mp4', '--scale', '0.2'])
         fullInspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
@@ -415,14 +389,11 @@ def main(sys_args=None):
         )
     tester.run_test('scale_tests', scale_tests)
 
-    # def various_errors_test():
-    #     checkForError(['example.mp4', '--zoom', '0,60,1.5', '--render', 'av'])
-    #     checkForError(['example.mp4', '--zoom', '0'])
-    #     checkForError(['example.mp4', '--zoom', '0,60'])
-    #     checkForError(['example.mp4', '--rectangle', '0,60,0,10,10,20', '--render', 'av'])
-    #     checkForError(['example.mp4', '--rectangle', '0,60'])
-    #     checkForError(['example.mp4', '--background', '000'])
-    # tester.run_test('various_errors_test', various_errors_test)
+    def various_errors_test():
+        checkForError(['example.mp4', '--zoom', '0', '--cut_out', '60,end'])
+        checkForError(['example.mp4', '--zoom', '0,60', '--cut_out', '60,end'])
+        checkForError(['example.mp4', '--rectangle', '0,60', '--cut_out', '60,end'])
+    tester.run_test('various_errors_test', various_errors_test)
 
     def create_sub_test():
         run_program(['create', 'test', '--width', '640', '--height', '360', '-o',
@@ -434,30 +405,30 @@ def main(sys_args=None):
         )
     tester.run_test('create_sub_test', create_sub_test)
 
-    def effect_tests():
-        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom', '10,60,2'])
+    # def effect_tests():
+    #     run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom', '10,60,2'])
 
-        run_program(['example.mp4', '--mark_as_loud', 'start,end', '--rectangle',
-            'audio>0.05,audio<0.05,20,50,50,100', 'audio>0.1,audio<0.1,120,50,150,100'])
+    #     run_program(['example.mp4', '--mark_as_loud', 'start,end', '--rectangle',
+    #         'audio>0.05,audio<0.05,20,50,50,100', 'audio>0.1,audio<0.1,120,50,150,100'])
 
-        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
-            'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
-        fullInspect(
-            'testsrc_ALTERED.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '320x180'],
-        )
-        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--rectangle',
-            '0,30,0,200,100,300,#43FA56,10'])
-        os.remove('testsrc_ALTERED.mp4')
-        os.remove('testsrc.mp4')
-    tester.run_test('effect_tests', effect_tests,
-        description='test the zoom and rectangle options',
-        cleanup=clean_all)
+    #     run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
+    #         'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
+    #     fullInspect(
+    #         'testsrc_ALTERED.mp4',
+    #         [ffprobe.getFrameRate, 30.0],
+    #         [ffprobe.getResolution, '320x180'],
+    #     )
+    #     run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--rectangle',
+    #         '0,30,0,200,100,300,#43FA56,10'])
+    #     os.remove('testsrc_ALTERED.mp4')
+    #     os.remove('testsrc.mp4')
+    # tester.run_test('effect_tests', effect_tests,
+    #     description='test the zoom and rectangle options',
+    #     cleanup=clean_all)
 
     def export_tests():
         for item in os.listdir('resources'):
-            if('man_on_green_screen' in item or item.startswith('.')):
+            if('man_on_green_screen' in item or item.startswith('.') or '_ALTERED' in item):
                 continue
             item = 'resources/{}'.format(item)
             run_program([item])

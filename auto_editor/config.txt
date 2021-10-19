@@ -1,8 +1,5 @@
 # Auto-Editor default configuration file
 
-# metadataOps
-auto-editor.metadataOps.force_fps_to = None               # None
-
 # exportMediaOps
 auto-editor.exportMediaOps.video_bitrate = 'unset'        # 'unset'
 auto-editor.exportMediaOps.audio_bitrate = 'unset'        # 'unset'
@@ -13,12 +10,6 @@ auto-editor.exportMediaOps.preset = 'unset'               # 'unset'
 auto-editor.exportMediaOps.tune = 'unset'                 # 'unset'
 auto-editor.exportMediaOps.constant_rate_factor = 'unset' # 'unset'
 
-# motionOps
-auto-editor.motionOps.dilates = 2                         # 2
-auto-editor.motionOps.width = 400                         # 400
-auto-editor.motionOps.blur = 21                           # 21
-
-auto-editor.render = 'auto'                               # 'auto'
 auto-editor.scale = 1                                     # 1
 
 auto-editor.motion_threshold = 0.02                       # 0.02
