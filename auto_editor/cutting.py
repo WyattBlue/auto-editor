@@ -114,7 +114,7 @@ def setRange(has_loud, range_syntax, fps, with_, log):
             return 0
         if(item == 'end'):
             return len(has_loud)
-        log.error('Variable {} not available.'.format(item))
+        log.error("variable '{}' not available.".format(item))
 
     def var_val_to_frames(val, fps, log):
         # type: (str, float | int, Any) -> int

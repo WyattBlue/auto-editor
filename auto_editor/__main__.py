@@ -15,6 +15,11 @@ from auto_editor.utils.func import fnone, append_filename, set_output_name
 from auto_editor.utils.log import Log, Timer
 from auto_editor.ffwrapper import FFmpeg
 
+# TODO: make zoom actually work.
+# TODO: make thickness work.
+# TODO: make start,end accept boolean expressions
+# TODO: convert all names to snake_case.
+
 def main_options(parser):
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
         frame_type, zoom_type, rect_type, range_type, speed_range_type, block_type)
