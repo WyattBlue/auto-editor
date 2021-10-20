@@ -395,7 +395,7 @@ def main(sys_args=None):
         checkForError(['example.mp4', '--rectangle', '0,60', '--cut_out', '60,end'])
     tester.run_test('various_errors_test', various_errors_test)
 
-    def create_sub_test():
+    def effect_tests():
         run_program(['create', 'test', '--width', '640', '--height', '360', '-o',
             'testsrc.mp4'])
         fullInspect(
@@ -403,28 +403,26 @@ def main(sys_args=None):
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '640x360'],
         )
-    tester.run_test('create_sub_test', create_sub_test)
 
-    # def effect_tests():
-    #     run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom', '10,60,2'])
+        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom', '10,60,2'])
 
     #     run_program(['example.mp4', '--mark_as_loud', 'start,end', '--rectangle',
     #         'audio>0.05,audio<0.05,20,50,50,100', 'audio>0.1,audio<0.1,120,50,150,100'])
 
-    #     run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
-    #         'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
-    #     fullInspect(
-    #         'testsrc_ALTERED.mp4',
-    #         [ffprobe.getFrameRate, 30.0],
-    #         [ffprobe.getResolution, '320x180'],
-    #     )
-    #     run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--rectangle',
-    #         '0,30,0,200,100,300,#43FA56,10'])
-    #     os.remove('testsrc_ALTERED.mp4')
-    #     os.remove('testsrc.mp4')
-    # tester.run_test('effect_tests', effect_tests,
-    #     description='test the zoom and rectangle options',
-    #     cleanup=clean_all)
+        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
+            'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
+        fullInspect(
+            'testsrc_ALTERED.mp4',
+            [ffprobe.getFrameRate, 30.0],
+            [ffprobe.getResolution, '320x180'],
+        )
+        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--rectangle',
+            '0,30,0,200,100,300,#43FA56,10'])
+        os.remove('testsrc_ALTERED.mp4')
+        os.remove('testsrc.mp4')
+    tester.run_test('effect_tests', effect_tests,
+        description='test the zoom and rectangle options',
+        cleanup=clean_all)
 
     def export_tests():
         for item in os.listdir('resources'):
