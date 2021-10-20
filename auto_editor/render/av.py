@@ -63,6 +63,11 @@ def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
 
 class Effect():
     def _values(self, val, _type):
+        # just to be clear, val can only be None if the default value is None.
+        # Users can't set the argument to None themselves.
+        if(val is None):
+            return None
+
         if(_type is str):
             return str(val)
 
@@ -99,15 +104,22 @@ class Effect():
         self._vars = _vars
         self.log = log
 
+        self.width = _vars['width']
+        self.height = _vars['height']
+
+        self.background = args.background
+
         num_effects = 0
 
         rect_types = {
-            'x1': int,
-            'y1': int,
-            'x2': int,
-            'y2': int,
-            'color': str,
+            'x1': int, 'y1': int, 'x2': int, 'y2': int, 'fill': str, 'width': int,
+            'outline': str,
         }
+        circle_types = rect_types
+        zoom_types = {
+            'zoom': float, 'end_zoom': float, 'x': int, 'y': int, 'interpolate': str,
+        }
+
         for rect in args.rectangle:
             effect = rect.copy()
             effect['type'] = 'rectangle'
@@ -120,13 +132,17 @@ class Effect():
 
             num_effects += 1
 
-        zoom_types = {
-            'zoom': float,
-            'end_zoom': float,
-            'x': int,
-            'y': int,
-            'interpolate': str,
-        }
+        for circle in args.circle:
+            effect = circle.copy()
+            effect['type'] = 'circle'
+
+            start = effect.pop('start', None)
+            end = effect.pop('end', None)
+
+            self.set_start_end(start, end, num_effects)
+            self.set_all(effect, circle_types)
+
+            num_effects += 1
 
         for zoom in args.zoom:
             if(zoom['end_zoom'] == '{zoom}'):
@@ -153,15 +169,28 @@ class Effect():
 
             if(pars['type'] == 'rectangle'):
                 draw = ImageDraw.Draw(img)
-                draw.rectangle([(pars['x1'], pars['y1'],), (pars['x2'], pars['y2'])],
-                    fill=pars['color'])
+                draw.rectangle([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
+                    fill=pars['fill'], width=pars['width'], outline=pars['outline'])
+
+            if(pars['type'] == 'circle'):
+                draw = ImageDraw.Draw(img)
+                draw.ellipse([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
+                    fill=pars['fill'], width=pars['width'], outline=pars['outline'])
 
             if(pars['type'] == 'zoom'):
-                w, h = img.size
+                x = pars['x']
+                y = pars['y']
+                zoom2 = pars['zoom'] * 2
 
-                # img = img.crop((pars['x'] - w / pars['zoom'], pars['y'] - h / pars['zoom'],
-                #     pars['x'] + w / pars['zoom'], pars['y'] + h / pars['zoom']))
-                # img = img.resize((w, h), Image.LANCZOS)
+                x1 = round(x - self.width / zoom2)
+                y1 = round(y - self.height / zoom2)
+                x2 = round(x + self.width / zoom2)
+                y2 = round(y + self.height / zoom2)
+
+                bg = Image.new(img.mode, (x2 - x1, y2 - y1), self.background)
+                bg.paste(img, (-x1, -y1))
+
+                img = bg.resize((self.width, self.height), Image.LANCZOS)
 
         frame = frame.from_image(img).reformat(format=self.pix_fmt)
         return frame

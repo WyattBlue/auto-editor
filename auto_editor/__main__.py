@@ -15,8 +15,6 @@ from auto_editor.utils.func import fnone, append_filename, set_output_name
 from auto_editor.utils.log import Log, Timer
 from auto_editor.ffwrapper import FFmpeg
 
-# TODO: make zoom actually work.
-# TODO: make thickness work.
 # TODO: make start,end accept boolean expressions
 # TODO: convert all names to snake_case.
 
@@ -102,29 +100,36 @@ def main_options(parser):
         choices=['unset', 'yes', 'no'],
         help='skip variable frame rate scan, saving time for big video files.')
 
+    parser.add_argument('effectOps', nargs=0, action='grouping')
+    parser.add_argument('--zoom', nargs='*', type=dict, group='effectOps',
+        help='set when and how a zoom will occur.',
+        keywords=[
+            {'start': ''}, {'end': ''}, {'zoom': ''}, {'end_zoom': '{zoom}'},
+            {'x': 'centerX'}, {'y': 'centerY'}, {'interpolate': 'linear'},
+        ])
+    parser.add_argument('--rectangle', nargs='*', type=dict, group='effectOps',
+        keywords=[
+            {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
+            {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': None}, {'outline': 'blue'}
+        ],
+        help='overlay a rectangle shape on the video.')
+    parser.add_argument('--circle', nargs='*', type=dict, group='effectOps',
+        keywords=[
+            {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
+            {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': None}, {'outline': 'blue'}
+        ],
+        help='overlay a circle shape on the video.',
+        extra='\n\nThe x and y coordinates specify a bounding box where the circle is '\
+            'drawn.')
+
+    parser.add_argument('--background', type=str, default='#000',
+        help='set the color of the background that is visible when the video is moved.')
     parser.add_argument('--render', default='auto', hidden=True,
         help="defunct option. doesn't do anything.")
     parser.add_argument('--scale', type=float_type, default=1,
         help='scale the output media file by a certain factor.')
     parser.add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
-
-    parser.add_argument('--zoom', nargs='*', type=dict,
-        help='set when and how a zoom will occur.',
-        keywords=[
-            {'start': ''}, {'end': ''}, {'zoom': ''}, {'end_zoom': '{zoom}'},
-            {'x': 'centerX'}, {'y': 'centerY'}, {'interpolate': 'linear'},
-        ])
-    parser.add_argument('--rectangle', nargs='*', type=dict,
-        keywords=[
-            {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
-            {'x2': ''}, {'y2': ''}, {'color': '#000'}, {'thickness': None},
-        ],
-        help='overlay a rectangle shape on the video.',
-        extra='\n\nWhen thickness is None, the shape will be solid.')
-
-    parser.add_argument('--background', type=str, default='#000',
-        help='set the color of the background that is visible when the video is moved.')
 
     parser.add_argument('--mark_as_loud', type=range_type, nargs='*',
         help='the range that will be marked as "loud".')
