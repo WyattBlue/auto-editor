@@ -20,7 +20,7 @@ from auto_editor.ffwrapper import FFmpeg
 
 def main_options(parser):
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
-        frame_type, zoom_type, rect_type, range_type, speed_range_type, block_type)
+        frame_type, range_type, speed_range_type, block_type)
 
     parser.add_argument('progressOps', nargs=0, action='grouping')
     parser.add_argument('--machine_readable_progress', action='store_true',
