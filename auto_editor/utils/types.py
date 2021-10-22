@@ -82,12 +82,6 @@ def comma_type(inp, min_args=1, max_args=None, name=''):
         error('Too many comma arguments for {}.'.format(name))
     return inp
 
-def zoom_type(inp):
-    return comma_type(inp, 3, 8, 'zoom_type')
-
-def rect_type(inp):
-    return comma_type(inp, 6, 8, 'rect_type')
-
 def range_type(inp):
     return comma_type(inp, 2, 2, 'range_type')
 
