@@ -406,8 +406,8 @@ def main(sys_args=None):
 
         run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom', '10,60,2'])
 
-    #     run_program(['example.mp4', '--mark_as_loud', 'start,end', '--rectangle',
-    #         'audio>0.05,audio<0.05,20,50,50,100', 'audio>0.1,audio<0.1,120,50,150,100'])
+        # run_program(['example.mp4', '--mark_as_loud', 'start,end', '--rectangle',
+        #     'audio>0.05,audio<0.05,20,50,50,100', 'audio>0.1,audio<0.1,120,50,150,100'])
 
         run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
             'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])

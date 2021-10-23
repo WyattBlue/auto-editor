@@ -1,20 +1,19 @@
 '''utils/video.py'''
 
 # Internal Libraries
-import os
+import os.path
 from shutil import move
 
 # Included Libraries
 from .func import fnone
 from auto_editor.render.audio import make_new_audio
 
-def handle_audio_tracks(ffmpeg, write_file, args, a_tracks, chunks, speeds, fps, temp,
-    log):
+def handle_audio_tracks(ffmpeg, write_file, args, a_tracks, chunks, speeds, fps, progress,
+    temp, log):
     for t in range(a_tracks):
         temp_file = os.path.join(temp, '{}.wav'.format(t))
         new_file = os.path.join(temp, 'new{}.wav'.format(t))
-        make_new_audio(temp_file, new_file, chunks, speeds, log, fps,
-            args.machine_readable_progress, args.no_progress)
+        make_new_audio(temp_file, new_file, chunks, speeds, log, fps, progress)
 
         if(not os.path.isfile(new_file)):
             log.bug('Audio file not created.')

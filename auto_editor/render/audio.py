@@ -1,9 +1,6 @@
 '''render/audio.py'''
 
-import os
-
 from auto_editor.utils.func import get_new_length, fnone
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.scipy.wavfile import read, write
 
 def convert_audio(ffmpeg, input_path, inp, output_path, codec, log):
@@ -14,6 +11,7 @@ def convert_audio(ffmpeg, input_path, inp, output_path, codec, log):
 
 def handle_audio(ffmpeg, input_path, bitrate, samplerate, temp, log):
     # type: (...) -> str
+    import os.path
     temp_file = os.path.join(temp, 'faAudio.wav')
 
     log.checkType(samplerate, 'samplerate', str)
@@ -27,8 +25,7 @@ def handle_audio(ffmpeg, input_path, bitrate, samplerate, temp, log):
 
     return temp_file
 
-def make_new_audio(input_path, output_path, chunks, speeds, log, fps, machine_readable,
-    hide_bar):
+def make_new_audio(input_path, output_path, chunks, speeds, log, fps, progress):
     import numpy as np
 
     def custom_speeds(a):
@@ -54,8 +51,7 @@ def make_new_audio(input_path, output_path, chunks, speeds, log, fps, machine_re
     channels = 2
     y_pointer = 0
 
-    progress = ProgressBar(len(chunks), 'Creating new audio', machine_readable,
-        hide_bar)
+    progress.start(len(chunks), 'Creating new audio')
 
     for c, chunk in enumerate(chunks):
         sample_start = int(chunk[0] / fps * samplerate)
@@ -89,6 +85,7 @@ def make_new_audio(input_path, output_path, chunks, speeds, log, fps, machine_re
             y_end_pointer = y_pointer
 
         progress.tick(c)
+    progress.end()
 
     log.debug('Total Samples: {}'.format(y_pointer))
     log.debug('Samples per Frame: {}'.format(samplerate / fps))

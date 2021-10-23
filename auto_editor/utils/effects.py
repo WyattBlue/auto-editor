@@ -2,6 +2,8 @@
 import numpy as np
 
 # Included Libraries
+from auto_editor.analyze import audio_detection
+
 from .interpolate import interpolate
 
 
@@ -40,14 +42,6 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
     rects = []
     for ms in cmdRects:
 
-        start, end, x1, y1, x2, y2 = ms[:6]
-
-        color = '#000'
-        thickness = -1
-        if(len(ms) > 6):
-            color = ms[6]
-        if(len(ms) > 7):
-            thickness = int(ms[7])
 
         # Handle Boolean Expressions. Mostly the same as zoom.
         start_list, end_list = None, None
@@ -58,9 +52,6 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
             if(start_list is None):
                 log.error('The start parameter must also have a boolean expression.')
             end_list = boolean_expression(end, audioData, sampleRate, fps, log)
-
-        if(start_list is None):
-            rects.append(['rectangle', start, end, x1, y1, x2, y2, color, thickness])
 
         elif(end_list is None):
             # Handle if end is not a boolean expression.
@@ -74,12 +65,6 @@ def applyRects(cmdRects, audioData, sampleRate, fps, log):
                 if(item[2] == 1):
                     rects.append(['rectangle', str(item[0]), str(item[1]), x1, y1, x2, y2,
                         color, thickness])
-
-            if(rects == []):
-                log.warning('No rectangles applied.')
-            else:
-                log.print(' {} rectangles applied.'.format(len(rects)))
-
     return rects
 
 
