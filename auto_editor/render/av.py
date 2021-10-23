@@ -8,7 +8,6 @@ import os.path
 import subprocess
 
 # Included Libraries
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.func import fnone
 
 def pix_fmt_allowed(pix_fmt):
@@ -195,11 +194,11 @@ class Effect():
         frame = frame.from_image(img).reformat(format=self.pix_fmt)
         return frame
 
-def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, temp, log):
+def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, temp, log):
 
-    totalFrames = chunks[len(chunks) - 1][1]
-    videoProgress = ProgressBar(totalFrames, 'Creating new video',
-        args.machine_readable_progress, args.no_progress)
+    total_frames = chunks[len(chunks) - 1][1]
+
+    progress.start(total_frames, 'Creating new video')
 
     input_ = av.open(inp.path)
     pix_fmt = input_.streams.video[0].pix_fmt
@@ -252,7 +251,7 @@ Convert your video to a supported pix_fmt. The following command might work for 
         'width': width,
         'height': height,
         'start': 0,
-        'end': totalFrames - 1,
+        'end': total_frames - 1,
         'centerX': width // 2,
         'centerY': height // 2,
     }
@@ -300,7 +299,8 @@ Convert your video to a supported pix_fmt. The following command might work for 
                     process2.stdin.write(in_bytes)
                     outputEquavalent += 1
 
-                videoProgress.tick(index - 1)
+                progress.tick(index - 1)
+        progress.end()
         process2.stdin.close()
         process2.wait()
     except BrokenPipeError:

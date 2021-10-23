@@ -35,32 +35,6 @@ def bar(columns, title, done, togo, percent, new_time):
 
 
 class ProgressBar():
-    def __init__(self, total, title='Please wait', machineReadable=False, hide=False):
-
-        self.total = total
-        self.beginTime = time()
-        self.title = title
-        self.len_title = len(title)
-        self.machine = machineReadable
-        self.hide = hide
-        self.ampm = True
-
-        if(system() == 'Darwin' and not self.machine):
-            try:
-                dateFormat = get_stdout(['defaults', 'read',
-                    'com.apple.menuextra.clock', 'DateFormat'])
-                self.ampm = 'a' in dateFormat
-            except FileNotFoundError:
-                pass
-
-        self.allow_unicode = True
-        try:
-            self.tick(0)
-        except UnicodeEncodeError:
-            newTime = _pretty_time(self.beginTime, self.ampm)
-            print('   0% done ETA {}'.format(newTime))
-            self.allow_unicode = False
-
     def tick(self, index):
 
         if(self.hide):
@@ -70,15 +44,15 @@ class ProgressBar():
         if(percentDone == 0): # Prevent dividing by zero.
             percentPerSec = 0
         else:
-            percentPerSec = (time() - self.beginTime) / percentDone
+            percentPerSec = (time() - self.begin_time) / percentDone
 
-        new_time = _pretty_time(self.beginTime + (percentPerSec * 100), self.ampm)
+        new_time = _pretty_time(self.begin_time + (percentPerSec * 100), self.ampm)
 
         if(self.machine):
             index = min(index, self.total)
-            raw = int(self.beginTime + (percentPerSec * 100))
+            raw = int(self.begin_time + (percentPerSec * 100))
             print('{}~{}~{}~{}~{}'.format(
-                self.title, index, self.total, self.beginTime, raw),
+                self.title, index, self.total, self.begin_time, raw),
                 end='\r', flush=True)
             return
 
@@ -91,3 +65,34 @@ class ProgressBar():
             bar(columns, self.title, '█' * done, togo, percentDone, new_time)
         else:
             print('   {}% done ETA {}'.format(percentDone, new_time))
+
+    def start(self, total, title='Please wait'):
+        self.title = title
+        self.len_title = len(title)
+        self.total = total
+        self.begin_time = time()
+
+        self.allow_unicode = True
+        try:
+            self.tick(0)
+        except UnicodeEncodeError:
+            newTime = _pretty_time(self.begin_time, self.ampm)
+            print('   0% done ETA {}'.format(newTime))
+            self.allow_unicode = False
+
+    @staticmethod
+    def end():
+        print(' ' * max(1, get_terminal_size().columns - 2), end='\r')
+
+    def __init__(self, machine_readable=False, hide=False):
+        self.machine = machine_readable
+        self.hide = hide
+
+        self.ampm = True
+        if(system() == 'Darwin' and not self.machine):
+            try:
+                date_format = get_stdout(['defaults', 'read',
+                    'com.apple.menuextra.clock', 'DateFormat'])
+                self.ampm = 'a' in date_format
+            except FileNotFoundError:
+                pass

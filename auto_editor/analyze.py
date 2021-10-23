@@ -4,45 +4,47 @@ import math
 
 import numpy as np
 
-def get_np_list(inp, audioData, sampleRate, fps, func):
-    if(audioData is not None):
-        audioSampleCount = audioData.shape[0]
-        samplesPerFrame = sampleRate / fps
-        audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
-        return func((audioFrameCount), dtype=np.bool_)
+from auto_editor.utils.progressbar import ProgressBar
+
+def get_np_list(inp, audio_samples, sample_rate, fps, func):
+    if(audio_samples is not None):
+        sample_count = audio_samples.shape[0]
+        sample_rate_per_frame = sample_rate / fps
+        audio_frame_count = int(math.ceil(sample_count / sample_rate_per_frame))
+        return func((audio_frame_count), dtype=np.bool_)
 
     import cv2
     cap = cv2.VideoCapture(inp.path)
-    totalFrames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) + 1
-    return func((totalFrames), dtype=np.bool_)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) + 1
+    return func((total_frames), dtype=np.bool_)
 
 
-def audio_detection(audioData, sampleRate, silent_threshold, fps, log):
+def audio_detection(audio_samples, sample_rate, silent_threshold, fps, log):
     # type: (np.ndarray, int, float, float, Any) -> np.ndarray
-    log.debug('Analyzing audio volume.')
+    log.conwrite('Analyzing audio volume.')
 
-    def getMaxVolume(s):
+    def get_max_volume(s):
         # type: (np.ndarray) -> float
         maxv = float(np.max(s))
         minv = float(np.min(s))
         return max(maxv, -minv)
 
-    maxAudioVolume = getMaxVolume(audioData)
-    audioSampleCount = audioData.shape[0]
+    max_volume = get_max_volume(audio_samples)
+    sample_count = audio_samples.shape[0]
 
-    samplesPerFrame = sampleRate / fps
-    audioFrameCount = int(math.ceil(audioSampleCount / samplesPerFrame))
-    hasLoudAudio = np.zeros((audioFrameCount), dtype=np.bool_)
+    sample_rate_per_frame = sample_rate / fps
+    audio_frame_count = int(math.ceil(sample_count / sample_rate_per_frame))
+    hasLoudAudio = np.zeros((audio_frame_count), dtype=np.bool_)
 
-    if(maxAudioVolume == 0):
+    if(max_volume == 0):
         log.error('The entire audio is completely silent.')
 
     # Calculate when the audio is loud or silent.
-    for i in range(audioFrameCount):
-        start = int(i * samplesPerFrame)
-        end = min(int((i+1) * samplesPerFrame), audioSampleCount)
-        audiochunks = audioData[start:end]
-        if(getMaxVolume(audiochunks) / maxAudioVolume >= silent_threshold):
+    for i in range(audio_frame_count):
+        start = int(i * sample_rate_per_frame)
+        end = min(int((i+1) * sample_rate_per_frame), sample_count)
+        audiochunks = audio_samples[start:end]
+        if(get_max_volume(audiochunks) / max_volume >= silent_threshold):
             hasLoudAudio[i] = True
 
     return hasLoudAudio
@@ -55,18 +57,17 @@ def motion_detection(inp, threshold, log, width, dilates, blur):
     # https://pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
 
     import cv2
-    from auto_editor.utils.progressbar import ProgressBar
 
-    log.debug('Analyzing video motion.')
+    log.conwrite('Analyzing video motion.')
 
     cap = cv2.VideoCapture(inp.path)
 
-    totalFrames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) + 1
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) + 1
 
-    log.debug('   - Cutting totalFrames: {}'.format(totalFrames))
+    log.debug('   - Cutting total_frames: {}'.format(total_frames))
     prevFrame = None
     gray = None
-    hasMotion = np.zeros((totalFrames), dtype=np.bool_)
+    has_motion = np.zeros((total_frames), dtype=np.bool_)
     total = None
 
     def resize(image, width=None, height=None, inter=cv2.INTER_AREA):
@@ -83,7 +84,7 @@ def motion_detection(inp, threshold, log, width, dilates, blur):
 
         return cv2.resize(image, dim, interpolation=inter)
 
-    progress = ProgressBar(totalFrames, 'Detecting motion')
+    progress = ProgressBar(total_frames, 'Detecting motion')
 
     while cap.isOpened():
         if(gray is None):
@@ -115,7 +116,7 @@ def motion_detection(inp, threshold, log, width, dilates, blur):
                 total = thresh.shape[0] * thresh.shape[1]
 
             if(np.count_nonzero(thresh) / total >= threshold):
-                hasMotion[cframe] = True
+                has_motion[cframe] = True
 
         progress.tick(cframe)
 
@@ -124,4 +125,4 @@ def motion_detection(inp, threshold, log, width, dilates, blur):
 
     log.conwrite('')
 
-    return hasMotion
+    return has_motion

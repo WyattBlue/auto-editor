@@ -11,6 +11,7 @@ import auto_editor
 import auto_editor.vanparse as vanparse
 import auto_editor.utils.func as usefulfunctions
 
+from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.func import fnone, append_filename, set_output_name
 from auto_editor.utils.log import Log, Timer
 from auto_editor.ffwrapper import FFmpeg
@@ -289,8 +290,8 @@ def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_
         fps, args, log)
 
 
-def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_file,
-    TEMP, log):
+def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_editor,
+    data_file, TEMP, log):
     chunks = None
     if(inp.ext == '.json'):
         from auto_editor.formats.make_json import read_json_cutlist
@@ -464,8 +465,8 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
     if(args.export_to_final_cut_pro or args.export_to_resolve):
         from auto_editor.formats.final_cut_pro import fcp_xml
 
-        totalFrames = chunks[len(chunks) - 1][1]
-        fcp_xml(inp, TEMP, output_path, clips, tracks, totalFrames, audio_file, fps, log)
+        total_frames = chunks[len(chunks) - 1][1]
+        fcp_xml(inp, TEMP, output_path, clips, tracks, total_frames, audio_file, fps, log)
         return num_cuts, output_path
 
     if(args.export_to_shotcut):
@@ -480,8 +481,7 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
             TEMP, log)
 
         temp_file = os.path.join(TEMP, 'convert.wav')
-        make_new_audio(the_file, temp_file, chunks, speeds, log, fps,
-            args.machine_readable_progress, args.no_progress)
+        make_new_audio(the_file, temp_file, chunks, speeds, log, fps, progress)
         convert_audio(ffmpeg, temp_file, inp, output_path, args.audio_codec, log)
 
     if(audio_file):
@@ -504,11 +504,11 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
             cut_subtitles(ffmpeg, inp, chunks, speeds, fps, TEMP, log)
 
         continue_video = handle_audio_tracks(ffmpeg, output_path, args, tracks, chunks,
-            speeds, fps, TEMP, log)
+            speeds, fps, progress, TEMP, log)
         if(continue_video):
             from auto_editor.render.av import render_av
             spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
-                TEMP, log)
+                progress, TEMP, log)
 
             if(log.is_debug):
                 log.debug('Writing the output file.')
@@ -536,13 +536,13 @@ def edit_media(i, inp, ffmpeg, args, speeds, segment, exporting_to_editor, data_
             return [start] + [item] + [end]
 
         i = 1
-        totalFrames = chunks[len(chunks) - 1][1]
+        total_frames = chunks[len(chunks) - 1][1]
         speeds.append(99999) # guarantee we have a cut speed to work with.
         for chunk in chunks:
             if(speeds[chunk[2]] == 99999):
                 continue
 
-            make_video_file(inp, pad_chunk(chunk, totalFrames),
+            make_video_file(inp, pad_chunk(chunk, total_frames),
                 append_filename(output_path, '-{}'.format(i)))
             i += 1
     else:
@@ -712,14 +712,16 @@ def main():
     def main_loop(input_list, ffmpeg, args, speeds, segments, log):
         num_cuts = 0
 
+        progress = ProgressBar(args.machine_readable_progress, args.no_progress)
+
         for i, input_path in enumerate(input_list):
             inp = ffmpeg.file_info(input_path)
 
             if(len(input_list) > 1):
                 log.conwrite('Working on {}'.format(inp.basename))
 
-            cuts, output_path = edit_media(i, inp, ffmpeg, args, speeds, segments[i],
-                exporting_to_editor, making_data_file, TEMP, log)
+            cuts, output_path = edit_media(i, inp, ffmpeg, args, progress, speeds,
+                segments[i], exporting_to_editor, making_data_file, TEMP, log)
             num_cuts += cuts
 
         if(not args.preview and not making_data_file):
