@@ -59,145 +59,8 @@ def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
         cmd.append(sped)
         ffmpeg.run(cmd)
 
-
-class Effect():
-    def _values(self, val, _type):
-        # just to be clear, val can only be None if the default value is None.
-        # Users can't set the argument to None themselves.
-        if(val is None):
-            return None
-
-        if(_type is str):
-            return str(val)
-
-        for key, item in self._vars.items():
-            if(val == key):
-                return item
-
-        if(not isinstance(val, int)
-            and not (val.replace('.', '', 1)).replace('-', '', 1).isdigit()):
-            self.log.error("variable '{}' is not defined.".format(val))
-        return _type(val)
-
-    def set_all(self, effect, my_types):
-        for key, _type in my_types.items():
-            effect[key] = self._values(effect[key], _type)
-
-        self.all.append(effect)
-
-    def set_start_end(self, start, end, num_effects):
-        start = self._values(start, int)
-        end = self._values(end, int)
-
-        for i in range(start, end, 1):
-            if(i in self.sheet):
-                self.sheet[i].append(num_effects)
-            else:
-                self.sheet[i] = [num_effects]
-
-    def __init__(self, args, log, pix_fmt, _vars):
-        self.pix_fmt = pix_fmt
-
-        self.all = []
-        self.sheet = {}
-        self._vars = _vars
-        self.log = log
-
-        self.width = _vars['width']
-        self.height = _vars['height']
-
-        self.background = args.background
-
-        num_effects = 0
-
-        rect_types = {
-            'x1': int, 'y1': int, 'x2': int, 'y2': int, 'fill': str, 'width': int,
-            'outline': str,
-        }
-        circle_types = rect_types
-        zoom_types = {
-            'zoom': float, 'end_zoom': float, 'x': int, 'y': int, 'interpolate': str,
-        }
-
-        for rect in args.rectangle:
-            effect = rect.copy()
-            effect['type'] = 'rectangle'
-
-            start = effect.pop('start', None)
-            end = effect.pop('end', None)
-
-            self.set_start_end(start, end, num_effects)
-            self.set_all(effect, rect_types)
-
-            num_effects += 1
-
-        for circle in args.circle:
-            effect = circle.copy()
-            effect['type'] = 'circle'
-
-            start = effect.pop('start', None)
-            end = effect.pop('end', None)
-
-            self.set_start_end(start, end, num_effects)
-            self.set_all(effect, circle_types)
-
-            num_effects += 1
-
-        for zoom in args.zoom:
-            if(zoom['end_zoom'] == '{zoom}'):
-                zoom['end_zoom'] = zoom['zoom']
-
-            effect = zoom.copy()
-            effect['type'] = 'zoom'
-
-            start = effect.pop('start', None)
-            end = effect.pop('end', None)
-
-            self.set_start_end(start, end, num_effects)
-            self.set_all(effect, zoom_types)
-
-            num_effects += 1
-
-    def apply(self, index, frame, pix_fmt):
-        from PIL import Image, ImageDraw, ImageFont
-
-        img = frame.to_image()
-
-        for item in self.sheet[index]:
-            pars = self.all[item]
-
-            if(pars['type'] == 'rectangle'):
-                draw = ImageDraw.Draw(img)
-                draw.rectangle([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
-                    fill=pars['fill'], width=pars['width'], outline=pars['outline'])
-
-            if(pars['type'] == 'circle'):
-                draw = ImageDraw.Draw(img)
-                draw.ellipse([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
-                    fill=pars['fill'], width=pars['width'], outline=pars['outline'])
-
-            if(pars['type'] == 'zoom'):
-                x = pars['x']
-                y = pars['y']
-                zoom2 = pars['zoom'] * 2
-
-                x1 = round(x - self.width / zoom2)
-                y1 = round(y - self.height / zoom2)
-                x2 = round(x + self.width / zoom2)
-                y2 = round(y + self.height / zoom2)
-
-                bg = Image.new(img.mode, (x2 - x1, y2 - y1), self.background)
-                bg.paste(img, (-x1, -y1))
-
-                img = bg.resize((self.width, self.height), Image.LANCZOS)
-
-        frame = frame.from_image(img).reformat(format=self.pix_fmt)
-        return frame
-
-def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, temp, log):
-
+def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects, temp, log):
     total_frames = chunks[len(chunks) - 1][1]
-
     progress.start(total_frames, 'Creating new video')
 
     input_ = av.open(inp.path)
@@ -247,15 +110,15 @@ Convert your video to a supported pix_fmt. The following command might work for 
     width = inputVideoStream.width
     height = inputVideoStream.height
 
-    _vars = {
-        'width': width,
-        'height': height,
-        'start': 0,
-        'end': total_frames - 1,
-        'centerX': width // 2,
-        'centerY': height // 2,
-    }
-    effects = Effect(args, log, pix_fmt=pix_fmt, _vars=_vars)
+    effects.add_var('fps', fps)
+    effects.add_var('width', width)
+    effects.add_var('height', height)
+    effects.add_var('start', 0)
+    effects.add_var('end', total_frames - 1)
+    effects.add_var('centerX', width // 2)
+    effects.add_var('centerY', height // 2)
+
+    effects.resolve(args)
 
     cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
         '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),

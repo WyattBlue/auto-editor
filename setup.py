@@ -36,18 +36,15 @@ setup(
      'silence-detect silence-removal silence-speedup motion-detection',
     packages=find_packages(),
     include_package_data=True,
-    # Latest that supports Python 3.6 or greater.
     install_requires=[
         'numpy>=1.19.5',
         'audiotsm2~=0.2.1',
         'youtube-dl>=2021.6.6',
         'pillow>=5.3.0',
         'av>=8.0.3',
+        'opencv-python>=4.3',
     ],
-    extras_require={
-      'motion-detection': 'opencv-python>=4.3',
-    },
-    python_requires='>=3.5', # Unofficial version supported.
+    python_requires='>=3.6',
     classifiers=[
         'Topic :: Multimedia :: Sound/Audio',
         'Topic :: Multimedia :: Video',
