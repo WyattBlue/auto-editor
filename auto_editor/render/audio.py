@@ -92,5 +92,3 @@ def make_new_audio(input_path, output_path, chunks, speeds, log, fps, progress):
     log.debug('Expected video length: {}'.format(y_pointer / (samplerate / fps)))
     new_audio = new_audio[:y_pointer]
     write(output_path, samplerate, new_audio)
-
-    log.conwrite('')

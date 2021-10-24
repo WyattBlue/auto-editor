@@ -72,13 +72,15 @@ class ProgressBar():
         self.total = total
         self.begin_time = time()
 
-        self.allow_unicode = True
-        try:
+        if(self.allow_unicode is None):
+            self.allow_unicode = True
+            try:
+                self.tick(0)
+            except UnicodeEncodeError:
+                self.allow_unicode = False
+                self.tick(0)
+        else:
             self.tick(0)
-        except UnicodeEncodeError:
-            newTime = _pretty_time(self.begin_time, self.ampm)
-            print('   0% done ETA {}'.format(newTime))
-            self.allow_unicode = False
 
     @staticmethod
     def end():
@@ -87,6 +89,7 @@ class ProgressBar():
     def __init__(self, machine_readable=False, hide=False):
         self.machine = machine_readable
         self.hide = hide
+        self.allow_unicode = None
 
         self.ampm = True
         if(system() == 'Darwin' and not self.machine):

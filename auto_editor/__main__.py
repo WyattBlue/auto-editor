@@ -12,12 +12,10 @@ import auto_editor.vanparse as vanparse
 import auto_editor.utils.func as usefulfunctions
 
 from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.utils.effects import Effect
 from auto_editor.utils.func import fnone, append_filename, set_output_name
 from auto_editor.utils.log import Log, Timer
 from auto_editor.ffwrapper import FFmpeg
-
-# TODO: make start,end accept boolean expressions
-# TODO: convert all names to snake_case.
 
 def main_options(parser):
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
@@ -111,13 +109,13 @@ def main_options(parser):
     parser.add_argument('--rectangle', nargs='*', type=dict, group='effectOps',
         keywords=[
             {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
-            {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': None}, {'outline': 'blue'}
+            {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': 0}, {'outline': 'blue'}
         ],
         help='overlay a rectangle shape on the video.')
     parser.add_argument('--circle', nargs='*', type=dict, group='effectOps',
         keywords=[
             {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
-            {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': None}, {'outline': 'blue'}
+            {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': 0}, {'outline': 'blue'}
         ],
         help='overlay a circle shape on the video.',
         extra='\n\nThe x and y coordinates specify a bounding box where the circle is '\
@@ -422,6 +420,12 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
             from auto_editor.scipy.wavfile import read
             sample_rate, audio_samples = read(temp_file)
 
+    effects = Effect(args, log, _vars={
+        'silent_threshold': args.silent_threshold
+        })
+    effects.audio_samples = audio_samples
+    effects.sample_rate = sample_rate
+
     log.debug('Frame Rate: {}'.format(fps))
     if(chunks is None):
         chunks = get_chunks(inp, speeds, segment, fps, args, log, audio_samples,
@@ -508,7 +512,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         if(continue_video):
             from auto_editor.render.av import render_av
             spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
-                progress, TEMP, log)
+                progress, effects, TEMP, log)
 
             if(log.is_debug):
                 log.debug('Writing the output file.')
