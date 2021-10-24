@@ -393,9 +393,11 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
                 os.path.join(TEMP, '{}.wav'.format(t))])
         cmd.extend(['-map', '0:v:0'])
         if(args.has_vfr == 'unset'):
+            log.conwrite('Extracting audio / detecting VFR')
             cmd.extend(['-vf', 'vfrdet', '-f', 'null', '-'])
             has_vfr = has_VFR(cmd, log)
         else:
+            log.conwrite('Extracting audio')
             ffmpeg.run(cmd)
             has_vfr = args.has_vfr == 'yes'
         del cmd
