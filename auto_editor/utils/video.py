@@ -82,6 +82,9 @@ def mux_rename_video(ffmpeg, spedup, write_file, args, inp, temp, log):
     if(not fnone(args.audio_codec)):
         cmd.extend(['-c:a', args.audio_codec])
 
+    if(not fnone(args.audio_bitrate)):
+        cmd.extend(['-b:a', args.audio_bitrate])
+
     cmd.append(write_file)
     ffmpeg.run(cmd)
     log.conwrite('')

@@ -331,8 +331,6 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         temp_file = os.path.join(TEMP, 'fastAud.wav')
 
         cmd = ['-i', inp.path]
-        if(not fnone(args.audio_bitrate)):
-            cmd.extend(['-b:a', args.audio_bitrate])
         cmd.extend(['-ac', '2', '-ar', sample_rate, '-vn', temp_file])
         ffmpeg.run(cmd)
 
@@ -386,10 +384,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         # Split audio tracks into: 0.wav, 1.wav, etc.
         cmd = ['-i', inp.path, '-hide_banner']
         for t in range(tracks):
-            cmd.extend(['-map', '0:a:{}'.format(t)])
-            if(not fnone(args.audio_bitrate)):
-                cmd.extend(['-ab', args.audio_bitrate])
-            cmd.extend(['-ac', '2', '-ar', sample_rate,
+            cmd.extend(['-map', '0:a:{}'.format(t), '-ac', '2', '-ar', sample_rate,
                 os.path.join(TEMP, '{}.wav'.format(t))])
         cmd.extend(['-map', '0:v:0'])
         if(args.has_vfr == 'unset'):
