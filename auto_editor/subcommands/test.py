@@ -128,25 +128,33 @@ def checkForError(cmd, match=None):
     else:
         raise Exception('Program should not respond with a code 0.')
 
-def fullInspect(fileName, *args):
+def fullInspect(path, *args):
     for item in args:
         func = item[0]
         expectedOutput = item[1]
-        if(func(fileName) != expectedOutput):
+        if(func(path) != expectedOutput):
             # Cheating on float numbers to allow 30 to equal 29.99944409236961
             if(isinstance(expectedOutput, float)):
                 from math import ceil
-                if(ceil(func(fileName) * 100) == expectedOutput * 100):
+                if(ceil(func(path) * 100) == expectedOutput * 100):
                     continue
-            raise Exception('Inspection Failed. Was {}, Expected {}.'.format(
-                expectedOutput, func(fileName)))
+            if(expectedOutput.endswith('k')):
+                a = int(func(path)[:-1])
+                b = int(expectedOutput[:-1])
+
+                # Allow bitrate to have slight differences.
+                if(abs(a - b) < 2):
+                    continue
+
+            raise Exception(
+                f'Inspection Failed. Was {func(path)}, Expected {expectedOutput}.')
 
 
 class Tester():
     def __init__(self, args):
         self.passed_tests = 0
         self.failed_tests = 0
-        self.allowable_fails = 1
+        self.allowable_fails = 0
         self.args = args
 
     def run_test(self, name, func, description='', cleanup=None):
