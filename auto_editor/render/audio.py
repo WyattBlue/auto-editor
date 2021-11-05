@@ -4,10 +4,11 @@ from auto_editor.utils.func import get_new_length, fnone
 from auto_editor.scipy.wavfile import read, write
 
 def convert_audio(ffmpeg, input_path, inp, output_path, codec, log):
-    if(fnone(codec)):
-        codec = inp.audio_streams[0]['codec']
-
-    ffmpeg.run(['-i', input_path, '-acodec', codec, output_path])
+    cmd = ['-i', input_path]
+    if(not fnone(codec)):
+        cmd.extend(['-acodec', codec])
+    cmd.append(output_path)
+    ffmpeg.run(cmd)
 
 def handle_audio(ffmpeg, input_path, bitrate, samplerate, temp, log):
     # type: (...) -> str
