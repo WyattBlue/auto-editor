@@ -5,6 +5,7 @@ from shutil import rmtree, get_terminal_size
 from time import time, sleep
 
 class Timer():
+    __slots__ = ['start_time', 'quiet']
     def __init__(self, quiet=False):
         self.start_time = time()
         self.quiet = quiet
