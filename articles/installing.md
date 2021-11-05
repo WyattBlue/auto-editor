@@ -1,6 +1,6 @@
 # Installing Auto-Editor
 
-Download and Install [Python 3](https://www.python.org/downloads/).
+Download and Install [Python 3.9](https://www.python.org/downloads/release/python-397/). The best version for auto-editor.
 
 > If you are installing on Windows, make sure "Add Python 3.9 to PATH" is checked.
 
@@ -101,7 +101,6 @@ The lead developer's own fork of audiotsm. Used for making new audio files at a 
 Public domain module used to download videos off of websites. When installed, always auto-editor to support URL inputs. i.e
 
 
-
 ----
 
 ## Pitfalls to Avoid
@@ -118,10 +117,12 @@ It means you are incorrectly running pip in the Python interpreter. Run `quit()`
 
 
 If running auto-editor causes an error message to appear like this:
+
 ```
   File "auto_editor/__main__.py", line 56
     def add_argument(*names, nargs=1, type=str, default=None,
                                  ^
 SyntaxError: invalid syntax
 ```
-It's because you're using a version of Python that's too old. Auto-Editor will on work on Python versions 3.6 or greater. Anything else will cause an invalid syntax error messages to pop up.
+
+It's because you're using a version of Python that's too old. Auto-Editor will on work on Python versions 3.6 or greater. Older versions may cause an invalid syntax error message to pop up.
