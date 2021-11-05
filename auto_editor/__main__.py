@@ -516,7 +516,9 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
             else:
                 log.conwrite('Writing the output file.')
 
-            mux_rename_video(ffmpeg, spedup, output_path, args, inp, TEMP, log)
+            mux_rename_video(ffmpeg, spedup, output_path, args, inp, TEMP)
+            log.conwrite('')
+
             if(output_path is not None and not os.path.isfile(output_path)):
                 log.bug('The file {} was not created.'.format(output_path))
 

@@ -36,15 +36,9 @@ def handle_audio_tracks(ffmpeg, write_file, args, a_tracks, chunks, speeds, fps,
         return False
     return True
 
-def mux_rename_video(ffmpeg, spedup, write_file, args, inp, temp, log):
-
+def mux_rename_video(ffmpeg, spedup, write_file, args, inp, temp):
     s_tracks = len(inp.subtitle_streams)
     a_tracks = len(inp.audio_streams)
-
-    if(a_tracks == 0 and s_tracks == 0):
-        move(spedup, write_file)
-        log.conwrite('')
-        return
 
     cmd = ['-i', spedup]
     if(a_tracks > 0):
@@ -87,4 +81,3 @@ def mux_rename_video(ffmpeg, spedup, write_file, args, inp, temp, log):
 
     cmd.append(write_file)
     ffmpeg.run(cmd)
-    log.conwrite('')
