@@ -1,8 +1,5 @@
 '''render/av.py'''
 
-# External Libraries
-import av
-
 # Internal Libraries
 import os.path
 import subprocess
@@ -60,6 +57,11 @@ def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
         ffmpeg.run(cmd)
 
 def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects, temp, log):
+    try:
+        import av
+    except ImportError:
+        log.error("av python module not installed. Run 'pip install av'")
+
     total_frames = chunks[len(chunks) - 1][1]
     progress.start(total_frames, 'Creating new video')
 
