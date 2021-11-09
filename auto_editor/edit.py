@@ -3,8 +3,9 @@
 # Internal Libraries
 import os
 
+import auto_editor
 from auto_editor.utils.effects import Effect
-from auto_editor.utils.func import fnone
+from auto_editor.utils.func import fnone, set_output_name, append_filename
 
 def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_rate=None):
     from auto_editor.cutting import (combine_audio_motion, combine_segment,
@@ -294,8 +295,8 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
 
             # convert audio
             cmd = ['-i', inp.path]
-            if(not fnone(codec)):
-                cmd.extend(['-acodec', codec])
+            if(not fnone(args.audio_codec)):
+                cmd.extend(['-acodec', args.audio_codec])
             cmd.append(output_path)
             ffmpeg.run(cmd)
         else:
@@ -346,12 +347,10 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
 
     total_frames = chunks[len(chunks) - 1][1]
 
-    if(99999 not in speeds):
-        speeds.append(99999)
-
     if(args.export_as_clip_sequence):
+        speeds.append(99999)
         for i, chunk in enumerate(chunks):
-            if(speeds[item[2]] == 99999):
+            if(speeds[chunk[2]] == 99999):
                 continue
             make_media(inp, pad_chunk(chunk, total_frames), append_filename(output_path, '-{}'.format(i)))
     else:
