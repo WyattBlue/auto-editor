@@ -4,6 +4,7 @@
 import os
 
 from auto_editor.utils.effects import Effect
+from auto_editor.utils.func import fnone
 
 def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_rate=None):
     from auto_editor.cutting import (combine_audio_motion, combine_segment,
