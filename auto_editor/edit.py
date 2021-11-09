@@ -281,7 +281,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
                 log.error("'{}' Container doesn't allow audio.".format(output_container))
 
             the_file = os.path.join(temp, 'faAudio.wav')
-            cmd = ['-i', input_path]
+            cmd = ['-i', inp.path]
             if(not fnone(args.audio_bitrate)):
                 cmd.extend(['-b:a', args.audio_bitrate])
             cmd.extend(['-ac', '2', '-ar', str(sample_rate), '-vn', the_file])
@@ -292,7 +292,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
             make_new_audio(the_file, temp_file, chunks, speeds, log, fps, progress)
 
             # convert audio
-            cmd = ['-i', input_path]
+            cmd = ['-i', inp.path]
             if(not fnone(codec)):
                 cmd.extend(['-acodec', codec])
             cmd.append(output_path)
