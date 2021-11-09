@@ -1,30 +1,7 @@
 '''render/audio.py'''
 
-from auto_editor.utils.func import get_new_length, fnone
+from auto_editor.utils.func import get_new_length
 from auto_editor.scipy.wavfile import read, write
-
-def convert_audio(ffmpeg, input_path, inp, output_path, codec, log):
-    cmd = ['-i', input_path]
-    if(not fnone(codec)):
-        cmd.extend(['-acodec', codec])
-    cmd.append(output_path)
-    ffmpeg.run(cmd)
-
-def handle_audio(ffmpeg, input_path, bitrate, samplerate, temp, log):
-    # type: (...) -> str
-    import os.path
-    temp_file = os.path.join(temp, 'faAudio.wav')
-
-    log.checkType(samplerate, 'samplerate', str)
-    cmd = ['-i', input_path]
-    if(not fnone(bitrate)):
-        cmd.extend(['-b:a', bitrate])
-    cmd.extend(['-ac', '2', '-ar', samplerate, '-vn', temp_file])
-
-    ffmpeg.run(cmd)
-    log.conwrite('')
-
-    return temp_file
 
 def make_new_audio(input_path, output_path, chunks, speeds, log, fps, progress):
     import numpy as np

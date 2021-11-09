@@ -2,43 +2,13 @@
 
 # Internal Libraries
 import os.path
-from shutil import move
 
 # Included Libraries
 from .func import fnone
-from auto_editor.render.audio import make_new_audio
 
-def handle_audio_tracks(ffmpeg, write_file, args, a_tracks, chunks, speeds, fps, progress,
-    temp, log):
-    for t in range(a_tracks):
-        temp_file = os.path.join(temp, '{}.wav'.format(t))
-        new_file = os.path.join(temp, 'new{}.wav'.format(t))
-        make_new_audio(temp_file, new_file, chunks, speeds, log, fps, progress)
-
-        if(not os.path.isfile(new_file)):
-            log.bug('Audio file not created.')
-
-    if(args.export_as_audio):
-        if(args.keep_tracks_seperate):
-            log.warning("Audio files don't have multiple a_tracks.")
-
-        if(a_tracks == 1):
-            move(os.path.join(temp, '0.wav'), write_file)
-            return False
-
-        cmd = []
-        for t in range(a_tracks):
-            cmd.extend(['-i', os.path.join(temp, '{}.wav'.format(t))])
-        cmd.extend(['-filter_complex', 'amix=inputs={}:duration=longest'.format(a_tracks),
-            write_file])
-        ffmpeg.run(cmd)
-
-        return False
-    return True
-
-def mux_rename_video(ffmpeg, spedup, write_file, args, inp, temp):
-    s_tracks = len(inp.subtitle_streams)
-    a_tracks = len(inp.audio_streams)
+def mux_rename_video(ffmpeg, spedup, rules, write_file, container, args, inp, temp):
+    s_tracks = 0 if not rules['allow_subtitle'] else len(inp.subtitle_streams)
+    a_tracks = 0 if not rules['allow_audio'] else len(inp.audio_streams)
 
     cmd = ['-i', spedup]
     if(a_tracks > 0):
@@ -64,20 +34,26 @@ def mux_rename_video(ffmpeg, spedup, write_file, args, inp, temp):
             new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
             cmd.extend(['-i', new_path])
 
-    total_streams = 1 + s_tracks + (a_tracks if args.keep_tracks_seperate else 1)
+    total_streams = 1 + s_tracks + (a_tracks if args.keep_tracks_seperate else min(a_tracks, 1))
+
     for i in range(total_streams):
         cmd.extend(['-map', '{}:0'.format(i)])
 
-    cmd.extend(['-c:v', 'copy'])
+    if(rules['vcodecs'] is None):
+        cmd.extend(['-c:v', 'copy'])
+    else:
+        cmd.extend(['-c:v', rules['vcodecs'][0]])
+
     if(s_tracks > 0):
         codec = inp.subtitle_streams[0]['codec']
         cmd.extend(['-c:s', codec])
 
-    if(not fnone(args.audio_codec)):
-        cmd.extend(['-c:a', args.audio_codec])
+    if(a_tracks > 0):
+        if(not fnone(args.audio_codec)):
+            cmd.extend(['-c:a', args.audio_codec])
 
-    if(not fnone(args.audio_bitrate)):
-        cmd.extend(['-b:a', args.audio_bitrate])
+        if(not fnone(args.audio_bitrate)):
+            cmd.extend(['-b:a', args.audio_bitrate])
 
     cmd.append(write_file)
     ffmpeg.run(cmd)
