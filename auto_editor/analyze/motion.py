@@ -76,7 +76,7 @@ def motion_detection(inp, threshold, log, width, dilates, blur):
     prev_frame = None
     gray = None
     has_motion = np.zeros((total_frames), dtype=np.bool_)
-    total = None
+    total_pixels = None
 
     progress = ProgressBar(total_frames, 'Detecting motion')
 
@@ -106,10 +106,10 @@ def motion_detection(inp, threshold, log, width, dilates, blur):
             if(dilates > 0):
                 thresh = cv2.dilate(thresh, None, iterations=dilates)
 
-            if(total is None):
-                total = thresh.shape[0] * thresh.shape[1]
+            if(total_pixels is None):
+                total_pixels = thresh.shape[0] * thresh.shape[1]
 
-            if(np.count_nonzero(thresh) / total >= threshold):
+            if(np.count_nonzero(thresh) / total_pixels >= threshold):
                 has_motion[cframe] = True
 
         progress.tick(cframe)
