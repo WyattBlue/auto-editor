@@ -17,7 +17,9 @@ def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_
 
     def get_has_loud(inp, args, fps, audio_samples, sample_rate, log):
         import numpy as np
-        from auto_editor.analyze import get_np_list, audio_detection, motion_detection
+
+        from auto_editor.analyze.generic import get_np_list
+
         if(args.edit_based_on == 'none'):
             return get_np_list(inp, audio_samples, sample_rate, fps, np.ones)
         if(args.edit_based_on == 'all'):
@@ -26,6 +28,8 @@ def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_
         audio_list, motion_list = None, None
 
         if('audio' in args.edit_based_on):
+            from auto_editor.analyze.audio import audio_detection
+
             if(audio_samples is None):
                 audio_list = get_np_list(inp, audio_samples, sample_rate, fps, np.ones)
             else:
@@ -33,6 +37,8 @@ def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_
                     args.silent_threshold, fps, log)
 
         if('motion' in args.edit_based_on):
+            from auto_editor.analyze.motion import motion_detection
+
             if(len(inp.video_streams) == 0):
                 motion_list = get_np_list(inp, audio_samples, sample_rate, fps, np.ones)
             else:

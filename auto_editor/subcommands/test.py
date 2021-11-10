@@ -254,9 +254,9 @@ def main(sys_args=None):
     tester.run_test('info_tests', info_tests)
 
     def level_tests():
-        run_program(['levels', 'example.mp4'])
+        run_program(['levels', 'resources/multi-track.mov'])
         run_program(['levels', 'resources/newCommentary.mp3'])
-    tester.run_test('level_tests', level_tests, cleanup=lambda: os.remove('data.txt'))
+    tester.run_test('level_tests', level_tests)
 
     def example_tests():
         run_program(['example.mp4'])

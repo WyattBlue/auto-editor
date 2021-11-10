@@ -3,7 +3,7 @@
 import numpy as np
 
 # Included Libraries
-from auto_editor.analyze import audio_detection
+from auto_editor.analyze.audio import audio_detection
 from auto_editor.cutting import merge, apply_basic_spacing
 
 from .interpolate import interpolate
@@ -51,7 +51,6 @@ class Effect():
         if(self.audio_samples is None or self.sample_rate is None):
             self.log.error('No audio data found.')
 
-        from auto_editor.analyze import audio_detection
         new_list = audio_detection(self.audio_samples, self.sample_rate,
             self._values(exp[1], float), self.fps, self.log)
 
