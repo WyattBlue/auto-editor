@@ -41,6 +41,46 @@ def main(sys_args=sys.argv[1:]):
             return ''
         return ' ({}:{})'.format(w, h)
 
+    def display_subtitle(inp, singular):
+        text = ''
+        if(singular):
+            text += ' - codec: {}\n'.format(inp.subtitle_streams[0]['codec'])
+            text += ' - lang: {}\n'.format(inp.subtitle_streams[0]['lang'])
+            return text
+
+        sub_tracks = len(inp.subtitle_streams)
+        text += ' - subtitle tracks: {}\n'.format(sub_tracks)
+        for track in range(sub_tracks):
+            text += '   - Track #{}\n'.format(track)
+            text += '     - codec: {}\n'.format(inp.subtitle_streams[track]['codec'])
+            text += '     - lang: {}\n'.format(inp.subtitle_streams[track]['lang'])
+
+        return text
+
+    def display_audio(inp, singular):
+        text = ''
+        if(singular):
+            text += ' - duration: {}\n'.format(inp.duration)
+            text += ' - codec: {}\n'.format(inp.audio_streams[0]['codec'])
+            text += ' - samplerate: {}\n'.format(inp.audio_streams[0]['samplerate'])
+            text += ' - bitrate: {}\n'.format(inp.audio_streams[0]['bitrate'])
+            lang = inp.audio_streams[0]['lang']
+            if(lang is not None):
+                text += ' - lang: {}\n'.format(lang)
+            return text
+
+        audio_tracks = len(inp.audio_streams)
+        text += ' - audio tracks: {}\n'.format(audio_tracks)
+        for track in range(audio_tracks):
+            text += '   - Track #{}\n'.format(track)
+            text += '     - codec: {}\n'.format(inp.audio_streams[track]['codec'])
+            text += '     - samplerate: {}\n'.format(
+                inp.audio_streams[track]['samplerate'])
+            text += '     - bitrate: {}\n'.format(inp.audio_streams[track]['bitrate'])
+            text += '     - lang: {}\n'.format(inp.audio_streams[track]['lang'])
+
+        return text
+
     for file in args.input:
         text = ''
         if(os.path.exists(file)):
@@ -49,6 +89,8 @@ def main(sys_args=sys.argv[1:]):
             log.error('Could not find file: {}'.format(file))
 
         inp = ffmpeg.file_info(file)
+        sub_tracks = len(inp.subtitle_streams)
+        aud_tracks = len(inp.audio_streams)
 
         if(len(inp.video_streams) > 0):
             text += ' - fps: {}\n'.format(inp.fps)
@@ -63,24 +105,10 @@ def main(sys_args=sys.argv[1:]):
             text += ' - video codec: {}\n'.format(inp.video_streams[0]['codec'])
             text += ' - video bitrate: {}\n'.format(inp.video_streams[0]['bitrate'])
 
-            audio_tracks = len(inp.audio_streams)
-            text += ' - audio tracks: {}\n'.format(audio_tracks)
+            text += display_audio(inp, singular=False)
 
-            for track in range(audio_tracks):
-                text += '   - Track #{}\n'.format(track)
-                text += '     - codec: {}\n'.format(inp.audio_streams[track]['codec'])
-                text += '     - samplerate: {}\n'.format(
-                    inp.audio_streams[track]['samplerate'])
-                text += '     - bitrate: {}\n'.format(inp.audio_streams[track]['bitrate'])
-                text += '     - lang: {}\n'.format(inp.audio_streams[track]['lang'])
-
-            sub_tracks = len(inp.subtitle_streams)
             if(sub_tracks > 0):
-                text += ' - subtitle tracks: {}\n'.format(sub_tracks)
-                for track in range(sub_tracks):
-                    text += '   - Track #{}\n'.format(track)
-                    text += '     - codec: {}\n'.format(inp.subtitle_streams[track]['codec'])
-                    text += '     - lang: {}\n'.format(inp.subtitle_streams[track]['lang'])
+                text += display_subtitle(inp, singular=False)
 
             if(args.include_vfr):
                 print(text, end='')
@@ -94,11 +122,10 @@ def main(sys_args=sys.argv[1:]):
 
                 text += ' - {}\n'.format(fps_mode)
 
-        elif(len(inp.audio_streams) > 0):
-            text += ' - duration: {}\n'.format(inp.duration)
-            text += ' - codec: {}\n'.format(inp.audio_streams[0]['codec'])
-            text += ' - samplerate: {}\n'.format(inp.audio_streams[0]['samplerate'])
-            text += ' - bitrate: {}\n'.format(inp.audio_streams[0]['bitrate'])
+        elif(aud_tracks > 0):
+            text += display_audio(inp, singular=aud_tracks == 1)
+        elif(sub_tracks > 0):
+            text += display_subtitle(inp, singular=sub_tracks == 1)
         else:
             text += 'Invalid media.\n'
         print(text)
