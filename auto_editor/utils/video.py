@@ -6,13 +6,22 @@ import os.path
 # Included Libraries
 from .func import fnone
 
-def mux_rename_video(ffmpeg, spedup, rules, write_file, container, args, inp, temp):
+def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, temp, log):
     s_tracks = 0 if not rules['allow_subtitle'] else len(inp.subtitle_streams)
     a_tracks = 0 if not rules['allow_audio'] else len(inp.audio_streams)
+    v_tracks = 0 if not rules['allow_video'] else len(inp.video_streams)
 
-    cmd = ['-i', spedup]
+    cmd = []
+    if(spedup is not None):
+        cmd.extend(['-i', spedup])
+
     if(a_tracks > 0):
-        if(args.keep_tracks_seperate):
+        if(args.keep_tracks_seperate and rules['max_audio_streams'] == 1):
+            log.warning(
+                "'{}' container doesn't support multiple audio tracks.".format(container)
+            )
+
+        if(args.keep_tracks_seperate and rules['max_audio_streams'] is None):
             for t in range(a_tracks):
                 cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
         else:
@@ -34,15 +43,16 @@ def mux_rename_video(ffmpeg, spedup, rules, write_file, container, args, inp, te
             new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
             cmd.extend(['-i', new_path])
 
-    total_streams = 1 + s_tracks + (a_tracks if args.keep_tracks_seperate else min(a_tracks, 1))
+    total_streams = v_tracks + s_tracks + (a_tracks if args.keep_tracks_seperate else min(a_tracks, 1))
 
     for i in range(total_streams):
         cmd.extend(['-map', '{}:0'.format(i)])
 
-    if(rules['vcodecs'] is None):
-        cmd.extend(['-c:v', 'copy'])
-    else:
-        cmd.extend(['-c:v', rules['vcodecs'][0]])
+    if(v_tracks > 0):
+        if(rules['vcodecs'] is None):
+            cmd.extend(['-c:v', 'copy'])
+        else:
+            cmd.extend(['-c:v', rules['vcodecs'][0]])
 
     if(s_tracks > 0):
         codec = inp.subtitle_streams[0]['codec']
@@ -51,9 +61,14 @@ def mux_rename_video(ffmpeg, spedup, rules, write_file, container, args, inp, te
     if(a_tracks > 0):
         if(not fnone(args.audio_codec)):
             cmd.extend(['-c:a', args.audio_codec])
-
         if(not fnone(args.audio_bitrate)):
             cmd.extend(['-b:a', args.audio_bitrate])
 
-    cmd.append(write_file)
+        if(fnone(args.sample_rate)):
+            if(rules['samplerate'] is not None):
+                cmd.extend(['-ar', str(rules['samplerate'][0])])
+        else:
+            cmd.extend(['-ar', str(args.sample_rate)])
+
+    cmd.extend(['-strict', '-2', write_file]) # Allow experimental codecs.
     ffmpeg.run(cmd)

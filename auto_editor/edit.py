@@ -69,6 +69,8 @@ def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_
 
 def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_editor,
     data_file, temp, log):
+    from auto_editor.utils.container import containers
+
     chunks = None
     if(inp.ext == '.json'):
         from auto_editor.formats.make_json import read_json_cutlist
@@ -84,20 +86,22 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
 
     log.debug('{} -> {}'.format(inp.path, output_path))
 
+    output_container = os.path.splitext(output_path)[1].replace('.', '')
+    rules = containers['default']
+    if(output_container in containers):
+        rules.update(containers[output_container])
+    else:
+        rules.update(containers['not_in_here'])
+
+    # Check if export options make sense.
+    if(not fnone(args.sample_rate)):
+        if(rules['samplerate'] is not None and args.sample_rate not in rules['samplerate']):
+            log.error("'{}' container only supports samplerates: {}".format(output_container,
+                rules['samplerate']))
+
     if(os.path.isfile(output_path) and inp.path != output_path):
         log.debug('Removing already existing file: {}'.format(output_path))
         os.remove(output_path)
-
-    def user_sample_rate(args_sample, inp):
-        # type: (int | str | None, Any) -> str | None
-        if(args_sample is None):
-            if(len(inp.audio_streams) > 0):
-                return inp.audio_streams[0]['samplerate']
-            return None
-        return str(args_sample)
-
-    sample_rate = user_sample_rate(args.sample_rate, inp)
-    log.debug('Samplerate: {}'.format(sample_rate))
 
     audio_samples = None
     tracks = len(inp.audio_streams)
@@ -124,75 +128,67 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
             cmd.extend([os.path.join(temp, '{}s.{}'.format(s, sub['ext']))])
         ffmpeg.run(cmd)
 
-    if(audio_file):
-        temp_file = os.path.join(temp, 'fastAud.wav')
+    sample_rate = None
 
-        cmd = ['-i', inp.path]
-        cmd.extend(['-ac', '2', '-ar', sample_rate, '-vn', temp_file])
+    if(args.cut_by_this_track >= tracks and 'cut_by_this_track' in args._set):
+        message = "You choose a track that doesn't exist.\nThere "
+        if(tracks == 1):
+            message += 'is only {} track.\n'.format(tracks)
+        else:
+            message += 'are only {} tracks.\n'.format(tracks)
+        for t in range(tracks):
+            message += ' Track {}\n'.format(t)
+        log.error(message)
+
+    def number_of_VFR_frames(text, log):
+        import re
+        search = re.search(r'VFR:[\d.]+ \(\d+\/\d+\)', text, re.M)
+        if(search is None):
+            log.warning('Could not get number of VFR Frames.')
+            return 0
+        else:
+            nums = re.search(r'\d+\/\d+', search.group()).group(0)
+            log.debug('VFR Frames: {}'.format(nums))
+            return int(nums.split('/')[0])
+
+    def has_VFR(cmd, log):
+        return number_of_VFR_frames(ffmpeg.pipe(cmd), log) != 0
+
+    # Split audio tracks into: 0.wav, 1.wav, etc.
+    cmd = ['-i', inp.path, '-hide_banner']
+    for t in range(tracks):
+        cmd.extend(['-map', '0:a:{}'.format(t), '-ac', '2',
+            os.path.join(temp, '{}.wav'.format(t))])
+    cmd.extend(['-map', '0:v:0'])
+    if(args.has_vfr == 'unset' and len(inp.video_streams) > 0):
+        log.conwrite('Extracting audio / detecting VFR')
+        cmd.extend(['-vf', 'vfrdet', '-f', 'null', '-'])
+        has_vfr = has_VFR(cmd, log)
+    else:
+        log.conwrite('Extracting audio')
         ffmpeg.run(cmd)
+        has_vfr = args.has_vfr == 'yes'
+    del cmd
+
+    if(len(inp.video_streams) > 0 and tracks == 0):
+        # Doesn't matter because we don't need to align to an audio track.
+        has_vfr = False
+
+    log.debug('Has VFR: {}'.format(has_vfr))
+
+    if(tracks != 0):
+        if(args.cut_by_all_tracks):
+            temp_file = os.path.join(temp, 'combined.wav')
+            cmd = ['-i', inp.path, '-filter_complex',
+                '[0:a]amix=inputs={}:duration=longest'.format(tracks), '-ac', '2',
+                '-f', 'wav', temp_file]
+            ffmpeg.run(cmd)
+            del cmd
+        else:
+            temp_file = os.path.join(temp, '{}.wav'.format(args.cut_by_this_track))
 
         from auto_editor.scipy.wavfile import read
         sample_rate, audio_samples = read(temp_file)
-    else:
-        if(args.cut_by_this_track >= tracks and 'cut_by_this_track' in args._set):
-            message = "You choose a track that doesn't exist.\nThere "
-            if(tracks == 1):
-                message += 'is only {} track.\n'.format(tracks)
-            else:
-                message += 'are only {} tracks.\n'.format(tracks)
-            for t in range(tracks):
-                message += ' Track {}\n'.format(t)
-            log.error(message)
-
-        def number_of_VFR_frames(text, log):
-            import re
-            search = re.search(r'VFR:[\d.]+ \(\d+\/\d+\)', text, re.M)
-            if(search is None):
-                log.warning('Could not get number of VFR Frames.')
-                return 0
-            else:
-                nums = re.search(r'\d+\/\d+', search.group()).group(0)
-                log.debug('VFR Frames: {}'.format(nums))
-                return int(nums.split('/')[0])
-
-        def has_VFR(cmd, log):
-            return number_of_VFR_frames(ffmpeg.pipe(cmd), log) != 0
-
-        # Split audio tracks into: 0.wav, 1.wav, etc.
-        cmd = ['-i', inp.path, '-hide_banner']
-        for t in range(tracks):
-            cmd.extend(['-map', '0:a:{}'.format(t), '-ac', '2', '-ar', sample_rate,
-                os.path.join(temp, '{}.wav'.format(t))])
-        cmd.extend(['-map', '0:v:0'])
-        if(args.has_vfr == 'unset' and len(inp.video_streams) > 0):
-            log.conwrite('Extracting audio / detecting VFR')
-            cmd.extend(['-vf', 'vfrdet', '-f', 'null', '-'])
-            has_vfr = has_VFR(cmd, log)
-        else:
-            log.conwrite('Extracting audio')
-            ffmpeg.run(cmd)
-            has_vfr = args.has_vfr == 'yes'
-        del cmd
-
-        if(len(inp.video_streams) > 0 and tracks == 0):
-            # Doesn't matter because we don't need to align to an audio track.
-            has_vfr = False
-
-        log.debug('Has VFR: {}'.format(has_vfr))
-
-        if(tracks != 0):
-            if(args.cut_by_all_tracks):
-                temp_file = os.path.join(temp, 'combined.wav')
-                cmd = ['-i', inp.path, '-filter_complex',
-                    '[0:a]amix=inputs={}:duration=longest'.format(tracks), '-ar',
-                    sample_rate, '-ac', '2', '-f', 'wav', temp_file]
-                ffmpeg.run(cmd)
-                del cmd
-            else:
-                temp_file = os.path.join(temp, '{}.wav'.format(args.cut_by_this_track))
-
-            from auto_editor.scipy.wavfile import read
-            sample_rate, audio_samples = read(temp_file)
 
     effects = Effect(args, log, _vars={
         'silent_threshold': args.silent_threshold
@@ -269,86 +265,39 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
 
 
     def make_media(inp, chunks, output_path):
-        from auto_editor.utils.container import containers
+        from auto_editor.utils.video import mux_quality_media
 
-        output_container = os.path.splitext(output_path)[1].replace('.', '')
+        spedup = None
 
-        rules = containers['default']
-
-        if(output_container in containers):
-            rules.update(containers[output_container])
-        else:
-            rules.update(containers['not_in_here'])
-
-        export_audio = args.export_as_audio or rules['allow_audio']
-
-        if(audio_file):
-            from auto_editor.render.audio import make_new_audio
-
-            if(not rules['allow_audio']):
-                log.error("'{}' Container doesn't allow audio.".format(output_container))
-
-            the_file = os.path.join(temp, 'faAudio.wav')
-            cmd = ['-i', inp.path]
-            if(not fnone(args.audio_bitrate)):
-                cmd.extend(['-b:a', args.audio_bitrate])
-            cmd.extend(['-ac', '2', '-ar', str(sample_rate), '-vn', the_file])
-            ffmpeg.run(cmd)
-            log.conwrite('')
-
-            temp_file = os.path.join(temp, 'convert.wav')
-            make_new_audio(the_file, temp_file, chunks, speeds, log, fps, progress)
-
-            # convert audio
-            cmd = ['-i', inp.path]
-            if(not fnone(args.audio_codec)):
-                cmd.extend(['-acodec', args.audio_codec])
-            cmd.append(output_path)
-            ffmpeg.run(cmd)
-        else:
-            from auto_editor.utils.video import mux_rename_video
-            from auto_editor.render.audio import make_new_audio
+        if(rules['allow_subtitle']):
             from auto_editor.render.subtitle import cut_subtitles
-
             cut_subtitles(ffmpeg, inp, chunks, speeds, fps, temp, log)
 
-            if(export_audio):
-                for t in range(tracks):
-                    temp_file = os.path.join(temp, '{}.wav'.format(t))
-                    new_file = os.path.join(temp, 'new{}.wav'.format(t))
-                    make_new_audio(temp_file, new_file, chunks, speeds, log, fps, progress)
+        if(rules['allow_audio']):
+            from auto_editor.render.audio import make_new_audio
 
-                    if(not os.path.isfile(new_file)):
-                        log.bug('Audio file not created.')
+            for t in range(tracks):
+                temp_file = os.path.join(temp, '{}.wav'.format(t))
+                new_file = os.path.join(temp, 'new{}.wav'.format(t))
+                make_new_audio(temp_file, new_file, chunks, speeds, log, fps, progress)
 
-                if(args.keep_tracks_seperate and output_container == 'wav'):
-                    log.warning("Wav files don't support multiple audio tracks.")
+                if(not os.path.isfile(new_file)):
+                    log.bug('Audio file not created.')
 
-                if(tracks == 1 and output_container == 'wav'):
-                    from shutil import move
-                    move(os.path.join(temp, '0.wav'), output_path)
-                else:
-                    cmd = []
-                    for t in range(tracks):
-                        cmd.extend(['-i', os.path.join(temp, '{}.wav'.format(t))])
-                    cmd.extend(['-filter_complex', 'amix=inputs={}:duration=longest'.format(tracks),
-                        output_path])
-                    ffmpeg.run(cmd)
+        if(rules['allow_video'] and len(inp.video_streams) > 0):
+            from auto_editor.render.av import render_av
+            spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress,
+                effects, temp, log)
 
-            if(rules['allow_video']):
-                from auto_editor.render.av import render_av
-                spedup = render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr,
-                    progress, effects, temp, log)
+            if(log.is_debug):
+                log.debug('Writing the output file.')
+            else:
+                log.conwrite('Writing the output file.')
 
-                if(log.is_debug):
-                    log.debug('Writing the output file.')
-                else:
-                    log.conwrite('Writing the output file.')
-
-                mux_rename_video(ffmpeg, spedup, rules, output_path, output_container,
-                    args, inp, temp)
-                if(output_path is not None and not os.path.isfile(output_path)):
-                    log.bug('The file {} was not created.'.format(output_path))
+        mux_quality_media(ffmpeg, spedup, rules, output_path, output_container, args,
+            inp, temp, log)
+        if(output_path is not None and not os.path.isfile(output_path)):
+            log.bug('The file {} was not created.'.format(output_path))
 
 
     total_frames = chunks[len(chunks) - 1][1]
