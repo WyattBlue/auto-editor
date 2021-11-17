@@ -2,23 +2,24 @@
 
 import sys
 from shutil import rmtree, get_terminal_size
-from time import time, sleep
+from time import perf_counter, sleep
 
 class Timer():
     __slots__ = ['start_time', 'quiet']
     def __init__(self, quiet=False):
-        self.start_time = time()
+        self.start_time = perf_counter()
         self.quiet = quiet
 
     def stop(self):
         from datetime import timedelta
 
-        second_len = round(time() - self.start_time, 2)
+        second_len = round(perf_counter() - self.start_time, 2)
         minute_len = timedelta(seconds=round(second_len))
         if(not self.quiet):
             print('Finished. took {} seconds ({})'.format(second_len, minute_len))
 
 class Log():
+    __slots__ = ['is_debug', 'quiet', 'temp']
     def __init__(self, show_debug=False, quiet=False, temp=None):
         self.is_debug = show_debug
         self.quiet = quiet
