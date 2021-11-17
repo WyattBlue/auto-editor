@@ -16,35 +16,9 @@ def pix_fmt_allowed(pix_fmt):
 
     return pix_fmt in allowed_formats
 
-def fset(cmd, option, value):
-    if(fnone(value)):
-        return cmd
-    return cmd + [option] + [value]
-
-def properties(cmd, args, inp):
-    if(args.video_codec == 'uncompressed'):
-        cmd.extend(['-vcodec', 'mpeg4', '-qscale:v', '1'])
-    elif(inp.ext == '.gif'):
-        cmd.extend(['-vcodec', 'gif'])
-    elif(args.video_codec == 'copy'):
-        new_codec = inp.video_streams[0]['codec']
-        if(new_codec != 'dvvideo'): # This codec seems strange.
-            cmd.extend(['-vcodec', new_codec])
-    else:
-        cmd = fset(cmd, '-vcodec', args.video_codec)
-
-    cmd = fset(cmd, '-crf', args.constant_rate_factor)
-    cmd = fset(cmd, '-b:v', args.video_bitrate)
-    cmd = fset(cmd, '-tune', args.tune)
-    cmd = fset(cmd, '-preset', args.preset)
-
-    cmd.extend(['-movflags', '+faststart', '-strict', '-2'])
-    return cmd
 
 def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
-    cmd = ['-i', scale]
-    cmd = properties(cmd, args, inp)
-    cmd.append(spedup)
+    cmd = ['-i', scale, spedup]
     check_errors = ffmpeg.pipe(cmd)
 
     if('Error' in check_errors or 'failed' in check_errors):
@@ -53,7 +27,7 @@ def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
             cmd.extend(['-allow_sw', '1'])
 
         cmd = properties(cmd, args, inp)
-        cmd.append(sped)
+        cmd.append(spedup)
         ffmpeg.run(cmd)
 
 def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects, temp, log):
@@ -122,20 +96,16 @@ Convert your video to a supported pix_fmt. The following command might work for 
 
     effects.resolve(args)
 
-    cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo',
+    spedup = os.path.join(temp, 'spedup.mp4')
+
+    cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-c:v', 'rawvideo',
         '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
-        '-i', '-', '-pix_fmt', pix_fmt]
-
-    correct_ext = '.mp4' if inp.ext == '.gif' else inp.ext
-
-    spedup = os.path.join(temp, 'spedup{}'.format(correct_ext))
-    scale = os.path.join(temp, 'scale{}'.format(correct_ext))
+        '-i', '-', '-pix_fmt', pix_fmt, '-c:v', 'mpeg4', '-qscale:v', '1']
 
     if(args.scale != 1):
-        cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale), scale])
-    else:
-        cmd = properties(cmd, args, inp)
-        cmd.append(spedup)
+        cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale)])
+
+    cmd.append(spedup)
 
     process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
         stderr=None if args.show_ffmpeg_debug else subprocess.DEVNULL)
@@ -172,9 +142,6 @@ Convert your video to a supported pix_fmt. The following command might work for 
         log.print(cmd)
         process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE)
         log.error('Broken Pipe Error!')
-
-    if(args.scale != 1):
-        scale_to_sped(ffmpeg, spedup, scale, inp, args, temp)
 
     return spedup
 
