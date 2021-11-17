@@ -6,6 +6,12 @@ import os.path
 # Included Libraries
 from .func import fnone
 
+def fset(cmd, option, value):
+    if(fnone(value)):
+        return cmd
+    return cmd + [option] + [value]
+
+
 def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, temp, log):
     s_tracks = 0 if not rules['allow_subtitle'] else len(inp.subtitle_streams)
     a_tracks = 0 if not rules['allow_audio'] else len(inp.audio_streams)
@@ -49,20 +55,35 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, t
         cmd.extend(['-map', '{}:0'.format(i)])
 
     if(v_tracks > 0):
-        if(rules['vcodecs'] is None):
-            cmd.extend(['-c:v', 'copy'])
+        cmd = fset(cmd, '-crf', args.constant_rate_factor)
+        cmd = fset(cmd, '-b:v', args.video_bitrate)
+        cmd = fset(cmd, '-tune', args.tune)
+        cmd = fset(cmd, '-preset', args.preset)
+
+        cmd.extend(['-movflags', '+faststart'])
+
+        if(fnone(args.video_codec)):
+            if(rules['vcodecs'] is None):
+                cmd.extend(['-c:v', 'copy'])
+            else:
+                cmd.extend(['-c:v', rules['vcodecs'][0]])
         else:
-            cmd.extend(['-c:v', rules['vcodecs'][0]])
+            vcodec = args.video_codec
+            if(vcodec == 'copy'):
+                vcodec = inp.video_streams[0].codec
+            if(vcodec == 'uncompressed'):
+                vcodec = 'copy'
+
+            # Rules checking is in edit.py
+            cmd.extend(['-c:v', vcodec])
 
     if(s_tracks > 0):
         codec = inp.subtitle_streams[0]['codec']
         cmd.extend(['-c:s', codec])
 
     if(a_tracks > 0):
-        if(not fnone(args.audio_codec)):
-            cmd.extend(['-c:a', args.audio_codec])
-        if(not fnone(args.audio_bitrate)):
-            cmd.extend(['-b:a', args.audio_bitrate])
+        cmd = fset(cmd, '-c:a', args.audio_codec)
+        cmd = fset(cmd, '-b:a', args.audio_bitrate)
 
         if(fnone(args.sample_rate)):
             if(rules['samplerate'] is not None):
