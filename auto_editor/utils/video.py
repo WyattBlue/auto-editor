@@ -60,8 +60,6 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, t
         cmd = fset(cmd, '-tune', args.tune)
         cmd = fset(cmd, '-preset', args.preset)
 
-        cmd.extend(['-movflags', '+faststart'])
-
         if(fnone(args.video_codec)):
             if(rules['vcodecs'] is None):
                 cmd.extend(['-c:v', 'copy'])
@@ -76,6 +74,8 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, t
 
             # Rules checking is in edit.py
             cmd.extend(['-c:v', vcodec])
+
+        cmd.extend(['-movflags', 'faststart'])
 
     if(s_tracks > 0):
         codec = inp.subtitle_streams[0]['codec']
