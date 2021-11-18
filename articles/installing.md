@@ -80,7 +80,6 @@ pip3 install auto-editor --no-deps
 ```
 pip3 install numpy
 pip3 install av
-pip3 install audiotsm2
 pip3 install youtube-dl
 ```
 
@@ -92,13 +91,9 @@ Foundational math module needed for handling large data. Must be installed for a
 
 Retrieve video data in a form Python can natively use. Allows for very fast rendering of videos.
 
-### Audiotsm2
-
-The lead developer's own fork of audiotsm. Used for making new audio files at a different speed. Recommended to be installed by all users but not required if `--video_speed` or `--silent_speed` are never used.
-
 ### Youtube-dl
 
-Public domain module used to download videos off of websites. When installed, always auto-editor to support URL inputs. i.e
+Public domain module used to download videos off of websites. When installed, always auto-editor to support URL inputs.
 
 
 ----
