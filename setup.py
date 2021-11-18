@@ -38,7 +38,6 @@ setup(
     include_package_data=True,
     install_requires=[
         'numpy>=1.19.5',
-        'audiotsm2~=0.2.1',
         'youtube-dl>=2021.6.6',
         'pillow>=5.3.0',
         'av>=8.0.3',
