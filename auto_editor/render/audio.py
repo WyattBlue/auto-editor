@@ -3,16 +3,11 @@
 from auto_editor.utils.func import get_new_length
 from auto_editor.scipy.wavfile import read, write
 
+from auto_editor.audiotsm2 import phasevocoder
+from auto_editor.audiotsm2.io.array import ArrReader, ArrWriter
+
 def make_new_audio(input_path, output_path, chunks, speeds, log, fps, progress):
     import numpy as np
-
-    def custom_speeds(a):
-        # type: (list[int | float]) -> bool
-        return len([x for x in a if x != 1 and x != 99999]) > 0
-
-    if(custom_speeds(speeds)):
-        from audiotsm2 import phasevocoder
-        from audiotsm2.io.array import ArrReader, ArrWriter
 
     if(len(chunks) == 1 and chunks[0][2] == 0):
         log.error('Trying to create an empty file.')
