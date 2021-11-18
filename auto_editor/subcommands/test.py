@@ -450,7 +450,6 @@ def main(sys_args=None):
     def codec_tests():
         run_program(['example.mp4', '--video_codec', 'h264', '--preset', 'faster'])
         run_program(['example.mp4', '--audio_codec', 'ac3'])
-        run_program(['resources/newCommentary.mp3', 'exportMediaOps', '-acodec', 'pcm_s16le'])
     tester.run_test('codec_tests', codec_tests)
 
     def combine_tests():

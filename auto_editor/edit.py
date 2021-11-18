@@ -94,10 +94,32 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         rules.update(containers['not_in_here'])
 
     # Check if export options make sense.
+
+    codec_error = "'{}' codec is not supported in '{}' container."
+
     if(not fnone(args.sample_rate)):
         if(rules['samplerate'] is not None and args.sample_rate not in rules['samplerate']):
             log.error("'{}' container only supports samplerates: {}".format(output_container,
                 rules['samplerate']))
+
+    if(not fnone(args.video_codec) and args.video_codec != 'uncompressed'):
+        if(rules['vstrict'] and args.video_codec not in rules['vcodecs']):
+            log.error(codec_error.format(args.video_codec, output_container))
+
+        if(args.video_codec in rules['disallow_v']):
+            log.error(codec_error.format(args.video_codec, output_container))
+
+    if(not fnone(args.audio_codec)):
+        if(rules['astrict'] and args.audio_codec not in rules['acodecs']):
+            log.error(codec_error.format(args.audio_codec, output_container))
+
+        if(args.audio_codec in rules['disallow_a']):
+            log.error(codec_error.format(args.audio_codec, output_container))
+
+    if(args.keep_tracks_seperate and rules['max_audio_streams'] == 1):
+        log.warning(
+            "'{}' container doesn't support multiple audio tracks.".format(container)
+        )
 
     if(os.path.isfile(output_path) and inp.path != output_path):
         log.debug('Removing already existing file: {}'.format(output_path))
