@@ -22,11 +22,6 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, t
         cmd.extend(['-i', spedup])
 
     if(a_tracks > 0):
-        if(args.keep_tracks_seperate and rules['max_audio_streams'] == 1):
-            log.warning(
-                "'{}' container doesn't support multiple audio tracks.".format(container)
-            )
-
         if(args.keep_tracks_seperate and rules['max_audio_streams'] is None):
             for t in range(a_tracks):
                 cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
@@ -60,7 +55,7 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, t
         cmd = fset(cmd, '-tune', args.tune)
         cmd = fset(cmd, '-preset', args.preset)
 
-        if(fnone(args.video_codec)):
+        if(fnone(args.video_codec) or args.video_codec == 'uncompressed'):
             if(rules['vcodecs'] is None):
                 cmd.extend(['-c:v', 'copy'])
             else:
@@ -78,8 +73,13 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, t
         cmd.extend(['-movflags', 'faststart'])
 
     if(s_tracks > 0):
-        codec = inp.subtitle_streams[0]['codec']
-        cmd.extend(['-c:s', codec])
+        scodec = inp.subtitle_streams[0]['codec']
+        if(inp.ext == '.' + container):
+            cmd.extend(['-c:s', scodec])
+        elif(rules['scodecs'] is not None):
+            if(scodec not in rules['scodecs']):
+                scodec = rules['scodecs'][0]
+            cmd.extend(['-c:s', scodec])
 
     if(a_tracks > 0):
         cmd = fset(cmd, '-c:a', args.audio_codec)

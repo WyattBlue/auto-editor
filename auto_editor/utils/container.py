@@ -1,6 +1,6 @@
 '''utils/container.py'''
 
-wav_formats = [
+pcm_formats = [
     'pcm_s16le', # default format
 
     'pcm_alaw',
@@ -23,52 +23,92 @@ wav_formats = [
     'pcm_u32le',
     'pcm_u8',
     'pcm_vidc',
-
-    'mp3',
 ]
 
+# Define aliases
+h265 = {
+    'name': 'H.265 / High Efficiency Video Coding (HEVC) / MPEG-H Part 2',
+    'allow_video': True,
+    'vcodecs': ['hevc', 'mpeg4', 'h264'],
+}
+h264 = {
+    'name': 'H.264 / Advanced Video Coding (AVC) / MPEG-4 Part 10',
+    'allow_video': True,
+    'vcodecs': ['h264', 'mpeg4', 'hevc'],
+}
+aac = {
+    'name': 'Advanced Audio Coding',
+    'allow_audio': True,
+    'max_audio_streams': 1,
+    'acodecs': ['aac'],
+    'astrict': True,
+}
+ass = {
+    'name': 'SubStation Alpha',
+    'allow_subtitle': True,
+    'scodecs': ['ass', 'ssa'],
+    'max_subtitle_streams': 1,
+    'sstrict': True,
+}
+mp4 = {
+    'name': 'MP4 / MPEG-4 Part 14',
+    'allow_video': True,
+    'allow_audio': True,
+    'allow_subtitle': True,
+    'vcodecs': ['mpeg4', 'h264', 'hevc'],
+    'acodecs': ['aac', 'mp3', 'opus'],
+    'disallow_v': ['prores', 'apng', 'gif'],
+}
+
 containers = {
+
+    # Aliases section
+
+    'aac': aac,
+    'adts': aac,
+    'ass': ass,
+    'ssa': ass,
+    '264': h264,
+    'h264': h264,
+    '265': h265,
+    'h265': h265,
+    'hevc': h265,
+
+    'mp4': mp4,
+    'm4a': mp4,
+
     'apng': {
         'name': 'Animated Portable Network Graphics',
         'allow_video': True,
         'max_video_streams': 1,
         'vcodecs': ['apng'],
-        'strict': True,
+        'vstrict': True,
     },
     'gif': {
         'name': 'Graphics Interchange Format',
         'allow_video': True,
         'max_video_streams': 1,
         'vcodecs': ['gif'],
-        'strict': True,
-    },
-    'aac': {
-        'name': 'Advanced Audio Coding',
-        'allow_audio': True,
-        'max_audio_streams': 1,
-        'acodecs': ['aac'],
-        'strict': True,
-    },
-    'adts': {
-        'name': 'Advanced Audio Coding',
-        'allow_audio': True,
-        'max_audio_streams': 1,
-        'acodecs': ['aac'],
-        'strict': True,
+        'vstrict': True,
     },
     'wav': {
         'name': 'Waveform Audio File Format',
         'allow_audio': True,
         'max_audio_streams': 1,
-        'acodecs': wav_formats,
-        'strict': True,
+        'acodecs': pcm_formats + ['mp3'],
+        'astrict': True,
+    },
+    'ast': {
+        'name': 'AST / Audio Stream',
+        'allow_audio': True,
+        'acodecs': ['pcm_s16be_planar'],
     },
     'mp3': {
         'name': 'MP3 / MPEG-2 Audio Layer 3',
         'allow_audio': True,
         'max_audio_streams': 1,
         'acodecs': ['mp3'],
-        'strict': True,
+        'astrict': True,
     },
     'opus': {
         'name': 'Opus',
@@ -104,34 +144,24 @@ containers = {
         'allow_subtitle': True,
         'vcodecs': ['vp9', 'vp8', 'av1', 'libaom-av1'],
         'acodecs': ['opus', 'vorbis'],
+        'scodecs': ['webvtt'],
+        'vstrict': True,
+        'astrict': True,
+        'sstrict': True,
     },
     'srt': {
         'name': 'SubRip Text / Subtitle Resource Tracks',
         'allow_subtitle': True,
         'scodecs': ['srt'],
         'max_subtitle_streams': 1,
-        'strict': True,
+        'sstrict': True,
     },
     'vtt': {
         'name': 'Web Video Text Track',
         'allow_subtitle': True,
         'scodecs': ['webvtt'],
         'max_subtitle_streams': 1,
-        'strict': True,
-    },
-    'ass': {
-        'name': 'SubStation Alpha',
-        'allow_subtitle': True,
-        'scodecs': ['ass', 'ssa'],
-        'max_subtitle_streams': 1,
-        'strict': True,
-    },
-    'ssa': {
-        'name': 'SubStation Alpha',
-        'allow_subtitle': True,
-        'scodecs': ['ass', 'ssa'],
-        'max_subtitle_streams': 1,
-        'strict': True,
+        'sstrict': True,
     },
     'avi': {
         'name': 'Audio Video Interleave',
@@ -145,28 +175,30 @@ containers = {
         'allow_video': True,
         'allow_audio': True,
         'vcodecs': ['msmpeg4v3'],
-        'acodecs': ['wmav2'],
+        'acodecs': ['wmav2', 'flac'],
+        'disallow_v': ['prores'],
     },
-    'h264': {
-        'name': 'H.264 / Advanced Video Coding (AVC) / MPEG-4 Part 10',
-        'allow_video': True,
-        'vcodecs': ['h264', 'mpeg4', 'hevc'],
-    },
-    'h265': {
-        'name': 'H.265 / High Efficiency Video Coding (HEVC) / MPEG-H Part 2',
-        'allow_video': True,
-        'vcodecs': ['hevc', 'mpeg4', 'h264'],
-    },
-    'hevc': {
-        'name': 'H.265 / High Efficiency Video Coding (HEVC) / MPEG-H Part 2',
-        'allow_video': True,
-        'vcodecs': ['hevc', 'mpeg4', 'h264'],
-    },
-    'mp4': {
-        'name': 'MP4 / MPEG-4 Part 14',
+    'mkv': {
+        'name': 'Matroska',
         'allow_video': True,
         'allow_audio': True,
         'allow_subtitle': True,
+        'vcodecs': ['h264', 'prores'],
+        'acodecs': ['vorbis', 'opus', 'flac', 'aac'],
+    },
+    'mka': {
+        'name': 'Matroska Audio',
+        'allow_audio': True,
+        'acodecs': ['vorbis', 'opus', 'flac', 'aac'],
+    },
+    'mov': {
+        'name': 'QuickTime / MOV',
+        'allow_video': True,
+        'allow_audio': True,
+        'allow_subtitle': True,
+        'vcodecs': ['h264', 'prores', 'hevc'],
+        'acodecs': ['aac', 'mp3', 'vorbis'],
+        'disallow_a': ['opus', 'flac'],
     },
     'swf': {
         'name': 'ShockWave Flash / Small Web Format',
@@ -192,7 +224,11 @@ containers = {
         'vcodecs': None,
         'acodecs': None,
         'scodecs': None,
-        'strict': False, # There may be more valid codecs than ones listed.
+        'vstrict': False,
+        'astrict': False,
+        'sstrict': False,
+        'disallow_v': [],
+        'disallow_a': [],
         'samplerate': None, # Any samplerate is allowed.
     },
 }
