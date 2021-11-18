@@ -12,7 +12,7 @@ invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
       '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
       '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
       '.db', '.ini', '.BIN', '.svg', '.in', '.pyc', '.log', '.xsd', '.ffpreset',
-      '.kys', '.essentialsound']
+      '.kys', '.essentialsound', '.np']
 
 class MyLogger(object):
     @staticmethod

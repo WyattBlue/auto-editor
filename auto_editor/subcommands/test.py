@@ -10,6 +10,7 @@ import sys
 import shutil
 import platform
 import subprocess
+from time import perf_counter
 
 # Included Libraries
 from auto_editor.utils.func import clean_list
@@ -150,36 +151,71 @@ def fullInspect(path, *args):
                 f'Inspection Failed. Was {func(path)}, Expected {expectedOutput}.')
 
 
+def make_np_list(in_file, compare_file, the_speed):
+    import numpy as np
+    from auto_editor.scipy.wavfile import read, write
+    from auto_editor.audiotsm2 import phasevocoder
+    from auto_editor.audiotsm2.io.array import ArrReader, ArrWriter
+
+    samplerate, sped_chunk = read(in_file)
+    spedup_audio = np.zeros((0, 2), dtype=np.int16)
+    channels = 2
+
+    with ArrReader(sped_chunk, channels, samplerate, 2) as reader:
+        with ArrWriter(spedup_audio, channels, samplerate, 2) as writer:
+            phasevocoder(reader.channels, speed=the_speed).run(
+                reader, writer
+            )
+            spedup_audio = writer.output
+
+
+    loaded = np.load(compare_file)
+
+    if(not np.array_equal(spedup_audio, loaded['a'])):
+        if(spedup_audio.shape == loaded['a'].shape):
+            print(f'Both shapes ({spedup_audio.shape}) are same')
+        else:
+            print(spedup_audio.shape)
+            print(loaded['a'].shape)
+
+        result = np.subtract(spedup_audio, loaded['a'])
+
+        print(np.count_nonzero(result) / spedup_audio.shape[0], 'difference between arrays')
+
+        raise Exception("file {} doesn't match array.".format(compare_file))
+
+    # np.savez_compressed(out_file, a=spedup_audio)
+
+
 class Tester():
     def __init__(self, args):
         self.passed_tests = 0
         self.failed_tests = 0
-        self.allowable_fails = 0
         self.args = args
 
-    def run_test(self, name, func, description='', cleanup=None):
+    def run_test(self, name, func, description='', cleanup=None, allow_fail=False):
         if(self.args.only != [] and name not in self.args.only):
             return
+        start = perf_counter()
         try:
             func()
+            end = perf_counter() - start
         except Exception as e:
             self.failed_tests += 1
             print("Test '{}' failed.".format(name))
             print(e)
-            clean_all()
-            if(self.failed_tests > self.allowable_fails):
+            if(not allow_fail):
+                clean_all()
                 sys.exit(1)
         else:
             self.passed_tests += 1
-            print('{} Passed.'.format(name))
+            print('{} Passed. {} secs.'.format(name, round(end, 2)))
             if(cleanup is not None):
                 cleanup()
 
     def end(self):
         print('{}/{}'.format(self.passed_tests, self.passed_tests + self.failed_tests))
         clean_all()
-        if(self.failed_tests > self.allowable_fails):
-            sys.exit(1)
         sys.exit(0)
 
 def main(sys_args=None):
@@ -244,6 +280,22 @@ def main(sys_args=None):
 
 
     tester.run_test('subtitle_tests', subtitle_tests)
+
+    def tsm_1a5_test():
+        make_np_list('resources/example_cut_s16le.wav',
+            'resources/example_1.5_speed.npz', 1.5)
+
+    def tsm_0a5_test():
+        make_np_list('resources/example_cut_s16le.wav',
+            'resources/example_0.5_speed.npz', 0.5)
+
+    def tsm_2a0_test():
+        make_np_list('resources/example_cut_s16le.wav',
+            'resources/example_2.0_speed.npz', 2)
+
+    tester.run_test('tsm_1a5_test', tsm_1a5_test)
+    tester.run_test('tsm_0a5_test', tsm_0a5_test, allow_fail=True)
+    tester.run_test('tsm_2a0_test', tsm_2a0_test)
 
     def info_tests():
         run_program(['info', 'example.mp4'])
@@ -434,7 +486,8 @@ def main(sys_args=None):
 
     def export_tests():
         for item in os.listdir('resources'):
-            if('man_on_green_screen' in item or item.startswith('.') or '_ALTERED' in item):
+            if('man_on_green_screen' in item or item.startswith('.') or '_ALTERED' in item
+                or item.endswith('.npz')):
                 continue
             item = 'resources/{}'.format(item)
             run_program([item])
