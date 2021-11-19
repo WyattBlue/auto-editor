@@ -140,25 +140,18 @@ class PhaseVocoderConverter(Converter):
         self._analysis_hop = analysis_hop
 
 
-class PhaseLocking(object):
-    """Enumeration of phase locking strategies."""
-
-    # No phase locking.
+class PhaseLocking():
     NONE = 0
-
-    # Identity phase locking.
     IDENTITY = 1
 
     @classmethod
     def from_str(cls, name):
-        """Returns a phase locking strategy given its name."""
         if name.lower() == 'none':
             return cls.NONE
         elif name.lower() == 'identity':
             return cls.IDENTITY
         else:
-            raise ValueError(
-                'Invalid phase locking name: "{}"'.format(name))
+            raise ValueError('Invalid phase locking name: "{}"'.format(name))
 
 
 def phasevocoder(channels, speed=1., frame_length=2048, analysis_hop=None,
