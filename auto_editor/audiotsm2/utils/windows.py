@@ -26,9 +26,6 @@ def hanning(length):
 
 
 def product(window1, window2):
-    """
-    Returns the product of two windows.
-    """
     if window1 is None:
         return window2
 
