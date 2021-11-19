@@ -18,10 +18,7 @@ def levels_options(parser):
 
 def main(sys_args=sys.argv[1:]):
     import os
-    import math
     import tempfile
-
-    import numpy as np
 
     import auto_editor
     import auto_editor.vanparse as vanparse
