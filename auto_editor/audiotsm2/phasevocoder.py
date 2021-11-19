@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from auto_editor.audiotsm2.base import AnalysisSynthesisTSM, Converter
+from auto_editor.audiotsm2.base import AnalysisSynthesisTSM
 from auto_editor.audiotsm2.utils.windows import hanning
 
 
@@ -55,7 +55,7 @@ def get_closest_peaks(peaks):
     return closest_peak
 
 
-class PhaseVocoderConverter(Converter):
+class PhaseVocoderConverter():
     """
     A Converter implementing the phase vocoder time-scale modification procedure.
     """

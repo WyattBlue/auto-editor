@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from auto_editor.audiotsm2.base import AnalysisSynthesisTSM, Converter
+from auto_editor.audiotsm2.base import AnalysisSynthesisTSM
 from auto_editor.audiotsm2.utils.windows import hanning
 
-class WSOLAConverter(Converter):
+class WSOLAConverter():
     """
     A Converter implementing the WSOLA (Waveform Similarity-based Overlap-Add)
     time-scale modification procedure.
