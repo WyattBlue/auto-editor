@@ -8,7 +8,7 @@ normalize audio buffers.
 import numpy as np
 
 
-class NormalizeBuffer(object):
+class NormalizeBuffer():
     """
     A NormalizeBuffer is a mono-channel circular buffer, used to
     normalize audio buffers.
@@ -44,7 +44,6 @@ class NormalizeBuffer(object):
 
     @property
     def length(self):
-        """The length of the CBuffer."""
         return self._length
 
     def remove(self, n):
