@@ -165,7 +165,7 @@ class AnalysisSynthesisTSM(TSM):
         return n, False
 
 
-class Converter(object):
+class Converter():
     def clear(self):
         return
 
