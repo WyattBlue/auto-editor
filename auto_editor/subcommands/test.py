@@ -151,7 +151,7 @@ def fullInspect(path, *args):
                 f'Inspection Failed. Was {func(path)}, Expected {expectedOutput}.')
 
 
-def make_np_list(in_file, out_file, the_speed):
+def make_np_list(in_file, compare_file, the_speed):
     import numpy as np
     from auto_editor.scipy.wavfile import read, write
     from auto_editor.audiotsm2 import phasevocoder
@@ -168,15 +168,13 @@ def make_np_list(in_file, out_file, the_speed):
             )
             spedup_audio = writer.output
 
-    np.savetxt(out_file, spedup_audio, fmt='%4.6f', delimiter=' ')
 
+    loaded = np.load(compare_file)
 
-def np_compare(file1, file2):
-    import filecmp
+    if(not np.array_equal(spedup_audio, loaded['a'])):
+        raise Exception("file {} don't match array.".format(compare_file))
 
-    if(not filecmp.cmp(file1, file2, shallow=False)):
-        subprocess.call(['diff', file1, file2])
-        raise Exception("file {} don't match.".format(file2))
+    # np.savez_compressed(out_file, a=spedup_audio)
 
 
 class Tester():
@@ -277,16 +275,16 @@ def main(sys_args=None):
     tester.run_test('subtitle_tests', subtitle_tests)
 
     def tsm_1a5_test():
-        make_np_list('resources/example_cut_s16le.wav', 'out.np', 1.5)
-        np_compare('out.np', 'resources/example_1.5_speed.np')
+        make_np_list('resources/example_cut_s16le.wav',
+            'resources/example_1.5_speed.npz', 1.5)
 
     def tsm_0a5_test():
-        make_np_list('resources/example_cut_s16le.wav', 'out.np', 0.5)
-        np_compare('out.np', 'resources/example_0.5_speed.np')
+        make_np_list('resources/example_cut_s16le.wav',
+            'resources/example_0.5_speed.npz', 0.5)
 
     def tsm_2a0_test():
-        make_np_list('resources/example_cut_s16le.wav', 'out.np', 2)
-        np_compare('out.np', 'resources/example_2.0_speed.np')
+        make_np_list('resources/example_cut_s16le.wav',
+            'resources/example_2.0_speed.npz', 2)
 
     tester.run_test('tsm_1a5_test', tsm_1a5_test)
     tester.run_test('tsm_0a5_test', tsm_0a5_test)
