@@ -173,7 +173,7 @@ def make_np_list(in_file, out_file, the_speed):
 
 def np_compare(file1, file2):
     import filecmp
-    if(not filecmp.cmp(file1, file2)):
+    if(not filecmp.cmp(file1, file2, shallow=False)):
         raise Exception("file {} don't match.".format(file2))
 
 
