@@ -80,7 +80,7 @@ pip3 install auto-editor --no-deps
 ```
 pip3 install numpy
 pip3 install av
-pip3 install youtube-dl
+pip3 install yt-dlp
 ```
 
 ### Numpy
@@ -91,10 +91,9 @@ Foundational math module needed for handling large data. Must be installed for a
 
 Retrieve video data in a form Python can natively use. Allows for very fast rendering of videos.
 
-### Youtube-dl
+### yt-dlp
 
-Public domain module used to download videos off of websites. When installed, always auto-editor to support URL inputs.
-
+Module used to download videos off of websites.
 
 ----
 
@@ -120,4 +119,4 @@ If running auto-editor causes an error message to appear like this:
 SyntaxError: invalid syntax
 ```
 
-It's because you're using a version of Python that's too old. Auto-Editor will on work on Python versions 3.6 or greater. Older versions may cause an invalid syntax error message to pop up.
+It's because you're using a version of Python that's too old. Auto-Editor will on work on Python versions 3.7 or greater. Older versions may cause an invalid syntax error message to pop up.
