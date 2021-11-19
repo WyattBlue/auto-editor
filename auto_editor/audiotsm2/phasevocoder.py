@@ -163,10 +163,6 @@ class PhaseLocking(object):
 
 def phasevocoder(channels, speed=1., frame_length=2048, analysis_hop=None,
     synthesis_hop=None, phase_locking=PhaseLocking.IDENTITY):
-    """
-    Returns audiotsm2.base.tsm.TSM object implementing the phase
-    vocoder time-scale modification procedure.
-    """
 
     if synthesis_hop is None:
         synthesis_hop = frame_length // 4
@@ -178,17 +174,14 @@ def phasevocoder(channels, speed=1., frame_length=2048, analysis_hop=None,
     synthesis_window = hanning(frame_length)
 
     if phase_locking == PhaseLocking.NONE:
-        # No phase locking: all freqyency bins are considered to be peaks
         peak_finder = all_peaks
     elif phase_locking == PhaseLocking.IDENTITY:
         peak_finder = find_peaks
     else:
-        raise ValueError(
-            'Invalid phase_locking value: "{}"'.format(phase_locking))
+        raise ValueError('Invalid phase_locking value: "{}"'.format(phase_locking))
 
     converter = PhaseVocoderConverter(channels, frame_length, analysis_hop,
-                                      synthesis_hop, peak_finder)
+        synthesis_hop, peak_finder)
 
-    return AnalysisSynthesisTSM(
-        converter, channels, frame_length, analysis_hop, synthesis_hop,
-        analysis_window, synthesis_window)
+    return AnalysisSynthesisTSM(converter, channels, frame_length, analysis_hop,
+        synthesis_hop, analysis_window, synthesis_window)
