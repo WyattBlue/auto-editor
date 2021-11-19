@@ -49,9 +49,6 @@ def main_options(parser):
         help='set the strength of the blur applied to a frame before being compared.')
 
     parser.add_argument('urlOps', nargs=0, action='grouping')
-    parser.add_argument('--format', type=str, group='urlOps',
-        default='bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
-        help='the format youtube-dl uses to when downloading a url.')
     parser.add_argument('--output_dir', type=str, group='urlOps',
         default=None,
         help='the directory where the downloaded file is placed.')
