@@ -72,7 +72,7 @@ def download_video(my_input, args, ffmpeg, log):
         res = res.strip()
         my_input= my_input[:my_input.index(' ')]
     else:
-        res = '480'
+        res = '720'
 
     outtmpl = re.sub(r'\W+', '-', my_input)
     if(outtmpl.endswith('-mp4')):
@@ -115,12 +115,16 @@ def download_video(my_input, args, ffmpeg, log):
             if(item is None):
                 del ydl_opts[key]
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            try:
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([my_input])
-            except yt_dlp.utils.DownloadError:
-                log.conwrite('')
-                log.error('yt-dlp: Connection Refused.')
+        except yt_dlp.utils.DownloadError as error:
+            if('format is not available' in str(error)):
+                del ydl_opts['format']
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([my_input])
+            else:
+                log.error('yt-dlp: Download Error.')
 
         log.conwrite('')
     return outtmpl
