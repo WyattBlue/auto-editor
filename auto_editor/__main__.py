@@ -273,8 +273,8 @@ def main():
         print('Python Version: {} {}'.format(platform.python_version(), is64bit))
         print('Platform: {} {}'.format(platform.system(), platform.release()))
         print('Config File path: {}'.format(os.path.join(dirpath, 'config.txt')))
-        print('FFmpeg path: {}'.format(ffmpeg.getPath()))
-        print('FFmpeg version: {}'.format(ffmpeg.version()))
+        print('FFmpeg path: {}'.format(ffmpeg.path))
+        print('FFmpeg version: {}'.format(ffmpeg.version))
         print('Auto-Editor version {}'.format(auto_editor.version))
         sys.exit()
 
@@ -361,7 +361,7 @@ def main():
     if(args.output_file is None):
         args.output_file = []
 
-    from auto_editor.validateInput import valid_input
+    from auto_editor.validate_input import valid_input
     input_list, segments = valid_input(args.input, ffmpeg, args, log)
 
     if(len(args.output_file) < len(input_list)):

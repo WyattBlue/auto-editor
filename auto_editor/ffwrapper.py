@@ -10,30 +10,6 @@ from platform import system
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
-def _set_ff_path(ff_location, my_ffmpeg):
-    # type: (str | None, bool) -> str
-    if(ff_location is not None):
-        return ff_location
-    if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
-        return 'ffmpeg'
-    program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
-    dirpath = os.path.dirname(os.path.realpath(__file__))
-    return os.path.join(dirpath, 'ffmpeg', system(), program)
-
-def _test_path(path):
-    try:
-        get_stdout([path, '-h'])
-    except FileNotFoundError:
-        if(system() == 'Darwin'):
-            Log().error('No ffmpeg found, download via homebrew or restore the '
-                'included binary.')
-        if(system() == 'Windows'):
-            Log().error('No ffmpeg found, download ffmpeg with your favorite package '
-                'manager (ex chocolatey), or restore the included binary.')
-
-        Log().error('ffmpeg must be installed and on PATH.')
-    return path
-
 def regex_match(regex, text):
     match = re.search(regex, text)
     if(match):
@@ -120,17 +96,38 @@ class File:
 
 
 class FFmpeg():
-    def __init__(self, ff_location=None, my_ffmpeg=False, debug=False):
-        _path = _set_ff_path(ff_location, my_ffmpeg)
-        self.path = _test_path(_path)
-        self.FFdebug = debug
 
-    def getPath(self):
-        return self.path
+    @staticmethod
+    def _set_ff_path(ff_location, my_ffmpeg):
+        # type: (str | None, bool) -> str
+        if(ff_location is not None):
+            return ff_location
+        if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
+            return 'ffmpeg'
+        program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
+        dirpath = os.path.dirname(os.path.realpath(__file__))
+        return os.path.join(dirpath, 'ffmpeg', system(), program)
+
+    def __init__(self, ff_location=None, my_ffmpeg=False, debug=False):
+        self.debug = debug
+        self.path = self._set_ff_path(ff_location, my_ffmpeg)
+        try:
+            _version = get_stdout([self.path, '-version']).split('\n')[0]
+            _version = _version.replace('ffmpeg version', '').strip()
+            self.version = _version.split(' ')[0]
+        except FileNotFoundError:
+            if(system() == 'Darwin'):
+                Log().error('No ffmpeg found, download via homebrew or restore the '
+                    'included binary.')
+            if(system() == 'Windows'):
+                Log().error('No ffmpeg found, download ffmpeg with your favorite package '
+                    'manager (ex chocolatey), or restore the included binary.')
+
+            Log().error('ffmpeg must be installed and on PATH.')
 
     def run(self, cmd):
         cmd = [self.path, '-y'] + cmd
-        if(self.FFdebug):
+        if(self.debug):
             cmd.extend(['-hide_banner'])
             print(cmd)
         else:
@@ -148,16 +145,10 @@ class FFmpeg():
         # type: (list[str]) -> str
         cmd = [self.path, '-y'] + cmd
 
-        if(self.FFdebug):
+        if(self.debug):
             print(cmd)
         output = get_stdout(cmd)
-        if(self.FFdebug):
+        if(self.debug):
             print(output)
 
         return output
-
-    def version(self):
-        # type: () -> str
-        _version = self.pipe(['-version']).split('\n')[0]
-        _version = _version.replace('ffmpeg version', '').strip()
-        return _version.split(' ')[0]

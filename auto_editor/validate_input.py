@@ -1,4 +1,4 @@
-'''validateInput.py'''
+'''validate_input.py'''
 
 import os
 import re
@@ -14,7 +14,7 @@ invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
       '.db', '.ini', '.BIN', '.svg', '.in', '.pyc', '.log', '.xsd', '.ffpreset',
       '.kys', '.essentialsound', '.np']
 
-class MyLogger(object):
+class MyLogger():
     @staticmethod
     def debug(msg):
         pass
@@ -92,7 +92,7 @@ def download_video(my_input, args, ffmpeg, log):
         ydl_opts = {
             'nocheckcertificate': not args.check_certificate,
             'outtmpl': outtmpl,
-            'ffmpeg_location': ffmpeg.getPath(),
+            'ffmpeg_location': ffmpeg.path,
             'format': args.format,
             'ratelimit': parse_bytes(args.limit_rate),
             'logger': MyLogger(),
