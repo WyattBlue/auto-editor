@@ -1,12 +1,6 @@
 '''audiotsm2/utils/normalizebuffer.py'''
 
-"""
-normalizebuffer module implements a mono-channel circular buffer used to
-normalize audio buffers.
-"""
-
 import numpy as np
-
 
 class NormalizeBuffer():
     """
@@ -28,8 +22,8 @@ class NormalizeBuffer():
         """
         n = len(window)
         if n > self._length:
-            raise ValueError("the window should be smaller than the "
-                             "NormalizeBuffer")
+            raise ValueError(
+                "the window should be smaller than the NormalizeBuffer")
 
         # Compute the slice of data where the values will be added
         start = self._offset
@@ -47,7 +41,7 @@ class NormalizeBuffer():
         return self._length
 
     def remove(self, n):
-        """Removes the first n values of the :class:`NormalizeBuffer."""
+        """Removes the first n values of the NormalizeBuffer."""
         if n >= self._length:
             n = self._length
         if n == 0:

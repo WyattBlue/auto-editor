@@ -1,2 +1,2 @@
 from .tsm import TSM
-from .analysis_synthesis import AnalysisSynthesisTSM, Converter
+from .analysis_synthesis import AnalysisSynthesisTSM
