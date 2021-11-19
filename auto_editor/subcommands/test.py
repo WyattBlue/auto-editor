@@ -153,7 +153,7 @@ def fullInspect(path, *args):
 
 def make_np_list(in_file, compare_file, the_speed):
     import numpy as np
-    from auto_editor.scipy.wavfile import read, write
+    from auto_editor.scipy.wavfile import read
     from auto_editor.audiotsm2 import phasevocoder
     from auto_editor.audiotsm2.io.array import ArrReader, ArrWriter
 
