@@ -17,7 +17,7 @@ invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
 class MyLogger():
     @staticmethod
     def debug(msg):
-        pass
+        print(msg)
 
     @staticmethod
     def warning(msg):
@@ -64,6 +64,16 @@ def sponsor_block_api(_id, categories, log):
         return None
 
 def download_video(my_input, args, ffmpeg, log):
+    log.conwrite('Downloading video...')
+    if('@' in my_input):
+        res = my_input[my_input.index('@')+1:]
+        if(' ' in res):
+            res = res[:res.index(' ')]
+        res = res.strip()
+        my_input= my_input[:my_input.index(' ')]
+    else:
+        res = '480'
+
     outtmpl = re.sub(r'\W+', '-', my_input)
     if(outtmpl.endswith('-mp4')):
         outtmpl = outtmpl[:-4]
@@ -73,10 +83,10 @@ def download_video(my_input, args, ffmpeg, log):
         outtmpl = os.path.join(args.output_dir, outtmpl)
 
     try:
-        import youtube_dl
+        import yt_dlp
     except ImportError:
-        log.error('Download the youtube-dl python library to download URLs.\n'
-            '   pip3 install youtube-dl')
+        log.error('Download the yt-dlp python library to download URLs.\n'
+            '   pip3 install yt-dlp')
 
     if(not os.path.isfile(outtmpl)):
         ytbar = ProgressBar(100, 'Downloading')
@@ -93,7 +103,7 @@ def download_video(my_input, args, ffmpeg, log):
             'nocheckcertificate': not args.check_certificate,
             'outtmpl': outtmpl,
             'ffmpeg_location': ffmpeg.path,
-            'format': args.format,
+            'format': f'bestvideo[ext=mp4][height<={res}]+bestaudio[ext=m4a]',
             'ratelimit': parse_bytes(args.limit_rate),
             'logger': MyLogger(),
             'cookiefile': abspath(args.cookies),
@@ -105,12 +115,12 @@ def download_video(my_input, args, ffmpeg, log):
             if(item is None):
                 del ydl_opts[key]
 
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
                 ydl.download([my_input])
-            except youtube_dl.utils.DownloadError:
+            except yt_dlp.utils.DownloadError:
                 log.conwrite('')
-                log.error('YouTube-dl: Connection Refused.')
+                log.error('yt-dlp: Connection Refused.')
 
         log.conwrite('')
     return outtmpl
