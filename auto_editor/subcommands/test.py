@@ -180,6 +180,9 @@ def make_np_list(in_file, compare_file, the_speed):
 
         result = np.subtract(spedup_audio, loaded['a'])
 
+        print('result non-zero: {}'.format(np.count_nonzero))
+        print('len of spedup_audio: {}'.format(len(spedup_audio)))
+
         print(np.count_nonzero(result) / spedup_audio.shape[0], 'difference between arrays')
 
         raise Exception("file {} doesn't match array.".format(compare_file))

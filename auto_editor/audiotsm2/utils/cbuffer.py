@@ -2,8 +2,7 @@
 
 import numpy as np
 
-
-class CBuffer(object):
+class CBuffer():
     def __init__(self, channels, max_length):
         self._data = np.zeros((channels, max_length), dtype=np.float32)
         self._channels = channels
@@ -73,8 +72,8 @@ class CBuffer(object):
         :func:`CBuffer.read_from` methods.
         """
         if buffer.shape[0] != self._data.shape[0]:
-            raise ValueError("the two buffers should have the same number of "
-                             "channels")
+            raise ValueError(
+                "the two buffers should have the same number of channels")
 
         n = min(buffer.shape[1], self._ready)
 
@@ -181,7 +180,7 @@ class CBuffer(object):
         read them.
         """
         if n > self._max_length - self._length:
-            raise ValueError("not enough space remaining in :class:`CBuffer`")
+            raise ValueError("not enough space remaining in CBuffer")
 
         self._length += n
 
@@ -205,8 +204,8 @@ class CBuffer(object):
         The written samples are marked as ready to be read.
         """
         if buffer.shape[0] != self._data.shape[0]:
-            raise ValueError("the two buffers should have the same number of "
-                             "channels")
+            raise ValueError(
+                "the two buffers should have the same number of channels")
 
         n = min(buffer.shape[1], self._max_length - self._length)
 
