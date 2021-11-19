@@ -64,7 +64,6 @@ class AnalysisSynthesisTSM(TSM):
             (self._channels, self._delta_before + self._frame_length // 2)))
         self._skip_output_samples = self._frame_length // 2
 
-        # Clear the converter
         self._converter.clear()
 
     def flush_to(self, writer):
@@ -163,11 +162,3 @@ class AnalysisSynthesisTSM(TSM):
             return n, True
 
         return n, False
-
-
-class Converter():
-    def clear(self):
-        return
-
-    def set_analysis_hop(self, analysis_hop):
-        return

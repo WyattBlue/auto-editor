@@ -1,6 +1,6 @@
 '''audiotsm2/base/tsm.py'''
 
-class TSM(object):
+class TSM():
     def run(self, reader, writer, flush=True):
         finished = False
         while not (finished and reader.empty):
