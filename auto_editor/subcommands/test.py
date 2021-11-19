@@ -10,6 +10,7 @@ import sys
 import shutil
 import platform
 import subprocess
+from time import perf_counter
 
 # Included Libraries
 from auto_editor.utils.func import clean_list
@@ -150,6 +151,32 @@ def fullInspect(path, *args):
                 f'Inspection Failed. Was {func(path)}, Expected {expectedOutput}.')
 
 
+def make_np_list(in_file, out_file, the_speed):
+    import numpy as np
+    from auto_editor.scipy.wavfile import read, write
+    from auto_editor.audiotsm2 import phasevocoder
+    from auto_editor.audiotsm2.io.array import ArrReader, ArrWriter
+
+    samplerate, sped_chunk = read(in_file)
+    spedup_audio = np.zeros((0, 2), dtype=np.int16)
+    channels = 2
+
+    with ArrReader(sped_chunk, channels, samplerate, 2) as reader:
+        with ArrWriter(spedup_audio, channels, samplerate, 2) as writer:
+            phasevocoder(reader.channels, speed=the_speed).run(
+                reader, writer
+            )
+            spedup_audio = writer.output
+
+    np.savetxt(out_file, spedup_audio, fmt='%4.6f', delimiter=' ')
+
+
+def np_compare(file1, file2):
+    import filecmp
+    if(not filecmp.cmp(file1, file2)):
+        raise Exception("file {} don't match.".format(file2))
+
+
 class Tester():
     def __init__(self, args):
         self.passed_tests = 0
@@ -157,11 +184,13 @@ class Tester():
         self.allowable_fails = 0
         self.args = args
 
-    def run_test(self, name, func, description='', cleanup=None):
+    def run_test(self, name, func, description='', cleanup=None, count_time=True):
         if(self.args.only != [] and name not in self.args.only):
             return
+        start = perf_counter()
         try:
             func()
+            end = perf_counter() - start
         except Exception as e:
             self.failed_tests += 1
             print("Test '{}' failed.".format(name))
@@ -171,7 +200,7 @@ class Tester():
                 sys.exit(1)
         else:
             self.passed_tests += 1
-            print('{} Passed.'.format(name))
+            print('{} Passed. {} secs.'.format(name, round(end, 2)))
             if(cleanup is not None):
                 cleanup()
 
@@ -244,6 +273,22 @@ def main(sys_args=None):
 
 
     tester.run_test('subtitle_tests', subtitle_tests)
+
+    def tsm_1a5_test():
+        make_np_list('resources/example_cut_s16le.wav', 'out.np', 1.5)
+        np_compare('out.np', 'resources/example_1.5_speed.np')
+
+    def tsm_0a5_test():
+        make_np_list('resources/example_cut_s16le.wav', 'out.np', 0.5)
+        np_compare('out.np', 'resources/example_0.5_speed.np')
+
+    def tsm_2a0_test():
+        make_np_list('resources/example_cut_s16le.wav', 'out.np', 2)
+        np_compare('out.np', 'resources/example_2.0_speed.np')
+
+    tester.run_test('tsm_1a5_test', tsm_1a5_test)
+    tester.run_test('tsm_0a5_test', tsm_0a5_test)
+    tester.run_test('tsm_2a0_test', tsm_2a0_test)
 
     def info_tests():
         run_program(['info', 'example.mp4'])
@@ -434,7 +479,8 @@ def main(sys_args=None):
 
     def export_tests():
         for item in os.listdir('resources'):
-            if('man_on_green_screen' in item or item.startswith('.') or '_ALTERED' in item):
+            if('man_on_green_screen' in item or item.startswith('.') or '_ALTERED' in item
+                or item.endswith('.np')):
                 continue
             item = 'resources/{}'.format(item)
             run_program([item])
