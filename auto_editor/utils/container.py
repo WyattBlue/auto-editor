@@ -55,9 +55,10 @@ mp4 = {
     'allow_video': True,
     'allow_audio': True,
     'allow_subtitle': True,
-    'vcodecs': ['mpeg4', 'h264', 'hevc'],
-    'acodecs': ['aac', 'mp3', 'opus'],
-    'disallow_v': ['prores', 'apng', 'gif'],
+    'vcodecs': ['h264', 'hevc', 'vp9', 'av1', 'mpeg4', 'mjpeg'],
+    'acodecs': ['aac', 'mp3', 'opus', 'flac', 'vorbis'],
+    'disallow_v': ['prores', 'apng', 'gif', 'msmpeg4v3', 'flv1', 'vp8'],
+    'disallow_a': pcm_formats,
 }
 
 containers = {
@@ -167,23 +168,24 @@ containers = {
         'name': 'Audio Video Interleave',
         'allow_video': True,
         'allow_audio': True,
-        'vcodecs': ['mpeg4'],
+        'vcodecs': ['mpeg4', 'h264', 'mjpeg'],
         'acodecs': ['mp3'],
+        'disallow_v': ['hevc'],
     },
     'wmv': {
         'name': 'Windows Media Video',
         'allow_video': True,
         'allow_audio': True,
-        'vcodecs': ['msmpeg4v3'],
-        'acodecs': ['wmav2', 'flac'],
-        'disallow_v': ['prores'],
+        'vcodecs': ['msmpeg4v3', 'h264', 'mpeg4'],
+        'acodecs': ['wmav2', 'aac', 'flac'],
+        'disallow_v': ['prores', 'hevc'],
     },
     'mkv': {
         'name': 'Matroska',
         'allow_video': True,
         'allow_audio': True,
         'allow_subtitle': True,
-        'vcodecs': ['h264', 'prores'],
+        'vcodecs': ['h264', 'hevc', 'mpeg4', 'prores'],
         'acodecs': ['vorbis', 'opus', 'flac', 'aac'],
     },
     'mka': {
@@ -196,7 +198,7 @@ containers = {
         'allow_video': True,
         'allow_audio': True,
         'allow_subtitle': True,
-        'vcodecs': ['h264', 'prores', 'hevc'],
+        'vcodecs': ['h264', 'prores', 'hevc', 'mpeg4'],
         'acodecs': ['aac', 'mp3', 'vorbis'],
         'disallow_a': ['opus', 'flac'],
     },
@@ -204,8 +206,10 @@ containers = {
         'name': 'ShockWave Flash / Small Web Format',
         'allow_video': True,
         'allow_audio': True,
-        'vcodecs': ['flv1'],
+        'vcodecs': ['flv1', 'mjpeg'],
         'acodecs': ['mp3'],
+        'vstrict': True,
+        'astrict': True,
         'samplerate': [44100, 22050, 11025],
     },
     'not_in_here': {
@@ -232,3 +236,14 @@ containers = {
         'samplerate': None, # Any samplerate is allowed.
     },
 }
+
+if(__name__ == '__main__'):
+    from auto_editor.ffwrapper import FFmpeg
+
+    import subprocess
+
+    ffmpeg = FFmpeg()
+
+    out = '../../out.mp4'
+    ffmpeg.run(['-i', '../../example.mp4', '-c:v', 'av1', '-strict', '-2', out])
+    subprocess.call(['aeinfo', out])
