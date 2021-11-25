@@ -92,12 +92,11 @@ def print_program_help(root, the_args):
             '--frame_margin --help\n')
     out(text)
 
-def get_option(item, group, the_args):
+def get_option(item, the_args):
     for options in the_args:
         for option in options:
             dash = list(map(lambda n: n.replace('_', '-'), option['names']))
-            if((item in option['names'] or item in dash)
-                and group in ['global', option['group']]):
+            if((item in option['names'] or item in dash)):
                 return option
     return None
 
@@ -189,7 +188,7 @@ class ParseOptions():
                 sys.exit(1)
         return dic
 
-    def setConfig(self, config_path, root):
+    def set_config(self, config_path, root):
         if(not os.path.isfile(config_path)):
             return
 
@@ -238,8 +237,8 @@ class ParseOptions():
                     value = option['default']
                 setattr(self, key, value)
 
-        dirPath = os.path.dirname(os.path.realpath(__file__))
-        self.setConfig(os.path.join(dirPath, 'config.txt'), root)
+        dirpath = os.path.dirname(os.path.realpath(__file__))
+        self.set_config(os.path.join(dirpath, 'config.txt'), root)
 
         # Figure out command line options changed by user.
         my_list = []
@@ -254,14 +253,7 @@ class ParseOptions():
             item = sys_args[i]
             label = 'option' if item.startswith('--') else 'short'
 
-            # Find the option.
-            if(label == 'option'):
-                option = get_option(item, group='global', the_args=args)
-            else:
-                option = get_option(item, group=group, the_args=args)
-                if(option is None and (group is not None)):
-                    group = None # Don't consider the next option to be in a group.
-                    option = get_option(item, group=group, the_args=args)
+            option = get_option(item, the_args=args)
 
             def error_message(args, item, label):
 
@@ -276,9 +268,6 @@ class ParseOptions():
                 opt_list = all_names(args)
                 close_matches = difflib.get_close_matches(item, opt_list)
                 if(close_matches):
-                    if(close_matches[0] == item):
-                        return '{} {} needs to be in a group'.format(label.capitalize(),
-                            item)
                     return 'Unknown {}: {}\n\n    Did you mean:\n        '.format(
                         label, item) + ', '.join(close_matches)
                 return 'Unknown {}: {}'.format(label, item)

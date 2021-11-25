@@ -29,22 +29,18 @@ def main_options(parser):
         group='progressOps',
         help='do not display any progress at all.')
 
-    # parser.add_argument('multiOps', nargs=0, action='grouping')
-    # parser.add_argument('--multi_processing', action='store_true', group='multiOps',
-    #     help='enable video rendering multi-processing.')
-
     parser.add_argument('metadataOps', nargs=0, action='grouping')
     parser.add_argument('--force_fps_to', type=float, group='metadataOps',
         help='manually set the fps value for the input video if detection fails.')
 
     parser.add_argument('motionOps', nargs=0, action='grouping')
-    parser.add_argument('--dilates', '-d', type=int, default=2, range='0 to 5',
+    parser.add_argument('--dilates', type=int, default=2, range='0 to 5',
         group='motionOps',
         help='set how many times a frame is dilated before being compared.')
-    parser.add_argument('--width', '-w', type=int, default=400, range='1 to Infinity',
+    parser.add_argument('--width', type=int, default=400, range='1 to Infinity',
         group='motionOps',
         help="scale the frame to this width before being compared.")
-    parser.add_argument('--blur', '-b', type=int, default=21, range='0 to Infinity',
+    parser.add_argument('--blur', type=int, default=21, range='0 to Infinity',
         group='motionOps',
         help='set the strength of the blur applied to a frame before being compared.')
 
@@ -69,23 +65,23 @@ def main_options(parser):
         help='check the website certificate before downloading.')
 
     parser.add_argument('exportMediaOps', nargs=0, action='grouping')
-    parser.add_argument('--video_bitrate', '-vb', default='unset', group='exportMediaOps',
+    parser.add_argument('--video_bitrate', '-b:v', default='unset', group='exportMediaOps',
         help='set the number of bits per second for video.')
-    parser.add_argument('--audio_bitrate', '-ab', default='unset', group='exportMediaOps',
+    parser.add_argument('--audio_bitrate', '-b:a', default='unset', group='exportMediaOps',
         help='set the number of bits per second for audio.')
-    parser.add_argument('--sample_rate', '-ar', '-r', type=sample_rate_type,
+    parser.add_argument('--sample_rate', '-ar', type=sample_rate_type,
         group='exportMediaOps',
         help='set the sample rate of the input and output videos.')
-    parser.add_argument('--video_codec', '-vcodec', default='uncompressed',
+    parser.add_argument('--video_codec', '-vcodec', '-c:v', default='uncompressed',
         group='exportMediaOps',
         help='set the video codec for the output media file.')
-    parser.add_argument('--audio_codec', '-acodec', group='exportMediaOps',
+    parser.add_argument('--audio_codec', '-acodec', '-c:a', group='exportMediaOps',
         help='set the audio codec for the output media file.')
-    parser.add_argument('--preset', '-p', default='unset', group='exportMediaOps',
+    parser.add_argument('--preset', '-preset', default='unset', group='exportMediaOps',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow', 'unset'],
         help='set the preset for ffmpeg to help save file size or increase quality.')
-    parser.add_argument('--tune', '-t', default='unset', group='exportMediaOps',
+    parser.add_argument('--tune', '-tune', default='unset', group='exportMediaOps',
         choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
             'zerolatency', 'none', 'unset'],
         help='set the tune for ffmpeg to compress video better in certain circumstances.')
@@ -192,7 +188,7 @@ def main_options(parser):
         extra='this is equivalent to --ffmpeg_location ffmpeg.')
     parser.add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
-    parser.add_argument('--debug', '--verbose', '-d', action='store_true',
+    parser.add_argument('--debug', action='store_true',
         help='show debugging messages and values.')
     parser.add_argument('--show_ffmpeg_debug', action='store_true',
         help='show ffmpeg progress and output.')
