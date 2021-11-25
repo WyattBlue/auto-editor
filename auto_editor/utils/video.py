@@ -12,7 +12,33 @@ def fset(cmd, option, value):
     return cmd + [option] + [value]
 
 
-def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, temp, log):
+def video_quality(cmd, args, inp):
+    cmd = fset(cmd, '-crf', args.constant_rate_factor)
+    cmd = fset(cmd, '-b:v', args.video_bitrate)
+    cmd = fset(cmd, '-tune', args.tune)
+    cmd = fset(cmd, '-preset', args.preset)
+
+    qscale = args.video_quality_scale
+    vcodec = args.video_codec
+
+    if(vcodec == 'copy'):
+        vcodec = inp.video_streams[0]['codec']
+        vcodec = 'copy' if vcodec is None else input_codec
+
+    if(vcodec == 'uncompressed'):
+        vcodec = 'mpeg4'
+        qscale = '1'
+
+    cmd.extend(['-c:v', vcodec])
+
+    cmd = fset(cmd, '-qscale:v', qscale)
+
+    cmd.extend(['-movflags', 'faststart'])
+    return cmd
+
+
+def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
+    args, inp, temp, log):
     s_tracks = 0 if not rules['allow_subtitle'] else len(inp.subtitle_streams)
     a_tracks = 0 if not rules['allow_audio'] else len(inp.audio_streams)
     v_tracks = 0 if not rules['allow_video'] else len(inp.video_streams)
@@ -50,27 +76,10 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, args, inp, t
         cmd.extend(['-map', '{}:0'.format(i)])
 
     if(v_tracks > 0):
-        cmd = fset(cmd, '-crf', args.constant_rate_factor)
-        cmd = fset(cmd, '-b:v', args.video_bitrate)
-        cmd = fset(cmd, '-tune', args.tune)
-        cmd = fset(cmd, '-preset', args.preset)
-
-        if(fnone(args.video_codec) or args.video_codec == 'uncompressed'):
-            if(rules['vcodecs'] is None):
-                cmd.extend(['-c:v', 'copy'])
-            else:
-                cmd.extend(['-c:v', rules['vcodecs'][0]])
+        if(apply_video):
+            cmd = video_quality(cmd, args, inp)
         else:
-            vcodec = args.video_codec
-            if(vcodec == 'copy'):
-                vcodec = inp.video_streams[0].codec
-            if(vcodec == 'uncompressed'):
-                vcodec = 'copy'
-
-            # Rules checking is in edit.py
-            cmd.extend(['-c:v', vcodec])
-
-        cmd.extend(['-movflags', 'faststart'])
+            cmd.extend(['-c:v', 'copy'])
 
     if(s_tracks > 0):
         scodec = inp.subtitle_streams[0]['codec']
