@@ -27,6 +27,23 @@ def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
         cmd.append(spedup)
         ffmpeg.run(cmd)
 
+
+class Wrapper:
+    """
+    Wrapper which only exposes the `read` method to avoid PyAV
+    trying to use `seek`.
+    From: github.com/PyAV-Org/PyAV/issues/578#issuecomment-621362337
+    """
+
+    name = "<wrapped>"
+
+    def __init__(self, fh):
+        self._fh = fh
+
+    def read(self, buf_size):
+        return self._fh.read(buf_size)
+
+
 def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects, temp, log):
     try:
         import av
@@ -39,28 +56,9 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
     input_ = av.open(inp.path)
     pix_fmt = input_.streams.video[0].pix_fmt
 
-    def throw_pix_fmt(inp, pix_fmt, log):
-        log.error('''pix_fmt {} is not supported.\n
-Convert your video to a supported pix_fmt. The following command might work for you:
-  ffmpeg -i "{}" -pix_fmt yuv420p converted{}
-'''.format(pix_fmt, inp.path, '' if inp.ext is None else inp.ext))
+    apply_video = True
 
     if(has_vfr):
-        class Wrapper:
-            """
-            Wrapper which only exposes the `read` method to avoid PyAV
-            trying to use `seek`.
-            From: github.com/PyAV-Org/PyAV/issues/578#issuecomment-621362337
-            """
-
-            name = "<wrapped>"
-
-            def __init__(self, fh):
-                self._fh = fh
-
-            def read(self, buf_size):
-                return self._fh.read(buf_size)
-
         # Create a cfr stream on stdout.
         cmd = ['-i', inp.path, '-map', '0:v:0', '-vf', 'fps=fps={}'.format(fps), '-r',
             str(fps), '-vsync', '1', '-f', 'matroska']
@@ -73,9 +71,16 @@ Convert your video to a supported pix_fmt. The following command might work for 
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
         input_ = av.open(wrapper, 'r')
     elif(not pix_fmt_allowed(pix_fmt)):
-        throw_pix_fmt(inp, pix_fmt, log)
+        pix_fmt = 'yuv420p'
+        cmd = ['-i', inp.path, '-map', '0:v:0', '-f', 'matroska', '-pix_fmt', pix_fmt,
+            '-vcodec', 'rawvideo', 'pipe:1']
+        wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
+        input_ = av.open(wrapper, 'r')
+    else:
+        apply_video = False
 
     log.debug('pix_fmt: {}'.format(pix_fmt))
+    log.debug('apply video: {}'.format(apply_video))
 
     inputVideoStream = input_.streams.video[0]
     inputVideoStream.thread_type = 'AUTO'
@@ -98,8 +103,6 @@ Convert your video to a supported pix_fmt. The following command might work for 
     cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-c:v', 'rawvideo',
         '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
         '-i', '-', '-pix_fmt', pix_fmt]
-
-    apply_video = False
 
     if(apply_video):
         cmd.extend(['-c:v', 'mpeg4', '-qscale:v', '1'])
