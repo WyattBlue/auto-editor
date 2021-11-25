@@ -97,7 +97,15 @@ Convert your video to a supported pix_fmt. The following command might work for 
 
     cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-c:v', 'rawvideo',
         '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
-        '-i', '-', '-pix_fmt', pix_fmt, '-c:v', 'mpeg4', '-qscale:v', '1']
+        '-i', '-', '-pix_fmt', pix_fmt]
+
+    apply_video = False
+
+    if(apply_video):
+        cmd.extend(['-c:v', 'mpeg4', '-qscale:v', '1'])
+    else:
+        from auto_editor.utils.video import video_quality
+        cmd = video_quality(cmd, args, inp)
 
     if(args.scale != 1):
         cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale)])
@@ -140,5 +148,5 @@ Convert your video to a supported pix_fmt. The following command might work for 
         process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE)
         log.error('Broken Pipe Error!')
 
-    return spedup
+    return spedup, apply_video
 

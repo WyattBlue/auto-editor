@@ -73,7 +73,7 @@ def main_options(parser):
         help='set the number of bits per second for video.')
     parser.add_argument('--audio_bitrate', '-ab', default='unset', group='exportMediaOps',
         help='set the number of bits per second for audio.')
-    parser.add_argument('--sample_rate', '-r', type=sample_rate_type,
+    parser.add_argument('--sample_rate', '-ar', '-r', type=sample_rate_type,
         group='exportMediaOps',
         help='set the sample rate of the input and output videos.')
     parser.add_argument('--video_codec', '-vcodec', default='uncompressed',
@@ -92,6 +92,9 @@ def main_options(parser):
     parser.add_argument('--constant_rate_factor', '-crf', default='unset',
         group='exportMediaOps', range='0 to 51',
         help='set the quality for video using the crf method.')
+    parser.add_argument('--video_quality_scale', '-qscale:v', '-q:v', default='unset',
+        group='exportMediaOps', range='1 to 31',
+        help='set a value to the ffmpeg option -qscale:v')
     parser.add_argument('--has_vfr', default='unset', group='exportMediaOps',
         choices=['unset', 'yes', 'no'],
         help='skip variable frame rate scan, saving time for big video files.')
