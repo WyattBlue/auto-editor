@@ -78,11 +78,11 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         input_path, chunks, speeds = read_json_cutlist(inp.path, auto_editor.version, log)
         inp = ffmpeg.file_info(input_path)
 
-        output_path = set_output_name(inp.path, data_file, args)
+        output_path = set_output_name(inp.path, inp.ext, data_file, args)
     else:
         output_path = args.output_file[i]
         if(not os.path.isdir(inp.path) and '.' not in output_path):
-            output_path = set_output_name(output_path, data_file, args)
+            output_path = set_output_name(output_path, inp.ext, data_file, args)
 
     log.debug('{} -> {}'.format(inp.path, output_path))
 
