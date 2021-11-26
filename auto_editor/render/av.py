@@ -90,15 +90,17 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
         '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
         '-i', '-', '-pix_fmt', pix_fmt]
 
+    if(args.scale != 1):
+        apply_video = False
+        # Due to some [redacted] decisions by the FFmpeg team, scaling operations
+        # have to be slow down. Certain scales need to be some with software rendering
+        # and FFmpeg sometimes doesn't accept the "-allow_sw 1" command at all.
+
     if(apply_video):
         cmd.extend(['-c:v', 'mpeg4', '-qscale:v', '1'])
     else:
         from auto_editor.utils.video import video_quality
         cmd = video_quality(cmd, args, inp, rules)
-
-    if(args.scale != 1):
-        cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale),
-            '-allow_sw', '1'])
 
     cmd.append(spedup)
 
@@ -137,6 +139,22 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
         log.print(cmd)
         process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE)
         log.error('Broken Pipe Error!')
+
+    # Unfortunately, scaling has to be a concrete step.
+    if(args.scale != 1):
+        sped_input = os.path.join(temp, 'spedup.mp4')
+        spedup = os.path.join(temp, 'scale.mp4')
+        cmd = ['-i', sped_input, '-vf', 'scale=iw*{s}:ih*{s}'.format(s=args.scale),
+            spedup]
+
+        check_errors = ffmpeg.pipe(cmd)
+        if('Error' in check_errors or 'failed' in check_errors):
+            if('-allow_sw 1' in check_errors):
+                # Add "-allow_sw 1" to command.
+                cmd.insert(-1, '1')
+                cmd.insert(-1, '-allow_sw')
+            # Run again to show errors even if it might not work.
+            ffmpeg.run(cmd)
 
     return spedup, apply_video
 

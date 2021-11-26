@@ -34,7 +34,8 @@ def video_quality(cmd, args, inp, rules):
 
     if(vcodec == 'uncompressed'):
         vcodec = 'mpeg4'
-        qscale = '1'
+        if(fnone(qscale)):
+            qscale = '1'
 
     cmd.extend(['-c:v', vcodec])
 
