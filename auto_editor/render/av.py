@@ -13,21 +13,6 @@ def pix_fmt_allowed(pix_fmt):
 
     return pix_fmt in allowed_formats
 
-
-def scale_to_sped(ffmpeg, spedup, scale, inp, args, temp):
-    cmd = ['-i', scale, spedup]
-    check_errors = ffmpeg.pipe(cmd)
-
-    if('Error' in check_errors or 'failed' in check_errors):
-        cmd = ['-i', scale]
-        if('-allow_sw 1' in check_errors):
-            cmd.extend(['-allow_sw', '1'])
-
-        cmd = properties(cmd, args, inp)
-        cmd.append(spedup)
-        ffmpeg.run(cmd)
-
-
 class Wrapper:
     """
     Wrapper which only exposes the `read` method to avoid PyAV
@@ -112,7 +97,8 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
         cmd = video_quality(cmd, args, inp, rules)
 
     if(args.scale != 1):
-        cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale)])
+        cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale),
+            '-allow_sw', '1'])
 
     cmd.append(spedup)
 
