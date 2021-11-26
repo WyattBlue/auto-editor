@@ -44,7 +44,8 @@ class Wrapper:
         return self._fh.read(buf_size)
 
 
-def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects, temp, log):
+def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects, rules,
+    temp, log):
     try:
         import av
     except ImportError:
@@ -77,7 +78,7 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
         input_ = av.open(wrapper, 'r')
     else:
-        apply_video = False
+        apply_video = inp.ext != '.mp4'
 
     log.debug('pix_fmt: {}'.format(pix_fmt))
     log.debug('apply video: {}'.format(apply_video))
@@ -108,7 +109,7 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
         cmd.extend(['-c:v', 'mpeg4', '-qscale:v', '1'])
     else:
         from auto_editor.utils.video import video_quality
-        cmd = video_quality(cmd, args, inp)
+        cmd = video_quality(cmd, args, inp, rules)
 
     if(args.scale != 1):
         cmd.extend(['-vf', 'scale=iw*{}:ih*{}'.format(args.scale, args.scale)])
