@@ -358,7 +358,8 @@ def main():
 
     if(len(args.output_file) < len(input_list)):
         for i in range(len(input_list) - len(args.output_file)):
-            args.output_file.append(set_output_name(input_list[i], making_data_file, args))
+            args.output_file.append(set_output_name(input_list[i], None,
+                making_data_file, args))
 
     if(args.combine_files):
         if(exporting_to_editor):

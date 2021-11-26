@@ -118,7 +118,7 @@ def run_program(cmd):
         raise Exception('{}\n{}\n'.format(stdout, stderr))
 
 
-def checkForError(cmd, match=None):
+def check_for_error(cmd, match=None):
     returncode, stdout, stderr = pipe_to_console(getRunner() + cmd)
     if(returncode > 0):
         if('Error!' in stderr):
@@ -129,7 +129,10 @@ def checkForError(cmd, match=None):
     else:
         raise Exception('Program should not respond with a code 0.')
 
-def fullInspect(path, *args):
+def inspect(path, *args):
+    if(not os.path.exists(path)):
+        raise Exception(f"Path '{path}' does not exist.")
+
     for item in args:
         func = item[0]
         expectedOutput = item[1]
@@ -315,7 +318,7 @@ def main(sys_args=None):
 
     def example_tests():
         run_program(['example.mp4', '--has_vfr', 'no'])
-        fullInspect(
+        inspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '1280x720'],
@@ -323,7 +326,7 @@ def main(sys_args=None):
             [ffprobe.getSampleRate, '48000'],
         )
         run_program(['example.mp4', '--video_codec', 'uncompressed', '--has_vfr', 'no'])
-        fullInspect(
+        inspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '1280x720'],
@@ -340,7 +343,7 @@ def main(sys_args=None):
     # Issue #172
     def bitrate_test():
         run_program(['example.mp4', '--audio_bitrate', '50k', '--has_vfr', 'no'])
-        fullInspect(
+        inspect(
             'example_ALTERED.mp4',
             [ffprobe.AudioBitRate, '50k'],
         )
@@ -380,7 +383,7 @@ def main(sys_args=None):
 
     def gif_test():
         run_program(['resources/man_on_green_screen.gif', '--edit', 'none'])
-        fullInspect(
+        inspect(
             'resources/man_on_green_screen_ALTERED.gif',
             [ffprobe.getVideoCodec, 'gif'],
         )
@@ -399,13 +402,31 @@ def main(sys_args=None):
         run_program(['example.mp4', '-m', '0.4 seconds'])
     tester.run_test('margin_tests', margin_tests)
 
-    def extension_tests():
-        # Input file must have an extension.
+    def input_extension():
+        # Input file must have an extension. Throw error if none is given.
         shutil.copy('example.mp4', 'example')
-        checkForError(['example', '--no_open'], 'must have an extension.')
+        check_for_error(['example', '--no_open'], 'must have an extension.')
         os.remove('example')
 
-    tester.run_test('extension_tests', extension_tests)
+    tester.run_test('input_extension', input_extension)
+
+    def output_extension():
+        # Add input extension to output name if no output extension is given.
+        run_program(['example.mp4', '--has_vfr', 'no', '-o', 'out'])
+        inspect(
+            'out.mp4',
+            [ffprobe.getVideoCodec, 'h264']
+        )
+        os.remove('out.mp4')
+
+        run_program(['resources/test.mkv', '--has_vfr', 'no', '-o', 'out'])
+        inspect(
+            'out.mkv',
+            [ffprobe.getVideoCodec, 'h264']
+        )
+        os.remove('out.mkv')
+
+    tester.run_test('output_extension', output_extension)
 
     def progress_ops_test():
         run_program(['example.mp4', '--has_vfr', 'no', 'progressOps', '--machine_readable_progress'])
@@ -429,7 +450,7 @@ def main(sys_args=None):
 
     def scale_tests():
         run_program(['example.mp4', '--scale', '1.5', '--has_vfr', 'no'])
-        fullInspect(
+        inspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '1920x1080'],
@@ -437,7 +458,7 @@ def main(sys_args=None):
         )
 
         run_program(['example.mp4', '--scale', '0.2', '--has_vfr', 'no'])
-        fullInspect(
+        inspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '256x144'],
@@ -446,15 +467,15 @@ def main(sys_args=None):
     tester.run_test('scale_tests', scale_tests)
 
     def various_errors_test():
-        checkForError(['example.mp4', '--zoom', '0', '--cut_out', '60,end'])
-        checkForError(['example.mp4', '--zoom', '0,60', '--cut_out', '60,end'])
-        checkForError(['example.mp4', '--rectangle', '0,60', '--cut_out', '60,end'])
+        check_for_error(['example.mp4', '--zoom', '0', '--cut_out', '60,end'])
+        check_for_error(['example.mp4', '--zoom', '0,60', '--cut_out', '60,end'])
+        check_for_error(['example.mp4', '--rectangle', '0,60', '--cut_out', '60,end'])
     tester.run_test('various_errors_test', various_errors_test)
 
     def effect_tests():
         run_program(['create', 'test', '--width', '640', '--height', '360', '-o',
             'testsrc.mp4'])
-        fullInspect(
+        inspect(
             'testsrc.mp4',
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '640x360'],
@@ -467,7 +488,7 @@ def main(sys_args=None):
 
         run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
             'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
-        fullInspect(
+        inspect(
             'testsrc_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '320x180'],

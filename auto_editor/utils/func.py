@@ -86,7 +86,7 @@ def append_filename(path, val):
     root, ext = os.path.splitext(path)
     return root + val + ext
 
-def set_output_name(path, making_data_file, args):
+def set_output_name(path, inp_ext, making_data_file, args):
     import os.path
     root, ext = os.path.splitext(path)
 
@@ -100,4 +100,8 @@ def set_output_name(path, making_data_file, args):
         return root + '.xml'
     if(args.export_as_audio):
         return root + '_ALTERED.wav'
+    if(ext == ''):
+        if(inp_ext is None):
+            return root
+        return root + inp_ext
     return root + '_ALTERED' + ext
