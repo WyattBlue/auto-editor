@@ -12,7 +12,7 @@ def fset(cmd, option, value):
     return cmd + [option] + [value]
 
 
-def video_quality(cmd, args, inp):
+def video_quality(cmd, args, inp, rules):
     cmd = fset(cmd, '-crf', args.constant_rate_factor)
     cmd = fset(cmd, '-b:v', args.video_bitrate)
     cmd = fset(cmd, '-tune', args.tune)
@@ -20,6 +20,13 @@ def video_quality(cmd, args, inp):
 
     qscale = args.video_quality_scale
     vcodec = args.video_codec
+
+    if(vcodec == 'auto'):
+        vcodec = inp.video_streams[0]['codec']
+
+        if((vcodec is None) or (rules['vstrict'] and vcodec not in rules['vcodecs'])
+            or (vcodec in rules['disallow_v'])):
+            vcodec = rules['vcodecs'][0]
 
     if(vcodec == 'copy'):
         vcodec = inp.video_streams[0]['codec']
@@ -77,7 +84,7 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
 
     if(v_tracks > 0):
         if(apply_video):
-            cmd = video_quality(cmd, args, inp)
+            cmd = video_quality(cmd, args, inp, rules)
         else:
             cmd.extend(['-c:v', 'copy'])
 

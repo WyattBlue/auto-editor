@@ -237,6 +237,15 @@ containers = {
     },
 }
 
+def get_rules(key):
+    # type: (str) -> dict
+    rules = containers['default']
+    if(key in containers):
+        rules.update(containers[key])
+    else:
+        rules.update(containers['not_in_here'])
+    return rules
+
 if(__name__ == '__main__'):
     from auto_editor.ffwrapper import FFmpeg
 

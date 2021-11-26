@@ -69,7 +69,7 @@ def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_
 
 def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_editor,
     data_file, temp, log):
-    from auto_editor.utils.container import containers
+    from auto_editor.utils.container import get_rules
 
     chunks = None
     if(inp.ext == '.json'):
@@ -87,14 +87,9 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
     log.debug('{} -> {}'.format(inp.path, output_path))
 
     output_container = os.path.splitext(output_path)[1].replace('.', '')
-    rules = containers['default']
-    if(output_container in containers):
-        rules.update(containers[output_container])
-    else:
-        rules.update(containers['not_in_here'])
 
     # Check if export options make sense.
-
+    rules = get_rules(output_container)
     codec_error = "'{}' codec is not supported in '{}' container."
 
     if(not fnone(args.sample_rate)):
@@ -102,12 +97,18 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
             log.error("'{}' container only supports samplerates: {}".format(output_container,
                 rules['samplerate']))
 
-    if(not fnone(args.video_codec) and args.video_codec != 'uncompressed'):
-        if(rules['vstrict'] and args.video_codec not in rules['vcodecs']):
-            log.error(codec_error.format(args.video_codec, output_container))
+    vcodec = args.video_codec
+    if(vcodec == 'uncompressed'):
+        vcodec = 'mpeg4'
+    if(vcodec == 'copy'):
+        vcodec = inp.video_streams[0]['codec']
 
-        if(args.video_codec in rules['disallow_v']):
-            log.error(codec_error.format(args.video_codec, output_container))
+    if(vcodec != 'auto'):
+        if(rules['vstrict'] and vcodec not in rules['vcodecs']):
+            log.error(codec_error.format(vcodec, output_container))
+
+        if(vcodec in rules['disallow_v']):
+            log.error(codec_error.format(vcodec, output_container))
 
     if(not fnone(args.audio_codec)):
         if(rules['astrict'] and args.audio_codec not in rules['acodecs']):
@@ -311,7 +312,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         if(rules['allow_video'] and len(inp.video_streams) > 0):
             from auto_editor.render.av import render_av
             spedup, apply_video = render_av(ffmpeg, inp, args, chunks, speeds, fps,
-                has_vfr, progress, effects, temp, log)
+                has_vfr, progress, effects, rules, temp, log)
 
             if(log.is_debug):
                 log.debug('Writing the output file.')

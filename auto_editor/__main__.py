@@ -72,7 +72,7 @@ def main_options(parser):
     parser.add_argument('--sample_rate', '-ar', type=sample_rate_type,
         group='exportMediaOps',
         help='set the sample rate of the input and output videos.')
-    parser.add_argument('--video_codec', '-vcodec', '-c:v', default='uncompressed',
+    parser.add_argument('--video_codec', '-vcodec', '-c:v', default='auto',
         group='exportMediaOps',
         help='set the video codec for the output media file.')
     parser.add_argument('--audio_codec', '-acodec', '-c:a', group='exportMediaOps',
@@ -305,10 +305,6 @@ def main():
         args.export_to_final_cut_pro, args.export_as_audio,
         args.export_to_shotcut, args.export_as_clip_sequence].count(True) > 1):
         log.error('You must choose only one export option.')
-
-    if(making_data_file and (args.video_codec != 'uncompressed' or
-        args.constant_rate_factor != 'unset' or args.tune != 'unset')):
-        log.warning('exportMediaOps options are not used when making a data file.')
 
     if(isinstance(args.frame_margin, str)):
         try:

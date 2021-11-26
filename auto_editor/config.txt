@@ -4,7 +4,7 @@
 auto-editor.exportMediaOps.video_bitrate = 'unset'        # 'unset'
 auto-editor.exportMediaOps.audio_bitrate = 'unset'        # 'unset'
 auto-editor.exportMediaOps.sample_rate = None             # None
-auto-editor.exportMediaOps.video_codec = 'uncompressed'   # 'uncompressed'
+auto-editor.exportMediaOps.video_codec = 'auto'           # 'auto'
 auto-editor.exportMediaOps.audio_codec = None             # None
 auto-editor.exportMediaOps.preset = 'unset'               # 'unset'
 auto-editor.exportMediaOps.tune = 'unset'                 # 'unset'

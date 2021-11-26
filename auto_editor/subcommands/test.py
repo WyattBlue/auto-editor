@@ -314,14 +314,15 @@ def main(sys_args=None):
     tester.run_test('level_tests', level_tests)
 
     def example_tests():
-        run_program(['example.mp4'])
+        run_program(['example.mp4', '--has_vfr', 'no'])
         fullInspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '1280x720'],
+            [ffprobe.getVideoCodec, 'h264'],
             [ffprobe.getSampleRate, '48000'],
         )
-        run_program(['example.mp4', '--video_codec', 'uncompressed'])
+        run_program(['example.mp4', '--video_codec', 'uncompressed', '--has_vfr', 'no'])
         fullInspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
@@ -338,7 +339,7 @@ def main(sys_args=None):
 
     # Issue #172
     def bitrate_test():
-        run_program(['example.mp4', '--audio_bitrate', '50k'])
+        run_program(['example.mp4', '--audio_bitrate', '50k', '--has_vfr', 'no'])
         fullInspect(
             'example_ALTERED.mp4',
             [ffprobe.AudioBitRate, '50k'],
@@ -348,10 +349,10 @@ def main(sys_args=None):
     # Issue #184
     def unit_tests():
         run_program(['example.mp4', '--mark_as_loud', '20s,22sec', '25secs,26.5seconds'])
-        run_program(['example.mp4', '--sample_rate', '44100'])
-        run_program(['example.mp4', '--sample_rate', '44100 Hz'])
-        run_program(['example.mp4', '--sample_rate', '44.1 kHz'])
-        run_program(['example.mp4', '--silent_threshold', '4%'])
+        run_program(['example.mp4', '--sample_rate', '44100', '--has_vfr', 'no'])
+        run_program(['example.mp4', '--sample_rate', '44100 Hz', '--has_vfr', 'no'])
+        run_program(['example.mp4', '--sample_rate', '44.1 kHz', '--has_vfr', 'no'])
+        run_program(['example.mp4', '--silent_threshold', '4%', '--has_vfr', 'no'])
     tester.run_test('unit_tests', unit_tests,
         description='''
         Make sure all units are working appropriately. That includes:
