@@ -55,11 +55,20 @@ mp4 = {
     'allow_video': True,
     'allow_audio': True,
     'allow_subtitle': True,
-    'vcodecs': ['h264', 'hevc', 'vp9', 'av1', 'mpeg4', 'mjpeg'],
-    'acodecs': ['aac', 'mp3', 'opus', 'flac', 'vorbis'],
-    'disallow_v': ['prores', 'apng', 'gif', 'msmpeg4v3', 'flv1', 'vp8'],
+    'vcodecs': ['h264', 'hevc', 'vp9', 'av1', 'mpeg4', 'mpeg2video', 'mjpeg'],
+    'acodecs': ['aac', 'mp3', 'opus', 'flac', 'vorbis', 'mp2'],
+    'disallow_v': ['prores', 'apng', 'gif', 'msmpeg4v3', 'flv1', 'vp8', 'rawvideo'],
     'disallow_a': pcm_formats,
 }
+ogg = {
+    'allow_video': True,
+    'allow_audio': True,
+    'allow_subtitle': True,
+    'vcodecs': ['theora'],
+    'acodecs': ['opus', 'flac', 'vorbis'],
+    'disallow_v': ['h264', 'hevc', 'prores', 'mpeg4', 'mpeg2video', 'mjpeg', 'rawvideo'],
+    'disallow_a': ['aac', 'mp3', 'mp2'],
+},
 
 containers = {
 
@@ -77,6 +86,9 @@ containers = {
 
     'mp4': mp4,
     'm4a': mp4,
+
+    'ogg': ogg,
+    'ogv': ogg,
 
     'apng': {
         'name': 'Animated Portable Network Graphics',
@@ -124,20 +136,6 @@ containers = {
         'max_audio_streams': 1,
         'acodecs': ['flac'],
     },
-    'ogg': {
-        'allow_video': True,
-        'allow_audio': True,
-        'allow_subtitle': True,
-        'vcodecs': ['theora'],
-        'acodecs': ['opus', 'flac', 'vorbis'],
-    },
-    'ogv': {
-        'allow_video': True,
-        'allow_audio': True,
-        'allow_subtitle': True,
-        'vcodecs': ['theora'],
-        'acodecs': ['opus', 'vorbis'],
-    },
     'webm': {
         'name': 'WebM',
         'allow_video': True,
@@ -168,39 +166,43 @@ containers = {
         'name': 'Audio Video Interleave',
         'allow_video': True,
         'allow_audio': True,
-        'vcodecs': ['mpeg4', 'h264', 'mjpeg'],
-        'acodecs': ['mp3'],
-        'disallow_v': ['hevc'],
+        'vcodecs': ['mpeg4', 'h264', 'prores', 'mjpeg', 'mpeg2video', 'rawvideo'],
+        'acodecs': ['mp3', 'aac', 'vorbis', 'mp2'],
+        'disallow_v': ['hevc', 'apng', 'gif'],
     },
     'wmv': {
         'name': 'Windows Media Video',
         'allow_video': True,
         'allow_audio': True,
-        'vcodecs': ['msmpeg4v3', 'h264', 'mpeg4'],
+        'vcodecs': ['msmpeg4v3', 'h264', 'mpeg4', 'mpeg2video', 'mjpeg', 'rawvideo'],
         'acodecs': ['wmav2', 'aac', 'flac'],
-        'disallow_v': ['prores', 'hevc'],
+        'disallow_v': ['prores', 'hevc', 'apng', 'gif'],
     },
     'mkv': {
         'name': 'Matroska',
         'allow_video': True,
         'allow_audio': True,
         'allow_subtitle': True,
-        'vcodecs': ['h264', 'hevc', 'mpeg4', 'prores'],
-        'acodecs': ['vorbis', 'opus', 'flac', 'aac'],
+        'vcodecs': ['h264', 'hevc', 'vp9', 'vp8', 'prores', 'mpeg4', 'mpeg2video',
+            'msmpeg4v3', 'mjpeg', 'gif', 'rawvideo'],
+        'acodecs': ['vorbis', 'opus', 'flac', 'aac', 'mp2'],
+        'disallow_v': ['apng'],
     },
     'mka': {
         'name': 'Matroska Audio',
         'allow_audio': True,
-        'acodecs': ['vorbis', 'opus', 'flac', 'aac'],
+        'acodecs': ['vorbis', 'opus', 'flac', 'aac', 'mp2'],
     },
     'mov': {
         'name': 'QuickTime / MOV',
         'allow_video': True,
         'allow_audio': True,
         'allow_subtitle': True,
-        'vcodecs': ['h264', 'prores', 'hevc', 'mpeg4'],
-        'acodecs': ['aac', 'mp3', 'vorbis'],
+        'vcodecs': ['h264', 'hevc', 'prores', 'mpeg4', 'mpeg2video', 'msmpeg4v3', 'mjpeg',
+            'gif', 'flv1', 'rawvideo'],
+        'acodecs': ['aac', 'mp3', 'mp2', 'vorbis'],
         'disallow_a': ['opus', 'flac'],
+        'disallow_v': ['apng', 'vp9', 'vp8'],
     },
     'swf': {
         'name': 'ShockWave Flash / Small Web Format',
@@ -253,6 +255,6 @@ if(__name__ == '__main__'):
 
     ffmpeg = FFmpeg()
 
-    out = '../../out.mp4'
-    ffmpeg.run(['-i', '../../example.mp4', '-c:v', 'av1', '-strict', '-2', out])
+    out = '../../out.ogg'
+    ffmpeg.run(['-i', '../../example.mp4', '-c:a', 'mp2', '-strict', '-2', out])
     subprocess.call(['aeinfo', out])
