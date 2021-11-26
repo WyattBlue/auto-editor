@@ -373,13 +373,17 @@ def main(sys_args=None):
 
     def cut_out_test():
         run_program(['example.mp4', '--edit', 'none', '--video_speed', '2',
-            '--silent_speed', '3', '--cut_out', '2secs,10secs'])
+            '--silent_speed', '3', '--cut_out', '2secs,10secs', '--has_vfr', 'no'])
         run_program(['example.mp4', '--edit', 'all', '--video_speed', '2',
-            '--add_in', '2secs,10secs'])
+            '--add_in', '2secs,10secs', '--has_vfr', 'no'])
     tester.run_test('cut_out_test', cut_out_test)
 
     def gif_test():
         run_program(['resources/man_on_green_screen.gif', '--edit', 'none'])
+        fullInspect(
+            'resources/man_on_green_screen_ALTERED.gif',
+            [ffprobe.getVideoCodec, 'gif'],
+        )
     tester.run_test('gif_test', gif_test, description='''
         Feed auto-editor a gif file and make sure it can spit out a correctly formated
         gif. No editing is requested.
@@ -396,21 +400,16 @@ def main(sys_args=None):
     tester.run_test('margin_tests', margin_tests)
 
     def extension_tests():
+        # Input file must have an extension.
         shutil.copy('example.mp4', 'example')
         checkForError(['example', '--no_open'], 'must have an extension.')
         os.remove('example')
 
-        run_program(['example.mp4', '-o', 'example.mkv'])
-        os.remove('example.mkv')
-
-        run_program(['resources/test.mkv', '-o', 'test.mp4'])
-        os.remove('test.mp4')
-
     tester.run_test('extension_tests', extension_tests)
 
     def progress_ops_test():
-        run_program(['example.mp4', 'progressOps', '--machine_readable_progress'])
-        run_program(['example.mp4', 'progressOps', '--no_progress'])
+        run_program(['example.mp4', '--has_vfr', 'no', 'progressOps', '--machine_readable_progress'])
+        run_program(['example.mp4', '--has_vfr', 'no', 'progressOps', '--no_progress'])
     tester.run_test('progress_ops_test', progress_ops_test)
 
     def silent_threshold():
@@ -428,15 +427,8 @@ def main(sys_args=None):
         run_program(['example.json'])
     tester.run_test('json_tests', json_tests)
 
-    def speed_tests():
-        run_program(['example.mp4', '-s', '2', '-mcut', '10'])
-        run_program(['example.mp4', '-v', '2', '-mclip', '4'])
-        run_program(['example.mp4', '--sounded_speed', '0.5'])
-        run_program(['example.mp4', '--silent_speed', '0.5'])
-    tester.run_test('speed_tests', speed_tests)
-
     def scale_tests():
-        run_program(['example.mp4', '--scale', '1.5'])
+        run_program(['example.mp4', '--scale', '1.5', '--has_vfr', 'no'])
         fullInspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
@@ -444,7 +436,7 @@ def main(sys_args=None):
             [ffprobe.getSampleRate, '48000'],
         )
 
-        run_program(['example.mp4', '--scale', '0.2'])
+        run_program(['example.mp4', '--scale', '0.2', '--has_vfr', 'no'])
         fullInspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
