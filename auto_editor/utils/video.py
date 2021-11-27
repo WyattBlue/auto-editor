@@ -12,6 +12,23 @@ def fset(cmd, option, value):
     return cmd + [option] + [value]
 
 
+def get_vcodec(args, inp, rules):
+    vcodec = args.video_codec
+    if(vcodec == 'auto'):
+        vcodec = inp.video_streams[0]['codec']
+
+        if((rules['vstrict'] and vcodec not in rules['vcodecs'])
+            or (vcodec in rules['disallow_v'])):
+            return rules['vcodecs'][0]
+
+    if(vcodec == 'copy'):
+        return inp.video_streams[0]['codec']
+
+    if(vcodec == 'uncompressed'):
+        return 'mpeg4'
+    return vcodec
+
+
 def video_quality(cmd, args, inp, rules):
     cmd = fset(cmd, '-crf', args.constant_rate_factor)
     cmd = fset(cmd, '-b:v', args.video_bitrate)
@@ -19,23 +36,11 @@ def video_quality(cmd, args, inp, rules):
     cmd = fset(cmd, '-preset', args.preset)
 
     qscale = args.video_quality_scale
-    vcodec = args.video_codec
 
-    if(vcodec == 'auto'):
-        vcodec = inp.video_streams[0]['codec']
+    if(args.video_codec == 'uncompressed' and fnone(qscale)):
+        qscale = '1'
 
-        if((vcodec is None) or (rules['vstrict'] and vcodec not in rules['vcodecs'])
-            or (vcodec in rules['disallow_v'])):
-            vcodec = rules['vcodecs'][0]
-
-    if(vcodec == 'copy'):
-        vcodec = inp.video_streams[0]['codec']
-        vcodec = 'copy' if vcodec is None else input_codec
-
-    if(vcodec == 'uncompressed'):
-        vcodec = 'mpeg4'
-        if(fnone(qscale)):
-            qscale = '1'
+    vcodec = get_vcodec(args, inp, rules)
 
     cmd.extend(['-c:v', vcodec])
 
@@ -78,7 +83,8 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
             new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
             cmd.extend(['-i', new_path])
 
-    total_streams = v_tracks + s_tracks + (a_tracks if args.keep_tracks_seperate else min(a_tracks, 1))
+    # copying png streams isn't supported yet.
+    total_streams = min(v_tracks, 1) + s_tracks + (a_tracks if args.keep_tracks_seperate else min(a_tracks, 1))
 
     for i in range(total_streams):
         cmd.extend(['-map', '{}:0'.format(i)])
