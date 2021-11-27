@@ -4,14 +4,13 @@
 import os.path
 import subprocess
 
+# From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
+allowed_pix_fmt = {'yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
+    'abgr', 'bgra', 'gray', 'gray8', 'rgb8', 'bgr8', 'pal8'}
+
 def pix_fmt_allowed(pix_fmt):
     # type: (str) -> bool
-
-    # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
-    allowed_formats = ['yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
-        'abgr', 'bgra', 'gray', 'gray8', 'rgb8', 'bgr8', 'pal8']
-
-    return pix_fmt in allowed_formats
+    return pix_fmt in allowed_pix_fmt
 
 class Wrapper:
     """
@@ -92,14 +91,19 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
 
     if(args.scale != 1):
         apply_video = False
-        # Due to some [redacted] decisions by the FFmpeg team, scaling operations
-        # have to be slow down. Certain scales need to be some with software rendering
-        # and FFmpeg sometimes doesn't accept the "-allow_sw 1" command at all.
+
+    from auto_editor.utils.encoder import encoders
+    from auto_editor.utils.video import get_vcodec, video_quality
+
+    my_codec = get_vcodec(args, inp, rules)
+
+    if(my_codec in encoders):
+        if(encoders[my_codec]['pix_fmt'].isdisjoint(allowed_pix_fmt)):
+            apply_video = True
 
     if(apply_video):
         cmd.extend(['-c:v', 'mpeg4', '-qscale:v', '1'])
     else:
-        from auto_editor.utils.video import video_quality
         cmd = video_quality(cmd, args, inp, rules)
 
     cmd.append(spedup)
