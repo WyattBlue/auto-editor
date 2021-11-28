@@ -64,10 +64,10 @@ ogg = {
     'allow_video': True,
     'allow_audio': True,
     'allow_subtitle': True,
-    'vcodecs': ['theora'],
-    'acodecs': ['opus', 'flac', 'vorbis'],
-    'disallow_v': ['h264', 'hevc', 'prores', 'mpeg4', 'mpeg2video', 'mjpeg', 'rawvideo'],
-    'disallow_a': ['aac', 'mp3', 'mp2'],
+    'vcodecs': ['libtheora', 'theora'],
+    'acodecs': ['libvorbis', 'vorbis', 'flac', 'opus', 'speex'],
+    'vstrict': True,
+    'astrict': True,
 },
 
 containers = {
@@ -126,9 +126,13 @@ containers = {
     'opus': {
         'name': 'Opus',
         'allow_audio': True,
+        'acodecs': ['opus', 'flac', 'libvorbis', 'vorbis', 'speex'],
+        'astrict': True,
     },
     'oga': {
         'allow_audio': True,
+        'acodecs': ['flac', 'libvorbis', 'vorbis', 'opus', 'speex'],
+        'astrict': True,
     },
     'flac': {
         'name': 'Free Lossless Audio Codec',
@@ -185,13 +189,13 @@ containers = {
         'allow_subtitle': True,
         'vcodecs': ['h264', 'hevc', 'vp9', 'vp8', 'prores', 'mpeg4', 'mpeg2video',
             'msmpeg4v3', 'mjpeg', 'gif', 'rawvideo'],
-        'acodecs': ['vorbis', 'opus', 'flac', 'aac', 'mp2'],
+        'acodecs': ['libvorbis', 'vorbis', 'opus', 'flac', 'aac', 'mp2'],
         'disallow_v': ['apng'],
     },
     'mka': {
         'name': 'Matroska Audio',
         'allow_audio': True,
-        'acodecs': ['vorbis', 'opus', 'flac', 'aac', 'mp2'],
+        'acodecs': ['libvorbis', 'vorbis', 'opus', 'flac', 'aac', 'mp2'],
     },
     'mov': {
         'name': 'QuickTime / MOV',
@@ -249,12 +253,16 @@ def get_rules(key):
     return rules
 
 if(__name__ == '__main__'):
+    import json
+    import subprocess
+
     from auto_editor.ffwrapper import FFmpeg
 
-    import subprocess
+    with open('../../container.json', 'w') as outfile:
+        json.dump(containers, outfile)
 
     ffmpeg = FFmpeg()
 
-    out = '../../out.ogg'
-    ffmpeg.run(['-i', '../../example.mp4', '-c:a', 'mp2', '-strict', '-2', out])
+    out = '../../out.opus'
+    ffmpeg.run(['-i', '../../example.mp4', '-c:a', 'flac', '-strict', '-2', out])
     subprocess.call(['aeinfo', out])
