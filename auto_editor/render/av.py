@@ -109,7 +109,7 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
     cmd.append(spedup)
 
     process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-        stderr=None if args.show_ffmpeg_debug else subprocess.DEVNULL)
+        stderr=subprocess.DEVNULL)
 
     inputEquavalent = 0.0
     outputEquavalent = 0
@@ -140,9 +140,9 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
         process2.stdin.close()
         process2.wait()
     except BrokenPipeError:
-        log.print(cmd)
-        process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE)
-        log.error('Broken Pipe Error!')
+        progress.end()
+        ffmpeg.run_check_errors(cmd, log, True)
+        log.error('FFmpeg Error!')
 
     # Unfortunately, scaling has to be a concrete step.
     if(args.scale != 1):
