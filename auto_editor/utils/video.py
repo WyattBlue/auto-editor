@@ -56,7 +56,7 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
     a_tracks = 0 if not rules['allow_audio'] else len(inp.audio_streams)
     v_tracks = 0 if not rules['allow_video'] else len(inp.video_streams)
 
-    cmd = []
+    cmd = ['-hide_banner', '-y']
     if(spedup is not None):
         cmd.extend(['-i', spedup])
 
@@ -115,4 +115,4 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
             cmd.extend(['-ar', str(args.sample_rate)])
 
     cmd.extend(['-strict', '-2', write_file]) # Allow experimental codecs.
-    ffmpeg.run(cmd)
+    ffmpeg.run_check_errors(cmd, log)

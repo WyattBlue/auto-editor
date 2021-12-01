@@ -28,7 +28,7 @@ class Log():
     def debug(self, message):
         if(self.is_debug):
             self.conwrite('')
-            print('Debug: {}'.format(message))
+            print('Debug: {}'.format(message), file=sys.stderr)
 
     def cleanup(self):
         if(self.temp is None):
