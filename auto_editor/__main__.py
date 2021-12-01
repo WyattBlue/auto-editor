@@ -65,7 +65,7 @@ def main_options(parser):
         help='check the website certificate before downloading.')
 
     parser.add_argument('exportMediaOps', nargs=0, action='grouping')
-    parser.add_argument('--video_bitrate', '-b:v', default='unset', group='exportMediaOps',
+    parser.add_argument('--video_bitrate', '-b:v', default='5m', group='exportMediaOps',
         help='set the number of bits per second for video.')
     parser.add_argument('--audio_bitrate', '-b:a', default='unset', group='exportMediaOps',
         help='set the number of bits per second for audio.')
