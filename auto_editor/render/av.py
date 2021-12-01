@@ -65,7 +65,7 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
         apply_video = inp.ext != '.mp4'
 
     log.debug('pix_fmt: {}'.format(pix_fmt))
-    log.debug('apply video: {}'.format(apply_video))
+    log.debug('apply video quality settings now: {}'.format(not apply_video))
 
     inputVideoStream = input_.streams.video[0]
     inputVideoStream.thread_type = 'AUTO'
