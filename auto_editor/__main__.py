@@ -267,7 +267,7 @@ def main():
         dirpath = os.path.dirname(os.path.realpath(__file__))
 
         print('Python Version: {} {}'.format(platform.python_version(), is64bit))
-        print('Platform: {} {}'.format(platform.system(), platform.release()))
+        print('Platform: {} {} {}'.format(platform.system(), platform.release(), platform.machine().lower()))
         print('Config File path: {}'.format(os.path.join(dirpath, 'config.txt')))
         print('FFmpeg path: {}'.format(ffmpeg.path))
         print('FFmpeg version: {}'.format(ffmpeg.version))
