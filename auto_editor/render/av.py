@@ -38,7 +38,7 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
     total_frames = chunks[len(chunks) - 1][1]
     progress.start(total_frames, 'Creating new video')
 
-    input_ = av.open(inp.path)
+    input_ = av.open(inp.path, 'r')
     pix_fmt = input_.streams.video[0].pix_fmt
 
     apply_video = True
