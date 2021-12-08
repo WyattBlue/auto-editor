@@ -139,13 +139,10 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
         progress.end()
         process2.stdin.close()
         process2.wait()
-    except BrokenPipeError:
+    except (OSError, BrokenPipeError):
         progress.end()
         ffmpeg.run_check_errors(cmd, log, True)
         log.error('FFmpeg Error!')
-    except OSError:
-        progress.end()
-        log.error('Python Exception: OSError. Your video codec may not be valid.')
 
     # Unfortunately, scaling has to be a concrete step.
     if(args.scale != 1):
