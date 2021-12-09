@@ -56,7 +56,7 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
     a_tracks = 0 if not rules['allow_audio'] else len(inp.audio_streams)
     v_tracks = 0 if not rules['allow_video'] else len(inp.video_streams)
 
-    cmd = ['-hide_banner', '-y']
+    cmd = ['-hide_banner', '-y', '-i', inp.path]
     if(spedup is not None):
         cmd.extend(['-i', spedup])
 
@@ -87,7 +87,7 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
     total_streams = min(v_tracks, 1) + s_tracks + (a_tracks if args.keep_tracks_seperate else min(a_tracks, 1))
 
     for i in range(total_streams):
-        cmd.extend(['-map', '{}:0'.format(i)])
+        cmd.extend(['-map', '{}:0'.format(i+1)])
 
     if(v_tracks > 0):
         if(apply_video):
@@ -114,5 +114,7 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
         else:
             cmd.extend(['-ar', str(args.sample_rate)])
 
-    cmd.extend(['-strict', '-2', write_file]) # Allow experimental codecs.
+    cmd.extend(['-strict', '-2']) # Allow experimental codecs.
+    cmd.extend(['-map', '0:t?', '-map', '0:d?']) # Add input attachments and data to output.
+    cmd.append(write_file)
     ffmpeg.run_check_errors(cmd, log)
