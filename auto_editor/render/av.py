@@ -61,8 +61,6 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
             '-vcodec', 'rawvideo', 'pipe:1']
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
         input_ = av.open(wrapper, 'r')
-    else:
-        apply_video = inp.ext != '.mp4'
 
     log.debug('pix_fmt: {}'.format(pix_fmt))
     log.debug('apply video quality settings now: {}'.format(not apply_video))
