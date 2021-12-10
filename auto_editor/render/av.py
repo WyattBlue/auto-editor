@@ -41,8 +41,6 @@ def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, 
     input_ = av.open(inp.path, 'r')
     pix_fmt = input_.streams.video[track].pix_fmt
 
-    apply_video = True
-
     if(has_vfr):
         # Create a cfr stream on stdout.
         cmd = ['-i', inp.path, '-map', f'0:v:{track}', '-vf', f'fps=fps={fps}', '-r',
@@ -62,8 +60,21 @@ def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, 
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
         input_ = av.open(wrapper, 'r')
 
+    from auto_editor.utils.encoder import encoders
+    from auto_editor.utils.video import get_vcodec, video_quality
+
+    my_codec = get_vcodec(args, inp, rules)
+
+    apply_video_later = True
+
+    if(my_codec in encoders):
+        apply_video_later = encoders[my_codec]['pix_fmt'].isdisjoint(allowed_pix_fmt)
+
+    if(args.scale != 1):
+        apply_video_later = False
+
     log.debug(f'pix_fmt: {pix_fmt}')
-    log.debug(f'apply video quality settings now: {not apply_video}')
+    log.debug(f'apply video quality settings now: {not apply_video_later}')
 
     inputVideoStream = input_.streams.video[track]
     inputVideoStream.thread_type = 'AUTO'
@@ -87,19 +98,7 @@ def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, 
         '-pix_fmt', pix_fmt, '-s', f'{width}*{height}', '-framerate', str(fps),
         '-i', '-', '-pix_fmt', pix_fmt]
 
-    if(args.scale != 1):
-        apply_video = False
-
-    from auto_editor.utils.encoder import encoders
-    from auto_editor.utils.video import get_vcodec, video_quality
-
-    my_codec = get_vcodec(args, inp, rules)
-
-    if(my_codec in encoders):
-        if(encoders[my_codec]['pix_fmt'].isdisjoint(allowed_pix_fmt)):
-            apply_video = True
-
-    if(apply_video):
+    if(apply_video_later):
         cmd.extend(['-c:v', 'mpeg4', '-qscale:v', '1'])
     else:
         cmd = video_quality(cmd, args, inp, rules)
@@ -158,5 +157,5 @@ def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, 
             # Run again to show errors even if it might not work.
             ffmpeg.run(cmd)
 
-    return 'video', spedup, apply_video
+    return 'video', spedup, apply_video_later
 
