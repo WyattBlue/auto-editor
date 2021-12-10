@@ -73,8 +73,11 @@ class File:
                     s_data['height'] = regex_match(r'\d+x(?P<match>\d+)[\s,]', line)
                     s_data['codec'] = regex_match(r'Video:\s(?P<match>\w+)', line)
                     s_data['bitrate'] = regex_match(r'\s(?P<match>\d+\skb\/s)', line)
+                    s_data['fps'] = regex_match(r'\s(?P<match>[\d\.]+)\stbr', line)
+                    s_data['lang'] = regex_match(r'Stream #\d+:\d+\((?P<match>\w+)\)', line)
+
                     if(fps is None):
-                        fps = regex_match(r'\s(?P<match>[\d\.]+)\stbr', line)
+                        fps = s_data['fps']
                     video_streams.append(s_data)
 
                 elif(re.search(r'Audio:', line)):
