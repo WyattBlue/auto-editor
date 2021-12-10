@@ -307,20 +307,21 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
                 if(not os.path.isfile(new_file)):
                     log.bug('Audio file not created.')
 
-        apply_video = True
+        video_stuff = []
 
-        if(rules['allow_video'] and len(inp.video_streams) > 0):
+        if(rules['allow_video']):
             from auto_editor.render.av import render_av
-            spedup, apply_video = render_av(ffmpeg, inp, args, chunks, speeds, fps,
-                has_vfr, progress, effects, rules, temp, log)
+            for v, vid in enumerate(inp.video_streams):
+                if(vid['codec'] in ['png', 'jpeg']):
+                    video_stuff.append(('image', None, None))
+                else:
+                    video_stuff.append(render_av(ffmpeg, v, inp, args, chunks, speeds,
+                        fps, has_vfr, progress, effects, rules, temp, log))
 
-            if(log.is_debug):
-                log.debug('Writing the output file.')
-            else:
-                log.conwrite('Writing the output file.')
+        log.conwrite('Writing the output file.')
 
-        mux_quality_media(ffmpeg, spedup, rules, output_path, output_container,
-            apply_video, args, inp, temp, log)
+        mux_quality_media(ffmpeg, video_stuff, rules, output_path, output_container,
+            args, inp, temp, log)
         if(output_path is not None and not os.path.isfile(output_path)):
             log.bug('The file {} was not created.'.format(output_path))
 

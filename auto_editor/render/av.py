@@ -28,8 +28,8 @@ class Wrapper:
         return self._fh.read(buf_size)
 
 
-def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects, rules,
-    temp, log):
+def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, effects,
+    rules, temp, log):
     try:
         import av
     except ImportError:
@@ -39,13 +39,13 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
     progress.start(total_frames, 'Creating new video')
 
     input_ = av.open(inp.path, 'r')
-    pix_fmt = input_.streams.video[0].pix_fmt
+    pix_fmt = input_.streams.video[track].pix_fmt
 
     apply_video = True
 
     if(has_vfr):
         # Create a cfr stream on stdout.
-        cmd = ['-i', inp.path, '-map', '0:v:0', '-vf', 'fps=fps={}'.format(fps), '-r',
+        cmd = ['-i', inp.path, '-map', f'0:v:{track}', '-vf', f'fps=fps={fps}', '-r',
             str(fps), '-vsync', '1', '-f', 'matroska']
         if(not pix_fmt_allowed(pix_fmt)):
             pix_fmt = 'yuv420p'
@@ -57,15 +57,15 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
         input_ = av.open(wrapper, 'r')
     elif(not pix_fmt_allowed(pix_fmt)):
         pix_fmt = 'yuv420p'
-        cmd = ['-i', inp.path, '-map', '0:v:0', '-f', 'matroska', '-pix_fmt', pix_fmt,
+        cmd = ['-i', inp.path, '-map', f'0:v:{track}', '-f', 'matroska', '-pix_fmt', pix_fmt,
             '-vcodec', 'rawvideo', 'pipe:1']
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
         input_ = av.open(wrapper, 'r')
 
-    log.debug('pix_fmt: {}'.format(pix_fmt))
-    log.debug('apply video quality settings now: {}'.format(not apply_video))
+    log.debug(f'pix_fmt: {pix_fmt}')
+    log.debug(f'apply video quality settings now: {not apply_video}')
 
-    inputVideoStream = input_.streams.video[0]
+    inputVideoStream = input_.streams.video[track]
     inputVideoStream.thread_type = 'AUTO'
 
     width = inputVideoStream.width
@@ -81,10 +81,10 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
 
     effects.resolve(args)
 
-    spedup = os.path.join(temp, 'spedup.mp4')
+    spedup = os.path.join(temp, f'spedup{track}.mp4')
 
     cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-c:v', 'rawvideo',
-        '-pix_fmt', pix_fmt, '-s', '{}*{}'.format(width, height), '-framerate', str(fps),
+        '-pix_fmt', pix_fmt, '-s', f'{width}*{height}', '-framerate', str(fps),
         '-i', '-', '-pix_fmt', pix_fmt]
 
     if(args.scale != 1):
@@ -144,8 +144,8 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
 
     # Unfortunately, scaling has to be a concrete step.
     if(args.scale != 1):
-        sped_input = os.path.join(temp, 'spedup.mp4')
-        spedup = os.path.join(temp, 'scale.mp4')
+        sped_input = os.path.join(temp, f'spedup{track}.mp4')
+        spedup = os.path.join(temp, f'scale{track}.mp4')
         cmd = ['-i', sped_input, '-vf', 'scale=iw*{s}:ih*{s}'.format(s=args.scale),
             spedup]
 
@@ -158,5 +158,5 @@ def render_av(ffmpeg, inp, args, chunks, speeds, fps, has_vfr, progress, effects
             # Run again to show errors even if it might not work.
             ffmpeg.run(cmd)
 
-    return spedup, apply_video
+    return 'video', spedup, apply_video
 

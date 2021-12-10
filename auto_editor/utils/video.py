@@ -50,30 +50,33 @@ def video_quality(cmd, args, inp, rules):
     return cmd
 
 
-def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
-    args, inp, temp, log):
+def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, inp,
+    temp, log):
     s_tracks = 0 if not rules['allow_subtitle'] else len(inp.subtitle_streams)
     a_tracks = 0 if not rules['allow_audio'] else len(inp.audio_streams)
-    v_tracks = 0 if not rules['allow_video'] else len(inp.video_streams)
-
+    v_tracks = 0
     cmd = ['-hide_banner', '-y', '-i', inp.path]
-    if(spedup is not None):
-        cmd.extend(['-i', spedup])
+
+    for _, spedup, _ in video_stuff:
+        if(spedup is not None):
+            cmd.extend(['-i', spedup])
+            v_tracks += 1
 
     if(a_tracks > 0):
         if(args.keep_tracks_seperate and rules['max_audio_streams'] is None):
             for t in range(a_tracks):
-                cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
+                cmd.extend(['-i', os.path.join(temp, f'new{t}.wav')])
         else:
             # Merge all the audio a_tracks into one.
             new_a_file = os.path.join(temp, 'new_audio.wav')
             if(a_tracks > 1):
                 new_cmd = []
                 for t in range(a_tracks):
-                    new_cmd.extend(['-i', os.path.join(temp, 'new{}.wav'.format(t))])
-                new_cmd.extend(['-filter_complex', 'amerge=inputs={}'.format(a_tracks),
-                    '-ac', '2', new_a_file])
+                    new_cmd.extend(['-i', os.path.join(temp, f'new{t}.wav')])
+                new_cmd.extend(['-filter_complex', f'amerge=inputs={a_tracks}', '-ac',
+                    '2', new_a_file])
                 ffmpeg.run(new_cmd)
+                a_tracks = 1
             else:
                 new_a_file = os.path.join(temp, 'new0.wav')
             cmd.extend(['-i', new_a_file])
@@ -83,17 +86,18 @@ def mux_quality_media(ffmpeg, spedup, rules, write_file, container, apply_video,
             new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
             cmd.extend(['-i', new_path])
 
-    # copying png streams isn't supported yet.
-    total_streams = min(v_tracks, 1) + s_tracks + (a_tracks if args.keep_tracks_seperate else min(a_tracks, 1))
+    total_streams = v_tracks + s_tracks + a_tracks
 
     for i in range(total_streams):
-        cmd.extend(['-map', '{}:0'.format(i+1)])
+        cmd.extend(['-map', f'{i+1}:0'])
 
-    if(v_tracks > 0):
-        if(apply_video):
-            cmd = video_quality(cmd, args, inp, rules)
-        else:
-            cmd.extend(['-c:v', 'copy'])
+    for video_type, _, apply_video in video_stuff:
+        if(video_type == 'video'):
+            if(apply_video):
+                cmd = video_quality(cmd, args, inp, rules)
+            else:
+                cmd.extend(['-c:v', 'copy'])
+            break
 
     if(s_tracks > 0):
         scodec = inp.subtitle_streams[0]['codec']
