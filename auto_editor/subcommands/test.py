@@ -67,6 +67,14 @@ class FFprobe():
     def getSampleRate(self, file, track=0):
         return self._get(file, 'sample_rate', 'a', track)
 
+    def getVLanguage(self, file):
+        return self.pipe(['-show_entries', 'stream=index:stream_tags=language',
+            '-select_streams', 'v', '-of', 'compact=p=0:nk=1', file]).strip()
+
+    def getALanguage(self, file):
+        return self.pipe(['-show_entries', 'stream=index:stream_tags=language',
+            '-select_streams', 'a', '-of', 'compact=p=0:nk=1', file]).strip()
+
     def AudioBitRate(self, file):
 
         def bitrate_format(num):
@@ -324,6 +332,8 @@ def main(sys_args=None):
             [ffprobe.getResolution, '1280x720'],
             [ffprobe.getVideoCodec, 'h264'],
             [ffprobe.getSampleRate, '48000'],
+            [ffprobe.getVLanguage, '0|eng'],
+            [ffprobe.getALanguage, '1|eng'],
         )
         run_program(['example.mp4', '--video_codec', 'uncompressed', '--has_vfr', 'no'])
         inspect(

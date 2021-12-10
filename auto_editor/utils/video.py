@@ -91,6 +91,19 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
     for i in range(total_streams):
         cmd.extend(['-map', f'{i+1}:0'])
 
+    # Copy lang metadata
+    for i, track in enumerate(inp.video_streams):
+        if(i > v_tracks):
+            break
+        if(track['lang'] is not None):
+            cmd.extend([f'-metadata:s:v:{i}', f'language={track["lang"]}'])
+
+    for i, track in enumerate(inp.audio_streams):
+        if(i > a_tracks):
+            break
+        if(track['lang'] is not None):
+            cmd.extend([f'-metadata:s:a:{i}', f'language={track["lang"]}'])
+
     for video_type, _, apply_video in video_stuff:
         if(video_type == 'video'):
             if(apply_video):
