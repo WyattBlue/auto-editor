@@ -6,14 +6,6 @@ import sys
 
 from auto_editor.utils.progressbar import ProgressBar
 
-invalidExtensions = ['.txt', '.md', '.rtf', '.csv', '.cvs', '.html', '.htm',
-      '.xml', '.yaml', '.png', '.jpeg', '.jpg', '.exe', '.doc',
-      '.docx', '.odt', '.pptx', '.xlsx', '.xls', 'ods', '.pdf', '.bat', '.dll',
-      '.prproj', '.psd', '.aep', '.zip', '.rar', '.7z', '.java', '.class', '.js',
-      '.c', '.cpp', '.csharp', '.py', '.app', '.git', '.github', '.gitignore',
-      '.db', '.ini', '.BIN', '.svg', '.in', '.pyc', '.log', '.xsd', '.ffpreset',
-      '.kys', '.essentialsound', '.np']
-
 class MyLogger():
     @staticmethod
     def debug(msg):
@@ -129,11 +121,6 @@ def download_video(my_input, args, ffmpeg, log):
         log.conwrite('')
     return outtmpl
 
-def _valid_files(path, bad_exts):
-    for f in os.listdir(path):
-        if(f[f.rfind('.'):] not in bad_exts and not os.path.isdir(f)
-            and not f.startswith('.')):
-            yield os.path.join(path, f)
 
 def get_segment(args, my_input, log):
     if(args.block is not None):
@@ -150,16 +137,11 @@ def valid_input(inputs, ffmpeg, args, log):
     new_inputs = []
     segments = []
     for my_input in inputs:
-        if(os.path.isdir(my_input)):
-            new_inputs += sorted(_valid_files(my_input, invalidExtensions))
-            segments += [None] * (len(new_inputs) - len(segments))
-        elif(os.path.isfile(my_input)):
+        if(os.path.isfile(my_input)):
             _, ext = os.path.splitext(my_input)
             if(ext == ''):
                 log.error('File must have an extension.')
 
-            if(ext in invalidExtensions):
-                log.error('Invalid file extension "{}" for {}'.format(ext, my_input))
             new_inputs.append(my_input)
             segments.append(get_segment(args, my_input, log))
 
@@ -167,6 +149,8 @@ def valid_input(inputs, ffmpeg, args, log):
             new_inputs.append(download_video(my_input, args, ffmpeg, log))
             segments.append(get_segment(args, my_input, log))
         else:
+            if(os.path.isdir(my_input)):
+                log.error('Input must be a file or url.')
             log.error('Could not find file: {}'.format(my_input))
 
     return new_inputs, segments
