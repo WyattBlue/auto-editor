@@ -120,7 +120,7 @@ def main(sys_args=sys.argv[1:]):
             log.error('{}: File does not exist.'.format(media_file))
 
         if(os.path.isdir(media_file)):
-            for subdir, dirs, files in os.walk(media_file):
+            for _, _, files in os.walk(media_file):
                 for file in files:
                     if(file == '.DS_Store'):
                         continue

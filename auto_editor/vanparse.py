@@ -163,7 +163,8 @@ class ArgumentParser():
 
 class ParseOptions():
 
-    def parse_parameters(self, val, op):
+    @staticmethod
+    def parse_parameters(val, op):
 
         # TODO: allow out-of-order arguments with keyword syntax.
 
@@ -248,7 +249,6 @@ class ParseOptions():
         option_list = 'input'
         list_type = str
         i = 0
-        group = None
         while i < len(sys_args):
             item = sys_args[i]
             label = 'option' if item.startswith('--') else 'short'
@@ -300,9 +300,6 @@ class ParseOptions():
 
                 key = _to_key(option)
                 _set.append(key)
-
-                if(option['action'] == 'grouping'):
-                    group = key
 
                 nextItem = None if i == len(sys_args) - 1 else sys_args[i+1]
                 if(nextItem == '-h' or nextItem == '--help'):
