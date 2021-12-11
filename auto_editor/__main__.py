@@ -220,7 +220,7 @@ def main_options(parser):
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
     parser.add_argument('(input)', nargs='*',
-        help='the path to a file, folder, or url you want edited.')
+        help='file(s) or URL(s) that will be edited.')
     return parser
 
 
