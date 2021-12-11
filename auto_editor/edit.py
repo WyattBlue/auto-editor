@@ -130,14 +130,12 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
     tracks = len(inp.audio_streams)
     audio_file = len(inp.video_streams) == 0 and tracks == 1
 
-    if(args.force_fps_to is not None):
-        fps = args.force_fps_to
-    elif(inp.fps is None):
+    if(inp.fps is None):
         fps = 30
+    elif(exporting_to_editor):
+        fps = int(inp.fps)
     else:
         fps = float(inp.fps)
-        if(exporting_to_editor):
-            fps = int(fps)
 
     if(fps < 1):
         log.error('{}: Frame rate cannot be below 1. fps: {}'.format(inp.basename, fps))
