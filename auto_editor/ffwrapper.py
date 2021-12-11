@@ -152,7 +152,6 @@ class FFmpeg():
         process.stdin.close()
         output = stderr.decode()
 
-        import re
         error_list = [
             r"Unknown encoder '.*'",
             r"-q:v qscale not available for encoder\. Use -b:v bitrate instead\.",

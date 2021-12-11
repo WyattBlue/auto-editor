@@ -43,7 +43,7 @@ setup(
         'av>=8.0.3',
         'opencv-python>=4.3',
     ],
-    python_requires='>=3.7',
+    python_requires='>=3.7,<3.12',
     classifiers=[
         'Topic :: Multimedia :: Sound/Audio',
         'Topic :: Multimedia :: Video',

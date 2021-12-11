@@ -290,8 +290,6 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
     def make_media(inp, chunks, output_path):
         from auto_editor.utils.video import mux_quality_media
 
-        spedup = None
-
         if(rules['allow_subtitle']):
             from auto_editor.render.subtitle import cut_subtitles
             cut_subtitles(ffmpeg, inp, chunks, speeds, fps, temp, log)
