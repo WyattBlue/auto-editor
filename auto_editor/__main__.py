@@ -29,10 +29,6 @@ def main_options(parser):
         group='progressOps',
         help='do not display any progress at all.')
 
-    parser.add_argument('metadataOps', nargs=0, action='grouping')
-    parser.add_argument('--force_fps_to', type=float, group='metadataOps',
-        help='manually set the fps value for the input video if detection fails.')
-
     parser.add_argument('motionOps', nargs=0, action='grouping')
     parser.add_argument('--dilates', type=int, default=2, range='0 to 5',
         group='motionOps',
@@ -119,8 +115,6 @@ def main_options(parser):
 
     parser.add_argument('--background', type=str, default='#000',
         help='set the color of the background that is visible when the video is moved.')
-    parser.add_argument('--render', default='auto', hidden=True,
-        help="defunct option. doesn't do anything.")
     parser.add_argument('--scale', type=float_type, default=1,
         help='scale the output media file by a certain factor.')
     parser.add_argument('--combine_files', action='store_true',
