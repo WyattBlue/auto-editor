@@ -519,7 +519,6 @@ def main(sys_args=None):
             item = 'resources/{}'.format(item)
             run_program([item])
             run_program([item, '-exp'])
-            run_program([item, '-exr'])
             run_program([item, '-exf'])
             run_program([item, '-exs'])
             run_program([item, '--export_as_clip_sequence'])

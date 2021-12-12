@@ -157,8 +157,6 @@ def main_options(parser):
 
     parser.add_argument('--export_to_premiere', '-exp', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of making a media file.')
-    parser.add_argument('--export_to_resolve', '-exr', action='store_true',
-        help='export as an XML file for DaVinci Resolve instead of making a media file.')
     parser.add_argument('--export_to_final_cut_pro', '-exf', action='store_true',
         help='export as an XML file for Final Cut Pro instead of making a media file.')
     parser.add_argument('--export_to_shotcut', '-exs', action='store_true',
@@ -247,8 +245,8 @@ def main():
 
     timer = Timer(args.quiet)
 
-    exporting_to_editor = (args.export_to_premiere or args.export_to_resolve or
-        args.export_to_final_cut_pro or args.export_to_shotcut)
+    exporting_to_editor = (args.export_to_premiere or args.export_to_final_cut_pro or
+        args.export_to_shotcut)
     making_data_file = exporting_to_editor or args.export_as_json
 
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
@@ -295,8 +293,7 @@ def main():
         log.error('You need to give auto-editor an input file or folder so it can '
             'do the work for you.')
 
-    if([args.export_to_premiere, args.export_to_resolve,
-        args.export_to_final_cut_pro, args.export_as_audio,
+    if([args.export_to_premiere, args.export_to_final_cut_pro, args.export_as_audio,
         args.export_to_shotcut, args.export_as_clip_sequence].count(True) > 1):
         log.error('You must choose only one export option.')
 
@@ -321,8 +318,6 @@ def main():
             return 'Exporting to Adobe Premiere Pro XML file.'
         if(args.export_to_final_cut_pro):
             return 'Exporting to Final Cut Pro XML file.'
-        if(args.export_to_resolve):
-            return 'Exporting to DaVinci Resolve XML file.'
         if(args.export_to_shotcut):
             return 'Exporting to Shotcut XML Timeline file.'
         if(args.export_as_audio):
