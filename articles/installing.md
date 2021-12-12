@@ -1,6 +1,6 @@
 # Installing Auto-Editor
 
-Download and Install [Python 3.9](https://www.python.org/downloads/release/python-397/). The best version for auto-editor.
+Download and Install [Python 3.9](https://www.python.org/downloads/release/python-399/). The best version for auto-editor.
 
 > If you are installing on Windows, make sure "Add Python 3.9 to PATH" is checked.
 
