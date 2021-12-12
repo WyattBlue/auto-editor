@@ -41,11 +41,12 @@ Create an XML file that can be imported to Adobe Premiere Pro using this command
 auto-editor example.mp4 --export_to_premiere
 ```
 
-Similar flags exist also for:
+You can also import to these programs using:
 
-- `--export_to_resolve` for DaVinci Resolve.
 - `--export_to_final_cut_pro` for Final Cut Pro.
 - `--export_to_shot_cut` for ShotCut.
+
+Other programs might also be able to understand these formats, but if they don't. You can use ` --export_as_clip_sequence` which exports to many files that can be imported and used in other editors.
 
 
 <h2 align="center">More Options</h2>
@@ -76,7 +77,7 @@ auto-editor --scale --help
  - [How to Install Auto-Editor](https://auto-editor.com/cli/installing)
  - [How to Edit Videos With Auto-Editor](https://auto-editor.com/cli/editing)
  - [How to Use Motion Detection in Auto-Editor](https://auto-editor.com/cli/motion_detection)
- - [What's new in Range Syntax](https://auto-editor.com/cli/range_syntax)
+ - [Range Syntax](https://auto-editor.com/cli/range_syntax)
  - [Subcommands](https://auto-editor.com/cli/subcommands)
  - [Branding Guide](https://auto-editor.com/docs/branding)
  - [GPU Acceleration](https://auto-editor.com/docs/gpu_acceleration)
