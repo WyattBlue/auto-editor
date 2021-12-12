@@ -257,7 +257,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
             fps, log)
         return num_cuts, output_path
 
-    if(args.export_to_final_cut_pro or args.export_to_resolve):
+    if(args.export_to_final_cut_pro):
         from auto_editor.formats.final_cut_pro import fcp_xml
 
         total_frames = chunks[len(chunks) - 1][1]

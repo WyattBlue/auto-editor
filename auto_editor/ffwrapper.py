@@ -49,11 +49,13 @@ class File:
                 key = regex_match(r'^\s*(?P<match>[a-z_]+)', line)
                 body = regex_match(r'^\s*[a-z_]*\s*:\s(?P<match>[\w\W]*)', line)
 
-                if(key is None):
-                    self.metadata[active_key] += '\n' + body
-                else:
-                    self.metadata[key] = body
-                    active_key = key
+                if(body is not None):
+                    if(key is None):
+                        if(active_key is not None):
+                            self.metadata[active_key] += '\n' + body
+                    else:
+                        self.metadata[key] = body
+                        active_key = key
 
             if(re.search(r'^\s\sMetadata:', line)):
                 active = True
