@@ -1,7 +1,7 @@
 # Auto-Editor default configuration file
 
 # exportMediaOps
-auto-editor.exportMediaOps.video_bitrate = '5m'           # '5m'
+auto-editor.exportMediaOps.video_bitrate = '10m'          # '10m'
 auto-editor.exportMediaOps.audio_bitrate = 'unset'        # 'unset'
 auto-editor.exportMediaOps.sample_rate = None             # None
 auto-editor.exportMediaOps.video_codec = 'auto'           # 'auto'

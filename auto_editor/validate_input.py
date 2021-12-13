@@ -71,8 +71,8 @@ def download_video(my_input, args, ffmpeg, log):
         outtmpl = outtmpl[:-4]
     outtmpl += '.mp4'
 
-    if(args.output_dir is not None):
-        outtmpl = os.path.join(args.output_dir, outtmpl)
+    if(args.download_dir is not None):
+        outtmpl = os.path.join(args.download_dir, outtmpl)
 
     try:
         import yt_dlp
