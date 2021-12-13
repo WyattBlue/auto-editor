@@ -41,7 +41,7 @@ def main_options(parser):
         help='set the strength of the blur applied to a frame before being compared.')
 
     parser.add_argument('urlOps', nargs=0, action='grouping')
-    parser.add_argument('--output_dir', type=str, group='urlOps',
+    parser.add_argument('--download_dir', type=str, group='urlOps',
         default=None,
         help='the directory where the downloaded file is placed.')
     parser.add_argument('--limit_rate', '-rate', default='3m',
@@ -61,7 +61,7 @@ def main_options(parser):
         help='check the website certificate before downloading.')
 
     parser.add_argument('exportMediaOps', nargs=0, action='grouping')
-    parser.add_argument('--video_bitrate', '-b:v', default='5m', group='exportMediaOps',
+    parser.add_argument('--video_bitrate', '-b:v', default='10m', group='exportMediaOps',
         help='set the number of bits per second for video.')
     parser.add_argument('--audio_bitrate', '-b:a', default='unset', group='exportMediaOps',
         help='set the number of bits per second for audio.')
