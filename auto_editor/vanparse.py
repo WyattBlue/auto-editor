@@ -35,21 +35,17 @@ def out(text):
     print('\n'.join(wrapped_lines))
 
 def print_option_help(args, option):
-    text = ''
-    if(option['action'] == 'grouping'):
-        text += '  {}:\n'.format(option['names'][0])
-    else:
-        text += '  ' + ', '.join(option['names']) + '\n    ' + option['help'] + '\n\n'
-        if(option['keywords'] != []):
-            text += '    Arguments:\n    '
-            for n, item in enumerate(option['keywords']):
-                [[k, v]] = item.items()
-                text += '{' + k
-                text += '' if v == '' else '=' + str(v)
-                text += '}' if n + 1 == len(option['keywords']) else '},'
+    text = '  ' + ', '.join(option['names']) + '\n    ' + option['help'] + '\n\n'
+    if(option['keywords'] != []):
+        text += '    Arguments:\n    '
+        for n, item in enumerate(option['keywords']):
+            [[k, v]] = item.items()
+            text += '{' + k
+            text += '' if v == '' else '=' + str(v)
+            text += '}' if n + 1 == len(option['keywords']) else '},'
 
-        if(option['extra'] != ''):
-            text += '{}\n\n'.format(indent(option['extra'], '    '))
+    if(option['extra'] != ''):
+        text += '{}\n\n'.format(indent(option['extra'], '    '))
 
     if(option['keywords'] != []):
         pass
@@ -61,29 +57,23 @@ def print_option_help(args, option):
 
         if(option['choices'] is not None):
             text += '    choices: ' +  ', '.join(option['choices']) + '\n'
-    elif(option['action'] == 'grouping'):
-        for options in args:
-            for op in options:
-                if(op['group'] == option['names'][0]):
-                    text += '  ' + ', '.join(op['names']) + ': ' + op['help'] + '\n'
     elif(option['action'] in ['store_true', 'store_false']):
         text += '    type: flag\n'
     else:
         text += '    type: unknown\n'
 
-    if(option['group'] is not None):
-        text += '    group: ' + option['group'] + '\n'
     out(text)
 
 def print_program_help(root, the_args):
     text = ''
     for options in the_args:
         for option in options:
-            if(not option['hidden']):
-                if(option['action'] == 'grouping'):
-                    text += "\n  {}:\n".format(option['names'][0])
-                else:
-                    text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
+            if(option['action'] == 'text'):
+                text += '\n  ' + option['names'][0] + '\n'
+            elif(option['action'] == 'blank'):
+                text += '\n'
+            elif(not option['hidden']):
+                text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
     text += '\n'
     if(root == 'auto-editor'):
         text += ('  Have an issue? Make an issue. Visit '
@@ -95,9 +85,10 @@ def print_program_help(root, the_args):
 def get_option(item, the_args):
     for options in the_args:
         for option in options:
-            dash = list(map(lambda n: n.replace('_', '-'), option['names']))
-            if((item in option['names'] or item in dash)):
-                return option
+            if(option['action'] != 'text' and option['action'] != 'blank'):
+                dash = list(map(lambda n: n.replace('_', '-'), option['names']))
+                if((item in option['names'] or item in dash)):
+                    return option
     return None
 
 def _to_key(val):
@@ -139,6 +130,15 @@ class ArgumentParser():
             my_dict[key] = item
 
         self.args.append(my_dict)
+
+    def add_text(self, text):
+        self.args.append({
+            'names': [text],
+            'action': 'text',
+        });
+
+    def add_blank(self):
+        self.args.append({'action': 'blank'});
 
     def parse_args(self, sys_args, log, root):
         if(sys_args == [] and self.description):
@@ -223,10 +223,11 @@ class ParseOptions():
 
     def __init__(self, sys_args, log, root, *args):
         # Set the default options.
-        option_names = []
         for options in args:
             for option in options:
-                option_names.append(option['names'][0])
+                if(option['action'] == 'text' or option['action'] == 'blank'):
+                    continue
+
                 key = _to_key(option)
                 if(option['action'] == 'store_true'):
                     value = False
