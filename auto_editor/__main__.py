@@ -71,7 +71,8 @@ def main_options(parser):
     parser.add_argument('--video_codec', '-vcodec', '-c:v', default='auto',
         group='exportMediaOps',
         help='set the video codec for the output media file.')
-    parser.add_argument('--audio_codec', '-acodec', '-c:a', group='exportMediaOps',
+    parser.add_argument('--audio_codec', '-acodec', '-c:a', default='auto',
+        group='exportMediaOps',
         help='set the audio codec for the output media file.')
     parser.add_argument('--preset', '-preset', default='unset', group='exportMediaOps',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
