@@ -189,38 +189,6 @@ class ParseOptions():
                 sys.exit(1)
         return dic
 
-    def set_config(self, config_path, root):
-        if(not os.path.isfile(config_path)):
-            return
-
-        with open(config_path, 'r') as file:
-            lines = file.readlines()
-
-        # Set attributes based on the config file to act as the new defaults.
-        for item in lines:
-            if('#' in item):
-                item = item[: item.index('#')]
-            item = item.replace(' ', '')
-            if(item.strip() == '' or (not item.startswith(root))):
-                continue
-            value = item[item.index('=')+1 :]
-
-            if(value[0] == "'" and value[-1] == "'"):
-                value = value[1:-1]
-            elif(value == 'None'):
-                value = None
-            elif('.' in value):
-                value = float(value)
-            else:
-                value = int(value)
-
-            key = item[: item.index('=')]
-            key = key[key.rfind('.')+1:]
-
-            if(getattr(self, key) != value):
-                print('Setting {} to {}'.format(key, value), file=sys.stderr)
-            setattr(self, key, value)
-
     def __init__(self, sys_args, log, root, *args):
         # Set the default options.
         for options in args:
@@ -238,9 +206,6 @@ class ParseOptions():
                 else:
                     value = option['default']
                 setattr(self, key, value)
-
-        dirpath = os.path.dirname(os.path.realpath(__file__))
-        self.set_config(os.path.join(dirpath, 'config.txt'), root)
 
         # Figure out command line options changed by user.
         my_list = []
