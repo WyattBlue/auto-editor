@@ -12,7 +12,7 @@ def levels_options(parser):
         help='use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
-    parser.add_argument('(input)', nargs='*',
+    parser.add_argument('input', nargs='*',
         help='the template')
     return parser
 

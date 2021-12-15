@@ -249,10 +249,6 @@ def main(sys_args=None):
         run_program(['-h'])
         run_program(['--frame_margin', '--help'])
         run_program(['--frame_margin', '-h'])
-        run_program(['exportMediaOps', '--help'])
-        run_program(['exportMediaOps', '-h'])
-        run_program(['progressOps', '-h'])
-
         run_program(['--help', '--help'])
         run_program(['-h', '--help'])
         run_program(['--help', '-h'])
@@ -439,8 +435,8 @@ def main(sys_args=None):
     tester.run_test('output_extension', output_extension)
 
     def progress_ops_test():
-        run_program(['example.mp4', '--has_vfr', 'no', 'progressOps', '--machine_readable_progress'])
-        run_program(['example.mp4', '--has_vfr', 'no', 'progressOps', '--no_progress'])
+        run_program(['example.mp4', '--has_vfr', 'no', '--machine_readable_progress'])
+        run_program(['example.mp4', '--has_vfr', 'no', '--no_progress'])
     tester.run_test('progress_ops_test', progress_ops_test)
 
     def silent_threshold():

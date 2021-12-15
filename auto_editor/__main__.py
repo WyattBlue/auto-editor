@@ -21,7 +21,7 @@ def main_options(parser):
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
         frame_type, range_type, speed_range_type, block_type)
 
-    parser.add_argument('progressOps', nargs=0, action='grouping')
+    parser.add_text('Progress Options')
     parser.add_argument('--machine_readable_progress', action='store_true',
         group='progressOps',
         help='set progress bar that is easier to parse.')
@@ -29,83 +29,20 @@ def main_options(parser):
         group='progressOps',
         help='do not display any progress at all.')
 
-    parser.add_argument('motionOps', nargs=0, action='grouping')
-    parser.add_argument('--dilates', type=int, default=2, range='0 to 5',
-        group='motionOps',
-        help='set how many times a frame is dilated before being compared.')
-    parser.add_argument('--width', type=int, default=400, range='1 to Infinity',
-        group='motionOps',
-        help="scale the frame to this width before being compared.")
-    parser.add_argument('--blur', type=int, default=21, range='0 to Infinity',
-        group='motionOps',
-        help='set the strength of the blur applied to a frame before being compared.')
-
-    parser.add_argument('urlOps', nargs=0, action='grouping')
-    parser.add_argument('--download_dir', type=str, group='urlOps',
-        default=None,
-        help='the directory where the downloaded file is placed.')
-    parser.add_argument('--limit_rate', '-rate', default='3m',
-        help='maximum download rate in bytes per second (50k, 4.2m)')
-    parser.add_argument('--id', type=str, default=None, group='urlOps',
-        help='manually set the YouTube ID the video belongs to.')
-    parser.add_argument('--block', type=block_type, group='urlOps',
-        help='mark all sponsors sections as silent.',
-        extra='Only for YouTube urls. This uses the SponsorBlock api.\n'
-            'Choices can include: sponsor intro outro selfpromo interaction music_offtopic')
-    parser.add_argument('--download_archive', type=file_type, default=None, group='urlOps',
-        help='Download only videos not listed in the archive file. Record the IDs of'
-             ' all downloaded videos in it')
-    parser.add_argument('--cookies', type=file_type, default=None, group='urlOps',
-        help='The file to read cookies from and dump the cookie jar in.')
-    parser.add_argument('--check_certificate', action='store_true', group='urlOps',
-        help='check the website certificate before downloading.')
-
-    parser.add_argument('exportMediaOps', nargs=0, action='grouping')
-    parser.add_argument('--video_bitrate', '-b:v', default='10m', group='exportMediaOps',
-        help='set the number of bits per second for video.')
-    parser.add_argument('--audio_bitrate', '-b:a', default='unset', group='exportMediaOps',
-        help='set the number of bits per second for audio.')
-    parser.add_argument('--sample_rate', '-ar', type=sample_rate_type,
-        group='exportMediaOps',
-        help='set the sample rate of the input and output videos.')
-    parser.add_argument('--video_codec', '-vcodec', '-c:v', default='auto',
-        group='exportMediaOps',
-        help='set the video codec for the output media file.')
-    parser.add_argument('--audio_codec', '-acodec', '-c:a', default='auto',
-        group='exportMediaOps',
-        help='set the audio codec for the output media file.')
-    parser.add_argument('--preset', '-preset', default='unset', group='exportMediaOps',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
-            'slow', 'slower', 'veryslow', 'unset'],
-        help='set the preset for ffmpeg to help save file size or increase quality.')
-    parser.add_argument('--tune', '-tune', default='unset', group='exportMediaOps',
-        choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
-            'zerolatency', 'none', 'unset'],
-        help='set the tune for ffmpeg to compress video better in certain circumstances.')
-    parser.add_argument('--constant_rate_factor', '-crf', default='unset',
-        group='exportMediaOps', range='0 to 51',
-        help='set the quality for video using the crf method.')
-    parser.add_argument('--video_quality_scale', '-qscale:v', '-q:v', default='unset',
-        group='exportMediaOps', range='1 to 31',
-        help='set a value to the ffmpeg option -qscale:v')
-    parser.add_argument('--has_vfr', default='unset', group='exportMediaOps',
-        choices=['unset', 'yes', 'no'],
-        help='skip variable frame rate scan, saving time for big video files.')
-
-    parser.add_argument('effectOps', nargs=0, action='grouping')
-    parser.add_argument('--zoom', nargs='*', type=dict, group='effectOps',
+    parser.add_text('Effect Options')
+    parser.add_argument('--zoom', nargs='*', type=dict,
         help='set when and how a zoom will occur.',
         keywords=[
             {'start': ''}, {'end': ''}, {'zoom': ''}, {'end_zoom': '{zoom}'},
             {'x': 'centerX'}, {'y': 'centerY'}, {'interpolate': 'linear'},
         ])
-    parser.add_argument('--rectangle', nargs='*', type=dict, group='effectOps',
+    parser.add_argument('--rectangle', nargs='*', type=dict,
         keywords=[
             {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
             {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': 0}, {'outline': 'blue'}
         ],
         help='overlay a rectangle shape on the video.')
-    parser.add_argument('--circle', nargs='*', type=dict, group='effectOps',
+    parser.add_argument('--circle', nargs='*', type=dict,
         keywords=[
             {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
             {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': 0}, {'outline': 'blue'}
@@ -114,35 +51,99 @@ def main_options(parser):
         extra='\n\nThe x and y coordinates specify a bounding box where the circle is '\
             'drawn.')
 
-    parser.add_argument('--background', type=str, default='#000',
-        help='set the color of the background that is visible when the video is moved.')
+    parser.add_text('URL Download Options')
+    parser.add_argument('--download_dir', type=str, default=None,
+        help='the directory where the downloaded file is placed.')
+    parser.add_argument('--limit_rate', '-rate', default='3m',
+        help='maximum download rate in bytes per second (50k, 4.2m)')
+    parser.add_argument('--id', type=str, default=None,
+        help='manually set the YouTube ID the video belongs to.')
+    parser.add_argument('--block', type=block_type,
+        help='mark all sponsors sections as silent.',
+        extra='Only for YouTube URLs. This uses the SponsorBlock API.\n'
+            'Choices can include: sponsor intro outro selfpromo interaction music_offtopic')
+
+    parser.add_argument('--download_archive', type=file_type, default=None,
+        help='download only videos not listed in archive file. Record the IDs of'
+             ' all downloads.')
+    parser.add_argument('--cookies', type=file_type, default=None,
+        help='the file to read cookies from and dump the cookie jar in.')
+    parser.add_argument('--check_certificate', action='store_true',
+        help='check the website certificate before downloading.')
+
+    parser.add_text('Motion Detection Options')
+    parser.add_argument('--motion_threshold', type=float_type, default=0.02,
+        range='0 to 1',
+        help='how much motion is required to be considered "moving"')
+    parser.add_blank()
+    parser.add_argument('--dilates', type=int, default=2, range='0 to 5',
+        help='set how many times a frame is dilated before being compared.')
+    parser.add_argument('--width', type=int, default=400, range='1 to Infinity',
+        help="scale the frame to this width before being compared.")
+    parser.add_argument('--blur', type=int, default=21, range='0 to Infinity',
+        help='set the strength of the blur applied to a frame before being compared.')
+
+    parser.add_text('Exporting as Media Options')
+    parser.add_argument('--video_bitrate', '-b:v', default='10m',
+        help='set the number of bits per second for video.')
+    parser.add_argument('--audio_bitrate', '-b:a', default='unset',
+        help='set the number of bits per second for audio.')
+    parser.add_argument('--sample_rate', '-ar', type=sample_rate_type,
+        help='set the sample rate of the input and output videos.')
+    parser.add_argument('--video_codec', '-vcodec', '-c:v', default='auto',
+        help='set the video codec for the output media file.')
+    parser.add_argument('--audio_codec', '-acodec', '-c:a', default='auto',
+        help='set the audio codec for the output media file.')
+    parser.add_argument('--preset', '-preset', default='unset',
+        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
+            'slow', 'slower', 'veryslow', 'unset'],
+        help='set the preset for ffmpeg to help save file size or increase quality.')
+    parser.add_argument('--tune', '-tune', default='unset',
+        choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
+            'zerolatency', 'none', 'unset'],
+        help='set the tune for ffmpeg to compress video better in certain circumstances.')
+    parser.add_argument('--constant_rate_factor', '-crf', default='unset', range='0 to 51',
+        help='set the quality for video using the crf method.')
+    parser.add_argument('--video_quality_scale', '-qscale:v', '-q:v', default='unset',
+        range='1 to 31',
+        help='set a value to the ffmpeg option -qscale:v')
     parser.add_argument('--scale', type=float_type, default=1,
         help='scale the output media file by a certain factor.')
+    parser.add_argument('--has_vfr', default='unset',
+        choices=['unset', 'yes', 'no'],
+        help='set whether the input file(s) have Variable Frame Rates',
+        extra='Detecting Variable Frame Rates takes a lot of time, skip variable frame rate scan, saving time for big video files.')
+
+    parser.add_text('Miscellaneous Options')
+    parser.add_argument('--background', type=str, default='#000',
+        help='set the color of the background that is visible when the video is moved.')
     parser.add_argument('--combine_files', action='store_true',
         help='combine all input files into one before editing.')
 
-    parser.add_argument('--mark_as_loud', type=range_type, nargs='*',
-        help='the range that will be marked as "loud".')
-    parser.add_argument('--mark_as_silent', type=range_type, nargs='*',
-        help='the range that will be marked as "silent".')
+    parser.add_text('Manual Editing Options')
     parser.add_argument('--cut_out', type=range_type, nargs='*',
         help='the range of media that will be removed completely, regardless of the '
             'value of silent speed.')
     parser.add_argument('--add_in', type=range_type, nargs='*',
         help='the range of media that will be added in, opposite of --cut_out')
+    parser.add_blank()
+    parser.add_argument('--mark_as_loud', type=range_type, nargs='*',
+        help='the range that will be marked as "loud".')
+    parser.add_argument('--mark_as_silent', type=range_type, nargs='*',
+        help='the range that will be marked as "silent".')
     parser.add_argument('--set_speed_for_range', type=speed_range_type, nargs='*',
         help='set an arbitrary speed for a given range.',
         extra='The arguments are: speed,start,end')
 
-    parser.add_argument('--motion_threshold', type=float_type, default=0.02,
-        range='0 to 1',
-        help='how much motion is required to be considered "moving"')
+    parser.add_text('Select Editing Source Options')
     parser.add_argument('--edit_based_on', '--edit', default='audio',
         choices=['audio', 'motion', 'none', 'all', 'not_audio', 'not_motion',
             'audio_or_motion', 'audio_and_motion', 'audio_xor_motion',
             'audio_and_not_motion', 'not_audio_and_motion', 'not_audio_and_not_motion'],
         help='decide which method to use when making edits.')
-
+    parser.add_argument('--keep_tracks_seperate', action='store_true',
+        help="don't combine audio tracks when exporting.")
+    parser.add_blank()
     parser.add_argument('--cut_by_this_audio', '-ca', type=file_type,
         help="base cuts by this audio file instead of the video's audio.")
     parser.add_argument('--cut_by_this_track', '-ct', type=int, default=0,
@@ -150,12 +151,8 @@ def main_options(parser):
         help='base cuts by a different audio track in the video.')
     parser.add_argument('--cut_by_all_tracks', '-cat', action='store_true',
         help='combine all audio tracks into one before basing cuts.')
-    parser.add_argument('--keep_tracks_seperate', action='store_true',
-        help="don't combine audio tracks when exporting.")
 
-    parser.add_argument('--export_as_audio', '-exa', action='store_true',
-        help='export as a WAV audio file.')
-
+    parser.add_text('Export Mode Options')
     parser.add_argument('--export_to_premiere', '-exp', action='store_true',
         help='export as an XML file for Adobe Premiere Pro instead of making a media file.')
     parser.add_argument('--export_to_final_cut_pro', '-exf', action='store_true',
@@ -164,9 +161,14 @@ def main_options(parser):
         help='export as an XML timeline file for Shotcut instead of making a media file.')
     parser.add_argument('--export_as_json', action='store_true',
         help='export as a JSON file that can be read by auto-editor later.')
+    parser.add_argument('--export_as_audio', '-exa', action='store_true',
+        help='export as a WAV audio file.')
     parser.add_argument('--export_as_clip_sequence', '-excs', action='store_true',
         help='export as multiple numbered media files.')
 
+    parser.add_text('Utility Options')
+    parser.add_argument('--no_open', action='store_true',
+        help='do not open the file after editing is done.')
     parser.add_argument('--temp_dir', default=None,
         help='set where the temporary directory is located.',
         extra='If not set, tempdir will be set with Python\'s tempfile module\n'
@@ -179,6 +181,8 @@ def main_options(parser):
     parser.add_argument('--my_ffmpeg', action='store_true',
         help='use the ffmpeg on your PATH instead of the one packaged.',
         extra='this is equivalent to --ffmpeg_location ffmpeg.')
+
+    parser.add_text('Display Options')
     parser.add_argument('--version', action='store_true',
         help='show which auto-editor you have.')
     parser.add_argument('--debug', action='store_true',
@@ -187,23 +191,18 @@ def main_options(parser):
         help='show ffmpeg progress and output.')
     parser.add_argument('--quiet', '-q', action='store_true',
         help='display less output.')
-
     parser.add_argument('--preview', action='store_true',
         help='show stats on how the input will be cut.')
-    parser.add_argument('--no_open', action='store_true',
-        help='do not open the file after editing is done.')
-    parser.add_argument('--min_clip_length', '-mclip', type=frame_type, default=3,
-        range='0 to Infinity',
-        help='set the minimum length a clip can be. If a clip is too short, cut it.')
-    parser.add_argument('--min_cut_length', '-mcut', type=frame_type, default=6,
-        range='0 to Infinity',
-        help="set the minimum length a cut can be. If a cut is too short, don't cut")
 
-    parser.add_argument('--output_file', '--output', '-o', nargs='*',
-        help='set the name(s) of the new output.')
+    parser.add_text('Editing Options')
+
     parser.add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
         range='0 to 1',
         help='set the volume that frames audio needs to surpass to be "loud".')
+    parser.add_argument('--frame_margin', '--margin', '-m', type=frame_type, default=6,
+        range='0 to Infinity',
+        help='set how many "silent" frames of on either side of "loud" sections '
+            'be included.')
     parser.add_argument('--silent_speed', '-s', type=float_type, default=99999,
         range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='set the speed that "silent" sections should be played at.')
@@ -211,14 +210,20 @@ def main_options(parser):
         default=1.00,
         range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='set the speed that "loud" sections should be played at.')
-    parser.add_argument('--frame_margin', '--margin', '-m', type=frame_type, default=6,
+    parser.add_argument('--min_clip_length', '-mclip', type=frame_type, default=3,
         range='0 to Infinity',
-        help='set how many "silent" frames of on either side of "loud" sections '
-            'be included.')
+        help='set the minimum length a clip can be. If a clip is too short, cut it.')
+    parser.add_argument('--min_cut_length', '-mcut', type=frame_type, default=6,
+        range='0 to Infinity',
+        help="set the minimum length a cut can be. If a cut is too short, don't cut")
 
+    parser.add_blank()
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
-    parser.add_argument('(input)', nargs='*',
+
+    parser.add_argument('--output_file', '--output', '-o', nargs='*',
+        help='set the name(s) of the new output.')
+    parser.add_argument('input', nargs='*',
         help='file(s) or URL(s) that will be edited.')
     return parser
 
