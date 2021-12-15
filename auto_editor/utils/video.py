@@ -28,6 +28,18 @@ def get_vcodec(args, inp, rules):
         return 'mpeg4'
     return vcodec
 
+def get_acodec(args, inp, rules):
+    acodec = args.audio_codec
+    if(acodec == 'auto'):
+        acodec = inp.audio_streams[0]['codec']
+
+        if((rules['astrict'] and acodec not in rules['acodecs'])
+            or (acodec in rules['disallow_a'])):
+            return rules['acodecs'][0]
+
+    if(acodec == 'copy'):
+        return inp.audio_streams[0]['codec']
+    return acodec
 
 def video_quality(cmd, args, inp, rules):
     cmd = fset(cmd, '-crf', args.constant_rate_factor)
@@ -128,7 +140,9 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
             cmd.extend(['-c:s', scodec])
 
     if(a_tracks > 0):
-        cmd = fset(cmd, '-c:a', args.audio_codec)
+        acodec = get_acodec(args, inp, rules)
+
+        cmd = fset(cmd, '-c:a', acodec)
         cmd = fset(cmd, '-b:a', args.audio_bitrate)
 
         if(fnone(args.sample_rate)):

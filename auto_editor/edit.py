@@ -110,12 +110,17 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         if(vcodec in rules['disallow_v']):
             log.error(codec_error.format(vcodec, output_container))
 
-    if(not fnone(args.audio_codec)):
-        if(rules['astrict'] and args.audio_codec not in rules['acodecs']):
-            log.error(codec_error.format(args.audio_codec, output_container))
+    acodec = args.audio_codec
+    if(acodec == 'copy'):
+        acodec = inp.audio_streams[0]['codec']
+        log.debug(f'Settings acodec to {acodec}')
 
-        if(args.audio_codec in rules['disallow_a']):
-            log.error(codec_error.format(args.audio_codec, output_container))
+    if(acodec not in ['unset', 'auto']):
+        if(rules['astrict'] and acodec not in rules['acodecs']):
+            log.error(codec_error.format(acodec, output_container))
+
+        if(acodec in rules['disallow_a']):
+            log.error(codec_error.format(acodec, output_container))
 
     if(args.keep_tracks_seperate and rules['max_audio_streams'] == 1):
         log.warning(
