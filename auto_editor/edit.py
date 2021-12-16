@@ -138,7 +138,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
     if(inp.fps is None):
         fps = 30
     elif(exporting_to_editor):
-        fps = int(inp.fps)
+        fps = int(float(inp.fps))
     else:
         fps = float(inp.fps)
 
