@@ -311,7 +311,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         video_stuff = []
 
         if(rules['allow_video']):
-            from auto_editor.render.av import render_av
+            from auto_editor.render.video import render_av
             for v, vid in enumerate(inp.video_streams):
                 if(vid['codec'] in ['png', 'jpeg']):
                     video_stuff.append(('image', None, None))
