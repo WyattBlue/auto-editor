@@ -75,8 +75,7 @@ class WavWriter():
 
     def write(self, buffer):
         if(buffer.shape[0] != self.channels):
-            raise ValueError("the buffer should have the same number of "
-                "channels as the WavWriter")
+            raise ValueError(f"buffer has {buffer.shape[0]} channels while self has {self.channels} channels")
 
         np.clip(buffer, -1, 1, out=buffer)
 
