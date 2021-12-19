@@ -1,6 +1,17 @@
 '''utils/effects.py'''
 
 class Effect():
+    __slots__ = ('all', 'sheet', '_vars', 'log', 'background', 'width', 'height')
+    def __init__(self, args, log, _vars):
+        self.all = []
+        self.sheet = {}
+        self._vars = _vars
+        self.log = log
+        self.background = args.background
+
+    def add_var(self, key, item):
+        self._vars[key] = item
+
     def _values(self, val, _type):
         # just to be clear, val can only be None if the default value is None.
         # Users can't set the argument to None themselves.
@@ -20,9 +31,12 @@ class Effect():
 
         return _type(val)
 
-    def set_start_end(self, start, end, effect_index):
-        start = self._values(start, int)
-        end = self._values(end, int)
+    def set_start_end(self, effect, effect_index):
+        start = effect.pop('start')
+        end = effect.pop('end')
+
+        start = self._values(start[1], int)
+        end = self._values(end[1], int)
 
         for i in range(start, end, 1):
             if(i in self.sheet):
@@ -30,79 +44,31 @@ class Effect():
             else:
                 self.sheet[i] = [effect_index]
 
-    def set_all(self, effect, my_types):
-        for key, _type in my_types.items():
-            effect[key] = self._values(effect[key], _type)
+        return effect
 
-        self.all.append(effect)
+    def set_all(self, effect):
+        new_effect = {}
+        for name, my_tup in effect.items():
+            if(name == 'type'):
+                new_effect['type'] = my_tup
+            else:
+                _type, val = my_tup
+                if(val.startswith('{') and val.endswith('}')):
+                    new_effect[name] = new_effect[val[1:-1]]
+                else:
+                    new_effect[name] = self._values(val, _type)
+
+        self.all.append(new_effect)
 
     def resolve(self, args):
-        self.fps = self._vars['fps']
         self.width = self._vars['width']
         self.height = self._vars['height']
 
-        num_effects = 0
+        effect_list = args.add_rectangle + args.add_ellipse + args.zoom
 
-        rect_types = {
-            'x1': int, 'y1': int, 'x2': int, 'y2': int, 'fill': str, 'width': int,
-            'outline': str,
-        }
-        circle_types = rect_types
-        zoom_types = {
-            'zoom': float, 'end_zoom': float, 'x': int, 'y': int, 'interpolate': str,
-        }
-
-        for rect in args.add_rectangle:
-            effect = rect.copy()
-            effect['type'] = 'rectangle'
-
-            start = effect.pop('start', None)
-            end = effect.pop('end', None)
-
-            self.set_start_end(start, end, num_effects)
-            self.set_all(effect, rect_types)
-
-            num_effects += 1
-
-        for circle in args.add_circle:
-            effect = circle.copy()
-            effect['type'] = 'circle'
-
-            start = effect.pop('start', None)
-            end = effect.pop('end', None)
-
-            self.set_start_end(start, end, num_effects)
-            self.set_all(effect, circle_types)
-
-            num_effects += 1
-
-        for zoom in args.zoom:
-            if(zoom['end_zoom'] == '{zoom}'):
-                zoom['end_zoom'] = zoom['zoom']
-
-            effect = zoom.copy()
-            effect['type'] = 'zoom'
-
-            start = effect.pop('start', None)
-            end = effect.pop('end', None)
-
-            self.set_start_end(start, end, num_effects)
-            self.set_all(effect, zoom_types)
-
-            num_effects += 1
-
-    def add_var(self, key, item):
-        self._vars[key] = item
-
-    def __init__(self, args, log, _vars):
-        self.all = []
-        self.sheet = {}
-        self._vars = _vars
-        self.log = log
-        self.background = args.background
-
-        self.audio_samples = None
-        self.sample_rate = None
+        for i, my_effect in enumerate(effect_list):
+            effect = self.set_start_end(my_effect, i)
+            self.set_all(effect)
 
     def apply(self, index, frame, pix_fmt):
         from PIL import Image, ImageDraw, ImageFont
@@ -117,7 +83,7 @@ class Effect():
                 draw.rectangle([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
                     fill=pars['fill'], width=pars['width'], outline=pars['outline'])
 
-            if(pars['type'] == 'circle'):
+            if(pars['type'] == 'ellipse'):
                 draw = ImageDraw.Draw(img)
                 draw.ellipse([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
                     fill=pars['fill'], width=pars['width'], outline=pars['outline'])

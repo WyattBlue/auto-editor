@@ -43,7 +43,7 @@ def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_
                 motion_list = get_np_list(inp, audio_samples, sample_rate, fps, np.ones)
             else:
                 motion_list = motion_detection(inp, args.motion_threshold, log,
-                    width=args.width, dilates=args.dilates, blur=args.blur)
+                    width=args.md_width, dilates=args.md_dilates, blur=args.md_blur)
 
         if(audio_list is not None and motion_list is not None):
             if(len(audio_list) > len(motion_list)):
