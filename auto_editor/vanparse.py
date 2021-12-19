@@ -39,9 +39,12 @@ def print_option_help(args, option):
         text += '    Arguments:\n    '
         for n, item in enumerate(option['keywords']):
             [[k, v]] = item.items()
-            text += '{' + k
-            text += '' if v == '' else '=' + str(v)
-            text += '}' if n + 1 == len(option['keywords']) else '},'
+
+            if(k != 'type'):
+                _, default = v
+                text += '{' + k
+                text += '' if default == '' else '=' + str(default)
+                text += '}' if n + 1 == len(option['keywords']) else '},'
 
     if(option['extra'] != ''):
         text += '{}\n\n'.format(indent(option['extra'], '    '))
@@ -179,7 +182,7 @@ class ParseOptions():
                 print(f"Error! Too many arguments, starting with '{item}'", file=sys.stderr)
                 sys.exit(1)
 
-            dic[keys[i]] = item
+            dic[keys[i]] = (dic[keys[i]][0], item)
 
         # Check if any positional args are not specified.
         for key, item in dic.items():
