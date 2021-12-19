@@ -331,10 +331,13 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
 
     if(args.export_as_clip_sequence):
         speeds.append(99999)
-        for i, chunk in enumerate(chunks):
+        num_clips = 0
+        for chunk in chunks:
             if(speeds[chunk[2]] == 99999):
                 continue
-            make_media(inp, pad_chunk(chunk, total_frames), append_filename(output_path, '-{}'.format(i)))
+            make_media(inp, pad_chunk(chunk, total_frames),
+                append_filename(output_path, '-{}'.format(num_clips)))
+            num_clips += 1
     else:
         make_media(inp, chunks, output_path)
     return num_cuts, output_path
