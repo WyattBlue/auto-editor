@@ -1,10 +1,5 @@
 '''utils/effects.py'''
 
-import numpy as np
-
-# Included Libraries
-from auto_editor.cutting import merge, apply_basic_spacing
-
 class Effect():
     def _values(self, val, _type):
         # just to be clear, val can only be None if the default value is None.
