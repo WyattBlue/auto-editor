@@ -227,8 +227,9 @@ class ParseOptions():
                     name_set = set()
                     for options in args:
                         for opt in options:
-                            for names in opt['names']:
-                                name_set.add(names)
+                            if(opt['action'] not in ['text', 'blank']):
+                                for names in opt['names']:
+                                    name_set.add(names)
                     return name_set
 
                 opt_list = all_names(args)
