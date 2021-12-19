@@ -3,14 +3,9 @@
 # Mirrored from: github.com/scipy/scipy/blob/master/scipy/io/wavfile.py
 
 import io
-import sys
 import numpy
 import struct
 from enum import IntEnum
-
-
-__all__ = [ 'read', 'write']
-
 
 class WAVE_FORMAT(IntEnum):
     UNKNOWN = 0x0000
