@@ -1,6 +1,5 @@
 '''vanparse.py'''
 
-import os
 import sys
 import difflib
 

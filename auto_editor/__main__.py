@@ -36,13 +36,13 @@ def main_options(parser):
             {'start': ''}, {'end': ''}, {'zoom': ''}, {'end_zoom': '{zoom}'},
             {'x': 'centerX'}, {'y': 'centerY'}, {'interpolate': 'linear'},
         ])
-    parser.add_argument('--rectangle', nargs='*', type=dict,
+    parser.add_argument('--add_rectangle', nargs='*', type=dict,
         keywords=[
             {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
             {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': 0}, {'outline': 'blue'}
         ],
         help='overlay a rectangle shape on the video.')
-    parser.add_argument('--circle', nargs='*', type=dict,
+    parser.add_argument('--add_circle', nargs='*', type=dict,
         keywords=[
             {'start': ''}, {'end': ''}, {'x1': ''}, {'y1': ''},
             {'x2': ''}, {'y2': ''}, {'fill': '#000'}, {'width': 0}, {'outline': 'blue'}

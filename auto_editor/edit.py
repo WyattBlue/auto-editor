@@ -216,12 +216,6 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         from auto_editor.scipy.wavfile import read
         sample_rate, audio_samples = read(temp_file)
 
-    effects = Effect(args, log, _vars={
-        'silent_threshold': args.silent_threshold
-        })
-    effects.audio_samples = audio_samples
-    effects.sample_rate = sample_rate
-
     log.debug('Frame Rate: {}'.format(fps))
     if(chunks is None):
         chunks = get_chunks(inp, speeds, segment, fps, args, log, audio_samples,
@@ -244,6 +238,8 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
 
     num_cuts = number_of_cuts(chunks, speeds)
     clips = get_clips(chunks, speeds)
+
+    effects = Effect(args, log, _vars={})
 
     if(args.export_as_json):
         from auto_editor.formats.make_json import make_json_cutlist
@@ -324,8 +320,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         mux_quality_media(ffmpeg, video_stuff, rules, output_path, output_container,
             args, inp, temp, log)
         if(output_path is not None and not os.path.isfile(output_path)):
-            log.bug('The file {} was not created.'.format(output_path))
-
+            log.bug(f'The file {output_path} was not created.')
 
     total_frames = chunks[len(chunks) - 1][1]
 

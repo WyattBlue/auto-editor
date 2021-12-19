@@ -475,7 +475,7 @@ def main(sys_args=None):
     def various_errors_test():
         check_for_error(['example.mp4', '--zoom', '0', '--cut_out', '60,end'])
         check_for_error(['example.mp4', '--zoom', '0,60', '--cut_out', '60,end'])
-        check_for_error(['example.mp4', '--rectangle', '0,60', '--cut_out', '60,end'])
+        check_for_error(['example.mp4', '--add_rectangle', '0,60', '--cut_out', '60,end'])
     tester.run_test('various_errors_test', various_errors_test)
 
     def effect_tests():
@@ -489,9 +489,6 @@ def main(sys_args=None):
 
         run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom', '10,60,2'])
 
-        run_program(['example.mp4', '--mark_as_loud', 'start,end', '--rectangle',
-            'audio>0.05,audio<0.05,20,50,50,100', 'audio>0.1,audio<0.1,120,50,150,100'])
-
         run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
             'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
         inspect(
@@ -499,7 +496,7 @@ def main(sys_args=None):
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '320x180'],
         )
-        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--rectangle',
+        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--add_rectangle',
             '0,30,0,200,100,300,#43FA56,10'])
         os.remove('testsrc_ALTERED.mp4')
         os.remove('testsrc.mp4')
