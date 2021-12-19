@@ -127,7 +127,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
             "'{}' container doesn't support multiple audio tracks.".format(container)
         )
 
-    if(os.path.isfile(output_path) and inp.path != output_path):
+    if(os.path.isfile(output_path) and inp.path != output_path and not args.preview):
         log.debug('Removing already existing file: {}'.format(output_path))
         os.remove(output_path)
 
@@ -186,7 +186,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
         cmd.extend(['-map', '0:a:{}'.format(t), '-ac', '2',
             os.path.join(temp, '{}.wav'.format(t))])
     cmd.extend(['-map', '0:v:0'])
-    if(args.has_vfr == 'unset' and len(inp.video_streams) > 0):
+    if(args.has_vfr == 'unset' and len(inp.video_streams) > 0 and not args.preview):
         log.conwrite('Extracting audio / detecting VFR')
         cmd.extend(['-vf', 'vfrdet', '-f', 'null', '-'])
         has_vfr = has_VFR(cmd, log)
