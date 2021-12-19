@@ -3,10 +3,7 @@
 import numpy as np
 
 # Included Libraries
-from auto_editor.analyze.audio import audio_detection
 from auto_editor.cutting import merge, apply_basic_spacing
-
-from .interpolate import interpolate
 
 class Effect():
     def _values(self, val, _type):
@@ -25,82 +22,24 @@ class Effect():
         if(not isinstance(val, int)
             and not (val.replace('.', '', 1)).replace('-', '', 1).isdigit()):
             self.log.error("variable '{}' is not defined.".format(val))
+
         return _type(val)
 
-    def boolean_expression(self, val):
-        # type: (str) -> np.ndarray
-        invert = False
+    def set_start_end(self, start, end, effect_index):
+        start = self._values(start, int)
+        end = self._values(end, int)
 
-        if('>' in val and '<' in val):
-            self.log.error('Cannot have both ">" and "<" in same expression.')
-        if('>' in val):
-            exp = val.split('>')
-        else:
-            exp = val.split('<')
-            invert = True
-
-        if(len(exp) != 2):
-            self.log.error('Only 1 expression supported, not {}.'.format(len(exp)-1))
-
-        if(exp[1] == 'audio'):
-            self.log.error('audio variable must be on the left side only.')
-
-        if(exp[0] != 'audio'):
-            self.log.error('Only audio variable is supported.')
-
-        if(self.audio_samples is None or self.sample_rate is None):
-            self.log.error('No audio data found.')
-
-        new_list = audio_detection(self.audio_samples, self.sample_rate,
-            self._values(exp[1], float), self.fps, self.log)
-
-        if(invert):
-            new_list = np.invert(new_list)
-
-        return new_list
+        for i in range(start, end, 1):
+            if(i in self.sheet):
+                self.sheet[i].append(effect_index)
+            else:
+                self.sheet[i] = [effect_index]
 
     def set_all(self, effect, my_types):
         for key, _type in my_types.items():
             effect[key] = self._values(effect[key], _type)
 
         self.all.append(effect)
-
-    def set_start_end(self, start, end, effect_index):
-
-        def resolve_start_end(val):
-            # type: (str) -> np.ndarray | int
-            if('>' in val or '<' in val):
-                return self.boolean_expression(val)
-            else:
-                return self._values(val, int)
-
-        def add_effect(i, effect_index):
-            if(i in self.sheet):
-                self.sheet[i].append(effect_index)
-            else:
-                self.sheet[i] = [effect_index]
-
-        start = resolve_start_end(start)
-        end = resolve_start_end(end)
-
-        if(isinstance(start, int) and isinstance(end, int)):
-            for i in range(start, end, 1):
-                add_effect(i, effect_index)
-        elif(isinstance(start, int)):
-            self.log.error('The start parameter must also be a boolean expression.')
-        elif(isinstance(end, int)):
-            # only start is a numpy array
-            # If this happens, the end parameter's value doesn't matter.
-            indexs = np.where(start)[0]
-            for index in indexs:
-                add_effect(index, effect_index)
-        else:
-            # both start and end are numpy arrays
-            chunks = apply_basic_spacing(merge(start, end), self.fps, 0, 0, self.log)
-            for item in chunks:
-                if(item[2] == 1):
-                    for i in range(item[0], item[1]):
-                        add_effect(i, effect_index)
 
     def resolve(self, args):
         self.fps = self._vars['fps']
@@ -118,7 +57,7 @@ class Effect():
             'zoom': float, 'end_zoom': float, 'x': int, 'y': int, 'interpolate': str,
         }
 
-        for rect in args.rectangle:
+        for rect in args.add_rectangle:
             effect = rect.copy()
             effect['type'] = 'rectangle'
 
@@ -130,7 +69,7 @@ class Effect():
 
             num_effects += 1
 
-        for circle in args.circle:
+        for circle in args.add_circle:
             effect = circle.copy()
             effect['type'] = 'circle'
 
