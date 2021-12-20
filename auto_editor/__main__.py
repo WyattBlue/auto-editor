@@ -59,6 +59,20 @@ def main_options(parser):
     ellipse = basic_obj_keywords[:]
     ellipse.append({'type': 'ellipse'})
 
+    parser.add_argument('--add_text', nargs='*', type=dict,
+        keywords=[
+            {'start': (int, ''),},
+            {'end': (int, ''),},
+            {'content': (str, ''),},
+            {'x': (int, 'centerX'),},
+            {'y': (int, 'centerY'),},
+            {'size': (int, 30),},
+            {'font': (str, 'default'),},
+            {'align': (str, 'left'),},
+            {'type': 'text',},
+        ],
+        help='Add a text object to the timeline.'
+    )
     parser.add_argument('--add_rectangle', nargs='*', type=dict,
         keywords=rect,
         help='Add a rectagnle object on the timeline.')
