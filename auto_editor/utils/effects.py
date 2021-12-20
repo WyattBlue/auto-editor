@@ -1,5 +1,7 @@
 '''utils/effects.py'''
 
+from PIL import Image, ImageDraw, ImageFont
+
 class Effect():
     __slots__ = ('all', 'sheet', '_vars', 'log', 'background', 'width', 'height')
     def __init__(self, args, log, _vars):
@@ -47,36 +49,55 @@ class Effect():
         return effect
 
     def set_all(self, effect):
-        new_effect = {}
+        this_type = effect['type']
+        new_effect = {'type': this_type}
+
         for name, my_tup in effect.items():
-            if(name == 'type'):
-                new_effect['type'] = my_tup
-            else:
+            if(name != 'type'):
                 _type, val = my_tup
-                if(val.startswith('{') and val.endswith('}')):
+                if(isinstance(val, str) and val.startswith('{') and val.endswith('}')):
                     new_effect[name] = new_effect[val[1:-1]]
                 else:
                     new_effect[name] = self._values(val, _type)
 
-        self.all.append(new_effect)
+        return new_effect
 
     def resolve(self, args):
         self.width = self._vars['width']
         self.height = self._vars['height']
 
-        effect_list = args.add_rectangle + args.add_ellipse + args.zoom
+        effect_list = args.add_text + args.add_rectangle + args.add_ellipse + args.zoom
 
         for i, my_effect in enumerate(effect_list):
             effect = self.set_start_end(my_effect, i)
-            self.set_all(effect)
+            effect = self.set_all(effect)
+
+            # Change font attr to ImageFont Obj. (must have font and size attr)
+            if('font' in effect):
+                if(effect['font'] == 'default'):
+                    try:
+                        effect['font'] = ImageFont.truetype(effect['font'], effect['size'])
+                    except OSError:
+                        effect['font'] = ImageFont.load_default()
+                else:
+                    try:
+                        effect['font'] = ImageFont.truetype(effect['font'], effect['size'])
+                    except OSError:
+                        self.log.error(f"Font '{effect['font']}' not found.")
+
+            self.all.append(effect)
 
     def apply(self, index, frame, pix_fmt):
-        from PIL import Image, ImageDraw, ImageFont
-
         img = frame.to_image()
 
         for item in self.sheet[index]:
             pars = self.all[item]
+
+            if(pars['type'] == 'text'):
+                draw = ImageDraw.Draw(img)
+
+                draw.text((pars['x'], pars['y']), pars['content'],
+                    font=pars['font'], fill=(255,255,255,255))
 
             if(pars['type'] == 'rectangle'):
                 draw = ImageDraw.Draw(img)

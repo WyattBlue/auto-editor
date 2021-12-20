@@ -504,6 +504,18 @@ def main(sys_args=None):
         description='test the zoom and rectangle options',
         cleanup=clean_all)
 
+    def render_text():
+        run_program(['example.mp4', '--has-vfr', 'no', '--add-text', 'start,end,This is my text'])
+
+    tester.run_test('render_text', render_text, allow_fail=True)
+
+    def check_font_error():
+        check_for_error(
+            ['example.mp4', '--has-vfr', 'no', '--add-text', 'start,end,text,0,0,30,notafont'],
+            'not found')
+
+    tester.run_test('check_font_error', check_font_error)
+
     def export_tests():
         for item in os.listdir('resources'):
             if('man_on_green_screen' in item or item.startswith('.') or '_ALTERED' in item
