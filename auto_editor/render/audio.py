@@ -26,20 +26,19 @@ def make_new_audio(input_path, output_path, chunks, speeds, log, fps, progress):
             sample_end = int(sample_start + (samplerate / fps) * (chunk[1] - chunk[0]))
 
             the_speed = speeds[chunk[2]]
-            if(the_speed != 99999):
-                sped_chunk = audio_samples[sample_start:sample_end]
 
-                if(the_speed == 1):
-                    main_writer.write(sped_chunk.T / 32676)
-                else:
-                    spedup_audio = np.zeros((0, 2), dtype=np.int16)
-                    with ArrReader(sped_chunk, channels, samplerate, samplewidth) as reader:
-                        with ArrWriter(spedup_audio, channels, samplerate, samplewidth) as writer:
-                            phasevocoder(reader.channels, speed=the_speed).run(
-                                reader, writer
-                            )
-                            spedup_audio = writer.output
-                            main_writer.write(spedup_audio.T  / 32676)
+            if(the_speed == 1):
+                main_writer.write(audio_samples[sample_start:sample_end].T / 32676)
+            elif(the_speed != 99999):
+                sped_chunk = audio_samples[sample_start:sample_end]
+                spedup_audio = np.zeros((0, 2), dtype=np.int16)
+                with ArrReader(sped_chunk, channels, samplerate, samplewidth) as reader:
+                    with ArrWriter(spedup_audio, channels, samplerate, samplewidth) as writer:
+                        phasevocoder(reader.channels, speed=the_speed).run(
+                            reader, writer
+                        )
+                        spedup_audio = writer.output
+                        main_writer.write(spedup_audio.T / 32676)
 
             progress.tick(c)
         progress.end()
