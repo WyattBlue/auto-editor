@@ -39,9 +39,6 @@ def audio_detection(audio_samples, sample_rate, silent_threshold, fps, log):
     audio_frame_count = math.ceil(sample_count / sample_rate_per_frame)
     has_loud_audio = np.zeros((audio_frame_count), dtype=np.bool_)
 
-    if(max_volume == 0):
-        log.error('The entire audio is completely silent.')
-
     # Calculate when the audio is loud or silent.
     for i in range(audio_frame_count):
         start = int(i * sample_rate_per_frame)
