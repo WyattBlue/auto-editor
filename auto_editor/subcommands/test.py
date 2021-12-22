@@ -14,12 +14,11 @@ from time import perf_counter
 
 # Included Libraries
 from auto_editor.utils.func import clean_list
-from auto_editor.utils.log import Log
 import auto_editor.vanparse as vanparse
 
 def test_options(parser):
     parser.add_argument('--ffprobe_location', default='ffprobe',
-        help='point to your custom ffmpeg file.')
+        help='point to your custom ffprobe file.')
     parser.add_argument('--only', '-n', nargs='*')
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')
@@ -239,7 +238,12 @@ def main(sys_args=None):
     if(sys_args is None):
         sys_args = sys.args[1:]
 
-    args = parser.parse_args(sys_args, Log(), 'test')
+    try:
+        args = parser.parse_args(sys_args)
+    except vanparse.ParserError as e:
+        print(e)
+        sys.exit(1)
+
     ffprobe = FFprobe(args.ffprobe_location)
 
     tester = Tester(args)

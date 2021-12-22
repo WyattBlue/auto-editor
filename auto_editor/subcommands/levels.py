@@ -33,7 +33,11 @@ def main(sys_args=sys.argv[1:]):
     temp = tempfile.mkdtemp()
     log = Log(temp=temp)
 
-    args = parser.parse_args(sys_args, log, 'levels')
+    try:
+        args = parser.parse_args(sys_args)
+    except vanparse.ParserError as e:
+        log.error(str(e))
+
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
     inp = ffmpeg.file_info(args.input[0])

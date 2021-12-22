@@ -23,7 +23,11 @@ def main(sys_args=sys.argv[1:]):
     parser = desc_options(parser)
 
     log = Log()
-    args = parser.parse_args(sys_args, log, 'desc')
+
+    try:
+        args = parser.parse_args(sys_args)
+    except vanparse.ParserError as e:
+        log.error(str(e))
 
     ffmpeg = FFmpeg(args.ffmpeg_location, debug=False)
 
