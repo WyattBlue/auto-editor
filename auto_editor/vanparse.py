@@ -166,10 +166,7 @@ class ArgumentParser():
 class ParseOptions():
 
     @staticmethod
-    def parse_parameters(val, op):
-
-        # TODO: allow out-of-order arguments with keyword syntax.
-
+    def parse_parameters(unsplit_parameters, op):
         dic = {}
         keys = []
         for key in op['keywords']:
@@ -177,16 +174,31 @@ class ParseOptions():
             keys.append(k)
             dic[k] = v
 
-        for i, item in enumerate(val.split(',')):
+        allow_positional_args = True
+
+        for i, item in enumerate(unsplit_parameters.split(',')):
             if(i+1 > len(keys)):
                 print(f"Error! Too many arguments, starting with '{item}'", file=sys.stderr)
                 sys.exit(1)
 
-            dic[keys[i]] = (dic[keys[i]][0], item)
+            if('=' in item):
+                allow_positional_args = False
+
+                parameters = item.split('=')
+                if(len(parameters) > 2):
+                    raise ValueError(f'Invalid Syntax: {item}')
+                key, val = parameters
+                if(key not in dic):
+                    raise ValueError(f"Parameter '{key}' does not exist.")
+                dic[key] = (dic[key][0], val)
+            elif(allow_positional_args):
+                dic[keys[i]] = (dic[keys[i]][0], item)
+            else:
+                raise ValueError(f'Positional argument follows keyword argument')
 
         # Check if any positional args are not specified.
-        for key, item in dic.items():
-            if(item == ''):
+        for key, type_val in dic.items():
+            if(type_val[1] == ''):
                 print(f"Error! parameter '{key}' is required.", file=sys.stderr)
                 sys.exit(1)
         return dic
