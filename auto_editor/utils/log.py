@@ -3,6 +3,7 @@
 import sys
 from shutil import rmtree, get_terminal_size
 from time import perf_counter, sleep
+from datetime import timedelta
 
 class Timer():
     __slots__ = ['start_time', 'quiet']
@@ -11,12 +12,11 @@ class Timer():
         self.quiet = quiet
 
     def stop(self):
-        from datetime import timedelta
-
-        second_len = round(perf_counter() - self.start_time, 2)
-        minute_len = timedelta(seconds=round(second_len))
         if(not self.quiet):
-            print('Finished. took {} seconds ({})'.format(second_len, minute_len))
+            second_len = round(perf_counter() - self.start_time, 2)
+            minute_len = timedelta(seconds=round(second_len))
+
+            sys.stdout.write(f'Finished. took {second_len} seconds ({minute_len})\n')
 
 class Log():
     __slots__ = ['is_debug', 'quiet', 'temp']
@@ -28,7 +28,7 @@ class Log():
     def debug(self, message):
         if(self.is_debug):
             self.conwrite('')
-            print('Debug: {}'.format(message), file=sys.stderr)
+            sys.stderr.write(f'Debug: {message}\n')
 
     def cleanup(self):
         if(self.temp is None):
@@ -50,15 +50,13 @@ class Log():
     def conwrite(self, message):
         if(not self.quiet):
             buffer = get_terminal_size().columns - len(message) - 3
-            try:
-                print('  ' + message + ' ' * buffer, end='\r', flush=True)
-            except TypeError:
-                print('  ' + message + ' ' * buffer, end='\r')
+            sys.stdout.write('  ' + message + ' ' * buffer + '\r')
+            sys.stdout.flush()
 
     def error(self, message):
         self.conwrite('')
         message = message.replace('\t', '    ')
-        print('Error! {}'.format(message), file=sys.stderr)
+        sys.stderr.write(f'Error! {message}\n')
         self.cleanup()
 
         from platform import system
@@ -75,14 +73,16 @@ class Log():
     def bug(self, message, bug_type='bug report'):
         self.conwrite('')
         URL = 'https://github.com/WyattBlue/auto-editor/issues/'
-        print('Error! {}\n\nSomething went wrong!\nCreate a {} at:\n  {}'.format(
-            message, bug_type, URL), file=sys.stderr)
+
+        sys.stderr.write(
+            'Error! {}\n\nSomething went wrong!\nCreate a {} at:\n  {}\n'.format(
+                message, bug_type, URL))
         self.cleanup()
         sys.exit(1)
 
     def warning(self, message):
         if(not self.quiet):
-            print('Warning! {}'.format(message), file=sys.stderr)
+            sys.stderr.write(f'Warning! {message}\n')
 
     def print(self, message, end='\n'):
         if(not self.quiet):
