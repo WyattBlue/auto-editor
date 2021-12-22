@@ -51,7 +51,10 @@ class Log():
         if(not self.quiet):
             buffer = get_terminal_size().columns - len(message) - 3
             sys.stdout.write('  ' + message + ' ' * buffer + '\r')
-            sys.stdout.flush()
+            try:
+                sys.stdout.flush()
+            except AttributeError:
+                pass
 
     def error(self, message):
         self.conwrite('')
@@ -84,9 +87,9 @@ class Log():
         if(not self.quiet):
             sys.stderr.write(f'Warning! {message}\n')
 
-    def print(self, message, end='\n'):
+    def print(self, message):
         if(not self.quiet):
-            print(message, end=end)
+            sys.stdout.write(f'{message}\n')
 
     def checkType(self, data, name, correct_type):
         if(not isinstance(data, correct_type)):
