@@ -256,18 +256,25 @@ def main_options(parser):
         help='Set the name(s) of the new output.')
     parser.add_argument('input', nargs='*',
         help='File(s) or URL(s) that will be edited.')
+
+    parser.add_blank()
+    parser.add_text('  Have an issue? Make an issue. Visit '
+            'https://github.com/wyattblue/auto-editor/issues\n\n  The help option '
+            'can also be used on a specific option:\n     auto-editor '
+            '--frame_margin --help\n')
     return parser
 
 
 def main():
-    parser = vanparse.ArgumentParser('Auto-Editor', auto_editor.version,
-        description='\nAuto-Editor is an automatic video/audio creator and editor. '
-            'By default, it will detect silence and create a new video with those '
-            'sections cut out. By changing some of the options, you can export to a '
-            'traditional editor like Premiere Pro and adjust the edits there, adjust '
-            'the pacing of the cuts, and change the method of editing like using audio '
-            'loudness and video motion to judge making cuts.\nRun:\n    auto-editor '
-            '--help\n\nTo get the list of options.\n')
+    desc = ('Auto-Editor is an automatic video/audio creator and editor. '
+        'By default, it will detect silence and create a new video with those '
+        'sections cut out. By changing some of the options, you can export to a '
+        'traditional editor like Premiere Pro and adjust the edits there, adjust '
+        'the pacing of the cuts, and change the method of editing like using audio '
+        'loudness and video motion to judge making cuts.\nRun:\n    auto-editor '
+        '--help\n\nTo get the list of options.\n')
+
+    parser = vanparse.ArgumentParser('Auto-Editor', auto_editor.version, description=desc)
 
     subcommands = ['create', 'test', 'info', 'levels', 'grep', 'subdump', 'desc']
 
@@ -278,7 +285,10 @@ def main():
         sys.exit()
     else:
         parser = main_options(parser)
-        args = parser.parse_args(sys.argv[1:], Log(), 'auto-editor')
+        try:
+            args = parser.parse_args(sys.argv[1:])
+        except vanparse.ParserError as e:
+            Log().error(str(e))
 
     timer = Timer(args.quiet)
 

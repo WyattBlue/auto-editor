@@ -3,6 +3,9 @@
 import sys
 import difflib
 
+class ParserError(Exception):
+    pass
+
 def indent(text, prefix, predicate=None):
     if predicate is None:
         def predicate(line):
@@ -66,7 +69,7 @@ def print_option_help(args, option):
 
     out(text)
 
-def print_program_help(root, the_args):
+def print_program_help(the_args):
     text = ''
     for options in the_args:
         for option in options:
@@ -77,11 +80,6 @@ def print_program_help(root, the_args):
             elif(not option['hidden']):
                 text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
     text += '\n'
-    if(root == 'auto-editor'):
-        text += ('  Have an issue? Make an issue. Visit '
-            'https://github.com/wyattblue/auto-editor/issues\n\n  The help option '
-            'can also be used on a specific option:\n     auto-editor '
-            '--frame_margin --help\n')
     out(text)
 
 def get_option(item, the_args):
@@ -142,7 +140,7 @@ class ArgumentParser():
     def add_blank(self):
         self.args.append({'action': 'blank'});
 
-    def parse_args(self, sys_args, log, root):
+    def parse_args(self, sys_args):
         if(sys_args == [] and self.description):
             out(self.description)
             sys.exit()
@@ -151,7 +149,7 @@ class ArgumentParser():
             out('{} version {}'.format(self.program_name, self._version))
             sys.exit()
 
-        return ParseOptions(sys_args, log, root, self.args)
+        return ParseOptions(sys_args, self.args)
 
 
 """
@@ -166,7 +164,12 @@ class ArgumentParser():
 class ParseOptions():
 
     @staticmethod
-    def parse_parameters(unsplit_parameters, op):
+    def parse_parameters(unsplit_arguments, op):
+
+        ARG_SEP = ','
+        KEYWORD_SEP = '='
+        REQUIRED = ''
+
         dic = {}
         keys = []
         for key in op['keywords']:
@@ -176,34 +179,32 @@ class ParseOptions():
 
         allow_positional_args = True
 
-        for i, item in enumerate(unsplit_parameters.split(',')):
+        for i, item in enumerate(unsplit_arguments.split(ARG_SEP)):
             if(i+1 > len(keys)):
-                print(f"Error! Too many arguments, starting with '{item}'", file=sys.stderr)
-                sys.exit(1)
+                raise ParserError(f"Too many arguments, starting with '{item}'.")
 
-            if('=' in item):
+            if(KEYWORD_SEP in item):
                 allow_positional_args = False
 
-                parameters = item.split('=')
+                parameters = item.split(KEYWORD_SEP)
                 if(len(parameters) > 2):
-                    raise ValueError(f'Invalid Syntax: {item}')
+                    raise ParserError(f"Invalid Syntax: '{item}'.")
                 key, val = parameters
                 if(key not in dic):
-                    raise ValueError(f"Parameter '{key}' does not exist.")
+                    raise ParserError(f"Parameter '{key}' does not exist.")
                 dic[key] = (dic[key][0], val)
             elif(allow_positional_args):
                 dic[keys[i]] = (dic[keys[i]][0], item)
             else:
-                raise ValueError(f'Positional argument follows keyword argument')
+                raise ParserError('Positional argument follows keyword argument.')
 
-        # Check if any positional args are not specified.
+        # Check if any required args are not specified.
         for key, type_val in dic.items():
-            if(type_val[1] == ''):
-                print(f"Error! parameter '{key}' is required.", file=sys.stderr)
-                sys.exit(1)
+            if(type_val[1] == REQUIRED):
+                raise ParserError(f"Parameter '{key}' is required.")
         return dic
 
-    def __init__(self, sys_args, log, root, *args):
+    def __init__(self, sys_args, *args):
         # Set the default options.
         for options in args:
             for option in options:
@@ -264,7 +265,7 @@ class ParseOptions():
                             item = self.parse_parameters(item, _op)
                     my_list.append(item)
                 else:
-                    log.error(error_message(args, item, label))
+                    raise ParserError(error_message(args, item, label))
             else:
                 # We found the option.
                 if(option_list is not None):
@@ -275,7 +276,7 @@ class ParseOptions():
                 my_list = []
 
                 if(option in used_options):
-                    log.error('Cannot repeat option {} twice.'.format(option['names'][0]))
+                    raise ParserError('Cannot repeat option {} twice.'.format(option['names'][0]))
 
                 used_options.append(option)
 
@@ -301,7 +302,8 @@ class ParseOptions():
                     if(option['choices'] is not None and value not in option['choices']):
                         option_name = option['names'][0]
                         my_choices = ', '.join(option['choices'])
-                        log.error('{} is not a choice for {}\nchoices are:\n  {}'.format(
+
+                        raise ParserError('{} is not a choice for {}\nchoices are:\n  {}'.format(
                             value, option_name, my_choices))
                     i += 1
                 setattr(self, key, value)
@@ -311,5 +313,5 @@ class ParseOptions():
             setattr(self, option_list, list(map(list_type, my_list)))
         setattr(self, '_set', _set)
         if(self.help):
-            print_program_help(root, args)
+            print_program_help(args)
             sys.exit()
