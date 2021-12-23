@@ -477,9 +477,8 @@ def main(sys_args=None):
     tester.run_test('scale_tests', scale_tests)
 
     def various_errors_test():
-        check_for_error(['example.mp4', '--zoom', '0', '--cut_out', '60,end'])
-        check_for_error(['example.mp4', '--zoom', '0,60', '--cut_out', '60,end'])
         check_for_error(['example.mp4', '--add_rectangle', '0,60', '--cut_out', '60,end'])
+
     tester.run_test('various_errors_test', various_errors_test)
 
     def effect_tests():
@@ -490,22 +489,12 @@ def main(sys_args=None):
             [ffprobe.getFrameRate, 30.0],
             [ffprobe.getResolution, '640x360'],
         )
-
-        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom', '10,60,2'])
-
-        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--zoom',
-            'start,end,1,0.5,centerX,centerY,linear', '--scale', '0.5'])
-        inspect(
-            'testsrc_ALTERED.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '320x180'],
-        )
         run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--add_rectangle',
             '0,30,0,200,100,300,#43FA56,10'])
         os.remove('testsrc_ALTERED.mp4')
         os.remove('testsrc.mp4')
     tester.run_test('effect_tests', effect_tests,
-        description='test the zoom and rectangle options',
+        description='test the rectangle object',
         cleanup=clean_all)
 
     def render_text():

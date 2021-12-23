@@ -66,7 +66,7 @@ class Effect():
         self.width = self._vars['width']
         self.height = self._vars['height']
 
-        effect_list = args.add_text + args.add_rectangle + args.add_ellipse + args.zoom
+        effect_list = args.add_text + args.add_rectangle + args.add_ellipse
 
         for i, my_effect in enumerate(effect_list):
             effect = self.set_start_end(my_effect, i)
@@ -89,40 +89,22 @@ class Effect():
 
     def apply(self, index, frame, pix_fmt):
         img = frame.to_image()
+        draw = ImageDraw.Draw(img)
 
         for item in self.sheet[index]:
             pars = self.all[item]
 
             if(pars['type'] == 'text'):
-                draw = ImageDraw.Draw(img)
-
                 draw.text((pars['x'], pars['y']), pars['content'],
                     font=pars['font'], fill=(255,255,255,255))
 
             if(pars['type'] == 'rectangle'):
-                draw = ImageDraw.Draw(img)
                 draw.rectangle([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
                     fill=pars['fill'], width=pars['width'], outline=pars['outline'])
 
             if(pars['type'] == 'ellipse'):
-                draw = ImageDraw.Draw(img)
                 draw.ellipse([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
                     fill=pars['fill'], width=pars['width'], outline=pars['outline'])
-
-            if(pars['type'] == 'zoom'):
-                x = pars['x']
-                y = pars['y']
-                zoom2 = pars['zoom'] * 2
-
-                x1 = round(x - self.width / zoom2)
-                y1 = round(y - self.height / zoom2)
-                x2 = round(x + self.width / zoom2)
-                y2 = round(y + self.height / zoom2)
-
-                bg = Image.new(img.mode, (x2 - x1, y2 - y1), self.background)
-                bg.paste(img, (-x1, -y1))
-
-                img = bg.resize((self.width, self.height), Image.LANCZOS)
 
         frame = frame.from_image(img).reformat(format=pix_fmt)
         return frame
