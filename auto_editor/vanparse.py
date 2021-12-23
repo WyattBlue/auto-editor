@@ -49,8 +49,8 @@ def print_option_help(args, option):
                 text += '' if default == '' else '=' + str(default)
                 text += '}' if n + 1 == len(option['keywords']) else '},'
 
-    if(option['extra'] != ''):
-        text += '{}\n\n'.format(indent(option['extra'], '    '))
+    if(option['manual'] != ''):
+        text += '{}\n\n'.format(indent(option['manual'], '    '))
 
     if(option['keywords'] != []):
         pass
@@ -113,7 +113,7 @@ class ArgumentParser():
             'help': '',
             'keywords': [],
             'hidden': False,
-            'extra': '',
+            'manual': '',
         }
 
     def add_argument(self, *args, **kwargs):

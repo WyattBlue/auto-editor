@@ -44,7 +44,7 @@ def audio_detection(audio_samples, sample_rate, silent_threshold, fps, log):
         start = int(i * sample_rate_per_frame)
         end = min(int((i+1) * sample_rate_per_frame), sample_count)
         audiochunks = audio_samples[start:end]
-        if(get_max_volume(audiochunks) / max_volume >= silent_threshold):
+        if(get_max_volume(audiochunks) / max_volume > silent_threshold):
             has_loud_audio[i] = True
 
     return has_loud_audio
