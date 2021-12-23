@@ -62,7 +62,7 @@ Use `--help` with a specific option for more information:
 ```
 auto-editor --scale --help
   --scale
-    scale the output media file by a certain factor.
+    Scale the output media file by a certain factor.
 
     type: float_type
     default: 1
@@ -81,9 +81,6 @@ auto-editor --scale --help
  - [Subcommands](https://auto-editor.com/cli/subcommands)
  - [Branding Guide](https://auto-editor.com/docs/branding)
  - [GPU Acceleration](https://auto-editor.com/docs/gpu_acceleration)
- - Effects
-   - [Rectangles](https://auto-editor.com/cli/effects/rectangles)
-   - [Zooming](https://auto-editor.com/cli/effects/zooming)
  
 ## Copyright
 Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) but contains non-free elements. See [this page](https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md) for more info.
