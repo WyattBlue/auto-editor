@@ -31,7 +31,7 @@ def main_options(parser):
 
     basic_obj_keywords = [
         {'start': (int, ''),},
-        {'end': (int, ''),},
+        {'dur': (int, ''),},
         {'x1': (int, ''),},
         {'y1': (int, ''),},
         {'x2': (int, ''),},
@@ -50,25 +50,33 @@ def main_options(parser):
     parser.add_argument('--add_text', nargs='*', type=dict,
         keywords=[
             {'start': (int, ''),},
-            {'end': (int, ''),},
+            {'dur': (int, ''),},
             {'content': (str, ''),},
             {'x': (int, 'centerX'),},
             {'y': (int, 'centerY'),},
             {'size': (int, 30),},
             {'font': (str, 'default'),},
             {'align': (str, 'left'),},
+            {'fill': (str, '#FFF'),},
             {'type': 'text',},
         ],
         help='Add a text object to the timeline.'
     )
     parser.add_argument('--add_rectangle', nargs='*', type=dict,
         keywords=rect,
-        help='Add a rectagnle object on the timeline.')
+        help='Add a rectangle object to the timeline.')
     parser.add_argument('--add_ellipse', nargs='*', type=dict,
         keywords=ellipse,
-        help='Add an ellipse object on the timeline.',
+        help='Add an ellipse object to the timeline.',
         extra='The x and y coordinates specify a bounding box where the ellipse is '\
             'drawn.')
+
+    # parser.add_argument('--add_image', nargs='*', type=dict,
+    #     keywords=[
+
+
+    #     ],
+    #     help='Add an image object onto the timeline.')
 
     parser.add_text('URL Download Options')
     parser.add_argument('--download_dir', type=str, default=None,

@@ -33,14 +33,17 @@ class Effect():
 
         return _type(val)
 
-    def set_start_end(self, effect, effect_index):
+    def set_timing(self, effect, effect_index):
         start = effect.pop('start')
-        end = effect.pop('end')
+        dur = effect.pop('dur')
 
         start = self._values(start[1], int)
-        end = self._values(end[1], int)
+        dur = self._values(dur[1], int)
 
-        for i in range(start, end, 1):
+        if(dur < 1):
+            self.log.error(f"dur's value must be greater than 0. Was '{dur}'.")
+
+        for i in range(start, start + dur, 1):
             if(i in self.sheet):
                 self.sheet[i].append(effect_index)
             else:
@@ -69,7 +72,7 @@ class Effect():
         effect_list = args.add_text + args.add_rectangle + args.add_ellipse
 
         for i, my_effect in enumerate(effect_list):
-            effect = self.set_start_end(my_effect, i)
+            effect = self.set_timing(my_effect, i)
             effect = self.set_all(effect)
 
             # Change font attr to ImageFont Obj. (must have font and size attr)
@@ -88,15 +91,17 @@ class Effect():
             self.all.append(effect)
 
     def apply(self, index, frame, pix_fmt):
-        img = frame.to_image()
-        draw = ImageDraw.Draw(img)
+        img = frame.to_image().convert('RGBA')
 
         for item in self.sheet[index]:
             pars = self.all[item]
 
+            obj_img = Image.new('RGBA', img.size, (255,255,255,0))
+            draw = ImageDraw.Draw(obj_img)
+
             if(pars['type'] == 'text'):
                 draw.text((pars['x'], pars['y']), pars['content'],
-                    font=pars['font'], fill=(255,255,255,255))
+                    font=pars['font'], fill=pars['fill'])
 
             if(pars['type'] == 'rectangle'):
                 draw.rectangle([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
@@ -105,6 +110,8 @@ class Effect():
             if(pars['type'] == 'ellipse'):
                 draw.ellipse([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
                     fill=pars['fill'], width=pars['width'], outline=pars['outline'])
+
+            img = Image.alpha_composite(img, obj_img)
 
         frame = frame.from_image(img).reformat(format=pix_fmt)
         return frame
