@@ -38,8 +38,8 @@ def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, 
     total_frames = chunks[len(chunks) - 1][1]
     progress.start(total_frames, 'Creating new video')
 
-    input_ = av.open(inp.path, 'r')
-    pix_fmt = input_.streams.video[track].pix_fmt
+    container = av.open(inp.path, 'r')
+    pix_fmt = container.streams.video[track].pix_fmt
 
     if(has_vfr):
         # Create a cfr stream on stdout.
@@ -52,13 +52,13 @@ def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, 
         cmd.extend(['-vcodec', 'rawvideo', 'pipe:1'])
 
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
-        input_ = av.open(wrapper, 'r')
+        container = av.open(wrapper, 'r')
     elif(not pix_fmt_allowed(pix_fmt)):
         pix_fmt = 'yuv420p'
         cmd = ['-i', inp.path, '-map', f'0:v:{track}', '-f', 'matroska', '-pix_fmt', pix_fmt,
             '-vcodec', 'rawvideo', 'pipe:1']
         wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
-        input_ = av.open(wrapper, 'r')
+        container = av.open(wrapper, 'r')
 
     from auto_editor.utils.encoder import encoders
     from auto_editor.utils.video import get_vcodec, video_quality
@@ -76,11 +76,11 @@ def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, 
     log.debug(f'pix_fmt: {pix_fmt}')
     log.debug(f'apply video quality settings now: {not apply_video_later}')
 
-    inputVideoStream = input_.streams.video[track]
-    inputVideoStream.thread_type = 'AUTO'
+    video_stream = container.streams.video[track]
+    video_stream.thread_type = 'AUTO'
 
-    width = inputVideoStream.width
-    height = inputVideoStream.height
+    width = video_stream.width
+    height = video_stream.height
 
     effects.add_var('fps', fps)
     effects.add_var('width', width)
@@ -108,31 +108,30 @@ def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, 
     process2 = ffmpeg.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL)
 
-    inputEquavalent = 0.0
-    outputEquavalent = 0
-    index = 0
+    input_equavalent = 0.0
+    output_equavalent = 0
     chunk = chunks.pop(0)
 
     try:
-        for packet in input_.demux(inputVideoStream):
-            for frame in packet.decode():
-                index += 1
-                if(len(chunks) > 0 and index >= chunk[1]):
-                    chunk = chunks.pop(0)
+        for index, frame in enumerate(container.decode(video_stream)):
+            if(len(chunks) > 0 and index-1 >= chunk[1]):
+                chunk = chunks.pop(0)
+                if(len(chunks) == 0 and speeds[chunk[2]] == 99999):
+                    break
 
-                if(speeds[chunk[2]] != 99999):
-                    inputEquavalent += (1 / speeds[chunk[2]])
+            if(speeds[chunk[2]] != 99999):
+                input_equavalent += (1 / speeds[chunk[2]])
 
-                while inputEquavalent > outputEquavalent:
+            while input_equavalent > output_equavalent:
+                if(index in effects.sheet):
+                    frame = effects.apply(index, frame, pix_fmt)
 
-                    if(index-1 in effects.sheet):
-                        frame = effects.apply(index-1, frame, pix_fmt)
+                in_bytes = frame.to_ndarray().tobytes()
+                process2.stdin.write(in_bytes)
+                output_equavalent += 1
 
-                    in_bytes = frame.to_ndarray().tobytes()
-                    process2.stdin.write(in_bytes)
-                    outputEquavalent += 1
+            progress.tick(index)
 
-                progress.tick(index - 1)
         progress.end()
         process2.stdin.close()
         process2.wait()
