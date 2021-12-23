@@ -68,7 +68,7 @@ def main_options(parser):
     parser.add_argument('--add_ellipse', nargs='*', type=dict,
         keywords=ellipse,
         help='Add an ellipse object to the timeline.',
-        extra='The x and y coordinates specify a bounding box where the ellipse is '\
+        manual='The x and y coordinates specify a bounding box where the ellipse is '\
             'drawn.')
 
     # parser.add_argument('--add_image', nargs='*', type=dict,
@@ -87,7 +87,7 @@ def main_options(parser):
         help='Manually set the YouTube ID the video belongs to.')
     parser.add_argument('--block', type=block_type,
         help='Mark all sponsors sections as silent.',
-        extra='Only for YouTube URLs. This uses the SponsorBlock API.\n'
+        manual='Only for YouTube URLs. This uses the SponsorBlock API.\n'
             'Choices can include: sponsor intro outro selfpromo interaction music_offtopic')
 
     parser.add_argument('--download_archive', type=file_type, default=None,
@@ -139,7 +139,7 @@ def main_options(parser):
     parser.add_argument('--has_vfr', default='unset',
         choices=['unset', 'yes', 'no'],
         help='Set whether the input file(s) have Variable Frame Rates',
-        extra='Detecting Variable Frame Rates takes a lot of time, skip variable frame rate scan, saving time for big video files.')
+        manual='Detecting Variable Frame Rates takes a lot of time, skip variable frame rate scan, saving time for big video files.')
 
     parser.add_text('Miscellaneous Options')
     parser.add_argument('--background', type=str, default='#000',
@@ -160,7 +160,13 @@ def main_options(parser):
         help='The range that will be marked as "silent".')
     parser.add_argument('--set_speed_for_range', type=speed_range_type, nargs='*',
         help='Set an arbitrary speed for a given range.',
-        extra='The arguments are: speed,start,end')
+        manual='This option takes 3 arguments delimited with commas and they are as follows:\n'
+            ' Speed\n'
+            ' - How fast the media plays. Speeds 0 or below and 99999 or above will be cut completely.\n'
+            ' Start\n'
+            ' - When the speed first gets applied. The default unit is in frames, but second units can also be used.\n'
+            ' End\n'
+            ' - When the speed stops being applied. It can use both frame and second units.\n')
 
     parser.add_text('Select Editing Source Options')
     parser.add_argument('--edit_based_on', '--edit', default='audio',
@@ -198,20 +204,21 @@ def main_options(parser):
         help='Do not open the file after editing is done.')
     parser.add_argument('--temp_dir', default=None,
         help='Set where the temporary directory is located.',
-        extra='If not set, tempdir will be set with Python\'s tempfile module\n'
+        manual='If not set, tempdir will be set with Python\'s tempfile module\n'
+            'The directory doesn\'t have to exist beforehand, however, the root path must be valid.'
             'For Windows users, this file will be in the C drive.\n'
             'The temp file can get quite big if you\'re generating a huge video, so '
             'make sure your location has enough space.')
     parser.add_argument('--ffmpeg_location', default=None,
         help='Set a custom path to the ffmpeg location.',
-        extra='This takes precedence over --my_ffmpeg.')
+        manual='This takes precedence over `--my_ffmpeg`.')
     parser.add_argument('--my_ffmpeg', action='store_true',
         help='Use the ffmpeg on your PATH instead of the one packaged.',
-        extra='This is equivalent to --ffmpeg_location ffmpeg.')
+        manual='This is equivalent to `--ffmpeg_location ffmpeg`.')
 
     parser.add_text('Display Options')
     parser.add_argument('--version', action='store_true',
-        help='Show which auto-editor you have.')
+        help="Display the program's version and halt.")
     parser.add_argument('--debug', action='store_true',
         help='Show debugging messages and values.')
     parser.add_argument('--show_ffmpeg_debug', action='store_true',
@@ -219,17 +226,21 @@ def main_options(parser):
     parser.add_argument('--quiet', '-q', action='store_true',
         help='Display less output.')
     parser.add_argument('--preview', action='store_true',
-        help='Show stats on how the input will be cut.')
+        help='Show stats on how the input will be cut and halt.')
 
     parser.add_text('Editing Options')
 
     parser.add_argument('--silent_threshold', '-t', type=float_type, default=0.04,
         range='0 to 1',
-        help='Set the volume that frames audio needs to surpass to be "loud".')
+        help='Set the volume that frames audio needs to surpass to be "loud".',
+        manual='Silent threshold is a percentage where 0% represents absolute silence and '
+            '100% represents the highest volume in the media file.\n'
+            'Setting the threshold to `0%` will cut only out areas where area is '
+            'absolutely silence while a value of 4% will cut ')
     parser.add_argument('--frame_margin', '--margin', '-m', type=frame_type, default=6,
         range='0 to Infinity',
-        help='Set how many "silent" frames of on either side of "loud" sections '
-            'be included.')
+        help='Set how many "silent" frames on either side on the "loud" sections to be '
+            'included.')
     parser.add_argument('--silent_speed', '-s', type=float_type, default=99999,
         range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='Set the speed that "silent" sections should be played at.')
