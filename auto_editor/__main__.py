@@ -27,19 +27,7 @@ def main_options(parser):
     parser.add_argument('--no_progress', action='store_true',
         help='Do not display any progress at all.')
 
-    parser.add_text('Effect Options')
-    parser.add_argument('--zoom', nargs='*', type=dict,
-        help='Set when and how a zoom will occur.',
-        keywords=[
-            {'start': (int, ''),},
-            {'end': (int, ''),},
-            {'zoom': (float, '')},
-            {'end_zoom': (float, '{zoom}'),},
-            {'x': (int, 'centerX'),},
-            {'y': (int, 'centerY'),},
-            {'interpolate': (str, 'linear'),},
-            {'type': 'zoom'},
-        ])
+    parser.add_text('Object Options')
 
     basic_obj_keywords = [
         {'start': (int, ''),},
