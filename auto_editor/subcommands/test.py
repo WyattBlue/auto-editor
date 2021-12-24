@@ -273,6 +273,12 @@ def main(sys_args=None):
             sys.exit(1)
     tester.run_test('version_tests', version_debug)
 
+
+    def parser_test():
+        check_for_error(['example.mp4', '--block'], 'needs argument')
+
+    tester.run_test('parser_test', parser_test, allow_fail=True)
+
     def subtitle_tests():
         from auto_editor.render.subtitle import SubtitleParser
         test = SubtitleParser()
@@ -500,7 +506,7 @@ def main(sys_args=None):
     def render_text():
         run_program(['example.mp4', '--has-vfr', 'no', '--add-text', 'start,end,This is my text'])
 
-    tester.run_test('render_text', render_text, allow_fail=True)
+    tester.run_test('render_text', render_text)
 
     def check_font_error():
         check_for_error(
