@@ -100,8 +100,14 @@ class Effect():
             draw = ImageDraw.Draw(obj_img)
 
             if(pars['type'] == 'text'):
-                draw.text((pars['x'], pars['y']), pars['content'],
-                    font=pars['font'], fill=pars['fill'])
+
+                tw, th = draw.textsize(pars['content'], font=pars['font'])
+
+                new_x = ((pars['x'] * 2) - tw) / 2
+                new_y = ((pars['y'] * 2) - th) / 2
+
+                draw.text((new_x, new_y), pars['content'], font=pars['font'],
+                    fill=pars['fill'])
 
             if(pars['type'] == 'rectangle'):
                 draw.rectangle([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
