@@ -402,7 +402,11 @@ def _read_data_chunk(fid, format_tag, channels, bit_depth, is_big_endian,
     _handle_pad_byte(fid, size)
 
     if channels > 1:
-        data = data.reshape(-1, channels)
+        try:
+            data = data.reshape(-1, channels)
+        except ValueError:
+            data = data[:-1].reshape(-1, channels)
+
     return data
 
 
