@@ -37,11 +37,11 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'numpy>=1.19.5',
-        'yt-dlp>=2021.11.10.1',
-        'pillow>=5.3.0',
-        'av>=8.0.3',
-        'opencv-python>=4.3',
+        'numpy>=1.21.0',
+        'yt-dlp>=2021.12.27',
+        'pillow>=8.4.0',
+        'av>=8.1.0',
+        'opencv-python>=4.5.5.62',
     ],
     python_requires='>=3.7,<3.12',
     classifiers=[
