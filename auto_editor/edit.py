@@ -3,7 +3,10 @@
 # Internal Libraries
 import os
 
+from typing import List, Tuple
+
 from auto_editor.utils.effects import Effect
+from auto_editor.utils.log import Log
 from auto_editor.utils.func import fnone, set_output_name, append_filename
 
 def get_chunks(inp, segment, fps, args, log, audio_samples=None, sample_rate=None):
@@ -218,16 +221,15 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     if(chunks is None):
         chunks = get_chunks(inp, segment, fps, args, log, audio_samples, sample_rate)
 
-    def is_clip(chunk):
-        # type: (list[tuple[float]]) -> bool
+    def is_clip(chunk: Tuple[int, int, float]) -> bool:
         return chunk[2] != 99999
 
     def number_of_cuts(chunks):
-        # type: (list[tuple[float]]) -> int
+        # type: (List[Tuple[int, int, float]]) -> int
         return len(list(filter(is_clip, chunks)))
 
     def get_clips(chunks):
-        # type: (list[tuple[float]]) -> list[list[float]]
+        # type: (List[Tuple[int, int, float]]) -> List[List[int, int, float]]
         clips = []
         for chunk in chunks:
             if(is_clip(chunk)):

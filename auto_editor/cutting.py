@@ -1,11 +1,14 @@
 '''cutting.py'''
 
+from typing import List, Tuple, Any, NoReturn, Optional
+from auto_editor.utils.log import Log
+
 import numpy as np
 
 from auto_editor.utils.types import split_num_str
 
 def combine_audio_motion(audio_list, motion_list, based, log):
-    # type: (np.ndarray, np.ndarray, str, Any) -> np.ndarray
+    # type: (np.ndarray, np.ndarray, str, Log) -> Optional[np.ndarray]
 
     if(based == 'audio' or based == 'not_audio'):
         if(max(audio_list) == 0):
@@ -81,13 +84,11 @@ def remove_small(has_loud, lim, replace, with_):
     return has_loud
 
 
-def str_is_number(val):
-    # type: (str) -> bool
+def str_is_number(val: str) -> bool:
     return val.replace('.', '', 1).replace('-', '', 1).isdigit()
 
 
-def str_starts_with_number(val):
-    # type: (str) -> bool
+def str_starts_with_number(val: str) -> bool:
     if(val.startswith('-')):
         val = val[1:]
     val = val.replace('.', '', 1)
@@ -95,10 +96,10 @@ def str_starts_with_number(val):
 
 
 def set_range(has_loud, range_syntax, fps, with_, log):
-    # type: (...) -> np.ndarray
+    # type: (np.ndarray, list, float, int, Log) -> np.ndarray
 
     def replace_variables_to_values(item, fps, log):
-        # type: (str, float | int, Any) -> int
+        # type: (str, float, Log) -> int | NoReturn
         if(str_is_number(item)):
             return int(item)
         if(str_starts_with_number(item)):
@@ -106,7 +107,7 @@ def set_range(has_loud, range_syntax, fps, with_, log):
             if(unit in ['', 'f', 'frame', 'frames']):
                 if(isinstance(value, float)):
                     log.error('float type cannot be used with frame unit')
-                return value
+                return int(value)
             if(unit in ['s', 'sec', 'secs', 'second', 'seconds']):
                 return round(value * fps)
             log.error('Unknown unit: {}'.format(unit))
@@ -114,10 +115,9 @@ def set_range(has_loud, range_syntax, fps, with_, log):
             return 0
         if(item == 'end'):
             return len(has_loud)
-        log.error("variable '{}' not available.".format(item))
+        return log.error("variable '{}' not available.".format(item))
 
-    def var_val_to_frames(val, fps, log):
-        # type: (str, float | int, Any) -> int
+    def var_val_to_frames(val: str, fps: float, log: Log) -> int:
         num = replace_variables_to_values(val, fps, log)
         if(num < 0):
             num += len(has_loud)
@@ -146,8 +146,7 @@ def cook(has_loud, min_clip, min_cut):
 
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 0, 0] => [[0, 3, 1], [3, 5, 0]]
-def chunkify(arr, arr_length=None):
-    # type: (np.ndarray, int | None) -> list[tuple[float]]
+def chunkify(arr: np.ndarray, arr_length: int = None) -> List[Tuple[int, int, float]]:
     if(arr_length is None):
         arr_length = len(arr)
 
@@ -164,8 +163,7 @@ def chunkify(arr, arr_length=None):
 # Turn chunk list into silent/loud like array.
 # Example: [(0, 3, 1), (3, 5, 2)] => [1, 1, 1, 2, 2]
 
-def chunks_to_has_loud(chunks):
-    # type: (list[tuple[float]]) -> np.ndarray
+def chunks_to_has_loud(chunks: List[Tuple[int, int, float]]) -> np.ndarray:
     has_loud = np.zeros((chunks[-1][1]), dtype=float)
 
     for chunk in chunks:
@@ -185,7 +183,7 @@ def apply_frame_margin(has_loud, has_loud_length, frame_margin):
 
 
 def apply_mark_as(has_loud, has_loud_length, fps, args, log):
-    # type: (...) -> np.ndarray
+    # type: (np.ndarray, int, float, Any, Log) -> np.ndarray
     if(args.mark_as_loud != []):
         has_loud = set_range(has_loud, args.mark_as_loud, fps, args.video_speed, log)
 
@@ -195,7 +193,7 @@ def apply_mark_as(has_loud, has_loud_length, fps, args, log):
 
 
 def apply_spacing_rules(speed_list, arr_length, min_clip, min_cut, fps, args, log):
-    # type: (...) -> list[tuple[float]]
+    # type: (...) -> List[Tuple[int, int, float]]
 
     speed_list[speed_list == 0] = args.silent_speed
     speed_list[speed_list == 1] = args.video_speed

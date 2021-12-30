@@ -1,5 +1,7 @@
 '''utils/log.py'''
 
+from typing import NoReturn
+
 import sys
 from shutil import rmtree, get_terminal_size
 from time import perf_counter, sleep
@@ -25,7 +27,7 @@ class Log():
         self.quiet = quiet
         self.temp = temp
 
-    def debug(self, message):
+    def debug(self, message: str):
         if(self.is_debug):
             self.conwrite('')
             sys.stderr.write(f'Debug: {message}\n')
@@ -47,7 +49,7 @@ class Log():
             # that's ok, the folder we are trying to remove is already gone
             pass
 
-    def conwrite(self, message):
+    def conwrite(self, message: str):
         if(not self.quiet):
             buffer = get_terminal_size().columns - len(message) - 3
             sys.stdout.write('  ' + message + ' ' * buffer + '\r')
@@ -56,7 +58,7 @@ class Log():
             except AttributeError:
                 pass
 
-    def error(self, message):
+    def error(self, message: str) -> NoReturn:
         self.conwrite('')
         message = message.replace('\t', '    ')
         sys.stderr.write(f'Error! {message}\n')
@@ -73,7 +75,7 @@ class Log():
                 import os
                 os._exit(1)
 
-    def bug(self, message, bug_type='bug report'):
+    def bug(self, message: str, bug_type='bug report') -> NoReturn:
         self.conwrite('')
         URL = 'https://github.com/WyattBlue/auto-editor/issues/'
 
@@ -83,11 +85,11 @@ class Log():
         self.cleanup()
         sys.exit(1)
 
-    def warning(self, message):
+    def warning(self, message: str):
         if(not self.quiet):
             sys.stderr.write(f'Warning! {message}\n')
 
-    def print(self, message):
+    def print(self, message: str):
         if(not self.quiet):
             sys.stdout.write(f'{message}\n')
 

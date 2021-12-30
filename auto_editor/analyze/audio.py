@@ -3,12 +3,13 @@
 import numpy as np
 import math
 
-def get_max_volume(s):
-    # type: (np.ndarray) -> float
+from auto_editor.utils.log import Log
+
+def get_max_volume(s: np.ndarray) -> float:
     return max(float(np.max(s)), -float(np.min(s)))
 
 
-def display_audio_levels(read_track, fps):
+def display_audio_levels(read_track, fps: float):
     import sys
 
     from auto_editor.scipy.wavfile import read
@@ -29,7 +30,7 @@ def display_audio_levels(read_track, fps):
 
 
 def audio_detection(audio_samples, sample_rate, silent_threshold, fps, log):
-    # type: (np.ndarray, int, float, float, Any) -> np.ndarray
+    # type: (np.ndarray, int, float, float, Log) -> np.ndarray
     log.conwrite('Analyzing audio volume.')
 
     max_volume = get_max_volume(audio_samples)
