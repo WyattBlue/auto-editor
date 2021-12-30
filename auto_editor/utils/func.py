@@ -5,8 +5,11 @@ To prevent duplicate code being pasted between scripts, common functions should 
 put here. No function should modify or create video/audio files on its own.
 """
 
+from typing import List, Tuple
+from auto_editor.utils.log import Log
+
 def get_stdout(cmd):
-    # type: (list[str]) -> str
+    # type: (List[str]) -> str
     import subprocess
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
@@ -23,7 +26,7 @@ def clean_list(x, rm_chars):
     return new_list
 
 def aspect_ratio(width, height):
-    # type: (int, int) -> tuple(2)
+    # type: (int, int) -> Tuple[int, int] | Tuple[None, None]
     if(height == 0):
         return None, None
 
@@ -36,8 +39,8 @@ def aspect_ratio(width, height):
     return width // c, height // c
 
 def get_new_length(chunks, fps):
-    # type: (list[tuple[float]], float) -> float
-    time_in_frames = 0
+    # type: (List[Tuple[int, int, float]], float) -> float
+    time_in_frames = 0.0
     for chunk in chunks:
         leng = chunk[1] - chunk[0]
         if(chunk[2] < 99999):
@@ -60,6 +63,7 @@ def human_readable_time(time_in_secs):
     return '{} {}'.format(time_in_secs, units)
 
 def open_with_system_default(path, log):
+    # type(str, Log) -> None
     from subprocess import call
     try:  # should work on Windows
         from os import startfile
@@ -87,6 +91,7 @@ def append_filename(path, val):
     return root + val + ext
 
 def set_output_name(path, inp_ext, making_data_file, args):
+    # type: (...) -> str
     import os.path
     root, ext = os.path.splitext(path)
 

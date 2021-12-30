@@ -25,8 +25,6 @@ def make_json_cutlist(media_file, out, chunks, log):
     if(not out.endswith('.json')):
         log.error('Output extension must be .json')
 
-    print(chunks)
-
     data = {
         'version': '0.1.0',
         'timeline': {

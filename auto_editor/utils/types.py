@@ -1,5 +1,7 @@
 '''utils/types.py'''
 
+from typing import Any, List, Tuple
+
 import os.path
 import sys
 
@@ -11,7 +13,7 @@ def error(message):
     sys.exit(1)
 
 def split_num_str(val, error_func):
-    # type: (str, Any) -> tuple(2)
+    # type: (str, Any) -> Tuple[int | float, str]
     index = 0
     for item in val:
         if(not item.isdigit() and item != ' ' and item != '.' and item != '-'):
@@ -38,7 +40,7 @@ def file_type(path):
     return path
 
 def unit_check(unit, allowed_units):
-    # type: (list, str) -> None
+    # type: (str, List[str]) -> None
     if(unit not in allowed_units):
         error('Unsupported unit: {}'.format(unit))
 

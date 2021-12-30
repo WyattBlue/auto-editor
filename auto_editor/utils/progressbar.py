@@ -6,8 +6,7 @@ from shutil import get_terminal_size
 
 from .func import get_stdout
 
-def _pretty_time(my_time, ampm):
-    # type: (float, bool) -> str
+def _pretty_time(my_time: float, ampm: bool) -> str:
     new_time = localtime(my_time)
 
     hours = new_time.tm_hour
@@ -18,8 +17,8 @@ def _pretty_time(my_time, ampm):
             hours = 12
         if(hours > 12):
             hours -= 12
-        ampm = 'PM' if new_time.tm_hour >= 12 else 'AM'
-        return '{:02}:{:02} {}'.format(hours, minutes, ampm)
+        ampm_marker = 'PM' if new_time.tm_hour >= 12 else 'AM'
+        return '{:02}:{:02} {}'.format(hours, minutes, ampm_marker)
     return '{:02}:{:02}'.format(hours, minutes)
 
 def bar(columns, title, done, togo, percent, new_time):

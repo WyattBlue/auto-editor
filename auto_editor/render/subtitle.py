@@ -5,12 +5,12 @@ import re
 
 class SubtitleParser:
     def __init__(self):
-        self.supported_codecs = ['ass', 'webvtt', 'mov_text']
+        self.supported_codecs = ('ass', 'webvtt', 'mov_text')
 
     def parse(self, text, fps, codec):
 
         if(codec not in self.supported_codecs):
-            raise ValueError('codec {} not supported.'.format(codec))
+            raise ValueError(f'codec {codec} not supported.')
 
         self.fps = fps
         self.codec = codec
@@ -64,7 +64,7 @@ class SubtitleParser:
 
         self.contents = new_content
 
-    def write(self, file_path):
+    def write(self, file_path: str):
         with open(file_path, 'w') as file:
             file.write(self.header)
             for item in self.contents:
@@ -77,20 +77,20 @@ class SubtitleParser:
                 ))
             file.write(self.footer)
 
-    def to_frame(self, text):
-        # type: (str) -> int
+    def to_frame(self, text: str) -> int:
         if(self.codec == 'mov_text'):
             time_format = r'(\d+):?(\d+):([\d,]+)'
         else:
             time_format = r'(\d+):?(\d+):([\d.]+)'
 
         nums = re.match(time_format, text)
+        assert nums is not None
+
         hours, minutes, seconds = nums.groups()
         seconds = seconds.replace(',', '.', 1)
         return round((int(hours) * 3600 + int(minutes) * 60 + float(seconds)) * self.fps)
 
-    def to_timecode(self, frame):
-        # type: (int) -> str
+    def to_timecode(self, frame: int) -> str:
         seconds = frame / self.fps
 
         m, s = divmod(seconds, 60)

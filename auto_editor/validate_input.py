@@ -5,6 +5,8 @@ import re
 import sys
 
 from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.utils.log import Log
+from typing import Optional
 
 class MyLogger():
     @staticmethod
@@ -23,7 +25,7 @@ class MyLogger():
             print(msg, file=sys.stderr)
 
 
-def parse_bytes(bytestr):
+def parse_bytes(bytestr) -> Optional[int]:
     # Parse a string indicating a byte quantity into an integer.
     matchobj = re.match(r'(?i)^(\d+(?:\.\d+)?)([kMGTPEZY]?)$', bytestr)
     if(matchobj is None):
@@ -33,8 +35,7 @@ def parse_bytes(bytestr):
     return round(number * multiplier)
 
 
-def sponsor_block_api(_id, categories, log):
-    # type: (str, list, Any) -> dict
+def sponsor_block_api(_id: str, categories: list, log: Log) -> Optional[dict]:
     from urllib import request
     from urllib.error import HTTPError
     import json
@@ -55,7 +56,7 @@ def sponsor_block_api(_id, categories, log):
         log.warning("Couldn't find skipSegments for id: {}".format(_id))
         return None
 
-def download_video(my_input, args, ffmpeg, log):
+def download_video(my_input, args, ffmpeg, log: Log):
     log.conwrite('Downloading video...')
     if('@' in my_input):
         res = my_input[my_input.index('@')+1:]
@@ -122,7 +123,7 @@ def download_video(my_input, args, ffmpeg, log):
     return outtmpl
 
 
-def get_segment(args, my_input, log):
+def get_segment(args, my_input, log: Log):
     if(args.block is not None):
         if(args.id is not None):
             return sponsor_block_api(args.id, args.block, log)
@@ -133,7 +134,7 @@ def get_segment(args, my_input, log):
             return sponsor_block_api(youtube_id, args.block, log)
     return None
 
-def valid_input(inputs, ffmpeg, args, log):
+def valid_input(inputs, ffmpeg, args, log: Log):
     new_inputs = []
     segments = []
     for my_input in inputs:

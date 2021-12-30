@@ -1,5 +1,7 @@
 '''utils/container.py'''
 
+from typing import Any
+
 pcm_formats = [
     'pcm_s16le', # default format
 
@@ -243,9 +245,9 @@ containers = {
     },
 }
 
-def get_rules(key):
-    # type: (str) -> dict
-    rules = containers['default']
+
+def get_rules(key: str) -> Any:
+    rules: Any = containers['default']
     if(key in containers):
         rules.update(containers[key])
     else:

@@ -6,6 +6,9 @@
 import cv2
 import numpy as np
 
+from auto_editor.ffwrapper import File
+from auto_editor.utils.log import Log
+
 def resize(image, width=None, height=None, inter=cv2.INTER_AREA):
     if(width is None and height is None):
         return image
@@ -21,7 +24,7 @@ def resize(image, width=None, height=None, inter=cv2.INTER_AREA):
     return cv2.resize(image, dim, interpolation=inter)
 
 
-def display_motion_levels(inp, width, dilates, blur):
+def display_motion_levels(inp: File, width: int, dilates: int, blur: int):
     import sys
 
     cap = cv2.VideoCapture(inp.path)
@@ -61,8 +64,8 @@ def display_motion_levels(inp, width, dilates, blur):
     cv2.destroyAllWindows()
 
 
-def motion_detection(inp, threshold, log, width, dilates, blur):
-    # type: (Any, float, Any, int, int, int) -> np.ndarray
+def motion_detection(inp: File, threshold: float, log: Log, width: int,
+    dilates: int, blur: int) -> np.ndarray:
 
     from auto_editor.utils.progressbar import ProgressBar
 
