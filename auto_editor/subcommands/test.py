@@ -290,10 +290,9 @@ def main(sys_args=None):
             [40, 50, "E"],
             [50, 60, "F"],
         ]
-        speeds = [99999, 1]
-        chunks = [[0, 10, 1], [10, 20, 0], [20, 30, 1], [30, 40, 0], [40, 50, 1],
-            [50, 60, 0]]
-        test.edit(chunks, speeds)
+        chunks = [(0, 10, 1), (10, 20, 99999), (20, 30, 1), (30, 40, 99999), (40, 50, 1),
+            (50, 60, 99999)]
+        test.edit(chunks)
 
         if(test.contents != [[0, 10, "A"], [10, 20, "C"], [20, 30, "E"]]):
             raise ValueError('Incorrect subtitle results.')

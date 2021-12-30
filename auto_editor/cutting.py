@@ -4,50 +4,50 @@ import numpy as np
 
 from auto_editor.utils.types import split_num_str
 
-def combine_audio_motion(audioList, motionList, based, log):
+def combine_audio_motion(audio_list, motion_list, based, log):
     # type: (np.ndarray, np.ndarray, str, Any) -> np.ndarray
 
     if(based == 'audio' or based == 'not_audio'):
-        if(max(audioList) == 0):
+        if(max(audio_list) == 0):
             log.error('There was no place where audio exceeded the threshold.')
     if(based == 'motion' or based == 'not_motion'):
-        if(max(motionList) == 0):
+        if(max(motion_list) == 0):
             log.error('There was no place where motion exceeded the threshold.')
 
-    if(audioList is not None and max(audioList) == 0):
+    if(audio_list is not None and max(audio_list) == 0):
         log.warning('There was no place where audio exceeded the threshold.')
-    if(motionList is not None and max(motionList) == 0):
+    if(motion_list is not None and max(motion_list) == 0):
         log.warning('There was no place where motion exceeded the threshold.')
 
     if(based == 'audio'):
-        return audioList
+        return audio_list
 
     if(based == 'motion'):
-        return motionList
+        return motion_list
 
     if(based == 'not_audio'):
-        return np.invert(audioList)
+        return np.invert(audio_list)
 
     if(based == 'not_motion'):
-        return np.invert(motionList)
+        return np.invert(motion_list)
 
     if(based == 'audio_and_motion'):
-        return audioList & motionList
+        return audio_list & motion_list
 
     if(based == 'audio_or_motion'):
-        return audioList | motionList
+        return audio_list | motion_list
 
     if(based == 'audio_xor_motion'):
-        return np.bitwise_xor(audioList, motionList)
+        return np.bitwise_xor(audio_list, motion_list)
 
     if(based == 'audio_and_not_motion'):
-        return audioList & np.invert(motionList)
+        return audio_list & np.invert(motion_list)
 
     if(based == 'not_audio_and_motion'):
-        return np.invert(audioList) & motionList
+        return np.invert(audio_list) & motion_list
 
     if(based == 'not_audio_and_not_motion'):
-        return np.invert(audioList) & np.invert(motionList)
+        return np.invert(audio_list) & np.invert(motion_list)
     return None
 
 
@@ -60,7 +60,7 @@ def combine_segment(has_loud, segment, fps):
     return has_loud
 
 
-def removeSmall(has_loud, lim, replace, with_):
+def remove_small(has_loud, lim, replace, with_):
     # type: (np.ndarray, int, int, int) -> np.ndarray
     startP = 0
     active = False
@@ -94,7 +94,7 @@ def str_starts_with_number(val):
     return val[0].isdigit()
 
 
-def setRange(has_loud, range_syntax, fps, with_, log):
+def set_range(has_loud, range_syntax, fps, with_, log):
     # type: (...) -> np.ndarray
 
     def replace_variables_to_values(item, fps, log):
@@ -137,36 +137,36 @@ def seconds_to_frames(value, fps):
         return int(float(value) * fps)
     return value
 
-def cook(has_loud, minClip, minCut):
+def cook(has_loud, min_clip, min_cut):
     # type: (np.ndarray, int, int) -> np.ndarray
-    has_loud = removeSmall(has_loud, minClip, replace=1, with_=0)
-    has_loud = removeSmall(has_loud, minCut, replace=0, with_=1)
+    has_loud = remove_small(has_loud, min_clip, replace=1, with_=0)
+    has_loud = remove_small(has_loud, min_cut, replace=0, with_=1)
     return has_loud
 
 
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 0, 0] => [[0, 3, 1], [3, 5, 0]]
-def chunkify(has_loud, has_loud_length=None):
-    # type: (np.ndarray, int | None) -> list[list[int]]
-    if(has_loud_length is None):
-        has_loud_length = len(has_loud)
+def chunkify(arr, arr_length=None):
+    # type: (np.ndarray, int | None) -> list[tuple[float]]
+    if(arr_length is None):
+        arr_length = len(arr)
 
     chunks = []
-    startP = 0
-    for j in range(1, has_loud_length):
-        if(has_loud[j] != has_loud[j - 1]):
-            chunks.append([startP, j, int(has_loud[j-1])])
-            startP = j
-    chunks.append([startP, has_loud_length, int(has_loud[j])])
+    start = 0
+    for j in range(1, arr_length):
+        if(arr[j] != arr[j - 1]):
+            chunks.append((start, j, arr[j - 1]))
+            start = j
+    chunks.append((start, arr_length, arr[j]))
     return chunks
 
 
 # Turn chunk list into silent/loud like array.
-# Example: [[0, 3, 1], [3, 5, 0]] => [1, 1, 1, 0, 0]
+# Example: [(0, 3, 1), (3, 5, 2)] => [1, 1, 1, 2, 2]
+
 def chunks_to_has_loud(chunks):
-    # type: (list[list[int]]) -> np.ndarray
-    duration = chunks[len(chunks) - 1][1]
-    has_loud = np.zeros((duration), dtype=np.uint8)
+    # type: (list[tuple[float]]) -> np.ndarray
+    has_loud = np.zeros((chunks[-1][1]), dtype=float)
 
     for chunk in chunks:
         if(chunk[2] != 0):
@@ -176,7 +176,7 @@ def chunks_to_has_loud(chunks):
 
 def apply_frame_margin(has_loud, has_loud_length, frame_margin):
     # type: (np.ndarray, int, int) -> np.ndarray
-    new = np.zeros((has_loud_length), dtype=np.uint8)
+    new = np.zeros((has_loud_length), dtype=float)
     for i in range(has_loud_length):
         start = int(max(0, i - frame_margin))
         end = int(min(has_loud_length, i+1+frame_margin))
@@ -187,35 +187,30 @@ def apply_frame_margin(has_loud, has_loud_length, frame_margin):
 def apply_mark_as(has_loud, has_loud_length, fps, args, log):
     # type: (...) -> np.ndarray
     if(args.mark_as_loud != []):
-        has_loud = setRange(has_loud, args.mark_as_loud, fps, 1, log)
+        has_loud = set_range(has_loud, args.mark_as_loud, fps, args.video_speed, log)
 
     if(args.mark_as_silent != []):
-        has_loud = setRange(has_loud, args.mark_as_silent, fps, 0, log)
+        has_loud = set_range(has_loud, args.mark_as_silent, fps, args.silent_speed, log)
     return has_loud
 
-def apply_spacing_rules(has_loud, has_loud_length, minClip, minCut, speeds, fps, args, log):
-    # type: (...) -> list[list[int]]
+
+def apply_spacing_rules(speed_list, arr_length, min_clip, min_cut, fps, args, log):
+    # type: (...) -> list[tuple[float]]
+
+    speed_list[speed_list == 0] = args.silent_speed
+    speed_list[speed_list == 1] = args.video_speed
+
     if(args.cut_out != []):
-        has_loud = setRange(has_loud, args.cut_out, fps, speeds.index(99999), log)
+        speed_list = set_range(speed_list, args.cut_out, fps, 99999, log)
 
     if(args.add_in != []):
-        has_loud = setRange(has_loud, args.add_in, fps, speeds.index(args.video_speed), log)
+        speed_list = set_range(speed_list, args.add_in, fps, args.video_speed, log)
 
     if(args.set_speed_for_range != []):
         for item in args.set_speed_for_range:
-            my_speed_index = speeds.index(float(item[0]))
-            has_loud = setRange(has_loud, [item[1:]], fps, my_speed_index, log)
+            speed_list = set_range(speed_list, [item[1:]], fps, item[0], log)
 
-    return chunkify(has_loud, has_loud_length)
-
-
-def apply_basic_spacing(has_loud, fps, minClip, minCut, log):
-    # type: (np.ndarray, float, int, int, Any) -> list[list[int]]
-    minClip = seconds_to_frames(minClip, fps)
-    minCut = seconds_to_frames(minCut, fps)
-
-    has_loud = cook(has_loud, minClip, minCut)
-    return chunkify(has_loud)
+    return chunkify(speed_list, arr_length)
 
 
 def merge(start_list, end_list):

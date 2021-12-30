@@ -185,7 +185,7 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
 
 def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile, fps, log):
 
-    duration = chunks[len(chunks) - 1][1]
+    duration = chunks[-1][1]
     pathurls = [fix_url(inp.path)]
 
     tracks = len(inp.audio_streams)

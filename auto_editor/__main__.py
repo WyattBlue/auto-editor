@@ -245,7 +245,7 @@ def main_options(parser):
         range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='Set the speed that "silent" sections should be played at.')
     parser.add_argument('--video_speed', '--sounded_speed', '-v', type=float_type,
-        default=1.00,
+        default=1,
         range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='Set the speed that "loud" sections should be played at.')
     parser.add_argument('--min_clip_length', '-mclip', type=frame_type, default=3,
@@ -416,17 +416,7 @@ def main():
         del cmd
         input_list = [temp_file]
 
-    speeds = [args.silent_speed, args.video_speed]
-    if(args.cut_out != [] and 99999 not in speeds):
-        speeds.append(99999)
-
-    for item in args.set_speed_for_range:
-        if(item[0] not in speeds):
-            speeds.append(float(item[0]))
-
-    log.debug('Speeds: {}'.format(speeds))
-
-    def main_loop(input_list, ffmpeg, args, speeds, segments, log):
+    def main_loop(input_list, ffmpeg, args, segments, log):
         num_cuts = 0
 
         progress = ProgressBar(args.machine_readable_progress, args.no_progress)
@@ -437,7 +427,7 @@ def main():
             if(len(input_list) > 1):
                 log.conwrite('Working on {}'.format(inp.basename))
 
-            cuts, output_path = edit_media(i, inp, ffmpeg, args, progress, speeds,
+            cuts, output_path = edit_media(i, inp, ffmpeg, args, progress,
                 segments[i], exporting_to_editor, making_data_file, TEMP, log)
             num_cuts += cuts
 
@@ -456,7 +446,7 @@ def main():
             usefulfunctions.open_with_system_default(output_path, log)
 
     try:
-        main_loop(input_list, ffmpeg, args, speeds, segments, log)
+        main_loop(input_list, ffmpeg, args, segments, log)
     except KeyboardInterrupt:
         log.error('Keyboard Interrupt')
     log.cleanup()
