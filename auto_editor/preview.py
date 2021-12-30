@@ -18,13 +18,13 @@ def time_frame(title, frames, fps):
     print('{}: {} secs ({})'.format(title, in_sec, minutes))
 
 
-def preview(inp, chunks, speeds, log):
+def preview(inp, chunks, log):
     fps = 30 if inp.fps is None else float(inp.fps)
 
     log.conwrite('')
 
     old_length = chunks[-1][1] / fps
-    new_length = get_new_length(chunks, speeds, fps)
+    new_length = get_new_length(chunks, fps)
 
     diff = new_length - old_length
 
@@ -41,10 +41,9 @@ def preview(inp, chunks, speeds, log):
     cut_lens = []
     clip_lens = []
     for chunk in chunks:
-        state = chunk[2]
-        if(speeds[state] != 99999):
+        if(chunk[2] != 99999):
             clips += 1
-            leng = (chunk[1] - chunk[0]) / speeds[state]
+            leng = (chunk[1] - chunk[0]) / chunk[2]
             clip_lens.append(leng)
         else:
             cuts += 1

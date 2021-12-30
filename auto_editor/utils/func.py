@@ -35,14 +35,14 @@ def aspect_ratio(width, height):
     c = gcd(width, height)
     return width // c, height // c
 
-def get_new_length(chunks, speeds, fps):
-    # type: (list[list[int]], list[float | int], float) -> float
-    timeInFrames = 0
+def get_new_length(chunks, fps):
+    # type: (list[tuple[float]], float) -> float
+    time_in_frames = 0
     for chunk in chunks:
         leng = chunk[1] - chunk[0]
-        if(speeds[chunk[2]] < 99999):
-            timeInFrames += leng * (1 / speeds[chunk[2]])
-    return timeInFrames / fps
+        if(chunk[2] < 99999):
+            time_in_frames += leng * (1 / chunk[2])
+    return time_in_frames / fps
 
 def human_readable_time(time_in_secs):
     # type(int | float) -> str
@@ -77,7 +77,7 @@ def open_with_system_default(path, log):
                     log.warning('Could not open output file.')
 
 def fnone(val):
-    # type: (Any) -> bool
+    # type: (...) -> bool
     return val == 'none' or val == 'unset' or val is None
 
 def append_filename(path, val):

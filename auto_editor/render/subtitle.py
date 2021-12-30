@@ -35,10 +35,9 @@ class SubtitleParser:
         self.footer = text[item.span()[1]:]
 
 
-    def edit(self, chunks, speeds):
-
+    def edit(self, chunks):
         for cut in reversed(chunks):
-            the_speed = speeds[cut[2]]
+            the_speed = cut[2]
             speed_factor = 1 if the_speed == 99999 else 1 - (1 / the_speed)
 
             new_content = []
@@ -113,7 +112,7 @@ class SubtitleParser:
         return time_format.format(int(h), int(m), s)
 
 
-def cut_subtitles(ffmpeg, inp, chunks, speeds, fps, temp, log):
+def cut_subtitles(ffmpeg, inp, chunks, fps, temp, log):
     for s, sub in enumerate(inp.subtitle_streams):
         file_path = os.path.join(temp, '{}s.{}'.format(s, sub['ext']))
         new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
@@ -129,5 +128,5 @@ def cut_subtitles(ffmpeg, inp, chunks, speeds, fps, temp, log):
             with open(convert_path, 'r') as file:
                 parser.parse(file.read(), fps, 'webvtt')
 
-        parser.edit(chunks, speeds)
+        parser.edit(chunks)
         parser.write(new_path)

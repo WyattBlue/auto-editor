@@ -7,38 +7,32 @@ Make a pre-edited file reference that can be inputted back into auto-editor.
 import os
 import json
 
-def read_json_cutlist(json_file, version, log):
+def read_json_cutlist(json_file, log):
     with open(json_file, 'r') as f:
         data = json.load(f)
 
-    if(data['presets']['version'] != version):
-        log.warning('This json file was generated using a different '
-            'version of auto-editor.')
+    source = data['timeline']['source']
 
-    media_file = data['timeline']['media_file']
+    if(not os.path.isfile(source)):
+        log.error(f"Could not locate media file: '{source}'")
 
-    if(not os.path.isfile(media_file)):
-        log.error('Could not locate media file: {}'.format(media_file))
-
-    speeds = data['presets']['speeds']
     chunks = data['timeline']['chunks']
 
-    return media_file, chunks, speeds
+    return source, chunks
 
 
-def make_json_cutlist(media_file, out, version, chunks, speeds, log):
+def make_json_cutlist(media_file, out, chunks, log):
     if(not out.endswith('.json')):
         log.error('Output extension must be .json')
 
-    data = {}
-    data['presets'] = {
-        'version': version,
-        'speeds': speeds,
-    }
-    data['timeline']= {
-        'media_file': os.path.abspath(media_file),
-        'chunks': chunks,
-    }
+    print(chunks)
 
+    data = {
+        'version': '0.1.0',
+        'timeline': {
+            'source': os.path.abspath(media_file),
+            'chunks': chunks,
+        },
+    }
     with open(out, 'w') as outfile:
-        json.dump(data, outfile, indent=4)
+        json.dump(data, outfile, indent=2)

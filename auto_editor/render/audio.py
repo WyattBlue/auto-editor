@@ -8,7 +8,7 @@ from auto_editor.audiotsm2.io.wav import WavWriter
 
 import numpy as np
 
-def make_new_audio(input_path, output_path, chunks, speeds, log, fps, progress):
+def make_new_audio(input_path, output_path, chunks, log, fps, progress):
 
     if(len(chunks) == 1 and chunks[0][2] == 0):
         log.error('Trying to create an empty file.')
@@ -25,7 +25,7 @@ def make_new_audio(input_path, output_path, chunks, speeds, log, fps, progress):
             sample_start = int(chunk[0] / fps * samplerate)
             sample_end = int(sample_start + (samplerate / fps) * (chunk[1] - chunk[0]))
 
-            the_speed = speeds[chunk[2]]
+            the_speed = chunk[2]
 
             if(the_speed == 1):
                 main_writer.write(audio_samples[sample_start:sample_end].T / 32676)

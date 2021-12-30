@@ -28,8 +28,8 @@ class Wrapper:
         return self._fh.read(buf_size)
 
 
-def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, effects,
-    rules, temp, log):
+def render_av(ffmpeg, track, inp, args, chunks, fps, has_vfr, progress, effects, rules,
+    temp, log):
     try:
         import av
     except ImportError:
@@ -116,11 +116,11 @@ def render_av(ffmpeg, track, inp, args, chunks, speeds, fps, has_vfr, progress, 
         for index, frame in enumerate(container.decode(video_stream)):
             if(len(chunks) > 0 and index-1 >= chunk[1]):
                 chunk = chunks.pop(0)
-                if(len(chunks) == 0 and speeds[chunk[2]] == 99999):
+                if(len(chunks) == 0 and chunk[2] == 99999):
                     break
 
-            if(speeds[chunk[2]] != 99999):
-                input_equavalent += (1 / speeds[chunk[2]])
+            if(chunk[2] != 99999):
+                input_equavalent += (1 / chunk[2])
 
             while input_equavalent > output_equavalent:
                 if(index in effects.sheet):

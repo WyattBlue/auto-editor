@@ -3,11 +3,10 @@
 # Internal Libraries
 import os
 
-import auto_editor
 from auto_editor.utils.effects import Effect
 from auto_editor.utils.func import fnone, set_output_name, append_filename
 
-def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_rate=None):
+def get_chunks(inp, segment, fps, args, log, audio_samples=None, sample_rate=None):
     from auto_editor.cutting import (combine_audio_motion, combine_segment,
         apply_spacing_rules, apply_mark_as, apply_frame_margin, seconds_to_frames, cook)
 
@@ -63,19 +62,18 @@ def get_chunks(inp, speeds, segment, fps, args, log, audio_samples=None, sample_
         has_loud = combine_segment(has_loud, segment, fps)
     # Remove small clips/cuts created by applying other rules.
     has_loud = cook(has_loud, min_clip, min_cut)
-    return apply_spacing_rules(has_loud, has_loud_length, min_clip, min_cut, speeds,
-        fps, args, log)
+    return apply_spacing_rules(has_loud, has_loud_length, min_clip, min_cut, fps, args, log)
 
 
-def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_editor,
-    data_file, temp, log):
+def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, data_file,
+    temp, log):
     from auto_editor.utils.container import get_rules
 
     chunks = None
     if(inp.ext == '.json'):
         from auto_editor.formats.make_json import read_json_cutlist
 
-        input_path, chunks, speeds = read_json_cutlist(inp.path, auto_editor.version, log)
+        input_path, chunks = read_json_cutlist(inp.path, log)
         inp = ffmpeg.file_info(input_path)
 
         output_path = set_output_name(inp.path, inp.ext, data_file, args)
@@ -218,38 +216,37 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
 
     log.debug('Frame Rate: {}'.format(fps))
     if(chunks is None):
-        chunks = get_chunks(inp, speeds, segment, fps, args, log, audio_samples,
-            sample_rate)
+        chunks = get_chunks(inp, segment, fps, args, log, audio_samples, sample_rate)
 
     def is_clip(chunk):
-        # type: (list) -> bool
-        return speeds[chunk[2]] != 99999
+        # type: (list[tuple[float]]) -> bool
+        return chunk[2] != 99999
 
-    def number_of_cuts(chunks, speeds):
-        # type: (list, list) -> int
+    def number_of_cuts(chunks):
+        # type: (list[tuple[float]]) -> int
         return len(list(filter(is_clip, chunks)))
 
-    def get_clips(chunks, speeds):
+    def get_clips(chunks):
+        # type: (list[tuple[float]]) -> list[list[float]]
         clips = []
         for chunk in chunks:
             if(is_clip(chunk)):
-                clips.append([chunk[0], chunk[1], speeds[chunk[2]] * 100])
+                clips.append([chunk[0], chunk[1], chunk[2] * 100])
         return clips
 
-    num_cuts = number_of_cuts(chunks, speeds)
-    clips = get_clips(chunks, speeds)
+    num_cuts = number_of_cuts(chunks)
+    clips = get_clips(chunks)
 
     effects = Effect(args, log, _vars={})
 
     if(args.export_as_json):
         from auto_editor.formats.make_json import make_json_cutlist
-        make_json_cutlist(inp.path, output_path, auto_editor.version, chunks, speeds,
-            log)
+        make_json_cutlist(inp.path, output_path, chunks, log)
         return num_cuts, output_path
 
     if(args.preview):
         from auto_editor.preview import preview
-        preview(inp, chunks, speeds, log)
+        preview(inp, chunks, log)
         return num_cuts, None
 
     if(args.export_to_premiere):
@@ -291,7 +288,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
 
         if(rules['allow_subtitle']):
             from auto_editor.render.subtitle import cut_subtitles
-            cut_subtitles(ffmpeg, inp, chunks, speeds, fps, temp, log)
+            cut_subtitles(ffmpeg, inp, chunks, fps, temp, log)
 
         if(rules['allow_audio']):
             from auto_editor.render.audio import make_new_audio
@@ -299,7 +296,7 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
             for t in range(tracks):
                 temp_file = os.path.join(temp, '{}.wav'.format(t))
                 new_file = os.path.join(temp, 'new{}.wav'.format(t))
-                make_new_audio(temp_file, new_file, chunks, speeds, log, fps, progress)
+                make_new_audio(temp_file, new_file, chunks, log, fps, progress)
 
                 if(not os.path.isfile(new_file)):
                     log.bug('Audio file not created.')
@@ -312,8 +309,8 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
                 if(vid['codec'] in ['png', 'jpeg']):
                     video_stuff.append(('image', None, None))
                 else:
-                    video_stuff.append(render_av(ffmpeg, v, inp, args, chunks, speeds,
-                        fps, has_vfr, progress, effects, rules, temp, log))
+                    video_stuff.append(render_av(ffmpeg, v, inp, args, chunks, fps,
+                        has_vfr, progress, effects, rules, temp, log))
 
         log.conwrite('Writing the output file.')
 
@@ -325,10 +322,9 @@ def edit_media(i, inp, ffmpeg, args, progress, speeds, segment, exporting_to_edi
     total_frames = chunks[len(chunks) - 1][1]
 
     if(args.export_as_clip_sequence):
-        speeds.append(99999)
         num_clips = 0
         for chunk in chunks:
-            if(speeds[chunk[2]] == 99999):
+            if(chunk[2] == 99999):
                 continue
             make_media(inp, pad_chunk(chunk, total_frames),
                 append_filename(output_path, '-{}'.format(num_clips)))
