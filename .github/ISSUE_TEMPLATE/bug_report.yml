@@ -1,0 +1,38 @@
+name: Bug Report
+description: Create a report to help improve the program.
+labels: bug
+body:
+  - type: textarea
+    attributes:
+      label: What's your platform?
+      description: "Which operating system do you use? Run `auto-editor --debug`"
+      placeholder: "Paste output of `auto-editor --debug`"
+      render: shell
+    validations:
+      required: true  
+
+  - type: textarea
+    attributes:
+      label: What did you try?
+      placeholder: "Paste the command you've tried."
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Bug description
+      description: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: What properties your input file(s)? (if applicable)
+      description: You can use  `aeinfo ./path/to/video.mp4` or `ffmpeg -hide_banner -i ./path/to/video.mp4` to get standard info.
+      placeholder: Paste output here
+      render: shell
+
+  - type: textarea
+    attributes:
+      label: Comments
