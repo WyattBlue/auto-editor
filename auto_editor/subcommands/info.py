@@ -1,19 +1,22 @@
 '''subcommands/info.py'''
 
 import sys
+import json
 import os.path
 
 def info_options(parser):
+    parser.add_argument('--json', action='store_true',
+        help='Export the information in JSON format.')
     parser.add_argument('--include_vfr', '--has_vfr', action='store_true',
-        help='skip information that is very slow to get.')
+        help='Skip information that is very slow to get.')
     parser.add_argument('--ffmpeg_location', default=None,
-        help='point to your custom ffmpeg file.')
+        help='Point to your custom ffmpeg file.')
     parser.add_argument('--my_ffmpeg', action='store_true',
-        help='use the ffmpeg on your PATH instead of the one packaged.')
+        help='Use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
-        help='print info about the program or an option and exit.')
+        help='Print info about the program or an option and exit.')
     parser.add_argument('input', nargs='*',
-        help='the path to a file you want inspected.')
+        help='The path to a file you want inspected.')
     return parser
 
 def main(sys_args=sys.argv[1:]):
@@ -45,6 +48,8 @@ def main(sys_args=sys.argv[1:]):
             return ''
         return ' ({}:{})'.format(w, h)
 
+    file_info = {}
+
     for file in args.input:
         text = ''
         if(os.path.exists(file)):
@@ -54,6 +59,13 @@ def main(sys_args=sys.argv[1:]):
 
         inp = ffmpeg.file_info(file)
 
+        file_info[file] = {
+            'video': [],
+            'audio': [],
+            'subtitle': [],
+            'container': {},
+        }
+
         if(len(inp.video_streams) > 0):
             text += f' - video tracks: {len(inp.video_streams)}\n'
 
@@ -61,8 +73,20 @@ def main(sys_args=sys.argv[1:]):
             text += '   - Track #{}\n'.format(track)
 
             text += '     - codec: {}\n'.format(stream['codec'])
+
+            vid = {}
+            vid['codec'] = stream['codec']
+
+            import av
+            container = av.open(file, 'r')
+            pix_fmt = container.streams.video[track].pix_fmt
+            text += f'     - pix_fmt: {pix_fmt}\n'
+
+            vid['pix_fmt'] = pix_fmt
+
             if(stream['fps'] is not None):
                 text += '     - fps: {}\n'.format(stream['fps'])
+                vid['fps'] = float(stream['fps'])
 
             w = stream['width']
             h = stream['height']
@@ -70,48 +94,77 @@ def main(sys_args=sys.argv[1:]):
             if(w is not None and h is not None):
                 text += '     - resolution: {}x{}{}\n'.format(w, h, aspect_str(w, h))
 
+                vid['width'] = int(w)
+                vid['height'] = int(h)
+                vid['aspect_ratio'] = aspect_ratio(int(w), int(h))
+
             if(stream['bitrate'] is not None):
                 text += '     - bitrate: {}\n'.format(stream['bitrate'])
+                vid['bitrate'] = stream['bitrate']
             if(stream['lang'] is not None):
                 text += '     - lang: {}\n'.format(stream['lang'])
+                vid['lang'] = stream['lang']
+
+            file_info[file]['video'].append(vid)
 
 
         if(len(inp.audio_streams) > 0):
             text += f' - audio tracks: {len(inp.audio_streams)}\n'
 
         for track, stream in enumerate(inp.audio_streams):
+            aud = {}
+
             text += '   - Track #{}\n'.format(track)
             text += '     - codec: {}\n'.format(stream['codec'])
             text += '     - samplerate: {}\n'.format(stream['samplerate'])
 
+            aud['codec'] = stream['codec']
+            aud['samplerate'] = int(stream['samplerate'])
+
             if(stream['bitrate'] is not None):
                 text += '     - bitrate: {}\n'.format(stream['bitrate'])
+                aud['bitrate'] = stream['bitrate']
 
             if(stream['lang'] is not None):
                 text += '     - lang: {}\n'.format(stream['lang'])
+                aud['lang'] = stream['lang']
+
+            file_info[file]['audio'].append(aud)
 
         if(len(inp.subtitle_streams) > 0):
             text += f' - subtitle tracks: {len(inp.subtitle_streams)}\n'
 
         for track, stream in enumerate(inp.subtitle_streams):
+            sub = {}
+
             text += '   - Track #{}\n'.format(track)
             text += '     - codec: {}\n'.format(stream['codec'])
+            sub['codec'] = stream['codec']
             if(stream['lang'] is not None):
                 text += '     - lang: {}\n'.format(stream['lang'])
+                sub['lang'] = stream['lang']
 
+            file_info[file]['subtitle'].append(sub)
 
         if(len(inp.video_streams) == 0 and len(inp.audio_streams) == 0 and
             len(inp.subtitle_streams) == 0):
             text += 'Invalid media.\n'
+            file_info[file] = {'media': 'invalid'}
         else:
             text += ' - container:\n'
+
+            cont = file_info[file]['container']
+
             if(inp.duration is not None):
                 text += '   - duration: {}\n'.format(inp.duration)
+                cont['duration'] = inp.duration
             if(inp.bitrate is not None):
                 text += '   - bitrate: {}\n'.format(inp.bitrate)
+                cont['bitrate'] = inp.bitrate
 
             if(args.include_vfr):
-                print(text, end='')
+                if(not args.json):
+                    print(text, end='')
                 text = ''
                 fps_mode = ffmpeg.pipe(['-i', file, '-hide_banner', '-vf', 'vfrdet',
                     '-an', '-f', 'null', '-'])
@@ -120,9 +173,15 @@ def main(sys_args=sys.argv[1:]):
                 if('VFR:' in fps_mode):
                     fps_mode = (fps_mode[fps_mode.index('VFR:'):]).strip()
 
-                text += '  - {}\n'.format(fps_mode)
+                text += '   - {}\n'.format(fps_mode)
+                cont['fps_mode'] = fps_mode
 
-        print(text)
+        if(not args.json):
+            print(text)
+
+    if(args.json):
+        json_object = json.dumps(file_info, indent=4) 
+        print(json_object)       
 
 if(__name__ == '__main__'):
     main()
