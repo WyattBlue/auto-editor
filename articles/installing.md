@@ -1,14 +1,14 @@
 # Installing Auto-Editor
 
-Download and Install [Python 3.9](https://www.python.org/downloads/release/python-399/). The best version for auto-editor.
+Download and Install [Python 3](https://www.python.org/downloads/).
 
-> If you are installing on Windows, make sure "Add Python 3.9 to PATH" is checked.
+> If you are installing on Windows, make sure "Add Python 3.10 to PATH" is checked.
 
 Once that's done, you should have pip on your PATH. That means when you run `pip3` on your console, you should get a list of commands and not `command not found`. If you don't have pip on your PATH, try reinstalling Python.
 
 Then run:
 ```
-pip3 install --upgrade pip
+pip install --upgrade pip
 ```
 
 to upgrade pip to the latest version.
@@ -20,10 +20,10 @@ to upgrade pip to the latest version.
 After upgrading pip, run:
 
 ```
-pip3 install auto-editor
+pip install auto-editor
 ```
 
-> Linux users will need to install FFmpeg. This command should work for most distros: `sudo apt-get install libavformat-dev libavfilter-dev libavdevice-dev ffmpeg`
+> Linux users will need to have FFmpeg installed. Run `sudo apt-get install ffmpeg` or `sudo pacman -S ffmpeg`
 
 Now run this command and it should list all the options you can use.
 
@@ -41,13 +41,13 @@ About every 1 or 2 weeks, a new version will be available. It's recommended that
 
 
 ```
-pip3 install auto-editor --upgrade
+pip install auto-editor --upgrade
 ```
 
 Run this to uninstall auto-editor:
 
 ```
-pip3 uninstall auto-editor
+pip uninstall auto-editor
 ```
 
 
@@ -58,8 +58,7 @@ pip3 uninstall auto-editor
 Use git to download the repository:
 
 ```terminal
-git clone https://github.com/WyattBlue/auto-editor.git
-cd auto-editor
+pip install git+https://github.com/WyattBlue/auto-editor.git
 ```
 
 Then run the local version using `py` or `python3`
@@ -74,13 +73,13 @@ python3 -m auto_editor example.mp4 --frame_margin 7
 If auto-editor could not be installed because a dependency couldn't be installed. Run:
 
 ```
-pip3 install auto-editor --no-deps
+pip install auto-editor --no-deps
 ```
 
 ```
-pip3 install numpy
-pip3 install av
-pip3 install yt-dlp
+pip install numpy
+pip install av
+pip install yt-dlp
 ```
 
 ### Numpy
@@ -102,7 +101,7 @@ Module used to download videos off of websites.
 If you get an error like this:
 ```
   File "<stdin>", line 1
-    pip3 install auto-editor
+    pip install auto-editor
          ^
 SyntaxError: invalid syntax
 ```

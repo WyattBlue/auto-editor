@@ -16,7 +16,7 @@ auto-editor path/to/your/video.mp4
 <h2 align="center">Installing</h2>
 
 ```
-pip3 install auto-editor
+pip install auto-editor
 ```
 
 See [Installing](https://auto-editor.com/cli/installing) for additional information.
