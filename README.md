@@ -19,7 +19,7 @@ auto-editor path/to/your/video.mp4
 pip install auto-editor
 ```
 
-See [Installing](https://auto-editor.com/cli/installing) for additional information.
+See [Installing](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md) for additional information.
 
 
 <h2 align="center">Cutting</h2>
@@ -74,7 +74,7 @@ auto-editor --scale --help
 
 
 ## Articles
- - [How to Install Auto-Editor](https://auto-editor.com/cli/installing)
+ - [How to Install Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md)
  - [How to Use Motion Detection in Auto-Editor](https://auto-editor.com/cli/motion_detection)
  - [Range Syntax](https://auto-editor.com/cli/range_syntax)
  - [Subcommands](https://auto-editor.com/cli/subcommands)
