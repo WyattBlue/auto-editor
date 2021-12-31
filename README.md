@@ -75,7 +75,6 @@ auto-editor --scale --help
 
 ## Articles
  - [How to Install Auto-Editor](https://auto-editor.com/cli/installing)
- - [How to Edit Videos With Auto-Editor](https://auto-editor.com/cli/editing)
  - [How to Use Motion Detection in Auto-Editor](https://auto-editor.com/cli/motion_detection)
  - [Range Syntax](https://auto-editor.com/cli/range_syntax)
  - [Subcommands](https://auto-editor.com/cli/subcommands)
