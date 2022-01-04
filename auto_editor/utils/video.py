@@ -104,23 +104,18 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
         cmd.extend(['-map', f'{i+1}:0'])
 
     # Copy lang metadata
-    for i, track in enumerate(inp.video_streams):
-        if(i > v_tracks):
-            break
-        if(track['lang'] is not None):
-            cmd.extend([f'-metadata:s:v:{i}', f'language={track["lang"]}'])
+    streams = (
+        (inp.video_streams, 'v', v_tracks),
+        (inp.audio_streams, 'a', a_tracks),
+        (inp.subtitle_streams, 's', s_tracks),
+    )
 
-    for i, track in enumerate(inp.audio_streams):
-        if(i > a_tracks):
-            break
-        if(track['lang'] is not None):
-            cmd.extend([f'-metadata:s:a:{i}', f'language={track["lang"]}'])
-
-    for i, track in enumerate(inp.subtitle_streams):
-        if(i > s_tracks):
-            break
-        if(track['lang'] is not None):
-            cmd.extend([f'-metadata:s:s:{i}', f'language={track["lang"]}'])
+    for stream, marker, max_streams in streams:
+        for i, track in enumerate(stream):
+            if(i > max_streams):
+                break
+            if(track['lang'] is not None):
+                cmd.extend([f'-metadata:s:{marker}:{i}', f'language={track["lang"]}'])
 
     for video_type, _, apply_video in video_stuff:
         if(video_type == 'video'):
