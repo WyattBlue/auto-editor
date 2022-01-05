@@ -218,8 +218,10 @@ class ParseOptions():
                     value = True
                 elif(option['nargs'] != 1):
                     value = []
+                elif(option['default'] is None):
+                    value = None
                 else:
-                    value = option['default']
+                    value = option['type'](option['default'])
                 setattr(self, key, value)
 
         # Figure out command line options changed by user.

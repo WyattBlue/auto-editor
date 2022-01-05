@@ -160,26 +160,35 @@ def chunkify(arr: np.ndarray, arr_length: int = None) -> List[Tuple[int, int, fl
     return chunks
 
 
-# Turn chunk list into silent/loud like array.
-# Example: [(0, 3, 1), (3, 5, 2)] => [1, 1, 1, 2, 2]
+def apply_margin(has_loud, has_loud_length, start_m, end_m):
+    # type: (np.ndarray, int, int, int) -> np.ndarray
 
-def chunks_to_has_loud(chunks: List[Tuple[int, int, float]]) -> np.ndarray:
-    has_loud = np.zeros((chunks[-1][1]), dtype=float)
+    # Find start and end indexes.
+    start_index = []
+    end_index = []
+    for j in range(1, has_loud_length):
+        if(has_loud[j] != has_loud[j - 1]):
+            if(has_loud[j]):
+                start_index.append(j)
+            else:
+                end_index.append(j)
 
-    for chunk in chunks:
-        if(chunk[2] != 0):
-            has_loud[chunk[0]:chunk[1]] = chunk[2]
+    # Apply margin
+    if(start_m > 0):
+        for i in start_index:
+            has_loud[max(i-start_m, 0):i] = True
+    if(start_m < 0):
+        for i in start_index:
+            has_loud[i:min(i-start_m, has_loud_length)] = False
+
+    if(end_m > 0):
+        for i in end_index:
+            has_loud[i:min(i+end_m, has_loud_length)] = True
+    if(end_m < 0):
+        for i in end_index:
+            has_loud[max(i+end_m, 0):i] = False
+
     return has_loud
-
-
-def apply_frame_margin(has_loud, has_loud_length, frame_margin):
-    # type: (np.ndarray, int, int) -> np.ndarray
-    new = np.zeros((has_loud_length), dtype=float)
-    for i in range(has_loud_length):
-        start = int(max(0, i - frame_margin))
-        end = int(min(has_loud_length, i+1+frame_margin))
-        new[i] = min(1, np.max(has_loud[start:end]))
-    return new
 
 
 def apply_mark_as(has_loud, has_loud_length, fps, args, log):
@@ -192,9 +201,10 @@ def apply_mark_as(has_loud, has_loud_length, fps, args, log):
     return has_loud
 
 
-def apply_spacing_rules(speed_list, arr_length, min_clip, min_cut, fps, args, log):
+def apply_spacing_rules(has_loud, arr_length, min_clip, min_cut, fps, args, log):
     # type: (...) -> List[Tuple[int, int, float]]
 
+    speed_list = has_loud.astype(float)
     speed_list[speed_list == 0] = args.silent_speed
     speed_list[speed_list == 1] = args.video_speed
 

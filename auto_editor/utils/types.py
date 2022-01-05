@@ -13,7 +13,9 @@ def error(message):
     sys.exit(1)
 
 def split_num_str(val, error_func):
-    # type: (str, Any) -> Tuple[int | float, str]
+    # type: (str | int, Any) -> Tuple[int | float, str]
+    if(isinstance(val, int)):
+        return val, ''
     index = 0
     for item in val:
         if(not item.isdigit() and item != ' ' and item != '.' and item != '-'):
@@ -44,9 +46,11 @@ def unit_check(unit, allowed_units):
     if(unit not in allowed_units):
         error('Unsupported unit: {}'.format(unit))
 
-
 def float_type(val):
-    # type: (str) -> float
+    # type: (str | int | float) -> float
+    if(isinstance(val, (int, float))):
+        return float(val)
+
     num, unit = split_num_str(val, error)
     unit_check(unit, ['%', ''])
     if(unit == '%'):
@@ -75,6 +79,15 @@ def frame_type(val):
     if(unit in second_units()):
         return str(num).strip()
     return int(num)
+
+def margin_type(val):
+    # type: (str) -> Tuple[int | str, int | str]
+    vals = val.split(',')
+    if(len(vals) == 1):
+        vals.append(vals[0])
+    if(len(vals) != 2):
+        error('Too many comma arguments for margin_type')
+    return frame_type(vals[0]), frame_type(vals[1])
 
 def comma_type(inp, min_args=1, max_args=None, name=''):
     inp = clean_list(inp.split(','), '\r\n\t')
