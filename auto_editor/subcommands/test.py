@@ -412,8 +412,8 @@ def main(sys_args=None):
         run_program(['example.mp4', '-m', '3'])
         run_program(['example.mp4', '--margin', '3'])
         run_program(['example.mp4', '-m', '0.3sec'])
-        run_program(['example.mp4', '-m', '6f'])
-        run_program(['example.mp4', '-m', '5 frames'])
+        run_program(['example.mp4', '-m', '6f,-3secs'])
+        run_program(['example.mp4', '-m', '3,5 frames'])
         run_program(['example.mp4', '-m', '0.4 seconds'])
     tester.run_test('margin_tests', margin_tests)
 
