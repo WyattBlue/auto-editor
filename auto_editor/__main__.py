@@ -19,7 +19,7 @@ from auto_editor.edit import edit_media
 
 def main_options(parser):
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
-        frame_type, range_type, speed_range_type, block_type)
+        frame_type, range_type, speed_range_type, block_type, margin_type)
 
     parser.add_text('Progress Options')
     parser.add_argument('--machine_readable_progress', action='store_true',
@@ -237,7 +237,7 @@ def main_options(parser):
             '100% represents the highest volume in the media file.\n'
             'Setting the threshold to `0%` will cut only out areas where area is '
             'absolutely silence while a value of 4% will cut ')
-    parser.add_argument('--frame_margin', '--margin', '-m', type=frame_type, default=6,
+    parser.add_argument('--frame_margin', '--margin', '-m', type=margin_type, default='6',
         range='0 to Infinity',
         help='Set how many "silent" frames on either side on the "loud" sections to be '
             'included.')
@@ -348,14 +348,6 @@ def main():
         args.export_to_shotcut, args.export_as_clip_sequence].count(True) > 1):
         log.error('You must choose only one export option.')
 
-    if(isinstance(args.frame_margin, str)):
-        try:
-            if(float(args.frame_margin) < 0):
-                log.error('Frame margin cannot be negative.')
-        except ValueError:
-            log.error('Frame margin {}, is not valid.'.format(args.frame_margin))
-    elif(args.frame_margin < 0):
-        log.error('Frame margin cannot be negative.')
     if(args.constant_rate_factor != 'unset'):
         if(int(args.constant_rate_factor) < 0 or int(args.constant_rate_factor) > 51):
             log.error('Constant rate factor (crf) must be between 0-51.')

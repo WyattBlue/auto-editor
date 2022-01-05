@@ -11,13 +11,17 @@ from auto_editor.utils.func import fnone, set_output_name, append_filename
 
 def get_chunks(inp, segment, fps, args, log, audio_samples=None, sample_rate=None):
     from auto_editor.cutting import (combine_audio_motion, combine_segment,
-        apply_spacing_rules, apply_mark_as, apply_frame_margin, seconds_to_frames, cook)
+        apply_spacing_rules, apply_mark_as, apply_margin, seconds_to_frames, cook)
 
-    frame_margin = seconds_to_frames(args.frame_margin, fps)
+    start_margin, end_margin = args.frame_margin
+
+    start_margin = seconds_to_frames(start_margin, fps)
+    end_margin = seconds_to_frames(end_margin, fps)
     min_clip = seconds_to_frames(args.min_clip_length, fps)
     min_cut = seconds_to_frames(args.min_cut_length, fps)
 
     def get_has_loud(inp, args, fps, audio_samples, sample_rate, log):
+        # type: (...) -> np.ndarray
         import numpy as np
 
         from auto_editor.analyze.generic import get_np_list
@@ -59,7 +63,7 @@ def get_chunks(inp, segment, fps, args, log, audio_samples=None, sample_rate=Non
     has_loud_length = len(has_loud)
     has_loud = apply_mark_as(has_loud, has_loud_length, fps, args, log)
     has_loud = cook(has_loud, min_clip, min_cut)
-    has_loud = apply_frame_margin(has_loud, has_loud_length, frame_margin)
+    has_loud = apply_margin(has_loud, has_loud_length, start_margin, end_margin)
 
     if(segment is not None):
         has_loud = combine_segment(has_loud, segment, fps)
@@ -321,16 +325,15 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         if(output_path is not None and not os.path.isfile(output_path)):
             log.bug(f'The file {output_path} was not created.')
 
-    total_frames = chunks[len(chunks) - 1][1]
-
     if(args.export_as_clip_sequence):
-        num_clips = 0
+        total_frames = chunks[-1][1]
+        clip_num = 0
         for chunk in chunks:
             if(chunk[2] == 99999):
                 continue
             make_media(inp, pad_chunk(chunk, total_frames),
-                append_filename(output_path, '-{}'.format(num_clips)))
-            num_clips += 1
+                append_filename(output_path, f'-{clip_num}'))
+            clip_num += 1
     else:
         make_media(inp, chunks, output_path)
     return num_cuts, output_path
