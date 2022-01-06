@@ -200,25 +200,14 @@ def apply_mark_as(has_loud, has_loud_length, fps, args, log):
         has_loud = set_range(has_loud, args.mark_as_silent, fps, args.silent_speed, log)
     return has_loud
 
-
-def apply_spacing_rules(has_loud, arr_length, min_clip, min_cut, fps, args, log):
-    # type: (...) -> List[Tuple[int, int, float]]
-
+def to_speed_list(has_loud, video_speed, silent_speed):
     speed_list = has_loud.astype(float)
-    speed_list[speed_list == 0] = args.silent_speed
-    speed_list[speed_list == 1] = args.video_speed
 
-    if(args.cut_out != []):
-        speed_list = set_range(speed_list, args.cut_out, fps, 99999, log)
+    # This code will break is speed is allowed to be 0
+    speed_list[speed_list == 1] = video_speed
+    speed_list[speed_list == 0] = silent_speed
 
-    if(args.add_in != []):
-        speed_list = set_range(speed_list, args.add_in, fps, args.video_speed, log)
-
-    if(args.set_speed_for_range != []):
-        for item in args.set_speed_for_range:
-            speed_list = set_range(speed_list, [item[1:]], fps, item[0], log)
-
-    return chunkify(speed_list, arr_length)
+    return speed_list
 
 
 def merge(start_list, end_list):

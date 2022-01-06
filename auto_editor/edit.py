@@ -11,8 +11,8 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.func import fnone, set_output_name, append_filename
 
 def get_chunks(inp, segment, fps, args, log, audio_samples=None, sample_rate=None):
-    from auto_editor.cutting import (combine_audio_motion, combine_segment,
-        apply_spacing_rules, apply_mark_as, apply_margin, seconds_to_frames, cook)
+    from auto_editor.cutting import (combine_audio_motion, combine_segment, to_speed_list,
+        set_range, chunkify, apply_mark_as, apply_margin, seconds_to_frames, cook)
 
     start_margin, end_margin = args.frame_margin
 
@@ -66,9 +66,23 @@ def get_chunks(inp, segment, fps, args, log, audio_samples=None, sample_rate=Non
 
     if(segment is not None):
         has_loud = combine_segment(has_loud, segment, fps)
+
     # Remove small clips/cuts created by applying other rules.
     has_loud = cook(has_loud, min_clip, min_cut)
-    return apply_spacing_rules(has_loud, has_loud_length, min_clip, min_cut, fps, args, log)
+
+    speed_list = to_speed_list(has_loud, args.video_speed, args.silent_speed)
+
+    if(args.cut_out != []):
+        speed_list = set_range(speed_list, args.cut_out, fps, 99999, log)
+
+    if(args.add_in != []):
+        speed_list = set_range(speed_list, args.add_in, fps, args.video_speed, log)
+
+    if(args.set_speed_for_range != []):
+        for item in args.set_speed_for_range:
+            speed_list = set_range(speed_list, [item[1:]], fps, item[0], log)
+
+    return chunkify(speed_list, has_loud_length)
 
 
 def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, data_file,
