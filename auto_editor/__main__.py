@@ -287,7 +287,7 @@ def main():
 
     parser = vanparse.ArgumentParser('Auto-Editor', auto_editor.version, description=desc)
 
-    subcommands = ['create', 'test', 'info', 'levels', 'grep', 'subdump', 'desc']
+    subcommands = ['create', 'test', 'info', 'levels', 'grep', 'subdump', 'desc', 'chunks']
 
     if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
         obj = __import__('auto_editor.subcommands.{}'.format(sys.argv[1]),
