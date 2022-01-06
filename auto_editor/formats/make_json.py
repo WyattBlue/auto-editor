@@ -5,9 +5,14 @@ Make a pre-edited file reference that can be inputted back into auto-editor.
 """
 
 import os
+import sys
 import json
 
+from typing import Tuple, List
+from auto_editor.utils.log import Log
+
 def read_json_cutlist(json_file, log):
+    # type: (str, Log) -> Tuple[str, List[Tuple[int, int, float]]]
     with open(json_file, 'r') as f:
         data = json.load(f)
 
@@ -22,9 +27,7 @@ def read_json_cutlist(json_file, log):
 
 
 def make_json_cutlist(media_file, out, chunks, log):
-    if(not out.endswith('.json')):
-        log.error('Output extension must be .json')
-
+    # type: (str, str | int, List[Tuple[int, int, float]], Log) -> None
     data = {
         'version': '0.1.0',
         'timeline': {
@@ -32,5 +35,13 @@ def make_json_cutlist(media_file, out, chunks, log):
             'chunks': chunks,
         },
     }
-    with open(out, 'w') as outfile:
-        json.dump(data, outfile, indent=2)
+
+    if(isinstance(out, str)):
+        if(not out.endswith('.json')):
+            log.error('Output extension must be .json')
+
+        with open(out, 'w') as outfile:
+            json.dump(data, outfile, indent=2)
+    else:
+        json.dump(data, sys.stdout, indent=2)
+

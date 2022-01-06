@@ -2,8 +2,9 @@
 
 # Internal Libraries
 import os
-
 from typing import List, Tuple
+
+import numpy as np
 
 from auto_editor.utils.effects import Effect
 from auto_editor.utils.log import Log
@@ -22,8 +23,6 @@ def get_chunks(inp, segment, fps, args, log, audio_samples=None, sample_rate=Non
 
     def get_has_loud(inp, args, fps, audio_samples, sample_rate, log):
         # type: (...) -> np.ndarray
-        import numpy as np
-
         from auto_editor.analyze.generic import get_np_list
 
         if(args.edit_based_on == 'none'):
@@ -132,7 +131,8 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
             "'{}' container doesn't support multiple audio tracks.".format(container)
         )
 
-    if(os.path.isfile(output_path) and inp.path != output_path and not args.preview):
+    if(os.path.isfile(output_path) and inp.path != output_path and not args.preview
+        and not args.timeline):
         log.debug('Removing already existing file: {}'.format(output_path))
         os.remove(output_path)
 
@@ -249,6 +249,11 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         from auto_editor.formats.make_json import make_json_cutlist
         make_json_cutlist(inp.path, output_path, chunks, log)
         return num_cuts, output_path
+
+    if(args.timeline):
+        from auto_editor.formats.make_json import make_json_cutlist
+        make_json_cutlist(inp.path, 0, chunks, log)
+        return num_cuts, None
 
     if(args.preview):
         from auto_editor.preview import preview

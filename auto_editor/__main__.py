@@ -198,6 +198,10 @@ def main_options(parser):
         help='Export as a WAV audio file.')
     parser.add_argument('--export_as_clip_sequence', '-excs', action='store_true',
         help='Export as multiple numbered media files.')
+    parser.add_argument('--timeline', action='store_true',
+        help='Display timeline JSON file and halt.',
+        manual='This option is like `--export_as_json` except that it outputs directly '
+            'to stdout instead of to a file.')
 
     parser.add_text('Utility Options')
     parser.add_argument('--no_open', action='store_true',
@@ -337,6 +341,9 @@ def main():
         else:
             os.mkdir(TEMP)
 
+    if(args.timeline):
+        args.quiet = True
+
     log = Log(args.debug, args.quiet, temp=TEMP)
     log.debug('Temp Directory: {}'.format(TEMP))
 
@@ -367,10 +374,10 @@ def main():
             return 'Exporting as audio.'
         return 'Starting.'
 
-    if(not args.preview):
+    if(not args.preview and not args.timeline):
         log.conwrite(write_starting_message(args))
 
-    if(args.preview or args.export_as_clip_sequence or making_data_file):
+    if(args.preview or args.timeline or args.export_as_clip_sequence or making_data_file):
         args.no_open = True
 
     if(args.md_blur < 0):
@@ -423,10 +430,10 @@ def main():
                 segments[i], exporting_to_editor, making_data_file, TEMP, log)
             num_cuts += cuts
 
-        if(not args.preview and not making_data_file):
+        if(not args.preview and not args.timeline and not making_data_file):
             timer.stop()
 
-        if(not args.preview and making_data_file):
+        if(not args.preview and not args.timeline and making_data_file):
             # Assume making each cut takes about 30 seconds.
             time_save = usefulfunctions.human_readable_time(num_cuts * 30)
             s = 's' if num_cuts != 1 else ''
