@@ -18,19 +18,109 @@ def regex_match(regex, text):
     return None
 
 
-class File:
-    def __repr__(self):
-        return str(self.__dict__)
+class FFmpeg():
 
-    def __init__(self, ffmpeg, path):
+    @staticmethod
+    def _set_ff_path(ff_location, my_ffmpeg):
+        # type: (str | None, bool) -> str
+        if(ff_location is not None):
+            return ff_location
+        if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
+            return 'ffmpeg'
+        program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
+        dirpath = os.path.dirname(os.path.realpath(__file__))
+        return os.path.join(dirpath, 'ffmpeg', system(), program)
+
+    def __init__(self, ff_location=None, my_ffmpeg=False, debug=False):
+        self.debug = debug
+        self.path = self._set_ff_path(ff_location, my_ffmpeg)
+        try:
+            _version = get_stdout([self.path, '-version']).split('\n')[0]
+            _version = _version.replace('ffmpeg version', '').strip()
+            self.version = _version.split(' ')[0]
+        except FileNotFoundError:
+            if(system() == 'Darwin'):
+                Log().error('No ffmpeg found, download via homebrew or restore the '
+                    'included binary.')
+            if(system() == 'Windows'):
+                Log().error('No ffmpeg found, download ffmpeg with your favorite package '
+                    'manager (ex chocolatey), or restore the included binary.')
+
+            Log().error('ffmpeg must be installed and on PATH.')
+
+    def print(self, message: str):
+        if(self.debug):
+            print('FFmpeg: {}'.format(message), file=sys.stderr)
+
+    def print_cmd(self, cmd):
+        # type: (list[str]) -> None
+        if(self.debug):
+            print('FFmpeg run: {}\n'.format(' '.join(cmd)), file=sys.stderr)
+
+    def run(self, cmd):
+        # type: (list[str]) -> None
+        cmd = [self.path, '-y', '-hide_banner'] + cmd
+        if(not self.debug):
+            cmd.extend(['-nostats', '-loglevel', 'error'])
+        self.print_cmd(cmd)
+        subprocess.call(cmd)
+
+    def run_check_errors(self, cmd, log, show_out=False):
+        process = self.Popen(cmd, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        stdout, stderr = process.communicate()
+        process.stdin.close()
+        output = stderr.decode()
+
+        error_list = [
+            r"Unknown encoder '.*'",
+            r"-q:v qscale not available for encoder\. Use -b:v bitrate instead\.",
+            r'Specified sample rate .* is not supported',
+            r'Unable to parse option value ".*"',
+            r'Error setting option .* to value .*\.',
+            r"Undefined constant or missing '.*' in '.*'",
+        ]
+
+        if(self.debug):
+            print('stderr: {}'.format(stderr.decode()))
+
+        for item in error_list:
+            check = re.search(item, output)
+            if(check):
+                log.error(check.group())
+
+        if(show_out and not self.debug):
+            print('stderr: {}'.format(stderr.decode()))
+
+    def file_info(self, path):
+        return File(self, path)
+
+    def Popen(self, cmd, stdin=None, stdout=subprocess.PIPE, stderr=None):
+        cmd = [self.path] + cmd
+        self.print_cmd(cmd)
+        return subprocess.Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr)
+
+    def pipe(self, cmd):
+        # type: (list[str]) -> str
+        cmd = [self.path, '-y'] + cmd
+
+        self.print_cmd(cmd)
+        output = get_stdout(cmd)
+        self.print(output)
+        return output
+
+
+class File:
+    __slots__ = ('path', 'abspath', 'basename', 'dirname', 'name', 'ext', 'duration',
+        'bitrate', 'metadata', 'fps', 'video_streams', 'audio_streams', 'subtitle_streams')
+
+    def __init__(self, ffmpeg: FFmpeg, path: str):
         self.path = path
         self.abspath = os.path.abspath(path)
         self.basename = os.path.basename(path)
         self.dirname = os.path.dirname(os.path.abspath(path))
-
-        f_name, f_ext = os.path.splitext(path)
-        self.name = f_name
-        self.ext = f_ext
+        self.name, self.ext = os.path.splitext(path)
 
         info = get_stdout([ffmpeg.path, '-hide_banner', '-i', path])
 
@@ -99,96 +189,3 @@ class File:
         self.video_streams = video_streams
         self.audio_streams = audio_streams
         self.subtitle_streams = subtitle_streams
-
-
-class FFmpeg():
-
-    @staticmethod
-    def _set_ff_path(ff_location, my_ffmpeg):
-        # type: (str | None, bool) -> str
-        if(ff_location is not None):
-            return ff_location
-        if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
-            return 'ffmpeg'
-        program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
-        dirpath = os.path.dirname(os.path.realpath(__file__))
-        return os.path.join(dirpath, 'ffmpeg', system(), program)
-
-    def __init__(self, ff_location=None, my_ffmpeg=False, debug=False):
-        self.debug = debug
-        self.path = self._set_ff_path(ff_location, my_ffmpeg)
-        try:
-            _version = get_stdout([self.path, '-version']).split('\n')[0]
-            _version = _version.replace('ffmpeg version', '').strip()
-            self.version = _version.split(' ')[0]
-        except FileNotFoundError:
-            if(system() == 'Darwin'):
-                Log().error('No ffmpeg found, download via homebrew or restore the '
-                    'included binary.')
-            if(system() == 'Windows'):
-                Log().error('No ffmpeg found, download ffmpeg with your favorite package '
-                    'manager (ex chocolatey), or restore the included binary.')
-
-            Log().error('ffmpeg must be installed and on PATH.')
-
-    def print(self, message):
-        if(self.debug):
-            print('FFmpeg: {}'.format(message), file=sys.stderr)
-
-    def print_cmd(self, cmd):
-        if(self.debug):
-            print('FFmpeg run: {}\n'.format(' '.join(cmd)), file=sys.stderr)
-
-    def run(self, cmd):
-        cmd = [self.path, '-y', '-hide_banner'] + cmd
-        if(not self.debug):
-            cmd.extend(['-nostats', '-loglevel', 'error'])
-        self.print_cmd(cmd)
-        subprocess.call(cmd)
-
-    def run_check_errors(self, cmd, log, show_out=False):
-        process = self.Popen(cmd, stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        stdout, stderr = process.communicate()
-        process.stdin.close()
-        output = stderr.decode()
-
-        error_list = [
-            r"Unknown encoder '.*'",
-            r"-q:v qscale not available for encoder\. Use -b:v bitrate instead\.",
-            r'Specified sample rate .* is not supported',
-            r'Unable to parse option value ".*"',
-            r'Error setting option .* to value .*\.',
-            r"Undefined constant or missing '.*' in '.*'",
-        ]
-
-        if(self.debug):
-            print('stderr: {}'.format(stderr.decode()))
-            print('stdout: {}'.format(stdout.decode()))
-
-        for item in error_list:
-            check = re.search(item, output)
-            if(check):
-                log.error(check.group())
-
-        if(show_out and not self.debug):
-            print('stderr: {}'.format(stderr.decode()))
-            print('stdout: {}'.format(stdout.decode()))
-
-    def file_info(self, path):
-        return File(self, path)
-
-    def Popen(self, cmd, stdin=None, stdout=subprocess.PIPE, stderr=None):
-        cmd = [self.path] + cmd
-        self.print_cmd(cmd)
-        return subprocess.Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr)
-
-    def pipe(self, cmd):
-        # type: (list[str]) -> str
-        cmd = [self.path, '-y'] + cmd
-
-        self.print_cmd(cmd)
-        output = get_stdout(cmd)
-        self.print(output)
-        return output
