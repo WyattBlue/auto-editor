@@ -72,7 +72,6 @@ setup(
             "aesubdump=auto_editor.subcommands.subdump:main",
             "aegrep=auto_editor.subcommands.grep:main",
             "aelevels=auto_editor.subcommands.levels:main",
-            "aechunks=auto_editor.subcommands.chunks:main",
         ]
     }
 )
