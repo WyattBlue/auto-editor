@@ -299,6 +299,8 @@ class ParseOptions():
                 elif(option['action'] == 'store_false'):
                     value = False
                 else:
+                    if(nextItem is None and option['nargs'] == 1):
+                        raise ParserError(f"{option['names'][0]} needs argument.")
                     value = option['type'](nextItem)
 
                     if(option['choices'] is not None and value not in option['choices']):
