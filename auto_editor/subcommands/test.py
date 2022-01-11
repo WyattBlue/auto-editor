@@ -277,7 +277,7 @@ def main(sys_args=None):
     def parser_test():
         check_for_error(['example.mp4', '--block'], 'needs argument')
 
-    tester.run_test('parser_test', parser_test, allow_fail=True)
+    tester.run_test('parser_test', parser_test)
 
     def subtitle_tests():
         from auto_editor.render.subtitle import SubtitleParser
