@@ -1,6 +1,20 @@
 '''utils/effects.py'''
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageChops
+
+def _apply_anchor(x, y, width, height, anchor):
+    if(anchor == 'ce'):
+        x = int((x * 2 - width) / 2)
+        y = int((y * 2 - height) / 2)
+    if(anchor == 'tr'):
+        x -= width
+    if(anchor == 'bl'):
+        y -= height
+    if(anchor == 'br'):
+        x -= width
+        y -= height
+    # Pillow uses 'tl' by default
+    return x, y
 
 class Effect():
     __slots__ = ('all', 'sheet', '_vars', 'log', 'background', 'width', 'height')
@@ -27,8 +41,9 @@ class Effect():
             if(val == key):
                 return _type(item)
 
-        if(not isinstance(val, int)
-            and not (val.replace('.', '', 1)).replace('-', '', 1).isdigit()):
+        try:
+            new_val = _type(val)
+        except Exception:
             self.log.error("variable '{}' is not defined.".format(val))
 
         return _type(val)
@@ -69,7 +84,7 @@ class Effect():
         self.width = self._vars['width']
         self.height = self._vars['height']
 
-        effect_list = args.add_text + args.add_rectangle + args.add_ellipse
+        effect_list = args.add_text + args.add_rectangle + args.add_ellipse + args.add_image
 
         for i, my_effect in enumerate(effect_list):
             effect = self.set_timing(my_effect, i)
@@ -88,7 +103,24 @@ class Effect():
                     except OSError:
                         self.log.error(f"Font '{effect['font']}' not found.")
 
+            if(effect['type'] == 'image'):
+                source = Image.open(effect['source'])
+                source = source.convert('RGBA')
+
+                _op = int(effect['opacity'] * 255)
+
+                source = ImageChops.multiply(source,
+                    Image.new('RGBA', source.size, (255, 255, 255, _op))
+                )
+                effect['source'] = source
+
+            if('anchor' in effect):
+                anchor_vals = ['tl', 'tr', 'bl', 'br', 'ce']
+                if(effect['anchor'] not in anchor_vals):
+                    self.log.error('anchor must be ' + ' '.join(anchor_vals))
+
             self.all.append(effect)
+
 
     def apply(self, index, frame, pix_fmt):
         img = frame.to_image().convert('RGBA')
@@ -96,15 +128,14 @@ class Effect():
         for item in self.sheet[index]:
             pars = self.all[item]
 
-            obj_img = Image.new('RGBA', img.size, (255,255,255,0))
+            obj_img = Image.new('RGBA', img.size, (255, 255, 255, 0))
             draw = ImageDraw.Draw(obj_img)
 
             if(pars['type'] == 'text'):
 
                 tw, th = draw.textsize(pars['content'], font=pars['font'])
 
-                new_x = ((pars['x'] * 2) - tw) / 2
-                new_y = ((pars['y'] * 2) - th) / 2
+                new_x, new_y = _apply_anchor(pars['x'], pars['y'], tw, th, 'ce')
 
                 draw.text((new_x, new_y), pars['content'], font=pars['font'],
                     fill=pars['fill'])
@@ -116,6 +147,11 @@ class Effect():
             if(pars['type'] == 'ellipse'):
                 draw.ellipse([pars['x1'], pars['y1'], pars['x2'], pars['y2']],
                     fill=pars['fill'], width=pars['width'], outline=pars['outline'])
+
+            if(pars['type'] == 'image'):
+                img_w, img_h = pars['source'].size
+                pos = _apply_anchor(pars['x'], pars['y'], img_w, img_h, pars['anchor'])
+                obj_img.paste(pars['source'], pos)
 
             img = Image.alpha_composite(img, obj_img)
 

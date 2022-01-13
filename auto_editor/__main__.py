@@ -58,7 +58,7 @@ def main_options(parser):
             {'font': (str, 'default'),},
             {'align': (str, 'left'),},
             {'fill': (str, '#FFF'),},
-            {'type': 'text',},
+            {'type': 'text'},
         ],
         help='Add a text object to the timeline.'
     )
@@ -71,12 +71,22 @@ def main_options(parser):
         manual='The x and y coordinates specify a bounding box where the ellipse is '\
             'drawn.')
 
-    # parser.add_argument('--add_image', nargs='*', type=dict,
-    #     keywords=[
-
-
-    #     ],
-    #     help='Add an image object onto the timeline.')
+    parser.add_argument('--add_image', nargs='*', type=dict,
+        keywords=[
+            {'start': (int, ''),},
+            {'dur': (int, ''),},
+            {'source': (str, ''),},
+            {'x': (int, 'centerX'),},
+            {'y': (int, 'centerY'),},
+            {'opacity': (float_type, 1),},
+            {'anchor': (str, 'ce'),},
+            {'type': 'image'},
+        ],
+        help='Add an image object onto the timeline.',
+        manual='Opacity is how transparent or solid the image is. A transparency of '\
+            '1 or 100% is completely solid. A transparency of 0 or 0% is completely '\
+            'transparent.\n' \
+            'The anchor point tells how the image is placed relative to its x y coordinates.')
 
     parser.add_text('URL Download Options')
     parser.add_argument('--download_dir', type=str, default=None,
