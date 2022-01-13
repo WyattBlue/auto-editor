@@ -136,10 +136,6 @@ def main_options(parser):
         help='Set a value to the ffmpeg option -qscale:v')
     parser.add_argument('--scale', type=float_type, default=1,
         help='Scale the output media file by a certain factor.')
-    parser.add_argument('--has_vfr', default='unset',
-        choices=['unset', 'yes', 'no'],
-        help='Set whether the input file(s) have Variable Frame Rates',
-        manual='Detecting Variable Frame Rates takes a lot of time, skip variable frame rate scan, saving time for big video files.')
 
     parser.add_text('Miscellaneous Options')
     parser.add_argument('--background', type=str, default='#000',

@@ -3,6 +3,7 @@
 # Internal Libraries
 import os.path
 import subprocess
+from math import floor
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
 allowed_pix_fmt = {'yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
@@ -28,8 +29,7 @@ class Wrapper:
         return self._fh.read(buf_size)
 
 
-def render_av(ffmpeg, track, inp, args, chunks, fps, has_vfr, progress, effects, rules,
-    temp, log):
+def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, temp, log):
     try:
         import av
     except ImportError:
@@ -41,19 +41,7 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, has_vfr, progress, effects,
     container = av.open(inp.path, 'r')
     pix_fmt = container.streams.video[track].pix_fmt
 
-    if(has_vfr):
-        # Create a cfr stream on stdout.
-        cmd = ['-i', inp.path, '-map', f'0:v:{track}', '-vf', f'fps=fps={fps}', '-r',
-            str(fps), '-vsync', '1', '-f', 'matroska']
-        if(not pix_fmt_allowed(pix_fmt)):
-            pix_fmt = 'yuv420p'
-            cmd.extend(['-pix_fmt', pix_fmt])
-
-        cmd.extend(['-vcodec', 'rawvideo', 'pipe:1'])
-
-        wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
-        container = av.open(wrapper, 'r')
-    elif(not pix_fmt_allowed(pix_fmt)):
+    if(not pix_fmt_allowed(pix_fmt)):
         pix_fmt = 'yuv420p'
         cmd = ['-i', inp.path, '-map', f'0:v:{track}', '-f', 'matroska', '-pix_fmt', pix_fmt,
             '-vcodec', 'rawvideo', 'pipe:1']
@@ -113,7 +101,9 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, has_vfr, progress, effects,
     chunk = chunks.pop(0)
 
     try:
-        for index, frame in enumerate(container.decode(video_stream)):
+        for frame in container.decode(video_stream):
+            index = floor(frame.time * fps)
+
             if(len(chunks) > 0 and index-1 >= chunk[1]):
                 chunk = chunks.pop(0)
                 if(len(chunks) == 0 and chunk[2] == 99999):
@@ -150,9 +140,8 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, has_vfr, progress, effects,
         check_errors = ffmpeg.pipe(cmd)
         if('Error' in check_errors or 'failed' in check_errors):
             if('-allow_sw 1' in check_errors):
-                # Add "-allow_sw 1" to command.
-                cmd.insert(-1, '1')
                 cmd.insert(-1, '-allow_sw')
+                cmd.insert(-1, '1')
             # Run again to show errors even if it might not work.
             ffmpeg.run(cmd)
 
