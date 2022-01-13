@@ -66,12 +66,21 @@ class FFmpeg():
         subprocess.call(cmd)
 
     def run_check_errors(self, cmd, log, show_out=False):
-        process = self.Popen(cmd, stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        stdout, stderr = process.communicate()
-        process.stdin.close()
-        output = stderr.decode()
+        def _run(cmd):
+            process = self.Popen(cmd, stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            _, stderr = process.communicate()
+            process.stdin.close()
+            return stderr.decode()
+
+        output = _run(cmd)
+
+        if('Try -allow_sw 1' in output):
+            cmd.insert(-1, '-allow_sw')
+            cmd.insert(-1, '1')
+            output = _run(cmd)
 
         error_list = [
             r"Unknown encoder '.*'",
@@ -83,7 +92,7 @@ class FFmpeg():
         ]
 
         if(self.debug):
-            print('stderr: {}'.format(stderr.decode()))
+            print(f'stderr: {output}')
 
         for item in error_list:
             check = re.search(item, output)
@@ -91,7 +100,7 @@ class FFmpeg():
                 log.error(check.group())
 
         if(show_out and not self.debug):
-            print('stderr: {}'.format(stderr.decode()))
+            print(f'stderr: {output}')
 
     def file_info(self, path):
         return File(self, path)

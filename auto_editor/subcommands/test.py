@@ -330,7 +330,7 @@ def main(sys_args=None):
     tester.run_test('level_tests', level_tests)
 
     def example_tests():
-        run_program(['example.mp4', '--has_vfr', 'no'])
+        run_program(['example.mp4'])
         inspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
@@ -340,7 +340,7 @@ def main(sys_args=None):
             [ffprobe.getVLanguage, '0|eng'],
             [ffprobe.getALanguage, '1|eng'],
         )
-        run_program(['example.mp4', '--video_codec', 'uncompressed', '--has_vfr', 'no'])
+        run_program(['example.mp4', '--video_codec', 'uncompressed'])
         inspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
@@ -357,7 +357,7 @@ def main(sys_args=None):
 
     # Issue #172
     def bitrate_test():
-        run_program(['example.mp4', '--audio_bitrate', '50k', '--has_vfr', 'no'])
+        run_program(['example.mp4', '--audio_bitrate', '50k'])
         inspect(
             'example_ALTERED.mp4',
             [ffprobe.AudioBitRate, '50k'],
@@ -367,10 +367,10 @@ def main(sys_args=None):
     # Issue #184
     def unit_tests():
         run_program(['example.mp4', '--mark_as_loud', '20s,22sec', '25secs,26.5seconds'])
-        run_program(['example.mp4', '--sample_rate', '44100', '--has_vfr', 'no'])
-        run_program(['example.mp4', '--sample_rate', '44100 Hz', '--has_vfr', 'no'])
-        run_program(['example.mp4', '--sample_rate', '44.1 kHz', '--has_vfr', 'no'])
-        run_program(['example.mp4', '--silent_threshold', '4%', '--has_vfr', 'no'])
+        run_program(['example.mp4', '--sample_rate', '44100'])
+        run_program(['example.mp4', '--sample_rate', '44100 Hz'])
+        run_program(['example.mp4', '--sample_rate', '44.1 kHz'])
+        run_program(['example.mp4', '--silent_threshold', '4%'])
     tester.run_test('unit_tests', unit_tests,
         description='''
         Make sure all units are working appropriately. That includes:
@@ -391,9 +391,9 @@ def main(sys_args=None):
 
     def cut_out_test():
         run_program(['example.mp4', '--edit', 'none', '--video_speed', '2',
-            '--silent_speed', '3', '--cut_out', '2secs,10secs', '--has_vfr', 'no'])
+            '--silent_speed', '3', '--cut_out', '2secs,10secs'])
         run_program(['example.mp4', '--edit', 'all', '--video_speed', '2',
-            '--add_in', '2secs,10secs', '--has_vfr', 'no'])
+            '--add_in', '2secs,10secs'])
     tester.run_test('cut_out_test', cut_out_test)
 
     def gif_test():
@@ -427,14 +427,14 @@ def main(sys_args=None):
 
     def output_extension():
         # Add input extension to output name if no output extension is given.
-        run_program(['example.mp4', '--has_vfr', 'no', '-o', 'out'])
+        run_program(['example.mp4', '-o', 'out'])
         inspect(
             'out.mp4',
             [ffprobe.getVideoCodec, 'h264']
         )
         os.remove('out.mp4')
 
-        run_program(['resources/test.mkv', '--has_vfr', 'no', '-o', 'out'])
+        run_program(['resources/test.mkv', '-o', 'out'])
         inspect(
             'out.mkv',
             [ffprobe.getVideoCodec, 'h264']
@@ -444,8 +444,8 @@ def main(sys_args=None):
     tester.run_test('output_extension', output_extension)
 
     def progress_ops_test():
-        run_program(['example.mp4', '--has_vfr', 'no', '--machine_readable_progress'])
-        run_program(['example.mp4', '--has_vfr', 'no', '--no_progress'])
+        run_program(['example.mp4', '--machine_readable_progress'])
+        run_program(['example.mp4', '--no_progress'])
     tester.run_test('progress_ops_test', progress_ops_test)
 
     def silent_threshold():
@@ -464,7 +464,7 @@ def main(sys_args=None):
     tester.run_test('json_tests', json_tests)
 
     def scale_tests():
-        run_program(['example.mp4', '--scale', '1.5', '--has_vfr', 'no'])
+        run_program(['example.mp4', '--scale', '1.5'])
         inspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
@@ -472,7 +472,7 @@ def main(sys_args=None):
             [ffprobe.getSampleRate, '48000'],
         )
 
-        run_program(['example.mp4', '--scale', '0.2', '--has_vfr', 'no'])
+        run_program(['example.mp4', '--scale', '0.2'])
         inspect(
             'example_ALTERED.mp4',
             [ffprobe.getFrameRate, 30.0],
@@ -503,13 +503,13 @@ def main(sys_args=None):
         cleanup=clean_all)
 
     def render_text():
-        run_program(['example.mp4', '--has-vfr', 'no', '--add-text', 'start,end,This is my text'])
+        run_program(['example.mp4', '--add-text', 'start,end,This is my text'])
 
     tester.run_test('render_text', render_text)
 
     def check_font_error():
         check_for_error(
-            ['example.mp4', '--has-vfr', 'no', '--add-text', 'start,end,text,0,0,30,notafont'],
+            ['example.mp4', '--add-text', 'start,end,text,0,0,30,notafont'],
             'not found')
 
     tester.run_test('check_font_error', check_font_error)

@@ -185,41 +185,15 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
             message += ' Track {}\n'.format(t)
         log.error(message)
 
-    def number_of_VFR_frames(text, log):
-        import re
-        search = re.search(r'VFR:[\d.]+ \(\d+\/\d+\)', text, re.M)
-        if(search is None):
-            log.warning('Could not get number of VFR Frames.')
-            return 0
-        else:
-            nums = re.search(r'\d+\/\d+', search.group()).group(0)
-            log.debug('VFR Frames: {}'.format(nums))
-            return int(nums.split('/')[0])
-
-    def has_VFR(cmd, log):
-        return number_of_VFR_frames(ffmpeg.pipe(cmd), log) != 0
-
     # Split audio tracks into: 0.wav, 1.wav, etc.
+    log.conwrite('Extracting audio')
+
     cmd = ['-i', inp.path, '-hide_banner']
     for t in range(tracks):
         cmd.extend(['-map', '0:a:{}'.format(t), '-ac', '2',
             os.path.join(temp, '{}.wav'.format(t))])
-    cmd.extend(['-map', '0:v:0'])
-    if(args.has_vfr == 'unset' and len(inp.video_streams) > 0 and not args.preview):
-        log.conwrite('Extracting audio / detecting VFR')
-        cmd.extend(['-vf', 'vfrdet', '-f', 'null', '-'])
-        has_vfr = has_VFR(cmd, log)
-    else:
-        log.conwrite('Extracting audio')
-        ffmpeg.run(cmd)
-        has_vfr = args.has_vfr == 'yes'
+    ffmpeg.run(cmd)
     del cmd
-
-    if(len(inp.video_streams) > 0 and tracks == 0):
-        # Doesn't matter because we don't need to align to an audio track.
-        has_vfr = False
-
-    log.debug('Has VFR: {}'.format(has_vfr))
 
     if(tracks != 0):
         if(args.cut_by_all_tracks):
@@ -335,7 +309,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
                     video_stuff.append(('image', None, None))
                 else:
                     video_stuff.append(render_av(ffmpeg, v, inp, args, chunks, fps,
-                        has_vfr, progress, effects, rules, temp, log))
+                        progress, effects, rules, temp, log))
 
         log.conwrite('Writing the output file.')
 
