@@ -221,11 +221,11 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         return len(list(filter(is_clip, chunks)))
 
     def get_clips(chunks):
-        # type: (List[Tuple[int, int, float]]) -> List[List[int, int, float]]
+        # type: (List[Tuple[int, int, float]]) -> List[Tuple[int, int, float]]
         clips = []
         for chunk in chunks:
             if(is_clip(chunk)):
-                clips.append([chunk[0], chunk[1], chunk[2] * 100])
+                clips.append((chunk[0], chunk[1], chunk[2] * 100))
         return clips
 
     num_cuts = number_of_cuts(chunks)

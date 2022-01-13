@@ -180,8 +180,8 @@ def main(sys_args=sys.argv[1:]):
             print(text)
 
     if(args.json):
-        json_object = json.dumps(file_info, indent=4) 
-        print(json_object)       
+        json_object = json.dumps(file_info, indent=4)
+        print(json_object)
 
 if(__name__ == '__main__'):
     main()
