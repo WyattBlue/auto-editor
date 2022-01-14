@@ -3,7 +3,6 @@
 # Internal Libraries
 import os.path
 import subprocess
-from math import floor
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
 allowed_pix_fmt = {'yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
@@ -35,7 +34,7 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     except ImportError:
         log.error("av python module not installed. Run 'pip install av'")
 
-    total_frames = chunks[len(chunks) - 1][1]
+    total_frames = chunks[-1][1]
     progress.start(total_frames, 'Creating new video')
 
     container = av.open(inp.path, 'r')
@@ -102,11 +101,12 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
 
     try:
         for frame in container.decode(video_stream):
-            index = floor(frame.time * fps)
+            index = int(frame.time * fps)
 
-            if(len(chunks) > 0 and index-1 >= chunk[1]):
-                chunk = chunks.pop(0)
-                if(len(chunks) == 0 and chunk[2] == 99999):
+            if index > chunk[1]:
+                if chunks:
+                    chunk = chunks.pop(0)
+                else:
                     break
 
             if(chunk[2] != 99999):

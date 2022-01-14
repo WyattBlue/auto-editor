@@ -145,7 +145,7 @@ def cook(has_loud, min_clip, min_cut):
 
 
 # Turn long silent/loud array to formatted chunk list.
-# Example: [1, 1, 1, 0, 0] => [[0, 3, 1], [3, 5, 0]]
+# Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]
 def chunkify(arr: np.ndarray, arr_length: int = None) -> List[Tuple[int, int, float]]:
     if(arr_length is None):
         arr_length = len(arr)
@@ -157,6 +157,9 @@ def chunkify(arr: np.ndarray, arr_length: int = None) -> List[Tuple[int, int, fl
             chunks.append((start, j, arr[j - 1]))
             start = j
     chunks.append((start, arr_length, arr[j]))
+
+    if(chunks[-1][2] == 99999):
+        chunks.pop()
     return chunks
 
 
