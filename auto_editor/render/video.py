@@ -99,6 +99,9 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     output_equavalent = 0
     chunk = chunks.pop(0)
 
+    seek_jumps = []
+    SEEK_COST = (int(fps)+1) * 2
+
     try:
         for frame in container.decode(video_stream):
             index = int(frame.time * fps)
@@ -111,6 +114,9 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
 
             if(chunk[2] != 99999):
                 input_equavalent += (1 / chunk[2])
+            elif(chunk[1] - index > SEEK_COST and chunk[1] not in seek_jumps):
+                container.seek(chunk[1] * frame.time_base.denominator)
+                seek_jumps.append(chunk[1])
 
             while input_equavalent > output_equavalent:
                 if(index in effects.sheet):
