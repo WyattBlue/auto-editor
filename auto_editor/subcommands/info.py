@@ -80,9 +80,14 @@ def main(sys_args=sys.argv[1:]):
             import av
             container = av.open(file, 'r')
             pix_fmt = container.streams.video[track].pix_fmt
+            time_base = container.streams.video[track].time_base
+
             text += f'     - pix_fmt: {pix_fmt}\n'
+            text += f'     - time_base: {time_base}\n'
 
             vid['pix_fmt'] = pix_fmt
+            vid['time_base'] = time_base
+
 
             if(stream['fps'] is not None):
                 text += '     - fps: {}\n'.format(stream['fps'])
