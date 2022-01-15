@@ -60,7 +60,6 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     if(args.scale != 1):
         apply_video_later = False
 
-    log.debug(f'pix_fmt: {pix_fmt}')
     log.debug(f'apply video quality settings now: {not apply_video_later}')
 
     video_stream = container.streams.video[track]
@@ -101,6 +100,8 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
 
     seek_jumps = []
     SEEK_COST = (int(fps)+1) * 2
+    TIME_BASE = container.streams.video[track].time_base.denominator
+    log.debug(f'time base: {TIME_BASE}')
 
     try:
         for frame in container.decode(video_stream):
@@ -115,7 +116,8 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
             if(chunk[2] != 99999):
                 input_equavalent += (1 / chunk[2])
             elif(chunk[1] - index > SEEK_COST and chunk[1] not in seek_jumps):
-                container.seek(chunk[1] * frame.time_base.denominator)
+                container.seek(chunk[1] * TIME_BASE)
+                log.debug(f'seeking to {chunk[1]}')
                 seek_jumps.append(chunk[1])
 
             while input_equavalent > output_equavalent:
