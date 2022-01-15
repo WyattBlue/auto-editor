@@ -99,6 +99,10 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     chunk = chunks.pop(0)
 
     seek_jumps = []
+    just_seeked = False
+    prev_index = 0
+
+    ENABLE_SEEK = True
     SEEK_COST = (int(fps)+1) * 2
     TIME_BASE = container.streams.video[track].time_base.denominator
     log.debug(f'time base: {TIME_BASE}')
@@ -107,21 +111,31 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
         for frame in container.decode(video_stream):
             index = int(frame.time * fps)
 
+            if just_seeked:
+                just_seeked = False
+                log.debug(f'seek after: {index}')
+                if index < prev_index:
+                    ENABLE_SEEK = False
+                    log.debug('Jumped backwards, perhaps time base is incorrect?')
+                    log.debug('Disabling seeking.')
+
             if index > chunk[1]:
                 if chunks:
                     chunk = chunks.pop(0)
                 else:
                     break
 
-            if(chunk[2] != 99999):
+            if chunk[2] != 99999:
                 input_equavalent += (1 / chunk[2])
-            elif(chunk[1] - index > SEEK_COST and chunk[1] not in seek_jumps):
+            elif ENABLE_SEEK and chunk[1] - index > SEEK_COST and chunk[1] not in seek_jumps:
                 container.seek(chunk[1] * TIME_BASE)
-                log.debug(f'seeking to {chunk[1]}')
+                just_seeked = True
+                prev_index = index
+                log.debug(f'at {index}, seeking to: {chunk[1]}')
                 seek_jumps.append(chunk[1])
 
             while input_equavalent > output_equavalent:
-                if(index in effects.sheet):
+                if index in effects.sheet:
                     frame = effects.apply(index, frame, pix_fmt)
 
                 in_bytes = frame.to_ndarray().tobytes()
