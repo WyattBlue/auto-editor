@@ -209,7 +209,6 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         from auto_editor.scipy.wavfile import read
         sample_rate, audio_samples = read(temp_file)
 
-    log.debug('Frame Rate: {}'.format(fps))
     if(chunks is None):
         chunks = get_chunks(inp, segment, fps, args, log, audio_samples, sample_rate)
 
