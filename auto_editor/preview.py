@@ -25,9 +25,7 @@ def preview(inp, chunks, log):
 
     log.conwrite('')
 
-    container = av.open(inp.path)
-
-    old_length = container.duration / av.time_base
+    old_length = chunks[-1][1] / fps
     new_length = get_new_length(chunks, fps)
 
     diff = new_length - old_length
@@ -55,21 +53,20 @@ def preview(inp, chunks, log):
             cut_lens.append(leng)
 
     print('clips: {}'.format(clips))
-    if(len(clip_lens) == 1):
-        time_frame(' - clip length', clip_lens[0], fps)
+    if(len(clip_lens) < 2):
+        time_frame(' - clip length', sum(clip_lens), fps)
     else:
         time_frame(' - smallest', min(clip_lens), fps)
         time_frame(' - largest', max(clip_lens), fps)
         time_frame(' - average', sum(clip_lens) / len(clip_lens), fps)
-        print('cuts: {}'.format(cuts))
 
-    if(cut_lens != []):
-        if(len(cut_lens) == 1):
-            time_frame(' - cut length', cut_lens[0], fps)
-        else:
-            time_frame(' - smallest', min(cut_lens), fps)
-            time_frame(' - largest', max(cut_lens), fps)
-            time_frame(' - average', sum(cut_lens) / len(cut_lens), fps)
-        print('')
+    print('cuts: {}'.format(cuts))
+    if(len(cut_lens) < 2):
+        time_frame(' - cut length', sum(cut_lens), fps)
+    else:
+        time_frame(' - smallest', min(cut_lens), fps)
+        time_frame(' - largest', max(cut_lens), fps)
+        time_frame(' - average', sum(cut_lens) / len(cut_lens), fps)
+    print('')
 
     log.debug('Chunks: {}'.format(chunks))

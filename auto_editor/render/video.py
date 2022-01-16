@@ -34,6 +34,9 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     except ImportError:
         log.error("av python module not installed. Run 'pip install av'")
 
+    if(chunks[-1][2] == 99999):
+        chunks.pop()
+
     total_frames = chunks[-1][1]
     progress.start(total_frames, 'Creating new video')
 
