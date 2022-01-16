@@ -157,9 +157,6 @@ def chunkify(arr: np.ndarray, arr_length: int = None) -> List[Tuple[int, int, fl
             chunks.append((start, j, arr[j - 1]))
             start = j
     chunks.append((start, arr_length, arr[j]))
-
-    if(chunks[-1][2] == 99999):
-        chunks.pop()
     return chunks
 
 
