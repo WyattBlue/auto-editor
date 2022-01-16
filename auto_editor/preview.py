@@ -3,11 +3,13 @@
 # Internal Libraries
 from datetime import timedelta
 
+# External Libraries
+import av
+
 # Included Libraries
 from auto_editor.utils.func import get_new_length
 
 def display_length(secs):
-    # display length
     if(secs < 0):
         return '-' + str(timedelta(seconds=round(abs(secs))))
     return str(timedelta(seconds=round(secs)))
@@ -23,7 +25,9 @@ def preview(inp, chunks, log):
 
     log.conwrite('')
 
-    old_length = chunks[-1][1] / fps
+    container = av.open(inp.path)
+
+    old_length = container.duration / av.time_base
     new_length = get_new_length(chunks, fps)
 
     diff = new_length - old_length
