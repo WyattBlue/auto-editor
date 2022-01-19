@@ -89,6 +89,7 @@ class FFmpeg():
             r'Unable to parse option value ".*"',
             r'Error setting option .* to value .*\.',
             r"Undefined constant or missing '.*' in '.*'",
+            r'DLL .* failed to open',
         ]
 
         if(self.debug):

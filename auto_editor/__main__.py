@@ -83,22 +83,24 @@ def main_options(parser):
             {'type': 'image'},
         ],
         help='Add an image object onto the timeline.',
-        manual='Opacity is how transparent or solid the image is. A transparency of '\
-            '1 or 100% is completely solid. A transparency of 0 or 0% is completely '\
-            'transparent.\n' \
+        manual='Opacity is how transparent or solid the image is. A transparency of '
+            '1 or 100% is completely solid. A transparency of 0 or 0% is completely '
+            'transparent.\n'
             'The anchor point tells how the image is placed relative to its x y coordinates.')
 
     parser.add_text('URL Download Options')
     parser.add_argument('--download_dir', type=str, default=None,
-        help='The directory where the downloaded file is placed.')
+        help='The directory where the downloaded URL is placed.')
     parser.add_argument('--limit_rate', '-rate', default='3m',
         help='The maximum download rate in bytes per second (50k, 4.2m)')
     parser.add_argument('--id', type=str, default=None,
         help='Manually set the YouTube ID the video belongs to.')
     parser.add_argument('--block', type=block_type,
-        help='Mark all sponsors sections as silent.',
-        manual='Only for YouTube URLs. This uses the SponsorBlock API.\n'
-            'Choices can include: sponsor intro outro selfpromo interaction music_offtopic')
+        help='Given a SponsorBlock category, mark the section as silent.',
+        manual='Multiple categories can be specified by using a comma: "sponsor,intro"\n'
+            'This option only works on YouTube URLs, or where `--id` points to a valid '
+            'YouTube ID.\n\nCategories include: '\
+            'sponsor intro outro selfpromo interaction music_offtopic')
 
     parser.add_argument('--download_archive', type=file_type, default=None,
         help='Download only videos not listed in archive file. Record the IDs of'
@@ -215,8 +217,8 @@ def main_options(parser):
     parser.add_argument('--temp_dir', default=None,
         help='Set where the temporary directory is located.',
         manual='If not set, tempdir will be set with Python\'s tempfile module\n'
-            'The directory doesn\'t have to exist beforehand, however, the root path must be valid.'
-            'For Windows users, this file will be in the C drive.\n'
+            'The directory doesn\'t have to exist beforehand, however, the root path '
+            'must be valid. For Windows users, this file will be in the C drive.\n'
             'The temp file can get quite big if you\'re generating a huge video, so '
             'make sure your location has enough space.')
     parser.add_argument('--ffmpeg_location', default=None,
@@ -248,9 +250,12 @@ def main_options(parser):
             'Setting the threshold to `0%` will cut only out areas where area is '
             'absolutely silence while a value of 4% will cut ')
     parser.add_argument('--frame_margin', '--margin', '-m', type=margin_type, default='6',
-        range='0 to Infinity',
+        range='-Infinity to Infinity',
         help='Set how many "silent" frames on either side on the "loud" sections to be '
-            'included.')
+            'included.',
+        manual='Margin is measured in frames, however, seconds can be used. e.g. `0.3secs`\n'
+            'The starting and ending margins can be set separately with the use of '
+            'a comma. e.g. `2sec,3sec` `7,10` `-1,6`')
     parser.add_argument('--silent_speed', '-s', type=float_type, default=99999,
         range='Any number. Values <= 0 or >= 99999 will be cut out.',
         help='Set the speed that "silent" sections should be played at.')
