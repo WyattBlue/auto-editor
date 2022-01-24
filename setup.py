@@ -36,10 +36,11 @@ setup(
      'silence-detect silence-removal silence-speedup motion-detection',
     packages=find_packages(),
     include_package_data=True,
+    zip_safe=False,
     install_requires=[
         'numpy>=1.21.0',
-        'yt-dlp>=2021.12.27',
-        'pillow>=8.4.0',
+        'yt-dlp>=2022.1.21',
+        'pillow==9.0.0',
         'av==8.1.0',
         'opencv-python>=4.5.5.62',
     ],
