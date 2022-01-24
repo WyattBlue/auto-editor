@@ -23,7 +23,7 @@ def timecode_to_frames(timecode, fps):
     s = float(s)
     return round((h * 3600 + m * 60 + s) * fps)
 
-def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
+def shotcut_xml(inp, temp, output, chunks, fps, log):
     width, height = get_width_height(inp)
     if(width is None or height is None):
         width, height = '1280', '720'
@@ -68,10 +68,11 @@ def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
 
         # Speeds like [1.5, 3] don't work because of duration issues, too bad!
 
-        for clip in clips:
-            speed = clip[2] / 100
-            if(int(speed) == speed):
-                speed = int(speed)
+        for clip in chunks:
+            if(clip[2] == 99999):
+                continue
+
+            speed = clip[2]
 
             _out = frames_to_timecode(clip[1] / speed, fps)
             length = frames_to_timecode((clip[1] / speed) + 1, fps)
@@ -126,7 +127,12 @@ def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
         out.write('\t\t<property name="shotcut:name">V1</property>\n')
 
         producers = 0
-        for i, clip in enumerate(clips):
+        i = 0
+        for clip in chunks:
+            if(clip[2] == 99999):
+                continue
+
+            speed = clip[2]
 
             if(speed == 1):
                 in_len = clip[0] - 1
@@ -145,6 +151,7 @@ def shotcut_xml(inp, temp, output, clips, chunks, fps, log):
 
             out.write('\t\t<entry producer="{}" in="{}" out="{}"/>\n'.format(
                 tag_name, _in, _out))
+            i += 1
 
         out.write('\t</playlist>\n')
 

@@ -152,14 +152,8 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
 
     audio_samples = None
     tracks = len(inp.audio_streams)
-    audio_file = len(inp.video_streams) == 0 and tracks == 1
 
-    if(inp.fps is None):
-        fps = 30
-    elif(exporting_to_editor):
-        fps = int(float(inp.fps))
-    else:
-        fps = float(inp.fps)
+    fps = 30 if inp.fps is None else float(inp.fps)
 
     if(fps < 1):
         log.error('{}: Frame rate cannot be below 1. fps: {}'.format(inp.basename, fps))
@@ -219,16 +213,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         # type: (List[Tuple[int, int, float]]) -> int
         return len(list(filter(is_clip, chunks)))
 
-    def get_clips(chunks):
-        # type: (List[Tuple[int, int, float]]) -> List[Tuple[int, int, float]]
-        clips = []
-        for chunk in chunks:
-            if(is_clip(chunk)):
-                clips.append((chunk[0], chunk[1], chunk[2] * 100))
-        return clips
-
     num_cuts = number_of_cuts(chunks)
-    clips = get_clips(chunks)
 
     effects = Effect(args, log, _vars={})
 
@@ -249,21 +234,19 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
 
     if(args.export_to_premiere):
         from auto_editor.formats.premiere import premiere_xml
-        premiere_xml(inp, temp, output_path, clips, chunks, sample_rate, audio_file,
-            fps, log)
+        premiere_xml(inp, temp, output_path, chunks, sample_rate, fps, log)
         return num_cuts, output_path
 
     if(args.export_to_final_cut_pro):
         from auto_editor.formats.final_cut_pro import fcp_xml
 
-        total_frames = chunks[len(chunks) - 1][1]
-        fcp_xml(inp, temp, output_path, clips, tracks, total_frames, audio_file, fps, log)
+        fcp_xml(inp, temp, output_path, chunks, fps, log)
         return num_cuts, output_path
 
     if(args.export_to_shotcut):
         from auto_editor.formats.shotcut import shotcut_xml
 
-        shotcut_xml(inp, temp, output_path, clips, chunks, fps, log)
+        shotcut_xml(inp, temp, output_path, chunks, fps, log)
         return num_cuts, output_path
 
     def pad_chunk(item, total_frames):

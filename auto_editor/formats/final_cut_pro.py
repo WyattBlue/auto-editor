@@ -4,7 +4,8 @@ from .utils import indent, get_width_height
 
 from platform import system
 
-def fcp_xml(inp, temp, output, clips, tracks, total_dur, audioFile, fps, log):
+def fcp_xml(inp, temp, output, chunks, fps, log):
+    total_dur = chunks[-1][1]
 
     if(system() == 'Windows'):
         import pathlib
@@ -79,17 +80,20 @@ def fcp_xml(inp, temp, output, clips, tracks, total_dur, audioFile, fps, log):
         )
 
         last_dur = 0
-        for clip in clips:
-            clip_dur = (clip[1] - clip[0]) / (clip[2] / 100)
+        for clip in chunks:
+            if(clip[2] == 99999):
+                continue
+
+            clip_dur = (clip[1] - clip[0]) / clip[2]
             dur = fraction(clip_dur, fps)
 
-            close = '/' if clip[2] == 100 else ''
+            close = '/' if clip[2] == 1 else ''
 
             if(last_dur == 0):
                 outfile.write(indent(6, '<asset-clip name="{}" offset="0s" ref="r2"'.format(name)+\
                 ' duration="{}" tcFormat="NDF"{}>'.format(dur, close)))
             else:
-                start = fraction(clip[0] / (clip[2] / 100), fps)
+                start = fraction(clip[0] / clip[2], fps)
                 off = fraction(last_dur, fps)
                 outfile.write(indent(6,
                     '<asset-clip name="{}" offset="{}" ref="r2" '.format(name, off)+\
@@ -97,13 +101,13 @@ def fcp_xml(inp, temp, output, clips, tracks, total_dur, audioFile, fps, log):
                     'tcFormat="NDF"{}>'.format(close),
                 ))
 
-            if(clip[2] != 100):
+            if(clip[2] != 1):
                 # See the "Time Maps" section.
                 # https://developer.apple.com/library/archive/documentation/FinalCutProX
                 #    /Reference/FinalCutProXXMLFormat/StoryElements/StoryElements.html
 
                 frac_total = fraction(total_dur, fps)
-                total_dur_divided_by_speed = fraction((total_dur) / (clip[2] / 100), fps)
+                total_dur_divided_by_speed = fraction(total_dur / clip[2], fps)
 
                 outfile.write(indent(6,
                     '\t<timeMap>',
