@@ -54,7 +54,7 @@ def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, s
     total = 0
     for j, clip in enumerate(clips):
         my_start = int(total)
-        total += (clip[1] - clip[0]) / (clip[2] / 100)
+        total += (clip[1] - clip[0]) / clip[2]
         my_end = int(total)
 
         outfile.write(indent(5, '<clipitem id="clipitem-{}">'.format(j+1),
@@ -62,8 +62,8 @@ def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, s
             '\t<name>{}</name>'.format(inp.basename),
             '\t<start>{}</start>'.format(my_start),
             '\t<end>{}</end>'.format(my_end),
-            '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
-            '\t<out>{}</out>'.format(int(clip[1] / (clip[2] / 100)))))
+            '\t<in>{}</in>'.format(int(clip[0] / clip[2])),
+            '\t<out>{}</out>'.format(int(clip[1] / clip[2]))))
 
         if(j == 0):
             outfile.write(indent(6, '<file id="file-1">',
@@ -96,8 +96,8 @@ def handle_video_clips(outfile, clips, inp, timebase, duration, width, height, s
         else:
             outfile.write('\t\t\t\t\t\t<file id="file-1"/>\n')
 
-        if(clip[2] != 100):
-            outfile.write(speedup(clip[2]))
+        if(clip[2] != 1):
+            outfile.write(speedup(clip[2] * 100))
 
         # Linking for video blocks
         for i in range(max(3, tracks + 1)):
@@ -126,7 +126,7 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
         for j, clip in enumerate(clips):
 
             my_start = int(total)
-            total += (clip[1] - clip[0]) / (clip[2] / 100)
+            total += (clip[1] - clip[0]) / clip[2]
             my_end = int(total)
 
             if(audioFile):
@@ -142,8 +142,8 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
                 '\t<name>{}</name>'.format(inp.basename),
                 '\t<start>{}</start>'.format(my_start),
                 '\t<end>{}</end>'.format(my_end),
-                '\t<in>{}</in>'.format(int(clip[0] / (clip[2] / 100))),
-                '\t<out>{}</out>'.format(int(clip[1] / (clip[2] / 100)))))
+                '\t<in>{}</in>'.format(int(clip[0] / clip[2])),
+                '\t<out>{}</out>'.format(int(clip[1] / clip[2]))))
 
             if((audioFile and j == 0) or (t > 0 and j == 0)):
                 outfile.write(indent(6, '<file id="file-{}">'.format(t+1),
@@ -175,15 +175,23 @@ def handle_audio_clips(tracks, outfile, audioFile, clips, inp, timebase, sr, pat
                 outfile.write(indent(6, '<labels>', '\t<label2>Iris</label2>', '</labels>'))
 
             # Add speed effect for audio blocks
-            if(clip[2] != 100):
-                outfile.write(speedup(clip[2]))
+            if(clip[2] != 1):
+                outfile.write(speedup(clip[2] * 100))
 
             outfile.write('\t\t\t\t\t</clipitem>\n')
         if(not audioFile):
             outfile.write('\t\t\t\t\t<outputchannelindex>1</outputchannelindex>\n')
         outfile.write('\t\t\t\t</track>\n')
 
-def premiere_xml(inp, temp, output, clips, chunks, sampleRate, audioFile, fps, log):
+def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
+
+    audioFile = len(inp.video_streams) == 0 and len(inp.audio_streams) == 1
+
+    clips = []
+    for chunk in chunks:
+        if(chunk[2] != 99999):
+            clips.append(chunk)
+    return clips
 
     duration = chunks[-1][1]
     pathurls = [fix_url(inp.path)]
