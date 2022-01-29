@@ -32,6 +32,23 @@ Change the **pace** of the edited video by using `--frame_margin`.
 auto-editor example.mp4 --frame_margin 8
 ```
 
+<h3>Set how cuts are made</h3>
+
+Use the `--edit` option. to change how auto-editor makes automated cuts.
+
+For example, edit out motionlessness in a video by setting `--edit motion`.
+
+
+```
+# cut out sections where percentage of motion is less than 2.
+auto-editor example.mp4 --edit motion --motion_threshold 2%
+
+# --edit is set to "audio" by default
+auto-editor example.mp4 --silent_threshold 4%
+
+# audio and motion thresholds are toggled independently
+auto-editor example.mp4 --edit audio_or_motion --silent_threshold 3% --motion_threshold 6%
+```
 
 <h2 align="center">Exporting to Editors</h2>
 
@@ -41,13 +58,46 @@ Create an XML file that can be imported to Adobe Premiere Pro using this command
 auto-editor example.mp4 --export_to_premiere
 ```
 
-You can also import to these programs using:
+Similar flags exist also for:
 
 - `--export_to_final_cut_pro` for Final Cut Pro.
 - `--export_to_shot_cut` for ShotCut.
 
 Other programs might also be able to understand these formats, but if they don't. You can use ` --export_as_clip_sequence` which exports to many files that can be imported and used in other editors.
 
+<h2 align="center">Manual Editing</h2>
+
+Use the `--cut_out` option to always remove a section.
+
+```
+# Cut out the first 10 seconds.
+auto-editor example.mp4 --cut_out start,10sec
+
+# Cut out the first 10 frames.
+auto-editor example.mp4 --cut_out start,10
+
+# Cut out the last 10 seconds.
+auto-editor example.mp4 --cut_out -10sec,end
+
+# Cut out the first 10 seconds and cut out the range from 15 seconds to 20 seconds.
+auto-editor example.mp4 --cut_out start,10sec 15sec,20sec
+```
+
+And of course, all the audio cuts still apply.
+
+If you don't want **any automatic cuts**, use `--edit none`
+
+```
+# Cut out the first 5 seconds, leave the rest untouched.
+auto-editor example.mp4 --edit none --cut_out start,5sec
+```
+
+And the inverse
+
+```
+# Leave in the first 5 seconds, cut everything else out.
+auto-editor example.mp4 --edit all --add_in start,5sec
+```
 
 <h2 align="center">More Options</h2>
 
