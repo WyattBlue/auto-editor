@@ -1,5 +1,3 @@
-'''ffwrapper.py'''
-
 # Internal Libraries
 import re
 import sys

@@ -1,5 +1,3 @@
-'''utils/func.py'''
-
 """
 To prevent duplicate code being pasted between scripts, common functions should be
 put here. No function should modify or create video/audio files on its own.

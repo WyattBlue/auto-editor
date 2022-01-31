@@ -1,5 +1,3 @@
-'''utils/log.py'''
-
 from typing import NoReturn
 
 import sys

@@ -1,5 +1,3 @@
-'''audiotsm2/base/tsm.py'''
-
 class TSM():
     def run(self, reader, writer, flush=True):
         finished = False

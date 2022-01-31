@@ -1,5 +1,3 @@
-'''render/video.py'''
-
 # Internal Libraries
 import os.path
 import subprocess

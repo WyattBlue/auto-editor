@@ -1,5 +1,3 @@
-'''utils/video.py'''
-
 # Internal Libraries
 import os.path
 

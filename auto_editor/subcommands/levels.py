@@ -1,5 +1,3 @@
-'''subcommands/levels.py'''
-
 import sys
 
 def levels_options(parser):

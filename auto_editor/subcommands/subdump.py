@@ -1,5 +1,3 @@
-'''subcommands/subdump.py'''
-
 import sys
 
 def subdump_options(parser):

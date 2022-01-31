@@ -1,5 +1,3 @@
-'''audiotsm2/utils/normalizebuffer.py'''
-
 import numpy as np
 
 class NormalizeBuffer():

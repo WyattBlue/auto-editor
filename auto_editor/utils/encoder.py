@@ -1,5 +1,3 @@
-'''utils/encoder.py'''
-
 encoders = {
     'libx264': {
         'pix_fmt': {'yuv420p', 'yuvj420p', 'yuv422p', 'yuvj422p', 'yuv444p', 'yuvj444p',

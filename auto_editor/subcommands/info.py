@@ -1,5 +1,3 @@
-'''subcommands/info.py'''
-
 import sys
 import json
 import os.path

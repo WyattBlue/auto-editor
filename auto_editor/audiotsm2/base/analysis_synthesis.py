@@ -1,5 +1,3 @@
-'''audiotsm2/base/analysis_synthesis.py'''
-
 import numpy as np
 
 from auto_editor.audiotsm2.utils import (windows, CBuffer, NormalizeBuffer)

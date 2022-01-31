@@ -1,5 +1,3 @@
-'''render/subtitle.py'''
-
 import os
 import re
 

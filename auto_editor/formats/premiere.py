@@ -1,5 +1,3 @@
-'''formats/premiere.py'''
-
 import os
 from shutil import move
 

@@ -1,5 +1,3 @@
-'''formats/final_cut_pro.py'''
-
 from .utils import indent, get_width_height
 
 from platform import system

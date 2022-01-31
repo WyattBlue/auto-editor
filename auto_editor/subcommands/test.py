@@ -1,7 +1,5 @@
-'''subcommands/test.py'''
-
 """
-Test auto-editor and make sure everything is working.
+Run End2End and Unit Tests to make sure everything is working OK.
 """
 
 # Internal Libraries

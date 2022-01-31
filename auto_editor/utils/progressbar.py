@@ -1,5 +1,3 @@
-'''utils/progressbar.py'''
-
 from time import time, localtime
 from platform import system
 from shutil import get_terminal_size

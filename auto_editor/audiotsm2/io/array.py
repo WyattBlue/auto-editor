@@ -1,5 +1,3 @@
-'''audiotsm2/io/array.py'''
-
 import numpy as np
 
 class ArrReader:
