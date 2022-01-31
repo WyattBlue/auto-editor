@@ -17,6 +17,8 @@ from auto_editor.ffwrapper import FFmpeg
 from auto_editor.edit import edit_media
 
 def main_options(parser):
+    from auto_editor.objects import (TextObject, RectangleObject, EllipseObject,
+        ImageObject)
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
         frame_type, range_type, speed_range_type, block_type, margin_type)
 
@@ -27,60 +29,15 @@ def main_options(parser):
         help='Do not display any progress at all.')
 
     parser.add_text('Object Options')
-
-    basic_obj_keywords = [
-        {'start': (int, ''),},
-        {'dur': (int, ''),},
-        {'x1': (int, ''),},
-        {'y1': (int, ''),},
-        {'x2': (int, ''),},
-        {'y2': (int, ''),},
-        {'fill': (str, '#000'),},
-        {'width': (int, 0),},
-        {'outline': (str,'blue'),},
-    ]
-
-    rect = basic_obj_keywords[:]
-    rect.append({'type': 'rectangle'})
-
-    ellipse = basic_obj_keywords[:]
-    ellipse.append({'type': 'ellipse'})
-
-    parser.add_argument('--add_text', nargs='*', type=dict,
-        keywords=[
-            {'start': (int, ''),},
-            {'dur': (int, ''),},
-            {'content': (str, ''),},
-            {'x': (int, 'centerX'),},
-            {'y': (int, 'centerY'),},
-            {'size': (int, 30),},
-            {'font': (str, 'default'),},
-            {'align': (str, 'left'),},
-            {'fill': (str, '#FFF'),},
-            {'type': 'text'},
-        ],
-        help='Add a text object to the timeline.'
-    )
-    parser.add_argument('--add_rectangle', nargs='*', type=dict,
-        keywords=rect,
+    parser.add_argument('--add_text', nargs='*', dataclass=TextObject,
+        help='Add a text object to the timeline.')
+    parser.add_argument('--add_rectangle', nargs='*', dataclass=RectangleObject,
         help='Add a rectangle object to the timeline.')
-    parser.add_argument('--add_ellipse', nargs='*', type=dict,
-        keywords=ellipse,
+    parser.add_argument('--add_ellipse', nargs='*', dataclass=EllipseObject,
         help='Add an ellipse object to the timeline.',
-        manual='The x and y coordinates specify a bounding box where the ellipse is '\
+        manual='The x and y coordinates specify a bounding box where the ellipse is '
             'drawn.')
-
-    parser.add_argument('--add_image', nargs='*', type=dict,
-        keywords=[
-            {'start': (int, ''),},
-            {'dur': (int, ''),},
-            {'source': (str, ''),},
-            {'x': (int, 'centerX'),},
-            {'y': (int, 'centerY'),},
-            {'opacity': (float_type, 1),},
-            {'anchor': (str, 'ce'),},
-            {'type': 'image'},
-        ],
+    parser.add_argument('--add_image', nargs='*', dataclass=ImageObject,
         help='Add an image object onto the timeline.',
         manual='Opacity is how transparent or solid the image is. A transparency of '
             '1 or 100% is completely solid. A transparency of 0 or 0% is completely '
@@ -98,7 +55,7 @@ def main_options(parser):
         help='Given a SponsorBlock category, mark the section as silent.',
         manual='Multiple categories can be specified by using a comma: "sponsor,intro"\n'
             'This option only works on YouTube URLs, or where `--id` points to a valid '
-            'YouTube ID.\n\nCategories include: '\
+            'YouTube ID.\n\nCategories include: '
             'sponsor intro outro selfpromo interaction music_offtopic')
 
     parser.add_argument('--download_archive', type=file_type, default=None,
