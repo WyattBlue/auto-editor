@@ -1,10 +1,8 @@
-'''cutting.py'''
-
 from typing import List, Tuple, Any, NoReturn, Optional
-from auto_editor.utils.log import Log
 
 import numpy as np
 
+from auto_editor.utils.log import Log
 from auto_editor.utils.types import split_num_str
 
 def combine_audio_motion(audio_list, motion_list, based, log):

@@ -1,7 +1,4 @@
-'''utils/windows.py'''
-
 import numpy as np
-
 
 def apply(buffer, window):
     """

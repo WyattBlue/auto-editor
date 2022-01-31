@@ -1,5 +1,3 @@
-'''preview.py'''
-
 # Internal Libraries
 from datetime import timedelta
 

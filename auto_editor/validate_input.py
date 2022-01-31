@@ -1,12 +1,10 @@
-'''validate_input.py'''
-
 import os
 import re
 import sys
+from typing import Optional
 
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.log import Log
-from typing import Optional
 
 class MyLogger():
     @staticmethod

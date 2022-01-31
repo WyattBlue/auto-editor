@@ -1,5 +1,3 @@
-'''utils/effects.py'''
-
 from PIL import Image, ImageDraw, ImageFont, ImageChops
 
 def _apply_anchor(x, y, width, height, anchor):

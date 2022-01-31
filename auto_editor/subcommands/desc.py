@@ -1,5 +1,3 @@
-'''subcommands/desc.py'''
-
 import sys
 
 def desc_options(parser):

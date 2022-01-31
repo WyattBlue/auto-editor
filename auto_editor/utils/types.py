@@ -1,5 +1,3 @@
-'''utils/types.py'''
-
 from typing import Any, List, Tuple
 
 import os.path

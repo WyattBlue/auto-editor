@@ -1,5 +1,3 @@
-'''audiotsm2/phasevocoder.py'''
-
 import numpy as np
 
 from auto_editor.audiotsm2.base import AnalysisSynthesisTSM

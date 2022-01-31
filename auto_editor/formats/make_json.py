@@ -1,5 +1,3 @@
-'''formats/json_cutlist.py'''
-
 """
 Make a pre-edited file reference that can be inputted back into auto-editor.
 """

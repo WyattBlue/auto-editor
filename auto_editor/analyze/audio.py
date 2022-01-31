@@ -1,5 +1,3 @@
-'''analyze/audio.py'''
-
 import numpy as np
 import math
 

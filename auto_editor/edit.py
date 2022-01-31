@@ -1,11 +1,11 @@
-'''edit.py'''
-
 # Internal Libraries
 import os
 from typing import List, Tuple
 
+# External Libraries
 import numpy as np
 
+# Included Libraries
 from auto_editor.utils.effects import Effect
 from auto_editor.utils.log import Log
 from auto_editor.utils.func import fnone, set_output_name, append_filename

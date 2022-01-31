@@ -1,5 +1,3 @@
-'''subcommands/grep.py'''
-
 import sys
 import os
 import re

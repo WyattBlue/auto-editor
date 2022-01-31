@@ -1,5 +1,3 @@
-'''audiotsm2/utils/cbuffer.py'''
-
 import numpy as np
 
 class CBuffer():

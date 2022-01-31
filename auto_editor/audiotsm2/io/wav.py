@@ -1,5 +1,3 @@
-'''io/wav.py'''
-
 import wave
 import numpy as np
 

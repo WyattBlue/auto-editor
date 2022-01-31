@@ -1,5 +1,3 @@
-'''scipy/wavfile.py'''
-
 # Mirrored from: github.com/scipy/scipy/blob/master/scipy/io/wavfile.py
 
 import io

@@ -1,5 +1,3 @@
-'''analyze/motion.py'''
-
 # Motion detection method is based on this post:
 # pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
 

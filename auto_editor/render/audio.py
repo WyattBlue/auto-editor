@@ -1,5 +1,3 @@
-'''render/audio.py'''
-
 from auto_editor.scipy.wavfile import read
 
 from auto_editor.audiotsm2 import phasevocoder

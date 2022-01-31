@@ -1,5 +1,3 @@
-'''utils/container.py'''
-
 from typing import Any
 
 pcm_formats = [

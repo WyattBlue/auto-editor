@@ -1,5 +1,3 @@
-'''formats/shotcut.py'''
-
 from .utils import get_width_height
 from auto_editor.utils.func import aspect_ratio
 
