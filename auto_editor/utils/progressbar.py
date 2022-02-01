@@ -1,3 +1,4 @@
+import sys
 from time import time, localtime
 from platform import system
 from shutil import get_terminal_size
@@ -19,80 +20,78 @@ def _pretty_time(my_time: float, ampm: bool) -> str:
         return '{:02}:{:02} {}'.format(hours, minutes, ampm_marker)
     return '{:02}:{:02}'.format(hours, minutes)
 
-def bar(columns, title, done, togo, percent, new_time):
-    bar = '  ⏳{}: [{}{}] {}% done ETA {}'.format(title, done, togo, percent, new_time)
-    if(len(bar) > columns - 2):
-        bar = bar[:columns - 2]
-    else:
-        bar += ' ' * (columns - len(bar) - 4)
-    try:
-        print(bar, end='\r', flush=True)
-    except TypeError:
-        print(bar, end='\r')
-
 
 class ProgressBar():
     def tick(self, index):
 
-        if(self.hide):
+        if self.hide:
             return
 
-        percentDone = min(100, round((index+1) / self.total * 100, 1))
-        if(percentDone == 0): # Prevent dividing by zero.
-            percentPerSec = 0
+        percent = min(100, round((index+1) / self.total * 100, 1))
+        if percent == 0:
+            percent_rate = 0
         else:
-            percentPerSec = (time() - self.begin_time) / percentDone
+            percent_rate = (time() - self.begin_time) / percent
 
-        new_time = _pretty_time(self.begin_time + (percentPerSec * 100), self.ampm)
+        new_time = _pretty_time(self.begin_time + (percent_rate * 100), self.ampm)
 
-        if(self.machine):
+        if self.machine:
             index = min(index, self.total)
-            raw = int(self.begin_time + (percentPerSec * 100))
+            raw = int(self.begin_time + (percent_rate * 100))
             print('{}~{}~{}~{}~{}'.format(
                 self.title, index, self.total, self.begin_time, raw),
                 end='\r', flush=True)
             return
 
         columns = get_terminal_size().columns
+        bar_len = max(1, columns - (self.len_title + 50))
+        done_nums = round(percent / (100 / bar_len))
 
-        if(self.allow_unicode):
-            bar_len = max(1, columns - (self.len_title + 50))
-            done = round(percentDone / (100 / bar_len))
-            togo = '░' * int(bar_len - done)
-            bar(columns, self.title, '█' * done, togo, percentDone, new_time)
+        done = self.done_char * done_nums
+        togo = self.togo_char * int(bar_len - done_nums)
+
+        bar = f'  {self.icon}{self.title}: [{done}{togo}] {percent}% done ETA {new_time}'
+
+        if len(bar) > columns - 2:
+            bar = bar[:columns - 2]
         else:
-            print('   {}% done ETA {}'.format(percentDone, new_time))
+            bar += ' ' * (columns - len(bar) - 4)
+
+        sys.stdout.write(bar + '\r')
+        try:
+            sys.stdout.flush()
+        except AttributeError:
+            pass
 
     def start(self, total, title='Please wait'):
         self.title = title
         self.len_title = len(title)
         self.total = total
         self.begin_time = time()
-
-        if(self.allow_unicode is None):
-            self.allow_unicode = True
-            try:
-                self.tick(0)
-            except UnicodeEncodeError:
-                self.allow_unicode = False
-                self.tick(0)
-        else:
-            self.tick(0)
+        self.tick(0)
 
     @staticmethod
     def end():
-        print(' ' * max(1, get_terminal_size().columns - 2), end='\r')
+        sys.stdout.write(' ' * (get_terminal_size().columns - 2) + '\r')
 
     def __init__(self, machine_readable=False, hide=False):
         self.machine = machine_readable
         self.hide = hide
-        self.allow_unicode = None
+
+        if sys.stdout.encoding == 'utf-8':
+            self.icon = '⏳'
+            self.togo_char = '░'
+            self.done_char = '█'
+        else:
+            self.icon = '& '
+            self.togo_char = '-'
+            self.done_char = '#'
 
         self.ampm = True
-        if(system() == 'Darwin' and not self.machine):
+        if system() == 'Darwin' and not self.machine:
             try:
-                date_format = get_stdout(['defaults', 'read',
-                    'com.apple.menuextra.clock', 'DateFormat'])
+                date_format = get_stdout(['defaults', 'read', 'com.apple.menuextra.clock',
+                    'DateFormat'])
                 self.ampm = 'a' in date_format
             except FileNotFoundError:
                 pass
