@@ -101,7 +101,11 @@ def set_range(has_loud, range_syntax, fps, with_, log):
         if(str_is_number(item)):
             return int(item)
         if(str_starts_with_number(item)):
-            value, unit = split_num_str(item, log.error)
+            try:
+                value, unit = split_num_str(item)
+            except TypeError as e:
+                log.error(str(e))
+
             if(unit in ['', 'f', 'frame', 'frames']):
                 if(isinstance(value, float)):
                     log.error('float type cannot be used with frame unit')

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from auto_editor.utils.types import float_type
+from auto_editor.utils.types import float_type, anchor_type
 
 @dataclass
 class TimelineObject:
@@ -38,9 +38,9 @@ class TextObject(TimelineObject):
 
 @dataclass
 class ImageObject(TimelineObject):
-    source: str
+    src: str
     x: int = 'centerX'
     y: int = 'centerY'
     opacity: float_type = 1
-    anchor: str = 'ce'
+    anchor: anchor_type = 'ce'
     _type: str = 'image'

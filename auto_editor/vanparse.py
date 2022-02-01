@@ -315,7 +315,10 @@ class ParseOptions:
                     if next_arg is None and option['nargs'] == 1:
                         raise ParserError(f"{option['names'][0]} needs argument.")
 
-                    value = option['type'](next_arg)
+                    try:
+                        value = option['type'](next_arg)
+                    except TypeError as e:
+                        raise ParserError(str(e))
 
                     if option['choices'] is not None and value not in option['choices']:
                         option_name = option['names'][0]
