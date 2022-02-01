@@ -31,20 +31,22 @@ class Effect:
     def _values(self, val, _type):
         # just to be clear, val can only be None if the default value is None.
         # Users can't set the argument to None themselves.
-        if(val is None):
+        if val is None:
             return None
 
-        if(_type is str):
+        if _type is str:
             return str(val)
 
         for key, item in self._vars.items():
-            if(val == key):
+            if val == key:
                 return _type(item)
 
         try:
-            new_val = _type(val)
+            _type(val)
+        except TypeError as e:
+            self.log.error(str(e))
         except Exception:
-            self.log.error("variable '{}' is not defined.".format(val))
+            self.log.error(f"variable '{val}' is not defined.")
 
         return _type(val)
 
@@ -69,13 +71,7 @@ class Effect:
 
         for i, obj in enumerate(pool):
 
-            if isinstance(obj, str):
-                raise TypeError('obj is str')
-
-            dic_value = {}
-            for k, v in asdict(obj).items():
-                dic_value[k] = v
-
+            dic_value = asdict(obj)
             dic_type = {}
             for field in fields(obj):
                 dic_type[field.name] = field.type
@@ -97,19 +93,14 @@ class Effect:
                         self.log.error(f"Font '{obj.font}' not found.")
 
             if obj._type == 'image':
-                anchor_vals = ['tl', 'tr', 'bl', 'br', 'ce']
-                if obj.anchor not in anchor_vals:
-                    self.log.error('anchor must be ' + ' '.join(anchor_vals))
-
-                source = Image.open(obj.source)
+                source = Image.open(obj.src)
                 source = source.convert('RGBA')
-
-                _op = int(obj.opacity * 255)
-
                 source = ImageChops.multiply(source,
-                    Image.new('RGBA', source.size, (255, 255, 255, _op))
+                    Image.new('RGBA', source.size,
+                        (255, 255, 255, int(obj.opacity * 255))
+                    )
                 )
-                obj.source = source
+                obj.src = source
 
             self.all.append(obj)
 
@@ -137,9 +128,9 @@ class Effect:
                     fill=obj.fill, width=obj.width, outline=obj.outline)
 
             if obj._type == 'image':
-                img_w, img_h = obj.source.size
+                img_w, img_h = obj.src.size
                 pos = _apply_anchor(obj.x, obj.y, img_w, img_h, obj.anchor)
-                obj_img.paste(obj.source, pos)
+                obj_img.paste(obj.src, pos)
 
             img = Image.alpha_composite(img, obj_img)
 
