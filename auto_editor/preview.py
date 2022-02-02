@@ -1,9 +1,6 @@
 # Internal Libraries
 from datetime import timedelta
 
-# External Libraries
-import av
-
 # Included Libraries
 from auto_editor.utils.func import get_new_length
 
