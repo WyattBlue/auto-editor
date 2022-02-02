@@ -4,7 +4,6 @@ put here. No function should modify or create video/audio files on its own.
 """
 
 from typing import List, Tuple
-from auto_editor.utils.log import Log
 
 def get_stdout(cmd):
     # type: (List[str]) -> str

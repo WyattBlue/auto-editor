@@ -68,7 +68,15 @@ class ProgressBar():
         self.len_title = len(title)
         self.total = total
         self.begin_time = time()
-        self.tick(0)
+
+        try:
+            self.tick(0)
+        except UnicodeEncodeError:
+            self.icon = '& '
+            self.togo_char = '-'
+            self.done_char = '#'
+
+            self.tick(0)
 
     @staticmethod
     def end():
@@ -78,14 +86,9 @@ class ProgressBar():
         self.machine = machine_readable
         self.hide = hide
 
-        if sys.stdout.encoding == 'utf-8':
-            self.icon = '⏳'
-            self.togo_char = '░'
-            self.done_char = '█'
-        else:
-            self.icon = '& '
-            self.togo_char = '-'
-            self.done_char = '#'
+        self.icon = '⏳'
+        self.togo_char = '░'
+        self.done_char = '█'
 
         self.ampm = True
         if system() == 'Darwin' and not self.machine:

@@ -189,15 +189,11 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
     for chunk in chunks:
         if(chunk[2] != 99999):
             clips.append(chunk)
-    return clips
 
     duration = chunks[-1][1]
     pathurls = [fix_url(inp.path)]
 
     tracks = len(inp.audio_streams)
-
-    log.debug('tracks: {}'.format(tracks))
-    log.debug(inp.dirname)
 
     if(tracks > 1):
         name_without_extension = inp.basename[:inp.basename.rfind('.')]

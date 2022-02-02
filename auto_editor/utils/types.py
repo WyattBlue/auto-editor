@@ -1,5 +1,4 @@
 import os.path
-import sys
 from typing import Any, List, Tuple
 
 from .func import clean_list
