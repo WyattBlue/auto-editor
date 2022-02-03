@@ -43,4 +43,5 @@ class ImageObject(TimelineObject):
     y: int = 'centerY'
     opacity: float_type = 1
     anchor: anchor_type = 'ce'
+    rotate: float = 0 # in degrees
     _type: str = 'image'

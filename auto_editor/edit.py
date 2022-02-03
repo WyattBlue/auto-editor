@@ -6,7 +6,7 @@ from typing import List, Tuple
 import numpy as np
 
 # Included Libraries
-from auto_editor.utils.effects import Effect
+from auto_editor.sheet import Sheet
 from auto_editor.utils.log import Log
 from auto_editor.utils.func import fnone, set_output_name, append_filename
 
@@ -215,7 +215,10 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
 
     num_cuts = number_of_cuts(chunks)
 
-    effects = Effect(args, log, _vars={})
+
+    pool = args.add_text + args.add_rectangle + args.add_ellipse + args.add_image
+
+    obj_sheet = Sheet(pool, inp, chunks, log)
 
     if(args.export_as_json):
         from auto_editor.formats.make_json import make_json_cutlist
@@ -291,7 +294,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
                     video_stuff.append(('image', None, None))
                 else:
                     video_stuff.append(render_av(ffmpeg, v, inp, args, chunks, fps,
-                        progress, effects, rules, temp, log))
+                        progress, obj_sheet, rules, temp, log))
 
         log.conwrite('Writing the output file.')
 

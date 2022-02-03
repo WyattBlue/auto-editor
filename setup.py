@@ -40,7 +40,7 @@ setup(
     install_requires=[
         'numpy>=1.21.0',
         'yt-dlp>=2022.1.21',
-        'pillow==9.0.0',
+        'pillow==9.0.1',
         'av==8.1.0',
         'opencv-python>=4.5.5.62',
     ],
