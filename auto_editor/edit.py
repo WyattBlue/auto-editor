@@ -10,7 +10,8 @@ from auto_editor.sheet import Sheet
 from auto_editor.utils.log import Log
 from auto_editor.utils.func import fnone, set_output_name, append_filename
 
-def get_chunks(inp, segment, fps, args, log, audio_samples=None, sample_rate=None):
+def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
+    sample_rate=None):
     from auto_editor.cutting import (combine_audio_motion, combine_segment, to_speed_list,
         set_range, chunkify, apply_mark_as, apply_margin, seconds_to_frames, cook)
 
@@ -47,7 +48,7 @@ def get_chunks(inp, segment, fps, args, log, audio_samples=None, sample_rate=Non
             if(len(inp.video_streams) == 0):
                 motion_list = get_np_list(inp, audio_samples, sample_rate, fps, np.ones)
             else:
-                motion_list = motion_detection(inp, args.motion_threshold, log,
+                motion_list = motion_detection(inp, args.motion_threshold, progress, log,
                     width=args.md_width, dilates=args.md_dilates, blur=args.md_blur)
 
         if(audio_list is not None and motion_list is not None):
@@ -203,8 +204,12 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         from auto_editor.scipy.wavfile import read
         sample_rate, audio_samples = read(temp_file)
 
-    if(chunks is None):
-        chunks = get_chunks(inp, segment, fps, args, log, audio_samples, sample_rate)
+    if chunks is None:
+        chunks = get_chunks(inp, segment, fps, args, progress, log, audio_samples,
+            sample_rate)
+
+    if len(chunks) == 1 and chunks[0][2] == 99999:
+        log.error('The entire media is cut!')
 
     def is_clip(chunk: Tuple[int, int, float]) -> bool:
         return chunk[2] != 99999
