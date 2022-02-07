@@ -20,7 +20,7 @@ def main_options(parser):
     from auto_editor.objects import (TextObject, RectangleObject, EllipseObject,
         ImageObject)
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
-        frame_type, range_type, speed_range_type, block_type, margin_type)
+        frame_type, range_type, speed_range_type, block_type, margin_type, color_type)
 
     parser.add_text('Progress Options')
     parser.add_argument('--machine_readable_progress', action='store_true',
@@ -106,7 +106,7 @@ def main_options(parser):
         help='Scale the output media file by a certain factor.')
 
     parser.add_text('Miscellaneous Options')
-    parser.add_argument('--background', type=str, default='#000',
+    parser.add_argument('--background', type=color_type, default='#000',
         help='Set the color of the background that is visible when the video is moved.')
     parser.add_argument('--combine_files', action='store_true',
         help='Combine all input files into one before editing.')
