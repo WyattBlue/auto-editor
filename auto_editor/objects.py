@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
-from auto_editor.utils.types import float_type, anchor_type, color_type
+from auto_editor.utils.types import (
+    float_type, anchor_type, color_type, text_content, align_type
+)
 
 @dataclass
 class TimelineObject:
@@ -8,32 +10,40 @@ class TimelineObject:
     dur: int
 
 @dataclass
-class _Basic(TimelineObject):
-    x1: int
-    y1: int
-    x2: int
-    y2: int
-    fill: color_type = '#000'
-    width: int = 0
-    outline: color_type = 'blue'
-
-@dataclass
-class RectangleObject(_Basic):
+class RectangleObject(TimelineObject):
+    x: int
+    y: int
+    width: int
+    height: int
+    anchor: anchor_type = 'ce'
+    fill: color_type = '#c4c4c4'
+    stroke: int = 0
+    strokecolor: color_type = '#000'
     _type: str = 'rectangle'
 
 @dataclass
-class EllipseObject(_Basic):
+class EllipseObject(TimelineObject):
+    x: int
+    y: int
+    width: int
+    height: int
+    anchor: anchor_type = 'ce'
+    fill: color_type = '#c4c4c4'
+    stroke: int = 0
+    strokecolor: color_type = '#000'
     _type: str = 'ellipse'
 
 @dataclass
 class TextObject(TimelineObject):
-    content: str
+    content: text_content
     x: int = 'centerX'
     y: int = 'centerY'
     size: int = 30
     font: str = 'default'
-    align: str = 'left'
-    fill: color_type = '#FFF'
+    align: align_type = 'left'
+    fill: color_type = '#000'
+    stroke: int = 0
+    strokecolor: color_type = '#000'
     _type: str = 'text'
 
 @dataclass

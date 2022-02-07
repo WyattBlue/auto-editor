@@ -103,6 +103,16 @@ def speed_range_type(inp):
 def block_type(inp):
     return comma_type(inp, 1, None, 'block_type')
 
+def text_content(val: str):
+    return val.replace('\\n', '\n')
+
+def align_type(val: str):
+    allowed = ('left', 'right', 'center')
+    if val not in allowed:
+        raise TypeError('Align must be: ' + ' '.join(allowed))
+    return val
+
+
 def color_type(val: str):
     """
     Convert a color str into an RGB tuple

@@ -28,6 +28,33 @@ def apply_anchor(x, y, width, height, anchor):
     # Pillow uses 'tl' by default
     return x, y
 
+def one_pos_two_pos(x, y, width, height, anchor):
+    """Convert: x, y, width, height -> x1, y1, x2, y2"""
+
+    if anchor == 'ce':
+        x1 = x - int(width / 2)
+        x2 = x + int(width / 2)
+        y1 = y - int(height / 2)
+        y2 = y + int(height / 2)
+
+        return x1, y1, x2, y2
+
+    if anchor in ('tr', 'br'):
+        x1 = x - width
+        x2 = x
+    else:
+        x1 = x
+        x2 = x + width
+
+    if anchor in ('tl', 'tr'):
+        y1 = y
+        y2 = y + height
+    else:
+        y1 = y
+        y2 = y - height
+
+    return x1, y1, x2, y2
+
 
 def set_static_assets(all_objects, log):
     """Save reloading the same thing over and over."""
@@ -76,15 +103,20 @@ def render_objects(sheet, all_objects, index, frame, pix_fmt):
         if obj._type == 'text':
             text_w, text_h = draw.textsize(obj.content, font=obj.font)
             pos = apply_anchor(obj.x, obj.y, text_w, text_h, 'ce')
-            draw.text(pos, obj.content, font=obj.font, fill=obj.fill)
+            draw.text(pos, obj.content, font=obj.font, fill=obj.fill, align=obj.align,
+                stroke_width=obj.stroke, stroke_fill=obj.strokecolor)
 
         if obj._type == 'rectangle':
-            draw.rectangle([obj.x1, obj.y1, obj.x2, obj.y2],
-                fill=obj.fill, width=obj.width, outline=obj.outline)
+            draw.rectangle(
+                one_pos_two_pos(obj.x, obj.y, obj.width, obj.height, obj.anchor),
+                fill=obj.fill, width=obj.stroke, outline=obj.strokecolor
+            )
 
         if obj._type == 'ellipse':
-            draw.ellipse([obj.x1, obj.y1, obj.x2, obj.y2],
-                fill=obj.fill, width=obj.width, outline=obj.outline)
+            draw.ellipse(
+                one_pos_two_pos(obj.x, obj.y, obj.width, obj.height, obj.anchor),
+                fill=obj.fill, width=obj.stroke, outline=obj.strokecolor
+            )
 
         if obj._type == 'image':
             img_w, img_h = obj.src.size

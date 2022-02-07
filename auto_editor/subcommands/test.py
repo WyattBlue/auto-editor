@@ -493,7 +493,7 @@ def main(sys_args=None):
             [ffprobe.getResolution, '640x360'],
         )
         run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--add_rectangle',
-            '0,30,0,200,100,300,#43FA56,10'])
+            '0,30,0,200,100,300,fill=#43FA56,stroke=10'])
         os.remove('testsrc_ALTERED.mp4')
         os.remove('testsrc.mp4')
     tester.run_test('effect_tests', effect_tests,
