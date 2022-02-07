@@ -15,13 +15,17 @@ class Sheet:
         if ending[-1][2] == 99999:
             ending.pop()
 
+        end = 0
+        if ending:
+            end = ending[-1][1]
+
         _vars = {
             'width': width,
             'height': height,
             'centerX': width // 2,
             'centerY': height // 2,
             'start': 0,
-            'end': ending[-1][1],
+            'end': end,
         }
 
         self.all = []

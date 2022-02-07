@@ -44,7 +44,7 @@ class ProgressBar():
             return
 
         columns = get_terminal_size().columns
-        bar_len = max(1, columns - (self.len_title + 50))
+        bar_len = max(1, columns - (self.len_title + 36))
         done_nums = round(percent / (100 / bar_len))
 
         done = self.done_char * done_nums

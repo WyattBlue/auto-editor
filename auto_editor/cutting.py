@@ -8,46 +8,48 @@ from auto_editor.utils.types import split_num_str
 def combine_audio_motion(audio_list, motion_list, based, log):
     # type: (np.ndarray, np.ndarray, str, Log) -> Optional[np.ndarray]
 
-    if(based == 'audio' or based == 'not_audio'):
-        if(max(audio_list) == 0):
-            log.error('There was no place where audio exceeded the threshold.')
-    if(based == 'motion' or based == 'not_motion'):
-        if(max(motion_list) == 0):
-            log.error('There was no place where motion exceeded the threshold.')
+    no_place_where = "There was no place where {} exceeded the threshold."
 
-    if(audio_list is not None and max(audio_list) == 0):
-        log.warning('There was no place where audio exceeded the threshold.')
-    if(motion_list is not None and max(motion_list) == 0):
-        log.warning('There was no place where motion exceeded the threshold.')
+    if (based == 'audio' or based == 'not_audio') and max(audio_list) == 0:
+        log.error(no_place_where.format('audio'))
 
-    if(based == 'audio'):
+    if (based == 'motion' or based == 'not_motion') and max(motion_list) == 0:
+        log.error(no_place_where.format('motion'))
+
+    if audio_list is not None and max(audio_list) == 0:
+        log.warning(no_place_where.format('audio'))
+
+    if motion_list is not None and max(motion_list) == 0:
+        log.warning(no_place_where.format('motion'))
+
+    if based == 'audio':
         return audio_list
 
-    if(based == 'motion'):
+    if based == 'motion':
         return motion_list
 
-    if(based == 'not_audio'):
+    if based == 'not_audio':
         return np.invert(audio_list)
 
-    if(based == 'not_motion'):
+    if based == 'not_motion':
         return np.invert(motion_list)
 
-    if(based == 'audio_and_motion'):
+    if based == 'audio_and_motion':
         return audio_list & motion_list
 
-    if(based == 'audio_or_motion'):
+    if based == 'audio_or_motion':
         return audio_list | motion_list
 
-    if(based == 'audio_xor_motion'):
+    if based == 'audio_xor_motion':
         return np.bitwise_xor(audio_list, motion_list)
 
-    if(based == 'audio_and_not_motion'):
+    if based == 'audio_and_not_motion':
         return audio_list & np.invert(motion_list)
 
-    if(based == 'not_audio_and_motion'):
+    if based == 'not_audio_and_motion':
         return np.invert(audio_list) & motion_list
 
-    if(based == 'not_audio_and_not_motion'):
+    if based == 'not_audio_and_not_motion':
         return np.invert(audio_list) & np.invert(motion_list)
     return None
 
