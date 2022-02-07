@@ -13,21 +13,6 @@ allowed_pix_fmt = {'yuv420p', 'yuvj420p', 'rgb24', 'bgr24', 'argb', 'rgba',
 def pix_fmt_allowed(pix_fmt: str) -> bool:
     return pix_fmt in allowed_pix_fmt
 
-class Wrapper:
-    """
-    Wrapper which only exposes the `read` method to avoid PyAV
-    trying to use `seek`.
-    From: github.com/PyAV-Org/PyAV/issues/578#issuecomment-621362337
-    """
-
-    name = "<wrapped>"
-
-    def __init__(self, fh):
-        self._fh = fh
-
-    def read(self, buf_size):
-        return self._fh.read(buf_size)
-
 
 def apply_anchor(x, y, width, height, anchor):
     if anchor == 'ce':
@@ -117,7 +102,7 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     except ImportError:
         log.error("av python module not installed. Run 'pip install av'")
 
-    if len(effects.sheet) == 0:
+    if len(effects.sheet) > 0:
         try:
             from PIL import Image, ImageDraw, ImageFont, ImageChops
         except ImportError:
@@ -132,12 +117,10 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     container = av.open(inp.path, 'r')
     pix_fmt = container.streams.video[track].pix_fmt
 
+    target_pix_fmt = pix_fmt
+
     if not pix_fmt_allowed(pix_fmt):
-        pix_fmt = 'yuv420p'
-        cmd = ['-i', inp.path, '-map', f'0:v:{track}', '-f', 'matroska', '-pix_fmt', pix_fmt,
-            '-vcodec', 'rawvideo', 'pipe:1']
-        wrapper = Wrapper(ffmpeg.Popen(cmd).stdout)
-        container = av.open(wrapper, 'r')
+        target_pix_fmt = 'yuv420p'
 
     my_codec = get_vcodec(args, inp, rules)
 
@@ -162,8 +145,8 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     spedup = os.path.join(temp, f'spedup{track}.mp4')
 
     cmd = ['-hide_banner', '-y', '-f', 'rawvideo', '-c:v', 'rawvideo',
-        '-pix_fmt', pix_fmt, '-s', f'{width}*{height}', '-framerate', str(fps),
-        '-i', '-', '-pix_fmt', pix_fmt]
+        '-pix_fmt', target_pix_fmt, '-s', f'{width}*{height}', '-framerate', str(fps),
+        '-i', '-', '-pix_fmt', target_pix_fmt]
 
     if apply_video_later:
         cmd.extend(['-c:v', 'mpeg4', '-qscale:v', '1'])
@@ -195,8 +178,10 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
             while input_equavalent > output_equavalent:
                 if index in effects.sheet:
                     frame = render_objects(
-                        effects.sheet, effects.all, index, frame, pix_fmt
+                        effects.sheet, effects.all, index, frame, target_pix_fmt
                     )
+                elif pix_fmt != target_pix_fmt:
+                    frame = frame.reformat(format=target_pix_fmt)
 
                 in_bytes = frame.to_ndarray().tobytes()
                 process2.stdin.write(in_bytes)
