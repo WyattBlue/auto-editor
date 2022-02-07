@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from auto_editor.utils.types import float_type, anchor_type
+from auto_editor.utils.types import float_type, anchor_type, color_type
 
 @dataclass
 class TimelineObject:
@@ -13,9 +13,9 @@ class _Basic(TimelineObject):
     y1: int
     x2: int
     y2: int
-    fill: str = '#000'
+    fill: color_type = '#000'
     width: int = 0
-    outline: str = 'blue'
+    outline: color_type = 'blue'
 
 @dataclass
 class RectangleObject(_Basic):
@@ -33,7 +33,7 @@ class TextObject(TimelineObject):
     size: int = 30
     font: str = 'default'
     align: str = 'left'
-    fill: str = '#FFF'
+    fill: color_type = '#FFF'
     _type: str = 'text'
 
 @dataclass

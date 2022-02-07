@@ -90,16 +90,16 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     from auto_editor.utils.container import get_rules
 
     chunks = None
-    if(inp.ext == '.json'):
-        from auto_editor.formats.make_json import read_json_cutlist
+    if inp.ext == '.json':
+        from auto_editor.formats.timeline import read_json_timeline
 
-        input_path, chunks = read_json_cutlist(inp.path, log)
+        args.background, input_path, chunks = read_json_timeline(inp.path, log)
         inp = ffmpeg.file_info(input_path)
 
         output_path = set_output_name(inp.path, inp.ext, data_file, args)
     else:
         output_path = args.output_file[i]
-        if(not os.path.isdir(inp.path) and os.path.splitext(output_path)[1] == ''):
+        if not os.path.isdir(inp.path) and os.path.splitext(output_path)[1] == '':
             output_path = set_output_name(output_path, inp.ext, data_file, args)
 
     log.debug('{} -> {}'.format(inp.path, output_path))
@@ -221,13 +221,14 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     obj_sheet = Sheet(pool, inp, chunks, log)
 
     if(args.export_as_json):
-        from auto_editor.formats.make_json import make_json_cutlist
-        make_json_cutlist(inp.path, output_path, chunks, log)
+        from auto_editor.formats.timeline import make_json_timeline
+        make_json_timeline(inp.path, output_path, obj_sheet, chunks, fps, args.background,
+            log)
         return num_cuts, output_path
 
     if(args.timeline):
-        from auto_editor.formats.make_json import make_json_cutlist
-        make_json_cutlist(inp.path, 0, chunks, log)
+        from auto_editor.formats.timeline import make_json_timeline
+        make_json_timeline(inp.path, 0, obj_sheet, chunks, fps, args.background, log)
         return num_cuts, None
 
     if(args.preview):
