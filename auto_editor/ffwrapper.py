@@ -88,6 +88,7 @@ class FFmpeg():
             r'Error setting option .* to value .*\.',
             r"Undefined constant or missing '.*' in '.*'",
             r'DLL .* failed to open',
+            r"Incompatible pixel format '.*' for codec '[A-Za-z0-9_]*'",
         ]
 
         if(self.debug):
