@@ -71,11 +71,9 @@ def main_options(parser):
         range='0 to 1',
         help='How much motion is required to be considered "moving"')
     parser.add_blank()
-    parser.add_argument('--md_dilates', type=int, default=2, range='0 to 5',
-        help='Set how many times a frame is dilated before being compared.')
     parser.add_argument('--md_width', type=int, default=400, range='1 to Infinity',
         help="Scale the frame to this width before being compared.")
-    parser.add_argument('--md_blur', type=int, default=21, range='0 to Infinity',
+    parser.add_argument('--md_blur', type=int, default=9, range='0 to Infinity',
         help='Set the strength of the blur applied to a frame before being compared.')
 
     parser.add_text('Exporting as Media Options')
@@ -327,8 +325,6 @@ def main():
             log.error('Constant rate factor (crf) must be between 0-51.')
     if(args.md_width < 1):
         log.error('--md_width cannot be less than 1.')
-    if(args.md_dilates < 0):
-        log.error('--md_dilates cannot be less than 0')
 
     def write_starting_message(args):
         if(args.export_to_premiere):

@@ -27,7 +27,6 @@ jobs:
         sudo apt install ffmpeg
     - name: Install Auto-Editor
       run: |
-        pip install opencv-python
         python3 setup.py install
     - name: Test
       run: |

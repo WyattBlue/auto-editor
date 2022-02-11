@@ -63,7 +63,7 @@ def main(sys_args=sys.argv[1:]):
 
         from auto_editor.analyze.motion import display_motion_levels
 
-        display_motion_levels(inp, width=400, dilates=2, blur=21)
+        display_motion_levels(inp.path, width=400, blur=9)
 
     log.cleanup()
 

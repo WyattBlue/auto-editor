@@ -42,7 +42,6 @@ setup(
         'yt-dlp>=2022.1.21',
         'pillow==9.0.1',
         'av==8.1.0',
-        'opencv-python>=4.5.5.62',
     ],
     python_requires='>=3.8,<3.12',
     classifiers=[
