@@ -26,35 +26,35 @@ def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
         # type: (...) -> np.ndarray
         from auto_editor.analyze.generic import get_np_list
 
-        if(args.edit_based_on == 'none'):
-            return get_np_list(inp, audio_samples, sample_rate, fps, np.ones)
-        if(args.edit_based_on == 'all'):
-            return get_np_list(inp, audio_samples, sample_rate, fps, np.zeros)
+        if args.edit_based_on == 'none':
+            return get_np_list(inp.path, audio_samples, sample_rate, fps, np.ones)
+        if args.edit_based_on == 'all':
+            return get_np_list(inp.path, audio_samples, sample_rate, fps, np.zeros)
 
         audio_list, motion_list = None, None
 
-        if('audio' in args.edit_based_on):
+        if 'audio' in args.edit_based_on:
             from auto_editor.analyze.audio import audio_detection
 
-            if(audio_samples is None):
-                audio_list = get_np_list(inp, audio_samples, sample_rate, fps, np.ones)
+            if audio_samples is None:
+                audio_list = get_np_list(inp.path, audio_samples, sample_rate, fps, np.ones)
             else:
                 audio_list = audio_detection(audio_samples, sample_rate,
                     args.silent_threshold, fps, log)
 
-        if('motion' in args.edit_based_on):
+        if 'motion' in args.edit_based_on:
             from auto_editor.analyze.motion import motion_detection
 
-            if(len(inp.video_streams) == 0):
-                motion_list = get_np_list(inp, audio_samples, sample_rate, fps, np.ones)
+            if len(inp.video_streams) == 0:
+                motion_list = get_np_list(inp.path, audio_samples, sample_rate, fps, np.ones)
             else:
-                motion_list = motion_detection(inp, args.motion_threshold, progress, log,
-                    width=args.md_width, dilates=args.md_dilates, blur=args.md_blur)
+                motion_list = motion_detection(inp.path, fps, args.motion_threshold,
+                    progress, args.md_width, args.md_blur)
 
-        if(audio_list is not None and motion_list is not None):
-            if(len(audio_list) > len(motion_list)):
+        if audio_list is not None and motion_list is not None:
+            if len(audio_list) > len(motion_list):
                 audio_list = audio_list[:len(motion_list)]
-            elif(len(motion_list) > len(audio_list)):
+            elif len(motion_list) > len(audio_list):
                 motion_list = motion_list[:len(audio_list)]
 
         return combine_audio_motion(audio_list, motion_list, args.edit_based_on, log)

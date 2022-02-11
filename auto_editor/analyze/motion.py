@@ -1,119 +1,102 @@
-import cv2
+import av
 import numpy as np
+from PIL import Image, ImageOps, ImageChops, ImageFilter
 
-from auto_editor.ffwrapper import File
-from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 
-def resize(image, width=None, height=None, inter=cv2.INTER_AREA):
-    if width is None and height is None:
-        return image
 
-    h, w = image.shape[:2]
-    if width is None:
-        r = height / h
-        dim = (int(w * r), height)
-    else:
-        r = width / w
-        dim = (width, int(h * r))
-
-    return cv2.resize(image, dim, interpolation=inter)
+def new_size(size, width):
+    h, w = size
+    r = width / w
+    return width, int(h * r)
 
 
-def display_motion_levels(inp: File, width: int, dilates: int, blur: int):
-    import sys
+def display_motion_levels(path: str, width: int, blur: int):
 
-    cap = cv2.VideoCapture(inp.path)
+    # TODO: Overwrite level when index is repeated. (Occurs in VFR videos)
 
-    prev_frame = None
-    gray = None
+    container = av.open(path, 'r')
+
+    video_stream = container.streams.video[0]
+    video_stream.thread_type = 'AUTO'
+
+    prev_image = None
+    image = None
     total_pixels = None
 
-    while cap.isOpened():
-        if(gray is None):
-            prev_frame = None
+    for frame in container.decode(video_stream):
+        if image is None:
+            prev_image = None
         else:
-            prev_frame = gray
+            prev_image = image
 
-        ret, frame = cap.read()
-        if(not ret):
-            break
+        image = frame.to_image()
 
-        frame = resize(frame, width=width)
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        if(blur > 0):
-            gray = cv2.GaussianBlur(gray, (blur, blur), 0)
+        if total_pixels is None:
+            total_pixels = image.size[0] * image.size[1]
 
-        if(prev_frame is not None):
-            frame_delta = cv2.absdiff(prev_frame, gray)
-            thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
+        image.thumbnail(new_size(image.size, width))
+        image = ImageOps.grayscale(image)
 
-            if(dilates > 0):
-                thresh = cv2.dilate(thresh, None, iterations=dilates)
-
-            if(total_pixels is None):
-                total_pixels = thresh.shape[0] * thresh.shape[1]
-
-            sys.stdout.write('{:.20f}\n'.format(np.count_nonzero(thresh) / total_pixels))
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-# Motion detection method is based on this post:
-# pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
-
-def motion_detection(inp: File, threshold: float, progress: ProgressBar, log: Log,
-    width: int, dilates: int, blur: int) -> np.ndarray:
-
-    cap = cv2.VideoCapture(inp.path)
-
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) + 1
-    log.debug(f' - cv2 total frames: {total_frames}')
-
-    prev_frame = None
-    gray = None
-    has_motion = np.zeros((total_frames), dtype=np.bool_)
-    total_pixels = None
-
-    progress.start(total_frames, 'Analyzing motion')
-
-    while cap.isOpened():
-        if gray is None:
-            prev_frame = None
-        else:
-            prev_frame = gray
-
-        ret, frame = cap.read()
-
-        if not ret:
-            break
-
-        cframe = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # current frame
-
-        frame = resize(frame, width=width)
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # Convert frame to grayscale.
         if blur > 0:
-            gray = cv2.GaussianBlur(gray, (blur, blur), 0)
+            image = image.filter(ImageFilter.GaussianBlur(radius=blur))
 
-        if prev_frame is not None:
-            frame_delta = cv2.absdiff(prev_frame, gray)
-            thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
+        if prev_image is not None:
+            count = np.count_nonzero(ImageChops.difference(prev_image, image))
 
-            # Dilate the thresholded image to fill in holes.
-            if dilates > 0:
-                thresh = cv2.dilate(thresh, None, iterations=dilates)
+            sys.stdout.write('{:.20f}\n'.format(count))
 
-            if total_pixels is None:
-                total_pixels = thresh.shape[0] * thresh.shape[1]
 
-            if np.count_nonzero(thresh) / total_pixels >= threshold:
-                has_motion[cframe] = True
+def motion_detection(path: str, fps: float, threshold: float, progress: ProgressBar,
+    width: int, blur: int) -> np.ndarray:
 
-        progress.tick(cframe)
+    container = av.open(path, 'r')
 
-    cap.release()
-    cv2.destroyAllWindows()
+    video_stream = container.streams.video[0]
+    video_stream.thread_type = 'AUTO'
+
+    inaccurate_dur = int(float(video_stream.duration * video_stream.time_base) * fps)
+
+    progress.start(inaccurate_dur, 'Analyzing motion')
+
+    prev_image = None
+    image = None
+    total_pixels = None
+    index = 0
+
+    has_motion = np.zeros((1024), dtype=np.bool_)
+
+    for frame in container.decode(video_stream):
+        if image is None:
+            prev_image = None
+        else:
+            prev_image = image
+
+        index = int(frame.time * fps)
+
+        progress.tick(index)
+
+        if index > len(has_motion) - 1:
+            has_motion = np.concatenate(
+                (has_motion, np.zeros((len(has_motion)), dtype=np.bool_)), axis=0
+            )
+
+        image = frame.to_image()
+
+        if total_pixels is None:
+            total_pixels = image.size[0] * image.size[1]
+
+        image.thumbnail(new_size(image.size, width))
+        image = ImageOps.grayscale(image)
+
+        if blur > 0:
+            image = image.filter(ImageFilter.GaussianBlur(radius=blur))
+
+        if prev_image is not None:
+            count = np.count_nonzero(ImageChops.difference(prev_image, image))
+
+            if count / total_pixels >= threshold:
+                has_motion[index] = True
 
     progress.end()
-
-    return has_motion
+    return has_motion[:index]
