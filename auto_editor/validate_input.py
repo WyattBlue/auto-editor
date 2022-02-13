@@ -74,9 +74,7 @@ def download_video(my_input, args, ffmpeg, log: Log):
     try:
         import yt_dlp
     except ImportError:
-        log.error(
-            'Download the yt-dlp python library to download URLs.\n   pip3 install yt-dlp'
-        )
+        log.import_error('yt-dlp')
 
     if not os.path.isfile(outtmpl):
         ytbar = ProgressBar(100, 'Downloading')

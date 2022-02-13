@@ -65,7 +65,7 @@ def set_static_assets(all_objects, log):
         try:
             from PIL import Image, ImageDraw, ImageFont, ImageChops
         except ImportError:
-            log.error("Python module pillow not installed. Run 'pip install pillow'")
+            log.import_error('Pillow')
 
     for obj in all_objects:
         if obj._type == 'text':
@@ -136,7 +136,7 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     try:
         import av
     except ImportError:
-        log.error("av python module not installed. Run 'pip install av'")
+        log.import_error('av')
 
     if chunks[-1][2] == 99999:
         chunks.pop()
