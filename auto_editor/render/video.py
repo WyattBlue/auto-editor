@@ -59,9 +59,13 @@ def one_pos_two_pos(x, y, width, height, anchor):
 def set_static_assets(all_objects, log):
     """Save reloading the same thing over and over."""
 
-    from PIL import Image, ImageFont, ImageChops
-
     new_objects = []
+
+    if len(all_objects) > 0:
+        try:
+            from PIL import Image, ImageDraw, ImageFont, ImageChops
+        except ImportError:
+            log.error("Python module pillow not installed. Run 'pip install pillow'")
 
     for obj in all_objects:
         if obj._type == 'text':
@@ -133,12 +137,6 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
         import av
     except ImportError:
         log.error("av python module not installed. Run 'pip install av'")
-
-    if len(effects.sheet) > 0:
-        try:
-            from PIL import Image, ImageDraw, ImageFont, ImageChops
-        except ImportError:
-            log.error("pillow python module not installed. Run 'pip install pillow'")
 
     if chunks[-1][2] == 99999:
         chunks.pop()
