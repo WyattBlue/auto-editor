@@ -170,7 +170,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
 
     sample_rate = None
 
-    if(args.cut_by_this_track >= tracks and 'cut_by_this_track' in args._set):
+    if args.cut_by_this_track >= tracks and args.cut_by_this_track != 0:
         message = "You choose a track that doesn't exist.\nThere "
         if(tracks == 1):
             message += 'is only {} track.\n'.format(tracks)
