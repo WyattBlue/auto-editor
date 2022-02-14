@@ -1,4 +1,8 @@
+import re
 import sys
+import difflib
+import textwrap
+from shutil import get_terminal_size
 
 class ParserError(Exception):
     pass
@@ -14,10 +18,6 @@ def indent(text, prefix, predicate=None):
     return ''.join(prefixed_lines())
 
 def out(text):
-    import re
-    import textwrap
-
-    from shutil import get_terminal_size
     width = get_terminal_size().columns - 3
 
     indent_regex = re.compile(r'^(\s+)')
@@ -93,8 +93,7 @@ def get_option(item, the_args):
                     return option
     return None
 
-def _to_key(val):
-    # (val: dict) -> str
+def _to_key(val: dict) -> str:
     return val['names'][0].replace('-', '')
 
 class ArgumentParser:
@@ -111,7 +110,6 @@ class ArgumentParser:
             'action': 'default',
             'range': None,
             'choices': None,
-            'group': None,
             'help': '',
             'dataclass': None,
             'hidden': False,
@@ -119,17 +117,11 @@ class ArgumentParser:
         }
 
     def add_argument(self, *args, **kwargs):
-        my_dict = {
-            'names': list(args),
-        }
+        my_dict = self.kwarg_defaults.copy()
+        my_dict['names'] = args
 
-        for key, item in self.kwarg_defaults.items():
-            my_dict[key] = item
-
-        for key, item in kwargs.items():
-            if key not in self.kwarg_defaults:
-                raise ValueError('key {} not found.'.format(key))
-            my_dict[key] = item
+        for key, val in kwargs.items():
+            my_dict[key] = val
 
         self.args.append(my_dict)
 
@@ -213,10 +205,14 @@ class ParseOptions:
 
     def __init__(self, sys_args, *args):
         # Set the default options.
+        option_names = []
         for options in args:
             for option in options:
                 if option['action'] == 'text' or option['action'] == 'blank':
                     continue
+
+                for name in option['names']:
+                    option_names.append(name)
 
                 key = _to_key(option)
                 if option['action'] == 'store_true':
@@ -234,36 +230,13 @@ class ParseOptions:
         # Figure out command line options changed by user.
         my_list = []
         used_options = []
-        _set = []
         setting_inputs = True
         option_list = 'input'
         list_type = str
         i = 0
         while i < len(sys_args):
             item = sys_args[i]
-            label = 'option' if item.startswith('--') else 'short'
-
             option = get_option(item, the_args=args)
-
-            def error_message(args, item, label):
-                import difflib
-
-                def all_names(args):
-                    name_set = set()
-                    for options in args:
-                        for opt in options:
-                            if opt['action'] not in ['text', 'blank']:
-                                for names in opt['names']:
-                                    name_set.add(names)
-                    return name_set
-
-                opt_list = all_names(args)
-
-                close_matches = difflib.get_close_matches(item, opt_list)
-                if close_matches:
-                    return 'Unknown {}: {}\n\n    Did you mean:\n        '.format(
-                        label, item) + ', '.join(close_matches)
-                return 'Unknown {}: {}'.format(label, item)
 
             if option is None:
                 # Unknown Option!
@@ -277,7 +250,19 @@ class ParseOptions:
 
                     my_list.append(item)
                 else:
-                    raise ParserError(error_message(args, item, label))
+                    label = 'option' if item.startswith('--') else 'short'
+
+                    # 'Did you mean' message might appear that options need a comma.
+                    if item.replace(',', '') in option_names:
+                        raise ParserError(f"Option '{item}' has an unnecessary comma.")
+
+                    close_matches = difflib.get_close_matches(item, option_names)
+                    if close_matches:
+                        raise ParserError(
+                            'Unknown {}: {}\n\n    Did you mean:\n        '.format(
+                            label, item) + ', '.join(close_matches)
+                        )
+                    raise ParserError(f'Unknown {label}: {item}')
             else:
                 # We found the option.
                 if option_list is not None:
@@ -290,13 +275,14 @@ class ParseOptions:
                 option_list = None
                 my_list = []
 
+                option_name = option['names'][0]
+
                 if option in used_options:
-                    raise ParserError('Cannot repeat option {} twice.'.format(option['names'][0]))
+                    raise ParserError(f'Cannot repeat option {option_name} twice.')
 
                 used_options.append(option)
 
                 key = _to_key(option)
-                _set.append(key)
 
                 next_arg = None if i == len(sys_args) - 1 else sys_args[i+1]
                 if next_arg == '-h' or next_arg == '--help':
@@ -313,7 +299,7 @@ class ParseOptions:
                     value = False
                 else:
                     if next_arg is None and option['nargs'] == 1:
-                        raise ParserError(f"{option['names'][0]} needs argument.")
+                        raise ParserError(f"{option_name} needs argument.")
 
                     try:
                         value = option['type'](next_arg)
@@ -321,7 +307,6 @@ class ParseOptions:
                         raise ParserError(str(e))
 
                     if option['choices'] is not None and value not in option['choices']:
-                        option_name = option['names'][0]
                         my_choices = ', '.join(option['choices'])
 
                         raise ParserError(f'{value} is not a choice for {option_name}\n'
@@ -335,7 +320,7 @@ class ParseOptions:
                 setattr(self, option_list, list(map(list_type, my_list)))
             else:
                 setattr(self, option_list, my_list)
-        setattr(self, '_set', _set)
+
         if self.help:
             print_program_help(args)
             sys.exit()
