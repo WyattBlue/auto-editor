@@ -3,7 +3,7 @@ import sys
 import time
 
 def create_options(parser):
-    parser.add_argument('--frame_rate', '-fps', '-r', type=float, default=30.0,
+    parser.add_argument('--frame-rate', '-fps', '-r', type=float, default=30.0,
         help='set the framerate for the output video.')
     parser.add_argument('--duration', '-d', type=int, default=10,
         help='set the length of the video (in seconds).')
@@ -11,11 +11,11 @@ def create_options(parser):
         help='set the pixel width of the video.')
     parser.add_argument('--height', type=int, default=720,
         help='set the pixel height of the video.')
-    parser.add_argument('--output_file', '--output', '-o', type=str,
+    parser.add_argument('--output-file', '--output', '-o', type=str,
         default='testsrc.mp4')
-    parser.add_argument('--ffmpeg_location', default=None,
+    parser.add_argument('--ffmpeg-location', default=None,
         help='point to your custom ffmpeg file.')
-    parser.add_argument('--my_ffmpeg', action='store_true',
+    parser.add_argument('--my-ffmpeg', action='store_true',
         help='use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')

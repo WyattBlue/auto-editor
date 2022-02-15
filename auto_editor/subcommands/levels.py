@@ -4,9 +4,9 @@ def levels_options(parser):
     parser.add_argument('--kind', type=str, default='audio')
     parser.add_argument('--track', type=int, default=0,
         help='what audio/video track to get. If --kind is set to motion, track will look at video streams.')
-    parser.add_argument('--ffmpeg_location', default=None,
+    parser.add_argument('--ffmpeg-location', default=None,
         help='point to your custom ffmpeg file.')
-    parser.add_argument('--my_ffmpeg', action='store_true',
+    parser.add_argument('--my-ffmpeg', action='store_true',
         help='use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='print info about the program or an option and exit.')

@@ -84,17 +84,25 @@ def print_program_help(the_args):
     text += '\n'
     out(text)
 
-def get_option(item, the_args):
+
+def to_underscore(name: str) -> str:
+    """Convert new style options to old style.  e.g. --hello-world -> --hello_world"""
+    return name[:2] + name[2:].replace('-', '_')
+
+
+def to_key(val: dict) -> str:
+    """Convert option name to arg key.  e.g. --hello-world -> hello_world"""
+    return val['names'][0][:2].replace('-', '') + val['names'][0][2:].replace('-', '_')
+
+
+def get_option(name: str, the_args):
     for options in the_args:
         for option in options:
             if option['action'] != 'text' and option['action'] != 'blank':
-                dash = list(map(lambda n: n.replace('_', '-'), option['names']))
-                if item in option['names'] or item in dash:
+                if name in option['names'] or name in map(to_underscore, option['names']):
                     return option
     return None
 
-def _to_key(val: dict) -> str:
-    return val['names'][0].replace('-', '')
 
 class ArgumentParser:
     def __init__(self, program_name, version, description=None):
@@ -214,7 +222,6 @@ class ParseOptions:
                 for name in option['names']:
                     option_names.append(name)
 
-                key = _to_key(option)
                 if option['action'] == 'store_true':
                     value = False
                 elif option['action'] == 'store_false':
@@ -225,7 +232,7 @@ class ParseOptions:
                     value = None
                 else:
                     value = option['type'](option['default'])
-                setattr(self, key, value)
+                setattr(self, to_key(option), value)
 
         # Figure out command line options changed by user.
         my_list = []
@@ -282,7 +289,7 @@ class ParseOptions:
 
                 used_options.append(option)
 
-                key = _to_key(option)
+                key = to_key(option)
 
                 next_arg = None if i == len(sys_args) - 1 else sys_args[i+1]
                 if next_arg == '-h' or next_arg == '--help':

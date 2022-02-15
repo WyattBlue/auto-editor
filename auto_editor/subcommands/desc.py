@@ -1,7 +1,7 @@
 import sys
 
 def desc_options(parser):
-    parser.add_argument('--ffmpeg_location', default=None,
+    parser.add_argument('--ffmpeg-location', default=None,
         help='Point to your custom ffmpeg file.')
     parser.add_argument('--help', '-h', action='store_true',
         help='Print info about the program or an option and exit.')
