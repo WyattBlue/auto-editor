@@ -4,21 +4,21 @@ import re
 import tempfile
 
 def grep_options(parser):
-    parser.add_argument('--no_filename', action='store_true',
+    parser.add_argument('--no-filename', action='store_true',
         help='Never print filenames with output lines.')
-    parser.add_argument('--max_count', '-m', type=int, default=float('inf'),
+    parser.add_argument('--max-count', '-m', type=int, default=float('inf'),
         help='Stop reading a file after NUM matching lines.')
     parser.add_argument('--count', '-c', action='store_true',
         help='Suppress normal output; instead print count of matching lines for each file.')
-    parser.add_argument('--ignore_case', '-i', action='store_true',
+    parser.add_argument('--ignore-case', '-i', action='store_true',
         help='Ignore case distinctions for the PATTERN.')
     parser.add_argument('--timecode', action='store_true',
         help="Print the match's timecode.")
     parser.add_argument('--time', action='store_true',
         help="Print when the match happens. (Ignore ending).")
-    parser.add_argument('--ffmpeg_location', default=None,
+    parser.add_argument('--ffmpeg-location', default=None,
         help='Point to your custom ffmpeg file.')
-    parser.add_argument('--my_ffmpeg', action='store_true',
+    parser.add_argument('--my-ffmpeg', action='store_true',
         help='Use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='Print info about the program or an option and exit.')

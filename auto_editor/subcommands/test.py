@@ -15,7 +15,7 @@ from auto_editor.utils.func import clean_list
 import auto_editor.vanparse as vanparse
 
 def test_options(parser):
-    parser.add_argument('--ffprobe_location', default='ffprobe',
+    parser.add_argument('--ffprobe-location', default='ffprobe',
         help='point to your custom ffprobe file.')
     parser.add_argument('--only', '-n', nargs='*')
     parser.add_argument('--help', '-h', action='store_true',
