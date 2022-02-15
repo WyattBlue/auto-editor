@@ -11,24 +11,18 @@ Then run:
 pip install --upgrade pip
 ```
 
-to upgrade pip to the latest version.
-
-
-:warning: | Windows users need to install [Visual Studio](https://visualstudio.microsoft.com/vs/features/cplusplus/) to compile the C program, opencv.
-:---: | :---
-
-After upgrading pip, run:
+to upgrade pip to the latest version. Then use pip to install auto-editor:
 
 ```
 pip install auto-editor
 ```
 
-> Linux users will need to have FFmpeg installed. Run `sudo apt-get install ffmpeg` or `sudo pacman -S ffmpeg`
+> Linux users: you will need to have FFmpeg installed and on your PATH.
 
 Now run this command and it should list all the options you can use.
 
 ```
-auto-editor -h
+auto-editor --help
 ```
 
 If that works then congratulations, you have successfully installed auto-editor. You can use now use this with any other type of video or audio that you have.
@@ -63,7 +57,7 @@ pip install git+https://github.com/WyattBlue/auto-editor.git
 
 Then run the local version using `py` or `python3`
 ```
-python3 -m auto_editor example.mp4 --frame_margin 7
+python3 -m auto_editor example.mp4 --frame-margin 7
 ```
 
 ----
@@ -79,43 +73,22 @@ pip install auto-editor --no-deps
 ```
 pip install numpy
 pip install av
+pip install Pillow
 pip install yt-dlp
 ```
 
-### Numpy
+### numpy
 
 Foundational math module needed for handling large data. Must be installed for any use with auto-editor.
 
-### Av
+### av
 
-Retrieve video data in a form Python can natively use. Allows for very fast rendering of videos.
+Retrieve low level video data in a form auto-editor can natively use. Allows for very fast rendering of videos.
+
+### Pillow
+
+Render video objects like text and ellipses.
 
 ### yt-dlp
 
 Module used to download videos off of websites.
-
-----
-
-## Pitfalls to Avoid
-
-If you get an error like this:
-```
-  File "<stdin>", line 1
-    pip install auto-editor
-         ^
-SyntaxError: invalid syntax
-```
-
-It means you are incorrectly running pip in the Python interpreter. Run `quit()` to go back to the regular console.
-
-
-If running auto-editor causes an error message to appear like this:
-
-```
-  File "auto_editor/__main__.py", line 56
-    def add_argument(*names, nargs=1, type=str, default=None,
-                                 ^
-SyntaxError: invalid syntax
-```
-
-It's because you're using a version of Python that's too old. Auto-Editor will on work on Python versions 3.7 or greater. Older versions may cause an invalid syntax error message to pop up.
