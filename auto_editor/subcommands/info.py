@@ -5,7 +5,7 @@ import os.path
 def info_options(parser):
     parser.add_argument('--json', action='store_true',
         help='Export the information in JSON format.')
-    parser.add_argument('--include-vfr', '--has_vfr', action='store_true',
+    parser.add_argument('--include-vfr', '--has-vfr', action='store_true',
         help='Skip information that is very slow to get.')
     parser.add_argument('--ffmpeg-location', default=None,
         help='Point to your custom ffmpeg file.')
