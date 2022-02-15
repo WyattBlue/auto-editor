@@ -233,11 +233,10 @@ def main_options(parser):
     parser.add_argument('input', nargs='*',
         help='File(s) or URL(s) that will be edited.')
 
-    parser.add_blank()
-    parser.add_text('  Have an issue? Make an issue. Visit '
-            'https://github.com/wyattblue/auto-editor/issues\n\n  The help option '
-            'can also be used on a specific option:\n     auto-editor '
-            '--frame-margin --help\n')
+    parser.add_text('Have an issue? Make an issue. Visit:\n '
+        '    https://github.com/wyattblue/auto-editor/issues')
+    parser.add_text('The help option can be used on a specific option:\n '
+        '    auto-editor --frame-margin --help')
     return parser
 
 

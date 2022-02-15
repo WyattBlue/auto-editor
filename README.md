@@ -24,12 +24,12 @@ See [Installing](https://github.com/WyattBlue/auto-editor/blob/master/articles/i
 
 <h2 align="center">Cutting</h2>
 
-Change the **pace** of the edited video by using `--frame_margin`.
+Change the **pace** of the edited video by using `--frame-margin`.
 
-`--frame_margin` will including small sections that are next to loud parts. A frame margin of 8 will add up to 8 frames before and 8 frames after the loud part.
+`--frame-margin` will including small sections that are next to loud parts. A frame margin of 8 will add up to 8 frames before and 8 frames after the loud part.
 
 ```
-auto-editor example.mp4 --frame_margin 8
+auto-editor example.mp4 --frame-margin 8
 ```
 
 <h3>Set how cuts are made</h3>
@@ -41,13 +41,13 @@ For example, edit out motionlessness in a video by setting `--edit motion`.
 
 ```
 # cut out sections where percentage of motion is less than 2.
-auto-editor example.mp4 --edit motion --motion_threshold 2%
+auto-editor example.mp4 --edit motion --motion-threshold 2%
 
 # --edit is set to "audio" by default
-auto-editor example.mp4 --silent_threshold 4%
+auto-editor example.mp4 --silent-threshold 4%
 
 # audio and motion thresholds are toggled independently
-auto-editor example.mp4 --edit audio_or_motion --silent_threshold 3% --motion_threshold 6%
+auto-editor example.mp4 --edit audio_or_motion --silent-threshold 3% --motion-threshold 6%
 ```
 
 <h2 align="center">Exporting to Editors</h2>
@@ -55,32 +55,32 @@ auto-editor example.mp4 --edit audio_or_motion --silent_threshold 3% --motion_th
 Create an XML file that can be imported to Adobe Premiere Pro using this command:
 
 ```
-auto-editor example.mp4 --export_to_premiere
+auto-editor example.mp4 --export-to-premiere
 ```
 
 Similar flags exist also for:
 
-- `--export_to_final_cut_pro` for Final Cut Pro.
-- `--export_to_shot_cut` for ShotCut.
+- `--export-to-final-cut-pro` for Final Cut Pro.
+- `--export-to-shot-cut` for ShotCut.
 
-Other programs might also be able to understand these formats, but if they don't. You can use ` --export_as_clip_sequence` which exports to many files that can be imported and used in other editors.
+Other programs might also be able to understand these formats, but if they don't. You can use ` --export-as-clip-sequence` which exports to many files that can be imported and used in other editors.
 
 <h2 align="center">Manual Editing</h2>
 
-Use the `--cut_out` option to always remove a section.
+Use the `--cut-out` option to always remove a section.
 
 ```
 # Cut out the first 10 seconds.
-auto-editor example.mp4 --cut_out start,10sec
+auto-editor example.mp4 --cut-out start,10sec
 
 # Cut out the first 10 frames.
-auto-editor example.mp4 --cut_out start,10
+auto-editor example.mp4 --cut-out start,10
 
 # Cut out the last 10 seconds.
-auto-editor example.mp4 --cut_out -10sec,end
+auto-editor example.mp4 --cut-out -10sec,end
 
 # Cut out the first 10 seconds and cut out the range from 15 seconds to 20 seconds.
-auto-editor example.mp4 --cut_out start,10sec 15sec,20sec
+auto-editor example.mp4 --cut-out start,10sec 15sec,20sec
 ```
 
 And of course, all the audio cuts still apply.
@@ -89,14 +89,14 @@ If you don't want **any automatic cuts**, use `--edit none`
 
 ```
 # Cut out the first 5 seconds, leave the rest untouched.
-auto-editor example.mp4 --edit none --cut_out start,5sec
+auto-editor example.mp4 --edit none --cut-out start,5sec
 ```
 
 And the inverse
 
 ```
 # Leave in the first 5 seconds, cut everything else out.
-auto-editor example.mp4 --edit all --add_in start,5sec
+auto-editor example.mp4 --edit all --add-in start,5sec
 ```
 
 <h2 align="center">More Options</h2>
