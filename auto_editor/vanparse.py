@@ -4,8 +4,12 @@ import difflib
 import textwrap
 from shutil import get_terminal_size
 
+from typing import Optional
+
+
 class ParserError(Exception):
     pass
+
 
 def indent(text, prefix, predicate=None):
     if predicate is None:
@@ -16,6 +20,7 @@ def indent(text, prefix, predicate=None):
         for line in text.splitlines(True):
             yield (prefix + line if predicate(line) else line)
     return ''.join(prefixed_lines())
+
 
 def out(text):
     width = get_terminal_size().columns - 3
@@ -33,7 +38,8 @@ def out(text):
 
     print('\n'.join(wrapped_lines))
 
-def print_option_help(args, option):
+
+def print_option_help(option):
     from dataclasses import fields, _MISSING_TYPE
 
     text = '  ' + ', '.join(option['names']) + '\n    ' + option['help'] + '\n\n'
@@ -71,16 +77,16 @@ def print_option_help(args, option):
 
     out(text)
 
-def print_program_help(the_args):
+
+def print_program_help(options):
     text = ''
-    for options in the_args:
-        for option in options:
-            if(option['action'] == 'text'):
-                text += '\n  ' + option['names'][0] + '\n'
-            elif(option['action'] == 'blank'):
-                text += '\n'
-            elif(not option['hidden']):
-                text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
+    for option in options:
+        if(option['action'] == 'text'):
+            text += '\n  ' + option['names'][0] + '\n'
+        elif(option['action'] == 'blank'):
+            text += '\n'
+        elif(not option['hidden']):
+            text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
     text += '\n'
     out(text)
 
@@ -95,12 +101,12 @@ def to_key(val: dict) -> str:
     return val['names'][0][:2].replace('-', '') + val['names'][0][2:].replace('-', '_')
 
 
-def get_option(name: str, the_args):
-    for options in the_args:
-        for option in options:
-            if option['action'] != 'text' and option['action'] != 'blank':
-                if name in option['names'] or name in map(to_underscore, option['names']):
-                    return option
+def get_option(name, options):
+    # type: (str, list[str]) -> Optional[dict]
+    for option in options:
+        if option['action'] != 'text' and option['action'] != 'blank':
+            if name in option['names'] or name in map(to_underscore, option['names']):
+                return option
     return None
 
 
@@ -124,6 +130,15 @@ class ArgumentParser:
             'manual': '',
         }
 
+        self.reqs = []
+        self.required_defaults = {
+            'nargs': '*',
+            'type': str,
+            'choices': None,
+            'help': '',
+            'manual': '',
+        }
+
     def add_argument(self, *args, **kwargs):
         my_dict = self.kwarg_defaults.copy()
         my_dict['names'] = args
@@ -133,14 +148,27 @@ class ArgumentParser:
 
         self.args.append(my_dict)
 
+
+    def add_required(self, *args, **kwargs):
+        my_dict = self.required_defaults.copy()
+        my_dict['names'] = args
+
+        for key, val in kwargs.items():
+            my_dict[key] = val
+
+        self.reqs.append(my_dict)
+
+
     def add_text(self, text):
         self.args.append({
             'names': [text],
             'action': 'text',
         });
 
+
     def add_blank(self):
         self.args.append({'action': 'blank'});
+
 
     def parse_args(self, sys_args):
         if sys_args == [] and self.description:
@@ -151,7 +179,7 @@ class ArgumentParser:
             out('{} version {}'.format(self.program_name, self._version))
             sys.exit()
 
-        return ParseOptions(sys_args, self.args)
+        return ParseOptions(sys_args, self.args, self.reqs)
 
 
 class ParseOptions:
@@ -182,24 +210,24 @@ class ParseOptions:
 
         allow_positional_args = True
 
-        for i, item in enumerate(unsplit_arguments.split(ARG_SEP)):
+        for i, arg in enumerate(unsplit_arguments.split(ARG_SEP)):
             if i+1 > len(keys):
                 raise ParserError(f"{d_name} has too many arguments, starting "
-                    f"with '{item}'.")
+                    f"with '{arg}'.")
 
-            if KEYWORD_SEP in item:
+            if KEYWORD_SEP in arg:
                 allow_positional_args = False
 
-                parameters = item.split(KEYWORD_SEP)
+                parameters = arg.split(KEYWORD_SEP)
                 if len(parameters) > 2:
-                    raise ParserError(f"{d_name} invalid syntax: '{item}'.")
+                    raise ParserError(f"{d_name} invalid syntax: '{arg}'.")
                 key, val = parameters
                 if key not in keys:
                     raise ParserError(f"{d_name} got an unexpected keyword '{key}'")
 
                 kwargs[key] = val
             elif allow_positional_args:
-                args.append(item)
+                args.append(arg)
             else:
                 raise ParserError(f'{d_name} positional argument follows keyword argument.')
 
@@ -211,123 +239,148 @@ class ParseOptions:
 
         return dataclass_instance
 
-    def __init__(self, sys_args, *args):
+
+    @staticmethod
+    def parse_arg(option: dict, arg):
+
+        option_name = option['names'][0]
+
+        if arg is None and option['nargs'] == 1:
+            raise ParserError(f"{option_name} needs argument.")
+
+        try:
+            value = option['type'](arg)
+        except TypeError as e:
+            raise ParserError(str(e))
+
+        if option['choices'] is not None and value not in option['choices']:
+            my_choices = ', '.join(option['choices'])
+
+            raise ParserError(f'{value} is not a choice for {option_name}\n'
+                f'choices are:\n  {my_choices}')
+
+        return value
+
+
+    def set_arg_list(self, option_list: str, my_list: list, list_type: type) -> None:
+        if list_type is not None:
+            setattr(self, option_list, list(map(list_type, my_list)))
+        else:
+            setattr(self, option_list, my_list)
+
+
+    def __init__(self, sys_args, options, requireds):
+        # type: (list[str], list[dict], list[dict]) -> None
+
         # Set the default options.
         option_names = []
-        for options in args:
-            for option in options:
-                if option['action'] == 'text' or option['action'] == 'blank':
-                    continue
+        for option in options:
+            if option['action'] == 'text' or option['action'] == 'blank':
+                continue
 
-                for name in option['names']:
-                    option_names.append(name)
+            for name in option['names']:
+                option_names.append(name)
 
-                if option['action'] == 'store_true':
-                    value = False
-                elif option['action'] == 'store_false':
-                    value = True
-                elif option['nargs'] != 1:
-                    value = []
-                elif option['default'] is None:
-                    value = None
-                else:
-                    value = option['type'](option['default'])
-                setattr(self, to_key(option), value)
+            if option['action'] == 'store_true':
+                value = False
+            elif option['action'] == 'store_false':
+                value = True
+            elif option['nargs'] != 1:
+                value = []
+            elif option['default'] is None:
+                value = None
+            else:
+                value = option['type'](option['default'])
+            setattr(self, to_key(option), value)
 
         # Figure out command line options changed by user.
-        my_list = []
         used_options = []
-        setting_inputs = True
-        option_list = 'input'
-        list_type = str
+
+        req_list = []
+        req_list_name = requireds[0]['names'][0]
+        req_list_type = requireds[0]['type']
+        setting_req_list = requireds[0]['nargs'] != 1
+
+        option_list = []
+        op_list_name = None
+        op_list_type = str
+        setting_op_list = False
+
         i = 0
         while i < len(sys_args):
-            item = sys_args[i]
-            option = get_option(item, the_args=args)
+            arg = sys_args[i]
+            option = get_option(arg, options)
 
             if option is None:
-                # Unknown Option!
-                if(setting_inputs and (option_list != 'input' or (option_list == 'input' and not item.startswith('-')))):
-                    # Option is actually an input file, like example.mp4
-
+                if setting_op_list:
                     if used_options and used_options[-1]['dataclass'] is not None:
-                        # Parse comma args instead.
-                        list_type = None
-                        item = self.parse_dataclass(item, used_options[-1])
+                        op_list_type = None
+                        arg = self.parse_dataclass(arg, used_options[-1])
 
-                    my_list.append(item)
+                    option_list.append(arg)
+
+                elif requireds and not arg.startswith('--'):
+
+                    if requireds[0]['nargs'] == 1:
+                        setattr(self, req_list_name, self.parse_arg(requireds[0], arg))
+                        requireds.pop()
+                    else:
+                        req_list.append(arg)
                 else:
-                    label = 'option' if item.startswith('--') else 'short'
+                    label = 'option' if arg.startswith('--') else 'short'
 
                     # 'Did you mean' message might appear that options need a comma.
-                    if item.replace(',', '') in option_names:
-                        raise ParserError(f"Option '{item}' has an unnecessary comma.")
+                    if arg.replace(',', '') in option_names:
+                        raise ParserError(f"Option '{arg}' has an unnecessary comma.")
 
-                    close_matches = difflib.get_close_matches(item, option_names)
+                    close_matches = difflib.get_close_matches(arg, option_names)
                     if close_matches:
                         raise ParserError(
                             'Unknown {}: {}\n\n    Did you mean:\n        '.format(
-                            label, item) + ', '.join(close_matches)
+                            label, arg) + ', '.join(close_matches)
                         )
-                    raise ParserError(f'Unknown {label}: {item}')
+                    raise ParserError(f'Unknown {label}: {arg}')
             else:
-                # We found the option.
-                if option_list is not None:
-                    if list_type is not None:
-                        setattr(self, option_list, list(map(list_type, my_list)))
-                    else:
-                        setattr(self, option_list, my_list)
-
-                setting_inputs = False
-                option_list = None
-                my_list = []
-
-                option_name = option['names'][0]
+                if op_list_name is not None:
+                    self.set_arg_list(op_list_name, option_list, op_list_type)
 
                 if option in used_options:
-                    raise ParserError(f'Cannot repeat option {option_name} twice.')
+                    raise ParserError(f"Cannot repeat option {option['names'][0]} twice.")
 
                 used_options.append(option)
+
+                setting_op_list = False
+                option_list = []
+                op_list_name = None
 
                 key = to_key(option)
 
                 next_arg = None if i == len(sys_args) - 1 else sys_args[i+1]
                 if next_arg == '-h' or next_arg == '--help':
-                    print_option_help(args, option)
+                    print_option_help(option)
                     sys.exit()
 
                 if option['nargs'] != 1:
-                    setting_inputs = True
-                    option_list = key
-                    list_type = option['type']
+                    setting_op_list = True
+                    op_list_name = key
+                    op_list_type = option['type']
                 elif option['action'] == 'store_true':
                     value = True
                 elif option['action'] == 'store_false':
                     value = False
                 else:
-                    if next_arg is None and option['nargs'] == 1:
-                        raise ParserError(f"{option_name} needs argument.")
-
-                    try:
-                        value = option['type'](next_arg)
-                    except TypeError as e:
-                        raise ParserError(str(e))
-
-                    if option['choices'] is not None and value not in option['choices']:
-                        my_choices = ', '.join(option['choices'])
-
-                        raise ParserError(f'{value} is not a choice for {option_name}\n'
-                            f'choices are:\n  {my_choices}')
+                    value = self.parse_arg(option, next_arg)
                     i += 1
                 setattr(self, key, value)
 
             i += 1
-        if setting_inputs:
-            if list_type is not None:
-                setattr(self, option_list, list(map(list_type, my_list)))
-            else:
-                setattr(self, option_list, my_list)
+
+        if setting_op_list:
+            self.set_arg_list(op_list_name, option_list, op_list_type)
+
+        if setting_req_list:
+            self.set_arg_list(req_list_name, req_list, req_list_type)
 
         if self.help:
-            print_program_help(args)
+            print_program_help(options)
             sys.exit()

@@ -222,7 +222,7 @@ def main_options(parser):
         help='Set the minimum length a clip can be. If a clip is too short, cut it.')
     parser.add_argument('--min-cut-length', '-mcut', type=frame_type, default=6,
         range='0 to Infinity',
-        help="Set the minimum length a cut can be. If a cut is too short, don't cut")
+        help="Set the minimum length a cut can be. If a cut is too short, don't cut.")
 
     parser.add_blank()
     parser.add_argument('--help', '-h', action='store_true',
@@ -230,7 +230,7 @@ def main_options(parser):
 
     parser.add_argument('--output-file', '--output', '-o', nargs='*',
         help='Set the name(s) of the new output.')
-    parser.add_argument('input', nargs='*',
+    parser.add_required('input', nargs='*',
         help='File(s) or URL(s) that will be edited.')
 
     parser.add_text('Have an issue? Make an issue. Visit:\n '

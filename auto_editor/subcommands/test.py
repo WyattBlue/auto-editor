@@ -1,7 +1,3 @@
-"""
-Run End2End and Unit Tests to make sure everything is working OK.
-"""
-
 # Internal Libraries
 import os
 import sys
@@ -19,10 +15,12 @@ import auto_editor.vanparse as vanparse
 
 def test_options(parser):
     parser.add_argument('--ffprobe-location', default='ffprobe',
-        help='point to your custom ffprobe file.')
+        help='Set a custom path to the ffprobe location.')
     parser.add_argument('--only', '-n', nargs='*')
     parser.add_argument('--help', '-h', action='store_true',
-        help='print info about the program or an option and exit.')
+        help='Print info about the program or an option and exit.')
+    parser.add_required('category', nargs=1, choices=['cli', 'api', 'unit', 'all'],
+        help='Set what category of tests to run.')
     return parser
 
 
@@ -237,12 +235,12 @@ class Tester():
         sys.exit(0)
 
 
-def main(sys_args=None):
+def main(sys_args: Optional[list[str]]=None):
     parser = vanparse.ArgumentParser('test', 'version')
     parser = test_options(parser)
 
     if sys_args is None:
-        sys_args = sys.args[1:]
+        sys_args = sys.argv[1:]
 
     try:
         args = parser.parse_args(sys_args)
@@ -554,41 +552,43 @@ def main(sys_args=None):
 
     tester = Tester(args)
 
-    tester.run_test(help_tests)
-    tester.run_test(version_test)
-    tester.run_test(parser_test)
+    if args.category in ('cli', 'all'):
+        tester.run_test(help_tests)
+        tester.run_test(version_test)
+        tester.run_test(parser_test)
 
-    # Unit tests
-    tester.run_test(subtitle_tests)
-    tester.run_test(tsm_1a5_test)
-    tester.run_test(tsm_0a5_test, allow_fail=True)
-    tester.run_test(tsm_2a0_test)
+    if args.category in ('unit', 'all'):
+        tester.run_test(subtitle_tests)
+        tester.run_test(tsm_1a5_test)
+        tester.run_test(tsm_0a5_test, allow_fail=True)
+        tester.run_test(tsm_2a0_test)
 
-    tester.run_test(info_tests)
-    tester.run_test(level_tests)
-    tester.run_test(example_tests, allow_fail=True)
-    tester.run_test(url_test)
-    tester.run_test(bitrate_test)
-    tester.run_test(unit_tests)
-    tester.run_test(backwards_range_test)
-    tester.run_test(cut_out_test)
-    tester.run_test(gif_test, cleanup=clean_all)
-    tester.run_test(margin_tests)
-    tester.run_test(input_extension)
-    tester.run_test(output_extension)
-    tester.run_test(progress_ops_test)
-    tester.run_test(silent_threshold)
-    tester.run_test(track_tests)
-    tester.run_test(json_tests)
-    tester.run_test(scale_tests)
-    tester.run_test(various_errors_test)
-    tester.run_test(effect_tests, cleanup=clean_all)
-    tester.run_test(render_text)
-    tester.run_test(check_font_error)
-    tester.run_test(export_tests)
-    tester.run_test(codec_tests)
-    tester.run_test(combine_tests)
-    tester.run_test(motion_tests)
+    if args.category in ('cli', 'all'):
+        tester.run_test(info_tests)
+        tester.run_test(level_tests)
+        tester.run_test(example_tests, allow_fail=True)
+        tester.run_test(url_test)
+        tester.run_test(bitrate_test)
+        tester.run_test(unit_tests)
+        tester.run_test(backwards_range_test)
+        tester.run_test(cut_out_test)
+        tester.run_test(gif_test, cleanup=clean_all)
+        tester.run_test(margin_tests)
+        tester.run_test(input_extension)
+        tester.run_test(output_extension)
+        tester.run_test(progress_ops_test)
+        tester.run_test(silent_threshold)
+        tester.run_test(track_tests)
+        tester.run_test(json_tests)
+        tester.run_test(scale_tests)
+        tester.run_test(various_errors_test)
+        tester.run_test(effect_tests, cleanup=clean_all)
+        tester.run_test(render_text)
+        tester.run_test(check_font_error)
+        tester.run_test(export_tests)
+        tester.run_test(codec_tests)
+        tester.run_test(combine_tests)
+        tester.run_test(motion_tests)
 
     tester.end()
 
