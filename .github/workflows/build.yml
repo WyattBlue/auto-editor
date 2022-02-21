@@ -30,7 +30,7 @@ jobs:
         python3 setup.py install
     - name: Test
       run: |
-        auto-editor test
+        auto-editor test all
 
   # No Windows CI for now because of some DLL.
   # [h264_amf @ 0000026ace714340] DLL amfrt64.dll failed to open

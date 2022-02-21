@@ -4,23 +4,23 @@ import time
 
 def create_options(parser):
     parser.add_argument('--frame-rate', '-fps', '-r', type=float, default=30.0,
-        help='set the framerate for the output video.')
+        help='Set the framerate for the output video.')
     parser.add_argument('--duration', '-d', type=int, default=10,
-        help='set the length of the video (in seconds).')
+        help='Set the length of the video (in seconds).')
     parser.add_argument('--width', type=int, default=1280,
-        help='set the pixel width of the video.')
+        help='Set the pixel width of the video.')
     parser.add_argument('--height', type=int, default=720,
-        help='set the pixel height of the video.')
+        help='Set the pixel height of the video.')
     parser.add_argument('--output-file', '--output', '-o', type=str,
         default='testsrc.mp4')
     parser.add_argument('--ffmpeg-location', default=None,
-        help='point to your custom ffmpeg file.')
+        help='Point to your custom ffmpeg file.')
     parser.add_argument('--my-ffmpeg', action='store_true',
-        help='use the ffmpeg on your PATH instead of the one packaged.')
+        help='Use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
-        help='print info about the program or an option and exit.')
-    parser.add_argument('input', nargs='*',
-        help='the template')
+        help='Print info about the program or an option and exit.')
+    parser.add_required('theme', nargs=1, choices=['test', 'black', 'white'],
+        help='What kind of media to create.')
     return parser
 
 def main(sys_args=sys.argv[1:]):
@@ -42,22 +42,15 @@ def main(sys_args=sys.argv[1:]):
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
 
-    theme = args.input
     output = args.output_file
     fps = args.frame_rate
-
-    if(len(theme) == 0):
-        log.error('You must put a theme!')
-    if(len(theme) > 1):
-        log.error('Only one theme at a time.')
-    theme = theme[0]
 
     try:
         os.remove(output)
     except FileNotFoundError:
         pass
 
-    if(theme == 'test'):
+    if args.theme == 'test':
         # Create sine wav.
         ffmpeg.run(['-f', 'lavfi', '-i', 'sine=frequency=1000:duration=0.2', 'short.wav'])
         ffmpeg.run(['-i', 'short.wav', '-af', 'apad', '-t', '1', 'beep.wav']) # Pad audio.
@@ -81,7 +74,7 @@ def main(sys_args=sys.argv[1:]):
         os.remove('beep.wav')
         os.remove('pre' + output)
 
-    if(theme in ['white', 'black']):
+    if args.theme in ['white', 'black']:
         ffmpeg.run(['-f', 'lavfi', '-i', 'color=size={}x{}:rate={}:color={}'.format(
             args.width, args.height, fps, theme), '-t', str(args.duration), output])
 
