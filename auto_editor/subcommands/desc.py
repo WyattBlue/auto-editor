@@ -5,8 +5,7 @@ def desc_options(parser):
         help='Point to your custom ffmpeg file.')
     parser.add_argument('--help', '-h', action='store_true',
         help='Print info about the program or an option and exit.')
-    parser.add_argument('input', nargs='*',
-        help='The path to file(s)')
+    parser.add_required('input', nargs='*', help='The path to file(s)')
     return parser
 
 def main(sys_args=sys.argv[1:]):

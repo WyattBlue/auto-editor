@@ -63,14 +63,16 @@ def print_option_help(option):
     if option['dataclass'] is not None:
         pass
     elif option['action'] == 'default':
-        text += '    type: ' + option['type'].__name__
-        text += '\n    default: {}\n'.format(option['default'])
+        text += f"    type: {option['type'].__name__}\n"
+        text += f"    nargs: {option['nargs']}\n"
+        text += f"    default: {option['default']}\n"
+
         if option['range'] is not None:
-            text += '    range: ' +  option['range'] + '\n'
+            text += f"    range: {option['range']}\n"
 
         if option['choices'] is not None:
             text += '    choices: ' +  ', '.join(option['choices']) + '\n'
-    elif option['action'] in ['store_true', 'store_false'] :
+    elif option['action'] in ('store_true', 'store_false'):
         text += '    type: flag\n'
     else:
         text += '    type: unknown\n'
@@ -81,11 +83,12 @@ def print_option_help(option):
 def print_program_help(options):
     text = ''
     for option in options:
-        if(option['action'] == 'text'):
-            text += '\n  ' + option['names'][0] + '\n'
-        elif(option['action'] == 'blank'):
+        if option['_type'] == 'text':
+            text += '\n  ' + option['text'] + '\n'
+        elif option['_type'] == 'blank':
             text += '\n'
-        elif(not option['hidden']):
+        elif (option['_type'] == 'required' or
+            (option['_type'] == 'option' and not option['hidden'])):
             text += '  ' + ', '.join(option['names']) + ': ' + option['help'] + '\n'
     text += '\n'
     out(text)
@@ -104,9 +107,8 @@ def to_key(val: dict) -> str:
 def get_option(name, options):
     # type: (str, list[str]) -> Optional[dict]
     for option in options:
-        if option['action'] != 'text' and option['action'] != 'blank':
-            if name in option['names'] or name in map(to_underscore, option['names']):
-                return option
+        if name in option['names'] or name in map(to_underscore, option['names']):
+            return option
     return None
 
 
@@ -128,15 +130,15 @@ class ArgumentParser:
             'dataclass': None,
             'hidden': False,
             'manual': '',
+            '_type': 'option',
         }
 
-        self.reqs = []
         self.required_defaults = {
             'nargs': '*',
             'type': str,
             'choices': None,
             'help': '',
-            'manual': '',
+            '_type': 'required',
         }
 
     def add_argument(self, *args, **kwargs):
@@ -156,21 +158,18 @@ class ArgumentParser:
         for key, val in kwargs.items():
             my_dict[key] = val
 
-        self.reqs.append(my_dict)
+        self.args.append(my_dict)
 
 
-    def add_text(self, text):
-        self.args.append({
-            'names': [text],
-            'action': 'text',
-        });
+    def add_text(self, text: str):
+        self.args.append({'text': text, '_type': 'text'});
 
 
     def add_blank(self):
-        self.args.append({'action': 'blank'});
+        self.args.append({'_type': 'blank'});
 
 
-    def parse_args(self, sys_args):
+    def parse_args(self, sys_args: list):
         if sys_args == [] and self.description:
             out(self.description)
             sys.exit()
@@ -179,7 +178,7 @@ class ArgumentParser:
             out('{} version {}'.format(self.program_name, self._version))
             sys.exit()
 
-        return ParseOptions(sys_args, self.args, self.reqs)
+        return ParseOptions(sys_args, self.args)
 
 
 class ParseOptions:
@@ -269,29 +268,35 @@ class ParseOptions:
             setattr(self, option_list, my_list)
 
 
-    def __init__(self, sys_args, options, requireds):
+    def __init__(self, sys_args, options_reqs):
         # type: (list[str], list[dict], list[dict]) -> None
 
-        # Set the default options.
+        # Partition options and requireds.
+        options = []
+        requireds = []
         option_names = []
-        for option in options:
-            if option['action'] == 'text' or option['action'] == 'blank':
-                continue
 
-            for name in option['names']:
-                option_names.append(name)
+        for item in options_reqs:
+            if item['_type'] == 'option':
+                options.append(item)
 
-            if option['action'] == 'store_true':
-                value = False
-            elif option['action'] == 'store_false':
-                value = True
-            elif option['nargs'] != 1:
-                value = []
-            elif option['default'] is None:
-                value = None
-            else:
-                value = option['type'](option['default'])
-            setattr(self, to_key(option), value)
+                for name in item['names']:
+                    option_names.append(name)
+
+                if item['action'] == 'store_true':
+                    value = False
+                elif item['action'] == 'store_false':
+                    value = True
+                elif item['nargs'] != 1:
+                    value = []
+                elif item['default'] is None:
+                    value = None
+                else:
+                    value = item['type'](item['default'])
+                setattr(self, to_key(item), value)
+
+            if item['_type'] == 'required':
+                requireds.append(item)
 
         # Figure out command line options changed by user.
         used_options = []
@@ -382,5 +387,5 @@ class ParseOptions:
             self.set_arg_list(req_list_name, req_list, req_list_type)
 
         if self.help:
-            print_program_help(options)
+            print_program_help(options_reqs)
             sys.exit()
