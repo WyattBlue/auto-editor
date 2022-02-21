@@ -6,7 +6,7 @@ import tempfile
 def grep_options(parser):
     parser.add_argument('--no-filename', action='store_true',
         help='Never print filenames with output lines.')
-    parser.add_argument('--max-count', '-m', type=int, default=float('inf'),
+    parser.add_argument('--max-count', '-m', type=int, default=None,
         help='Stop reading a file after NUM matching lines.')
     parser.add_argument('--count', '-c', action='store_true',
         help='Suppress normal output; instead print count of matching lines for each file.')
@@ -22,8 +22,7 @@ def grep_options(parser):
         help='Use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='Print info about the program or an option and exit.')
-    parser.add_argument('input', nargs='*',
-        help='The path to a file you want inspected.')
+    parser.add_required('input', nargs='*', help='The path to a file you want inspected.')
     return parser
 
 # stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string
@@ -47,12 +46,15 @@ def grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP):
     count = 0
 
     flags = 0
-    if(args.ignore_case):
+    if args.ignore_case:
         flags = re.IGNORECASE
 
     prefix = ''
-    if(add_prefix):
+    if add_prefix:
         prefix = '{}:'.format(os.path.splitext(os.path.basename(media_file))[0])
+
+    if args.max_count is None:
+        args.max_count = float('inf')
 
     timecode = ''
     line_number = -1
@@ -60,16 +62,16 @@ def grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP):
         while True:
             line = file.readline()
             line_number += 1
-            if(line_number == 0):
+            if line_number == 0:
                 continue
 
-            if(not line or count >= args.max_count):
+            if not line or count >= args.max_count:
                 break
 
-            if(line.strip() == ''):
+            if line.strip() == '':
                 continue
 
-            if(re.match(r'\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*', line)):
+            if re.match(r'\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*', line):
                 if(args.time):
                     timecode = line.split('-->')[0].strip() + ' '
                 else:
@@ -80,15 +82,15 @@ def grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP):
             match = re.search(args.input[0], line, flags)
             line = line.strip()
 
-            if(match):
+            if match:
                 count += 1
-                if(not args.count):
-                    if(args.timecode or args.time):
+                if not args.count:
+                    if args.timecode or args.time:
                         print(prefix + timecode + line)
                     else:
                         print(prefix + line)
 
-    if(args.count):
+    if args.count:
         print(prefix + str(count))
 
 
@@ -118,16 +120,17 @@ def main(sys_args=sys.argv[1:]):
     add_prefix = (len(media_files) > 1 or os.path.isdir(media_files[0])) and not args.no_filename
 
     for media_file in media_files:
-        if(not os.path.exists(media_file)):
-            log.error('{}: File does not exist.'.format(media_file))
+        if not os.path.exists(media_file):
+            log.error(f'{media_file}: File does not exist.')
 
-        if(os.path.isdir(media_file)):
+        if os.path.isdir(media_file):
             for _, _, files in os.walk(media_file):
                 for file in files:
-                    if(file == '.DS_Store'):
+                    if file == '.DS_Store':
                         continue
-                    grep_core(os.path.join(media_file, file),
-                        add_prefix, ffmpeg, args, log, TEMP)
+
+                    grep_core(os.path.join(media_file, file), add_prefix, ffmpeg, args,
+                        log, TEMP)
         else:
             grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP)
 

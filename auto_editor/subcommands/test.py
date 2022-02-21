@@ -19,7 +19,7 @@ def test_options(parser):
     parser.add_argument('--only', '-n', nargs='*')
     parser.add_argument('--help', '-h', action='store_true',
         help='Print info about the program or an option and exit.')
-    parser.add_required('category', nargs=1, choices=['cli', 'api', 'unit', 'all'],
+    parser.add_required('category', nargs=1, choices=['cli', 'sub', 'api', 'unit', 'all'],
         help='Set what category of tests to run.')
     return parser
 
@@ -322,7 +322,7 @@ def main(sys_args: Optional[list[str]]=None):
             'resources/example_2.0_speed.npz', 2)
 
 
-    def info_tests():
+    def info():
         run_program(['info', 'example.mp4'])
         run_program(['info', 'resources/man_on_green_screen.mp4'])
         run_program(['info', 'resources/multi-track.mov'])
@@ -330,9 +330,21 @@ def main(sys_args: Optional[list[str]]=None):
         run_program(['info', 'resources/test.mkv'])
 
 
-    def level_tests():
+    def levels():
         run_program(['levels', 'resources/multi-track.mov'])
         run_program(['levels', 'resources/newCommentary.mp3'])
+
+
+    def subdump():
+        run_program(['subdump', 'resources/subtitle.mp4'])
+
+
+    def grep():
+        run_program(['grep', 'boop', 'resources/subtitle.mp4'])
+
+
+    def desc():
+        run_program(['desc', 'example.mp4'])
 
 
     def example_tests():
@@ -552,20 +564,23 @@ def main(sys_args: Optional[list[str]]=None):
 
     tester = Tester(args)
 
-    if args.category in ('cli', 'all'):
-        tester.run_test(help_tests)
-        tester.run_test(version_test)
-        tester.run_test(parser_test)
-
     if args.category in ('unit', 'all'):
         tester.run_test(subtitle_tests)
         tester.run_test(tsm_1a5_test)
         tester.run_test(tsm_0a5_test, allow_fail=True)
         tester.run_test(tsm_2a0_test)
 
+    if args.category in ('sub', 'all'):
+        tester.run_test(info)
+        tester.run_test(levels)
+        tester.run_test(subdump)
+        tester.run_test(grep)
+        tester.run_test(desc)
+
     if args.category in ('cli', 'all'):
-        tester.run_test(info_tests)
-        tester.run_test(level_tests)
+        tester.run_test(help_tests)
+        tester.run_test(version_test)
+        tester.run_test(parser_test)
         tester.run_test(example_tests, allow_fail=True)
         tester.run_test(url_test)
         tester.run_test(bitrate_test)

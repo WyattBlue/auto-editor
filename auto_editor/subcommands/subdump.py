@@ -7,8 +7,8 @@ def subdump_options(parser):
         help='Use the ffmpeg on your PATH instead of the one packaged.')
     parser.add_argument('--help', '-h', action='store_true',
         help='Print info about the program or an option and exit.')
-    parser.add_argument('input', nargs='*',
-        help='The path to a file you want inspected.')
+    parser.add_required('input', nargs='*',
+        help='Path to the file to have its subtitles dumped.')
     return parser
 
 def main(sys_args=sys.argv[1:]):
