@@ -6,6 +6,10 @@ import platform
 import subprocess
 from time import perf_counter
 
+# External Libraries
+import av
+import numpy as np
+
 # Typing
 from typing import Callable, NoReturn, Optional, Union
 
@@ -14,8 +18,6 @@ from auto_editor.utils.func import clean_list
 import auto_editor.vanparse as vanparse
 
 def test_options(parser):
-    parser.add_argument('--ffprobe-location', default='ffprobe',
-        help='Set a custom path to the ffprobe location.')
     parser.add_argument('--only', '-n', nargs='*')
     parser.add_argument('--help', '-h', action='store_true',
         help='Print info about the program or an option and exit.')
@@ -24,68 +26,28 @@ def test_options(parser):
     return parser
 
 
-class FFprobe:
-    def __init__(self, path: str):
-        self.path = path
+def av_inspect(path: str, *args):
+    container = av.open(path, 'r')
 
-    def run(self, cmd: list[str]) -> str:
-        cmd.insert(0, self.path)
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-        stdout, __ = process.communicate()
-        return stdout.decode('utf-8')
+    media = {}
+    if len(container.streams.video) > 0:
+        video = container.streams.video[0]
+        media['fps'] = video.average_rate
+        media['resolution'] = video.width, video.height
+        media['vcodec'] = video.codec.name
+        media['vlanguage'] = video.language
 
-    def pipe(self, cmd: list[str]) -> str:
-        full_cmd = [self.path, '-v', 'error'] + cmd
-        process = subprocess.Popen(full_cmd, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-        stdout, __ = process.communicate()
-        return stdout.decode('utf-8')
+    if len(container.streams.audio) > 0:
+        audio = container.streams.audio[0]
+        media['samplerate'] = audio.rate
+        media['acodec'] = audio.codec.name
+        media['alanguage'] = audio.language
 
-    def _get(self, file, stream, the_type, track, of='compact=p=0:nk=1') -> str:
-        return self.pipe(['-select_streams', '{}:{}'.format(the_type, track),
-            '-show_entries', 'stream={}'.format(stream), '-of', of, file]).strip()
-
-    def getResolution(self, file: str) -> str:
-        return self._get(file, 'height,width', 'v', 0, of='csv=s=x:p=0')
-
-    def getTimeBase(self, file: str) -> str:
-        return self.pipe(['-select_streams', 'v', '-show_entries',
-            'stream=avg_frame_rate', '-of', 'compact=p=0:nk=1', file]).strip()
-
-    def getFrameRate(self, file: str) -> float:
-        nums = clean_list(self.getTimeBase(file).split('/'), '\r\t\n')
-        return int(nums[0]) / int(nums[1])
-
-    def getAudioCodec(self, file: str, track: int=0) -> str:
-        return self._get(file, 'codec_name', 'a', track)
-
-    def getVideoCodec(self, file: str, track: int=0) -> str:
-        return self._get(file, 'codec_name', 'v', track)
-
-    def getSampleRate(self, file: str, track: int=0) -> str:
-        return self._get(file, 'sample_rate', 'a', track)
-
-    def getVLanguage(self, file: str) -> str:
-        return self.pipe(['-show_entries', 'stream=index:stream_tags=language',
-            '-select_streams', 'v', '-of', 'compact=p=0:nk=1', file]).strip()
-
-    def getALanguage(self, file: str) -> str:
-        return self.pipe(['-show_entries', 'stream=index:stream_tags=language',
-            '-select_streams', 'a', '-of', 'compact=p=0:nk=1', file]).strip()
-
-    def AudioBitRate(self, file: str) -> str:
-
-        def bitrate_format(num: Union[int, float]) -> str:
-            magnitude = 0
-            while abs(num) >= 1000:
-                magnitude += 1
-                num /= 1000.0
-            num = round(num)
-            return '%d%s' % (num, ['', 'k', 'm', 'g', 't', 'p'][magnitude])
-
-        exact_bitrate = self._get(file, 'bit_rate', 'a', 0)
-        return bitrate_format(int(exact_bitrate))
+    for key, expected in args:
+        if media[key] != expected:
+            raise Exception(
+                f"Media attribute '{key}' was '{media[key]}', expected '{expected}'."
+            )
 
 
 def pipe_to_console(cmd: list[str]) -> tuple[int, str, str]:
@@ -138,34 +100,8 @@ def check_for_error(cmd: list[str], match=None) -> None:
     else:
         raise Exception('Program should not respond with a code 0.')
 
-def inspect(path: str, *args) -> None:
-    if not os.path.exists(path):
-        raise Exception(f"Path '{path}' does not exist.")
-
-    for item in args:
-        func = item[0]
-        expected_output = item[1]
-        if func(path) != expected_output:
-            # Cheating on float numbers to allow 30 to equal 29.99944409236961
-            if isinstance(expected_output, float):
-                from math import ceil
-                if ceil(func(path) * 100) == expected_output * 100:
-                    continue
-            if expected_output.endswith('k'):
-                a = int(func(path)[:-1])
-                b = int(expected_output[:-1])
-
-                # Allow bitrate to have slight differences.
-                if abs(a - b) < 2:
-                    continue
-
-            raise Exception(
-                f'Inspection Failed. Was {func(path)}, Expected {expected_output}.'
-            )
-
 
 def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
-    import numpy as np
     from auto_editor.scipy.wavfile import read
     from auto_editor.audiotsm2 import phasevocoder
     from auto_editor.audiotsm2.io.array import ArrReader, ArrWriter
@@ -216,6 +152,10 @@ class Tester():
         try:
             func()
             end = perf_counter() - start
+        except KeyboardInterrupt:
+            print(f'Testing Interrupted by User.')
+            clean_all()
+            sys.exit(1)
         except Exception as e:
             self.failed_tests += 1
             print(f"Test '{func.__name__}' failed.")
@@ -246,13 +186,6 @@ def main(sys_args: Optional[list[str]]=None):
         args = parser.parse_args(sys_args)
     except vanparse.ParserError as e:
         print(e)
-        sys.exit(1)
-
-    ffprobe = FFprobe(args.ffprobe_location)
-
-    # Sanity check for ffprobe
-    if ffprobe.getFrameRate('example.mp4') != 30.0:
-        print('getFrameRate did not equal 30.0')
         sys.exit(1)
 
 
@@ -348,38 +281,29 @@ def main(sys_args: Optional[list[str]]=None):
 
 
     def example_tests():
-        run_program(['example.mp4'])
-        inspect(
-            'example_ALTERED.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '1280x720'],
-            [ffprobe.getVideoCodec, 'h264'],
-            [ffprobe.getSampleRate, '48000'],
-            [ffprobe.getVLanguage, '0|eng'],
-            [ffprobe.getALanguage, '1|eng'],
-        )
         run_program(['example.mp4', '--video_codec', 'uncompressed'])
-        inspect(
-            'example_ALTERED.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '1280x720'],
-            [ffprobe.getVideoCodec, 'mpeg4'],
-            [ffprobe.getSampleRate, '48000'],
+        av_inspect('example_ALTERED.mp4',
+            ('fps', 30),
+            ('resolution', (1280, 720), ),
+            ('vcodec', 'mpeg4'),
+            ('acodec', 'aac'),
+            ('samplerate', 48000),
         )
 
+        run_program(['example.mp4'])
+        av_inspect('example_ALTERED.mp4',
+            ('fps', 30),
+            ('resolution', (1280, 720), ),
+            ('vcodec', 'h264'),
+            ('acodec', 'aac'),
+            ('samplerate', 48000),
+            ('vlanguage', 'eng'),
+            ('alanguage', 'eng'),
+        )
 
     # Issue #200
     def url_test():
         run_program(['https://github.com/WyattBlue/auto-editor/raw/master/example.mp4'])
-
-
-    # Issue #172
-    def bitrate_test():
-        run_program(['example.mp4', '--audio_bitrate', '50k'])
-        inspect(
-            'example_ALTERED.mp4',
-            [ffprobe.AudioBitRate, '50k'],
-        )
 
 
     # Issue #184
@@ -422,9 +346,8 @@ def main(sys_args: Optional[list[str]]=None):
         gif. No editing is requested.
         """
         run_program(['resources/man_on_green_screen.gif', '--edit', 'none'])
-        inspect(
-            'resources/man_on_green_screen_ALTERED.gif',
-            [ffprobe.getVideoCodec, 'gif'],
+        av_inspect('resources/man_on_green_screen_ALTERED.gif',
+            ('vcodec', 'gif'),
         )
 
 
@@ -448,16 +371,14 @@ def main(sys_args: Optional[list[str]]=None):
     def output_extension():
         # Add input extension to output name if no output extension is given.
         run_program(['example.mp4', '-o', 'out'])
-        inspect(
-            'out.mp4',
-            [ffprobe.getVideoCodec, 'h264']
+        av_inspect('out.mp4',
+            ('vcodec', 'h264'),
         )
         os.remove('out.mp4')
 
         run_program(['resources/test.mkv', '-o', 'out'])
-        inspect(
-            'out.mkv',
-            [ffprobe.getVideoCodec, 'h264']
+        av_inspect('out.mkv',
+            ('vcodec', 'h264'),
         )
         os.remove('out.mkv')
 
@@ -484,19 +405,17 @@ def main(sys_args: Optional[list[str]]=None):
 
     def scale_tests():
         run_program(['example.mp4', '--scale', '1.5'])
-        inspect(
-            'example_ALTERED.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '1920x1080'],
-            [ffprobe.getSampleRate, '48000'],
+        av_inspect('example_ALTERED.mp4',
+            ('fps', 30),
+            ('resolution', (1920, 1080), ),
+            ('samplerate', 48000),
         )
 
         run_program(['example.mp4', '--scale', '0.2'])
-        inspect(
-            'example_ALTERED.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '256x144'],
-            [ffprobe.getSampleRate, '48000'],
+        av_inspect('example_ALTERED.mp4',
+            ('fps', 30),
+            ('resolution', (256, 144), ),
+            ('samplerate', 48000),
         )
 
 
@@ -508,10 +427,9 @@ def main(sys_args: Optional[list[str]]=None):
         """Test rendering video objects"""
         run_program(['create', 'test', '--width', '640', '--height', '360', '-o',
             'testsrc.mp4'])
-        inspect(
-            'testsrc.mp4',
-            [ffprobe.getFrameRate, 30.0],
-            [ffprobe.getResolution, '640x360'],
+        av_inspect('testsrc.mp4',
+            ('fps', 30),
+            ('resolution', (640, 360), ),
         )
         run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--add_rectangle',
             '0,30,0,200,100,300,fill=#43FA56,stroke=10'])
@@ -583,7 +501,6 @@ def main(sys_args: Optional[list[str]]=None):
         tester.run_test(parser_test)
         tester.run_test(example_tests, allow_fail=True)
         tester.run_test(url_test)
-        tester.run_test(bitrate_test)
         tester.run_test(unit_tests)
         tester.run_test(backwards_range_test)
         tester.run_test(cut_out_test)
