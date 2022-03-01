@@ -11,7 +11,7 @@ import av
 import numpy as np
 
 # Typing
-from typing import Callable, NoReturn, Optional, Union
+from typing import List, Tuple, Callable, NoReturn, Optional, Union
 
 # Included Libraries
 from auto_editor.utils.func import clean_list
@@ -50,7 +50,7 @@ def av_inspect(path: str, *args):
             )
 
 
-def pipe_to_console(cmd: list[str]) -> tuple[int, str, str]:
+def pipe_to_console(cmd: List[str]) -> Tuple[int, str, str]:
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     return process.returncode, stdout.decode('utf-8'), stderr.decode('utf-8')
@@ -77,7 +77,7 @@ def get_runner() -> list:
     return ['python3', '-m', 'auto_editor']
 
 
-def run_program(cmd: list[str]) -> None:
+def run_program(cmd: List[str]) -> None:
     no_open = '.' in cmd[0]
     cmd = get_runner() + cmd
 
@@ -89,7 +89,7 @@ def run_program(cmd: list[str]) -> None:
         raise Exception('{}\n{}\n'.format(stdout, stderr))
 
 
-def check_for_error(cmd: list[str], match=None) -> None:
+def check_for_error(cmd: List[str], match=None) -> None:
     returncode, stdout, stderr = pipe_to_console(get_runner() + cmd)
     if returncode > 0:
         if 'Error!' in stderr:
@@ -175,7 +175,7 @@ class Tester():
         sys.exit(0)
 
 
-def main(sys_args: Optional[list[str]]=None):
+def main(sys_args: Optional[List[str]]=None):
     parser = vanparse.ArgumentParser('test', 'version')
     parser = test_options(parser)
 
