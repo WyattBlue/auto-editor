@@ -40,7 +40,7 @@ def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
                 audio_list = get_np_list(inp.path, audio_samples, sample_rate, fps, np.ones)
             else:
                 audio_list = audio_detection(audio_samples, sample_rate,
-                    args.silent_threshold, fps, log)
+                    args.silent_threshold, fps, progress)
 
         if 'motion' in args.edit_based_on:
             from auto_editor.analyze.motion import motion_detection
@@ -214,8 +214,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     def is_clip(chunk: Tuple[int, int, float]) -> bool:
         return chunk[2] != 99999
 
-    def number_of_cuts(chunks):
-        # type: (List[Tuple[int, int, float]]) -> int
+    def number_of_cuts(chunks: List[Tuple[int, int, float]]) -> int:
         return len(list(filter(is_clip, chunks)))
 
     num_cuts = number_of_cuts(chunks)
@@ -276,11 +275,11 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     def make_media(inp, chunks, output_path):
         from auto_editor.utils.video import mux_quality_media
 
-        if(rules['allow_subtitle']):
+        if rules['allow_subtitle']:
             from auto_editor.render.subtitle import cut_subtitles
             cut_subtitles(ffmpeg, inp, chunks, fps, temp, log)
 
-        if(rules['allow_audio']):
+        if rules['allow_audio']:
             from auto_editor.render.audio import make_new_audio
 
             for t in range(tracks):
@@ -288,32 +287,33 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
                 new_file = os.path.join(temp, 'new{}.wav'.format(t))
                 make_new_audio(temp_file, new_file, chunks, log, fps, progress)
 
-                if(not os.path.isfile(new_file)):
+                if not os.path.isfile(new_file):
                     log.bug('Audio file not created.')
 
         video_stuff = []
 
-        if(rules['allow_video']):
+        if rules['allow_video']:
             from auto_editor.render.video import render_av
             for v, vid in enumerate(inp.video_streams):
-                if(vid['codec'] in ['png', 'jpeg']):
+                if vid['codec'] in ('png', 'jpeg'):
                     video_stuff.append(('image', None, None))
                 else:
                     video_stuff.append(render_av(ffmpeg, v, inp, args, chunks, fps,
                         progress, obj_sheet, rules, temp, log))
 
-        log.conwrite('Writing the output file.')
+        log.conwrite('Writing output file')
 
-        mux_quality_media(ffmpeg, video_stuff, rules, output_path, output_container,
-            args, inp, temp, log)
-        if(output_path is not None and not os.path.isfile(output_path)):
+        mux_quality_media(
+            ffmpeg, video_stuff, rules, output_path, output_container, args, inp, temp, log
+        )
+        if output_path is not None and not os.path.isfile(output_path):
             log.bug(f'The file {output_path} was not created.')
 
-    if(args.export_as_clip_sequence):
+    if args.export_as_clip_sequence:
         total_frames = chunks[-1][1]
         clip_num = 0
         for chunk in chunks:
-            if(chunk[2] == 99999):
+            if chunk[2] == 99999:
                 continue
             make_media(inp, pad_chunk(chunk, total_frames),
                 append_filename(output_path, f'-{clip_num}'))
