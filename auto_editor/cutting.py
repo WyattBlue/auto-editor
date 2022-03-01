@@ -1,12 +1,13 @@
-from typing import List, Tuple, Any, NoReturn, Optional
+from typing import List, Tuple, NoReturn, Optional, Union
 
 import numpy as np
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import split_num_str
 
-def combine_audio_motion(audio_list, motion_list, based, log):
-    # type: (np.ndarray, np.ndarray, str, Log) -> Optional[np.ndarray]
+def combine_audio_motion(
+    audio_list: np.ndarray, motion_list: np.ndarray, based: str, log: Log
+    ) -> Optional[np.ndarray]:
 
     no_place_where = "There was no place where {} exceeded the threshold."
 
@@ -54,7 +55,7 @@ def combine_audio_motion(audio_list, motion_list, based, log):
     return None
 
 
-def combine_segment(has_loud, segment, fps):
+def combine_segment(has_loud: np.ndarray, segment, fps: float) -> np.ndarray:
     for item in segment:
         start, end = item['segment']
         start = int(start * fps)
@@ -63,22 +64,23 @@ def combine_segment(has_loud, segment, fps):
     return has_loud
 
 
-def remove_small(has_loud, lim, replace, with_):
-    # type: (np.ndarray, int, int, int) -> np.ndarray
+def remove_small(
+    has_loud: np.ndarray, lim: int, replace: int, with_: int
+    ) -> np.ndarray:
     startP = 0
     active = False
     for j, item in enumerate(has_loud):
-        if(item == replace):
+        if item == replace:
             if(not active):
                 startP = j
                 active = True
             # Special case for end.
-            if(j == len(has_loud) - 1):
+            if j == len(has_loud) - 1:
                 if(j - startP < lim):
                     has_loud[startP:j+1] = with_
         else:
-            if(active):
-                if(j - startP < lim):
+            if active:
+                if j - startP < lim:
                     has_loud[startP:j] = with_
                 active = False
     return has_loud
@@ -89,41 +91,42 @@ def str_is_number(val: str) -> bool:
 
 
 def str_starts_with_number(val: str) -> bool:
-    if(val.startswith('-')):
+    if val.startswith('-'):
         val = val[1:]
     val = val.replace('.', '', 1)
     return val[0].isdigit()
 
 
-def set_range(has_loud, range_syntax, fps, with_, log):
-    # type: (np.ndarray, list, float, int, Log) -> np.ndarray
+def set_range(
+    has_loud: np.ndarray, range_syntax: list, fps: float, with_: int, log: Log
+    ) -> np.ndarray:
 
-    def replace_variables_to_values(item, fps, log):
-        # type: (str, float, Log) -> int | NoReturn
-        if(str_is_number(item)):
-            return int(item)
-        if(str_starts_with_number(item)):
+    def replace_variables_to_values(val: str, fps: float, log: Log) -> Union[int, NoReturn]:
+        if str_is_number(val):
+            return int(val)
+        if str_starts_with_number(val):
             try:
-                value, unit = split_num_str(item)
+                value, unit = split_num_str(val)
             except TypeError as e:
                 log.error(str(e))
 
-            if(unit in ['', 'f', 'frame', 'frames']):
-                if(isinstance(value, float)):
+            if unit in ('', 'f', 'frame', 'frames'):
+                if isinstance(value, float):
                     log.error('float type cannot be used with frame unit')
                 return int(value)
-            if(unit in ['s', 'sec', 'secs', 'second', 'seconds']):
+            if unit in ('s', 'sec', 'secs', 'second', 'seconds'):
                 return round(value * fps)
-            log.error('Unknown unit: {}'.format(unit))
-        if(item == 'start'):
+            log.error(f'Unknown unit: {unit}')
+
+        if val == 'start':
             return 0
-        if(item == 'end'):
+        if val == 'end':
             return len(has_loud)
-        return log.error("variable '{}' not available.".format(item))
+        return log.error(f"variable '{val}' not available.")
 
     def var_val_to_frames(val: str, fps: float, log: Log) -> int:
         num = replace_variables_to_values(val, fps, log)
-        if(num < 0):
+        if num < 0:
             num += len(has_loud)
         return num
 
@@ -135,14 +138,12 @@ def set_range(has_loud, range_syntax, fps, with_, log):
     return has_loud
 
 
-def seconds_to_frames(value, fps):
-    # type: (int | str, float) -> int
-    if(isinstance(value, str)):
+def seconds_to_frames(value: Union[int, str], fps: float) -> int:
+    if isinstance(value, str):
         return int(float(value) * fps)
     return value
 
-def cook(has_loud, min_clip, min_cut):
-    # type: (np.ndarray, int, int) -> np.ndarray
+def cook(has_loud: np.ndarray, min_clip: int, min_cut: int) -> np.ndarray:
     has_loud = remove_small(has_loud, min_clip, replace=1, with_=0)
     has_loud = remove_small(has_loud, min_cut, replace=0, with_=1)
     return has_loud
@@ -164,8 +165,9 @@ def chunkify(arr: np.ndarray, arr_length: int = None) -> List[Tuple[int, int, fl
     return chunks
 
 
-def apply_margin(has_loud, has_loud_length, start_m, end_m):
-    # type: (np.ndarray, int, int, int) -> np.ndarray
+def apply_margin(
+    has_loud: np.ndarray, has_loud_length: int, start_m: int, end_m: int
+    ) -> np.ndarray:
 
     # Find start and end indexes.
     start_index = []
@@ -178,33 +180,39 @@ def apply_margin(has_loud, has_loud_length, start_m, end_m):
                 end_index.append(j)
 
     # Apply margin
-    if(start_m > 0):
+    if start_m > 0:
         for i in start_index:
             has_loud[max(i-start_m, 0):i] = True
-    if(start_m < 0):
+    if start_m < 0:
         for i in start_index:
             has_loud[i:min(i-start_m, has_loud_length)] = False
 
-    if(end_m > 0):
+    if end_m > 0:
         for i in end_index:
             has_loud[i:min(i+end_m, has_loud_length)] = True
-    if(end_m < 0):
+    if end_m < 0:
         for i in end_index:
             has_loud[max(i+end_m, 0):i] = False
 
     return has_loud
 
 
-def apply_mark_as(has_loud, has_loud_length, fps, args, log):
-    # type: (np.ndarray, int, float, Any, Log) -> np.ndarray
-    if(args.mark_as_loud != []):
+def apply_mark_as(
+    has_loud: np.ndarray, has_loud_length: int, fps: float, args: object, log: Log
+    ) -> np.ndarray:
+
+    if args.mark_as_loud != []:
         has_loud = set_range(has_loud, args.mark_as_loud, fps, args.video_speed, log)
 
-    if(args.mark_as_silent != []):
+    if args.mark_as_silent != []:
         has_loud = set_range(has_loud, args.mark_as_silent, fps, args.silent_speed, log)
     return has_loud
 
-def to_speed_list(has_loud, video_speed, silent_speed):
+
+def to_speed_list(
+    has_loud: np.ndarray, video_speed: float, silent_speed: float
+    ) -> np.ndarray:
+
     speed_list = has_loud.astype(float)
 
     # This code will break is speed is allowed to be 0
@@ -214,8 +222,7 @@ def to_speed_list(has_loud, video_speed, silent_speed):
     return speed_list
 
 
-def merge(start_list, end_list):
-    # type: (np.ndarray, np.ndarray) -> np.ndarray
+def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
     merge = np.zeros((len(start_list)), dtype=np.bool_)
 
     startP = 0

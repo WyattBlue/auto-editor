@@ -11,7 +11,7 @@ class Timer:
         self.start_time = perf_counter()
         self.quiet = quiet
 
-    def stop(self):
+    def stop(self) -> None:
         if not self.quiet:
             second_len = round(perf_counter() - self.start_time, 2)
             minute_len = timedelta(seconds=round(second_len))
@@ -89,10 +89,3 @@ class Log:
     def print(self, message: str) -> None:
         if not self.quiet:
             sys.stdout.write(f'{message}\n')
-
-    def checkType(self, data, name, correct_type):
-        if not isinstance(data, correct_type):
-            badtype = type(data).__name__
-            goodtype = correct_type.__name__
-            self.bug('Variable "{}" was not a {}, but a {}'.format(
-                name, goodtype, badtype), 'bug report')

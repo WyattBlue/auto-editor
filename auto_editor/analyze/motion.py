@@ -1,3 +1,5 @@
+import sys
+
 import av
 import numpy as np
 from PIL import Image, ImageOps, ImageChops, ImageFilter

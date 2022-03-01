@@ -1,15 +1,16 @@
 import os.path
 import re
 
+from typing import List, Tuple, Union
+
 from .func import clean_list
 
-def split_num_str(val):
-    # type: (str | int) -> tuple[int | float, str]
+def split_num_str(val: Union[str, int]) -> Tuple[Union[int, float], str]:
     if isinstance(val, int):
         return val, ''
     index = 0
-    for item in val:
-        if not item.isdigit() and item != ' ' and item != '.' and item != '-':
+    for char in val:
+        if not char.isdigit() and char not in (' ', '.', '-'):
             break
         index += 1
     num, unit = val[:index], val[index:]
@@ -30,13 +31,11 @@ def file_type(path: str) -> str:
         raise TypeError(f'Auto-Editor could not find the file: {path}')
     return path
 
-def unit_check(unit, allowed_units):
-    # type: (str, list[str]) -> None
+def unit_check(unit: str, allowed_units: List[str]) -> None:
     if unit not in allowed_units:
         raise TypeError(f"Unknown unit: '{unit}'")
 
-def float_type(val):
-    # type: (str | int | float) -> float
+def float_type(val: Union[str, int, float]) -> float:
     if isinstance(val, (int, float)):
         return float(val)
 
@@ -59,8 +58,7 @@ def frame_units():
 def second_units():
     return ['s', 'sec', 'secs', 'second', 'seconds']
 
-def frame_type(val):
-    # type: (str) -> int | str
+def frame_type(val: str) -> Union[int, str]:
     num, unit = split_num_str(val)
     unit_check(unit, [''] + frame_units() + second_units())
 
@@ -74,8 +72,7 @@ def anchor_type(val: str):
         raise TypeError('Anchor must be: ' + ' '.join(allowed))
     return val
 
-def margin_type(val):
-    # type: (str) -> tuple[int | str, int | str]
+def margin_type(val: str) -> Tuple[Union[int, str], Union[int, str]]:
     vals = val.split(',')
     if len(vals) == 1:
         vals.append(vals[0])
@@ -83,24 +80,24 @@ def margin_type(val):
         raise TypeError('Too many comma arguments for margin_type')
     return frame_type(vals[0]), frame_type(vals[1])
 
-def comma_type(inp, min_args=1, max_args=None, name=''):
-    inp = clean_list(inp.split(','), '\r\n\t')
-    if min_args > len(inp):
+def comma_type(val: str, min_args=1, max_args=None, name='') -> list:
+    val = clean_list(val.split(','), '\r\n\t')
+    if min_args > len(val):
         raise TypeError(f'Too few comma arguments for {name}.')
-    if max_args is not None and len(inp) > max_args:
+    if max_args is not None and len(val) > max_args:
         raise TypeError(f'Too many comma arguments for {name}.')
-    return inp
+    return val
 
-def range_type(inp):
-    return comma_type(inp, 2, 2, 'range_type')
+def range_type(val: str) -> list:
+    return comma_type(val, 2, 2, 'range_type')
 
-def speed_range_type(inp):
-    return comma_type(inp, 3, 3, 'speed_range_type')
+def speed_range_type(val: str) -> list:
+    return comma_type(val, 3, 3, 'speed_range_type')
 
-def block_type(inp):
-    return comma_type(inp, 1, None, 'block_type')
+def block_type(val: str) -> list:
+    return comma_type(val, 1, None, 'block_type')
 
-def text_content(val: str):
+def text_content(val: str) -> str:
     return val.replace('\\n', '\n')
 
 def align_type(val: str):

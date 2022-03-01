@@ -3,6 +3,11 @@ import os
 import re
 import tempfile
 
+import auto_editor
+import auto_editor.vanparse as vanparse
+from auto_editor.utils.log import Log
+from auto_editor.ffwrapper import FFmpeg
+
 def grep_options(parser):
     parser.add_argument('--no-filename', action='store_true',
         help='Never print filenames with output lines.')
@@ -26,13 +31,15 @@ def grep_options(parser):
     return parser
 
 # stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string
-def cleanhtml(raw_html):
-    # type: (str) -> str
+def cleanhtml(raw_html: str) -> str:
     cleanr = re.compile('<.*?>')
     cleantext = re.sub(cleanr, '', raw_html)
     return cleantext
 
-def grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP):
+
+def grep_core(
+    media_file: str, add_prefix: bool, ffmpeg: FFmpeg, args: object, log: Log, TEMP: str
+) -> None:
 
     """
     We're using the WEBVTT subtitle format. It's better than srt
@@ -72,7 +79,7 @@ def grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP):
                 continue
 
             if re.match(r'\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*', line):
-                if(args.time):
+                if args.time:
                     timecode = line.split('-->')[0].strip() + ' '
                 else:
                     timecode = line.strip() + '; '
@@ -95,14 +102,9 @@ def grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP):
 
 
 def main(sys_args=sys.argv[1:]):
-    import auto_editor
-    import auto_editor.vanparse as vanparse
-
-    from auto_editor.utils.log import Log
-    from auto_editor.ffwrapper import FFmpeg
-
     parser = vanparse.ArgumentParser('grep', auto_editor.version,
-        description='Read and match subtitle tracks in media files.')
+        description='Read and match subtitle tracks in media files.',
+    )
     parser = grep_options(parser)
 
     TEMP = tempfile.mkdtemp()
@@ -136,5 +138,6 @@ def main(sys_args=sys.argv[1:]):
 
     log.cleanup()
 
-if(__name__ == '__main__'):
+
+if __name__ == '__main__':
     main()

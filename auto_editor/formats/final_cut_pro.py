@@ -1,38 +1,36 @@
 from .utils import indent, get_width_height
 
 from platform import system
+from pathlib import Path, PureWindowsPath
 
 def fcp_xml(inp, temp, output, chunks, fps, log):
     total_dur = chunks[-1][1]
 
-    if(system() == 'Windows'):
-        import pathlib
-        pathurl = 'file://localhost/' + pathlib.PureWindowsPath(inp.abspath).as_posix()
+    if system() == 'Windows':
+        pathurl = 'file://localhost/' + PureWindowsPath(inp.abspath).as_posix()
     else:
-        from pathlib import Path
         pathurl = Path(inp.abspath).as_uri()
     name = inp.basename
 
-    def fraction(a, fps):
-        # type: (...) -> str
+    def fraction(a, fps) -> str:
         from fractions import Fraction
 
-        if(a == 0):
+        if a == 0:
             return '0s'
 
-        if(isinstance(a, float)):
+        if isinstance(a, float):
             a = Fraction(a)
-        if(isinstance(fps, float)):
+        if isinstance(fps, float):
             fps = Fraction(fps)
 
         frac = Fraction(a, fps).limit_denominator()
         num = frac.numerator
         dem = frac.denominator
 
-        if(dem < 3000):
+        if dem < 3000:
             factor = int(3000 / dem)
 
-            if(factor == 3000 / dem):
+            if factor == 3000 / dem:
                 num *= factor
                 dem *= factor
             else:
@@ -46,7 +44,7 @@ def fcp_xml(inp, temp, output, chunks, fps, log):
         return '{}/{}s'.format(num, dem)
 
     width, height = get_width_height(inp)
-    if(width is None or height is None):
+    if width is None or height is None:
         width, height = '1280', '720'
     frame_duration = fraction(1, fps)
 
@@ -79,7 +77,7 @@ def fcp_xml(inp, temp, output, chunks, fps, log):
 
         last_dur = 0
         for clip in chunks:
-            if(clip[2] == 99999):
+            if clip[2] == 99999:
                 continue
 
             clip_dur = (clip[1] - clip[0]) / clip[2]
@@ -87,7 +85,7 @@ def fcp_xml(inp, temp, output, chunks, fps, log):
 
             close = '/' if clip[2] == 1 else ''
 
-            if(last_dur == 0):
+            if last_dur == 0:
                 outfile.write(indent(6, '<asset-clip name="{}" offset="0s" ref="r2"'.format(name)+\
                 ' duration="{}" tcFormat="NDF"{}>'.format(dur, close)))
             else:
@@ -99,7 +97,7 @@ def fcp_xml(inp, temp, output, chunks, fps, log):
                     'tcFormat="NDF"{}>'.format(close),
                 ))
 
-            if(clip[2] != 1):
+            if clip[2] != 1:
                 # See the "Time Maps" section.
                 # https://developer.apple.com/library/archive/documentation/FinalCutProX
                 #    /Reference/FinalCutProXXMLFormat/StoryElements/StoryElements.html
