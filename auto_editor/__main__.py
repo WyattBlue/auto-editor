@@ -51,14 +51,11 @@ def main_options(parser):
             'This option only works on YouTube URLs, or where `--id` points to a valid '
             'YouTube ID.\n\nCategories include: '
             'sponsor intro outro selfpromo interaction music_offtopic')
-
     parser.add_argument('--download-archive', type=file_type, default=None,
         help='Download only videos not listed in archive file. Record the IDs of'
              ' all downloads.')
     parser.add_argument('--cookies', type=file_type, default=None,
         help='The file to read cookies from and dump the cookie jar in.')
-    parser.add_argument('--check-certificate', action='store_true',
-        help='Check the website certificate before downloading.')
 
     parser.add_text('Motion Detection Options')
     parser.add_argument('--motion-threshold', type=float_type, default=0.02,

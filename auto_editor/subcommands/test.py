@@ -384,8 +384,9 @@ def main(sys_args: Optional[List[str]]=None):
 
 
     def progress_ops_test():
-        run_program(['example.mp4', '--machine_readable_progress'])
-        run_program(['example.mp4', '--no_progress'])
+        run_program(['example.mp4', '--progress', 'machine'])
+        run_program(['example.mp4', '--progress', 'none'])
+        run_program(['example.mp4', '--progress', 'ascii'])
 
 
     def silent_threshold():
