@@ -1,16 +1,17 @@
 import os
 import re
 import sys
-from typing import Optional
+from typing import List, Optional
 
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.log import Log
+from auto_editor.ffwrapper import FFmpeg
 
 
 class MyLogger:
     @staticmethod
     def debug(msg):
-        print(msg)
+        pass
 
     @staticmethod
     def warning(msg):
@@ -34,7 +35,7 @@ def parse_bytes(bytestr) -> Optional[int]:
     return round(number * multiplier)
 
 
-def sponsor_block_api(_id: str, categories: list, log: Log) -> Optional[dict]:
+def sponsor_block_api(_id: str, categories: List[str], log: Log) -> Optional[dict]:
     from urllib import request
     from urllib.error import HTTPError
     import json
@@ -52,7 +53,7 @@ def sponsor_block_api(_id: str, categories: list, log: Log) -> Optional[dict]:
         return None
 
 
-def download_video(my_input, args, ffmpeg, log: Log):
+def download_video(my_input: str, args: object, ffmpeg: FFmpeg, log: Log) -> None:
     log.conwrite('Downloading video...')
     if '@' in my_input:
         res = my_input[my_input.index('@') + 1 :]
@@ -77,9 +78,10 @@ def download_video(my_input, args, ffmpeg, log: Log):
         log.import_error('yt-dlp')
 
     if not os.path.isfile(outtmpl):
-        ytbar = ProgressBar(100, 'Downloading')
+        ytbar = ProgressBar(args.progress)
+        ytbar.start(100, 'Downloading')
 
-        def my_hook(d):
+        def my_hook(d: dict) -> None:
             if d['status'] == 'downloading':
                 ytbar.tick(float(d['_percent_str'].replace('%', '')))
 
@@ -89,7 +91,6 @@ def download_video(my_input, args, ffmpeg, log: Log):
             return os.path.abspath(path)
 
         ydl_opts = {
-            'nocheckcertificate': not args.check_certificate,
             'outtmpl': outtmpl,
             'ffmpeg_location': ffmpeg.path,
             'format': f'bestvideo[ext=mp4][height<={res}]+bestaudio[ext=m4a]',
@@ -119,7 +120,7 @@ def download_video(my_input, args, ffmpeg, log: Log):
     return outtmpl
 
 
-def get_segment(args, my_input, log: Log):
+def get_segment(args: object, my_input: str, log: Log):
     if args.block is not None:
         if args.id is not None:
             return sponsor_block_api(args.id, args.block, log)
@@ -132,7 +133,7 @@ def get_segment(args, my_input, log: Log):
     return None
 
 
-def valid_input(inputs, ffmpeg, args, log: Log):
+def valid_input(inputs: List[str], ffmpeg: FFmpeg, args: object, log: Log):
     new_inputs = []
     segments = []
     for my_input in inputs:
