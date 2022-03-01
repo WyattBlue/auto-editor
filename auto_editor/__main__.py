@@ -22,12 +22,6 @@ def main_options(parser):
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
         frame_type, range_type, speed_range_type, block_type, margin_type, color_type)
 
-    parser.add_text('Progress Options')
-    parser.add_argument('--machine-readable-progress', action='store_true',
-        help='Set progress bar that is easier to parse.')
-    parser.add_argument('--no-progress', action='store_true',
-        help='Do not display any progress at all.')
-
     parser.add_text('Object Options')
     parser.add_argument('--add-text', nargs='*', dataclass=TextObject,
         help='Add a text object to the timeline.')
@@ -108,6 +102,9 @@ def main_options(parser):
         help='Set the color of the background that is visible when the video is moved.')
     parser.add_argument('--combine-files', action='store_true',
         help='Combine all input files into one before editing.')
+    parser.add_argument('--progress', default='modern',
+        choices=['modern', 'classic', 'ascii', 'machine', 'none'],
+        help='Set what type of progress bar to use.')
 
     parser.add_text('Manual Editing Options')
     parser.add_argument('--cut-out', type=range_type, nargs='*',
@@ -380,7 +377,7 @@ def main():
     def main_loop(input_list, ffmpeg, args, segments, log):
         num_cuts = 0
 
-        progress = ProgressBar(args.machine_readable_progress, args.no_progress)
+        progress = ProgressBar(args.progress)
 
         for i, input_path in enumerate(input_list):
             inp = ffmpeg.file_info(input_path)
