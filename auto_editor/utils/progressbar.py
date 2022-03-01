@@ -1,56 +1,98 @@
 import sys
+
+from math import floor
 from time import time, localtime
-from platform import system
 from shutil import get_terminal_size
+from platform import system
 
 from .func import get_stdout
 
-def _pretty_time(my_time: float, ampm: bool) -> str:
-    new_time = localtime(my_time)
 
-    hours = new_time.tm_hour
-    minutes = new_time.tm_min
+class ProgressBar:
+    def __init__(self, bar_type: str):
 
-    if(ampm):
-        if(hours == 0):
-            hours = 12
-        if(hours > 12):
-            hours -= 12
-        ampm_marker = 'PM' if new_time.tm_hour >= 12 else 'AM'
-        return '{:02}:{:02} {}'.format(hours, minutes, ampm_marker)
-    return '{:02}:{:02}'.format(hours, minutes)
+        self.machine = False
+        self.hide = False
+
+        self.icon = '⏳'
+        self.chars = (' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█')
+        self.brackets = ('|', '|')
+
+        if bar_type == 'classic':
+            self.icon = '⏳'
+            self.chars = ('░', '█')
+            self.brackets = ('[', ']')
+        if bar_type == 'ascii':
+            self.icon = '& '
+            self.chars = ('-', '#')
+            self.brackets = ('[', ']')
+        if bar_type == 'machine':
+            self.machine = True
+        if bar_type == 'none':
+            self.hide = True
+
+        self.part_width = len(self.chars) - 1
+
+        self.ampm = True
+        if system() == 'Darwin' and bar_type in ('default', 'classic'):
+            try:
+                date_format = get_stdout(
+                    ['defaults', 'read', 'com.apple.menuextra.clock', 'DateFormat']
+                )
+                self.ampm = 'a' in date_format
+            except FileNotFoundError:
+                pass
 
 
-class ProgressBar():
+    @staticmethod
+    def pretty_time(my_time: float, ampm: bool) -> str:
+        new_time = localtime(my_time)
+
+        hours = new_time.tm_hour
+        minutes = new_time.tm_min
+
+        if ampm:
+            if hours == 0:
+                hours = 12
+            if hours > 12:
+                hours -= 12
+            ampm_marker = 'PM' if new_time.tm_hour >= 12 else 'AM'
+            return '{:02}:{:02} {}'.format(hours, minutes, ampm_marker)
+        return '{:02}:{:02}'.format(hours, minutes)
+
     def tick(self, index):
 
         if self.hide:
             return
 
-        percent = min(100, round((index+1) / self.total * 100, 1))
-        if percent == 0:
-            percent_rate = 0
-        else:
-            percent_rate = (time() - self.begin_time) / percent
+        progress = min(1, max(0, index / self.total))
 
-        new_time = _pretty_time(self.begin_time + (percent_rate * 100), self.ampm)
+        if progress == 0:
+            progress_rate = 0
+        else:
+            progress_rate = (time() - self.begin_time) / progress
 
         if self.machine:
             index = min(index, self.total)
-            raw = int(self.begin_time + (percent_rate * 100))
+            raw = int(self.begin_time + progress_rate)
             print('{}~{}~{}~{}~{}'.format(
                 self.title, index, self.total, self.begin_time, raw),
                 end='\r', flush=True)
             return
 
+
+        new_time = self.pretty_time(self.begin_time + progress_rate, self.ampm)
+
+        percent = round(progress * 100, 1)
+        p_pad = " " * (4 - len(str(percent)))
+
         columns = get_terminal_size().columns
-        bar_len = max(1, columns - (self.len_title + 36))
-        done_nums = round(percent / (100 / bar_len))
+        bar_len = max(1, columns - (self.len_title + 32))
+        done_nums = round(percent * bar_len)
 
-        done = self.done_char * done_nums
-        togo = self.togo_char * int(bar_len - done_nums)
+        progress_bar_str = self.progress_bar_str(progress, bar_len)
 
-        bar = f'  {self.icon}{self.title}: [{done}{togo}] {percent}% done ETA {new_time}'
+        bar = f'  {self.icon}{self.title} {progress_bar_str} {p_pad}{percent}%  ETA {new_time}'
 
         if len(bar) > columns - 2:
             bar = bar[:columns - 2]
@@ -73,28 +115,27 @@ class ProgressBar():
             self.tick(0)
         except UnicodeEncodeError:
             self.icon = '& '
-            self.togo_char = '-'
-            self.done_char = '#'
+            self.chars = ('-', '#')
+            self.part_width = 1
 
-            self.tick(0)
+    def progress_bar_str(self, progress: float, width: int) -> str:
+        whole_width = floor(progress * width)
+        remainder_width = (progress * width) % 1
+        part_width = floor(remainder_width * self.part_width)
+        part_char = self.chars[part_width]
+
+        if width - whole_width - 1 < 0:
+            part_char = ''
+
+        line = (
+            self.brackets[0]
+            + self.chars[-1] * whole_width
+            + part_char
+            + self.chars[0] * (width - whole_width - 1)
+            + self.brackets[1]
+        )
+        return line
 
     @staticmethod
     def end():
         sys.stdout.write(' ' * (get_terminal_size().columns - 2) + '\r')
-
-    def __init__(self, machine_readable=False, hide=False):
-        self.machine = machine_readable
-        self.hide = hide
-
-        self.icon = '⏳'
-        self.togo_char = '░'
-        self.done_char = '█'
-
-        self.ampm = True
-        if system() == 'Darwin' and not self.machine:
-            try:
-                date_format = get_stdout(['defaults', 'read', 'com.apple.menuextra.clock',
-                    'DateFormat'])
-                self.ampm = 'a' in date_format
-            except FileNotFoundError:
-                pass
