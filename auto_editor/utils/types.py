@@ -1,11 +1,10 @@
 import os.path
 import re
-from typing import Any, List, Tuple
 
 from .func import clean_list
 
 def split_num_str(val):
-    # type: (str | int, Any) -> Tuple[int | float, str]
+    # type: (str | int) -> tuple[int | float, str]
     if isinstance(val, int):
         return val, ''
     index = 0
@@ -26,14 +25,13 @@ def split_num_str(val):
         raise TypeError(f"Invalid number: '{val}'")
     return int(num), unit
 
-def file_type(path):
-    # type: (str) -> str
+def file_type(path: str) -> str:
     if not os.path.isfile(path):
         raise TypeError(f'Auto-Editor could not find the file: {path}')
     return path
 
 def unit_check(unit, allowed_units):
-    # type: (str, List[str]) -> None
+    # type: (str, list[str]) -> None
     if unit not in allowed_units:
         raise TypeError(f"Unknown unit: '{unit}'")
 
@@ -48,8 +46,7 @@ def float_type(val):
         return float(num / 100)
     return float(num)
 
-def sample_rate_type(val):
-    # type: (str) -> int
+def sample_rate_type(val: str) -> int:
     num, unit = split_num_str(val)
     unit_check(unit, ['Hz', 'kHz', ''])
     if unit == 'kHz':
@@ -71,14 +68,14 @@ def frame_type(val):
         return str(num).strip()
     return int(num)
 
-def anchor_type(val):
+def anchor_type(val: str):
     allowed = ('tl', 'tr', 'bl', 'br', 'ce')
     if val not in allowed:
         raise TypeError('Anchor must be: ' + ' '.join(allowed))
     return val
 
 def margin_type(val):
-    # type: (str) -> Tuple[int | str, int | str]
+    # type: (str) -> tuple[int | str, int | str]
     vals = val.split(',')
     if len(vals) == 1:
         vals.append(vals[0])
