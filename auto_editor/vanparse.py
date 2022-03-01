@@ -4,14 +4,14 @@ import difflib
 import textwrap
 from shutil import get_terminal_size
 
-from typing import Optional
+from typing import List, Optional
 
 
 class ParserError(Exception):
     pass
 
 
-def indent(text, prefix, predicate=None):
+def indent(text: str, prefix, predicate=None) -> str:
     if predicate is None:
         def predicate(line):
             return line.strip()
@@ -22,7 +22,7 @@ def indent(text, prefix, predicate=None):
     return ''.join(prefixed_lines())
 
 
-def out(text):
+def out(text: str) -> None:
     width = get_terminal_size().columns - 3
 
     indent_regex = re.compile(r'^(\s+)')
@@ -104,8 +104,7 @@ def to_key(val: dict) -> str:
     return val['names'][0][:2].replace('-', '') + val['names'][0][2:].replace('-', '_')
 
 
-def get_option(name, options):
-    # type: (str, list[str]) -> Optional[dict]
+def get_option(name: str, options: List[dict]) -> Optional[dict]:
     for option in options:
         if name in option['names'] or name in map(to_underscore, option['names']):
             return option
@@ -268,8 +267,7 @@ class ParseOptions:
             setattr(self, option_list, my_list)
 
 
-    def __init__(self, sys_args, options_reqs):
-        # type: (list[str], list[dict], list[dict]) -> None
+    def __init__(self, sys_args: List[str], options_reqs: List[dict]) -> None:
 
         # Partition options and requireds.
         options = []

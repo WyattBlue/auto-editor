@@ -22,8 +22,7 @@ def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
     min_clip = seconds_to_frames(args.min_clip_length, fps)
     min_cut = seconds_to_frames(args.min_cut_length, fps)
 
-    def get_has_loud(inp, args, fps, audio_samples, sample_rate, log):
-        # type: (...) -> np.ndarray
+    def get_has_loud(inp, args, fps, audio_samples, sample_rate, log) -> np.ndarray:
         from auto_editor.analyze.generic import get_np_list
 
         if args.edit_based_on == 'none':
@@ -65,7 +64,7 @@ def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
     has_loud = cook(has_loud, min_clip, min_cut)
     has_loud = apply_margin(has_loud, has_loud_length, start_margin, end_margin)
 
-    if(segment is not None):
+    if segment is not None:
         has_loud = combine_segment(has_loud, segment, fps)
 
     # Remove small clips/cuts created by applying other rules.
@@ -73,13 +72,13 @@ def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
 
     speed_list = to_speed_list(has_loud, args.video_speed, args.silent_speed)
 
-    if(args.cut_out != []):
+    if args.cut_out != []:
         speed_list = set_range(speed_list, args.cut_out, fps, 99999, log)
 
-    if(args.add_in != []):
+    if args.add_in != []:
         speed_list = set_range(speed_list, args.add_in, fps, args.video_speed, log)
 
-    if(args.set_speed_for_range != []):
+    if args.set_speed_for_range != []:
         for item in args.set_speed_for_range:
             speed_list = set_range(speed_list, [item[1:]], fps, item[0], log)
 
@@ -111,42 +110,42 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     rules = get_rules(output_container)
     codec_error = "'{}' codec is not supported in '{}' container."
 
-    if(not fnone(args.sample_rate)):
-        if(rules['samplerate'] is not None and args.sample_rate not in rules['samplerate']):
-            log.error("'{}' container only supports samplerates: {}".format(output_container,
-                rules['samplerate']))
+    if not fnone(args.sample_rate):
+        if rules['samplerate'] is not None and args.sample_rate not in rules['samplerate']:
+            log.error(
+                "'{}' container only supports samplerates: {}".format(output_container,
+                rules['samplerate'])
+            )
 
     vcodec = args.video_codec
-    if(vcodec == 'uncompressed'):
+    if vcodec == 'uncompressed':
         vcodec = 'mpeg4'
-    if(vcodec == 'copy'):
+    if vcodec == 'copy':
         vcodec = inp.video_streams[0]['codec']
 
-    if(vcodec != 'auto'):
-        if(rules['vstrict'] and vcodec not in rules['vcodecs']):
+    if vcodec != 'auto':
+        if rules['vstrict'] and vcodec not in rules['vcodecs']:
             log.error(codec_error.format(vcodec, output_container))
 
-        if(vcodec in rules['disallow_v']):
+        if vcodec in rules['disallow_v']:
             log.error(codec_error.format(vcodec, output_container))
 
     acodec = args.audio_codec
-    if(acodec == 'copy'):
+    if acodec == 'copy':
         acodec = inp.audio_streams[0]['codec']
         log.debug(f'Settings acodec to {acodec}')
 
-    if(acodec not in ['unset', 'auto']):
-        if(rules['astrict'] and acodec not in rules['acodecs']):
+    if acodec not in ('unset', 'auto'):
+        if rules['astrict'] and acodec not in rules['acodecs']:
             log.error(codec_error.format(acodec, output_container))
 
-        if(acodec in rules['disallow_a']):
+        if acodec in rules['disallow_a']:
             log.error(codec_error.format(acodec, output_container))
 
-    if(args.keep_tracks_seperate and rules['max_audio_streams'] == 1):
-        log.warning(
-            "'{}' container doesn't support multiple audio tracks.".format(container)
-        )
+    if args.keep_tracks_seperate and rules['max_audio_streams'] == 1:
+        log.warning(f"'{container}' container doesn't support multiple audio tracks.")
 
-    if(os.path.isfile(output_path) and inp.path != output_path and not args.preview
+    if (os.path.isfile(output_path) and inp.path != output_path and not args.preview
         and not args.timeline):
         log.debug('Removing already existing file: {}'.format(output_path))
         os.remove(output_path)
@@ -156,11 +155,11 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
 
     fps = 30 if inp.fps is None else float(inp.fps)
 
-    if(fps < 1):
+    if fps < 1:
         log.error('{}: Frame rate cannot be below 1. fps: {}'.format(inp.basename, fps))
 
     # Extract subtitles in their native format.
-    if(len(inp.subtitle_streams) > 0):
+    if len(inp.subtitle_streams) > 0:
         cmd = ['-i', inp.path, '-hide_banner']
         for s, sub in enumerate(inp.subtitle_streams):
             cmd.extend(['-map', '0:s:{}'.format(s)])
@@ -172,7 +171,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
 
     if args.cut_by_this_track >= tracks and args.cut_by_this_track != 0:
         message = "You choose a track that doesn't exist.\nThere "
-        if(tracks == 1):
+        if tracks == 1:
             message += 'is only {} track.\n'.format(tracks)
         else:
             message += 'are only {} tracks.\n'.format(tracks)
@@ -190,8 +189,8 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     ffmpeg.run(cmd)
     del cmd
 
-    if(tracks != 0):
-        if(args.cut_by_all_tracks):
+    if tracks != 0:
+        if args.cut_by_all_tracks:
             temp_file = os.path.join(temp, 'combined.wav')
             cmd = ['-i', inp.path, '-filter_complex',
                 '[0:a]amix=inputs={}:duration=longest'.format(tracks), '-ac', '2',
@@ -224,55 +223,55 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
 
     obj_sheet = Sheet(pool, inp, chunks, log)
 
-    if(args.export_as_json):
+    if args.export_as_json:
         from auto_editor.formats.timeline import make_json_timeline
         make_json_timeline(inp.path, output_path, obj_sheet, chunks, fps, args.background,
             log)
         return num_cuts, output_path
 
-    if(args.timeline):
+    if args.timeline:
         from auto_editor.formats.timeline import make_json_timeline
         make_json_timeline(inp.path, 0, obj_sheet, chunks, fps, args.background, log)
         return num_cuts, None
 
-    if(args.preview):
+    if args.preview:
         from auto_editor.preview import preview
         preview(inp, chunks, log)
         return num_cuts, None
 
-    if(args.export_to_premiere):
+    if args.export_to_premiere:
         from auto_editor.formats.premiere import premiere_xml
         premiere_xml(inp, temp, output_path, chunks, sample_rate, fps, log)
         return num_cuts, output_path
 
-    if(args.export_to_final_cut_pro):
+    if args.export_to_final_cut_pro:
         from auto_editor.formats.final_cut_pro import fcp_xml
 
         fcp_xml(inp, temp, output_path, chunks, fps, log)
         return num_cuts, output_path
 
-    if(args.export_to_shotcut):
+    if args.export_to_shotcut:
         from auto_editor.formats.shotcut import shotcut_xml
 
         shotcut_xml(inp, temp, output_path, chunks, fps, log)
         return num_cuts, output_path
 
-    def pad_chunk(item, total_frames):
+    def pad_chunk(item: list, total_frames: int) -> list:
         start = None
         end = None
-        if(item[0] != 0):
+        if item[0] != 0:
             start = [0, item[0], 2]
-        if(item[1] != total_frames -1):
-            end = [item[1], total_frames -1, 2]
+        if item[1] != total_frames - 1:
+            end = [item[1], total_frames - 1, 2]
 
-        if(start is None):
+        if start is None:
             return [item] + [end]
-        if(end is None):
+        if end is None:
             return [start] + [item]
         return [start] + [item] + [end]
 
 
-    def make_media(inp, chunks, output_path):
+    def make_media(inp, chunks, output_path: str) -> None:
         from auto_editor.utils.video import mux_quality_media
 
         if rules['allow_subtitle']:

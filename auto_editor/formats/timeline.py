@@ -8,8 +8,7 @@ import json
 
 from auto_editor.utils.log import Log
 
-def read_json_timeline(json_file, log):
-    # type: (str, Log) -> tuple[str, str, list[tuple[int, int, float]]]
+def read_json_timeline(json_file: str, log: Log):
     with open(json_file, 'r') as f:
         data = json.load(f)
 

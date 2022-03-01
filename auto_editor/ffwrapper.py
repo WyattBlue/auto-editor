@@ -5,13 +5,16 @@ import os.path
 import subprocess
 from platform import system
 
+# Typing
+from typing import List, Optional
+
 # Included Libraries
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
 def regex_match(regex, text):
     match = re.search(regex, text)
-    if(match):
+    if match:
         return match.groupdict()['match']
     return None
 
@@ -19,11 +22,10 @@ def regex_match(regex, text):
 class FFmpeg():
 
     @staticmethod
-    def _set_ff_path(ff_location, my_ffmpeg):
-        # type: (str | None, bool) -> str
-        if(ff_location is not None):
+    def _set_ff_path(ff_location: Optional[str], my_ffmpeg: bool) -> str:
+        if ff_location is not None:
             return ff_location
-        if(my_ffmpeg or system() not in ['Windows', 'Darwin']):
+        if my_ffmpeg or system() not in ('Windows', 'Darwin'):
             return 'ffmpeg'
         program = 'ffmpeg' if system() == 'Darwin' else 'ffmpeg.exe'
         dirpath = os.path.dirname(os.path.realpath(__file__))
@@ -37,33 +39,31 @@ class FFmpeg():
             _version = _version.replace('ffmpeg version', '').strip()
             self.version = _version.split(' ')[0]
         except FileNotFoundError:
-            if(system() == 'Darwin'):
+            if system() == 'Darwin':
                 Log().error('No ffmpeg found, download via homebrew or restore the '
                     'included binary.')
-            if(system() == 'Windows'):
+            if system() == 'Windows':
                 Log().error('No ffmpeg found, download ffmpeg with your favorite package '
                     'manager (ex chocolatey), or restore the included binary.')
 
             Log().error('ffmpeg must be installed and on PATH.')
 
-    def print(self, message: str):
-        if(self.debug):
-            print('FFmpeg: {}'.format(message), file=sys.stderr)
+    def print(self, message: str) -> None:
+        if self.debug:
+            print(f'FFmpeg: {message}', file=sys.stderr)
 
-    def print_cmd(self, cmd):
-        # type: (list[str]) -> None
-        if(self.debug):
+    def print_cmd(self, cmd: List[str]) -> None:
+        if self.debug:
             print('FFmpeg run: {}\n'.format(' '.join(cmd)), file=sys.stderr)
 
-    def run(self, cmd):
-        # type: (list[str]) -> None
+    def run(self, cmd: List[str]) -> None:
         cmd = [self.path, '-y', '-hide_banner'] + cmd
-        if(not self.debug):
+        if not self.debug:
             cmd.extend(['-nostats', '-loglevel', 'error'])
         self.print_cmd(cmd)
         subprocess.call(cmd)
 
-    def run_check_errors(self, cmd, log, show_out=False):
+    def run_check_errors(self, cmd: List[str], log, show_out=False):
 
         def _run(cmd):
             process = self.Popen(cmd, stdin=subprocess.PIPE,
@@ -75,7 +75,7 @@ class FFmpeg():
 
         output = _run(cmd)
 
-        if('Try -allow_sw 1' in output):
+        if 'Try -allow_sw 1' in output:
             cmd.insert(-1, '-allow_sw')
             cmd.insert(-1, '1')
             output = _run(cmd)
@@ -91,18 +91,18 @@ class FFmpeg():
             r"Incompatible pixel format '.*' for codec '[A-Za-z0-9_]*'",
         ]
 
-        if(self.debug):
+        if self.debug:
             print(f'stderr: {output}')
 
         for item in error_list:
             check = re.search(item, output)
-            if(check):
+            if check:
                 log.error(check.group())
 
-        if(show_out and not self.debug):
+        if show_out and not self.debug:
             print(f'stderr: {output}')
 
-    def file_info(self, path):
+    def file_info(self, path: str):
         return File(self, path)
 
     def Popen(self, cmd, stdin=None, stdout=subprocess.PIPE, stderr=None):
@@ -110,8 +110,7 @@ class FFmpeg():
         self.print_cmd(cmd)
         return subprocess.Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr)
 
-    def pipe(self, cmd):
-        # type: (list[str]) -> str
+    def pipe(self, cmd: List[str]) -> str:
         cmd = [self.path, '-y'] + cmd
 
         self.print_cmd(cmd)
