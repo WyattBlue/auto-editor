@@ -7,7 +7,7 @@ from datetime import timedelta
 
 class Timer:
     __slots__ = ('start_time', 'quiet')
-    def __init__(self, quiet=False):
+    def __init__(self, quiet=False) -> None:
         self.start_time = perf_counter()
         self.quiet = quiet
 
@@ -20,7 +20,7 @@ class Timer:
 
 class Log:
     __slots__ = ('is_debug', 'quiet', 'temp')
-    def __init__(self, show_debug=False, quiet=False, temp=None):
+    def __init__(self, show_debug=False, quiet=False, temp=None) -> None:
         self.is_debug = show_debug
         self.quiet = quiet
         self.temp = temp

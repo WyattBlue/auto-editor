@@ -1,28 +1,31 @@
 import os
 import re
 
+from typing import List, Tuple
+from auto_editor.utils.log import Log
+
 class SubtitleParser:
     def __init__(self):
         self.supported_codecs = ('ass', 'webvtt', 'mov_text')
 
-    def parse(self, text, fps, codec):
+    def parse(self, text, fps: float, codec: str):
 
-        if(codec not in self.supported_codecs):
+        if codec not in self.supported_codecs:
             raise ValueError(f'codec {codec} not supported.')
 
         self.fps = fps
         self.codec = codec
         self.contents = []
 
-        if(codec == 'ass'):
+        if codec == 'ass':
             time_code = re.compile(r'(.*)(\d+:\d+:[\d.]+)(.*)(\d+:\d+:[\d.]+)(.*)')
-        if(codec == 'webvtt'):
+        if codec == 'webvtt':
             time_code = re.compile(r'()(\d+:[\d.]+)( --> )(\d+:[\d.]+)(\n.*)')
-        if(codec == 'mov_text'):
+        if codec == 'mov_text':
             time_code = re.compile(r'()(\d+:\d+:[\d,]+)( --> )(\d+:\d+:[\d,]+)(\n.*)')
 
         for i, item in enumerate(re.finditer(time_code, text)):
-            if(i == 0):
+            if i == 0:
                 self.header = text[:item.span()[0]]
 
             self.contents.append(
@@ -33,31 +36,31 @@ class SubtitleParser:
         self.footer = text[item.span()[1]:]
 
 
-    def edit(self, chunks):
+    def edit(self, chunks: List[Tuple[int, int, float]]) -> None:
         for cut in reversed(chunks):
             the_speed = cut[2]
             speed_factor = 1 if the_speed == 99999 else 1 - (1 / the_speed)
 
             new_content = []
             for content in self.contents:
-                if(cut[0] <= content[1] and cut[1] > content[0]):
+                if cut[0] <= content[1] and cut[1] > content[0]:
 
                     diff = int(
                         (min(cut[1], content[1]) - max(cut[0], content[0])) * speed_factor
                     )
-                    if(content[0] > cut[0]):
+                    if content[0] > cut[0]:
                         content[0] -= diff
                         content[1] -= diff
 
                     content[1] -= diff
 
-                elif(content[0] >= cut[0]):
+                elif content[0] >= cut[0]:
                     diff = int((cut[1] - cut[0]) * speed_factor)
 
                     content[0] -= diff
                     content[1] -= diff
 
-                if(content[0] != content[1]):
+                if content[0] != content[1]:
                     new_content.append(content)
 
         self.contents = new_content
@@ -76,7 +79,7 @@ class SubtitleParser:
             file.write(self.footer)
 
     def to_frame(self, text: str) -> int:
-        if(self.codec == 'mov_text'):
+        if self.codec == 'mov_text':
             time_format = r'(\d+):?(\d+):([\d,]+)'
         else:
             time_format = r'(\d+):?(\d+):([\d.]+)'
@@ -95,29 +98,33 @@ class SubtitleParser:
         h, m = divmod(m, 60)
 
         sig_fig = 2 if self.codec == 'ass' else 3
-        s = str(round(s, sig_fig)).zfill(2)
 
-        if(self.codec == 'webvtt'):
-            if(int(h) == 0):
-                return '{:02d}:{}'.format(int(m), s)
+        str_s = str(round(s, sig_fig)).zfill(2)
+        del s
+
+        if self.codec == 'webvtt':
+            if int(h) == 0:
+                return '{:02d}:{}'.format(int(m), str_s)
             time_format = '{:02d}:{:02d}:{}'
-        elif(self.codec == 'mov_text'):
-            s = s.replace('.', ',', 1)
+        elif self.codec == 'mov_text':
+            str_s = str_s.replace('.', ',', 1)
             time_format = '{:02d}:{:02d}:{}'
         else:
             time_format = '{:d}:{:02d}:{}'
 
-        return time_format.format(int(h), int(m), s)
+        return time_format.format(int(h), int(m), str_s)
 
 
-def cut_subtitles(ffmpeg, inp, chunks, fps, temp, log):
+def cut_subtitles(
+    ffmpeg, inp, chunks: List[Tuple[int, int, float]], fps: float, temp: str, log: Log
+) -> None:
     for s, sub in enumerate(inp.subtitle_streams):
         file_path = os.path.join(temp, '{}s.{}'.format(s, sub['ext']))
         new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
 
         parser = SubtitleParser()
 
-        if(sub['codec'] in parser.supported_codecs):
+        if sub['codec'] in parser.supported_codecs:
             with open(file_path, 'r') as file:
                 parser.parse(file.read(), fps, sub['codec'])
         else:

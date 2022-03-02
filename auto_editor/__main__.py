@@ -247,7 +247,7 @@ def main():
 
     subcommands = ['create', 'test', 'info', 'levels', 'grep', 'subdump', 'desc']
 
-    if(len(sys.argv) > 1 and sys.argv[1] in subcommands):
+    if len(sys.argv) > 1 and sys.argv[1] in subcommands:
         obj = __import__('auto_editor.subcommands.{}'.format(sys.argv[1]),
             fromlist=['subcommands'])
         obj.main(sys.argv[2:])
@@ -269,7 +269,7 @@ def main():
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, args.show_ffmpeg_debug)
 
-    if(args.debug and args.input == []):
+    if args.debug and args.input == []:
         import platform
 
         print('Python Version: {} {}'.format(platform.python_version(), is64bit))
@@ -279,33 +279,33 @@ def main():
         print('Auto-Editor version {}'.format(auto_editor.version))
         sys.exit()
 
-    if(is64bit == '32-bit'):
+    if is64bit == '32-bit':
         Log().warning('You have the 32-bit version of Python, which may lead to '
             'memory crashes.')
 
-    if(args.version):
+    if args.version:
         print('Auto-Editor version {}'.format(auto_editor.version))
         sys.exit()
 
-    if(args.temp_dir is None):
+    if args.temp_dir is None:
         TEMP = tempfile.mkdtemp()
     else:
         TEMP = args.temp_dir
-        if(os.path.isfile(TEMP)):
+        if os.path.isfile(TEMP):
             Log().error('Temp directory cannot be an already existing file.')
-        if(os.path.isdir(TEMP)):
-            if(len(os.listdir(TEMP)) != 0):
+        if os.path.isdir(TEMP):
+            if len(os.listdir(TEMP)) != 0:
                 Log().error('Temp directory should be empty!')
         else:
             os.mkdir(TEMP)
 
-    if(args.timeline):
+    if args.timeline:
         args.quiet = True
 
     log = Log(args.debug, args.quiet, temp=TEMP)
     log.debug('Temp Directory: {}'.format(TEMP))
 
-    if(args.input == []):
+    if args.input == []:
         log.error('You need to give auto-editor an input file or folder so it can '
             'do the work for you.')
 
@@ -313,51 +313,51 @@ def main():
         args.export_to_shotcut, args.export_as_clip_sequence].count(True) > 1):
         log.error('You must choose only one export option.')
 
-    if(args.constant_rate_factor != 'unset'):
+    if args.constant_rate_factor != 'unset':
         if(int(args.constant_rate_factor) < 0 or int(args.constant_rate_factor) > 51):
             log.error('Constant rate factor (crf) must be between 0-51.')
-    if(args.md_width < 1):
+    if args.md_width < 1:
         log.error('--md-width cannot be less than 1.')
 
-    def write_starting_message(args):
-        if(args.export_to_premiere):
+    def write_starting_message(args: object) -> str:
+        if args.export_to_premiere:
             return 'Exporting to Adobe Premiere Pro XML file.'
-        if(args.export_to_final_cut_pro):
+        if args.export_to_final_cut_pro:
             return 'Exporting to Final Cut Pro XML file.'
-        if(args.export_to_shotcut):
+        if args.export_to_shotcut:
             return 'Exporting to Shotcut XML Timeline file.'
-        if(args.export_as_audio):
+        if args.export_as_audio:
             return 'Exporting as audio.'
         return 'Starting.'
 
-    if(not args.preview and not args.timeline):
+    if not args.preview and not args.timeline:
         log.conwrite(write_starting_message(args))
 
-    if(args.preview or args.timeline or args.export_as_clip_sequence or making_data_file):
+    if args.preview or args.timeline or args.export_as_clip_sequence or making_data_file:
         args.no_open = True
 
-    if(args.md_blur < 0):
+    if args.md_blur < 0:
         args.md_blur = 0
 
-    if(args.silent_speed <= 0 or args.silent_speed > 99999):
+    if args.silent_speed <= 0 or args.silent_speed > 99999:
         args.silent_speed = 99999
 
-    if(args.video_speed <= 0 or args.video_speed > 99999):
+    if args.video_speed <= 0 or args.video_speed > 99999:
         args.video_speed = 99999
 
-    if(args.output_file is None):
+    if args.output_file is None:
         args.output_file = []
 
     from auto_editor.validate_input import valid_input
     input_list, segments = valid_input(args.input, ffmpeg, args, log)
 
-    if(len(args.output_file) < len(input_list)):
+    if len(args.output_file) < len(input_list):
         for i in range(len(input_list) - len(args.output_file)):
             args.output_file.append(set_output_name(input_list[i], None,
                 making_data_file, args))
 
-    if(args.combine_files):
-        if(exporting_to_editor):
+    if args.combine_files:
+        if exporting_to_editor:
             temp_file = 'combined.mp4'
         else:
             temp_file = os.path.join(TEMP, 'combined.mp4')
@@ -386,10 +386,10 @@ def main():
                 segments[i], exporting_to_editor, making_data_file, TEMP, log)
             num_cuts += cuts
 
-        if(not args.preview and not args.timeline and not making_data_file):
+        if not args.preview and not args.timeline and not making_data_file:
             timer.stop()
 
-        if(not args.preview and not args.timeline and making_data_file):
+        if not args.preview and not args.timeline and making_data_file:
             # Assume making each cut takes about 30 seconds.
             time_save = usefulfunctions.human_readable_time(num_cuts * 30)
             s = 's' if num_cuts != 1 else ''
@@ -397,7 +397,7 @@ def main():
             log.print('Auto-Editor made {} cut{}, which would have taken about {} if '
                 'edited manually.'.format(num_cuts, s, time_save))
 
-        if(not args.no_open):
+        if not args.no_open:
             usefulfunctions.open_with_system_default(output_path, log)
 
     try:
@@ -406,5 +406,5 @@ def main():
         log.error('Keyboard Interrupt')
     log.cleanup()
 
-if(__name__ == '__main__'):
+if __name__ == '__main__':
     main()
