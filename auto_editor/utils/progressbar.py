@@ -105,7 +105,7 @@ class ProgressBar:
         except AttributeError:
             pass
 
-    def start(self, total, title='Please wait'):
+    def start(self, total, title: str='Please wait'):
         self.title = title
         self.len_title = len(title)
         self.total = total
