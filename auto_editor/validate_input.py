@@ -53,7 +53,7 @@ def sponsor_block_api(_id: str, categories: List[str], log: Log) -> Optional[dic
         return None
 
 
-def download_video(my_input: str, args: object, ffmpeg: FFmpeg, log: Log) -> None:
+def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     log.conwrite('Downloading video...')
     if '@' in my_input:
         res = my_input[my_input.index('@') + 1 :]
@@ -120,7 +120,7 @@ def download_video(my_input: str, args: object, ffmpeg: FFmpeg, log: Log) -> Non
     return outtmpl
 
 
-def get_segment(args: object, my_input: str, log: Log):
+def get_segment(args, my_input: str, log: Log):
     if args.block is not None:
         if args.id is not None:
             return sponsor_block_api(args.id, args.block, log)
@@ -133,7 +133,7 @@ def get_segment(args: object, my_input: str, log: Log):
     return None
 
 
-def valid_input(inputs: List[str], ffmpeg: FFmpeg, args: object, log: Log):
+def valid_input(inputs: List[str], ffmpeg: FFmpeg, args, log: Log):
     new_inputs = []
     segments = []
     for my_input in inputs:

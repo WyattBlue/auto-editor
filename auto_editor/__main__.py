@@ -319,7 +319,7 @@ def main():
     if args.md_width < 1:
         log.error('--md-width cannot be less than 1.')
 
-    def write_starting_message(args: object) -> str:
+    def write_starting_message(args) -> str:
         if args.export_to_premiere:
             return 'Exporting to Adobe Premiere Pro XML file.'
         if args.export_to_final_cut_pro:
