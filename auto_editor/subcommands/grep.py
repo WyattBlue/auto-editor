@@ -38,7 +38,7 @@ def cleanhtml(raw_html: str) -> str:
 
 
 def grep_core(
-    media_file: str, add_prefix: bool, ffmpeg: FFmpeg, args: object, log: Log, TEMP: str
+    media_file: str, add_prefix: bool, ffmpeg: FFmpeg, args, log: Log, TEMP: str
 ) -> None:
 
     """

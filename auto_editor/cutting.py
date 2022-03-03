@@ -198,7 +198,7 @@ def apply_margin(
 
 
 def apply_mark_as(
-    has_loud: np.ndarray, has_loud_length: int, fps: float, args: object, log: Log
+    has_loud: np.ndarray, has_loud_length: int, fps: float, args, log: Log
     ) -> np.ndarray:
 
     if args.mark_as_loud != []:
