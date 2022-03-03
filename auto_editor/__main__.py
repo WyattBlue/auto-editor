@@ -68,16 +68,16 @@ def main_options(parser):
         help='Set the strength of the blur applied to a frame before being compared.')
 
     parser.add_text('Exporting as Media Options')
+    parser.add_argument('--video-codec', '-vcodec', '-c:v', default='auto',
+        help='Set the video codec for the output media file.')
+    parser.add_argument('--audio-codec', '-acodec', '-c:a', default='auto',
+        help='Set the audio codec for the output media file.')
     parser.add_argument('--video-bitrate', '-b:v', default='10m',
         help='Set the number of bits per second for video.')
     parser.add_argument('--audio-bitrate', '-b:a', default='unset',
         help='Set the number of bits per second for audio.')
     parser.add_argument('--sample-rate', '-ar', type=sample_rate_type,
         help='Set the sample rate of the input and output videos.')
-    parser.add_argument('--video-codec', '-vcodec', '-c:v', default='auto',
-        help='Set the video codec for the output media file.')
-    parser.add_argument('--audio-codec', '-acodec', '-c:a', default='auto',
-        help='Set the audio codec for the output media file.')
     parser.add_argument('--preset', '-preset', default='unset',
         choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
             'slow', 'slower', 'veryslow', 'unset'],
@@ -87,12 +87,15 @@ def main_options(parser):
             'zerolatency', 'none', 'unset'],
         help='Set the tune for ffmpeg to compress video better in certain circumstances.')
     parser.add_argument('--constant-rate-factor', '-crf', default='unset', range='0 to 51',
-        help='Set the quality for video using the crf method.')
+        help='Set a value to the ffmpeg option -crf.',
+        manual="This option's value gets directly passed to the -crf flag used by ffmpeg "
+        "during encoding. If the video encoder does not support crf, "
+        "the program will error.")
     parser.add_argument('--video-quality-scale', '-qscale:v', '-q:v', default='unset',
         range='1 to 31',
         help='Set a value to the ffmpeg option -qscale:v')
     parser.add_argument('--scale', type=float_type, default=1,
-        help='Scale the output media file by a certain factor.')
+        help='Scale the output video by a certain factor.')
 
     parser.add_text('Miscellaneous Options')
     parser.add_argument('--background', type=color_type, default='#000',
@@ -224,13 +227,10 @@ def main_options(parser):
 
     parser.add_argument('--output-file', '--output', '-o', nargs='*',
         help='Set the name(s) of the new output.')
+    parser.add_blank()
     parser.add_required('input', nargs='*',
         help='File(s) or URL(s) that will be edited.')
 
-    parser.add_text('Have an issue? Make an issue. Visit:\n '
-        '    https://github.com/wyattblue/auto-editor/issues')
-    parser.add_text('The help option can be used on a specific option:\n '
-        '    auto-editor --frame-margin --help')
     return parser
 
 
@@ -303,7 +303,7 @@ def main():
         args.quiet = True
 
     log = Log(args.debug, args.quiet, temp=TEMP)
-    log.debug('Temp Directory: {}'.format(TEMP))
+    log.debug(f'Temp Directory: {TEMP}')
 
     if args.input == []:
         log.error('You need to give auto-editor an input file or folder so it can '
@@ -314,7 +314,7 @@ def main():
         log.error('You must choose only one export option.')
 
     if args.constant_rate_factor != 'unset':
-        if(int(args.constant_rate_factor) < 0 or int(args.constant_rate_factor) > 51):
+        if int(args.constant_rate_factor) < 0 or int(args.constant_rate_factor) > 51:
             log.error('Constant rate factor (crf) must be between 0-51.')
     if args.md_width < 1:
         log.error('--md-width cannot be less than 1.')
@@ -379,8 +379,8 @@ def main():
         for i, input_path in enumerate(input_list):
             inp = ffmpeg.file_info(input_path)
 
-            if(len(input_list) > 1):
-                log.conwrite('Working on {}'.format(inp.basename))
+            if len(input_list) > 1:
+                log.conwrite(f'Working on {inp.basename}')
 
             cuts, output_path = edit_media(i, inp, ffmpeg, args, progress,
                 segments[i], exporting_to_editor, making_data_file, TEMP, log)
