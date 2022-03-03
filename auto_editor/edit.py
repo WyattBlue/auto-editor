@@ -153,7 +153,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     audio_samples = None
     tracks = len(inp.audio_streams)
 
-    fps = 30 if inp.fps is None else float(inp.fps)
+    fps = 30.0 if inp.fps is None else float(inp.fps)
 
     if fps < 1:
         log.error('{}: Frame rate cannot be below 1. fps: {}'.format(inp.basename, fps))
@@ -256,22 +256,22 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         shotcut_xml(inp, temp, output_path, chunks, fps, log)
         return num_cuts, output_path
 
-    def pad_chunk(item: list, total_frames: int) -> list:
-        start = None
-        end = None
-        if item[0] != 0:
-            start = [0, item[0], 2]
-        if item[1] != total_frames - 1:
-            end = [item[1], total_frames - 1, 2]
+    def pad_chunk(
+        chunk: Tuple[int, int, float], total_frames: int
+    ) -> List[Tuple[int, int, float]]:
 
-        if start is None:
-            return [item] + [end]
-        if end is None:
-            return [start] + [item]
-        return [start] + [item] + [end]
+        start = []
+        end = []
+        if chunk[0] != 0:
+            start.append((0, chunk[0], 99999.0))
+
+        if chunk[1] != total_frames - 1:
+            end.append((chunk[1], total_frames - 1, 99999.0))
+
+        return start + [chunk] + end
 
 
-    def make_media(inp, chunks, output_path: str) -> None:
+    def make_media(inp, chunks: List[Tuple[int, int, float]], output_path: str) -> None:
         from auto_editor.utils.video import mux_quality_media
 
         if rules['allow_subtitle']:
