@@ -272,11 +272,11 @@ def main():
     if args.debug and args.input == []:
         import platform
 
-        print('Python Version: {} {}'.format(platform.python_version(), is64bit))
-        print('Platform: {} {} {}'.format(platform.system(), platform.release(), platform.machine().lower()))
-        print('FFmpeg path: {}'.format(ffmpeg.path))
-        print('FFmpeg version: {}'.format(ffmpeg.version))
-        print('Auto-Editor version {}'.format(auto_editor.version))
+        print(f'Python Version: {platform.python_version()} {is64bit}')
+        print(f'Platform: {platform.system()} {platform.release()} {platform.machine().lower()}')
+        print(f'FFmpeg Version: {ffmpeg.version}')
+        print(f'FFmpeg Path: {ffmpeg.path}')
+        print(f'Auto-Editor Version: {auto_editor.version}')
         sys.exit()
 
     if is64bit == '32-bit':
