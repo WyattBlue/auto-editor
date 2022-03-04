@@ -47,7 +47,9 @@ def audio_detection(
 
     # Calculate when the audio is loud or silent.
     for i in range(audio_frame_count):
-        progress.tick(i)
+
+        if i % 500 == 0:
+            progress.tick(i)
 
         start = int(i * sample_rate_per_frame)
         end = min(int((i+1) * sample_rate_per_frame), sample_count)
