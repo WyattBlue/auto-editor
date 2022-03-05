@@ -284,7 +284,7 @@ def main():
             'memory crashes.')
 
     if args.version:
-        print('Auto-Editor version {}'.format(auto_editor.version))
+        print(f'Auto-Editor Version: {auto_editor.version}')
         sys.exit()
 
     if args.temp_dir is None:
@@ -321,14 +321,14 @@ def main():
 
     def write_starting_message(args) -> str:
         if args.export_to_premiere:
-            return 'Exporting to Adobe Premiere Pro XML file.'
+            return 'Exporting to Adobe Premiere Pro XML file'
         if args.export_to_final_cut_pro:
-            return 'Exporting to Final Cut Pro XML file.'
+            return 'Exporting to Final Cut Pro XML file'
         if args.export_to_shotcut:
-            return 'Exporting to Shotcut XML Timeline file.'
+            return 'Exporting to Shotcut XML Timeline file'
         if args.export_as_audio:
-            return 'Exporting as audio.'
-        return 'Starting.'
+            return 'Exporting as audio'
+        return 'Starting'
 
     if not args.preview and not args.timeline:
         log.conwrite(write_starting_message(args))

@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-from typing import List, Optional
+from typing import List, Tuple, Optional
 
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.log import Log
@@ -55,19 +55,15 @@ def sponsor_block_api(_id: str, categories: List[str], log: Log) -> Optional[dic
 
 def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     log.conwrite('Downloading video...')
-    if '@' in my_input:
-        res = my_input[my_input.index('@') + 1 :]
-        if ' ' in res:
-            res = res[: res.index(' ')]
-        res = res.strip()
+    if ' @' in my_input:
+        max_height = my_input[my_input.index(' @') + 2 :].strip()
+        download_format = f'bestvideo[ext=mp4][height<={max_height}]+bestaudio[ext=m4a]'
+
         my_input = my_input[: my_input.index(' ')]
     else:
-        res = '720'
+        download_format = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]'
 
-    outtmpl = re.sub(r'\W+', '-', my_input)
-    if outtmpl.endswith('-mp4'):
-        outtmpl = outtmpl[:-4]
-    outtmpl += '.mp4'
+    outtmpl = re.sub(r'\W+', '-', os.path.splitext(my_input)[0]) + '.mp4'
 
     if args.download_dir is not None:
         outtmpl = os.path.join(args.download_dir, outtmpl)
@@ -85,7 +81,7 @@ def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
             if d['status'] == 'downloading':
                 ytbar.tick(float(d['_percent_str'].replace('%', '')))
 
-        def abspath(path):
+        def abspath(path: Optional[str]) -> Optional[str]:
             if path is None:
                 return None
             return os.path.abspath(path)
@@ -93,7 +89,7 @@ def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
         ydl_opts = {
             'outtmpl': outtmpl,
             'ffmpeg_location': ffmpeg.path,
-            'format': f'bestvideo[ext=mp4][height<={res}]+bestaudio[ext=m4a]',
+            'format': download_format,
             'ratelimit': parse_bytes(args.limit_rate),
             'logger': MyLogger(),
             'cookiefile': abspath(args.cookies),
@@ -120,7 +116,7 @@ def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     return outtmpl
 
 
-def get_segment(args, my_input: str, log: Log):
+def get_segment(args, my_input: str, log: Log) -> Optional[dict]:
     if args.block is not None:
         if args.id is not None:
             return sponsor_block_api(args.id, args.block, log)
@@ -133,7 +129,10 @@ def get_segment(args, my_input: str, log: Log):
     return None
 
 
-def valid_input(inputs: List[str], ffmpeg: FFmpeg, args, log: Log):
+def valid_input(
+    inputs: List[str], ffmpeg: FFmpeg, args, log: Log
+    ) -> Tuple[List[str], List[Optional[dict]]]:
+
     new_inputs = []
     segments = []
     for my_input in inputs:
