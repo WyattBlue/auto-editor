@@ -284,7 +284,7 @@ def main():
             'memory crashes.')
 
     if args.version:
-        print(f'Auto-Editor Version: {auto_editor.version}')
+        print(f'Auto-Editor version {auto_editor.version}')
         sys.exit()
 
     if args.temp_dir is None:
