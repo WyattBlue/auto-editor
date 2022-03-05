@@ -104,6 +104,8 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
     for i in range(total_streams):
         cmd.extend(['-map', f'{i+1}:0'])
 
+    cmd.extend(['-map_metadata', '0']) # Must explicitly set this in ffmpeg 5.x
+
     # Copy lang metadata
     streams = (
         (inp.video_streams, 'v', v_tracks),

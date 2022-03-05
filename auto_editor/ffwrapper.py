@@ -170,6 +170,8 @@ class File:
         subtitle_streams = []
         fps = None
 
+        lang_regex = r'Stream #\d+:\d(?:[\[\]a-z0-9]|)+\((?P<match>\w+)\)'
+
         sub_exts = {'mov_text': 'srt', 'ass': 'ass', 'webvtt': 'vtt'}
 
         for line in info.split('\n'):
@@ -181,7 +183,7 @@ class File:
                     s_data['codec'] = regex_match(r'Video:\s(?P<match>\w+)', line)
                     s_data['bitrate'] = regex_match(r'\s(?P<match>\d+\skb\/s)', line)
                     s_data['fps'] = regex_match(r'\s(?P<match>[\d\.]+)\stbr', line)
-                    s_data['lang'] = regex_match(r'Stream #\d+:\d+\((?P<match>\w+)\)', line)
+                    s_data['lang'] = regex_match(lang_regex, line)
 
                     if fps is None:
                         fps = s_data['fps']
@@ -191,11 +193,11 @@ class File:
                     s_data['codec'] = regex_match(r'Audio:\s(?P<match>\w+)', line)
                     s_data['samplerate'] = regex_match(r'(?P<match>\d+)\sHz', line)
                     s_data['bitrate'] = regex_match(r'\s(?P<match>\d+\skb\/s)', line)
-                    s_data['lang'] = regex_match(r'Stream #\d+:\d+\((?P<match>\w+)\)', line)
+                    s_data['lang'] = regex_match(lang_regex, line)
                     audio_streams.append(s_data)
 
                 elif re.search(r'Subtitle:', line):
-                    s_data['lang'] = regex_match(r'Stream #\d+:\d+\((?P<match>\w+)\)', line)
+                    s_data['lang'] = regex_match(lang_regex, line)
                     s_data['codec'] = regex_match(r'Subtitle:\s(?P<match>\w+)', line)
 
                     if s_data['codec'] is not None:
