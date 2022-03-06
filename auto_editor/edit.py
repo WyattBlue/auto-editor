@@ -204,8 +204,10 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         sample_rate, audio_samples = read(temp_file)
 
     if chunks is None:
-        chunks = get_chunks(inp, segment, fps, args, progress, log, audio_samples,
-            sample_rate)
+        chunks = get_chunks(
+            inp, segment, fps, args, progress, log, audio_samples, sample_rate
+        )
+    del audio_samples
 
     if len(chunks) == 1 and chunks[0][2] == 99999:
         log.error('The entire media is cut!')
