@@ -107,15 +107,16 @@ def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
     from auto_editor.audiotsm2.io.array import ArrReader, ArrWriter
 
     samplerate, sped_chunk = read(in_file)
-    spedup_audio = np.zeros((0, 2), dtype=np.int16)
     channels = 2
 
-    with ArrReader(sped_chunk, channels, samplerate, 2) as reader:
-        with ArrWriter(spedup_audio, channels, samplerate, 2) as writer:
-            phasevocoder(reader.channels, speed=the_speed).run(
-                reader, writer
-            )
-            spedup_audio = writer.output
+    reader = ArrReader(sped_chunk)
+    writer = ArrWriter(np.zeros((0, 2), dtype=np.int16))
+
+    phasevocoder(channels, speed=the_speed).run(reader, writer)
+
+    spedup_audio = writer.output
+    del writer
+    del reader
 
     loaded = np.load(compare_file)
 

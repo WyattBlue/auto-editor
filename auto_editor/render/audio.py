@@ -45,13 +45,12 @@ def make_new_audio(
             main_writer.writeframes(audio_samples[sample_start:sample_end])
         elif the_speed != 99999:
             sped_chunk = audio_samples[sample_start:sample_end]
-            spedup_audio = np.zeros((0, 2), dtype=np.int16)
-            with ArrReader(sped_chunk, channels, samplerate, samplewidth) as reader:
-                with ArrWriter(spedup_audio, channels, samplerate, samplewidth) as writer:
-                    phasevocoder(reader.channels, speed=the_speed).run(
-                        reader, writer
-                    )
-                    main_writer.writeframes(writer.output)
+
+            reader = ArrReader(sped_chunk)
+            writer = ArrWriter(np.zeros((0, 2), dtype=np.int16))
+
+            phasevocoder(2, speed=the_speed).run(reader, writer)
+            main_writer.writeframes(writer.output)
 
         progress.tick(c)
     progress.end()

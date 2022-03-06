@@ -1,12 +1,24 @@
 import numpy as np
 
 from auto_editor.audiotsm2.utils import (windows, CBuffer, NormalizeBuffer)
-from .tsm import TSM
 
 EPSILON = 0.0001
 
 
-class AnalysisSynthesisTSM(TSM):
+class AnalysisSynthesisTSM:
+    def run(self, reader, writer, flush=True):
+        finished = False
+        while not (finished and reader.empty):
+            self.read_from(reader)
+            _, finished = self.write_to(writer)
+
+        if flush:
+            finished = False
+            while not finished:
+                _, finished = self.flush_to(writer)
+
+            self.clear()
+
     def __init__(self, converter, channels, frame_length, analysis_hop, synthesis_hop,
         analysis_window, synthesis_window, delta_before=0, delta_after=0):
         self._converter = converter
