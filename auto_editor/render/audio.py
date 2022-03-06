@@ -30,14 +30,6 @@ def make_new_audio(
 
     progress.start(len(chunks), 'Creating new audio')
 
-
-    def write(writer, buffer):
-        np.clip(buffer, -1, 1, out=buffer)
-
-        frames = (buffer.T.reshape((-1,)) * 32676).astype(np.int16).tobytes()
-        writer.writeframes(frames)
-        del frames
-
     main_writer = wave.open(output_path, 'wb')
     main_writer.setnchannels(2)
     main_writer.setframerate(samplerate)
@@ -50,7 +42,7 @@ def make_new_audio(
         the_speed = chunk[2]
 
         if the_speed == 1:
-            write(main_writer, audio_samples[sample_start:sample_end].T / 32676)
+            main_writer.writeframes(audio_samples[sample_start:sample_end])
         elif the_speed != 99999:
             sped_chunk = audio_samples[sample_start:sample_end]
             spedup_audio = np.zeros((0, 2), dtype=np.int16)
@@ -59,8 +51,7 @@ def make_new_audio(
                     phasevocoder(reader.channels, speed=the_speed).run(
                         reader, writer
                     )
-                    spedup_audio = writer.output
-                    write(main_writer, spedup_audio.T / 32676)
+                    main_writer.writeframes(writer.output)
 
         progress.tick(c)
     progress.end()
