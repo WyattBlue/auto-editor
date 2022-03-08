@@ -1,5 +1,3 @@
-'''setup.py'''
-
 import re
 from setuptools import setup, find_packages
 
@@ -10,7 +8,7 @@ def pip_version():
     version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
         version_content, re.M)
 
-    if(version_match):
+    if version_match:
         return version_match.group(1)
 
     raise ValueError('Unable to find version string.')
@@ -41,9 +39,9 @@ setup(
         'numpy>=1.21.0',
         'yt-dlp>=2022.1.21',
         'pillow==9.0.1',
-        'av==8.1.0',
+        'av==9.0.0',
     ],
-    python_requires='>=3.8,<3.12',
+    python_requires='>=3.8',
     classifiers=[
         'Topic :: Multimedia :: Sound/Audio',
         'Topic :: Multimedia :: Video',
