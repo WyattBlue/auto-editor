@@ -7,7 +7,6 @@ on:
       - '**.md'
       - '**.txt'
       - '**.png'
-      - 'setup.py'
       - 'auto_editor/__init__.py'
     branches:
       - master
