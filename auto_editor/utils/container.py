@@ -251,19 +251,3 @@ def get_rules(key: str) -> Any:
     else:
         rules.update(containers['not_in_here'])
     return rules
-
-
-if __name__ == '__main__':
-    import json
-    import subprocess
-
-    from auto_editor.ffwrapper import FFmpeg
-
-    with open('../../container.json', 'w') as outfile:
-        json.dump(containers, outfile)
-
-    ffmpeg = FFmpeg()
-
-    out = '../../out.opus'
-    ffmpeg.run(['-i', '../../example.mp4', '-c:a', 'flac', '-strict', '-2', out])
-    subprocess.call(['aeinfo', out])
