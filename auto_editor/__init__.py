@@ -1,2 +1,2 @@
-__version__ = '22.9.1'
-version = '22w09a'
+__version__ = '22.10.1.dev0'
+version = '22w10a dev'
