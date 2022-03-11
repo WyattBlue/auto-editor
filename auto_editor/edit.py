@@ -92,9 +92,10 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     chunks = None
     if inp.ext == '.json':
         from auto_editor.formats.timeline import read_json_timeline
+        from auto_editor.ffwrapper import FileInfo
 
         args.background, input_path, chunks = read_json_timeline(inp.path, log)
-        inp = ffmpeg.file_info(input_path)
+        inp = FileInfo(input_path, ffmpeg)
 
         output_path = set_output_name(inp.path, inp.ext, data_file, args)
     else:
@@ -102,7 +103,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         if not os.path.isdir(inp.path) and os.path.splitext(output_path)[1] == '':
             output_path = set_output_name(output_path, inp.ext, data_file, args)
 
-    log.debug('{} -> {}'.format(inp.path, output_path))
+    log.debug(f'{inp.path} -> {output_path}')
 
     output_container = os.path.splitext(output_path)[1].replace('.', '')
 

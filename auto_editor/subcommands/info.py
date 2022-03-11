@@ -24,7 +24,7 @@ def main(sys_args=sys.argv[1:]):
     from auto_editor.utils.func import aspect_ratio
     from auto_editor.utils.log import Log
 
-    from auto_editor.ffwrapper import FFmpeg
+    from auto_editor.ffwrapper import FFmpeg, FileInfo
 
     parser = vanparse.ArgumentParser('info', auto_editor.version,
         description='Get basic information about media files.')
@@ -54,7 +54,7 @@ def main(sys_args=sys.argv[1:]):
         else:
             log.error('Could not find file: {}'.format(file))
 
-        inp = ffmpeg.file_info(file)
+        inp = FileInfo(file, ffmpeg)
 
         file_info[file] = {
             'video': [],

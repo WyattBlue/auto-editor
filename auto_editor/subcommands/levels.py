@@ -23,7 +23,7 @@ def main(sys_args=sys.argv[1:]):
     import auto_editor.vanparse as vanparse
 
     from auto_editor.utils.log import Log
-    from auto_editor.ffwrapper import FFmpeg
+    from auto_editor.ffwrapper import FFmpeg, FileInfo
 
     parser = vanparse.ArgumentParser('levels', auto_editor.version,
         description='Get loudness of audio over time.')
@@ -39,7 +39,7 @@ def main(sys_args=sys.argv[1:]):
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
-    inp = ffmpeg.file_info(args.input[0])
+    inp = FileInfo(args.input[0], ffmpeg)
     fps = 30 if inp.fps is None else float(inp.fps)
 
     if args.kind == 'audio':

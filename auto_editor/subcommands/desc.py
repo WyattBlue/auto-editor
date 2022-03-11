@@ -13,7 +13,7 @@ def main(sys_args=sys.argv[1:]):
     import auto_editor.vanparse as vanparse
 
     from auto_editor.utils.log import Log
-    from auto_editor.ffwrapper import FFmpeg
+    from auto_editor.ffwrapper import FFmpeg, FileInfo
 
     parser = vanparse.ArgumentParser('desc', auto_editor.version,
         description="Print the video's metadata description.")
@@ -30,7 +30,7 @@ def main(sys_args=sys.argv[1:]):
 
     print('')
     for input_file in args.input:
-        inp = ffmpeg.file_info(input_file)
+        inp = FileInfo(input_file, ffmpeg)
         if 'description' in inp.metadata:
             print(inp.metadata['description'], end='\n\n')
         else:

@@ -109,10 +109,6 @@ class FFmpeg:
         if show_out and not self.debug:
             print(f'stderr: {output}')
 
-    def file_info(self, path):
-        # type: (str) -> File
-        return File(self, path)
-
     def Popen(self, cmd: List[str], stdin=None, stdout=PIPE, stderr=None):
         cmd = [self.path] + cmd
         self.print_cmd(cmd)
@@ -127,11 +123,11 @@ class FFmpeg:
         return output
 
 
-class File:
+class FileInfo:
     __slots__ = ('path', 'abspath', 'basename', 'dirname', 'name', 'ext', 'duration',
         'bitrate', 'metadata', 'fps', 'video_streams', 'audio_streams', 'subtitle_streams')
 
-    def __init__(self, ffmpeg: FFmpeg, path: str):
+    def __init__(self, path: str, ffmpeg: FFmpeg):
         self.path = path
         self.abspath = os.path.abspath(path)
         self.basename = os.path.basename(path)
