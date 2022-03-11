@@ -6,7 +6,15 @@ def info_options(parser):
     parser.add_argument('--json', action='store_true',
         help='Export the information in JSON format.')
     parser.add_argument('--include-vfr', '--has-vfr', action='store_true',
-        help='Skip information that is very slow to get.')
+        help='Display the number of Variable Frame Rate frames.',
+        manual='A typical output would look like this:\n'
+        '   - VFR:0.583394 (3204/2288) min: 41 max: 42 avg: 41\n\n'
+        'The first number is the ratio of how many VFR frames are there in total.\n'
+        'The second number is the total number of VFR frames and the third is the total '
+        'number of CFR frames. Adding the second and third number will result in how '
+        'many frames the video has in total.')
+    parser.add_argument('--include-timebase', action='store_true',
+        help='Show what time base the video streams have.')
     parser.add_argument('--ffmpeg-location', default=None,
         help='Point to your custom ffmpeg file.')
     parser.add_argument('--my-ffmpeg', action='store_true',
@@ -77,14 +85,13 @@ def main(sys_args=sys.argv[1:]):
             import av
             container = av.open(file, 'r')
             pix_fmt = container.streams.video[track].pix_fmt
-            time_base = container.streams.video[track].time_base
-
             text += f'     - pix_fmt: {pix_fmt}\n'
-            text += f'     - time_base: {time_base}\n'
-
             vid['pix_fmt'] = pix_fmt
-            vid['time_base'] = time_base
 
+            if args.include_timebase:
+                time_base = container.streams.video[track].time_base
+                text += f'     - time_base: {time_base}\n'
+                vid['time_base'] = time_base
 
             if stream['fps'] is not None:
                 text += '     - fps: {}\n'.format(stream['fps'])
