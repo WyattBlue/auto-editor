@@ -88,7 +88,6 @@ class ProgressBar:
 
         columns = get_terminal_size().columns
         bar_len = max(1, columns - (self.len_title + 32))
-        done_nums = round(percent * bar_len)
 
         progress_bar_str = self.progress_bar_str(progress, bar_len)
 
