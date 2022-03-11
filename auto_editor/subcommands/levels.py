@@ -42,25 +42,24 @@ def main(sys_args=sys.argv[1:]):
     inp = ffmpeg.file_info(args.input[0])
     fps = 30 if inp.fps is None else float(inp.fps)
 
-    if(args.kind == 'audio'):
+    if args.kind == 'audio':
         from auto_editor.analyze.audio import display_audio_levels
 
-        if(args.track >= len(inp.audio_streams)):
-            log.error("Audio track '{}' does not exist.".format(args.track))
+        if args.track >= len(inp.audio_streams):
+            log.error(f"Audio track '{args.track}' does not exist.")
 
         read_track = os.path.join(temp, '{}.wav'.format(args.track))
 
-        ffmpeg.run(['-i', inp.path, '-ac', '2', '-map', '0:a:{}'.format(args.track),
-            read_track])
+        ffmpeg.run(['-i', inp.path, '-ac', '2', '-map', f'0:a:{args.track}', read_track])
 
-        if(not os.path.isfile(read_track)):
+        if not os.path.isfile(read_track):
             log.error('Audio track file not found!')
 
         display_audio_levels(read_track, fps)
 
-    if(args.kind == 'motion'):
-        if(args.track >= len(inp.video_streams)):
-            log.error("Video track '{}' does not exist.".format(args.track))
+    if args.kind == 'motion':
+        if args.track >= len(inp.video_streams):
+            log.error(f"Video track '{args.track}' does not exist.")
 
         from auto_editor.analyze.motion import display_motion_levels
 
@@ -68,5 +67,5 @@ def main(sys_args=sys.argv[1:]):
 
     log.cleanup()
 
-if(__name__ == '__main__'):
+if __name__ == '__main__':
     main()

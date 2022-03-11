@@ -156,7 +156,7 @@ class File:
 
                 if body is not None:
                     if key is None:
-                        if(active_key is not None):
+                        if active_key is not None:
                             self.metadata[active_key] += '\n' + body
                     else:
                         self.metadata[key] = body

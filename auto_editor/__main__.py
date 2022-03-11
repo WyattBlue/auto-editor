@@ -309,7 +309,7 @@ def main():
         log.error('You need to give auto-editor an input file or folder so it can '
             'do the work for you.')
 
-    if([args.export_to_premiere, args.export_to_final_cut_pro, args.export_as_audio,
+    if ([args.export_to_premiere, args.export_to_final_cut_pro, args.export_as_audio,
         args.export_to_shotcut, args.export_as_clip_sequence].count(True) > 1):
         log.error('You must choose only one export option.')
 

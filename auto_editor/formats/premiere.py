@@ -183,23 +183,23 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
                 else:
                     outfile.write('\t\t\t\t\t\t<file id="file-1"/>\n')
 
-                if(clip[2] != 1):
+                if clip[2] != 1:
                     outfile.write(speedup(clip[2] * 100))
 
                 # Linking for video blocks
                 for i in range(max(3, tracks + 1)):
                     outfile.write('\t\t\t\t\t\t<link>\n')
                     outfile.write('\t\t\t\t\t\t\t<linkclipref>clipitem-{}</linkclipref>\n'.format((i*(len(clips)))+j+1))
-                    if(i == 0):
+                    if i == 0:
                         outfile.write('\t\t\t\t\t\t\t<mediatype>video</mediatype>\n')
                     else:
                         outfile.write('\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n')
-                    if(i == 2):
+                    if i == 2:
                         outfile.write('\t\t\t\t\t\t\t<trackindex>2</trackindex>\n')
                     else:
                         outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
                     outfile.write('\t\t\t\t\t\t\t<clipindex>{}</clipindex>\n'.format(j+1))
-                    if(i > 0):
+                    if i > 0:
                         outfile.write('\t\t\t\t\t\t\t<groupindex>1</groupindex>\n')
                     outfile.write('\t\t\t\t\t\t</link>\n')
 

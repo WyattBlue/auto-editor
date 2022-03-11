@@ -71,12 +71,12 @@ def remove_small(
     active = False
     for j, item in enumerate(has_loud):
         if item == replace:
-            if(not active):
+            if not active:
                 startP = j
                 active = True
             # Special case for end.
             if j == len(has_loud) - 1:
-                if(j - startP < lim):
+                if j - startP < lim:
                     has_loud[startP:j+1] = with_
         else:
             if active:
@@ -152,13 +152,13 @@ def cook(has_loud: np.ndarray, min_clip: int, min_cut: int) -> np.ndarray:
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]
 def chunkify(arr: np.ndarray, arr_length: int = None) -> List[Tuple[int, int, float]]:
-    if(arr_length is None):
+    if arr_length is None:
         arr_length = len(arr)
 
     chunks = []
     start = 0
     for j in range(1, arr_length):
-        if(arr[j] != arr[j - 1]):
+        if arr[j] != arr[j - 1]:
             chunks.append((start, j, arr[j - 1]))
             start = j
     chunks.append((start, arr_length, arr[j]))
@@ -173,8 +173,8 @@ def apply_margin(
     start_index = []
     end_index = []
     for j in range(1, has_loud_length):
-        if(has_loud[j] != has_loud[j - 1]):
-            if(has_loud[j]):
+        if has_loud[j] != has_loud[j - 1]:
+            if has_loud[j]:
                 start_index.append(j)
             else:
                 end_index.append(j)
@@ -227,9 +227,9 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> np.ndarray:
 
     startP = 0
     for item in start_list:
-        if(item == True):
+        if item == True:
             where_list = np.where(end_list[startP:])[0]
-            if(len(where_list) > 0):
+            if len(where_list) > 0:
                 merge[startP:where_list[0]] = True
         startP += 1
     return merge
