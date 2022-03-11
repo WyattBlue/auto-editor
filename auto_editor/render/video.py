@@ -192,9 +192,33 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     output_equavalent = 0
     chunk = chunks.pop(0)
 
+    tou = None
+    seek = 10
+    i = 0
+
+    seek_frame = None
+    frames_saved = 0
+
+    SEEK_COST = int(fps * 5)  # Keyframes are usually spread out every 5 seconds or less.
+    SEEK_RETRY = SEEK_COST // 2
+
     try:
         for frame in container.decode(video_stream):
             index = int(frame.time * fps)
+
+            if frame.key_frame:
+                log.debug(f'Keyframe {index} {frame.pts}')
+
+            if seek_frame is not None:
+                log.debug(f'Skipped {index - seek_frame} frames')
+                frames_saved += index - seek_frame
+                seek_frame = None
+
+            if i < 2:
+                i += 1
+            if i == 2:
+                tou = frame.pts
+                i += 1
 
             if index > chunk[1]:
                 if chunks:
@@ -202,7 +226,13 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
                 else:
                     break
 
-            if chunk[2] != 99999:
+            if chunk[2] == 99999:
+                if chunk[1] - index > SEEK_COST and index > seek:
+                    seek = index + SEEK_RETRY
+
+                    seek_frame = index
+                    container.seek(chunk[1] * tou, stream=video_stream)
+            else:
                 input_equavalent += (1 / chunk[2])
 
             while input_equavalent > output_equavalent:
@@ -217,7 +247,8 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
                 process2.stdin.write(in_bytes)
                 output_equavalent += 1
 
-            progress.tick(index)
+            if index % 3 == 0:
+                progress.tick(index)
 
         progress.end()
         process2.stdin.close()
@@ -227,6 +258,8 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
         ffmpeg.run_check_errors(cmd, log, True)
         log.error('FFmpeg Error!')
 
+    log.debug(f'Total frames saved seeking: {frames_saved}')
+
     # Unfortunately, scaling has to be a concrete step.
     if args.scale != 1:
         sped_input = os.path.join(temp, f'spedup{track}.mp4')
@@ -235,8 +268,8 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
             spedup]
 
         check_errors = ffmpeg.pipe(cmd)
-        if('Error' in check_errors or 'failed' in check_errors):
-            if('-allow_sw 1' in check_errors):
+        if 'Error' in check_errors or 'failed' in check_errors:
+            if '-allow_sw 1' in check_errors:
                 cmd.insert(-1, '-allow_sw')
                 cmd.insert(-1, '1')
             # Run again to show errors even if it might not work.
