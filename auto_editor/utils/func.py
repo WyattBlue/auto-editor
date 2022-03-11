@@ -55,19 +55,19 @@ def human_readable_time(time_in_secs: Union[int, float]) -> str:
     return '{} {}'.format(time_in_secs, units)
 
 def open_with_system_default(path: str, log: Log) -> None:
-    from subprocess import call
+    from subprocess import run
     try:  # should work on Windows
         from os import startfile
         startfile(path)
     except ImportError:
         try:  # should work on MacOS and most Linux versions
-            call(['open', path])
+            run(['open', path])
         except Exception:
             try: # should work on WSL2
-                call(['cmd.exe', '/C', 'start', path])
+                run(['cmd.exe', '/C', 'start', path])
             except Exception:
                 try: # should work on various other Linux distros
-                    call(['xdg-open', path])
+                    run(['xdg-open', path])
                 except Exception:
                     log.warning('Could not open output file.')
 

@@ -2,7 +2,8 @@
 import re
 import sys
 import os.path
-from subprocess import Popen, call, PIPE
+import subprocess
+from subprocess import Popen, PIPE
 from platform import system
 
 # Typing
@@ -68,7 +69,7 @@ class FFmpeg:
         if not self.debug:
             cmd.extend(['-nostats', '-loglevel', 'error'])
         self.print_cmd(cmd)
-        call(cmd)
+        subprocess.run(cmd)
 
     def run_check_errors(self, cmd: List[str], log: Log, show_out: bool=False) -> None:
 
