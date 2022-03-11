@@ -19,7 +19,7 @@ def main(sys_args=sys.argv[1:]):
     import auto_editor.vanparse as vanparse
 
     from auto_editor.utils.log import Log
-    from auto_editor.ffwrapper import FFmpeg
+    from auto_editor.ffwrapper import FFmpeg, FileInfo
 
     parser = vanparse.ArgumentParser('subdump', auto_editor.version,
         description='Dump subtitle streams to stdout in text readable form.')
@@ -36,7 +36,7 @@ def main(sys_args=sys.argv[1:]):
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
 
     for i, input_file in enumerate(args.input):
-        inp = ffmpeg.file_info(input_file)
+        inp = FileInfo(input_file, ffmpeg)
 
         cmd = ['-i', input_file]
         for s, sub in enumerate(inp.subtitle_streams):

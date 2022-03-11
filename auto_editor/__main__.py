@@ -13,7 +13,7 @@ import auto_editor.utils.func as usefulfunctions
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.func import set_output_name
 from auto_editor.utils.log import Log, Timer
-from auto_editor.ffwrapper import FFmpeg
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.edit import edit_media
 
 def main_options(parser):
@@ -377,7 +377,7 @@ def main():
         progress = ProgressBar(args.progress)
 
         for i, input_path in enumerate(input_list):
-            inp = ffmpeg.file_info(input_path)
+            inp = FileInfo(input_path, ffmpeg)
 
             if len(input_list) > 1:
                 log.conwrite(f'Working on {inp.basename}')
