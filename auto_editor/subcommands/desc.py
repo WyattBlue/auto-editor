@@ -31,13 +31,11 @@ def main(sys_args=sys.argv[1:]):
     print('')
     for input_file in args.input:
         inp = ffmpeg.file_info(input_file)
-        if('description' in inp.metadata):
+        if 'description' in inp.metadata:
             print(inp.metadata['description'], end='\n\n')
         else:
             print('No description.', end='\n\n')
 
-    log.cleanup()
 
-
-if(__name__ == '__main__'):
+if __name__ == '__main__':
     main()

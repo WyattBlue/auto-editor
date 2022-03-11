@@ -13,7 +13,7 @@ def read_json_timeline(json_file: str, log: Log):
         data = json.load(f)
 
     source = data['source']
-    if(not os.path.isfile(source)):
+    if not os.path.isfile(source):
         log.error(f"Could not locate media file: '{source}'")
 
     background = data['background']
@@ -30,8 +30,8 @@ def make_json_timeline(media_file, out, obj_sheet, chunks, fps, background, log)
         'timeline': obj_sheet.all,
     }
 
-    if(isinstance(out, str)):
-        if(not out.endswith('.json')):
+    if isinstance(out, str):
+        if not out.endswith('.json'):
             log.error('Output extension must be .json')
 
         with open(out, 'w') as outfile:

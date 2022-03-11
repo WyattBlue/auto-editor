@@ -68,7 +68,7 @@ ogg = {
     'acodecs': ['libvorbis', 'vorbis', 'flac', 'opus', 'speex'],
     'vstrict': True,
     'astrict': True,
-},
+}
 
 containers = {
 
@@ -246,13 +246,14 @@ containers = {
 
 def get_rules(key: str) -> Any:
     rules: Any = containers['default']
-    if(key in containers):
+    if key in containers:
         rules.update(containers[key])
     else:
         rules.update(containers['not_in_here'])
     return rules
 
-if(__name__ == '__main__'):
+
+if __name__ == '__main__':
     import json
     import subprocess
 

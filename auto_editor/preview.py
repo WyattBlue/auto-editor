@@ -5,7 +5,7 @@ from datetime import timedelta
 from auto_editor.utils.func import get_new_length
 
 def display_length(secs):
-    if(secs < 0):
+    if secs < 0:
         return '-' + str(timedelta(seconds=round(abs(secs))))
     return str(timedelta(seconds=round(secs)))
 
@@ -38,7 +38,7 @@ def preview(inp, chunks, log):
     cut_lens = []
     clip_lens = []
     for chunk in chunks:
-        if(chunk[2] != 99999):
+        if chunk[2] != 99999:
             clips += 1
             leng = (chunk[1] - chunk[0]) / chunk[2]
             clip_lens.append(leng)
@@ -47,16 +47,16 @@ def preview(inp, chunks, log):
             leng = chunk[1] - chunk[0]
             cut_lens.append(leng)
 
-    print('clips: {}'.format(clips))
-    if(len(clip_lens) < 2):
+    print(f'clips: {clips}')
+    if len(clip_lens) < 2:
         time_frame(' - clip length', sum(clip_lens), fps)
     else:
         time_frame(' - smallest', min(clip_lens), fps)
         time_frame(' - largest', max(clip_lens), fps)
         time_frame(' - average', sum(clip_lens) / len(clip_lens), fps)
 
-    print('cuts: {}'.format(cuts))
-    if(len(cut_lens) < 2):
+    print(f'cuts: {cuts}')
+    if len(cut_lens) < 2:
         time_frame(' - cut length', sum(cut_lens), fps)
     else:
         time_frame(' - smallest', min(cut_lens), fps)
@@ -64,4 +64,4 @@ def preview(inp, chunks, log):
         time_frame(' - average', sum(cut_lens) / len(cut_lens), fps)
     print('')
 
-    log.debug('Chunks: {}'.format(chunks))
+    log.debug(f'Chunks: {chunks}')

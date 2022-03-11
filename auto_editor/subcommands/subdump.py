@@ -52,5 +52,5 @@ def main(sys_args=sys.argv[1:]):
 
     log.cleanup()
 
-if(__name__ == '__main__'):
+if __name__ == '__main__':
     main()

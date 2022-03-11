@@ -78,5 +78,5 @@ def main(sys_args=sys.argv[1:]):
         ffmpeg.run(['-f', 'lavfi', '-i', 'color=size={}x{}:rate={}:color={}'.format(
             args.width, args.height, fps, theme), '-t', str(args.duration), output])
 
-if(__name__ == '__main__'):
+if __name__ == '__main__':
     main()

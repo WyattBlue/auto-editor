@@ -7,7 +7,7 @@ def frames_to_timecode(frames, fps):
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
 
-    if(len(str(int(s))) == 1):
+    if len(str(int(s))) == 1:
         s = '0' + str('{:.3f}'.format(round(s, 3)))
     else:
         s = str('{:.3f}'.format(round(s, 3)))
@@ -23,7 +23,7 @@ def timecode_to_frames(timecode, fps):
 
 def shotcut_xml(inp, temp, output, chunks, fps, log):
     width, height = get_width_height(inp)
-    if(width is None or height is None):
+    if width is None or height is None:
         width, height = '1280', '720'
     num, den = aspect_ratio(int(width), int(height))
 
@@ -67,7 +67,7 @@ def shotcut_xml(inp, temp, output, chunks, fps, log):
         # Speeds like [1.5, 3] don't work because of duration issues, too bad!
 
         for clip in chunks:
-            if(clip[2] == 99999):
+            if clip[2] == 99999:
                 continue
 
             speed = clip[2]
@@ -75,7 +75,7 @@ def shotcut_xml(inp, temp, output, chunks, fps, log):
             _out = frames_to_timecode(clip[1] / speed, fps)
             length = frames_to_timecode((clip[1] / speed) + 1, fps)
 
-            if(speed == 1):
+            if speed == 1:
                 resource = inp.path
                 caption = inp.basename
                 out.write('\t<chain id="chain{}" out="{}">\n'.format(
@@ -93,7 +93,7 @@ def shotcut_xml(inp, temp, output, chunks, fps, log):
             out.write('\t\t<property name="eof">pause</property>\n')
             out.write('\t\t<property name="resource">{}</property>\n'.format(resource))
 
-            if(speed == 1):
+            if speed == 1:
                 out.write('\t\t<property name="mlt_service">avformat-novalidate</property>\n')
                 out.write('\t\t<property name="seekable">1</property>\n')
                 out.write('\t\t<property name="audio_index">1</property>\n')
@@ -127,12 +127,12 @@ def shotcut_xml(inp, temp, output, chunks, fps, log):
         producers = 0
         i = 0
         for clip in chunks:
-            if(clip[2] == 99999):
+            if clip[2] == 99999:
                 continue
 
             speed = clip[2]
 
-            if(speed == 1):
+            if speed == 1:
                 in_len = clip[0] - 1
             else:
                 in_len = max(clip[0] / speed, 0)
@@ -143,7 +143,7 @@ def shotcut_xml(inp, temp, output, chunks, fps, log):
             _out = frames_to_timecode(out_len, fps)
 
             tag_name = 'chain{}'.format(i)
-            if(speed != 1):
+            if speed != 1:
                 tag_name = 'producer{}'.format(producers)
                 producers += 1
 
