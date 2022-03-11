@@ -11,10 +11,9 @@ import av
 import numpy as np
 
 # Typing
-from typing import List, Tuple, Callable, NoReturn, Optional, Union
+from typing import List, Tuple, Callable, NoReturn, Optional
 
 # Included Libraries
-from auto_editor.utils.func import clean_list
 import auto_editor.vanparse as vanparse
 
 def test_options(parser):
@@ -106,7 +105,7 @@ def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
     from auto_editor.audiotsm2 import phasevocoder
     from auto_editor.audiotsm2.io.array import ArrReader, ArrWriter
 
-    samplerate, sped_chunk = read(in_file)
+    _, sped_chunk = read(in_file)
     channels = 2
 
     reader = ArrReader(sped_chunk)

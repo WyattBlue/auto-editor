@@ -23,12 +23,9 @@ def make_new_audio(
     if len(chunks) == 1 and chunks[0][2] == 99999:
         log.error('Trying to create an empty file.')
 
-    samplerate, audio_samples = read(input_path)
-
-    channels = 2
-    samplewidth = 2
-
     progress.start(len(chunks), 'Creating new audio')
+
+    samplerate, audio_samples = read(input_path)
 
     main_writer = wave.open(output_path, 'wb')
     main_writer.setnchannels(2)
