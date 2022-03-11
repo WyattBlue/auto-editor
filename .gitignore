@@ -1,7 +1,6 @@
 # Auto-Editor Generated Files
 *_ALTERED*
 *_tracks
-*src.mp4
 *example
 *.xml
 *.mlt
@@ -15,10 +14,10 @@ __pycache__/
 *.pyo
 *.spec
 
-# Setup.py Generated Files
+# Build Files
 build/
 dist/
 *.egg-info/
 
-# OS Generated Files
+# OS Files
 .DS_Store

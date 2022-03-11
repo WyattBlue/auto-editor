@@ -427,16 +427,9 @@ def main(sys_args: Optional[List[str]]=None):
 
     def effect_tests():
         """Test rendering video objects"""
-        run_program(['create', 'test', '--width', '640', '--height', '360', '-o',
-            'testsrc.mp4'])
-        av_inspect('testsrc.mp4',
-            ('fps', 30),
-            ('resolution', (640, 360), ),
-        )
-        run_program(['testsrc.mp4', '--mark_as_loud', 'start,end', '--add_rectangle',
-            '0,30,0,200,100,300,fill=#43FA56,stroke=10'])
-        os.remove('testsrc_ALTERED.mp4')
-        os.remove('testsrc.mp4')
+        run_program(['resources/testsrc.mp4', '--mark_as_loud', 'start,end',
+            '--add_rectangle', '0,30,0,200,100,300,fill=#43FA56,stroke=10'])
+        os.remove('resources/testsrc_ALTERED.mp4')
 
 
     def render_text():
@@ -501,7 +494,7 @@ def main(sys_args: Optional[List[str]]=None):
         tester.run_test(help_tests)
         tester.run_test(version_test)
         tester.run_test(parser_test)
-        tester.run_test(example_tests, allow_fail=True)
+        tester.run_test(example_tests)
         tester.run_test(url_test)
         tester.run_test(unit_tests)
         tester.run_test(backwards_range_test)
