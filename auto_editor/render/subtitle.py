@@ -24,16 +24,22 @@ class SubtitleParser:
         if codec == 'mov_text':
             time_code = re.compile(r'()(\d+:\d+:[\d,]+)( --> )(\d+:\d+:[\d,]+)(\n.*)')
 
-        for i, item in enumerate(re.finditer(time_code, text)):
-            if i == 0:
-                self.header = text[:item.span()[0]]
+        i = 0
+        for reg in re.finditer(time_code, text):
+            i += 1
+            if i == 1:
+                self.header = text[:reg.span()[0]]
 
             self.contents.append(
-                [self.to_frame(item.group(2)), self.to_frame(item.group(4)),
-                item.group(1), item.group(3), item.group(5) + '\n']
+                [self.to_frame(reg.group(2)), self.to_frame(reg.group(4)),
+                reg.group(1), reg.group(3), reg.group(5) + '\n']
             )
 
-        self.footer = text[item.span()[1]:]
+        if i == 0:
+            self.header = ''
+            self.footer = ''
+        else:
+            self.footer = text[reg.span()[1]:]
 
 
     def edit(self, chunks: List[Tuple[int, int, float]]) -> None:
