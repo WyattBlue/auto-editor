@@ -38,4 +38,5 @@ def make_json_timeline(media_file, out, obj_sheet, chunks, fps, background, log)
             json.dump(data, outfile, indent=2, default=lambda o: o.__dict__)
     else:
         json.dump(data, sys.stdout, indent=2, default=lambda o: o.__dict__)
+        print('')  # Flush stdout
 

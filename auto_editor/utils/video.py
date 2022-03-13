@@ -1,11 +1,14 @@
 # Internal Libraries
 import os.path
 
+# Typing
+from typing import List
+
 # Included Libraries
 from .func import fnone
 
 
-def fset(cmd, option, value):
+def fset(cmd: List[str], option: str, value) -> List[str]:
     if fnone(value):
         return cmd
     return cmd + [option] + [value]
