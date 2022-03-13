@@ -1,21 +1,27 @@
 # Internal Libraries
 from datetime import timedelta
 
+# Typing
+from typing import List, Tuple, Union
+
 # Included Libraries
 from auto_editor.utils.func import get_new_length
+from auto_editor.utils.log import Log
+from auto_editor.ffwrapper import FileInfo
 
-def display_length(secs):
+
+def display_length(secs: Union[int, float]) -> str:
     if secs < 0:
         return '-' + str(timedelta(seconds=round(abs(secs))))
     return str(timedelta(seconds=round(secs)))
 
-def time_frame(title, frames, fps):
+def time_frame(title: str, frames: Union[int, float], fps: float) -> None:
     in_sec = round(frames / fps, 1)
     minutes = timedelta(seconds=round(in_sec))
-    print('{}: {} secs ({})'.format(title, in_sec, minutes))
+    print(f'{title}: {in_sec} secs ({minutes})')
 
 
-def preview(inp, chunks, log):
+def preview(inp: FileInfo, chunks: List[Tuple[int, int, float]], log: Log) -> None:
     fps = 30 if inp.fps is None else float(inp.fps)
 
     log.conwrite('')

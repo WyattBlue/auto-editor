@@ -1,13 +1,15 @@
-from typing import NoReturn
-
 import sys
 from shutil import rmtree, get_terminal_size
 from time import perf_counter, sleep
 from datetime import timedelta
 
+from typing import NoReturn, Optional
+
+
 class Timer:
     __slots__ = ('start_time', 'quiet')
-    def __init__(self, quiet=False) -> None:
+
+    def __init__(self, quiet: bool = False) -> None:
         self.start_time = perf_counter()
         self.quiet = quiet
 
@@ -18,9 +20,13 @@ class Timer:
 
             sys.stdout.write(f'Finished. took {second_len} seconds ({minute_len})\n')
 
+
 class Log:
     __slots__ = ('is_debug', 'quiet', 'temp')
-    def __init__(self, show_debug=False, quiet=False, temp=None) -> None:
+
+    def __init__(
+        self, show_debug: bool = False, quiet: bool = False, temp: Optional[str] = None
+    ) -> None:
         self.is_debug = show_debug
         self.quiet = quiet
         self.temp = temp
@@ -47,7 +53,7 @@ class Log:
             # that's ok, the folder we are trying to remove is already gone
             pass
 
-    def conwrite(self, message: str):
+    def conwrite(self, message: str) -> None:
         if not self.quiet:
             buffer = get_terminal_size().columns - len(message) - 3
             sys.stdout.write('  ' + message + ' ' * buffer + '\r')
@@ -71,9 +77,10 @@ class Log:
                 sys.exit(1)
             except SystemExit:
                 import os
+
                 os._exit(1)
 
-    def bug(self, message: str, bug_type='bug report') -> NoReturn:
+    def bug(self, message: str, bug_type: str = 'bug report') -> NoReturn:
         self.error(
             f'{message}\n\nSomething went wrong!\nCreate a {bug_type} at:\n  '
             'https://github.com/WyattBlue/auto-editor/issues/\n'

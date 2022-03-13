@@ -1,30 +1,31 @@
 import sys
-
 from math import floor
 from time import time, localtime
 from shutil import get_terminal_size
 from platform import system
 
+from typing import Union
+
 from .func import get_stdout
 
 
 class ProgressBar:
-    def __init__(self, bar_type: str):
+    def __init__(self, bar_type: str) -> None:
 
         self.machine = False
         self.hide = False
 
         self.icon = '⏳'
-        self.chars = (' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█')
+        self.chars = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
         self.brackets = ('|', '|')
 
         if bar_type == 'classic':
             self.icon = '⏳'
-            self.chars = ('░', '█')
+            self.chars = ['░', '█']
             self.brackets = ('[', ']')
         if bar_type == 'ascii':
             self.icon = '& '
-            self.chars = ('-', '#')
+            self.chars = ['-', '#']
             self.brackets = ('[', ']')
         if bar_type == 'machine':
             self.machine = True
@@ -60,7 +61,7 @@ class ProgressBar:
             return '{:02}:{:02} {}'.format(hours, minutes, ampm_marker)
         return '{:02}:{:02}'.format(hours, minutes)
 
-    def tick(self, index):
+    def tick(self, index: Union[int, float]) -> None:
 
         if self.hide:
             return
@@ -68,7 +69,7 @@ class ProgressBar:
         progress = min(1, max(0, index / self.total))
 
         if progress == 0:
-            progress_rate = 0
+            progress_rate = 0.0
         else:
             progress_rate = (time() - self.begin_time) / progress
 
@@ -104,7 +105,7 @@ class ProgressBar:
         except AttributeError:
             pass
 
-    def start(self, total, title: str='Please wait'):
+    def start(self, total: Union[int, float], title: str='Please wait') -> None:
         self.title = title
         self.len_title = len(title)
         self.total = total
@@ -114,7 +115,8 @@ class ProgressBar:
             self.tick(0)
         except UnicodeEncodeError:
             self.icon = '& '
-            self.chars = ('-', '#')
+            self.chars = ['-', '#']
+            self.brackets = ('[', ']')
             self.part_width = 1
 
     def progress_bar_str(self, progress: float, width: int) -> str:
@@ -136,5 +138,5 @@ class ProgressBar:
         return line
 
     @staticmethod
-    def end():
+    def end() -> None:
         sys.stdout.write(' ' * (get_terminal_size().columns - 2) + '\r')
