@@ -12,7 +12,7 @@ def get_stdout(cmd: List[str]) -> str:
     stdout, _ = Popen(cmd, stdout=PIPE, stderr=STDOUT).communicate()
     return stdout.decode()
 
-def clean_list(x: List[str], rm_chars: str) -> list:
+def clean_list(x: List[str], rm_chars: str) -> List[str]:
     new_list = []
     for item in x:
         for char in rm_chars:
@@ -24,7 +24,7 @@ def aspect_ratio(width: int, height: int) -> Union[Tuple[int, int], Tuple[None, 
     if height == 0:
         return None, None
 
-    def gcd(a, b):
+    def gcd(a: int, b: int) -> int:
         while b:
             a, b = b, a % b
         return a
@@ -80,7 +80,7 @@ def append_filename(path: str, val: str) -> str:
     root, ext = splitext(path)
     return root + val + ext
 
-def set_output_name(path: str, inp_ext: str, making_data_file: bool, args: object) -> str:
+def set_output_name(path: str, inp_ext: str, making_data_file: bool, args) -> str:
     from os.path import splitext
 
     root, ext = splitext(path)
