@@ -254,7 +254,9 @@ def edit_media(i, inp, segment, ffmpeg, args, progress, temp, log):
 
     if args.timeline:
         from auto_editor.formats.timeline import make_json_timeline
-        make_json_timeline('0.2.0', inp.path, 0, obj_sheet, chunks, fps, args.background, log)
+        make_json_timeline(
+            args.api, inp.path, 0, obj_sheet, chunks, fps, args.background, log
+        )
         return num_cuts, None
 
     if args.preview:
@@ -264,8 +266,9 @@ def edit_media(i, inp, segment, ffmpeg, args, progress, temp, log):
 
     if args.export == 'json':
         from auto_editor.formats.timeline import make_json_timeline
-        make_json_timeline('0.2.0', inp.path, output_path, obj_sheet, chunks, fps, args.background,
-            log)
+        make_json_timeline(
+            args.api, inp.path, output_path, obj_sheet, chunks, fps, args.background, log
+        )
         return num_cuts, output_path
 
     if args.export == 'premiere':

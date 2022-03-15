@@ -58,8 +58,8 @@ def pipe_to_console(cmd: List[str]) -> Tuple[int, str, str]:
 def cleanup(the_dir: str) -> None:
     for item in os.listdir(the_dir):
         item = os.path.join(the_dir, item)
-        if ('_ALTERED' in item or item.endswith('.xml') or item.endswith('.json')
-            or item.endswith('.fcpxml') or item.endswith('.mlt')):
+        if ('_ALTERED' in item or item.endswith('.xml') or item.endswith('.fcpxml')
+            or item.endswith('.mlt')):
             os.remove(item)
         if item.endswith('_tracks'):
             shutil.rmtree(item)
@@ -190,6 +190,13 @@ def main(sys_args: Optional[List[str]]=None):
 
 
     ### Tests ###
+
+    ## API Tests ##
+
+    def read_api_0_1():
+        check_for_error(['resources/0.1-non-zero-start.json'], 'Error! First chunk must start with 0')
+        check_for_error(['resources/0.1-disjoint.json'], 'Error! Chunk disjointed at')
+
 
     def help_tests():
         """check the help option, its short, and help on options and groups."""
@@ -481,6 +488,10 @@ def main(sys_args: Optional[List[str]]=None):
         tester.run_test(tsm_1a5_test)
         tester.run_test(tsm_0a5_test, allow_fail=True)
         tester.run_test(tsm_2a0_test)
+
+
+    if args.category in ('api', 'all'):
+        tester.run_test(read_api_0_1)
 
     if args.category in ('sub', 'all'):
         tester.run_test(info)

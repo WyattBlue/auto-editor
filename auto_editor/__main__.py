@@ -144,15 +144,16 @@ def main_options(parser):
         help='Combine all audio tracks into one before basing cuts.')
 
     parser.add_argument('--export', default='default',
-        choices=['premiere', 'final-cut-pro', 'shotcut', 'json', 'audio', 'clip-sequence', 'default'],
+        choices=['default', 'premiere', 'final-cut-pro', 'shotcut', 'json', 'audio', 'clip-sequence'],
         help='Choice the export mode.',
         manual='Instead of exporting a video, export as one of these options instead.\n\n'
+            'default       : Export as usual\n'
             'premiere      : Export as an XML timeline file for Adobe Premiere Pro\n'
             'final-cut-pro : Export as an XML timeline file for Final Cut Pro\n'
             'shotcut       : Export as an XML timeline file for Shotcut\n'
             'json          : Export as an auto-editor JSON timeline file\n'
             'audio         : Export as a WAV audio file\n'
-            'clip-sequence : Export as multiple numbered media files\n\n'
+            'clip-sequence : Export as multiple numbered media files'
     )
 
     parser.add_text('Utility Options')
@@ -185,6 +186,8 @@ def main_options(parser):
         help='Show stats on how the input will be cut and halt.')
     parser.add_argument('--timeline', action='store_true',
         help='Show auto-editor JSON timeline file and halt.')
+    parser.add_argument('--api', default='0.2.0',
+        help='Set what version of the JSON timeline to output.')
 
     parser.add_text('Editing Options')
 
