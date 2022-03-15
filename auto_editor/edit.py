@@ -2,7 +2,7 @@
 import os
 
 # Typing
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 # External Libraries
 import numpy as np
@@ -10,7 +10,7 @@ import numpy as np
 # Included Libraries
 from auto_editor.sheet import Sheet
 from auto_editor.utils.log import Log
-from auto_editor.utils.func import fnone, set_output_name, append_filename
+from auto_editor.utils.func import fnone, append_filename
 
 def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
     sample_rate=None):
@@ -87,8 +87,26 @@ def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
     return chunkify(speed_list, has_loud_length)
 
 
-def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, data_file,
-    temp, log):
+def set_output_name(path: str, inp_ext: str, export: str) -> str:
+    root, ext = os.path.splitext(path)
+
+    if export == 'json':
+        return root + '.json'
+    if export == 'final-cut-pro':
+        return root + '.fcpxml'
+    if export == 'shotcut':
+        return root + '.mlt'
+    if export == 'premiere':
+        return root + '.xml'
+    if export == 'audio':
+        return root + '_ALTERED.wav'
+    if ext == '':
+        return root + inp_ext
+
+    return root + '_ALTERED' + ext
+
+
+def edit_media(i, inp, segment, ffmpeg, args, progress, temp, log):
     from auto_editor.utils.container import get_rules
 
     chunks = None
@@ -99,11 +117,14 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         args.background, input_path, chunks = read_json_timeline(inp.path, log)
         inp = FileInfo(input_path, ffmpeg)
 
-        output_path = set_output_name(inp.path, inp.ext, data_file, args)
-    else:
+    if i < len(args.output_file):
         output_path = args.output_file[i]
-        if not os.path.isdir(inp.path) and os.path.splitext(output_path)[1] == '':
-            output_path = set_output_name(output_path, inp.ext, data_file, args)
+
+        # Add input extension if output doesn't have one.
+        if os.path.splitext(output_path)[1] == '':
+            output_path = set_output_name(output_path, inp.ext, args.export)
+    else:
+        output_path = set_output_name(inp.path, inp.ext, args.export)
 
     log.debug(f'{inp.path} -> {output_path}')
 
@@ -148,10 +169,13 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     if args.keep_tracks_seperate and rules['max_audio_streams'] == 1:
         log.warning(f"'{container}' container doesn't support multiple audio tracks.")
 
-    if (os.path.isfile(output_path) and inp.path != output_path and not args.preview
-        and not args.timeline):
-        log.debug('Removing already existing file: {}'.format(output_path))
-        os.remove(output_path)
+    if not args.preview and not args.timeline:
+        if os.path.isdir(output_path):
+            log.error('Output path already has an existing directory!')
+
+        if os.path.isfile(output_path) and inp.path != output_path:
+            log.debug(f'Removing already existing file: {output_path}')
+            os.remove(output_path)
 
     audio_samples = None
     tracks = len(inp.audio_streams)
@@ -159,7 +183,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
     fps = 30.0 if inp.fps is None else float(inp.fps)
 
     if fps < 1:
-        log.error('{}: Frame rate cannot be below 1. fps: {}'.format(inp.basename, fps))
+        log.error(f'{inp.basename}: Frame rate cannot be below 1. fps: {fps}')
 
     # Extract subtitles in their native format.
     if len(inp.subtitle_streams) > 0:
@@ -228,15 +252,9 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
 
     obj_sheet = Sheet(pool, inp, chunks, log)
 
-    if args.export_as_json:
-        from auto_editor.formats.timeline import make_json_timeline
-        make_json_timeline(inp.path, output_path, obj_sheet, chunks, fps, args.background,
-            log)
-        return num_cuts, output_path
-
     if args.timeline:
         from auto_editor.formats.timeline import make_json_timeline
-        make_json_timeline(inp.path, 0, obj_sheet, chunks, fps, args.background, log)
+        make_json_timeline('0.2.0', inp.path, 0, obj_sheet, chunks, fps, args.background, log)
         return num_cuts, None
 
     if args.preview:
@@ -244,18 +262,24 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         preview(inp, chunks, log)
         return num_cuts, None
 
-    if args.export_to_premiere:
+    if args.export == 'json':
+        from auto_editor.formats.timeline import make_json_timeline
+        make_json_timeline('0.2.0', inp.path, output_path, obj_sheet, chunks, fps, args.background,
+            log)
+        return num_cuts, output_path
+
+    if args.export == 'premiere':
         from auto_editor.formats.premiere import premiere_xml
         premiere_xml(inp, temp, output_path, chunks, sample_rate, fps, log)
         return num_cuts, output_path
 
-    if args.export_to_final_cut_pro:
+    if args.export == 'final-cut-pro':
         from auto_editor.formats.final_cut_pro import fcp_xml
 
         fcp_xml(inp, temp, output_path, chunks, fps, log)
         return num_cuts, output_path
 
-    if args.export_to_shotcut:
+    if args.export == 'shotcut':
         from auto_editor.formats.shotcut import shotcut_xml
 
         shotcut_xml(inp, temp, output_path, chunks, fps, log)
@@ -313,7 +337,7 @@ def edit_media(i, inp, ffmpeg, args, progress, segment, exporting_to_editor, dat
         if output_path is not None and not os.path.isfile(output_path):
             log.bug(f'The file {output_path} was not created.')
 
-    if args.export_as_clip_sequence:
+    if args.export == 'clip-sequence':
         total_frames = chunks[-1][1]
         clip_num = 0
         for chunk in chunks:

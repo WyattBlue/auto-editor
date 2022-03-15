@@ -47,7 +47,7 @@ def make_json_timeline(version, media_file, out, obj_sheet, chunks, fps, backgro
     if version == '0.1.0':
         data = {
             'version': '0.1.0',
-            'source': os.path.abspath(media_file)
+            'source': os.path.abspath(media_file),
             'chunks': chunks,
         }
     if version == '0.2.0':
