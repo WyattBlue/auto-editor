@@ -24,7 +24,6 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install FFmpeg
       run: |
-        sudo apt update
         sudo apt install ffmpeg
     - name: Install Auto-Editor
       run: pip install -e .
