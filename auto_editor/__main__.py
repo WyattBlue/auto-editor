@@ -11,7 +11,6 @@ import auto_editor.vanparse as vanparse
 import auto_editor.utils.func as usefulfunctions
 
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.func import set_output_name
 from auto_editor.utils.log import Log, Timer
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.edit import edit_media
@@ -144,23 +143,17 @@ def main_options(parser):
     parser.add_argument('--cut-by-all-tracks', '-cat', action='store_true',
         help='Combine all audio tracks into one before basing cuts.')
 
-    parser.add_text('Export Mode Options')
-    parser.add_argument('--export-to-premiere', '-exp', action='store_true',
-        help='Export as an XML file for Adobe Premiere Pro instead of making a media file.')
-    parser.add_argument('--export-to-final-cut-pro', '-exf', action='store_true',
-        help='Export as an XML file for Final Cut Pro instead of making a media file.')
-    parser.add_argument('--export-to-shotcut', '-exs', action='store_true',
-        help='Export as an XML timeline file for Shotcut instead of making a media file.')
-    parser.add_argument('--export-as-json', action='store_true',
-        help='Export as a JSON file that can be read by auto-editor later.')
-    parser.add_argument('--export-as-audio', '-exa', action='store_true',
-        help='Export as a WAV audio file.')
-    parser.add_argument('--export-as-clip-sequence', '-excs', action='store_true',
-        help='Export as multiple numbered media files.')
-    parser.add_argument('--timeline', action='store_true',
-        help='Display timeline JSON file and halt.',
-        manual='This option is like `--export-as-json` except that it outputs directly '
-            'to stdout instead of to a file.')
+    parser.add_argument('--export', default='default',
+        choices=['premiere', 'final-cut-pro', 'shotcut', 'json', 'audio', 'clip-sequence', 'default'],
+        help='Choice the export mode.',
+        manual='Instead of exporting a video, export as one of these options instead.\n\n'
+            'premiere      : Export as an XML timeline file for Adobe Premiere Pro\n'
+            'final-cut-pro : Export as an XML timeline file for Final Cut Pro\n'
+            'shotcut       : Export as an XML timeline file for Shotcut\n'
+            'json          : Export as an auto-editor JSON timeline file\n'
+            'audio         : Export as a WAV audio file\n'
+            'clip-sequence : Export as multiple numbered media files\n\n'
+    )
 
     parser.add_text('Utility Options')
     parser.add_argument('--no-open', action='store_true',
@@ -190,6 +183,8 @@ def main_options(parser):
         help='Display less output.')
     parser.add_argument('--preview', action='store_true',
         help='Show stats on how the input will be cut and halt.')
+    parser.add_argument('--timeline', action='store_true',
+        help='Show auto-editor JSON timeline file and halt.')
 
     parser.add_text('Editing Options')
 
@@ -254,16 +249,48 @@ def main():
         sys.exit()
     else:
         parser = main_options(parser)
+
+        # Preserve backwards compatibility
+
+        sys_a = sys.argv[1:]
+
+        def c(sys_a, options, new):
+            for option in options:
+                if option in sys_a:
+                    pos = sys_a.index(option)
+                    sys_a[pos:pos+1] = new
+            return sys_a
+
+        sys_a = c(sys_a,
+            ['--export_to_premiere', '--export-to-premiere', '-exp'],
+            ['--export', 'premiere']
+        )
+        sys_a = c(sys_a,
+            ['--export_to_final_cut_pro', '--export-to-final-cut-pro', '-exf'],
+            ['--export', 'final-cut-pro']
+        )
+        sys_a = c(sys_a,
+            ['--export_to_shotcut', '--export-to-shotcut', '-exs'],
+            ['--export', 'shotcut']
+        )
+        sys_a = c(sys_a,
+            ['--export_as_json', '--export-as-json'],
+            ['--export', 'json']
+        )
+        sys_a = c(sys_a,
+            ['--export_as_clip_sequence', '--export-as-clip-sequence', '-excs'],
+            ['--export', 'clip-sequence']
+        )
+
         try:
-            args = parser.parse_args(sys.argv[1:])
+            args = parser.parse_args(sys_a)
         except vanparse.ParserError as e:
             Log().error(str(e))
 
     timer = Timer(args.quiet)
 
-    exporting_to_editor = (args.export_to_premiere or args.export_to_final_cut_pro or
-        args.export_to_shotcut)
-    making_data_file = exporting_to_editor or args.export_as_json
+    exporting_to_editor = args.export in ('premiere', 'final-cut-pro', 'shotcut')
+    making_data_file = exporting_to_editor or args.export == 'json'
 
     is64bit = '64-bit' if sys.maxsize > 2**32 else '32-bit'
 
@@ -309,31 +336,27 @@ def main():
         log.error('You need to give auto-editor an input file or folder so it can '
             'do the work for you.')
 
-    if ([args.export_to_premiere, args.export_to_final_cut_pro, args.export_as_audio,
-        args.export_to_shotcut, args.export_as_clip_sequence].count(True) > 1):
-        log.error('You must choose only one export option.')
-
     if args.constant_rate_factor != 'unset':
         if int(args.constant_rate_factor) < 0 or int(args.constant_rate_factor) > 51:
             log.error('Constant rate factor (crf) must be between 0-51.')
     if args.md_width < 1:
         log.error('--md-width cannot be less than 1.')
 
-    def write_starting_message(args) -> str:
-        if args.export_to_premiere:
+    def write_starting_message(export: str) -> str:
+        if export == 'premiere':
             return 'Exporting to Adobe Premiere Pro XML file'
-        if args.export_to_final_cut_pro:
+        if export == 'final-cut-pro':
             return 'Exporting to Final Cut Pro XML file'
-        if args.export_to_shotcut:
+        if export == 'shotcut':
             return 'Exporting to Shotcut XML Timeline file'
-        if args.export_as_audio:
+        if export == 'audio':
             return 'Exporting as audio'
         return 'Starting'
 
     if not args.preview and not args.timeline:
-        log.conwrite(write_starting_message(args))
+        log.conwrite(write_starting_message(args.export))
 
-    if args.preview or args.timeline or args.export_as_clip_sequence or making_data_file:
+    if args.preview or args.export not in ('audio', 'default'):
         args.no_open = True
 
     if args.md_blur < 0:
@@ -350,11 +373,6 @@ def main():
 
     from auto_editor.validate_input import valid_input
     input_list, segments = valid_input(args.input, ffmpeg, args, log)
-
-    if len(args.output_file) < len(input_list):
-        for i in range(len(input_list) - len(args.output_file)):
-            args.output_file.append(set_output_name(input_list[i], None,
-                making_data_file, args))
 
     if args.combine_files:
         if exporting_to_editor:
@@ -382,8 +400,9 @@ def main():
             if len(input_list) > 1:
                 log.conwrite(f'Working on {inp.basename}')
 
-            cuts, output_path = edit_media(i, inp, ffmpeg, args, progress,
-                segments[i], exporting_to_editor, making_data_file, TEMP, log)
+            cuts, output_path = edit_media(
+                i, inp, segments[i], ffmpeg, args, progress, TEMP, log
+            )
             num_cuts += cuts
 
         if not args.preview and not args.timeline and not making_data_file:

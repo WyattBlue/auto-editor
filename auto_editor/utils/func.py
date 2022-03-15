@@ -79,25 +79,3 @@ def append_filename(path: str, val: str) -> str:
 
     root, ext = splitext(path)
     return root + val + ext
-
-def set_output_name(path: str, inp_ext: str, making_data_file: bool, args) -> str:
-    from os.path import splitext
-
-    root, ext = splitext(path)
-
-    if args.export_as_json:
-        return root + '.json'
-    if args.export_to_final_cut_pro:
-        return root + '.fcpxml'
-    if args.export_to_shotcut:
-        return root + '.mlt'
-    if making_data_file:
-        return root + '.xml'
-    if args.export_as_audio:
-        return root + '_ALTERED.wav'
-    if ext == '':
-        if inp_ext is None:
-            return root
-        return root + inp_ext
-
-    return root + '_ALTERED' + ext
