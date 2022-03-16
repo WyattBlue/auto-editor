@@ -55,15 +55,15 @@ auto-editor example.mp4 --edit audio_or_motion --silent-threshold 3% --motion-th
 Create an XML file that can be imported to Adobe Premiere Pro using this command:
 
 ```
-auto-editor example.mp4 --export-to-premiere
+auto-editor example.mp4 --export premiere
 ```
 
-Similar flags exist also for:
+Similar commands exist for:
 
-- `--export-to-final-cut-pro` for Final Cut Pro.
-- `--export-to-shot-cut` for ShotCut.
+- `--export final-cut-pro` for Final Cut Pro.
+- `--export shotcut` for ShotCut.
 
-Other programs might also be able to understand these formats, but if they don't. You can use ` --export-as-clip-sequence` which exports to many files that can be imported and used in other editors.
+Other editors, like Sony Vegas, can understand the `premiere` format. If your favorite editor doesn't, you can use ` --export clip-sequence` which creates many video clips that can be imported and manipulated like normal.
 
 <h2 align="center">Manual Editing</h2>
 
@@ -128,7 +128,6 @@ auto-editor --scale --help
  - [How to Use Motion Detection in Auto-Editor](https://auto-editor.com/cli/motion_detection)
  - [Range Syntax](https://auto-editor.com/cli/range_syntax)
  - [Subcommands](https://auto-editor.com/cli/subcommands)
- - [Branding Guide](https://auto-editor.com/docs/branding)
  - [GPU Acceleration](https://auto-editor.com/docs/gpu_acceleration)
  
 ## Copyright
