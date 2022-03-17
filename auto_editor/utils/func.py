@@ -59,6 +59,8 @@ def open_with_system_default(path: str, log: Log) -> None:
     try:  # should work on Windows
         from os import startfile
         startfile(path)
+    except OSError:
+        pass
     except ImportError:
         try:  # should work on MacOS and most Linux versions
             run(['open', path])
