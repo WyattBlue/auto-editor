@@ -82,6 +82,8 @@ def main_options(parser):
         help='Set a value to the ffmpeg option -qscale:v')
     parser.add_argument('--scale', type=float_type, default=1,
         help='Scale the output video by a certain factor.')
+    parser.add_argument('--extras',
+        help='Add extra options for ffmpeg for video rendering. Must be in quotes.')
 
     parser.add_text('Miscellaneous Options')
     parser.add_argument('--background', type=color_type, default='#000',

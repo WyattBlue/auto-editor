@@ -96,6 +96,7 @@ class FFmpeg:
             r"Undefined constant or missing '.*' in '.*'",
             r'DLL .* failed to open',
             r"Incompatible pixel format '.*' for codec '[A-Za-z0-9_]*'",
+            r"Unrecognized option '.*'",
             r"Permission denied",
         ]
 
