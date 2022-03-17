@@ -149,6 +149,7 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
         else:
             cmd.extend(['-ar', str(args.sample_rate)])
 
+    cmd.extend(args.extras.split(' '))
     cmd.extend(['-strict', '-2'])  # Allow experimental codecs.
     cmd.extend(['-map', '0:t?', '-map', '0:d?'])  # Add input attachments and data to output.
     cmd.append(write_file)
