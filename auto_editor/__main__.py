@@ -77,19 +77,6 @@ def main_options(parser):
         help='Set the number of bits per second for audio.')
     parser.add_argument('--sample-rate', '-ar', type=sample_rate_type,
         help='Set the sample rate of the input and output videos.')
-    parser.add_argument('--preset', '-preset', default='unset',
-        choices=['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium',
-            'slow', 'slower', 'veryslow', 'unset'],
-        help='Set the preset for ffmpeg to help save file size or increase quality.')
-    parser.add_argument('--tune', '-tune', default='unset',
-        choices=['film', 'animation', 'grain', 'stillimage', 'fastdecode',
-            'zerolatency', 'none', 'unset'],
-        help='Set the tune for ffmpeg to compress video better in certain circumstances.')
-    parser.add_argument('--constant-rate-factor', '-crf', default='unset', range='0 to 51',
-        help='Set a value to the ffmpeg option -crf.',
-        manual="This option's value gets directly passed to the -crf flag used by ffmpeg "
-        "during encoding. If the video encoder does not support crf, "
-        "the program will error.")
     parser.add_argument('--video-quality-scale', '-qscale:v', '-q:v', default='unset',
         range='1 to 31',
         help='Set a value to the ffmpeg option -qscale:v')
@@ -339,9 +326,6 @@ def main():
         log.error('You need to give auto-editor an input file or folder so it can '
             'do the work for you.')
 
-    if args.constant_rate_factor != 'unset':
-        if int(args.constant_rate_factor) < 0 or int(args.constant_rate_factor) > 51:
-            log.error('Constant rate factor (crf) must be between 0-51.')
     if args.md_width < 1:
         log.error('--md-width cannot be less than 1.')
 

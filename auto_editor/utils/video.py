@@ -46,10 +46,7 @@ def get_acodec(args, inp, rules):
 
 
 def video_quality(cmd, args, inp, rules):
-    cmd = fset(cmd, '-crf', args.constant_rate_factor)
     cmd = fset(cmd, '-b:v', args.video_bitrate)
-    cmd = fset(cmd, '-tune', args.tune)
-    cmd = fset(cmd, '-preset', args.preset)
 
     qscale = args.video_quality_scale
 
