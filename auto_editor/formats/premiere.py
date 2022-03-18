@@ -1,3 +1,13 @@
+"""
+Premiere Pro uses the Final Cut Pro 7 XML Interchange Format
+
+See docs here:
+https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/Elements/Elements.html
+
+Also, Premiere itself will happily output subtlety incorrect XML files that don't
+come back the way they started.
+"""
+
 import os.path
 from os.path import abspath
 from shutil import move
@@ -8,7 +18,6 @@ from .utils import indent, get_width_height, safe_mkdir
 
 PIXEL_ASPECT_RATIO = 'square'
 COLORDEPTH = '24'
-NTSC = 'FALSE'
 ANAMORPHIC = 'FALSE'
 DEPTH = '16'
 
@@ -45,13 +54,29 @@ def speedup(speed: float) -> str:
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
 
-def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
+def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
 
     audio_file = len(inp.video_streams) == 0 and len(inp.audio_streams) == 1
 
-    clips = list(filter(lambda chunk: chunk[2] != 99999, chunks))
+    # This is not at all how timebase works in actual media but that's how it works here.
+    timebase = int(fps)
+
+    if fps == 23.98 or fps == 23.97602397 or fps == 23.976:
+        timebase = 24
+        ntsc = 'TRUE'
+    elif fps == 29.97 or fps == 29.97002997:
+        timebase = 30
+        ntsc = 'TRUE'
+    elif fps == 59.94 or fps == 59.94005994:
+        timebase = 60
+        ntsc = 'TRUE'
+    else:
+        ntsc = 'FALSE'
 
     duration = chunks[-1][1]
+
+    clips = list(filter(lambda chunk: chunk[2] != 99999, chunks))
+
     pathurls = [fix_url(inp.path)]
 
     tracks = len(inp.audio_streams)
@@ -71,8 +96,6 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
     if width is None or height is None:
         width, height = '1280', '720'
 
-    timebase = str(int(fps))
-
     group_name = 'Auto-Editor {} Group'.format('Audio' if audio_file else 'Video')
 
     with open(output, 'w', encoding='utf-8') as outfile:
@@ -83,7 +106,7 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
         outfile.write(f'\t\t<duration>{duration}</duration>\n')
         outfile.write('\t\t<rate>\n')
         outfile.write(f'\t\t\t<timebase>{timebase}</timebase>\n')
-        outfile.write(f'\t\t\t<ntsc>{NTSC}</ntsc>\n')
+        outfile.write(f'\t\t\t<ntsc>{ntsc}</ntsc>\n')
         outfile.write('\t\t</rate>\n')
         outfile.write('\t\t<media>\n')
         outfile.write(indent(3,
@@ -97,13 +120,13 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
             outfile.write(indent(3,
                 '\t\t\t<rate>',
                 f'\t\t\t\t<timebase>{timebase}</timebase>',
-                f'\t\t\t\t<ntsc>{NTSC}</ntsc>',
+                f'\t\t\t\t<ntsc>{ntsc}</ntsc>',
                 '\t\t\t</rate>')
             )
 
         outfile.write(indent(3,
-            '\t\t\t<width>{}</width>'.format(width),
-            '\t\t\t<height>{}</height>'.format(height),
+            f'\t\t\t<width>{width}</width>',
+            f'\t\t\t<height>{height}</height>',
             f'\t\t\t<pixelaspectratio>{PIXEL_ASPECT_RATIO}</pixelaspectratio>',
         ))
 
@@ -152,7 +175,7 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
                         '\t<pathurl>{}</pathurl>'.format(pathurls[0]),
                         '\t<rate>',
                         f'\t\t<timebase>{timebase}</timebase>',
-                        f'\t\t<ntsc>{NTSC}</ntsc>',
+                        f'\t\t<ntsc>{ntsc}</ntsc>',
                         '\t</rate>',
                         f'\t<duration>{duration}</duration>',
                         '\t<media>',
@@ -160,10 +183,10 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
                         '\t\t\t<samplecharacteristics>',
                         '\t\t\t\t<rate>',
                         f'\t\t\t\t\t<timebase>{timebase}</timebase>',
-                        f'\t\t\t\t\t<ntsc>{NTSC}</ntsc>',
+                        f'\t\t\t\t\t<ntsc>{ntsc}</ntsc>',
                         '\t\t\t\t</rate>',
-                        '\t\t\t\t<width>{}</width>'.format(width),
-                        '\t\t\t\t<height>{}</height>'.format(height),
+                        f'\t\t\t\t<width>{width}</width>',
+                        f'\t\t\t\t<height>{height}</height>',
                         f'\t\t\t\t<anamorphic>{ANAMORPHIC}</anamorphic>',
                         f'\t\t\t\t<pixelaspectratio>{PIXEL_ASPECT_RATIO}</pixelaspectratio>',
                         '\t\t\t\t<fielddominance>none</fielddominance>',
@@ -172,7 +195,7 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
                         '\t\t<audio>',
                         '\t\t\t<samplecharacteristics>',
                         f'\t\t\t\t<depth>{DEPTH}</depth>',
-                        f'\t\t\t\t<samplerate>{sampleRate}</samplerate>',
+                        f'\t\t\t\t<samplerate>{sample_rate}</samplerate>',
                         '\t\t\t</samplecharacteristics>',
                         '\t\t\t<channelcount>2</channelcount>',
                         '\t\t</audio>',
@@ -214,7 +237,7 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
             '\t<format>',
             '\t\t<samplecharacteristics>',
             f'\t\t\t<depth>{DEPTH}</depth>',
-            f'\t\t\t<samplerate>{sampleRate}</samplerate>',
+            f'\t\t\t<samplerate>{sample_rate}</samplerate>',
             '\t\t</samplecharacteristics>',
             '\t</format>'
             )
@@ -257,13 +280,13 @@ def premiere_xml(inp, temp, output, chunks, sampleRate, fps, log):
                         '\t<pathurl>{}</pathurl>'.format(pathurls[t]),
                         '\t<rate>',
                         f'\t\t<timebase>{timebase}</timebase>',
-                        f'\t\t<ntsc>{NTSC}</ntsc>',
+                        f'\t\t<ntsc>{ntsc}</ntsc>',
                         '\t</rate>',
                         '\t<media>',
                         '\t\t<audio>',
                         '\t\t\t<samplecharacteristics>',
                         f'\t\t\t\t<depth>{DEPTH}</depth>',
-                        f'\t\t\t\t<samplerate>{sampleRate}</samplerate>',
+                        f'\t\t\t\t<samplerate>{sample_rate}</samplerate>',
                         '\t\t\t</samplecharacteristics>',
                         '\t\t\t<channelcount>2</channelcount>',
                         '\t\t</audio>',
