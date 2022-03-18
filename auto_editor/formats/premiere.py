@@ -75,7 +75,10 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
 
     duration = chunks[-1][1]
 
-    clips = list(filter(lambda chunk: chunk[2] != 99999, chunks))
+    clips = []
+    for chunk in chunks:
+        if chunk[2] != 99999:
+            clips.append(chunk)
 
     pathurls = [fix_url(inp.path)]
 
@@ -150,21 +153,23 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
             total = 0
             for j, clip in enumerate(clips):
 
-                clip_duration = (clip[1] - clip[0]) / clip[2]
+                clip_duration = (clip[1] - clip[0] + 1) / clip[2]
 
-                my_start = int(total)
-                my_end = int(total) + int(clip_duration)
+                _start = int(total)
+                _end = int(total) + int(clip_duration)
+                _in = int(clip[0] / clip[2])
+                _out = int(clip[1] / clip[2])
 
                 total += clip_duration
 
                 outfile.write(indent(5,
                     '<clipitem id="clipitem-{}">'.format(j+1),
                     '\t<masterclipid>masterclip-2</masterclipid>',
-                    '\t<name>{}</name>'.format(inp.basename),
-                    '\t<start>{}</start>'.format(my_start),
-                    '\t<end>{}</end>'.format(my_end),
-                    '\t<in>{}</in>'.format(int(clip[0] / clip[2])),
-                    '\t<out>{}</out>'.format(int(clip[1] / clip[2]))
+                    f'\t<name>{inp.basename}</name>',
+                    f'\t<start>{_start}</start>',
+                    f'\t<end>{_end}</end>',
+                    f'\t<in>{_in}</in>',
+                    f'\t<out>{_out}</out>',
                     )
                 )
 
@@ -248,10 +253,12 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
             total = 0
             for j, clip in enumerate(clips):
 
-                clip_duration = (clip[1] - clip[0]) / clip[2]
+                clip_duration = (clip[1] - clip[0] + 1) / clip[2]
 
-                my_start = int(total)
-                my_end = int(total) + int(clip_duration)
+                _start = int(total)
+                _end = int(total) + int(clip_duration)
+                _in = int(clip[0] / clip[2])
+                _out = int(clip[1] / clip[2])
 
                 total += clip_duration
 
@@ -266,10 +273,10 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
                     f'<clipitem id="clipitem-{clip_item_num}" premiereChannelType="stereo">',
                     f'\t<masterclipid>masterclip-{master_id}</masterclipid>',
                     f'\t<name>{inp.basename}</name>',
-                    f'\t<start>{my_start}</start>',
-                    f'\t<end>{my_end}</end>',
-                    '\t<in>{}</in>'.format(int(clip[0] / clip[2])),
-                    '\t<out>{}</out>'.format(int(clip[1] / clip[2]))
+                    f'\t<start>{_start}</start>',
+                    f'\t<end>{_end}</end>',
+                    f'\t<in>{_in}</in>',
+                    f'\t<out>{_out}</out>',
                     )
                 )
 
