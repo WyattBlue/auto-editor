@@ -12,10 +12,9 @@ from auto_editor.sheet import Sheet
 from auto_editor.utils.log import Log
 from auto_editor.utils.func import fnone, append_filename
 
-def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
-    sample_rate=None):
-    from auto_editor.cutting import (combine_audio_motion, combine_segment, to_speed_list,
-        set_range, chunkify, apply_mark_as, apply_margin, seconds_to_frames, cook)
+def get_chunks(inp, fps, args, progress, log, audio_samples=None, sample_rate=None):
+    from auto_editor.cutting import (combine_audio_motion, to_speed_list, set_range,
+        chunkify, apply_mark_as, apply_margin, seconds_to_frames, cook)
 
     start_margin, end_margin = args.frame_margin
 
@@ -66,9 +65,6 @@ def get_chunks(inp, segment, fps, args, progress, log, audio_samples=None,
     has_loud = cook(has_loud, min_clip, min_cut)
     has_loud = apply_margin(has_loud, has_loud_length, start_margin, end_margin)
 
-    if segment is not None:
-        has_loud = combine_segment(has_loud, segment, fps)
-
     # Remove small clips/cuts created by applying other rules.
     has_loud = cook(has_loud, min_clip, min_cut)
 
@@ -106,7 +102,7 @@ def set_output_name(path: str, inp_ext: str, export: str) -> str:
     return root + '_ALTERED' + ext
 
 
-def edit_media(i, inp, segment, ffmpeg, args, progress, temp, log):
+def edit_media(i, inp, ffmpeg, args, progress, temp, log):
     from auto_editor.utils.container import get_rules
 
     chunks = None
@@ -231,9 +227,8 @@ def edit_media(i, inp, segment, ffmpeg, args, progress, temp, log):
         sample_rate, audio_samples = read(temp_file)
 
     if chunks is None:
-        chunks = get_chunks(
-            inp, segment, fps, args, progress, log, audio_samples, sample_rate
-        )
+        chunks = get_chunks(inp, fps, args, progress, log, audio_samples, sample_rate)
+
     del audio_samples
 
     if len(chunks) == 1 and chunks[0][2] == 99999:

@@ -55,18 +55,7 @@ def combine_audio_motion(
     return None
 
 
-def combine_segment(has_loud: np.ndarray, segment, fps: float) -> np.ndarray:
-    for item in segment:
-        start, end = item['segment']
-        start = int(start * fps)
-        end = int(end * fps)
-        has_loud[start:end] = False
-    return has_loud
-
-
-def remove_small(
-    has_loud: np.ndarray, lim: int, replace: int, with_: int
-    ) -> np.ndarray:
+def remove_small(has_loud: np.ndarray, lim: int, replace: int, with_: int) -> np.ndarray:
     startP = 0
     active = False
     for j, item in enumerate(has_loud):
