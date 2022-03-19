@@ -21,7 +21,7 @@ def timecode_to_frames(timecode, fps):
     s = float(s)
     return round((h * 3600 + m * 60 + s) * fps)
 
-def shotcut_xml(inp, temp, output, chunks, fps, log):
+def shotcut_xml(inp, output, chunks, fps, log):
     width, height = get_width_height(inp)
     if width is None or height is None:
         width, height = '1280', '720'
