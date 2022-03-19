@@ -194,7 +194,8 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
 
     tou = None
     seek = 10
-    i = 0
+
+    pts = []
 
     seek_frame = None
     frames_saved = 0
@@ -214,11 +215,13 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
                 frames_saved += index - seek_frame
                 seek_frame = None
 
-            if i < 2:
-                i += 1
-            if i == 2:
-                tou = frame.pts
-                i += 1
+            if tou is None:
+                if len(pts) < 2:
+                    pts.append(frame.pts)
+                else:
+                    tou = pts[1] - pts[0]
+                    log.debug(f'tou: {tou}')
+                    del pts
 
             if index > chunk[1]:
                 if chunks:
