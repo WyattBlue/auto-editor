@@ -279,13 +279,13 @@ def edit_media(i, inp, segment, ffmpeg, args, progress, temp, log):
     if args.export == 'final-cut-pro':
         from auto_editor.formats.final_cut_pro import fcp_xml
 
-        fcp_xml(inp, temp, output_path, chunks, fps, log)
+        fcp_xml(inp, output_path, chunks, fps, log)
         return num_cuts, output_path
 
     if args.export == 'shotcut':
         from auto_editor.formats.shotcut import shotcut_xml
 
-        shotcut_xml(inp, temp, output_path, chunks, fps, log)
+        shotcut_xml(inp, output_path, chunks, fps, log)
         return num_cuts, output_path
 
     def pad_chunk(
