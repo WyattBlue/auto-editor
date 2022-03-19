@@ -35,24 +35,6 @@ def parse_bytes(bytestr) -> Optional[int]:
     return round(number * multiplier)
 
 
-def sponsor_block_api(_id: str, categories: List[str], log: Log) -> Optional[dict]:
-    from urllib import request
-    from urllib.error import HTTPError
-    import json
-
-    cat_url = 'categories=["' + '","'.join(categories) + '"]'
-
-    try:
-        contents = request.urlopen(
-            f'https://sponsor.ajay.app/api/skipSegments?videoID={_id}&{cat_url}'
-        )
-
-        return json.loads(contents.read())
-    except HTTPError:
-        log.warning("Couldn't find skipSegments for id: {}".format(_id))
-        return None
-
-
 def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     log.conwrite('Downloading video...')
     if ' @' in my_input:
@@ -116,40 +98,21 @@ def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     return outtmpl
 
 
-def get_segment(args, my_input: str, log: Log) -> Optional[dict]:
-    if args.block is not None:
-        if args.id is not None:
-            return sponsor_block_api(args.id, args.block, log)
-        match = re.search(
-            r'youtube\.com/watch\?v=(?P<match>[A-Za-z0-9_-]{11})', my_input
-        )
-        if match:
-            youtube_id = match.groupdict()['match']
-            return sponsor_block_api(youtube_id, args.block, log)
-    return None
-
-
-def valid_input(
-    inputs: List[str], ffmpeg: FFmpeg, args, log: Log
-    ) -> Tuple[List[str], List[Optional[dict]]]:
-
+def valid_input(inputs: List[str], ffmpeg: FFmpeg, args, log: Log) -> List[str]:
     new_inputs = []
-    segments = []
+
     for my_input in inputs:
         if os.path.isfile(my_input):
             _, ext = os.path.splitext(my_input)
             if ext == '':
                 log.error('File must have an extension.')
-
             new_inputs.append(my_input)
-            segments.append(get_segment(args, my_input, log))
 
         elif my_input.startswith('http://') or my_input.startswith('https://'):
             new_inputs.append(download_video(my_input, args, ffmpeg, log))
-            segments.append(get_segment(args, my_input, log))
         else:
             if os.path.isdir(my_input):
-                log.error('Input must be a file or url.')
-            log.error('Could not find file: {}'.format(my_input))
+                log.error('Input must be a file or a URL.')
+            log.error(f'Could not find file: {my_input}')
 
-    return new_inputs, segments
+    return new_inputs

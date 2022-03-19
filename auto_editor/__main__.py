@@ -42,14 +42,6 @@ def main_options(parser):
         help='The directory where the downloaded URL is placed.')
     parser.add_argument('--limit-rate', '-rate', default='3m',
         help='The maximum download rate in bytes per second (50k, 4.2m)')
-    parser.add_argument('--id', type=str, default=None,
-        help='Manually set the YouTube ID the video belongs to.')
-    parser.add_argument('--block', type=block_type,
-        help='Given a SponsorBlock category, mark the section as silent.',
-        manual='Multiple categories can be specified by using a comma: "sponsor,intro"\n'
-            'This option only works on YouTube URLs, or where `--id` points to a valid '
-            'YouTube ID.\n\nCategories include: '
-            'sponsor intro outro selfpromo interaction music_offtopic')
     parser.add_argument('--download-archive', type=file_type, default=None,
         help='Download only videos not listed in archive file. Record the IDs of'
              ' all downloads.')
@@ -361,7 +353,7 @@ def main():
         args.output_file = []
 
     from auto_editor.validate_input import valid_input
-    input_list, segments = valid_input(args.input, ffmpeg, args, log)
+    input_list = valid_input(args.input, ffmpeg, args, log)
 
     if args.combine_files:
         if exporting_to_editor:
@@ -378,7 +370,7 @@ def main():
         del cmd
         input_list = [temp_file]
 
-    def main_loop(input_list, ffmpeg, args, segments, log):
+    def main_loop(input_list, ffmpeg, args, log):
         num_cuts = 0
 
         progress = ProgressBar(args.progress)
@@ -389,9 +381,7 @@ def main():
             if len(input_list) > 1:
                 log.conwrite(f'Working on {inp.basename}')
 
-            cuts, output_path = edit_media(
-                i, inp, segments[i], ffmpeg, args, progress, TEMP, log
-            )
+            cuts, output_path = edit_media(i, inp, ffmpeg, args, progress, TEMP, log)
             num_cuts += cuts
 
         if not args.preview and not args.timeline and not making_data_file:
@@ -409,7 +399,7 @@ def main():
             usefulfunctions.open_with_system_default(output_path, log)
 
     try:
-        main_loop(input_list, ffmpeg, args, segments, log)
+        main_loop(input_list, ffmpeg, args, log)
     except KeyboardInterrupt:
         log.error('Keyboard Interrupt')
     log.cleanup()
