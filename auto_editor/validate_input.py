@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-from typing import List, Tuple, Optional
+from typing import List, Optional
 
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.log import Log

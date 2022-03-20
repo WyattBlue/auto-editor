@@ -2,7 +2,7 @@
 import os
 
 # Typing
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 # External Libraries
 import numpy as np

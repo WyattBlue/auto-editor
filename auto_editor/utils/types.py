@@ -94,9 +94,6 @@ def range_type(val: str) -> list:
 def speed_range_type(val: str) -> list:
     return comma_type(val, 3, 3, 'speed_range_type')
 
-def block_type(val: str) -> list:
-    return comma_type(val, 1, None, 'block_type')
-
 def text_content(val: str) -> str:
     return val.replace('\\n', '\n')
 

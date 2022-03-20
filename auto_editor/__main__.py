@@ -19,7 +19,7 @@ def main_options(parser):
     from auto_editor.objects import (TextObject, RectangleObject, EllipseObject,
         ImageObject)
     from auto_editor.utils.types import (file_type, float_type, sample_rate_type,
-        frame_type, range_type, speed_range_type, block_type, margin_type, color_type)
+        frame_type, range_type, speed_range_type, margin_type, color_type)
 
     parser.add_text('Object Options')
     parser.add_argument('--add-text', nargs='*', dataclass=TextObject,
