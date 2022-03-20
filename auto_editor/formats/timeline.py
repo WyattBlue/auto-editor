@@ -58,7 +58,7 @@ def read_json_timeline(json_file: str, log: Log):
     check_attrs(data, log, 'version')
 
     if data['version'] not in ('0.1.0', '0.2.0'):
-        log.error(f'Unsupported version: {version}')
+        log.error(f"Unsupported version: {data['version']}")
 
     if data['version'] == '0.1.0':
         check_attrs(data, log, 'source', 'chunks')
@@ -66,7 +66,7 @@ def read_json_timeline(json_file: str, log: Log):
 
         chunks = validate_chunks(data['chunks'], log)
 
-        return '#000', data['source'], data['chunks']
+        return '#000', data['source'], chunks
 
     # version 0.2.0
     check_attrs(data, log, 'source', 'background', 'chunks', 'timeline')

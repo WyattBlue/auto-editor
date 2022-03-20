@@ -1,4 +1,4 @@
-from typing import List, Tuple, NoReturn, Optional, Union
+from typing import List, Tuple, NoReturn, Union
 
 import numpy as np
 
@@ -7,7 +7,7 @@ from auto_editor.utils.types import split_num_str
 
 def combine_audio_motion(
     audio_list: np.ndarray, motion_list: np.ndarray, based: str, log: Log
-    ) -> Optional[np.ndarray]:
+    ) -> np.ndarray:
 
     no_place_where = "There was no place where {} exceeded the threshold."
 
@@ -50,9 +50,8 @@ def combine_audio_motion(
     if based == 'not_audio_and_motion':
         return np.invert(audio_list) & motion_list
 
-    if based == 'not_audio_and_not_motion':
-        return np.invert(audio_list) & np.invert(motion_list)
-    return None
+    # based == 'not_audio_and_not_motion':
+    return np.invert(audio_list) & np.invert(motion_list)
 
 
 def remove_small(has_loud: np.ndarray, lim: int, replace: int, with_: int) -> np.ndarray:

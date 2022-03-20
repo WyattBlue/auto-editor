@@ -219,7 +219,7 @@ def main(sys_args: Optional[List[str]]=None):
 
 
     def parser_test():
-        check_for_error(['example.mp4', '--block'], 'needs argument')
+        check_for_error(['example.mp4', '--video-speed'], 'needs argument')
 
 
     def subtitle_tests():
