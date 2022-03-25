@@ -58,7 +58,7 @@ def print_option_help(option):
         text += ','.join(args)
 
     if option['manual'] != '':
-        text += '{}\n\n'.format(indent(option['manual'], '    '))
+        text += indent(option['manual'], '    ') + '\n\n'
 
     if option['dataclass'] is not None:
         pass
@@ -339,8 +339,8 @@ class ParseOptions:
                     close_matches = difflib.get_close_matches(arg, option_names)
                     if close_matches:
                         raise ParserError(
-                            'Unknown {}: {}\n\n    Did you mean:\n        '.format(
-                            label, arg) + ', '.join(close_matches)
+                            f'Unknown {label}: {arg}\n\n    Did you mean:\n        ' +
+                            ', '.join(close_matches)
                         )
                     raise ParserError(f'Unknown {label}: {arg}')
             else:

@@ -63,8 +63,8 @@ def edit_media(i, inp, ffmpeg, args, progress, temp, log):
     if not fnone(args.sample_rate):
         if rules['samplerate'] is not None and args.sample_rate not in rules['samplerate']:
             log.error(
-                "'{}' container only supports samplerates: {}".format(output_container,
-                rules['samplerate'])
+                f"'{output_container}' container only supports "
+                f"samplerates: {rules['samplerate']}"
             )
 
     vcodec = args.video_codec
@@ -213,8 +213,8 @@ def edit_media(i, inp, ffmpeg, args, progress, temp, log):
             from auto_editor.render.audio import make_new_audio
 
             for t in range(tracks):
-                temp_file = os.path.join(temp, '{}.wav'.format(t))
-                new_file = os.path.join(temp, 'new{}.wav'.format(t))
+                temp_file = os.path.join(temp, f'{t}.wav')
+                new_file = os.path.join(temp, f'new{t}.wav')
                 make_new_audio(temp_file, new_file, chunks, log, fps, progress)
 
                 if not os.path.isfile(new_file):

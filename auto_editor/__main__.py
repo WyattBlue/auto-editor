@@ -255,8 +255,7 @@ def main():
     subcommands = ['test', 'info', 'levels', 'grep', 'subdump', 'desc']
 
     if len(sys.argv) > 1 and sys.argv[1] in subcommands:
-        obj = __import__('auto_editor.subcommands.{}'.format(sys.argv[1]),
-            fromlist=['subcommands'])
+        obj = __import__(f'auto_editor.subcommands.{sys.argv[1]}', fromlist=['subcommands'])
         obj.main(sys.argv[2:])
         sys.exit()
     else:
@@ -386,8 +385,14 @@ def main():
         cmd = []
         for fileref in input_list:
             cmd.extend(['-i', fileref])
-        cmd.extend(['-filter_complex', '[0:v]concat=n={}:v=1:a=1'.format(len(input_list)),
-            '-codec:v', 'h264', '-pix_fmt', 'yuv420p', '-strict', '-2', temp_file])
+        cmd.extend([
+            '-filter_complex', f'[0:v]concat=n={len(input_list)}:v=1:a=1',
+            '-codec:v', 'h264',
+            '-pix_fmt', 'yuv420p',
+            '-strict', '-2',
+            temp_file,
+        ])
+
         ffmpeg.run(cmd)
         del cmd
         input_list = [temp_file]
@@ -414,8 +419,10 @@ def main():
             time_save = usefulfunctions.human_readable_time(num_cuts * 30)
             s = 's' if num_cuts != 1 else ''
 
-            log.print('Auto-Editor made {} cut{}, which would have taken about {} if '
-                'edited manually.'.format(num_cuts, s, time_save))
+            log.print(
+                f'Auto-Editor made {num_cuts} cut{s}, which would have taken '
+                f'about {time_save} if edited manually.'
+            )
 
         if not args.no_open:
             usefulfunctions.open_with_system_default(output_path, log)
