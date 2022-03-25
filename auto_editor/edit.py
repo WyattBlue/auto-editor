@@ -11,77 +11,7 @@ import numpy as np
 from auto_editor.sheet import Sheet
 from auto_editor.utils.log import Log
 from auto_editor.utils.func import fnone, append_filename
-
-def get_chunks(inp, fps, args, progress, log, audio_samples=None, sample_rate=None):
-    from auto_editor.cutting import (combine_audio_motion, to_speed_list, set_range,
-        chunkify, apply_mark_as, apply_margin, seconds_to_frames, cook)
-
-    start_margin, end_margin = args.frame_margin
-
-    start_margin = seconds_to_frames(start_margin, fps)
-    end_margin = seconds_to_frames(end_margin, fps)
-    min_clip = seconds_to_frames(args.min_clip_length, fps)
-    min_cut = seconds_to_frames(args.min_cut_length, fps)
-
-    def get_has_loud(inp, args, fps, audio_samples, sample_rate, log) -> np.ndarray:
-        from auto_editor.analyze.generic import get_np_list
-
-        if args.edit_based_on == 'none':
-            return get_np_list(inp.path, audio_samples, sample_rate, fps, np.ones)
-        if args.edit_based_on == 'all':
-            return get_np_list(inp.path, audio_samples, sample_rate, fps, np.zeros)
-
-        audio_list, motion_list = None, None
-
-        if 'audio' in args.edit_based_on:
-            from auto_editor.analyze.audio import audio_detection
-
-            if audio_samples is None:
-                audio_list = get_np_list(inp.path, audio_samples, sample_rate, fps, np.ones)
-            else:
-                audio_list = audio_detection(audio_samples, sample_rate,
-                    args.silent_threshold, fps, progress)
-
-        if 'motion' in args.edit_based_on:
-            from auto_editor.analyze.motion import motion_detection
-
-            if len(inp.video_streams) == 0:
-                motion_list = get_np_list(inp.path, audio_samples, sample_rate, fps, np.ones)
-            else:
-                motion_list = motion_detection(inp.path, fps, args.motion_threshold,
-                    progress, args.md_width, args.md_blur)
-
-        if audio_list is not None and motion_list is not None:
-            if len(audio_list) > len(motion_list):
-                audio_list = audio_list[:len(motion_list)]
-            elif len(motion_list) > len(audio_list):
-                motion_list = motion_list[:len(audio_list)]
-
-        return combine_audio_motion(audio_list, motion_list, args.edit_based_on, log)
-
-    has_loud = get_has_loud(inp, args, fps, audio_samples, sample_rate, log)
-    has_loud_length = len(has_loud)
-    has_loud = apply_mark_as(has_loud, has_loud_length, fps, args, log)
-    has_loud = cook(has_loud, min_clip, min_cut)
-    has_loud = apply_margin(has_loud, has_loud_length, start_margin, end_margin)
-
-    # Remove small clips/cuts created by applying other rules.
-    has_loud = cook(has_loud, min_clip, min_cut)
-
-    speed_list = to_speed_list(has_loud, args.video_speed, args.silent_speed)
-
-    if args.cut_out != []:
-        speed_list = set_range(speed_list, args.cut_out, fps, 99999, log)
-
-    if args.add_in != []:
-        speed_list = set_range(speed_list, args.add_in, fps, args.video_speed, log)
-
-    if args.set_speed_for_range != []:
-        for item in args.set_speed_for_range:
-            speed_list = set_range(speed_list, [item[1:]], fps, item[0], log)
-
-    return chunkify(speed_list, has_loud_length)
-
+from auto_editor.method import get_chunks
 
 def set_output_name(path: str, inp_ext: str, export: str) -> str:
     root, ext = os.path.splitext(path)
@@ -185,51 +115,25 @@ def edit_media(i, inp, ffmpeg, args, progress, temp, log):
     if len(inp.subtitle_streams) > 0:
         cmd = ['-i', inp.path, '-hide_banner']
         for s, sub in enumerate(inp.subtitle_streams):
-            cmd.extend(['-map', '0:s:{}'.format(s)])
+            cmd.extend(['-map', f'0:s:{s}'])
         for s, sub in enumerate(inp.subtitle_streams):
-            cmd.extend([os.path.join(temp, '{}s.{}'.format(s, sub['ext']))])
+            cmd.extend([os.path.join(temp, f"{s}s.{sub['ext']}")])
         ffmpeg.run(cmd)
 
     sample_rate = None
-
-    if args.cut_by_this_track >= tracks and args.cut_by_this_track != 0:
-        message = "You choose a track that doesn't exist.\nThere "
-        if tracks == 1:
-            message += 'is only {} track.\n'.format(tracks)
-        else:
-            message += 'are only {} tracks.\n'.format(tracks)
-        for t in range(tracks):
-            message += ' Track {}\n'.format(t)
-        log.error(message)
 
     # Split audio tracks into: 0.wav, 1.wav, etc.
     log.conwrite('Extracting audio')
 
     cmd = ['-i', inp.path, '-hide_banner']
     for t in range(tracks):
-        cmd.extend(['-map', '0:a:{}'.format(t), '-ac', '2',
-            os.path.join(temp, '{}.wav'.format(t))])
+        cmd.extend(['-map', f'0:a:{t}', '-ac', '2', os.path.join(temp, f'{t}.wav')])
     ffmpeg.run(cmd)
     del cmd
 
-    if tracks != 0:
-        if args.cut_by_all_tracks:
-            temp_file = os.path.join(temp, 'combined.wav')
-            cmd = ['-i', inp.path, '-filter_complex',
-                '[0:a]amix=inputs={}:duration=longest'.format(tracks), '-ac', '2',
-                '-f', 'wav', temp_file]
-            ffmpeg.run(cmd)
-            del cmd
-        else:
-            temp_file = os.path.join(temp, '{}.wav'.format(args.cut_by_this_track))
-
-        from auto_editor.scipy.wavfile import read
-        sample_rate, audio_samples = read(temp_file)
 
     if chunks is None:
-        chunks = get_chunks(inp, fps, args, progress, log, audio_samples, sample_rate)
-
-    del audio_samples
+        chunks = get_chunks(inp, fps, args, progress, temp, log)
 
     if len(chunks) == 1 and chunks[0][2] == 99999:
         log.error('The entire media is cut!')

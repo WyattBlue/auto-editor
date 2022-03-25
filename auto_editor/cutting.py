@@ -5,54 +5,6 @@ import numpy as np
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import split_num_str
 
-def combine_audio_motion(
-    audio_list: np.ndarray, motion_list: np.ndarray, based: str, log: Log
-    ) -> np.ndarray:
-
-    no_place_where = "There was no place where {} exceeded the threshold."
-
-    if (based == 'audio' or based == 'not_audio') and max(audio_list) == 0:
-        log.error(no_place_where.format('audio'))
-
-    if (based == 'motion' or based == 'not_motion') and max(motion_list) == 0:
-        log.error(no_place_where.format('motion'))
-
-    if audio_list is not None and max(audio_list) == 0:
-        log.warning(no_place_where.format('audio'))
-
-    if motion_list is not None and max(motion_list) == 0:
-        log.warning(no_place_where.format('motion'))
-
-    if based == 'audio':
-        return audio_list
-
-    if based == 'motion':
-        return motion_list
-
-    if based == 'not_audio':
-        return np.invert(audio_list)
-
-    if based == 'not_motion':
-        return np.invert(motion_list)
-
-    if based == 'audio_and_motion':
-        return audio_list & motion_list
-
-    if based == 'audio_or_motion':
-        return audio_list | motion_list
-
-    if based == 'audio_xor_motion':
-        return np.bitwise_xor(audio_list, motion_list)
-
-    if based == 'audio_and_not_motion':
-        return audio_list & np.invert(motion_list)
-
-    if based == 'not_audio_and_motion':
-        return np.invert(audio_list) & motion_list
-
-    # based == 'not_audio_and_not_motion':
-    return np.invert(audio_list) & np.invert(motion_list)
-
 
 def remove_small(has_loud: np.ndarray, lim: int, replace: int, with_: int) -> np.ndarray:
     startP = 0
