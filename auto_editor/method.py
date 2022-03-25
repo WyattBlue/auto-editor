@@ -5,6 +5,33 @@ import numpy as np
 
 from auto_editor.utils.log import Log
 
+
+def get_audio_list(stream, threshold, fps, progress, temp, log):
+    from auto_editor.analyze.audio import audio_detection
+    from auto_editor.scipy.wavfile import read
+
+    path = os.path.join(temp, f'{stream}.wav')
+
+    if os.path.isfile(path):
+        sample_rate, audio_samples = read(path)
+    else:
+        log.error(f"Audio stream '{stream}' does not exist.")
+
+    audio_list = audio_detection(audio_samples, sample_rate, threshold, fps, progress)
+
+    del audio_samples
+
+    return audio_list
+
+
+def or_combine(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    if len(a) > len(b):
+        b = np.resize(b, len(a))
+    if len(b) > len(a):
+        a = np.resize(a, len(b))
+    return a | b
+
+
 def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
 
     from auto_editor.analyze.generic import get_np_list
@@ -16,23 +43,21 @@ def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
     if method == 'all':
         return get_np_list(inp.path, audio_samples, sample_rate, fps, np.zeros)
     if method == 'audio':
-        from auto_editor.analyze.audio import audio_detection
-        from auto_editor.scipy.wavfile import read
+        if attrs.stream == 'all':
+            total_list = None
+            for i in range(len(inp.audio_streams)):
+                audio_list = get_audio_list(i, attrs.threshold, fps, progress, temp, log)
+                if total_list is None:
+                    total_list = audio_list
+                else:
+                    total_list = or_combine(total_list, audio_list)
 
-        path = os.path.join(temp, f'{attrs.stream}.wav')
-
-        if os.path.isfile(path):
-            sample_rate, audio_samples = read(path)
+            if total_list is None:
+                log.error('Input has no audio streams.')
+            return total_list
         else:
-            log.error(f"Audio stream '{attrs.stream}' does not exist.")
+            return get_audio_list(attrs.stream, attrs.threshold, fps, progress, temp, log)
 
-        audio_list = audio_detection(
-            audio_samples, sample_rate, attrs.threshold, fps, progress
-        )
-
-        del audio_samples
-
-        return audio_list
 
     if method == 'motion':
         from auto_editor.analyze.motion import motion_detection
@@ -69,9 +94,14 @@ def get_has_loud(method_str, inp, fps, progress, temp, log, args):
 
     from auto_editor.utils.types import float_type
 
+    def stream_type(val: str):
+        if val == 'all':
+            return val
+        return int(val)
+
     @dataclass
     class Audio:
-        stream: int = 0
+        stream: stream_type = 0
         threshold: float_type = args.silent_threshold
 
     @dataclass
