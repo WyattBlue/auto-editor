@@ -282,10 +282,11 @@ def _raise_bad_format(format_tag):
     try:
         format_name = WAVE_FORMAT(format_tag).name
     except ValueError:
-        format_name = '{:#06x}'.format(format_tag)
-    raise ValueError("Unknown wave file format: {}. Supported ".format(format_name) +
-        "formats: " + ', '.join(x.name for x in KNOWN_WAVE_FORMATS))
-
+        format_name = f"{format_tag:#06x}"
+    raise ValueError(
+        f"Unknown wave file format: {format_name}. Supported "
+        "formats: " + ", ".join(x.name for x in KNOWN_WAVE_FORMATS)
+    )
 
 def _read_fmt_chunk(fid, is_big_endian):
     if is_big_endian:
@@ -332,12 +333,12 @@ def _read_fmt_chunk(fid, is_big_endian):
     # fmt should always be 16, 18 or 40, but handle it just in case
     _handle_pad_byte(fid, size)
 
-    return (size, format_tag, channels, fs, bytes_per_second, block_align,
-            bit_depth)
+    return (size, format_tag, channels, fs, bytes_per_second, block_align, bit_depth)
 
 
-def _read_data_chunk(fid, format_tag, channels, bit_depth, is_big_endian,
-                     block_align, mmap=False):
+def _read_data_chunk(
+    fid, format_tag, channels, bit_depth, is_big_endian, block_align, mmap=False
+):
     if is_big_endian:
         fmt = '>'
     else:
@@ -358,16 +359,18 @@ def _read_data_chunk(fid, format_tag, channels, bit_depth, is_big_endian,
             dtype = 'V1'
         elif bit_depth <= 64:
             # Remaining bit depths can map directly to signed numpy dtypes
-            dtype = '{}i{}'.format(fmt, bytes_per_sample)
+            dtype = f'{fmt}i{bytes_per_sample}'
         else:
-            raise ValueError("Unsupported bit depth: the WAV file "
-                "has {}-bit integer data.".format(bit_depth))
+            raise ValueError(
+                f"Unsupported bit depth: the WAV file has {bit_depth}-bit integer data."
+            )
     elif format_tag == WAVE_FORMAT.IEEE_FLOAT:
         if bit_depth in {32, 64}:
-            dtype = '{}f{}'.format(fmt, bytes_per_sample)
+            dtype = f'{fmt}f{bytes_per_sample}'
         else:
-            raise ValueError("Unsupported bit depth: the WAV file "
-                "has {}-bit floating-point data.".format(bit_depth))
+            raise ValueError(
+                f"Unsupported bit depth: the WAV file has {bit_depth}-bit floating-point data."
+            )
     else:
         _raise_bad_format(format_tag)
 
@@ -394,8 +397,9 @@ def _read_data_chunk(fid, format_tag, channels, bit_depth, is_big_endian,
                                 shape=(n_samples,))
             fid.seek(start + size)
         else:
-            raise ValueError("mmap=True not compatible with "
-                "{}-byte container size.".format(bytes_per_sample))
+            raise ValueError(
+               f"mmap=True not compatible with {bytes_per_sample}-byte container size."
+            )
 
     _handle_pad_byte(fid, size)
 
@@ -435,15 +439,16 @@ def _read_riff_chunk(fid):
         fmt = '>I'
     else:
         # There are also .wav files with "FFIR" or "XFIR" signatures?
-        raise ValueError("File format {} not understood. ".format(repr(str1)) +
-            "Only 'RIFF' and 'RIFX' supported.")
+        raise ValueError(
+            f"File format {repr(str1)} not understood. Only 'RIFF' and 'RIFX' supported."
+        )
 
     # Size of entire file
     file_size = struct.unpack(fmt, fid.read(4))[0] + 8
 
     str2 = fid.read(4)
     if str2 != b'WAVE':
-        raise ValueError("Not a WAV file. RIFF form type is {}.".format(repr(str2)))
+        raise ValueError(f"Not a WAV file. RIFF form type is {repr(str2)}.")
 
     return file_size, is_big_endian
 
@@ -477,7 +482,7 @@ def read(filename, mmap=False):
                 else:
                     raise ValueError("Unexpected end of file.")
             elif len(chunk_id) < 4:
-                msg = "Incomplete chunk ID: {}".format(repr(chunk_id))
+                msg = f"Incomplete chunk ID: {repr(chunk_id)}"
                 # If we have the data, ignore the broken chunk
                 if fmt_chunk_received and data_chunk_received:
                     pass
@@ -496,8 +501,9 @@ def read(filename, mmap=False):
                 data_chunk_received = True
                 if not fmt_chunk_received:
                     raise ValueError("No fmt chunk before data")
-                data = _read_data_chunk(fid, format_tag, channels, bit_depth,
-                                        is_big_endian, block_align, mmap)
+                data = _read_data_chunk(
+                    fid, format_tag, channels, bit_depth, is_big_endian, block_align, mmap
+                )
             elif chunk_id == b'LIST':
                 # Someday this could be handled properly but for now skip it
                 _skip_unknown_chunk(fid, is_big_endian)

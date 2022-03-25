@@ -70,7 +70,7 @@ def clean_all() -> None:
     cleanup(os.getcwd())
 
 
-def get_runner() -> list:
+def get_runner() -> List[str]:
     if platform.system() == 'Windows':
         return ['py', '-m', 'auto_editor']
     return ['python3', '-m', 'auto_editor']
@@ -85,7 +85,7 @@ def run_program(cmd: List[str]) -> None:
 
     returncode, stdout, stderr = pipe_to_console(cmd)
     if returncode > 0:
-        raise Exception('{}\n{}\n'.format(stdout, stderr))
+        raise Exception(f'{stdout}\n{stderr}\n')
 
 
 def check_for_error(cmd: List[str], match=None) -> None:
@@ -93,9 +93,9 @@ def check_for_error(cmd: List[str], match=None) -> None:
     if returncode > 0:
         if 'Error!' in stderr:
             if match is not None and match not in stderr:
-                raise Exception('Could\'t find "{}"'.format(match))
+                raise Exception(f'Could\'t find "{match}"')
         else:
-            raise Exception('Program crashed.\n{}\n{}'.format(stdout, stderr))
+            raise Exception(f'Program crashed.\n{stdout}\n{stderr}')
     else:
         raise Exception('Program should not respond with a code 0.')
 
@@ -128,12 +128,12 @@ def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
 
         result = np.subtract(spedup_audio, loaded['a'])
 
-        print('result non-zero: {}'.format(np.count_nonzero(result)))
-        print('len of spedup_audio: {}'.format(len(spedup_audio)))
+        print(f'result non-zero: {np.count_nonzero(result)}')
+        print(f'len of spedup_audio: {len(spedup_audio)}')
 
         print(np.count_nonzero(result) / spedup_audio.shape[0], 'difference between arrays')
 
-        raise Exception("file {} doesn't match array.".format(compare_file))
+        raise Exception(f"file {compare_file} doesn't match array.")
 
     # np.savez_compressed(out_file, a=spedup_audio)
 

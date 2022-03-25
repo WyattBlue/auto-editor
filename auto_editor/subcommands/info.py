@@ -51,16 +51,16 @@ def main(sys_args=sys.argv[1:]):
         w, h = aspect_ratio(int(w), int(h))
         if w is None:
             return ''
-        return ' ({}:{})'.format(w, h)
+        return f' ({w}:{h})'
 
     file_info = {}
 
     for file in args.input:
         text = ''
         if os.path.exists(file):
-            text += 'file: {}\n'.format(file)
+            text += f'file: {file}\n'
         else:
-            log.error('Could not find file: {}'.format(file))
+            log.error(f'Could not find file: {file}')
 
         inp = FileInfo(file, ffmpeg)
 
@@ -75,9 +75,9 @@ def main(sys_args=sys.argv[1:]):
             text += f' - video tracks: {len(inp.video_streams)}\n'
 
         for track, stream in enumerate(inp.video_streams):
-            text += '   - Track #{}\n'.format(track)
+            text += f'   - Track #{track}\n'
 
-            text += '     - codec: {}\n'.format(stream['codec'])
+            text += f"     - codec: {stream['codec']}\n"
 
             vid = {}
             vid['codec'] = stream['codec']
@@ -94,24 +94,24 @@ def main(sys_args=sys.argv[1:]):
                 vid['time_base'] = time_base
 
             if stream['fps'] is not None:
-                text += '     - fps: {}\n'.format(stream['fps'])
+                text += f"     - fps: {stream['fps']}\n"
                 vid['fps'] = float(stream['fps'])
 
             w = stream['width']
             h = stream['height']
 
             if w is not None and h is not None:
-                text += '     - resolution: {}x{}{}\n'.format(w, h, aspect_str(w, h))
+                text += f'     - resolution: {w}x{h}{aspect_str(w, h)}\n'
 
                 vid['width'] = int(w)
                 vid['height'] = int(h)
                 vid['aspect_ratio'] = aspect_ratio(int(w), int(h))
 
             if stream['bitrate'] is not None:
-                text += '     - bitrate: {}\n'.format(stream['bitrate'])
+                text += f"     - bitrate: {stream['bitrate']}\n"
                 vid['bitrate'] = stream['bitrate']
             if stream['lang'] is not None:
-                text += '     - lang: {}\n'.format(stream['lang'])
+                text += f"     - lang: {stream['lang']}\n"
                 vid['lang'] = stream['lang']
 
             file_info[file]['video'].append(vid)
@@ -123,19 +123,19 @@ def main(sys_args=sys.argv[1:]):
         for track, stream in enumerate(inp.audio_streams):
             aud = {}
 
-            text += '   - Track #{}\n'.format(track)
-            text += '     - codec: {}\n'.format(stream['codec'])
-            text += '     - samplerate: {}\n'.format(stream['samplerate'])
+            text += f'   - Track #{track}\n'
+            text += f"     - codec: {stream['codec']}\n"
+            text += f"     - samplerate: {stream['samplerate']}\n"
 
             aud['codec'] = stream['codec']
             aud['samplerate'] = int(stream['samplerate'])
 
             if stream['bitrate'] is not None:
-                text += '     - bitrate: {}\n'.format(stream['bitrate'])
+                text += f"     - bitrate: {stream['bitrate']}\n"
                 aud['bitrate'] = stream['bitrate']
 
             if stream['lang'] is not None:
-                text += '     - lang: {}\n'.format(stream['lang'])
+                text += f"     - lang: {stream['lang']}\n"
                 aud['lang'] = stream['lang']
 
             file_info[file]['audio'].append(aud)
@@ -146,11 +146,11 @@ def main(sys_args=sys.argv[1:]):
         for track, stream in enumerate(inp.subtitle_streams):
             sub = {}
 
-            text += '   - Track #{}\n'.format(track)
-            text += '     - codec: {}\n'.format(stream['codec'])
+            text += f'   - Track #{track}\n'
+            text += f"     - codec: {stream['codec']}\n"
             sub['codec'] = stream['codec']
             if stream['lang'] is not None:
-                text += '     - lang: {}\n'.format(stream['lang'])
+                text += f"     - lang: {stream['lang']}\n"
                 sub['lang'] = stream['lang']
 
             file_info[file]['subtitle'].append(sub)
@@ -181,7 +181,7 @@ def main(sys_args=sys.argv[1:]):
                 if 'VFR:' in fps_mode:
                     fps_mode = (fps_mode[fps_mode.index('VFR:'):]).strip()
 
-                text += '   - {}\n'.format(fps_mode)
+                text += f'   - {fps_mode}\n'
                 cont['fps_mode'] = fps_mode
 
         if not args.json:
