@@ -401,7 +401,7 @@ def main(sys_args: Optional[List[str]]=None):
 
 
     def track_tests():
-        run_program(['resources/multi-track.mov', '--cut_by_all_tracks'])
+        # run_program(['resources/multi-track.mov', '--edit audio:stream=all'])
         run_program(['resources/multi-track.mov', '--keep_tracks_seperate'])
         run_program(['example.mp4', '--cut_by_this_audio', 'resources/newCommentary.mp3'])
 
@@ -474,10 +474,13 @@ def main(sys_args: Optional[List[str]]=None):
 
 
     def motion_tests():
-        run_program(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion',
-            '--debug', '--frame_margin', '0', '-mcut', '0', '-mclip', '0'])
-        run_program(['resources/man_on_green_screen.mp4', '--edit_based_on', 'motion',
-            '--motion_threshold', '0'])
+        run_program(
+            ['resources/man_on_green_screen.mp4', '--edit', 'motion', '--debug',
+            '--frame_margin', '0', '-mcut', '0', '-mclip', '0']
+        )
+        run_program(
+            ['resources/man_on_green_screen.mp4', '--edit', 'motion:threshold=0']
+        )
 
     ### Runners ###
 

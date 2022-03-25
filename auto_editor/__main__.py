@@ -48,16 +48,6 @@ def main_options(parser):
     parser.add_argument('--cookies', type=file_type, default=None,
         help='The file to read cookies from and dump the cookie jar in.')
 
-    parser.add_text('Motion Detection Options')
-    parser.add_argument('--motion-threshold', type=float_type, default=0.02,
-        range='0 to 1',
-        help='How much motion is required to be considered "moving"')
-    parser.add_blank()
-    parser.add_argument('--md-width', type=int, default=400, range='1 to Infinity',
-        help="Scale the frame to this width before being compared.")
-    parser.add_argument('--md-blur', type=int, default=9, range='0 to Infinity',
-        help='Set the strength of the blur applied to a frame before being compared.')
-
     parser.add_text('Exporting as Media Options')
     parser.add_argument('--video-codec', '-vcodec', '-c:v', default='auto',
         help='Set the video codec for the output media file.')
@@ -109,20 +99,58 @@ def main_options(parser):
 
     parser.add_text('Select Editing Source Options')
     parser.add_argument('--edit-based-on', '--edit', default='audio',
-        choices=['audio', 'motion', 'none', 'all', 'not_audio', 'not_motion',
-            'audio_or_motion', 'audio_and_motion', 'audio_xor_motion',
-            'audio_and_not_motion', 'not_audio_and_motion', 'not_audio_and_not_motion'],
-        help='Decide which method to use when making edits.')
+        help='Decide which method to use when making edits.',
+        manual='''
+
+Here are some example uses:
+
+```
+--edit audio
+--edit audio:stream=1
+--edit audio:threshold=4%
+--edit audio:threshold=0.03
+
+--edit motion
+--edit motion:threshold=2%,blur=3
+
+--edit audio:threshold=4% or motion:threshold=2%,blur=3
+
+--edit none
+--edit all
+```
+
+Editing Methods:
+ - audio:
+    General audio detection.
+ - motion:
+    Motion detection specialized for real life noisy video.
+ - none:
+    Do not modify the media in anyway. (Mark all sections as "loud")
+ - all:
+    Cut out everything out. (Mark all sections as "silent")
+
+Editing Methods Attributes:
+ - audio: 1
+    - stream: 0 : int
+    - threshold: args.silent_threshold : float_type
+ - motion: 3
+    - threshold: 2% : float_type
+    - blur: 9 : int
+    - width: 400 : int
+ - none: 0
+ - all: 0
+
+Logical Operators:
+ - and
+ - or
+ - xor
+''')
+
     parser.add_argument('--keep-tracks-seperate', action='store_true',
         help="Don't combine audio tracks when exporting.")
     parser.add_blank()
     parser.add_argument('--cut-by-this-audio', '-ca', type=file_type,
         help="Base cuts by this audio file instead of the video's audio.")
-    parser.add_argument('--cut-by-this-track', '-ct', type=int, default=0,
-        range='0 to the number of audio tracks minus one',
-        help='Base cuts by a different audio track in the video.')
-    parser.add_argument('--cut-by-all-tracks', '-cat', action='store_true',
-        help='Combine all audio tracks into one before basing cuts.')
 
     parser.add_argument('--export', default='default',
         choices=['default', 'premiere', 'final-cut-pro', 'shotcut', 'json', 'audio', 'clip-sequence'],
@@ -320,9 +348,6 @@ def main():
         log.error('You need to give auto-editor an input file or folder so it can '
             'do the work for you.')
 
-    if args.md_width < 1:
-        log.error('--md-width cannot be less than 1.')
-
     def write_starting_message(export: str) -> str:
         if export == 'premiere':
             return 'Exporting to Adobe Premiere Pro XML file'
@@ -339,9 +364,6 @@ def main():
 
     if args.preview or args.export not in ('audio', 'default'):
         args.no_open = True
-
-    if args.md_blur < 0:
-        args.md_blur = 0
 
     if args.silent_speed <= 0 or args.silent_speed > 99999:
         args.silent_speed = 99999

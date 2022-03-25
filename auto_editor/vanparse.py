@@ -174,69 +174,69 @@ class ArgumentParser:
             sys.exit()
 
         if sys_args == ['-v'] or sys_args == ['-V']:
-            out('{} version {}'.format(self.program_name, self._version))
+            out(f'{self.program_name} version {self._version}')
             sys.exit()
 
         return ParseOptions(sys_args, self.args)
 
 
+def parse_dataclass(unsplit_arguments, dataclass):
+    """
+    Positional Arguments
+        --rectangle 0,end,10,20,20,30,#000, ...
+
+    Keyword Arguments
+        --rectangle start=0,end=end,x1=10, ...
+    """
+
+    from dataclasses import fields
+
+    ARG_SEP = ','
+    KEYWORD_SEP = '='
+
+    d_name = dataclass.__name__
+
+    keys = [field.name for field in fields(dataclass)]
+    kwargs = {}
+    args = []
+
+    allow_positional_args = True
+
+    if unsplit_arguments == '':
+        return dataclass()
+
+    for i, arg in enumerate(unsplit_arguments.split(ARG_SEP)):
+        if i+1 > len(keys):
+            raise ParserError(
+                f"{d_name} has too many arguments, starting with '{arg}'."
+            )
+
+        if KEYWORD_SEP in arg:
+            allow_positional_args = False
+
+            parameters = arg.split(KEYWORD_SEP)
+            if len(parameters) > 2:
+                raise ParserError(f"{d_name} invalid syntax: '{arg}'.")
+            key, val = parameters
+            if key not in keys:
+                raise ParserError(f"{d_name} got an unexpected keyword '{key}'")
+
+            kwargs[key] = val
+        elif allow_positional_args:
+            args.append(arg)
+        else:
+            raise ParserError(f'{d_name} positional argument follows keyword argument.')
+
+    try:
+        dataclass_instance = dataclass(*args, **kwargs)
+    except TypeError as err:
+        err_list = [d_name] + str(err).split(' ')[1:]
+        raise ParserError(' '.join(err_list))
+
+    return dataclass_instance
+
+
 class ParseOptions:
-
-    @staticmethod
-    def parse_dataclass(unsplit_arguments, op):
-        """
-        Positional Arguments
-            --rectangle 0,end,10,20,20,30,#000, ...
-
-        Keyword Arguments
-            --rectangle start=0,end=end,x1=10, ...
-        """
-
-        from dataclasses import fields
-
-        ARG_SEP = ','
-        KEYWORD_SEP = '='
-
-        d_name = op['dataclass'].__name__
-
-        keys = []
-        for field in fields(op['dataclass']):
-            keys.append(field.name)
-
-        kwargs = {}
-        args = []
-
-        allow_positional_args = True
-
-        for i, arg in enumerate(unsplit_arguments.split(ARG_SEP)):
-            if i+1 > len(keys):
-                raise ParserError(f"{d_name} has too many arguments, starting "
-                    f"with '{arg}'.")
-
-            if KEYWORD_SEP in arg:
-                allow_positional_args = False
-
-                parameters = arg.split(KEYWORD_SEP)
-                if len(parameters) > 2:
-                    raise ParserError(f"{d_name} invalid syntax: '{arg}'.")
-                key, val = parameters
-                if key not in keys:
-                    raise ParserError(f"{d_name} got an unexpected keyword '{key}'")
-
-                kwargs[key] = val
-            elif allow_positional_args:
-                args.append(arg)
-            else:
-                raise ParserError(f'{d_name} positional argument follows keyword argument.')
-
-        try:
-            dataclass_instance = op['dataclass'](*args, **kwargs)
-        except TypeError as err:
-            err_list = [d_name] + str(err).split(' ')[1:]
-            raise ParserError(' '.join(err_list))
-
-        return dataclass_instance
-
 
     @staticmethod
     def parse_arg(option: dict, arg):
@@ -318,7 +318,7 @@ class ParseOptions:
                 if setting_op_list:
                     if used_options and used_options[-1]['dataclass'] is not None:
                         op_list_type = None
-                        arg = self.parse_dataclass(arg, used_options[-1])
+                        arg = parse_dataclass(arg, used_options[-1]['dataclass'])
 
                     option_list.append(arg)
 
