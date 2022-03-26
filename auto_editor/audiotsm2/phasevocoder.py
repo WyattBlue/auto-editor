@@ -1,6 +1,6 @@
 import numpy as np
 
-from auto_editor.audiotsm2.base import AnalysisSynthesisTSM
+from auto_editor.audiotsm2.analysis_synthesis import AnalysisSynthesisTSM
 from auto_editor.audiotsm2.utils.windows import hanning
 
 
@@ -26,14 +26,6 @@ def find_peaks(amplitude):
     return peaks
 
 
-def all_peaks(amplitude):
-    """
-    A peak finder that considers all values to be peaks.
-    This is used for the phase vocoder without phase locking.
-    """
-    return np.ones_like(amplitude, dtype=bool)
-
-
 def get_closest_peaks(peaks):
     """
     Returns an array containing the index of the closest peak of each index.
@@ -53,7 +45,7 @@ def get_closest_peaks(peaks):
     return closest_peak
 
 
-class PhaseVocoderConverter():
+class PhaseVocoderConverter:
     """
     A Converter implementing the phase vocoder time-scale modification procedure.
     """
@@ -138,22 +130,9 @@ class PhaseVocoderConverter():
         self._analysis_hop = analysis_hop
 
 
-class PhaseLocking():
-    NONE = 0
-    IDENTITY = 1
-
-    @classmethod
-    def from_str(cls, name):
-        if name.lower() == 'none':
-            return cls.NONE
-        elif name.lower() == 'identity':
-            return cls.IDENTITY
-        else:
-            raise ValueError('Invalid phase locking name: "{}"'.format(name))
-
-
-def phasevocoder(channels, speed=1., frame_length=2048, analysis_hop=None,
-    synthesis_hop=None, phase_locking=PhaseLocking.IDENTITY):
+def phasevocoder(
+    channels, speed=1., frame_length=2048, analysis_hop=None, synthesis_hop=None
+):
 
     if synthesis_hop is None:
         synthesis_hop = frame_length // 4
@@ -164,12 +143,7 @@ def phasevocoder(channels, speed=1., frame_length=2048, analysis_hop=None,
     analysis_window = hanning(frame_length)
     synthesis_window = hanning(frame_length)
 
-    if phase_locking == PhaseLocking.NONE:
-        peak_finder = all_peaks
-    elif phase_locking == PhaseLocking.IDENTITY:
-        peak_finder = find_peaks
-    else:
-        raise ValueError('Invalid phase_locking value: "{}"'.format(phase_locking))
+    peak_finder = find_peaks
 
     converter = PhaseVocoderConverter(channels, frame_length, analysis_hop,
         synthesis_hop, peak_finder)

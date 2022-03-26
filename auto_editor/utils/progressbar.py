@@ -58,8 +58,8 @@ class ProgressBar:
             if hours > 12:
                 hours -= 12
             ampm_marker = 'PM' if new_time.tm_hour >= 12 else 'AM'
-            return '{:02}:{:02} {}'.format(hours, minutes, ampm_marker)
-        return '{:02}:{:02}'.format(hours, minutes)
+            return f'{hours:02}:{minutes:02} {ampm_marker}'
+        return f'{hours:02}:{minutes:02}'
 
     def tick(self, index: Union[int, float]) -> None:
 
@@ -76,8 +76,7 @@ class ProgressBar:
         if self.machine:
             index = min(index, self.total)
             raw = int(self.begin_time + progress_rate)
-            print('{}~{}~{}~{}~{}'.format(
-                self.title, index, self.total, self.begin_time, raw),
+            print(f'{self.title}~{index}~{self.total}~{self.begin_time}~{raw}',
                 end='\r', flush=True)
             return
 
@@ -100,10 +99,6 @@ class ProgressBar:
             bar += ' ' * (columns - len(bar) - 4)
 
         sys.stdout.write(bar + '\r')
-        try:
-            sys.stdout.flush()
-        except AttributeError:
-            pass
 
     def start(self, total: Union[int, float], title: str='Please wait') -> None:
         self.title = title

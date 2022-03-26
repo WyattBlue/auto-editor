@@ -1,6 +1,6 @@
 import numpy as np
 
-class CBuffer():
+class CBuffer:
     def __init__(self, channels, max_length):
         self._data = np.zeros((channels, max_length), dtype=np.float32)
         self._channels = channels
@@ -17,8 +17,7 @@ class CBuffer():
     def add(self, buffer):
         """Adds a buffer element-wise to the CBuffer."""
         if buffer.shape[0] != self._data.shape[0]:
-            raise ValueError("the two buffers should have the same number of "
-                "channels")
+            raise ValueError("the two buffers should have the same number of channels")
 
         n = buffer.shape[1]
         if n > self._length:
@@ -70,8 +69,7 @@ class CBuffer():
         :func:`CBuffer.read_from` methods.
         """
         if buffer.shape[0] != self._data.shape[0]:
-            raise ValueError(
-                "the two buffers should have the same number of channels")
+            raise ValueError("the two buffers should have the same number of channels")
 
         n = min(buffer.shape[1], self._ready)
 
@@ -83,10 +81,8 @@ class CBuffer():
             np.copyto(buffer[:, :n], self._data[:, start:end])
         else:
             end -= self._max_length
-            np.copyto(buffer[:, :self._max_length - start],
-                      self._data[:, start:])
-            np.copyto(buffer[:, self._max_length - start:n],
-                      self._data[:, :end])
+            np.copyto(buffer[:, :self._max_length - start], self._data[:, start:])
+            np.copyto(buffer[:, self._max_length - start:n], self._data[:, :end])
 
         return n
 
@@ -202,8 +198,7 @@ class CBuffer():
         The written samples are marked as ready to be read.
         """
         if buffer.shape[0] != self._data.shape[0]:
-            raise ValueError(
-                "the two buffers should have the same number of channels")
+            raise ValueError("the two buffers should have the same number of channels")
 
         n = min(buffer.shape[1], self._max_length - self._length)
 
@@ -219,10 +214,8 @@ class CBuffer():
             # _data, and the other at the beginning.
             end -= self._max_length
 
-            np.copyto(self._data[:, start:],
-                      buffer[:, :self._max_length - start])
-            np.copyto(self._data[:, :end],
-                      buffer[:, self._max_length - start:n])
+            np.copyto(self._data[:, start:], buffer[:, :self._max_length - start])
+            np.copyto(self._data[:, :end], buffer[:, self._max_length - start:n])
 
         self._length += n
         self._ready = self._length

@@ -57,10 +57,6 @@ class Log:
         if not self.quiet:
             buffer = get_terminal_size().columns - len(message) - 3
             sys.stdout.write('  ' + message + ' ' * buffer + '\r')
-            try:
-                sys.stdout.flush()
-            except AttributeError:
-                pass
 
     def error(self, message: str) -> NoReturn:
         self.conwrite('')
