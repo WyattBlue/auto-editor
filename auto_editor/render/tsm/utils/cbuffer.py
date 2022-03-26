@@ -10,10 +10,6 @@ class CBuffer:
         self._ready = 0
         self._length = 0
 
-    def __repr__(self):
-        return "CBuffer(offset={}, length={}, ready={}, data=\n{})".format(
-            self._offset, self._length, self._ready, repr(self.to_array()))
-
     def add(self, buffer):
         """Adds a buffer element-wise to the CBuffer."""
         if buffer.shape[0] != self._data.shape[0]:
