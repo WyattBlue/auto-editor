@@ -1,6 +1,6 @@
 import numpy as np
 
-class NormalizeBuffer():
+class NormalizeBuffer:
     """
     A NormalizeBuffer is a mono-channel circular buffer, used to
     normalize audio buffers.

@@ -1,1 +1,2 @@
-from .phasevocoder import phasevocoder, PhaseLocking
+from .phasevocoder import phasevocoder
+from .array import ArrReader, ArrWriter
