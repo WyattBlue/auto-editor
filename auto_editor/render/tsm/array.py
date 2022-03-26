@@ -1,10 +1,12 @@
 import numpy as np
 
+
 class ArrReader:
-    pointer = 0
+    __slots__ = ("samples", "pointer")
 
     def __init__(self, arr):
         self.samples = arr
+        self.pointer = 0
 
     @property
     def empty(self):
@@ -26,10 +28,11 @@ class ArrReader:
 
 
 class ArrWriter:
-    pointer = 0
+    __slots__ = ("output", "pointer")
 
     def __init__(self, arr):
         self.output = arr
+        self.pointer = 0
 
     def write(self, buffer: np.ndarray) -> int:
         end = self.pointer + buffer.shape[1]

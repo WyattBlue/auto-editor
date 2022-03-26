@@ -1,6 +1,6 @@
 import numpy as np
 
-from auto_editor.audiotsm2.utils import (windows, CBuffer, NormalizeBuffer)
+from .utils import (windows, CBuffer, NormalizeBuffer)
 
 EPSILON = 0.0001
 

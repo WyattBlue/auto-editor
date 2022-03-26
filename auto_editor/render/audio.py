@@ -4,7 +4,7 @@ import numpy as np
 
 from auto_editor.scipy.wavfile import read
 
-from auto_editor.audiotsm2 import phasevocoder, ArrReader, ArrWriter
+from auto_editor.render.tsm import phasevocoder, ArrReader, ArrWriter
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar

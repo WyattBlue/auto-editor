@@ -1,7 +1,7 @@
 import numpy as np
 
-from auto_editor.audiotsm2.analysis_synthesis import AnalysisSynthesisTSM
-from auto_editor.audiotsm2.utils.windows import hanning
+from .analysis_synthesis import AnalysisSynthesisTSM
+from .utils.windows import hanning
 
 
 def find_peaks(amplitude):
