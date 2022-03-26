@@ -71,7 +71,9 @@ class FFmpeg:
         self.print_cmd(cmd)
         subprocess.run(cmd)
 
-    def run_check_errors(self, cmd: List[str], log: Log, show_out: bool=False) -> None:
+    def run_check_errors(
+        self, cmd: List[str], log: Log, show_out: bool=False, path=None
+    ) -> None:
 
         def _run(cmd: List[str]) -> Any:
             process = self.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
@@ -108,7 +110,10 @@ class FFmpeg:
             if check:
                 log.error(check.group())
 
-        if show_out and not self.debug:
+        if path is not None and not os.path.isfile(path):
+            print(output)
+            log.error(f'The file {path} was not created.')
+        elif show_out and not self.debug:
             print(f'stderr: {output}')
 
     def Popen(self, cmd: List[str], stdin=None, stdout=PIPE, stderr=None):
