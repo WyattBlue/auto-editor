@@ -218,7 +218,7 @@ def edit_media(i, inp, ffmpeg, args, progress, temp, log):
                 make_new_audio(temp_file, new_file, chunks, log, fps, progress)
 
                 if not os.path.isfile(new_file):
-                    log.bug('Audio file not created.')
+                    log.error('Audio file not created.')
 
         video_stuff = []
 
@@ -236,8 +236,6 @@ def edit_media(i, inp, ffmpeg, args, progress, temp, log):
         mux_quality_media(
             ffmpeg, video_stuff, rules, output_path, output_container, args, inp, temp, log
         )
-        if output_path is not None and not os.path.isfile(output_path):
-            log.bug(f'The file {output_path} was not created.')
 
     if args.export == 'clip-sequence':
         total_frames = chunks[-1][1]
