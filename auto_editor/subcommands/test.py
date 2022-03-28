@@ -400,7 +400,6 @@ def main(sys_args: Optional[List[str]]=None):
 
 
     def track_tests():
-        run_program(['resources/multi-track.mov', '--edit', 'audio:stream=all'])
         run_program(['resources/multi-track.mov', '--keep_tracks_seperate'])
         run_program(['example.mp4', '--cut_by_this_audio', 'resources/newCommentary.mp3'])
 
@@ -481,6 +480,43 @@ def main(sys_args: Optional[List[str]]=None):
             ['resources/man_on_green_screen.mp4', '--edit', 'motion:threshold=0']
         )
 
+    def edit_positive_tests():
+        run_program(['resources/multi-track.mov', '--edit', 'audio:stream=all'])
+        run_program(['resources/multi-track.mov', '--edit', 'not audio:stream=all'])
+        run_program(['resources/multi-track.mov', '--edit', 'not audio:threshold=4% or audio:stream=1'])
+        #run_program(['resources/multi-track.mov', '--edit', 'not audio:threshold=4% or not audio:stream=1'])
+
+
+    def edit_negative_tests():
+        check_for_error(
+            ['resources/example_cut_s16le.wav', '--edit', 'motion'], "Video stream '0' does not exist"
+        )
+        check_for_error(
+            ['resources/man_on_green_screen.gif', '--edit', 'audio'], "Audio stream '0' does not exist"
+        )
+        check_for_error(
+            ['example.mp4', '--edit', 'not'], "Error! Dangling operand: 'not'"
+        )
+        check_for_error(
+            ['example.mp4', '--edit', 'audio and'], "Error! Dangling operand: 'and'"
+        )
+        check_for_error(
+            ['example.mp4', '--edit', 'and'], "Error! 'and' operand needs two arguments."
+        )
+        check_for_error(
+            ['example.mp4', '--edit', 'and audio'], "Error! 'and' operand needs two arguments."
+        )
+        check_for_error(
+            ['example.mp4', '--edit', 'or audio'], "Error! 'or' operand needs two arguments."
+        )
+        check_for_error(
+            ['example.mp4', '--edit', 'audio four audio'], "Error! Unknown method/operator: 'four'"
+        )
+        check_for_error(
+            ['example.mp4', '--edit', 'audio audio'], "Logic operator must be between two editing methods"
+        )
+
+
     ### Runners ###
 
     tester = Tester(args)
@@ -528,6 +564,8 @@ def main(sys_args: Optional[List[str]]=None):
         tester.run_test(codec_tests)
         tester.run_test(combine_tests)
         tester.run_test(motion_tests)
+        tester.run_test(edit_positive_tests)
+        tester.run_test(edit_negative_tests)
 
     tester.end()
 
