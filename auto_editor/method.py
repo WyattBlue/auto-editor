@@ -24,12 +24,13 @@ def get_audio_list(stream, threshold, fps, progress, temp, log):
     return audio_list
 
 
-def or_combine(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def operand_combine(a: np.ndarray, b: np.ndarray, call) -> np.ndarray:
     if len(a) > len(b):
         b = np.resize(b, len(a))
     if len(b) > len(a):
         a = np.resize(a, len(b))
-    return a | b
+
+    return call(a, b)
 
 
 def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
@@ -50,7 +51,7 @@ def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
                 if total_list is None:
                     total_list = audio_list
                 else:
-                    total_list = or_combine(total_list, audio_list)
+                    total_list = operand_combine(total_list, audio_list, np.logical_or)
 
             if total_list is None:
                 log.error('Input has no audio streams.')
@@ -62,6 +63,8 @@ def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
     if method == 'motion':
         from auto_editor.analyze.motion import motion_detection
 
+        if len(inp.video_streams) == 0:
+            log.error("Video stream '0' does not exist.")
         return motion_detection(
             inp.path, fps, attrs.threshold, progress, attrs.width, attrs.blur
         )
@@ -106,7 +109,7 @@ def get_has_loud(method_str, inp, fps, progress, temp, log, args):
 
     @dataclass
     class Motion:
-        threshold: float = 0.02
+        threshold: float_type = 0.02
         blur: int = 9
         width: int = 400
 
@@ -114,8 +117,20 @@ def get_has_loud(method_str, inp, fps, progress, temp, log, args):
     METHOD_ATTRS_SEP = ':'
 
     result_array = None
+    operand = None
+
+    logic_funcs = {
+        'and': np.logical_and,
+        'or': np.logical_or,
+        'xor': np.logical_xor,
+    }
+
+    method_str = method_str.replace('_', ' ')  # Allow old style `--edit` to work
 
     for method in method_str.split(KEYWORD_SEP):
+
+        if method == '':  # Skip whitespace
+            continue
 
         if METHOD_ATTRS_SEP in method:
             method, attrs_str = method.split(METHOD_ATTRS_SEP)
@@ -130,14 +145,38 @@ def get_has_loud(method_str, inp, fps, progress, temp, log, args):
             attrs = None
 
         if method in ('audio', 'motion', 'none', 'all'):
+
+            if result_array is not None and operand is None:
+                log.error("Logic operator must be between two editing methods.")
+
             stream_data = get_stream_data(
                 method, attrs, args, inp, fps, progress, temp, log
             )
 
-            if result_array is None:
+            if operand == 'not':
+                result_array = np.logical_not(stream_data)
+                operand = None
+            elif result_array is None:
                 result_array = stream_data
+            elif operand in ('and', 'or', 'xor'):
+                result_array = operand_combine(result_array, stream_data, logic_funcs[operand])
+                operand = None
+
+        elif method in ('and', 'or', 'xor'):
+            if operand is not None:
+                log.error('Invalid Editing Syntax.')
+            if result_array is None:
+                log.error(f"'{method}' operand needs two arguments.")
+            operand = method
+        elif method == 'not':
+            if operand is not None:
+                log.error('Invalid Editing Syntax.')
+            operand = method
         else:
-            log.error(f"Editing method: '{method}' is not supported.")
+            log.error(f"Unknown method/operator: '{method}'")
+
+    if operand is not None:
+        log.error(f"Dangling operand: '{operand}'")
 
     return result_array
 
