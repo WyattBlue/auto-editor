@@ -1,6 +1,6 @@
 import numpy as np
 
-from .utils import (windows, CBuffer, NormalizeBuffer)
+from .utils import windows, CBuffer, NormalizeBuffer
 
 EPSILON = 0.0001
 
@@ -19,8 +19,18 @@ class AnalysisSynthesisTSM:
 
             self.clear()
 
-    def __init__(self, converter, channels, frame_length, analysis_hop, synthesis_hop,
-        analysis_window, synthesis_window, delta_before=0, delta_after=0):
+    def __init__(
+        self,
+        converter,
+        channels,
+        frame_length,
+        analysis_hop,
+        synthesis_hop,
+        analysis_window,
+        synthesis_window,
+        delta_before=0,
+        delta_after=0,
+    ):
         self._converter = converter
 
         self._channels = channels
@@ -44,8 +54,9 @@ class AnalysisSynthesisTSM:
         self._skip_output_samples = 0
 
         # Compute the normalize window
-        self._normalize_window = windows.product(self._analysis_window,
-                                                 self._synthesis_window)
+        self._normalize_window = windows.product(
+            self._analysis_window, self._synthesis_window
+        )
 
         if self._normalize_window is None:
             self._normalize_window = np.ones(self._frame_length)
@@ -53,8 +64,7 @@ class AnalysisSynthesisTSM:
         # Initialize the buffers
         delta = self._delta_before + self._delta_after
         self._in_buffer = CBuffer(self._channels, self._frame_length + delta)
-        self._analysis_frame = np.empty(
-            (self._channels, self._frame_length + delta))
+        self._analysis_frame = np.empty((self._channels, self._frame_length + delta))
         self._out_buffer = CBuffer(self._channels, self._frame_length)
         self._normalize_buffer = NormalizeBuffer(self._frame_length)
 
@@ -70,8 +80,9 @@ class AnalysisSynthesisTSM:
         # Left pad the input with half a frame of zeros, and ignore that half
         # frame in the output. This makes the output signal start in the middle
         # of a frame, which should be the peak of the window function.
-        self._in_buffer.write(np.zeros(
-            (self._channels, self._delta_before + self._frame_length // 2)))
+        self._in_buffer.write(
+            np.zeros((self._channels, self._delta_before + self._frame_length // 2))
+        )
         self._skip_output_samples = self._frame_length // 2
 
         self._converter.clear()
@@ -140,8 +151,10 @@ class AnalysisSynthesisTSM:
 
         n += self._in_buffer.read_from(reader)
 
-        if (self._in_buffer.remaining_length == 0 and
-            self._out_buffer.remaining_length >= self._synthesis_hop):
+        if (
+            self._in_buffer.remaining_length == 0
+            and self._out_buffer.remaining_length >= self._synthesis_hop
+        ):
             # The input buffer has enough data to process, and there is enough
             # space in the output buffer to store the output
             self._process_frame()

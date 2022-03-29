@@ -4,9 +4,6 @@ import os
 # Typing
 from typing import List, Tuple
 
-# External Libraries
-import numpy as np
-
 # Included Libraries
 from auto_editor.sheet import Sheet
 from auto_editor.utils.log import Log
@@ -103,7 +100,6 @@ def edit_media(i, inp, ffmpeg, args, progress, temp, log):
             log.debug(f'Removing already existing file: {output_path}')
             os.remove(output_path)
 
-    audio_samples = None
     tracks = len(inp.audio_streams)
 
     fps = 30.0 if inp.fps is None else float(inp.fps)

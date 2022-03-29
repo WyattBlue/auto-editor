@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class CBuffer:
     def __init__(self, channels, max_length):
         self._data = np.zeros((channels, max_length), dtype=np.float32)
@@ -27,8 +28,8 @@ class CBuffer:
             self._data[:, start:end] += buffer[:, :n]
         else:
             end -= self._max_length
-            self._data[:, start:] += buffer[:, :self._max_length - start]
-            self._data[:, :end] += buffer[:, self._max_length - start:n]
+            self._data[:, start:] += buffer[:, : self._max_length - start]
+            self._data[:, :end] += buffer[:, self._max_length - start : n]
 
     def divide(self, array):
         """
@@ -46,8 +47,8 @@ class CBuffer:
             self._data[:, start:end] /= array[:n]
         else:
             end -= self._max_length
-            self._data[:, start:] /= array[:self._max_length - start]
-            self._data[:, :end] /= array[self._max_length - start:n]
+            self._data[:, start:] /= array[: self._max_length - start]
+            self._data[:, :end] /= array[self._max_length - start : n]
 
     @property
     def length(self):
@@ -77,8 +78,8 @@ class CBuffer:
             np.copyto(buffer[:, :n], self._data[:, start:end])
         else:
             end -= self._max_length
-            np.copyto(buffer[:, :self._max_length - start], self._data[:, start:])
-            np.copyto(buffer[:, self._max_length - start:n], self._data[:, :end])
+            np.copyto(buffer[:, : self._max_length - start], self._data[:, start:])
+            np.copyto(buffer[:, self._max_length - start : n], self._data[:, :end])
 
         return n
 
@@ -210,8 +211,8 @@ class CBuffer:
             # _data, and the other at the beginning.
             end -= self._max_length
 
-            np.copyto(self._data[:, start:], buffer[:, :self._max_length - start])
-            np.copyto(self._data[:, :end], buffer[:, self._max_length - start:n])
+            np.copyto(self._data[:, start:], buffer[:, : self._max_length - start])
+            np.copyto(self._data[:, :end], buffer[:, self._max_length - start : n])
 
         self._length += n
         self._ready = self._length

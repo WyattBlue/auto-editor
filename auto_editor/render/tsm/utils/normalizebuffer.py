@@ -2,6 +2,7 @@ import numpy as np
 
 # A NormalizeBuffer is a mono-channel circular buffer, used to normalize audio buffers.
 
+
 class NormalizeBuffer:
     def __init__(self, length):
         self._data = np.zeros(length)

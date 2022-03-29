@@ -5,6 +5,7 @@ import numpy
 import struct
 from enum import IntEnum
 
+
 class WAVE_FORMAT(IntEnum):
     UNKNOWN = 0x0000
     PCM = 0x0001
@@ -288,38 +289,39 @@ def _raise_bad_format(format_tag):
         "formats: " + ", ".join(x.name for x in KNOWN_WAVE_FORMATS)
     )
 
+
 def _read_fmt_chunk(fid, is_big_endian):
     if is_big_endian:
-        fmt = '>'
+        fmt = ">"
     else:
-        fmt = '<'
+        fmt = "<"
 
-    size = struct.unpack(fmt+'I', fid.read(4))[0]
+    size = struct.unpack(fmt + "I", fid.read(4))[0]
 
     if size < 16:
         raise ValueError("Binary structure of wave file is not compliant")
 
-    res = struct.unpack(fmt+'HHIIHH', fid.read(16))
+    res = struct.unpack(fmt + "HHIIHH", fid.read(16))
     bytes_read = 16
 
     format_tag, channels, fs, bytes_per_second, block_align, bit_depth = res
 
-    if format_tag == WAVE_FORMAT.EXTENSIBLE and size >= (16+2):
-        ext_chunk_size = struct.unpack(fmt+'H', fid.read(2))[0]
+    if format_tag == WAVE_FORMAT.EXTENSIBLE and size >= (16 + 2):
+        ext_chunk_size = struct.unpack(fmt + "H", fid.read(2))[0]
         bytes_read += 2
         if ext_chunk_size >= 22:
             extensible_chunk_data = fid.read(22)
             bytes_read += 22
-            raw_guid = extensible_chunk_data[2+4:2+4+16]
+            raw_guid = extensible_chunk_data[2 + 4 : 2 + 4 + 16]
             # GUID template {XXXXXXXX-0000-0010-8000-00AA00389B71} (RFC-2361)
             # MS GUID byte order: first three groups are native byte order,
             # rest is Big Endian
             if is_big_endian:
-                tail = b'\x00\x00\x00\x10\x80\x00\x00\xAA\x00\x38\x9B\x71'
+                tail = b"\x00\x00\x00\x10\x80\x00\x00\xAA\x00\x38\x9B\x71"
             else:
-                tail = b'\x00\x00\x10\x00\x80\x00\x00\xAA\x00\x38\x9B\x71'
+                tail = b"\x00\x00\x10\x00\x80\x00\x00\xAA\x00\x38\x9B\x71"
             if raw_guid.endswith(tail):
-                format_tag = struct.unpack(fmt+'I', raw_guid[:4])[0]
+                format_tag = struct.unpack(fmt + "I", raw_guid[:4])[0]
         else:
             raise ValueError("Binary structure of wave file is not compliant")
 
@@ -340,12 +342,12 @@ def _read_data_chunk(
     fid, format_tag, channels, bit_depth, is_big_endian, block_align, mmap=False
 ):
     if is_big_endian:
-        fmt = '>'
+        fmt = ">"
     else:
-        fmt = '<'
+        fmt = "<"
 
     # Size of the data subchunk in bytes
-    size = struct.unpack(fmt+'I', fid.read(4))[0]
+    size = struct.unpack(fmt + "I", fid.read(4))[0]
 
     # Number of bytes per sample (sample container size)
     bytes_per_sample = block_align // channels
@@ -353,20 +355,20 @@ def _read_data_chunk(
 
     if format_tag == WAVE_FORMAT.PCM:
         if 1 <= bit_depth <= 8:
-            dtype = 'u1'  # WAV of 8-bit integer or less are unsigned
+            dtype = "u1"  # WAV of 8-bit integer or less are unsigned
         elif bytes_per_sample in {3, 5, 6, 7}:
             # No compatible dtype.  Load as raw bytes for reshaping later.
-            dtype = 'V1'
+            dtype = "V1"
         elif bit_depth <= 64:
             # Remaining bit depths can map directly to signed numpy dtypes
-            dtype = f'{fmt}i{bytes_per_sample}'
+            dtype = f"{fmt}i{bytes_per_sample}"
         else:
             raise ValueError(
                 f"Unsupported bit depth: the WAV file has {bit_depth}-bit integer data."
             )
     elif format_tag == WAVE_FORMAT.IEEE_FLOAT:
         if bit_depth in {32, 64}:
-            dtype = f'{fmt}f{bytes_per_sample}'
+            dtype = f"{fmt}f{bytes_per_sample}"
         else:
             raise ValueError(
                 f"Unsupported bit depth: the WAV file has {bit_depth}-bit floating-point data."
@@ -377,28 +379,28 @@ def _read_data_chunk(
     start = fid.tell()
     if not mmap:
         try:
-            count = size if dtype == 'V1' else n_samples
+            count = size if dtype == "V1" else n_samples
             data = numpy.fromfile(fid, dtype=dtype, count=count)
         except io.UnsupportedOperation:  # not a C-like file
             fid.seek(start, 0)  # just in case it seeked, though it shouldn't
             data = numpy.frombuffer(fid.read(size), dtype=dtype)
 
-        if dtype == 'V1':
+        if dtype == "V1":
             # Rearrange raw bytes into smallest compatible numpy dtype
             dt = numpy.int32 if bytes_per_sample == 3 else numpy.int64
-            a = numpy.zeros((len(data) // bytes_per_sample, dt().itemsize),
-                            dtype='V1')
+            a = numpy.zeros((len(data) // bytes_per_sample, dt().itemsize), dtype="V1")
             a[:, -bytes_per_sample:] = data.reshape((-1, bytes_per_sample))
             data = a.view(dt).reshape(a.shape[:-1])
     else:
         if bytes_per_sample in {1, 2, 4, 8}:
             start = fid.tell()
-            data = numpy.memmap(fid, dtype=dtype, mode='c', offset=start,
-                                shape=(n_samples,))
+            data = numpy.memmap(
+                fid, dtype=dtype, mode="c", offset=start, shape=(n_samples,)
+            )
             fid.seek(start + size)
         else:
             raise ValueError(
-               f"mmap=True not compatible with {bytes_per_sample}-byte container size."
+                f"mmap=True not compatible with {bytes_per_sample}-byte container size."
             )
 
     _handle_pad_byte(fid, size)
@@ -414,9 +416,9 @@ def _read_data_chunk(
 
 def _skip_unknown_chunk(fid, is_big_endian):
     if is_big_endian:
-        fmt = '>I'
+        fmt = ">I"
     else:
-        fmt = '<I'
+        fmt = "<I"
 
     data = fid.read(4)
     # call unpack() and seek() only if we have really read data from file
@@ -431,12 +433,12 @@ def _skip_unknown_chunk(fid, is_big_endian):
 
 def _read_riff_chunk(fid):
     str1 = fid.read(4)  # File signature
-    if str1 == b'RIFF':
+    if str1 == b"RIFF":
         is_big_endian = False
-        fmt = '<I'
-    elif str1 == b'RIFX':
+        fmt = "<I"
+    elif str1 == b"RIFX":
         is_big_endian = True
-        fmt = '>I'
+        fmt = ">I"
     else:
         # There are also .wav files with "FFIR" or "XFIR" signatures?
         raise ValueError(
@@ -447,7 +449,7 @@ def _read_riff_chunk(fid):
     file_size = struct.unpack(fmt, fid.read(4))[0] + 8
 
     str2 = fid.read(4)
-    if str2 != b'WAVE':
+    if str2 != b"WAVE":
         raise ValueError(f"Not a WAV file. RIFF form type is {repr(str2)}.")
 
     return file_size, is_big_endian
@@ -461,11 +463,11 @@ def _handle_pad_byte(fid, size):
 
 
 def read(filename, mmap=False):
-    if hasattr(filename, 'read'):
+    if hasattr(filename, "read"):
         fid = filename
         mmap = False
     else:
-        fid = open(filename, 'rb')
+        fid = open(filename, "rb")
 
     try:
         file_size, is_big_endian = _read_riff_chunk(fid)
@@ -489,32 +491,38 @@ def read(filename, mmap=False):
                 else:
                     raise ValueError(msg)
 
-            if chunk_id == b'fmt ':
+            if chunk_id == b"fmt ":
                 fmt_chunk_received = True
                 fmt_chunk = _read_fmt_chunk(fid, is_big_endian)
                 format_tag, channels, fs = fmt_chunk[1:4]
                 bit_depth = fmt_chunk[6]
                 block_align = fmt_chunk[5]
-            elif chunk_id == b'fact':
+            elif chunk_id == b"fact":
                 _skip_unknown_chunk(fid, is_big_endian)
-            elif chunk_id == b'data':
+            elif chunk_id == b"data":
                 data_chunk_received = True
                 if not fmt_chunk_received:
                     raise ValueError("No fmt chunk before data")
                 data = _read_data_chunk(
-                    fid, format_tag, channels, bit_depth, is_big_endian, block_align, mmap
+                    fid,
+                    format_tag,
+                    channels,
+                    bit_depth,
+                    is_big_endian,
+                    block_align,
+                    mmap,
                 )
-            elif chunk_id == b'LIST':
+            elif chunk_id == b"LIST":
                 # Someday this could be handled properly but for now skip it
                 _skip_unknown_chunk(fid, is_big_endian)
-            elif chunk_id in {b'JUNK', b'Fake'}:
+            elif chunk_id in {b"JUNK", b"Fake"}:
                 # Skip alignment chunks without warning
                 _skip_unknown_chunk(fid, is_big_endian)
             else:
                 # Chunk (non-data) not understood, skipping it.",
                 _skip_unknown_chunk(fid, is_big_endian)
     finally:
-        if not hasattr(filename, 'read'):
+        if not hasattr(filename, "read"):
             fid.close()
         else:
             fid.seek(0)

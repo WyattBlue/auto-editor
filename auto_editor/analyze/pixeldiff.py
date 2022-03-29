@@ -2,7 +2,7 @@ import sys
 
 import av
 import numpy as np
-from PIL import ImageOps, ImageChops, ImageFilter
+from PIL import ImageChops
 
 from auto_editor.utils.progressbar import ProgressBar
 

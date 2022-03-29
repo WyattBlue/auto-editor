@@ -20,8 +20,12 @@ def find_peaks(amplitude):
     shifted_r2 = padded[4:]
 
     # Compare the original array with the shifted versions.
-    peaks = ((amplitude >= shifted_l2) & (amplitude >= shifted_l1) &
-             (amplitude >= shifted_r1) & (amplitude >= shifted_r2))
+    peaks = (
+        (amplitude >= shifted_l2)
+        & (amplitude >= shifted_l1)
+        & (amplitude >= shifted_r1)
+        & (amplitude >= shifted_r2)
+    )
 
     return peaks
 
@@ -35,8 +39,8 @@ def get_closest_peaks(peaks):
     for i, is_peak in enumerate(peaks):
         if is_peak:
             if previous >= 0:
-                closest_peak[previous:(previous + i) // 2 + 1] = previous
-                closest_peak[(previous + i) // 2 + 1:i] = i
+                closest_peak[previous : (previous + i) // 2 + 1] = previous
+                closest_peak[(previous + i) // 2 + 1 : i] = i
             else:
                 closest_peak[:i] = i
             previous = i
@@ -50,7 +54,9 @@ class PhaseVocoderConverter:
     A Converter implementing the phase vocoder time-scale modification procedure.
     """
 
-    def __init__(self, channels, frame_length, analysis_hop, synthesis_hop, peak_finder):
+    def __init__(
+        self, channels, frame_length, analysis_hop, synthesis_hop, peak_finder
+    ):
         self._channels = channels
         self._frame_length = frame_length
         self._synthesis_hop = synthesis_hop
@@ -89,8 +95,9 @@ class PhaseVocoderConverter:
             else:
                 # Compute the phase increment
                 self._buffer[peaks] = (
-                    phase[peaks] - self._previous_phase[k, peaks] -
-                    self._analysis_hop * self._center_frequency[peaks]
+                    phase[peaks]
+                    - self._previous_phase[k, peaks]
+                    - self._analysis_hop * self._center_frequency[peaks]
                 )
 
                 # Unwrap the phase increment
@@ -108,8 +115,7 @@ class PhaseVocoderConverter:
 
                 # Phase locking
                 self._output_phase[k] = (
-                    self._output_phase[k][closest_peak] +
-                    phase - phase[closest_peak]
+                    self._output_phase[k][closest_peak] + phase - phase[closest_peak]
                 )
 
                 # Compute the new stft
@@ -131,7 +137,7 @@ class PhaseVocoderConverter:
 
 
 def phasevocoder(
-    channels, speed=1., frame_length=2048, analysis_hop=None, synthesis_hop=None
+    channels, speed=1.0, frame_length=2048, analysis_hop=None, synthesis_hop=None
 ):
 
     if synthesis_hop is None:
@@ -145,8 +151,16 @@ def phasevocoder(
 
     peak_finder = find_peaks
 
-    converter = PhaseVocoderConverter(channels, frame_length, analysis_hop,
-        synthesis_hop, peak_finder)
+    converter = PhaseVocoderConverter(
+        channels, frame_length, analysis_hop, synthesis_hop, peak_finder
+    )
 
-    return AnalysisSynthesisTSM(converter, channels, frame_length, analysis_hop,
-        synthesis_hop, analysis_window, synthesis_window)
+    return AnalysisSynthesisTSM(
+        converter,
+        channels,
+        frame_length,
+        analysis_hop,
+        synthesis_hop,
+        analysis_window,
+        synthesis_window,
+    )
