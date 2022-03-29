@@ -10,7 +10,7 @@ def get_stdout(cmd: List[str]) -> str:
     from subprocess import Popen, PIPE, STDOUT
 
     stdout, _ = Popen(cmd, stdout=PIPE, stderr=STDOUT).communicate()
-    return stdout.decode()
+    return stdout.decode('utf-8', 'replace')
 
 def clean_list(x: List[str], rm_chars: str) -> List[str]:
     new_list = []
