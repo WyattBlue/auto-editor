@@ -1,7 +1,9 @@
 import sys
 
 def levels_options(parser):
-    parser.add_argument('--kind', type=str, default='audio')
+    parser.add_argument('--kind', type=str, default='audio',
+        choices=['audio', 'motion', 'pixeldiff'],
+    )
     parser.add_argument('--track', type=int, default=0,
         help='Select the track to get. If `--kind` is set to motion, track will look '
             'at video tracks instead of audio.')
@@ -48,7 +50,7 @@ def main(sys_args=sys.argv[1:]):
         if args.track >= len(inp.audio_streams):
             log.error(f"Audio track '{args.track}' does not exist.")
 
-        read_track = os.path.join(temp, '{}.wav'.format(args.track))
+        read_track = os.path.join(temp, f'{args.track}.wav')
 
         ffmpeg.run(['-i', inp.path, '-ac', '2', '-map', f'0:a:{args.track}', read_track])
 
@@ -63,7 +65,15 @@ def main(sys_args=sys.argv[1:]):
 
         from auto_editor.analyze.motion import display_motion_levels
 
-        display_motion_levels(inp.path, width=400, blur=9)
+        display_motion_levels(inp.path, fps, width=400, blur=9)
+
+    if args.kind == 'pixeldiff':
+        if args.track >= len(inp.video_streams):
+            log.error(f"Video track '{args.track}' does not exist.")
+
+        from auto_editor.analyze.pixeldiff import display_pixel_diff
+
+        display_pixel_diff(inp.path)
 
     log.cleanup()
 

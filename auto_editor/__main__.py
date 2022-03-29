@@ -100,43 +100,28 @@ def main_options(parser):
     parser.add_text('Select Editing Source Options')
     parser.add_argument('--edit-based-on', '--edit', default='audio',
         help='Decide which method to use when making edits.',
-        manual='''
-
-Here are some example uses:
-
-```
---edit audio
---edit audio:stream=1
---edit audio:threshold=4%
---edit audio:threshold=0.03
-
---edit motion
---edit motion:threshold=2%,blur=3
-
---edit audio:threshold=4% or motion:threshold=2%,blur=3
-
---edit none
---edit all
-```
-
-Editing Methods:
+        manual='''Editing Methods:
  - audio:
     General audio detection.
  - motion:
     Motion detection specialized for real life noisy video.
+ - pixeldiff:
+    Detect when a certain amount of pixels have changed between frames.
  - none:
     Do not modify the media in anyway. (Mark all sections as "loud")
  - all:
     Cut out everything out. (Mark all sections as "silent")
 
 Editing Methods Attributes:
- - audio: 1
-    - stream: 0 : int
+ - audio: 2
+    - stream: 0 : Union[int, 'all']
     - threshold: args.silent_threshold : float_type
  - motion: 3
     - threshold: 2% : float_type
     - blur: 9 : int
     - width: 400 : int
+ - pixeldiff: 2
+    - threshold: 1 : int
  - none: 0
  - all: 0
 
@@ -144,7 +129,17 @@ Logical Operators:
  - and
  - or
  - xor
-''')
+
+Examples:
+  --edit audio
+  --edit audio:stream=1
+  --edit audio:threshold=4%
+  --edit audio:threshold=0.03
+  --edit motion
+  --edit motion:threshold=2%,blur=3
+  --edit audio:threshold=4% or motion:threshold=2%,blur=3
+  --edit none
+  --edit all''')
 
     parser.add_argument('--keep-tracks-seperate', action='store_true',
         help="Don't combine audio tracks when exporting.")
