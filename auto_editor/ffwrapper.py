@@ -80,7 +80,7 @@ class FFmpeg:
 
             _, stderr = process.communicate()
             process.stdin.close()
-            return stderr.decode()
+            return stderr.decode('utf-8', 'replace')
 
         output = _run(cmd)
 
