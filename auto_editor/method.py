@@ -58,8 +58,6 @@ def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
             return total_list
         else:
             return get_audio_list(attrs.stream, attrs.threshold, fps, progress, temp, log)
-
-
     if method == 'motion':
         from auto_editor.analyze.motion import motion_detection
 
@@ -68,7 +66,12 @@ def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
         return motion_detection(
             inp.path, fps, attrs.threshold, progress, attrs.width, attrs.blur
         )
+    if method == 'pixeldiff':
+        from auto_editor.analyze.pixeldiff import pixel_difference
 
+        if len(inp.video_streams) == 0:
+            log.error("Video stream '0' does not exist.")
+        return pixel_difference(inp.path, fps, attrs.threshold, progress)
 
 def get_attributes(attrs_str, dataclass, log):
     from auto_editor.vanparse import parse_dataclass, ParserError
@@ -113,6 +116,10 @@ def get_has_loud(method_str, inp, fps, progress, temp, log, args):
         blur: int = 9
         width: int = 400
 
+    @dataclass
+    class Pixeldiff:
+        threshold: int = 1
+
     KEYWORD_SEP = ' '
     METHOD_ATTRS_SEP = ':'
 
@@ -141,10 +148,12 @@ def get_has_loud(method_str, inp, fps, progress, temp, log, args):
             attrs = get_attributes(attrs_str, Audio, log)
         elif method == 'motion':
             attrs = get_attributes(attrs_str, Motion, log)
+        elif method == 'pixeldiff':
+            attrs = get_attributes(attrs_str, Pixeldiff, log)
         else:
             attrs = None
 
-        if method in ('audio', 'motion', 'none', 'all'):
+        if method in ('audio', 'motion', 'pixeldiff', 'none', 'all'):
 
             if result_array is not None and operand is None:
                 log.error("Logic operator must be between two editing methods.")

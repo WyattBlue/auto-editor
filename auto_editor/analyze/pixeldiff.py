@@ -1,5 +1,4 @@
 import sys
-from typing import Tuple
 
 import av
 import numpy as np
@@ -8,12 +7,7 @@ from PIL import ImageOps, ImageChops, ImageFilter
 from auto_editor.utils.progressbar import ProgressBar
 
 
-def new_size(size: Tuple[int, int], width: int) -> Tuple[int, int]:
-    h, w = size
-    return width, int(h * (width / w))
-
-
-def display_motion_levels(path: str, fps: float, width: int, blur: int) -> None:
+def display_pixel_diff(path: str) -> None:
 
     container = av.open(path, 'r')
 
@@ -22,7 +16,6 @@ def display_motion_levels(path: str, fps: float, width: int, blur: int) -> None:
 
     prev_image = None
     image = None
-    total_pixels = None
 
     for frame in container.decode(video_stream):
         if image is None:
@@ -32,23 +25,12 @@ def display_motion_levels(path: str, fps: float, width: int, blur: int) -> None:
 
         image = frame.to_image()
 
-        if total_pixels is None:
-            total_pixels = image.size[0] * image.size[1]
-
-        image.thumbnail(new_size(image.size, width))
-        image = ImageOps.grayscale(image)
-
-        if blur > 0:
-            image = image.filter(ImageFilter.GaussianBlur(radius=blur))
-
         if prev_image is not None:
             count = np.count_nonzero(ImageChops.difference(prev_image, image))
+            sys.stdout.write(f'{count}\n')
 
-            sys.stdout.write(f'{count / total_pixels:.20f}\n')
 
-
-def motion_detection(path: str, fps: float, threshold: float, progress: ProgressBar,
-    width: int, blur: int) -> np.ndarray:
+def pixel_difference(path: str, fps: float, threshold: int, progress: ProgressBar) -> np.ndarray:
 
     container = av.open(path, 'r')
 
@@ -57,11 +39,10 @@ def motion_detection(path: str, fps: float, threshold: float, progress: Progress
 
     inaccurate_dur = int(float(video_stream.duration * video_stream.time_base) * fps)
 
-    progress.start(inaccurate_dur, 'Analyzing motion')
+    progress.start(inaccurate_dur, 'Analyzing pixel diffs')
 
     prev_image = None
     image = None
-    total_pixels = None
     index = 0
 
     has_motion = np.zeros((1024), dtype=np.bool_)
@@ -83,19 +64,10 @@ def motion_detection(path: str, fps: float, threshold: float, progress: Progress
 
         image = frame.to_image()
 
-        if total_pixels is None:
-            total_pixels = image.size[0] * image.size[1]
-
-        image.thumbnail(new_size(image.size, width))
-        image = ImageOps.grayscale(image)
-
-        if blur > 0:
-            image = image.filter(ImageFilter.GaussianBlur(radius=blur))
-
         if prev_image is not None:
             count = np.count_nonzero(ImageChops.difference(prev_image, image))
 
-            if count / total_pixels >= threshold:
+            if count >= threshold:
                 has_motion[index] = True
 
     progress.end()
