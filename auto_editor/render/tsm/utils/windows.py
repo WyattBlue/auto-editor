@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def apply(buffer, window):
     """
     Applies a window to a buffer.

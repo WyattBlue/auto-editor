@@ -8,8 +8,8 @@ from auto_editor.utils.video import get_vcodec, video_quality
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
 allowed_pix_fmt = {
-    'yuv420p', 'yuvj420p', 'rgb48be', 'rgb48le', 'rgb64be', 'rgb64le', 'rgb24', 'bgr24', 
-    'argb', 'rgba', 'abgr', 'bgra', 'gray', 'gray8', 'gray16be', 'gray16le', 'rgb8', 
+    'yuv420p', 'yuvj420p', 'rgb48be', 'rgb48le', 'rgb64be', 'rgb64le', 'rgb24', 'bgr24',
+    'argb', 'rgba', 'abgr', 'bgra', 'gray', 'gray8', 'gray16be', 'gray16le', 'rgb8',
     'bgr8', 'pal8',
 }
 
