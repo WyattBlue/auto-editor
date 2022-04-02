@@ -195,11 +195,10 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
     output_equavalent = 0
     chunk = chunks.pop(0)
 
-    tou = None
+    tou = int(video_stream.time_base.denominator / fps)
+    log.debug(f'Tou {tou}')
+
     seek = 10
-
-    pts = []
-
     seek_frame = None
     frames_saved = 0
 
@@ -217,14 +216,6 @@ def render_av(ffmpeg, track, inp, args, chunks, fps, progress, effects, rules, t
                 log.debug(f'Skipped {index - seek_frame} frames')
                 frames_saved += index - seek_frame
                 seek_frame = None
-
-            if tou is None:
-                if len(pts) < 2:
-                    pts.append(frame.pts)
-                else:
-                    tou = pts[1] - pts[0]
-                    log.debug(f'tou: {tou}')
-                    del pts
 
             if index > chunk[1]:
                 if chunks:
