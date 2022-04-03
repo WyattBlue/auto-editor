@@ -143,10 +143,6 @@ Examples:
 
     parser.add_argument('--keep-tracks-seperate', action='store_true',
         help="Don't combine audio tracks when exporting.")
-    parser.add_blank()
-    parser.add_argument('--cut-by-this-audio', '-ca', type=file_type,
-        help="Base cuts by this audio file instead of the video's audio.")
-
     parser.add_argument('--export', default='default',
         choices=['default', 'premiere', 'final-cut-pro', 'shotcut', 'json', 'audio', 'clip-sequence'],
         help='Choice the export mode.',
@@ -159,7 +155,6 @@ Examples:
             'audio         : Export as a WAV audio file\n'
             'clip-sequence : Export as multiple numbered media files'
     )
-
     parser.add_text('Utility Options')
     parser.add_argument('--no-open', action='store_true',
         help='Do not open the file after editing is done.')
