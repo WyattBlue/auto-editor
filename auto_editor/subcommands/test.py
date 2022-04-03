@@ -401,7 +401,6 @@ def main(sys_args: Optional[List[str]]=None):
 
     def track_tests():
         run_program(['resources/multi-track.mov', '--keep_tracks_seperate'])
-        run_program(['example.mp4', '--cut_by_this_audio', 'resources/newCommentary.mp3'])
 
 
     def json_tests():
