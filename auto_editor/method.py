@@ -1,12 +1,23 @@
 import os
 from dataclasses import dataclass, asdict, fields
 
+from typing import Union, Callable
+
 import numpy as np
 
 from auto_editor.utils.log import Log
+from auto_editor.utils.progressbar import ProgressBar
 
 
-def get_audio_list(stream, threshold, fps, progress, temp, log):
+def get_audio_list(
+    stream: Union[int, str],
+    threshold: float,
+    fps: float,
+    progress: ProgressBar,
+    temp: str,
+    log: Log,
+) -> np.ndarray:
+
     from auto_editor.analyze.audio import audio_detection
     from auto_editor.scipy.wavfile import read
 
@@ -17,14 +28,14 @@ def get_audio_list(stream, threshold, fps, progress, temp, log):
     else:
         log.error(f"Audio stream '{stream}' does not exist.")
 
-    audio_list = audio_detection(audio_samples, sample_rate, threshold, fps, progress)
+    audio_list = audio_detection(audio_samples, sample_rate, fps, progress)
 
     del audio_samples
 
-    return audio_list
+    return np.fromiter((x > threshold for x in audio_list), dtype=np.bool_)
 
 
-def operand_combine(a: np.ndarray, b: np.ndarray, call) -> np.ndarray:
+def operand_combine(a: np.ndarray, b: np.ndarray, call: Callable) -> np.ndarray:
     if len(a) > len(b):
         b = np.resize(b, len(a))
     if len(b) > len(a):
@@ -63,15 +74,18 @@ def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
 
         if len(inp.video_streams) == 0:
             log.error("Video stream '0' does not exist.")
-        return motion_detection(
-            inp.path, fps, attrs.threshold, progress, attrs.width, attrs.blur
-        )
+
+        motion_list = motion_detection(inp.path, fps, progress, attrs.width, attrs.blur)
+        return np.fromiter((x >= attrs.threshold for x in motion_list), dtype=np.bool_)
+
     if method == 'pixeldiff':
         from auto_editor.analyze.pixeldiff import pixel_difference
 
         if len(inp.video_streams) == 0:
             log.error("Video stream '0' does not exist.")
-        return pixel_difference(inp.path, fps, attrs.threshold, progress)
+
+        pixel_list = pixel_difference(inp.path, fps, progress)
+        return np.fromiter((x >= attrs.threshold for x in pixel_list), dtype=np.bool_)
 
 def get_attributes(attrs_str, dataclass, log):
     from auto_editor.vanparse import parse_dataclass, ParserError

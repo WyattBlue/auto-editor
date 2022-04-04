@@ -7,45 +7,22 @@ from PIL import ImageChops
 from auto_editor.utils.progressbar import ProgressBar
 
 
-def display_pixel_diff(path: str) -> None:
+def pixel_difference(path: str, fps: float, progress: ProgressBar) -> np.ndarray:
 
-    container = av.open(path, 'r')
-
-    video_stream = container.streams.video[0]
-    video_stream.thread_type = 'AUTO'
-
-    prev_image = None
-    image = None
-
-    for frame in container.decode(video_stream):
-        if image is None:
-            prev_image = None
-        else:
-            prev_image = image
-
-        image = frame.to_image()
-
-        if prev_image is not None:
-            count = np.count_nonzero(ImageChops.difference(prev_image, image))
-            sys.stdout.write(f'{count}\n')
-
-
-def pixel_difference(path: str, fps: float, threshold: int, progress: ProgressBar) -> np.ndarray:
-
-    container = av.open(path, 'r')
+    container = av.open(path, "r")
 
     video_stream = container.streams.video[0]
-    video_stream.thread_type = 'AUTO'
+    video_stream.thread_type = "AUTO"
 
     inaccurate_dur = int(float(video_stream.duration * video_stream.time_base) * fps)
 
-    progress.start(inaccurate_dur, 'Analyzing pixel diffs')
+    progress.start(inaccurate_dur, "Analyzing pixel diffs")
 
     prev_image = None
     image = None
     index = 0
 
-    has_motion = np.zeros((1024), dtype=np.bool_)
+    threshold_list = np.zeros((1024), dtype=np.uint64)
 
     for frame in container.decode(video_stream):
         if image is None:
@@ -54,21 +31,20 @@ def pixel_difference(path: str, fps: float, threshold: int, progress: ProgressBa
             prev_image = image
 
         index = int(frame.time * fps)
-
         progress.tick(index)
 
-        if index > len(has_motion) - 1:
-            has_motion = np.concatenate(
-                (has_motion, np.zeros((len(has_motion)), dtype=np.bool_)), axis=0
+        if index > len(threshold_list) - 1:
+            threshold_list = np.concatenate(
+                (threshold_list, np.zeros((len(threshold_list)), dtype=np.uint64)),
+                axis=0,
             )
 
         image = frame.to_image()
 
         if prev_image is not None:
-            count = np.count_nonzero(ImageChops.difference(prev_image, image))
-
-            if count >= threshold:
-                has_motion[index] = True
+            threshold_list[index] = np.count_nonzero(
+                ImageChops.difference(prev_image, image)
+            )
 
     progress.end()
-    return has_motion[:index]
+    return threshold_list[:index]
