@@ -30,7 +30,6 @@ def display_audio_levels(read_track, fps: float):
 def audio_detection(
     audio_samples: np.ndarray,
     sample_rate: int,
-    silent_threshold: float,
     fps: float,
     progress: ProgressBar,
     ) -> np.ndarray:
@@ -43,7 +42,7 @@ def audio_detection(
 
     progress.start(audio_frame_count, 'Analyzing audio volume')
 
-    has_loud_audio = np.zeros((audio_frame_count), dtype=np.bool_)
+    threshold_list = np.zeros((audio_frame_count), dtype=float)
 
     # Calculate when the audio is loud or silent.
     for i in range(audio_frame_count):
@@ -54,8 +53,7 @@ def audio_detection(
         start = int(i * sample_rate_per_frame)
         end = min(int((i+1) * sample_rate_per_frame), sample_count)
 
-        if get_max_volume(audio_samples[start:end]) / max_volume > silent_threshold:
-            has_loud_audio[i] = True
+        threshold_list[i] = get_max_volume(audio_samples[start:end]) / max_volume
 
     progress.end()
-    return has_loud_audio
+    return threshold_list
