@@ -7,7 +7,7 @@ from subprocess import Popen, PIPE
 from platform import system
 
 # Typing
-from typing import List, Optional, Any
+from typing import List, Optional
 
 # Included Libraries
 from auto_editor.utils.func import get_stdout
@@ -72,14 +72,16 @@ class FFmpeg:
         subprocess.run(cmd)
 
     def run_check_errors(
-        self, cmd: List[str], log: Log, show_out: bool=False, path=None
+        self, cmd: List[str], log: Log, show_out: bool=False, path: Optional[str]=None
     ) -> None:
 
-        def _run(cmd: List[str]) -> Any:
+        def _run(cmd: List[str]) -> str:
             process = self.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 
             _, stderr = process.communicate()
-            process.stdin.close()
+
+            if process.stdin is not None:
+                process.stdin.close()
             return stderr.decode('utf-8', 'replace')
 
         output = _run(cmd)
@@ -116,7 +118,7 @@ class FFmpeg:
         elif show_out and not self.debug:
             print(f'stderr: {output}')
 
-    def Popen(self, cmd: List[str], stdin=None, stdout=PIPE, stderr=None):
+    def Popen(self, cmd: List[str], stdin=None, stdout=PIPE, stderr=None) -> Popen:
         cmd = [self.path] + cmd
         self.print_cmd(cmd)
         return Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr)

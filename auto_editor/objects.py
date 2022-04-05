@@ -1,3 +1,5 @@
+# type: ignore
+
 from dataclasses import dataclass
 
 from auto_editor.utils.types import (

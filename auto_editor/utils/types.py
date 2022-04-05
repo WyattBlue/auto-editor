@@ -1,20 +1,21 @@
 import os.path
 import re
 
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 
 from .func import clean_list
 
+
 def split_num_str(val: Union[str, int]) -> Tuple[Union[int, float], str]:
     if isinstance(val, int):
-        return val, ''
+        return val, ""
     index = 0
     for char in val:
-        if not char.isdigit() and char not in (' ', '.', '-'):
+        if not char.isdigit() and char not in (" ", ".", "-"):
             break
         index += 1
     num, unit = val[:index], val[index:]
-    if '.' in num:
+    if "." in num:
         try:
             float(num)
         except ValueError:
@@ -26,85 +27,101 @@ def split_num_str(val: Union[str, int]) -> Tuple[Union[int, float], str]:
         raise TypeError(f"Invalid number: '{val}'")
     return int(num), unit
 
+
 def file_type(path: str) -> str:
     if not os.path.isfile(path):
-        raise TypeError(f'Auto-Editor could not find the file: {path}')
+        raise TypeError(f"Auto-Editor could not find the file: {path}")
     return path
+
 
 def unit_check(unit: str, allowed_units: List[str]) -> None:
     if unit not in allowed_units:
         raise TypeError(f"Unknown unit: '{unit}'")
+
 
 def float_type(val: Union[str, int, float]) -> float:
     if isinstance(val, (int, float)):
         return float(val)
 
     num, unit = split_num_str(val)
-    unit_check(unit, ['%', ''])
-    if unit == '%':
+    unit_check(unit, ["%", ""])
+    if unit == "%":
         return float(num / 100)
     return float(num)
 
+
 def sample_rate_type(val: str) -> int:
     num, unit = split_num_str(val)
-    unit_check(unit, ['Hz', 'kHz', ''])
-    if unit == 'kHz':
+    unit_check(unit, ["Hz", "kHz", ""])
+    if unit == "kHz":
         return int(num * 1000)
     return int(num)
 
-def frame_units():
-    return ['f', 'frame', 'frames']
 
-def second_units():
-    return ['s', 'sec', 'secs', 'second', 'seconds']
+def frame_units() -> List[str]:
+    return ["f", "frame", "frames"]
+
+
+def second_units() -> List[str]:
+    return ["s", "sec", "secs", "second", "seconds"]
+
 
 def frame_type(val: str) -> Union[int, str]:
     num, unit = split_num_str(val)
-    unit_check(unit, [''] + frame_units() + second_units())
+    unit_check(unit, [""] + frame_units() + second_units())
 
     if unit in second_units():
         return str(num).strip()
     return int(num)
 
-def anchor_type(val: str):
-    allowed = ('tl', 'tr', 'bl', 'br', 'ce')
+
+def anchor_type(val: str) -> str:
+    allowed = ("tl", "tr", "bl", "br", "ce")
     if val not in allowed:
-        raise TypeError('Anchor must be: ' + ' '.join(allowed))
+        raise TypeError("Anchor must be: " + " ".join(allowed))
     return val
 
+
 def margin_type(val: str) -> Tuple[Union[int, str], Union[int, str]]:
-    vals = val.split(',')
+    vals = val.split(",")
     if len(vals) == 1:
         vals.append(vals[0])
     if len(vals) != 2:
-        raise TypeError('Too many comma arguments for margin_type')
+        raise TypeError("Too many comma arguments for margin_type")
     return frame_type(vals[0]), frame_type(vals[1])
 
-def comma_type(val: str, min_args=1, max_args=None, name='') -> list:
-    val = clean_list(val.split(','), '\r\n\t')
+
+def comma_type(
+    _val: str, min_args: int = 1, max_args: Optional[int] = None, name: str = ""
+) -> str:
+    val = clean_list(_val.split(","), "\r\n\t")
     if min_args > len(val):
-        raise TypeError(f'Too few comma arguments for {name}.')
+        raise TypeError(f"Too few comma arguments for {name}.")
     if max_args is not None and len(val) > max_args:
-        raise TypeError(f'Too many comma arguments for {name}.')
+        raise TypeError(f"Too many comma arguments for {name}.")
     return val
 
-def range_type(val: str) -> list:
-    return comma_type(val, 2, 2, 'range_type')
 
-def speed_range_type(val: str) -> list:
-    return comma_type(val, 3, 3, 'speed_range_type')
+def range_type(val: str) -> List[str]:
+    return comma_type(val, 2, 2, "range_type")
+
+
+def speed_range_type(val: str) -> List[str]:
+    return comma_type(val, 3, 3, "speed_range_type")
+
 
 def text_content(val: str) -> str:
-    return val.replace('\\n', '\n')
+    return val.replace("\\n", "\n")
 
-def align_type(val: str):
-    allowed = ('left', 'right', 'center')
+
+def align_type(val: str) -> str:
+    allowed = ("left", "right", "center")
     if val not in allowed:
-        raise TypeError('Align must be: ' + ' '.join(allowed))
+        raise TypeError("Align must be: " + " ".join(allowed))
     return val
 
 
-def color_type(val: str):
+def color_type(val: str) -> str:
     """
     Convert a color str into an RGB tuple
 
@@ -120,7 +137,7 @@ def color_type(val: str):
         color = colormap[color]
 
     if re.match("#[a-f0-9]{3}$", color):
-        return "#" + "".join([x*2 for x in color[1:]])
+        return "#" + "".join([x * 2 for x in color[1:]])
 
     if re.match("#[a-f0-9]{6}$", color):
         return color
