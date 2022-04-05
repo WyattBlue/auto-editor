@@ -2,13 +2,15 @@
 import os
 
 # Typing
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 # Included Libraries
 from auto_editor.sheet import Sheet
 from auto_editor.utils.log import Log
 from auto_editor.utils.func import fnone, append_filename
+from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.method import get_chunks
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 
 def set_output_name(path: str, inp_ext: str, export: str) -> str:
     root, ext = os.path.splitext(path)
@@ -29,13 +31,14 @@ def set_output_name(path: str, inp_ext: str, export: str) -> str:
     return root + '_ALTERED' + ext
 
 
-def edit_media(i, inp, ffmpeg, args, progress, temp, log):
+def edit_media(
+    i: int, inp: FileInfo, ffmpeg: FFmpeg, args, progress: ProgressBar, temp: str, log: Log
+) -> Tuple[int, Optional[str]]:
     from auto_editor.utils.container import get_rules
 
     chunks = None
     if inp.ext == '.json':
         from auto_editor.formats.timeline import read_json_timeline
-        from auto_editor.ffwrapper import FileInfo
 
         args.background, input_path, chunks = read_json_timeline(inp.path, log)
         inp = FileInfo(input_path, ffmpeg)
@@ -116,8 +119,6 @@ def edit_media(i, inp, ffmpeg, args, progress, temp, log):
             cmd.extend([os.path.join(temp, f"{s}s.{sub['ext']}")])
         ffmpeg.run(cmd)
 
-    sample_rate = None
-
     # Split audio tracks into: 0.wav, 1.wav, etc.
     log.conwrite('Extracting audio')
 
@@ -168,7 +169,7 @@ def edit_media(i, inp, ffmpeg, args, progress, temp, log):
 
     if args.export == 'premiere':
         from auto_editor.formats.premiere import premiere_xml
-        premiere_xml(inp, temp, output_path, chunks, sample_rate, fps, log)
+        premiere_xml(inp, temp, output_path, chunks, fps, log)
         return num_cuts, output_path
 
     if args.export == 'final-cut-pro':
@@ -198,7 +199,8 @@ def edit_media(i, inp, ffmpeg, args, progress, temp, log):
         return start + [chunk] + end
 
 
-    def make_media(inp, chunks: List[Tuple[int, int, float]], output_path: str) -> None:
+    def make_media(inp: FileInfo, chunks: List[Tuple[int, int, float]], output_path: str
+    ) -> None:
         from auto_editor.utils.video import mux_quality_media
 
         if rules['allow_subtitle']:
