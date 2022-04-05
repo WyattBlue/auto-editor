@@ -93,7 +93,7 @@ def margin_type(val: str) -> Tuple[Union[int, str], Union[int, str]]:
 
 def comma_type(
     _val: str, min_args: int = 1, max_args: Optional[int] = None, name: str = ""
-) -> str:
+) -> List[str]:
     val = clean_list(_val.split(","), "\r\n\t")
     if min_args > len(val):
         raise TypeError(f"Too few comma arguments for {name}.")

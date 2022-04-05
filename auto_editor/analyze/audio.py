@@ -1,30 +1,12 @@
 import numpy as np
+import numpy.typing as npt
 from math import ceil
 
 from auto_editor.utils.progressbar import ProgressBar
 
+
 def get_max_volume(s: np.ndarray) -> float:
     return max(float(np.max(s)), -float(np.min(s)))
-
-
-def display_audio_levels(read_track, fps: float):
-    import sys
-
-    from auto_editor.scipy.wavfile import read
-
-    sample_rate, audio_samples = read(read_track)
-
-    max_volume = get_max_volume(audio_samples)
-    sample_count = audio_samples.shape[0]
-
-    sample_rate_per_frame = sample_rate / fps
-    audio_frame_count = ceil(sample_count / sample_rate_per_frame)
-
-    for i in range(audio_frame_count):
-        start = int(i * sample_rate_per_frame)
-        end = min(int((i+1) * sample_rate_per_frame), sample_count)
-        audiochunks = audio_samples[start:end]
-        sys.stdout.write('{:.20f}\n'.format(get_max_volume(audiochunks) / max_volume))
 
 
 def audio_detection(
@@ -32,7 +14,7 @@ def audio_detection(
     sample_rate: int,
     fps: float,
     progress: ProgressBar,
-    ) -> np.ndarray:
+    ) -> npt.NDArray[np.float_]:
 
     max_volume = get_max_volume(audio_samples)
     sample_count = audio_samples.shape[0]
@@ -42,7 +24,7 @@ def audio_detection(
 
     progress.start(audio_frame_count, 'Analyzing audio volume')
 
-    threshold_list = np.zeros((audio_frame_count), dtype=float)
+    threshold_list = np.zeros((audio_frame_count), dtype=np.float_)
 
     # Calculate when the audio is loud or silent.
     for i in range(audio_frame_count):
