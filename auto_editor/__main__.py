@@ -5,6 +5,9 @@ import os
 import sys
 import tempfile
 
+# Typing
+from typing import List
+
 # Included Libraries
 import auto_editor
 import auto_editor.vanparse as vanparse
@@ -387,7 +390,7 @@ def main():
         del cmd
         input_list = [temp_file]
 
-    def main_loop(input_list, ffmpeg, args, log):
+    def main_loop(input_list: List[str], ffmpeg: FFmpeg, args, log: Log) -> None:
         num_cuts = 0
 
         progress = ProgressBar(args.progress)

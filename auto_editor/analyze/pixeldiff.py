@@ -1,5 +1,3 @@
-import sys
-
 import av
 import numpy as np
 from PIL import ImageChops
@@ -7,7 +5,7 @@ from PIL import ImageChops
 from auto_editor.utils.progressbar import ProgressBar
 
 
-def pixel_difference(path: str, fps: float, progress: ProgressBar) -> np.ndarray:
+def pixel_difference(path: str, fps: float, progress: ProgressBar) -> np.ndarray[np.uint64]:
 
     container = av.open(path, "r")
 

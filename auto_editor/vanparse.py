@@ -168,7 +168,7 @@ class ArgumentParser:
         self.args.append({'_type': 'blank'});
 
 
-    def parse_args(self, sys_args: list):
+    def parse_args(self, sys_args: List[str]):
         if sys_args == [] and self.description:
             out(self.description)
             sys.exit()
