@@ -1,3 +1,16 @@
+import os.path
+from os.path import abspath
+from shutil import move
+from urllib.parse import quote
+from platform import system
+
+from typing import List, Tuple
+
+from .utils import indent, get_width_height, safe_mkdir
+
+from auto_editor.utils.log import Log
+from auto_editor.ffwrapper import FileInfo
+
 """
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format
 
@@ -8,18 +21,18 @@ Also, Premiere itself will happily output subtlety incorrect XML files that don'
 come back the way they started.
 """
 
-import os.path
-from os.path import abspath
-from shutil import move
-from urllib.parse import quote
-from platform import system
-
-from .utils import indent, get_width_height, safe_mkdir
-
 PIXEL_ASPECT_RATIO = 'square'
 COLORDEPTH = '24'
 ANAMORPHIC = 'FALSE'
 DEPTH = '16'
+
+
+def get_samplerate(inp: FileInfo, default: str = '48000') -> str:
+    if len(inp.audio_streams) > 0:
+        if 'samplerate' in inp.audio_streams[0] and inp.audio_streams[0]['samplerate'] is not None:
+            return inp.audio_streams[0]['samplerate']
+    return default
+
 
 def fix_url(path: str) -> str:
     if system() == 'Windows':
@@ -54,7 +67,14 @@ def speedup(speed: float) -> str:
         '\t\t</parameter>', '\t</effect>', '</filter>')
 
 
-def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
+def premiere_xml(
+    inp: FileInfo,
+    temp: str,
+    output: str,
+    chunks: List[Tuple[int, int, float]],
+    fps: float,
+    log: Log,
+) -> None:
 
     audio_file = len(inp.video_streams) == 0 and len(inp.audio_streams) == 1
 
@@ -87,8 +107,7 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
     if tracks > 1:
         name_without_extension = inp.basename[:inp.basename.rfind('.')]
 
-        fold = safe_mkdir(os.path.join(inp.dirname, '{}_tracks'.format(
-            name_without_extension)))
+        fold = safe_mkdir(os.path.join(inp.dirname, f'{name_without_extension}_tracks'))
 
         for i in range(1, tracks):
             newtrack = os.path.join(fold, f'{i}.wav')
@@ -99,7 +118,9 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
     if width is None or height is None:
         width, height = '1280', '720'
 
-    group_name = 'Auto-Editor {} Group'.format('Audio' if audio_file else 'Video')
+    sample_rate = get_samplerate(inp)
+
+    group_name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
 
     with open(output, 'w', encoding='utf-8') as outfile:
         outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n')
@@ -163,7 +184,7 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
                 total += clip_duration
 
                 outfile.write(indent(5,
-                    '<clipitem id="clipitem-{}">'.format(j+1),
+                    f'<clipitem id="clipitem-{j+1}">',
                     '\t<masterclipid>masterclip-2</masterclipid>',
                     f'\t<name>{inp.basename}</name>',
                     f'\t<start>{_start}</start>',
@@ -176,8 +197,8 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
                 if j == 0:
                     outfile.write(indent(6,
                         '<file id="file-1">',
-                        '\t<name>{}</name>'.format(inp.basename),
-                        '\t<pathurl>{}</pathurl>'.format(pathurls[0]),
+                        f'\t<name>{inp.basename}</name>',
+                        f'\t<pathurl>{pathurls[0]}</pathurl>',
                         '\t<rate>',
                         f'\t\t<timebase>{timebase}</timebase>',
                         f'\t\t<ntsc>{ntsc}</ntsc>',
@@ -226,7 +247,7 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
                         outfile.write('\t\t\t\t\t\t\t<trackindex>2</trackindex>\n')
                     else:
                         outfile.write('\t\t\t\t\t\t\t<trackindex>1</trackindex>\n')
-                    outfile.write('\t\t\t\t\t\t\t<clipindex>{}</clipindex>\n'.format(j+1))
+                    outfile.write(f'\t\t\t\t\t\t\t<clipindex>{j+1}</clipindex>\n')
                     if i > 0:
                         outfile.write('\t\t\t\t\t\t\t<groupindex>1</groupindex>\n')
                     outfile.write('\t\t\t\t\t\t</link>\n')
@@ -282,9 +303,9 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
 
                 if j == 0 and (audio_file or t > 0):
                     outfile.write(indent(6,
-                        '<file id="file-{}">'.format(t+1),
-                        '\t<name>{}</name>'.format(inp.basename),
-                        '\t<pathurl>{}</pathurl>'.format(pathurls[t]),
+                        f'<file id="file-{t+1}">',
+                        f'\t<name>{inp.basename}</name>',
+                        f'\t<pathurl>{pathurls[t]}</pathurl>',
                         '\t<rate>',
                         f'\t\t<timebase>{timebase}</timebase>',
                         f'\t\t<ntsc>{ntsc}</ntsc>',
@@ -308,10 +329,10 @@ def premiere_xml(inp, temp, output, chunks, sample_rate, fps, log):
                     '<sourcetrack>',
                     '\t<mediatype>audio</mediatype>',
                     '\t<trackindex>1</trackindex>',
-                    '</sourcetrack>'
+                    '</sourcetrack>',
                     '<labels>',
                     '\t<label2>Iris</label2>',
-                    '</labels>'
+                    '</labels>',
                     )
                 )
 
