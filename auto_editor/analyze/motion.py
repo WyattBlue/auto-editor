@@ -2,6 +2,7 @@ from typing import Tuple
 
 import av
 import numpy as np
+import numpy.typing as npt
 from PIL import ImageOps, ImageChops, ImageFilter
 
 from auto_editor.utils.progressbar import ProgressBar
@@ -14,7 +15,7 @@ def new_size(size: Tuple[int, int], width: int) -> Tuple[int, int]:
 
 def motion_detection(
     path: str, fps: float, progress: ProgressBar, width: int, blur: int
-) -> np.ndarray:
+) -> npt.NDArray[np.float_]:
 
     container = av.open(path, 'r')
 
@@ -30,7 +31,7 @@ def motion_detection(
     total_pixels = None
     index = 0
 
-    threshold_list = np.zeros((1024), dtype=float)
+    threshold_list = np.zeros((1024), dtype=np.float_)
 
     for frame in container.decode(video_stream):
         if image is None:
@@ -44,7 +45,7 @@ def motion_detection(
 
         if index > len(threshold_list) - 1:
             threshold_list = np.concatenate(
-                (threshold_list, np.zeros((len(threshold_list)), dtype=float)), axis=0
+                (threshold_list, np.zeros((len(threshold_list)), dtype=np.float_)), axis=0
             )
 
         image = frame.to_image()

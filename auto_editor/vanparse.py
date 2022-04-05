@@ -260,11 +260,14 @@ class ParseOptions:
         return value
 
 
-    def set_arg_list(self, option_list: str, my_list: list, list_type: type) -> None:
+    def set_arg_list(
+        self, option_list_name: Optional[str], my_list: list, list_type: Optional[type]
+    ) -> None:
+        assert option_list_name is not None
         if list_type is not None:
-            setattr(self, option_list, list(map(list_type, my_list)))
+            setattr(self, option_list_name, list(map(list_type, my_list)))
         else:
-            setattr(self, option_list, my_list)
+            setattr(self, option_list_name, my_list)
 
 
     def __init__(self, sys_args: List[str], options_reqs: List[dict]) -> None:
@@ -273,6 +276,8 @@ class ParseOptions:
         options = []
         requireds = []
         option_names = []
+
+        self.help = False
 
         for item in options_reqs:
             if item['_type'] == 'option':
@@ -306,7 +311,7 @@ class ParseOptions:
 
         option_list = []
         op_list_name = None
-        op_list_type = str
+        op_list_type: Optional[type] = str
         setting_op_list = False
 
         i = 0
