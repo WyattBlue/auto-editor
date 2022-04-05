@@ -5,6 +5,8 @@ import numpy
 import struct
 from enum import IntEnum
 
+from typing import Tuple, NoReturn
+
 
 class WAVE_FORMAT(IntEnum):
     UNKNOWN = 0x0000
@@ -279,7 +281,7 @@ class WAVE_FORMAT(IntEnum):
 KNOWN_WAVE_FORMATS = {WAVE_FORMAT.PCM, WAVE_FORMAT.IEEE_FLOAT}
 
 
-def _raise_bad_format(format_tag):
+def _raise_bad_format(format_tag: int) -> NoReturn:
     try:
         format_name = WAVE_FORMAT(format_tag).name
     except ValueError:
@@ -290,13 +292,15 @@ def _raise_bad_format(format_tag):
     )
 
 
-def _read_fmt_chunk(fid, is_big_endian):
+def _read_fmt_chunk(
+    fid: io.BufferedReader, is_big_endian: bool
+) -> Tuple[int, int, int, int, int]:
     if is_big_endian:
         fmt = ">"
     else:
         fmt = "<"
 
-    size = struct.unpack(fmt + "I", fid.read(4))[0]
+    size: int = struct.unpack(fmt + "I", fid.read(4))[0]
 
     if size < 16:
         raise ValueError("Binary structure of wave file is not compliant")
@@ -335,19 +339,25 @@ def _read_fmt_chunk(fid, is_big_endian):
     # fmt should always be 16, 18 or 40, but handle it just in case
     _handle_pad_byte(fid, size)
 
-    return (size, format_tag, channels, fs, bytes_per_second, block_align, bit_depth)
+    return format_tag, channels, fs, block_align, bit_depth
 
 
 def _read_data_chunk(
-    fid, format_tag, channels, bit_depth, is_big_endian, block_align, mmap=False
-):
+    fid: io.BufferedReader,
+    format_tag: int,
+    channels: int,
+    bit_depth: int,
+    is_big_endian: bool,
+    block_align: int,
+    mmap: bool = False,
+) -> numpy.ndarray:
     if is_big_endian:
         fmt = ">"
     else:
         fmt = "<"
 
     # Size of the data subchunk in bytes
-    size = struct.unpack(fmt + "I", fid.read(4))[0]
+    size: int = struct.unpack(fmt + "I", fid.read(4))[0]
 
     # Number of bytes per sample (sample container size)
     bytes_per_sample = block_align // channels
@@ -414,7 +424,7 @@ def _read_data_chunk(
     return data
 
 
-def _skip_unknown_chunk(fid, is_big_endian):
+def _skip_unknown_chunk(fid: io.BufferedReader, is_big_endian: bool) -> None:
     if is_big_endian:
         fmt = ">I"
     else:
@@ -431,7 +441,7 @@ def _skip_unknown_chunk(fid, is_big_endian):
         _handle_pad_byte(fid, size)
 
 
-def _read_riff_chunk(fid):
+def _read_riff_chunk(fid: io.BufferedReader) -> Tuple[int, bool]:
     str1 = fid.read(4)  # File signature
     if str1 == b"RIFF":
         is_big_endian = False
@@ -446,7 +456,7 @@ def _read_riff_chunk(fid):
         )
 
     # Size of entire file
-    file_size = struct.unpack(fmt, fid.read(4))[0] + 8
+    file_size: int = struct.unpack(fmt, fid.read(4))[0] + 8
 
     str2 = fid.read(4)
     if str2 != b"WAVE":
@@ -455,19 +465,15 @@ def _read_riff_chunk(fid):
     return file_size, is_big_endian
 
 
-def _handle_pad_byte(fid, size):
+def _handle_pad_byte(fid: io.BufferedReader, size: int) -> None:
     # "If the chunk size is an odd number of bytes, a pad byte with value zero
     # is written after ckData." So we need to seek past this after each chunk.
     if size % 2:
         fid.seek(1, 1)
 
 
-def read(filename, mmap=False):
-    if hasattr(filename, "read"):
-        fid = filename
-        mmap = False
-    else:
-        fid = open(filename, "rb")
+def read(filename: str, mmap: bool = False) -> Tuple[int, numpy.ndarray]:
+    fid = open(filename, "rb")
 
     try:
         file_size, is_big_endian = _read_riff_chunk(fid)
@@ -493,12 +499,9 @@ def read(filename, mmap=False):
 
             if chunk_id == b"fmt ":
                 fmt_chunk_received = True
-                fmt_chunk = _read_fmt_chunk(fid, is_big_endian)
-                format_tag, channels, fs = fmt_chunk[1:4]
-                bit_depth = fmt_chunk[6]
-                block_align = fmt_chunk[5]
-            elif chunk_id == b"fact":
-                _skip_unknown_chunk(fid, is_big_endian)
+                format_tag, channels, fs, block_align, bit_depth = _read_fmt_chunk(
+                    fid, is_big_endian
+                )
             elif chunk_id == b"data":
                 data_chunk_received = True
                 if not fmt_chunk_received:
@@ -512,19 +515,19 @@ def read(filename, mmap=False):
                     block_align,
                     mmap,
                 )
-            elif chunk_id == b"LIST":
-                # Someday this could be handled properly but for now skip it
-                _skip_unknown_chunk(fid, is_big_endian)
-            elif chunk_id in {b"JUNK", b"Fake"}:
-                # Skip alignment chunks without warning
-                _skip_unknown_chunk(fid, is_big_endian)
             else:
                 # Chunk (non-data) not understood, skipping it.",
                 _skip_unknown_chunk(fid, is_big_endian)
+
+            # elif chunk_id == b"fact":
+            #     _skip_unknown_chunk(fid, is_big_endian)
+            # elif chunk_id == b"LIST":
+            #     # Someday this could be handled properly but for now skip it
+            #     _skip_unknown_chunk(fid, is_big_endian)
+            # elif chunk_id in {b"JUNK", b"Fake"}:
+            #     # Skip alignment chunks without warning
+            #     _skip_unknown_chunk(fid, is_big_endian)
     finally:
-        if not hasattr(filename, "read"):
-            fid.close()
-        else:
-            fid.seek(0)
+        fid.seek(0)
 
     return fs, data
