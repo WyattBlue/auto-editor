@@ -62,7 +62,7 @@ class FFmpeg:
 
     def print_cmd(self, cmd: List[str]) -> None:
         if self.debug:
-            print('FFmpeg run: {}\n'.format(' '.join(cmd)), file=sys.stderr)
+            print(f"FFmpeg run: {' '.join(cmd)}\n", file=sys.stderr)
 
     def run(self, cmd: List[str]) -> None:
         cmd = [self.path, '-y', '-hide_banner'] + cmd
