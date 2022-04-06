@@ -41,15 +41,14 @@ def main_options(parser):
             'The anchor point tells how the image is placed relative to its x y coordinates.')
 
     parser.add_text('URL Download Options')
-    parser.add_argument('--download-dir', type=str, default=None,
-        help='The directory where the downloaded URL is placed.')
-    parser.add_argument('--limit-rate', '-rate', default='3m',
-        help='The maximum download rate in bytes per second (50k, 4.2m)')
-    parser.add_argument('--download-archive', type=file_type, default=None,
-        help='Download only videos not listed in archive file. Record the IDs of'
-             ' all downloads.')
-    parser.add_argument('--cookies', type=file_type, default=None,
-        help='The file to read cookies from and dump the cookie jar in.')
+    parser.add_argument('--yt-dlp-location', default=None,
+        help='Set a custom path to yt-dlp.')
+    parser.add_argument('--download-format', default=None,
+        help='Set the yt-dlp download format. (--format, -f)')
+    parser.add_argument('--output-format', default=None,
+        help='Set the yt-dlp output file template. (--output, -o)')
+    parser.add_argument('--yt-dlp-extras', default=None,
+        help='Add extra options for yt-dlp. Must be in quotes')
 
     parser.add_text('Exporting as Media Options')
     parser.add_argument('--video-codec', '-vcodec', '-c:v', default='auto',
