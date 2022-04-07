@@ -29,7 +29,7 @@ def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     else:
         output_format = args.output_format
 
-    yt_dlp_path = "yt-dlp" if args.yt_dlp_location is None else args.yt_dlp_location
+    yt_dlp_path = args.yt_dlp_location
 
     cmd = ["--ffmpeg-location", ffmpeg.path]
 

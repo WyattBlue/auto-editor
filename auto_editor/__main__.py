@@ -41,7 +41,7 @@ def main_options(parser):
             'The anchor point tells how the image is placed relative to its x y coordinates.')
 
     parser.add_text('URL Download Options')
-    parser.add_argument('--yt-dlp-location', default=None,
+    parser.add_argument('--yt-dlp-location', default='yt-dlp',
         help='Set a custom path to yt-dlp.')
     parser.add_argument('--download-format', default=None,
         help='Set the yt-dlp download format. (--format, -f)')
