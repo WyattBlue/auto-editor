@@ -4,19 +4,12 @@ import io
 import numpy
 import struct
 
-from typing import Tuple, NoReturn
+from typing import Tuple
 
 
 PCM = 0x0001
 IEEE_FLOAT = 0x0003
 EXTENSIBLE = 0xFFFE
-
-
-def _raise_bad_format(fmt_tag: int) -> NoReturn:
-    raise ValueError(
-        f"Unknown wave file format: {fmt_tag:#06x}. Supported formats: PCM, IEEE_FLOAT"
-    )
-
 
 def _read_fmt_chunk(
     fid: io.BufferedReader, is_big_endian: bool
@@ -56,7 +49,9 @@ def _read_fmt_chunk(
             raise ValueError("Binary structure of wave file is not compliant")
 
     if format_tag not in {PCM, IEEE_FLOAT}:
-        _raise_bad_format(format_tag)
+        raise ValueError(
+            f"Encountered unknown format tag: {format_tag:#06x}, while reading fmt chunk."
+        )
 
     # move file pointer to next chunk
     if size > bytes_read:
@@ -75,7 +70,6 @@ def _read_data_chunk(
     bit_depth: int,
     is_big_endian: bool,
     block_align: int,
-    mmap: bool = False,
 ) -> numpy.ndarray:
     if is_big_endian:
         fmt = ">"
@@ -110,10 +104,18 @@ def _read_data_chunk(
                 f"Unsupported bit depth: the WAV file has {bit_depth}-bit floating-point data."
             )
     else:
-        _raise_bad_format(format_tag)
+        raise ValueError(
+            f"Unknown wave file format: {format_tag:#06x}. Supported formats: PCM, IEEE_FLOAT"
+        )
 
     start = fid.tell()
-    if not mmap:
+
+    if bytes_per_sample in (1, 2, 4, 8):
+        data = numpy.memmap(
+            fid, dtype=dtype, mode="c", offset=start, shape=(n_samples,)
+        )
+        fid.seek(start + size)
+    else:
         try:
             count = size if dtype == "V1" else n_samples
             data = numpy.fromfile(fid, dtype=dtype, count=count)
@@ -127,17 +129,6 @@ def _read_data_chunk(
             a = numpy.zeros((len(data) // bytes_per_sample, dt().itemsize), dtype="V1")
             a[:, -bytes_per_sample:] = data.reshape((-1, bytes_per_sample))
             data = a.view(dt).reshape(a.shape[:-1])
-    else:
-        if bytes_per_sample in {1, 2, 4, 8}:
-            start = fid.tell()
-            data = numpy.memmap(
-                fid, dtype=dtype, mode="c", offset=start, shape=(n_samples,)
-            )
-            fid.seek(start + size)
-        else:
-            raise ValueError(
-                f"mmap=True not compatible with {bytes_per_sample}-byte container size."
-            )
 
     _handle_pad_byte(fid, size)
 
@@ -168,6 +159,9 @@ def _skip_unknown_chunk(fid: io.BufferedReader, is_big_endian: bool) -> None:
 
 
 def _read_riff_chunk(fid: io.BufferedReader) -> Tuple[int, bool]:
+
+    # TODO: Add support for RF64
+
     str1 = fid.read(4)  # File signature
     if str1 == b"RIFF":
         is_big_endian = False
@@ -176,7 +170,6 @@ def _read_riff_chunk(fid: io.BufferedReader) -> Tuple[int, bool]:
         is_big_endian = True
         fmt = ">I"
     else:
-        # There are also .wav files with "FFIR" or "XFIR" signatures?
         raise ValueError(
             f"File format {repr(str1)} not understood. Only 'RIFF' and 'RIFX' supported."
         )
@@ -198,7 +191,7 @@ def _handle_pad_byte(fid: io.BufferedReader, size: int) -> None:
         fid.seek(1, 1)
 
 
-def read(filename: str, mmap: bool = True) -> Tuple[int, numpy.ndarray]:
+def read(filename: str) -> Tuple[int, numpy.ndarray]:
     fid = open(filename, "rb")
 
     try:
@@ -216,12 +209,10 @@ def read(filename: str, mmap: bool = True) -> Tuple[int, numpy.ndarray]:
                 else:
                     raise ValueError("Unexpected end of file.")
             elif len(chunk_id) < 4:
-                msg = f"Incomplete chunk ID: {repr(chunk_id)}"
-                # If we have the data, ignore the broken chunk
                 if fmt_chunk_received and data_chunk_received:
                     pass
                 else:
-                    raise ValueError(msg)
+                    raise ValueError(f"Incomplete chunk ID: {repr(chunk_id)}")
 
             if chunk_id == b"fmt ":
                 fmt_chunk_received = True
@@ -239,7 +230,6 @@ def read(filename: str, mmap: bool = True) -> Tuple[int, numpy.ndarray]:
                     bit_depth,
                     is_big_endian,
                     block_align,
-                    mmap,
                 )
             else:
                 _skip_unknown_chunk(fid, is_big_endian)
