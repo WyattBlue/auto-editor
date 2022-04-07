@@ -198,7 +198,7 @@ def _handle_pad_byte(fid: io.BufferedReader, size: int) -> None:
         fid.seek(1, 1)
 
 
-def read(filename: str, mmap: bool = False) -> Tuple[int, numpy.ndarray]:
+def read(filename: str, mmap: bool = True) -> Tuple[int, numpy.ndarray]:
     fid = open(filename, "rb")
 
     try:
