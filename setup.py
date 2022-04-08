@@ -38,7 +38,7 @@ setup(
     install_requires=[
         'numpy>=1.21.0',
         'yt-dlp>=2022.1.21',
-        'pillow==9.0.1',
+        'pillow==9.1.0',
         'av==9.1.0',
     ],
     python_requires='>=3.8',
