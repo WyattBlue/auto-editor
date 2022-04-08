@@ -125,11 +125,13 @@ auto-editor --scale --help
 
 ## Articles
  - [How to Install Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md)
- - [How to Use Motion Detection in Auto-Editor](https://auto-editor.com/cli/motion_detection)
- - [Range Syntax](https://auto-editor.com/cli/range_syntax)
- - [Subcommands](https://auto-editor.com/cli/subcommands)
- - [GPU Acceleration](https://auto-editor.com/docs/gpu_acceleration)
- 
+ - [All the Options (And What They Do)](https://auto-editor.com/options)
+ - [Supported Media](https://auto-editor.com/supported_media)
+ - [What is Range Syntax](https://auto-editor.com/range_syntax)
+ - [Subcommands](https://auto-editor.com/subcommands)
+ - [GPU Acceleration](https://auto-editor.com/gpu_acceleration)
+
+
 ## Copyright
 Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) but contains non-free elements. See [this page](https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md) for more info.
 
