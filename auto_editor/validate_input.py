@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 import subprocess
 from typing import List
 
