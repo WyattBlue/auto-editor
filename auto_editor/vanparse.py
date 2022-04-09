@@ -6,9 +6,7 @@ from shutil import get_terminal_size
 
 from typing import List, Optional
 
-
-class ParserError(Exception):
-    pass
+from auto_editor.utils.log import Log
 
 
 def indent(text: str, prefix, predicate=None) -> str:
@@ -207,7 +205,7 @@ def parse_dataclass(unsplit_arguments, dataclass):
 
     for i, arg in enumerate(unsplit_arguments.split(ARG_SEP)):
         if i+1 > len(keys):
-            raise ParserError(
+            Log().error(
                 f"{d_name} has too many arguments, starting with '{arg}'."
             )
 
@@ -216,22 +214,22 @@ def parse_dataclass(unsplit_arguments, dataclass):
 
             parameters = arg.split(KEYWORD_SEP)
             if len(parameters) > 2:
-                raise ParserError(f"{d_name} invalid syntax: '{arg}'.")
+                Log().error(f"{d_name} invalid syntax: '{arg}'.")
             key, val = parameters
             if key not in keys:
-                raise ParserError(f"{d_name} got an unexpected keyword '{key}'")
+                Log().error(f"{d_name} got an unexpected keyword '{key}'")
 
             kwargs[key] = val
         elif allow_positional_args:
             args.append(arg)
         else:
-            raise ParserError(f'{d_name} positional argument follows keyword argument.')
+            Log().error(f'{d_name} positional argument follows keyword argument.')
 
     try:
         dataclass_instance = dataclass(*args, **kwargs)
     except TypeError as err:
         err_list = [d_name] + str(err).split(' ')[1:]
-        raise ParserError(' '.join(err_list))
+        Log().error(' '.join(err_list))
 
     return dataclass_instance
 
@@ -244,18 +242,19 @@ class ParseOptions:
         option_name = option['names'][0]
 
         if arg is None and option['nargs'] == 1:
-            raise ParserError(f"{option_name} needs argument.")
+            Log().error(f"{option_name} needs argument.")
 
         try:
             value = option['type'](arg)
         except TypeError as e:
-            raise ParserError(str(e))
+            Log().error(str(e))
 
         if option['choices'] is not None and value not in option['choices']:
             my_choices = ', '.join(option['choices'])
 
-            raise ParserError(f'{value} is not a choice for {option_name}\n'
-                f'choices are:\n  {my_choices}')
+            Log().error(
+                f'{value} is not a choice for {option_name}\nchoices are:\n  {my_choices}'
+            )
 
         return value
 
@@ -339,21 +338,21 @@ class ParseOptions:
 
                     # 'Did you mean' message might appear that options need a comma.
                     if arg.replace(',', '') in option_names:
-                        raise ParserError(f"Option '{arg}' has an unnecessary comma.")
+                        Log().error(f"Option '{arg}' has an unnecessary comma.")
 
                     close_matches = difflib.get_close_matches(arg, option_names)
                     if close_matches:
-                        raise ParserError(
+                        Log().error(
                             f'Unknown {label}: {arg}\n\n    Did you mean:\n        ' +
                             ', '.join(close_matches)
                         )
-                    raise ParserError(f'Unknown {label}: {arg}')
+                    Log().error(f'Unknown {label}: {arg}')
             else:
                 if op_list_name is not None:
                     self.set_arg_list(op_list_name, option_list, op_list_type)
 
                 if option in used_options:
-                    raise ParserError(f"Cannot repeat option {option['names'][0]} twice.")
+                    Log().error(f"Cannot repeat option {option['names'][0]} twice.")
 
                 used_options.append(option)
 

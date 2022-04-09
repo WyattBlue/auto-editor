@@ -37,14 +37,7 @@ def main(sys_args=sys.argv[1:]):
     parser = vanparse.ArgumentParser('info', auto_editor.version,
         description='Get basic information about media files.')
     parser = info_options(parser)
-
-    log = Log()
-
-    try:
-        args = parser.parse_args(sys_args)
-    except vanparse.ParserError as e:
-        log.error(str(e))
-
+    args = parser.parse_args(sys_args)
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
     def aspect_str(w, h) -> str:
@@ -60,7 +53,7 @@ def main(sys_args=sys.argv[1:]):
         if os.path.exists(file):
             text += f'file: {file}\n'
         else:
-            log.error(f'Could not find file: {file}')
+            Log().error(f'Could not find file: {file}')
 
         inp = FileInfo(file, ffmpeg)
 

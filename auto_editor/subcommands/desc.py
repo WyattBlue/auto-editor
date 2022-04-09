@@ -19,7 +19,6 @@ def main(sys_args=sys.argv[1:]):
     import auto_editor
     import auto_editor.vanparse as vanparse
 
-    from auto_editor.utils.log import Log
     from auto_editor.ffwrapper import FFmpeg, FileInfo
 
     parser = vanparse.ArgumentParser(
@@ -28,14 +27,7 @@ def main(sys_args=sys.argv[1:]):
         description="Print the video's metadata description.",
     )
     parser = desc_options(parser)
-
-    log = Log()
-
-    try:
-        args = parser.parse_args(sys_args)
-    except vanparse.ParserError as e:
-        log.error(str(e))
-
+    args = parser.parse_args(sys_args)
     ffmpeg = FFmpeg(args.ffmpeg_location, debug=False)
 
     print("")

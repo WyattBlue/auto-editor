@@ -61,14 +61,7 @@ def main(sys_args=sys.argv[1:]):
         "levels", auto_editor.version, description="Get loudness of audio over time."
     )
     parser = levels_options(parser)
-
-    temp = tempfile.mkdtemp()
-    log = Log(temp=temp)
-
-    try:
-        args = parser.parse_args(sys_args)
-    except vanparse.ParserError as e:
-        log.error(str(e))
+    args = parser.parse_args(sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
@@ -76,6 +69,9 @@ def main(sys_args=sys.argv[1:]):
 
     inp = FileInfo(args.input[0], ffmpeg)
     fps = 30 if inp.fps is None else float(inp.fps)
+
+    temp = tempfile.mkdtemp()
+    log = Log(temp=temp)
 
     if args.kind == "audio":
         from auto_editor.analyze.audio import audio_detection

@@ -20,7 +20,8 @@ def test_options(parser):
     parser.add_argument('--only', '-n', nargs='*')
     parser.add_argument('--help', '-h', action='store_true',
         help='Print info about the program or an option and exit.')
-    parser.add_required('category', nargs=1, choices=['cli', 'sub', 'api', 'unit', 'all'],
+    parser.add_required('category', nargs=1, default='cli',
+        choices=['cli', 'sub', 'api', 'unit', 'all'],
         help='Set what category of tests to run.')
     return parser
 
@@ -169,7 +170,7 @@ class Tester():
                 cleanup()
 
     def end(self) -> NoReturn:
-        print('{}/{}'.format(self.passed_tests, self.passed_tests + self.failed_tests))
+        print(f"{self.passed_tests}/{self.passed_tests + self.failed_tests}")
         clean_all()
         sys.exit(0)
 
