@@ -88,12 +88,9 @@ def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
         return np.fromiter((x >= attrs.threshold for x in pixel_list), dtype=np.bool_)
 
 def get_attributes(attrs_str, dataclass, log):
-    from auto_editor.vanparse import parse_dataclass, ParserError
+    from auto_editor.vanparse import parse_dataclass
 
-    try:
-        attrs = parse_dataclass(attrs_str, dataclass)
-    except ParserError as e:
-        log.error(str(e))
+    attrs = parse_dataclass(attrs_str, dataclass)
 
     dic_value = asdict(attrs)
     dic_type = {}

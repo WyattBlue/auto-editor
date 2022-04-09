@@ -7,7 +7,7 @@ from typing import NoReturn, Optional
 
 
 class Timer:
-    __slots__ = ('start_time', 'quiet')
+    __slots__ = ("start_time", "quiet")
 
     def __init__(self, quiet: bool = False) -> None:
         self.start_time = perf_counter()
@@ -18,11 +18,11 @@ class Timer:
             second_len = round(perf_counter() - self.start_time, 2)
             minute_len = timedelta(seconds=round(second_len))
 
-            sys.stdout.write(f'Finished. took {second_len} seconds ({minute_len})\n')
+            sys.stdout.write(f"Finished. took {second_len} seconds ({minute_len})\n")
 
 
 class Log:
-    __slots__ = ('is_debug', 'quiet', 'temp')
+    __slots__ = ("is_debug", "quiet", "temp")
 
     def __init__(
         self, show_debug: bool = False, quiet: bool = False, temp: Optional[str] = None
@@ -33,22 +33,22 @@ class Log:
 
     def debug(self, message: str) -> None:
         if self.is_debug:
-            self.conwrite('')
-            sys.stderr.write(f'Debug: {message}\n')
+            self.conwrite("")
+            sys.stderr.write(f"Debug: {message}\n")
 
     def cleanup(self) -> None:
         if self.temp is None:
             return
         try:
             rmtree(self.temp)
-            self.debug('Removed Temp Directory.')
+            self.debug("Removed Temp Directory.")
         except PermissionError:
             sleep(0.1)
             try:
                 rmtree(self.temp)
-                self.debug('Removed Temp Directory.')
+                self.debug("Removed Temp Directory.")
             except Exception:
-                self.debug('Failed to delete temp dir.')
+                self.debug("Failed to delete temp dir.")
         except FileNotFoundError:
             # that's ok, the folder we are trying to remove is already gone
             pass
@@ -56,17 +56,16 @@ class Log:
     def conwrite(self, message: str) -> None:
         if not self.quiet:
             buffer = get_terminal_size().columns - len(message) - 3
-            sys.stdout.write('  ' + message + ' ' * buffer + '\r')
+            sys.stdout.write("  " + message + " " * buffer + "\r")
 
     def error(self, message: str) -> NoReturn:
-        self.conwrite('')
-        message = message.replace('\t', '    ')
-        sys.stderr.write(f'Error! {message}\n')
+        self.conwrite("")
+        sys.stderr.write(f"Error! {message}\n")
         self.cleanup()
 
         from platform import system
 
-        if system() == 'Linux':
+        if system() == "Linux":
             sys.exit(1)
         else:
             try:
@@ -81,8 +80,8 @@ class Log:
 
     def warning(self, message: str) -> None:
         if not self.quiet:
-            sys.stderr.write(f'Warning! {message}\n')
+            sys.stderr.write(f"Warning! {message}\n")
 
     def print(self, message: str) -> None:
         if not self.quiet:
-            sys.stdout.write(f'{message}\n')
+            sys.stdout.write(f"{message}\n")

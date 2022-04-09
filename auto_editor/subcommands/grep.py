@@ -58,7 +58,7 @@ def grep_core(
 
     prefix = ''
     if add_prefix:
-        prefix = '{}:'.format(os.path.splitext(os.path.basename(media_file))[0])
+        prefix = f"{os.path.splitext(os.path.basename(media_file))[0]}:"
 
     if args.max_count is None:
         args.max_count = float('inf')
@@ -106,19 +106,13 @@ def main(sys_args=sys.argv[1:]):
         description='Read and match subtitle tracks in media files.',
     )
     parser = grep_options(parser)
+    args = parser.parse_args(sys_args)
+    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
 
     TEMP = tempfile.mkdtemp()
     log = Log(temp=TEMP)
 
-    try:
-        args = parser.parse_args(sys_args)
-    except vanparse.ParserError as e:
-        log.error(str(e))
-
-    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
-
     media_files = args.input[1:]
-
     add_prefix = (len(media_files) > 1 or os.path.isdir(media_files[0])) and not args.no_filename
 
     for media_file in media_files:

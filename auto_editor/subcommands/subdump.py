@@ -39,15 +39,12 @@ def main(sys_args=sys.argv[1:]):
     )
     parser = subdump_options(parser)
 
-    temp = tempfile.mkdtemp()
-    log = Log(temp=temp)
-
-    try:
-        args = parser.parse_args(sys_args)
-    except vanparse.ParserError as e:
-        log.error(str(e))
+    args = parser.parse_args(sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
+
+    temp = tempfile.mkdtemp()
+    log = Log(temp=temp)
 
     for i, input_file in enumerate(args.input):
         inp = FileInfo(input_file, ffmpeg)

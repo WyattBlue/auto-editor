@@ -285,10 +285,7 @@ def main():
             ['--export', 'clip-sequence']
         )
 
-        try:
-            args = parser.parse_args(sys_a)
-        except vanparse.ParserError as e:
-            Log().error(str(e))
+        args = parser.parse_args(sys_a)
 
     timer = Timer(args.quiet)
 
