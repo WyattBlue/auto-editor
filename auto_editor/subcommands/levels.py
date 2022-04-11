@@ -75,6 +75,7 @@ def main(sys_args=sys.argv[1:]):
 
     if args.kind == "audio":
         from auto_editor.analyze.audio import audio_detection
+        from auto_editor.wavfile import read
 
         if args.track >= len(inp.audio_streams):
             log.error(f"Audio track '{args.track}' does not exist.")
@@ -88,7 +89,6 @@ def main(sys_args=sys.argv[1:]):
         if not os.path.isfile(read_track):
             log.error("Audio track file not found!")
 
-        from auto_editor.scipy.wavfile import read
         sample_rate, audio_samples = read(read_track)
 
         print_float_list(audio_detection(audio_samples, sample_rate, fps, progress))

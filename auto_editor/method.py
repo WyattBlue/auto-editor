@@ -19,7 +19,7 @@ def get_audio_list(
 ) -> np.ndarray:
 
     from auto_editor.analyze.audio import audio_detection
-    from auto_editor.scipy.wavfile import read
+    from auto_editor.wavfile import read
 
     path = os.path.join(temp, f'{stream}.wav')
 

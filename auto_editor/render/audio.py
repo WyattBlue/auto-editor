@@ -2,12 +2,11 @@ import wave
 
 import numpy as np
 
-from auto_editor.scipy.wavfile import read
-
+from auto_editor.wavfile import read
 from auto_editor.render.tsm import phasevocoder, ArrReader, ArrWriter
-
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
+
 from typing import List, Tuple
 
 def make_new_audio(

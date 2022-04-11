@@ -124,7 +124,7 @@ def edit_media(
 
     cmd = ['-i', inp.path, '-hide_banner']
     for t in range(tracks):
-        cmd.extend(['-map', f'0:a:{t}', '-ac', '2', os.path.join(temp, f'{t}.wav')])
+        cmd.extend(['-map', f'0:a:{t}', '-ac', '2', '-rf64', 'always', os.path.join(temp, f'{t}.wav')])
     ffmpeg.run(cmd)
     del cmd
 
