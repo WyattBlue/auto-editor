@@ -102,7 +102,7 @@ def check_for_error(cmd: List[str], match=None) -> None:
 
 
 def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
-    from auto_editor.scipy.wavfile import read
+    from auto_editor.wavfile import read
     from auto_editor.render.tsm import phasevocoder, ArrReader, ArrWriter
 
     _, sped_chunk = read(in_file)
