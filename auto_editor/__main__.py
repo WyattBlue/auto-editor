@@ -62,7 +62,6 @@ def main_options(parser):
     parser.add_argument('--sample-rate', '-ar', type=sample_rate_type,
         help='Set the sample rate of the input and output videos.')
     parser.add_argument('--video-quality-scale', '-qscale:v', '-q:v', default='unset',
-        range='1 to 31',
         help='Set a value to the ffmpeg option -qscale:v')
     parser.add_argument('--scale', type=float_type, default=1,
         help='Scale the output video by a certain factor.')
@@ -193,32 +192,50 @@ Examples:
     parser.add_text('Editing Options')
 
     parser.add_argument('--silent-threshold', '-t', type=float_type, default=0.04,
-        range='0 to 1',
         help='Set the volume that frames audio needs to surpass to be "loud".',
         manual='Silent threshold is a percentage where 0% represents absolute silence and '
             '100% represents the highest volume in the media file.\n'
             'Setting the threshold to `0%` will cut only out areas where area is '
             'absolutely silence while a value of 4% will cut ')
     parser.add_argument('--frame-margin', '--margin', '-m', type=margin_type, default='6',
-        range='-Infinity to Infinity',
         help='Set how many "silent" frames on either side on the "loud" sections to be '
             'included.',
         manual='Margin is measured in frames, however, seconds can be used. e.g. `0.3secs`\n'
             'The starting and ending margins can be set separately with the use of '
-            'a comma. e.g. `2sec,3sec` `7,10` `-1,6`')
-    parser.add_argument('--silent-speed', '-s', type=float_type, default=99999,
-        range='Any number. Values <= 0 or >= 99999 will be cut out.',
-        help='Set the speed that "silent" sections should be played at.')
-    parser.add_argument('--video-speed', '--sounded-speed', '-v', type=float_type,
+            'a comma. e.g. `2sec,3sec` `7,10` `-1,6`\nRange: -Infinity to Infinity')
+    parser.add_argument(
+        '--silent-speed',
+        '-s',
+        type=float_type,
+        default=99999,
+        help='Set the speed that "silent" sections should be played at.',
+        manual="Values <= 0 or >= 99999 are the 'cut speed'",
+    )
+    parser.add_argument(
+        '--video-speed',
+        '--sounded-speed',
+        '-v',
+        type=float_type,
         default=1,
-        range='Any number. Values <= 0 or >= 99999 will be cut out.',
-        help='Set the speed that "loud" sections should be played at.')
-    parser.add_argument('--min-clip-length', '-mclip', type=frame_type, default=3,
-        range='0 to Infinity',
-        help='Set the minimum length a clip can be. If a clip is too short, cut it.')
-    parser.add_argument('--min-cut-length', '-mcut', type=frame_type, default=6,
-        range='0 to Infinity',
-        help="Set the minimum length a cut can be. If a cut is too short, don't cut.")
+        help='Set the speed that "loud" sections should be played at.',
+        manual="Values <= 0 or >= 99999 are the 'cut speed'",
+    )
+    parser.add_argument(
+        '--min-clip-length',
+        '-mclip',
+        type=frame_type,
+        default=3,
+        help="Set the minimum length a clip can be. If a clip is too short, cut it.",
+        manual="Range: 0 to Infinity",
+    )
+    parser.add_argument(
+        '--min-cut-length',
+        '-mcut',
+        type=frame_type,
+        default=6,
+        help="Set the minimum length a cut can be. If a cut is too short, don't cut.",
+        manual="Range: 0 to Infinity",
+    )
 
     parser.add_blank()
     parser.add_argument('--help', '-h', action='store_true',

@@ -38,6 +38,7 @@ def main(sys_args=sys.argv[1:]):
         description='Get basic information about media files.')
     parser = info_options(parser)
     args = parser.parse_args(sys_args)
+
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
     def aspect_str(w, h) -> str:

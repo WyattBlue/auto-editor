@@ -20,7 +20,7 @@ def test_options(parser):
     parser.add_argument('--only', '-n', nargs='*')
     parser.add_argument('--help', '-h', action='store_true',
         help='Print info about the program or an option and exit.')
-    parser.add_required('category', nargs=1, default='cli',
+    parser.add_required('category', nargs=1,
         choices=['cli', 'sub', 'api', 'unit', 'all'],
         help='Set what category of tests to run.')
     return parser
