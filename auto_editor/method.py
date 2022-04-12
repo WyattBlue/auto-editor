@@ -1,12 +1,34 @@
 import os
+from math import ceil
 from dataclasses import dataclass, asdict, fields
 
 from typing import Union, Callable
 
 import numpy as np
 
+from auto_editor.wavfile import read
 from auto_editor.utils.log import Log
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.progressbar import ProgressBar
+
+
+def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
+
+    audio_path = os.path.join(temp, "0.wav")
+
+    if os.path.isfile(audio_path):
+        sample_rate, audio_samples = read(audio_path)
+        sample_rate_per_frame = sample_rate / fps
+        return ceil(audio_samples.shape[0] / sample_rate_per_frame)
+
+    import av
+    container = av.open(path)
+
+    if len(container.streams.video) < 1:
+        log.error("Could not get media duration")
+
+    video = av.open(path, 'r').streams.video[0]
+    return int(float(video.duration * video.time_base) * fps)
 
 
 def get_audio_list(
@@ -19,7 +41,6 @@ def get_audio_list(
 ) -> np.ndarray:
 
     from auto_editor.analyze.audio import audio_detection
-    from auto_editor.wavfile import read
 
     path = os.path.join(temp, f'{stream}.wav')
 
@@ -44,16 +65,14 @@ def operand_combine(a: np.ndarray, b: np.ndarray, call: Callable) -> np.ndarray:
     return call(a, b)
 
 
-def get_stream_data(method: str, attrs, args, inp, fps, progress, temp, log):
-
-    from auto_editor.analyze.generic import get_np_list
-
-    audio_samples, sample_rate = None, None
+def get_stream_data(
+    method: str, attrs, args, inp: FileInfo, fps: float, progress, temp: str, log: Log
+):
 
     if method == 'none':
-        return get_np_list(inp.path, audio_samples, sample_rate, fps, np.ones)
+        return np.ones((get_media_duration(inp.path, fps, temp, log)), dtype=np.bool_)
     if method == 'all':
-        return get_np_list(inp.path, audio_samples, sample_rate, fps, np.zeros)
+        return np.zeros((get_media_duration(inp.path, fps, temp, log)), dtype=np.bool_)
     if method == 'audio':
         if attrs.stream == 'all':
             total_list = None
