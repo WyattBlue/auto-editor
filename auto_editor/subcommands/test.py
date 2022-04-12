@@ -452,6 +452,7 @@ def main(sys_args: Optional[List[str]]=None):
 
             test_file = f'resources/{test_name}'
             run_program([test_file])
+            run_program([test_file, '--edit', 'none'])
             run_program([test_file, '-exp'])
             run_program([test_file, '-exf'])
             run_program([test_file, '-exs'])
