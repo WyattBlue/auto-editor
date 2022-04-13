@@ -77,7 +77,7 @@ class ProgressBar:
             index = min(index, self.total)
             raw = int(self.begin_time + progress_rate)
             print(f'{self.title}~{index}~{self.total}~{self.begin_time}~{raw}',
-                end='\r')
+                end='\r', flush=True)
             return
 
 
