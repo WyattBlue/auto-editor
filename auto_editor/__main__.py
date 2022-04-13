@@ -43,11 +43,11 @@ def main_options(parser):
     parser.add_text('URL Download Options')
     parser.add_argument('--yt-dlp-location', default='yt-dlp',
         help='Set a custom path to yt-dlp.')
-    parser.add_argument('--download-format', default=None,
+    parser.add_argument('--download-format',
         help='Set the yt-dlp download format. (--format, -f)')
-    parser.add_argument('--output-format', default=None,
+    parser.add_argument('--output-format',
         help='Set the yt-dlp output file template. (--output, -o)')
-    parser.add_argument('--yt-dlp-extras', default=None,
+    parser.add_argument('--yt-dlp-extras',
         help='Add extra options for yt-dlp. Must be in quotes')
 
     parser.add_text('Exporting as Media Options')
@@ -71,7 +71,7 @@ def main_options(parser):
     parser.add_text('Miscellaneous Options')
     parser.add_argument('--background', type=color_type, default='#000',
         help='Set the color of the background that is visible when the video is moved.')
-    parser.add_argument('--combine-files', action='store_true',
+    parser.add_argument('--combine-files', flag=True,
         help='Combine all input files into one before editing.')
     parser.add_argument('--progress', default='modern',
         choices=['modern', 'classic', 'ascii', 'machine', 'none'],
@@ -142,7 +142,7 @@ Examples:
   --edit none
   --edit all''')
 
-    parser.add_argument('--keep-tracks-seperate', action='store_true',
+    parser.add_argument('--keep-tracks-seperate', flag=True,
         help="Don't combine audio tracks when exporting.")
     parser.add_argument('--export', default='default',
         choices=['default', 'premiere', 'final-cut-pro', 'shotcut', 'json', 'audio', 'clip-sequence'],
@@ -157,34 +157,34 @@ Examples:
             'clip-sequence : Export as multiple numbered media files'
     )
     parser.add_text('Utility Options')
-    parser.add_argument('--no-open', action='store_true',
+    parser.add_argument('--no-open', flag=True,
         help='Do not open the file after editing is done.')
-    parser.add_argument('--temp-dir', default=None,
+    parser.add_argument('--temp-dir',
         help='Set where the temporary directory is located.',
         manual='If not set, tempdir will be set with Python\'s tempfile module\n'
             'The directory doesn\'t have to exist beforehand, however, the root path '
             'must be valid. For Windows users, this file will be in the C drive.\n'
             'The temp file can get quite big if you\'re generating a huge video, so '
             'make sure your location has enough space.')
-    parser.add_argument('--ffmpeg-location', default=None,
+    parser.add_argument('--ffmpeg-location',
         help='Set a custom path to the ffmpeg location.',
         manual='This takes precedence over `--my-ffmpeg`.')
-    parser.add_argument('--my-ffmpeg', action='store_true',
+    parser.add_argument('--my-ffmpeg', flag=True,
         help='Use the ffmpeg on your PATH instead of the one packaged.',
         manual='This is equivalent to `--ffmpeg-location ffmpeg`.')
 
     parser.add_text('Display Options')
-    parser.add_argument('--version', action='store_true',
+    parser.add_argument('--version', flag=True,
         help="Display the program's version and halt.")
-    parser.add_argument('--debug', action='store_true',
+    parser.add_argument('--debug', flag=True,
         help='Show debugging messages and values.')
-    parser.add_argument('--show-ffmpeg-debug', action='store_true',
+    parser.add_argument('--show-ffmpeg-debug', flag=True,
         help='Show ffmpeg progress and output.')
-    parser.add_argument('--quiet', '-q', action='store_true',
+    parser.add_argument('--quiet', '-q', flag=True,
         help='Display less output.')
-    parser.add_argument('--preview', action='store_true',
+    parser.add_argument('--preview', flag=True,
         help='Show stats on how the input will be cut and halt.')
-    parser.add_argument('--timeline', action='store_true',
+    parser.add_argument('--timeline', flag=True,
         help='Show auto-editor JSON timeline file and halt.')
     parser.add_argument('--api', default='0.2.0',
         help='Set what version of the JSON timeline to output.')
@@ -236,14 +236,9 @@ Examples:
         help="Set the minimum length a cut can be. If a cut is too short, don't cut.",
         manual="Range: 0 to Infinity",
     )
-
     parser.add_blank()
-    parser.add_argument('--help', '-h', action='store_true',
-        help='Print info about the program or an option and exit.')
-
     parser.add_argument('--output-file', '--output', '-o', nargs='*',
         help='Set the name(s) of the new output.')
-    parser.add_blank()
     parser.add_required('input', nargs='*',
         help='File(s) or URL(s) that will be edited.')
 

@@ -26,7 +26,7 @@ class Options:
     nargs: Union[int, str] = 1
     type: type = str
     default: Optional[Union[int, str]] = None
-    action: str = "default"
+    flag: bool = False
     choices: Optional[Sequence[str]] = None
     help: str = ""
     dataclass: Any = None
@@ -73,8 +73,7 @@ def print_option_help(option: Options) -> None:
 
     text = "  " + ", ".join(option.names) + "\n    " + option.help + "\n\n"
     if option.dataclass is not None:
-        text += "    Arguments:\n    "
-
+        text += "    "
         args = []
         for field in fields(option.dataclass):
             if field.name != "_type":
@@ -84,14 +83,14 @@ def print_option_help(option: Options) -> None:
                 arg += "}"
                 args.append(arg)
 
-        text += ",".join(args)
+        text += ",".join(args) + "\n"
 
     if option.manual != "":
         text += indent(option.manual, "    ") + "\n\n"
 
-    if option.dataclass is not None:
-        pass
-    elif option.action == "default":
+    if option.flag:
+        text += "    type: flag\n"
+    else:
         text += f"    type: {option.type.__name__}\n"
 
         if option.nargs != 1:
@@ -102,15 +101,13 @@ def print_option_help(option: Options) -> None:
 
         if option.choices is not None:
             text += "    choices: " + ", ".join(option.choices) + "\n"
-    elif option.action == "store_true":
-        text += "    type: flag\n"
-    else:
-        text += "    type: unknown\n"
 
     out(text)
 
 
-def print_program_help(args: List[Union[Options, Required, OptionText]]) -> None:
+def print_program_help(
+    reqs: List[Required], args: List[Union[Options, OptionText]]
+) -> None:
     text = ""
     for arg in args:
         if isinstance(arg, OptionText):
@@ -118,6 +115,8 @@ def print_program_help(args: List[Union[Options, Required, OptionText]]) -> None
         else:
             text += "  " + ", ".join(arg.names) + f": {arg.help}\n"
     text += "\n"
+    for req in reqs:
+        text += "  " + ", ".join(req.names) + f": {req.help}\n"
     out(text)
 
 
@@ -148,7 +147,7 @@ class ArgumentParser:
 
         self.requireds: List[Required] = []
         self.options: List[Options] = []
-        self.args: List[Union[Options, Required, OptionText]] = []
+        self.args: List[Union[Options, OptionText]] = []
 
     def add_argument(self, *args: str, **kwargs) -> None:
         x = Options(args, **kwargs)
@@ -156,9 +155,7 @@ class ArgumentParser:
         self.args.append(x)
 
     def add_required(self, *args: str, **kwargs) -> None:
-        x = Required(args, **kwargs)
-        self.requireds.append(x)
-        self.args.append(x)
+        self.requireds.append(Required(args, **kwargs))
 
     def add_text(self, text: str) -> None:
         self.args.append(OptionText(text, "text"))
@@ -266,10 +263,18 @@ class ParseOptions:
         sys_args: List[str],
         options: List[Options],
         requireds: List[Required],
-        args: List[Union[Options, Required, OptionText]],
+        args: List[Union[Options, OptionText]],
     ) -> None:
 
         option_names: List[str] = []
+
+        builtin_help = Options(
+            ("--help", "-h"),
+            flag=True,
+            help="Show info about this program or an option then exit.",
+        )
+        options.append(builtin_help)
+        args.append(builtin_help)
 
         self.help = False
 
@@ -278,7 +283,7 @@ class ParseOptions:
             for name in op.names:
                 option_names.append(name)
 
-            if op.action == "store_true":
+            if op.flag:
                 value: Any = False
             elif op.nargs != 1:
                 value = []
@@ -362,7 +367,7 @@ class ParseOptions:
                     setting_op_list = True
                     op_list_name = key
                     op_list_type = option.type
-                elif option.action == "store_true":
+                elif option.flag:
                     value = True
                 else:
                     value = self.parse_value(option, next_arg)
@@ -378,5 +383,5 @@ class ParseOptions:
             self.set_arg_list(req_list_name, req_list, req_list_type)
 
         if self.help:
-            print_program_help(args)
+            print_program_help(requireds, args)
             sys.exit()

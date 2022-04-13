@@ -8,36 +8,53 @@ import auto_editor.vanparse as vanparse
 from auto_editor.utils.log import Log
 from auto_editor.ffwrapper import FFmpeg
 
+
 def grep_options(parser):
-    parser.add_argument('--no-filename', action='store_true',
-        help='Never print filenames with output lines.')
-    parser.add_argument('--max-count', '-m', type=int, default=None,
-        help='Stop reading a file after NUM matching lines.')
-    parser.add_argument('--count', '-c', action='store_true',
-        help='Suppress normal output; instead print count of matching lines for each file.')
-    parser.add_argument('--ignore-case', '-i', action='store_true',
-        help='Ignore case distinctions for the PATTERN.')
-    parser.add_argument('--timecode', action='store_true',
-        help="Print the match's timecode.")
-    parser.add_argument('--time', action='store_true',
-        help="Print when the match happens. (Ignore ending).")
-    parser.add_argument('--ffmpeg-location', default=None,
-        help='Point to your custom ffmpeg file.')
-    parser.add_argument('--my-ffmpeg', action='store_true',
-        help='Use the ffmpeg on your PATH instead of the one packaged.')
-    parser.add_argument('--help', '-h', action='store_true',
-        help='Print info about the program or an option and exit.')
-    parser.add_required('input', nargs='*', help='The path to a file you want inspected.')
+    parser.add_argument(
+        "--no-filename", flag=True, help="Never print filenames with output lines."
+    )
+    parser.add_argument(
+        "--max-count",
+        "-m",
+        type=int,
+        help="Stop reading a file after NUM matching lines.",
+    )
+    parser.add_argument(
+        "--count",
+        "-c",
+        flag=True,
+        help="Suppress normal output; instead print count of matching lines for each file.",
+    )
+    parser.add_argument(
+        "--ignore-case",
+        "-i",
+        flag=True,
+        help="Ignore case distinctions for the PATTERN.",
+    )
+    parser.add_argument("--timecode", flag=True, help="Print the match's timecode.")
+    parser.add_argument(
+        "--time", flag=True, help="Print when the match happens. (Ignore ending)."
+    )
+    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
+    parser.add_argument(
+        "--my-ffmpeg",
+        flag=True,
+        help="Use the ffmpeg on your PATH instead of the one packaged.",
+    )
+    parser.add_required(
+        "input", nargs="*", help="The path to a file you want inspected."
+    )
     return parser
+
 
 # stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string
 def cleanhtml(raw_html: str) -> str:
-    cleanr = re.compile('<.*?>')
-    cleantext = re.sub(cleanr, '', raw_html)
+    cleanr = re.compile("<.*?>")
+    cleantext = re.sub(cleanr, "", raw_html)
     return cleantext
 
 
-def grep_core(
+def grep_file(
     media_file: str, add_prefix: bool, ffmpeg: FFmpeg, args, log: Log, TEMP: str
 ) -> None:
 
@@ -47,8 +64,8 @@ def grep_core(
     (hh:mm:ss.sss) instead of (dd:hh:mm:ss,sss)
     """
 
-    out_file = os.path.join(TEMP, 'media.vtt')
-    ffmpeg.run(['-i', media_file, out_file])
+    out_file = os.path.join(TEMP, "media.vtt")
+    ffmpeg.run(["-i", media_file, out_file])
 
     count = 0
 
@@ -56,16 +73,16 @@ def grep_core(
     if args.ignore_case:
         flags = re.IGNORECASE
 
-    prefix = ''
+    prefix = ""
     if add_prefix:
         prefix = f"{os.path.splitext(os.path.basename(media_file))[0]}:"
 
     if args.max_count is None:
-        args.max_count = float('inf')
+        args.max_count = float("inf")
 
-    timecode = ''
+    timecode = ""
     line_number = -1
-    with open(out_file, 'r') as file:
+    with open(out_file, "r") as file:
         while True:
             line = file.readline()
             line_number += 1
@@ -75,14 +92,14 @@ def grep_core(
             if not line or count >= args.max_count:
                 break
 
-            if line.strip() == '':
+            if line.strip() == "":
                 continue
 
-            if re.match(r'\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*', line):
+            if re.match(r"\d*:\d\d.\d*\s-->\s\d*:\d\d.\d*", line):
                 if args.time:
-                    timecode = line.split('-->')[0].strip() + ' '
+                    timecode = line.split("-->")[0].strip() + " "
                 else:
-                    timecode = line.strip() + '; '
+                    timecode = line.strip() + "; "
                 continue
 
             line = cleanhtml(line)
@@ -102,8 +119,10 @@ def grep_core(
 
 
 def main(sys_args=sys.argv[1:]):
-    parser = vanparse.ArgumentParser('grep', auto_editor.version,
-        description='Read and match subtitle tracks in media files.',
+    parser = vanparse.ArgumentParser(
+        "grep",
+        auto_editor.version,
+        description="Read and match subtitle tracks in media files.",
     )
     parser = grep_options(parser)
     args = parser.parse_args(sys_args)
@@ -113,25 +132,29 @@ def main(sys_args=sys.argv[1:]):
     log = Log(temp=TEMP)
 
     media_files = args.input[1:]
-    add_prefix = (len(media_files) > 1 or os.path.isdir(media_files[0])) and not args.no_filename
+    add_prefix = (
+        len(media_files) > 1 or os.path.isdir(media_files[0])
+    ) and not args.no_filename
 
-    for media_file in media_files:
-        if not os.path.exists(media_file):
-            log.error(f'{media_file}: File does not exist.')
-
-        if os.path.isdir(media_file):
-            for _, _, files in os.walk(media_file):
-                for file in files:
-                    if file == '.DS_Store':
-                        continue
-
-                    grep_core(os.path.join(media_file, file), add_prefix, ffmpeg, args,
-                        log, TEMP)
+    for path in media_files:
+        if os.path.isdir(path):
+            for filename in [f for f in os.listdir(path) if not f.startswith(".")]:
+                grep_file(
+                    os.path.join(path, filename),
+                    add_prefix,
+                    ffmpeg,
+                    args,
+                    log,
+                    TEMP,
+                )
+        elif os.path.isfile(path):
+            grep_file(path, add_prefix, ffmpeg, args, log, TEMP)
         else:
-            grep_core(media_file, add_prefix, ffmpeg, args, log, TEMP)
+            log.error(f"{path}: File does not exist.")
+
 
     log.cleanup()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
