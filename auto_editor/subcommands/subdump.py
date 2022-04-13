@@ -2,19 +2,11 @@ import sys
 
 
 def subdump_options(parser):
-    parser.add_argument(
-        "--ffmpeg-location", default=None, help="Point to your custom ffmpeg file."
-    )
+    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
     parser.add_argument(
         "--my-ffmpeg",
-        action="store_true",
+        flag=True,
         help="Use the ffmpeg on your PATH instead of the one packaged.",
-    )
-    parser.add_argument(
-        "--help",
-        "-h",
-        action="store_true",
-        help="Print info about the program or an option and exit.",
     )
     parser.add_required(
         "input", nargs="*", help="Path to the file to have its subtitles dumped."

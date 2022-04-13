@@ -7,6 +7,7 @@ def levels_options(parser):
         type=str,
         default="audio",
         choices=["audio", "motion", "pixeldiff"],
+        help="Select the kind of detection to analyze.",
     )
     parser.add_argument(
         "--track",
@@ -15,19 +16,11 @@ def levels_options(parser):
         help="Select the track to get. If `--kind` is set to motion, track will look "
         "at video tracks instead of audio.",
     )
-    parser.add_argument(
-        "--ffmpeg-location", default=None, help="Point to your custom ffmpeg file."
-    )
+    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
     parser.add_argument(
         "--my-ffmpeg",
-        action="store_true",
+        flag=True,
         help="Use the ffmpeg on your PATH instead of the one packaged.",
-    )
-    parser.add_argument(
-        "--help",
-        "-h",
-        action="store_true",
-        help="Print info about the program or an option and exit.",
     )
     parser.add_required(
         "input", nargs="*", help="Path to the file to have its levels dumped."
@@ -35,15 +28,14 @@ def levels_options(parser):
     return parser
 
 
-
 def print_float_list(a):
     for item in a:
-        sys.stdout.write(f'{item:.20f}\n')
+        sys.stdout.write(f"{item:.20f}\n")
 
 
 def print_int_list(a):
     for item in a:
-        sys.stdout.write(f'{item}\n')
+        sys.stdout.write(f"{item}\n")
 
 
 def main(sys_args=sys.argv[1:]):

@@ -18,7 +18,7 @@ import auto_editor.vanparse as vanparse
 
 def test_options(parser):
     parser.add_argument('--only', '-n', nargs='*')
-    parser.add_argument('--help', '-h', action='store_true',
+    parser.add_argument('--help', '-h', flag=True,
         help='Print info about the program or an option and exit.')
     parser.add_required('category', nargs=1,
         choices=['cli', 'sub', 'api', 'unit', 'all'],
