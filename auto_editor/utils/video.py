@@ -2,50 +2,52 @@
 import os.path
 
 # Typing
-from typing import List
+from typing import List, Optional
 
 # Included Libraries
 from .func import fnone
+from .container import Container
+from auto_editor.ffwrapper import FileInfo
 
 
-def fset(cmd: List[str], option: str, value) -> List[str]:
+def fset(cmd: List[str], option: str, value: str) -> List[str]:
     if fnone(value):
         return cmd
     return cmd + [option] + [value]
 
 
-def get_vcodec(args, inp, rules):
+def get_vcodec(args, inp: FileInfo, rules: Container) -> Optional[str]:
     vcodec = args.video_codec
     if vcodec == 'auto':
-        vcodec = inp.video_streams[0]['codec']
+        vcodec = inp.video_streams[0].codec
 
-        if (rules['vstrict'] and vcodec not in rules['vcodecs']) or (
-            vcodec in rules['disallow_v']):
-            return rules['vcodecs'][0]
+        if (rules.vstrict and vcodec not in rules.vcodecs) or (
+            vcodec in rules.disallow_v):
+            return rules.vcodecs[0]
 
     if vcodec == 'copy':
-        return inp.video_streams[0]['codec']
+        return inp.video_streams[0].codec
 
     if vcodec == 'uncompressed':
         return 'mpeg4'
     return vcodec
 
 
-def get_acodec(args, inp, rules):
+def get_acodec(args, inp: FileInfo, rules: Container) -> Optional[str]:
     acodec = args.audio_codec
     if acodec == 'auto':
-        acodec = inp.audio_streams[0]['codec']
+        acodec = inp.audio_streams[0].codec
 
-        if (rules['astrict'] and acodec not in rules['acodecs']) or (
-            acodec in rules['disallow_a']):
-            return rules['acodecs'][0]
+        if (rules.astrict and acodec not in rules.acodecs) or (
+            acodec in rules.disallow_a):
+            return rules.acodecs[0]
 
     if acodec == 'copy':
-        return inp.audio_streams[0]['codec']
+        return inp.audio_streams[0].codec
     return acodec
 
 
-def video_quality(cmd, args, inp, rules):
+def video_quality(cmd: List[str], args, inp: FileInfo, rules: Container) -> List[str]:
     cmd = fset(cmd, '-b:v', args.video_bitrate)
 
     qscale = args.video_quality_scale
@@ -63,9 +65,11 @@ def video_quality(cmd, args, inp, rules):
     return cmd
 
 
-def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, inp, temp, log):
-    s_tracks = 0 if not rules['allow_subtitle'] else len(inp.subtitle_streams)
-    a_tracks = 0 if not rules['allow_audio'] else len(inp.audio_streams)
+def mux_quality_media(
+    ffmpeg, video_stuff, rules: Container, write_file, container, args, inp, temp, log
+) -> None:
+    s_tracks = 0 if not rules.allow_subtitle else len(inp.subtitle_streams)
+    a_tracks = 0 if not rules.allow_audio else len(inp.audio_streams)
     v_tracks = 0
     cmd = ['-hide_banner', '-y', '-i', inp.path]
 
@@ -75,7 +79,7 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
             v_tracks += 1
 
     if a_tracks > 0:
-        if args.keep_tracks_seperate and rules['max_audio_streams'] is None:
+        if args.keep_tracks_seperate and rules.max_audio_streams is None:
             for t in range(a_tracks):
                 cmd.extend(['-i', os.path.join(temp, f'new{t}.wav')])
         else:
@@ -96,8 +100,7 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
 
     if s_tracks > 0:
         for s, sub in enumerate(inp.subtitle_streams):
-            new_path = os.path.join(temp, 'new{}s.{}'.format(s, sub['ext']))
-            cmd.extend(['-i', new_path])
+            cmd.extend(['-i', os.path.join(temp, f"new{s}s.{sub.ext}")])
 
     total_streams = v_tracks + s_tracks + a_tracks
 
@@ -117,8 +120,8 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
         for i, track in enumerate(stream):
             if i > max_streams:
                 break
-            if track['lang'] is not None:
-                cmd.extend([f'-metadata:s:{marker}:{i}', f'language={track["lang"]}'])
+            if track.lang is not None:
+                cmd.extend([f'-metadata:s:{marker}:{i}', f'language={track.lang}'])
 
     for video_type, _, apply_video in video_stuff:
         if video_type == 'video':
@@ -129,12 +132,12 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
             break
 
     if s_tracks > 0:
-        scodec = inp.subtitle_streams[0]['codec']
+        scodec = inp.subtitle_streams[0].codec
         if inp.ext == '.' + container:
             cmd.extend(['-c:s', scodec])
-        elif rules['scodecs'] is not None:
-            if scodec not in rules['scodecs']:
-                scodec = rules['scodecs'][0]
+        elif rules.scodecs is not None:
+            if scodec not in rules.scodecs:
+                scodec = rules.scodecs[0]
             cmd.extend(['-c:s', scodec])
 
     if a_tracks > 0:
@@ -144,8 +147,8 @@ def mux_quality_media(ffmpeg, video_stuff, rules, write_file, container, args, i
         cmd = fset(cmd, '-b:a', args.audio_bitrate)
 
         if fnone(args.sample_rate):
-            if rules['samplerate'] is not None:
-                cmd.extend(['-ar', str(rules['samplerate'][0])])
+            if rules.samplerate is not None:
+                cmd.extend(['-ar', str(rules.samplerate[0])])
         else:
             cmd.extend(['-ar', str(args.sample_rate)])
 

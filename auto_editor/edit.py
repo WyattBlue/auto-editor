@@ -68,42 +68,38 @@ def edit_media(
     codec_error = "'{}' codec is not supported in '{}' container."
 
     if not fnone(args.sample_rate):
-        if (
-            rules["samplerate"] is not None
-            and args.sample_rate not in rules["samplerate"]
-        ):
+        if rules.samplerate is not None and args.sample_rate not in rules.samplerate:
             log.error(
-                f"'{output_container}' container only supports "
-                f"samplerates: {rules['samplerate']}"
+                f"'{output_container}' container only supports samplerates: {rules.samplerate}"
             )
 
     vcodec = args.video_codec
     if vcodec == "uncompressed":
         vcodec = "mpeg4"
     if vcodec == "copy":
-        vcodec = inp.video_streams[0]["codec"]
+        vcodec = inp.video_streams[0].codec
 
     if vcodec != "auto":
-        if rules["vstrict"] and vcodec not in rules["vcodecs"]:
+        if rules.vstrict and vcodec not in rules.vcodecs:
             log.error(codec_error.format(vcodec, output_container))
 
-        if vcodec in rules["disallow_v"]:
+        if vcodec in rules.disallow_v:
             log.error(codec_error.format(vcodec, output_container))
 
     acodec = args.audio_codec
     if acodec == "copy":
-        acodec = inp.audio_streams[0]["codec"]
+        acodec = inp.audio_streams[0].codec
         log.debug(f"Settings acodec to {acodec}")
 
     if acodec not in ("unset", "auto"):
-        if rules["astrict"] and acodec not in rules["acodecs"]:
+        if rules.astrict and acodec not in rules.acodecs:
             log.error(codec_error.format(acodec, output_container))
 
-        if acodec in rules["disallow_a"]:
+        if acodec in rules.disallow_a:
             log.error(codec_error.format(acodec, output_container))
 
-    if args.keep_tracks_seperate and rules["max_audio_streams"] == 1:
-        log.warning(f"'{container}' container doesn't support multiple audio tracks.")
+    if args.keep_tracks_seperate and rules.max_audio_streams == 1:
+        log.warning(f"'{output_container}' container doesn't support multiple audio tracks.")
 
     if not args.preview and not args.timeline:
         if os.path.isdir(output_path):
@@ -126,7 +122,7 @@ def edit_media(
         for s, sub in enumerate(inp.subtitle_streams):
             cmd.extend(["-map", f"0:s:{s}"])
         for s, sub in enumerate(inp.subtitle_streams):
-            cmd.extend([os.path.join(temp, f"{s}s.{sub['ext']}")])
+            cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
         ffmpeg.run(cmd)
 
     # Split audio tracks into: 0.wav, 1.wav, etc.
@@ -224,12 +220,12 @@ def edit_media(
     ) -> None:
         from auto_editor.utils.video import mux_quality_media
 
-        if rules["allow_subtitle"]:
+        if rules.allow_subtitle:
             from auto_editor.render.subtitle import cut_subtitles
 
             cut_subtitles(ffmpeg, inp, chunks, fps, temp, log)
 
-        if rules["allow_audio"]:
+        if rules.allow_audio:
             from auto_editor.render.audio import make_new_audio
 
             for t in range(tracks):
@@ -242,11 +238,11 @@ def edit_media(
 
         video_stuff = []
 
-        if rules["allow_video"]:
+        if rules.allow_video:
             from auto_editor.render.video import render_av
 
             for v, vid in enumerate(inp.video_streams):
-                if vid["codec"] in ("png", "jpeg"):
+                if vid.codec in ("png", "jpeg"):
                     video_stuff.append(("image", None, None))
                 else:
                     video_stuff.append(

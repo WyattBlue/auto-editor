@@ -1,14 +1,24 @@
 from dataclasses import asdict, fields
 
+from typing import List, Tuple, Dict
+
+from auto_editor.utils.log import Log
+from auto_editor.ffwrapper import FileInfo, VideoStream
 
 class Sheet:
     __slots__ = ("all", "sheet")
 
-    def __init__(self, pool, inp, chunks, log):
+    def __init__(
+        self, pool, inp: FileInfo, chunks: List[Tuple[int, int, float]], log: Log
+    ) -> None:
 
         if len(inp.video_streams) > 0:
-            width = int(inp.video_streams[0]["width"])
-            height = int(inp.video_streams[0]["height"])
+            w = inp.video_streams[0].width
+            h = inp.video_streams[0].height
+            if w is None or h is None:
+                width, height = 1280, 720
+            else:
+                width, height = int(w), int(h)
         else:
             width, height = 1280, 720
 
@@ -32,7 +42,7 @@ class Sheet:
         self.all = []
         self.sheet = {}
 
-        def _values(val, _type, _vars):
+        def _values(val, _type, _vars: Dict[str, int]):
             if val is None:
                 return None
 

@@ -28,12 +28,8 @@ DEPTH = "16"
 
 
 def get_samplerate(inp: FileInfo, default: str = "48000") -> str:
-    if len(inp.audio_streams) > 0:
-        if (
-            "samplerate" in inp.audio_streams[0]
-            and inp.audio_streams[0]["samplerate"] is not None
-        ):
-            return inp.audio_streams[0]["samplerate"]
+    if len(inp.audio_streams) > 0 and inp.audio_streams[0].samplerate is not None:
+        return inp.audio_streams[0].samplerate
     return default
 
 

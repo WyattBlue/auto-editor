@@ -43,18 +43,12 @@ def main(sys_args=sys.argv[1:]):
 
         cmd = ["-i", input_file]
         for s, sub in enumerate(inp.subtitle_streams):
-            cmd.extend(
-                [
-                    "-map",
-                    f"0:s:{s}",
-                    os.path.join(temp, f"{i}s{s}.{sub['ext']}"),
-                ]
-            )
+            cmd.extend(["-map", f"0:s:{s}", os.path.join(temp, f"{i}s{s}.{sub.ext}")])
         ffmpeg.run(cmd)
 
         for s, sub in enumerate(inp.subtitle_streams):
-            print(f"file: {input_file} ({s}:{sub['lang']}:{sub['ext']})")
-            with open(os.path.join(temp, f"{i}s{s}.{sub['ext']}")) as file:
+            print(f"file: {input_file} ({s}:{sub.lang}:{sub.ext})")
+            with open(os.path.join(temp, f"{i}s{s}.{sub.ext}")) as file:
                 print(file.read())
             print("------")
 

@@ -197,11 +197,7 @@ def main(sys_args: Optional[List[str]] = None):
     if sys_args is None:
         sys_args = sys.argv[1:]
 
-    try:
-        args = parser.parse_args(sys_args)
-    except vanparse.ParserError as e:
-        print(e)
-        sys.exit(1)
+    args = parser.parse_args(sys_args)
 
     ### Tests ###
 
