@@ -1,13 +1,14 @@
 from dataclasses import asdict, fields
 
+
 class Sheet:
-    __slots__ = ('all', 'sheet')
+    __slots__ = ("all", "sheet")
 
     def __init__(self, pool, inp, chunks, log):
 
         if len(inp.video_streams) > 0:
-            width = int(inp.video_streams[0]['width'])
-            height = int(inp.video_streams[0]['height'])
+            width = int(inp.video_streams[0]["width"])
+            height = int(inp.video_streams[0]["height"])
         else:
             width, height = 1280, 720
 
@@ -20,12 +21,12 @@ class Sheet:
             end = ending[-1][1]
 
         _vars = {
-            'width': width,
-            'height': height,
-            'centerX': width // 2,
-            'centerY': height // 2,
-            'start': 0,
-            'end': end,
+            "width": width,
+            "height": height,
+            "centerX": width // 2,
+            "centerY": height // 2,
+            "start": 0,
+            "end": end,
         }
 
         self.all = []
@@ -36,7 +37,7 @@ class Sheet:
                 return None
 
             if _type is str:
-                return str(val) # Skip replacing variables with vals.
+                return str(val)  # Skip replacing variables with vals.
 
             for key, item in _vars.items():
                 if val == key:

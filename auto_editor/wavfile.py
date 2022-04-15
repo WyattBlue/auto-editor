@@ -18,18 +18,18 @@ def _read_fmt_chunk(
     else:
         fmt = "<"
 
-    size: int = struct.unpack(fmt + "I", fid.read(4))[0]
+    size: int = struct.unpack(f"{fmt}I", fid.read(4))[0]
 
     if size < 16:
         raise ValueError("Binary structure of wave file is not compliant")
 
-    res = struct.unpack(fmt + "HHIIHH", fid.read(16))
+    res = struct.unpack(f"{fmt}HHIIHH", fid.read(16))
     bytes_read = 16
 
     format_tag, channels, fs, bytes_per_second, block_align, bit_depth = res
 
     if format_tag == EXTENSIBLE and size >= 18:
-        ext_chunk_size = struct.unpack(fmt + "H", fid.read(2))[0]
+        ext_chunk_size = struct.unpack(f"{fmt}H", fid.read(2))[0]
         bytes_read += 2
         if ext_chunk_size >= 22:
             extensible_chunk_data = fid.read(22)
@@ -41,7 +41,7 @@ def _read_fmt_chunk(
             else:
                 tail = b"\x00\x00\x10\x00\x80\x00\x00\xAA\x00\x38\x9B\x71"
             if raw_guid.endswith(tail):
-                format_tag = struct.unpack(fmt + "I", raw_guid[:4])[0]
+                format_tag = struct.unpack(f"{fmt}I", raw_guid[:4])[0]
         else:
             raise ValueError("Binary structure of wave file is not compliant")
 
@@ -69,12 +69,9 @@ def _read_data_chunk(
     block_align: int,
     data_size: Optional[int],
 ) -> numpy.memmap:
-    if is_big_endian:
-        fmt = ">"
-    else:
-        fmt = "<"
 
-    size: int = struct.unpack(fmt + "I", fid.read(4))[0]
+    fmt = ">" if is_big_endian else "<"
+    size: int = struct.unpack(f"{fmt}I", fid.read(4))[0]
     if data_size is not None:
         # size is only 32-bits here, so get real size from header.
         size = data_size

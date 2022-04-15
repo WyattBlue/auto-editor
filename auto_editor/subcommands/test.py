@@ -16,32 +16,40 @@ from typing import List, Tuple, Callable, NoReturn, Optional
 # Included Libraries
 import auto_editor.vanparse as vanparse
 
+
 def test_options(parser):
-    parser.add_argument('--only', '-n', nargs='*')
-    parser.add_argument('--help', '-h', flag=True,
-        help='Print info about the program or an option and exit.')
-    parser.add_required('category', nargs=1,
-        choices=['cli', 'sub', 'api', 'unit', 'all'],
-        help='Set what category of tests to run.')
+    parser.add_argument("--only", "-n", nargs="*")
+    parser.add_argument(
+        "--help",
+        "-h",
+        flag=True,
+        help="Print info about the program or an option and exit.",
+    )
+    parser.add_required(
+        "category",
+        nargs=1,
+        choices=["cli", "sub", "api", "unit", "all"],
+        help="Set what category of tests to run.",
+    )
     return parser
 
 
 def av_inspect(path: str, *args):
-    container = av.open(path, 'r')
+    container = av.open(path, "r")
 
     media = {}
     if len(container.streams.video) > 0:
         video = container.streams.video[0]
-        media['fps'] = video.average_rate
-        media['resolution'] = video.width, video.height
-        media['vcodec'] = video.codec.name
-        media['vlanguage'] = video.language
+        media["fps"] = video.average_rate
+        media["resolution"] = video.width, video.height
+        media["vcodec"] = video.codec.name
+        media["vlanguage"] = video.language
 
     if len(container.streams.audio) > 0:
         audio = container.streams.audio[0]
-        media['samplerate'] = audio.rate
-        media['acodec'] = audio.codec.name
-        media['alanguage'] = audio.language
+        media["samplerate"] = audio.rate
+        media["acodec"] = audio.codec.name
+        media["alanguage"] = audio.language
 
     for key, expected in args:
         if media[key] != expected:
@@ -53,52 +61,56 @@ def av_inspect(path: str, *args):
 def pipe_to_console(cmd: List[str]) -> Tuple[int, str, str]:
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
-    return process.returncode, stdout.decode('utf-8'), stderr.decode('utf-8')
+    return process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
 
 
 def cleanup(the_dir: str) -> None:
     for item in os.listdir(the_dir):
         item = os.path.join(the_dir, item)
-        if ('_ALTERED' in item or item.endswith('.xml') or item.endswith('.fcpxml')
-            or item.endswith('.mlt')):
+        if (
+            "_ALTERED" in item
+            or item.endswith(".xml")
+            or item.endswith(".fcpxml")
+            or item.endswith(".mlt")
+        ):
             os.remove(item)
-        if item.endswith('_tracks'):
+        if item.endswith("_tracks"):
             shutil.rmtree(item)
 
 
 def clean_all() -> None:
-    cleanup('resources')
+    cleanup("resources")
     cleanup(os.getcwd())
 
 
 def get_runner() -> List[str]:
-    if platform.system() == 'Windows':
-        return ['py', '-m', 'auto_editor']
-    return ['python3', '-m', 'auto_editor']
+    if platform.system() == "Windows":
+        return ["py", "-m", "auto_editor"]
+    return ["python3", "-m", "auto_editor"]
 
 
 def run_program(cmd: List[str]) -> None:
-    no_open = '.' in cmd[0]
+    no_open = "." in cmd[0]
     cmd = get_runner() + cmd
 
     if no_open:
-        cmd += ['--no_open']
+        cmd += ["--no_open"]
 
     returncode, stdout, stderr = pipe_to_console(cmd)
     if returncode > 0:
-        raise Exception(f'{stdout}\n{stderr}\n')
+        raise Exception(f"{stdout}\n{stderr}\n")
 
 
 def check_for_error(cmd: List[str], match=None) -> None:
     returncode, stdout, stderr = pipe_to_console(get_runner() + cmd)
     if returncode > 0:
-        if 'Error!' in stderr:
+        if "Error!" in stderr:
             if match is not None and match not in stderr:
                 raise Exception(f'Could\'t find "{match}"')
         else:
-            raise Exception(f'Program crashed.\n{stdout}\n{stderr}')
+            raise Exception(f"Program crashed.\n{stdout}\n{stderr}")
     else:
-        raise Exception('Program should not respond with a code 0.')
+        raise Exception("Program should not respond with a code 0.")
 
 
 def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
@@ -119,26 +131,29 @@ def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
 
     loaded = np.load(compare_file)
 
-    if not np.array_equal(spedup_audio, loaded['a']):
-        if spedup_audio.shape == loaded['a'].shape:
-            print(f'Both shapes ({spedup_audio.shape}) are same')
+    if not np.array_equal(spedup_audio, loaded["a"]):
+        if spedup_audio.shape == loaded["a"].shape:
+            print(f"Both shapes ({spedup_audio.shape}) are same")
         else:
             print(spedup_audio.shape)
-            print(loaded['a'].shape)
+            print(loaded["a"].shape)
 
-        result = np.subtract(spedup_audio, loaded['a'])
+        result = np.subtract(spedup_audio, loaded["a"])
 
-        print(f'result non-zero: {np.count_nonzero(result)}')
-        print(f'len of spedup_audio: {len(spedup_audio)}')
+        print(f"result non-zero: {np.count_nonzero(result)}")
+        print(f"len of spedup_audio: {len(spedup_audio)}")
 
-        print(np.count_nonzero(result) / spedup_audio.shape[0], 'difference between arrays')
+        print(
+            np.count_nonzero(result) / spedup_audio.shape[0],
+            "difference between arrays",
+        )
 
         raise Exception(f"file {compare_file} doesn't match array.")
 
     # np.savez_compressed(out_file, a=spedup_audio)
 
 
-class Tester():
+class Tester:
     def __init__(self, args):
         self.passed_tests = 0
         self.failed_tests = 0
@@ -153,7 +168,7 @@ class Tester():
             func()
             end = perf_counter() - start
         except KeyboardInterrupt:
-            print(f'Testing Interrupted by User.')
+            print(f"Testing Interrupted by User.")
             clean_all()
             sys.exit(1)
         except Exception as e:
@@ -175,8 +190,8 @@ class Tester():
         sys.exit(0)
 
 
-def main(sys_args: Optional[List[str]]=None):
-    parser = vanparse.ArgumentParser('test', 'version')
+def main(sys_args: Optional[List[str]] = None):
+    parser = vanparse.ArgumentParser("test", "version")
     parser = test_options(parser)
 
     if sys_args is None:
@@ -188,42 +203,41 @@ def main(sys_args: Optional[List[str]]=None):
         print(e)
         sys.exit(1)
 
-
     ### Tests ###
 
     ## API Tests ##
 
     def read_api_0_1():
-        check_for_error(['resources/0.1-non-zero-start.json'], 'Error! First chunk must start with 0')
-        check_for_error(['resources/0.1-disjoint.json'], 'Error! Chunk disjointed at')
-
+        check_for_error(
+            ["resources/0.1-non-zero-start.json"],
+            "Error! First chunk must start with 0",
+        )
+        check_for_error(["resources/0.1-disjoint.json"], "Error! Chunk disjointed at")
 
     def help_tests():
         """check the help option, its short, and help on options and groups."""
-        run_program(['--help'])
-        run_program(['-h'])
-        run_program(['--frame_margin', '--help'])
-        run_program(['--frame_margin', '-h'])
-        run_program(['--help', '--help'])
-        run_program(['-h', '--help'])
-        run_program(['--help', '-h'])
-        run_program(['-h', '--help'])
-
+        run_program(["--help"])
+        run_program(["-h"])
+        run_program(["--frame_margin", "--help"])
+        run_program(["--frame_margin", "-h"])
+        run_program(["--help", "--help"])
+        run_program(["-h", "--help"])
+        run_program(["--help", "-h"])
+        run_program(["-h", "--help"])
 
     def version_test():
         """Test version flags and debug by itself."""
-        run_program(['--version'])
-        run_program(['-v'])
-        run_program(['-V'])
-        run_program(['--debug'])
-
+        run_program(["--version"])
+        run_program(["-v"])
+        run_program(["-V"])
+        run_program(["--debug"])
 
     def parser_test():
-        check_for_error(['example.mp4', '--video-speed'], 'needs argument')
-
+        check_for_error(["example.mp4", "--video-speed"], "needs argument")
 
     def subtitle_tests():
         from auto_editor.render.subtitle import SubtitleParser
+
         test = SubtitleParser()
         test.contents = [
             [0, 10, "A"],
@@ -244,74 +258,75 @@ def main(sys_args: Optional[List[str]]=None):
         test.edit(chunks)
 
         if test.contents != [[0, 10, "A"], [10, 20, "C"], [20, 30, "E"]]:
-            raise ValueError('Incorrect subtitle results.')
-
+            raise ValueError("Incorrect subtitle results.")
 
     def tsm_1a5_test():
-        make_np_list('resources/example_cut_s16le.wav',
-            'resources/example_1.5_speed.npz', 1.5)
-
-
-    def tsm_0a5_test():
-        make_np_list('resources/example_cut_s16le.wav',
-            'resources/example_0.5_speed.npz', 0.5)
-
-
-    def tsm_2a0_test():
-        make_np_list('resources/example_cut_s16le.wav',
-            'resources/example_2.0_speed.npz', 2)
-
-
-    def info():
-        run_program(['info', 'example.mp4'])
-        run_program(['info', 'resources/man_on_green_screen.mp4'])
-        run_program(['info', 'resources/multi-track.mov'])
-        run_program(['info', 'resources/newCommentary.mp3'])
-        run_program(['info', 'resources/test.mkv'])
-
-
-    def levels():
-        run_program(['levels', 'resources/multi-track.mov'])
-        run_program(['levels', 'resources/newCommentary.mp3'])
-
-
-    def subdump():
-        run_program(['subdump', 'resources/subtitle.mp4'])
-
-
-    def grep():
-        run_program(['grep', 'boop', 'resources/subtitle.mp4'])
-
-
-    def desc():
-        run_program(['desc', 'example.mp4'])
-
-
-    def example_tests():
-        run_program(['example.mp4', '--video_codec', 'uncompressed'])
-        av_inspect('example_ALTERED.mp4',
-            ('fps', 30),
-            ('resolution', (1280, 720), ),
-            ('vcodec', 'mpeg4'),
-            ('acodec', 'aac'),
-            ('samplerate', 48000),
+        make_np_list(
+            "resources/example_cut_s16le.wav", "resources/example_1.5_speed.npz", 1.5
         )
 
-        run_program(['example.mp4'])
-        av_inspect('example_ALTERED.mp4',
-            ('fps', 30),
-            ('resolution', (1280, 720), ),
-            ('vcodec', 'h264'),
-            ('acodec', 'aac'),
-            ('samplerate', 48000),
-            ('vlanguage', 'eng'),
-            ('alanguage', 'eng'),
+    def tsm_0a5_test():
+        make_np_list(
+            "resources/example_cut_s16le.wav", "resources/example_0.5_speed.npz", 0.5
+        )
+
+    def tsm_2a0_test():
+        make_np_list(
+            "resources/example_cut_s16le.wav", "resources/example_2.0_speed.npz", 2
+        )
+
+    def info():
+        run_program(["info", "example.mp4"])
+        run_program(["info", "resources/man_on_green_screen.mp4"])
+        run_program(["info", "resources/multi-track.mov"])
+        run_program(["info", "resources/newCommentary.mp3"])
+        run_program(["info", "resources/test.mkv"])
+
+    def levels():
+        run_program(["levels", "resources/multi-track.mov"])
+        run_program(["levels", "resources/newCommentary.mp3"])
+
+    def subdump():
+        run_program(["subdump", "resources/subtitle.mp4"])
+
+    def grep():
+        run_program(["grep", "boop", "resources/subtitle.mp4"])
+
+    def desc():
+        run_program(["desc", "example.mp4"])
+
+    def example_tests():
+        run_program(["example.mp4", "--video_codec", "uncompressed"])
+        av_inspect(
+            "example_ALTERED.mp4",
+            ("fps", 30),
+            (
+                "resolution",
+                (1280, 720),
+            ),
+            ("vcodec", "mpeg4"),
+            ("acodec", "aac"),
+            ("samplerate", 48000),
+        )
+
+        run_program(["example.mp4"])
+        av_inspect(
+            "example_ALTERED.mp4",
+            ("fps", 30),
+            (
+                "resolution",
+                (1280, 720),
+            ),
+            ("vcodec", "h264"),
+            ("acodec", "aac"),
+            ("samplerate", 48000),
+            ("vlanguage", "eng"),
+            ("alanguage", "eng"),
         )
 
     # Issue #200
     def url_test():
-        run_program(['https://github.com/WyattBlue/auto-editor/raw/master/example.mp4'])
-
+        run_program(["https://github.com/WyattBlue/auto-editor/raw/master/example.mp4"])
 
     # Issue #184
     def unit_tests():
@@ -324,222 +339,272 @@ def main(sys_args: Optional[List[str]]=None):
          - Percent:       %
         """
 
-        run_program(['example.mp4', '--mark_as_loud', '20s,22sec', '25secs,26.5seconds'])
-        run_program(['example.mp4', '--sample_rate', '44100'])
-        run_program(['example.mp4', '--sample_rate', '44100 Hz'])
-        run_program(['example.mp4', '--sample_rate', '44.1 kHz'])
-        run_program(['example.mp4', '--silent_threshold', '4%'])
-
+        run_program(
+            ["example.mp4", "--mark_as_loud", "20s,22sec", "25secs,26.5seconds"]
+        )
+        run_program(["example.mp4", "--sample_rate", "44100"])
+        run_program(["example.mp4", "--sample_rate", "44100 Hz"])
+        run_program(["example.mp4", "--sample_rate", "44.1 kHz"])
+        run_program(["example.mp4", "--silent_threshold", "4%"])
 
     def backwards_range_test():
         """
         Cut out the last 5 seconds of a media file by using negative number in the
         range.
         """
-        run_program(['example.mp4', '--edit', 'none', '--cut_out', '-5secs,end'])
-        run_program(['example.mp4', '--edit', 'all', '--add_in', '-5secs,end'])
-
+        run_program(["example.mp4", "--edit", "none", "--cut_out", "-5secs,end"])
+        run_program(["example.mp4", "--edit", "all", "--add_in", "-5secs,end"])
 
     def cut_out_test():
-        run_program(['example.mp4', '--edit', 'none', '--video_speed', '2', '--silent_speed',
-            '3', '--cut_out', '2secs,10secs'])
-        run_program(['example.mp4', '--edit', 'all', '--video_speed', '2', '--add_in',
-            '2secs,10secs'])
-
+        run_program(
+            [
+                "example.mp4",
+                "--edit",
+                "none",
+                "--video_speed",
+                "2",
+                "--silent_speed",
+                "3",
+                "--cut_out",
+                "2secs,10secs",
+            ]
+        )
+        run_program(
+            [
+                "example.mp4",
+                "--edit",
+                "all",
+                "--video_speed",
+                "2",
+                "--add_in",
+                "2secs,10secs",
+            ]
+        )
 
     def gif_test():
         """
         Feed auto-editor a gif file and make sure it can spit out a correctly formated
         gif. No editing is requested.
         """
-        run_program(['resources/man_on_green_screen.gif', '--edit', 'none'])
-        av_inspect('resources/man_on_green_screen_ALTERED.gif',
-            ('vcodec', 'gif'),
+        run_program(["resources/man_on_green_screen.gif", "--edit", "none"])
+        av_inspect(
+            "resources/man_on_green_screen_ALTERED.gif",
+            ("vcodec", "gif"),
         )
 
-
     def margin_tests():
-        run_program(['example.mp4', '-m', '3'])
-        run_program(['example.mp4', '--margin', '3'])
-        run_program(['example.mp4', '-m', '0.3sec'])
-        run_program(['example.mp4', '-m', '6f,-3secs'])
-        run_program(['example.mp4', '-m', '3,5 frames'])
-        run_program(['example.mp4', '-m', '0.4 seconds'])
-
+        run_program(["example.mp4", "-m", "3"])
+        run_program(["example.mp4", "--margin", "3"])
+        run_program(["example.mp4", "-m", "0.3sec"])
+        run_program(["example.mp4", "-m", "6f,-3secs"])
+        run_program(["example.mp4", "-m", "3,5 frames"])
+        run_program(["example.mp4", "-m", "0.4 seconds"])
 
     def input_extension():
         """Input file must have an extension. Throw error if none is given."""
 
-        shutil.copy('example.mp4', 'example')
-        check_for_error(['example', '--no_open'], 'must have an extension.')
-        os.remove('example')
-
+        shutil.copy("example.mp4", "example")
+        check_for_error(["example", "--no_open"], "must have an extension.")
+        os.remove("example")
 
     def output_extension():
         # Add input extension to output name if no output extension is given.
-        run_program(['example.mp4', '-o', 'out'])
-        av_inspect('out.mp4',
-            ('vcodec', 'h264'),
+        run_program(["example.mp4", "-o", "out"])
+        av_inspect(
+            "out.mp4",
+            ("vcodec", "h264"),
         )
-        os.remove('out.mp4')
+        os.remove("out.mp4")
 
-        run_program(['resources/test.mkv', '-o', 'out'])
-        av_inspect('out.mkv',
-            ('vcodec', 'h264'),
+        run_program(["resources/test.mkv", "-o", "out"])
+        av_inspect(
+            "out.mkv",
+            ("vcodec", "h264"),
         )
-        os.remove('out.mkv')
-
+        os.remove("out.mkv")
 
     def progress_ops_test():
-        run_program(['example.mp4', '--progress', 'machine'])
-        run_program(['example.mp4', '--progress', 'none'])
-        run_program(['example.mp4', '--progress', 'ascii'])
-
+        run_program(["example.mp4", "--progress", "machine"])
+        run_program(["example.mp4", "--progress", "none"])
+        run_program(["example.mp4", "--progress", "ascii"])
 
     def silent_threshold():
-        run_program(['resources/newCommentary.mp3', '--silent_threshold', '0.1'])
-
+        run_program(["resources/newCommentary.mp3", "--silent_threshold", "0.1"])
 
     def track_tests():
-        run_program(['resources/multi-track.mov', '--keep_tracks_seperate'])
-
+        run_program(["resources/multi-track.mov", "--keep_tracks_seperate"])
 
     def json_tests():
-        run_program(['example.mp4', '--export_as_json'])
-        run_program(['example.json'])
-
+        run_program(["example.mp4", "--export_as_json"])
+        run_program(["example.json"])
 
     def scale_tests():
-        run_program(['example.mp4', '--scale', '1.5'])
-        av_inspect('example_ALTERED.mp4',
-            ('fps', 30),
-            ('resolution', (1920, 1080), ),
-            ('samplerate', 48000),
+        run_program(["example.mp4", "--scale", "1.5"])
+        av_inspect(
+            "example_ALTERED.mp4",
+            ("fps", 30),
+            (
+                "resolution",
+                (1920, 1080),
+            ),
+            ("samplerate", 48000),
         )
 
-        run_program(['example.mp4', '--scale', '0.2'])
-        av_inspect('example_ALTERED.mp4',
-            ('fps', 30),
-            ('resolution', (256, 144), ),
-            ('samplerate', 48000),
+        run_program(["example.mp4", "--scale", "0.2"])
+        av_inspect(
+            "example_ALTERED.mp4",
+            ("fps", 30),
+            (
+                "resolution",
+                (256, 144),
+            ),
+            ("samplerate", 48000),
         )
-
 
     def various_errors_test():
-        check_for_error(['example.mp4', '--add_rectangle', '0,60', '--cut_out', '60,end'])
-
+        check_for_error(
+            ["example.mp4", "--add_rectangle", "0,60", "--cut_out", "60,end"]
+        )
 
     def effect_tests():
         """Test rendering video objects"""
-        run_program(['resources/testsrc.mp4', '--mark_as_loud', 'start,end',
-            '--add_rectangle', '0,30,0,200,100,300,fill=#43FA56,stroke=10'])
-        os.remove('resources/testsrc_ALTERED.mp4')
-
+        run_program(
+            [
+                "resources/testsrc.mp4",
+                "--mark_as_loud",
+                "start,end",
+                "--add_rectangle",
+                "0,30,0,200,100,300,fill=#43FA56,stroke=10",
+            ]
+        )
+        os.remove("resources/testsrc_ALTERED.mp4")
 
     def render_text():
-        run_program(['example.mp4', '--add-text', 'start,end,This is my text'])
-
+        run_program(["example.mp4", "--add-text", "start,end,This is my text"])
 
     def check_font_error():
         check_for_error(
-            ['example.mp4', '--add-text', 'start,end,text,0,0,30,notafont'], 'not found'
+            ["example.mp4", "--add-text", "start,end,text,0,0,30,notafont"], "not found"
         )
 
-
     def export_tests():
-        for test_name in ('aac.m4a', 'alac.m4a', 'pcm_f32le.wav', 'multi-track.mov',
-            'pcm_s32le.wav', 'subtitle.mp4', 'test.mkv'):
+        for test_name in (
+            "aac.m4a",
+            "alac.m4a",
+            "pcm_f32le.wav",
+            "multi-track.mov",
+            "pcm_s32le.wav",
+            "subtitle.mp4",
+            "test.mkv",
+        ):
 
-            test_file = f'resources/{test_name}'
+            test_file = f"resources/{test_name}"
             run_program([test_file])
-            run_program([test_file, '--edit', 'none'])
-            run_program([test_file, '-exp'])
-            run_program([test_file, '-exf'])
-            run_program([test_file, '-exs'])
-            run_program([test_file, '--export_as_clip_sequence'])
-            run_program([test_file, '--preview'])
-            cleanup('resources')
-
+            run_program([test_file, "--edit", "none"])
+            run_program([test_file, "-exp"])
+            run_program([test_file, "-exf"])
+            run_program([test_file, "-exs"])
+            run_program([test_file, "--export_as_clip_sequence"])
+            run_program([test_file, "--preview"])
+            cleanup("resources")
 
     def codec_tests():
-        run_program(['example.mp4', '--video_codec', 'h264'])
-        run_program(['example.mp4', '--audio_codec', 'ac3'])
-
+        run_program(["example.mp4", "--video_codec", "h264"])
+        run_program(["example.mp4", "--audio_codec", "ac3"])
 
     def combine_tests():
-        run_program(['example.mp4', '--mark_as_silent', '0,171', '-o', 'hmm.mp4'])
-        run_program(['example.mp4', 'hmm.mp4', '--combine_files', '--debug'])
-        os.remove('hmm.mp4')
-
+        run_program(["example.mp4", "--mark_as_silent", "0,171", "-o", "hmm.mp4"])
+        run_program(["example.mp4", "hmm.mp4", "--combine_files", "--debug"])
+        os.remove("hmm.mp4")
 
     def motion_tests():
         run_program(
-            ['resources/man_on_green_screen.mp4', '--edit', 'motion', '--debug',
-            '--frame_margin', '0', '-mcut', '0', '-mclip', '0']
+            [
+                "resources/man_on_green_screen.mp4",
+                "--edit",
+                "motion",
+                "--debug",
+                "--frame_margin",
+                "0",
+                "-mcut",
+                "0",
+                "-mclip",
+                "0",
+            ]
         )
         run_program(
-            ['resources/man_on_green_screen.mp4', '--edit', 'motion:threshold=0']
+            ["resources/man_on_green_screen.mp4", "--edit", "motion:threshold=0"]
         )
 
     def edit_positive_tests():
-        run_program(['resources/multi-track.mov', '--edit', 'audio:stream=all'])
-        run_program(['resources/multi-track.mov', '--edit', 'not audio:stream=all'])
-        run_program(['resources/multi-track.mov', '--edit', 'not audio:threshold=4% or audio:stream=1'])
-        #run_program(['resources/multi-track.mov', '--edit', 'not audio:threshold=4% or not audio:stream=1'])
-
+        run_program(["resources/multi-track.mov", "--edit", "audio:stream=all"])
+        run_program(["resources/multi-track.mov", "--edit", "not audio:stream=all"])
+        run_program(
+            [
+                "resources/multi-track.mov",
+                "--edit",
+                "not audio:threshold=4% or audio:stream=1",
+            ]
+        )
+        # run_program(['resources/multi-track.mov', '--edit', 'not audio:threshold=4% or not audio:stream=1'])
 
     def edit_negative_tests():
         check_for_error(
-            ['resources/example_cut_s16le.wav', '--edit', 'motion'], "Video stream '0' does not exist"
+            ["resources/example_cut_s16le.wav", "--edit", "motion"],
+            "Video stream '0' does not exist",
         )
         check_for_error(
-            ['resources/man_on_green_screen.gif', '--edit', 'audio'], "Audio stream '0' does not exist"
+            ["resources/man_on_green_screen.gif", "--edit", "audio"],
+            "Audio stream '0' does not exist",
         )
         check_for_error(
-            ['example.mp4', '--edit', 'not'], "Error! Dangling operand: 'not'"
+            ["example.mp4", "--edit", "not"], "Error! Dangling operand: 'not'"
         )
         check_for_error(
-            ['example.mp4', '--edit', 'audio and'], "Error! Dangling operand: 'and'"
+            ["example.mp4", "--edit", "audio and"], "Error! Dangling operand: 'and'"
         )
         check_for_error(
-            ['example.mp4', '--edit', 'and'], "Error! 'and' operand needs two arguments."
+            ["example.mp4", "--edit", "and"],
+            "Error! 'and' operand needs two arguments.",
         )
         check_for_error(
-            ['example.mp4', '--edit', 'and audio'], "Error! 'and' operand needs two arguments."
+            ["example.mp4", "--edit", "and audio"],
+            "Error! 'and' operand needs two arguments.",
         )
         check_for_error(
-            ['example.mp4', '--edit', 'or audio'], "Error! 'or' operand needs two arguments."
+            ["example.mp4", "--edit", "or audio"],
+            "Error! 'or' operand needs two arguments.",
         )
         check_for_error(
-            ['example.mp4', '--edit', 'audio four audio'], "Error! Unknown method/operator: 'four'"
+            ["example.mp4", "--edit", "audio four audio"],
+            "Error! Unknown method/operator: 'four'",
         )
         check_for_error(
-            ['example.mp4', '--edit', 'audio audio'], "Logic operator must be between two editing methods"
+            ["example.mp4", "--edit", "audio audio"],
+            "Logic operator must be between two editing methods",
         )
-
 
     ### Runners ###
 
     tester = Tester(args)
 
-    if args.category in ('unit', 'all'):
+    if args.category in ("unit", "all"):
         tester.run_test(subtitle_tests)
         tester.run_test(tsm_1a5_test)
         tester.run_test(tsm_0a5_test, allow_fail=True)
         tester.run_test(tsm_2a0_test)
 
-
-    if args.category in ('api', 'all'):
+    if args.category in ("api", "all"):
         tester.run_test(read_api_0_1)
 
-    if args.category in ('sub', 'all'):
+    if args.category in ("sub", "all"):
         tester.run_test(info)
         tester.run_test(levels)
         tester.run_test(subdump)
         tester.run_test(grep)
         tester.run_test(desc)
 
-    if args.category in ('cli', 'all'):
+    if args.category in ("cli", "all"):
         tester.run_test(help_tests)
         tester.run_test(version_test)
         tester.run_test(parser_test)
@@ -570,5 +635,6 @@ def main(sys_args: Optional[List[str]]=None):
 
     tester.end()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
