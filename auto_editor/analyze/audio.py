@@ -14,7 +14,7 @@ def audio_detection(
     sample_rate: int,
     fps: float,
     progress: ProgressBar,
-    ) -> npt.NDArray[np.float_]:
+) -> npt.NDArray[np.float_]:
 
     max_volume = get_max_volume(audio_samples)
     sample_count = audio_samples.shape[0]
@@ -22,7 +22,7 @@ def audio_detection(
     sample_rate_per_frame = sample_rate / fps
     audio_frame_count = ceil(sample_count / sample_rate_per_frame)
 
-    progress.start(audio_frame_count, 'Analyzing audio volume')
+    progress.start(audio_frame_count, "Analyzing audio volume")
 
     threshold_list = np.zeros((audio_frame_count), dtype=np.float_)
 
@@ -33,7 +33,7 @@ def audio_detection(
             progress.tick(i)
 
         start = int(i * sample_rate_per_frame)
-        end = min(int((i+1) * sample_rate_per_frame), sample_count)
+        end = min(int((i + 1) * sample_rate_per_frame), sample_count)
 
         threshold_list[i] = get_max_volume(audio_samples[start:end]) / max_volume
 

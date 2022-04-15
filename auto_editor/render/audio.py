@@ -9,23 +9,24 @@ from auto_editor.utils.progressbar import ProgressBar
 
 from typing import List, Tuple
 
+
 def make_new_audio(
     input_path: str,
     output_path: str,
     chunks: List[Tuple[int, int, float]],
     log: Log,
     fps: float,
-    progress: ProgressBar
+    progress: ProgressBar,
 ) -> None:
 
     if len(chunks) == 1 and chunks[0][2] == 99999:
-        log.error('Trying to create an empty file.')
+        log.error("Trying to create an empty file.")
 
-    progress.start(len(chunks), 'Creating new audio')
+    progress.start(len(chunks), "Creating new audio")
 
     samplerate, audio_samples = read(input_path)
 
-    main_writer = wave.open(output_path, 'wb')
+    main_writer = wave.open(output_path, "wb")
     main_writer.setnchannels(2)
     main_writer.setframerate(samplerate)
     main_writer.setsampwidth(2)

@@ -71,7 +71,7 @@ def out(text: str) -> None:
 def print_option_help(option: Options) -> None:
     from dataclasses import fields, _MISSING_TYPE
 
-    text = "  " + ", ".join(option.names) + "\n    " + option.help + "\n\n"
+    text = "  " + ", ".join(option.names) + f"\n    {option.help}\n\n"
     if option.dataclass is not None:
         text += "    "
         args = []

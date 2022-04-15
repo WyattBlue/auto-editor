@@ -17,14 +17,14 @@ def motion_detection(
     path: str, fps: float, progress: ProgressBar, width: int, blur: int
 ) -> npt.NDArray[np.float_]:
 
-    container = av.open(path, 'r')
+    container = av.open(path, "r")
 
     video_stream = container.streams.video[0]
-    video_stream.thread_type = 'AUTO'
+    video_stream.thread_type = "AUTO"
 
     inaccurate_dur = int(float(video_stream.duration * video_stream.time_base) * fps)
 
-    progress.start(inaccurate_dur, 'Analyzing motion')
+    progress.start(inaccurate_dur, "Analyzing motion")
 
     prev_image = None
     image = None
@@ -45,7 +45,8 @@ def motion_detection(
 
         if index > len(threshold_list) - 1:
             threshold_list = np.concatenate(
-                (threshold_list, np.zeros((len(threshold_list)), dtype=np.float_)), axis=0
+                (threshold_list, np.zeros((len(threshold_list)), dtype=np.float_)),
+                axis=0,
             )
 
         image = frame.to_image()
