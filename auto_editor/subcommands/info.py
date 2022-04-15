@@ -2,6 +2,8 @@ import sys
 import json
 import os.path
 
+from typing import Optional
+
 
 def info_options(parser):
     parser.add_argument(
@@ -58,11 +60,13 @@ def main(sys_args=sys.argv[1:]):
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
-    def aspect_str(w, h) -> str:
-        w, h = aspect_ratio(int(w), int(h))
-        if w is None:
+    def aspect_str(w: Optional[str], h: Optional[str]) -> str:
+        if w is None or h is None:
             return ""
-        return f" ({w}:{h})"
+        w_, h_ = aspect_ratio(int(w), int(h))
+        if w_ is None:
+            return ""
+        return f" ({w_}:{h_})"
 
     file_info = {}
 
@@ -87,11 +91,10 @@ def main(sys_args=sys.argv[1:]):
 
         for track, stream in enumerate(inp.video_streams):
             text += f"   - Track #{track}\n"
-
-            text += f"     - codec: {stream['codec']}\n"
+            text += f"     - codec: {stream.codec}\n"
 
             vid = {}
-            vid["codec"] = stream["codec"]
+            vid["codec"] = stream.codec
 
             import av
 
@@ -105,12 +108,12 @@ def main(sys_args=sys.argv[1:]):
                 text += f"     - time_base: {time_base}\n"
                 vid["time_base"] = time_base
 
-            if stream["fps"] is not None:
-                text += f"     - fps: {stream['fps']}\n"
-                vid["fps"] = float(stream["fps"])
+            if stream.fps is not None:
+                text += f"     - fps: {stream.fps}\n"
+                vid["fps"] = float(stream.fps)
 
-            w = stream["width"]
-            h = stream["height"]
+            w = stream.width
+            h = stream.height
 
             if w is not None and h is not None:
                 text += f"     - resolution: {w}x{h}{aspect_str(w, h)}\n"
@@ -119,12 +122,12 @@ def main(sys_args=sys.argv[1:]):
                 vid["height"] = int(h)
                 vid["aspect_ratio"] = aspect_ratio(int(w), int(h))
 
-            if stream["bitrate"] is not None:
-                text += f"     - bitrate: {stream['bitrate']}\n"
-                vid["bitrate"] = stream["bitrate"]
-            if stream["lang"] is not None:
-                text += f"     - lang: {stream['lang']}\n"
-                vid["lang"] = stream["lang"]
+            if stream.bitrate is not None:
+                text += f"     - bitrate: {stream.bitrate}\n"
+                vid["bitrate"] = stream.bitrate
+            if stream.lang is not None:
+                text += f"     - lang: {stream.lang}\n"
+                vid["lang"] = stream.lang
 
             file_info[file]["video"].append(vid)
 
@@ -135,19 +138,19 @@ def main(sys_args=sys.argv[1:]):
             aud = {}
 
             text += f"   - Track #{track}\n"
-            text += f"     - codec: {stream['codec']}\n"
-            text += f"     - samplerate: {stream['samplerate']}\n"
+            text += f"     - codec: {stream.codec}\n"
+            text += f"     - samplerate: {stream.samplerate}\n"
 
-            aud["codec"] = stream["codec"]
-            aud["samplerate"] = int(stream["samplerate"])
+            aud["codec"] = stream.codec
+            aud["samplerate"] = int(stream.samplerate)
 
-            if stream["bitrate"] is not None:
-                text += f"     - bitrate: {stream['bitrate']}\n"
-                aud["bitrate"] = stream["bitrate"]
+            if stream.bitrate is not None:
+                text += f"     - bitrate: {stream.bitrate}\n"
+                aud["bitrate"] = stream.bitrate
 
-            if stream["lang"] is not None:
-                text += f"     - lang: {stream['lang']}\n"
-                aud["lang"] = stream["lang"]
+            if stream.lang is not None:
+                text += f"     - lang: {stream.lang}\n"
+                aud["lang"] = stream.lang
 
             file_info[file]["audio"].append(aud)
 
@@ -158,11 +161,11 @@ def main(sys_args=sys.argv[1:]):
             sub = {}
 
             text += f"   - Track #{track}\n"
-            text += f"     - codec: {stream['codec']}\n"
-            sub["codec"] = stream["codec"]
-            if stream["lang"] is not None:
-                text += f"     - lang: {stream['lang']}\n"
-                sub["lang"] = stream["lang"]
+            text += f"     - codec: {stream.codec}\n"
+            sub["codec"] = stream.codec
+            if stream.lang is not None:
+                text += f"     - lang: {stream.lang}\n"
+                sub["lang"] = stream.lang
 
             file_info[file]["subtitle"].append(sub)
 
@@ -189,17 +192,8 @@ def main(sys_args=sys.argv[1:]):
                     print(text, end="")
                 text = ""
                 fps_mode = ffmpeg.pipe(
-                    [
-                        "-i",
-                        file,
-                        "-hide_banner",
-                        "-vf",
-                        "vfrdet",
-                        "-an",
-                        "-f",
-                        "null",
-                        "-",
-                    ]
+                    ["-i", file, "-hide_banner", "-vf", "vfrdet", "-an", "-f", "null",
+                        "-"]
                 )
                 fps_mode = fps_mode.strip()
 

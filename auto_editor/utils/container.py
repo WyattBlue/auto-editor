@@ -1,4 +1,6 @@
-from typing import Any
+from typing import Optional, List, Dict, Any
+
+from dataclasses import dataclass, field
 
 pcm_formats = [
     'pcm_s16le', # default format
@@ -70,7 +72,7 @@ ogg = {
     'astrict': True,
 }
 
-containers = {
+containers: Dict[str, Dict[str, Any]] = {
 
     # Aliases section
 
@@ -223,31 +225,30 @@ containers = {
         'allow_audio': True,
         'allow_subtitle': True,
     },
-    'default': {
-        'name': None,
-        'allow_video': False,
-        'allow_audio': False,
-        'allow_subtitle': False,
-        'max_video_streams': None,
-        'max_audio_streams': None,
-        'max_subtitle_streams': None,
-        'vcodecs': None,
-        'acodecs': None,
-        'scodecs': None,
-        'vstrict': False,
-        'astrict': False,
-        'sstrict': False,
-        'disallow_v': [],
-        'disallow_a': [],
-        'samplerate': None, # Any samplerate is allowed.
-    },
 }
 
 
-def get_rules(key: str) -> Any:
-    rules: Any = containers['default']
+@dataclass
+class Container:
+    name: Optional[str] = None
+    allow_video: bool = False
+    allow_audio: bool = False
+    allow_subtitle: bool = False
+    max_video_streams: Optional[int] = None
+    max_audio_streams: Optional[int] = None
+    max_subtitle_streams: Optional[int] = None
+    vcodecs: Optional[List[str]] = None
+    acodecs: Optional[List[str]] = None
+    scodecs: Optional[List[str]] = None
+    vstrict: bool = False
+    astrict: bool = False
+    sstrict: bool = False
+    disallow_v: List[str] = field(default_factory=list)
+    disallow_a: List[str] = field(default_factory=list)
+    samplerate: Optional[List[int]] = None  # Any samplerate is allowed
+
+
+def get_rules(key: str) -> Container:
     if key in containers:
-        rules.update(containers[key])
-    else:
-        rules.update(containers['not_in_here'])
-    return rules
+        return Container(**containers[key])
+    return Container(**containers["not_in_here"])

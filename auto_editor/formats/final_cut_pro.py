@@ -93,7 +93,7 @@ def fcp_xml(inp, output: str, chunks: List[Tuple[int, int, float]], fps: float, 
             )
         )
 
-        last_dur = 0
+        last_dur = 0.0
         for clip in chunks:
             if clip[2] == 99999:
                 continue

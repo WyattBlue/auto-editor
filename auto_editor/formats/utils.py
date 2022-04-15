@@ -18,7 +18,7 @@ def get_width_height(inp: FileInfo) -> Tuple[Optional[str], Optional[str]]:
     if len(inp.video_streams) == 0:
         return None, None
     else:
-        return inp.video_streams[0]["width"], inp.video_streams[0]["height"]
+        return inp.video_streams[0].width, inp.video_streams[0].height
 
 
 def indent(base: int, *lines: str) -> str:

@@ -3,8 +3,9 @@ import re
 import sys
 import os.path
 import subprocess
-from subprocess import Popen, PIPE
 from platform import system
+from subprocess import Popen, PIPE
+from dataclasses import dataclass
 
 # Typing
 from typing import List, Optional
@@ -140,6 +141,31 @@ class FFmpeg:
         return output
 
 
+@dataclass
+class VideoStream:
+    width: Optional[str]
+    height: Optional[str]
+    codec: Optional[str]
+    bitrate: Optional[str]
+    fps: Optional[str]
+    lang: Optional[str]
+
+
+@dataclass
+class AudioStream:
+    codec: Optional[str]
+    samplerate: Optional[str]
+    bitrate: Optional[str]
+    lang: Optional[str]
+
+
+@dataclass
+class SubtitleStream:
+    codec: Optional[str]
+    lang: Optional[str]
+    ext: Optional[str] = None
+
+
 class FileInfo:
     __slots__ = (
         "path",
@@ -203,32 +229,36 @@ class FileInfo:
 
         for line in info.split("\n"):
             if re.search(r"Stream #", line):
-                s_data = {}
                 if re.search(r"Video:", line):
-                    s_data["width"] = regex_match(r"(?P<match>\d+)x\d+[\s,]", line)
-                    s_data["height"] = regex_match(r"\d+x(?P<match>\d+)[\s,]", line)
-                    s_data["codec"] = regex_match(r"Video:\s(?P<match>\w+)", line)
-                    s_data["bitrate"] = regex_match(r"\s(?P<match>\d+\skb\/s)", line)
-                    s_data["fps"] = regex_match(r"\s(?P<match>[\d\.]+)\stbr", line)
-                    s_data["lang"] = regex_match(lang_regex, line)
-
+                    v_data = VideoStream(
+                        width=regex_match(r"(?P<match>\d+)x\d+[\s,]", line),
+                        height=regex_match(r"\d+x(?P<match>\d+)[\s,]", line),
+                        codec=regex_match(r"Video:\s(?P<match>\w+)", line),
+                        bitrate=regex_match(r"\s(?P<match>\d+\skb\/s)", line),
+                        fps=regex_match(r"\s(?P<match>[\d\.]+)\stbr", line),
+                        lang=regex_match(lang_regex, line),
+                    )
                     if fps is None:
-                        fps = s_data["fps"]
-                    video_streams.append(s_data)
+                        fps = v_data.fps
+                    video_streams.append(v_data)
 
                 elif re.search(r"Audio:", line):
-                    s_data["codec"] = regex_match(r"Audio:\s(?P<match>\w+)", line)
-                    s_data["samplerate"] = regex_match(r"(?P<match>\d+)\sHz", line)
-                    s_data["bitrate"] = regex_match(r"\s(?P<match>\d+\skb\/s)", line)
-                    s_data["lang"] = regex_match(lang_regex, line)
-                    audio_streams.append(s_data)
+                    audio_streams.append(
+                        AudioStream(
+                            codec=regex_match(r"Audio:\s(?P<match>\w+)", line),
+                            samplerate=regex_match(r"(?P<match>\d+)\sHz", line),
+                            bitrate=regex_match(r"\s(?P<match>\d+\skb\/s)", line),
+                            lang=regex_match(lang_regex, line),
+                        )
+                    )
 
                 elif re.search(r"Subtitle:", line):
-                    s_data["lang"] = regex_match(lang_regex, line)
-                    s_data["codec"] = regex_match(r"Subtitle:\s(?P<match>\w+)", line)
-
-                    if s_data["codec"] is not None:
-                        s_data["ext"] = sub_exts.get(s_data["codec"], "vtt")
+                    s_data = SubtitleStream(
+                        codec=regex_match(r"Subtitle:\s(?P<match>\w+)", line),
+                        lang=regex_match(lang_regex, line),
+                    )
+                    if s_data.codec is not None:
+                        s_data.ext = sub_exts.get(s_data.codec, "vtt")
                     subtitle_streams.append(s_data)
 
         self.fps = fps
