@@ -5,7 +5,6 @@
 *.xml
 *.mlt
 *.fcpxml
-*.json
 *https*
 
 # Python Generated Files

@@ -3,10 +3,9 @@ import os
 import re
 import tempfile
 
-import auto_editor
-import auto_editor.vanparse as vanparse
 from auto_editor.utils.log import Log
 from auto_editor.ffwrapper import FFmpeg
+from auto_editor.vanparse import ArgumentParser
 
 
 def grep_options(parser):
@@ -119,13 +118,9 @@ def grep_file(
 
 
 def main(sys_args=sys.argv[1:]):
-    parser = vanparse.ArgumentParser(
-        "grep",
-        auto_editor.version,
-        description="Read and match subtitle tracks in media files.",
-    )
-    parser = grep_options(parser)
+    parser = grep_options(ArgumentParser("grep"))
     args = parser.parse_args(sys_args)
+
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
 
     TEMP = tempfile.mkdtemp()

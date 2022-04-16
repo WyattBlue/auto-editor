@@ -14,7 +14,7 @@ import numpy as np
 from typing import List, Tuple, Callable, NoReturn, Optional
 
 # Included Libraries
-import auto_editor.vanparse as vanparse
+from auto_editor.vanparse import ArgumentParser
 
 
 def test_options(parser):
@@ -191,8 +191,7 @@ class Tester:
 
 
 def main(sys_args: Optional[List[str]] = None):
-    parser = vanparse.ArgumentParser("test", "version")
-    parser = test_options(parser)
+    parser = test_options(ArgumentParser("test"))
 
     if sys_args is None:
         sys_args = sys.argv[1:]
