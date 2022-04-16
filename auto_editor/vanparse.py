@@ -5,8 +5,9 @@ import textwrap
 from dataclasses import dataclass
 from shutil import get_terminal_size
 
-from typing import List, Sequence, Optional, Any, Union
+from typing import List, Sequence, Optional, Any, Union, Dict
 
+import auto_editor
 from auto_editor.utils.log import Log
 
 
@@ -30,7 +31,6 @@ class Options:
     choices: Optional[Sequence[str]] = None
     help: str = ""
     dataclass: Any = None
-    manual: str = ""
     _type: str = "option"
 
 
@@ -68,7 +68,34 @@ def out(text: str) -> None:
     print("\n".join(wrapped_lines))
 
 
-def print_option_help(option: Options) -> None:
+def print_program_help(
+    reqs: List[Required], args: List[Union[Options, OptionText]]
+) -> None:
+    text = ""
+    for arg in args:
+        if isinstance(arg, OptionText):
+            text += f"\n  {arg.text}\n" if arg._type == "text" else "\n"
+        else:
+            text += "  " + ", ".join(arg.names) + f": {arg.help}\n"
+    text += "\n"
+    for req in reqs:
+        text += "  " + ", ".join(req.names) + f": {req.help}\n"
+    out(text)
+
+
+def get_help_data() -> Dict[str, Dict[str, str]]:
+    import json
+    import os.path
+
+
+    dirpath = os.path.dirname(os.path.realpath(__file__))
+
+    with open(os.path.join(dirpath, "help.json"), "r") as fileobj:
+        data = json.load(fileobj)
+
+    return data
+
+def print_option_help(program_name: str, option: Options) -> None:
     from dataclasses import fields, _MISSING_TYPE
 
     text = "  " + ", ".join(option.names) + f"\n    {option.help}\n\n"
@@ -85,8 +112,10 @@ def print_option_help(option: Options) -> None:
 
         text += ",".join(args) + "\n"
 
-    if option.manual != "":
-        text += indent(option.manual, "    ") + "\n\n"
+    data = get_help_data()
+
+    if option.names[0] in data[program_name]:
+        text += indent(data[program_name][option.names[0]], "    ") + "\n\n"
 
     if option.flag:
         text += "    type: flag\n"
@@ -102,21 +131,6 @@ def print_option_help(option: Options) -> None:
         if option.choices is not None:
             text += "    choices: " + ", ".join(option.choices) + "\n"
 
-    out(text)
-
-
-def print_program_help(
-    reqs: List[Required], args: List[Union[Options, OptionText]]
-) -> None:
-    text = ""
-    for arg in args:
-        if isinstance(arg, OptionText):
-            text += f"\n  {arg.text}\n" if arg._type == "text" else "\n"
-        else:
-            text += "  " + ", ".join(arg.names) + f": {arg.help}\n"
-    text += "\n"
-    for req in reqs:
-        text += "  " + ", ".join(req.names) + f": {req.help}\n"
     out(text)
 
 
@@ -138,13 +152,8 @@ def get_option(name: str, options: List[Options]) -> Optional[Options]:
 
 
 class ArgumentParser:
-    def __init__(
-        self, program_name: str, version: str, description: Optional[str] = None
-    ):
+    def __init__(self, program_name: str) -> None:
         self.program_name = program_name
-        self._version = version
-        self.description = description
-
         self.requireds: List[Required] = []
         self.options: List[Options] = []
         self.args: List[Union[Options, OptionText]] = []
@@ -164,15 +173,17 @@ class ArgumentParser:
         self.args.append(OptionText("", "blank"))
 
     def parse_args(self, sys_args: List[str]):
-        if sys_args == [] and self.description:
-            out(self.description)
+        if sys_args == []:
+            out(get_help_data()[self.program_name]["_"])
             sys.exit()
 
         if sys_args == ["-v"] or sys_args == ["-V"]:
-            out(f"{self.program_name} version {self._version}")
+            out(f"{self.program_name} version {auto_editor.version}")
             sys.exit()
 
-        return ParseOptions(sys_args, self.options, self.requireds, self.args)
+        return ParseOptions(
+            sys_args, self.program_name, self.options, self.requireds, self.args
+        )
 
 
 def parse_dataclass(unsplit_arguments: str, dataclass: Any) -> Any:
@@ -261,6 +272,7 @@ class ParseOptions:
     def __init__(
         self,
         sys_args: List[str],
+        program_name: str,
         options: List[Options],
         requireds: List[Required],
         args: List[Union[Options, OptionText]],
@@ -271,7 +283,7 @@ class ParseOptions:
         builtin_help = Options(
             ("--help", "-h"),
             flag=True,
-            help="Show info about this program or an option then exit.",
+            help="Show info about this program or option then exit.",
         )
         options.append(builtin_help)
         args.append(builtin_help)
@@ -360,7 +372,7 @@ class ParseOptions:
 
                 next_arg = None if i == len(sys_args) - 1 else sys_args[i + 1]
                 if next_arg == "-h" or next_arg == "--help":
-                    print_option_help(option)
+                    print_option_help(program_name, option)
                     sys.exit()
 
                 if option.nargs != 1:

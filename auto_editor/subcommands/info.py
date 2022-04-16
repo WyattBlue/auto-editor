@@ -6,25 +6,18 @@ from typing import Optional
 
 
 def info_options(parser):
-    parser.add_argument(
-        "--json", flag=True, help="Export the information in JSON format."
-    )
+    parser.add_argument("--json", flag=True, help="Export info in JSON format.")
     parser.add_argument(
         "--include-vfr",
         "--has-vfr",
         flag=True,
-        help="Display the number of Variable Frame Rate frames.",
-        manual="A typical output would look like this:\n"
-        "   - VFR:0.583394 (3204/2288) min: 41 max: 42 avg: 41\n\n"
-        "The first number is the ratio of how many VFR frames are there in total.\n"
-        "The second number is the total number of VFR frames and the third is the total "
-        "number of CFR frames. Adding the second and third number will result in how "
-        "many frames the video has in total.",
+        help="Display the number of Variable Frame Rate (VFR) frames.",
     )
     parser.add_argument(
         "--include-timebase",
+        "--has-timebase",
         flag=True,
-        help="Show what time base the video streams have.",
+        help="Show what timebase the video streams have.",
     )
     parser.add_argument(
         "--ffmpeg-location", default=None, help="Point to your custom ffmpeg file."
@@ -41,21 +34,12 @@ def info_options(parser):
 
 
 def main(sys_args=sys.argv[1:]):
-
-    import auto_editor
-    import auto_editor.vanparse as vanparse
-
-    from auto_editor.utils.func import aspect_ratio
     from auto_editor.utils.log import Log
-
+    from auto_editor.utils.func import aspect_ratio
+    from auto_editor.vanparse import ArgumentParser
     from auto_editor.ffwrapper import FFmpeg, FileInfo
 
-    parser = vanparse.ArgumentParser(
-        "info",
-        auto_editor.version,
-        description="Get basic information about media files.",
-    )
-    parser = info_options(parser)
+    parser = info_options(ArgumentParser("info"))
     args = parser.parse_args(sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)

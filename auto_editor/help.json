@@ -1,0 +1,38 @@
+{
+  "Auto-Editor": {
+    "_": "Auto-Editor is an automatic video/audio creator and editor. By default, it will detect silence and create a new video with those sections cut out. By changing some of the options, you can export to a traditional editor like Premiere Pro and adjust the edits there, adjust the pacing of the cuts, and change the method of editing like using audio loudness and video motion to judge making cuts.\n\nRun:\n    auto-editor --help\n\nTo get the list of options.\n",
+    "--add-ellipse": "The x and y coordinates specify a bounding box where the ellipse is drawn.",
+    "--add-image": "Opacity is how transparent or solid the image is. A transparency of 1 or 100% is completely solid. A transparency of 0 or 0% is completely transparent.\nThe anchor point tells how the image is placed relative to its x y coordinates.",
+    "--set-speed-for-range": "This option takes 3 arguments delimited with commas and they are as follows:\n Speed\n - How fast the media plays. Speeds 0 or below and 99999 or above will be cut completely.\n Start\n - When the speed first gets applied. The default unit is in frames, but second units can also be used.\n End\n - When the speed stops being applied. It can use both frame and second units.",
+    "--edit-based-on": "Editing Methods:\n - audio:\n    General audio detection.\n - motion:\n    Motion detection specialized for real life noisy video.\n - pixeldiff:\n    Detect when a certain amount of pixels have changed between frames.\n - none:\n    Do not modify the media in anyway. (Mark all sections as \"loud\")\n - all:\n    Cut out everything out. (Mark all sections as \"silent\")\n\nEditing Methods Attributes:\n - audio: 2\n    - stream: 0 : int | \"all\"\n    - threshold: args.silent_threshold : float_type\n - motion: 3\n    - threshold: 2% : float_type\n    - blur: 9 : int\n    - width: 400 : int\n - pixeldiff: 2\n    - threshold: 1 : int\n - none: 0\n - all: 0\n\nLogical Operators:\n - and\n - or\n - xor\n\nExamples:\n  --edit audio\n  --edit audio:stream=1\n  --edit audio:threshold=4%\n  --edit audio:threshold=0.03\n  --edit motion\n  --edit motion:threshold=2%,blur=3\n  --edit audio:threshold=4% or motion:threshold=2%,blur=3\n  --edit none\n  --edit all",
+    "--export": "Instead of exporting a video, export as one of these options instead.\n\ndefault       : Export as usual\npremiere      : Export as an XML timeline file for Adobe Premiere Pro\nfinal-cut-pro : Export as an XML timeline file for Final Cut Pro\nshotcut       : Export as an XML timeline file for Shotcut\njson          : Export as an auto-editor JSON timeline file\naudio         : Export as a WAV audio file\nclip-sequence : Export as multiple numbered media files",
+    "--temp-dir": "If not set, tempdir will be set with Python's tempfile module\nThe directory doesn't have to exist beforehand, however, the root path must be valid.\nThe temp file can get quite big if you're generating a huge video, so make sure your location has enough space.",
+    "--ffmpeg-location": "This takes precedence over `--my-ffmpeg`.",
+    "--my-ffmpeg": "This is equivalent to `--ffmpeg-location ffmpeg`.",
+    "--silent-threshold": "Silent threshold is a percentage where 0% represents absolute silence and 100% represents the highest volume in the media file.\nSetting the threshold to `0%` will cut only out areas where area is absolutely silence.",
+    "--frame-margin": "Margin is measured in frames, however, seconds can be used. e.g. `0.3secs`\nThe starting and ending margins can be set separately with the use of a comma. e.g. `2sec,3sec` `7,10` `-1,6`\nRange: -Infinity to Infinity",
+    "--silent-speed": "Values <= 0 or >= 99999 are the 'cut speed'",
+    "--video-speed": "Values <= 0 or >= 99999 are the 'cut speed'",
+    "--min-clip-length": "Range: 0 to Infinity",
+    "--min-cut-length": "Range: 0 to Infinity"
+  },
+  "info": {
+    "_": "Retrive information and properties about media files",
+    "--include-vfr": "A typical output looks like this:\n   - VFR:0.583394 (3204/2288) min: 41 max: 42 avg: 41\n\nThe first number is the ratio of how many VFR frames are there in total.\nThe second number is the total number of VFR frames and the third is the total number of CFR frames. Adding the second and third number will result in how many frames the video has in total."
+  },
+  "levels": {
+    "_": "Display loudness over time"
+  },
+  "subdump": {
+    "_": "Dump text-based subtitles to stdout with formatting stripped out"
+  },
+  "grep": {
+    "_": "Read and match text-based subtitle tracks"
+  },
+  "desc": {
+    "_": "Display a media's description metadata"
+  },
+  "test": {
+    "_": "Self-Hosted Unit and End-to-End tests"
+  }
+}

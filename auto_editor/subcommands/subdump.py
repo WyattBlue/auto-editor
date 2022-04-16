@@ -18,19 +18,11 @@ def main(sys_args=sys.argv[1:]):
     import os
     import tempfile
 
-    import auto_editor
-    import auto_editor.vanparse as vanparse
-
     from auto_editor.utils.log import Log
+    from auto_editor.vanparse import ArgumentParser
     from auto_editor.ffwrapper import FFmpeg, FileInfo
 
-    parser = vanparse.ArgumentParser(
-        "subdump",
-        auto_editor.version,
-        description="Dump subtitle streams to stdout in text readable form.",
-    )
-    parser = subdump_options(parser)
-
+    parser = subdump_options(ArgumentParser("subdump"))
     args = parser.parse_args(sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)

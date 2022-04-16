@@ -42,17 +42,12 @@ def main(sys_args=sys.argv[1:]):
     import os
     import tempfile
 
-    import auto_editor
-    import auto_editor.vanparse as vanparse
-
     from auto_editor.utils.log import Log
+    from auto_editor.vanparse import ArgumentParser
     from auto_editor.utils.progressbar import ProgressBar
     from auto_editor.ffwrapper import FFmpeg, FileInfo
 
-    parser = vanparse.ArgumentParser(
-        "levels", auto_editor.version, description="Get loudness of audio over time."
-    )
-    parser = levels_options(parser)
+    parser = levels_options(ArgumentParser("levels"))
     args = parser.parse_args(sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
