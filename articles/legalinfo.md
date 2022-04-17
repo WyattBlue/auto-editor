@@ -1,6 +1,6 @@
 ## Legal Info
 
-Auto-Editor is under the Public Domain and includes all files besides the ones listed below. Auto-Editor was created by [these people.](https://github.com/WyattBlue/auto-editor/blob/master/resources/AUTHORS.md)
+Auto-Editor is under the Public Domain and includes all files besides the ones listed below. Auto-Editor was created by [these people.](https://github.com/WyattBlue/auto-editor/blob/master/AUTHORS.md)
 
 ----
 
