@@ -64,7 +64,9 @@ def shotcut_xml(inp, output, chunks, fps, log):
         out.write("\t</producer>\n")
 
         out.write('\t<playlist id="background">\n')  # same for this out too.
-        out.write(f'\t\t<entry producer="black" in="00:00:00.000" out="{global_out}"/>\n')
+        out.write(
+            f'\t\t<entry producer="black" in="00:00:00.000" out="{global_out}"/>\n'
+        )
         out.write("\t</playlist>\n")
 
         chains = 0

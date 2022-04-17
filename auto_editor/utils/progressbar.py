@@ -15,35 +15,34 @@ class ProgressBar:
         self.machine = False
         self.hide = False
 
-        self.icon = '⏳'
-        self.chars = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
-        self.brackets = ('|', '|')
+        self.icon = "⏳"
+        self.chars = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
+        self.brackets = ("|", "|")
 
-        if bar_type == 'classic':
-            self.icon = '⏳'
-            self.chars = ['░', '█']
-            self.brackets = ('[', ']')
-        if bar_type == 'ascii':
-            self.icon = '& '
-            self.chars = ['-', '#']
-            self.brackets = ('[', ']')
-        if bar_type == 'machine':
+        if bar_type == "classic":
+            self.icon = "⏳"
+            self.chars = ["░", "█"]
+            self.brackets = ("[", "]")
+        if bar_type == "ascii":
+            self.icon = "& "
+            self.chars = ["-", "#"]
+            self.brackets = ("[", "]")
+        if bar_type == "machine":
             self.machine = True
-        if bar_type == 'none':
+        if bar_type == "none":
             self.hide = True
 
         self.part_width = len(self.chars) - 1
 
         self.ampm = True
-        if system() == 'Darwin' and bar_type in ('default', 'classic'):
+        if system() == "Darwin" and bar_type in ("default", "classic"):
             try:
                 date_format = get_stdout(
-                    ['defaults', 'read', 'com.apple.menuextra.clock', 'DateFormat']
+                    ["defaults", "read", "com.apple.menuextra.clock", "DateFormat"]
                 )
-                self.ampm = 'a' in date_format
+                self.ampm = "a" in date_format
             except FileNotFoundError:
                 pass
-
 
     @staticmethod
     def pretty_time(my_time: float, ampm: bool) -> str:
@@ -57,9 +56,9 @@ class ProgressBar:
                 hours = 12
             if hours > 12:
                 hours -= 12
-            ampm_marker = 'PM' if new_time.tm_hour >= 12 else 'AM'
-            return f'{hours:02}:{minutes:02} {ampm_marker}'
-        return f'{hours:02}:{minutes:02}'
+            ampm_marker = "PM" if new_time.tm_hour >= 12 else "AM"
+            return f"{hours:02}:{minutes:02} {ampm_marker}"
+        return f"{hours:02}:{minutes:02}"
 
     def tick(self, index: Union[int, float]) -> None:
 
@@ -76,10 +75,12 @@ class ProgressBar:
         if self.machine:
             index = min(index, self.total)
             raw = int(self.begin_time + progress_rate)
-            print(f'{self.title}~{index}~{self.total}~{self.begin_time}~{raw}',
-                end='\r', flush=True)
+            print(
+                f"{self.title}~{index}~{self.total}~{self.begin_time}~{raw}",
+                end="\r",
+                flush=True,
+            )
             return
-
 
         new_time = self.pretty_time(self.begin_time + progress_rate, self.ampm)
 
@@ -91,16 +92,16 @@ class ProgressBar:
 
         progress_bar_str = self.progress_bar_str(progress, bar_len)
 
-        bar = f'  {self.icon}{self.title} {progress_bar_str} {p_pad}{percent}%  ETA {new_time}'
+        bar = f"  {self.icon}{self.title} {progress_bar_str} {p_pad}{percent}%  ETA {new_time}"
 
         if len(bar) > columns - 2:
-            bar = bar[:columns - 2]
+            bar = bar[: columns - 2]
         else:
-            bar += ' ' * (columns - len(bar) - 4)
+            bar += " " * (columns - len(bar) - 4)
 
-        sys.stdout.write(bar + '\r')
+        sys.stdout.write(bar + "\r")
 
-    def start(self, total: Union[int, float], title: str='Please wait') -> None:
+    def start(self, total: Union[int, float], title: str = "Please wait") -> None:
         self.title = title
         self.len_title = len(title)
         self.total = total
@@ -109,9 +110,9 @@ class ProgressBar:
         try:
             self.tick(0)
         except UnicodeEncodeError:
-            self.icon = '& '
-            self.chars = ['-', '#']
-            self.brackets = ('[', ']')
+            self.icon = "& "
+            self.chars = ["-", "#"]
+            self.brackets = ("[", "]")
             self.part_width = 1
 
     def progress_bar_str(self, progress: float, width: int) -> str:
@@ -121,7 +122,7 @@ class ProgressBar:
         part_char = self.chars[part_width]
 
         if width - whole_width - 1 < 0:
-            part_char = ''
+            part_char = ""
 
         line = (
             self.brackets[0]
@@ -134,4 +135,4 @@ class ProgressBar:
 
     @staticmethod
     def end() -> None:
-        sys.stdout.write(' ' * (get_terminal_size().columns - 2) + '\r')
+        sys.stdout.write(" " * (get_terminal_size().columns - 2) + "\r")

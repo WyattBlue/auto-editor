@@ -40,7 +40,9 @@ def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     if args.yt_dlp_extras is not None:
         cmd.extend(args.yt_dlp_extras.split(" "))
 
-    location = get_stdout([yt_dlp_path, "--get-filename", "--no-warnings"] + cmd).strip()
+    location = get_stdout(
+        [yt_dlp_path, "--get-filename", "--no-warnings"] + cmd
+    ).strip()
 
     if not os.path.isfile(location):
         subprocess.run([yt_dlp_path] + cmd)

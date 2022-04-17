@@ -99,7 +99,9 @@ def edit_media(
             log.error(codec_error.format(acodec, output_container))
 
     if args.keep_tracks_seperate and rules.max_audio_streams == 1:
-        log.warning(f"'{output_container}' container doesn't support multiple audio tracks.")
+        log.warning(
+            f"'{output_container}' container doesn't support multiple audio tracks."
+        )
 
     if not args.preview and not args.timeline:
         if os.path.isdir(output_path):
@@ -130,8 +132,17 @@ def edit_media(
 
     cmd = ["-i", inp.path, "-hide_banner"]
     for t in range(tracks):
-        cmd.extend(["-map", f"0:a:{t}", "-ac", "2", "-rf64", "always",
-            os.path.join(temp, f"{t}.wav")])
+        cmd.extend(
+            [
+                "-map",
+                f"0:a:{t}",
+                "-ac",
+                "2",
+                "-rf64",
+                "always",
+                os.path.join(temp, f"{t}.wav"),
+            ]
+        )
 
     ffmpeg.run(cmd)
     del cmd

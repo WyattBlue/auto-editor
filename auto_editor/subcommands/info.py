@@ -176,8 +176,17 @@ def main(sys_args=sys.argv[1:]):
                     print(text, end="")
                 text = ""
                 fps_mode = ffmpeg.pipe(
-                    ["-i", file, "-hide_banner", "-vf", "vfrdet", "-an", "-f", "null",
-                        "-"]
+                    [
+                        "-i",
+                        file,
+                        "-hide_banner",
+                        "-vf",
+                        "vfrdet",
+                        "-an",
+                        "-f",
+                        "null",
+                        "-",
+                    ]
                 )
                 fps_mode = fps_mode.strip()
 

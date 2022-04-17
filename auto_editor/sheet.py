@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict
 from auto_editor.utils.log import Log
 from auto_editor.ffwrapper import FileInfo, VideoStream
 
+
 class Sheet:
     __slots__ = ("all", "sheet")
 
