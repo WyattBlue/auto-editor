@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple
 from auto_editor.ffwrapper import FileInfo
 
 
@@ -14,11 +14,11 @@ def safe_mkdir(path: str) -> str:
     return path
 
 
-def get_width_height(inp: FileInfo) -> Tuple[Optional[str], Optional[str]]:
-    if len(inp.videos) == 0:
-        return None, None
-    else:
-        return inp.videos[0].width, inp.videos[0].height
+def get_width_height(inp: FileInfo) -> Tuple[str, str]:
+    v = inp.videos
+    if len(v) > 0 and v[0].width is not None and v[0].height is not None:
+        return v[0].width, v[0].height
+    return "1280", "720"
 
 
 def indent(base: int, *lines: str) -> str:

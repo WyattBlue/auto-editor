@@ -27,10 +27,10 @@ ANAMORPHIC = "FALSE"
 DEPTH = "16"
 
 
-def get_samplerate(inp: FileInfo, default: str = "48000") -> str:
+def get_samplerate(inp: FileInfo) -> str:
     if len(inp.audios) > 0 and inp.audios[0].samplerate is not None:
         return inp.audios[0].samplerate
-    return default
+    return "48000"
 
 
 def fix_url(path: str) -> str:
@@ -126,9 +126,6 @@ def premiere_xml(
             pathurls.append(fix_url(newtrack))
 
     width, height = get_width_height(inp)
-    if width is None or height is None:
-        width, height = "1280", "720"
-
     sample_rate = get_samplerate(inp)
 
     group_name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
