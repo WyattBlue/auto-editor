@@ -16,17 +16,20 @@ def fset(cmd: List[str], option: str, value: str) -> List[str]:
     return cmd + [option] + [value]
 
 
-def get_vcodec(args, inp: FileInfo, rules: Container) -> Optional[str]:
+def get_vcodec(args, inp: FileInfo, rules: Container) -> str:
     vcodec = args.video_codec
     if vcodec == "auto":
         vcodec = inp.videos[0].codec
 
-        if (rules.vstrict and vcodec not in rules.vcodecs) or (
-            vcodec in rules.disallow_v
-        ):
-            return rules.vcodecs[0]
+        if rules.vcodecs is not None:
+            if rules.vstrict and vcodec not in rules.vcodecs:
+                return rules.vcodecs[0]
+
+            if vcodec in rules.disallow_v:
+                return rules.vcodecs[0]
 
     if vcodec == "copy":
+        assert inp.videos[0].codec is not None
         return inp.videos[0].codec
 
     if vcodec == "uncompressed":
@@ -34,17 +37,21 @@ def get_vcodec(args, inp: FileInfo, rules: Container) -> Optional[str]:
     return vcodec
 
 
-def get_acodec(args, inp: FileInfo, rules: Container) -> Optional[str]:
+def get_acodec(args, inp: FileInfo, rules: Container) -> str:
     acodec = args.audio_codec
     if acodec == "auto":
         acodec = inp.audios[0].codec
 
-        if (rules.astrict and acodec not in rules.acodecs) or (
-            acodec in rules.disallow_a
-        ):
-            return rules.acodecs[0]
+        if rules.acodecs is not None:  # Just in case, but shouldn't happen
+            if rules.astrict and acodec not in rules.acodecs:
+                # Input codec can't be used for output, so use a new safe codec.
+                return rules.acodecs[0]
+
+            if acodec in rules.disallow_a:
+                return rules.acodecs[0]
 
     if acodec == "copy":
+        assert inp.audios[0].codec is not None
         return inp.audios[0].codec
     return acodec
 

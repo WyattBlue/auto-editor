@@ -9,7 +9,7 @@ https://developer.apple.com/documentation/professional_video_applications/fcpxml
 from platform import system
 from pathlib import Path, PureWindowsPath
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from .utils import indent, get_width_height
 
@@ -22,16 +22,18 @@ def fcp_xml(inp, output: str, chunks: List[Tuple[int, int, float]], fps: float, 
     else:
         pathurl = Path(inp.abspath).as_uri()
 
-    def fraction(a, fps) -> str:
+    def fraction(_a: Union[int, float], _fps: float) -> str:
         from fractions import Fraction
 
-        if a == 0:
+        if _a == 0:
             return "0s"
 
-        if isinstance(a, float):
-            a = Fraction(a)
-        if isinstance(fps, float):
-            fps = Fraction(fps)
+        if isinstance(_a, float):
+            a = Fraction(_a)
+        else:
+            a = _a
+
+        fps = Fraction(_fps)
 
         frac = Fraction(a, fps).limit_denominator()
         num = frac.numerator
@@ -45,7 +47,7 @@ def fcp_xml(inp, output: str, chunks: List[Tuple[int, int, float]], fps: float, 
                 dem *= factor
             else:
                 # Good enough but has some error that are impacted at speeds such as 150%.
-                total = 0
+                total = Fraction(0)
                 while total < frac:
                     total += Fraction(1, 30)
                 num = total.numerator

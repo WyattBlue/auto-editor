@@ -1,30 +1,40 @@
+from typing import List, Tuple, Union
+
 from .utils import get_width_height
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.func import aspect_ratio
+from auto_editor.utils.log import Log
 
 
-def frames_to_timecode(frames: int, fps: float) -> str:
+def frames_to_timecode(frames: Union[int, float], fps: float) -> str:
     seconds = frames / fps
 
-    m, s = divmod(seconds, 60)
+    m, _s = divmod(seconds, 60)
     h, m = divmod(m, 60)
 
-    if len(str(int(s))) == 1:
-        s = "0" + str(f"{round(s, 3):.3f}")
+    if len(str(int(_s))) == 1:
+        s = f"0{round(_s, 3):.3f}"
     else:
-        s = str(f"{round(s, 3):.3f}")
+        s = f"{round(_s, 3):.3f}"
 
     return f"{int(h):02d}:{int(m):02d}:{s}"
 
 
 def timecode_to_frames(timecode: str, fps: float) -> int:
-    h, m, s = timecode.split(":")
-    h = int(h)
-    m = int(m)
-    s = float(s)
+    _h, _m, _s = timecode.split(":")
+    h = int(_h)
+    m = int(_m)
+    s = float(_s)
     return round((h * 3600 + m * 60 + s) * fps)
 
 
-def shotcut_xml(inp, output, chunks, fps, log):
+def shotcut_xml(
+    inp: FileInfo,
+    output: str,
+    chunks: List[Tuple[int, int, float]],
+    fps: float,
+    log: Log,
+) -> None:
     width, height = get_width_height(inp)
     num, den = aspect_ratio(int(width), int(height))
 
@@ -145,7 +155,7 @@ def shotcut_xml(inp, output, chunks, fps, log):
             speed = clip[2]
 
             if speed == 1:
-                in_len = clip[0] - 1
+                in_len: float = clip[0] - 1
             else:
                 in_len = max(clip[0] / speed, 0)
 

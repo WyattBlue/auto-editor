@@ -191,7 +191,7 @@ def premiere_xml(
         if len(inp.videos) > 0:
             # Handle video clips
 
-            total = 0
+            total = 0.0
             for j, clip in enumerate(clips):
 
                 clip_duration = (clip[1] - clip[0] + 1) / clip[2]

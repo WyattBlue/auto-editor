@@ -1,6 +1,6 @@
 from dataclasses import asdict, fields
 
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 
 from auto_editor.utils.log import Log
 from auto_editor.ffwrapper import FileInfo
@@ -41,7 +41,7 @@ class Sheet:
         }
 
         self.all = []
-        self.sheet = {}
+        self.sheet: Dict[int, List[int]] = {}
 
         def _values(val, _type, _vars: Dict[str, int]):
             if val is None:
