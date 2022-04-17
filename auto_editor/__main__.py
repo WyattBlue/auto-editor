@@ -466,7 +466,7 @@ def main():
                 f"about {time_save} if edited manually."
             )
 
-        if not args.no_open:
+        if not args.no_open and output_path is not None:
             usefulfunctions.open_with_system_default(output_path, log)
 
     try:

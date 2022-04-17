@@ -1,6 +1,6 @@
 import re
 
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Sequence, Union, Optional
 
 from .func import clean_list
 
@@ -27,7 +27,7 @@ def split_num_str(val: Union[str, int]) -> Tuple[Union[int, float], str]:
     return int(num), unit
 
 
-def unit_check(unit: str, allowed_units: Tuple[str]) -> None:
+def unit_check(unit: str, allowed_units: Sequence[str]) -> None:
     if unit not in allowed_units:
         raise TypeError(f"Unknown unit: '{unit}'")
 
