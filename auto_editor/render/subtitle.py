@@ -5,6 +5,7 @@ from typing import List, Tuple
 from auto_editor.utils.log import Log
 from auto_editor.ffwrapper import FileInfo
 
+
 class SubtitleParser:
     def __init__(self):
         self.supported_codecs = ("ass", "webvtt", "mov_text")
@@ -132,7 +133,12 @@ class SubtitleParser:
 
 
 def cut_subtitles(
-    ffmpeg, inp: FileInfo, chunks: List[Tuple[int, int, float]], fps: float, temp: str, log: Log
+    ffmpeg,
+    inp: FileInfo,
+    chunks: List[Tuple[int, int, float]],
+    fps: float,
+    temp: str,
+    log: Log,
 ) -> None:
     for s, sub in enumerate(inp.subtitle_streams):
         file_path = os.path.join(temp, f"{s}s.{sub.ext}")

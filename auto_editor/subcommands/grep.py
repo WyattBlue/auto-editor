@@ -147,7 +147,6 @@ def main(sys_args=sys.argv[1:]):
         else:
             log.error(f"{path}: File does not exist.")
 
-
     log.cleanup()
 
 

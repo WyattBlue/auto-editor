@@ -15,11 +15,25 @@ from auto_editor.utils.video import get_vcodec, video_quality
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
 allowed_pix_fmt = {
-    "yuv420p", "yuvj420p",
-    "rgb48be", "rgb48le", "rgb64be", "rgb64le", "rgb24", "bgr24",
-    "argb", "rgba", "abgr", "bgra",
-    "gray", "gray8", "gray16be", "gray16le",
-    "rgb8", "bgr8", "pal8",
+    "yuv420p",
+    "yuvj420p",
+    "rgb48be",
+    "rgb48le",
+    "rgb64be",
+    "rgb64le",
+    "rgb24",
+    "bgr24",
+    "argb",
+    "rgba",
+    "abgr",
+    "bgra",
+    "gray",
+    "gray8",
+    "gray16be",
+    "gray16le",
+    "rgb8",
+    "bgr8",
+    "pal8",
 }
 
 
@@ -210,9 +224,23 @@ def render_av(
 
     spedup = os.path.join(temp, f"spedup{track}.mp4")
 
-    cmd = ["-hide_banner", "-y", "-f", "rawvideo", "-c:v", "rawvideo", "-pix_fmt",
-        target_pix_fmt, "-s", f"{width}*{height}", "-framerate", str(fps), "-i",
-        "-", "-pix_fmt", target_pix_fmt,
+    cmd = [
+        "-hide_banner",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-c:v",
+        "rawvideo",
+        "-pix_fmt",
+        target_pix_fmt,
+        "-s",
+        f"{width}*{height}",
+        "-framerate",
+        str(fps),
+        "-i",
+        "-",
+        "-pix_fmt",
+        target_pix_fmt,
     ]
 
     if apply_video_later:
@@ -237,7 +265,9 @@ def render_av(
     seek_frame = None
     frames_saved = 0
 
-    SEEK_COST = int(fps * 5)  # Keyframes are usually spread out every 5 seconds or less.
+    SEEK_COST = int(
+        fps * 5
+    )  # Keyframes are usually spread out every 5 seconds or less.
     SEEK_RETRY = SEEK_COST // 2
 
     try:
@@ -297,7 +327,13 @@ def render_av(
         sped_input = os.path.join(temp, f"spedup{track}.mp4")
         spedup = os.path.join(temp, f"scale{track}.mp4")
 
-        cmd = ["-i", sped_input, "-vf", f"scale=iw*{args.scale}:ih*{args.scale}", spedup]
+        cmd = [
+            "-i",
+            sped_input,
+            "-vf",
+            f"scale=iw*{args.scale}:ih*{args.scale}",
+            spedup,
+        ]
 
         check_errors = ffmpeg.pipe(cmd)
         if "Error" in check_errors or "failed" in check_errors:
