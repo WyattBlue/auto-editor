@@ -54,9 +54,6 @@ def fcp_xml(inp, output: str, chunks: List[Tuple[int, int, float]], fps: float, 
         return f"{num}/{dem}s"
 
     width, height = get_width_height(inp)
-    if width is None or height is None:
-        width, height = "1280", "720"
-
     frame_duration = fraction(1, fps)
 
     audio_file = len(inp.videos) == 0 and len(inp.audios) > 0

@@ -354,30 +354,29 @@ def main():
     exporting_to_editor = args.export in ("premiere", "final-cut-pro", "shotcut")
     making_data_file = exporting_to_editor or args.export == "json"
 
-    is64bit = "64-bit" if sys.maxsize > 2**32 else "32-bit"
-
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, args.show_ffmpeg_debug)
 
     if args.debug and args.input == []:
-        import platform
+        import platform as plat
 
-        print(f"Python Version: {platform.python_version()} {is64bit}")
-        print(
-            f"Platform: {platform.system()} {platform.release()} {platform.machine().lower()}"
-        )
-        print(f"FFmpeg Version: {ffmpeg.version}")
-        print(f"FFmpeg Path: {ffmpeg.path}")
+        is64bit = "64-bit" if sys.maxsize > 2**32 else "32-bit"
+        print(f"Python Version: {plat.python_version()} {is64bit}")
+        print(f"Platform: {plat.system()} {plat.release()} {plat.machine().lower()}")
+        print(f"FFmpeg Version: {ffmpeg.version}\nFFmpeg Path: {ffmpeg.path}")
         print(f"Auto-Editor Version: {auto_editor.version}")
         sys.exit()
 
-    if is64bit == "32-bit":
-        Log().warning(
-            "You have the 32-bit version of Python, which may lead to memory crashes."
-        )
-
     if args.version:
-        print(f"Auto-Editor version {auto_editor.version}")
+        print(f"Auto-Editor Version: {auto_editor.version}")
         sys.exit()
+
+    if args.timeline:
+        args.quiet = True
+
+    if args.input == []:
+        Log().error(
+            "You need to give auto-editor an input file so it can do the work for you."
+        )
 
     if args.temp_dir is None:
         TEMP = tempfile.mkdtemp()
@@ -391,30 +390,10 @@ def main():
         else:
             os.mkdir(TEMP)
 
-    if args.timeline:
-        args.quiet = True
-
     log = Log(args.debug, args.quiet, temp=TEMP)
     log.debug(f"Temp Directory: {TEMP}")
 
-    if args.input == []:
-        log.error(
-            "You need to give auto-editor an input file so it can do the work for you."
-        )
-
-    def write_starting_message(export: str) -> str:
-        if export == "premiere":
-            return "Exporting to Adobe Premiere Pro XML file"
-        if export == "final-cut-pro":
-            return "Exporting to Final Cut Pro XML file"
-        if export == "shotcut":
-            return "Exporting to Shotcut XML Timeline file"
-        if export == "audio":
-            return "Exporting as audio"
-        return "Starting"
-
-    if not args.preview and not args.timeline:
-        log.conwrite(write_starting_message(args.export))
+    log.conwrite("Starting")
 
     if args.preview or args.export not in ("audio", "default"):
         args.no_open = True

@@ -178,7 +178,7 @@ class ArgumentParser:
             sys.exit()
 
         if sys_args == ["-v"] or sys_args == ["-V"]:
-            out(f"{self.program_name} version {auto_editor.version}")
+            out(f"{self.program_name} Version {auto_editor.version}")
             sys.exit()
 
         return ParseOptions(
