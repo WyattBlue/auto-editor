@@ -28,8 +28,8 @@ DEPTH = "16"
 
 
 def get_samplerate(inp: FileInfo, default: str = "48000") -> str:
-    if len(inp.audio_streams) > 0 and inp.audio_streams[0].samplerate is not None:
-        return inp.audio_streams[0].samplerate
+    if len(inp.audios) > 0 and inp.audios[0].samplerate is not None:
+        return inp.audios[0].samplerate
     return default
 
 
@@ -87,7 +87,7 @@ def premiere_xml(
     log: Log,
 ) -> None:
 
-    audio_file = len(inp.video_streams) == 0 and len(inp.audio_streams) == 1
+    audio_file = len(inp.videos) == 0 and len(inp.audios) == 1
 
     # This is not at all how timebase works in actual media but that's how it works here.
     timebase = int(fps)
@@ -113,7 +113,7 @@ def premiere_xml(
 
     pathurls = [fix_url(inp.path)]
 
-    tracks = len(inp.audio_streams)
+    tracks = len(inp.audios)
 
     if tracks > 1:
         name_without_extension = inp.basename[: inp.basename.rfind(".")]
@@ -153,7 +153,7 @@ def premiere_xml(
             )
         )
 
-        if len(inp.video_streams) > 0:
+        if len(inp.videos) > 0:
             outfile.write(
                 indent(
                     3,
@@ -173,7 +173,7 @@ def premiere_xml(
             )
         )
 
-        if len(inp.video_streams) > 0:
+        if len(inp.videos) > 0:
             outfile.write(
                 indent(
                     3,
@@ -187,11 +187,11 @@ def premiere_xml(
                 3,
                 "\t\t</samplecharacteristics>",
                 "\t</format>",
-                "</video>" if len(inp.video_streams) == 0 else "\t<track>",
+                "</video>" if len(inp.videos) == 0 else "\t<track>",
             )
         )
 
-        if len(inp.video_streams) > 0:
+        if len(inp.videos) > 0:
             # Handle video clips
 
             total = 0

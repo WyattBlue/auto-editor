@@ -178,9 +178,9 @@ class FileInfo:
         "bitrate",
         "metadata",
         "fps",
-        "video_streams",
-        "audio_streams",
-        "subtitle_streams",
+        "videos",
+        "audios",
+        "subtitles",
     )
 
     def __init__(self, path: str, ffmpeg: FFmpeg):
@@ -218,9 +218,9 @@ class FileInfo:
             if re.search(r"^\s\sMetadata:", line):
                 active = True
 
-        video_streams = []
-        audio_streams = []
-        subtitle_streams = []
+        videos = []
+        audios = []
+        subtitles = []
         fps = None
 
         lang_regex = r"Stream #\d+:\d(?:[\[\]a-z0-9]|)+\((?P<match>\w+)\)"
@@ -240,10 +240,10 @@ class FileInfo:
                     )
                     if fps is None:
                         fps = v_data.fps
-                    video_streams.append(v_data)
+                    videos.append(v_data)
 
                 elif re.search(r"Audio:", line):
-                    audio_streams.append(
+                    audios.append(
                         AudioStream(
                             codec=regex_match(r"Audio:\s(?P<match>\w+)", line),
                             samplerate=regex_match(r"(?P<match>\d+)\sHz", line),
@@ -259,9 +259,9 @@ class FileInfo:
                     )
                     if s_data.codec is not None:
                         s_data.ext = sub_exts.get(s_data.codec, "vtt")
-                    subtitle_streams.append(s_data)
+                    subtitles.append(s_data)
 
         self.fps = fps
-        self.video_streams = video_streams
-        self.audio_streams = audio_streams
-        self.subtitle_streams = subtitle_streams
+        self.videos = videos
+        self.audios = audios
+        self.subtitles = subtitles

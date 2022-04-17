@@ -28,13 +28,7 @@ def split_num_str(val: Union[str, int]) -> Tuple[Union[int, float], str]:
     return int(num), unit
 
 
-def file_type(path: str) -> str:
-    if not os.path.isfile(path):
-        raise TypeError(f"Auto-Editor could not find the file: {path}")
-    return path
-
-
-def unit_check(unit: str, allowed_units: List[str]) -> None:
+def unit_check(unit: str, allowed_units: Tuple[str]) -> None:
     if unit not in allowed_units:
         raise TypeError(f"Unknown unit: '{unit}'")
 
@@ -44,7 +38,7 @@ def float_type(val: Union[str, int, float]) -> float:
         return float(val)
 
     num, unit = split_num_str(val)
-    unit_check(unit, ["%", ""])
+    unit_check(unit, ("%", ""))
     if unit == "%":
         return float(num / 100)
     return float(num)
@@ -52,26 +46,18 @@ def float_type(val: Union[str, int, float]) -> float:
 
 def sample_rate_type(val: str) -> int:
     num, unit = split_num_str(val)
-    unit_check(unit, ["Hz", "kHz", ""])
+    unit_check(unit, ("Hz", "kHz", ""))
     if unit == "kHz":
         return int(num * 1000)
     return int(num)
 
 
-def frame_units() -> List[str]:
-    return ["f", "frame", "frames"]
-
-
-def second_units() -> List[str]:
-    return ["s", "sec", "secs", "second", "seconds"]
-
-
 def frame_type(val: str) -> Union[int, str]:
     num, unit = split_num_str(val)
-    unit_check(unit, [""] + frame_units() + second_units())
-
-    if unit in second_units():
+    if unit in ("s", "sec", "secs", "second", "seconds"):
         return str(num).strip()
+
+    unit_check(unit, ("", "f", "frame", "frames"))
     return int(num)
 
 

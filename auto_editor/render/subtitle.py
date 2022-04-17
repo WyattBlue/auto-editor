@@ -140,7 +140,7 @@ def cut_subtitles(
     temp: str,
     log: Log,
 ) -> None:
-    for s, sub in enumerate(inp.subtitle_streams):
+    for s, sub in enumerate(inp.subtitles):
         file_path = os.path.join(temp, f"{s}s.{sub.ext}")
         new_path = os.path.join(temp, f"new{s}s.{sub.ext}")
 
