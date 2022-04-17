@@ -84,7 +84,7 @@ def get_stream_data(
     if method == "audio":
         if attrs.stream == "all":
             total_list = None
-            for i in range(len(inp.audio_streams)):
+            for i in range(len(inp.audios)):
                 audio_list = get_audio_list(
                     i, attrs.threshold, fps, progress, temp, log
                 )
@@ -103,7 +103,7 @@ def get_stream_data(
     if method == "motion":
         from auto_editor.analyze.motion import motion_detection
 
-        if len(inp.video_streams) == 0:
+        if len(inp.videos) == 0:
             log.error("Video stream '0' does not exist.")
 
         motion_list = motion_detection(inp.path, fps, progress, attrs.width, attrs.blur)
@@ -112,7 +112,7 @@ def get_stream_data(
     if method == "pixeldiff":
         from auto_editor.analyze.pixeldiff import pixel_difference
 
-        if len(inp.video_streams) == 0:
+        if len(inp.videos) == 0:
             log.error("Video stream '0' does not exist.")
 
         pixel_list = pixel_difference(inp.path, fps, progress)

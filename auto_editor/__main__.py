@@ -27,7 +27,6 @@ def main_options(parser):
         ImageObject,
     )
     from auto_editor.utils.types import (
-        file_type,
         float_type,
         sample_rate_type,
         frame_type,

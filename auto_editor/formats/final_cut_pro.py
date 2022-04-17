@@ -59,7 +59,7 @@ def fcp_xml(inp, output: str, chunks: List[Tuple[int, int, float]], fps: float, 
 
     frame_duration = fraction(1, fps)
 
-    audio_file = len(inp.video_streams) == 0 and len(inp.audio_streams) > 0
+    audio_file = len(inp.videos) == 0 and len(inp.audios) > 0
     group_name = "Auto-Editor {} Group".format("Audio" if audio_file else "Video")
     name = inp.basename
 

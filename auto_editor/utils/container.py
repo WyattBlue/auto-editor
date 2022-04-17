@@ -40,7 +40,7 @@ h264 = {
 aac = {
     "name": "Advanced Audio Coding",
     "allow_audio": True,
-    "max_audio_streams": 1,
+    "max_audios": 1,
     "acodecs": ["aac"],
     "astrict": True,
 }
@@ -48,7 +48,7 @@ ass = {
     "name": "SubStation Alpha",
     "allow_subtitle": True,
     "scodecs": ["ass", "ssa"],
-    "max_subtitle_streams": 1,
+    "max_subtitles": 1,
     "sstrict": True,
 }
 mp4 = {
@@ -89,21 +89,21 @@ containers: Dict[str, Dict[str, Any]] = {
     "apng": {
         "name": "Animated Portable Network Graphics",
         "allow_video": True,
-        "max_video_streams": 1,
+        "max_videos": 1,
         "vcodecs": ["apng"],
         "vstrict": True,
     },
     "gif": {
         "name": "Graphics Interchange Format",
         "allow_video": True,
-        "max_video_streams": 1,
+        "max_videos": 1,
         "vcodecs": ["gif"],
         "vstrict": True,
     },
     "wav": {
         "name": "Waveform Audio File Format",
         "allow_audio": True,
-        "max_audio_streams": 1,
+        "max_audios": 1,
         "acodecs": pcm_formats + ["mp3"],
         "astrict": True,
     },
@@ -115,7 +115,7 @@ containers: Dict[str, Dict[str, Any]] = {
     "mp3": {
         "name": "MP3 / MPEG-2 Audio Layer 3",
         "allow_audio": True,
-        "max_audio_streams": 1,
+        "max_audios": 1,
         "acodecs": ["mp3"],
         "astrict": True,
     },
@@ -133,7 +133,7 @@ containers: Dict[str, Dict[str, Any]] = {
     "flac": {
         "name": "Free Lossless Audio Codec",
         "allow_audio": True,
-        "max_audio_streams": 1,
+        "max_audios": 1,
         "acodecs": ["flac"],
     },
     "webm": {
@@ -152,14 +152,14 @@ containers: Dict[str, Dict[str, Any]] = {
         "name": "SubRip Text / Subtitle Resource Tracks",
         "allow_subtitle": True,
         "scodecs": ["srt"],
-        "max_subtitle_streams": 1,
+        "max_subtitles": 1,
         "sstrict": True,
     },
     "vtt": {
         "name": "Web Video Text Track",
         "allow_subtitle": True,
         "scodecs": ["webvtt"],
-        "max_subtitle_streams": 1,
+        "max_subtitles": 1,
         "sstrict": True,
     },
     "avi": {
@@ -249,9 +249,9 @@ class Container:
     allow_video: bool = False
     allow_audio: bool = False
     allow_subtitle: bool = False
-    max_video_streams: Optional[int] = None
-    max_audio_streams: Optional[int] = None
-    max_subtitle_streams: Optional[int] = None
+    max_videos: Optional[int] = None
+    max_audios: Optional[int] = None
+    max_subtitles: Optional[int] = None
     vcodecs: Optional[List[str]] = None
     acodecs: Optional[List[str]] = None
     scodecs: Optional[List[str]] = None

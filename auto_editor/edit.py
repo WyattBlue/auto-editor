@@ -77,7 +77,7 @@ def edit_media(
     if vcodec == "uncompressed":
         vcodec = "mpeg4"
     if vcodec == "copy":
-        vcodec = inp.video_streams[0].codec
+        vcodec = inp.videos[0].codec
 
     if vcodec != "auto":
         if rules.vstrict and vcodec not in rules.vcodecs:
@@ -88,7 +88,7 @@ def edit_media(
 
     acodec = args.audio_codec
     if acodec == "copy":
-        acodec = inp.audio_streams[0].codec
+        acodec = inp.audios[0].codec
         log.debug(f"Settings acodec to {acodec}")
 
     if acodec not in ("unset", "auto"):
@@ -98,7 +98,7 @@ def edit_media(
         if acodec in rules.disallow_a:
             log.error(codec_error.format(acodec, output_container))
 
-    if args.keep_tracks_seperate and rules.max_audio_streams == 1:
+    if args.keep_tracks_seperate and rules.max_audios == 1:
         log.warning(
             f"'{output_container}' container doesn't support multiple audio tracks."
         )
@@ -111,7 +111,7 @@ def edit_media(
             log.debug(f"Removing already existing file: {output_path}")
             os.remove(output_path)
 
-    tracks = len(inp.audio_streams)
+    tracks = len(inp.audios)
 
     fps = 30.0 if inp.fps is None else float(inp.fps)
 
@@ -119,11 +119,11 @@ def edit_media(
         log.error(f"{inp.basename}: Frame rate cannot be below 1. fps: {fps}")
 
     # Extract subtitles in their native format.
-    if len(inp.subtitle_streams) > 0:
+    if len(inp.subtitles) > 0:
         cmd = ["-i", inp.path, "-hide_banner"]
-        for s, sub in enumerate(inp.subtitle_streams):
+        for s, sub in enumerate(inp.subtitles):
             cmd.extend(["-map", f"0:s:{s}"])
-        for s, sub in enumerate(inp.subtitle_streams):
+        for s, sub in enumerate(inp.subtitles):
             cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
         ffmpeg.run(cmd)
 
@@ -252,7 +252,7 @@ def edit_media(
         if rules.allow_video:
             from auto_editor.render.video import render_av
 
-            for v, vid in enumerate(inp.video_streams):
+            for v, vid in enumerate(inp.videos):
                 if vid.codec in ("png", "jpeg"):
                     video_stuff.append(("image", None, None))
                 else:
