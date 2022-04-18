@@ -3,12 +3,12 @@ import numpy as np
 import numpy.typing as npt
 from PIL import ImageChops
 
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.progressbar import ProgressBar
 
 
-def pixel_difference(
-    path: str, fps: float, progress: ProgressBar
-) -> npt.NDArray[np.uint64]:
+def pixel_difference(inp: FileInfo, progress: ProgressBar) -> npt.NDArray[np.uint64]:
+    path, fps = inp.path, inp.gfps
 
     container = av.open(path, "r")
 

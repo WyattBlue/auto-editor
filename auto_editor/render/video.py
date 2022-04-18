@@ -94,7 +94,6 @@ def render_av(
     inp: FileInfo,
     args,
     chunks: List[Tuple[int, int, float]],
-    fps: float,
     progress: ProgressBar,
     effects,
     rules,
@@ -194,6 +193,8 @@ def render_av(
     total_frames = chunks[-1][1]
     progress.start(total_frames, "Creating new video")
 
+    fps = inp.videos[track].fps
+
     container = av.open(inp.path, "r")
     pix_fmt = container.streams.video[track].pix_fmt
 
@@ -236,7 +237,7 @@ def render_av(
         "-s",
         f"{width}*{height}",
         "-framerate",
-        str(fps),
+        f"{fps}",
         "-i",
         "-",
         "-pix_fmt",

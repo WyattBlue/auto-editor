@@ -31,7 +31,7 @@ def main(sys_args=sys.argv[1:]):
     log = Log(temp=temp)
 
     for i, input_file in enumerate(args.input):
-        inp = FileInfo(input_file, ffmpeg)
+        inp = FileInfo(input_file, ffmpeg, log)
 
         cmd = ["-i", input_file]
         for s, sub in enumerate(inp.subtitles):

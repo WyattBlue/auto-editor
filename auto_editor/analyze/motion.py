@@ -5,6 +5,7 @@ import numpy as np
 import numpy.typing as npt
 from PIL import ImageOps, ImageChops, ImageFilter
 
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.progressbar import ProgressBar
 
 
@@ -14,8 +15,10 @@ def new_size(size: Tuple[int, int], width: int) -> Tuple[int, int]:
 
 
 def motion_detection(
-    path: str, fps: float, progress: ProgressBar, width: int, blur: int
+    inp: FileInfo, progress: ProgressBar, width: int, blur: int
 ) -> npt.NDArray[np.float_]:
+
+    path, fps = inp.path, inp.gfps
 
     container = av.open(path, "r")
 

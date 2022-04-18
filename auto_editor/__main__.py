@@ -445,7 +445,7 @@ def main():
         progress = ProgressBar(args.progress)
 
         for i, input_path in enumerate(input_list):
-            inp = FileInfo(input_path, ffmpeg)
+            inp = FileInfo(input_path, ffmpeg, log)
 
             if len(input_list) > 1:
                 log.conwrite(f"Working on {inp.basename}")
