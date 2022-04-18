@@ -224,6 +224,7 @@ def edit_media(
         inp: FileInfo, chunks: List[Tuple[int, int, float]], output_path: str
     ) -> None:
         from auto_editor.utils.video import mux_quality_media
+        from auto_editor.render.video import render_av
 
         if rules.allow_subtitle:
             from auto_editor.render.subtitle import cut_subtitles
@@ -241,35 +242,30 @@ def edit_media(
                 if not os.path.isfile(new_file):
                     log.error("Audio file not created.")
 
-        video_stuff = []
+        video_output = []
 
-        if rules.allow_video:
-            from auto_editor.render.video import render_av
-
-            for v, vid in enumerate(inp.videos):
-                if vid.codec in ("png", "jpeg"):
-                    video_stuff.append(("image", None, None))
-                else:
-                    video_stuff.append(
-                        render_av(
-                            ffmpeg,
-                            v,
-                            inp,
-                            args,
-                            chunks,
-                            progress,
-                            obj_sheet,
-                            rules,
-                            temp,
-                            log,
-                        )
+        for v, vid in enumerate(inp.videos):
+            if vid.codec not in ("png", "jpeg") and rules.allow_video:
+                video_output.append(
+                    render_av(
+                        ffmpeg,
+                        v,
+                        inp,
+                        args,
+                        chunks,
+                        progress,
+                        obj_sheet,
+                        rules,
+                        temp,
+                        log,
                     )
+                )
 
         log.conwrite("Writing output file")
 
         mux_quality_media(
             ffmpeg,
-            video_stuff,
+            video_output,
             rules,
             output_path,
             output_container,

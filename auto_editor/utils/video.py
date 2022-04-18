@@ -73,16 +73,17 @@ def video_quality(cmd: List[str], args, inp: FileInfo, rules: Container) -> List
 
 
 def mux_quality_media(
-    ffmpeg, video_stuff, rules: Container, write_file, container, args, inp, temp, log
+    ffmpeg, video_output, rules: Container, write_file, container, args, inp, temp, log
 ) -> None:
     s_tracks = 0 if not rules.allow_subtitle else len(inp.subtitles)
     a_tracks = 0 if not rules.allow_audio else len(inp.audios)
-    v_tracks = 0
+
     cmd = ["-hide_banner", "-y", "-i", inp.path]
 
-    for _, spedup, _ in video_stuff:
-        if spedup is not None:
-            cmd.extend(["-i", spedup])
+    v_tracks = 0
+    for spedup_file, _ in video_output:
+        if spedup_file is not None:
+            cmd.extend(["-i", spedup_file])
             v_tracks += 1
 
     if a_tracks > 0:
@@ -136,13 +137,12 @@ def mux_quality_media(
             if track.lang is not None:
                 cmd.extend([f"-metadata:s:{marker}:{i}", f"language={track.lang}"])
 
-    for video_type, _, apply_video in video_stuff:
-        if video_type == "video":
-            if apply_video:
-                cmd = video_quality(cmd, args, inp, rules)
-            else:
-                cmd.extend(["-c:v", "copy"])
-            break
+    for _, apply_video in video_output:
+        if apply_video:
+            cmd = video_quality(cmd, args, inp, rules)
+        else:
+            cmd.extend(["-c:v", "copy"])
+        break
 
     if s_tracks > 0:
         scodec = inp.subtitles[0].codec
