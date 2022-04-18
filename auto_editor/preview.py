@@ -23,12 +23,10 @@ def time_frame(title: str, frames: Union[int, float], fps: float) -> None:
 
 
 def preview(inp: FileInfo, chunks: List[Tuple[int, int, float]], log: Log) -> None:
-    fps = 30 if inp.fps is None else float(inp.fps)
-
     log.conwrite("")
 
-    old_length = chunks[-1][1] / fps
-    new_length = get_new_length(chunks, fps)
+    old_length = chunks[-1][1] / inp.gfps
+    new_length = get_new_length(chunks, inp.gfps)
 
     diff = new_length - old_length
 
@@ -54,19 +52,19 @@ def preview(inp: FileInfo, chunks: List[Tuple[int, int, float]], log: Log) -> No
 
     print(f"clips: {clips}")
     if len(clip_lens) < 2:
-        time_frame(" - clip length", sum(clip_lens), fps)
+        time_frame(" - clip length", sum(clip_lens), inp.gfps)
     else:
-        time_frame(" - smallest", min(clip_lens), fps)
-        time_frame(" - largest", max(clip_lens), fps)
-        time_frame(" - average", sum(clip_lens) / len(clip_lens), fps)
+        time_frame(" - smallest", min(clip_lens), inp.gfps)
+        time_frame(" - largest", max(clip_lens), inp.gfps)
+        time_frame(" - average", sum(clip_lens) / len(clip_lens), inp.gfps)
 
     print(f"cuts: {cuts}")
     if len(cut_lens) < 2:
-        time_frame(" - cut length", sum(cut_lens), fps)
+        time_frame(" - cut length", sum(cut_lens), inp.gfps)
     else:
-        time_frame(" - smallest", min(cut_lens), fps)
-        time_frame(" - largest", max(cut_lens), fps)
-        time_frame(" - average", sum(cut_lens) / len(cut_lens), fps)
+        time_frame(" - smallest", min(cut_lens), inp.gfps)
+        time_frame(" - largest", max(cut_lens), inp.gfps)
+        time_frame(" - average", sum(cut_lens) / len(cut_lens), inp.gfps)
     print("")
 
     log.debug(f"Chunks: {chunks}")

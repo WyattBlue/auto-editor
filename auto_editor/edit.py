@@ -48,7 +48,7 @@ def edit_media(
         from auto_editor.formats.timeline import read_json_timeline
 
         args.background, input_path, chunks = read_json_timeline(inp.path, log)
-        inp = FileInfo(input_path, ffmpeg)
+        inp = FileInfo(input_path, ffmpeg, log)
 
     if i < len(args.output_file):
         output_path = args.output_file[i]
@@ -113,11 +113,6 @@ def edit_media(
 
     tracks = len(inp.audios)
 
-    fps = 30.0 if inp.fps is None else float(inp.fps)
-
-    if fps < 1:
-        log.error(f"{inp.basename}: Frame rate cannot be below 1. fps: {fps}")
-
     # Extract subtitles in their native format.
     if len(inp.subtitles) > 0:
         cmd = ["-i", inp.path, "-hide_banner"]
@@ -148,7 +143,7 @@ def edit_media(
     del cmd
 
     if chunks is None:
-        chunks = get_chunks(inp, fps, args, progress, temp, log)
+        chunks = get_chunks(inp, args, progress, temp, log)
 
     if len(chunks) == 1 and chunks[0][2] == 99999:
         log.error("The entire media is cut!")
@@ -169,7 +164,7 @@ def edit_media(
         from auto_editor.formats.timeline import make_json_timeline
 
         make_json_timeline(
-            args.api, inp.path, 0, obj_sheet, chunks, fps, args.background, log
+            args.api, inp.path, 0, obj_sheet, chunks, args.background, log
         )
         return num_cuts, None
 
@@ -188,7 +183,6 @@ def edit_media(
             output_path,
             obj_sheet,
             chunks,
-            fps,
             args.background,
             log,
         )
@@ -197,19 +191,19 @@ def edit_media(
     if args.export == "premiere":
         from auto_editor.formats.premiere import premiere_xml
 
-        premiere_xml(inp, temp, output_path, chunks, fps, log)
+        premiere_xml(inp, temp, output_path, chunks)
         return num_cuts, output_path
 
     if args.export == "final-cut-pro":
         from auto_editor.formats.final_cut_pro import fcp_xml
 
-        fcp_xml(inp, output_path, chunks, fps, log)
+        fcp_xml(inp, output_path, chunks)
         return num_cuts, output_path
 
     if args.export == "shotcut":
         from auto_editor.formats.shotcut import shotcut_xml
 
-        shotcut_xml(inp, output_path, chunks, fps, log)
+        shotcut_xml(inp, output_path, chunks)
         return num_cuts, output_path
 
     def pad_chunk(
@@ -234,7 +228,7 @@ def edit_media(
         if rules.allow_subtitle:
             from auto_editor.render.subtitle import cut_subtitles
 
-            cut_subtitles(ffmpeg, inp, chunks, fps, temp, log)
+            cut_subtitles(ffmpeg, inp, chunks, temp, log)
 
         if rules.allow_audio:
             from auto_editor.render.audio import make_new_audio
@@ -242,7 +236,7 @@ def edit_media(
             for t in range(tracks):
                 temp_file = os.path.join(temp, f"{t}.wav")
                 new_file = os.path.join(temp, f"new{t}.wav")
-                make_new_audio(temp_file, new_file, chunks, log, fps, progress)
+                make_new_audio(temp_file, new_file, chunks, log, inp.gfps, progress)
 
                 if not os.path.isfile(new_file):
                     log.error("Audio file not created.")
@@ -263,7 +257,6 @@ def edit_media(
                             inp,
                             args,
                             chunks,
-                            fps,
                             progress,
                             obj_sheet,
                             rules,

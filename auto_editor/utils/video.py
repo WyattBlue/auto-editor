@@ -29,7 +29,6 @@ def get_vcodec(args, inp: FileInfo, rules: Container) -> str:
                 return rules.vcodecs[0]
 
     if vcodec == "copy":
-        assert inp.videos[0].codec is not None
         return inp.videos[0].codec
 
     if vcodec == "uncompressed":
@@ -51,7 +50,6 @@ def get_acodec(args, inp: FileInfo, rules: Container) -> str:
                 return rules.acodecs[0]
 
     if acodec == "copy":
-        assert inp.audios[0].codec is not None
         return inp.audios[0].codec
     return acodec
 

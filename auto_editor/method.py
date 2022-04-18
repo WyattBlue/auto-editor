@@ -2,7 +2,7 @@ import os
 from math import ceil
 from dataclasses import dataclass, asdict, fields
 
-from typing import Union, Callable
+from typing import List, Tuple, Union, Callable
 
 import numpy as np
 
@@ -71,22 +71,25 @@ def get_stream_data(
     attrs,
     args,
     inp: FileInfo,
-    fps: float,
     progress: ProgressBar,
     temp: str,
     log: Log,
-):
+) -> np.ndarray:
 
     if method == "none":
-        return np.ones((get_media_duration(inp.path, fps, temp, log)), dtype=np.bool_)
+        return np.ones(
+            (get_media_duration(inp.path, inp.gfps, temp, log)), dtype=np.bool_
+        )
     if method == "all":
-        return np.zeros((get_media_duration(inp.path, fps, temp, log)), dtype=np.bool_)
+        return np.zeros(
+            (get_media_duration(inp.path, inp.gfps, temp, log)), dtype=np.bool_
+        )
     if method == "audio":
         if attrs.stream == "all":
             total_list = None
             for i in range(len(inp.audios)):
                 audio_list = get_audio_list(
-                    i, attrs.threshold, fps, progress, temp, log
+                    i, attrs.threshold, inp.gfps, progress, temp, log
                 )
                 if total_list is None:
                     total_list = audio_list
@@ -98,7 +101,7 @@ def get_stream_data(
             return total_list
         else:
             return get_audio_list(
-                attrs.stream, attrs.threshold, fps, progress, temp, log
+                attrs.stream, attrs.threshold, inp.gfps, progress, temp, log
             )
     if method == "motion":
         from auto_editor.analyze.motion import motion_detection
@@ -106,7 +109,7 @@ def get_stream_data(
         if len(inp.videos) == 0:
             log.error("Video stream '0' does not exist.")
 
-        motion_list = motion_detection(inp.path, fps, progress, attrs.width, attrs.blur)
+        motion_list = motion_detection(inp, progress, attrs.width, attrs.blur)
         return np.fromiter((x >= attrs.threshold for x in motion_list), dtype=np.bool_)
 
     if method == "pixeldiff":
@@ -115,11 +118,11 @@ def get_stream_data(
         if len(inp.videos) == 0:
             log.error("Video stream '0' does not exist.")
 
-        pixel_list = pixel_difference(inp.path, fps, progress)
+        pixel_list = pixel_difference(inp, progress)
         return np.fromiter((x >= attrs.threshold for x in pixel_list), dtype=np.bool_)
 
 
-def get_attributes(attrs_str, dataclass, log):
+def get_attributes(attrs_str, dataclass, log: Log):
     from auto_editor.vanparse import parse_dataclass
 
     attrs = parse_dataclass(attrs_str, dataclass)
@@ -139,7 +142,9 @@ def get_attributes(attrs_str, dataclass, log):
     return attrs
 
 
-def get_has_loud(method_str, inp, fps, progress, temp, log, args):
+def get_has_loud(
+    method_str: str, inp: FileInfo, progress: ProgressBar, temp: str, log: Log, args
+) -> np.ndarray:
 
     from auto_editor.utils.types import float_type
 
@@ -201,9 +206,7 @@ def get_has_loud(method_str, inp, fps, progress, temp, log, args):
             if result_array is not None and operand is None:
                 log.error("Logic operator must be between two editing methods.")
 
-            stream_data = get_stream_data(
-                method, attrs, args, inp, fps, progress, temp, log
-            )
+            stream_data = get_stream_data(method, attrs, args, inp, progress, temp, log)
 
             if operand == "not":
                 result_array = np.logical_not(stream_data)
@@ -235,7 +238,9 @@ def get_has_loud(method_str, inp, fps, progress, temp, log, args):
     return result_array
 
 
-def get_chunks(inp, fps, args, progress, temp, log):
+def get_chunks(
+    inp: FileInfo, args, progress: ProgressBar, temp: str, log: Log
+) -> List[Tuple[int, int, float]]:
     from auto_editor.cutting import (
         to_speed_list,
         set_range,
@@ -248,12 +253,14 @@ def get_chunks(inp, fps, args, progress, temp, log):
 
     start_margin, end_margin = args.frame_margin
 
+    fps = inp.gfps
+
     start_margin = seconds_to_frames(start_margin, fps)
     end_margin = seconds_to_frames(end_margin, fps)
     min_clip = seconds_to_frames(args.min_clip_length, fps)
     min_cut = seconds_to_frames(args.min_cut_length, fps)
 
-    has_loud = get_has_loud(args.edit_based_on, inp, fps, progress, temp, log, args)
+    has_loud = get_has_loud(args.edit_based_on, inp, progress, temp, log, args)
     has_loud_length = len(has_loud)
 
     has_loud = apply_mark_as(has_loud, has_loud_length, fps, args, log)

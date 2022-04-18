@@ -10,6 +10,7 @@ def desc_options(parser):
 def main(sys_args=sys.argv[1:]):
     from auto_editor.vanparse import ArgumentParser
     from auto_editor.ffwrapper import FFmpeg, FileInfo
+    from auto_editor.utils.log import Log
 
     parser = desc_options(ArgumentParser("desc"))
     args = parser.parse_args(sys_args)
@@ -18,7 +19,7 @@ def main(sys_args=sys.argv[1:]):
 
     print("")
     for input_file in args.input:
-        inp = FileInfo(input_file, ffmpeg)
+        inp = FileInfo(input_file, ffmpeg, Log())
         if "description" in inp.metadata:
             print(inp.metadata["description"], end="\n\n")
         else:

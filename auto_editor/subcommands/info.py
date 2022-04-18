@@ -44,14 +44,6 @@ def main(sys_args=sys.argv[1:]):
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
-    def aspect_str(w: Optional[str], h: Optional[str]) -> str:
-        if w is None or h is None:
-            return ""
-        w_, h_ = aspect_ratio(int(w), int(h))
-        if w_ is None:
-            return ""
-        return f" ({w_}:{h_})"
-
     file_info = {}
 
     for file in args.input:
@@ -61,7 +53,7 @@ def main(sys_args=sys.argv[1:]):
         else:
             Log().error(f"Could not find file: {file}")
 
-        inp = FileInfo(file, ffmpeg)
+        inp = FileInfo(file, ffmpeg, Log())
 
         file_info[file] = {
             "video": [],
@@ -96,15 +88,13 @@ def main(sys_args=sys.argv[1:]):
                 text += f"     - fps: {stream.fps}\n"
                 vid["fps"] = float(stream.fps)
 
-            w = stream.width
-            h = stream.height
+            w, h = stream.width, stream.height
+            w_, h_ = aspect_ratio(w, h)
+            text += f"     - resolution: {w}x{h} ({w_}:{h_})\n"
 
-            if w is not None and h is not None:
-                text += f"     - resolution: {w}x{h}{aspect_str(w, h)}\n"
-
-                vid["width"] = int(w)
-                vid["height"] = int(h)
-                vid["aspect_ratio"] = aspect_ratio(int(w), int(h))
+            vid["width"] = stream.width
+            vid["height"] = stream.height
+            vid["aspect_ratio"] = aspect_ratio(w, h)
 
             if stream.bitrate is not None:
                 text += f"     - bitrate: {stream.bitrate}\n"
@@ -126,7 +116,7 @@ def main(sys_args=sys.argv[1:]):
             text += f"     - samplerate: {stream.samplerate}\n"
 
             aud["codec"] = stream.codec
-            aud["samplerate"] = int(stream.samplerate)
+            aud["samplerate"] = stream.samplerate
 
             if stream.bitrate is not None:
                 text += f"     - bitrate: {stream.bitrate}\n"

@@ -6,6 +6,8 @@ import os
 import sys
 import json
 
+from typing import List, Tuple, Union
+
 from auto_editor.utils.log import Log
 
 
@@ -20,7 +22,7 @@ def check_file(path: str, log: Log):
         log.error(f"Could not locate media file: '{path}'")
 
 
-def validate_chunks(chunks, log: Log):
+def validate_chunks(chunks, log: Log) -> List[Tuple[int, int, float]]:
 
     if len(chunks) == 0:
         log.error("Chunks are empty!")
@@ -80,8 +82,14 @@ def read_json_timeline(json_file: str, log: Log):
 
 
 def make_json_timeline(
-    version, media_file, out, obj_sheet, chunks, fps, background, log
-):
+    version: str,
+    media_file: str,
+    out: Union[str, int],
+    obj_sheet,
+    chunks: List[Tuple[int, int, float]],
+    background,
+    log: Log,
+) -> None:
 
     if version not in ("0.1.0", "0.2.0"):
         log.error(f"Version {version} is not supported!")

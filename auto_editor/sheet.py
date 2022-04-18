@@ -13,16 +13,6 @@ class Sheet:
         self, pool, inp: FileInfo, chunks: List[Tuple[int, int, float]], log: Log
     ) -> None:
 
-        if len(inp.videos) > 0:
-            w = inp.videos[0].width
-            h = inp.videos[0].height
-            if w is None or h is None:
-                width, height = 1280, 720
-            else:
-                width, height = int(w), int(h)
-        else:
-            width, height = 1280, 720
-
         ending = chunks[:]
         if ending[-1][2] == 99999:
             ending.pop()
@@ -32,10 +22,10 @@ class Sheet:
             end = ending[-1][1]
 
         _vars = {
-            "width": width,
-            "height": height,
-            "centerX": width // 2,
-            "centerY": height // 2,
+            "width": inp.gwidth,
+            "height": inp.gheight,
+            "centerX": inp.gwidth // 2,
+            "centerY": inp.gheight // 2,
             "start": 0,
             "end": end,
         }
