@@ -99,7 +99,7 @@ def render_av(
     rules,
     temp: str,
     log: Log,
-) -> Tuple[str, str, bool]:
+) -> Tuple[str, bool]:
     try:
         import av
     except ImportError:
@@ -344,4 +344,4 @@ def render_av(
             # Run again to show errors even if it might not work.
             ffmpeg.run(cmd)
 
-    return "video", spedup, apply_video_later
+    return spedup, apply_video_later

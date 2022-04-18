@@ -232,6 +232,10 @@ class FileInfo:
         for line in info.split("\n"):
             if re.search(r"Stream #", line):
                 if re.search(r"Video:", line):
+                    codec = regex_match(r"Video:\s(?P<match>\w+)", line)
+                    if codec is None:
+                        log.error("Auto-Editor got 'None' when probing video codec")
+
                     w = regex_match(r"(?P<match>[0-9]+)x[0-9]+[\s,]", line)
                     h = regex_match(r"[0-9]+x(?P<match>[0-9]+)[\s,]", line)
                     _fps = regex_match(r"\s(?P<match>[0-9\.]+)\stbr", line)
@@ -239,17 +243,15 @@ class FileInfo:
                     if w is None or h is None:
                         log.error("Auto-Editor got 'None' when probing resolution")
                     if _fps is None:
-                        log.error("Auto-Editor got 'None' when probing fps")
+                        if codec not in ("png", "jpeg", "jpg"):
+                            log.error("Auto-Editor got 'None' when probing fps")
+                        _fps = "30"
 
                     fps = float(_fps)
                     if fps < 1:
                         log.error(
                             f"{self.basename}: Frame rate cannot be below 1. fps: {fps}"
                         )
-
-                    codec = regex_match(r"Video:\s(?P<match>\w+)", line)
-                    if codec is None:
-                        log.error("Auto-Editor got 'None' when probing video codec")
 
                     self.videos.append(
                         VideoStream(
