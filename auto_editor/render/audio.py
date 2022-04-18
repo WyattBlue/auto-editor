@@ -46,7 +46,8 @@ def make_new_audio(
             writer = ArrWriter(np.zeros((0, 2), dtype=np.int16))
 
             phasevocoder(2, speed=the_speed).run(reader, writer)
-            main_writer.writeframes(writer.output)
+            if writer.output.shape[0] != 0:
+                main_writer.writeframes(writer.output)
 
         progress.tick(c)
     progress.end()

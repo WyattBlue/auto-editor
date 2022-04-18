@@ -319,6 +319,10 @@ def main(sys_args: Optional[List[str]] = None):
             ("alanguage", "eng"),
         )
 
+    # PR #260
+    def high_speed_test():
+        run_program(["example.mp4", "--video-speed", "99998"])
+
     # Issue #200
     def url_test():
         run_program(["https://github.com/WyattBlue/auto-editor/raw/master/example.mp4"])
@@ -610,6 +614,7 @@ def main(sys_args: Optional[List[str]] = None):
         tester.run_test(version_test)
         tester.run_test(parser_test)
         tester.run_test(example_tests)
+        tester.run_test(high_speed_test)
         tester.run_test(url_test)
         tester.run_test(unit_tests)
         tester.run_test(backwards_range_test)
