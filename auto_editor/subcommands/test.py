@@ -204,10 +204,10 @@ def main(sys_args: Optional[List[str]] = None):
 
     def read_api_0_1():
         check_for_error(
-            ["resources/0.1-non-zero-start.json"],
+            ["resources/json/0.1-non-zero-start.json"],
             "Error! First chunk must start with 0",
         )
-        check_for_error(["resources/0.1-disjoint.json"], "Error! Chunk disjointed at")
+        check_for_error(["resources/json/0.1-disjoint.json"], "Error! Chunk disjointed at")
 
     def help_tests():
         """check the help option, its short, and help on options and groups."""
@@ -262,12 +262,12 @@ def main(sys_args: Optional[List[str]] = None):
 
     def tsm_0a5_test():
         make_np_list(
-            "resources/example-cut-s16le.wav", "resources/data/example_0.5_speed.npz", 0.5
+            "resources/wav/example-cut-s16le.wav", "resources/data/example_0.5_speed.npz", 0.5
         )
 
     def tsm_2a0_test():
         make_np_list(
-            "resources/example-cut-s16le.wav", "resources/data/example_2.0_speed.npz", 2
+            "resources/wav/example-cut-s16le.wav", "resources/data/example_2.0_speed.npz", 2
         )
 
     def info():
@@ -275,7 +275,7 @@ def main(sys_args: Optional[List[str]] = None):
         run_program(["info", "resources/only-video/man-on-green-screen.mp4"])
         run_program(["info", "resources/multi-track.mov"])
         run_program(["info", "resources/new-commentary.mp3"])
-        run_program(["info", "resources/test.mkv"])
+        run_program(["info", "resources/testsrc.mkv"])
 
     def levels():
         run_program(["levels", "resources/multi-track.mov"])
