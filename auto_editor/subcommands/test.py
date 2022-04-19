@@ -257,29 +257,29 @@ def main(sys_args: Optional[List[str]] = None):
 
     def tsm_1a5_test():
         make_np_list(
-            "resources/example_cut_s16le.wav", "resources/example_1.5_speed.npz", 1.5
+            "resources/wav/example-cut-s16le.wav", "resources/data/example_1.5_speed.npz", 1.5
         )
 
     def tsm_0a5_test():
         make_np_list(
-            "resources/example_cut_s16le.wav", "resources/example_0.5_speed.npz", 0.5
+            "resources/example-cut-s16le.wav", "resources/data/example_0.5_speed.npz", 0.5
         )
 
     def tsm_2a0_test():
         make_np_list(
-            "resources/example_cut_s16le.wav", "resources/example_2.0_speed.npz", 2
+            "resources/example-cut-s16le.wav", "resources/data/example_2.0_speed.npz", 2
         )
 
     def info():
         run_program(["info", "example.mp4"])
-        run_program(["info", "resources/man_on_green_screen.mp4"])
+        run_program(["info", "resources/only-video/man-on-green-screen.mp4"])
         run_program(["info", "resources/multi-track.mov"])
-        run_program(["info", "resources/newCommentary.mp3"])
+        run_program(["info", "resources/new-commentary.mp3"])
         run_program(["info", "resources/test.mkv"])
 
     def levels():
         run_program(["levels", "resources/multi-track.mov"])
-        run_program(["levels", "resources/newCommentary.mp3"])
+        run_program(["levels", "resources/new-commentary.mp3"])
 
     def subdump():
         run_program(["subdump", "resources/subtitle.mp4"])
@@ -385,9 +385,9 @@ def main(sys_args: Optional[List[str]] = None):
         Feed auto-editor a gif file and make sure it can spit out a correctly formated
         gif. No editing is requested.
         """
-        run_program(["resources/man_on_green_screen.gif", "--edit", "none"])
+        run_program(["resources/only-video/man-on-green-screen.gif", "--edit", "none"])
         av_inspect(
-            "resources/man_on_green_screen_ALTERED.gif",
+            "resources/only-video/man-on-green-screen_ALTERED.gif",
             ("vcodec", "gif"),
         )
 
@@ -415,7 +415,7 @@ def main(sys_args: Optional[List[str]] = None):
         )
         os.remove("out.mp4")
 
-        run_program(["resources/test.mkv", "-o", "out"])
+        run_program(["resources/testsrc.mkv", "-o", "out"])
         av_inspect(
             "out.mkv",
             ("vcodec", "h264"),
@@ -428,7 +428,7 @@ def main(sys_args: Optional[List[str]] = None):
         run_program(["example.mp4", "--progress", "ascii"])
 
     def silent_threshold():
-        run_program(["resources/newCommentary.mp3", "--silent_threshold", "0.1"])
+        run_program(["resources/new-commentary.mp3", "--silent_threshold", "0.1"])
 
     def track_tests():
         run_program(["resources/multi-track.mov", "--keep_tracks_seperate"])
@@ -490,11 +490,11 @@ def main(sys_args: Optional[List[str]] = None):
         for test_name in (
             "aac.m4a",
             "alac.m4a",
-            "pcm_f32le.wav",
+            "wav/pcm-f32le.wav",
+            "wav/pcm-s32le.wav",
             "multi-track.mov",
-            "pcm_s32le.wav",
             "subtitle.mp4",
-            "test.mkv",
+            "testsrc.mkv",
         ):
 
             test_file = f"resources/{test_name}"
@@ -517,7 +517,7 @@ def main(sys_args: Optional[List[str]] = None):
         os.remove("hmm.mp4")
 
     def thumbnail_test():
-        run_program(["resources/embedded_thumbnail.mp4"])
+        run_program(["resources/embedded-thumbnail.mp4"])
         # Add code to see if thumbnail is in output later.
         # container = av.open("resources/embeded_thumbnail_ALTERED.mp4", "r")
         # video = container.streams.video[1]
@@ -525,7 +525,7 @@ def main(sys_args: Optional[List[str]] = None):
     def motion_tests():
         run_program(
             [
-                "resources/man_on_green_screen.mp4",
+                "resources/only-video/man-on-green-screen.mp4",
                 "--edit",
                 "motion",
                 "--debug",
@@ -538,7 +538,7 @@ def main(sys_args: Optional[List[str]] = None):
             ]
         )
         run_program(
-            ["resources/man_on_green_screen.mp4", "--edit", "motion:threshold=0"]
+            ["resources/only-video/man-on-green-screen.mp4", "--edit", "motion:threshold=0"]
         )
 
     def edit_positive_tests():
@@ -555,11 +555,11 @@ def main(sys_args: Optional[List[str]] = None):
 
     def edit_negative_tests():
         check_for_error(
-            ["resources/example_cut_s16le.wav", "--edit", "motion"],
+            ["resources/wav/example-cut-s16le.wav", "--edit", "motion"],
             "Video stream '0' does not exist",
         )
         check_for_error(
-            ["resources/man_on_green_screen.gif", "--edit", "audio"],
+            ["resources/only-video/man-on-green-screen.gif", "--edit", "audio"],
             "Audio stream '0' does not exist",
         )
         check_for_error(
