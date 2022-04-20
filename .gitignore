@@ -6,6 +6,7 @@
 *.mlt
 *.fcpxml
 *https*
+example.json
 
 # Python Generated Files
 __pycache__/
