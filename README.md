@@ -42,13 +42,13 @@ For example, edit out motionlessness in a video by setting `--edit motion`.
 
 ```
 # cut out sections where percentage of motion is less than 2.
-auto-editor example.mp4 --edit motion --motion-threshold 2%
+auto-editor example.mp4 --edit motion:threshold=2%
 
 # --edit is set to "audio" by default
 auto-editor example.mp4 --silent-threshold 4%
 
 # audio and motion thresholds are toggled independently
-auto-editor example.mp4 --edit audio_or_motion --silent-threshold 3% --motion-threshold 6%
+auto-editor example.mp4 --edit 'audio:threshold=3% or motion:threshold=6%'
 ```
 
 <h2 align="center">Exporting to Editors</h2>
