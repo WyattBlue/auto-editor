@@ -2,12 +2,13 @@
 import os.path
 
 # Typing
-from typing import List, Optional
+from typing import List, Tuple, Optional
 
 # Included Libraries
 from .func import fnone
 from .container import Container
-from auto_editor.ffwrapper import FileInfo
+from auto_editor.utils.log import Log
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 
 
 def fset(cmd: List[str], option: str, value: str) -> List[str]:
@@ -73,18 +74,26 @@ def video_quality(cmd: List[str], args, inp: FileInfo, rules: Container) -> List
 
 
 def mux_quality_media(
-    ffmpeg, video_output, rules: Container, write_file, container, args, inp, temp, log
+    ffmpeg: FFmpeg,
+    video_output: List[Tuple[int, bool, str, bool]],
+    rules: Container,
+    write_file: str,
+    container: str,
+    args,
+    inp: FileInfo,
+    temp: str,
+    log: Log,
 ) -> None:
     s_tracks = 0 if not rules.allow_subtitle else len(inp.subtitles)
     a_tracks = 0 if not rules.allow_audio else len(inp.audios)
+    v_tracks = 0 if not rules.allow_video else len(inp.videos)
 
     cmd = ["-hide_banner", "-y", "-i", inp.path]
 
-    v_tracks = 0
-    for spedup_file, _ in video_output:
-        if spedup_file is not None:
-            cmd.extend(["-i", spedup_file])
-            v_tracks += 1
+    # fmt: off
+    for _, _, path, _, in video_output:
+        cmd.extend(["-i", path])
+    # fmt: on
 
     if a_tracks > 0:
         if args.keep_tracks_seperate and rules.max_audios is None:
@@ -137,16 +146,20 @@ def mux_quality_media(
             if track.lang is not None:
                 cmd.extend([f"-metadata:s:{marker}:{i}", f"language={track.lang}"])
 
-    for _, apply_video in video_output:
-        if apply_video:
-            cmd = video_quality(cmd, args, inp, rules)
+    for track, is_video, path, apply_video in video_output:
+        if is_video:
+            if apply_video:
+                cmd = video_quality(cmd, args, inp, rules)
+            else:
+                cmd.extend([f"-c:v:{track}", "copy"])
         else:
-            cmd.extend(["-c:v", "copy"])
-        break
+            cmd.extend(
+                [f"-c:v:{track}", "png", f"-disposition:v:{track}", "attached_pic"]
+            )
 
     if s_tracks > 0:
         scodec = inp.subtitles[0].codec
-        if inp.ext == "." + container:
+        if inp.ext == f".{container}":
             cmd.extend(["-c:s", scodec])
         elif rules.scodecs is not None:
             if scodec not in rules.scodecs:

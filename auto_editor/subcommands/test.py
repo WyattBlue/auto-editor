@@ -207,7 +207,9 @@ def main(sys_args: Optional[List[str]] = None):
             ["resources/json/0.1-non-zero-start.json"],
             "Error! First chunk must start with 0",
         )
-        check_for_error(["resources/json/0.1-disjoint.json"], "Error! Chunk disjointed at")
+        check_for_error(
+            ["resources/json/0.1-disjoint.json"], "Error! Chunk disjointed at"
+        )
 
     def help_tests():
         """check the help option, its short, and help on options and groups."""
@@ -257,17 +259,23 @@ def main(sys_args: Optional[List[str]] = None):
 
     def tsm_1a5_test():
         make_np_list(
-            "resources/wav/example-cut-s16le.wav", "resources/data/example_1.5_speed.npz", 1.5
+            "resources/wav/example-cut-s16le.wav",
+            "resources/data/example_1.5_speed.npz",
+            1.5,
         )
 
     def tsm_0a5_test():
         make_np_list(
-            "resources/wav/example-cut-s16le.wav", "resources/data/example_0.5_speed.npz", 0.5
+            "resources/wav/example-cut-s16le.wav",
+            "resources/data/example_0.5_speed.npz",
+            0.5,
         )
 
     def tsm_2a0_test():
         make_np_list(
-            "resources/wav/example-cut-s16le.wav", "resources/data/example_2.0_speed.npz", 2
+            "resources/wav/example-cut-s16le.wav",
+            "resources/data/example_2.0_speed.npz",
+            2,
         )
 
     def info():
@@ -518,9 +526,8 @@ def main(sys_args: Optional[List[str]] = None):
 
     def thumbnail_test():
         run_program(["resources/embedded-thumbnail.mp4"])
-        # Add code to see if thumbnail is in output later.
-        # container = av.open("resources/embeded_thumbnail_ALTERED.mp4", "r")
-        # video = container.streams.video[1]
+        container = av.open("resources/embedded-thumbnail_ALTERED.mp4", "r")
+        assert len(container.streams.video) == 2
 
     def motion_tests():
         run_program(
@@ -538,7 +545,11 @@ def main(sys_args: Optional[List[str]] = None):
             ]
         )
         run_program(
-            ["resources/only-video/man-on-green-screen.mp4", "--edit", "motion:threshold=0"]
+            [
+                "resources/only-video/man-on-green-screen.mp4",
+                "--edit",
+                "motion:threshold=0",
+            ]
         )
 
     def edit_positive_tests():
@@ -619,6 +630,7 @@ def main(sys_args: Optional[List[str]] = None):
         tester.run_test(unit_tests)
         tester.run_test(backwards_range_test)
         tester.run_test(cut_out_test)
+        tester.run_test(thumbnail_test)
         tester.run_test(gif_test, cleanup=clean_all)
         tester.run_test(margin_tests)
         tester.run_test(input_extension)
@@ -635,7 +647,6 @@ def main(sys_args: Optional[List[str]] = None):
         tester.run_test(export_tests)
         tester.run_test(codec_tests)
         tester.run_test(combine_tests)
-        tester.run_test(thumbnail_test)
         tester.run_test(motion_tests)
         tester.run_test(edit_positive_tests)
         tester.run_test(edit_negative_tests)
