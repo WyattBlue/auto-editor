@@ -56,6 +56,7 @@ mp4 = {
     "allow_video": True,
     "allow_audio": True,
     "allow_subtitle": True,
+    "allow_image": True,
     "vcodecs": ["h264", "hevc", "vp9", "av1", "mpeg4", "mpeg2video", "mjpeg"],
     "acodecs": ["aac", "mp3", "opus", "flac", "vorbis", "mp2"],
     "disallow_v": ["prores", "apng", "gif", "msmpeg4v3", "flv1", "vp8", "rawvideo"],
@@ -249,6 +250,7 @@ class Container:
     allow_video: bool = False
     allow_audio: bool = False
     allow_subtitle: bool = False
+    allow_image: bool = False
     max_videos: Optional[int] = None
     max_audios: Optional[int] = None
     max_subtitles: Optional[int] = None

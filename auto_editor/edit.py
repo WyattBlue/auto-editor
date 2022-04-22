@@ -246,15 +246,7 @@ def edit_media(
 
         if rules.allow_video:
             for v, vid in enumerate(inp.videos):
-                if vid.codec in ("png", "jpeg", "jpg", "webp"):
-                    out_path = os.path.join(temp, f"{v}.{vid.codec}")
-                    # fmt: off
-                    ffmpeg.run(["-i", inp.path, "-map", "0:v", "-map", "-0:V",
-                        "-c", "copy", out_path])
-                    # fmt: on
-                    video_output.append((v, False, out_path, False))
-                    del out_path
-                else:
+                if vid.codec not in ("png", "mjpeg", "webp"):
                     out_path, apply_later = render_av(
                         ffmpeg,
                         v,
@@ -267,8 +259,14 @@ def edit_media(
                         temp,
                         log,
                     )
-
                     video_output.append((v, True, out_path, apply_later))
+                elif rules.allow_image:
+                    out_path = os.path.join(temp, f"{v}.{vid.codec}")
+                    # fmt: off
+                    ffmpeg.run(["-i", inp.path, "-map", "0:v", "-map", "-0:V",
+                        "-c", "copy", out_path])
+                    # fmt: on
+                    video_output.append((v, False, out_path, False))
 
         log.conwrite("Writing output file")
 
