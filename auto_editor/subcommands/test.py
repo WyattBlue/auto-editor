@@ -2,6 +2,7 @@
 import os
 import sys
 import shutil
+import logging
 import platform
 import subprocess
 from time import perf_counter
@@ -32,30 +33,6 @@ def test_options(parser):
         help="Set what category of tests to run.",
     )
     return parser
-
-
-def av_inspect(path: str, *args):
-    container = av.open(path, "r")
-
-    media = {}
-    if len(container.streams.video) > 0:
-        video = container.streams.video[0]
-        media["fps"] = video.average_rate
-        media["resolution"] = video.width, video.height
-        media["vcodec"] = video.codec.name
-        media["vlanguage"] = video.language
-
-    if len(container.streams.audio) > 0:
-        audio = container.streams.audio[0]
-        media["samplerate"] = audio.rate
-        media["acodec"] = audio.codec.name
-        media["alanguage"] = audio.language
-
-    for key, expected in args:
-        if media[key] != expected:
-            raise Exception(
-                f"Media attribute '{key}' was '{media[key]}', expected '{expected}'."
-            )
 
 
 def pipe_to_console(cmd: List[str]) -> Tuple[int, str, str]:
@@ -173,9 +150,9 @@ class Tester:
             sys.exit(1)
         except Exception as e:
             self.failed_tests += 1
-            print(f"Test '{func.__name__}' failed.")
-            print(e)
+            print(f"Test '{func.__name__}' failed.\n{e}")
             if not allow_fail:
+                logging.error("", exc_info=True)
                 clean_all()
                 sys.exit(1)
         else:
@@ -300,32 +277,26 @@ def main(sys_args: Optional[List[str]] = None):
 
     def example_tests():
         run_program(["example.mp4", "--video_codec", "uncompressed"])
-        av_inspect(
-            "example_ALTERED.mp4",
-            ("fps", 30),
-            (
-                "resolution",
-                (1280, 720),
-            ),
-            ("vcodec", "mpeg4"),
-            ("acodec", "aac"),
-            ("samplerate", 48000),
-        )
+        with av.open("example_ALTERED.mp4") as cn:
+            video = cn.streams.video[0]
+            assert video.average_rate == 30
+            assert video.width == 1280
+            assert video.height == 720
+            assert video.codec.name == "mpeg4"
+            assert cn.streams.audio[0].codec.name == "aac"
+            assert cn.streams.audio[0].rate == 48000
 
         run_program(["example.mp4"])
-        av_inspect(
-            "example_ALTERED.mp4",
-            ("fps", 30),
-            (
-                "resolution",
-                (1280, 720),
-            ),
-            ("vcodec", "h264"),
-            ("acodec", "aac"),
-            ("samplerate", 48000),
-            ("vlanguage", "eng"),
-            ("alanguage", "eng"),
-        )
+        with av.open("example_ALTERED.mp4") as cn:
+            video = cn.streams.video[0]
+            assert video.average_rate == 30
+            assert video.width == 1280
+            assert video.height == 720
+            assert video.codec.name == "h264"
+            assert cn.streams.audio[0].codec.name == "aac"
+            assert cn.streams.audio[0].rate == 48000
+            assert video.language == "eng"
+            assert cn.streams.audio[0].language == "eng"
 
     # PR #260
     def high_speed_test():
@@ -394,10 +365,8 @@ def main(sys_args: Optional[List[str]] = None):
         gif. No editing is requested.
         """
         run_program(["resources/only-video/man-on-green-screen.gif", "--edit", "none"])
-        av_inspect(
-            "resources/only-video/man-on-green-screen_ALTERED.gif",
-            ("vcodec", "gif"),
-        )
+        with av.open("resources/only-video/man-on-green-screen_ALTERED.gif") as cn:
+            assert cn.streams.video[0].codec.name == "gif"
 
     def margin_tests():
         run_program(["example.mp4", "-m", "3"])
@@ -417,17 +386,15 @@ def main(sys_args: Optional[List[str]] = None):
     def output_extension():
         # Add input extension to output name if no output extension is given.
         run_program(["example.mp4", "-o", "out"])
-        av_inspect(
-            "out.mp4",
-            ("vcodec", "h264"),
-        )
+        with av.open("out.mp4") as cn:
+            assert cn.streams.video[0].codec.name == "h264"
+
         os.remove("out.mp4")
 
         run_program(["resources/testsrc.mkv", "-o", "out"])
-        av_inspect(
-            "out.mkv",
-            ("vcodec", "h264"),
-        )
+        with av.open("out.mkv") as cn:
+            assert cn.streams.video[0].codec.name == "h264"
+
         os.remove("out.mkv")
 
     def progress_ops_test():
@@ -447,26 +414,18 @@ def main(sys_args: Optional[List[str]] = None):
 
     def scale_tests():
         run_program(["example.mp4", "--scale", "1.5"])
-        av_inspect(
-            "example_ALTERED.mp4",
-            ("fps", 30),
-            (
-                "resolution",
-                (1920, 1080),
-            ),
-            ("samplerate", 48000),
-        )
+        with av.open("example_ALTERED.mp4") as cn:
+            assert cn.streams.video[0].average_rate == 30
+            assert cn.streams.video[0].width == 1920
+            assert cn.streams.video[0].height == 1080
+            assert cn.streams.audio[0].rate == 48000
 
         run_program(["example.mp4", "--scale", "0.2"])
-        av_inspect(
-            "example_ALTERED.mp4",
-            ("fps", 30),
-            (
-                "resolution",
-                (256, 144),
-            ),
-            ("samplerate", 48000),
-        )
+        with av.open("example_ALTERED.mp4") as cn:
+            assert cn.streams.video[0].average_rate == 30
+            assert cn.streams.video[0].width == 256
+            assert cn.streams.video[0].height == 144
+            assert cn.streams.audio[0].rate == 48000
 
     def various_errors_test():
         check_for_error(
@@ -524,10 +483,15 @@ def main(sys_args: Optional[List[str]] = None):
         run_program(["example.mp4", "hmm.mp4", "--combine_files", "--debug"])
         os.remove("hmm.mp4")
 
-    def thumbnail_test():
-        run_program(["resources/embedded-thumbnail.mp4"])
-        container = av.open("resources/embedded-thumbnail_ALTERED.mp4", "r")
-        assert len(container.streams.video) == 2
+    def image_test():
+        run_program(["resources/embedded-image/h264-png.mp4"])
+        with av.open("resources/embedded-image/h264-png_ALTERED.mp4", "r") as cn:
+            assert cn.streams.video[0].codec.name == "h264"
+            assert cn.streams.video[1].codec.name == "png"
+
+        run_program(["resources/embedded-image/h264-png.mkv"])
+        with av.open("resources/embedded-image/h264-png_ALTERED.mkv", "r") as cn:
+            assert cn.streams.video[0].codec.name == "h264"
 
     def motion_tests():
         run_program(
@@ -630,7 +594,7 @@ def main(sys_args: Optional[List[str]] = None):
         tester.run_test(unit_tests)
         tester.run_test(backwards_range_test)
         tester.run_test(cut_out_test)
-        tester.run_test(thumbnail_test)
+        tester.run_test(image_test)
         tester.run_test(gif_test, cleanup=clean_all)
         tester.run_test(margin_tests)
         tester.run_test(input_extension)

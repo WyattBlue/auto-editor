@@ -86,13 +86,16 @@ def mux_quality_media(
 ) -> None:
     s_tracks = 0 if not rules.allow_subtitle else len(inp.subtitles)
     a_tracks = 0 if not rules.allow_audio else len(inp.audios)
-    v_tracks = 0 if not rules.allow_video else len(inp.videos)
+    v_tracks = 0 if not rules.allow_video else len(video_output)
 
     cmd = ["-hide_banner", "-y", "-i", inp.path]
 
     # fmt: off
-    for _, _, path, _, in video_output:
-        cmd.extend(["-i", path])
+    for _, is_video, path, _, in video_output:
+        if is_video or rules.allow_image:
+            cmd.extend(["-i", path])
+        else:
+            v_tracks -= 1
     # fmt: on
 
     if a_tracks > 0:
@@ -130,7 +133,18 @@ def mux_quality_media(
     for i in range(total_streams):
         cmd.extend(["-map", f"{i+1}:0"])
 
-    cmd.extend(["-map_metadata", "0"])  # Must explicitly set this in ffmpeg 5.x
+    cmd.extend(["-map_metadata", "0"])
+
+    for track, is_video, path, apply_video in video_output:
+        if is_video:
+            if apply_video:
+                cmd = video_quality(cmd, args, inp, rules)
+            else:
+                cmd.extend([f"-c:v:{track}", "copy"])
+        elif rules.allow_image:
+            cmd.extend(
+                [f"-c:v:{track}", "png", f"-disposition:v:{track}", "attached_pic"]
+            )
 
     # Copy lang metadata
     streams = (
@@ -145,17 +159,6 @@ def mux_quality_media(
                 break
             if track.lang is not None:
                 cmd.extend([f"-metadata:s:{marker}:{i}", f"language={track.lang}"])
-
-    for track, is_video, path, apply_video in video_output:
-        if is_video:
-            if apply_video:
-                cmd = video_quality(cmd, args, inp, rules)
-            else:
-                cmd.extend([f"-c:v:{track}", "copy"])
-        else:
-            cmd.extend(
-                [f"-c:v:{track}", "png", f"-disposition:v:{track}", "attached_pic"]
-            )
 
     if s_tracks > 0:
         scodec = inp.subtitles[0].codec
