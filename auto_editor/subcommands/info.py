@@ -4,6 +4,10 @@ import os.path
 
 from typing import Optional
 
+import av
+
+av.logging.set_level(av.logging.PANIC)
+
 
 def info_options(parser):
     parser.add_argument("--json", flag=True, help="Export info in JSON format.")
@@ -72,9 +76,8 @@ def main(sys_args=sys.argv[1:]):
             vid = {}
             vid["codec"] = stream.codec
 
-            import av
-
             container = av.open(file, "r")
+
             pix_fmt = container.streams.video[track].pix_fmt
             text += f"     - pix_fmt: {pix_fmt}\n"
             vid["pix_fmt"] = pix_fmt

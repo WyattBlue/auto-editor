@@ -102,6 +102,8 @@ def render_av(
 ) -> Tuple[str, bool]:
     try:
         import av
+
+        av.logging.set_level(av.logging.PANIC)
     except ImportError:
         log.import_error("av")
     try:

@@ -11,6 +11,8 @@ from time import perf_counter
 import av
 import numpy as np
 
+av.logging.set_level(av.logging.PANIC)
+
 # Typing
 from typing import List, Tuple, Callable, NoReturn, Optional
 
