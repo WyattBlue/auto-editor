@@ -184,6 +184,7 @@ containers: Dict[str, Dict[str, Any]] = {
         "allow_video": True,
         "allow_audio": True,
         "allow_subtitle": True,
+        "allow_image": True,
         "vcodecs": [
             "h264",
             "hevc",

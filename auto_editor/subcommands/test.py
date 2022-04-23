@@ -491,9 +491,20 @@ def main(sys_args: Optional[List[str]] = None):
             assert cn.streams.video[0].codec.name == "h264"
             assert cn.streams.video[1].codec.name == "png"
 
+        run_program(["resources/embedded-image/h264-mjpeg.mp4"])
+        with av.open("resources/embedded-image/h264-mjpeg_ALTERED.mp4", "r") as cn:
+            assert cn.streams.video[0].codec.name == "h264"
+            assert cn.streams.video[1].codec.name == "mjpeg"
+
         run_program(["resources/embedded-image/h264-png.mkv"])
         with av.open("resources/embedded-image/h264-png_ALTERED.mkv", "r") as cn:
             assert cn.streams.video[0].codec.name == "h264"
+            assert cn.streams.video[1].codec.name == "png"
+
+        run_program(["resources/embedded-image/h264-mjpeg.mkv"])
+        with av.open("resources/embedded-image/h264-mjpeg_ALTERED.mkv", "r") as cn:
+            assert cn.streams.video[0].codec.name == "h264"
+            assert cn.streams.video[1].codec.name == "mjpeg"
 
     def motion_tests():
         run_program(

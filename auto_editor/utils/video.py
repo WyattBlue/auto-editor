@@ -142,8 +142,9 @@ def mux_quality_media(
             else:
                 cmd.extend([f"-c:v:{track}", "copy"])
         elif rules.allow_image:
+            ext = os.path.splitext(path)[1][1:]
             cmd.extend(
-                [f"-c:v:{track}", "png", f"-disposition:v:{track}", "attached_pic"]
+                [f"-c:v:{track}", ext, f"-disposition:v:{track}", "attached_pic"]
             )
 
     # Copy lang metadata
