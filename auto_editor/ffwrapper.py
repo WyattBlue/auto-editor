@@ -245,7 +245,7 @@ class FileInfo:
                     if _fps is None:
                         if codec not in ("png", "mjpeg", "webp"):
                             log.error("Auto-Editor got 'None' when probing fps")
-                        _fps = "30"
+                        _fps = "25"
 
                     try:
                         fps = float(_fps)

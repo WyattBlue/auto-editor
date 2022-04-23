@@ -2,7 +2,7 @@ import sys
 import json
 import os.path
 
-from typing import Optional
+from typing import Dict, Union, Any
 
 import av
 
@@ -17,15 +17,7 @@ def info_options(parser):
         flag=True,
         help="Display the number of Variable Frame Rate (VFR) frames.",
     )
-    parser.add_argument(
-        "--include-timebase",
-        "--has-timebase",
-        flag=True,
-        help="Show what timebase the video streams have.",
-    )
-    parser.add_argument(
-        "--ffmpeg-location", default=None, help="Point to your custom ffmpeg file."
-    )
+    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
     parser.add_argument(
         "--my-ffmpeg",
         flag=True,
@@ -48,17 +40,13 @@ def main(sys_args=sys.argv[1:]):
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
-    file_info = {}
+    file_info: Dict[str, Union[List[Dict[str, Any]], Dict[str, Any]]] = {}
 
     for file in args.input:
-        text = ""
-        if os.path.exists(file):
-            text += f"file: {file}\n"
-        else:
+        if not os.path.isfile(file):
             Log().error(f"Could not find file: {file}")
 
         inp = FileInfo(file, ffmpeg, Log())
-
         file_info[file] = {
             "video": [],
             "audio": [],
@@ -66,105 +54,48 @@ def main(sys_args=sys.argv[1:]):
             "container": {},
         }
 
-        if len(inp.videos) > 0:
-            text += f" - video tracks: {len(inp.videos)}\n"
-
         for track, stream in enumerate(inp.videos):
-            text += f"   - Track #{track}\n"
-            text += f"     - codec: {stream.codec}\n"
+            with av.open(file, "r") as container:
+                pix_fmt = container.streams.video[track].pix_fmt
+                time_base = str(container.streams.video[track].time_base)
+                w, h = stream.width, stream.height
+                w_, h_ = aspect_ratio(w, h)
 
-            vid = {}
-            vid["codec"] = stream.codec
+            fps = stream.fps
+            if fps is not None and int(fps) == float(fps):
+                fps = int(fps)
 
-            container = av.open(file, "r")
-
-            pix_fmt = container.streams.video[track].pix_fmt
-            text += f"     - pix_fmt: {pix_fmt}\n"
-            vid["pix_fmt"] = pix_fmt
-
-            if args.include_timebase:
-                time_base = container.streams.video[track].time_base
-                text += f"     - time_base: {time_base}\n"
-                vid["time_base"] = time_base
-
-            if stream.fps is not None:
-                text += f"     - fps: {stream.fps}\n"
-                vid["fps"] = float(stream.fps)
-
-            w, h = stream.width, stream.height
-            w_, h_ = aspect_ratio(w, h)
-            text += f"     - resolution: {w}x{h} ({w_}:{h_})\n"
-
-            vid["width"] = stream.width
-            vid["height"] = stream.height
-            vid["aspect_ratio"] = aspect_ratio(w, h)
-
-            if stream.bitrate is not None:
-                text += f"     - bitrate: {stream.bitrate}\n"
-                vid["bitrate"] = stream.bitrate
-            if stream.lang is not None:
-                text += f"     - lang: {stream.lang}\n"
-                vid["lang"] = stream.lang
-
+            vid = {
+                "codec": stream.codec,
+                "pix_fmt": pix_fmt,
+                "fps": fps,
+                "timebase": time_base,
+                "resolution": [w, h],
+                "aspect ratio": [w_, h_],
+                "bitrate": stream.bitrate,
+                "lang": stream.lang,
+            }
             file_info[file]["video"].append(vid)
 
-        if len(inp.audios) > 0:
-            text += f" - audio tracks: {len(inp.audios)}\n"
-
         for track, stream in enumerate(inp.audios):
-            aud = {}
-
-            text += f"   - Track #{track}\n"
-            text += f"     - codec: {stream.codec}\n"
-            text += f"     - samplerate: {stream.samplerate}\n"
-
-            aud["codec"] = stream.codec
-            aud["samplerate"] = stream.samplerate
-
-            if stream.bitrate is not None:
-                text += f"     - bitrate: {stream.bitrate}\n"
-                aud["bitrate"] = stream.bitrate
-
-            if stream.lang is not None:
-                text += f"     - lang: {stream.lang}\n"
-                aud["lang"] = stream.lang
-
+            aud = {
+                "codec": stream.codec,
+                "samplerate": stream.samplerate,
+                "bitrate": stream.bitrate,
+                "lang": stream.lang,
+            }
             file_info[file]["audio"].append(aud)
 
-        if len(inp.subtitles) > 0:
-            text += f" - subtitle tracks: {len(inp.subtitles)}\n"
-
         for track, stream in enumerate(inp.subtitles):
-            sub = {}
-
-            text += f"   - Track #{track}\n"
-            text += f"     - codec: {stream.codec}\n"
-            sub["codec"] = stream.codec
-            if stream.lang is not None:
-                text += f"     - lang: {stream.lang}\n"
-                sub["lang"] = stream.lang
-
+            sub = {"codec": stream.codec, "lang": stream.lang}
             file_info[file]["subtitle"].append(sub)
 
         if len(inp.videos) + len(inp.audios) + len(inp.subtitles) == 0:
-            text += "Invalid media.\n"
             file_info[file] = {"media": "invalid"}
         else:
-            text += " - container:\n"
-
-            cont = file_info[file]["container"]
-
-            if inp.duration is not None:
-                text += f"   - duration: {inp.duration}\n"
-                cont["duration"] = inp.duration
-            if inp.bitrate is not None:
-                text += f"   - bitrate: {inp.bitrate}\n"
-                cont["bitrate"] = inp.bitrate
+            cont = {"duration": inp.duration, "bitrate": inp.bitrate}
 
             if args.include_vfr:
-                if not args.json:
-                    print(text, end="")
-                text = ""
                 fps_mode = ffmpeg.pipe(
                     [
                         "-i",
@@ -177,21 +108,50 @@ def main(sys_args=sys.argv[1:]):
                         "null",
                         "-",
                     ]
-                )
-                fps_mode = fps_mode.strip()
-
+                ).strip()
                 if "VFR:" in fps_mode:
                     fps_mode = (fps_mode[fps_mode.index("VFR:") :]).strip()
 
-                text += f"   - {fps_mode}\n"
                 cont["fps_mode"] = fps_mode
 
-        if not args.json:
-            print(text)
+            file_info[file]["container"] = cont
 
     if args.json:
-        json_object = json.dumps(file_info, indent=4)
-        print(json_object)
+        print(json.dumps(file_info, indent=4))
+        return
+
+    def stream_to_text(text: str, label: str, streams) -> str:
+        if len(streams) > 0:
+            text += f" - {label}:\n"
+
+        for s, stream in enumerate(streams):
+            text += f"   - track {s}:\n"
+            for key, value in stream.items():
+                if value is not None:
+                    if isinstance(value, list):
+                        sep = "x" if key == "resolution" else ":"
+                        value = sep.join([str(x) for x in value])
+
+                    text += f"     - {key}: {value}\n"
+        return text
+
+    text = ""
+    for name, info in file_info.items():
+        text += f"{name}:\n"
+        if "media" in info:
+            text += " - invalid media\n\n"
+            continue
+
+        for label, streams in info.items():
+            if isinstance(streams, dict):
+                text += f" - container:\n"
+                for key, value in streams.items():
+                    text += f"   - {key}: {value}\n"
+            else:
+                text = stream_to_text(text, label, streams)
+        text += "\n"
+
+    sys.stdout.write(text)
 
 
 if __name__ == "__main__":
