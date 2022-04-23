@@ -243,11 +243,15 @@ class FileInfo:
                     if w is None or h is None:
                         log.error("Auto-Editor got 'None' when probing resolution")
                     if _fps is None:
-                        if codec not in ("png", "jpeg", "jpg"):
+                        if codec not in ("png", "mjpeg", "webp"):
                             log.error("Auto-Editor got 'None' when probing fps")
                         _fps = "30"
 
-                    fps = float(_fps)
+                    try:
+                        fps = float(_fps)
+                    except ValueError:
+                        log.error(f"Couldn't convert '{fps}' to float")
+
                     if fps < 1:
                         log.error(
                             f"{self.basename}: Frame rate cannot be below 1. fps: {fps}"
