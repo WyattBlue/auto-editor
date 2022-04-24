@@ -74,6 +74,54 @@ encoders = {
             "gray12le",
         },
     },
+    "hevc_nvenc": {
+        "pix_fmt": {
+            "yuv420p",
+            "nv12",
+            "p010le",
+            "yuv444p",
+            "p016le",
+            "yuv444p16le",
+            "bgr0",
+            "rgb0",
+            "gbrp",
+            "gbrp16le",
+            "cuda",
+            "d3d11",
+        },
+    },
+    "hevc_amf": {
+        "pix_fmt": {
+            "yuv420p",
+            "nv12",
+            "d3d11",
+            "dxva2_vld",
+        },
+    },
+    "h264_nvenc": {
+        "pix_fmt": {
+            "yuv420p",
+            "nv12",
+            "p010le",
+            "yuv444p",
+            "p016le",
+            "yuv444p16le",
+            "bgr0",
+            "rgb0",
+            "gbrp",
+            "gbrp16le",
+            "cuda",
+            "d3d11",
+        },
+    },
+    "h264_amf": {
+        "pix_fmt": {
+            "yuv420p",
+            "nv12",
+            "d3d11",
+            "dxva2_vld",
+        },
+    },
     "vp9": {
         "pix_fmt": {
             "yuv420p",
