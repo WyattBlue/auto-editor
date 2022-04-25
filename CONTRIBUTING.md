@@ -1,20 +1,61 @@
-# How to Contribute
+# Contributing
 
-## Basic
+## Making a Great Issue
 
-1. Go to a file and click on the "pencil icon". You'll now be able to edit a file in the browser.
+### Nice formatting
 
-1. Once you've made your changes, click "propose changes" at the bottom of the page.
+ - For option names, surround them with a single backtick (\`). \`--example\` will be rendered as `--example` 
+ - For auto-editor output or tracebacks, surround them with triple backticks. 
 
-1. Wait for feedback.
+\`\`\`
+auto-editor --version
 
+Auto-Editor Version: x 
+\`\`\`
 
-
-## Advanced
-
-Fork the project. Go to your new respitory.
-
+Will be rendered as:
 
 ```
-git clone https://github.com/{YOUR-USERNAME}/auto-editor.git
+auto-editor --version
+
+Auto-Editor Version: x 
 ```
+
+### General Tips
+ - See what does and doesn't work.  
+ - If you're confused what `--option` does. Run `auto-editor --option --help`
+
+## Contributing Code
+
+Fork the main repo and then clone your repo. Replacing `USER` with your actual GitHub username.
+
+```
+git clone https://github.com/USER/auto-editor.git
+cd auto-editor
+```
+
+Then make a new branch and call it something like `patch-1`, `support-for-gif`,  or `fix-typo`
+
+```
+git branch patch-1
+git checkout patch-1
+```
+
+Then open up your favorite text editor and apply your changes.
+
+### Code styling
+
+Auto-Editor uses black to keep the code tidy and consistent. Install black with:
+```
+pip install black
+```
+
+Run black on the root folder. Do this every time you make a change.
+```
+black auto_editor
+```
+
+### Making a Pull Request
+Go to https://github.com/WyattBlue/auto-editor/pulls and hit the "New Pull Request" button.
+
+GitHub should autofill in the rest since you've made a fork. Make sure you select the branch you've made and not `master`.
