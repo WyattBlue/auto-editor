@@ -41,6 +41,7 @@ setup(
             "help.json",
             "ffmpeg/LICENSE.txt",
             "ffmpeg/Windows/ffmpeg.exe",
+            "ffmpeg/Windows/libopenh264.dll",
             "ffmpeg/Darwin/ffmpeg",
         ],
     },
