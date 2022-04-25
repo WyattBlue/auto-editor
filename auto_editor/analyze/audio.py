@@ -17,6 +17,11 @@ def audio_detection(
 ) -> npt.NDArray[np.float_]:
 
     max_volume = get_max_volume(audio_samples)
+
+    if max_volume == 0:
+        # Prevent dividing by zero
+        max_volume = 1
+
     sample_count = audio_samples.shape[0]
 
     sample_rate_per_frame = sample_rate / fps
