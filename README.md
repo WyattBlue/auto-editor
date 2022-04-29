@@ -35,7 +35,7 @@ auto-editor example.mp4 --frame-margin 8
 
 <h3>Set how cuts are made</h3>
 
-Use the `--edit` option. to change how auto-editor makes automated cuts.
+Use the `--edit` option to change how auto-editor makes automated cuts.
 
 For example, edit out motionlessness in a video by setting `--edit motion`.
 
@@ -49,6 +49,14 @@ auto-editor example.mp4 --silent-threshold 4%
 
 # audio and motion thresholds are toggled independently
 auto-editor example.mp4 --edit 'audio:threshold=3% or motion:threshold=6%'
+```
+
+<h3>See what auto-editor cuts out</h3>
+
+To export what auto-editor normally cuts out. Set `--video-speed` to `99999` and `--silent-speed` to `1`. This is the reverse of the usual default values.  
+
+```
+auto-editor example.mp4 --video-speed 99999 --silent-speed 1
 ```
 
 <h2 align="center">Exporting to Editors</h2>
