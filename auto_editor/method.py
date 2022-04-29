@@ -2,7 +2,7 @@ import os
 from math import ceil
 from dataclasses import dataclass, asdict, fields
 
-from typing import List, Tuple, Union, Callable
+from typing import List, Tuple, Union, Callable, Dict, Type, TypeVar, TYPE_CHECKING
 
 import numpy as np
 
@@ -10,6 +10,62 @@ from auto_editor.wavfile import read
 from auto_editor.utils.log import Log
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.progressbar import ProgressBar
+
+T = TypeVar("T")
+
+
+def parse_dataclass(unsplit_arguments, dataclass, log):
+    """
+    Positional Arguments
+        --rectangle 0,end,10,20,20,30,#000, ...
+
+    Keyword Arguments
+        --rectangle start=0,end=end,x1=10, ...
+    """
+
+    from dataclasses import fields
+
+    ARG_SEP = ","
+    KEYWORD_SEP = "="
+
+    d_name = dataclass.__name__
+
+    keys = [field.name for field in fields(dataclass)]
+    kwargs = {}
+    args = []
+
+    allow_positional_args = True
+
+    if unsplit_arguments == "":
+        return dataclass()
+
+    for i, arg in enumerate(unsplit_arguments.split(ARG_SEP)):
+        if i + 1 > len(keys):
+            log.error(f"{d_name} has too many arguments, starting with '{arg}'.")
+
+        if KEYWORD_SEP in arg:
+            allow_positional_args = False
+
+            parameters = arg.split(KEYWORD_SEP)
+            if len(parameters) > 2:
+                log.error(f"{d_name} invalid syntax: '{arg}'.")
+            key, val = parameters
+            if key not in keys:
+                Log().error(f"{d_name} got an unexpected keyword '{key}'")
+
+            kwargs[key] = val
+        elif allow_positional_args:
+            args.append(arg)
+        else:
+            log.error(f"{d_name} positional argument follows keyword argument.")
+
+    try:
+        dataclass_instance = dataclass(*args, **kwargs)
+    except TypeError as err:
+        err_list = [d_name] + str(err).split(" ")[1:]
+        log.error(" ".join(err_list))
+
+    return dataclass_instance
 
 
 def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
@@ -112,20 +168,18 @@ def get_stream_data(
         motion_list = motion_detection(inp, progress, attrs.width, attrs.blur)
         return np.fromiter((x >= attrs.threshold for x in motion_list), dtype=np.bool_)
 
-    if method == "pixeldiff":
-        from auto_editor.analyze.pixeldiff import pixel_difference
+    # "pixeldiff"
+    from auto_editor.analyze.pixeldiff import pixel_difference
 
-        if len(inp.videos) == 0:
-            log.error("Video stream '0' does not exist.")
+    if len(inp.videos) == 0:
+        log.error("Video stream '0' does not exist.")
 
-        pixel_list = pixel_difference(inp, progress)
-        return np.fromiter((x >= attrs.threshold for x in pixel_list), dtype=np.bool_)
+    pixel_list = pixel_difference(inp, progress)
+    return np.fromiter((x >= attrs.threshold for x in pixel_list), dtype=np.bool_)
 
 
-def get_attributes(attrs_str, dataclass, log: Log):
-    from auto_editor.vanparse import parse_dataclass
-
-    attrs = parse_dataclass(attrs_str, dataclass)
+def get_attributes(attrs_str: str, dataclass: T, log: Log) -> T:
+    attrs: T = parse_dataclass(attrs_str, dataclass, log)
 
     dic_value = asdict(attrs)
     dic_type = {}
@@ -148,25 +202,44 @@ def get_has_loud(
 
     from auto_editor.utils.types import float_type
 
-    def stream_type(val: str):
+    def stream_type(val: str) -> Union[int, str]:
         if val == "all":
             return val
         return int(val)
 
-    @dataclass
-    class Audio:
-        stream: stream_type = 0
-        threshold: float_type = args.silent_threshold
+    if TYPE_CHECKING:
 
-    @dataclass
-    class Motion:
-        threshold: float_type = 0.02
-        blur: int = 9
-        width: int = 400
+        @dataclass
+        class Audio:
+            stream: Union[int, str]
+            threshold: float
 
-    @dataclass
-    class Pixeldiff:
-        threshold: int = 1
+        @dataclass
+        class Motion:
+            threshold: float
+            blur: int
+            width: int
+
+        @dataclass
+        class Pixeldiff:
+            threshold: int
+
+    else:
+
+        @dataclass
+        class Audio:
+            stream: stream_type = 0
+            threshold: float_type = args.silent_threshold
+
+        @dataclass
+        class Motion:
+            threshold: float_type = 0.02
+            blur: int = 9
+            width: int = 400
+
+        @dataclass
+        class Pixeldiff:
+            threshold: int = 1
 
     KEYWORD_SEP = " "
     METHOD_ATTRS_SEP = ":"
@@ -179,6 +252,8 @@ def get_has_loud(
         "or": np.logical_or,
         "xor": np.logical_xor,
     }
+
+    Methods = Union[Type[Audio], Type[Motion], Type[Pixeldiff], None]
 
     method_str = method_str.replace("_", " ")  # Allow old style `--edit` to work
 
@@ -193,7 +268,7 @@ def get_has_loud(
             attrs_str = ""
 
         if method == "audio":
-            attrs = get_attributes(attrs_str, Audio, log)
+            attrs: Methods = get_attributes(attrs_str, Audio, log)
         elif method == "motion":
             attrs = get_attributes(attrs_str, Motion, log)
         elif method == "pixeldiff":
@@ -213,7 +288,7 @@ def get_has_loud(
                 operand = None
             elif result_array is None:
                 result_array = stream_data
-            elif operand in ("and", "or", "xor"):
+            elif operand is not None and operand in ("and", "or", "xor"):
                 result_array = operand_combine(
                     result_array, stream_data, logic_funcs[operand]
                 )
@@ -235,6 +310,7 @@ def get_has_loud(
     if operand is not None:
         log.error(f"Dangling operand: '{operand}'")
 
+    assert result_array is not None
     return result_array
 
 
