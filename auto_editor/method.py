@@ -2,7 +2,7 @@ import os
 from math import ceil
 from dataclasses import dataclass, asdict, fields
 
-from typing import List, Tuple, Union, Callable, Dict, Type, TypeVar, TYPE_CHECKING
+from typing import List, Tuple, Union, Callable, Type, TypeVar, TYPE_CHECKING
 
 import numpy as np
 
@@ -22,8 +22,6 @@ def parse_dataclass(unsplit_arguments, dataclass, log):
     Keyword Arguments
         --rectangle start=0,end=end,x1=10, ...
     """
-
-    from dataclasses import fields
 
     ARG_SEP = ","
     KEYWORD_SEP = "="

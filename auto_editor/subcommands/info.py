@@ -47,6 +47,11 @@ def main(sys_args=sys.argv[1:]):
             Log().error(f"Could not find file: {file}")
 
         inp = FileInfo(file, ffmpeg, Log())
+
+        if len(inp.videos) + len(inp.audios) + len(inp.subtitles) == 0:
+            file_info[file] = {"media": "invalid"}
+            continue
+
         file_info[file] = {
             "video": [],
             "audio": [],
@@ -54,12 +59,14 @@ def main(sys_args=sys.argv[1:]):
             "container": {},
         }
 
+        container = av.open(file, "r")
+
         for track, stream in enumerate(inp.videos):
-            with av.open(file, "r") as container:
-                pix_fmt = container.streams.video[track].pix_fmt
-                time_base = str(container.streams.video[track].time_base)
-                w, h = stream.width, stream.height
-                w_, h_ = aspect_ratio(w, h)
+            pix_fmt = container.streams.video[track].pix_fmt
+            time_base = str(container.streams.video[track].time_base)
+            cc_time_base = str(container.streams.video[track].codec_context.time_base)
+            w, h = stream.width, stream.height
+            w_, h_ = aspect_ratio(w, h)
 
             fps = stream.fps
             if fps is not None and int(fps) == float(fps):
@@ -69,9 +76,10 @@ def main(sys_args=sys.argv[1:]):
                 "codec": stream.codec,
                 "pix_fmt": pix_fmt,
                 "fps": fps,
-                "timebase": time_base,
                 "resolution": [w, h],
                 "aspect ratio": [w_, h_],
+                "timebase": time_base,
+                "cc timebase": cc_time_base,
                 "bitrate": stream.bitrate,
                 "lang": stream.lang,
             }
@@ -90,31 +98,28 @@ def main(sys_args=sys.argv[1:]):
             sub = {"codec": stream.codec, "lang": stream.lang}
             file_info[file]["subtitle"].append(sub)
 
-        if len(inp.videos) + len(inp.audios) + len(inp.subtitles) == 0:
-            file_info[file] = {"media": "invalid"}
-        else:
-            cont = {"duration": inp.duration, "bitrate": inp.bitrate}
+        cont = {"duration": inp.duration, "bitrate": inp.bitrate}
 
-            if args.include_vfr:
-                fps_mode = ffmpeg.pipe(
-                    [
-                        "-i",
-                        file,
-                        "-hide_banner",
-                        "-vf",
-                        "vfrdet",
-                        "-an",
-                        "-f",
-                        "null",
-                        "-",
-                    ]
-                ).strip()
-                if "VFR:" in fps_mode:
-                    fps_mode = (fps_mode[fps_mode.index("VFR:") :]).strip()
+        if args.include_vfr:
+            fps_mode = ffmpeg.pipe(
+                [
+                    "-i",
+                    file,
+                    "-hide_banner",
+                    "-vf",
+                    "vfrdet",
+                    "-an",
+                    "-f",
+                    "null",
+                    "-",
+                ]
+            ).strip()
+            if "VFR:" in fps_mode:
+                fps_mode = (fps_mode[fps_mode.index("VFR:") :]).strip()
 
-                cont["fps_mode"] = fps_mode
+            cont["fps_mode"] = fps_mode
 
-            file_info[file]["container"] = cont
+        file_info[file]["container"] = cont
 
     if args.json:
         print(json.dumps(file_info, indent=4))
