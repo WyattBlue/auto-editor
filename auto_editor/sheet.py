@@ -1,16 +1,85 @@
-from dataclasses import asdict, fields
+# type: ignore
+
+from dataclasses import dataclass, asdict, fields
 
 from typing import List, Tuple, Dict, Union
 
 from auto_editor.utils.log import Log
+from auto_editor.utils.types import (
+    float_type,
+    anchor_type,
+    color_type,
+    text_content,
+    align_type,
+)
 from auto_editor.ffwrapper import FileInfo
+from auto_editor.method import parse_dataclass
+
+
+@dataclass
+class Rectangle:
+    start: int
+    dur: int
+    x: int
+    y: int
+    width: int
+    height: int
+    anchor: anchor_type = "ce"
+    fill: color_type = "#c4c4c4"
+    stroke: int = 0
+    strokecolor: color_type = "#000"
+    _type: str = "rectangle"
+
+
+@dataclass
+class Ellipse:
+    start: int
+    dur: int
+    x: int
+    y: int
+    width: int
+    height: int
+    anchor: anchor_type = "ce"
+    fill: color_type = "#c4c4c4"
+    stroke: int = 0
+    strokecolor: color_type = "#000"
+    _type: str = "ellipse"
+
+
+@dataclass
+class Text:
+    start: int
+    dur: int
+    content: text_content
+    x: int = "centerX"
+    y: int = "centerY"
+    size: int = 30
+    font: str = "default"
+    align: align_type = "left"
+    fill: color_type = "#000"
+    stroke: int = 0
+    strokecolor: color_type = "#000"
+    _type: str = "text"
+
+
+@dataclass
+class Image:
+    start: int
+    dur: int
+    src: str
+    x: int = "centerX"
+    y: int = "centerY"
+    opacity: float_type = 1
+    anchor: anchor_type = "ce"
+    rotate: float = 0  # in degrees
+    _type: str = "image"
 
 
 class Sheet:
     __slots__ = ("all", "sheet")
 
     def __init__(
-        self, pool, inp: FileInfo, chunks: List[Tuple[int, int, float]], log: Log
+        self, args, inp: FileInfo, chunks: List[Tuple[int, int, float]], log: Log
     ) -> None:
 
         ending = chunks[:]
@@ -52,6 +121,17 @@ class Sheet:
                 log.error(f"variable '{val}' is not defined.")
 
             return _type(val)
+
+        pool = []
+
+        for o in args.add_text:
+            pool.append(parse_dataclass(o, Text, log))
+        for o in args.add_rectangle:
+            pool.append(parse_dataclass(o, Rectangle, log))
+        for o in args.add_ellipse:
+            pool.append(parse_dataclass(o, Ellipse, log))
+        for o in args.add_image:
+            pool.append(parse_dataclass(o, Image, log))
 
         for index, obj in enumerate(pool):
 

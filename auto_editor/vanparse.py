@@ -30,7 +30,6 @@ class Options:
     flag: bool = False
     choices: Optional[Sequence[str]] = None
     help: str = ""
-    dataclass: Any = None
     _type: str = "option"
 
 
@@ -96,21 +95,7 @@ def get_help_data() -> Dict[str, Dict[str, str]]:
 
 
 def print_option_help(program_name: str, option: Options) -> None:
-    from dataclasses import fields, _MISSING_TYPE
-
     text = "  " + ", ".join(option.names) + f"\n    {option.help}\n\n"
-    if option.dataclass is not None:
-        text += "    "
-        args = []
-        for field in fields(option.dataclass):
-            if field.name != "_type":
-                arg = "{" + field.name
-                if not isinstance(field.default, _MISSING_TYPE):
-                    arg += "=" + str(field.default)
-                arg += "}"
-                args.append(arg)
-
-        text += ",".join(args) + "\n"
 
     data = get_help_data()
 
@@ -178,66 +163,12 @@ class ArgumentParser:
             sys.exit()
 
         if sys_args == ["-v"] or sys_args == ["-V"]:
-            out(f"{self.program_name} Version {auto_editor.version}")
+            print(f"{auto_editor.version} ({auto_editor.__version__})")
             sys.exit()
 
         return ParseOptions(
             sys_args, self.program_name, self.options, self.requireds, self.args
         )
-
-
-def parse_dataclass(unsplit_arguments: str, dataclass: Any) -> Any:
-    """
-    Positional Arguments
-        --rectangle 0,end,10,20,20,30,#000, ...
-
-    Keyword Arguments
-        --rectangle start=0,end=end,x1=10, ...
-    """
-
-    from dataclasses import fields
-
-    ARG_SEP = ","
-    KEYWORD_SEP = "="
-
-    d_name = dataclass.__name__
-
-    keys = [field.name for field in fields(dataclass)]
-    kwargs = {}
-    args = []
-
-    allow_positional_args = True
-
-    if unsplit_arguments == "":
-        return dataclass()
-
-    for i, arg in enumerate(unsplit_arguments.split(ARG_SEP)):
-        if i + 1 > len(keys):
-            Log().error(f"{d_name} has too many arguments, starting with '{arg}'.")
-
-        if KEYWORD_SEP in arg:
-            allow_positional_args = False
-
-            parameters = arg.split(KEYWORD_SEP)
-            if len(parameters) > 2:
-                Log().error(f"{d_name} invalid syntax: '{arg}'.")
-            key, val = parameters
-            if key not in keys:
-                Log().error(f"{d_name} got an unexpected keyword '{key}'")
-
-            kwargs[key] = val
-        elif allow_positional_args:
-            args.append(arg)
-        else:
-            Log().error(f"{d_name} positional argument follows keyword argument.")
-
-    try:
-        dataclass_instance = dataclass(*args, **kwargs)
-    except TypeError as err:
-        err_list = [d_name] + str(err).split(" ")[1:]
-        Log().error(" ".join(err_list))
-
-    return dataclass_instance
 
 
 class ParseOptions:
@@ -326,10 +257,6 @@ class ParseOptions:
 
             if option is None:
                 if setting_op_list:
-                    if used_options and used_options[-1].dataclass is not None:
-                        op_list_type = None
-                        arg = parse_dataclass(arg, used_options[-1].dataclass)
-
                     option_list.append(arg)
 
                 elif requireds and not arg.startswith("--"):

@@ -20,12 +20,6 @@ from auto_editor.edit import edit_media
 
 
 def main_options(parser):
-    from auto_editor.objects import (
-        TextObject,
-        RectangleObject,
-        EllipseObject,
-        ImageObject,
-    )
     from auto_editor.utils.types import (
         float_type,
         sample_rate_type,
@@ -40,25 +34,21 @@ def main_options(parser):
     parser.add_argument(
         "--add-text",
         nargs="*",
-        dataclass=TextObject,
         help="Add a text object to the timeline.",
     )
     parser.add_argument(
         "--add-rectangle",
         nargs="*",
-        dataclass=RectangleObject,
         help="Add a rectangle object to the timeline.",
     )
     parser.add_argument(
         "--add-ellipse",
         nargs="*",
-        dataclass=EllipseObject,
         help="Add an ellipse object to the timeline.",
     )
     parser.add_argument(
         "--add-image",
         nargs="*",
-        dataclass=ImageObject,
         help="Add an image object onto the timeline.",
     )
     parser.add_text("URL Download Options")
@@ -367,7 +357,7 @@ def main():
         sys.exit()
 
     if args.version:
-        print(f"Auto-Editor Version: {auto_editor.version}")
+        print(f"{auto_editor.version} ({auto_editor.__version__})")
         sys.exit()
 
     if args.timeline:

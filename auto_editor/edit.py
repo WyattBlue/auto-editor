@@ -156,9 +156,7 @@ def edit_media(
 
     num_cuts = number_of_cuts(chunks)
 
-    pool = args.add_text + args.add_rectangle + args.add_ellipse + args.add_image
-
-    obj_sheet = Sheet(pool, inp, chunks, log)
+    obj_sheet = Sheet(args, inp, chunks, log)
 
     if args.timeline:
         from auto_editor.formats.timeline import make_json_timeline
