@@ -261,21 +261,21 @@ def render_av(
     output_equavalent = 0
     chunk = chunks.pop(0)
 
-    tou = int(video_stream.time_base.denominator / fps)
-    log.debug(f"Tou {tou}")
+    tou = video_stream.time_base.denominator / fps
+    log.debug(f"Tou: {tou}")
 
     seek = 10
     seek_frame = None
     frames_saved = 0
 
-    SEEK_COST = int(
-        fps * 5
-    )  # Keyframes are usually spread out every 5 seconds or less.
+    # Keyframes are usually spread out every 5 seconds or less.
+    SEEK_COST = int(fps * 5)
     SEEK_RETRY = SEEK_COST // 2
 
     try:
         for frame in container.decode(video_stream):
             index = int(frame.time * fps)
+            # print(f"{index=} {frame.time=} {frame.pts=}")
 
             if frame.key_frame:
                 log.debug(f"Keyframe {index} {frame.pts}")
@@ -296,7 +296,7 @@ def render_av(
                     seek = index + SEEK_RETRY
 
                     seek_frame = index
-                    container.seek(chunk[1] * tou, stream=video_stream)
+                    container.seek(int(chunk[1] * tou), stream=video_stream)
             else:
                 input_equavalent += 1 / chunk[2]
 
