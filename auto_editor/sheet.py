@@ -12,8 +12,8 @@ from auto_editor.utils.types import (
     text_content,
     align_type,
 )
+from auto_editor.utils.func import parse_dataclass
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.method import parse_dataclass
 
 
 @dataclass

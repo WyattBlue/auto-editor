@@ -1,6 +1,6 @@
 import re
 
-from typing import List, Tuple, Sequence, Union, Optional
+from typing import List, Tuple, Sequence, Union, Optional, Literal
 
 from .func import clean_list
 
@@ -128,6 +128,15 @@ def color_type(val: str) -> str:
         return color
 
     raise ValueError(f"Invalid Color: '{color}'")
+
+
+StreamType = Union[int, Literal["all"]]
+
+
+def stream_type(val: Union[str, Literal["all"]]) -> StreamType:
+    if val == "all":
+        return val
+    return int(val)
 
 
 colormap = {

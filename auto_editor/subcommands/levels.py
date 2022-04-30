@@ -4,7 +4,6 @@ import sys
 def levels_options(parser):
     parser.add_argument(
         "--kind",
-        type=str,
         default="audio",
         choices=["audio", "motion", "pixeldiff"],
         help="Select the kind of detection to analyze.",
