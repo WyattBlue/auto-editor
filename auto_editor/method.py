@@ -1,69 +1,45 @@
 import os
+import random
 from math import ceil
+from datetime import datetime
 from dataclasses import dataclass, asdict, fields
 
-from typing import List, Tuple, Union, Callable, Type, TypeVar, TYPE_CHECKING
+from typing import List, Tuple, Union, Dict, Any, Callable, Type, TypeVar
 
 import numpy as np
 
 from auto_editor.wavfile import read
 from auto_editor.utils.log import Log
-from auto_editor.ffwrapper import FileInfo
+from auto_editor.utils.func import parse_dataclass
+from auto_editor.utils.types import float_type, StreamType, stream_type
 from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.ffwrapper import FileInfo
 
 T = TypeVar("T")
 
 
-def parse_dataclass(unsplit_arguments, dataclass, log):
-    """
-    Positional Arguments
-        --rectangle 0,end,10,20,20,30,#000, ...
+def get_attributes(attrs_str: str, dataclass: T, log: Log) -> T:
+    attrs: T = parse_dataclass(attrs_str, dataclass, log)
 
-    Keyword Arguments
-        --rectangle start=0,end=end,x1=10, ...
-    """
+    dic_value = asdict(attrs)
+    dic_type: Dict[str, Union[type, Callable[[Any], Any]]] = {}
+    for field in fields(attrs):
+        dic_type[field.name] = field.type
 
-    ARG_SEP = ","
-    KEYWORD_SEP = "="
+    # Convert to the correct types
+    for k, _type in dic_type.items():
 
-    d_name = dataclass.__name__
+        if _type == float:
+            _type = float_type
+        elif _type == StreamType:
+            _type = stream_type
 
-    keys = [field.name for field in fields(dataclass)]
-    kwargs = {}
-    args = []
+        try:
+            attrs.__setattr__(k, _type(dic_value[k]))
+        except (ValueError, TypeError) as e:
+            log.error(str(e))
 
-    allow_positional_args = True
-
-    if unsplit_arguments == "":
-        return dataclass()
-
-    for i, arg in enumerate(unsplit_arguments.split(ARG_SEP)):
-        if i + 1 > len(keys):
-            log.error(f"{d_name} has too many arguments, starting with '{arg}'.")
-
-        if KEYWORD_SEP in arg:
-            allow_positional_args = False
-
-            parameters = arg.split(KEYWORD_SEP)
-            if len(parameters) > 2:
-                log.error(f"{d_name} invalid syntax: '{arg}'.")
-            key, val = parameters
-            if key not in keys:
-                Log().error(f"{d_name} got an unexpected keyword '{key}'")
-
-            kwargs[key] = val
-        elif allow_positional_args:
-            args.append(arg)
-        else:
-            log.error(f"{d_name} positional argument follows keyword argument.")
-
-    try:
-        dataclass_instance = dataclass(*args, **kwargs)
-    except TypeError as err:
-        err_list = [d_name] + str(err).split(" ")[1:]
-        log.error(" ".join(err_list))
-
-    return dataclass_instance
+    return attrs
 
 
 def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
@@ -87,7 +63,7 @@ def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
 
 
 def get_audio_list(
-    stream: Union[int, str],
+    stream: StreamType,
     threshold: float,
     fps: float,
     progress: ProgressBar,
@@ -138,6 +114,17 @@ def get_stream_data(
         return np.zeros(
             (get_media_duration(inp.path, inp.gfps, temp, log)), dtype=np.bool_
         )
+    if method == "random":
+        if attrs.cutchance > 1 or attrs.cutchance < 0:
+            log.error(f"random:cutchance must be between 0 and 1")
+        l = get_media_duration(inp.path, inp.gfps, temp, log)
+
+        random.seed(attrs.seed)
+        log.debug(f"Seed: {attrs.seed}")
+
+        a = random.choices((0, 1), weights=(attrs.cutchance, 1 - attrs.cutchance), k=l)
+
+        return np.asarray(a, dtype=np.bool_)
     if method == "audio":
         if attrs.stream == "all":
             total_list = None
@@ -176,68 +163,28 @@ def get_stream_data(
     return np.fromiter((x >= attrs.threshold for x in pixel_list), dtype=np.bool_)
 
 
-def get_attributes(attrs_str: str, dataclass: T, log: Log) -> T:
-    attrs: T = parse_dataclass(attrs_str, dataclass, log)
-
-    dic_value = asdict(attrs)
-    dic_type = {}
-    for field in fields(attrs):
-        dic_type[field.name] = field.type
-
-    # Convert to the correct types
-    for k, _type in dic_type.items():
-        try:
-            attrs.__setattr__(k, _type(dic_value[k]))
-        except (ValueError, TypeError) as e:
-            log.error(str(e))
-
-    return attrs
-
-
 def get_has_loud(
     method_str: str, inp: FileInfo, progress: ProgressBar, temp: str, log: Log, args
 ) -> np.ndarray:
+    @dataclass
+    class Audio:
+        stream: StreamType = 0
+        threshold: float = args.silent_threshold
 
-    from auto_editor.utils.types import float_type
+    @dataclass
+    class Motion:
+        threshold: float = 0.02
+        blur: int = 9
+        width: int = 400
 
-    def stream_type(val: str) -> Union[int, str]:
-        if val == "all":
-            return val
-        return int(val)
+    @dataclass
+    class Pixeldiff:
+        threshold: int = 1
 
-    if TYPE_CHECKING:
-
-        @dataclass
-        class Audio:
-            stream: Union[int, str]
-            threshold: float
-
-        @dataclass
-        class Motion:
-            threshold: float
-            blur: int
-            width: int
-
-        @dataclass
-        class Pixeldiff:
-            threshold: int
-
-    else:
-
-        @dataclass
-        class Audio:
-            stream: stream_type = 0
-            threshold: float_type = args.silent_threshold
-
-        @dataclass
-        class Motion:
-            threshold: float_type = 0.02
-            blur: int = 9
-            width: int = 400
-
-        @dataclass
-        class Pixeldiff:
-            threshold: int = 1
+    @dataclass
+    class Random:
+        cutchance: float = 0.5
+        seed: int = random.randint(0, 2147483647)
 
     KEYWORD_SEP = " "
     METHOD_ATTRS_SEP = ":"
@@ -251,7 +198,7 @@ def get_has_loud(
         "xor": np.logical_xor,
     }
 
-    Methods = Union[Type[Audio], Type[Motion], Type[Pixeldiff], None]
+    Methods = Union[Type[Audio], Type[Motion], Type[Pixeldiff], Type[Random], None]
 
     method_str = method_str.replace("_", " ")  # Allow old style `--edit` to work
 
@@ -265,19 +212,20 @@ def get_has_loud(
         else:
             attrs_str = ""
 
-        if method == "audio":
-            attrs: Methods = get_attributes(attrs_str, Audio, log)
-        elif method == "motion":
-            attrs = get_attributes(attrs_str, Motion, log)
-        elif method == "pixeldiff":
-            attrs = get_attributes(attrs_str, Pixeldiff, log)
-        else:
-            attrs = None
-
-        if method in ("audio", "motion", "pixeldiff", "none", "all"):
-
+        if method in ("audio", "motion", "pixeldiff", "random", "none", "all"):
             if result_array is not None and operand is None:
                 log.error("Logic operator must be between two editing methods.")
+
+            if method == "audio":
+                attrs: Methods = get_attributes(attrs_str, Audio, log)
+            elif method == "motion":
+                attrs = get_attributes(attrs_str, Motion, log)
+            elif method == "pixeldiff":
+                attrs = get_attributes(attrs_str, Pixeldiff, log)
+            elif method == "random":
+                attrs = get_attributes(attrs_str, Random, log)
+            else:
+                attrs = None
 
             stream_data = get_stream_data(method, attrs, args, inp, progress, temp, log)
 
