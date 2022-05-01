@@ -38,7 +38,7 @@ def make_new_audio(
         the_speed = chunk[2]
 
         if the_speed == 1:
-            main_writer.writeframes(audio_samples[sample_start:sample_end])
+            main_writer.writeframes(audio_samples[sample_start:sample_end])  # type: ignore
         elif the_speed != 99999:
             sped_chunk = audio_samples[sample_start:sample_end]
 

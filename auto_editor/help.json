@@ -17,7 +17,7 @@
     "--min-cut-length": "Range: 0 to Infinity"
   },
   "info": {
-    "_": "Retrive information and properties about media files",
+    "_": "Retrieve information and properties about media files",
     "--include-vfr": "A typical output looks like this:\n   - VFR:0.583394 (3204/2288) min: 41 max: 42 avg: 41\n\nThe first number is the ratio of how many VFR frames are there in total.\nThe second number is the total number of VFR frames and the third is the total number of CFR frames. Adding the second and third number will result in how many frames the video has in total."
   },
   "levels": {

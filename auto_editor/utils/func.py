@@ -113,22 +113,24 @@ def human_readable_time(time_in_secs: Union[int, float]) -> str:
 
 
 def open_with_system_default(path: str, log: Log) -> None:
+    import sys
     from subprocess import run
 
-    try:  # should work on Windows
-        from os import startfile  # type: ignore
+    if sys.platform == "win64" or sys.platform == "win32":
+        from os import startfile
 
-        startfile(path)
-    except OSError:
-        pass
-    except ImportError:
-        try:  # should work on MacOS and most Linux versions
+        try:
+            startfile(path)
+        except OSError:
+            log.warning("Could not find application to open file.")
+    else:
+        try:  # should work on MacOS and some Linux distros
             run(["open", path])
         except Exception:
             try:  # should work on WSL2
                 run(["cmd.exe", "/C", "start", path])
             except Exception:
-                try:  # should work on various other Linux distros
+                try:  # should work on most other Linux distros
                     run(["xdg-open", path])
                 except Exception:
                     log.warning("Could not open output file.")
