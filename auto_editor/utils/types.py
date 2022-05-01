@@ -1,6 +1,6 @@
 import re
 
-from typing import List, Tuple, Sequence, Union, Optional, Literal, Final
+from typing import List, Tuple, Sequence, Union, Optional, Literal
 
 from .func import clean_list
 
@@ -135,9 +135,9 @@ def color_type(val: str) -> str:
 StreamType = Union[int, Literal["all"]]
 
 
-def stream_type(val: Union[str, Literal["all"]]) -> StreamType:
+def stream_type(val: str) -> StreamType:
     if val == "all":
-        return val
+        return "all"
     return int(val)
 
 

@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict, fields
 
-from typing import List, Tuple, Dict, Union, Callable, Any, Literal
+from typing import List, Tuple, Dict, Union, Callable, Any
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -56,6 +56,7 @@ class TextObj:
     stroke: int = 0
     strokecolor: str = "#000"
     _cache_font: Any = None
+
 
 @dataclass
 class ImageObj:
