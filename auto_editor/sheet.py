@@ -1,78 +1,73 @@
-# type: ignore
-
 from dataclasses import dataclass, asdict, fields
 
-from typing import List, Tuple, Dict, Union
+from typing import List, Tuple, Dict, Union, Callable, Any, Literal
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     float_type,
     anchor_type,
     color_type,
-    text_content,
     align_type,
+    AlignType,
 )
 from auto_editor.utils.func import parse_dataclass
 from auto_editor.ffwrapper import FileInfo
 
 
 @dataclass
-class Rectangle:
+class RectangleObj:
     start: int
     dur: int
     x: int
     y: int
     width: int
     height: int
-    anchor: anchor_type = "ce"
-    fill: color_type = "#c4c4c4"
+    anchor: str = "ce"
+    fill: str = "#c4c4c4"
     stroke: int = 0
-    strokecolor: color_type = "#000"
-    _type: str = "rectangle"
+    strokecolor: str = "#000"
 
 
 @dataclass
-class Ellipse:
+class EllipseObj:
     start: int
     dur: int
     x: int
     y: int
     width: int
     height: int
-    anchor: anchor_type = "ce"
-    fill: color_type = "#c4c4c4"
+    anchor: str = "ce"
+    fill: str = "#c4c4c4"
     stroke: int = 0
-    strokecolor: color_type = "#000"
-    _type: str = "ellipse"
+    strokecolor: str = "#000"
 
 
 @dataclass
-class Text:
+class TextObj:
     start: int
     dur: int
-    content: text_content
-    x: int = "centerX"
-    y: int = "centerY"
+    content: str
+    x: int = "centerX"  # type: ignore
+    y: int = "centerY"  # type: ignore
     size: int = 30
     font: str = "default"
-    align: align_type = "left"
-    fill: color_type = "#000"
+    align: AlignType = "left"
+    fill: str = "#000"
     stroke: int = 0
-    strokecolor: color_type = "#000"
-    _type: str = "text"
-
+    strokecolor: str = "#000"
+    _cache_font: Any = None
 
 @dataclass
-class Image:
+class ImageObj:
     start: int
     dur: int
     src: str
-    x: int = "centerX"
-    y: int = "centerY"
-    opacity: float_type = 1
-    anchor: anchor_type = "ce"
+    x: int = "centerX"  # type: ignore
+    y: int = "centerY"  # type: ignore
+    opacity: float = 1
+    anchor: str = "ce"
     rotate: float = 0  # in degrees
-    _type: str = "image"
+    _cache_src: Any = None
 
 
 class Sheet:
@@ -90,7 +85,7 @@ class Sheet:
         if ending:
             end = ending[-1][1]
 
-        _vars = {
+        _vars: Dict[str, int] = {
             "width": inp.gwidth,
             "height": inp.gheight,
             "centerX": inp.gwidth // 2,
@@ -102,16 +97,27 @@ class Sheet:
         self.all = []
         self.sheet: Dict[int, List[int]] = {}
 
-        def _values(val, _type, _vars: Dict[str, int]):
-            if val is None:
+        def _values(
+            name: str,
+            val: Union[int, str, float],
+            _type: Union[type, Callable[[Any], Any]],
+            _vars: Dict[str, int],
+        ):
+            if _type is Any:
                 return None
+            if _type is float and name != "rotate":
+                _type = float_type
+            elif _type == AlignType:
+                _type = align_type
+            elif name == "anchor":
+                _type = anchor_type
+            elif name in ("fill", "strokecolor"):
+                _type = color_type
 
-            if _type is str:
-                return str(val)  # Skip replacing variables with vals.
-
-            for key, item in _vars.items():
-                if val == key:
-                    return _type(item)
+            if _type is int:
+                for key, item in _vars.items():
+                    if val == key:
+                        return item
 
             try:
                 _type(val)
@@ -125,13 +131,13 @@ class Sheet:
         pool = []
 
         for o in args.add_text:
-            pool.append(parse_dataclass(o, Text, log))
+            pool.append(parse_dataclass(o, TextObj, log))
         for o in args.add_rectangle:
-            pool.append(parse_dataclass(o, Rectangle, log))
+            pool.append(parse_dataclass(o, RectangleObj, log))
         for o in args.add_ellipse:
-            pool.append(parse_dataclass(o, Ellipse, log))
+            pool.append(parse_dataclass(o, EllipseObj, log))
         for o in args.add_image:
-            pool.append(parse_dataclass(o, Image, log))
+            pool.append(parse_dataclass(o, ImageObj, log))
 
         for index, obj in enumerate(pool):
 
@@ -142,10 +148,10 @@ class Sheet:
 
             # Convert to the correct types
             for k, _type in dic_type.items():
-                obj.__setattr__(k, _values(dic_value[k], _type, _vars))
+                obj.__setattr__(k, _values(k, dic_value[k], _type, _vars))
 
             if obj.dur < 1:
-                log.error(f"dur's value must be greater than 0. Was '{dur}'.")
+                log.error(f"dur's value must be greater than 0. Was '{obj.dur}'.")
 
             for frame in range(obj.start, obj.start + obj.dur, 1):
                 if frame in self.sheet:

@@ -1,6 +1,6 @@
 import re
 
-from typing import List, Tuple, Sequence, Union, Optional, Literal
+from typing import List, Tuple, Sequence, Union, Optional, Literal, Final
 
 from .func import clean_list
 
@@ -95,15 +95,17 @@ def speed_range_type(val: str) -> List[str]:
     return comma_type(val, 3, 3, "speed_range_type")
 
 
-def text_content(val: str) -> str:
-    return val.replace("\\n", "\n")
+AlignType = Literal["left", "center", "right"]
 
 
-def align_type(val: str) -> str:
-    allowed = ("left", "right", "center")
-    if val not in allowed:
-        raise TypeError("Align must be: " + " ".join(allowed))
-    return val
+def align_type(val: str) -> AlignType:
+    if val == "left":
+        return "left"
+    if val == "center":
+        return "center"
+    if val == "right":
+        return "right"
+    raise TypeError("Align must be 'left', 'right', or 'center'")
 
 
 def color_type(val: str) -> str:

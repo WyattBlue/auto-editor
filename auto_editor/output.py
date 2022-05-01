@@ -2,13 +2,19 @@
 import os.path
 
 # Typing
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Union, Optional
 
 # Included Libraries
-from .func import fnone
-from .container import Container
 from auto_editor.utils.log import Log
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.func import fnone
+from auto_editor.utils.container import Container
+from auto_editor.ffwrapper import (
+    FFmpeg,
+    FileInfo,
+    VideoStream,
+    AudioStream,
+    SubtitleStream,
+)
 
 
 def fset(cmd: List[str], option: str, value: str) -> List[str]:
@@ -147,19 +153,21 @@ def mux_quality_media(
                 [f"-c:v:{track}", ext, f"-disposition:v:{track}", "attached_pic"]
             )
 
-    # Copy lang metadata
-    streams = (
-        (inp.videos, "v", v_tracks),
-        (inp.audios, "a", a_tracks),
-        (inp.subtitles, "s", s_tracks),
-    )
-
-    for stream, marker, max_streams in streams:
-        for i, track in enumerate(stream):
-            if i > max_streams:
-                break
-            if track.lang is not None:
-                cmd.extend([f"-metadata:s:{marker}:{i}", f"language={track.lang}"])
+    for i, vstream in enumerate(inp.videos):
+        if i > v_tracks:
+            break
+        if vstream.lang is not None:
+            cmd.extend([f"-metadata:s:v:{i}", f"language={vstream.lang}"])
+    for i, astream in enumerate(inp.audios):
+        if i > a_tracks:
+            break
+        if astream.lang is not None:
+            cmd.extend([f"-metadata:s:a:{i}", f"language={astream.lang}"])
+    for i, sstream in enumerate(inp.subtitles):
+        if i > s_tracks:
+            break
+        if sstream.lang is not None:
+            cmd.extend([f"-metadata:s:s:{i}", f"language={sstream.lang}"])
 
     if s_tracks > 0:
         scodec = inp.subtitles[0].codec

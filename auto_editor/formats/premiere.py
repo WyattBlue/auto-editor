@@ -26,12 +26,6 @@ ANAMORPHIC = "FALSE"
 DEPTH = "16"
 
 
-def get_samplerate(inp: FileInfo) -> str:
-    if len(inp.audios) > 0 and inp.audios[0].samplerate is not None:
-        return inp.audios[0].samplerate
-    return "48000"
-
-
 def fix_url(path: str) -> str:
     if system() == "Windows":
         return "file://localhost/" + quote(abspath(path)).replace("%5C", "/")

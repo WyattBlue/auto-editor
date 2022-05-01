@@ -11,7 +11,8 @@ from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.progressbar import ProgressBar
 
 from auto_editor.utils.encoder import encoders
-from auto_editor.utils.video import get_vcodec, video_quality
+from auto_editor.output import get_vcodec, video_quality
+from auto_editor.sheet import RectangleObj, EllipseObj, TextObj, ImageObj
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
 allowed_pix_fmt = {
@@ -117,16 +118,16 @@ def render_av(
         new_objects = []
 
         for obj in all_objects:
-            if obj._type == "text":
+            if isinstance(obj, TextObj):
                 try:
-                    obj.font = ImageFont.truetype(obj.font, obj.size)
+                    obj._cache_font = ImageFont.truetype(obj.font, obj.size)
                 except OSError:
                     if obj.font == "default":
-                        obj.font = ImageFont.load_default()
+                        obj._cache_font = ImageFont.load_default()
                     else:
                         log.error(f"Font '{obj.font}' not found.")
 
-            if obj._type == "image":
+            if isinstance(obj, ImageObj):
                 source = Image.open(obj.src)
                 source = source.convert("RGBA")
                 source = source.rotate(obj.rotate, expand=True)
@@ -136,7 +137,7 @@ def render_av(
                         "RGBA", source.size, (255, 255, 255, int(obj.opacity * 255))
                     ),
                 )
-                obj.src = source
+                obj._cache_src = source
 
             new_objects.append(obj)
 
@@ -151,20 +152,20 @@ def render_av(
             obj_img = Image.new("RGBA", img.size, (255, 255, 255, 0))
             draw = ImageDraw.Draw(obj_img)
 
-            if obj._type == "text":
-                text_w, text_h = draw.textsize(obj.content, font=obj.font)
+            if isinstance(obj, TextObj):
+                text_w, text_h = draw.textsize(obj.content, font=obj._cache_font)
                 pos = apply_anchor(obj.x, obj.y, text_w, text_h, "ce")
                 draw.text(
                     pos,
                     obj.content,
-                    font=obj.font,
+                    font=obj._cache_font,
                     fill=obj.fill,
                     align=obj.align,
                     stroke_width=obj.stroke,
                     stroke_fill=obj.strokecolor,
                 )
 
-            if obj._type == "rectangle":
+            if isinstance(obj, RectangleObj):
                 draw.rectangle(
                     one_pos_two_pos(obj.x, obj.y, obj.width, obj.height, obj.anchor),
                     fill=obj.fill,
@@ -172,7 +173,7 @@ def render_av(
                     outline=obj.strokecolor,
                 )
 
-            if obj._type == "ellipse":
+            if isinstance(obj, EllipseObj):
                 draw.ellipse(
                     one_pos_two_pos(obj.x, obj.y, obj.width, obj.height, obj.anchor),
                     fill=obj.fill,
@@ -180,10 +181,10 @@ def render_av(
                     outline=obj.strokecolor,
                 )
 
-            if obj._type == "image":
-                img_w, img_h = obj.src.size
+            if isinstance(obj, ImageObj):
+                img_w, img_h = obj._cache_src.size
                 pos = apply_anchor(obj.x, obj.y, img_w, img_h, obj.anchor)
-                obj_img.paste(obj.src, pos)
+                obj_img.paste(obj._cache_src, pos)
 
             img = Image.alpha_composite(img, obj_img)
 
@@ -256,6 +257,7 @@ def render_av(
     process2 = ffmpeg.Popen(
         cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
+    assert process2.stdin is not None
 
     input_equavalent = 0.0
     output_equavalent = 0

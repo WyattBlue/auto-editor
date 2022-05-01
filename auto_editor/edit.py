@@ -80,8 +80,10 @@ def edit_media(
         vcodec = inp.videos[0].codec
 
     if vcodec != "auto":
-        if rules.vstrict and vcodec not in rules.vcodecs:
-            log.error(codec_error.format(vcodec, output_container))
+        if rules.vstrict:
+            assert rules.vcodecs is not None
+            if vcodec not in rules.vcodecs:
+                log.error(codec_error.format(vcodec, output_container))
 
         if vcodec in rules.disallow_v:
             log.error(codec_error.format(vcodec, output_container))
@@ -92,8 +94,10 @@ def edit_media(
         log.debug(f"Settings acodec to {acodec}")
 
     if acodec not in ("unset", "auto"):
-        if rules.astrict and acodec not in rules.acodecs:
-            log.error(codec_error.format(acodec, output_container))
+        if rules.astrict:
+            assert rules.acodecs is not None
+            if acodec not in rules.acodecs:
+                log.error(codec_error.format(acodec, output_container))
 
         if acodec in rules.disallow_a:
             log.error(codec_error.format(acodec, output_container))
@@ -221,7 +225,7 @@ def edit_media(
     def make_media(
         inp: FileInfo, chunks: List[Tuple[int, int, float]], output_path: str
     ) -> None:
-        from auto_editor.utils.video import mux_quality_media
+        from auto_editor.output import mux_quality_media
         from auto_editor.render.video import render_av
 
         if rules.allow_subtitle:
