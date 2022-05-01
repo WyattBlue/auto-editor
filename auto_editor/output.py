@@ -2,19 +2,13 @@
 import os.path
 
 # Typing
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Optional
 
 # Included Libraries
 from auto_editor.utils.log import Log
 from auto_editor.utils.func import fnone
 from auto_editor.utils.container import Container
-from auto_editor.ffwrapper import (
-    FFmpeg,
-    FileInfo,
-    VideoStream,
-    AudioStream,
-    SubtitleStream,
-)
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 
 
 def fset(cmd: List[str], option: str, value: str) -> List[str]:

@@ -114,6 +114,11 @@ def main_options(parser):
         "--extras",
         help="Add extra options for ffmpeg for video rendering. Must be in quotes.",
     )
+    parser.add_argument(
+        "--no-seek",
+        flag=True,
+        help="Disable file seeking when rendering video. Helpful for debugging desync issues.",
+    )
     parser.add_text("Miscellaneous Options")
     parser.add_argument(
         "--background",
