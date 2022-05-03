@@ -410,7 +410,7 @@ def main():
         temp_file = (
             "combined.mp4"
             if exporting_to_editor
-            else os.path.join(TEMP, "combined.mp4")
+            else os.path.join("combined.mp4")
         )
 
         cmd = []
@@ -421,7 +421,7 @@ def main():
                 "-filter_complex",
                 f"[0:v]concat=n={len(input_list)}:v=1:a=1",
                 "-codec:v",
-                "h264",
+                args.video_codec,
                 "-pix_fmt",
                 "yuv420p",
                 "-strict",
