@@ -2,8 +2,6 @@ import re
 
 from typing import List, Tuple, Sequence, Union, Optional, Literal
 
-from .func import clean_list
-
 
 def split_num_str(val: Union[str, int]) -> Tuple[Union[int, float], str]:
     if isinstance(val, int):
@@ -68,31 +66,29 @@ def anchor_type(val: str) -> str:
 
 
 def margin_type(val: str) -> Tuple[Union[int, str], Union[int, str]]:
-    vals = val.split(",")
+    vals = val.strip().split(",")
     if len(vals) == 1:
         vals.append(vals[0])
     if len(vals) != 2:
-        raise TypeError("Too many comma arguments for margin_type")
+        raise TypeError("--margin has too many arguments.")
     return frame_type(vals[0]), frame_type(vals[1])
 
 
-def comma_type(
-    _val: str, min_args: int = 1, max_args: Optional[int] = None, name: str = ""
-) -> List[str]:
-    val = clean_list(_val.split(","), "\r\n\t")
-    if min_args > len(val):
-        raise TypeError(f"Too few comma arguments for {name}.")
-    if max_args is not None and len(val) > max_args:
-        raise TypeError(f"Too many comma arguments for {name}.")
-    return val
+def comma_type(name: str, val: str, min_args: int, max_args: int) -> List[str]:
+    vals = val.strip().split(",")
+    if min_args > len(vals):
+        raise TypeError(f"Too few arguments for {name}.")
+    if len(vals) > max_args:
+        raise TypeError(f"Too many arguments for {name}.")
+    return vals
 
 
 def range_type(val: str) -> List[str]:
-    return comma_type(val, 2, 2, "range_type")
+    return comma_type("range_type", val, 2, 2)
 
 
 def speed_range_type(val: str) -> List[str]:
-    return comma_type(val, 3, 3, "speed_range_type")
+    return comma_type("speed_range_type", val, 3, 3)
 
 
 AlignType = Literal["left", "center", "right"]

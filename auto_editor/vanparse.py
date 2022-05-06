@@ -196,7 +196,10 @@ class ParseOptions:
     ) -> None:
         assert option_list_name is not None
         if list_type is not None:
-            setattr(self, option_list_name, list(map(list_type, my_list)))
+            try:
+                setattr(self, option_list_name, list(map(list_type, my_list)))
+            except (TypeError, ValueError) as e:
+                Log().error(str(e))
         else:
             setattr(self, option_list_name, my_list)
 
