@@ -17,8 +17,7 @@ def fset(cmd: List[str], option: str, value: str) -> List[str]:
     return cmd + [option] + [value]
 
 
-def get_vcodec(args, inp: FileInfo, rules: Container) -> str:
-    vcodec = args.video_codec
+def get_vcodec(vcodec: str, inp: FileInfo, rules: Container) -> str:
     if vcodec == "auto":
         vcodec = inp.videos[0].codec
 
@@ -37,8 +36,7 @@ def get_vcodec(args, inp: FileInfo, rules: Container) -> str:
     return vcodec
 
 
-def get_acodec(args, inp: FileInfo, rules: Container) -> str:
-    acodec = args.audio_codec
+def get_acodec(acodec: str, inp: FileInfo, rules: Container) -> str:
     if acodec == "auto":
         acodec = inp.audios[0].codec
 
@@ -63,7 +61,7 @@ def video_quality(cmd: List[str], args, inp: FileInfo, rules: Container) -> List
     if args.video_codec == "uncompressed" and fnone(qscale):
         qscale = "1"
 
-    vcodec = get_vcodec(args, inp, rules)
+    vcodec = get_vcodec(args.video_codec, inp, rules)
 
     cmd.extend(["-c:v", vcodec])
 
@@ -173,7 +171,7 @@ def mux_quality_media(
             cmd.extend(["-c:s", scodec])
 
     if a_tracks > 0:
-        acodec = get_acodec(args, inp, rules)
+        acodec = get_acodec(args.audio_codec, inp, rules)
 
         cmd = fset(cmd, "-c:a", acodec)
         cmd = fset(cmd, "-b:a", args.audio_bitrate)
