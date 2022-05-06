@@ -66,15 +66,6 @@ def get_stdout(cmd: List[str]) -> str:
     return stdout.decode("utf-8", "replace")
 
 
-def clean_list(x: List[str], rm_chars: str) -> List[str]:
-    new_list = []
-    for item in x:
-        for char in rm_chars:
-            item = item.replace(char, "")
-        new_list.append(item)
-    return new_list
-
-
 def aspect_ratio(width: int, height: int) -> Union[Tuple[int, int], Tuple[None, None]]:
     if height == 0:
         return None, None
