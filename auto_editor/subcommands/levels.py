@@ -76,7 +76,7 @@ def main(sys_args=sys.argv[1:]):
         sample_rate, audio_samples = read(read_track)
 
         print_float_list(
-            audio_detection(audio_samples, sample_rate, inp.gfps, progress)
+            audio_detection(audio_samples, sample_rate, inp.get_fps(), progress)
         )
 
     if args.kind == "motion":

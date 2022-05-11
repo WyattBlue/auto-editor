@@ -1,67 +1,56 @@
-# Internal Libraries
 import os
+from typing import List, Optional, Tuple
 
-# Typing
-from typing import List, Tuple, Optional
-
-# Included Libraries
-from auto_editor.sheet import Sheet
-from auto_editor.utils.log import Log
-from auto_editor.utils.func import fnone, append_filename
-from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.method import get_chunks
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.timeline import Timeline, make_timeline
+from auto_editor.utils.container import get_rules
+from auto_editor.utils.func import append_filename, fnone
+from auto_editor.utils.log import Log
+from auto_editor.utils.progressbar import ProgressBar
 
 
 def set_output_name(path: str, inp_ext: str, export: str) -> str:
     root, ext = os.path.splitext(path)
 
     if export == "json":
-        return root + ".json"
+        return f"{root}.json"
     if export == "final-cut-pro":
-        return root + ".fcpxml"
+        return f"{root}.fcpxml"
     if export == "shotcut":
-        return root + ".mlt"
+        return f"{root}.mlt"
     if export == "premiere":
-        return root + ".xml"
+        return f"{root}.xml"
     if export == "audio":
-        return root + "_ALTERED.wav"
+        return f"{root}_ALTERED.wav"
     if ext == "":
         return root + inp_ext
 
-    return root + "_ALTERED" + ext
+    return f"{root}_ALTERED{ext}"
 
 
 def edit_media(
-    i: int,
-    inp: FileInfo,
-    ffmpeg: FFmpeg,
-    args,
-    progress: ProgressBar,
-    temp: str,
-    log: Log,
-) -> Tuple[int, Optional[str]]:
-    from auto_editor.utils.container import get_rules
+    inputs: List[FileInfo], ffmpeg: FFmpeg, args, temp: str, log: Log
+) -> Optional[str]:
 
-    chunks = None
-    if inp.ext == ".json":
+    progress = ProgressBar(args.progress)
+
+    timeline = None
+    if inputs[0].ext == ".json":
         from auto_editor.formats.timeline import read_json_timeline
 
-        args.background, input_path, chunks = read_json_timeline(inp.path, log)
-        inp = FileInfo(input_path, ffmpeg, log)
+        timeline = read_json_timeline(inputs[0].path, ffmpeg, log)
+        inputs = [timeline.inp]
 
-    if i < len(args.output_file):
-        output_path = args.output_file[i]
+    inp = inputs[0]
 
-        # Add input extension if output doesn't have one.
-        if os.path.splitext(output_path)[1] == "":
-            output_path = set_output_name(output_path, inp.ext, args.export)
+    if args.output_file is None:
+        output = set_output_name(inp.path, inp.ext, args.export)
     else:
-        output_path = set_output_name(inp.path, inp.ext, args.export)
+        output = args.output_file
+        if os.path.splitext(output)[1] == "":
+            output = set_output_name(output, inp.ext, args.export)
 
-    log.debug(f"{inp.path} -> {output_path}")
-
-    output_container = os.path.splitext(output_path)[1].replace(".", "")
+    output_container = os.path.splitext(output)[1].replace(".", "")
 
     # Check if export options make sense.
     rules = get_rules(output_container)
@@ -108,138 +97,104 @@ def edit_media(
         )
 
     if not args.preview and not args.timeline:
-        if os.path.isdir(output_path):
+        if os.path.isdir(output):
             log.error("Output path already has an existing directory!")
 
-        if os.path.isfile(output_path) and inp.path != output_path:
-            log.debug(f"Removing already existing file: {output_path}")
-            os.remove(output_path)
-
-    tracks = len(inp.audios)
+        if os.path.isfile(output) and inputs[0].path != output:
+            log.debug(f"Removing already existing file: {output}")
+            os.remove(output)
 
     # Extract subtitles in their native format.
-    if len(inp.subtitles) > 0:
-        cmd = ["-i", inp.path, "-hide_banner"]
-        for s, sub in enumerate(inp.subtitles):
-            cmd.extend(["-map", f"0:s:{s}"])
-        for s, sub in enumerate(inp.subtitles):
-            cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
-        ffmpeg.run(cmd)
+    # TODO
+    # if len(inp.subtitles) > 0:
+    #     cmd = ["-i", inp.path, "-hide_banner"]
+    #     for s, sub in enumerate(inp.subtitles):
+    #         cmd.extend(["-map", f"0:s:{s}"])
+    #     for s, sub in enumerate(inp.subtitles):
+    #         cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
+    #     ffmpeg.run(cmd)
 
-    # Split audio tracks into: 0.wav, 1.wav, etc.
     log.conwrite("Extracting audio")
 
-    cmd = ["-i", inp.path, "-hide_banner"]
-    for t in range(tracks):
-        cmd.extend(
-            [
-                "-map",
-                f"0:a:{t}",
-                "-ac",
-                "2",
-                "-rf64",
-                "always",
-                os.path.join(temp, f"{t}.wav"),
-            ]
-        )
+    cmd = []
+    for i, inp in enumerate(inputs):
+        cmd.extend(["-i", inp.path])
+    cmd.append("-hide_banner")
+
+    for i, inp in enumerate(inputs):
+        for s in range(len(inp.audios)):
+            cmd.extend(
+                [
+                    "-map",
+                    f"{i}:a:{s}",
+                    "-ac",
+                    "2",
+                    "-rf64",
+                    "always",
+                    os.path.join(temp, f"{i}-{s}.wav"),
+                ]
+            )
 
     ffmpeg.run(cmd)
-    del cmd
 
-    if chunks is None:
-        chunks = get_chunks(inp, args, progress, temp, log)
-
-    if len(chunks) == 1 and chunks[0][2] == 99999:
-        log.error("The entire media is cut!")
-
-    def is_clip(chunk: Tuple[int, int, float]) -> bool:
-        return chunk[2] != 99999
-
-    def number_of_cuts(chunks: List[Tuple[int, int, float]]) -> int:
-        return len(list(filter(is_clip, chunks)))
-
-    num_cuts = number_of_cuts(chunks)
-
-    obj_sheet = Sheet(args, inp, chunks, log)
+    if timeline is None:
+        timeline = make_timeline(inputs, args, progress, temp, log)
 
     if args.timeline:
         from auto_editor.formats.timeline import make_json_timeline
 
-        make_json_timeline(
-            args.api, inp.path, 0, obj_sheet, chunks, args.background, log
-        )
-        return num_cuts, None
+        make_json_timeline(args.api, 0, timeline, log)
+        return None
 
     if args.preview:
         from auto_editor.preview import preview
 
-        preview(inp, chunks, log)
-        return num_cuts, None
+        preview(timeline, log)
+        return None
 
     if args.export == "json":
         from auto_editor.formats.timeline import make_json_timeline
 
-        make_json_timeline(
-            args.api,
-            inp.path,
-            output_path,
-            obj_sheet,
-            chunks,
-            args.background,
-            log,
-        )
-        return num_cuts, output_path
+        make_json_timeline(args.api, output, timeline, log)
+        return output
 
     if args.export == "premiere":
         from auto_editor.formats.premiere import premiere_xml
 
-        premiere_xml(inp, temp, output_path, chunks)
-        return num_cuts, output_path
+        premiere_xml(temp, output, timeline)
+        return output
 
     if args.export == "final-cut-pro":
         from auto_editor.formats.final_cut_pro import fcp_xml
 
-        fcp_xml(inp, output_path, chunks)
-        return num_cuts, output_path
+        fcp_xml(output, timeline)
+        return output
 
     if args.export == "shotcut":
         from auto_editor.formats.shotcut import shotcut_xml
 
-        shotcut_xml(inp, output_path, chunks)
-        return num_cuts, output_path
+        shotcut_xml(output, timeline)
+        return output
 
-    def pad_chunk(
-        chunk: Tuple[int, int, float], total_frames: int
-    ) -> List[Tuple[int, int, float]]:
-
-        start = []
-        end = []
-        if chunk[0] != 0:
-            start.append((0, chunk[0], 99999.0))
-
-        if chunk[1] != total_frames - 1:
-            end.append((chunk[1], total_frames - 1, 99999.0))
-
-        return start + [chunk] + end
-
-    def make_media(
-        inp: FileInfo, chunks: List[Tuple[int, int, float]], output_path: str
-    ) -> None:
+    def make_media(inp: FileInfo, timeline: Timeline, output: str) -> None:
         from auto_editor.output import mux_quality_media
         from auto_editor.render.video import render_av
 
         if rules.allow_subtitle:
             from auto_editor.render.subtitle import cut_subtitles
 
-            cut_subtitles(ffmpeg, inp, chunks, temp, log)
+            cut_subtitles(ffmpeg, timeline, temp, log)
 
         if rules.allow_audio:
             from auto_editor.render.audio import make_new_audio
 
-            for t in range(tracks):
-                temp_file = os.path.join(temp, f"{t}.wav")
-                new_file = os.path.join(temp, f"new{t}.wav")
-                make_new_audio(temp_file, new_file, chunks, log, inp.gfps, progress)
+            for t in range(len(inp.audios)):
+                # TODO: add many to one audio rendering
+                temp_file = os.path.join(temp, f"0-{t}.wav")
+                new_file = os.path.join(temp, f"0-new{t}.wav")
+                make_new_audio(
+                    temp_file, new_file, timeline.aclips[t], timeline.fps, progress, log
+                )
 
                 if not os.path.isfile(new_file):
                     log.error("Audio file not created.")
@@ -250,16 +205,7 @@ def edit_media(
             for v, vid in enumerate(inp.videos):
                 if vid.codec not in ("png", "mjpeg", "webp"):
                     out_path, apply_later = render_av(
-                        ffmpeg,
-                        v,
-                        inp,
-                        args,
-                        chunks,
-                        progress,
-                        obj_sheet,
-                        rules,
-                        temp,
-                        log,
+                        ffmpeg, v, timeline, args, progress, rules, temp, log
                     )
                     video_output.append((v, True, out_path, apply_later))
                 elif rules.allow_image:
@@ -273,29 +219,21 @@ def edit_media(
         log.conwrite("Writing output file")
 
         mux_quality_media(
-            ffmpeg,
-            video_output,
-            rules,
-            output_path,
-            output_container,
-            args,
-            inp,
-            temp,
-            log,
+            ffmpeg, video_output, rules, output, output_container, args, inp, temp, log
         )
 
-    if args.export == "clip-sequence":
-        total_frames = chunks[-1][1]
-        clip_num = 0
-        for chunk in chunks:
-            if chunk[2] == 99999:
-                continue
-            make_media(
-                inp,
-                pad_chunk(chunk, total_frames),
-                append_filename(output_path, f"-{clip_num}"),
-            )
-            clip_num += 1
-    else:
-        make_media(inp, chunks, output_path)
-    return num_cuts, output_path
+    # if args.export == "clip-sequence":
+    #     total_frames = chunks[-1][1]
+    #     clip_num = 0
+    #     for chunk in chunks:
+    #         if chunk[2] == 99999:
+    #             continue
+    #         make_media(
+    #             inp,
+    #             pad_chunk(chunk, total_frames),
+    #             append_filename(output, f"-{clip_num}"),
+    #         )
+    #         clip_num += 1
+    # else:
+    make_media(inp, timeline, output)
+    return output

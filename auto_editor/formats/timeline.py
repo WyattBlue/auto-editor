@@ -6,9 +6,11 @@ import os
 import sys
 import json
 
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Any
 
 from auto_editor.utils.log import Log
+from auto_editor.timeline import Timeline
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 
 
 def check_attrs(data, log: Log, *attrs: str):
@@ -55,7 +57,7 @@ def validate_chunks(chunks, log: Log) -> List[Tuple[int, int, float]]:
     return new_chunks
 
 
-def read_json_timeline(json_file: str, log: Log):
+def read_json_timeline(json_file: str, ffmpeg: FFmpeg, log: Log):
     with open(json_file, "r") as f:
         data = json.load(f)
 
@@ -70,24 +72,28 @@ def read_json_timeline(json_file: str, log: Log):
 
         chunks = validate_chunks(data["chunks"], log)
 
-        return "#000", data["source"], chunks
+        inp = FileInfo(data["source"], ffmpeg, log)
 
-    # version 0.2.0
-    check_attrs(data, log, "source", "background", "chunks", "timeline")
-    check_file(data["source"], log)
+        fps = inp.get_fps()
+        sr = inp.get_samplerate()
+        res = inp.get_res()
 
-    chunks = validate_chunks(data["chunks"], log)
+        return Timeline(fps, sr, res, "#000", chunks, inp, log)
 
-    return data["background"], data["source"], chunks
+    if data["version"] == "0.2.0":
+        check_attrs(data, log, "timeline")
+        # check_file(data["source"], log)
+        # return data["background"], data["source"], chunks
+
+        raise ValueError("Incomplete")
+
+    raise ValueError("Unreachable")
 
 
 def make_json_timeline(
     version: str,
-    media_file: str,
     out: Union[str, int],
-    obj_sheet,
-    chunks: List[Tuple[int, int, float]],
-    background,
+    timeline: Timeline,
     log: Log,
 ) -> None:
 
@@ -95,18 +101,22 @@ def make_json_timeline(
         log.error(f"Version {version} is not supported!")
 
     if version == "0.1.0":
-        data = {
+        data: Any = {
             "version": "0.1.0",
-            "source": os.path.abspath(media_file),
-            "chunks": chunks,
+            "source": os.path.abspath(timeline.inp.path),
+            "chunks": timeline.chunks,
         }
     if version == "0.2.0":
         data = {
             "version": "0.2.0",
-            "source": os.path.abspath(media_file),
-            "background": background,
-            "chunks": chunks,
-            "timeline": obj_sheet.all,
+            "timeline": {
+                "background": timeline.background,
+                "resolution": timeline.res,
+                "fps": timeline.fps,
+                "samplerate": timeline.samplerate,
+                "video": timeline.vclips,
+                "audio": timeline.aclips,
+            },
         }
 
     if isinstance(out, str):

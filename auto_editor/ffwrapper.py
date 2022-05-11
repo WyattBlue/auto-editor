@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from subprocess import Popen, PIPE
 
 # Typing
-from typing import List, Optional
+from typing import List, Tuple, Optional
 
 # Included Libraries
 from auto_editor.utils.func import get_stdout
@@ -180,11 +180,24 @@ class FileInfo:
         "videos",
         "audios",
         "subtitles",
-        "gfps",
-        "gwidth",
-        "gheight",
-        "gsamplerate",
     )
+
+    def get_res(self) -> Tuple[int, int]:
+        if len(self.videos) > 0:
+            return self.videos[0].width, self.videos[0].height
+        return 1920, 1080
+
+    def get_fps(self) -> float:
+        fps = None
+        if len(self.videos) > 0:
+            fps = self.videos[0].fps
+
+        return 30 if fps is None else fps
+
+    def get_samplerate(self) -> int:
+        if len(self.audios) > 0:
+            return self.audios[0].samplerate
+        return 48000
 
     def __init__(self, path: str, ffmpeg: FFmpeg, log: Log):
         self.path = path
@@ -294,15 +307,3 @@ class FileInfo:
                     self.subtitles.append(
                         SubtitleStream(codec, ext, regex_match(lang_regex, line))
                     )
-
-        self.gfps: float = 30.0 if fps is None else fps
-
-        if len(self.videos) > 0:
-            self.gwidth, self.gheight = self.videos[0].width, self.videos[0].height
-        else:
-            self.gwidth, self.gheight = 1280, 720
-
-        if len(self.audios) > 0:
-            self.gsamplerate = self.audios[0].samplerate
-        else:
-            self.gsamplerate = 48000

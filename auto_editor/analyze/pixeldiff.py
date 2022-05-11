@@ -1,21 +1,21 @@
 import av
 import numpy as np
-import numpy.typing as npt
+from numpy.typing import NDArray
 from PIL import ImageChops
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.progressbar import ProgressBar
 
 
-def pixel_difference(inp: FileInfo, progress: ProgressBar) -> npt.NDArray[np.uint64]:
-    path, fps = inp.path, inp.gfps
-
+def pixel_difference(
+    path: str, fps: float, progress: ProgressBar
+) -> NDArray[np.uint64]:
     container = av.open(path, "r")
 
-    video_stream = container.streams.video[0]
-    video_stream.thread_type = "AUTO"
+    stream = container.streams.video[0]
+    stream.thread_type = "AUTO"
 
-    inaccurate_dur = int(float(video_stream.duration * video_stream.time_base) * fps)
+    inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)
 
     progress.start(inaccurate_dur, "Analyzing pixel diffs")
 
@@ -25,7 +25,7 @@ def pixel_difference(inp: FileInfo, progress: ProgressBar) -> npt.NDArray[np.uin
 
     threshold_list = np.zeros((1024), dtype=np.uint64)
 
-    for frame in container.decode(video_stream):
+    for frame in container.decode(stream):
         if image is None:
             prev_image = None
         else:

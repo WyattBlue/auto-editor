@@ -12,7 +12,8 @@ from auto_editor.utils.progressbar import ProgressBar
 
 from auto_editor.utils.encoder import encoders
 from auto_editor.output import get_vcodec, video_quality
-from auto_editor.sheet import RectangleObj, EllipseObj, TextObj, ImageObj
+from auto_editor.objects import RectangleObj, EllipseObj, TextObj, ImageObj
+from auto_editor.timeline import Timeline
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
 allowed_pix_fmt = {
@@ -92,11 +93,9 @@ def one_pos_two_pos(
 def render_av(
     ffmpeg: FFmpeg,
     track: int,
-    inp: FileInfo,
+    timeline: Timeline,
     args,
-    chunks: List[Tuple[int, int, float]],
     progress: ProgressBar,
-    effects,
     rules,
     temp: str,
     log: Log,
@@ -190,6 +189,9 @@ def render_av(
 
         return frame.from_image(img).reformat(format=pix_fmt)
 
+    chunks = timeline.chunks[:]
+    inp = timeline.inp
+
     if chunks[-1][2] == 99999:
         chunks.pop()
 
@@ -224,7 +226,7 @@ def render_av(
     width = video_stream.width
     height = video_stream.height
 
-    effects.all = set_static_assets(effects.all, log)
+    # effects.all = set_static_assets(effects.all, log)
 
     spedup = os.path.join(temp, f"spedup{track}.mp4")
 
@@ -306,11 +308,11 @@ def render_av(
                 input_equavalent += 1 / chunk[2]
 
             while input_equavalent > output_equavalent:
-                if index in effects.sheet:
-                    frame = render_objects(
-                        effects.sheet, effects.all, index, frame, target_pix_fmt
-                    )
-                elif pix_fmt != target_pix_fmt:
+                # if index in effects.sheet:
+                #     frame = render_objects(
+                #         effects.sheet, effects.all, index, frame, target_pix_fmt
+                #     )
+                if pix_fmt != target_pix_fmt:
                     frame = frame.reformat(format=target_pix_fmt)
 
                 in_bytes = frame.to_ndarray().tobytes()

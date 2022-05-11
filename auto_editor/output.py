@@ -99,14 +99,14 @@ def mux_quality_media(
     if a_tracks > 0:
         if args.keep_tracks_seperate and rules.max_audios is None:
             for t in range(a_tracks):
-                cmd.extend(["-i", os.path.join(temp, f"new{t}.wav")])
+                cmd.extend(["-i", os.path.join(temp, f"0-new{t}.wav")])
         else:
             # Merge all the audio a_tracks into one.
             new_a_file = os.path.join(temp, "new_audio.wav")
             if a_tracks > 1:
                 new_cmd = []
                 for t in range(a_tracks):
-                    new_cmd.extend(["-i", os.path.join(temp, f"new{t}.wav")])
+                    new_cmd.extend(["-i", os.path.join(temp, f"0-new{t}.wav")])
                 new_cmd.extend(
                     [
                         "-filter_complex",
@@ -119,7 +119,7 @@ def mux_quality_media(
                 ffmpeg.run(new_cmd)
                 a_tracks = 1
             else:
-                new_a_file = os.path.join(temp, "new0.wav")
+                new_a_file = os.path.join(temp, "0-new0.wav")
             cmd.extend(["-i", new_a_file])
 
     if s_tracks > 0:

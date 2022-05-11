@@ -3,7 +3,8 @@ import re
 
 from typing import List, Tuple
 from auto_editor.utils.log import Log
-from auto_editor.ffwrapper import FileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.timeline import Timeline
 
 
 class SubtitleParser:
@@ -133,12 +134,13 @@ class SubtitleParser:
 
 
 def cut_subtitles(
-    ffmpeg,
-    inp: FileInfo,
-    chunks: List[Tuple[int, int, float]],
+    ffmpeg: FFmpeg,
+    timeline: Timeline,
     temp: str,
     log: Log,
 ) -> None:
+    inp = timeline.inp
+    chunks = timeline.chunks
     for s, sub in enumerate(inp.subtitles):
         file_path = os.path.join(temp, f"{s}s.{sub.ext}")
         new_path = os.path.join(temp, f"new{s}s.{sub.ext}")
@@ -147,12 +149,12 @@ def cut_subtitles(
 
         if sub.codec in parser.supported_codecs:
             with open(file_path) as file:
-                parser.parse(file.read(), inp.gfps, sub.codec)
+                parser.parse(file.read(), timeline.fps, sub.codec)
         else:
             convert_path = os.path.join(temp, f"{s}s_convert.vtt")
             ffmpeg.run(["-i", file_path, convert_path])
             with open(convert_path) as file:
-                parser.parse(file.read(), inp.gfps, "webvtt")
+                parser.parse(file.read(), timeline.fps, "webvtt")
 
         parser.edit(chunks)
         parser.write(new_path)

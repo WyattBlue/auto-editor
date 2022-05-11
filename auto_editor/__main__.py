@@ -10,24 +10,24 @@ from typing import List
 
 # Included Libraries
 import auto_editor
-import auto_editor.vanparse as vanparse
 import auto_editor.utils.func as usefulfunctions
+import auto_editor.vanparse as vanparse
 
-from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.log import Log, Timer
+from auto_editor.edit import edit_media, set_output_name
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.edit import edit_media
+from auto_editor.utils.log import Log, Timer
+from auto_editor.validate_input import valid_input
 
 
 def main_options(parser):
     from auto_editor.utils.types import (
-        float_type,
-        sample_rate_type,
-        frame_type,
-        range_type,
-        speed_range_type,
-        margin_type,
         color_type,
+        float_type,
+        frame_type,
+        margin_type,
+        range_type,
+        sample_rate_type,
+        speed_range_type,
     )
 
     parser.add_text("Object Options")
@@ -92,12 +92,6 @@ def main_options(parser):
         help="Set the number of bits per second for audio.",
     )
     parser.add_argument(
-        "--sample-rate",
-        "-ar",
-        type=sample_rate_type,
-        help="Set the sample rate of the input and output videos.",
-    )
-    parser.add_argument(
         "--video-quality-scale",
         "-qscale:v",
         "-q:v",
@@ -108,7 +102,7 @@ def main_options(parser):
         "--scale",
         type=float_type,
         default=1,
-        help="Scale the output video by a certain factor.",
+        help="Scale the input video's resolution by the given factor.",
     )
     parser.add_argument(
         "--extras",
@@ -118,24 +112,6 @@ def main_options(parser):
         "--no-seek",
         flag=True,
         help="Disable file seeking when rendering video. Helpful for debugging desync issues.",
-    )
-    parser.add_text("Miscellaneous Options")
-    parser.add_argument(
-        "--background",
-        type=color_type,
-        default="#000",
-        help="Set the color of the background that is visible when the video is moved.",
-    )
-    parser.add_argument(
-        "--combine-files",
-        flag=True,
-        help="Combine all input files into one before editing.",
-    )
-    parser.add_argument(
-        "--progress",
-        default="modern",
-        choices=["modern", "classic", "ascii", "machine", "none"],
-        help="Set what type of progress bar to use.",
     )
     parser.add_text("Manual Editing Options")
     parser.add_argument(
@@ -170,6 +146,26 @@ def main_options(parser):
         nargs="*",
         help="Set an arbitrary speed for a given range.",
     )
+    parser.add_text("Timeline Options")
+    parser.add_argument(
+        "--frame-rate",
+        "-fps",
+        "-r",
+        type=float,
+        help="Set the frame rate for the timeline and output media.",
+    )
+    parser.add_argument(
+        "--sample-rate",
+        "-ar",
+        type=sample_rate_type,
+        help="Set the sample rate for the timeline and output media.",
+    )
+    parser.add_argument(
+        "--background",
+        type=color_type,
+        default="#000",
+        help="Set the color of the background that is visible when the video is moved.",
+    )
     parser.add_text("Select Editing Source Options")
     parser.add_argument(
         "--edit-based-on",
@@ -184,6 +180,7 @@ def main_options(parser):
     )
     parser.add_argument(
         "--export",
+        "-ex",
         default="default",
         choices=[
             "default",
@@ -215,6 +212,12 @@ def main_options(parser):
     )
     parser.add_text("Display Options")
     parser.add_argument(
+        "--progress",
+        default="modern",
+        choices=["modern", "classic", "ascii", "machine", "none"],
+        help="Set what type of progress bar to use.",
+    )
+    parser.add_argument(
         "--version", flag=True, help="Display the program's version and halt."
     )
     parser.add_argument(
@@ -232,10 +235,10 @@ def main_options(parser):
     )
     parser.add_argument(
         "--api",
-        default="0.2.0",
+        default="0.1.0",
         help="Set what version of the JSON timeline to output.",
     )
-    parser.add_text("Editing Options")
+    parser.add_text("Global Editing Options")
     parser.add_argument(
         "--silent-threshold",
         "-t",
@@ -268,6 +271,7 @@ def main_options(parser):
     )
     parser.add_argument(
         "--min-clip-length",
+        "-minclip",
         "-mclip",
         type=frame_type,
         default=3,
@@ -275,6 +279,7 @@ def main_options(parser):
     )
     parser.add_argument(
         "--min-cut-length",
+        "-mincut",
         "-mcut",
         type=frame_type,
         default=6,
@@ -285,8 +290,7 @@ def main_options(parser):
         "--output-file",
         "--output",
         "-o",
-        nargs="*",
-        help="Set the name(s) of the new output.",
+        help="Set the name/path of the new output file.",
     )
     parser.add_required(
         "input", nargs="*", help="File(s) or URL(s) that will be edited."
@@ -313,7 +317,7 @@ def main():
 
         sys_a = sys.argv[1:]
 
-        def c(sys_a, options, new):
+        def c(sys_a: List[str], options: List[str], new: List[str]) -> List[str]:
             for option in options:
                 if option in sys_a:
                     pos = sys_a.index(option)
@@ -374,19 +378,19 @@ def main():
         )
 
     if args.temp_dir is None:
-        TEMP = tempfile.mkdtemp()
+        temp = tempfile.mkdtemp()
     else:
-        TEMP = args.temp_dir
-        if os.path.isfile(TEMP):
+        temp = args.temp_dir
+        if os.path.isfile(temp):
             Log().error("Temp directory cannot be an already existing file.")
-        if os.path.isdir(TEMP):
-            if len(os.listdir(TEMP)) != 0:
+        if os.path.isdir(temp):
+            if len(os.listdir(temp)) != 0:
                 Log().error("Temp directory should be empty!")
         else:
-            os.mkdir(TEMP)
+            os.mkdir(temp)
 
-    log = Log(args.debug, args.quiet, temp=TEMP)
-    log.debug(f"Temp Directory: {TEMP}")
+    log = Log(args.debug, args.quiet, temp=temp)
+    log.debug(f"Temp Directory: {temp}")
 
     log.conwrite("Starting")
 
@@ -399,73 +403,35 @@ def main():
     if args.video_speed <= 0 or args.video_speed > 99999:
         args.video_speed = 99999
 
-    if args.output_file is None:
-        args.output_file = []
+    inputs = valid_input(args.input, ffmpeg, args, log)
 
-    from auto_editor.validate_input import valid_input
-
-    input_list = valid_input(args.input, ffmpeg, args, log)
-
-    if args.combine_files:
-        temp_file = (
-            "combined.mp4"
-            if exporting_to_editor
-            else os.path.join(TEMP, "combined.mp4")
-        )
-
+    if exporting_to_editor and len(inputs) > 1:
         cmd = []
-        for fileref in input_list:
-            cmd.extend(["-i", fileref])
+        for inp in inputs:
+            cmd.extend(["-i", inp.path])
         cmd.extend(
             [
                 "-filter_complex",
-                f"[0:v]concat=n={len(input_list)}:v=1:a=1",
+                f"[0:v]concat=n={len(inputs)}:v=1:a=1",
                 "-codec:v",
                 "h264",
                 "-pix_fmt",
                 "yuv420p",
                 "-strict",
                 "-2",
-                temp_file,
+                "combined.mp4",
             ]
         )
-
         ffmpeg.run(cmd)
-        del cmd
-        input_list = [temp_file]
+        inputs = [FileInfo("combined.mp4", ffmpeg, log)]
+    try:
+        output = edit_media(inputs, ffmpeg, args, temp, log)
 
-    def main_loop(input_list: List[str], ffmpeg: FFmpeg, args, log: Log) -> None:
-        num_cuts = 0
-
-        progress = ProgressBar(args.progress)
-
-        for i, input_path in enumerate(input_list):
-            inp = FileInfo(input_path, ffmpeg, log)
-
-            if len(input_list) > 1:
-                log.conwrite(f"Working on {inp.basename}")
-
-            cuts, output_path = edit_media(i, inp, ffmpeg, args, progress, TEMP, log)
-            num_cuts += cuts
-
-        if not args.preview and not args.timeline and not making_data_file:
+        if not args.preview and not args.timeline:
             timer.stop()
 
-        if not args.preview and not args.timeline and making_data_file:
-            # Assume making each cut takes about 30 seconds.
-            time_save = usefulfunctions.human_readable_time(num_cuts * 30)
-            s = "s" if num_cuts != 1 else ""
-
-            log.print(
-                f"Auto-Editor made {num_cuts} cut{s}, which would have taken "
-                f"about {time_save} if edited manually."
-            )
-
-        if not args.no_open and output_path is not None:
-            usefulfunctions.open_with_system_default(output_path, log)
-
-    try:
-        main_loop(input_list, ffmpeg, args, log)
+        if not args.no_open and output is not None:
+            usefulfunctions.open_with_system_default(output, log)
     except KeyboardInterrupt:
         log.error("Keyboard Interrupt")
     log.cleanup()
