@@ -1,28 +1,28 @@
 import wave
+from typing import List, Tuple
 
 import numpy as np
 
-from auto_editor.wavfile import read
-from auto_editor.render.tsm import phasevocoder, ArrReader, ArrWriter
+from auto_editor.objects import AudioObj
+from auto_editor.render.tsm import ArrReader, ArrWriter, phasevocoder
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-
-from typing import List, Tuple
+from auto_editor.wavfile import read
 
 
 def make_new_audio(
     input_path: str,
     output_path: str,
-    chunks: List[Tuple[int, int, float]],
-    log: Log,
+    clips: List[AudioObj],
     fps: float,
     progress: ProgressBar,
+    log: Log,
 ) -> None:
 
-    if len(chunks) == 1 and chunks[0][2] == 99999:
+    if len(clips) == 0:
         log.error("Trying to create an empty file.")
 
-    progress.start(len(chunks), "Creating new audio")
+    progress.start(len(clips), "Creating new audio")
 
     samplerate, audio_samples = read(input_path)
 
@@ -31,21 +31,19 @@ def make_new_audio(
     main_writer.setframerate(samplerate)
     main_writer.setsampwidth(2)
 
-    for c, chunk in enumerate(chunks):
-        sample_start = int(chunk[0] / fps * samplerate)
-        sample_end = int(sample_start + (samplerate / fps) * (chunk[1] - chunk[0]))
+    for c, clip in enumerate(clips):
+        sample_start = int(clip.offset / fps * samplerate)
+        sample_end = int((clip.offset + clip.dur) / fps * samplerate)
 
-        the_speed = chunk[2]
-
-        if the_speed == 1:
+        if clip.speed == 1:
             main_writer.writeframes(audio_samples[sample_start:sample_end])  # type: ignore
-        elif the_speed != 99999:
+        else:
             sped_chunk = audio_samples[sample_start:sample_end]
 
             reader = ArrReader(sped_chunk)
             writer = ArrWriter(np.zeros((0, 2), dtype=np.int16))
 
-            phasevocoder(2, speed=the_speed).run(reader, writer)
+            phasevocoder(2, speed=clip.speed).run(reader, writer)
             if writer.output.shape[0] != 0:
                 main_writer.writeframes(writer.output)
 

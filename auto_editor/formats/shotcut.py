@@ -2,6 +2,7 @@ from typing import List, Tuple, Union
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.func import aspect_ratio
+from auto_editor.timeline import Timeline
 
 
 def frames_to_timecode(frames: Union[int, float], fps: float) -> str:
@@ -27,13 +28,15 @@ def timecode_to_frames(timecode: str, fps: float) -> int:
 
 
 def shotcut_xml(
-    inp: FileInfo,
     output: str,
-    chunks: List[Tuple[int, int, float]],
+    timeline: Timeline,
 ) -> None:
-    width, height = inp.gwidth, inp.gheight
+    width, height = timeline.res
     num, den = aspect_ratio(width, height)
 
+    chunks = timeline.chunks
+    fps = timeline.fps
+    inp = timeline.inp
     global_out = inp.duration
 
     version = "21.05.18"
@@ -42,15 +45,14 @@ def shotcut_xml(
         out.write('<?xml version="1.0" standalone="no"?>\n')
         out.write(
             '<mlt LC_NUMERIC="C" version="7.1.0" '
-            + f'title="Shotcut version {version}" '
-            + 'producer="main_bin">\n'
+            f'title="Shotcut version {version}" producer="main_bin">\n'
         )
         out.write(
             '\t<profile description="automatic" '
-            + f'width="{width}" height="{height}" '
-            + 'progressive="1" sample_aspect_num="1" sample_aspect_den="1" '
-            + f'display_aspect_num="{num}" display_aspect_den="{den}" '
-            + f'frame_rate_num="{inp.gfps}" frame_rate_den="1" colorspace="709"/>\n'
+            f'width="{width}" height="{height}" '
+            'progressive="1" sample_aspect_num="1" sample_aspect_den="1" '
+            f'display_aspect_num="{num}" display_aspect_den="{den}" '
+            f'frame_rate_num="{fps}" frame_rate_den="1" colorspace="709"/>\n'
         )
         out.write('\t<playlist id="main_bin">\n')
         out.write('\t\t<property name="xml_retain">1</property>\n')
@@ -84,24 +86,21 @@ def shotcut_xml(
 
             speed = clip[2]
 
-            _out = frames_to_timecode(clip[1] / speed, inp.gfps)
-            length = frames_to_timecode((clip[1] / speed) + 1, inp.gfps)
+            _out = frames_to_timecode(clip[1] / speed, fps)
+            length = frames_to_timecode((clip[1] / speed) + 1, fps)
 
             if speed == 1:
                 resource = inp.path
                 caption = inp.basename
                 out.write(f'\t<chain id="chain{chains}" out="{_out}">\n')
-                chains += 1
             else:
                 resource = f"{speed}:{inp.path}"
                 caption = f"{inp.basename} ({speed}x)"
                 out.write(
-                    '\t<producer id="producer{}" in="00:00:00.000" out="{}">\n'.format(
-                        producers, _out
-                    )
+                    f'\t<producer id="producer{producers}" in="00:00:00.000" out="{_out}">\n'
                 )
                 producers += 1
-                chains += 1  # yes, Shotcut does this.
+            chains += 1
 
             out.write(f'\t\t<property name="length">{length}</property>\n')
             out.write('\t\t<property name="eof">pause</property>\n')
@@ -157,8 +156,8 @@ def shotcut_xml(
 
             out_len = max((clip[1] - 2) / speed, 0)
 
-            _in = frames_to_timecode(in_len, inp.gfps)
-            _out = frames_to_timecode(out_len, inp.gfps)
+            _in = frames_to_timecode(in_len, fps)
+            _out = frames_to_timecode(out_len, fps)
 
             tag_name = f"chain{i}"
             if speed != 1:
@@ -172,7 +171,7 @@ def shotcut_xml(
 
         out.write(
             f'\t<tractor id="tractor0" title="Shotcut version {version}" '
-            + f'in="00:00:00.000" out="{global_out}">\n'
+            f'in="00:00:00.000" out="{global_out}">\n'
         )
         out.write('\t\t<property name="shotcut">1</property>\n')
         out.write('\t\t<property name="shotcut:projectAudioChannels">2</property>\n')

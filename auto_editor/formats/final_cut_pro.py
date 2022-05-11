@@ -13,9 +13,48 @@ from typing import List, Tuple, Union
 
 from .utils import indent
 from auto_editor.ffwrapper import FileInfo
+from auto_editor.timeline import Timeline
 
 
-def fcp_xml(inp: FileInfo, output: str, chunks: List[Tuple[int, int, float]]) -> None:
+def fraction(_a: Union[int, float], _fps: float) -> str:
+    from fractions import Fraction
+
+    if _a == 0:
+        return "0s"
+
+    if isinstance(_a, float):
+        a = Fraction(_a)
+    else:
+        a = _a
+
+    fps = Fraction(_fps)
+
+    frac = Fraction(a, fps).limit_denominator()
+    num = frac.numerator
+    dem = frac.denominator
+
+    if dem < 3000:
+        factor = int(3000 / dem)
+
+        if factor == 3000 / dem:
+            num *= factor
+            dem *= factor
+        else:
+            # Good enough but has some error that are impacted at speeds such as 150%.
+            total = Fraction(0)
+            while total < frac:
+                total += Fraction(1, 30)
+            num = total.numerator
+            dem = total.denominator
+
+    return f"{num}/{dem}s"
+
+
+def fcp_xml(output: str, timeline: Timeline) -> None:
+    inp = timeline.inp
+    fps = timeline.fps
+    chunks = timeline.chunks
+
     total_dur = chunks[-1][1]
 
     if system() == "Windows":
@@ -23,41 +62,8 @@ def fcp_xml(inp: FileInfo, output: str, chunks: List[Tuple[int, int, float]]) ->
     else:
         pathurl = Path(inp.abspath).as_uri()
 
-    def fraction(_a: Union[int, float], _fps: float) -> str:
-        from fractions import Fraction
-
-        if _a == 0:
-            return "0s"
-
-        if isinstance(_a, float):
-            a = Fraction(_a)
-        else:
-            a = _a
-
-        fps = Fraction(_fps)
-
-        frac = Fraction(a, fps).limit_denominator()
-        num = frac.numerator
-        dem = frac.denominator
-
-        if dem < 3000:
-            factor = int(3000 / dem)
-
-            if factor == 3000 / dem:
-                num *= factor
-                dem *= factor
-            else:
-                # Good enough but has some error that are impacted at speeds such as 150%.
-                total = Fraction(0)
-                while total < frac:
-                    total += Fraction(1, 30)
-                num = total.numerator
-                dem = total.denominator
-
-        return f"{num}/{dem}s"
-
-    width, height = inp.gwidth, inp.gheight
-    frame_duration = fraction(1, inp.gfps)
+    width, height = timeline.res
+    frame_duration = fraction(1, fps)
 
     audio_file = len(inp.videos) == 0 and len(inp.audios) > 0
     group_name = "Auto-Editor {} Group".format("Audio" if audio_file else "Video")
@@ -69,13 +75,15 @@ def fcp_xml(inp: FileInfo, output: str, chunks: List[Tuple[int, int, float]]) ->
         outfile.write('<fcpxml version="1.9">\n')
         outfile.write("\t<resources>\n")
         outfile.write(
-            f'\t\t<format id="r1" name="FFVideoFormat{height}p{inp.gfps}" '
+            f'\t\t<format id="r1" name="FFVideoFormat{height}p{fps}" '
             f'frameDuration="{frame_duration}" '
             f'width="{width}" height="{height}" '
             'colorSpace="1-1-1 (Rec. 709)"/>\n'
         )
         outfile.write(
-            f'\t\t<asset id="r2" name="{name}" start="0s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" duration="{fraction(total_dur, inp.gfps)}">\n'
+            f'\t\t<asset id="r2" name="{name}" start="0s" hasVideo="1" format="r1" '
+            'hasAudio="1" audioSources="1" audioChannels="2" '
+            f'duration="{fraction(total_dur, fps)}">\n'
         )
         outfile.write(
             f'\t\t\t<media-rep kind="original-media" src="{pathurl}"></media-rep>\n'
@@ -99,7 +107,7 @@ def fcp_xml(inp: FileInfo, output: str, chunks: List[Tuple[int, int, float]]) ->
                 continue
 
             clip_dur = (clip[1] - clip[0] + 1) / clip[2]
-            dur = fraction(clip_dur, inp.gfps)
+            dur = fraction(clip_dur, fps)
 
             close = "/" if clip[2] == 1 else ""
 
@@ -111,8 +119,8 @@ def fcp_xml(inp: FileInfo, output: str, chunks: List[Tuple[int, int, float]]) ->
                     )
                 )
             else:
-                start = fraction(clip[0] / clip[2], inp.gfps)
-                off = fraction(last_dur, inp.gfps)
+                start = fraction(clip[0] / clip[2], fps)
+                off = fraction(last_dur, fps)
                 outfile.write(
                     indent(
                         6,
@@ -126,8 +134,8 @@ def fcp_xml(inp: FileInfo, output: str, chunks: List[Tuple[int, int, float]]) ->
                 # See the "Time Maps" section.
                 # https://developer.apple.com/library/archive/documentation/FinalCutProX/Reference/FinalCutProXXMLFormat/StoryElements/StoryElements.html
 
-                frac_total = fraction(total_dur, inp.gfps)
-                speed_dur = fraction(total_dur / clip[2], inp.gfps)
+                frac_total = fraction(total_dur, fps)
+                speed_dur = fraction(total_dur / clip[2], fps)
 
                 outfile.write(
                     indent(

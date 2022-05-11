@@ -30,7 +30,7 @@ body:
     attributes:
       label: What properties does your input video have?
       description: This is NOT the place where you paste your command. IF YOU DO NOT FILL THIS OUT CORRECTLY, YOUR ISSUE WILL BE DELETED.
-      placeholder: Run `auto-editor info your_video.mp4` or `ffmpeg -hide_banner -i your_video.mp4`
+      placeholder: Run `auto-editor info your_video.mp4` AND `ffmpeg -hide_banner -i your_video.mp4`
       render: shell
 
   - type: textarea

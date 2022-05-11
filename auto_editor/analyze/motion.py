@@ -2,7 +2,7 @@ from typing import Tuple
 
 import av
 import numpy as np
-import numpy.typing as npt
+from numpy.typing import NDArray
 from PIL import ImageOps, ImageChops, ImageFilter
 
 from auto_editor.ffwrapper import FileInfo
@@ -15,17 +15,14 @@ def new_size(size: Tuple[int, int], width: int) -> Tuple[int, int]:
 
 
 def motion_detection(
-    inp: FileInfo, progress: ProgressBar, width: int, blur: int
-) -> npt.NDArray[np.float_]:
-
-    path, fps = inp.path, inp.gfps
-
+    path: str, fps: float, progress: ProgressBar, width: int, blur: int
+) -> NDArray[np.float_]:
     container = av.open(path, "r")
 
-    video_stream = container.streams.video[0]
-    video_stream.thread_type = "AUTO"
+    stream = container.streams.video[0]
+    stream.thread_type = "AUTO"
 
-    inaccurate_dur = int(float(video_stream.duration * video_stream.time_base) * fps)
+    inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)
 
     progress.start(inaccurate_dur, "Analyzing motion")
 
@@ -36,7 +33,7 @@ def motion_detection(
 
     threshold_list = np.zeros((1024), dtype=np.float_)
 
-    for frame in container.decode(video_stream):
+    for frame in container.decode(stream):
         if image is None:
             prev_image = None
         else:

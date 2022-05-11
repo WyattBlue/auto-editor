@@ -1,13 +1,10 @@
-# Internal Libraries
 from datetime import timedelta
-
-# Typing
 from typing import List, Tuple, Union
 
-# Included Libraries
+from auto_editor.ffwrapper import FileInfo
+from auto_editor.timeline import Timeline
 from auto_editor.utils.func import get_new_length
 from auto_editor.utils.log import Log
-from auto_editor.ffwrapper import FileInfo
 
 
 def display_length(secs: Union[int, float]) -> str:
@@ -22,11 +19,14 @@ def time_frame(title: str, frames: Union[int, float], fps: float) -> None:
     print(f"{title}: {in_sec} secs ({minutes})")
 
 
-def preview(inp: FileInfo, chunks: List[Tuple[int, int, float]], log: Log) -> None:
+def preview(timeline: Timeline, log: Log) -> None:
     log.conwrite("")
 
-    old_length = chunks[-1][1] / inp.gfps
-    new_length = get_new_length(chunks, inp.gfps)
+    chunks = timeline.chunks
+    fps = timeline.fps
+
+    old_length = chunks[-1][1] / fps
+    new_length = get_new_length(chunks, fps)
 
     diff = new_length - old_length
 
@@ -52,19 +52,19 @@ def preview(inp: FileInfo, chunks: List[Tuple[int, int, float]], log: Log) -> No
 
     print(f"clips: {clips}")
     if len(clip_lens) < 2:
-        time_frame(" - clip length", sum(clip_lens), inp.gfps)
+        time_frame(" - clip length", sum(clip_lens), fps)
     else:
-        time_frame(" - smallest", min(clip_lens), inp.gfps)
-        time_frame(" - largest", max(clip_lens), inp.gfps)
-        time_frame(" - average", sum(clip_lens) / len(clip_lens), inp.gfps)
+        time_frame(" - smallest", min(clip_lens), fps)
+        time_frame(" - largest", max(clip_lens), fps)
+        time_frame(" - average", sum(clip_lens) / len(clip_lens), fps)
 
     print(f"cuts: {cuts}")
     if len(cut_lens) < 2:
-        time_frame(" - cut length", sum(cut_lens), inp.gfps)
+        time_frame(" - cut length", sum(cut_lens), fps)
     else:
-        time_frame(" - smallest", min(cut_lens), inp.gfps)
-        time_frame(" - largest", max(cut_lens), inp.gfps)
-        time_frame(" - average", sum(cut_lens) / len(cut_lens), inp.gfps)
+        time_frame(" - smallest", min(cut_lens), fps)
+        time_frame(" - largest", max(cut_lens), fps)
+        time_frame(" - average", sum(cut_lens) / len(cut_lens), fps)
     print("")
 
     log.debug(f"Chunks: {chunks}")
