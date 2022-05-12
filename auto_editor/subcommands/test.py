@@ -278,6 +278,7 @@ def main(sys_args: Optional[List[str]] = None):
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "mpeg4"
+            assert float(video.duration * video.time_base) == 17.633333333333333
             assert cn.streams.audio[0].codec.name == "aac"
             assert cn.streams.audio[0].rate == 48000
 
@@ -288,6 +289,7 @@ def main(sys_args: Optional[List[str]] = None):
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "h264"
+            assert float(video.duration * video.time_base) == 17.633333333333333
             assert cn.streams.audio[0].codec.name == "aac"
             assert cn.streams.audio[0].rate == 48000
             assert video.language == "eng"
@@ -473,10 +475,32 @@ def main(sys_args: Optional[List[str]] = None):
         run_program(["example.mp4", "--video_codec", "h264"])
         run_program(["example.mp4", "--audio_codec", "ac3"])
 
-    def combine_tests():
+    def combine():
         run_program(["example.mp4", "--mark_as_silent", "0,171", "-o", "hmm.mp4"])
-        run_program(["example.mp4", "hmm.mp4", "--debug"])
+        run_program(["example.mp4", "hmm.mp4", "--combine-files", "--debug"])
         os.remove("hmm.mp4")
+
+    def frame_rate():
+        run_program(["example.mp4", "-r", "15", "--no-seek"])
+        with av.open("example_ALTERED.mp4", "r") as cn:
+            video = cn.streams.video[0]
+            assert video.average_rate == 15
+            dur = float(video.duration * video.time_base)
+            assert dur - 17.633333333333333 < 3
+
+        run_program(["example.mp4", "-r", "20"])
+        with av.open("example_ALTERED.mp4", "r") as cn:
+            video = cn.streams.video[0]
+            assert video.average_rate == 20
+            dur = float(video.duration * video.time_base)
+            assert dur - 17.633333333333333 < 2
+
+        run_program(["example.mp4", "-r", "60"])
+        with av.open("example_ALTERED.mp4", "r") as cn:
+            video = cn.streams.video[0]
+            assert video.average_rate == 60
+            dur = float(video.duration * video.time_base)
+            assert dur - 17.633333333333333 < 0.3
 
     def image_test():
         run_program(["resources/embedded-image/h264-png.mp4"])
@@ -584,6 +608,7 @@ def main(sys_args: Optional[List[str]] = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                frame_rate,
                 help_tests,
                 version_test,
                 parser_test,
@@ -615,7 +640,7 @@ def main(sys_args: Optional[List[str]] = None):
         # tester.run(effect_tests, cleanup=clean_all)
         # tester.run(render_text)
         # tester.run(check_font_error)
-        # tester.run(combine_tests)
+        # tester.run(combine)
 
     tester = Tester(args)
 
