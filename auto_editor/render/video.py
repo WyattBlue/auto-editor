@@ -191,13 +191,14 @@ def render_av(
         return frame.from_image(img).reformat(format=pix_fmt)
 
     chunks = timeline.chunks[:]
+    inp = timeline.inp
 
     if chunks[-1][2] == 99999:
         chunks.pop()
 
     progress.start(chunks[-1][1], "Creating new video")
 
-    cn = av.open(timeline.inp.path, "r")
+    cn = av.open(inp.path, "r")
     pix_fmt = cn.streams.video[track].pix_fmt
 
     target_pix_fmt = pix_fmt
@@ -205,7 +206,7 @@ def render_av(
     if not pix_fmt_allowed(pix_fmt):
         target_pix_fmt = "yuv420p"
 
-    my_codec = get_vcodec(args, timeline.inp, rules)
+    my_codec = get_vcodec(args, inp, rules)
 
     apply_video_later = True
 
