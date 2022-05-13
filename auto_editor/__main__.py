@@ -235,7 +235,7 @@ def main_options(parser):
     )
     parser.add_argument(
         "--api",
-        default="0.1.0",
+        default="1.0.0",
         help="Set what version of the JSON timeline to output.",
     )
     parser.add_text("Global Editing Options")

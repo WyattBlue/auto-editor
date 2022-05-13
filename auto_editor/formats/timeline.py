@@ -24,7 +24,9 @@ def check_file(path: str, log: Log):
         log.error(f"Could not locate media file: '{path}'")
 
 
-def validate_chunks(chunks, log: Log) -> List[Tuple[int, int, float]]:
+def validate_chunks(chunks: object, log: Log) -> List[Tuple[int, int, float]]:
+    if not isinstance(chunks, (list, tuple)):
+        log.error("Chunks must be a list")
 
     if len(chunks) == 0:
         log.error("Chunks are empty!")
@@ -36,7 +38,7 @@ def validate_chunks(chunks, log: Log) -> List[Tuple[int, int, float]]:
     for i, chunk in enumerate(chunks):
 
         if len(chunk) != 3:
-            log.error("Chunk has incorrect length.")
+            log.error("Chunk must have a length of 3.")
 
         if i == 0 and chunk[0] != 0:
             log.error("First chunk must start with 0")
@@ -57,16 +59,38 @@ def validate_chunks(chunks, log: Log) -> List[Tuple[int, int, float]]:
     return new_chunks
 
 
+class Version:
+    __slots__ = ("major", "minor", "micro")
+
+    def __init__(self, val: str, log: Log) -> None:
+        ver_str = val.split(".")
+        if len(ver_str) > 3:
+            log.error("Version string: Too many separators!")
+        while len(ver_str) < 3:
+            ver_str.append("0")
+
+        try:
+            self.major, self.minor, self.micro = map(int, ver_str)
+        except ValueError:
+            log.error("Version string: Could not convert to int.")
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, tuple) and len(other) == 2:
+            return (self.major, self.minor) == other
+        return (self.major, self.minor, self.micro) == other
+
+    def __str__(self) -> str:
+        return f"{self.major}.{self.minor}.{self.micro}"
+
+
 def read_json_timeline(json_file: str, ffmpeg: FFmpeg, log: Log):
     with open(json_file, "r") as f:
         data = json.load(f)
 
     check_attrs(data, log, "version")
+    version = Version(data["version"], log)
 
-    if data["version"] not in ("0.1.0", "0.2.0"):
-        log.error(f"Unsupported version: {data['version']}")
-
-    if data["version"] == "0.1.0":
+    if version == (1, 0) or version == (0, 1):
         check_attrs(data, log, "source", "chunks")
         check_file(data["source"], log)
 
@@ -80,35 +104,34 @@ def read_json_timeline(json_file: str, ffmpeg: FFmpeg, log: Log):
 
         return Timeline(fps, sr, res, "#000", chunks, inp, log)
 
-    if data["version"] == "0.2.0":
+    if version == (2, 0) or version == (0, 2):
         check_attrs(data, log, "timeline")
         # check_file(data["source"], log)
         # return data["background"], data["source"], chunks
 
         raise ValueError("Incomplete")
 
-    raise ValueError("Unreachable")
+    log.error(f"Unsupported version: {data['version']}")
 
 
 def make_json_timeline(
-    version: str,
+    _version: str,
     out: Union[str, int],
     timeline: Timeline,
     log: Log,
 ) -> None:
 
-    if version not in ("0.1.0", "0.2.0"):
-        log.error(f"Version {version} is not supported!")
+    version = Version(_version, log)
 
-    if version == "0.1.0":
+    if version == (1, 0) or version == (0, 1):
         data: Any = {
-            "version": "0.1.0",
+            "version": "1.0.0",
             "source": os.path.abspath(timeline.inp.path),
             "chunks": timeline.chunks,
         }
-    if version == "0.2.0":
+    elif version == (2, 0) or version == (0, 2):
         data = {
-            "version": "0.2.0",
+            "version": "2.0.0",
             "timeline": {
                 "background": timeline.background,
                 "resolution": timeline.res,
@@ -118,6 +141,8 @@ def make_json_timeline(
                 "audio": timeline.aclips,
             },
         }
+    else:
+        log.error(f"Version {version} is not supported!")
 
     if isinstance(out, str):
         if not out.endswith(".json"):
