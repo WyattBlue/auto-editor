@@ -1,5 +1,5 @@
 from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Union, Optional
-from dataclasses import dataclass, asdict, fields
+from dataclasses import asdict, fields
 
 import numpy as np
 
@@ -44,17 +44,20 @@ def clipify(chunks: List[Tuple[int, int, float]]) -> List[Clip]:
 
 def unclipify(layer: List[Clip]) -> np.ndarray:
     l: List[Optional[int]] = []
+    m: List[int] = []
     for clip in layer:
-        b = list(range(clip.offset, clip.offset + clip.dur))
-
         while clip.start > len(l):
             l.append(None)
 
-        for item in b:
+        for item in range(clip.offset, clip.offset + clip.dur):
             l.append(item)
+            m.append(item)
 
-    if None in l or len(set(l)) != len(l) or sorted(l) != l:
-        raise ValueError(f"Clip layer to complex, cannot convert to speed list: {l}")
+    if None in l:
+        raise ValueError(f"Clip layer has null frames, cannot convert speed list: {l}")
+
+    if len(set(m)) != len(m) or sorted(m) != m:
+        raise ValueError(f"Clip layer to complex, cannot convert to speed list: {m}")
 
     arr = np.empty(layer[-1].offset + layer[-1].dur, dtype=float)
     arr.fill(99999)

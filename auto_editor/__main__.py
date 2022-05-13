@@ -13,7 +13,7 @@ import auto_editor
 import auto_editor.utils.func as usefulfunctions
 import auto_editor.vanparse as vanparse
 
-from auto_editor.edit import edit_media, set_output_name
+from auto_editor.edit import edit_media
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.log import Log, Timer
 from auto_editor.validate_input import valid_input

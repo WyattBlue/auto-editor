@@ -3,7 +3,7 @@ import re
 
 from typing import List, Tuple
 from auto_editor.utils.log import Log
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg
 from auto_editor.timeline import Timeline
 
 
