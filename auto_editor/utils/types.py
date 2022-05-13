@@ -1,9 +1,9 @@
 import re
 
-from typing import List, Tuple, Sequence, Union, Optional, Literal
+from typing import List, Tuple, Sequence, Union, Literal
 
 
-def split_num_str(val: Union[str, int]) -> Tuple[Union[int, float], str]:
+def split_num_str(val: Union[str, int]) -> Tuple[float, str]:
     if isinstance(val, int):
         return val, ""
     index = 0
@@ -12,17 +12,12 @@ def split_num_str(val: Union[str, int]) -> Tuple[Union[int, float], str]:
             break
         index += 1
     num, unit = val[:index], val[index:]
-    if "." in num:
-        try:
-            float(num)
-        except ValueError:
-            raise TypeError(f"Invalid number: '{val}'")
-        return float(num), unit
+
     try:
-        int(num)
+        float(num)
     except ValueError:
         raise TypeError(f"Invalid number: '{val}'")
-    return int(num), unit
+    return float(num), unit
 
 
 def unit_check(unit: str, allowed_units: Sequence[str]) -> None:
@@ -30,15 +25,15 @@ def unit_check(unit: str, allowed_units: Sequence[str]) -> None:
         raise TypeError(f"Unknown unit: '{unit}'")
 
 
-def float_type(val: Union[str, int, float]) -> float:
-    if isinstance(val, (int, float)):
-        return float(val)
+def float_type(val: Union[str, float]) -> float:
+    if not isinstance(val, str):
+        return val
 
     num, unit = split_num_str(val)
     unit_check(unit, ("%", ""))
     if unit == "%":
-        return float(num / 100)
-    return float(num)
+        return num / 100
+    return num
 
 
 def sample_rate_type(val: str) -> int:

@@ -122,7 +122,6 @@ class FFmpeg:
                 log.error(check.group())
 
         if path is not None and not os.path.isfile(path):
-            print(output)
             log.error(f"The file {path} was not created.")
         elif show_out and not self.debug:
             print(f"stderr: {output}")

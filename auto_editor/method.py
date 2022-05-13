@@ -16,7 +16,6 @@ from auto_editor.ffwrapper import FileInfo
 from auto_editor.cutting import (
     to_speed_list,
     set_range,
-    chunkify,
     apply_mark_as,
     apply_margin,
     seconds_to_frames,
