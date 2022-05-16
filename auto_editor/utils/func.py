@@ -1,10 +1,26 @@
 from typing import List, Tuple, Union
 from auto_editor.utils.log import Log
 
+import numpy as np
+
 """
 To prevent duplicate code being pasted between scripts, common functions should be
-put here. No function should modify or create video/audio files on its own.
+put here. Every function should be pure with no side effects.
 """
+
+# Turn long silent/loud array to formatted chunk list.
+# Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]
+def chunkify(arr: np.ndarray) -> List[Tuple[int, int, float]]:
+    arr_length = len(arr)
+
+    chunks = []
+    start = 0
+    for j in range(1, arr_length):
+        if arr[j] != arr[j - 1]:
+            chunks.append((start, j, arr[j - 1]))
+            start = j
+    chunks.append((start, arr_length, arr[j]))
+    return chunks
 
 
 def parse_dataclass(unsplit_arguments, dataclass, log):
@@ -125,10 +141,6 @@ def open_with_system_default(path: str, log: Log) -> None:
                     run(["xdg-open", path])
                 except Exception:
                     log.warning("Could not open output file.")
-
-
-def fnone(val: object) -> bool:
-    return val == "none" or val == "unset" or val is None
 
 
 def append_filename(path: str, val: str) -> str:

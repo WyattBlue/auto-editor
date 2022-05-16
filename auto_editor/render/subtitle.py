@@ -141,6 +141,10 @@ def cut_subtitles(
 ) -> None:
     inp = timeline.inp
     chunks = timeline.chunks
+
+    if chunks is None:
+        log.error("Timeline too complex")
+
     for s, sub in enumerate(inp.subtitles):
         file_path = os.path.join(temp, f"{s}s.{sub.ext}")
         new_path = os.path.join(temp, f"new{s}s.{sub.ext}")

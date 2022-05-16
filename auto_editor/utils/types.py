@@ -3,6 +3,9 @@ import re
 from typing import List, Tuple, Sequence, Union, Literal
 
 
+ChunkType = List[Tuple[int, int, float]]
+
+
 def split_num_str(val: Union[str, int]) -> Tuple[float, str]:
     if isinstance(val, int):
         return val, ""

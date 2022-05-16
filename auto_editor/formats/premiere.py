@@ -80,6 +80,10 @@ def premiere_xml(
 
     inp = timeline.inp
     chunks = timeline.chunks
+
+    if chunks is None:
+        raise ValueError("Timeline too complex")
+
     fps = timeline.fps
     samplerate = timeline.samplerate
 

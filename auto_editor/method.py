@@ -86,7 +86,6 @@ def get_audio_list(
     if os.path.isfile(path):
         sample_rate, audio_samples = read(path)
     else:
-        print(path)
         log.error(f"Audio stream '{stream}' does not exist.")
 
     audio_list = audio_detection(audio_samples, sample_rate, fps, progress)

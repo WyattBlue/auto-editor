@@ -14,7 +14,7 @@ class VideoObj:
     dur: int
     offset: int
     speed: float
-    src: str
+    src: int
     stream: int = 0
 
 
@@ -24,7 +24,7 @@ class AudioObj:
     dur: int
     offset: int
     speed: float
-    src: str
+    src: int
     stream: int = 0
 
 

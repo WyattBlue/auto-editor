@@ -4,7 +4,7 @@ from typing import List, Optional
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.container import get_rules
-from auto_editor.utils.func import append_filename, fnone
+from auto_editor.utils.func import append_filename
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 
@@ -36,10 +36,10 @@ def edit_media(
 
     timeline = None
     if inputs[0].ext == ".json":
-        from auto_editor.formats.timeline import read_json_timeline
+        from auto_editor.formats.json import read_json
 
-        timeline = read_json_timeline(inputs[0].path, ffmpeg, log)
-        inputs = [timeline.inp]
+        timeline = read_json(inputs[0].path, ffmpeg, log)
+        inputs = timeline.inputs
 
     inp = inputs[0]
 
@@ -56,7 +56,7 @@ def edit_media(
     rules = get_rules(output_container)
     codec_error = "'{}' codec is not supported in '{}' container."
 
-    if not fnone(args.sample_rate):
+    if not (args.sample_rate is None or args.sample_rate == "unset"):
         if rules.samplerate is not None and args.sample_rate not in rules.samplerate:
             log.error(
                 f"'{output_container}' container only supports samplerates: {rules.samplerate}"
@@ -121,6 +121,11 @@ def edit_media(
         cmd.extend(["-i", inp.path])
     cmd.append("-hide_banner")
 
+    if args.sample_rate is None:
+        samplerate = inputs[0].get_samplerate()
+    else:
+        samplerate = args.sample_rate
+
     for i, inp in enumerate(inputs):
         for s in range(len(inp.audios)):
             cmd.extend(
@@ -129,6 +134,8 @@ def edit_media(
                     f"{i}:a:{s}",
                     "-ac",
                     "2",
+                    "-ar",
+                    f"{samplerate}",
                     "-rf64",
                     "always",
                     os.path.join(temp, f"{i}-{s}.wav"),
@@ -138,10 +145,10 @@ def edit_media(
     ffmpeg.run(cmd)
 
     if timeline is None:
-        timeline = make_timeline(inputs, args, progress, temp, log)
+        timeline = make_timeline(inputs, args, samplerate, progress, temp, log)
 
     if args.timeline:
-        from auto_editor.formats.timeline import make_json_timeline
+        from auto_editor.formats.json import make_json_timeline
 
         make_json_timeline(args.api, 0, timeline, log)
         return None
@@ -153,7 +160,7 @@ def edit_media(
         return None
 
     if args.export == "json":
-        from auto_editor.formats.timeline import make_json_timeline
+        from auto_editor.formats.json import make_json_timeline
 
         make_json_timeline(args.api, output, timeline, log)
         return output
@@ -189,15 +196,7 @@ def edit_media(
             from auto_editor.render.audio import make_new_audio
 
             for t in range(len(inp.audios)):
-                # TODO: add many to one audio rendering
-                temp_file = os.path.join(temp, f"0-{t}.wav")
-                new_file = os.path.join(temp, f"0-new{t}.wav")
-                make_new_audio(
-                    temp_file, new_file, timeline.aclips[t], timeline.fps, progress, log
-                )
-
-                if not os.path.isfile(new_file):
-                    log.error("Audio file not created.")
+                make_new_audio(t, temp, timeline, progress, log)
 
         video_output = []
 

@@ -1,9 +1,8 @@
 from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Union, Optional
-from dataclasses import asdict, fields
+from dataclasses import dataclass, asdict, fields
 
 import numpy as np
 
-from auto_editor.cutting import chunkify
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.method import get_speed_list
 from auto_editor.objects import (
@@ -14,7 +13,7 @@ from auto_editor.objects import (
     TextObj,
     VideoObj,
 )
-from auto_editor.utils.func import parse_dataclass
+from auto_editor.utils.func import parse_dataclass, chunkify
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import (
@@ -23,29 +22,22 @@ from auto_editor.utils.types import (
     anchor_type,
     color_type,
     float_type,
+    ChunkType,
 )
 
 Clip = NamedTuple(
-    "Clip", [("start", int), ("dur", int), ("offset", int), ("speed", float)]
+    "Clip",
+    [("start", int), ("dur", int), ("offset", int), ("speed", float), ("src", int)],
 )
-
-
-def clipify(chunks: List[Tuple[int, int, float]]) -> List[Clip]:
-    clips = []
-    start = 0
-    for chunk in chunks:
-        if chunk[2] != 99999:
-            dur = chunk[1] - chunk[0]
-            clips.append(Clip(start, dur, chunk[0], chunk[2]))
-            start += dur
-
-    return clips
 
 
 def unclipify(layer: List[Clip]) -> np.ndarray:
     l: List[Optional[int]] = []
     m: List[int] = []
     for clip in layer:
+        if clip.src != 0:
+            raise ValueError("Clip has src that is not 0")
+
         while clip.start > len(l):
             l.append(None)
 
@@ -70,7 +62,7 @@ def unclipify(layer: List[Clip]) -> np.ndarray:
 
 def _values(
     name: str,
-    val: Union[int, str, float],
+    val: Union[float, str],
     _type: Union[type, Callable[[Any], Any]],
     _vars: Dict[str, int],
     log: Log,
@@ -101,50 +93,78 @@ def _values(
     return _type(val)
 
 
+@dataclass
 class Timeline:
-    def __init__(
-        self,
-        fps: float,
-        samplerate: int,
-        res: Tuple[int, int],
-        background: str,
-        chunks: List[Tuple[int, int, float]],
-        inp: FileInfo,
-        log: Log,
-    ):
+    inputs: List[FileInfo]
+    fps: float
+    samplerate: int
+    res: Tuple[int, int]
+    background: str
+    vclips: List[List[VideoObj]]
+    aclips: List[List[AudioObj]]
+    chunks: Optional[ChunkType] = None
 
-        vclips: List[List[VideoObj]] = [[] for v in inp.videos]
-        aclips: List[List[AudioObj]] = [[] for a in inp.audios]
+    @property
+    def inp(self):
+        return self.inputs[0]
 
-        self.fps = fps
-        self.samplerate = samplerate
-        self.res = res
 
-        self.chunks = chunks
-        clips = clipify(self.chunks)
+def clipify(chunks: ChunkType, src: int) -> List[Clip]:
+    clips = []
+    start = 0
+    for chunk in chunks:
+        if chunk[2] != 99999:
+            dur = chunk[1] - chunk[0]
+            clips.append(Clip(start, dur, chunk[0], chunk[2], src))
+            start += dur
 
-        for v, _ in enumerate(inp.videos):
-            for clip in clips:
-                vclips[v].append(
-                    VideoObj(clip.start, clip.dur, clip.offset, clip.speed, inp.path)
-                )
+    return clips
 
-        for a, _ in enumerate(inp.audios):
-            for clip in clips:
-                aclips[a].append(
-                    AudioObj(clip.start, clip.dur, clip.offset, clip.speed, inp.path, a)
-                )
 
-        self.aclips = aclips
-        self.vclips = vclips
-        self.background = background
-        self.inp = inp
+def make_av(
+    clips: List[Clip], inp: FileInfo
+) -> Tuple[List[List[VideoObj]], List[List[AudioObj]]]:
+
+    vclips: List[List[VideoObj]] = [[] for v in inp.videos]
+    aclips: List[List[AudioObj]] = [[] for a in inp.audios]
+
+    for v, _ in enumerate(inp.videos):
+        for clip in clips:
+            vclips[v].append(
+                VideoObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src)
+            )
+
+    for a, _ in enumerate(inp.audios):
+        for clip in clips:
+            aclips[a].append(
+                AudioObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src, a)
+            )
+
+    return vclips, aclips
+
+
+def make_layers(
+    inputs: List[FileInfo], speedlists: List[np.ndarray]
+) -> Tuple[Optional[ChunkType], List[List[VideoObj]], List[List[AudioObj]]]:
+
+    clips = []
+    for i, _chunks in enumerate([chunkify(s) for s in speedlists]):
+        clips += clipify(_chunks, i)
+
+    chunks: Optional[ChunkType] = None
+    try:
+        chunks = chunkify(unclipify(clips))
+    except ValueError:
+        pass
+
+    vclips, aclips = make_av(clips, inputs[0])
+    return chunks, vclips, aclips
 
 
 def make_timeline(
-    inputs: List[FileInfo], args, progress: ProgressBar, temp: str, log: Log
+    inputs: List[FileInfo], args, sr: int, progress: ProgressBar, temp: str, log: Log
 ) -> Timeline:
-    assert len(inputs) == 1
+    assert len(inputs) > 0
 
     inp = inputs[0]
 
@@ -153,17 +173,15 @@ def make_timeline(
     else:
         fps = args.frame_rate
 
-    if args.sample_rate is None:
-        samplerate = inp.get_samplerate()
-    else:
-        samplerate = args.sample_rate
-
     res = inp.get_res()
 
-    speedlist = get_speed_list(0, inp, fps, args, progress, temp, log)
-    chunks = chunkify(speedlist)
+    speedlists = []
+    for i, inp in enumerate(inputs):
+        speedlists.append(get_speed_list(i, inp, fps, args, progress, temp, log))
 
-    # TODO: Calculate timeline duration
+    chunks, vclips, aclips = make_layers(inputs, speedlists)
+
+    timeline = Timeline(inputs, fps, sr, res, args.background, vclips, aclips, chunks)
 
     w, h = res
     _vars: Dict[str, int] = {
@@ -175,19 +193,16 @@ def make_timeline(
         "end": 0,  # TODO: deal with this
     }
 
-    # self.all = []
-    # self.sheet: Dict[int, List[int]] = {}
+    pool = []
 
-    # pool = []
-
-    # for o in args.add_text:
-    #     pool.append(parse_dataclass(o, TextObj, log))
-    # for o in args.add_rectangle:
-    #     pool.append(parse_dataclass(o, RectangleObj, log))
-    # for o in args.add_ellipse:
-    #     pool.append(parse_dataclass(o, EllipseObj, log))
-    # for o in args.add_image:
-    #     pool.append(parse_dataclass(o, ImageObj, log))
+    for o in args.add_text:
+        pool.append(parse_dataclass(o, TextObj, log))
+    for o in args.add_rectangle:
+        pool.append(parse_dataclass(o, RectangleObj, log))
+    for o in args.add_ellipse:
+        pool.append(parse_dataclass(o, EllipseObj, log))
+    for o in args.add_image:
+        pool.append(parse_dataclass(o, ImageObj, log))
 
     # for index, obj in enumerate(pool):
 
@@ -211,4 +226,4 @@ def make_timeline(
 
     #     self.all.append(obj)
 
-    return Timeline(fps, samplerate, res, args.background, chunks, inp, log)
+    return timeline
