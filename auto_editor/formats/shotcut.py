@@ -35,6 +35,8 @@ def shotcut_xml(
     num, den = aspect_ratio(width, height)
 
     chunks = timeline.chunks
+    if chunks is None:
+        raise ValueError("Timeline too complex")
     fps = timeline.fps
     inp = timeline.inp
     global_out = inp.duration

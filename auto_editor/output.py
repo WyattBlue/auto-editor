@@ -6,13 +6,12 @@ from typing import List, Tuple, Optional
 
 # Included Libraries
 from auto_editor.utils.log import Log
-from auto_editor.utils.func import fnone
 from auto_editor.utils.container import Container
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 
 
 def fset(cmd: List[str], option: str, value: str) -> List[str]:
-    if fnone(value):
+    if value is None or value == "unset":
         return cmd
     return cmd + [option] + [value]
 
@@ -58,7 +57,7 @@ def video_quality(cmd: List[str], args, inp: FileInfo, rules: Container) -> List
 
     qscale = args.video_quality_scale
 
-    if args.video_codec == "uncompressed" and fnone(qscale):
+    if args.video_codec == "uncompressed" and (qscale is None or qscale == "unset"):
         qscale = "1"
 
     vcodec = get_vcodec(args.video_codec, inp, rules)
@@ -99,14 +98,14 @@ def mux_quality_media(
     if a_tracks > 0:
         if args.keep_tracks_seperate and rules.max_audios is None:
             for t in range(a_tracks):
-                cmd.extend(["-i", os.path.join(temp, f"0-new{t}.wav")])
+                cmd.extend(["-i", os.path.join(temp, f"new{t}.wav")])
         else:
             # Merge all the audio a_tracks into one.
             new_a_file = os.path.join(temp, "new_audio.wav")
             if a_tracks > 1:
                 new_cmd = []
                 for t in range(a_tracks):
-                    new_cmd.extend(["-i", os.path.join(temp, f"0-new{t}.wav")])
+                    new_cmd.extend(["-i", os.path.join(temp, f"new{t}.wav")])
                 new_cmd.extend(
                     [
                         "-filter_complex",
@@ -119,7 +118,7 @@ def mux_quality_media(
                 ffmpeg.run(new_cmd)
                 a_tracks = 1
             else:
-                new_a_file = os.path.join(temp, "0-new0.wav")
+                new_a_file = os.path.join(temp, "new0.wav")
             cmd.extend(["-i", new_a_file])
 
     if s_tracks > 0:
@@ -175,12 +174,6 @@ def mux_quality_media(
 
         cmd = fset(cmd, "-c:a", acodec)
         cmd = fset(cmd, "-b:a", args.audio_bitrate)
-
-        if fnone(args.sample_rate):
-            if rules.samplerate is not None:
-                cmd.extend(["-ar", str(rules.samplerate[0])])
-        else:
-            cmd.extend(["-ar", str(args.sample_rate)])
 
     if args.extras is not None:
         cmd.extend(args.extras.split(" "))

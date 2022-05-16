@@ -345,6 +345,7 @@ def main():
             ["--export_as_clip_sequence", "--export-as-clip-sequence", "-excs"],
             ["--export", "clip-sequence"],
         )
+        sys_a = c(sys_a, ["--combine-files", "--combine_files"], [])
 
         args = parser.parse_args(sys_a)
 

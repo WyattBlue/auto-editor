@@ -9,7 +9,7 @@ import json
 from typing import List, Tuple, Union, Any
 
 from auto_editor.utils.log import Log
-from auto_editor.timeline import Timeline
+from auto_editor.timeline import Timeline, make_av, clipify
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 
 
@@ -83,8 +83,8 @@ class Version:
         return f"{self.major}.{self.minor}.{self.micro}"
 
 
-def read_json_timeline(json_file: str, ffmpeg: FFmpeg, log: Log):
-    with open(json_file, "r") as f:
+def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
+    with open(path, "r") as f:
         data = json.load(f)
 
     check_attrs(data, log, "version")
@@ -95,14 +95,15 @@ def read_json_timeline(json_file: str, ffmpeg: FFmpeg, log: Log):
         check_file(data["source"], log)
 
         chunks = validate_chunks(data["chunks"], log)
-
         inp = FileInfo(data["source"], ffmpeg, log)
+
+        vclips, aclips = make_av(clipify(chunks, 0), inp)
 
         fps = inp.get_fps()
         sr = inp.get_samplerate()
         res = inp.get_res()
 
-        return Timeline(fps, sr, res, "#000", chunks, inp, log)
+        return Timeline([inp], fps, sr, res, "#000", vclips, aclips, chunks)
 
     if version == (2, 0) or version == (0, 2):
         check_attrs(data, log, "timeline")
@@ -111,7 +112,7 @@ def read_json_timeline(json_file: str, ffmpeg: FFmpeg, log: Log):
 
         raise ValueError("Incomplete")
 
-    log.error(f"Unsupported version: {data['version']}")
+    log.error(f"Unsupported version: {version}")
 
 
 def make_json_timeline(
@@ -124,14 +125,19 @@ def make_json_timeline(
     version = Version(_version, log)
 
     if version == (1, 0) or version == (0, 1):
+        if timeline.chunks is None:
+            log.error("Timeline too complex to convert to version 1.0")
+
         data: Any = {
             "version": "1.0.0",
             "source": os.path.abspath(timeline.inp.path),
             "chunks": timeline.chunks,
         }
     elif version == (2, 0) or version == (0, 2):
+        sources = [os.path.abspath(inp.path) for inp in timeline.inputs]
         data = {
             "version": "2.0.0",
+            "sources": sources,
             "timeline": {
                 "background": timeline.background,
                 "resolution": timeline.res,

@@ -55,6 +55,9 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
     fps = timeline.fps
     chunks = timeline.chunks
 
+    if chunks is None:
+        raise ValueError("Timeline too complex")
+
     total_dur = chunks[-1][1]
 
     if system() == "Windows":

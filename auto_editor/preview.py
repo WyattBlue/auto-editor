@@ -1,5 +1,4 @@
 from datetime import timedelta
-from typing import List, Tuple, Union
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import Timeline
@@ -7,13 +6,13 @@ from auto_editor.utils.func import get_new_length
 from auto_editor.utils.log import Log
 
 
-def display_length(secs: Union[int, float]) -> str:
+def display(secs: float) -> str:
     if secs < 0:
-        return "-" + str(timedelta(seconds=round(abs(secs))))
-    return str(timedelta(seconds=round(secs)))
+        return f"-{timedelta(seconds=round(abs(secs)))}"
+    return f"{timedelta(seconds=round(secs))}"
 
 
-def time_frame(title: str, frames: Union[int, float], fps: float) -> None:
+def time_frame(title: str, frames: float, fps: float) -> None:
     in_sec = round(frames / fps, 1)
     minutes = timedelta(seconds=round(in_sec))
     print(f"{title}: {in_sec} secs ({minutes})")
@@ -23,6 +22,10 @@ def preview(timeline: Timeline, log: Log) -> None:
     log.conwrite("")
 
     chunks = timeline.chunks
+
+    if chunks is None:
+        log.error("")
+
     fps = timeline.fps
 
     old_length = chunks[-1][1] / fps
@@ -31,9 +34,9 @@ def preview(timeline: Timeline, log: Log) -> None:
     diff = new_length - old_length
 
     print(
-        f"\nlength:\n - change: ({display_length(old_length)}) 100% -> "
-        f"({display_length(new_length)}) {round((new_length / old_length) * 100, 2)}%\n "
-        f"- diff: ({display_length(diff)}) {round((diff / old_length) * 100, 2)}%"
+        f"\nlength:\n - change: ({display(old_length)}) 100% -> "
+        f"({display(new_length)}) {round((new_length / old_length) * 100, 2)}%\n "
+        f"- diff: ({display(diff)}) {round((diff / old_length) * 100, 2)}%"
     )
 
     clips = 0

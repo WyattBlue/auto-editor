@@ -190,7 +190,11 @@ def render_av(
 
         return frame.from_image(img).reformat(format=pix_fmt)
 
-    chunks = timeline.chunks[:]
+    chunks = timeline.chunks
+
+    if chunks is None:
+        log.error("Timeline too complex")
+
     inp = timeline.inp
 
     if chunks[-1][2] == 99999:

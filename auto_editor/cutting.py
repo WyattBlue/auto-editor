@@ -93,22 +93,6 @@ def cook(has_loud: np.ndarray, min_clip: int, min_cut: int) -> np.ndarray:
     return has_loud
 
 
-# Turn long silent/loud array to formatted chunk list.
-# Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]
-def chunkify(arr: np.ndarray, arr_length: int = None) -> List[Tuple[int, int, float]]:
-    if arr_length is None:
-        arr_length = len(arr)
-
-    chunks = []
-    start = 0
-    for j in range(1, arr_length):
-        if arr[j] != arr[j - 1]:
-            chunks.append((start, j, arr[j - 1]))
-            start = j
-    chunks.append((start, arr_length, arr[j]))
-    return chunks
-
-
 def apply_margin(
     has_loud: np.ndarray, has_loud_length: int, start_m: int, end_m: int
 ) -> np.ndarray:
