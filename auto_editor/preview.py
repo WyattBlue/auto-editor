@@ -24,18 +24,17 @@ def preview(timeline: Timeline, log: Log) -> None:
 
     old_length = sum([inp.fdur for inp in timeline.inputs])
 
-    # TODO: Fix
     new_length = 0
     if len(timeline.vclips) > 0:
         dur = 0
         for clip in timeline.vclips[0]:
-            dur += (clip.offset + clip.dur) / clip.speed
+            dur += clip.dur / clip.speed
         new_length = max(new_length, dur / fps)
 
     if len(timeline.aclips) > 0:
         dur = 0
         for clip in timeline.aclips[0]:
-            dur += (clip.offset + clip.dur) / clip.speed
+            dur += clip.dur / clip.speed
         new_length = max(new_length, dur / fps)
 
     diff = new_length - old_length

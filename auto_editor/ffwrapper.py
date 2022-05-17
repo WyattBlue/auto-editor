@@ -165,7 +165,9 @@ class SubtitleStream:
     lang: Optional[str]
 
 
-def to_fdur(dur: str) -> float:
+def to_fdur(dur: Optional[str]) -> float:
+    if dur is None:
+        return 0
     nums = dur.split(":")
     while len(nums) < 3:
         nums.insert(0, "0")
