@@ -1,15 +1,16 @@
 import numpy as np
+from numpy.typing import NDArray
 
 
 class ArrReader:
     __slots__ = ("samples", "pointer")
 
-    def __init__(self, arr):
+    def __init__(self, arr: np.ndarray) -> None:
         self.samples = arr
         self.pointer = 0
 
     @property
-    def empty(self):
+    def empty(self) -> bool:
         return self.samples.shape[0] <= self.pointer
 
     def read(self, buffer: np.ndarray) -> int:
@@ -21,23 +22,23 @@ class ArrReader:
         self.pointer = end
         return n
 
-    def skip(self, n):
-        pastPointer = self.pointer
+    def skip(self, n: int) -> int:
+        past_pointer = self.pointer
         self.pointer += n
-        return self.pointer - pastPointer
+        return self.pointer - past_pointer
 
 
 class ArrWriter:
     __slots__ = ("output", "pointer")
 
-    def __init__(self, arr):
+    def __init__(self, arr: NDArray[np.int16]) -> None:
         self.output = arr
         self.pointer = 0
 
     def write(self, buffer: np.ndarray) -> int:
         end = self.pointer + buffer.shape[1]
-        changedBuffer = buffer.T.astype(np.int16)
-        self.output = np.concatenate((self.output, changedBuffer))
+        changed_buffer: NDArray[np.int16] = buffer.T.astype(np.int16)
+        self.output = np.concatenate((self.output, changed_buffer))
         self.pointer = end
 
         return buffer.shape[1]
