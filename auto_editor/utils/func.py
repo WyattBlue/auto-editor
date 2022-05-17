@@ -95,15 +95,6 @@ def aspect_ratio(width: int, height: int) -> Union[Tuple[int, int], Tuple[None, 
     return width // c, height // c
 
 
-def get_new_length(chunks: List[Tuple[int, int, float]], fps: float) -> float:
-    time_in_frames = 0.0
-    for chunk in chunks:
-        leng = chunk[1] - chunk[0]
-        if chunk[2] != 99999:
-            time_in_frames += leng * (1 / chunk[2])
-    return time_in_frames / fps
-
-
 def human_readable_time(time_in_secs: Union[int, float]) -> str:
     units = "seconds"
     if time_in_secs >= 3600:

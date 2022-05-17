@@ -165,6 +165,18 @@ class SubtitleStream:
     lang: Optional[str]
 
 
+def to_fdur(dur: str) -> float:
+    nums = dur.split(":")
+    while len(nums) < 3:
+        nums.insert(0, "0")
+
+    hours, minutes, seconds = nums
+    try:
+        return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    except ValueError:
+        return 0
+
+
 class FileInfo:
     __slots__ = (
         "path",
@@ -174,6 +186,7 @@ class FileInfo:
         "name",
         "ext",
         "duration",
+        "fdur",
         "bitrate",
         "metadata",
         "videos",
@@ -208,6 +221,7 @@ class FileInfo:
         info = get_stdout([ffmpeg.path, "-hide_banner", "-i", path])
 
         self.duration = regex_match(r"Duration:\s(?P<match>[0-9:.]+),", info)
+        self.fdur = to_fdur(self.duration)
         self.bitrate = regex_match(r"bitrate:\s(?P<match>[0-9]+\skb\/s)", info)
 
         self.metadata = {}
@@ -225,7 +239,7 @@ class FileInfo:
                 if body is not None:
                     if key is None:
                         if active_key is not None:
-                            self.metadata[active_key] += "\n" + body
+                            self.metadata[active_key] += f"\n{body}"
                     else:
                         self.metadata[key] = body
                         active_key = key

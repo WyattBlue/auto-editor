@@ -1,10 +1,15 @@
 import numpy as np
+from numpy.typing import NDArray
 
 from .analysis_synthesis import AnalysisSynthesisTSM
-from .utils.windows import hanning
 
 
-def find_peaks(amplitude):
+def hanning(length: int) -> np.ndarray:
+    time = np.arange(length)
+    return 0.5 * (1 - np.cos(2 * np.pi * time / length))
+
+
+def find_peaks(amplitude: NDArray[np.float_]) -> NDArray[np.bool_]:
     """
     A value is considered to be a peak if it is higher than its four closest
     neighbours.
@@ -30,7 +35,7 @@ def find_peaks(amplitude):
     return peaks
 
 
-def get_closest_peaks(peaks):
+def get_closest_peaks(peaks: NDArray[np.bool_]) -> NDArray[np.int_]:
     """
     Returns an array containing the index of the closest peak of each index.
     """
@@ -50,21 +55,15 @@ def get_closest_peaks(peaks):
 
 
 class PhaseVocoderConverter:
-    """
-    A Converter implementing the phase vocoder time-scale modification procedure.
-    """
-
     def __init__(
-        self, channels, frame_length, analysis_hop, synthesis_hop, peak_finder
-    ):
-        self._channels = channels
+        self, channels: int, frame_length: int, analysis_hop: int, synthesis_hop: int
+    ) -> None:
+        self.channels = channels
         self._frame_length = frame_length
         self._synthesis_hop = synthesis_hop
         self._analysis_hop = analysis_hop
-        self._find_peaks = peak_finder
 
-        # Centers of the FFT frequency bins
-        self._center_frequency = np.fft.rfftfreq(frame_length) * 2 * np.pi
+        self._center_frequency = np.fft.rfftfreq(frame_length) * 2 * np.pi  # type: ignore
         fft_length = len(self._center_frequency)
 
         self._first = True
@@ -75,18 +74,20 @@ class PhaseVocoderConverter:
         # Buffer used to compute the phase increment and the instantaneous frequency
         self._buffer = np.empty(fft_length)
 
-    def clear(self):
+    def clear(self) -> None:
         self._first = True
 
-    def convert_frame(self, frame):
-        for k in range(0, self._channels):
+    def convert_frame(self, frame: np.ndarray) -> np.ndarray:
+        for k in range(self.channels):
             # Compute the FFT of the analysis frame
             stft = np.fft.rfft(frame[k])
             amplitude = np.abs(stft)
-            phase = np.angle(stft)
+
+            phase: NDArray[np.float_]
+            phase = np.angle(stft) # type: ignore
             del stft
 
-            peaks = self._find_peaks(amplitude)
+            peaks = find_peaks(amplitude)
             closest_peak = get_closest_peaks(peaks)
 
             if self._first:
@@ -132,27 +133,21 @@ class PhaseVocoderConverter:
 
         return frame
 
-    def set_analysis_hop(self, analysis_hop):
-        self._analysis_hop = analysis_hop
-
 
 def phasevocoder(
-    channels, speed=1.0, frame_length=2048, analysis_hop=None, synthesis_hop=None
-):
+    channels: int, speed: float = 1.0, frame_length: int = 2048
+) -> AnalysisSynthesisTSM:
 
-    if synthesis_hop is None:
-        synthesis_hop = frame_length // 4
+    # Frame length should be a power of two for maximum performance.
 
-    if analysis_hop is None:
-        analysis_hop = int(synthesis_hop * speed)
+    synthesis_hop = frame_length // 4
+    analysis_hop = int(synthesis_hop * speed)
 
     analysis_window = hanning(frame_length)
     synthesis_window = hanning(frame_length)
 
-    peak_finder = find_peaks
-
     converter = PhaseVocoderConverter(
-        channels, frame_length, analysis_hop, synthesis_hop, peak_finder
+        channels, frame_length, analysis_hop, synthesis_hop
     )
 
     return AnalysisSynthesisTSM(

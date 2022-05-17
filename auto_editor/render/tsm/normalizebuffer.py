@@ -1,15 +1,17 @@
+from typing import Optional
+
 import numpy as np
 
 # A NormalizeBuffer is a mono-channel circular buffer, used to normalize audio buffers.
 
 
 class NormalizeBuffer:
-    def __init__(self, length):
+    def __init__(self, length: int) -> None:
         self._data = np.zeros(length)
         self._offset = 0
         self.length = length
 
-    def add(self, window):
+    def add(self, window: np.ndarray) -> None:
         # Adds a window element-wise to the NormalizeBuffer.
         n = len(window)
         if n > self.length:
@@ -26,7 +28,7 @@ class NormalizeBuffer:
             self._data[start:] += window[: self.length - start]
             self._data[:end] += window[self.length - start :]
 
-    def remove(self, n):
+    def remove(self, n: int) -> None:
         if n >= self.length:
             n = self.length
         if n == 0:
@@ -46,7 +48,7 @@ class NormalizeBuffer:
         self._offset += n
         self._offset %= self.length
 
-    def to_array(self, start=0, end=None):
+    def to_array(self, start: int = 0, end: Optional[int] = None) -> np.ndarray:
         if end is None:
             end = self.length
 

@@ -32,24 +32,19 @@ Clip = NamedTuple(
 
 
 def unclipify(layer: List[Clip]) -> np.ndarray:
-    l: List[Optional[int]] = []
-    m: List[int] = []
+    l: List[int] = []
     for clip in layer:
         if clip.src != 0:
             raise ValueError("Clip has src that is not 0")
 
-        while clip.start > len(l):
-            l.append(None)
+        if clip.start > len(l):
+            raise ValueError(f"Clip layer has null frames, cannot convert speed list: {l}")
 
         for item in range(clip.offset, clip.offset + clip.dur):
             l.append(item)
-            m.append(item)
 
-    if None in l:
-        raise ValueError(f"Clip layer has null frames, cannot convert speed list: {l}")
-
-    if len(set(m)) != len(m) or sorted(m) != m:
-        raise ValueError(f"Clip layer to complex, cannot convert to speed list: {m}")
+    if len(set(l)) != len(l) or sorted(l) != l:
+        raise ValueError(f"Clip layer to complex, cannot convert to speed list: {l}")
 
     arr = np.empty(layer[-1].offset + layer[-1].dur, dtype=float)
     arr.fill(99999)
