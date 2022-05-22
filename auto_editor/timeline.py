@@ -38,7 +38,9 @@ def unclipify(layer: List[Clip]) -> np.ndarray:
             raise ValueError("Clip has src that is not 0")
 
         if clip.start > len(l):
-            raise ValueError(f"Clip layer has null frames, cannot convert speed list: {l}")
+            raise ValueError(
+                f"Clip layer has null frames, cannot convert speed list: {l}"
+            )
 
         for item in range(clip.offset, clip.offset + clip.dur):
             l.append(item)

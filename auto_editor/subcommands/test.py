@@ -608,6 +608,7 @@ def main(sys_args: Optional[List[str]] = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                various_errors_test,
                 frame_rate,
                 help_tests,
                 version_test,
@@ -636,11 +637,9 @@ def main(sys_args: Optional[List[str]] = None):
             ]
         )
 
-        # tester.run(various_errors_test)
         # tester.run(effect_tests, cleanup=clean_all)
         # tester.run(render_text)
         # tester.run(check_font_error)
-        # tester.run(combine)
 
     tester = Tester(args)
 

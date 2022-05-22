@@ -23,6 +23,30 @@ def chunkify(arr: np.ndarray) -> List[Tuple[int, int, float]]:
     return chunks
 
 
+def to_timecode(secs: float, fmt: str) -> str:
+    sign = ""
+    if secs < 0:
+        sign = "-"
+        secs = -secs
+
+    _m, _s = divmod(secs, 60)
+    _h, _m = divmod(_m, 60)
+    s, m, h = float(_s), int(_m), int(_h)
+
+    if fmt == "webvtt":
+        if h == 0:
+            return f"{sign}{m:02d}:{s:06.3f}"
+        return f"{sign}{h:02d}:{m:02d}:{s:06.3f}"
+
+    if fmt == "mov_text":
+        return f"{sign}{h:02d}:{m:02d}:" + f"{s:06.3f}".replace(".", ",", 1)
+
+    if fmt == "ass":
+        return f"{sign}{h:d}:{m:02d}:{s:05.2f}"
+    # rass
+    return f"{sign}{h:d}:{m:02d}:{s:02.0f}"
+
+
 def parse_dataclass(unsplit_arguments, dataclass, log):
     from dataclasses import fields
 

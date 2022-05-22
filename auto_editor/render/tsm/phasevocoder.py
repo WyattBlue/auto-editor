@@ -84,7 +84,7 @@ class PhaseVocoderConverter:
             amplitude = np.abs(stft)
 
             phase: NDArray[np.float_]
-            phase = np.angle(stft) # type: ignore
+            phase = np.angle(stft)  # type: ignore
             del stft
 
             peaks = find_peaks(amplitude)
