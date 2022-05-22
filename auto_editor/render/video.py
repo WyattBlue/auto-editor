@@ -143,11 +143,11 @@ def render_av(
 
         return new_objects
 
-    def render_objects(sheet, all_objects, index: int, frame, pix_fmt: str):
+    def render_objects(timeline, index: int, frame, pix_fmt: str):
         img = frame.to_image().convert("RGBA")
 
-        for item in sheet[index]:
-            obj = all_objects[item]
+        # TODO: Fix me
+        for obj in timeline.vclips[track]:
 
             obj_img = Image.new("RGBA", img.size, (255, 255, 255, 0))
             draw = ImageDraw.Draw(obj_img)
@@ -227,8 +227,6 @@ def render_av(
 
     width = stream.width
     height = stream.height
-
-    # effects.all = set_static_assets(effects.all, log)
 
     spedup = os.path.join(temp, f"spedup{track}.mp4")
 

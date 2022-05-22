@@ -374,9 +374,7 @@ def main():
         args.quiet = True
 
     if args.input == []:
-        Log().error(
-            "You need to give auto-editor an input file so it can do the work for you."
-        )
+        Log().error("You need to give auto-editor an input file.")
 
     if args.temp_dir is None:
         temp = tempfile.mkdtemp()
