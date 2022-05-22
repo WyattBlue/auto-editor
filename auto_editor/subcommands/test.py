@@ -211,31 +211,6 @@ def main(sys_args: Optional[List[str]] = None):
     def parser_test():
         check_for_error(["example.mp4", "--video-speed"], "needs argument")
 
-    def subtitle_tests():
-        from auto_editor.render.subtitle import SubtitleParser
-
-        test = SubtitleParser()
-        test.contents = [
-            [0, 10, "A"],
-            [10, 20, "B"],
-            [20, 30, "C"],
-            [30, 40, "D"],
-            [40, 50, "E"],
-            [50, 60, "F"],
-        ]
-        chunks = [
-            (0, 10, 1),
-            (10, 20, 99999),
-            (20, 30, 1),
-            (30, 40, 99999),
-            (40, 50, 1),
-            (50, 60, 99999),
-        ]
-        test.edit(chunks)
-
-        if test.contents != [[0, 10, "A"], [10, 20, "C"], [20, 30, "E"]]:
-            raise ValueError("Incorrect subtitle results.")
-
     def tsm_1a5_test():
         make_np_list(
             "resources/wav/example-cut-s16le.wav",
@@ -597,7 +572,7 @@ def main(sys_args: Optional[List[str]] = None):
     tests = []
 
     if args.category in ("unit", "all"):
-        tests.extend([subtitle_tests, tsm_1a5_test, tsm_2a0_test])
+        tests.extend([tsm_1a5_test, tsm_2a0_test])
 
     if args.category in ("api", "all"):
         tests.append(read_api_0_1)

@@ -66,6 +66,8 @@ def preview(timeline: Timeline, log: Log) -> None:
         cut_lens.append(round(in_len * fps) - oe[-1][1])
 
     print(f"clips: {len(clip_lens)}")
+    if len(clip_lens) == 0:
+        clip_lens = [0]
     time_frame("smallest", min(clip_lens), fps)
     time_frame("largest", max(clip_lens), fps)
     if len(clip_lens) > 1:
@@ -73,6 +75,8 @@ def preview(timeline: Timeline, log: Log) -> None:
         time_frame("average", fmean(clip_lens), fps)
 
     print(f"cuts: {len(cut_lens)}")
+    if len(cut_lens) == 0:
+        cut_lens = [0]
     time_frame("smallest", min(cut_lens), fps)
     time_frame("largest", max(cut_lens), fps)
     if len(cut_lens) > 1:
