@@ -94,20 +94,12 @@ def check_for_error(cmd: List[str], match=None) -> None:
 
 def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
     from auto_editor.wavfile import read
-    from auto_editor.render.tsm import phasevocoder, ArrReader, ArrWriter
+    from auto_editor.render.tsm import phasevocoder
 
     _, sped_chunk = read(in_file)
     channels = 2
 
-    reader = ArrReader(sped_chunk)
-    writer = ArrWriter(np.zeros((0, 2), dtype=np.int16))
-
-    phasevocoder(channels, speed=the_speed).run(reader, writer)
-
-    spedup_audio = writer.output
-    del writer
-    del reader
-
+    spedup_audio = phasevocoder(channels, the_speed, sped_chunk)
     loaded = np.load(compare_file)
 
     if not np.array_equal(spedup_audio, loaded["a"]):

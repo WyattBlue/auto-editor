@@ -2,9 +2,7 @@ import wave
 import os
 from typing import List
 
-import numpy as np
-
-from auto_editor.render.tsm import ArrReader, ArrWriter, phasevocoder
+from auto_editor.render.tsm import phasevocoder
 from auto_editor.timeline import Timeline
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
@@ -51,12 +49,9 @@ def make_new_audio(
         if clip.speed == 1:
             main_writer.writeframes(samp_list[sample_start:sample_end])  # type: ignore
         else:
-            reader = ArrReader(samp_list[sample_start:sample_end])
-            writer = ArrWriter(np.zeros((0, 2), dtype=np.int16))
-
-            phasevocoder(2, speed=clip.speed).run(reader, writer)
-            if writer.output.shape[0] != 0:
-                main_writer.writeframes(writer.output)
+            output = phasevocoder(2, clip.speed, samp_list[sample_start:sample_end])
+            if output.shape[0] != 0:
+                main_writer.writeframes(output)  # type: ignore
 
         progress.tick(c)
     progress.end()
