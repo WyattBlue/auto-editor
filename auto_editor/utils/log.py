@@ -31,7 +31,7 @@ class Log:
         self.quiet = quiet
         self.temp = temp
 
-    def debug(self, message: str) -> None:
+    def debug(self, message: object) -> None:
         if self.is_debug:
             self.conwrite("")
             sys.stderr.write(f"Debug: {message}\n")

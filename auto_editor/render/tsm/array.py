@@ -23,9 +23,8 @@ class ArrReader:
         return n
 
     def skip(self, n: int) -> int:
-        past_pointer = self.pointer
         self.pointer += n
-        return self.pointer - past_pointer
+        return n
 
 
 class ArrWriter:

@@ -1,13 +1,14 @@
 import io
-import numpy
 import struct
+from typing import Optional, Tuple, Union
 
-from typing import Tuple, Optional
-
+import numpy as np
 
 PCM = 0x0001
 IEEE_FLOAT = 0x0003
 EXTENSIBLE = 0xFFFE
+
+AudioData = Union[np.memmap, np.ndarray]
 
 
 def _read_fmt_chunk(
@@ -68,7 +69,7 @@ def _read_data_chunk(
     is_big_endian: bool,
     block_align: int,
     data_size: Optional[int],
-) -> numpy.memmap:
+) -> AudioData:
 
     fmt = ">" if is_big_endian else "<"
     size: int = struct.unpack(f"{fmt}I", fid.read(4))[0]
@@ -77,8 +78,6 @@ def _read_data_chunk(
         size = data_size
 
     bytes_per_sample = block_align // channels
-    # bytes per sample, a.k.a sample container size
-
     n_samples = size // bytes_per_sample
 
     if bytes_per_sample in (3, 5, 6, 7):
@@ -106,28 +105,24 @@ def _read_data_chunk(
         )
 
     start = fid.tell()
-    data = numpy.memmap(fid, dtype=dtype, mode="c", offset=start, shape=(n_samples,))
+    data = np.memmap(fid, dtype=dtype, mode="c", offset=start, shape=(n_samples,))
     fid.seek(start + size)
 
     _handle_pad_byte(fid, size)
 
     if channels > 1:
         try:
-            data = data.reshape(-1, channels)  # type: ignore
+            _data = data.reshape(-1, channels)
         except ValueError:
-            data = data[:-1].reshape(-1, channels)  # type: ignore
-
+            _data = data[:-1].reshape(-1, channels)
+        return _data
     return data
 
 
 def _skip_unknown_chunk(fid: io.BufferedReader, is_big_endian: bool) -> None:
-    if is_big_endian:
-        fmt = ">I"
-    else:
-        fmt = "<I"
-
+    fmt = ">I" if is_big_endian else "<I"
     data = fid.read(4)
-    if data:
+    if data != 0:
         size = struct.unpack(fmt, data)[0]
         fid.seek(size, 1)
         _handle_pad_byte(fid, size)
@@ -185,11 +180,11 @@ def _read_riff_chunk(sig: bytes, fid: io.BufferedReader) -> Tuple[None, int, boo
 
 
 def _handle_pad_byte(fid: io.BufferedReader, size: int) -> None:
-    if size % 2:
+    if size % 2 == 1:
         fid.seek(1, 1)
 
 
-def read(filename: str) -> Tuple[int, numpy.memmap]:
+def read(filename: str) -> Tuple[int, AudioData]:
     fid = open(filename, "rb")
 
     try:
@@ -204,13 +199,11 @@ def read(filename: str) -> Tuple[int, numpy.memmap]:
         fmt_chunk_received = False
         data_chunk_received = False
         while fid.tell() < file_size:
-
-            # read the next chunk
             chunk_id = fid.read(4)
 
             if not chunk_id:
                 if data_chunk_received:
-                    # End of file but data successfully read
+                    # EOF but data successfully read
                     break
                 else:
                     raise ValueError("Unexpected end of file.")
