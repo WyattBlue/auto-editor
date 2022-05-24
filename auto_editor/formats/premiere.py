@@ -1,14 +1,12 @@
 import os.path
 from os.path import abspath
+from platform import system
 from shutil import move
 from urllib.parse import quote
-from platform import system
-
-from typing import List, Tuple
-
-from .utils import indent, safe_mkdir
 
 from auto_editor.timeline import Timeline
+
+from .utils import indent, safe_mkdir
 
 """
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format

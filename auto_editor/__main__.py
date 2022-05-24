@@ -352,7 +352,6 @@ def main():
     timer = Timer(args.quiet)
 
     exporting_to_editor = args.export in ("premiere", "final-cut-pro", "shotcut")
-    making_data_file = exporting_to_editor or args.export == "json"
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, args.show_ffmpeg_debug)
 

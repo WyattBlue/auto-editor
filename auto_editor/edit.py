@@ -4,7 +4,6 @@ from typing import List, Optional
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.container import get_rules
-from auto_editor.utils.func import append_filename
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 
