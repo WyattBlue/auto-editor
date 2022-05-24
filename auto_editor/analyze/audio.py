@@ -1,6 +1,7 @@
+from math import ceil
+
 import numpy as np
 import numpy.typing as npt
-from math import ceil
 
 from auto_editor.utils.progressbar import ProgressBar
 

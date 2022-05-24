@@ -1,23 +1,20 @@
-# Internal Libraries
-import os
-import sys
-import shutil
-import logging
-import platform
-import subprocess
-from time import perf_counter
+# type: ignore
 
-# External Libraries
+import logging
+import os
+import platform
+import shutil
+import subprocess
+import sys
+from time import perf_counter
+from typing import Callable, List, NoReturn, Optional, Tuple
+
 import av
 import numpy as np
 
-av.logging.set_level(av.logging.PANIC)
-
-# Typing
-from typing import List, Tuple, Callable, NoReturn, Optional
-
-# Included Libraries
 from auto_editor.vanparse import ArgumentParser
+
+av.logging.set_level(av.logging.PANIC)
 
 
 def test_options(parser):
@@ -93,8 +90,8 @@ def check_for_error(cmd: List[str], match=None) -> None:
 
 
 def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
+    from auto_editor.render.tsm.phasevocoder import phasevocoder
     from auto_editor.wavfile import read
-    from auto_editor.render.tsm import phasevocoder
 
     _, sped_chunk = read(in_file)
     channels = 2

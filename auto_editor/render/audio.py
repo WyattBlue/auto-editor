@@ -1,7 +1,7 @@
 import os
 import wave
 
-from auto_editor.render.tsm import phasevocoder
+from auto_editor.render.tsm.phasevocoder import phasevocoder
 from auto_editor.timeline import Timeline
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar

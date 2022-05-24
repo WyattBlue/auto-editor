@@ -13,7 +13,7 @@ from auto_editor.timeline import Timeline, make_av, clipify
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 
 
-def check_attrs(data, log: Log, *attrs: str):
+def check_attrs(data: object, log: Log, *attrs: str) -> None:
     for attr in attrs:
         if attr not in data:
             log.error(f"'{attr}' attribute not found!")

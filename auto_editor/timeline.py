@@ -1,7 +1,8 @@
-from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Union, Optional
-from dataclasses import dataclass, asdict, fields
+from dataclasses import asdict, dataclass, fields
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
+from numpy.typing import NDArray
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.method import get_speed_list
@@ -13,16 +14,16 @@ from auto_editor.objects import (
     TextObj,
     VideoObj,
 )
-from auto_editor.utils.func import parse_dataclass, chunkify
+from auto_editor.utils.func import chunkify, parse_dataclass
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import (
     AlignType,
+    ChunkType,
     align_type,
     anchor_type,
     color_type,
     float_type,
-    ChunkType,
 )
 
 Clip = NamedTuple(
@@ -31,7 +32,7 @@ Clip = NamedTuple(
 )
 
 
-def unclipify(layer: List[Clip]) -> np.ndarray:
+def unclipify(layer: List[Clip]) -> NDArray[np.float_]:
     l: List[int] = []
     for clip in layer:
         if clip.src != 0:
@@ -141,7 +142,7 @@ def make_av(
 
 
 def make_layers(
-    inputs: List[FileInfo], speedlists: List[np.ndarray]
+    inputs: List[FileInfo], speedlists: List[NDArray[np.float_]]
 ) -> Tuple[Optional[ChunkType], List[List[VideoObj]], List[List[AudioObj]]]:
 
     clips = []

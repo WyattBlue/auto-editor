@@ -1,7 +1,18 @@
+import os
 import sys
+import tempfile
+from typing import Sequence
+
+import numpy as np
+from numpy.typing import NDArray
+
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.log import Log
+from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.vanparse import ArgumentParser
 
 
-def levels_options(parser):
+def levels_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--kind",
         default="audio",
@@ -27,25 +38,17 @@ def levels_options(parser):
     return parser
 
 
-def print_float_list(a):
-    for item in a:
-        sys.stdout.write(f"{item:.20f}\n")
+def print_float_list(arr: NDArray[np.float_]) -> None:
+    for a in arr:
+        sys.stdout.write(f"{a:.20f}\n")
 
 
-def print_int_list(a):
-    for item in a:
-        sys.stdout.write(f"{item}\n")
+def print_int_list(arr: NDArray[np.uint64]) -> None:
+    for a in arr:
+        sys.stdout.write(f"{a}\n")
 
 
-def main(sys_args=sys.argv[1:]):
-    import os
-    import tempfile
-
-    from auto_editor.utils.log import Log
-    from auto_editor.vanparse import ArgumentParser
-    from auto_editor.utils.progressbar import ProgressBar
-    from auto_editor.ffwrapper import FFmpeg, FileInfo
-
+def main(sys_args=sys.argv[1:]) -> None:
     parser = levels_options(ArgumentParser("levels"))
     args = parser.parse_args(sys_args)
 
