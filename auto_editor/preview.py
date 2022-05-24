@@ -1,7 +1,6 @@
 from statistics import fmean, median
 from typing import List, Tuple
 
-from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
@@ -13,9 +12,8 @@ def display(secs: float) -> str:
 
 def time_frame(title: str, frames: float, fps: float) -> None:
     tc = to_timecode(frames / fps, "ass")
-    title = f"{title}:"
     preci = 0 if int(frames) == frames else 2
-    print(f" - {title:<10} {tc:<12} ({frames:.{preci}f})")
+    print(f" - {f'{title}:':<10} {tc:<12} ({frames:.{preci}f})")
 
 
 def preview(timeline: Timeline, log: Log) -> None:

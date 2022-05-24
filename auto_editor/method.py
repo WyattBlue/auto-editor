@@ -1,26 +1,25 @@
 import os
 import random
 from math import ceil
-from dataclasses import dataclass, asdict, fields
-
-from typing import List, Tuple, Union, Dict, Any, Callable, Type, TypeVar
+from dataclasses import asdict, dataclass, fields
+from typing import Any, Callable, Dict, List, Tuple, Type, TypeVar, Union
 
 import numpy as np
 
-from auto_editor.wavfile import read
-from auto_editor.utils.log import Log
-from auto_editor.utils.func import parse_dataclass
-from auto_editor.utils.types import float_type, StreamType, stream_type
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.cutting import (
-    to_speed_list,
-    set_range,
-    apply_mark_as,
-    apply_margin,
-    seconds_to_frames,
+from auto_editor.utils.func import (
     cook,
+    set_range,
+    apply_margin,
+    apply_mark_as,
+    to_speed_list,
+    parse_dataclass,
+    seconds_to_frames,
 )
+from auto_editor.utils.log import Log
+from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.utils.types import StreamType, float_type, stream_type
+from auto_editor.wavfile import read
 
 T = TypeVar("T")
 
