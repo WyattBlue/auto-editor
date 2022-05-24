@@ -12,7 +12,6 @@ from pathlib import Path, PureWindowsPath
 from typing import List, Tuple, Union
 
 from .utils import indent
-from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import Timeline
 
 

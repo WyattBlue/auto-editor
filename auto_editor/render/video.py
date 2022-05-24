@@ -1,20 +1,15 @@
-# Internal Libraries
 import os.path
 import subprocess
 from fractions import Fraction
+from typing import Tuple
 
-# Typing
-from typing import List, Tuple
-
-# Included Libraries
-from auto_editor.utils.log import Log
-from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.utils.progressbar import ProgressBar
-
-from auto_editor.utils.encoder import encoders
+from auto_editor.ffwrapper import FFmpeg
+from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj
 from auto_editor.output import get_vcodec, video_quality
-from auto_editor.objects import RectangleObj, EllipseObj, TextObj, ImageObj
 from auto_editor.timeline import Timeline
+from auto_editor.utils.encoder import encoders
+from auto_editor.utils.log import Log
+from auto_editor.utils.progressbar import ProgressBar
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
 allowed_pix_fmt = {
@@ -108,7 +103,7 @@ def render_av(
     except ImportError:
         log.import_error("av")
     try:
-        from PIL import Image, ImageDraw, ImageFont, ImageChops
+        from PIL import Image, ImageChops, ImageDraw, ImageFont
     except ImportError:
         log.import_error("Pillow")
 

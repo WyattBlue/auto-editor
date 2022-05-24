@@ -1,6 +1,5 @@
-import wave
 import os
-from typing import List
+import wave
 
 from auto_editor.render.tsm import phasevocoder
 from auto_editor.timeline import Timeline
