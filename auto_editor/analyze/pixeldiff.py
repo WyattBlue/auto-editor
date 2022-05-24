@@ -3,7 +3,6 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import ImageChops
 
-from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.progressbar import ProgressBar
 
 

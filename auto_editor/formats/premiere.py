@@ -8,7 +8,6 @@ from typing import List, Tuple
 
 from .utils import indent, safe_mkdir
 
-from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import Timeline
 
 """
@@ -30,7 +29,7 @@ DEPTH = "16"
 def fix_url(path: str) -> str:
     if system() == "Windows":
         return "file://localhost/" + quote(abspath(path)).replace("%5C", "/")
-    return "file://localhost" + abspath(path)
+    return f"file://localhost{abspath(path)}"
 
 
 def speedup(speed: float) -> str:

@@ -1,22 +1,5 @@
-from typing import List, Tuple, Union
-
-from auto_editor.ffwrapper import FileInfo
-from auto_editor.utils.func import aspect_ratio
+from auto_editor.utils.func import aspect_ratio, to_timecode
 from auto_editor.timeline import Timeline
-
-
-def frames_to_timecode(frames: Union[int, float], fps: float) -> str:
-    seconds = frames / fps
-
-    m, _s = divmod(seconds, 60)
-    h, m = divmod(m, 60)
-
-    if len(str(int(_s))) == 1:
-        s = f"0{round(_s, 3):.3f}"
-    else:
-        s = f"{round(_s, 3):.3f}"
-
-    return f"{int(h):02d}:{int(m):02d}:{s}"
 
 
 def timecode_to_frames(timecode: str, fps: float) -> int:
@@ -88,8 +71,8 @@ def shotcut_xml(
 
             speed = clip[2]
 
-            _out = frames_to_timecode(clip[1] / speed, fps)
-            length = frames_to_timecode((clip[1] / speed) + 1, fps)
+            _out = to_timecode(clip[1] / speed / fps, "standard")
+            length = to_timecode((clip[1] / speed + 1) / fps, "standard")
 
             if speed == 1:
                 resource = inp.path
@@ -158,8 +141,8 @@ def shotcut_xml(
 
             out_len = max((clip[1] - 2) / speed, 0)
 
-            _in = frames_to_timecode(in_len, fps)
-            _out = frames_to_timecode(out_len, fps)
+            _in = to_timecode(in_len / fps, "standard")
+            _out = to_timecode(out_len / fps, "standard")
 
             tag_name = f"chain{i}"
             if speed != 1:
