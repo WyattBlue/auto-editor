@@ -205,7 +205,7 @@ def render_av(
     if not pix_fmt_allowed(pix_fmt):
         target_pix_fmt = "yuv420p"
 
-    my_codec = get_vcodec(args, inp, rules)
+    my_codec = get_vcodec(args.video_codec, inp, rules)
 
     apply_video_later = True
 
