@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass, fields
 from typing import Any, Callable, Dict, List, Tuple, Type, TypeVar, Union
 
 import numpy as np
+from numpy.typing import NDArray
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.func import (
@@ -76,7 +77,7 @@ def get_audio_list(
     progress: ProgressBar,
     temp: str,
     log: Log,
-) -> np.ndarray:
+) -> NDArray[np.bool_]:
 
     from auto_editor.analyze.audio import audio_detection
 
@@ -92,7 +93,9 @@ def get_audio_list(
     return np.fromiter((x > threshold for x in audio_list), dtype=np.bool_)
 
 
-def operand_combine(a: np.ndarray, b: np.ndarray, call: Callable) -> np.ndarray:
+def operand_combine(
+    a: NDArray[np.bool_], b: NDArray[np.bool_], call: Callable
+) -> NDArray[np.bool_]:
     if len(a) > len(b):
         b = np.resize(b, len(a))
     if len(b) > len(a):
@@ -111,7 +114,7 @@ def get_stream_data(
     progress: ProgressBar,
     temp: str,
     log: Log,
-) -> np.ndarray:
+) -> NDArray[np.bool_]:
 
     if method == "none":
         return np.ones((get_media_duration(inp.path, fps, temp, log)), dtype=np.bool_)
@@ -178,7 +181,7 @@ def get_has_loud(
     temp: str,
     log: Log,
     args,
-) -> np.ndarray:
+) -> NDArray[np.bool_]:
     @dataclass
     class Audio:
         stream: StreamType = 0
@@ -277,7 +280,7 @@ def get_has_loud(
 
 def get_speed_list(
     i: int, inp: FileInfo, fps: float, args, progress: ProgressBar, temp: str, log: Log
-) -> np.ndarray:
+) -> NDArray[np.float_]:
 
     start_margin, end_margin = args.frame_margin
 

@@ -1,7 +1,13 @@
+import os
 import sys
+import tempfile
+
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.log import Log
+from auto_editor.vanparse import ArgumentParser
 
 
-def subdump_options(parser):
+def subdump_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
     parser.add_argument(
         "--my-ffmpeg",
@@ -14,14 +20,7 @@ def subdump_options(parser):
     return parser
 
 
-def main(sys_args=sys.argv[1:]):
-    import os
-    import tempfile
-
-    from auto_editor.utils.log import Log
-    from auto_editor.vanparse import ArgumentParser
-    from auto_editor.ffwrapper import FFmpeg, FileInfo
-
+def main(sys_args=sys.argv[1:]) -> None:
     parser = subdump_options(ArgumentParser("subdump"))
     args = parser.parse_args(sys_args)
 

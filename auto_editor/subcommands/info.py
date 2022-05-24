@@ -1,15 +1,18 @@
-import sys
 import json
 import os.path
-
-from typing import Dict, Union, Any
+import sys
 
 import av
+
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.func import aspect_ratio
+from auto_editor.utils.log import Log
+from auto_editor.vanparse import ArgumentParser
 
 av.logging.set_level(av.logging.PANIC)
 
 
-def info_options(parser):
+def info_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument("--json", flag=True, help="Export info in JSON format.")
     parser.add_argument(
         "--include-vfr",
@@ -30,17 +33,12 @@ def info_options(parser):
 
 
 def main(sys_args=sys.argv[1:]):
-    from auto_editor.utils.log import Log
-    from auto_editor.utils.func import aspect_ratio
-    from auto_editor.vanparse import ArgumentParser
-    from auto_editor.ffwrapper import FFmpeg, FileInfo
-
     parser = info_options(ArgumentParser("info"))
     args = parser.parse_args(sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
-    file_info: Dict[str, Union[List[Dict[str, Any]], Dict[str, Any]]] = {}
+    file_info = {}
 
     for file in args.input:
         if not os.path.isfile(file):
@@ -59,12 +57,12 @@ def main(sys_args=sys.argv[1:]):
             "container": {},
         }
 
-        container = av.open(file, "r")
+        cn = av.open(file, "r")
 
         for track, stream in enumerate(inp.videos):
-            pix_fmt = container.streams.video[track].pix_fmt
-            time_base = str(container.streams.video[track].time_base)
-            cc_time_base = str(container.streams.video[track].codec_context.time_base)
+            pix_fmt = cn.streams.video[track].pix_fmt
+            time_base = str(cn.streams.video[track].time_base)
+            cc_time_base = str(cn.streams.video[track].codec_context.time_base)
             w, h = stream.width, stream.height
             w_, h_ = aspect_ratio(w, h)
 

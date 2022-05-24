@@ -1,17 +1,17 @@
 import sys
 
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.log import Log
+from auto_editor.vanparse import ArgumentParser
 
-def desc_options(parser):
+
+def desc_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
     parser.add_required("input", nargs="*", help="Path to file(s)")
     return parser
 
 
-def main(sys_args=sys.argv[1:]):
-    from auto_editor.vanparse import ArgumentParser
-    from auto_editor.ffwrapper import FFmpeg, FileInfo
-    from auto_editor.utils.log import Log
-
+def main(sys_args=sys.argv[1:]) -> None:
     parser = desc_options(ArgumentParser("desc"))
     args = parser.parse_args(sys_args)
 
