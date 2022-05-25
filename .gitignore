@@ -21,3 +21,4 @@ dist/
 
 # OS Files
 .DS_Store
+auto_editor/ffmpeg/Windows/ffprobe.exe
