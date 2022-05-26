@@ -1,4 +1,3 @@
-from typing import Any
 from dataclasses import dataclass
 
 from auto_editor.utils.types import AlignType
@@ -41,7 +40,6 @@ class TextObj:
     fill: str = "#000"
     stroke: int = 0
     strokecolor: str = "#000"
-    _cache_font: Any = None
 
 
 @dataclass
@@ -54,7 +52,6 @@ class ImageObj:
     opacity: float = 1
     anchor: str = "ce"
     rotate: float = 0  # in degrees
-    _cache_src: Any = None
 
 
 @dataclass

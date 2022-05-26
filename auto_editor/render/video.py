@@ -88,7 +88,6 @@ def one_pos_two_pos(
 
 def render_av(
     ffmpeg: FFmpeg,
-    track: int,
     timeline: Timeline,
     args,
     progress: ProgressBar,
@@ -107,22 +106,20 @@ def render_av(
     except ImportError:
         log.import_error("Pillow")
 
-    def set_static_assets(all_objects, log: Log):
-        # Save reloading the same thing over and over.
-
-        new_objects = []
-
-        for obj in all_objects:
-            if isinstance(obj, TextObj):
+    font_cache = {}
+    img_cache = {}
+    for layer in timeline.v:
+        for obj in layer:
+            if isinstance(obj, TextObj) and obj.font not in font_cache:
                 try:
-                    obj._cache_font = ImageFont.truetype(obj.font, obj.size)
+                    font_cache[obj.font] = ImageFont.truetype(obj.font, obj.size)
                 except OSError:
                     if obj.font == "default":
-                        obj._cache_font = ImageFont.load_default()
+                        font_cache["default"] = ImageFont.load_default()
                     else:
                         log.error(f"Font '{obj.font}' not found.")
 
-            if isinstance(obj, ImageObj):
+            if isinstance(obj, ImageObj) and obj.src not in img_cache:
                 source = Image.open(obj.src)
                 source = source.convert("RGBA")
                 source = source.rotate(obj.rotate, expand=True)
@@ -132,56 +129,57 @@ def render_av(
                         "RGBA", source.size, (255, 255, 255, int(obj.opacity * 255))
                     ),
                 )
-                obj._cache_src = source
+                img_cache[obj.src] = source
 
-            new_objects.append(obj)
-
-        return new_objects
-
-    def render_objects(timeline, index: int, frame, pix_fmt: str):
+    def render_frame(frame, pix_fmt: str, timeline, index):
         img = frame.to_image().convert("RGBA")
 
-        # TODO: Fix me
-        for obj in timeline.vclips[track]:
+        for layer in timeline.v:
+            for obj in layer:
+                obj_img = Image.new("RGBA", img.size, (255, 255, 255, 0))
+                draw = ImageDraw.Draw(obj_img)
 
-            obj_img = Image.new("RGBA", img.size, (255, 255, 255, 0))
-            draw = ImageDraw.Draw(obj_img)
+                if isinstance(obj, TextObj):
+                    text_w, text_h = draw.textsize(
+                        obj.content, font=font_cache[obj.font]
+                    )
+                    pos = apply_anchor(obj.x, obj.y, text_w, text_h, "ce")
+                    draw.text(
+                        pos,
+                        obj.content,
+                        font=font_cache[obj.font],
+                        fill=obj.fill,
+                        align=obj.align,
+                        stroke_width=obj.stroke,
+                        stroke_fill=obj.strokecolor,
+                    )
 
-            if isinstance(obj, TextObj):
-                text_w, text_h = draw.textsize(obj.content, font=obj._cache_font)
-                pos = apply_anchor(obj.x, obj.y, text_w, text_h, "ce")
-                draw.text(
-                    pos,
-                    obj.content,
-                    font=obj._cache_font,
-                    fill=obj.fill,
-                    align=obj.align,
-                    stroke_width=obj.stroke,
-                    stroke_fill=obj.strokecolor,
-                )
+                if isinstance(obj, RectangleObj):
+                    draw.rectangle(
+                        one_pos_two_pos(
+                            obj.x, obj.y, obj.width, obj.height, obj.anchor
+                        ),
+                        fill=obj.fill,
+                        width=obj.stroke,
+                        outline=obj.strokecolor,
+                    )
 
-            if isinstance(obj, RectangleObj):
-                draw.rectangle(
-                    one_pos_two_pos(obj.x, obj.y, obj.width, obj.height, obj.anchor),
-                    fill=obj.fill,
-                    width=obj.stroke,
-                    outline=obj.strokecolor,
-                )
+                if isinstance(obj, EllipseObj):
+                    draw.ellipse(
+                        one_pos_two_pos(
+                            obj.x, obj.y, obj.width, obj.height, obj.anchor
+                        ),
+                        fill=obj.fill,
+                        width=obj.stroke,
+                        outline=obj.strokecolor,
+                    )
 
-            if isinstance(obj, EllipseObj):
-                draw.ellipse(
-                    one_pos_two_pos(obj.x, obj.y, obj.width, obj.height, obj.anchor),
-                    fill=obj.fill,
-                    width=obj.stroke,
-                    outline=obj.strokecolor,
-                )
+                if isinstance(obj, ImageObj):
+                    img_w, img_h = img_cache[obj.src].size
+                    pos = apply_anchor(obj.x, obj.y, img_w, img_h, obj.anchor)
+                    obj_img.paste(img_cache[obj.src], pos)
 
-            if isinstance(obj, ImageObj):
-                img_w, img_h = obj._cache_src.size
-                pos = apply_anchor(obj.x, obj.y, img_w, img_h, obj.anchor)
-                obj_img.paste(obj._cache_src, pos)
-
-            img = Image.alpha_composite(img, obj_img)
+                img = Image.alpha_composite(img, obj_img)
 
         return frame.from_image(img).reformat(format=pix_fmt)
 
@@ -198,7 +196,7 @@ def render_av(
     progress.start(chunks[-1][1], "Creating new video")
 
     cn = av.open(inp.path, "r")
-    pix_fmt = cn.streams.video[track].pix_fmt
+    pix_fmt = cn.streams.video[0].pix_fmt
 
     target_pix_fmt = pix_fmt
 
@@ -217,13 +215,13 @@ def render_av(
 
     log.debug(f"apply video quality settings now: {not apply_video_later}")
 
-    stream = cn.streams.video[track]
+    stream = cn.streams.video[0]
     stream.thread_type = "AUTO"
 
     width = stream.width
     height = stream.height
 
-    spedup = os.path.join(temp, f"spedup{track}.mp4")
+    spedup = os.path.join(temp, "spedup0.mp4")
 
     cmd = [
         "-hide_banner",
@@ -307,10 +305,7 @@ def render_av(
                 input_equavalent += Fraction(1, Fraction(chunk[2]) * fps_convert)
 
             while input_equavalent > output_equavalent:
-                # if index in effects.sheet:
-                #     frame = render_objects(
-                #         effects.sheet, effects.all, index, frame, target_pix_fmt
-                #     )
+                # frame = render_frame(frame, target_pix_fmt, timeline, index)
                 if pix_fmt != target_pix_fmt:
                     frame = frame.reformat(format=target_pix_fmt)
 
@@ -333,8 +328,8 @@ def render_av(
 
     # Unfortunately, scaling has to be a concrete step.
     if args.scale != 1:
-        sped_input = os.path.join(temp, f"spedup{track}.mp4")
-        spedup = os.path.join(temp, f"scale{track}.mp4")
+        sped_input = os.path.join(temp, "spedup0.mp4")
+        spedup = os.path.join(temp, "scale0.mp4")
 
         cmd = [
             "-i",

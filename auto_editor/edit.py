@@ -201,9 +201,9 @@ def edit_media(
 
         if rules.allow_video:
             for v, vid in enumerate(inp.videos):
-                if vid.codec not in ("png", "mjpeg", "webp"):
+                if vid.codec not in ("png", "mjpeg", "webp") and v == 0:
                     out_path, apply_later = render_av(
-                        ffmpeg, v, timeline, args, progress, rules, temp, log
+                        ffmpeg, timeline, args, progress, rules, temp, log
                     )
                     video_output.append((v, True, out_path, apply_later))
                 elif rules.allow_image:

@@ -6,9 +6,10 @@ import os
 import sys
 import json
 
-from typing import List, Tuple, Union, Any
+from typing import Union, Any
 
 from auto_editor.utils.log import Log
+from auto_editor.utils.types import ChunkType
 from auto_editor.timeline import Timeline, make_av, clipify
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 
@@ -24,7 +25,7 @@ def check_file(path: str, log: Log):
         log.error(f"Could not locate media file: '{path}'")
 
 
-def validate_chunks(chunks: object, log: Log) -> List[Tuple[int, int, float]]:
+def validate_chunks(chunks: object, log: Log) -> ChunkType:
     if not isinstance(chunks, (list, tuple)):
         log.error("Chunks must be a list")
 
@@ -97,13 +98,13 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         chunks = validate_chunks(data["chunks"], log)
         inp = FileInfo(data["source"], ffmpeg, log)
 
-        vclips, aclips = make_av(clipify(chunks, 0), inp)
+        vspace, aspace = make_av(clipify(chunks, 0), inp)
 
         fps = inp.get_fps()
         sr = inp.get_samplerate()
         res = inp.get_res()
 
-        return Timeline([inp], fps, sr, res, "#000", vclips, aclips, chunks)
+        return Timeline([inp], fps, sr, res, "#000", vspace, aspace, chunks)
 
     if version == (2, 0) or version == (0, 2):
         check_attrs(data, log, "timeline")
@@ -143,8 +144,8 @@ def make_json_timeline(
                 "resolution": timeline.res,
                 "fps": timeline.fps,
                 "samplerate": timeline.samplerate,
-                "video": timeline.vclips,
-                "audio": timeline.aclips,
+                "video": timeline.v,
+                "audio": timeline.a,
             },
         }
     else:

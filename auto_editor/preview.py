@@ -23,12 +23,12 @@ def preview(timeline: Timeline, log: Log) -> None:
     in_len = sum([inp.fdur for inp in timeline.inputs])
 
     out_len: float = 0
-    for vclips in timeline.vclips:
+    for vclips in timeline.v:
         dur: float = 0
         for vclip in vclips:
             dur += vclip.dur / vclip.speed
         out_len = max(out_len, dur / fps)
-    for aclips in timeline.aclips:
+    for aclips in timeline.a:
         dur = 0
         for aclip in aclips:
             dur += aclip.dur / aclip.speed
@@ -42,13 +42,13 @@ def preview(timeline: Timeline, log: Log) -> None:
         f"- diff: ({display(diff)}) {round((diff / in_len) * 100, 2)}%"
     )
 
-    clip_lens = [clip.dur / clip.speed for clip in timeline.aclips[0]]
+    clip_lens = [clip.dur / clip.speed for clip in timeline.a[0]]
 
     # Calculate cuts
     oe: List[Tuple[int, int]] = []
 
     # TODO: Make offset_end_pairs work on overlapping clips.
-    for clip in timeline.aclips[0]:
+    for clip in timeline.a[0]:
         oe.append((clip.offset, clip.offset + clip.dur))
 
     cut_lens = []
