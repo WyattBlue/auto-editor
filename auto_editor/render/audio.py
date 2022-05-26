@@ -16,7 +16,7 @@ def make_new_audio(
     log: Log,
 ) -> None:
 
-    clips = timeline.aclips[t]
+    clips = timeline.a[t]
     if len(clips) == 0:
         log.error("Trying to create an empty file.")
 
