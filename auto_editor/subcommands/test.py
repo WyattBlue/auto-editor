@@ -1,23 +1,20 @@
-# Internal Libraries
-import os
-import sys
-import shutil
-import logging
-import platform
-import subprocess
-from time import perf_counter
+# type: ignore
 
-# External Libraries
+import logging
+import os
+import platform
+import shutil
+import subprocess
+import sys
+from time import perf_counter
+from typing import Callable, List, NoReturn, Optional, Tuple
+
 import av
 import numpy as np
 
-av.logging.set_level(av.logging.PANIC)
-
-# Typing
-from typing import List, Tuple, Callable, NoReturn, Optional
-
-# Included Libraries
 from auto_editor.vanparse import ArgumentParser
+
+av.logging.set_level(av.logging.PANIC)
 
 
 def test_options(parser):
@@ -93,21 +90,13 @@ def check_for_error(cmd: List[str], match=None) -> None:
 
 
 def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
+    from auto_editor.render.tsm.phasevocoder import phasevocoder
     from auto_editor.wavfile import read
-    from auto_editor.render.tsm import phasevocoder, ArrReader, ArrWriter
 
     _, sped_chunk = read(in_file)
     channels = 2
 
-    reader = ArrReader(sped_chunk)
-    writer = ArrWriter(np.zeros((0, 2), dtype=np.int16))
-
-    phasevocoder(channels, speed=the_speed).run(reader, writer)
-
-    spedup_audio = writer.output
-    del writer
-    del reader
-
+    spedup_audio = phasevocoder(channels, the_speed, sped_chunk)
     loaded = np.load(compare_file)
 
     if not np.array_equal(spedup_audio, loaded["a"]):
@@ -210,31 +199,6 @@ def main(sys_args: Optional[List[str]] = None):
 
     def parser_test():
         check_for_error(["example.mp4", "--video-speed"], "needs argument")
-
-    def subtitle_tests():
-        from auto_editor.render.subtitle import SubtitleParser
-
-        test = SubtitleParser()
-        test.contents = [
-            [0, 10, "A"],
-            [10, 20, "B"],
-            [20, 30, "C"],
-            [30, 40, "D"],
-            [40, 50, "E"],
-            [50, 60, "F"],
-        ]
-        chunks = [
-            (0, 10, 1),
-            (10, 20, 99999),
-            (20, 30, 1),
-            (30, 40, 99999),
-            (40, 50, 1),
-            (50, 60, 99999),
-        ]
-        test.edit(chunks)
-
-        if test.contents != [[0, 10, "A"], [10, 20, "C"], [20, 30, "E"]]:
-            raise ValueError("Incorrect subtitle results.")
 
     def tsm_1a5_test():
         make_np_list(
@@ -597,7 +561,7 @@ def main(sys_args: Optional[List[str]] = None):
     tests = []
 
     if args.category in ("unit", "all"):
-        tests.extend([subtitle_tests, tsm_1a5_test, tsm_2a0_test])
+        tests.extend([tsm_1a5_test, tsm_2a0_test])
 
     if args.category in ("api", "all"):
         tests.append(read_api_0_1)
@@ -608,6 +572,7 @@ def main(sys_args: Optional[List[str]] = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                various_errors_test,
                 frame_rate,
                 help_tests,
                 version_test,
@@ -636,11 +601,9 @@ def main(sys_args: Optional[List[str]] = None):
             ]
         )
 
-        # tester.run(various_errors_test)
         # tester.run(effect_tests, cleanup=clean_all)
         # tester.run(render_text)
         # tester.run(check_font_error)
-        # tester.run(combine)
 
     tester = Tester(args)
 

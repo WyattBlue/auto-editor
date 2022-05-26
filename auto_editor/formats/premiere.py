@@ -1,15 +1,12 @@
 import os.path
 from os.path import abspath
+from platform import system
 from shutil import move
 from urllib.parse import quote
-from platform import system
 
-from typing import List, Tuple
+from auto_editor.timeline import Timeline
 
 from .utils import indent, safe_mkdir
-
-from auto_editor.ffwrapper import FileInfo
-from auto_editor.timeline import Timeline
 
 """
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format
@@ -30,7 +27,7 @@ DEPTH = "16"
 def fix_url(path: str) -> str:
     if system() == "Windows":
         return "file://localhost/" + quote(abspath(path)).replace("%5C", "/")
-    return "file://localhost" + abspath(path)
+    return f"file://localhost{abspath(path)}"
 
 
 def speedup(speed: float) -> str:

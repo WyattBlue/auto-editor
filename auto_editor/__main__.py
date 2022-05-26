@@ -1,25 +1,20 @@
 #!/usr/bin/env python3
 
-# Internal Libraries
 import os
 import sys
 import tempfile
-
-# Typing
 from typing import List
 
-# Included Libraries
 import auto_editor
 import auto_editor.utils.func as usefulfunctions
-import auto_editor.vanparse as vanparse
-
 from auto_editor.edit import edit_media
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.log import Log, Timer
 from auto_editor.validate_input import valid_input
+from auto_editor.vanparse import ArgumentParser
 
 
-def main_options(parser):
+def main_options(parser: ArgumentParser) -> ArgumentParser:
     from auto_editor.utils.types import (
         color_type,
         float_type,
@@ -142,9 +137,10 @@ def main_options(parser):
     )
     parser.add_argument(
         "--set-speed-for-range",
+        "--set-speed",
         type=speed_range_type,
         nargs="*",
-        help="Set an arbitrary speed for a given range.",
+        help="SPEED,START,STOP - Set an arbitrary speed for a given range.",
     )
     parser.add_text("Timeline Options")
     parser.add_argument(
@@ -299,10 +295,9 @@ def main_options(parser):
     return parser
 
 
-def main():
-    parser = vanparse.ArgumentParser("Auto-Editor")
-
-    subcommands = ["test", "info", "levels", "grep", "subdump", "desc"]
+def main() -> None:
+    parser = ArgumentParser("Auto-Editor")
+    subcommands = ("test", "info", "levels", "grep", "subdump", "desc")
 
     if len(sys.argv) > 1 and sys.argv[1] in subcommands:
         obj = __import__(
@@ -317,42 +312,43 @@ def main():
 
         sys_a = sys.argv[1:]
 
-        def c(sys_a: List[str], options: List[str], new: List[str]) -> List[str]:
+        def macro(sys_a: List[str], options: List[str], new: List[str]) -> List[str]:
             for option in options:
                 if option in sys_a:
                     pos = sys_a.index(option)
                     sys_a[pos : pos + 1] = new
             return sys_a
 
-        sys_a = c(
+        sys_a = macro(
             sys_a,
             ["--export_to_premiere", "--export-to-premiere", "-exp"],
             ["--export", "premiere"],
         )
-        sys_a = c(
+        sys_a = macro(
             sys_a,
             ["--export_to_final_cut_pro", "--export-to-final-cut-pro", "-exf"],
             ["--export", "final-cut-pro"],
         )
-        sys_a = c(
+        sys_a = macro(
             sys_a,
             ["--export_to_shotcut", "--export-to-shotcut", "-exs"],
             ["--export", "shotcut"],
         )
-        sys_a = c(sys_a, ["--export_as_json", "--export-as-json"], ["--export", "json"])
-        sys_a = c(
+        sys_a = macro(
+            sys_a, ["--export_as_json", "--export-as-json"], ["--export", "json"]
+        )
+        sys_a = macro(
             sys_a,
             ["--export_as_clip_sequence", "--export-as-clip-sequence", "-excs"],
             ["--export", "clip-sequence"],
         )
-        sys_a = c(sys_a, ["--combine-files", "--combine_files"], [])
+        sys_a = macro(sys_a, ["--combine-files", "--combine_files"], [])
 
         args = parser.parse_args(sys_a)
 
     timer = Timer(args.quiet)
 
     exporting_to_editor = args.export in ("premiere", "final-cut-pro", "shotcut")
-    making_data_file = exporting_to_editor or args.export == "json"
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, args.show_ffmpeg_debug)
 
@@ -374,9 +370,7 @@ def main():
         args.quiet = True
 
     if args.input == []:
-        Log().error(
-            "You need to give auto-editor an input file so it can do the work for you."
-        )
+        Log().error("You need to give auto-editor an input file.")
 
     if args.temp_dir is None:
         temp = tempfile.mkdtemp()

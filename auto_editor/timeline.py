@@ -1,7 +1,8 @@
-from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Union, Optional
-from dataclasses import dataclass, asdict, fields
+from dataclasses import asdict, dataclass, fields
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
+from numpy.typing import NDArray
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.method import get_speed_list
@@ -13,16 +14,16 @@ from auto_editor.objects import (
     TextObj,
     VideoObj,
 )
-from auto_editor.utils.func import parse_dataclass, chunkify
+from auto_editor.utils.func import chunkify, parse_dataclass
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import (
     AlignType,
+    ChunkType,
     align_type,
     anchor_type,
     color_type,
     float_type,
-    ChunkType,
 )
 
 Clip = NamedTuple(
@@ -30,15 +31,24 @@ Clip = NamedTuple(
     [("start", int), ("dur", int), ("offset", int), ("speed", float), ("src", int)],
 )
 
+Visual = Union[VideoObj, TextObj, ImageObj, RectangleObj, EllipseObj]
+VLayer = List[Visual]
+VSpace = List[VLayer]
 
-def unclipify(layer: List[Clip]) -> np.ndarray:
+ALayer = List[AudioObj]
+ASpace = List[ALayer]
+
+
+def unclipify(layer: List[Clip]) -> NDArray[np.float_]:
     l: List[int] = []
     for clip in layer:
         if clip.src != 0:
             raise ValueError("Clip has src that is not 0")
 
         if clip.start > len(l):
-            raise ValueError(f"Clip layer has null frames, cannot convert speed list: {l}")
+            raise ValueError(
+                f"Clip layer has null frames, cannot convert speed list: {l}"
+            )
 
         for item in range(clip.offset, clip.offset + clip.dur):
             l.append(item)
@@ -95,8 +105,8 @@ class Timeline:
     samplerate: int
     res: Tuple[int, int]
     background: str
-    vclips: List[List[VideoObj]]
-    aclips: List[List[AudioObj]]
+    v: VSpace
+    a: ASpace
     chunks: Optional[ChunkType] = None
 
     @property
@@ -116,18 +126,15 @@ def clipify(chunks: ChunkType, src: int) -> List[Clip]:
     return clips
 
 
-def make_av(
-    clips: List[Clip], inp: FileInfo
-) -> Tuple[List[List[VideoObj]], List[List[AudioObj]]]:
+def make_av(clips: List[Clip], inp: FileInfo) -> Tuple[VSpace, ASpace]:
 
-    vclips: List[List[VideoObj]] = [[] for v in inp.videos]
-    aclips: List[List[AudioObj]] = [[] for a in inp.audios]
+    vclips: VSpace = [[]]
+    aclips: ASpace = [[] for a in inp.audios]
 
-    for v, _ in enumerate(inp.videos):
-        for clip in clips:
-            vclips[v].append(
-                VideoObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src)
-            )
+    for clip in clips:
+        vclips[0].append(
+            VideoObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src)
+        )
 
     for a, _ in enumerate(inp.audios):
         for clip in clips:
@@ -139,12 +146,18 @@ def make_av(
 
 
 def make_layers(
-    inputs: List[FileInfo], speedlists: List[np.ndarray]
-) -> Tuple[Optional[ChunkType], List[List[VideoObj]], List[List[AudioObj]]]:
+    inputs: List[FileInfo], speedlists: List[NDArray[np.float_]]
+) -> Tuple[int, Optional[ChunkType], VSpace, ASpace]:
 
     clips = []
     for i, _chunks in enumerate([chunkify(s) for s in speedlists]):
         clips += clipify(_chunks, i)
+
+    if len(clips) == 0:
+        end = 0
+    else:
+        e = clips[-1]
+        end = round(e.start + (e.dur * e.speed))
 
     chunks: Optional[ChunkType] = None
     try:
@@ -153,7 +166,7 @@ def make_layers(
         pass
 
     vclips, aclips = make_av(clips, inputs[0])
-    return chunks, vclips, aclips
+    return end, chunks, vclips, aclips
 
 
 def make_timeline(
@@ -174,7 +187,7 @@ def make_timeline(
     for i, inp in enumerate(inputs):
         speedlists.append(get_speed_list(i, inp, fps, args, progress, temp, log))
 
-    chunks, vclips, aclips = make_layers(inputs, speedlists)
+    end, chunks, vclips, aclips = make_layers(inputs, speedlists)
 
     timeline = Timeline(inputs, fps, sr, res, args.background, vclips, aclips, chunks)
 
@@ -185,7 +198,7 @@ def make_timeline(
         "centerX": w // 2,
         "centerY": h // 2,
         "start": 0,
-        "end": 0,  # TODO: deal with this
+        "end": end,
     }
 
     pool = []
@@ -199,26 +212,21 @@ def make_timeline(
     for o in args.add_image:
         pool.append(parse_dataclass(o, ImageObj, log))
 
-    # for index, obj in enumerate(pool):
+    for index, obj in enumerate(pool):
+        dic_value = asdict(obj)
+        dic_type = {}
+        for field in fields(obj):
+            dic_type[field.name] = field.type
 
-    #     dic_value = asdict(obj)
-    #     dic_type = {}
-    #     for field in fields(obj):
-    #         dic_type[field.name] = field.type
+        # Convert to the correct types
+        for k, _type in dic_type.items():
+            obj.__setattr__(k, _values(k, dic_value[k], _type, _vars, log))
 
-    #     # Convert to the correct types
-    #     for k, _type in dic_type.items():
-    #         obj.__setattr__(k, _values(k, dic_value[k], _type, _vars, log))
+        if obj.dur < 1:
+            log.error(f"dur's value must be greater than 0. Was '{obj.dur}'.")
 
-    #     if obj.dur < 1:
-    #         log.error(f"dur's value must be greater than 0. Was '{obj.dur}'.")
-
-    #     for frame in range(obj.start, obj.start + obj.dur, 1):
-    #         if frame in self.sheet:
-    #             self.sheet[frame].append(index)
-    #         else:
-    #             self.sheet[frame] = [index]
-
-    #     self.all.append(obj)
+    # Higher layers are visually on top
+    for obj in pool:
+        timeline.v.append([obj])
 
     return timeline

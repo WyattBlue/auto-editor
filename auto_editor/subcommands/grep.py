@@ -1,14 +1,14 @@
-import sys
 import os
 import re
+import sys
 import tempfile
 
-from auto_editor.utils.log import Log
 from auto_editor.ffwrapper import FFmpeg
+from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
 
-def grep_options(parser):
+def grep_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--no-filename", flag=True, help="Never print filenames with output lines."
     )
@@ -117,7 +117,7 @@ def grep_file(
         print(prefix + str(count))
 
 
-def main(sys_args=sys.argv[1:]):
+def main(sys_args=sys.argv[1:]) -> None:
     parser = grep_options(ArgumentParser("grep"))
     args = parser.parse_args(sys_args)
 

@@ -1,7 +1,18 @@
+import os
 import sys
+import tempfile
+from typing import Sequence
+
+import numpy as np
+from numpy.typing import NDArray
+
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.log import Log
+from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.vanparse import ArgumentParser
 
 
-def levels_options(parser):
+def levels_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--kind",
         default="audio",
@@ -27,25 +38,17 @@ def levels_options(parser):
     return parser
 
 
-def print_float_list(a):
-    for item in a:
-        sys.stdout.write(f"{item:.20f}\n")
+def print_float_list(arr: NDArray[np.float_]) -> None:
+    for a in arr:
+        sys.stdout.write(f"{a:.20f}\n")
 
 
-def print_int_list(a):
-    for item in a:
-        sys.stdout.write(f"{item}\n")
+def print_int_list(arr: NDArray[np.uint64]) -> None:
+    for a in arr:
+        sys.stdout.write(f"{a}\n")
 
 
-def main(sys_args=sys.argv[1:]):
-    import os
-    import tempfile
-
-    from auto_editor.utils.log import Log
-    from auto_editor.vanparse import ArgumentParser
-    from auto_editor.utils.progressbar import ProgressBar
-    from auto_editor.ffwrapper import FFmpeg, FileInfo
-
+def main(sys_args=sys.argv[1:]) -> None:
     parser = levels_options(ArgumentParser("levels"))
     args = parser.parse_args(sys_args)
 
@@ -56,6 +59,7 @@ def main(sys_args=sys.argv[1:]):
     log = Log(temp=temp)
 
     inp = FileInfo(args.input[0], ffmpeg, log)
+    fps = inp.get_fps()
 
     if args.kind == "audio":
         from auto_editor.analyze.audio import audio_detection
@@ -75,9 +79,7 @@ def main(sys_args=sys.argv[1:]):
 
         sample_rate, audio_samples = read(read_track)
 
-        print_float_list(
-            audio_detection(audio_samples, sample_rate, inp.get_fps(), progress)
-        )
+        print_float_list(audio_detection(audio_samples, sample_rate, fps, progress))
 
     if args.kind == "motion":
         if args.track >= len(inp.videos):
@@ -85,7 +87,7 @@ def main(sys_args=sys.argv[1:]):
 
         from auto_editor.analyze.motion import motion_detection
 
-        print_float_list(motion_detection(inp, progress, width=400, blur=9))
+        print_float_list(motion_detection(inp.path, fps, progress, width=400, blur=9))
 
     if args.kind == "pixeldiff":
         if args.track >= len(inp.videos):
@@ -93,7 +95,7 @@ def main(sys_args=sys.argv[1:]):
 
         from auto_editor.analyze.pixeldiff import pixel_difference
 
-        print_int_list(pixel_difference(inp, progress))
+        print_int_list(pixel_difference(inp.path, fps, progress))
 
     log.cleanup()
 

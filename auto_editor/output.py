@@ -1,13 +1,9 @@
-# Internal Libraries
 import os.path
+from typing import List, Tuple
 
-# Typing
-from typing import List, Tuple, Optional
-
-# Included Libraries
-from auto_editor.utils.log import Log
-from auto_editor.utils.container import Container
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.container import Container
+from auto_editor.utils.log import Log
 
 
 def fset(cmd: List[str], option: str, value: str) -> List[str]:

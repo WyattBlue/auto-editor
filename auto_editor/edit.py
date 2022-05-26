@@ -4,7 +4,6 @@ from typing import List, Optional
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.container import get_rules
-from auto_editor.utils.func import append_filename
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 
@@ -202,9 +201,9 @@ def edit_media(
 
         if rules.allow_video:
             for v, vid in enumerate(inp.videos):
-                if vid.codec not in ("png", "mjpeg", "webp"):
+                if vid.codec not in ("png", "mjpeg", "webp") and v == 0:
                     out_path, apply_later = render_av(
-                        ffmpeg, v, timeline, args, progress, rules, temp, log
+                        ffmpeg, timeline, args, progress, rules, temp, log
                     )
                     video_output.append((v, True, out_path, apply_later))
                 elif rules.allow_image:
