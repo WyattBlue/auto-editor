@@ -16,6 +16,7 @@ from typing import List, Tuple, Optional
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
+
 class FFmpeg:
     __slots__ = ("debug", "path", "version")
 
@@ -193,64 +194,111 @@ class FileInfo:
             return self.audios[0].samplerate
         return 48000
 
-
     def __init__(self, path: str, ffmpeg: FFmpeg, log: Log):
-        self.path = path # The media file location
+        self.path = path  # The media file location
         self.abspath = os.path.abspath(path)
         self.basename = os.path.basename(path)
         self.dirname = os.path.dirname(os.path.abspath(path))
         self.name, self.ext = os.path.splitext(path)
 
         # What does the container look like?
-        command_with_options = ['FFprobe', '-hide_banner', '-loglevel', 'quiet', '-print_format', 'json', '-show_entries', 'format=duration,bit_rate,nb_streams:format_tags', '-i', path]
-        _raw = subprocess.Popen(command_with_options, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err =  _raw.communicate()
+        command_with_options = [
+            "FFprobe",
+            "-hide_banner",
+            "-loglevel",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_entries",
+            "format=duration,bit_rate,nb_streams:format_tags",
+            "-i",
+            path,
+        ]
+        _raw = subprocess.Popen(
+            command_with_options, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        out, err = _raw.communicate()
         if err:
-            log.warning('The command, ' + command_with_options + ', included an error from stderr: ' + err)
+            log.warning(
+                "The command, "
+                + command_with_options
+                + ", included an error from stderr: "
+                + err
+            )
 
-        if len(out)>0:
+        if len(out) > 0:
             media_format_data = json.loads(out)
         else:
-            log.error('Auto-Editor could not read the media information.')
+            log.error("Auto-Editor could not read the media information.")
 
-        self.duration = media_format_data['format']['duration']
+        self.duration = media_format_data["format"]["duration"]
         self.duration_float = float(self.duration)
-        self.bitrate = media_format_data['format']['bit_rate']
+        self.bitrate = media_format_data["format"]["bit_rate"]
 
-        self.metadata = media_format_data['format']['tags'] # Simple dictionary of the container's Metadata
+        # Simple dictionary of the container's Metadata
+        self.metadata = media_format_data["format"]["tags"]
+        # Lookup table: subtitle-codex_name to subtitle-file-extension
+        sub_exts = {
+            "mov_text": "srt",
+            "ass": "ass",
+            "webvtt": "vtt",
+        }
 
-        sub_exts = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"} # Lookup table subtitle codex_name to subtitle file extension
+        streams_in_container = media_format_data["format"]["nb_streams"]
+        self.videos = []  # initialize
+        self.audios = []  # initialize
+        self.subtitles = []  # initialize
+        stream_keys_all_codecs = "stream=avg_frame_rate,bit_rate,codec_name,codec_type,height,index,sample_rate,width:stream_tags=language"
 
-        streams_in_container = media_format_data['format']['nb_streams']
-        self.videos = [] # initialize
-        self.audios = [] # initialize
-        self.subtitles = [] # initialize
-        stream_keys_all_codecs = 'stream=avg_frame_rate,bit_rate,codec_name,codec_type,height,index,sample_rate,width:stream_tags=language'
-
-        stream_index = 0 # initialize
+        stream_index = 0  # initialize
         while stream_index < streams_in_container:
-            fps = None # initialize
+            fps = None  # initialize
 
-            command_with_options = ['FFprobe', '-hide_banner', '-loglevel', 'quiet', '-print_format', 'json', '-select_streams', str(stream_index), '-show_entries', stream_keys_all_codecs, '-i', path]
-            _raw = subprocess.Popen(command_with_options, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out, err =  _raw.communicate()
+            command_with_options = [
+                "FFprobe",
+                "-hide_banner",
+                "-loglevel",
+                "quiet",
+                "-print_format",
+                "json",
+                "-select_streams",
+                str(stream_index),
+                "-show_entries",
+                stream_keys_all_codecs,
+                "-i",
+                path,
+            ]
+            _raw = subprocess.Popen(
+                command_with_options, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            out, err = _raw.communicate()
             if err:
-                log.warning('The command, ' + command_with_options + ', included an error from stderr: ' + err)
+                log.warning(
+                    "The command, "
+                    + command_with_options
+                    + ", included an error from stderr: "
+                    + err
+                )
 
-            if len(out)>0:
+            if len(out) > 0:
                 stream_data = json.loads(out)
             else:
-                log.error('Auto-Editor could not read the information about stream #' + stream_index)
+                log.error(
+                    "Auto-Editor could not read the information about stream #"
+                    + stream_index
+                )
 
             # What type of stream is this?
             # Stream types not accounted for here: attachments, data
-            stream_type = stream_data['streams'][0]['codec_type'] # The data is always in list index [0]. This value is not the stream_index: the location/syntax is a confusing coincidence.
-            if stream_type == 'audio': # In this elif chain, the values for stream_type are in alphabetical order. To wit: audio, subtitle, video
-                _sr = stream_data['streams'][0]['sample_rate'] 
+            # The data is always in list index [0]. This value is not the stream_index: the location/syntax is a confusing coincidence.
+            stream_type = stream_data["streams"][0]["codec_type"]
+            # In this elif chain, the values for stream_type are in alphabetical order. To wit: audio, subtitle, video
+            if stream_type == "audio":
+                _sr = stream_data["streams"][0]["sample_rate"]
                 if _sr is None:
                     log.error("Auto-Editor got 'None' when probing samplerate")
 
-                codec = stream_data['streams'][0]['codec_name']
+                codec = stream_data["streams"][0]["codec_name"]
                 if codec is None:
                     log.error("Auto-Editor got 'None' when probing audio codec")
 
@@ -258,31 +306,33 @@ class FileInfo:
                     AudioStream(
                         codec,
                         int(_sr),
-                        bitrate=stream_data['streams'][0]['bit_rate'],
-                        lang=stream_data['streams'][0]['tags']['language'],
+                        bitrate=stream_data["streams"][0]["bit_rate"],
+                        lang=stream_data["streams"][0]["tags"]["language"],
                     )
                 )
-            elif stream_type == 'subtitle':
-                codec = stream_data['streams'][0]['codec_name']
+            elif stream_type == "subtitle":
+                codec = stream_data["streams"][0]["codec_name"]
                 if codec is None:
                     log.error("Auto-Editor got 'None' when probing subtitle codec")
 
                 ext = sub_exts.get(codec, "vtt")
 
                 self.subtitles.append(
-                    SubtitleStream(codec, ext, lang=stream_data['streams'][0]['tags']['language'])
+                    SubtitleStream(
+                        codec, ext, lang=stream_data["streams"][0]["tags"]["language"]
+                    )
                 )
-            elif stream_type == 'video':
-                codec = stream_data['streams'][0]['codec_name']
+            elif stream_type == "video":
+                codec = stream_data["streams"][0]["codec_name"]
                 if codec is None:
                     log.error("Auto-Editor got 'None' when probing video codec")
 
-                w = stream_data['streams'][0]['width']
-                h = stream_data['streams'][0]['height']
+                w = stream_data["streams"][0]["width"]
+                h = stream_data["streams"][0]["height"]
                 if w is None or h is None:
                     log.error("Auto-Editor got 'None' when probing resolution")
 
-                _fps = stream_data['streams'][0]['avg_frame_rate']
+                _fps = stream_data["streams"][0]["avg_frame_rate"]
                 if _fps is None:
                     if codec not in ("png", "mjpeg", "webp"):
                         log.error("Auto-Editor got 'None' when probing fps")
@@ -304,11 +354,11 @@ class FileInfo:
                         h,
                         codec,
                         fps,
-                        bitrate=stream_data['streams'][0]['bit_rate'],
-                        lang=stream_data['streams'][0]['tags']['language'],
+                        bitrate=stream_data["streams"][0]["bit_rate"],
+                        lang=stream_data["streams"][0]["tags"]["language"],
                     )
                 )
             else:
-                log.warning('Unknown codec_type in stream #' + stream_index) # Stream copy the stream?
+                log.warning("Unknown codec_type in stream #" + stream_index)
 
-            stream_index += 1 # End of while loop
+            stream_index += 1  # End of while loop
