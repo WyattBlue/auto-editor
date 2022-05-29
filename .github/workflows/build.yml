@@ -10,6 +10,9 @@ on:
       - 'auto_editor/__init__.py'
     branches:
       - master
+  pull_request:
+    branches:
+      - master
 jobs:
   build1:
     strategy:
