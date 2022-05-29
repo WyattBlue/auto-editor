@@ -227,7 +227,7 @@ class FileInfo:
         # info = get_stdout([ffmpeg.path, "-hide_banner", "-i", path])
 
         # self.duration = regex_match(r"Duration:\s(?P<match>[0-9:.]+),", info)
-        # self.fdur = to_fdur(self.duration)
+        # self.duration_float = to_fdur(self.duration)
         # self.bitrate = regex_match(r"bitrate:\s(?P<match>[0-9]+\skb\/s)", info)
 
         # self.metadata = {}
@@ -358,7 +358,8 @@ class FileInfo:
         self.bitrate = media_format_data["format"]["bit_rate"]
 
         # Simple dictionary of the container's Metadata
-        self.metadata = media_format_data["format"]["tags"]
+        if "tags" in media_format_data["format"]:
+            self.metadata = media_format_data["format"]["tags"]
         # Lookup table: subtitle-codex_name to subtitle-file-extension
         sub_exts = {
             "mov_text": "srt",
@@ -420,14 +421,22 @@ class FileInfo:
                 if codec is None:
                     log.error("Auto-Editor got 'None' when probing audio codec")
 
-                self.audios.append(
-                    AudioStream(
-                        codec,
-                        int(_sr),
-                        bitrate=stream_data["streams"][0]["bit_rate"],
-                        lang=stream_data["streams"][0]["tags"]["language"],
-                    )
-                )
+                if "bit_rate" in stream_data["streams"][0]:
+                    bitrate = stream_data["streams"][0]["bit_rate"]
+                else:
+                    bitrate = None
+                if bitrate == "N/A":
+                    bitrate = None
+
+                if (
+                    "tags" in stream_data["streams"][0]
+                    and "language" in stream_data["streams"][0]["tags"]
+                ):
+                    lang = stream_data["streams"][0]["tags"]["language"]
+                else:
+                    lang = None
+
+                self.audios.append(AudioStream(codec, int(_sr), bitrate, lang))
             elif stream_type == "subtitle":
                 codec = stream_data["streams"][0]["codec_name"]
                 if codec is None:
@@ -435,11 +444,15 @@ class FileInfo:
 
                 ext = sub_exts.get(codec, "vtt")
 
-                self.subtitles.append(
-                    SubtitleStream(
-                        codec, ext, lang=stream_data["streams"][0]["tags"]["language"]
-                    )
-                )
+                if (
+                    "tags" in stream_data["streams"][0]
+                    and "language" in stream_data["streams"][0]["tags"]
+                ):
+                    lang = stream_data["streams"][0]["tags"]["language"]
+                else:
+                    lang = None
+
+                self.subtitles.append(SubtitleStream(codec, ext, lang))
             elif stream_type == "video":
                 codec = stream_data["streams"][0]["codec_name"]
                 if codec is None:
@@ -451,31 +464,41 @@ class FileInfo:
                     log.error("Auto-Editor got 'None' when probing resolution")
 
                 _fps = stream_data["streams"][0]["avg_frame_rate"]
-                if _fps is None:
+                if _fps is None or _fps == "0/0":
                     if codec not in ("png", "mjpeg", "webp"):
                         log.error("Auto-Editor got 'None' when probing fps")
-                    _fps = "25"
-                try:
-                    _fps = Fraction(_fps)
-                except ValueError:
-                    log.error(f"Couldn't convert '{_fps}' to Fraction")
-                _fps = float(_fps)
-                fps = round(_fps, 2)
+                    else:
+                        fps = 25.00
+                else:
+                    _fps_list = _fps.split("/")
+                    _fps_list[0] = int(_fps_list[0])
+                    _fps_list[1] = int(_fps_list[1])
+                    if _fps_list[1] != 0:
+                        _fps = _fps_list[0] / _fps_list[1]
+                    else:
+                        _fps = _fps_list[0]
+                    fps = round(_fps, 2)
                 if fps < 1:
                     log.error(
                         f"{self.basename}: Frame rate cannot be below 1. fps: {fps}"
                     )
 
-                self.videos.append(
-                    VideoStream(
-                        w,
-                        h,
-                        codec,
-                        fps,
-                        bitrate=stream_data["streams"][0]["bit_rate"],
-                        lang=stream_data["streams"][0]["tags"]["language"],
-                    )
-                )
+                if "bit_rate" in stream_data["streams"][0]:
+                    bitrate = stream_data["streams"][0]["bit_rate"]
+                else:
+                    bitrate = None
+                if bitrate == "N/A":
+                    bitrate = None
+
+                if (
+                    "tags" in stream_data["streams"][0]
+                    and "language" in stream_data["streams"][0]["tags"]
+                ):
+                    lang = stream_data["streams"][0]["tags"]["language"]
+                else:
+                    lang = None
+
+                self.videos.append(VideoStream(w, h, codec, fps, bitrate, lang))
             else:
                 log.warning(f"Unknown codec_type in stream #{stream_index}")
 
