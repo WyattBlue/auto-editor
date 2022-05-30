@@ -8,7 +8,7 @@ from typing import List
 import auto_editor
 import auto_editor.utils.func as usefulfunctions
 from auto_editor.edit import edit_media
-from auto_editor.ffwrapper import FFmpeg, FFprobe
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.log import Log, Timer
 from auto_editor.validate_input import valid_input
 from auto_editor.vanparse import ArgumentParser
@@ -403,7 +403,7 @@ def main() -> None:
     if exporting_to_editor and len(inputs) > 1:
         cmd = []
         for inp in inputs:
-            cmd.extend(["-i", inp.path])
+            cmd.extend(["-i", inp])
         cmd.extend(
             [
                 "-filter_complex",
@@ -418,7 +418,7 @@ def main() -> None:
             ]
         )
         ffmpeg.run(cmd)
-        inputs = [FFprobe("combined.mp4", ffmpeg, log)]
+        inputs = ["combined.mp4"]
     try:
         output = edit_media(inputs, ffmpeg, args, temp, log)
 
