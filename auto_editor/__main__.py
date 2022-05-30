@@ -403,7 +403,7 @@ def main() -> None:
     if exporting_to_editor and len(inputs) > 1:
         cmd = []
         for inp in inputs:
-            cmd.extend(["-i", inp.path])
+            cmd.extend(["-i", inp])
         cmd.extend(
             [
                 "-filter_complex",
@@ -418,7 +418,7 @@ def main() -> None:
             ]
         )
         ffmpeg.run(cmd)
-        inputs = [FileInfo("combined.mp4", ffmpeg, log)]
+        inputs = ["combined.mp4"]
     try:
         output = edit_media(inputs, ffmpeg, args, temp, log)
 

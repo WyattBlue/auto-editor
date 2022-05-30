@@ -28,18 +28,24 @@ def set_output_name(path: str, inp_ext: str, export: str) -> str:
 
 
 def edit_media(
-    inputs: List[FileInfo], ffmpeg: FFmpeg, args, temp: str, log: Log
+    path_list: List[str], ffmpeg: FFmpeg, args, temp: str, log: Log
 ) -> Optional[str]:
 
     progress = ProgressBar(args.progress)
-
     timeline = None
-    if inputs[0].ext == ".json":
+
+    path_ext = os.path.splitext(path_list[0])[1]
+    if path_ext == ".json":
         from auto_editor.formats.json import read_json
 
-        timeline = read_json(inputs[0].path, ffmpeg, log)
-        inputs = timeline.inputs
+        timeline = read_json(path_list[0], ffmpeg, log)
+        inputs: List[FileInfo] = timeline.inputs
+    else:
+        inputs = []
+        for path in path_list:
+            inputs.append(FileInfo(path, ffmpeg, log))
 
+    del path_list
     inp = inputs[0]
 
     if args.output_file is None:

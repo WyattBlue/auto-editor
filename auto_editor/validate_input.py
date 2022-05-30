@@ -5,7 +5,7 @@ from typing import List
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.func import get_stdout
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg
 
 
 def get_domain(url: str) -> str:
@@ -53,7 +53,7 @@ def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     return location
 
 
-def valid_input(inputs: List[str], ffmpeg: FFmpeg, args, log: Log) -> List[FileInfo]:
+def valid_input(inputs: List[str], ffmpeg: FFmpeg, args, log: Log) -> List[str]:
     new_inputs = []
 
     for my_input in inputs:
@@ -61,12 +61,10 @@ def valid_input(inputs: List[str], ffmpeg: FFmpeg, args, log: Log) -> List[FileI
             _, ext = os.path.splitext(my_input)
             if ext == "":
                 log.error("File must have an extension.")
-            new_inputs.append(FileInfo(my_input, ffmpeg, log))
+            new_inputs.append(my_input)
 
         elif my_input.startswith("http://") or my_input.startswith("https://"):
-            new_inputs.append(
-                FileInfo(download_video(my_input, args, ffmpeg, log), ffmpeg, log)
-            )
+            new_inputs.append(download_video(my_input, args, ffmpeg, log))
         else:
             if os.path.isdir(my_input):
                 log.error("Input must be a file or a URL, not a directory.")
