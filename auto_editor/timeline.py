@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from auto_editor.ffwrapper import FileInfo
+from auto_editor.ffwrapper import FFprobe
 from auto_editor.method import get_speed_list
 from auto_editor.objects import (
     AudioObj,
@@ -100,7 +100,7 @@ def _values(
 
 @dataclass
 class Timeline:
-    inputs: List[FileInfo]
+    inputs: List[FFprobe]
     fps: float
     samplerate: int
     res: Tuple[int, int]
@@ -126,7 +126,7 @@ def clipify(chunks: ChunkType, src: int) -> List[Clip]:
     return clips
 
 
-def make_av(clips: List[Clip], inp: FileInfo) -> Tuple[VSpace, ASpace]:
+def make_av(clips: List[Clip], inp: FFprobe) -> Tuple[VSpace, ASpace]:
 
     vclips: VSpace = [[]]
     aclips: ASpace = [[] for a in inp.audios]
@@ -146,7 +146,7 @@ def make_av(clips: List[Clip], inp: FileInfo) -> Tuple[VSpace, ASpace]:
 
 
 def make_layers(
-    inputs: List[FileInfo], speedlists: List[NDArray[np.float_]]
+    inputs: List[FFprobe], speedlists: List[NDArray[np.float_]]
 ) -> Tuple[int, Optional[ChunkType], VSpace, ASpace]:
 
     clips = []
@@ -170,7 +170,7 @@ def make_layers(
 
 
 def make_timeline(
-    inputs: List[FileInfo], args, sr: int, progress: ProgressBar, temp: str, log: Log
+    inputs: List[FFprobe], args, sr: int, progress: ProgressBar, temp: str, log: Log
 ) -> Timeline:
     assert len(inputs) > 0
 

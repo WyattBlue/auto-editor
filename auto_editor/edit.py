@@ -1,7 +1,7 @@
 import os
 from typing import List, Optional
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo, FFprobe
+from auto_editor.ffwrapper import FFmpeg, FFprobe
 from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.container import get_rules
 from auto_editor.utils.log import Log
@@ -39,11 +39,11 @@ def edit_media(
         from auto_editor.formats.json import read_json
 
         timeline = read_json(path_list[0], ffmpeg, log)
-        inputs: List[FileInfo] = timeline.inputs
+        inputs: List[FFprobe] = timeline.inputs
     else:
         inputs = []
         for path in path_list:
-            inputs.append(FileInfo(path, ffmpeg, log))
+            inputs.append(FFprobe(path, ffmpeg, log))
 
     del path_list
     inp = inputs[0]

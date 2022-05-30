@@ -1,6 +1,6 @@
 import sys
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FFprobe
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -19,7 +19,7 @@ def main(sys_args=sys.argv[1:]) -> None:
 
     print("")
     for input_file in args.input:
-        inp = FileInfo(input_file, ffmpeg, Log())
+        inp = FFprobe(input_file, ffmpeg, Log())
         if "description" in inp.metadata:
             print(inp.metadata["description"], end="\n\n")
         else:

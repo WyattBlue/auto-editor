@@ -8,7 +8,7 @@ from typing import List
 import auto_editor
 import auto_editor.utils.func as usefulfunctions
 from auto_editor.edit import edit_media
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.log import Log, Timer
 from auto_editor.validate_input import valid_input
 from auto_editor.vanparse import ArgumentParser

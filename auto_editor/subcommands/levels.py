@@ -6,7 +6,7 @@ from typing import Sequence
 import numpy as np
 from numpy.typing import NDArray
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FFprobe
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.vanparse import ArgumentParser
@@ -58,7 +58,7 @@ def main(sys_args=sys.argv[1:]) -> None:
     temp = tempfile.mkdtemp()
     log = Log(temp=temp)
 
-    inp = FileInfo(args.input[0], ffmpeg, log)
+    inp = FFprobe(args.input[0], ffmpeg, log)
     fps = inp.get_fps()
 
     if args.kind == "audio":

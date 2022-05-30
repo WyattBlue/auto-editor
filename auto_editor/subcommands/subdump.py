@@ -2,7 +2,7 @@ import os
 import sys
 import tempfile
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FFprobe
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -30,7 +30,7 @@ def main(sys_args=sys.argv[1:]) -> None:
     log = Log(temp=temp)
 
     for i, input_file in enumerate(args.input):
-        inp = FileInfo(input_file, ffmpeg, log)
+        inp = FFprobe(input_file, ffmpeg, log)
 
         cmd = ["-i", input_file]
         for s, sub in enumerate(inp.subtitles):

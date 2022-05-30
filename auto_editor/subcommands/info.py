@@ -4,7 +4,7 @@ import sys
 
 import av
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FFprobe
 from auto_editor.utils.func import aspect_ratio
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
@@ -44,7 +44,7 @@ def main(sys_args=sys.argv[1:]):
         if not os.path.isfile(file):
             Log().error(f"Could not find file: {file}")
 
-        inp = FileInfo(file, ffmpeg, Log())
+        inp = FFprobe(file, ffmpeg, Log())
 
         if len(inp.videos) + len(inp.audios) + len(inp.subtitles) == 0:
             file_info[file] = {"media": "invalid"}

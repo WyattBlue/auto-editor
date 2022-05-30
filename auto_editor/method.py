@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Tuple, Type, TypeVar, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from auto_editor.ffwrapper import FileInfo, FFprobe
+from auto_editor.ffwrapper import FFprobe
 from auto_editor.utils.func import (
     cook,
     set_range,
@@ -279,7 +279,7 @@ def get_has_loud(
 
 
 def get_speed_list(
-    i: int, inp: FileInfo, fps: float, args, progress: ProgressBar, temp: str, log: Log
+    i: int, inp: FFprobe, fps: float, args, progress: ProgressBar, temp: str, log: Log
 ) -> NDArray[np.float_]:
 
     start_margin, end_margin = args.frame_margin

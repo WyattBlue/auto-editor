@@ -185,6 +185,7 @@ def to_fdur(dur: Optional[str]) -> float:
         return 0
 
 
+# Figure out how to select between FileInfo and FFprobe
 class FileInfo:
     __slots__ = (
         "path",
@@ -435,6 +436,11 @@ class FFprobe:
 
                 codec = stream_data["streams"][0]["codec_name"]
 
+                # These three if statements have a lot of duplicate code, which is silly. Probably create one or more functions.
+                # Note that most of the duplication looks like: try VAR = ["streams"][0]["KEYVALUE"] except KeyError VAR = None
+                # The variable, lang, is slightly different: try VAR = ["streams"][0]["KEYVALUE_1"]["KEYVALUE_2"] except KeyError VAR = None
+                # If I can write a function that doesn't care about the difference between ["KEYVALUE"] and ["KEYVALUE_1"]["KEYVALUE_2"], then one function could be called six times.
+                # On the other hand, bitrate does additional error checking specific to bitrate and lang does error checking specific to lang, so perhaps it is better to have get_lang()
                 try:
                     bitrate = stream_data["streams"][0]["bit_rate"]
                 except KeyError:
