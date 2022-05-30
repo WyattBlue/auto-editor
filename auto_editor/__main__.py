@@ -8,7 +8,7 @@ from typing import List
 import auto_editor
 import auto_editor.utils.func as usefulfunctions
 from auto_editor.edit import edit_media
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.log import Log, Timer
 from auto_editor.validate_input import valid_input
 from auto_editor.vanparse import ArgumentParser
@@ -25,6 +25,13 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         speed_range_type,
     )
 
+    parser.add_text("Experimental Options")
+    parser.add_argument(
+        "--source-of-truth",
+        default="ffprobe",
+        choices=["ffprobe", "ffmpeg"],
+        help="Set how to get input media properties",
+    )
     parser.add_text("Object Options")
     parser.add_argument(
         "--add-text",

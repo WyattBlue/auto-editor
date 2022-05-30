@@ -20,6 +20,12 @@ def info_options(parser: ArgumentParser) -> ArgumentParser:
         flag=True,
         help="Display the number of Variable Frame Rate (VFR) frames.",
     )
+    parser.add_argument(
+        "--source-of-truth",
+        default="ffprobe",
+        choices=["ffprobe", "ffmpeg"],
+        help="Set how to get input media properties",
+    )
     parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
     parser.add_argument(
         "--my-ffmpeg",
@@ -44,7 +50,7 @@ def main(sys_args=sys.argv[1:]):
         if not os.path.isfile(file):
             Log().error(f"Could not find file: {file}")
 
-        inp = FileInfo(file, ffmpeg, Log())
+        inp = FileInfo(file, ffmpeg, Log(), args.source_of_truth)
 
         if len(inp.videos) + len(inp.audios) + len(inp.subtitles) == 0:
             file_info[file] = {"media": "invalid"}
