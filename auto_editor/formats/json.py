@@ -11,7 +11,7 @@ from typing import Union, Any
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import ChunkType
 from auto_editor.timeline import Timeline, make_av, clipify
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FFprobe
 
 
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
@@ -96,7 +96,7 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         check_file(data["source"], log)
 
         chunks = validate_chunks(data["chunks"], log)
-        inp = FileInfo(data["source"], ffmpeg, log)
+        inp = FFprobe(data["source"], ffmpeg, log)
 
         vspace, aspace = make_av(clipify(chunks, 0), inp)
 

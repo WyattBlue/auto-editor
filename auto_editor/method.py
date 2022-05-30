@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Tuple, Type, TypeVar, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from auto_editor.ffwrapper import FileInfo
+from auto_editor.ffwrapper import FileInfo, FFprobe
 from auto_editor.utils.func import (
     cook,
     set_range,
@@ -109,7 +109,7 @@ def get_stream_data(
     attrs,
     args,
     i: int,
-    inp: FileInfo,
+    inp: FFprobe,
     fps: float,
     progress: ProgressBar,
     temp: str,
@@ -175,7 +175,7 @@ def get_stream_data(
 def get_has_loud(
     method_str: str,
     i: int,
-    inp: FileInfo,
+    inp: FFprobe,
     fps: float,
     progress: ProgressBar,
     temp: str,

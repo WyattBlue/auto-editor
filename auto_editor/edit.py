@@ -1,7 +1,7 @@
 import os
 from typing import List, Optional
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo, FFprobe
 from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.container import get_rules
 from auto_editor.utils.log import Log
@@ -182,7 +182,7 @@ def edit_media(
         shotcut_xml(output, timeline)
         return output
 
-    def make_media(inp: FileInfo, timeline: Timeline, output: str) -> None:
+    def make_media(inp: FFprobe, timeline: Timeline, output: str) -> None:
         from auto_editor.output import mux_quality_media
         from auto_editor.render.video import render_av
 

@@ -1,7 +1,7 @@
 import os.path
 from typing import List, Tuple
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FFprobe
 from auto_editor.utils.container import Container
 from auto_editor.utils.log import Log
 
@@ -12,7 +12,7 @@ def fset(cmd: List[str], option: str, value: str) -> List[str]:
     return cmd + [option] + [value]
 
 
-def get_vcodec(vcodec: str, inp: FileInfo, rules: Container) -> str:
+def get_vcodec(vcodec: str, inp: FFprobe, rules: Container) -> str:
     if vcodec == "auto":
         vcodec = inp.videos[0].codec
 
@@ -31,7 +31,7 @@ def get_vcodec(vcodec: str, inp: FileInfo, rules: Container) -> str:
     return vcodec
 
 
-def get_acodec(acodec: str, inp: FileInfo, rules: Container) -> str:
+def get_acodec(acodec: str, inp: FFprobe, rules: Container) -> str:
     if acodec == "auto":
         acodec = inp.audios[0].codec
 
@@ -48,7 +48,7 @@ def get_acodec(acodec: str, inp: FileInfo, rules: Container) -> str:
     return acodec
 
 
-def video_quality(cmd: List[str], args, inp: FileInfo, rules: Container) -> List[str]:
+def video_quality(cmd: List[str], args, inp: FFprobe, rules: Container) -> List[str]:
     cmd = fset(cmd, "-b:v", args.video_bitrate)
 
     qscale = args.video_quality_scale
@@ -73,7 +73,7 @@ def mux_quality_media(
     write_file: str,
     container: str,
     args,
-    inp: FileInfo,
+    inp: FFprobe,
     temp: str,
     log: Log,
 ) -> None:

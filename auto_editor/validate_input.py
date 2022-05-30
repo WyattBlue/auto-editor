@@ -5,7 +5,7 @@ from typing import List
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.func import get_stdout
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo, FFprobe
 
 
 def get_domain(url: str) -> str:
@@ -61,11 +61,14 @@ def valid_input(inputs: List[str], ffmpeg: FFmpeg, args, log: Log) -> List[FileI
             _, ext = os.path.splitext(my_input)
             if ext == "":
                 log.error("File must have an extension.")
-            new_inputs.append(FileInfo(my_input, ffmpeg, log))
+            elif ext == ".json":
+                new_inputs.append(FileInfo(my_input, ffmpeg, log))
+            else:
+                new_inputs.append(FFprobe(my_input, ffmpeg, log))
 
         elif my_input.startswith("http://") or my_input.startswith("https://"):
             new_inputs.append(
-                FileInfo(download_video(my_input, args, ffmpeg, log), ffmpeg, log)
+                FFprobe(download_video(my_input, args, ffmpeg, log), ffmpeg, log)
             )
         else:
             if os.path.isdir(my_input):

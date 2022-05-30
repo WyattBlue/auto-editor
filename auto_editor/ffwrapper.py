@@ -17,6 +17,10 @@ from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
 
+# Lookup table: subtitle-codex_name to subtitle-file-extension
+sub_exts = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
+
+
 def regex_match(regex: str, text: str) -> Optional[str]:
     match = re.search(regex, text)
     if match:
@@ -190,7 +194,7 @@ class FileInfo:
         "name",
         "ext",
         "duration",
-        "duration_float",
+        "fdur",
         "bitrate",
         "metadata",
         "videos",
@@ -216,290 +220,292 @@ class FileInfo:
         return 48000
 
     def __init__(self, path: str, ffmpeg: FFmpeg, log: Log):
+        self.path = path
+        self.abspath = os.path.abspath(path)
+        self.basename = os.path.basename(path)
+        self.dirname = os.path.dirname(os.path.abspath(path))
+        self.name, self.ext = os.path.splitext(path)
+
+        info = get_stdout([ffmpeg.path, "-hide_banner", "-i", path])
+
+        self.duration = regex_match(r"Duration:\s(?P<match>[0-9:.]+),", info)
+        self.fdur = to_fdur(self.duration)
+        self.bitrate = regex_match(r"bitrate:\s(?P<match>[0-9]+\skb\/s)", info)
+
+        self.metadata = {}
+        active = False
+        active_key = None
+
+        for line in info.split("\n"):
+            if active:
+                if re.search(r"^\s*[A-Z][a-z_]*", line):
+                    break
+
+                key = regex_match(r"^\s*(?P<match>[a-z_]+)", line)
+                body = regex_match(r"^\s*[a-z_]*\s*:\s(?P<match>[\w\W]*)", line)
+
+                if body is not None:
+                    if key is None:
+                        if active_key is not None:
+                            self.metadata[active_key] += f"\n{body}"
+                    else:
+                        self.metadata[key] = body
+                        active_key = key
+
+            if re.search(r"^\s\sMetadata:", line):
+                active = True
+
+        fps = None
+        lang_regex = r"Stream #[0-9]+:[0-9](?:[\[\]a-z0-9]|)+\((?P<match>\w+)\)"
+
+        self.videos = []
+        self.audios = []
+        self.subtitles = []
+
+        for line in info.split("\n"):
+            if re.search(r"Stream #", line):
+                if re.search(r"Video:", line):
+                    codec = regex_match(r"Video:\s(?P<match>\w+)", line)
+                    if codec is None:
+                        log.error("Auto-Editor got 'None' when probing video codec")
+
+                    w = regex_match(r"(?P<match>[0-9]+)x[0-9]+[\s,]", line)
+                    h = regex_match(r"[0-9]+x(?P<match>[0-9]+)[\s,]", line)
+                    _fps = regex_match(r"\s(?P<match>[0-9\.]+)\stbr", line)
+
+                    if w is None or h is None:
+                        log.error("Auto-Editor got 'None' when probing resolution")
+                    if _fps is None:
+                        if codec not in ("png", "mjpeg", "webp"):
+                            log.error("Auto-Editor got 'None' when probing fps")
+                        _fps = "25"
+
+                    try:
+                        fps = float(_fps)
+                    except ValueError:
+                        log.error(f"Couldn't convert '{_fps}' to float")
+
+                    if fps < 1:
+                        log.error(
+                            f"{self.basename}: Frame rate cannot be below 1. fps: {fps}"
+                        )
+
+                    self.videos.append(
+                        VideoStream(
+                            int(w),
+                            int(h),
+                            codec,
+                            fps,
+                            bitrate=regex_match(r"\s(?P<match>[0-9]+\skb\/s)", line),
+                            lang=regex_match(lang_regex, line),
+                        )
+                    )
+                elif re.search(r"Audio:", line):
+                    _sr = regex_match(r"(?P<match>[0-9]+)\sHz", line)
+                    if _sr is None:
+                        log.error("Auto-Editor got 'None' when probing samplerate")
+
+                    codec = regex_match(r"Audio:\s(?P<match>\w+)", line)
+                    if codec is None:
+                        log.error("Auto-Editor got 'None' when probing audio codec")
+
+                    self.audios.append(
+                        AudioStream(
+                            codec,
+                            int(_sr),
+                            bitrate=regex_match(r"\s(?P<match>[0-9]+\skb\/s)", line),
+                            lang=regex_match(lang_regex, line),
+                        )
+                    )
+                elif re.search(r"Subtitle:", line):
+                    codec = regex_match(r"Subtitle:\s(?P<match>\w+)", line)
+                    if codec is None:
+                        log.error("Auto-Editor got 'None' when probing subtitle codec")
+
+                    ext = sub_exts.get(codec, "vtt")
+
+                    self.subtitles.append(
+                        SubtitleStream(codec, ext, regex_match(lang_regex, line))
+                    )
+
+
+def run_ffprobe(key_options, input_file) -> dict:
+    ffprobe_with__default_options = [
+        "FFprobe",
+        "-hide_banner",
+        "-loglevel",
+        "quiet",
+        "-print_format",
+        "json",
+    ]
+
+    command_list = ffprobe_with__default_options + key_options + ["-i", input_file]
+
+    p = subprocess.Popen(command_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = p.communicate()
+
+    if err:
+        log.warning(f"Command: {command_list}\nIncluded in stderr: {err}")
+
+    if len(out) > 0:
+        return json.loads(out)
+    else:
+        log.error("Auto-Editor could not read the media information.")
+
+
+class FFprobe:
+    __slots__ = (
+        "path",
+        "abspath",
+        "basename",
+        "dirname",
+        "name",
+        "ext",
+        "duration",
+        "fdur",
+        "bitrate",
+        "metadata",
+        "videos",
+        "audios",
+        "subtitles",
+    )
+
+    def get_res(self) -> Tuple[int, int]:
+        if len(self.videos) > 0:
+            return self.videos[0].width, self.videos[0].height
+        return 1920, 1080
+
+    def get_fps(self) -> float:
+        fps = None
+        if len(self.videos) > 0:
+            fps = self.videos[0].fps
+
+        return 30 if fps is None else fps
+
+    def get_samplerate(self) -> int:
+        if len(self.audios) > 0:
+            return self.audios[0].samplerate
+        return 48000
+
+    def __init__(self, path: str, ffmpeg: FFmpeg, log: Log):
+        self.videos = []
+        self.audios = []
+        self.subtitles = []
+
         self.path = path  # The media file location
         self.abspath = os.path.abspath(path)
         self.basename = os.path.basename(path)
         self.dirname = os.path.dirname(os.path.abspath(path))
         self.name, self.ext = os.path.splitext(path)
 
-        # add some option to switch between FFmpeg and FFprobe
-        # FFmpeg
-        # info = get_stdout([ffmpeg.path, "-hide_banner", "-i", path])
+        # Collect data about the container
+        container_keys = "format=duration,bit_rate,nb_streams:format_tags"
+        ffprobe_options = ["-show_entries", container_keys]
+        media_container_data = run_ffprobe(ffprobe_options, path)
 
-        # self.duration = regex_match(r"Duration:\s(?P<match>[0-9:.]+),", info)
-        # self.duration_float = to_fdur(self.duration)
-        # self.bitrate = regex_match(r"bitrate:\s(?P<match>[0-9]+\skb\/s)", info)
+        self.duration = media_container_data["format"]["duration"]
+        self.fdur = float(self.duration)
+        self.bitrate = media_container_data["format"]["bit_rate"]
 
-        # self.metadata = {}
-        # active = False
-        # active_key = None
+        try:
+            self.metadata = media_container_data["format"]["tags"]
+        except KeyError:
+            self.metadata = None
 
-        # for line in info.split("\n"):
-            # if active:
-                # if re.search(r"^\s*[A-Z][a-z_]*", line):
-                    # break
-
-                # key = regex_match(r"^\s*(?P<match>[a-z_]+)", line)
-                # body = regex_match(r"^\s*[a-z_]*\s*:\s(?P<match>[\w\W]*)", line)
-
-                # if body is not None:
-                    # if key is None:
-                        # if active_key is not None:
-                            # self.metadata[active_key] += f"\n{body}"
-                    # else:
-                        # self.metadata[key] = body
-                        # active_key = key
-
-            # if re.search(r"^\s\sMetadata:", line):
-                # active = True
-
-        # fps = None
-        # lang_regex = r"Stream #[0-9]+:[0-9](?:[\[\]a-z0-9]|)+\((?P<match>\w+)\)"
-        # sub_exts = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
-
-        # self.videos = []
-        # self.audios = []
-        # self.subtitles = []
-
-        # for line in info.split("\n"):
-            # if re.search(r"Stream #", line):
-                # if re.search(r"Video:", line):
-                    # codec = regex_match(r"Video:\s(?P<match>\w+)", line)
-                    # if codec is None:
-                        # log.error("Auto-Editor got 'None' when probing video codec")
-
-                    # w = regex_match(r"(?P<match>[0-9]+)x[0-9]+[\s,]", line)
-                    # h = regex_match(r"[0-9]+x(?P<match>[0-9]+)[\s,]", line)
-                    # _fps = regex_match(r"\s(?P<match>[0-9\.]+)\stbr", line)
-
-                    # if w is None or h is None:
-                        # log.error("Auto-Editor got 'None' when probing resolution")
-                    # if _fps is None:
-                        # if codec not in ("png", "mjpeg", "webp"):
-                            # log.error("Auto-Editor got 'None' when probing fps")
-                        # _fps = "25"
-
-                    # try:
-                        # fps = float(_fps)
-                    # except ValueError:
-                        # log.error(f"Couldn't convert '{fps}' to float")
-
-                    # if fps < 1:
-                        # log.error(
-                            # f"{self.basename}: Frame rate cannot be below 1. fps: {fps}"
-                        # )
-
-                    # self.videos.append(
-                        # VideoStream(
-                            # int(w),
-                            # int(h),
-                            # codec,
-                            # fps,
-                            # bitrate=regex_match(r"\s(?P<match>[0-9]+\skb\/s)", line),
-                            # lang=regex_match(lang_regex, line),
-                        # )
-                    # )
-                # elif re.search(r"Audio:", line):
-                    # _sr = regex_match(r"(?P<match>[0-9]+)\sHz", line)
-                    # if _sr is None:
-                        # log.error("Auto-Editor got 'None' when probing samplerate")
-
-                    # codec = regex_match(r"Audio:\s(?P<match>\w+)", line)
-                    # if codec is None:
-                        # log.error("Auto-Editor got 'None' when probing audio codec")
-
-                    # self.audios.append(
-                        # AudioStream(
-                            # codec,
-                            # int(_sr),
-                            # bitrate=regex_match(r"\s(?P<match>[0-9]+\skb\/s)", line),
-                            # lang=regex_match(lang_regex, line),
-                        # )
-                    # )
-                # elif re.search(r"Subtitle:", line):
-                    # codec = regex_match(r"Subtitle:\s(?P<match>\w+)", line)
-                    # if codec is None:
-                        # log.error("Auto-Editor got 'None' when probing subtitle codec")
-
-                    # ext = sub_exts.get(codec, "vtt")
-
-                    # self.subtitles.append(
-                        # SubtitleStream(codec, ext, regex_match(lang_regex, line))
-                    # )
-
-        # FFprobe
-        # What does the container look like?
-        command_with_options = [
-            "FFprobe",
-            "-hide_banner",
-            "-loglevel",
-            "quiet",
-            "-print_format",
-            "json",
-            "-show_entries",
-            "format=duration,bit_rate,nb_streams:format_tags",
-            "-i",
-            path,
-        ]
-        _raw = subprocess.Popen(
-            command_with_options, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        out, err = _raw.communicate()
-        if err:
-            log.warning(f"Command: {command_with_options}\nIncluded in stderr: {err}")
-
-        if len(out) > 0:
-            media_format_data = json.loads(out)
-        else:
-            log.error("Auto-Editor could not read the media information.")
-
-        self.duration = media_format_data["format"]["duration"]
-        self.duration_float = float(self.duration)
-        self.bitrate = media_format_data["format"]["bit_rate"]
-
-        # Simple dictionary of the container's Metadata
-        if "tags" in media_format_data["format"]:
-            self.metadata = media_format_data["format"]["tags"]
-        # Lookup table: subtitle-codex_name to subtitle-file-extension
-        sub_exts = {
-            "mov_text": "srt",
-            "ass": "ass",
-            "webvtt": "vtt",
-        }
-
-        streams_in_container = media_format_data["format"]["nb_streams"]
-        self.videos = []
-        self.audios = []
-        self.subtitles = []
+        # Collect data about each stream
         stream_keys_all_codecs = "stream=avg_frame_rate,bit_rate,codec_name,codec_type,height,index,sample_rate,width:stream_tags=language"
 
+        streams_in_container = media_container_data["format"]["nb_streams"]
         stream_index = 0
         while stream_index < streams_in_container:
-            fps = None
-
-            command_with_options = [
-                "FFprobe",
-                "-hide_banner",
-                "-loglevel",
-                "quiet",
-                "-print_format",
-                "json",
+            ffprobe_options = [
                 "-select_streams",
                 str(stream_index),
                 "-show_entries",
                 stream_keys_all_codecs,
-                "-i",
-                path,
             ]
-            _raw = subprocess.Popen(
-                command_with_options, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            out, err = _raw.communicate()
-            if err:
-                log.warning(
-                    f"Command: {command_with_options}\nIncluded in stderr: {err}"
-                )
+            stream_data = run_ffprobe(ffprobe_options, path)
 
-            if len(out) > 0:
-                stream_data = json.loads(out)
-            else:
-                log.error(
-                    f"Auto-Editor could not read the information about stream #{stream_index}"
-                )
-
-            # What type of stream is this?
-            # Stream types not accounted for here: attachments, data
-            # The data is always in list index [0]. This value is not the stream_index: the location/syntax is a confusing coincidence.
+            # [0] is the list index, not stream_index. It is always [0].
             stream_type = stream_data["streams"][0]["codec_type"]
-            # In this elif chain, the values for stream_type are in alphabetical order: audio, subtitle, video
+            # Can collect: audio, subtitle, video. Cannot collect: attachments, data.
             if stream_type == "audio":
-                _sr = stream_data["streams"][0]["sample_rate"]
-                if _sr is None:
-                    log.error("Auto-Editor got 'None' when probing samplerate")
+                samplerate = stream_data["streams"][0]["sample_rate"]
+                int(samplerate)
 
                 codec = stream_data["streams"][0]["codec_name"]
-                if codec is None:
-                    log.error("Auto-Editor got 'None' when probing audio codec")
 
-                if "bit_rate" in stream_data["streams"][0]:
+                try:
                     bitrate = stream_data["streams"][0]["bit_rate"]
-                else:
+                except KeyError:
                     bitrate = None
                 if bitrate == "N/A":
                     bitrate = None
 
-                if (
-                    "tags" in stream_data["streams"][0]
-                    and "language" in stream_data["streams"][0]["tags"]
-                ):
+                try:
                     lang = stream_data["streams"][0]["tags"]["language"]
-                else:
+                except KeyError:
+                    lang = None
+                if lang == "und":
                     lang = None
 
-                self.audios.append(AudioStream(codec, int(_sr), bitrate, lang))
+                self.audios.append(AudioStream(codec, samplerate, bitrate, lang))
             elif stream_type == "subtitle":
                 codec = stream_data["streams"][0]["codec_name"]
-                if codec is None:
-                    log.error("Auto-Editor got 'None' when probing subtitle codec")
 
                 ext = sub_exts.get(codec, "vtt")
 
-                if (
-                    "tags" in stream_data["streams"][0]
-                    and "language" in stream_data["streams"][0]["tags"]
-                ):
+                try:
                     lang = stream_data["streams"][0]["tags"]["language"]
-                else:
+                except KeyError:
+                    lang = None
+                if lang == "und":
                     lang = None
 
                 self.subtitles.append(SubtitleStream(codec, ext, lang))
             elif stream_type == "video":
                 codec = stream_data["streams"][0]["codec_name"]
-                if codec is None:
-                    log.error("Auto-Editor got 'None' when probing video codec")
-
                 w = stream_data["streams"][0]["width"]
                 h = stream_data["streams"][0]["height"]
-                if w is None or h is None:
-                    log.error("Auto-Editor got 'None' when probing resolution")
 
-                _fps = stream_data["streams"][0]["avg_frame_rate"]
-                if _fps is None or _fps == "0/0":
+                # fps = None
+                try:
+                    _fps = stream_data["streams"][0]["avg_frame_rate"]
+                except KeyError:
+                    _fps = None
+                if _fps == "0/0":
+                    _fps = None
+                if _fps is not None:
+                    _fps = Fraction(_fps)
+                    _fps = float(_fps)
+                if _fps is None:
                     if codec not in ("png", "mjpeg", "webp"):
                         log.error("Auto-Editor got 'None' when probing fps")
                     else:
                         fps = 25.00
                 else:
-                    _fps_list = _fps.split("/")
-                    _fps_list[0] = int(_fps_list[0])
-                    _fps_list[1] = int(_fps_list[1])
-                    if _fps_list[1] != 0:
-                        _fps = _fps_list[0] / _fps_list[1]
-                    else:
-                        _fps = _fps_list[0]
                     fps = round(_fps, 2)
                 if fps < 1:
                     log.error(
                         f"{self.basename}: Frame rate cannot be below 1. fps: {fps}"
                     )
 
-                if "bit_rate" in stream_data["streams"][0]:
+                try:
                     bitrate = stream_data["streams"][0]["bit_rate"]
-                else:
+                except KeyError:
                     bitrate = None
                 if bitrate == "N/A":
                     bitrate = None
 
-                if (
-                    "tags" in stream_data["streams"][0]
-                    and "language" in stream_data["streams"][0]["tags"]
-                ):
+                try:
                     lang = stream_data["streams"][0]["tags"]["language"]
-                else:
+                except KeyError:
+                    lang = None
+                if lang == "und":
                     lang = None
 
                 self.videos.append(VideoStream(w, h, codec, fps, bitrate, lang))
             else:
-                log.warning(f"Unknown codec_type in stream #{stream_index}")
+                log.warning(f"Unknown codec_type in stream #{stream_index}.")
 
             stream_index += 1  # End of while loop
