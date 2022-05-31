@@ -38,12 +38,12 @@ def edit_media(
     if path_ext == ".json":
         from auto_editor.formats.json import read_json
 
-        timeline = read_json(path_list[0], ffmpeg, log, args.source_of_truth)
+        timeline = read_json(path_list[0], ffmpeg, log)
         inputs: List[FileInfo] = timeline.inputs
     else:
         inputs = []
         for path in path_list:
-            inputs.append(FileInfo(path, ffmpeg, log, args.source_of_truth))
+            inputs.append(FileInfo(path, ffmpeg, log))
 
     del path_list
     inp = inputs[0]

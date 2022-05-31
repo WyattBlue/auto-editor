@@ -12,18 +12,13 @@ def desc_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 def main(sys_args=sys.argv[1:]) -> None:
-    parser = desc_options(ArgumentParser("desc"))
-    args = parser.parse_args(sys_args)
-
-    ffmpeg = FFmpeg(args.ffmpeg_location, debug=False)
-
-    print("")
+    args = desc_options(ArgumentParser("desc")).parse_args(sys_args)
     for input_file in args.input:
-        inp = FileInfo(input_file, ffmpeg, Log())
-        if "description" in inp.metadata:
-            print(inp.metadata["description"], end="\n\n")
+        inp = FileInfo(input_file, FFmpeg(args.ffmpeg_location, debug=False), Log())
+        if inp.description is not None:
+            sys.stdout.write(f"\n{inp.description}\n\n")
         else:
-            print("No description.", end="\n\n")
+            sys.stdout.write("\nNo description.\n\n")
 
 
 if __name__ == "__main__":

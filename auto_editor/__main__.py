@@ -25,13 +25,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         speed_range_type,
     )
 
-    parser.add_text("Experimental Options")
-    parser.add_argument(
-        "--source-of-truth",
-        default="ffprobe",
-        choices=["ffprobe", "ffmpeg"],
-        help="Set how to get input media properties",
-    )
     parser.add_text("Object Options")
     parser.add_argument(
         "--add-text",
