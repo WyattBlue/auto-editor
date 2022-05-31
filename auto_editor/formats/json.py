@@ -84,7 +84,7 @@ class Version:
         return f"{self.major}.{self.minor}.{self.micro}"
 
 
-def read_json(path: str, ffmpeg: FFmpeg, log: Log, truth: str) -> Timeline:
+def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
     with open(path, "r") as f:
         data = json.load(f)
 
@@ -96,7 +96,7 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log, truth: str) -> Timeline:
         check_file(data["source"], log)
 
         chunks = validate_chunks(data["chunks"], log)
-        inp = FileInfo(data["source"], ffmpeg, log, truth)
+        inp = FileInfo(data["source"], ffmpeg, log)
 
         vspace, aspace = make_av(clipify(chunks, 0), inp)
 
