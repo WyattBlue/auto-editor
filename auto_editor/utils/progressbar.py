@@ -1,9 +1,8 @@
 import sys
 from math import floor
-from time import time, localtime
-from shutil import get_terminal_size
 from platform import system
-
+from shutil import get_terminal_size
+from time import localtime, time
 from typing import Union
 
 from .func import get_stdout

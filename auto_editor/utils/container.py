@@ -1,6 +1,5 @@
-from typing import Optional, List, Dict, Any
-
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 pcm_formats = [
     "pcm_s16le",  # default format

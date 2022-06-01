@@ -1,5 +1,5 @@
 import os
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
@@ -7,6 +7,7 @@ from auto_editor.utils.container import get_rules
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import ChunkType
+
 
 def set_output_name(path: str, inp_ext: str, export: str) -> str:
     root, ext = os.path.splitext(path)
@@ -231,7 +232,7 @@ def edit_media(
             log.error("Timeline to complex to use clip-sequence export")
 
         total_frames = chunks[-1][1] - 1
-        from copy import deepcopy
+        from auto_editor.timeline import clipify, make_av
         from auto_editor.utils.func import append_filename
 
         def pad_chunk(chunk: Tuple[int, int, float], total_frames: int) -> ChunkType:
@@ -244,8 +245,18 @@ def edit_media(
             if chunk[2] == 99999:
                 continue
 
-            my_timeline = deepcopy(timeline)
-            my_timeline.chunks = pad_chunk(chunk, total_frames)
+            _c = pad_chunk(chunk, total_frames)
+            vspace, aspace = make_av(clipify(_c, 0), inp)
+            my_timeline = Timeline(
+                timeline.inputs,
+                timeline.fps,
+                timeline.samplerate,
+                timeline.res,
+                "#000",
+                vspace,
+                aspace,
+                _c,
+            )
 
             make_media(
                 inp,

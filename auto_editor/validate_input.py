@@ -4,9 +4,9 @@ import subprocess
 from platform import system
 from typing import List
 
-from auto_editor.utils.log import Log
-from auto_editor.utils.func import get_stdout
 from auto_editor.ffwrapper import FFmpeg
+from auto_editor.utils.func import get_stdout
+from auto_editor.utils.log import Log
 
 
 def get_domain(url: str) -> str:

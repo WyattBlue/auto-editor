@@ -45,13 +45,14 @@ Then open up your favorite text editor and apply your changes.
 
 ### Code styling
 
-Auto-Editor uses black to keep the code tidy and consistent. Install black with:
+Auto-Editor uses black and isort to keep the code tidy and consistent. Install with:
 ```
-pip install black
+pip install black isort
 ```
 
-Run black on the root folder. Do this every time you make a change.
+Run isort and black on the root folder in this order. Apply this to your code before you commit it.
 ```
+isort auto_editor
 black auto_editor
 ```
 

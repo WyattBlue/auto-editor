@@ -6,13 +6,13 @@ https://developer.apple.com/documentation/professional_video_applications/fcpxml
 
 """
 
-from platform import system
 from pathlib import Path, PureWindowsPath
-
+from platform import system
 from typing import List, Tuple, Union
 
-from .utils import indent
 from auto_editor.timeline import Timeline
+
+from .utils import indent
 
 
 def fraction(_a: Union[int, float], _fps: float) -> str:

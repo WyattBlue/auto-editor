@@ -3,7 +3,7 @@ from typing import Tuple
 import av
 import numpy as np
 from numpy.typing import NDArray
-from PIL import ImageOps, ImageChops, ImageFilter
+from PIL import ImageChops, ImageFilter, ImageOps
 
 from auto_editor.utils.progressbar import ProgressBar
 
