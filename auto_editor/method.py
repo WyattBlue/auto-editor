@@ -1,7 +1,7 @@
 import os
 import random
-from math import ceil
 from dataclasses import asdict, dataclass, fields
+from math import ceil
 from typing import Any, Callable, Dict, List, Tuple, Type, TypeVar, Union
 
 import numpy as np
@@ -9,13 +9,13 @@ from numpy.typing import NDArray
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.func import (
-    cook,
-    set_range,
     apply_margin,
     apply_mark_as,
-    to_speed_list,
+    cook,
     parse_dataclass,
     seconds_to_frames,
+    set_range,
+    to_speed_list,
 )
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar

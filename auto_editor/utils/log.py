@@ -1,8 +1,7 @@
 import sys
-from shutil import rmtree, get_terminal_size
-from time import perf_counter, sleep
 from datetime import timedelta
-
+from shutil import get_terminal_size, rmtree
+from time import perf_counter, sleep
 from typing import NoReturn, Optional
 
 

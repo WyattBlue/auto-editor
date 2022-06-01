@@ -1,7 +1,5 @@
 import re
-
-from typing import List, Tuple, Sequence, Union, Literal
-
+from typing import List, Literal, Sequence, Tuple, Union
 
 ChunkType = List[Tuple[int, int, float]]
 

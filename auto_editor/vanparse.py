@@ -1,11 +1,10 @@
+import difflib
 import re
 import sys
-import difflib
 import textwrap
 from dataclasses import dataclass
 from shutil import get_terminal_size
-
-from typing import List, Sequence, Optional, Any, Union, Dict
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import auto_editor
 from auto_editor.utils.log import Log

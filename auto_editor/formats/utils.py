@@ -1,6 +1,6 @@
 def safe_mkdir(path: str) -> str:
-    from shutil import rmtree
     from os import mkdir
+    from shutil import rmtree
 
     try:
         mkdir(path)

@@ -1,5 +1,5 @@
-from auto_editor.utils.func import aspect_ratio, to_timecode
 from auto_editor.timeline import Timeline
+from auto_editor.utils.func import aspect_ratio, to_timecode
 
 
 def timecode_to_frames(timecode: str, fps: float) -> int:

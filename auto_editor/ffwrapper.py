@@ -280,9 +280,7 @@ class FileInfo:
                         log.error("fps cannot be less than 1.")
 
                 self.videos.append(
-                    VideoStream(
-                        stream["width"], stream["height"], codec, fps, br, lang
-                    )
+                    VideoStream(stream["width"], stream["height"], codec, fps, br, lang)
                 )
             if codec_type == "audio":
                 sr = int(stream["sample_rate"])

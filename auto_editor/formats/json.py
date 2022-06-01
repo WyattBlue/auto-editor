@@ -2,16 +2,15 @@
 Make a pre-edited file reference that can be inputted back into auto-editor.
 """
 
+import json
 import os
 import sys
-import json
+from typing import Any, Union
 
-from typing import Union, Any
-
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.timeline import Timeline, clipify, make_av
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import ChunkType
-from auto_editor.timeline import Timeline, make_av, clipify
-from auto_editor.ffwrapper import FFmpeg, FileInfo
 
 
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
