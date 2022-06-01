@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+from platform import system
 from typing import List
 
 from auto_editor.utils.log import Log
@@ -40,9 +41,19 @@ def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     if args.yt_dlp_extras is not None:
         cmd.extend(args.yt_dlp_extras.split(" "))
 
-    location = get_stdout(
-        [yt_dlp_path, "--get-filename", "--no-warnings"] + cmd
-    ).strip()
+    try:
+        location = get_stdout(
+            [yt_dlp_path, "--get-filename", "--no-warnings"] + cmd
+        ).strip()
+    except FileNotFoundError:
+        msg = "Could not find program 'yt-dlp' when attempting to download a URL. Install yt-dlp with "
+        if system() == "Windows":
+            msg += "your favorite package manager (pip, choco, winget)."
+        elif system() == "Darwin":
+            msg += "brew or pip and make sure it's in PATH."
+        else:
+            msg += "pip or your favorite package manager and make sure it's in PATH."
+        log.error(msg)
 
     if not os.path.isfile(location):
         subprocess.run([yt_dlp_path] + cmd)

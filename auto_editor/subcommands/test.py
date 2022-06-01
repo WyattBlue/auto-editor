@@ -263,10 +263,6 @@ def main(sys_args: Optional[List[str]] = None):
     def high_speed_test():
         run_program(["example.mp4", "--video-speed", "99998"])
 
-    # Issue #200
-    def url_test():
-        run_program(["https://github.com/WyattBlue/auto-editor/raw/master/example.mp4"])
-
     # Issue #184
     def unit_tests():
         """
@@ -421,7 +417,7 @@ def main(sys_args: Optional[List[str]] = None):
             "wav/pcm-f32le.wav",
             "wav/pcm-s32le.wav",
             "multi-track.mov",
-            # "subtitle.mp4",
+            "subtitle.mp4",
             "testsrc.mkv",
         ):
 
@@ -431,7 +427,7 @@ def main(sys_args: Optional[List[str]] = None):
             run_program([test_file, "-exp"])
             run_program([test_file, "-exf"])
             run_program([test_file, "-exs"])
-            # run_program([test_file, "--export_as_clip_sequence"])
+            run_program([test_file, "--export_as_clip_sequence"])
             run_program([test_file, "--preview"])
             cleanup("resources")
 
@@ -573,13 +569,16 @@ def main(sys_args: Optional[List[str]] = None):
         tests.extend(
             [
                 various_errors_test,
+                render_text,
+                check_font_error,
+                effect_tests,
                 frame_rate,
                 help_tests,
                 version_test,
                 parser_test,
                 example_tests,
+                export_tests,
                 high_speed_test,
-                url_test,
                 unit_tests,
                 backwards_range_test,
                 cut_out_test,
@@ -593,17 +592,12 @@ def main(sys_args: Optional[List[str]] = None):
                 track_tests,
                 json_tests,
                 scale_tests,
-                export_tests,
                 codec_tests,
                 motion_tests,
                 edit_positive_tests,
                 edit_negative_tests,
             ]
         )
-
-        # tester.run(effect_tests, cleanup=clean_all)
-        # tester.run(render_text)
-        # tester.run(check_font_error)
 
     tester = Tester(args)
 
