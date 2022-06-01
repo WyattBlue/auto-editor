@@ -23,20 +23,20 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PIP_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PIP_PASSWORD }}
       run: |
-        mv auto_editor/ffmpeg/Windows/ffmpeg.exe ./
+        mv auto_editor/ffmpeg/Windows ./
         python setup.py bdist_wheel --plat-name=macosx_10_9_x86_64
 
         twine upload dist/*
         rm -rf dist build
 
-        mv ffmpeg.exe auto_editor/ffmpeg/Windows/
-        mv auto_editor/ffmpeg/Darwin/ffmpeg ./
+        mv Windows auto_editor/ffmpeg
+        mv auto_editor/ffmpeg/Darwin ./
 
         python setup.py bdist_wheel --plat-name=win_amd64
         twine upload dist/*
         rm -rf dist build
 
-        mv auto_editor/ffmpeg/Windows/ffmpeg.exe ./
+        mv auto_editor/ffmpeg/Windows ./
 
         python setup.py sdist bdist_wheel
         twine upload dist/*
