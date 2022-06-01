@@ -1,12 +1,12 @@
 import os
-from typing import List, Optional
+from typing import List, Tuple, Optional
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.container import get_rules
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-
+from auto_editor.utils.types import ChunkType
 
 def set_output_name(path: str, inp_ext: str, export: str) -> str:
     root, ext = os.path.splitext(path)
@@ -110,14 +110,13 @@ def edit_media(
             os.remove(output)
 
     # Extract subtitles in their native format.
-    # TODO
-    # if len(inp.subtitles) > 0:
-    #     cmd = ["-i", inp.path, "-hide_banner"]
-    #     for s, sub in enumerate(inp.subtitles):
-    #         cmd.extend(["-map", f"0:s:{s}"])
-    #     for s, sub in enumerate(inp.subtitles):
-    #         cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
-    #     ffmpeg.run(cmd)
+    if len(inp.subtitles) > 0:
+        cmd = ["-i", inp.path, "-hide_banner"]
+        for s, sub in enumerate(inp.subtitles):
+            cmd.extend(["-map", f"0:s:{s}"])
+        for s, sub in enumerate(inp.subtitles):
+            cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
+        ffmpeg.run(cmd)
 
     log.conwrite("Extracting audio")
 
@@ -226,18 +225,34 @@ def edit_media(
             ffmpeg, video_output, rules, output, output_container, args, inp, temp, log
         )
 
-    # if args.export == "clip-sequence":
-    #     total_frames = chunks[-1][1]
-    #     clip_num = 0
-    #     for chunk in chunks:
-    #         if chunk[2] == 99999:
-    #             continue
-    #         make_media(
-    #             inp,
-    #             pad_chunk(chunk, total_frames),
-    #             append_filename(output, f"-{clip_num}"),
-    #         )
-    #         clip_num += 1
-    # else:
-    make_media(inp, timeline, output)
+    if args.export == "clip-sequence":
+        chunks = timeline.chunks
+        if chunks is None:
+            log.error("Timeline to complex to use clip-sequence export")
+
+        total_frames = chunks[-1][1] - 1
+        from copy import deepcopy
+        from auto_editor.utils.func import append_filename
+
+        def pad_chunk(chunk: Tuple[int, int, float], total_frames: int) -> ChunkType:
+            start = [] if chunk[0] == 0 else [(0, chunk[0], 99999)]
+            end = [] if chunk[1] == total_frames else [(chunk[1], total_frames, 99999)]
+            return start + [chunk] + end
+
+        clip_num = 0
+        for chunk in chunks:
+            if chunk[2] == 99999:
+                continue
+
+            my_timeline = deepcopy(timeline)
+            my_timeline.chunks = pad_chunk(chunk, total_frames)
+
+            make_media(
+                inp,
+                my_timeline,
+                append_filename(output, f"-{clip_num}"),
+            )
+            clip_num += 1
+    else:
+        make_media(inp, timeline, output)
     return output
