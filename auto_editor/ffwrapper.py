@@ -25,9 +25,17 @@ class FFmpeg:
             return ff_location
         if my_ffmpeg or system() not in ("Windows", "Darwin"):
             return "ffmpeg"
-        program = "ffmpeg" if system() == "Darwin" else "ffmpeg.exe"
+
+        # Assumming accessing __file__ is somewhat expensive.
+        program = "ffmpeg.exe" if system() == "Windows" else "ffmpeg"
         dirpath = os.path.dirname(os.path.realpath(__file__))
-        return os.path.join(dirpath, "ffmpeg", system(), program)
+        file_path = os.path.join(dirpath, "ffmpeg", system(), program)
+
+        # May not exist because auto-editor doesn't bundle every architecture.
+        if os.path.isfile(file_path):
+            return file_path
+
+        return "ffmpeg"
 
     def __init__(
         self,
