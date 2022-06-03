@@ -245,8 +245,8 @@ class FileInfo:
         self.fdur = float(json_info["format"]["duration"])
         self.duration = to_timecode(self.fdur, "standard")
         self.bitrate = json_info["format"]["bit_rate"]
-        if "description" in json_info["format"]:
-            self.description = json_info["format"]["description"]
+        if "tags" in json_info["format"] and "description" in json_info["format"]["tags"]:
+            self.description = json_info["format"]["tags"]["description"]
 
         for stream in json_info["streams"]:
             lang = None
