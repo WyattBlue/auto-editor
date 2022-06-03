@@ -74,10 +74,6 @@ def remove_small(
     return has_loud
 
 
-def str_is_number(val: str) -> bool:
-    return val.replace(".", "", 1).replace("-", "", 1).isdigit()
-
-
 def str_starts_with_number(val: str) -> bool:
     if val.startswith("-"):
         val = val[1:]
@@ -109,8 +105,6 @@ def set_range(
 
 def set_range(arr, range_syntax, fps, with_, log):
     def replace_variables_to_values(val: str, fps: float, log: Log) -> int:
-        if str_is_number(val):
-            return int(val)
         if str_starts_with_number(val):
             try:
                 value, unit = split_num_str(val)
@@ -118,9 +112,10 @@ def set_range(arr, range_syntax, fps, with_, log):
                 log.error(str(e))
 
             if unit in ("", "f", "frame", "frames"):
-                if isinstance(value, float):
+                _val = float(value)
+                if int(_val) != _val:
                     log.error("float type cannot be used with frame unit")
-                return int(value)
+                return int(_val)
             if unit in ("s", "sec", "secs", "second", "seconds"):
                 return round(value * fps)
             log.error(f"Unknown unit: {unit}")

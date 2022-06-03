@@ -237,7 +237,9 @@ def edit_media(
 
         def pad_chunk(chunk: Tuple[int, int, float], total_frames: int) -> ChunkType:
             start = [] if chunk[0] == 0 else [(0, chunk[0], 99999.0)]
-            end = [] if chunk[1] == total_frames else [(chunk[1], total_frames, 99999.0)]
+            end = (
+                [] if chunk[1] == total_frames else [(chunk[1], total_frames, 99999.0)]
+            )
             return start + [chunk] + end
 
         clip_num = 0

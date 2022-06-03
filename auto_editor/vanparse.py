@@ -248,7 +248,7 @@ class ParseOptions:
         setting_req_list = requireds[0].nargs != 1
 
         option_list = []
-        op_list_name = None
+        op_list_name: Optional[str] = None
         op_list_type: Optional[type] = str
         setting_op_list = False
 

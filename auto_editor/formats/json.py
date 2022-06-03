@@ -5,7 +5,7 @@ Make a pre-edited file reference that can be inputted back into auto-editor.
 import json
 import os
 import sys
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, clipify, make_av
@@ -16,9 +16,9 @@ from auto_editor.utils.types import ChunkType
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
     if not isinstance(data, dict):
         log.error("Data is in wrong shape!")
-        for attr in attrs:
-            if attr not in data:
-                log.error(f"'{attr}' attribute not found!")
+    for attr in attrs:
+        if attr not in data:
+            log.error(f"'{attr}' attribute not found!")
 
 
 def check_file(path: str, log: Log):
@@ -35,7 +35,7 @@ def validate_chunks(chunks: object, log: Log) -> ChunkType:
 
     new_chunks = []
 
-    prev_end = None
+    prev_end: Optional[int] = None
 
     for i, chunk in enumerate(chunks):
 
