@@ -14,9 +14,11 @@ from auto_editor.utils.types import ChunkType
 
 
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
-    for attr in attrs:
-        if attr not in data:
-            log.error(f"'{attr}' attribute not found!")
+    if not isinstance(data, dict):
+        log.error("Data is in wrong shape!")
+        for attr in attrs:
+            if attr not in data:
+                log.error(f"'{attr}' attribute not found!")
 
 
 def check_file(path: str, log: Log):

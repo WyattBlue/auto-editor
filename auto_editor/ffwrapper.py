@@ -273,7 +273,7 @@ class FileInfo:
             if codec_type == "video":
                 codec = stream["codec_name"]
                 try:
-                    fps = Fraction(stream["avg_frame_rate"])
+                    fps = float(Fraction(stream["avg_frame_rate"]))
                 except ZeroDivisionError:
                     fps = 0
                 except ValueError:
