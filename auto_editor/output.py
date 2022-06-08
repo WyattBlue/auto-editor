@@ -92,7 +92,7 @@ def mux_quality_media(
     # fmt: on
 
     if a_tracks > 0:
-        if args.keep_tracks_seperate and rules.max_audios is None:
+        if args.keep_tracks_separate and rules.max_audios is None:
             for t in range(a_tracks):
                 cmd.extend(["-i", os.path.join(temp, f"new{t}.wav")])
         else:
