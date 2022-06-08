@@ -4,7 +4,7 @@ import sys
 import textwrap
 from dataclasses import dataclass
 from shutil import get_terminal_size
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import auto_editor
 from auto_editor.utils.log import Log
@@ -90,6 +90,7 @@ def get_help_data() -> Dict[str, Dict[str, str]]:
     with open(os.path.join(dirpath, "help.json"), "r") as fileobj:
         data = json.load(fileobj)
 
+    assert isinstance(data, dict)
     return data
 
 
@@ -156,14 +157,26 @@ class ArgumentParser:
     def add_blank(self) -> None:
         self.args.append(OptionText("", "blank"))
 
-    def parse_args(self, sys_args: List[str]):
-        if sys_args == []:
+    def parse_args(
+        self,
+        sys_args: List[str],
+        macros: Optional[List[Tuple[Set[str], List[str]]]] = None,
+    ):
+        if len(sys_args) == 0:
             out(get_help_data()[self.program_name]["_"])
             sys.exit()
 
-        if sys_args == ["-v"] or sys_args == ["-V"]:
-            print(f"{auto_editor.version} ({auto_editor.__version__})")
+        if len(sys_args) == 1 and sys_args[0] in ("-v", "-V"):
+            sys.stdout.write(f"{auto_editor.version} ({auto_editor.__version__})\n")
             sys.exit()
+
+        if macros is not None:
+            _macros = [(x[0].union(map(to_underscore, x[0])), x[1]) for x in macros]
+            for old_options, new in _macros:
+                for option in old_options:
+                    if option in sys_args:
+                        pos = sys_args.index(option)
+                        sys_args[pos : pos + 1] = new
 
         return ParseOptions(
             sys_args, self.program_name, self.options, self.requireds, self.args
@@ -190,17 +203,11 @@ class ParseOptions:
 
         return value
 
-    def set_arg_list(
-        self, option_list_name: Optional[str], my_list: list, list_type: Optional[type]
-    ) -> None:
-        assert option_list_name is not None
-        if list_type is not None:
-            try:
-                setattr(self, option_list_name, list(map(list_type, my_list)))
-            except (TypeError, ValueError) as e:
-                Log().error(str(e))
-        else:
-            setattr(self, option_list_name, my_list)
+    def set_arg_list(self, key: str, my_list: List[str], list_type: type) -> None:
+        try:
+            setattr(self, key, list(map(list_type, my_list)))
+        except (TypeError, ValueError) as e:
+            Log().error(str(e))
 
     def __init__(
         self,
@@ -249,7 +256,7 @@ class ParseOptions:
 
         option_list = []
         op_list_name: Optional[str] = None
-        op_list_type: Optional[type] = str
+        op_list_type: type = str
         setting_op_list = False
 
         i = 0
@@ -318,6 +325,7 @@ class ParseOptions:
             i += 1
 
         if setting_op_list:
+            assert op_list_name is not None
             self.set_arg_list(op_list_name, option_list, op_list_type)
 
         if setting_req_list:

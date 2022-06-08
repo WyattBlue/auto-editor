@@ -296,7 +296,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 def main() -> None:
-    parser = ArgumentParser("Auto-Editor")
     subcommands = ("test", "info", "levels", "grep", "subdump", "desc")
 
     if len(sys.argv) > 1 and sys.argv[1] in subcommands:
@@ -306,50 +305,18 @@ def main() -> None:
         obj.main(sys.argv[2:])
         sys.exit()
     else:
-        parser = main_options(parser)
-
-        # Preserve backwards compatibility
-
-        sys_a = sys.argv[1:]
-
-        def macro(sys_a: List[str], options: List[str], new: List[str]) -> List[str]:
-            for option in options:
-                if option in sys_a:
-                    pos = sys_a.index(option)
-                    sys_a[pos : pos + 1] = new
-            return sys_a
-
-        sys_a = macro(
-            sys_a,
-            ["--export_to_premiere", "--export-to-premiere", "-exp"],
-            ["--export", "premiere"],
+        args = main_options(ArgumentParser("Auto-Editor")).parse_args(
+            sys.argv[1:],
+            macros=[
+                ({"--export-to-premiere", "-exp"}, ["--export", "premiere"]),
+                ({"--export-to-final-cut-pro", "-exf"}, ["--export", "final-cut-pro"]),
+                ({"--export-to-shotcut", "-exs"}, ["--export", "shotcut"]),
+                ({"--export-as-json"}, ["--export", "json"]),
+                ({"--export-as-clip-sequence", "-excs"}, ["--export", "clip-sequence"]),
+                ({"--combine-files"}, []),
+                ({"--keep-tracks-seperate"}, ["--keep-tracks-separate"]),
+            ],
         )
-        sys_a = macro(
-            sys_a,
-            ["--export_to_final_cut_pro", "--export-to-final-cut-pro", "-exf"],
-            ["--export", "final-cut-pro"],
-        )
-        sys_a = macro(
-            sys_a,
-            ["--export_to_shotcut", "--export-to-shotcut", "-exs"],
-            ["--export", "shotcut"],
-        )
-        sys_a = macro(
-            sys_a, ["--export_as_json", "--export-as-json"], ["--export", "json"]
-        )
-        sys_a = macro(
-            sys_a,
-            ["--export_as_clip_sequence", "--export-as-clip-sequence", "-excs"],
-            ["--export", "clip-sequence"],
-        )
-        sys_a = macro(sys_a, ["--combine-files", "--combine_files"], [])
-        sys_a = macro(
-            sys_a,
-            ["--keep-tracks-seperate", "--keep_tracks_seperate"],
-            ["--keep-tracks-separate"],
-        )
-
-        args = parser.parse_args(sys_a)
 
     timer = Timer(args.quiet)
 
