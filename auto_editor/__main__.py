@@ -170,7 +170,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Decide which method to use when making edits.",
     )
     parser.add_argument(
-        "--keep-tracks-seperate",
+        "--keep-tracks-separate",
         flag=True,
         help="Don't combine audio tracks when exporting.",
     )
@@ -343,6 +343,11 @@ def main() -> None:
             ["--export", "clip-sequence"],
         )
         sys_a = macro(sys_a, ["--combine-files", "--combine_files"], [])
+        sys_a = macro(
+            sys_a,
+            ["--keep-tracks-seperate", "--keep_tracks_seperate"],
+            ["--keep-tracks-separate"],
+        )
 
         args = parser.parse_args(sys_a)
 

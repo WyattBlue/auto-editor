@@ -97,7 +97,7 @@ def edit_media(
         if acodec in rules.disallow_a:
             log.error(codec_error.format(acodec, output_container))
 
-    if args.keep_tracks_seperate and rules.max_audios == 1:
+    if args.keep_tracks_separate and rules.max_audios == 1:
         log.warning(
             f"'{output_container}' container doesn't support multiple audio tracks."
         )
