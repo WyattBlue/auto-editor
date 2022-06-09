@@ -3,6 +3,7 @@ from typing import List, Tuple
 
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
+from auto_editor.objects import VideoObj
 from auto_editor.utils.log import Log
 
 
@@ -25,8 +26,11 @@ def preview(timeline: Timeline, log: Log) -> None:
     out_len: float = 0
     for vclips in timeline.v:
         dur: float = 0
-        for vclip in vclips:
-            dur += vclip.dur / vclip.speed
+        for v_obj in vclips:
+            if isinstance(v_obj, VideoObj):
+                dur += v_obj.dur / v_obj.speed
+            else:
+                dur += v_obj.dur
         out_len = max(out_len, dur / fps)
     for aclips in timeline.a:
         dur = 0

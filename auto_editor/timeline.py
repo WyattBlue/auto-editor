@@ -31,8 +31,8 @@ Clip = NamedTuple(
     [("start", int), ("dur", int), ("offset", int), ("speed", float), ("src", int)],
 )
 
-Visual = Union[VideoObj, TextObj, ImageObj, RectangleObj, EllipseObj]
-VLayer = List[Visual]
+Visual = Union[TextObj, ImageObj, RectangleObj, EllipseObj]
+VLayer = List[Union[VideoObj, Visual]]
 VSpace = List[VLayer]
 
 ALayer = List[AudioObj]

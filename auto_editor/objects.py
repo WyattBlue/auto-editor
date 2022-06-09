@@ -34,10 +34,10 @@ class TextObj:
     content: str
     x: int = "centerX"  # type: ignore
     y: int = "centerY"  # type: ignore
-    size: int = 30
-    font: str = "default"
+    size: int = 55
+    font: str = "Arial"
     align: AlignType = "left"
-    fill: str = "#000"
+    fill: str = "#FFF"
     stroke: int = 0
     strokecolor: str = "#000"
 
