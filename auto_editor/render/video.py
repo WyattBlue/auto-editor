@@ -1,15 +1,24 @@
 import os.path
 import subprocess
 from fractions import Fraction
-from typing import Tuple
+from typing import Tuple, List, Union
+from dataclasses import dataclass
+from dataclasses import replace as dc_replace
 
 from auto_editor.ffwrapper import FFmpeg
-from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj
+from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
 from auto_editor.output import get_vcodec, video_quality
-from auto_editor.timeline import Timeline
+from auto_editor.timeline import Timeline, Visual
 from auto_editor.utils.encoder import encoders
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
+
+
+@dataclass
+class VideoFrame:
+    index: int
+    source: int
+
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
 allowed_pix_fmt = {
@@ -33,11 +42,6 @@ allowed_pix_fmt = {
     "bgr8",
     "pal8",
 }
-
-
-def pix_fmt_allowed(pix_fmt: str) -> bool:
-    return pix_fmt in allowed_pix_fmt
-
 
 def apply_anchor(
     x: int, y: int, width: int, height: int, anchor: str
@@ -112,12 +116,12 @@ def render_av(
         for obj in layer:
             if isinstance(obj, TextObj) and obj.font not in font_cache:
                 try:
-                    font_cache[obj.font] = ImageFont.truetype(obj.font, obj.size)
-                except OSError:
                     if obj.font == "default":
-                        font_cache["default"] = ImageFont.load_default()
+                        font_cache[obj.font] = ImageFont.load_default()
                     else:
-                        log.error(f"Font '{obj.font}' not found.")
+                        font_cache[obj.font] = ImageFont.truetype(obj.font, obj.size)
+                except OSError:
+                    log.error(f"Font '{obj.font}' not found.")
 
             if isinstance(obj, ImageObj) and obj.src not in img_cache:
                 source = Image.open(obj.src)
@@ -131,78 +135,10 @@ def render_av(
                 )
                 img_cache[obj.src] = source
 
-    def render_frame(frame, pix_fmt: str, timeline, index):
-        img = frame.to_image().convert("RGBA")
-
-        for layer in timeline.v:
-            for obj in layer:
-                obj_img = Image.new("RGBA", img.size, (255, 255, 255, 0))
-                draw = ImageDraw.Draw(obj_img)
-
-                if isinstance(obj, TextObj):
-                    text_w, text_h = draw.textsize(
-                        obj.content, font=font_cache[obj.font]
-                    )
-                    pos = apply_anchor(obj.x, obj.y, text_w, text_h, "ce")
-                    draw.text(
-                        pos,
-                        obj.content,
-                        font=font_cache[obj.font],
-                        fill=obj.fill,
-                        align=obj.align,
-                        stroke_width=obj.stroke,
-                        stroke_fill=obj.strokecolor,
-                    )
-
-                if isinstance(obj, RectangleObj):
-                    draw.rectangle(
-                        one_pos_two_pos(
-                            obj.x, obj.y, obj.width, obj.height, obj.anchor
-                        ),
-                        fill=obj.fill,
-                        width=obj.stroke,
-                        outline=obj.strokecolor,
-                    )
-
-                if isinstance(obj, EllipseObj):
-                    draw.ellipse(
-                        one_pos_two_pos(
-                            obj.x, obj.y, obj.width, obj.height, obj.anchor
-                        ),
-                        fill=obj.fill,
-                        width=obj.stroke,
-                        outline=obj.strokecolor,
-                    )
-
-                if isinstance(obj, ImageObj):
-                    img_w, img_h = img_cache[obj.src].size
-                    pos = apply_anchor(obj.x, obj.y, img_w, img_h, obj.anchor)
-                    obj_img.paste(img_cache[obj.src], pos)
-
-                img = Image.alpha_composite(img, obj_img)
-
-        return frame.from_image(img).reformat(format=pix_fmt)
-
-    chunks = timeline.chunks
-
-    if chunks is None:
-        log.error("Timeline too complex")
-
     inp = timeline.inp
-
-    if chunks[-1][2] == 99999:
-        chunks.pop()
-
-    progress.start(chunks[-1][1], "Creating new video")
-
     cn = av.open(inp.path, "r")
     pix_fmt = cn.streams.video[0].pix_fmt
-
-    target_pix_fmt = pix_fmt
-
-    if not pix_fmt_allowed(pix_fmt):
-        target_pix_fmt = "yuv420p"
-
+    target_pix_fmt = pix_fmt if pix_fmt in allowed_pix_fmt else "yuv420p"
     my_codec = get_vcodec(args.video_codec, inp, rules)
 
     apply_video_later = True
@@ -215,11 +151,8 @@ def render_av(
 
     log.debug(f"apply video quality settings now: {not apply_video_later}")
 
-    stream = cn.streams.video[0]
-    stream.thread_type = "AUTO"
-
-    width = stream.width
-    height = stream.height
+    width = inp.videos[0].width
+    height = inp.videos[0].height
 
     spedup = os.path.join(temp, "spedup0.mp4")
 
@@ -254,10 +187,8 @@ def render_av(
     )
     assert process2.stdin is not None
 
-    input_equavalent = Fraction(0, 1)
-    output_equavalent = 0
-    chunk = chunks.pop(0)
-
+    stream = cn.streams.video[0]
+    stream.thread_type = "AUTO"
     tou = int(stream.time_base.denominator / stream.average_rate)
     log.debug(f"Tou: {tou}")
 
@@ -272,46 +203,112 @@ def render_av(
         SEEK_COST = int(stream.average_rate * 5)
     SEEK_RETRY = SEEK_COST // 2
 
-    # Converting between two different framerates is a lot like applying a speed.
-    fps_convert = Fraction(stream.average_rate, Fraction(timeline.fps))
+    # New NLE method setup
+    end = 0
+    for layer in timeline.v:
+        end = max(end, layer[-1].start + layer[-1].dur)
 
+    d = cn.decode(stream)
+    progress.start(end, "Creating new video")
+
+    null_img = Image.new("RGB", (width, height), args.background)
+    null_frame = av.VideoFrame.from_image(null_img).reformat(format=pix_fmt)
+
+    frame_index = -1
     try:
-        for frame in cn.decode(stream):
-            # frame.time == frame.pts * stream.time_base
-            index = round(frame.time * timeline.fps)
-            index2 = round(frame.time * stream.average_rate)
+        for index in range(end):
+            # Add objects to obj_list
+            obj_list: List[Union[VideoFrame, Visual]] = []
+            for layer in timeline.v:
+                for obj in layer:
+                    if isinstance(obj, VideoObj):
+                        if index >= obj.start and index < obj.start + round(obj.speed * obj.dur):
+                            obj_list.append(VideoFrame(obj.offset + index - obj.start, obj.src))
+                    elif index >= obj.start and index < obj.start + obj.dur:
+                        obj_list.append(obj)
 
-            if frame.key_frame:
-                log.debug(f"Keyframe {index} {frame.pts}")
+            # Render obj_list
+            frame = null_frame
+            for obj in obj_list:
+                if isinstance(obj, VideoFrame):
+                    if frame_index > obj.index:
+                        log.debug("Seeking to beginning of file")
+                        cn.seek(0)
+                        frame = next(d)
+                        frame_index = round(frame.time * timeline.fps)
 
-            if seek_frame is not None:
-                log.debug(f"Skipped {index - seek_frame} frames")
-                frames_saved += index - seek_frame
-                seek_frame = None
+                    while frame_index < obj.index:
+                        # Check if skipping ahead is worth it.
+                        if obj.index - frame_index > SEEK_COST and frame_index > seek:
+                             seek = frame_index + SEEK_RETRY
+                             seek_frame = frame_index
+                             cn.seek(obj.index * tou, stream=stream)
 
-            if index > chunk[1]:
-                if chunks:
-                    chunk = chunks.pop(0)
+                        try:
+                            frame = next(d)
+                            frame_index = round(frame.time * timeline.fps)
+                        except StopIteration:
+                            log.warning("No source frames left!")
+                            frame = null_frame
+                            break
+
+                        if frame.key_frame:
+                            log.debug(f"Keyframe {frame_index} {frame.pts}")
+                        if seek_frame is not None:
+                            log.debug(f"Skipped {frame_index - seek_frame} frames")
+                            frames_saved += frame_index - seek_frame
+                            seek_frame = None
+
+                # Render visual objects
                 else:
-                    break
+                    img = frame.to_image().convert("RGBA")
+                    obj_img = Image.new("RGBA", img.size, (255, 255, 255, 0))
+                    draw = ImageDraw.Draw(obj_img)
 
-            if chunk[2] == 99999:
-                if chunk[1] - index2 > SEEK_COST and index2 > seek:
-                    seek = index2 + SEEK_RETRY
+                    if isinstance(obj, TextObj):
+                        text_w, text_h = draw.textsize(
+                            obj.content, font=font_cache[obj.font]
+                        )
+                        pos = apply_anchor(obj.x, obj.y, text_w, text_h, "ce")
+                        draw.text(
+                            pos,
+                            obj.content,
+                            font=font_cache[obj.font],
+                            fill=obj.fill,
+                            align=obj.align,
+                            stroke_width=obj.stroke,
+                            stroke_fill=obj.strokecolor,
+                        )
 
-                    seek_frame = index
-                    cn.seek(chunk[1] * tou, stream=stream)
-            else:
-                input_equavalent += Fraction(1, Fraction(chunk[2]) * fps_convert)
+                    if isinstance(obj, RectangleObj):
+                        draw.rectangle(
+                            one_pos_two_pos(
+                                obj.x, obj.y, obj.width, obj.height, obj.anchor
+                            ),
+                            fill=obj.fill,
+                            width=obj.stroke,
+                            outline=obj.strokecolor,
+                        )
 
-            while input_equavalent > output_equavalent:
-                # frame = render_frame(frame, target_pix_fmt, timeline, index)
-                if pix_fmt != target_pix_fmt:
-                    frame = frame.reformat(format=target_pix_fmt)
+                    if isinstance(obj, EllipseObj):
+                        draw.ellipse(
+                            one_pos_two_pos(
+                                obj.x, obj.y, obj.width, obj.height, obj.anchor
+                            ),
+                            fill=obj.fill,
+                            width=obj.stroke,
+                            outline=obj.strokecolor,
+                        )
 
-                in_bytes = frame.to_ndarray().tobytes()
-                process2.stdin.write(in_bytes)
-                output_equavalent += 1
+                    if isinstance(obj, ImageObj):
+                        img_w, img_h = img_cache[obj.src].size
+                        pos = apply_anchor(obj.x, obj.y, img_w, img_h, obj.anchor)
+                        obj_img.paste(img_cache[obj.src], pos)
+
+                    img = Image.alpha_composite(img, obj_img)
+                    frame = frame.from_image(img).reformat(format=pix_fmt)
+
+            process2.stdin.write(frame.to_ndarray().tobytes())
 
             if index % 3 == 0:
                 progress.tick(index)
@@ -326,7 +323,6 @@ def render_av(
 
     log.debug(f"Total frames saved seeking: {frames_saved}")
 
-    # Unfortunately, scaling has to be a concrete step.
     if args.scale != 1:
         sped_input = os.path.join(temp, "spedup0.mp4")
         spedup = os.path.join(temp, "scale0.mp4")

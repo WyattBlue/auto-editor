@@ -242,7 +242,7 @@ def main(sys_args: Optional[List[str]] = None):
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "mpeg4"
-            assert float(video.duration * video.time_base) == 17.633333333333333
+            assert float(video.duration * video.time_base) == 17.6
             assert cn.streams.audio[0].codec.name == "aac"
             assert cn.streams.audio[0].rate == 48000
 
@@ -253,7 +253,7 @@ def main(sys_args: Optional[List[str]] = None):
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "h264"
-            assert float(video.duration * video.time_base) == 17.633333333333333
+            assert float(video.duration * video.time_base) == 17.6
             assert cn.streams.audio[0].codec.name == "aac"
             assert cn.streams.audio[0].rate == 48000
             assert video.language == "eng"
@@ -403,11 +403,11 @@ def main(sys_args: Optional[List[str]] = None):
         os.remove("resources/testsrc_ALTERED.mp4")
 
     def render_text():
-        run_program(["example.mp4", "--add-text", "start,end,This is my text"])
+        run_program(["example.mp4", "--add-text", "0,30,This is my text,font=default"])
 
     def check_font_error():
         check_for_error(
-            ["example.mp4", "--add-text", "start,end,text,0,0,30,notafont"], "not found"
+            ["example.mp4", "--add-text", "0,30,text,0,0,30,notafont"], "not found"
         )
 
     def export_tests():
