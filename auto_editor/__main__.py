@@ -3,7 +3,6 @@
 import os
 import sys
 import tempfile
-from typing import List
 
 import auto_editor
 import auto_editor.utils.func as usefulfunctions

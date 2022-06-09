@@ -1,7 +1,6 @@
 import os
 import sys
 import tempfile
-from typing import Sequence
 
 import numpy as np
 from numpy.typing import NDArray

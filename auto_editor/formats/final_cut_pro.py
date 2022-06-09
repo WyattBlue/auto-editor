@@ -8,7 +8,7 @@ https://developer.apple.com/documentation/professional_video_applications/fcpxml
 
 from pathlib import Path, PureWindowsPath
 from platform import system
-from typing import List, Tuple, Union
+from typing import Union
 
 from auto_editor.timeline import Timeline
 

@@ -212,7 +212,7 @@ def make_timeline(
     for o in args.add_image:
         pool.append(parse_dataclass(o, ImageObj, log))
 
-    for index, obj in enumerate(pool):
+    for obj in pool:
         dic_value = asdict(obj)
         dic_type = {}
         for field in fields(obj):

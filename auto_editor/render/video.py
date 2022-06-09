@@ -1,9 +1,7 @@
 import os.path
 import subprocess
-from fractions import Fraction
 from typing import Tuple, List, Union
 from dataclasses import dataclass
-from dataclasses import replace as dc_replace
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
