@@ -576,6 +576,7 @@ def main(sys_args: Optional[List[str]] = None):
                 help_tests,
                 version_test,
                 parser_test,
+                combine,
                 example_tests,
                 export_tests,
                 high_speed_test,
