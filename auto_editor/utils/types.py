@@ -1,15 +1,15 @@
 import re
 from typing import List, Literal, Sequence, Tuple, Union
 
-ChunkType = List[Tuple[int, int, float]]
+Chunk = Tuple[int, int, float]
+Chunks = List[Chunk]
 
 
-def split_num_str(val: Union[str, int]) -> Tuple[float, str]:
-    if isinstance(val, int):
-        return val, ""
+def split_num_str(val: str) -> Tuple[float, str]:
+    NUM_CHARS = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", " ", ".", "-"}
     index = 0
     for char in val:
-        if not char.isdigit() and char not in (" ", ".", "-"):
+        if char not in NUM_CHARS:
             break
         index += 1
     num, unit = val[:index], val[index:]
@@ -39,18 +39,24 @@ def float_type(val: Union[str, float]) -> float:
 
 def sample_rate_type(val: str) -> int:
     num, unit = split_num_str(val)
-    unit_check(unit, ("Hz", "kHz", ""))
     if unit == "kHz":
         return int(num * 1000)
+    unit_check(unit, ("", "Hz"))
     return int(num)
 
 
 def frame_type(val: str) -> Union[int, str]:
     num, unit = split_num_str(val)
     if unit in ("s", "sec", "secs", "second", "seconds"):
-        return str(num).strip()
+        return str(num)
+    if unit in ("m", "min", "mins", "minute", "minutes"):
+        return str(num * 60)
+    if unit in ("h", "hour", "hours"):
+        return str(num * 3600)
 
     unit_check(unit, ("", "f", "frame", "frames"))
+    if not num.is_integer():
+        raise TypeError(f"'{val}': Frame unit doesn't accept decimals.")
     return int(num)
 
 

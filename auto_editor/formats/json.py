@@ -10,7 +10,7 @@ from typing import Any, Optional, Union
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, clipify, make_av
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import ChunkType
+from auto_editor.utils.types import Chunks
 
 
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
@@ -26,7 +26,7 @@ def check_file(path: str, log: Log):
         log.error(f"Could not locate media file: '{path}'")
 
 
-def validate_chunks(chunks: object, log: Log) -> ChunkType:
+def validate_chunks(chunks: object, log: Log) -> Chunks:
     if not isinstance(chunks, (list, tuple)):
         log.error("Chunks must be a list")
 
@@ -34,11 +34,9 @@ def validate_chunks(chunks: object, log: Log) -> ChunkType:
         log.error("Chunks are empty!")
 
     new_chunks = []
-
     prev_end: Optional[int] = None
 
     for i, chunk in enumerate(chunks):
-
         if len(chunk) != 3:
             log.error("Chunk must have a length of 3.")
 

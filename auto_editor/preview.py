@@ -1,9 +1,9 @@
 from statistics import fmean, median
 from typing import List, Tuple
 
+from auto_editor.objects import VideoObj
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
-from auto_editor.objects import VideoObj
 from auto_editor.utils.log import Log
 
 

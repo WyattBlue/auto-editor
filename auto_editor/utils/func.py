@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import ChunkType, split_num_str
+from auto_editor.utils.types import Chunks, frame_type
 
 """
 To prevent duplicate code being pasted between scripts, common functions should be
@@ -13,7 +13,7 @@ put here. Every function should be pure with no side effects.
 
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]
-def chunkify(arr: Union[np.ndarray, List[int]]) -> ChunkType:
+def chunkify(arr: Union[np.ndarray, List[int]]) -> Chunks:
     arr_length = len(arr)
 
     chunks = []
@@ -74,13 +74,6 @@ def remove_small(
     return has_loud
 
 
-def str_starts_with_number(val: str) -> bool:
-    if val.startswith("-"):
-        val = val[1:]
-    val = val.replace(".", "", 1)
-    return val[0].isdigit()
-
-
 @overload
 def set_range(
     arr: NDArray[np.float_],
@@ -105,26 +98,18 @@ def set_range(
 
 def set_range(arr, range_syntax, fps, with_, log):
     def replace_variables_to_values(val: str, fps: float, log: Log) -> int:
-        if str_starts_with_number(val):
-            try:
-                value, unit = split_num_str(val)
-            except TypeError as e:
-                log.error(str(e))
-
-            if unit in ("", "f", "frame", "frames"):
-                _val = float(value)
-                if int(_val) != _val:
-                    log.error("float type cannot be used with frame unit")
-                return int(_val)
-            if unit in ("s", "sec", "secs", "second", "seconds"):
-                return round(value * fps)
-            log.error(f"Unknown unit: {unit}")
-
         if val == "start":
             return 0
         if val == "end":
             return len(arr)
-        return log.error(f"variable '{val}' not available.")
+
+        try:
+            value = frame_type(val)
+        except TypeError as e:
+            log.error(f"{e}")
+        if isinstance(value, int):
+            return value
+        return round(float(value) * fps)
 
     for _range in range_syntax:
         pair = []

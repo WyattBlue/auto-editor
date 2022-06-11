@@ -19,7 +19,7 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import (
     AlignType,
-    ChunkType,
+    Chunks,
     align_type,
     anchor_type,
     color_type,
@@ -107,14 +107,14 @@ class Timeline:
     background: str
     v: VSpace
     a: ASpace
-    chunks: Optional[ChunkType] = None
+    chunks: Optional[Chunks] = None
 
     @property
     def inp(self):
         return self.inputs[0]
 
 
-def clipify(chunks: ChunkType, src: int) -> List[Clip]:
+def clipify(chunks: Chunks, src: int) -> List[Clip]:
     clips = []
     start = 0
     for chunk in chunks:
@@ -147,7 +147,7 @@ def make_av(clips: List[Clip], inp: FileInfo) -> Tuple[VSpace, ASpace]:
 
 def make_layers(
     inputs: List[FileInfo], speedlists: List[NDArray[np.float_]]
-) -> Tuple[int, Optional[ChunkType], VSpace, ASpace]:
+) -> Tuple[int, Optional[Chunks], VSpace, ASpace]:
 
     clips = []
     for i, _chunks in enumerate([chunkify(s) for s in speedlists]):
@@ -159,7 +159,7 @@ def make_layers(
         e = clips[-1]
         end = round(e.start + (e.dur * e.speed))
 
-    chunks: Optional[ChunkType] = None
+    chunks: Optional[Chunks] = None
     try:
         chunks = chunkify(unclipify(clips))
     except ValueError:

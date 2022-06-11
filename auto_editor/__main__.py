@@ -269,7 +269,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "-minclip",
         "-mclip",
         type=frame_type,
-        default=3,
+        default="3",
         help="Set the minimum length a clip can be. If a clip is too short, cut it.",
     )
     parser.add_argument(
@@ -277,7 +277,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "-mincut",
         "-mcut",
         type=frame_type,
-        default=6,
+        default="6",
         help="Set the minimum length a cut can be. If a cut is too short, don't cut.",
     )
     parser.add_blank()
