@@ -6,7 +6,7 @@ from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.container import get_rules
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import ChunkType
+from auto_editor.utils.types import Chunk, Chunks
 
 
 def set_output_name(path: str, inp_ext: str, export: str) -> str:
@@ -235,7 +235,7 @@ def edit_media(
         from auto_editor.timeline import clipify, make_av
         from auto_editor.utils.func import append_filename
 
-        def pad_chunk(chunk: Tuple[int, int, float], total_frames: int) -> ChunkType:
+        def pad_chunk(chunk: Chunk, total_frames: int) -> Chunks:
             start = [] if chunk[0] == 0 else [(0, chunk[0], 99999.0)]
             end = (
                 [] if chunk[1] == total_frames else [(chunk[1], total_frames, 99999.0)]

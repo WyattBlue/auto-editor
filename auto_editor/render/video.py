@@ -1,7 +1,7 @@
 import os.path
 import subprocess
-from typing import Tuple, List, Union
 from dataclasses import dataclass
+from typing import Dict, List, Tuple, Union
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
@@ -40,6 +40,7 @@ allowed_pix_fmt = {
     "bgr8",
     "pal8",
 }
+
 
 def apply_anchor(
     x: int, y: int, width: int, height: int, anchor: str
@@ -108,7 +109,7 @@ def render_av(
     except ImportError:
         log.import_error("Pillow")
 
-    font_cache = {}
+    font_cache: Dict[str, Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]] = {}
     img_cache = {}
     for layer in timeline.v:
         for obj in layer:
@@ -220,8 +221,12 @@ def render_av(
             for layer in timeline.v:
                 for obj in layer:
                     if isinstance(obj, VideoObj):
-                        if index >= obj.start and index < obj.start + round(obj.speed * obj.dur):
-                            obj_list.append(VideoFrame(obj.offset + index - obj.start, obj.src))
+                        if index >= obj.start and index < obj.start + round(
+                            obj.speed * obj.dur
+                        ):
+                            obj_list.append(
+                                VideoFrame(obj.offset + index - obj.start, obj.src)
+                            )
                     elif index >= obj.start and index < obj.start + obj.dur:
                         obj_list.append(obj)
 
@@ -238,9 +243,9 @@ def render_av(
                     while frame_index < obj.index:
                         # Check if skipping ahead is worth it.
                         if obj.index - frame_index > SEEK_COST and frame_index > seek:
-                             seek = frame_index + SEEK_RETRY
-                             seek_frame = frame_index
-                             cn.seek(obj.index * tou, stream=stream)
+                            seek = frame_index + SEEK_RETRY
+                            seek_frame = frame_index
+                            cn.seek(obj.index * tou, stream=stream)
 
                         try:
                             frame = next(d)
