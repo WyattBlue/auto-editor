@@ -1,50 +1,39 @@
 from statistics import fmean, median
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from auto_editor.objects import VideoObj
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
+from auto_editor.method import get_media_duration
 from auto_editor.utils.log import Log
 
 
-def display(secs: float) -> str:
-    return to_timecode(round(secs), "rass")
-
-
-def time_frame(title: str, frames: float, fps: float) -> None:
+def time_frame(title: str, frames: float, fps: float, per: Optional[str]=None) -> None:
     tc = to_timecode(frames / fps, "ass")
+
+    tp = 9 if tc.startswith("-") else 10
+    tcp = 12 if tc.startswith("-") else 11
     preci = 0 if int(frames) == frames else 2
-    print(f" - {f'{title}:':<10} {tc:<12} ({frames:.{preci}f})")
+    end = "" if per is None else f" {per:>7}"
+    print(f" - {f'{title}:':<{tp}} {tc:<{tcp}} {f'({frames:.{preci}f})':<6}{end}")
 
-
-def preview(timeline: Timeline, log: Log) -> None:
+def preview(timeline: Timeline, temp: str, log: Log) -> None:
     log.conwrite("")
-
     fps = timeline.fps
-    in_len = sum([inp.fdur for inp in timeline.inputs])
 
-    out_len: float = 0
-    for vclips in timeline.v:
-        dur: float = 0
-        for v_obj in vclips:
-            if isinstance(v_obj, VideoObj):
-                dur += v_obj.dur / v_obj.speed
-            else:
-                dur += v_obj.dur
-        out_len = max(out_len, dur / fps)
-    for aclips in timeline.a:
-        dur = 0
-        for aclip in aclips:
-            dur += aclip.dur / aclip.speed
-        out_len = max(out_len, dur / fps)
+    # Calculate input videos length
+    in_len = 0
+    for inp in timeline.inputs:
+        in_len += get_media_duration(inp.path, inp.get_fps(), temp, log)
+
+    out_len = timeline.out_len()
 
     diff = out_len - in_len
 
-    print(
-        f"\nlength:\n - change: ({display(in_len)}) 100% -> "
-        f"({display(out_len)}) {round((out_len / in_len) * 100, 2)}%\n "
-        f"- diff: ({display(diff)}) {round((diff / in_len) * 100, 2)}%"
-    )
+    print("\nlength:")
+    time_frame("input", in_len, fps, per="100.0%")
+    time_frame("output", out_len, fps, per=f"{round((out_len / in_len) * 100, 2)}%")
+    time_frame("diff", diff, fps, per=f"{round((diff / in_len) * 100, 2)}%")
 
     clip_lens = [clip.dur / clip.speed for clip in timeline.a[0]]
 
@@ -65,22 +54,22 @@ def preview(timeline: Timeline, log: Log) -> None:
         i += 1
 
     if len(oe) > 0 and oe[-1][1] < round(in_len * fps):
-        cut_lens.append(round(in_len * fps) - oe[-1][1])
+        cut_lens.append(in_len - oe[-1][1])
 
-    print(f"clips: {len(clip_lens)}")
     log.debug(clip_lens)
     if len(clip_lens) == 0:
         clip_lens = [0]
+    print(f"clips:\n - amount:    {len(clip_lens)}")
     time_frame("smallest", min(clip_lens), fps)
     time_frame("largest", max(clip_lens), fps)
     if len(clip_lens) > 1:
         time_frame("median", median(clip_lens), fps)
         time_frame("average", fmean(clip_lens), fps)
 
-    print(f"cuts: {len(cut_lens)}")
     log.debug(cut_lens)
     if len(cut_lens) == 0:
         cut_lens = [0]
+    print(f"cuts:\n - amount:    {len(clip_lens)}")
     time_frame("smallest", min(cut_lens), fps)
     time_frame("largest", max(cut_lens), fps)
     if len(cut_lens) > 1:

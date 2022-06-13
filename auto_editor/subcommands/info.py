@@ -96,7 +96,7 @@ def main(sys_args=sys.argv[1:]):
             sub = {"codec": stream.codec, "lang": stream.lang}
             file_info[file]["subtitle"].append(sub)
 
-        cont = {"duration": inp.duration, "bitrate": inp.bitrate}
+        cont = {"bitrate": inp.bitrate}
 
         if args.include_vfr:
             fps_mode = ffmpeg.pipe(
