@@ -113,7 +113,6 @@ class Timeline:
     def inp(self) -> FileInfo:
         return self.inputs[0]
 
-
     def out_len(self) -> float:
         out_len: float = 0
         for vclips in self.v:

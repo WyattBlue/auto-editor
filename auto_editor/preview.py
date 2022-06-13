@@ -1,14 +1,16 @@
 from statistics import fmean, median
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
+from auto_editor.method import get_media_duration
 from auto_editor.objects import VideoObj
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
-from auto_editor.method import get_media_duration
 from auto_editor.utils.log import Log
 
 
-def time_frame(title: str, frames: float, fps: float, per: Optional[str]=None) -> None:
+def time_frame(
+    title: str, frames: float, fps: float, per: Optional[str] = None
+) -> None:
     tc = to_timecode(frames / fps, "ass")
 
     tp = 9 if tc.startswith("-") else 10
@@ -16,6 +18,7 @@ def time_frame(title: str, frames: float, fps: float, per: Optional[str]=None) -
     preci = 0 if int(frames) == frames else 2
     end = "" if per is None else f" {per:>7}"
     print(f" - {f'{title}:':<{tp}} {tc:<{tcp}} {f'({frames:.{preci}f})':<6}{end}")
+
 
 def preview(timeline: Timeline, temp: str, log: Log) -> None:
     log.conwrite("")

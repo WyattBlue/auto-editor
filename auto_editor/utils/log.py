@@ -77,6 +77,7 @@ class Log:
 
     def warning(self, message: str) -> None:
         if not self.quiet:
+            self.conwrite("")
             sys.stderr.write(f"Warning! {message}\n")
 
     def print(self, message: str) -> None:
