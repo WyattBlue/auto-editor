@@ -245,13 +245,16 @@ def render_av(
                         if obj.index - frame_index > SEEK_COST and frame_index > seek:
                             seek = frame_index + SEEK_RETRY
                             seek_frame = frame_index
-                            cn.seek(obj.index * tou, stream=stream)
+                            log.debug(f"Seeking to {frame_index * tou}")
+                            cn.seek(frame_index * tou, stream=stream)
 
                         try:
                             frame = next(d)
                             frame_index = round(frame.time * timeline.fps)
                         except StopIteration:
-                            log.warning("No source frames left!")
+                            log.warning(
+                                "No source frame at current position. Using null frame"
+                            )
                             frame = null_frame
                             break
 

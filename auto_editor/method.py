@@ -54,7 +54,7 @@ def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
     if os.path.isfile(audio_path):
         sample_rate, audio_samples = read(audio_path)
         sample_rate_per_frame = sample_rate / fps
-        return ceil(audio_samples.shape[0] / sample_rate_per_frame)
+        return round(audio_samples.shape[0] / sample_rate_per_frame)
 
     import av
 
