@@ -22,8 +22,8 @@ def shotcut_xml(
         raise ValueError("Timeline too complex")
     fps = timeline.fps
     inp = timeline.inp
-    global_out = inp.duration
 
+    global_out = to_timecode(timeline.out_len() / fps, "standard")
     version = "21.05.18"
 
     with open(output, "w", encoding="utf-8") as out:

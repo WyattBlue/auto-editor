@@ -110,8 +110,26 @@ class Timeline:
     chunks: Optional[Chunks] = None
 
     @property
-    def inp(self):
+    def inp(self) -> FileInfo:
         return self.inputs[0]
+
+
+    def out_len(self) -> float:
+        out_len: float = 0
+        for vclips in self.v:
+            dur: float = 0
+            for v_obj in vclips:
+                if isinstance(v_obj, VideoObj):
+                    dur += v_obj.dur / v_obj.speed
+                else:
+                    dur += v_obj.dur
+            out_len = max(out_len, dur)
+        for aclips in self.a:
+            dur = 0
+            for aclip in aclips:
+                dur += aclip.dur / aclip.speed
+            out_len = max(out_len, dur)
+        return out_len
 
 
 def clipify(chunks: Chunks, src: int) -> List[Clip]:

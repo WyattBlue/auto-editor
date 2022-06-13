@@ -161,7 +161,7 @@ def edit_media(
     if args.preview:
         from auto_editor.preview import preview
 
-        preview(timeline, log)
+        preview(timeline, temp, log)
         return None
 
     if args.export == "json":

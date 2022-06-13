@@ -175,8 +175,6 @@ class FileInfo:
         "dirname",
         "name",
         "ext",
-        "duration",
-        "fdur",
         "bitrate",
         "description",
         "videos",
@@ -240,10 +238,8 @@ class FileInfo:
             if "format" not in json_info:
                 raise ValueError("Key 'format' not found")
         except Exception as e:
-            log.error(f"Could not read ffprobe JSON: {e}")
+            log.error(f"{path}: Could not read ffprobe JSON: {e}")
 
-        self.fdur = float(json_info["format"]["duration"])
-        self.duration = to_timecode(self.fdur, "standard")
         self.bitrate = json_info["format"]["bit_rate"]
         if (
             "tags" in json_info["format"]

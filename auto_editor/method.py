@@ -50,9 +50,7 @@ def get_attributes(attrs_str: str, dataclass: T, log: Log) -> T:
 
 
 def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
-
     audio_path = os.path.join(temp, "0-0.wav")
-
     if os.path.isfile(audio_path):
         sample_rate, audio_samples = read(audio_path)
         sample_rate_per_frame = sample_rate / fps
