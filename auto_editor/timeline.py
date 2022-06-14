@@ -134,11 +134,41 @@ class Timeline:
 def clipify(chunks: Chunks, src: int) -> List[Clip]:
     clips = []
     start = 0
+    # Add "+1" to match how chunks are rendered in 22w18a
+    i = 0
     for chunk in chunks:
         if chunk[2] != 99999:
-            dur = chunk[1] - chunk[0]
-            clips.append(Clip(start, dur, chunk[0], chunk[2], src))
+            if i == 0:
+                dur = chunk[1] - chunk[0] + 1
+                offset = chunk[0]
+            else:
+                dur = chunk[1] - chunk[0]
+                offset = chunk[0] + 1
+
+            clips.append(Clip(start, dur, offset, chunk[2], src))
             start += dur
+            i += 1
+
+    # If Chunks equals: [
+    #    (0, 26, 1.0),
+    #    (26, 34, 99999.0),
+    #    (34, 396, 1.0),
+    #    (396, 410, 99999.0),
+    #    (410, 522, 1.0), (522, 1192, 99999.0),
+    #    (1192, 1220, 1.0),
+    #    (1220, 1273, 99999.0)
+    # ]
+    # try:
+    #     assert clips == [
+    #         Clip(start=0, dur=27, offset=0, speed=1.0, src=0),
+    #         Clip(start=27, dur=362, offset=35, speed=1.0, src=0),
+    #         Clip(start=27 + 362, dur=112, offset=411, speed=1.0, src=0),
+    #         Clip(start=27 + 362 + 112, dur=28, offset=1193, speed=1.0, src=0),
+    #     ]
+    # except AssertionError:
+    #     for clip in clips:
+    #         print(clip)
+    #     quit(1)
 
     return clips
 

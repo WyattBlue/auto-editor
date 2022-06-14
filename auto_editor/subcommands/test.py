@@ -242,7 +242,7 @@ def main(sys_args: Optional[List[str]] = None):
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "mpeg4"
-            assert float(video.duration * video.time_base) == 17.6
+            assert float(video.duration * video.time_base) == 17.333333333
             assert cn.streams.audio[0].codec.name == "aac"
             assert cn.streams.audio[0].rate == 48000
 
@@ -253,7 +253,7 @@ def main(sys_args: Optional[List[str]] = None):
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "h264"
-            assert float(video.duration * video.time_base) == 17.6
+            assert float(video.duration * video.time_base) == 17.333333333
             assert cn.streams.audio[0].codec.name == "aac"
             assert cn.streams.audio[0].rate == 48000
             assert video.language == "eng"
@@ -446,21 +446,21 @@ def main(sys_args: Optional[List[str]] = None):
             video = cn.streams.video[0]
             assert video.average_rate == 15
             dur = float(video.duration * video.time_base)
-            assert dur - 17.633333333333333 < 3
+            assert dur - 17.33333333333333333333333 < 3
 
         run_program(["example.mp4", "-r", "20"])
         with av.open("example_ALTERED.mp4", "r") as cn:
             video = cn.streams.video[0]
             assert video.average_rate == 20
             dur = float(video.duration * video.time_base)
-            assert dur - 17.633333333333333 < 2
+            assert dur - 17.33333333333333333333333 < 2
 
         run_program(["example.mp4", "-r", "60"])
         with av.open("example_ALTERED.mp4", "r") as cn:
             video = cn.streams.video[0]
             assert video.average_rate == 60
             dur = float(video.duration * video.time_base)
-            assert dur - 17.633333333333333 < 0.3
+            assert dur - 17.33333333333333333333333 < 0.3
 
     def image_test():
         run_program(["resources/embedded-image/h264-png.mp4"])
