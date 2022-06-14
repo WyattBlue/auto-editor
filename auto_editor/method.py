@@ -54,7 +54,7 @@ def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
     if os.path.isfile(audio_path):
         sample_rate, audio_samples = read(audio_path)
         sample_rate_per_frame = sample_rate / fps
-        return round(audio_samples.shape[0] / sample_rate_per_frame) - 1
+        return round(audio_samples.shape[0] / sample_rate_per_frame)
 
     import av
 
@@ -115,13 +115,17 @@ def get_stream_data(
 ) -> NDArray[np.bool_]:
 
     if method == "none":
-        return np.ones((get_media_duration(inp.path, fps, temp, log)), dtype=np.bool_)
+        return np.ones(
+            (get_media_duration(inp.path, fps, temp, log) - 1), dtype=np.bool_
+        )
     if method == "all":
-        return np.zeros((get_media_duration(inp.path, fps, temp, log)), dtype=np.bool_)
+        return np.zeros(
+            (get_media_duration(inp.path, fps, temp, log) - 1), dtype=np.bool_
+        )
     if method == "random":
         if attrs.cutchance > 1 or attrs.cutchance < 0:
             log.error(f"random:cutchance must be between 0 and 1")
-        l = get_media_duration(inp.path, fps, temp, log)
+        l = get_media_duration(inp.path, fps, temp, log) - 1
 
         random.seed(attrs.seed)
         log.debug(f"Seed: {attrs.seed}")
