@@ -1,2 +1,2 @@
-__version__ = "22.22.1"
-version = "22w22a"
+__version__ = "22.24.1"
+version = "22w24a"
