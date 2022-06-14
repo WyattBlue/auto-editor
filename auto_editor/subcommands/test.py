@@ -242,7 +242,6 @@ def main(sys_args: Optional[List[str]] = None):
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "mpeg4"
-            assert float(video.duration * video.time_base) == 17.333333333
             assert cn.streams.audio[0].codec.name == "aac"
             assert cn.streams.audio[0].rate == 48000
 
@@ -253,7 +252,6 @@ def main(sys_args: Optional[List[str]] = None):
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "h264"
-            assert float(video.duration * video.time_base) == 17.333333333
             assert cn.streams.audio[0].codec.name == "aac"
             assert cn.streams.audio[0].rate == 48000
             assert video.language == "eng"
