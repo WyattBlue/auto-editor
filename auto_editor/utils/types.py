@@ -1,5 +1,6 @@
 import re
-from typing import List, Literal, Tuple, Union
+from dataclasses import dataclass, field
+from typing import List, Literal, Optional, Tuple, Union
 
 
 def _comma_coerce(name: str, val: str, num_args: int) -> List[str]:
@@ -77,7 +78,10 @@ def anchor(val: str) -> str:
     return val
 
 
-def margin(val: str) -> Tuple[Union[int, str], Union[int, str]]:
+Margin = Tuple[Union[int, str], Union[int, str]]
+
+
+def margin(val: str) -> Margin:
     vals = val.strip().split(",")
     if len(vals) == 1:
         vals.append(vals[0])
@@ -138,6 +142,58 @@ def color(val: str) -> str:
         return color
 
     raise ValueError(f"Invalid Color: '{color}'")
+
+
+@dataclass
+class MainArgs:
+    add_text: List[str] = field(default_factory=list)
+    add_rectangle: List[str] = field(default_factory=list)
+    add_ellipse: List[str] = field(default_factory=list)
+    add_image: List[str] = field(default_factory=list)
+    yt_dlp_location: str = "yt-dlp"
+    download_format: Optional[str] = None
+    output_format: Optional[str] = None
+    yt_dlp_extras: Optional[str] = None
+    video_codec: str = "auto"
+    audio_codec: str = "auto"
+    video_bitrate: str = "10m"
+    audio_bitrate: str = "unset"
+    video_quality_scale: str = "unset"
+    scale: float = 1.0
+    extras: Optional[str] = None
+    no_seek: bool = False
+    cut_out: List[str] = field(default_factory=list)
+    add_in: List[str] = field(default_factory=list)
+    mark_as_loud: List[str] = field(default_factory=list)
+    mark_as_silent: List[str] = field(default_factory=list)
+    set_speed_for_range: List[str] = field(default_factory=list)
+    frame_rate: Optional[float] = None
+    sample_rate: Optional[int] = None
+    background: str = "#000"
+    edit_based_on: str = "audio"
+    keep_tracks_separate: bool = False
+    export: str = "default"
+    no_open: bool = False
+    temp_dir: Optional[str] = None
+    ffmpeg_location: Optional[str] = None
+    my_ffmpeg: bool = False
+    progress: str = "modern"
+    version: bool = False
+    debug: bool = False
+    show_ffmpeg_debug: bool = False
+    quiet: bool = False
+    preview: bool = False
+    timeline: bool = False
+    api: str = "1.0.0"
+    silent_threshold: float = 0.04
+    frame_margin: Margin = (6, 6)
+    silent_speed: float = 99999.0
+    video_speed: float = 1.0
+    min_clip_length: Union[int, str] = 3
+    min_cut_length: Union[int, str] = 6
+    output_file: Optional[str] = None
+    help: bool = False
+    input: List[str] = field(default_factory=list)
 
 
 colormap = {

@@ -6,6 +6,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Callable, List, NoReturn, Optional, Tuple
 
@@ -17,14 +18,15 @@ from auto_editor.vanparse import ArgumentParser
 av.logging.set_level(av.logging.PANIC)
 
 
+@dataclass
+class TestArgs:
+    only: List[str] = field(default_factory=list)
+    help: bool = False
+    category: str = "cli"
+
+
 def test_options(parser):
     parser.add_argument("--only", "-n", nargs="*")
-    parser.add_argument(
-        "--help",
-        "-h",
-        flag=True,
-        help="Print info about the program or an option and exit.",
-    )
     parser.add_required(
         "category",
         nargs=1,
@@ -122,7 +124,7 @@ def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
 
 
 class Tester:
-    def __init__(self, args):
+    def __init__(self, args: TestArgs) -> None:
         self.passed_tests = 0
         self.failed_tests = 0
         self.args = args
@@ -159,12 +161,10 @@ class Tester:
 
 
 def main(sys_args: Optional[List[str]] = None):
-    parser = test_options(ArgumentParser("test"))
-
     if sys_args is None:
         sys_args = sys.argv[1:]
 
-    args = parser.parse_args(sys_args)
+    args = test_options(ArgumentParser("test")).parse_args(TestArgs, sys_args)
 
     ### Tests ###
 

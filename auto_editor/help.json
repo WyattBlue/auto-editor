@@ -10,7 +10,7 @@
     "--ffmpeg-location": "This takes precedence over `--my-ffmpeg`.",
     "--my-ffmpeg": "This is equivalent to `--ffmpeg-location ffmpeg`.",
     "--silent-threshold": "Silent threshold is a percentage where 0% represents absolute silence and 100% represents the highest volume in the media file.\nSetting the threshold to `0%` will cut only out areas where area is absolutely silence.",
-    "--frame-margin": "Margin is measured in frames, however, seconds can be used. e.g. `0.3secs`\nThe starting and ending margins can be set separately with the use of a comma. e.g. `2sec,3sec` `7,10` `-1,6`\nRange: -Infinity to Infinity",
+    "--frame-margin": "Margin is measured in frames if no units are specified. Seconds can be used. e.g. `0.3secs`\nThe starting and ending margins can be set separately with the use of a comma. e.g. `2sec,3sec` `7,10` `-1,6`\n",
     "--silent-speed": "Values <= 0 or >= 99999 are the 'cut speed'",
     "--video-speed": "Values <= 0 or >= 99999 are the 'cut speed'",
     "--min-clip-length": "Range: 0 to Infinity",
@@ -18,7 +18,7 @@
   },
   "info": {
     "_": "Retrieve information and properties about media files",
-    "--include-vfr": "A typical output looks like this:\n   - VFR:0.583394 (3204/2288) min: 41 max: 42 avg: 41\n\nThe first number is the ratio of how many VFR frames are there in total.\nThe second number is the total number of VFR frames and the third is the total number of CFR frames. Adding the second and third number will result in how many frames the video has in total."
+    "--include-vfr": "A typical output looks like this:\n   - VFR:0.583394 (3204/2288) min: 41 max: 42 avg: 41\n\nThe first number is the ratio of how many VFR frames are there.\nThe second number is the total number of VFR frames, and the third is the number of non-VFR frames. Adding the second and third number will result in how many frames the video has in total."
   },
   "levels": {
     "_": "Display loudness over time"

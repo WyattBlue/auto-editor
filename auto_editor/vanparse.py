@@ -4,16 +4,32 @@ import sys
 import textwrap
 from dataclasses import dataclass
 from shutil import get_terminal_size
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import auto_editor
 from auto_editor.utils.log import Log
+
+T = TypeVar("T", bound=Callable)
+Nargs = Union[int, Literal["*"]]
 
 
 @dataclass
 class Required:
     names: Sequence[str]
-    nargs: Union[int, str] = "*"
+    nargs: Nargs = "*"
     type: type = str
     choices: Optional[Sequence[str]] = None
     help: str = ""
@@ -23,9 +39,8 @@ class Required:
 @dataclass
 class Options:
     names: Sequence[str]
-    nargs: Union[int, str] = 1
+    nargs: Nargs = 1
     type: type = str
-    default: Optional[Union[int, str]] = None
     flag: bool = False
     choices: Optional[Sequence[str]] = None
     help: str = ""
@@ -94,7 +109,17 @@ def get_help_data() -> Dict[str, Dict[str, str]]:
     return data
 
 
-def print_option_help(program_name: str, option: Options) -> None:
+def to_underscore(name: str) -> str:
+    """Convert new style options to old style.  e.g. --hello-world -> --hello_world"""
+    return name[:2] + name[2:].replace("-", "_")
+
+
+def to_key(op: Union[Options, Required]) -> str:
+    """Convert option name to arg key.  e.g. --hello-world -> hello_world"""
+    return op.names[0][:2].replace("-", "") + op.names[0][2:].replace("-", "_")
+
+
+def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
     text = "  " + ", ".join(option.names) + f"\n    {option.help}\n\n"
 
     data = get_help_data()
@@ -110,8 +135,10 @@ def print_option_help(program_name: str, option: Options) -> None:
         if option.nargs != 1:
             text += f"    nargs: {option.nargs}\n"
 
-        if option.default is not None:
-            text += f"    default: {option.default}\n"
+        default = getattr(ns_obj, to_key(option))
+
+        if default is not None:
+            text += f"    default: {default}\n"
 
         if option.choices is not None:
             text += "    choices: " + ", ".join(option.choices) + "\n"
@@ -119,21 +146,30 @@ def print_option_help(program_name: str, option: Options) -> None:
     out(text)
 
 
-def to_underscore(name: str) -> str:
-    """Convert new style options to old style.  e.g. --hello-world -> --hello_world"""
-    return name[:2] + name[2:].replace("-", "_")
-
-
-def to_key(op: Union[Options, Required]) -> str:
-    """Convert option name to arg key.  e.g. --hello-world -> hello_world"""
-    return op.names[0][:2].replace("-", "") + op.names[0][2:].replace("-", "_")
-
-
 def get_option(name: str, options: List[Options]) -> Optional[Options]:
     for option in options:
         if name in option.names or name in map(to_underscore, option.names):
             return option
     return None
+
+
+def parse_value(option: Union[Options, Required], val: Optional[str]) -> Any:
+    if val is None and option.nargs == 1:
+        Log().error(f"{option.names[0]} needs argument.")
+
+    try:
+        value = option.type(val)
+    except TypeError as e:
+        Log().error(str(e))
+
+    if option.choices is not None and value not in option.choices:
+        my_choices = ", ".join(option.choices)
+
+        Log().error(
+            f"{value} is not a choice for {option.names[0]}\nchoices are:\n  {my_choices}"
+        )
+
+    return value
 
 
 class ArgumentParser:
@@ -159,9 +195,10 @@ class ArgumentParser:
 
     def parse_args(
         self,
+        ns_obj: T,
         sys_args: List[str],
         macros: Optional[List[Tuple[Set[str], List[str]]]] = None,
-    ):
+    ) -> T:
         if len(sys_args) == 0:
             out(get_help_data()[self.program_name]["_"])
             sys.exit()
@@ -173,52 +210,20 @@ class ArgumentParser:
         if macros is not None:
             _macros = [(x[0].union(map(to_underscore, x[0])), x[1]) for x in macros]
             for old_options, new in _macros:
-                for option in old_options:
-                    if option in sys_args:
-                        pos = sys_args.index(option)
+                for old_option in old_options:
+                    if old_option in sys_args:
+                        pos = sys_args.index(old_option)
                         sys_args[pos : pos + 1] = new
+            del _macros
+        del macros
 
-        return ParseOptions(
-            sys_args, self.program_name, self.options, self.requireds, self.args
-        )
-
-
-class ParseOptions:
-    @staticmethod
-    def parse_value(option: Union[Options, Required], val: Optional[str]) -> Any:
-        if val is None and option.nargs == 1:
-            Log().error(f"{option.names[0]} needs argument.")
-
-        try:
-            value = option.type(val)
-        except TypeError as e:
-            Log().error(str(e))
-
-        if option.choices is not None and value not in option.choices:
-            my_choices = ", ".join(option.choices)
-
-            Log().error(
-                f"{value} is not a choice for {option.names[0]}\nchoices are:\n  {my_choices}"
-            )
-
-        return value
-
-    def set_arg_list(self, key: str, my_list: List[str], list_type: type) -> None:
-        try:
-            setattr(self, key, list(map(list_type, my_list)))
-        except (TypeError, ValueError) as e:
-            Log().error(str(e))
-
-    def __init__(
-        self,
-        sys_args: List[str],
-        program_name: str,
-        options: List[Options],
-        requireds: List[Required],
-        args: List[Union[Options, OptionText]],
-    ) -> None:
-
+        ns = ns_obj()
         option_names: List[str] = []
+
+        program_name = self.program_name
+        requireds = self.requireds
+        options = self.options
+        args = self.args
 
         builtin_help = Options(
             ("--help", "-h"),
@@ -228,36 +233,16 @@ class ParseOptions:
         options.append(builtin_help)
         args.append(builtin_help)
 
-        self.help = False
-
-        # Set default attributes
-        for op in options:
-            for name in op.names:
-                option_names.append(name)
-
-            if op.flag:
-                value: Any = False
-            elif op.nargs != 1:
-                value = []
-            elif op.default is None:
-                value = None
-            else:
-                value = op.type(op.default)
-
-            setattr(self, to_key(op), value)
-
         # Figure out command line options changed by user.
         used_options: List[Options] = []
 
-        req_list = []
+        req_list: List[str] = []
         req_list_name = requireds[0].names[0]
-        req_list_type = requireds[0].type
         setting_req_list = requireds[0].nargs != 1
 
-        option_list = []
-        op_list_name: Optional[str] = None
-        op_list_type: type = str
-        setting_op_list = False
+        option_list: List[str] = []
+        oplist_name: Optional[str] = None
+        oplist_coerce = str
 
         i = 0
         while i < len(sys_args):
@@ -265,15 +250,12 @@ class ParseOptions:
             option = get_option(arg, options)
 
             if option is None:
-                if setting_op_list:
-                    option_list.append(arg)
+                if oplist_name is not None:
+                    option_list.append(oplist_coerce(arg))
 
                 elif requireds and not arg.startswith("--"):
-
                     if requireds[0].nargs == 1:
-                        setattr(
-                            self, req_list_name, self.parse_value(requireds[0], arg)
-                        )
+                        ns.__setattr__(req_list_name, parse_value(requireds[0], arg))
                         requireds.pop()
                     else:
                         req_list.append(arg)
@@ -292,45 +274,43 @@ class ParseOptions:
                         )
                     Log().error(f"Unknown {label}: {arg}")
             else:
-                if op_list_name is not None:
-                    self.set_arg_list(op_list_name, option_list, op_list_type)
+                if oplist_name is not None:
+                    ns.__setattr__(oplist_name, option_list)
 
                 if option in used_options:
                     Log().error(f"Cannot repeat option {option.names[0]} twice.")
 
                 used_options.append(option)
 
-                setting_op_list = False
                 option_list = []
-                op_list_name = None
+                oplist_name = None
+                oplist_coerce = option.type
 
                 key = to_key(option)
 
                 next_arg = None if i == len(sys_args) - 1 else sys_args[i + 1]
-                if next_arg == "-h" or next_arg == "--help":
-                    print_option_help(program_name, option)
+                if next_arg in ("-h", "--help"):
+                    print_option_help(program_name, ns_obj, option)
                     sys.exit()
 
                 if option.nargs != 1:
-                    setting_op_list = True
-                    op_list_name = key
-                    op_list_type = option.type
+                    oplist_name = key
+                    ns.__setattr__(key, parse_value(option, next_arg))
                 elif option.flag:
-                    value = True
+                    ns.__setattr__(key, True)
                 else:
-                    value = self.parse_value(option, next_arg)
+                    ns.__setattr__(key, parse_value(option, next_arg))
                     i += 1
-                setattr(self, key, value)
-
             i += 1
 
-        if setting_op_list:
-            assert op_list_name is not None
-            self.set_arg_list(op_list_name, option_list, op_list_type)
+        if oplist_name is not None:
+            ns.__setattr__(oplist_name, option_list)
 
         if setting_req_list:
-            self.set_arg_list(req_list_name, req_list, req_list_type)
+            ns.__setattr__(req_list_name, req_list)
 
-        if self.help:
+        if ns.help:
             print_program_help(requireds, args)
             sys.exit()
+
+        return ns

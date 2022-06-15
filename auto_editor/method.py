@@ -2,7 +2,7 @@ import os
 import random
 from dataclasses import asdict, dataclass, fields
 from math import ceil
-from typing import Any, Callable, Dict, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -207,7 +207,7 @@ def get_has_loud(
     KEYWORD_SEP = " "
     METHOD_ATTRS_SEP = ":"
 
-    result_array = None
+    result_array: Optional[NDArray[np.bool_]] = None
     operand = None
 
     logic_funcs = {

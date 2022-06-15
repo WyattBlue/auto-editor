@@ -2,10 +2,26 @@ import os
 import re
 import sys
 import tempfile
+from dataclasses import dataclass, field
+from typing import List, Optional, Type
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
+
+
+@dataclass
+class GrepArgs:
+    no_filename: bool = False
+    max_count: Optional[int] = None
+    count: bool = False
+    ignore_case: bool = False
+    timecode: bool = False
+    time: bool = False
+    ffmpeg_location: Optional[str] = None
+    my_ffmpeg: bool = False
+    help: bool = False
+    input: List[str] = field(default_factory=list)
 
 
 def grep_options(parser: ArgumentParser) -> ArgumentParser:
@@ -54,7 +70,12 @@ def cleanhtml(raw_html: str) -> str:
 
 
 def grep_file(
-    media_file: str, add_prefix: bool, ffmpeg: FFmpeg, args, log: Log, TEMP: str
+    media_file: str,
+    add_prefix: bool,
+    ffmpeg: FFmpeg,
+    args: Type[GrepArgs],
+    log: Log,
+    TEMP: str,
 ) -> None:
 
     """
@@ -76,9 +97,6 @@ def grep_file(
     if add_prefix:
         prefix = f"{os.path.splitext(os.path.basename(media_file))[0]}:"
 
-    if args.max_count is None:
-        args.max_count = float("inf")
-
     timecode = ""
     line_number = -1
     with open(out_file, "r") as file:
@@ -88,7 +106,7 @@ def grep_file(
             if line_number == 0:
                 continue
 
-            if not line or count >= args.max_count:
+            if not line or (args.max_count is not None and count >= args.max_count):
                 break
 
             if line.strip() == "":
@@ -118,9 +136,7 @@ def grep_file(
 
 
 def main(sys_args=sys.argv[1:]) -> None:
-    parser = grep_options(ArgumentParser("grep"))
-    args = parser.parse_args(sys_args)
-
+    args = grep_options(ArgumentParser("grep")).parse_args(GrepArgs, sys_args)
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
 
     TEMP = tempfile.mkdtemp()
