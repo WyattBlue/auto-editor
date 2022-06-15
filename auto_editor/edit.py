@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional, Tuple, Type
+from typing import List, Optional, Type
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline

@@ -2,7 +2,6 @@ from statistics import fmean, median
 from typing import List, Optional, Tuple
 
 from auto_editor.method import get_media_duration
-from auto_editor.objects import VideoObj
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
