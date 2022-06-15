@@ -1,11 +1,17 @@
 import re
-from typing import List, Literal, Sequence, Tuple, Union
-
-Chunk = Tuple[int, int, float]
-Chunks = List[Chunk]
+from typing import List, Literal, Tuple, Union
 
 
-def split_num_str(val: str) -> Tuple[float, str]:
+def _comma_coerce(name: str, val: str, num_args: int) -> List[str]:
+    vals = val.strip().split(",")
+    if num_args > len(vals):
+        raise TypeError(f"Too few arguments for {name}.")
+    if len(vals) > num_args:
+        raise TypeError(f"Too many arguments for {name}.")
+    return vals
+
+
+def _split_num_str(val: str) -> Tuple[float, str]:
     NUM_CHARS = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", " ", ".", "-"}
     index = 0
     for char in val:
@@ -21,32 +27,36 @@ def split_num_str(val: str) -> Tuple[float, str]:
     return float(num), unit
 
 
-def unit_check(unit: str, allowed_units: Sequence[str]) -> None:
+def _unit_check(unit: str, allowed_units: Tuple[str, ...]) -> None:
     if unit not in allowed_units:
         raise TypeError(f"Unknown unit: '{unit}'")
 
 
-def float_type(val: Union[str, float]) -> float:
+Chunk = Tuple[int, int, float]
+Chunks = List[Chunk]
+
+
+def number(val: Union[str, float]) -> float:
     if not isinstance(val, str):
         return val
 
-    num, unit = split_num_str(val)
-    unit_check(unit, ("%", ""))
+    num, unit = _split_num_str(val)
+    _unit_check(unit, ("%", ""))
     if unit == "%":
         return num / 100
     return num
 
 
-def sample_rate_type(val: str) -> int:
-    num, unit = split_num_str(val)
+def sample_rate(val: str) -> int:
+    num, unit = _split_num_str(val)
     if unit == "kHz":
         return int(num * 1000)
-    unit_check(unit, ("", "Hz"))
+    _unit_check(unit, ("", "Hz"))
     return int(num)
 
 
-def frame_type(val: str) -> Union[int, str]:
-    num, unit = split_num_str(val)
+def time(val: str) -> Union[int, str]:
+    num, unit = _split_num_str(val)
     if unit in ("s", "sec", "secs", "second", "seconds"):
         return str(num)
     if unit in ("m", "min", "mins", "minute", "minutes"):
@@ -54,49 +64,40 @@ def frame_type(val: str) -> Union[int, str]:
     if unit in ("h", "hour", "hours"):
         return str(num * 3600)
 
-    unit_check(unit, ("", "f", "frame", "frames"))
+    _unit_check(unit, ("", "f", "frame", "frames"))
     if not num.is_integer():
-        raise TypeError(f"'{val}': Frame unit doesn't accept decimals.")
+        raise TypeError(f"'{val}': Frame unit doesn't accept non-ints.")
     return int(num)
 
 
-def anchor_type(val: str) -> str:
+def anchor(val: str) -> str:
     allowed = ("tl", "tr", "bl", "br", "ce")
     if val not in allowed:
         raise TypeError("Anchor must be: " + " ".join(allowed))
     return val
 
 
-def margin_type(val: str) -> Tuple[Union[int, str], Union[int, str]]:
+def margin(val: str) -> Tuple[Union[int, str], Union[int, str]]:
     vals = val.strip().split(",")
     if len(vals) == 1:
         vals.append(vals[0])
     if len(vals) != 2:
         raise TypeError("--margin has too many arguments.")
-    return frame_type(vals[0]), frame_type(vals[1])
+    return time(vals[0]), time(vals[1])
 
 
-def comma_type(name: str, val: str, min_args: int, max_args: int) -> List[str]:
-    vals = val.strip().split(",")
-    if min_args > len(vals):
-        raise TypeError(f"Too few arguments for {name}.")
-    if len(vals) > max_args:
-        raise TypeError(f"Too many arguments for {name}.")
-    return vals
+def time_range(val: str) -> List[str]:
+    return _comma_coerce("time_range", val, 2)
 
 
-def range_type(val: str) -> List[str]:
-    return comma_type("range_type", val, 2, 2)
+def speed_range(val: str) -> List[str]:
+    return _comma_coerce("speed_range", val, 3)
 
 
-def speed_range_type(val: str) -> List[str]:
-    return comma_type("speed_range_type", val, 3, 3)
+Align = Literal["left", "center", "right"]
 
 
-AlignType = Literal["left", "center", "right"]
-
-
-def align_type(val: str) -> AlignType:
+def align(val: str) -> Align:
     if val == "left":
         return "left"
     if val == "center":
@@ -106,7 +107,16 @@ def align_type(val: str) -> AlignType:
     raise TypeError("Align must be 'left', 'right', or 'center'")
 
 
-def color_type(val: str) -> str:
+Stream = Union[int, Literal["all"]]
+
+
+def stream(val: str) -> Stream:
+    if val == "all":
+        return "all"
+    return int(val)
+
+
+def color(val: str) -> str:
     """
     Convert a color str into an RGB tuple
 
@@ -128,15 +138,6 @@ def color_type(val: str) -> str:
         return color
 
     raise ValueError(f"Invalid Color: '{color}'")
-
-
-StreamType = Union[int, Literal["all"]]
-
-
-def stream_type(val: str) -> StreamType:
-    if val == "all":
-        return "all"
-    return int(val)
 
 
 colormap = {

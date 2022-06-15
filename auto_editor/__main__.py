@@ -15,13 +15,13 @@ from auto_editor.vanparse import ArgumentParser
 
 def main_options(parser: ArgumentParser) -> ArgumentParser:
     from auto_editor.utils.types import (
-        color_type,
-        float_type,
-        frame_type,
-        margin_type,
-        range_type,
-        sample_rate_type,
-        speed_range_type,
+        color,
+        margin,
+        number,
+        sample_rate,
+        speed_range,
+        time,
+        time_range,
     )
 
     parser.add_text("Object Options")
@@ -94,7 +94,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_argument(
         "--scale",
-        type=float_type,
+        type=number,
         default=1,
         help="Scale the input video's resolution by the given factor.",
     )
@@ -110,34 +110,34 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_text("Manual Editing Options")
     parser.add_argument(
         "--cut-out",
-        type=range_type,
+        type=time_range,
         nargs="*",
         help="The range of media that will be removed completely, regardless of the "
         "value of silent speed.",
     )
     parser.add_argument(
         "--add-in",
-        type=range_type,
+        type=time_range,
         nargs="*",
         help="The range of media that will be added in, opposite of --cut-out",
     )
     parser.add_blank()
     parser.add_argument(
         "--mark-as-loud",
-        type=range_type,
+        type=time_range,
         nargs="*",
         help='The range that will be marked as "loud".',
     )
     parser.add_argument(
         "--mark-as-silent",
-        type=range_type,
+        type=time_range,
         nargs="*",
         help='The range that will be marked as "silent".',
     )
     parser.add_argument(
         "--set-speed-for-range",
         "--set-speed",
-        type=speed_range_type,
+        type=speed_range,
         nargs="*",
         help="SPEED,START,STOP - Set an arbitrary speed for a given range.",
     )
@@ -152,12 +152,12 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--sample-rate",
         "-ar",
-        type=sample_rate_type,
+        type=sample_rate,
         help="Set the sample rate for the timeline and output media.",
     )
     parser.add_argument(
         "--background",
-        type=color_type,
+        type=color,
         default="#000",
         help="Set the color of the background that is visible when the video is moved.",
     )
@@ -237,7 +237,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--silent-threshold",
         "-t",
-        type=float_type,
+        type=number,
         default=0.04,
         help="Set the volume that frames audio needs to surpass to be marked loud.",
     )
@@ -245,14 +245,14 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--frame-margin",
         "--margin",
         "-m",
-        type=margin_type,
+        type=margin,
         default="6",
         help='Set how many "silent" frames on either side of the "loud" sections to include.',
     )
     parser.add_argument(
         "--silent-speed",
         "-s",
-        type=float_type,
+        type=number,
         default=99999,
         help='Set the speed that "silent" sections should be played at.',
     )
@@ -260,7 +260,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--video-speed",
         "--sounded-speed",
         "-v",
-        type=float_type,
+        type=number,
         default=1,
         help='Set the speed that "loud" sections should be played at.',
     )
@@ -268,7 +268,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--min-clip-length",
         "-minclip",
         "-mclip",
-        type=frame_type,
+        type=time,
         default="3",
         help="Set the minimum length a clip can be. If a clip is too short, cut it.",
     )
@@ -276,7 +276,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--min-cut-length",
         "-mincut",
         "-mcut",
-        type=frame_type,
+        type=time,
         default="6",
         help="Set the minimum length a cut can be. If a cut is too short, don't cut.",
     )
