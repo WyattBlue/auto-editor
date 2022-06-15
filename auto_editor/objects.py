@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from auto_editor.utils.types import AlignType
+from auto_editor.utils.types import Align
 
 # start - When the clip starts in the timeline
 # dur - The duration of the clip in the timeline before speed is applied
@@ -36,7 +36,7 @@ class TextObj:
     y: int = "centerY"  # type: ignore
     size: int = 55
     font: str = "Arial"
-    align: AlignType = "left"
+    align: Align = "left"
     fill: str = "#FFF"
     stroke: int = 0
     strokecolor: str = "#000"

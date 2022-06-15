@@ -17,14 +17,7 @@ from auto_editor.objects import (
 from auto_editor.utils.func import chunkify, parse_dataclass
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import (
-    AlignType,
-    Chunks,
-    align_type,
-    anchor_type,
-    color_type,
-    float_type,
-)
+from auto_editor.utils.types import Align, Chunks, align, anchor, color, number
 
 Clip = NamedTuple(
     "Clip",
@@ -75,13 +68,13 @@ def _values(
     if _type is Any:
         return None
     if _type is float and name != "rotate":
-        _type = float_type
-    elif _type == AlignType:
-        _type = align_type
+        _type = number
+    elif _type == Align:
+        _type = align
     elif name == "anchor":
-        _type = anchor_type
+        _type = anchor
     elif name in ("fill", "strokecolor"):
-        _type = color_type
+        _type = color
 
     if _type is int:
         for key, item in _vars.items():

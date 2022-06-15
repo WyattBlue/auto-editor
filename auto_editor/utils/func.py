@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import Chunks, frame_type
+from auto_editor.utils.types import Chunks, time
 
 """
 To prevent duplicate code being pasted between scripts, common functions should be
@@ -104,7 +104,7 @@ def set_range(arr, range_syntax, fps, with_, log):
             return len(arr)
 
         try:
-            value = frame_type(val)
+            value = time(val)
         except TypeError as e:
             log.error(f"{e}")
         if isinstance(value, int):

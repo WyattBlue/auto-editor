@@ -19,7 +19,7 @@ from auto_editor.utils.func import (
 )
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import StreamType, float_type, stream_type
+from auto_editor.utils.types import Stream, number, stream
 from auto_editor.wavfile import read
 
 T = TypeVar("T")
@@ -37,9 +37,9 @@ def get_attributes(attrs_str: str, dataclass: T, log: Log) -> T:
     for k, _type in dic_type.items():
 
         if _type == float:
-            _type = float_type
-        elif _type == StreamType:
-            _type = stream_type
+            _type = number
+        elif _type == Stream:
+            _type = stream
 
         try:
             attrs.__setattr__(k, _type(dic_value[k]))
@@ -186,7 +186,7 @@ def get_has_loud(
 ) -> NDArray[np.bool_]:
     @dataclass
     class Audio:
-        stream: StreamType = 0
+        stream: Stream = 0
         threshold: float = args.silent_threshold
 
     @dataclass
