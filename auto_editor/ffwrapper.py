@@ -9,7 +9,7 @@ from re import search
 from subprocess import PIPE, Popen
 from typing import List, Optional, Tuple
 
-from auto_editor.utils.func import get_stdout, to_timecode
+from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
 IMG_CODECS = ("png", "mjpeg", "webp")
