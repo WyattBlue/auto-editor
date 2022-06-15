@@ -1,6 +1,8 @@
 import os
 import sys
 import tempfile
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,17 +13,25 @@ from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.vanparse import ArgumentParser
 
 
+@dataclass
+class LevelArgs:
+    kind: str = "audio"
+    track: int = 0
+    ffmpeg_location: Optional[str] = None
+    my_ffmpeg: bool = False
+    help: bool = False
+    input: List[str] = field(default_factory=list)
+
+
 def levels_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--kind",
-        default="audio",
         choices=["audio", "motion", "pixeldiff"],
         help="Select the kind of detection to analyze.",
     )
     parser.add_argument(
         "--track",
         type=int,
-        default=0,
         help="Select the track to get. If `--kind` is set to motion, track will look "
         "at video tracks instead of audio.",
     )
@@ -49,7 +59,7 @@ def print_int_list(arr: NDArray[np.uint64]) -> None:
 
 def main(sys_args=sys.argv[1:]) -> None:
     parser = levels_options(ArgumentParser("levels"))
-    args = parser.parse_args(sys_args)
+    args = parser.parse_args(LevelArgs, sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 

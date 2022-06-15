@@ -112,6 +112,7 @@ def set_range(arr, range_syntax, fps, with_, log):
         return round(float(value) * fps)
 
     for _range in range_syntax:
+        print(_range)
         pair = []
         for val in _range:
             num = replace_variables_to_values(val, fps, log)

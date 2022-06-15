@@ -9,6 +9,7 @@ import auto_editor.utils.func as usefulfunctions
 from auto_editor.edit import edit_media
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.log import Log, Timer
+from auto_editor.utils.types import MainArgs
 from auto_editor.validate_input import valid_input
 from auto_editor.vanparse import ArgumentParser
 
@@ -46,9 +47,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Add an image object onto the timeline.",
     )
     parser.add_text("URL Download Options")
-    parser.add_argument(
-        "--yt-dlp-location", default="yt-dlp", help="Set a custom path to yt-dlp."
-    )
+    parser.add_argument("--yt-dlp-location", help="Set a custom path to yt-dlp.")
     parser.add_argument(
         "--download-format", help="Set the yt-dlp download format. (--format, -f)"
     )
@@ -63,39 +62,33 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--video-codec",
         "-vcodec",
         "-c:v",
-        default="auto",
         help="Set the video codec for the output media file.",
     )
     parser.add_argument(
         "--audio-codec",
         "-acodec",
         "-c:a",
-        default="auto",
         help="Set the audio codec for the output media file.",
     )
     parser.add_argument(
         "--video-bitrate",
         "-b:v",
-        default="10m",
         help="Set the number of bits per second for video.",
     )
     parser.add_argument(
         "--audio-bitrate",
         "-b:a",
-        default="unset",
         help="Set the number of bits per second for audio.",
     )
     parser.add_argument(
         "--video-quality-scale",
         "-qscale:v",
         "-q:v",
-        default="unset",
         help="Set a value to the ffmpeg option -qscale:v",
     )
     parser.add_argument(
         "--scale",
         type=number,
-        default=1,
         help="Scale the input video's resolution by the given factor.",
     )
     parser.add_argument(
@@ -158,14 +151,12 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--background",
         type=color,
-        default="#000",
         help="Set the color of the background that is visible when the video is moved.",
     )
     parser.add_text("Select Editing Source Options")
     parser.add_argument(
         "--edit-based-on",
         "--edit",
-        default="audio",
         help="Decide which method to use when making edits.",
     )
     parser.add_argument(
@@ -176,7 +167,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--export",
         "-ex",
-        default="default",
         choices=[
             "default",
             "premiere",
@@ -208,7 +198,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_text("Display Options")
     parser.add_argument(
         "--progress",
-        default="modern",
         choices=["modern", "classic", "ascii", "machine", "none"],
         help="Set what type of progress bar to use.",
     )
@@ -228,17 +217,12 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--timeline", flag=True, help="Show auto-editor JSON timeline file and halt."
     )
-    parser.add_argument(
-        "--api",
-        default="1.0.0",
-        help="Set what version of the JSON timeline to output.",
-    )
+    parser.add_argument("--api", help="Set what version of the timeline to use.")
     parser.add_text("Global Editing Options")
     parser.add_argument(
         "--silent-threshold",
         "-t",
         type=number,
-        default=0.04,
         help="Set the volume that frames audio needs to surpass to be marked loud.",
     )
     parser.add_argument(
@@ -246,14 +230,12 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--margin",
         "-m",
         type=margin,
-        default="6",
         help='Set how many "silent" frames on either side of the "loud" sections to include.',
     )
     parser.add_argument(
         "--silent-speed",
         "-s",
         type=number,
-        default=99999,
         help='Set the speed that "silent" sections should be played at.',
     )
     parser.add_argument(
@@ -261,7 +243,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--sounded-speed",
         "-v",
         type=number,
-        default=1,
         help='Set the speed that "loud" sections should be played at.',
     )
     parser.add_argument(
@@ -269,7 +250,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "-minclip",
         "-mclip",
         type=time,
-        default="3",
         help="Set the minimum length a clip can be. If a clip is too short, cut it.",
     )
     parser.add_argument(
@@ -277,7 +257,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "-mincut",
         "-mcut",
         type=time,
-        default="6",
         help="Set the minimum length a cut can be. If a cut is too short, don't cut.",
     )
     parser.add_blank()
@@ -305,6 +284,7 @@ def main() -> None:
         sys.exit()
     else:
         args = main_options(ArgumentParser("Auto-Editor")).parse_args(
+            MainArgs,
             sys.argv[1:],
             macros=[
                 ({"--export-to-premiere", "-exp"}, ["--export", "premiere"]),

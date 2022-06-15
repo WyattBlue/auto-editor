@@ -1,9 +1,10 @@
 import os.path
-from typing import List, Tuple
+from typing import List, Tuple, Type
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.container import Container
 from auto_editor.utils.log import Log
+from auto_editor.utils.types import MainArgs
 
 
 def fset(cmd: List[str], option: str, value: str) -> List[str]:
@@ -48,12 +49,14 @@ def get_acodec(acodec: str, inp: FileInfo, rules: Container) -> str:
     return acodec
 
 
-def video_quality(cmd: List[str], args, inp: FileInfo, rules: Container) -> List[str]:
+def video_quality(
+    cmd: List[str], args: Type[MainArgs], inp: FileInfo, rules: Container
+) -> List[str]:
     cmd = fset(cmd, "-b:v", args.video_bitrate)
 
     qscale = args.video_quality_scale
 
-    if args.video_codec == "uncompressed" and (qscale is None or qscale == "unset"):
+    if args.video_codec == "uncompressed" and qscale == "unset":
         qscale = "1"
 
     vcodec = get_vcodec(args.video_codec, inp, rules)
@@ -72,7 +75,7 @@ def mux_quality_media(
     rules: Container,
     write_file: str,
     container: str,
-    args,
+    args: Type[MainArgs],
     inp: FileInfo,
     temp: str,
     log: Log,

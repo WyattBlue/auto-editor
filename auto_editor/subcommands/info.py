@@ -1,6 +1,8 @@
 import json
 import os.path
 import sys
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 import av
 
@@ -10,6 +12,16 @@ from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
 av.logging.set_level(av.logging.PANIC)
+
+
+@dataclass
+class InfoArgs:
+    json: bool = False
+    include_vfr: bool = False
+    ffmpeg_location: Optional[str] = None
+    my_ffmpeg: bool = False
+    help: bool = False
+    input: List[str] = field(default_factory=list)
 
 
 def info_options(parser: ArgumentParser) -> ArgumentParser:
@@ -33,8 +45,7 @@ def info_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 def main(sys_args=sys.argv[1:]):
-    parser = info_options(ArgumentParser("info"))
-    args = parser.parse_args(sys_args)
+    args = info_options(ArgumentParser("info")).parse_args(InfoArgs, sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
