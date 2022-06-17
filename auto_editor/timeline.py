@@ -106,6 +106,23 @@ class Timeline:
     def inp(self) -> FileInfo:
         return self.inputs[0]
 
+    @property
+    def end(self) -> int:
+        end = 0
+        for vclips in self.v:
+            if len(vclips) > 0:
+                v = vclips[-1]
+                if isinstance(v, VideoObj):
+                    end = max(end, max(1, round(v.start + (v.dur / v.speed))))
+                else:
+                    end = max(end, v.start + v.dur)
+        for aclips in self.a:
+            if len(aclips) > 0:
+                a = aclips[-1]
+                end = max(end, max(1, round(a.start + (a.dur / a.speed))))
+
+        return end
+
     def out_len(self) -> float:
         out_len: float = 0
         for vclips in self.v:
@@ -125,8 +142,8 @@ class Timeline:
 
 
 def clipify(chunks: Chunks, src: int) -> List[Clip]:
-    clips = []
-    start = 0
+    clips: List[Clip] = []
+    start = 0.0
     # Add "+1" to match how chunks are rendered in 22w18a
     i = 0
     for chunk in chunks:
@@ -138,8 +155,9 @@ def clipify(chunks: Chunks, src: int) -> List[Clip]:
                 dur = chunk[1] - chunk[0]
                 offset = chunk[0] + 1
 
-            clips.append(Clip(start, dur, offset, chunk[2], src))
-            start += dur
+            if not (len(clips) > 0 and clips[-1].start == round(start)):
+                clips.append(Clip(round(start), dur, offset, chunk[2], src))
+            start += dur / chunk[2]
             i += 1
 
     # If Chunks equals: [
@@ -187,17 +205,11 @@ def make_av(clips: List[Clip], inp: FileInfo) -> Tuple[VSpace, ASpace]:
 
 def make_layers(
     inputs: List[FileInfo], speedlists: List[NDArray[np.float_]]
-) -> Tuple[int, Optional[Chunks], VSpace, ASpace]:
+) -> Tuple[Optional[Chunks], VSpace, ASpace]:
 
     clips = []
     for i, _chunks in enumerate([chunkify(s) for s in speedlists]):
         clips += clipify(_chunks, i)
-
-    if len(clips) == 0:
-        end = 0
-    else:
-        e = clips[-1]
-        end = round(e.start + (e.dur * e.speed))
 
     chunks: Optional[Chunks] = None
     try:
@@ -206,7 +218,7 @@ def make_layers(
         pass
 
     vclips, aclips = make_av(clips, inputs[0])
-    return end, chunks, vclips, aclips
+    return chunks, vclips, aclips
 
 
 def make_timeline(
@@ -227,7 +239,7 @@ def make_timeline(
     for i, inp in enumerate(inputs):
         speedlists.append(get_speed_list(i, inp, fps, args, progress, temp, log))
 
-    end, chunks, vclips, aclips = make_layers(inputs, speedlists)
+    chunks, vclips, aclips = make_layers(inputs, speedlists)
 
     timeline = Timeline(inputs, fps, sr, res, args.background, vclips, aclips, chunks)
 
@@ -238,7 +250,7 @@ def make_timeline(
         "centerX": w // 2,
         "centerY": h // 2,
         "start": 0,
-        "end": end,
+        "end": timeline.end,
     }
 
     pool = []
