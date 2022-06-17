@@ -1,6 +1,7 @@
 import os.path
 import subprocess
 from dataclasses import dataclass
+from math import ceil
 from typing import Dict, List, Tuple, Union
 
 from auto_editor.ffwrapper import FFmpeg
@@ -202,30 +203,28 @@ def render_av(
         SEEK_COST = int(stream.average_rate * 5)
     SEEK_RETRY = SEEK_COST // 2
 
-    # New NLE method setup
-    end = 0
-    for layer in timeline.v:
-        end = max(end, layer[-1].start + layer[-1].dur)
-
     d = cn.decode(stream)
-    progress.start(end, "Creating new video")
+    progress.start(timeline.end, "Creating new video")
 
     null_img = Image.new("RGB", (width, height), args.background)
     null_frame = av.VideoFrame.from_image(null_img).reformat(format=pix_fmt)
 
     frame_index = -1
     try:
-        for index in range(end):
+        for index in range(timeline.end):
             # Add objects to obj_list
             obj_list: List[Union[VideoFrame, Visual]] = []
             for layer in timeline.v:
                 for obj in layer:
                     if isinstance(obj, VideoObj):
-                        if index >= obj.start and index < obj.start + round(
-                            obj.speed * obj.dur
+                        if index >= obj.start and index < obj.start + ceil(
+                            obj.dur / obj.speed
                         ):
                             obj_list.append(
-                                VideoFrame(obj.offset + index - obj.start, obj.src)
+                                VideoFrame(
+                                    obj.offset + round((index - obj.start) * obj.speed),
+                                    obj.src,
+                                )
                             )
                     elif index >= obj.start and index < obj.start + obj.dur:
                         obj_list.append(obj)
