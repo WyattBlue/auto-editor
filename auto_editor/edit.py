@@ -1,12 +1,12 @@
 import os
-from typing import List, Optional, Type
+from typing import List, Optional
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.container import get_rules
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import Chunk, Chunks, MainArgs
+from auto_editor.utils.types import Args, Chunk, Chunks
 
 
 def set_output_name(path: str, inp_ext: str, export: str) -> str:
@@ -29,7 +29,7 @@ def set_output_name(path: str, inp_ext: str, export: str) -> str:
 
 
 def edit_media(
-    path_list: List[str], ffmpeg: FFmpeg, args: Type[MainArgs], temp: str, log: Log
+    path_list: List[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
 ) -> Optional[str]:
 
     progress = ProgressBar(args.progress)

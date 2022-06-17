@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import Chunks, time
+from auto_editor.utils.types import Args, Chunks, time
 
 """
 To prevent duplicate code being pasted between scripts, common functions should be
@@ -79,7 +79,7 @@ def set_range(
     arr: NDArray[np.float_],
     range_syntax: List[List[str]],
     fps: float,
-    with_: int,
+    with_: float,
     log: Log,
 ) -> NDArray[np.float_]:
     pass
@@ -90,7 +90,7 @@ def set_range(
     arr: NDArray[np.bool_],
     range_syntax: List[List[str]],
     fps: float,
-    with_: int,
+    with_: float,
     log: Log,
 ) -> NDArray[np.bool_]:
     pass
@@ -106,13 +106,12 @@ def set_range(arr, range_syntax, fps, with_, log):
         try:
             value = time(val)
         except TypeError as e:
-            log.error(f"{e}")
+            log.error(e)
         if isinstance(value, int):
             return value
         return round(float(value) * fps)
 
     for _range in range_syntax:
-        print(_range)
         pair = []
         for val in _range:
             num = replace_variables_to_values(val, fps, log)
@@ -168,13 +167,13 @@ def apply_margin(
 
 
 def apply_mark_as(
-    has_loud: NDArray[np.bool_], has_loud_length: int, fps: float, args, log: Log
+    has_loud: NDArray[np.bool_], has_loud_length: int, fps: float, args: Args, log: Log
 ) -> NDArray[np.bool_]:
 
-    if args.mark_as_loud != []:
+    if len(args.mark_as_loud) > 0:
         has_loud = set_range(has_loud, args.mark_as_loud, fps, args.video_speed, log)
 
-    if args.mark_as_silent != []:
+    if len(args.mark_as_silent) > 0:
         has_loud = set_range(has_loud, args.mark_as_silent, fps, args.silent_speed, log)
     return has_loud
 

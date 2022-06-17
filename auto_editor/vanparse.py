@@ -159,7 +159,7 @@ def parse_value(option: Union[Options, Required], val: Optional[str]) -> Any:
     try:
         value = option.type(val)
     except TypeError as e:
-        Log().error(str(e))
+        Log().error(e)
 
     if option.choices is not None and value not in option.choices:
         my_choices = ", ".join(option.choices)
@@ -241,7 +241,7 @@ class ArgumentParser:
 
         option_list: List[str] = []
         oplist_name: Optional[str] = None
-        oplist_coerce = str
+        oplist_coerce: Callable[[str], str] = str
 
         i = 0
         while i < len(sys_args):
