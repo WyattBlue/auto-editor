@@ -1,10 +1,10 @@
 import os.path
-from typing import List, Tuple, Type
+from typing import List, Tuple
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.container import Container
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import MainArgs
+from auto_editor.utils.types import Args
 
 
 def fset(cmd: List[str], option: str, value: str) -> List[str]:
@@ -50,7 +50,7 @@ def get_acodec(acodec: str, inp: FileInfo, rules: Container) -> str:
 
 
 def video_quality(
-    cmd: List[str], args: Type[MainArgs], inp: FileInfo, rules: Container
+    cmd: List[str], args: Args, inp: FileInfo, rules: Container
 ) -> List[str]:
     cmd = fset(cmd, "-b:v", args.video_bitrate)
 
@@ -75,7 +75,7 @@ def mux_quality_media(
     rules: Container,
     write_file: str,
     container: str,
-    args: Type[MainArgs],
+    args: Args,
     inp: FileInfo,
     temp: str,
     log: Log,

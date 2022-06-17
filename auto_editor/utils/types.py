@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass, field
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple, Type, Union
 
 
 def _comma_coerce(name: str, val: str, num_args: int) -> List[str]:
@@ -12,15 +12,17 @@ def _comma_coerce(name: str, val: str, num_args: int) -> List[str]:
     return vals
 
 
-def _split_num_str(val: str) -> Tuple[float, str]:
-    NUM_CHARS = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", " ", ".", "-"}
+def _split_num_str(val: Union[str, float]) -> Tuple[float, str]:
+    if isinstance(val, (float, int)):
+        return val, ""
+
+    NUM_CHARS = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "_", " ", ".", "-"}
     index = 0
     for char in val:
         if char not in NUM_CHARS:
             break
         index += 1
     num, unit = val[:index], val[index:]
-
     try:
         float(num)
     except ValueError:
@@ -37,12 +39,21 @@ Chunk = Tuple[int, int, float]
 Chunks = List[Chunk]
 
 
-def number(val: Union[str, float]) -> float:
-    if not isinstance(val, str):
-        return val
-
+# Numbers: 0, 1, 2, 3, ...
+def natural(val: Union[str, float]) -> int:
     num, unit = _split_num_str(val)
-    _unit_check(unit, ("%", ""))
+    if unit != "":
+        raise TypeError(f"'{val}': Natural does not allow units.")
+    if num < 0:
+        raise TypeError(f"'{val}': Natural cannot be negative.")
+    if not isinstance(num, int) and not num.is_integer():
+        raise TypeError(f"'{val}': Natural must be an integer.")
+    return int(num)
+
+
+def number(val: Union[str, float]) -> float:
+    num, unit = _split_num_str(val)
+    _unit_check(unit, ("", "%"))
     if unit == "%":
         return num / 100
     return num
@@ -50,10 +61,10 @@ def number(val: Union[str, float]) -> float:
 
 def sample_rate(val: str) -> int:
     num, unit = _split_num_str(val)
-    if unit == "kHz":
-        return int(num * 1000)
+    if unit in ("kHz", "KHz"):
+        return natural(num * 1000)
     _unit_check(unit, ("", "Hz"))
-    return int(num)
+    return natural(num)
 
 
 def time(val: str) -> Union[int, str]:
@@ -66,7 +77,7 @@ def time(val: str) -> Union[int, str]:
         return str(num * 3600)
 
     _unit_check(unit, ("", "f", "frame", "frames"))
-    if not num.is_integer():
+    if not isinstance(num, int) and not num.is_integer():
         raise TypeError(f"'{val}': Frame unit doesn't accept non-ints.")
     return int(num)
 
@@ -94,8 +105,9 @@ def time_range(val: str) -> List[str]:
     return _comma_coerce("time_range", val, 2)
 
 
-def speed_range(val: str) -> List[str]:
-    return _comma_coerce("speed_range", val, 3)
+def speed_range(val: str) -> Tuple[float, str, str]:
+    a = _comma_coerce("speed_range", val, 3)
+    return (number(a[0]), a[1], a[2])
 
 
 Align = Literal["left", "center", "right"]
@@ -117,7 +129,7 @@ Stream = Union[int, Literal["all"]]
 def stream(val: str) -> Stream:
     if val == "all":
         return "all"
-    return int(val)
+    return natural(val)
 
 
 def color(val: str) -> str:
@@ -162,11 +174,11 @@ class MainArgs:
     scale: float = 1.0
     extras: Optional[str] = None
     no_seek: bool = False
-    cut_out: List[str] = field(default_factory=list)
-    add_in: List[str] = field(default_factory=list)
-    mark_as_loud: List[str] = field(default_factory=list)
-    mark_as_silent: List[str] = field(default_factory=list)
-    set_speed_for_range: List[str] = field(default_factory=list)
+    cut_out: List[List[str]] = field(default_factory=list)
+    add_in: List[List[str]] = field(default_factory=list)
+    mark_as_loud: List[List[str]] = field(default_factory=list)
+    mark_as_silent: List[List[str]] = field(default_factory=list)
+    set_speed_for_range: List[Tuple[float, str, str]] = field(default_factory=list)
     frame_rate: Optional[float] = None
     sample_rate: Optional[int] = None
     background: str = "#000"
@@ -194,6 +206,9 @@ class MainArgs:
     output_file: Optional[str] = None
     help: bool = False
     input: List[str] = field(default_factory=list)
+
+
+Args = Type[MainArgs]
 
 
 colormap = {

@@ -18,13 +18,16 @@ from auto_editor.utils.func import (
 )
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import Stream, number, stream
+from auto_editor.utils.types import Args, Stream, number, stream
 from auto_editor.wavfile import read
 
 T = TypeVar("T")
 
 
-def get_attributes(attrs_str: str, dataclass: T, log: Log) -> T:
+def get_attributes(attrs_str: Optional[str], dataclass: T, log: Log) -> T:
+    if attrs_str is None:
+        return dataclass
+
     attrs: T = parse_dataclass(attrs_str, dataclass, log)
 
     dic_value = asdict(attrs)
@@ -43,7 +46,7 @@ def get_attributes(attrs_str: str, dataclass: T, log: Log) -> T:
         try:
             attrs.__setattr__(k, _type(dic_value[k]))
         except (ValueError, TypeError) as e:
-            log.error(str(e))
+            log.error(e)
 
     return attrs
 
@@ -104,7 +107,7 @@ def operand_combine(
 def get_stream_data(
     method: str,
     attrs,
-    args,
+    args: Args,
     i: int,
     inp: FileInfo,
     fps: float,
@@ -181,7 +184,7 @@ def get_has_loud(
     progress: ProgressBar,
     temp: str,
     log: Log,
-    args,
+    args: Args,
 ) -> NDArray[np.bool_]:
     @dataclass
     class Audio:
@@ -224,10 +227,9 @@ def get_has_loud(
         if method == "":  # Skip whitespace
             continue
 
+        attrs_str: Optional[str] = None
         if METHOD_ATTRS_SEP in method:
             method, attrs_str = method.split(METHOD_ATTRS_SEP)
-        else:
-            attrs_str = ""
 
         if method in ("audio", "motion", "pixeldiff", "random", "none", "all"):
             if result_array is not None and operand is None:
@@ -280,7 +282,13 @@ def get_has_loud(
 
 
 def get_speed_list(
-    i: int, inp: FileInfo, fps: float, args, progress: ProgressBar, temp: str, log: Log
+    i: int,
+    inp: FileInfo,
+    fps: float,
+    args: Args,
+    progress: ProgressBar,
+    temp: str,
+    log: Log,
 ) -> NDArray[np.float_]:
 
     start_margin, end_margin = args.frame_margin
@@ -308,8 +316,7 @@ def get_speed_list(
     if args.add_in != []:
         speed_list = set_range(speed_list, args.add_in, fps, args.video_speed, log)
 
-    if args.set_speed_for_range != []:
-        for item in args.set_speed_for_range:
-            speed_list = set_range(speed_list, [item[1:]], fps, item[0], log)
+    for item in args.set_speed_for_range:
+        speed_list = set_range(speed_list, [list(item[1:])], fps, item[0], log)
 
     return speed_list

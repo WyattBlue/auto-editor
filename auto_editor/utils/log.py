@@ -2,7 +2,7 @@ import sys
 from datetime import timedelta
 from shutil import get_terminal_size, rmtree
 from time import perf_counter, sleep
-from typing import NoReturn, Optional
+from typing import NoReturn, Optional, Union
 
 
 class Timer:
@@ -56,8 +56,10 @@ class Log:
             buffer = " " * (get_terminal_size().columns - len(message) - 3)
             sys.stdout.write(f"  {message}{buffer}\r")
 
-    def error(self, message: str) -> NoReturn:
+    def error(self, message: Union[str, Exception]) -> NoReturn:
         self.conwrite("")
+        # if isinstance(message, Exception):
+        #     raise message
         sys.stderr.write(f"Error! {message}\n")
         self.cleanup()
         from platform import system
