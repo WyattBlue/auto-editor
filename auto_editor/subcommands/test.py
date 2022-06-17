@@ -263,19 +263,12 @@ def main(sys_args: Optional[List[str]] = None):
 
     # Issue #184
     def unit_tests():
-        """
-        Make sure all units are working appropriately. That includes:
-
-         - Seconds units: s, sec, secs, second, seconds
-         - Frame units:   f, frame, frames
-         - Sample units:  Hz, kHz
-         - Percent:       %
-        """
-
         run_program(
             ["example.mp4", "--mark_as_loud", "20s,22sec", "25secs,26.5seconds"]
         )
-        run_program(["example.mp4", "--sample_rate", "44100"])
+        run_program(["example.mp4", "--edit", "all", "--set-speed", "125%,-30,end"])
+        run_program(["example.mp4", "--sample_rate", "44_100"])
+        run_program(["example.mp4", "--margin", "3_0"])
         run_program(["example.mp4", "--sample_rate", "44100 Hz"])
         run_program(["example.mp4", "--sample_rate", "44.1 kHz"])
         run_program(["example.mp4", "--silent_threshold", "4%"])
