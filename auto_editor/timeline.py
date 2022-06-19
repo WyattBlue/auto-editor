@@ -14,7 +14,7 @@ from auto_editor.objects import (
     TextObj,
     VideoObj,
 )
-from auto_editor.utils.func import chunkify, parse_dataclass
+from auto_editor.utils.func import chunkify, chunks_len, parse_dataclass
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Align, Chunks, align, anchor, color, number
@@ -65,7 +65,7 @@ def _values(
     _vars: Dict[str, int],
     log: Log,
 ):
-    if _type is Any:
+    if _type is Any:  # TODO: See if this check is necessary
         return None
     if _type is float and name != "rotate":
         _type = number
@@ -84,7 +84,7 @@ def _values(
     try:
         _type(val)
     except TypeError as e:
-        log.error(str(e))
+        log.error(e)
     except Exception:
         log.error(f"variable '{val}' is not defined.")
 
@@ -141,9 +141,8 @@ class Timeline:
         return out_len
 
 
-def clipify(chunks: Chunks, src: int) -> List[Clip]:
+def clipify(chunks: Chunks, src: int, start: float) -> List[Clip]:
     clips: List[Clip] = []
-    start = 0.0
     # Add "+1" to match how chunks are rendered in 22w18a
     i = 0
     for chunk in chunks:
@@ -160,32 +159,10 @@ def clipify(chunks: Chunks, src: int) -> List[Clip]:
             start += dur / chunk[2]
             i += 1
 
-    # If Chunks equals: [
-    #    (0, 26, 1.0),
-    #    (26, 34, 99999.0),
-    #    (34, 396, 1.0),
-    #    (396, 410, 99999.0),
-    #    (410, 522, 1.0), (522, 1192, 99999.0),
-    #    (1192, 1220, 1.0),
-    #    (1220, 1273, 99999.0)
-    # ]
-    # try:
-    #     assert clips == [
-    #         Clip(start=0, dur=27, offset=0, speed=1.0, src=0),
-    #         Clip(start=27, dur=362, offset=35, speed=1.0, src=0),
-    #         Clip(start=27 + 362, dur=112, offset=411, speed=1.0, src=0),
-    #         Clip(start=27 + 362 + 112, dur=28, offset=1193, speed=1.0, src=0),
-    #     ]
-    # except AssertionError:
-    #     for clip in clips:
-    #         print(clip)
-    #     quit(1)
-
     return clips
 
 
 def make_av(clips: List[Clip], inp: FileInfo) -> Tuple[VSpace, ASpace]:
-
     vclips: VSpace = [[]]
     aclips: ASpace = [[] for a in inp.audios]
 
@@ -208,8 +185,10 @@ def make_layers(
 ) -> Tuple[Optional[Chunks], VSpace, ASpace]:
 
     clips = []
+    start = 0.0
     for i, _chunks in enumerate([chunkify(s) for s in speedlists]):
-        clips += clipify(_chunks, i)
+        clips += clipify(_chunks, i, start)
+        start += chunks_len(_chunks)
 
     chunks: Optional[Chunks] = None
     try:

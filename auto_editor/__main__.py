@@ -297,6 +297,7 @@ def main() -> None:
             ],
         )
 
+    log = Log(args.debug, args.quiet)
     timer = Timer(args.quiet)
 
     exporting_to_editor = args.export in ("premiere", "final-cut-pro", "shotcut")
@@ -321,17 +322,17 @@ def main() -> None:
         args.quiet = True
 
     if args.input == []:
-        Log().error("You need to give auto-editor an input file.")
+        log.error("You need to give auto-editor an input file.")
 
     if args.temp_dir is None:
         temp = tempfile.mkdtemp()
     else:
         temp = args.temp_dir
         if os.path.isfile(temp):
-            Log().error("Temp directory cannot be an already existing file.")
+            log.error("Temp directory cannot be an already existing file.")
         if os.path.isdir(temp):
             if len(os.listdir(temp)) != 0:
-                Log().error("Temp directory should be empty!")
+                log.error("Temp directory should be empty!")
         else:
             os.mkdir(temp)
 

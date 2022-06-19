@@ -7,6 +7,7 @@ from typing import List
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
+from auto_editor.utils.types import Args
 
 
 def get_domain(url: str) -> str:
@@ -16,7 +17,7 @@ def get_domain(url: str) -> str:
     return ".".join(t.split(".")[-2:])
 
 
-def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
+def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
     log.conwrite("Downloading video...")
 
     download_format = args.download_format
@@ -64,7 +65,7 @@ def download_video(my_input: str, args, ffmpeg: FFmpeg, log: Log) -> str:
     return location
 
 
-def valid_input(inputs: List[str], ffmpeg: FFmpeg, args, log: Log) -> List[str]:
+def valid_input(inputs: List[str], ffmpeg: FFmpeg, args: Args, log: Log) -> List[str]:
     new_inputs = []
 
     for my_input in inputs:
