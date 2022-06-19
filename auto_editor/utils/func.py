@@ -26,6 +26,14 @@ def chunkify(arr: Union[np.ndarray, List[int]]) -> Chunks:
     return chunks
 
 
+def chunks_len(chunks: Chunks) -> int:
+    _len = 0.0
+    for chunk in chunks:
+        if chunk[2] != 99999:
+            _len += (chunk[1] - chunk[0]) / chunk[2]
+    return round(_len)
+
+
 def to_timecode(secs: float, fmt: str) -> str:
     sign = ""
     if secs < 0:

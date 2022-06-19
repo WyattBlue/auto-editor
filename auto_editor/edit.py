@@ -29,24 +29,22 @@ def set_output_name(path: str, inp_ext: str, export: str) -> str:
 
 
 def edit_media(
-    path_list: List[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
+    paths: List[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
 ) -> Optional[str]:
 
     progress = ProgressBar(args.progress)
     timeline = None
 
-    path_ext = os.path.splitext(path_list[0])[1]
+    path_ext = os.path.splitext(paths[0])[1]
     if path_ext == ".json":
         from auto_editor.formats.json import read_json
 
-        timeline = read_json(path_list[0], ffmpeg, log)
+        timeline = read_json(paths[0], ffmpeg, log)
         inputs: List[FileInfo] = timeline.inputs
     else:
-        inputs = []
-        for path in path_list:
-            inputs.append(FileInfo(path, ffmpeg, log))
+        inputs = [FileInfo(path, ffmpeg, log) for path in paths]
 
-    del path_list
+    del paths
     inp = inputs[0]
 
     if args.output_file is None:
@@ -235,11 +233,9 @@ def edit_media(
         from auto_editor.timeline import clipify, make_av
         from auto_editor.utils.func import append_filename
 
-        def pad_chunk(chunk: Chunk, total_frames: int) -> Chunks:
+        def pad_chunk(chunk: Chunk, total: int) -> Chunks:
             start = [] if chunk[0] == 0 else [(0, chunk[0], 99999.0)]
-            end = (
-                [] if chunk[1] == total_frames else [(chunk[1], total_frames, 99999.0)]
-            )
+            end = [] if chunk[1] == total else [(chunk[1], total, 99999.0)]
             return start + [chunk] + end
 
         clip_num = 0
@@ -248,7 +244,7 @@ def edit_media(
                 continue
 
             _c = pad_chunk(chunk, total_frames)
-            vspace, aspace = make_av(clipify(_c, 0), inp)
+            vspace, aspace = make_av(clipify(_c, 0, 0), inp)
             my_timeline = Timeline(
                 timeline.inputs,
                 timeline.fps,
