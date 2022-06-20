@@ -119,28 +119,39 @@ def to_key(op: Union[Options, Required]) -> str:
 
 
 def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
-    text = "  " + ", ".join(option.names) + f"\n    {option.help}\n\n"
+    text = f"  {', '.join(option.names)}\n\n"
 
-    data = get_help_data()
-
-    if option.names[0] in data[program_name]:
-        text += indent(data[program_name][option.names[0]], "    ") + "\n\n"
-
+    bar_len = 11
     if option.flag:
         text += "    type: flag\n"
+        bar_len = 15
     else:
-        text += f"    type: {option.type.__name__}\n"
+        _add = f"    type: {option.type.__name__}\n"
+        bar_len = len(_add)
+        text += _add
 
         if option.nargs != 1:
-            text += f"    nargs: {option.nargs}\n"
+            _add = f"    nargs: {option.nargs}\n"
+            bar_len = len(_add)
+            text += _add
 
         default = getattr(ns_obj, to_key(option))
-
         if default is not None:
-            text += f"    default: {default}\n"
+            if isinstance(default, tuple):
+                _add = f"    default: {','.join(map(str, default))}\n"
+            else:
+                _add = f"    default: {default}\n"
+            bar_len = len(_add)
+            text += _add
 
         if option.choices is not None:
             text += "    choices: " + ", ".join(option.choices) + "\n"
+
+    text += f"    {'-' * (bar_len - 5)}\n\n    {option.help}\n\n"
+    data = get_help_data()
+
+    if option.names[0] in data[program_name]:
+        text += indent(data[program_name][option.names[0]], "    ") + "\n"
 
     out(text)
 

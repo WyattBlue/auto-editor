@@ -263,7 +263,9 @@ def render_av(
                             break
 
                         if seek_frame is not None:
-                            log.debug(f"Skipped {frame_index - seek_frame} frame indexes")
+                            log.debug(
+                                f"Skipped {frame_index - seek_frame} frame indexes"
+                            )
                             frames_saved += frame_index - seek_frame
                             seek_frame = None
                         if frame.key_frame:

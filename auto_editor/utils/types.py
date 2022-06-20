@@ -185,6 +185,7 @@ class MainArgs:
     edit_based_on: str = "audio"
     keep_tracks_separate: bool = False
     export: str = "default"
+    player: Optional[str] = None
     no_open: bool = False
     temp_dir: Optional[str] = None
     ffmpeg_location: Optional[str] = None
