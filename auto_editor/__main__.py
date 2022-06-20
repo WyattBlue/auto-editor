@@ -62,13 +62,13 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--video-codec",
         "-vcodec",
         "-c:v",
-        help="Set the video codec for the output media file.",
+        help="Set video codec for output media.",
     )
     parser.add_argument(
         "--audio-codec",
         "-acodec",
         "-c:a",
-        help="Set the audio codec for the output media file.",
+        help="Set audio codec for output media.",
     )
     parser.add_argument(
         "--video-bitrate",
@@ -179,8 +179,11 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Choose the export mode.",
     )
     parser.add_text("Utility Options")
+    parser.add_argument("--player", help="Set player to open output media files.")
     parser.add_argument(
-        "--no-open", flag=True, help="Do not open the file after editing is done."
+        "--no-open",
+        flag=True,
+        help="Do not open the output file after editing is done.",
     )
     parser.add_argument(
         "--temp-dir",
@@ -378,7 +381,13 @@ def main() -> None:
             timer.stop()
 
         if not args.no_open and output is not None:
-            usefulfunctions.open_with_system_default(output, log)
+            if args.player is None:
+                usefulfunctions.open_with_system_default(output, log)
+            else:
+                import subprocess
+                from shlex import split
+
+                subprocess.run(split(args.player) + [output])
     except KeyboardInterrupt:
         log.error("Keyboard Interrupt")
     log.cleanup()
