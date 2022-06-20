@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from math import ceil
 from typing import Dict, List, Tuple, Union
 
+import av
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
+
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
 from auto_editor.output import get_vcodec, video_quality
@@ -11,12 +14,15 @@ from auto_editor.timeline import Timeline, Visual
 from auto_editor.utils.encoder import encoders
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.utils.types import Args
+
+av.logging.set_level(av.logging.PANIC)
 
 
 @dataclass
 class VideoFrame:
     index: int
-    source: int
+    src: int
 
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
@@ -93,22 +99,12 @@ def one_pos_two_pos(
 def render_av(
     ffmpeg: FFmpeg,
     timeline: Timeline,
-    args,
+    args: Args,
     progress: ProgressBar,
     rules,
     temp: str,
     log: Log,
 ) -> Tuple[str, bool]:
-    try:
-        import av
-
-        av.logging.set_level(av.logging.PANIC)
-    except ImportError:
-        log.import_error("av")
-    try:
-        from PIL import Image, ImageChops, ImageDraw, ImageFont
-    except ImportError:
-        log.import_error("Pillow")
 
     font_cache: Dict[str, Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]] = {}
     img_cache = {}
@@ -136,9 +132,23 @@ def render_av(
                 img_cache[obj.src] = source
 
     inp = timeline.inp
-    cn = av.open(inp.path, "r")
-    pix_fmt = cn.streams.video[0].pix_fmt
-    target_pix_fmt = pix_fmt if pix_fmt in allowed_pix_fmt else "yuv420p"
+    cns = [av.open(inp.path, "r") for inp in timeline.inputs]
+
+    decoders = []
+    tous = []
+    pix_fmts = []
+    for cn in cns:
+        stream = cn.streams.video[0]
+        stream.thread_type = "AUTO"
+
+        tous.append(int(stream.time_base.denominator / stream.average_rate))
+        pix_fmts.append(stream.pix_fmt)
+        decoders.append(cn.decode(stream))
+
+    log.debug(f"Tous: {tous}")
+    log.debug(f"Clips: {timeline.v}")
+
+    target_pix_fmt = pix_fmts[0] if pix_fmts[0] in allowed_pix_fmt else "yuv420p"
     my_codec = get_vcodec(args.video_codec, inp, rules)
 
     apply_video_later = True
@@ -187,11 +197,6 @@ def render_av(
     )
     assert process2.stdin is not None
 
-    stream = cn.streams.video[0]
-    stream.thread_type = "AUTO"
-    tou = int(stream.time_base.denominator / stream.average_rate)
-    log.debug(f"Tou: {tou}")
-
     seek = 10
     seek_frame = None
     frames_saved = 0
@@ -200,14 +205,13 @@ def render_av(
     if args.no_seek:
         SEEK_COST = 4294967295
     else:
-        SEEK_COST = int(stream.average_rate * 5)
+        SEEK_COST = int(cns[0].streams.video[0].average_rate * 7)
     SEEK_RETRY = SEEK_COST // 2
 
-    d = cn.decode(stream)
     progress.start(timeline.end, "Creating new video")
 
     null_img = Image.new("RGB", (width, height), args.background)
-    null_frame = av.VideoFrame.from_image(null_img).reformat(format=pix_fmt)
+    null_frame = av.VideoFrame.from_image(null_img).reformat(format=target_pix_fmt)
 
     frame_index = -1
     try:
@@ -235,8 +239,8 @@ def render_av(
                 if isinstance(obj, VideoFrame):
                     if frame_index > obj.index:
                         log.debug("Seeking to beginning of file")
-                        cn.seek(0)
-                        frame = next(d)
+                        cns[obj.src].seek(0)
+                        frame = next(decoders[obj.src])
                         frame_index = round(frame.time * timeline.fps)
 
                     while frame_index < obj.index:
@@ -244,16 +248,17 @@ def render_av(
                         if obj.index - frame_index > SEEK_COST and frame_index > seek:
                             seek = frame_index + SEEK_RETRY
                             seek_frame = frame_index
-                            log.debug(f"Seeking to {frame_index * tou}")
-                            cn.seek(frame_index * tou, stream=stream)
+                            log.debug(f"Seeking to {frame_index * tous[obj.src]}")
+                            cns[obj.src].seek(
+                                frame_index * tous[obj.src],
+                                stream=cns[obj.src].streams.video[0],
+                            )
 
                         try:
-                            frame = next(d)
+                            frame = next(decoders[obj.src])
                             frame_index = round(frame.time * timeline.fps)
                         except StopIteration:
-                            log.warning(
-                                "No source frame at current position. Using null frame"
-                            )
+                            log.debug(f"No source frame at {index=}. Using null frame")
                             frame = null_frame
                             break
 
@@ -263,6 +268,11 @@ def render_av(
                             log.debug(f"Skipped {frame_index - seek_frame} frames")
                             frames_saved += frame_index - seek_frame
                             seek_frame = None
+
+                    if frame.width != width or frame.height != height:
+                        img = frame.to_image().convert("RGB")
+                        img = ImageOps.pad(img, (width, height), color=args.background)
+                        frame = frame.from_image(img).reformat(format=target_pix_fmt)
 
                 # Render visual objects
                 else:
@@ -311,7 +321,7 @@ def render_av(
                         obj_img.paste(img_cache[obj.src], pos)
 
                     img = Image.alpha_composite(img, obj_img)
-                    frame = frame.from_image(img).reformat(format=pix_fmt)
+                    frame = frame.from_image(img).reformat(format=target_pix_fmt)
 
             process2.stdin.write(frame.to_ndarray().tobytes())
 
@@ -331,14 +341,9 @@ def render_av(
     if args.scale != 1:
         sped_input = os.path.join(temp, "spedup0.mp4")
         spedup = os.path.join(temp, "scale0.mp4")
+        scale_filter = f"scale=iw*{args.scale}:ih*{args.scale}"
 
-        cmd = [
-            "-i",
-            sped_input,
-            "-vf",
-            f"scale=iw*{args.scale}:ih*{args.scale}",
-            spedup,
-        ]
+        cmd = ["-i", sped_input, "-vf", scale_filter, spedup]
 
         check_errors = ffmpeg.pipe(cmd)
         if "Error" in check_errors or "failed" in check_errors:

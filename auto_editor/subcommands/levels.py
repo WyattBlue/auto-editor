@@ -88,7 +88,9 @@ def main(sys_args=sys.argv[1:]) -> None:
 
         sample_rate, audio_samples = read(read_track)
 
-        print_float_list(audio_detection(audio_samples, sample_rate, fps, progress))
+        print_float_list(
+            audio_detection(audio_samples, sample_rate, fps, progress, log)
+        )
 
     if args.kind == "motion":
         if args.track >= len(inp.videos):

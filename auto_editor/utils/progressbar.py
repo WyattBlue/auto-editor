@@ -3,7 +3,6 @@ from math import floor
 from platform import system
 from shutil import get_terminal_size
 from time import localtime, time
-from typing import Union
 
 from .func import get_stdout
 
@@ -59,21 +58,16 @@ class ProgressBar:
             return f"{hours:02}:{minutes:02} {ampm_marker}"
         return f"{hours:02}:{minutes:02}"
 
-    def tick(self, index: Union[int, float]) -> None:
-
+    def tick(self, index: float) -> None:
         if self.hide:
             return
 
         progress = min(1, max(0, index / self.total))
-
-        if progress == 0:
-            progress_rate = 0.0
-        else:
-            progress_rate = (time() - self.begin_time) / progress
+        rate = 0.0 if progress == 0 else (time() - self.begin_time) / progress
 
         if self.machine:
             index = min(index, self.total)
-            raw = int(self.begin_time + progress_rate)
+            raw = int(self.begin_time + rate)
             print(
                 f"{self.title}~{index}~{self.total}~{self.begin_time}~{raw}",
                 end="\r",
@@ -81,17 +75,15 @@ class ProgressBar:
             )
             return
 
-        new_time = self.pretty_time(self.begin_time + progress_rate, self.ampm)
+        new_time = self.pretty_time(self.begin_time + rate, self.ampm)
 
         percent = round(progress * 100, 1)
         p_pad = " " * (4 - len(str(percent)))
-
         columns = get_terminal_size().columns
         bar_len = max(1, columns - (self.len_title + 32))
+        bar_str = self.progress_bar_str(progress, bar_len)
 
-        progress_bar_str = self.progress_bar_str(progress, bar_len)
-
-        bar = f"  {self.icon}{self.title} {progress_bar_str} {p_pad}{percent}%  ETA {new_time}"
+        bar = f"  {self.icon}{self.title} {bar_str} {p_pad}{percent}%  ETA {new_time}"
 
         if len(bar) > columns - 2:
             bar = bar[: columns - 2]
@@ -100,7 +92,7 @@ class ProgressBar:
 
         sys.stdout.write(bar + "\r")
 
-    def start(self, total: Union[int, float], title: str = "Please wait") -> None:
+    def start(self, total: float, title: str = "Please wait") -> None:
         self.title = title
         self.len_title = len(title)
         self.total = total

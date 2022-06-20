@@ -56,7 +56,10 @@ def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
     if os.path.isfile(audio_path):
         sample_rate, audio_samples = read(audio_path)
         sample_rate_per_frame = sample_rate / fps
-        return round(audio_samples.shape[0] / sample_rate_per_frame)
+
+        dur = round(audio_samples.shape[0] / sample_rate_per_frame)
+        log.debug(f"Dur (audio): {dur}")
+        return dur
 
     import av
 
@@ -66,7 +69,9 @@ def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
         log.error("Could not get media duration")
 
     video = cn.streams.video[0]
-    return int(float(video.duration * video.time_base) * fps)
+    dur = int(float(video.duration * video.time_base) * fps)
+    log.debug(f"Dur (video): {dur}")
+    return dur
 
 
 def get_audio_list(
@@ -88,7 +93,7 @@ def get_audio_list(
     else:
         log.error(f"Audio stream '{stream}' does not exist.")
 
-    audio_list = audio_detection(audio_samples, sample_rate, fps, progress)
+    audio_list = audio_detection(audio_samples, sample_rate, fps, progress, log)
 
     return np.fromiter((x > threshold for x in audio_list), dtype=np.bool_)
 

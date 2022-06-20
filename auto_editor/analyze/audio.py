@@ -3,6 +3,7 @@ from math import ceil
 import numpy as np
 import numpy.typing as npt
 
+from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 
 
@@ -15,6 +16,7 @@ def audio_detection(
     sample_rate: int,
     fps: float,
     progress: ProgressBar,
+    log: Log,
 ) -> npt.NDArray[np.float_]:
 
     max_volume = get_max_volume(audio_samples)
@@ -27,6 +29,7 @@ def audio_detection(
 
     sample_rate_per_frame = sample_rate / fps
     audio_frame_count = ceil(sample_count / sample_rate_per_frame)
+    log.debug(f"Dur (Audio Analyze): {audio_frame_count}")
 
     progress.start(audio_frame_count, "Analyzing audio volume")
 
