@@ -205,7 +205,7 @@ def render_av(
     if args.no_seek:
         SEEK_COST = 4294967295
     else:
-        SEEK_COST = int(cns[0].streams.video[0].average_rate * 7)
+        SEEK_COST = int(cns[0].streams.video[0].average_rate * 5)
     SEEK_RETRY = SEEK_COST // 2
 
     progress.start(timeline.end, "Creating new video")
@@ -238,7 +238,7 @@ def render_av(
             for obj in obj_list:
                 if isinstance(obj, VideoFrame):
                     if frame_index > obj.index:
-                        log.debug("Seeking to beginning of file")
+                        log.debug(f"Seek: {frame_index} -> beginning")
                         cns[obj.src].seek(0)
                         frame = next(decoders[obj.src])
                         frame_index = round(frame.time * timeline.fps)
@@ -248,9 +248,9 @@ def render_av(
                         if obj.index - frame_index > SEEK_COST and frame_index > seek:
                             seek = frame_index + SEEK_RETRY
                             seek_frame = frame_index
-                            log.debug(f"Seeking to {frame_index * tous[obj.src]}")
+                            log.debug(f"Seek: {frame_index} -> {obj.index}")
                             cns[obj.src].seek(
-                                frame_index * tous[obj.src],
+                                obj.index * tous[obj.src],
                                 stream=cns[obj.src].streams.video[0],
                             )
 
@@ -262,12 +262,12 @@ def render_av(
                             frame = null_frame
                             break
 
-                        if frame.key_frame:
-                            log.debug(f"Keyframe {frame_index} {frame.pts}")
                         if seek_frame is not None:
-                            log.debug(f"Skipped {frame_index - seek_frame} frames")
+                            log.debug(f"Skipped {frame_index - seek_frame} frame indexes")
                             frames_saved += frame_index - seek_frame
                             seek_frame = None
+                        if frame.key_frame:
+                            log.debug(f"Keyframe {frame_index} {frame.pts}")
 
                     if frame.width != width or frame.height != height:
                         img = frame.to_image().convert("RGB")
