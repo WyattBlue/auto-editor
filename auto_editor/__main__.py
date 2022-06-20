@@ -139,7 +139,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--frame-rate",
         "-fps",
         "-r",
-        type=float,
+        type=number,
         help="Set the frame rate for the timeline and output media.",
     )
     parser.add_argument(

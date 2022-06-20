@@ -52,6 +52,18 @@ def natural(val: Union[str, float]) -> int:
 
 
 def number(val: Union[str, float]) -> float:
+    if isinstance(val, str) and "/" in val:
+        nd = val.split("/")
+        if len(nd) != 2:
+            raise TypeError(f"'{val}': One divisor allowed.")
+        vs = []
+        for v in nd:
+            try:
+                vs.append(int(v))
+            except ValueError:
+                raise TypeError(f"'{val}': Numerator and Denominator must be integers.")
+        return vs[0] / vs[1]
+
     num, unit = _split_num_str(val)
     _unit_check(unit, ("", "%"))
     if unit == "%":
