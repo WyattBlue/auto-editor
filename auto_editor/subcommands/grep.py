@@ -99,7 +99,7 @@ def grep_file(
 
     timecode = ""
     line_number = -1
-    with open(out_file, "r") as file:
+    with open(out_file) as file:
         while True:
             line = file.readline()
             line_number += 1

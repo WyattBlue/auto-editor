@@ -101,7 +101,7 @@ def get_help_data() -> Dict[str, Dict[str, str]]:
 
     dirpath = os.path.dirname(os.path.realpath(__file__))
 
-    with open(os.path.join(dirpath, "help.json"), "r") as fileobj:
+    with open(os.path.join(dirpath, "help.json")) as fileobj:
         data = json.load(fileobj)
 
     assert isinstance(data, dict)
