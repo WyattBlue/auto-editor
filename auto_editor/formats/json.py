@@ -84,7 +84,7 @@ class Version:
 
 
 def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
-    with open(path, "r") as f:
+    with open(path) as f:
         data = json.load(f)
 
     check_attrs(data, log, "version")

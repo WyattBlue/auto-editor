@@ -19,10 +19,14 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Align, Chunks, align, anchor, color, number
 
-Clip = NamedTuple(
-    "Clip",
-    [("start", int), ("dur", int), ("offset", int), ("speed", float), ("src", int)],
-)
+
+class Clip(NamedTuple):
+    start: int
+    dur: int
+    offset: int
+    speed: float
+    src: int
+
 
 Visual = Union[TextObj, ImageObj, RectangleObj, EllipseObj]
 VLayer = List[Union[VideoObj, Visual]]
