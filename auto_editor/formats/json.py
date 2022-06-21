@@ -97,7 +97,7 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         chunks = validate_chunks(data["chunks"], log)
         inp = FileInfo(data["source"], ffmpeg, log)
 
-        vspace, aspace = make_av(clipify(chunks, 0, 0), inp)
+        vspace, aspace = make_av([clipify(chunks, 0, 0)], [inp])
 
         fps = inp.get_fps()
         sr = inp.get_samplerate()

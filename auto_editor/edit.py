@@ -244,7 +244,7 @@ def edit_media(
                 continue
 
             _c = pad_chunk(chunk, total_frames)
-            vspace, aspace = make_av(clipify(_c, 0, 0), inp)
+            vspace, aspace = make_av([clipify(_c, 0, 0)], [inp])
             my_timeline = Timeline(
                 timeline.inputs,
                 timeline.fps,
