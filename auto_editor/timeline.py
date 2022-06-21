@@ -17,7 +17,7 @@ from auto_editor.objects import (
 from auto_editor.utils.func import chunkify, chunks_len, parse_dataclass
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import Align, Chunks, align, anchor, color, number
+from auto_editor.utils.types import Align, Args, Chunks, align, anchor, color, number
 
 
 class Clip(NamedTuple):
@@ -68,7 +68,7 @@ def _values(
     _type: Union[type, Callable[[Any], Any]],
     _vars: Dict[str, int],
     log: Log,
-):
+) -> Any:
     if _type is Any:  # TODO: See if this check is necessary
         return None
     if _type is float and name != "rotate":
@@ -205,7 +205,12 @@ def make_layers(
 
 
 def make_timeline(
-    inputs: List[FileInfo], args, sr: int, progress: ProgressBar, temp: str, log: Log
+    inputs: List[FileInfo],
+    args: Args,
+    sr: int,
+    progress: ProgressBar,
+    temp: str,
+    log: Log,
 ) -> Timeline:
     assert len(inputs) > 0
 
@@ -236,20 +241,28 @@ def make_timeline(
         "end": timeline.end,
     }
 
-    pool = []
+    pool: List[Visual] = []
 
     for o in args.add_text:
-        pool.append(parse_dataclass(o, TextObj, log))
+        _text = parse_dataclass(o, TextObj, log)
+        assert isinstance(_text, TextObj)
+        pool.append(_text)
     for o in args.add_rectangle:
-        pool.append(parse_dataclass(o, RectangleObj, log))
+        _rect = parse_dataclass(o, RectangleObj, log)
+        assert isinstance(_rect, RectangleObj)
+        pool.append(_rect)
     for o in args.add_ellipse:
-        pool.append(parse_dataclass(o, EllipseObj, log))
+        _ellipse = parse_dataclass(o, EllipseObj, log)
+        assert isinstance(_ellipse, EllipseObj)
+        pool.append(_ellipse)
     for o in args.add_image:
-        pool.append(parse_dataclass(o, ImageObj, log))
+        _img = parse_dataclass(o, ImageObj, log)
+        assert isinstance(_img, ImageObj)
+        pool.append(_img)
 
     for obj in pool:
         dic_value = asdict(obj)
-        dic_type = {}
+        dic_type: Dict[str, Callable[[Any], Any]] = {}
         for field in fields(obj):
             dic_type[field.name] = field.type
 
@@ -260,8 +273,7 @@ def make_timeline(
         if obj.dur < 1:
             log.error(f"dur's value must be greater than 0. Was '{obj.dur}'.")
 
-    # Higher layers are visually on top
-    for obj in pool:
+        # Higher layers are visually on top
         timeline.v.append([obj])
 
     return timeline

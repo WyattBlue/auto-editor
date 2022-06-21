@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union, overload
+from typing import Callable, List, Tuple, TypeVar, Union, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -10,6 +10,8 @@ from auto_editor.utils.types import Args, Chunks, time
 To prevent duplicate code being pasted between scripts, common functions should be
 put here. Every function should be pure with no side effects.
 """
+
+T = TypeVar("T", bound=Callable)
 
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]
@@ -210,7 +212,7 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> NDArray[np.bool_]:
     return result
 
 
-def parse_dataclass(unsplit_arguments, dataclass, log):
+def parse_dataclass(unsplit_arguments: str, dataclass: T, log: Log) -> T:
     from dataclasses import fields
 
     # Positional Arguments
@@ -230,7 +232,8 @@ def parse_dataclass(unsplit_arguments, dataclass, log):
     allow_positional_args = True
 
     if unsplit_arguments == "":
-        return dataclass()
+        dataclass_instance: T = dataclass()
+        return dataclass_instance
 
     for i, arg in enumerate(unsplit_arguments.split(ARG_SEP)):
         if i + 1 > len(keys):
