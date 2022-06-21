@@ -1,7 +1,8 @@
 import os
 import random
+import re
 from dataclasses import asdict, dataclass, fields
-from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -21,14 +22,40 @@ from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args, Stream, number, stream
 from auto_editor.wavfile import read
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Callable[[Any], Any])
+BoolList = NDArray[np.bool_]
+BoolOperand = Callable[[BoolList, BoolList], BoolList]
+
+
+@dataclass
+class Audio:
+    stream: Stream = 0
+    threshold: float = -1
+
+
+@dataclass
+class Motion:
+    threshold: float = 0.02
+    blur: int = 9
+    width: int = 400
+
+
+@dataclass
+class Pixeldiff:
+    threshold: int = 1
+
+
+@dataclass
+class Random:
+    cutchance: float = 0.5
+    seed: int = -1
 
 
 def get_attributes(attrs_str: Optional[str], dataclass: T, log: Log) -> T:
     if attrs_str is None:
         return dataclass
 
-    attrs: T = parse_dataclass(attrs_str, dataclass, log)
+    attrs = parse_dataclass(attrs_str, dataclass, log)
 
     dic_value = asdict(attrs)
     dic_type: Dict[str, Union[type, Callable[[Any], Any]]] = {}
@@ -98,9 +125,7 @@ def get_audio_list(
     return np.fromiter((x > threshold for x in audio_list), dtype=np.bool_)
 
 
-def operand_combine(
-    a: NDArray[np.bool_], b: NDArray[np.bool_], call: Callable
-) -> NDArray[np.bool_]:
+def operand_combine(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
     if len(a) > len(b):
         b = np.resize(b, len(a))
     if len(b) > len(a):
@@ -111,7 +136,7 @@ def operand_combine(
 
 def get_stream_data(
     method: str,
-    attrs,
+    attrs_str: str,
     args: Args,
     i: int,
     inp: FileInfo,
@@ -130,22 +155,28 @@ def get_stream_data(
             (get_media_duration(inp.path, fps, temp, log) - 1), dtype=np.bool_
         )
     if method == "random":
-        if attrs.cutchance > 1 or attrs.cutchance < 0:
+        robj = get_attributes(attrs_str, Random, log)
+        if robj.cutchance > 1 or robj.cutchance < 0:
             log.error(f"random:cutchance must be between 0 and 1")
+        if robj.seed == -1:
+            robj.seed = random.randint(0, 2147483647)
         l = get_media_duration(inp.path, fps, temp, log) - 1
 
-        random.seed(attrs.seed)
-        log.debug(f"Seed: {attrs.seed}")
+        random.seed(robj.seed)
+        log.debug(f"Seed: {robj.seed}")
 
-        a = random.choices((0, 1), weights=(attrs.cutchance, 1 - attrs.cutchance), k=l)
+        a = random.choices((0, 1), weights=(robj.cutchance, 1 - robj.cutchance), k=l)
 
         return np.asarray(a, dtype=np.bool_)
     if method == "audio":
-        if attrs.stream == "all":
-            total_list = None
+        audio = get_attributes(attrs_str, Audio, log)
+        if audio.threshold == -1:
+            audio.threshold = args.silent_threshold
+        if audio.stream == "all":
+            total_list: Optional[NDArray[np.bool_]] = None
             for s in range(len(inp.audios)):
                 audio_list = get_audio_list(
-                    i, s, attrs.threshold, fps, progress, temp, log
+                    i, s, audio.threshold, fps, progress, temp, log
                 )
                 if total_list is None:
                     total_list = audio_list
@@ -157,7 +188,7 @@ def get_stream_data(
             return total_list
         else:
             return get_audio_list(
-                i, attrs.stream, attrs.threshold, fps, progress, temp, log
+                i, audio.stream, audio.threshold, fps, progress, temp, log
             )
     if method == "motion":
         from auto_editor.analyze.motion import motion_detection
@@ -165,24 +196,25 @@ def get_stream_data(
         if len(inp.videos) == 0:
             log.error("Video stream '0' does not exist.")
 
-        motion_list = motion_detection(inp.path, fps, progress, attrs.width, attrs.blur)
-        return np.fromiter((x >= attrs.threshold for x in motion_list), dtype=np.bool_)
+        mobj = get_attributes(attrs_str, Motion, log)
+        motion_list = motion_detection(inp.path, fps, progress, mobj.width, mobj.blur)
+        return np.fromiter((x >= mobj.threshold for x in motion_list), dtype=np.bool_)
 
-    # "pixeldiff"
     if method == "pixeldiff":
         from auto_editor.analyze.pixeldiff import pixel_difference
 
         if len(inp.videos) == 0:
             log.error("Video stream '0' does not exist.")
 
+        pobj = get_attributes(attrs_str, Pixeldiff, log)
         pixel_list = pixel_difference(inp.path, fps, progress)
-        return np.fromiter((x >= attrs.threshold for x in pixel_list), dtype=np.bool_)
+        return np.fromiter((x >= pobj.threshold for x in pixel_list), dtype=np.bool_)
 
     raise ValueError(f"Unreachable. {method=}")
 
 
 def get_has_loud(
-    method_str: str,
+    token_str: str,
     i: int,
     inp: FileInfo,
     fps: float,
@@ -191,68 +223,33 @@ def get_has_loud(
     log: Log,
     args: Args,
 ) -> NDArray[np.bool_]:
-    @dataclass
-    class Audio:
-        stream: Stream = 0
-        threshold: float = args.silent_threshold
 
-    @dataclass
-    class Motion:
-        threshold: float = 0.02
-        blur: int = 9
-        width: int = 400
-
-    @dataclass
-    class Pixeldiff:
-        threshold: int = 1
-
-    @dataclass
-    class Random:
-        cutchance: float = 0.5
-        seed: int = random.randint(0, 2147483647)
-
-    KEYWORD_SEP = " "
-    METHOD_ATTRS_SEP = ":"
+    KEYWORD_SEP = " _"
+    TOKEN_ATTRS_SEP = ":"
 
     result_array: Optional[NDArray[np.bool_]] = None
-    operand = None
+    operand: Optional[str] = None
 
-    logic_funcs = {
+    logic_funcs: Dict[str, BoolOperand] = {
         "and": np.logical_and,
         "or": np.logical_or,
         "xor": np.logical_xor,
     }
 
-    Methods = Union[Type[Audio], Type[Motion], Type[Pixeldiff], Type[Random], None]
+    # See: https://stackoverflow.com/questions/1059559/
+    for token in filter(None, re.split(r"[ _]+", token_str)):
 
-    method_str = method_str.replace("_", " ")  # Allow old style `--edit` to work
+        if TOKEN_ATTRS_SEP in token:
+            token, attrs_str = token.split(TOKEN_ATTRS_SEP)
+        else:
+            attrs_str = ""
 
-    for method in method_str.split(KEYWORD_SEP):
-
-        if method == "":  # Skip whitespace
-            continue
-
-        attrs_str: Optional[str] = None
-        if METHOD_ATTRS_SEP in method:
-            method, attrs_str = method.split(METHOD_ATTRS_SEP)
-
-        if method in ("audio", "motion", "pixeldiff", "random", "none", "all"):
+        if token in ("audio", "motion", "pixeldiff", "random", "none", "all"):
             if result_array is not None and operand is None:
                 log.error("Logic operator must be between two editing methods.")
 
-            if method == "audio":
-                attrs: Methods = get_attributes(attrs_str, Audio, log)
-            elif method == "motion":
-                attrs = get_attributes(attrs_str, Motion, log)
-            elif method == "pixeldiff":
-                attrs = get_attributes(attrs_str, Pixeldiff, log)
-            elif method == "random":
-                attrs = get_attributes(attrs_str, Random, log)
-            else:
-                attrs = None
-
             stream_data = get_stream_data(
-                method, attrs, args, i, inp, fps, progress, temp, log
+                token, attrs_str, args, i, inp, fps, progress, temp, log
             )
 
             if operand == "not":
@@ -266,18 +263,18 @@ def get_has_loud(
                 )
                 operand = None
 
-        elif method in ("and", "or", "xor"):
+        elif token in ("and", "or", "xor"):
             if operand is not None:
                 log.error("Invalid Editing Syntax.")
             if result_array is None:
-                log.error(f"'{method}' operand needs two arguments.")
-            operand = method
-        elif method == "not":
+                log.error(f"'{token}' operand needs two arguments.")
+            operand = token
+        elif token == "not":
             if operand is not None:
                 log.error("Invalid Editing Syntax.")
-            operand = method
+            operand = token
         else:
-            log.error(f"Unknown method/operator: '{method}'")
+            log.error(f"Unknown method/operator: '{token}'")
 
     if operand is not None:
         log.error(f"Dangling operand: '{operand}'")
@@ -315,10 +312,10 @@ def get_speed_list(
 
     speed_list = to_speed_list(has_loud, args.video_speed, args.silent_speed)
 
-    if args.cut_out != []:
+    if len(args.cut_out) > 0:
         speed_list = set_range(speed_list, args.cut_out, fps, 99999, log)
 
-    if args.add_in != []:
+    if len(args.add_in) > 0:
         speed_list = set_range(speed_list, args.add_in, fps, args.video_speed, log)
 
     for item in args.set_speed_for_range:

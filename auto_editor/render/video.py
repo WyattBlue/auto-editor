@@ -107,29 +107,29 @@ def render_av(
 ) -> Tuple[str, bool]:
 
     font_cache: Dict[str, Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]] = {}
-    img_cache = {}
+    img_cache: Dict[str, Image.Image] = {}
     for layer in timeline.v:
-        for obj in layer:
-            if isinstance(obj, TextObj) and obj.font not in font_cache:
+        for vobj in layer:
+            if isinstance(vobj, TextObj) and vobj.font not in font_cache:
                 try:
-                    if obj.font == "default":
-                        font_cache[obj.font] = ImageFont.load_default()
+                    if vobj.font == "default":
+                        font_cache[vobj.font] = ImageFont.load_default()
                     else:
-                        font_cache[obj.font] = ImageFont.truetype(obj.font, obj.size)
+                        font_cache[vobj.font] = ImageFont.truetype(vobj.font, vobj.size)
                 except OSError:
-                    log.error(f"Font '{obj.font}' not found.")
+                    log.error(f"Font '{vobj.font}' not found.")
 
-            if isinstance(obj, ImageObj) and obj.src not in img_cache:
-                source = Image.open(obj.src)
+            if isinstance(vobj, ImageObj) and vobj.src not in img_cache:
+                source = Image.open(vobj.src)
                 source = source.convert("RGBA")
-                source = source.rotate(obj.rotate, expand=True)
+                source = source.rotate(vobj.rotate, expand=True)
                 source = ImageChops.multiply(
                     source,
                     Image.new(
-                        "RGBA", source.size, (255, 255, 255, int(obj.opacity * 255))
+                        "RGBA", source.size, (255, 255, 255, int(vobj.opacity * 255))
                     ),
                 )
-                img_cache[obj.src] = source
+                img_cache[vobj.src] = source
 
     inp = timeline.inp
     cns = [av.open(inp.path, "r") for inp in timeline.inputs]
@@ -219,19 +219,20 @@ def render_av(
             # Add objects to obj_list
             obj_list: List[Union[VideoFrame, Visual]] = []
             for layer in timeline.v:
-                for obj in layer:
-                    if isinstance(obj, VideoObj):
-                        if index >= obj.start and index < obj.start + ceil(
-                            obj.dur / obj.speed
+                for lobj in layer:
+                    if isinstance(lobj, VideoObj):
+                        if index >= lobj.start and index < lobj.start + ceil(
+                            lobj.dur / lobj.speed
                         ):
                             obj_list.append(
                                 VideoFrame(
-                                    obj.offset + round((index - obj.start) * obj.speed),
-                                    obj.src,
+                                    lobj.offset
+                                    + round((index - lobj.start) * lobj.speed),
+                                    lobj.src,
                                 )
                             )
-                    elif index >= obj.start and index < obj.start + obj.dur:
-                        obj_list.append(obj)
+                    elif index >= lobj.start and index < lobj.start + lobj.dur:
+                        obj_list.append(lobj)
 
             # Render obj_list
             frame = null_frame

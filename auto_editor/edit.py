@@ -60,7 +60,7 @@ def edit_media(
     rules = get_rules(output_container)
     codec_error = "'{}' codec is not supported in '{}' container."
 
-    if not (args.sample_rate is None or args.sample_rate == "unset"):
+    if args.sample_rate is not None:
         if rules.samplerate is not None and args.sample_rate not in rules.samplerate:
             log.error(
                 f"'{output_container}' container only supports samplerates: {rules.samplerate}"
