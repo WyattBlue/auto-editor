@@ -37,6 +37,9 @@ ASpace = List[ALayer]
 
 
 def unclipify(layer: List[Clip]) -> NDArray[np.float_]:
+    if len(layer) == 0:
+        raise ValueError("Empty Clips")
+
     l: List[int] = []
     for clip in layer:
         if clip.src != 0:
@@ -52,7 +55,6 @@ def unclipify(layer: List[Clip]) -> NDArray[np.float_]:
 
     if len(set(l)) != len(l) or sorted(l) != l:
         raise ValueError(f"Clip layer to complex, cannot convert to speed list: {l}")
-
     arr = np.empty(layer[-1].offset + layer[-1].dur, dtype=float)
     arr.fill(99999)
 
@@ -166,20 +168,27 @@ def clipify(chunks: Chunks, src: int, start: float) -> List[Clip]:
     return clips
 
 
-def make_av(clips: List[Clip], inp: FileInfo) -> Tuple[VSpace, ASpace]:
+def make_av(all_clips: List[List[Clip]], inputs: List[FileInfo]) -> Tuple[VSpace, ASpace]:
     vclips: VSpace = [[]]
-    aclips: ASpace = [[] for a in inp.audios]
 
-    for clip in clips:
-        vclips[0].append(
-            VideoObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src)
-        )
+    max_a = 0
+    for inp in inputs:
+        max_a = max(max_a, len(inp.audios))
 
-    for a, _ in enumerate(inp.audios):
-        for clip in clips:
-            aclips[a].append(
-                AudioObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src, a)
-            )
+    aclips: ASpace = [[] for a in range(max_a)]
+
+    for clips, inp in zip(all_clips, inputs):
+        if len(inp.videos) > 0:
+            for clip in clips:
+                vclips[0].append(
+                    VideoObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src)
+                )
+        if len(inp.audios) > 0:
+            for clip in clips:
+                for a, _ in enumerate(inp.audios):
+                    aclips[a].append(
+                        AudioObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src, a)
+                    )
 
     return vclips, aclips
 
@@ -188,19 +197,22 @@ def make_layers(
     inputs: List[FileInfo], speedlists: List[NDArray[np.float_]]
 ) -> Tuple[Optional[Chunks], VSpace, ASpace]:
 
-    clips = []
+    all_clips: List[List[Clip]] = []
     start = 0.0
     for i, _chunks in enumerate([chunkify(s) for s in speedlists]):
-        clips += clipify(_chunks, i, start)
+        all_clips.append(clipify(_chunks, i, start))
         start += chunks_len(_chunks)
 
     chunks: Optional[Chunks] = None
     try:
+        from itertools import chain
+
+        clips = list(chain.from_iterable(all_clips))
         chunks = chunkify(unclipify(clips))
     except ValueError:
         pass
 
-    vclips, aclips = make_av(clips, inputs[0])
+    vclips, aclips = make_av(all_clips, inputs)
     return chunks, vclips, aclips
 
 
@@ -214,14 +226,12 @@ def make_timeline(
 ) -> Timeline:
     assert len(inputs) > 0
 
-    inp = inputs[0]
-
     if args.frame_rate is None:
-        fps = inp.get_fps()
+        fps = inputs[0].get_fps()
     else:
         fps = args.frame_rate
 
-    res = inp.get_res()
+    res = inputs[0].get_res()
 
     speedlists = []
     for i, inp in enumerate(inputs):
