@@ -168,7 +168,9 @@ def clipify(chunks: Chunks, src: int, start: float) -> List[Clip]:
     return clips
 
 
-def make_av(all_clips: List[List[Clip]], inputs: List[FileInfo]) -> Tuple[VSpace, ASpace]:
+def make_av(
+    all_clips: List[List[Clip]], inputs: List[FileInfo]
+) -> Tuple[VSpace, ASpace]:
     vclips: VSpace = [[]]
 
     max_a = 0
@@ -187,7 +189,9 @@ def make_av(all_clips: List[List[Clip]], inputs: List[FileInfo]) -> Tuple[VSpace
             for clip in clips:
                 for a, _ in enumerate(inp.audios):
                     aclips[a].append(
-                        AudioObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src, a)
+                        AudioObj(
+                            clip.start, clip.dur, clip.offset, clip.speed, clip.src, a
+                        )
                     )
 
     return vclips, aclips
@@ -205,9 +209,7 @@ def make_layers(
 
     chunks: Optional[Chunks] = None
     try:
-        from itertools import chain
-
-        clips = list(chain.from_iterable(all_clips))
+        clips = [item for sublist in all_clips for item in sublist]
         chunks = chunkify(unclipify(clips))
     except ValueError:
         pass
