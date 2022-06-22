@@ -71,9 +71,7 @@ def _values(
     _vars: Dict[str, int],
     log: Log,
 ) -> Any:
-    if _type is Any:  # TODO: See if this check is necessary
-        return None
-    if _type is float and name != "rotate":
+    if _type is float:
         _type = number
     elif _type == Align:
         _type = align

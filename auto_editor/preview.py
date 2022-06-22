@@ -25,8 +25,8 @@ def preview(timeline: Timeline, temp: str, log: Log) -> None:
 
     # Calculate input videos length
     in_len = 0
-    for inp in timeline.inputs:
-        in_len += get_media_duration(inp.path, inp.get_fps(), temp, log)
+    for i, inp in enumerate(timeline.inputs):
+        in_len += get_media_duration(inp.path, i, inp.get_fps(), temp, log)
 
     out_len = timeline.out_len()
 

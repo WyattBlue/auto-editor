@@ -51,10 +51,7 @@ class Random:
     seed: int = -1
 
 
-def get_attributes(attrs_str: Optional[str], dataclass: T, log: Log) -> T:
-    if attrs_str is None:
-        return dataclass
-
+def get_attributes(attrs_str: str, dataclass: T, log: Log) -> T:
     attrs = parse_dataclass(attrs_str, dataclass, log)
 
     dic_value = asdict(attrs)
@@ -78,8 +75,8 @@ def get_attributes(attrs_str: Optional[str], dataclass: T, log: Log) -> T:
     return attrs
 
 
-def get_media_duration(path: str, fps: float, temp: str, log: Log) -> int:
-    audio_path = os.path.join(temp, "0-0.wav")
+def get_media_duration(path: str, i: int, fps: float, temp: str, log: Log) -> int:
+    audio_path = os.path.join(temp, f"{i}-0.wav")
     if os.path.isfile(audio_path):
         sample_rate, audio_samples = read(audio_path)
         sample_rate_per_frame = sample_rate / fps
@@ -148,11 +145,11 @@ def get_stream_data(
 
     if method == "none":
         return np.ones(
-            (get_media_duration(inp.path, fps, temp, log) - 1), dtype=np.bool_
+            (get_media_duration(inp.path, i, fps, temp, log) - 1), dtype=np.bool_
         )
     if method == "all":
         return np.zeros(
-            (get_media_duration(inp.path, fps, temp, log) - 1), dtype=np.bool_
+            (get_media_duration(inp.path, i, fps, temp, log) - 1), dtype=np.bool_
         )
     if method == "random":
         robj = get_attributes(attrs_str, Random, log)
@@ -160,7 +157,7 @@ def get_stream_data(
             log.error(f"random:cutchance must be between 0 and 1")
         if robj.seed == -1:
             robj.seed = random.randint(0, 2147483647)
-        l = get_media_duration(inp.path, fps, temp, log) - 1
+        l = get_media_duration(inp.path, i, fps, temp, log) - 1
 
         random.seed(robj.seed)
         log.debug(f"Seed: {robj.seed}")
@@ -224,8 +221,8 @@ def get_has_loud(
     args: Args,
 ) -> NDArray[np.bool_]:
 
-    KEYWORD_SEP = " _"
-    TOKEN_ATTRS_SEP = ":"
+    METHOD_ATTRS_SEP = ":"
+    METHODS = ("audio", "motion", "pixeldiff", "random", "none", "all")
 
     result_array: Optional[NDArray[np.bool_]] = None
     operand: Optional[str] = None
@@ -238,13 +235,14 @@ def get_has_loud(
 
     # See: https://stackoverflow.com/questions/1059559/
     for token in filter(None, re.split(r"[ _]+", token_str)):
-
-        if TOKEN_ATTRS_SEP in token:
-            token, attrs_str = token.split(TOKEN_ATTRS_SEP)
+        if METHOD_ATTRS_SEP in token:
+            token, attrs_str = token.split(METHOD_ATTRS_SEP)
+            if token not in METHODS:
+                log.error(f"'{token}': Token not allowed to have attributes.")
         else:
             attrs_str = ""
 
-        if token in ("audio", "motion", "pixeldiff", "random", "none", "all"):
+        if token in METHODS:
             if result_array is not None and operand is None:
                 log.error("Logic operator must be between two editing methods.")
 
