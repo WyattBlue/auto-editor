@@ -23,34 +23,38 @@ def make_new_audio(
     samples = []
     samplerate = 0
     for x in range(len(timeline.inputs)):
-        samplerate, s = read(os.path.join(temp, f"{x}-{t}.wav"))
-        samples.append(s)
+        audio_path = os.path.join(temp, f"{x}-{t}.wav")
+        if os.path.exists(audio_path):
+            samplerate, s = read(audio_path)
+            samples.append(s)
 
     assert samplerate != 0
 
     progress.start(len(clips), "Creating new audio")
     fps = timeline.fps
 
-    main_writer = wave.open(os.path.join(temp, f"new{t}.wav"), "wb")
-    main_writer.setnchannels(2)
-    main_writer.setframerate(samplerate)
-    main_writer.setsampwidth(2)
+    # See: https://github.com/python/cpython/blob/3.10/Lib/wave.py
+    writer = wave.open(os.path.join(temp, f"new{t}.wav"), "wb")
+    writer.setnchannels(2)
+    writer.setframerate(samplerate)
+    writer.setsampwidth(2)
 
     for c, clip in enumerate(clips):
-        sample_start = int(clip.offset / fps * samplerate)
-        sample_end = int((clip.offset + clip.dur) / fps * samplerate)
-
         samp_list = samples[clip.src]
 
-        if sample_end > len(samp_list):
-            sample_end = len(samp_list)
+        samp_start = int(clip.offset / fps * samplerate)
+        samp_end = int((clip.offset + clip.dur) / fps * samplerate)
+        if samp_end > len(samp_list):
+            samp_end = len(samp_list)
 
         if clip.speed == 1:
-            main_writer.writeframes(samp_list[sample_start:sample_end])  # type: ignore
+            writer.writeframesraw(samp_list[samp_start:samp_end])  # type: ignore
         else:
-            output = phasevocoder(2, clip.speed, samp_list[sample_start:sample_end])
+            output = phasevocoder(2, clip.speed, samp_list[samp_start:samp_end])
             if output.shape[0] != 0:
-                main_writer.writeframes(output)  # type: ignore
+                writer.writeframesraw(output)  # type: ignore
 
         progress.tick(c)
+
+    writer.close()
     progress.end()
