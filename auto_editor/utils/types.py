@@ -168,6 +168,16 @@ def color(val: str) -> str:
     raise ValueError(f"Invalid Color: '{color}'")
 
 
+def resolution(val: Optional[str]) -> Optional[Tuple[int, int]]:
+    if val is None:
+        return None
+    vals = val.strip().split(",")
+    if len(vals) != 2:
+        raise TypeError(f"'{val}': Resolution takes two numbers")
+
+    return natural(vals[0]), natural(vals[1])
+
+
 @dataclass
 class MainArgs:
     add_text: List[str] = field(default_factory=list)
@@ -193,6 +203,7 @@ class MainArgs:
     set_speed_for_range: List[Tuple[float, str, str]] = field(default_factory=list)
     frame_rate: Optional[float] = None
     sample_rate: Optional[int] = None
+    resolution: Optional[Tuple[int, int]] = None
     background: str = "#000"
     edit_based_on: str = "audio"
     keep_tracks_separate: bool = False

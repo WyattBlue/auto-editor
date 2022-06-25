@@ -360,7 +360,7 @@ def main(sys_args: Optional[List[str]] = None):
         run_program(["example.mp4", "--export_as_json"])
         run_program(["example.json"])
 
-    def scale_tests():
+    def resolution_and_scale():
         run_program(["example.mp4", "--scale", "1.5"])
         with av.open("example_ALTERED.mp4") as cn:
             assert cn.streams.video[0].average_rate == 30
@@ -373,6 +373,13 @@ def main(sys_args: Optional[List[str]] = None):
             assert cn.streams.video[0].average_rate == 30
             assert cn.streams.video[0].width == 256
             assert cn.streams.video[0].height == 144
+            assert cn.streams.audio[0].rate == 48000
+
+        run_program(["example.mp4", "-res", "700,380", "-b", "darkgreen"])
+        with av.open("example_ALTERED.mp4") as cn:
+            assert cn.streams.video[0].average_rate == 30
+            assert cn.streams.video[0].width == 700
+            assert cn.streams.video[0].height == 380
             assert cn.streams.audio[0].rate == 48000
 
     def various_errors_test():
@@ -559,6 +566,7 @@ def main(sys_args: Optional[List[str]] = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                resolution_and_scale,
                 various_errors_test,
                 render_text,
                 check_font_error,
@@ -583,7 +591,6 @@ def main(sys_args: Optional[List[str]] = None):
                 silent_threshold,
                 track_tests,
                 json_tests,
-                scale_tests,
                 codec_tests,
                 motion_tests,
                 edit_positive_tests,

@@ -161,9 +161,7 @@ def render_av(
 
     log.debug(f"apply video quality settings now: {not apply_video_later}")
 
-    width = inp.videos[0].width
-    height = inp.videos[0].height
-
+    width, height = timeline.res
     spedup = os.path.join(temp, "spedup0.mp4")
 
     cmd = [
@@ -274,6 +272,9 @@ def render_av(
 
                     if frame.width != width or frame.height != height:
                         img = frame.to_image().convert("RGB")
+                        if img.width > width or img.height > height:
+                            factor = ceil(max(width / img.width, height / img.height))
+                            img = ImageOps.scale(img, factor)
                         img = ImageOps.pad(img, (width, height), color=args.background)
                         frame = frame.from_image(img).reformat(format=target_pix_fmt)
 

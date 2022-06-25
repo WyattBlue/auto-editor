@@ -9,22 +9,22 @@ import auto_editor.utils.func as usefulfunctions
 from auto_editor.edit import edit_media
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.log import Log, Timer
-from auto_editor.utils.types import MainArgs
+from auto_editor.utils.types import (
+    MainArgs,
+    color,
+    margin,
+    number,
+    resolution,
+    sample_rate,
+    speed_range,
+    time,
+    time_range,
+)
 from auto_editor.validate_input import valid_input
 from auto_editor.vanparse import ArgumentParser
 
 
 def main_options(parser: ArgumentParser) -> ArgumentParser:
-    from auto_editor.utils.types import (
-        color,
-        margin,
-        number,
-        sample_rate,
-        speed_range,
-        time,
-        time_range,
-    )
-
     parser.add_text("Object Options")
     parser.add_argument(
         "--add-text",
@@ -147,6 +147,9 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "-ar",
         type=sample_rate,
         help="Set the sample rate for the timeline and output media.",
+    )
+    parser.add_argument(
+        "--resolution", "-res", type=resolution, help="Set timeline width and height."
     )
     parser.add_argument(
         "--background",
