@@ -150,6 +150,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_argument(
         "--background",
+        "-b",
         type=color,
         help="Set the color of the background that is visible when the video is moved.",
     )
@@ -179,7 +180,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Choose the export mode.",
     )
     parser.add_text("Utility Options")
-    parser.add_argument("--player", help="Set player to open output media files.")
+    parser.add_argument("--player", "-p", help="Set player to open output media files.")
     parser.add_argument(
         "--no-open",
         flag=True,
