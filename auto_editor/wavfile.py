@@ -9,11 +9,11 @@ IEEE_FLOAT = 0x0003
 EXTENSIBLE = 0xFFFE
 
 AudioData = Union[np.memmap, np.ndarray]
-EndianType = Literal[">", "<"]  # Big Endian, Little Endian
+Endian = Literal[">", "<"]  # Big Endian, Little Endian
 
 
 def _read_fmt_chunk(
-    fid: io.BufferedReader, en: EndianType
+    fid: io.BufferedReader, en: Endian
 ) -> Tuple[int, int, int, int, int]:
     size: int = struct.unpack(f"{en}I", fid.read(4))[0]
 
@@ -24,7 +24,7 @@ def _read_fmt_chunk(
     bytes_read = 16
 
     format_tag, channels, fs, _, block_align, bit_depth = res
-    # underscore is "bytes_per_second"
+    # underscore is "bitrate"
 
     if format_tag == EXTENSIBLE and size >= 18:
         ext_chunk_size = struct.unpack(f"{en}H", fid.read(2))[0]
@@ -63,7 +63,7 @@ def _read_data_chunk(
     format_tag: int,
     channels: int,
     bit_depth: int,
-    en: EndianType,
+    en: Endian,
     block_align: int,
     data_size: Optional[int],
 ) -> AudioData:
@@ -115,15 +115,14 @@ def _read_data_chunk(
     return data
 
 
-def _skip_unknown_chunk(fid: io.BufferedReader, en: EndianType) -> None:
-    data = fid.read(4)
-    if data:
+def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
+    if data := fid.read(4):
         size = struct.unpack(f"{en}I", data)[0]
         fid.seek(size, 1)
         _handle_pad_byte(fid, size)
 
 
-def _read_rf64_chunk(fid: io.BufferedReader) -> Tuple[int, int, EndianType]:
+def _read_rf64_chunk(fid: io.BufferedReader) -> Tuple[int, int, Endian]:
 
     # https://tech.ebu.ch/docs/tech/tech3306v1_0.pdf
     # https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.2088-1-201910-I!!PDF-E.pdf
@@ -137,7 +136,7 @@ def _read_rf64_chunk(fid: io.BufferedReader) -> Tuple[int, int, EndianType]:
     bw_size_low = fid.read(4)
     bw_size_high = fid.read(4)
 
-    en: EndianType = ">" if (bw_size_high > bw_size_low) else "<"
+    en: Endian = ">" if (bw_size_high > bw_size_low) else "<"
 
     data_size_low = fid.read(4)
     data_size_high = fid.read(4)
@@ -156,10 +155,8 @@ def _read_rf64_chunk(fid: io.BufferedReader) -> Tuple[int, int, EndianType]:
     return data_size, file_size, en
 
 
-def _read_riff_chunk(
-    sig: bytes, fid: io.BufferedReader
-) -> Tuple[None, int, EndianType]:
-    en: EndianType = "<" if sig == b"RIFF" else ">"
+def _read_riff_chunk(sig: bytes, fid: io.BufferedReader) -> Tuple[None, int, Endian]:
+    en: Endian = "<" if sig == b"RIFF" else ">"
     file_size: int = struct.unpack(f"{en}I", fid.read(4))[0] + 8
 
     form = fid.read(4)
