@@ -226,12 +226,8 @@ def make_timeline(
 ) -> Timeline:
     assert len(inputs) > 0
 
-    if args.frame_rate is None:
-        fps = inputs[0].get_fps()
-    else:
-        fps = args.frame_rate
-
-    res = inputs[0].get_res()
+    fps = inputs[0].get_fps() if args.frame_rate is None else args.frame_rate
+    res = inputs[0].get_res() if args.resolution is None else args.resolution
 
     speedlists = []
     for i, inp in enumerate(inputs):
