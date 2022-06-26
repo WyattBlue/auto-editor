@@ -387,8 +387,7 @@ def main(sys_args: Optional[List[str]] = None):
             ["example.mp4", "--add_rectangle", "0,60", "--cut_out", "60,end"]
         )
 
-    def effect_tests():
-        """Test rendering video objects"""
+    def render_video_objs():
         run_program(
             [
                 "resources/testsrc.mp4",
@@ -399,6 +398,37 @@ def main(sys_args: Optional[List[str]] = None):
             ]
         )
         os.remove("resources/testsrc_ALTERED.mp4")
+
+        # Every element should be visible, order should be preserved.
+        run_program(
+            [
+                "example.mp4",
+                "--add-ellipse",
+                "0,30,centerX,centerY,300,300,fill=red",
+                "--add-rectangle",
+                "0,30,500,440,400,200,fill=skyblue",
+                "--add-ellipse",
+                "0,30,centerX,centerY,100,100,fill=darkgreen",
+                "--edit",
+                "none",
+                "--cut-out",
+                "30,end",
+            ]
+        )
+
+        # Both ellipses should be visible
+        run_program(
+            [
+                "example.mp4",
+                "--add-ellipse",
+                "0,60,centerX,centerY,300,300,fill=darkgreen",
+                "0,30,centerX,centerY,200,200,fill=green",
+                "--edit",
+                "none",
+                "--cut-out",
+                "60,end",
+            ]
+        )
 
     def render_text():
         run_program(["example.mp4", "--add-text", "0,30,This is my text,font=default"])
@@ -566,11 +596,11 @@ def main(sys_args: Optional[List[str]] = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                render_video_objs,
                 resolution_and_scale,
                 various_errors_test,
                 render_text,
                 check_font_error,
-                effect_tests,
                 frame_rate,
                 help_tests,
                 version_test,

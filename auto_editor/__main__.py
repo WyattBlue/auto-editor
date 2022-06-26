@@ -29,21 +29,25 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--add-text",
         nargs="*",
+        pool=True,
         help="Add a text object to the timeline.",
     )
     parser.add_argument(
         "--add-rectangle",
         nargs="*",
+        pool=True,
         help="Add a rectangle object to the timeline.",
     )
     parser.add_argument(
         "--add-ellipse",
         nargs="*",
+        pool=True,
         help="Add an ellipse object to the timeline.",
     )
     parser.add_argument(
         "--add-image",
         nargs="*",
+        pool=True,
         help="Add an image object onto the timeline.",
     )
     parser.add_text("URL Download Options")

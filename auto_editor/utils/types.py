@@ -180,10 +180,7 @@ def resolution(val: Optional[str]) -> Optional[Tuple[int, int]]:
 
 @dataclass
 class MainArgs:
-    add_text: List[str] = field(default_factory=list)
-    add_rectangle: List[str] = field(default_factory=list)
-    add_ellipse: List[str] = field(default_factory=list)
-    add_image: List[str] = field(default_factory=list)
+    pool: List[Tuple[str, str]] = field(default_factory=list)
     yt_dlp_location: str = "yt-dlp"
     download_format: Optional[str] = None
     output_format: Optional[str] = None
