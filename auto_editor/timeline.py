@@ -248,23 +248,23 @@ def make_timeline(
     }
 
     pool: List[Visual] = []
-
-    for o in args.add_text:
-        _text = parse_dataclass(o, TextObj, log)
-        assert isinstance(_text, TextObj)
-        pool.append(_text)
-    for o in args.add_rectangle:
-        _rect = parse_dataclass(o, RectangleObj, log)
-        assert isinstance(_rect, RectangleObj)
-        pool.append(_rect)
-    for o in args.add_ellipse:
-        _ellipse = parse_dataclass(o, EllipseObj, log)
-        assert isinstance(_ellipse, EllipseObj)
-        pool.append(_ellipse)
-    for o in args.add_image:
-        _img = parse_dataclass(o, ImageObj, log)
-        assert isinstance(_img, ImageObj)
-        pool.append(_img)
+    for key, obj_str in args.pool:
+        if key == "add_text":
+            _text = parse_dataclass(obj_str, TextObj, log)
+            assert isinstance(_text, TextObj)
+            pool.append(_text)
+        if key == "add_rectangle":
+            _rect = parse_dataclass(obj_str, RectangleObj, log)
+            assert isinstance(_rect, RectangleObj)
+            pool.append(_rect)
+        if key == "add_ellipse":
+            _ellipse = parse_dataclass(obj_str, EllipseObj, log)
+            assert isinstance(_ellipse, EllipseObj)
+            pool.append(_ellipse)
+        if key == "add_image":
+            _img = parse_dataclass(obj_str, ImageObj, log)
+            assert isinstance(_img, ImageObj)
+            pool.append(_img)
 
     for obj in pool:
         dic_value = asdict(obj)
