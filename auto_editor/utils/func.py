@@ -1,4 +1,4 @@
-from typing import Callable, List, Tuple, TypeVar, Union, overload
+from typing import List, Tuple, TypeVar, Union, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,7 +11,7 @@ To prevent duplicate code being pasted between scripts, common functions should 
 put here. Every function should be pure with no side effects.
 """
 
-T = TypeVar("T", bound=Callable)
+T = TypeVar("T", bound=type)
 
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]

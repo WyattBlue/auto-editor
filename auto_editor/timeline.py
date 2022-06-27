@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, fields
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Type, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -28,7 +28,7 @@ class Clip(NamedTuple):
     src: int
 
 
-Visual = Union[TextObj, ImageObj, RectangleObj, EllipseObj]
+Visual = Type[Union[TextObj, ImageObj, RectangleObj, EllipseObj]]
 VLayer = List[Union[VideoObj, Visual]]
 VSpace = List[VLayer]
 
@@ -250,21 +250,13 @@ def make_timeline(
     pool: List[Visual] = []
     for key, obj_str in args.pool:
         if key == "add_text":
-            _text = parse_dataclass(obj_str, TextObj, log)
-            assert isinstance(_text, TextObj)
-            pool.append(_text)
+            pool.append(parse_dataclass(obj_str, TextObj, log))
         if key == "add_rectangle":
-            _rect = parse_dataclass(obj_str, RectangleObj, log)
-            assert isinstance(_rect, RectangleObj)
-            pool.append(_rect)
+            pool.append(parse_dataclass(obj_str, RectangleObj, log))
         if key == "add_ellipse":
-            _ellipse = parse_dataclass(obj_str, EllipseObj, log)
-            assert isinstance(_ellipse, EllipseObj)
-            pool.append(_ellipse)
+            pool.append(parse_dataclass(obj_str, EllipseObj, log))
         if key == "add_image":
-            _img = parse_dataclass(obj_str, ImageObj, log)
-            assert isinstance(_img, ImageObj)
-            pool.append(_img)
+            pool.append(parse_dataclass(obj_str, ImageObj, log))
 
     for obj in pool:
         dic_value = asdict(obj)
@@ -274,7 +266,7 @@ def make_timeline(
 
         # Convert to the correct types
         for k, _type in dic_type.items():
-            obj.__setattr__(k, _values(k, dic_value[k], _type, _vars, log))
+            setattr(obj, k, _values(k, dic_value[k], _type, _vars, log))
 
         if obj.dur < 1:
             log.error(f"dur's value must be greater than 0. Was '{obj.dur}'.")
