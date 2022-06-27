@@ -22,7 +22,7 @@ from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args, Stream, number, stream
 from auto_editor.wavfile import read
 
-T = TypeVar("T", bound=Callable[[Any], Any])
+T = TypeVar("T", bound=type)
 BoolList = NDArray[np.bool_]
 BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
