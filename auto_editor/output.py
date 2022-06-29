@@ -8,21 +8,21 @@ from auto_editor.utils.types import Args
 
 
 def fset(cmd: List[str], option: str, value: str) -> List[str]:
-    if value is None or value == "unset":
+    if value == "unset":
         return cmd
     return cmd + [option] + [value]
 
 
-def get_vcodec(vcodec: str, inp: FileInfo, rules: Container) -> str:
+def get_vcodec(vcodec: str, inp: FileInfo, ctr: Container) -> str:
     if vcodec == "auto":
         vcodec = inp.videos[0].codec
 
-        if rules.vcodecs is not None:
-            if rules.vstrict and vcodec not in rules.vcodecs:
-                return rules.vcodecs[0]
+        if ctr.vcodecs is not None:
+            if ctr.vstrict and vcodec not in ctr.vcodecs:
+                return ctr.vcodecs[0]
 
-            if vcodec in rules.disallow_v:
-                return rules.vcodecs[0]
+            if vcodec in ctr.disallow_v:
+                return ctr.vcodecs[0]
 
     if vcodec == "copy":
         return inp.videos[0].codec
@@ -32,17 +32,17 @@ def get_vcodec(vcodec: str, inp: FileInfo, rules: Container) -> str:
     return vcodec
 
 
-def get_acodec(acodec: str, inp: FileInfo, rules: Container) -> str:
+def get_acodec(acodec: str, inp: FileInfo, ctr: Container) -> str:
     if acodec == "auto":
         acodec = inp.audios[0].codec
 
-        if rules.acodecs is not None:  # Just in case, but shouldn't happen
-            if rules.astrict and acodec not in rules.acodecs:
+        if ctr.acodecs is not None:  # Just in case, but shouldn't happen
+            if ctr.astrict and acodec not in ctr.acodecs:
                 # Input codec can't be used for output, so use a new safe codec.
-                return rules.acodecs[0]
+                return ctr.acodecs[0]
 
-            if acodec in rules.disallow_a:
-                return rules.acodecs[0]
+            if acodec in ctr.disallow_a:
+                return ctr.acodecs[0]
 
     if acodec == "copy":
         return inp.audios[0].codec
@@ -50,21 +50,18 @@ def get_acodec(acodec: str, inp: FileInfo, rules: Container) -> str:
 
 
 def video_quality(
-    cmd: List[str], args: Args, inp: FileInfo, rules: Container
+    cmd: List[str], args: Args, inp: FileInfo, ctr: Container
 ) -> List[str]:
     cmd = fset(cmd, "-b:v", args.video_bitrate)
 
     qscale = args.video_quality_scale
-
     if args.video_codec == "uncompressed" and qscale == "unset":
         qscale = "1"
 
-    vcodec = get_vcodec(args.video_codec, inp, rules)
+    vcodec = get_vcodec(args.video_codec, inp, ctr)
 
     cmd.extend(["-c:v", vcodec])
-
     cmd = fset(cmd, "-qscale:v", qscale)
-
     cmd.extend(["-movflags", "faststart"])
     return cmd
 
@@ -72,30 +69,32 @@ def video_quality(
 def mux_quality_media(
     ffmpeg: FFmpeg,
     video_output: List[Tuple[int, bool, str, bool]],
-    rules: Container,
-    write_file: str,
-    container: str,
+    ctr: Container,
+    output_path: str,
     args: Args,
     inp: FileInfo,
     temp: str,
     log: Log,
 ) -> None:
-    s_tracks = 0 if not rules.allow_subtitle else len(inp.subtitles)
-    a_tracks = 0 if not rules.allow_audio else len(inp.audios)
-    v_tracks = 0 if not rules.allow_video else len(video_output)
+    s_tracks = 0 if not ctr.allow_subtitle else len(inp.subtitles)
+    a_tracks = 0 if not ctr.allow_audio else len(inp.audios)
+    v_tracks = 0 if not ctr.allow_video else len(video_output)
 
     cmd = ["-hide_banner", "-y", "-i", inp.path]
 
-    # fmt: off
-    for _, is_video, path, _, in video_output:
-        if is_video or rules.allow_image:
+    for (
+        _,
+        is_video,
+        path,
+        _,
+    ) in video_output:
+        if is_video or ctr.allow_image:
             cmd.extend(["-i", path])
         else:
             v_tracks -= 1
-    # fmt: on
 
     if a_tracks > 0:
-        if args.keep_tracks_separate and rules.max_audios is None:
+        if args.keep_tracks_separate and ctr.max_audios is None:
             for t in range(a_tracks):
                 cmd.extend(["-i", os.path.join(temp, f"new{t}.wav")])
         else:
@@ -134,10 +133,10 @@ def mux_quality_media(
     for track, is_video, path, apply_video in video_output:
         if is_video:
             if apply_video:
-                cmd = video_quality(cmd, args, inp, rules)
+                cmd = video_quality(cmd, args, inp, ctr)
             else:
                 cmd.extend([f"-c:v:{track}", "copy"])
-        elif rules.allow_image:
+        elif ctr.allow_image:
             ext = os.path.splitext(path)[1][1:]
             cmd.extend(
                 [f"-c:v:{track}", ext, f"-disposition:v:{track}", "attached_pic"]
@@ -161,15 +160,15 @@ def mux_quality_media(
 
     if s_tracks > 0:
         scodec = inp.subtitles[0].codec
-        if inp.ext == f".{container}":
+        if inp.ext == os.path.splitext(output_path)[1]:
             cmd.extend(["-c:s", scodec])
-        elif rules.scodecs is not None:
-            if scodec not in rules.scodecs:
-                scodec = rules.scodecs[0]
+        elif ctr.scodecs is not None:
+            if scodec not in ctr.scodecs:
+                scodec = ctr.scodecs[0]
             cmd.extend(["-c:s", scodec])
 
     if a_tracks > 0:
-        acodec = get_acodec(args.audio_codec, inp, rules)
+        acodec = get_acodec(args.audio_codec, inp, ctr)
 
         cmd = fset(cmd, "-c:a", acodec)
         cmd = fset(cmd, "-b:a", args.audio_bitrate)
@@ -180,5 +179,5 @@ def mux_quality_media(
     cmd.extend(
         ["-map", "0:t?", "-map", "0:d?"]
     )  # Add input attachments and data to output.
-    cmd.append(write_file)
-    ffmpeg.run_check_errors(cmd, log, path=write_file)
+    cmd.append(output_path)
+    ffmpeg.run_check_errors(cmd, log, path=output_path)
