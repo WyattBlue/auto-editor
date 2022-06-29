@@ -8,6 +8,7 @@ on:
       - '**.txt'
       - '**.png'
       - 'auto_editor/__init__.py'
+      - 'site/**/*'
     branches:
       - master
   pull_request:
