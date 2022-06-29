@@ -265,7 +265,7 @@ class Container:
     samplerate: Optional[List[int]] = None  # Any samplerate is allowed
 
 
-def get_rules(key: str) -> Container:
+def container_constructor(key: str) -> Container:
     if key in containers:
         return Container(**containers[key])
     return Container(**containers["not_in_here"])

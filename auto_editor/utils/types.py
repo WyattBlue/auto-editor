@@ -119,7 +119,7 @@ def time_range(val: str) -> List[str]:
 
 def speed_range(val: str) -> Tuple[float, str, str]:
     a = _comma_coerce("speed_range", val, 3)
-    return (number(a[0]), a[1], a[2])
+    return number(a[0]), a[1], a[2]
 
 
 Align = Literal["left", "center", "right"]

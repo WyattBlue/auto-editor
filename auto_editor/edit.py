@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
-from auto_editor.utils.container import get_rules
+from auto_editor.utils.container import container_constructor
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args, Chunk, Chunks
@@ -54,17 +54,14 @@ def edit_media(
         if os.path.splitext(output)[1] == "":
             output = set_output_name(output, inp.ext, args.export)
 
-    output_container = os.path.splitext(output)[1].replace(".", "")
+    out_ext = os.path.splitext(output)[1].replace(".", "")
 
     # Check if export options make sense.
-    rules = get_rules(output_container)
+    ctr = container_constructor(out_ext)
     codec_error = "'{}' codec is not supported in '{}' container."
 
-    if args.sample_rate is not None:
-        if rules.samplerate is not None and args.sample_rate not in rules.samplerate:
-            log.error(
-                f"'{output_container}' container only supports samplerates: {rules.samplerate}"
-            )
+    if ctr.samplerate is not None and args.sample_rate not in ctr.samplerate:
+        log.error(f"'{out_ext}' container only supports samplerates: {ctr.samplerate}")
 
     vcodec = args.video_codec
     if vcodec == "uncompressed":
@@ -73,13 +70,13 @@ def edit_media(
         vcodec = inp.videos[0].codec
 
     if vcodec != "auto":
-        if rules.vstrict:
-            assert rules.vcodecs is not None
-            if vcodec not in rules.vcodecs:
-                log.error(codec_error.format(vcodec, output_container))
+        if ctr.vstrict:
+            assert ctr.vcodecs is not None
+            if vcodec not in ctr.vcodecs:
+                log.error(codec_error.format(vcodec, out_ext))
 
-        if vcodec in rules.disallow_v:
-            log.error(codec_error.format(vcodec, output_container))
+        if vcodec in ctr.disallow_v:
+            log.error(codec_error.format(vcodec, out_ext))
 
     acodec = args.audio_codec
     if acodec == "copy":
@@ -87,18 +84,16 @@ def edit_media(
         log.debug(f"Settings acodec to {acodec}")
 
     if acodec not in ("unset", "auto"):
-        if rules.astrict:
-            assert rules.acodecs is not None
-            if acodec not in rules.acodecs:
-                log.error(codec_error.format(acodec, output_container))
+        if ctr.astrict:
+            assert ctr.acodecs is not None
+            if acodec not in ctr.acodecs:
+                log.error(codec_error.format(acodec, out_ext))
 
-        if acodec in rules.disallow_a:
-            log.error(codec_error.format(acodec, output_container))
+        if acodec in ctr.disallow_a:
+            log.error(codec_error.format(acodec, out_ext))
 
-    if args.keep_tracks_separate and rules.max_audios == 1:
-        log.warning(
-            f"'{output_container}' container doesn't support multiple audio tracks."
-        )
+    if args.keep_tracks_separate and ctr.max_audios == 1:
+        log.warning(f"'{out_ext}' container doesn't support multiple audio tracks.")
 
     if not args.preview and not args.timeline:
         if os.path.isdir(output):
@@ -190,12 +185,12 @@ def edit_media(
         from auto_editor.output import mux_quality_media
         from auto_editor.render.video import render_av
 
-        if rules.allow_subtitle:
+        if ctr.allow_subtitle:
             from auto_editor.render.subtitle import cut_subtitles
 
             cut_subtitles(ffmpeg, timeline, temp, log)
 
-        if rules.allow_audio:
+        if ctr.allow_audio:
             from auto_editor.render.audio import make_new_audio
 
             for t in range(len(inp.audios)):
@@ -203,14 +198,14 @@ def edit_media(
 
         video_output = []
 
-        if rules.allow_video:
+        if ctr.allow_video:
             for v, vid in enumerate(inp.videos):
                 if vid.codec not in ("png", "mjpeg", "webp") and v == 0:
                     out_path, apply_later = render_av(
-                        ffmpeg, timeline, args, progress, rules, temp, log
+                        ffmpeg, timeline, args, progress, ctr, temp, log
                     )
                     video_output.append((v, True, out_path, apply_later))
-                elif rules.allow_image:
+                elif ctr.allow_image:
                     out_path = os.path.join(temp, f"{v}.{vid.codec}")
                     # fmt: off
                     ffmpeg.run(["-i", inp.path, "-map", "0:v", "-map", "-0:V",
@@ -219,10 +214,7 @@ def edit_media(
                     video_output.append((v, False, out_path, False))
 
         log.conwrite("Writing output file")
-
-        mux_quality_media(
-            ffmpeg, video_output, rules, output, output_container, args, inp, temp, log
-        )
+        mux_quality_media(ffmpeg, video_output, ctr, output, args, inp, temp, log)
 
     if args.export == "clip-sequence":
         chunks = timeline.chunks
