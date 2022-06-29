@@ -1,0 +1,97 @@
+{{ comp.index_header "Auto-Editor" }}
+<body>
+{{ comp.nav }}
+<section class="section">
+<div class="container">
+<img class="center" src="/img/auto-editor-banner.svg" width="700" alt="Auto-Editor">
+<br>
+<p><strong>Auto-Editor</strong> is a command line application for automatically <strong>editing video and audio</strong> by analyzing a variety of methods, most notably audio loudness.</p>
+<hr/>
+<p>Before doing the real editing, you first cut out the "dead space" which is typically silence. This is known as a "first pass". Cutting these is a boring task, especially if the video is very long.
+</p>
+<pre><code>auto-editor path/to/your/video.mp4</code></pre>
+<h2>Installing</h2>
+<pre><code>pip install auto-editor</code></pre>
+<p><a href="https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md">See Installing</a> for additional information.</p>
+
+<h2>Cutting</h2>
+<p>Change the pace of a video by using <code>--frame-margin</code>.
+<p><code>--frame-margin</code> will add small sections that are next to loud sections. A frame margin of 8 will add up to 8 frames before and 8 frames after.</p>
+<pre><code>auto-editor example.mp4 --frame-margin 8</code></pre>
+
+<h3>Set how cuts are made</h3>
+<p>Use the <code>--edit</code> option. to change how auto-editor makes automated cuts.</p>
+<p>For example, edit out motionlessness in a video by setting <code>--edit motion</code>.</p>
+<pre><code><i># cut out sections where percentage of motion is less than 2.</i>
+auto-editor example.mp4 --edit motion:threshold=2%</code>
+
+<code><i># --edit is set to "audio" by default</i></code>
+<code>auto-editor example.mp4 --silent-threshold 4%</code>
+
+<code><i># audio and motion thresholds are toggled independently</i></code>
+<code>auto-editor example.mp4 --edit 'audio:threshold=3% or motion:threshold=6%'</code>
+</pre>
+
+<h2>Exporting to Editors</h2>
+<p>Create an XML file that can be imported to Adobe Premiere Pro using this command:</p>
+<pre><code>auto-editor example.mp4 --export premiere</code></pre>
+<p>Similar commands exist for:</p>
+<ul>
+  <li><code>--export final-cut-pro</code> for for Final Cut Pro.</li>
+  <li><code>--export shotcut</code> for ShotCut.</li>
+</ul>
+<p>Other editors, like Sony Vegas, can understand the <code>premiere</code> format. If your favorite editor doesn't, you can use <code>--export clip-sequence</code> which creates many video clips that can be imported and manipulated like normal.</p>
+<br>
+
+<h2>Manual Editing</h2>
+<p>Use the <code>--cut-out</code> option to always remove a section.</p>
+<pre><code><i># Cut out the first 10 seconds.</i>
+auto-editor example.mp4 --cut-out start,10sec
+
+<i># Cut out the first 10 frames.</i>
+auto-editor example.mp4 --cut-out start,10
+
+<i># Cut out the last 10 seconds.</i>
+auto-editor example.mp4 --cut-out -10sec,end
+
+<i># Cut out the first 10 seconds and cut out the range from 15 seconds to 20 seconds.</i>
+auto-editor example.mp4 --cut_out start,10sec 15sec,20sec</code></pre>
+
+<p>And of course, all the audio cuts still apply.</p>
+<p>If you don't want <strong>any automatic cuts</strong>, use <code>--edit none</code></p>
+<pre><code><i># Cut out the first 5 seconds, leave the rest untouched.</i>
+auto-editor example.mp4 --edit none --cut-out start,5sec</code></pre>
+<p>And the inverse</p>
+<pre><code><i># Leave in the first 5 seconds, cut everything else out.</i>
+auto-editor example.mp4 --edit all --add-in start,5sec</code></pre>
+
+<h2>More Options</h2>
+<p>List all available options:</p>
+<pre><code>auto-editor --help</code></pre>
+<p>Use <code>--help</code> with a specific option for more information:</p>
+<pre><code>auto-editor --scale --help
+--scale
+
+  type: number
+  default: 1.0
+  ------------
+
+  Scale the input video's resolution by the given factor.</code></pre>
+
+<h3>Articles</h3>
+<ul>
+  <li><a href="https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md">How to Install Auto-Editor</a></li>
+  <li><a href="/options.html">All the Options (And What They Do)</a></li>
+  <li><a href="/range_syntax.html">Range Syntax</a></li>
+  <li><a href="/supported_media.html">Supported Media</a></li>
+  <li><a href="/subcommands.html">Subcommands</a></li>
+  <li><a href="/gpu.html">GPU Acceleration</a></li>
+</ul>
+<h3>Copyright</h3>
+<p>Auto-Editor is under the <a href="https://github.com/WyattBlue/auto-editor/blob/master/LICENSE">Public Domain</a> but uses dependencies with other licenses. See <a href="https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md">this page</a> for more info.</p>
+<h3>Issues</h3>
+<p>If you encounter a bug or have a feature request, you can <a href="https://github.com/WyattBlue/auto-editor/issues/new">create a new issue</a>. If you'll like to discuss this project, and chat with other users, you can use the <a href="https://discord.com/invite/kMHAWJJ">discord server</a>.</p>
+</div>
+</section>
+</body>
+</html>

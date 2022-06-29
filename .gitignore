@@ -8,6 +8,10 @@
 *https*
 example.json
 
+# Website Files
+site/src/app/
+site/binaries/
+
 # Python Generated Files
 __pycache__/
 *.pyc
