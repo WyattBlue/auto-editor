@@ -1,4 +1,4 @@
-<p align="center"><img src="https://raw.githubusercontent.com/wyattblue/auto-editor/master/articles/imgs/auto-editor_banner.png" title="Auto-Editor" width="700"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/wyattblue/auto-editor/master/site/src/img/auto-editor-banner.webp" title="Auto-Editor" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing a variety of methods, most notably audio loudness.
 
@@ -20,7 +20,7 @@ auto-editor path/to/your/video.mp4
 pip install auto-editor
 ```
 
-See [Installing](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md) for additional information.
+See [Installing](https://auto-editor.com/installing) for additional information.
 
 
 <h2 align="center">Cutting</h2>
@@ -99,11 +99,7 @@ If you don't want **any automatic cuts**, use `--edit none`
 ```
 # Cut out the first 5 seconds, leave the rest untouched.
 auto-editor example.mp4 --edit none --cut-out start,5sec
-```
 
-And the inverse
-
-```
 # Leave in the first 5 seconds, cut everything else out.
 auto-editor example.mp4 --edit all --add-in start,5sec
 ```
@@ -120,30 +116,30 @@ Use `--help` with a specific option for more information:
 
 ```
 auto-editor --scale --help
-  --scale
-    Scale the output media file by a certain factor.
+--scale
 
-    type: float_type
-    default: 1
+  type: number
+  default: 1.0
+  ------------
+
+  Scale the input video's resolution by the given factor.
 ```
 
-
 <h3 align="center">Auto-Editor is available on all platforms</h3>
-<p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/articles/imgs/cross_platform.png" width="500" title="Windows, MacOS, and Linux"></p>
-
+<p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/site/src/img/cross-platform.webp" width="500" title="Windows, MacOS, and Linux"></p>
 
 ## Articles
- - [How to Install Auto-Editor](https://github.com/WyattBlue/auto-editor/blob/master/articles/installing.md)
+ - [How to Install Auto-Editor](https://auto-editor.com/installing)
  - [All the Options (And What They Do)](https://auto-editor.com/options)
  - [Supported Media](https://auto-editor.com/supported_media)
  - [What is Range Syntax](https://auto-editor.com/range_syntax)
  - [Subcommands](https://auto-editor.com/subcommands)
- - [GPU Acceleration](https://auto-editor.com/gpu_acceleration)
-
+ - [Note on GPU Acceleration](https://auto-editor.com/gpu)
 
 ## Copyright
-Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) but contains non-free elements. See [this page](https://github.com/WyattBlue/auto-editor/blob/master/articles/legalinfo.md) for more info.
+Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all files besides the ones listed below. Auto-Editor was created by [these people.](https://github.com/WyattBlue/auto-editor/blob/master/AUTHORS.md)
 
+The binaries under auto_editor/ffmpeg are subject to the [LGPLv3 License](https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/ffmpeg/LICENSE.txt). The FFmpeg and FFprobe programs were created by the FFmpeg team and purposely compiled by WyattBlue for use in auto-editor.
 
 ## Issues
-If you have a bug or a code suggestion, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new) here. If you'll like to discuss this project, suggest new features, or chat with other users, you can use [the discord server](https://discord.com/invite/kMHAWJJ).
+If you encounter a bug or have a feature request, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new). If you'll like to discuss this project, and chat with other users, you can use the [discord server](https://discord.com/invite/kMHAWJJ).
