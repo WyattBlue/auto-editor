@@ -468,6 +468,37 @@ def main(sys_args: Optional[List[str]] = None):
         run_program(["example.mp4", "hmm.mp4", "--combine-files", "--debug"])
         os.remove("hmm.mp4")
 
+    def concat_mux_tracks():
+        run_program(["example.mp4", "resources/multi-track.mov", "-o", "out.mov"])
+        with av.open("out.mov", "r") as cn:
+            assert len(cn.streams.audio) == 1
+
+    def concat_multiple_tracks():
+        run_program(
+            [
+                "resources/multi-track.mov",
+                "resources/multi-track.mov",
+                "--keep-tracks-separate",
+                "-o",
+                "out.mov",
+            ]
+        )
+        with av.open("out.mov", "r") as cn:
+            assert len(cn.streams.audio) == 2, f"audio streams: {len(cn.streams.audio)}"
+
+        run_program(
+            [
+                "example.mp4",
+                "resources/multi-track.mov",
+                "--keep-tracks-separate",
+                "-o",
+                "out.mov",
+            ]
+        )
+        with av.open("out.mov", "r") as cn:
+            assert len(cn.streams.audio) == 2
+        os.remove("out.mov")
+
     def frame_rate():
         run_program(["example.mp4", "-r", "15", "--no-seek"])
         with av.open("example_ALTERED.mp4", "r") as cn:
@@ -596,6 +627,8 @@ def main(sys_args: Optional[List[str]] = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                concat_mux_tracks,
+                concat_multiple_tracks,
                 render_video_objs,
                 resolution_and_scale,
                 various_errors_test,

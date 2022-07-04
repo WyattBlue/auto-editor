@@ -185,6 +185,9 @@ def edit_media(
         from auto_editor.output import mux_quality_media
         from auto_editor.render.video import render_av
 
+        video_output = []
+        audio_output = []
+
         if ctr.allow_subtitle:
             from auto_editor.render.subtitle import cut_subtitles
 
@@ -193,10 +196,7 @@ def edit_media(
         if ctr.allow_audio:
             from auto_editor.render.audio import make_new_audio
 
-            for t in range(len(inp.audios)):
-                make_new_audio(t, temp, timeline, progress, log)
-
-        video_output = []
+            audio_output = make_new_audio(timeline, progress, temp, log)
 
         if ctr.allow_video:
             for v, vid in enumerate(inp.videos):
@@ -214,7 +214,9 @@ def edit_media(
                     video_output.append((v, False, out_path, False))
 
         log.conwrite("Writing output file")
-        mux_quality_media(ffmpeg, video_output, ctr, output, args, inp, temp, log)
+        mux_quality_media(
+            ffmpeg, video_output, audio_output, ctr, output, args, inp, temp, log
+        )
 
     if args.export == "clip-sequence":
         chunks = timeline.chunks
