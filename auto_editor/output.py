@@ -69,6 +69,7 @@ def video_quality(
 def mux_quality_media(
     ffmpeg: FFmpeg,
     video_output: List[Tuple[int, bool, str, bool]],
+    audio_output: List[str],
     ctr: Container,
     output_path: str,
     args: Args,
@@ -77,7 +78,7 @@ def mux_quality_media(
     log: Log,
 ) -> None:
     s_tracks = 0 if not ctr.allow_subtitle else len(inp.subtitles)
-    a_tracks = 0 if not ctr.allow_audio else len(inp.audios)
+    a_tracks = 0 if not ctr.allow_audio else len(audio_output)
     v_tracks = 0 if not ctr.allow_video else len(video_output)
 
     cmd = ["-hide_banner", "-y", "-i", inp.path]
@@ -95,19 +96,19 @@ def mux_quality_media(
 
     if a_tracks > 0:
         if args.keep_tracks_separate and ctr.max_audios is None:
-            for t in range(a_tracks):
-                cmd.extend(["-i", os.path.join(temp, f"new{t}.wav")])
+            for path in audio_output:
+                cmd.extend(["-i", path])
         else:
             # Merge all the audio a_tracks into one.
             new_a_file = os.path.join(temp, "new_audio.wav")
             if a_tracks > 1:
                 new_cmd = []
-                for t in range(a_tracks):
-                    new_cmd.extend(["-i", os.path.join(temp, f"new{t}.wav")])
+                for path in audio_output:
+                    new_cmd.extend(["-i", path])
                 new_cmd.extend(
                     [
                         "-filter_complex",
-                        f"amerge=inputs={a_tracks}",
+                        f"amix=inputs={a_tracks}:duration=longest",
                         "-ac",
                         "2",
                         new_a_file,
@@ -116,7 +117,7 @@ def mux_quality_media(
                 ffmpeg.run(new_cmd)
                 a_tracks = 1
             else:
-                new_a_file = os.path.join(temp, "new0.wav")
+                new_a_file = audio_output[0]
             cmd.extend(["-i", new_a_file])
 
     if s_tracks > 0:

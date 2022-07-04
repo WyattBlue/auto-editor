@@ -11,6 +11,7 @@ from auto_editor.ffwrapper import FFmpeg
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
 from auto_editor.output import get_vcodec, video_quality
 from auto_editor.timeline import Timeline, Visual
+from auto_editor.utils.container import Container
 from auto_editor.utils.encoder import encoders
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
@@ -101,7 +102,7 @@ def render_av(
     timeline: Timeline,
     args: Args,
     progress: ProgressBar,
-    rules,
+    ctr: Container,
     temp: str,
     log: Log,
 ) -> Tuple[str, bool]:
@@ -149,7 +150,7 @@ def render_av(
     log.debug(f"Clips: {timeline.v}")
 
     target_pix_fmt = pix_fmts[0] if pix_fmts[0] in allowed_pix_fmt else "yuv420p"
-    my_codec = get_vcodec(args.video_codec, inp, rules)
+    my_codec = get_vcodec(args.video_codec, inp, ctr)
 
     apply_video_later = True
 
@@ -186,7 +187,7 @@ def render_av(
     if apply_video_later:
         cmd.extend(["-c:v", "mpeg4", "-qscale:v", "1"])
     else:
-        cmd = video_quality(cmd, args, inp, rules)
+        cmd = video_quality(cmd, args, inp, ctr)
 
     cmd.append(spedup)
 
