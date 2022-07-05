@@ -185,8 +185,9 @@ def edit_media(
         from auto_editor.output import mux_quality_media
         from auto_editor.render.video import render_av
 
-        video_output = []
+        visual_output = []
         audio_output = []
+        apply_later = False
 
         if ctr.allow_subtitle:
             from auto_editor.render.subtitle import cut_subtitles
@@ -204,18 +205,27 @@ def edit_media(
                     out_path, apply_later = render_av(
                         ffmpeg, timeline, args, progress, ctr, temp, log
                     )
-                    video_output.append((v, True, out_path, apply_later))
+                    visual_output.append((True, out_path))
                 elif ctr.allow_image:
                     out_path = os.path.join(temp, f"{v}.{vid.codec}")
                     # fmt: off
                     ffmpeg.run(["-i", inp.path, "-map", "0:v", "-map", "-0:V",
                         "-c", "copy", out_path])
                     # fmt: on
-                    video_output.append((v, False, out_path, False))
+                    visual_output.append((False, out_path))
 
         log.conwrite("Writing output file")
         mux_quality_media(
-            ffmpeg, video_output, audio_output, ctr, output, args, inp, temp, log
+            ffmpeg,
+            visual_output,
+            audio_output,
+            apply_later,
+            ctr,
+            output,
+            args,
+            inp,
+            temp,
+            log,
         )
 
     if args.export == "clip-sequence":
