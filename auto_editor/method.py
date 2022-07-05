@@ -2,11 +2,14 @@ import os
 import random
 import re
 from dataclasses import asdict, dataclass, fields
-from typing import Any, Callable, Dict, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
 import numpy as np
 from numpy.typing import NDArray
 
+from auto_editor.analyze.audio import audio_detection
+from auto_editor.analyze.motion import motion_detection
+from auto_editor.analyze.pixeldiff import pixel_difference
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.func import (
     apply_margin,
@@ -106,19 +109,13 @@ def get_audio_list(
     progress: ProgressBar,
     temp: str,
     log: Log,
-) -> NDArray[np.bool_]:
-
-    from auto_editor.analyze.audio import audio_detection
-
-    path = os.path.join(temp, f"{i}-{stream}.wav")
-
-    if os.path.isfile(path):
+) -> BoolList:
+    if os.path.isfile(path := os.path.join(temp, f"{i}-{stream}.wav")):
         sample_rate, audio_samples = read(path)
     else:
-        log.error(f"Audio stream '{stream}' does not exist.")
+        raise TypeError(f"Audio stream '{stream}' does not exist.")
 
     audio_list = audio_detection(audio_samples, sample_rate, fps, progress, log)
-
     return np.fromiter((x > threshold for x in audio_list), dtype=np.bool_)
 
 
@@ -131,26 +128,31 @@ def operand_combine(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
     return call(a, b)
 
 
+def get_all_list(path: str, i: int, fps: float, temp: str, log: Log) -> BoolList:
+    return np.zeros(get_media_duration(path, i, fps, temp, log) - 1, dtype=np.bool_)
+
+
 def get_stream_data(
     method: str,
     attrs_str: str,
     args: Args,
     i: int,
-    inp: FileInfo,
+    inputs: List[FileInfo],
     fps: float,
     progress: ProgressBar,
     temp: str,
     log: Log,
-) -> NDArray[np.bool_]:
+) -> BoolList:
+
+    inp = inputs[0]
+    strict = len(inputs) < 2
 
     if method == "none":
         return np.ones(
-            (get_media_duration(inp.path, i, fps, temp, log) - 1), dtype=np.bool_
+            get_media_duration(inp.path, i, fps, temp, log) - 1, dtype=np.bool_
         )
     if method == "all":
-        return np.zeros(
-            (get_media_duration(inp.path, i, fps, temp, log) - 1), dtype=np.bool_
-        )
+        return get_all_list(inp.path, i, fps, temp, log)
     if method == "random":
         robj = get_attributes(attrs_str, Random, log)
         if robj.cutchance > 1 or robj.cutchance < 0:
@@ -172,25 +174,39 @@ def get_stream_data(
         if audio.stream == "all":
             total_list: Optional[NDArray[np.bool_]] = None
             for s in range(len(inp.audios)):
-                audio_list = get_audio_list(
-                    i, s, audio.threshold, fps, progress, temp, log
-                )
-                if total_list is None:
-                    total_list = audio_list
-                else:
-                    total_list = operand_combine(total_list, audio_list, np.logical_or)
+                try:
+                    audio_list = get_audio_list(
+                        i, s, audio.threshold, fps, progress, temp, log
+                    )
+                    if total_list is None:
+                        total_list = audio_list
+                    else:
+                        total_list = operand_combine(
+                            total_list, audio_list, np.logical_or
+                        )
+                except TypeError as e:
+                    if not strict:
+                        return get_all_list(inp.path, i, fps, temp, log)
+                    log.error(e)
 
             if total_list is None:
+                if not strict:
+                    return get_all_list(inp.path, i, fps, temp, log)
                 log.error("Input has no audio streams.")
             return total_list
         else:
-            return get_audio_list(
-                i, audio.stream, audio.threshold, fps, progress, temp, log
-            )
+            try:
+                return get_audio_list(
+                    i, audio.stream, audio.threshold, fps, progress, temp, log
+                )
+            except TypeError as e:
+                if not strict:
+                    return get_all_list(inp.path, i, fps, temp, log)
+                log.error(e)
     if method == "motion":
-        from auto_editor.analyze.motion import motion_detection
-
         if len(inp.videos) == 0:
+            if not strict:
+                return get_all_list(inp.path, i, fps, temp, log)
             log.error("Video stream '0' does not exist.")
 
         mobj = get_attributes(attrs_str, Motion, log)
@@ -198,9 +214,9 @@ def get_stream_data(
         return np.fromiter((x >= mobj.threshold for x in motion_list), dtype=np.bool_)
 
     if method == "pixeldiff":
-        from auto_editor.analyze.pixeldiff import pixel_difference
-
         if len(inp.videos) == 0:
+            if not strict:
+                return get_all_list(inp.path, i, fps, temp, log)
             log.error("Video stream '0' does not exist.")
 
         pobj = get_attributes(attrs_str, Pixeldiff, log)
@@ -213,7 +229,7 @@ def get_stream_data(
 def get_has_loud(
     token_str: str,
     i: int,
-    inp: FileInfo,
+    inputs: List[FileInfo],
     fps: float,
     progress: ProgressBar,
     temp: str,
@@ -247,7 +263,7 @@ def get_has_loud(
                 log.error("Logic operator must be between two editing methods.")
 
             stream_data = get_stream_data(
-                token, attrs_str, args, i, inp, fps, progress, temp, log
+                token, attrs_str, args, i, inputs, fps, progress, temp, log
             )
 
             if operand == "not":
@@ -283,7 +299,7 @@ def get_has_loud(
 
 def get_speed_list(
     i: int,
-    inp: FileInfo,
+    inputs: List[FileInfo],
     fps: float,
     args: Args,
     progress: ProgressBar,
@@ -298,7 +314,9 @@ def get_speed_list(
     min_clip = seconds_to_frames(args.min_clip_length, fps)
     min_cut = seconds_to_frames(args.min_cut_length, fps)
 
-    has_loud = get_has_loud(args.edit_based_on, i, inp, fps, progress, temp, log, args)
+    has_loud = get_has_loud(
+        args.edit_based_on, i, inputs, fps, progress, temp, log, args
+    )
     has_loud_length = len(has_loud)
 
     has_loud = apply_mark_as(has_loud, has_loud_length, fps, args, log)

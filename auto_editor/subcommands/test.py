@@ -468,6 +468,21 @@ def main(sys_args: Optional[List[str]] = None):
         run_program(["example.mp4", "hmm.mp4", "--combine-files", "--debug"])
         os.remove("hmm.mp4")
 
+    # Issue #241
+    def multi_track_edit():
+        run_program(
+            [
+                "example.mp4",
+                "resources/multi-track.mov",
+                "--edit",
+                "audio:stream=1",
+                "-o",
+                "out.mov",
+            ]
+        )
+        with av.open("out.mov", "r") as cn:
+            assert len(cn.streams.audio) == 1
+
     def concat_mux_tracks():
         run_program(["example.mp4", "resources/multi-track.mov", "-o", "out.mov"])
         with av.open("out.mov", "r") as cn:
@@ -627,6 +642,9 @@ def main(sys_args: Optional[List[str]] = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                edit_positive_tests,
+                edit_negative_tests,
+                multi_track_edit,
                 concat_mux_tracks,
                 concat_multiple_tracks,
                 render_video_objs,
@@ -656,8 +674,6 @@ def main(sys_args: Optional[List[str]] = None):
                 json_tests,
                 codec_tests,
                 motion_tests,
-                edit_positive_tests,
-                edit_negative_tests,
             ]
         )
 

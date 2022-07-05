@@ -1,9 +1,6 @@
 from dataclasses import asdict, dataclass, fields
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Type, Union
 
-import numpy as np
-from numpy.typing import NDArray
-
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.method import get_speed_list
 from auto_editor.objects import (
@@ -36,32 +33,16 @@ ALayer = List[AudioObj]
 ASpace = List[ALayer]
 
 
-def unclipify(layer: List[Clip]) -> NDArray[np.float_]:
-    if len(layer) == 0:
-        raise ValueError("Empty Clips")
+def merge_chunks(all_chunks: List[Chunks]) -> Chunks:
+    chunks = []
+    start = 0
+    for _chunks in all_chunks:
+        for chunk in _chunks:
+            chunks.append((chunk[0] + start, chunk[1] + start, chunk[2]))
+        if _chunks:
+            start += _chunks[-1][1]
 
-    l: List[int] = []
-    for clip in layer:
-        if clip.src != 0:
-            raise ValueError("Clip has src that is not 0")
-
-        if clip.start > len(l):
-            raise ValueError(
-                f"Clip layer has null frames, cannot convert speed list: {l}"
-            )
-
-        for item in range(clip.offset, clip.offset + clip.dur):
-            l.append(item)
-
-    if len(set(l)) != len(l) or sorted(l) != l:
-        raise ValueError(f"Clip layer to complex, cannot convert to speed list: {l}")
-    arr = np.empty(layer[-1].offset + layer[-1].dur, dtype=float)
-    arr.fill(99999)
-
-    for clip in layer:
-        arr[clip.offset : clip.offset + clip.dur] = clip.speed
-
-    return arr
+    return chunks
 
 
 def _values(
@@ -195,27 +176,6 @@ def make_av(
     return vclips, aclips
 
 
-def make_layers(
-    inputs: List[FileInfo], speedlists: List[NDArray[np.float_]]
-) -> Tuple[Optional[Chunks], VSpace, ASpace]:
-
-    all_clips: List[List[Clip]] = []
-    start = 0.0
-    for i, _chunks in enumerate([chunkify(s) for s in speedlists]):
-        all_clips.append(clipify(_chunks, i, start))
-        start += chunks_len(_chunks)
-
-    chunks: Optional[Chunks] = None
-    try:
-        clips = [item for sublist in all_clips for item in sublist]
-        chunks = chunkify(unclipify(clips))
-    except ValueError:
-        pass
-
-    vclips, aclips = make_av(all_clips, inputs)
-    return chunks, vclips, aclips
-
-
 def make_timeline(
     inputs: List[FileInfo],
     args: Args,
@@ -224,16 +184,30 @@ def make_timeline(
     temp: str,
     log: Log,
 ) -> Timeline:
-    assert len(inputs) > 0
 
-    fps = inputs[0].get_fps() if args.frame_rate is None else args.frame_rate
-    res = inputs[0].get_res() if args.resolution is None else args.resolution
+    if inputs:
+        fps = inputs[0].get_fps() if args.frame_rate is None else args.frame_rate
+        res = inputs[0].get_res() if args.resolution is None else args.resolution
+    else:
+        fps, res = 30.0, (1920, 1080)
 
-    speedlists = []
-    for i, inp in enumerate(inputs):
-        speedlists.append(get_speed_list(i, inp, fps, args, progress, temp, log))
+    def make_layers(inputs: List[FileInfo]) -> Tuple[Chunks, VSpace, ASpace]:
+        start = 0.0
+        all_clips: List[List[Clip]] = []
+        all_chunks: List[Chunks] = []
 
-    chunks, vclips, aclips = make_layers(inputs, speedlists)
+        for i in range(len(inputs)):
+            _chunks = chunkify(
+                get_speed_list(i, inputs, fps, args, progress, temp, log)
+            )
+            all_chunks.append(_chunks)
+            all_clips.append(clipify(_chunks, i, start))
+            start += chunks_len(_chunks)
+
+        vclips, aclips = make_av(all_clips, inputs)
+        return merge_chunks(all_chunks), vclips, aclips
+
+    chunks, vclips, aclips = make_layers(inputs)
 
     timeline = Timeline(inputs, fps, sr, res, args.background, vclips, aclips, chunks)
 

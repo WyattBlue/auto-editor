@@ -68,8 +68,9 @@ def video_quality(
 
 def mux_quality_media(
     ffmpeg: FFmpeg,
-    video_output: List[Tuple[int, bool, str, bool]],
+    visual_output: List[Tuple[bool, str]],
     audio_output: List[str],
+    apply_v: bool,
     ctr: Container,
     output_path: str,
     args: Args,
@@ -79,16 +80,11 @@ def mux_quality_media(
 ) -> None:
     s_tracks = 0 if not ctr.allow_subtitle else len(inp.subtitles)
     a_tracks = 0 if not ctr.allow_audio else len(audio_output)
-    v_tracks = 0 if not ctr.allow_video else len(video_output)
+    v_tracks = 0 if not ctr.allow_video else len(visual_output)
 
     cmd = ["-hide_banner", "-y", "-i", inp.path]
 
-    for (
-        _,
-        is_video,
-        path,
-        _,
-    ) in video_output:
+    for is_video, path in visual_output:
         if is_video or ctr.allow_image:
             cmd.extend(["-i", path])
         else:
@@ -131,9 +127,10 @@ def mux_quality_media(
 
     cmd.extend(["-map_metadata", "0"])
 
-    for track, is_video, path, apply_video in video_output:
+    track = 0
+    for is_video, path in visual_output:
         if is_video:
-            if apply_video:
+            if apply_v:
                 cmd = video_quality(cmd, args, inp, ctr)
             else:
                 cmd.extend([f"-c:v:{track}", "copy"])
@@ -142,6 +139,8 @@ def mux_quality_media(
             cmd.extend(
                 [f"-c:v:{track}", ext, f"-disposition:v:{track}", "attached_pic"]
             )
+        track += 1
+    del track
 
     for i, vstream in enumerate(inp.videos):
         if i > v_tracks:
@@ -177,8 +176,10 @@ def mux_quality_media(
     if args.extras is not None:
         cmd.extend(args.extras.split(" "))
     cmd.extend(["-strict", "-2"])  # Allow experimental codecs.
-    cmd.extend(
-        ["-map", "0:t?", "-map", "0:d?"]
-    )  # Add input attachments and data to output.
+    cmd.extend(["-map", "0:t?"])  # Add input attachments to output.
+
+    # This was causing a crash for 'example.mp4 multi-track.mov'
+    # cmd.extend(["-map", "0:d?"])
+
     cmd.append(output_path)
     ffmpeg.run_check_errors(cmd, log, path=output_path)
