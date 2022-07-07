@@ -50,8 +50,8 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        "numpy>=1.21.0",
-        "pillow==9.1.1",
+        "numpy>=1.22.0",
+        "pillow==9.2.0",
         "av==9.2.0",
     ],
     python_requires=">=3.8",
