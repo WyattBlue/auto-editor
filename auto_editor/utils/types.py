@@ -178,6 +178,14 @@ def resolution(val: Optional[str]) -> Optional[Tuple[int, int]]:
     return natural(vals[0]), natural(vals[1])
 
 
+def pos(val: Tuple[Union[float, str], int]) -> int:
+    num, unit = _split_num_str(val[0])
+    if unit == "%":
+        return round((num / 100) * val[1])
+    _unit_check(unit, ("",))
+    return round(num)
+
+
 @dataclass
 class MainArgs:
     pool: List[Tuple[str, str]] = field(default_factory=list)

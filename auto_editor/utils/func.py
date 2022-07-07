@@ -259,7 +259,7 @@ def parse_dataclass(unsplit_arguments: str, dataclass: T, log: Log) -> T:
         dataclass_instance = dataclass(*args, **kwargs)
     except TypeError as err:
         err_list = [d_name] + str(err).split(" ")[1:]
-        log.error(" ".join(err_list))
+        log.error(f"'{unsplit_arguments}' : " + " ".join(err_list))
 
     return dataclass_instance
 

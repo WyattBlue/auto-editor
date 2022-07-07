@@ -404,11 +404,11 @@ def main(sys_args: Optional[List[str]] = None):
             [
                 "example.mp4",
                 "--add-ellipse",
-                "0,30,centerX,centerY,300,300,fill=red",
+                "0,30,50%,50%,300,300,fill=red",
                 "--add-rectangle",
                 "0,30,500,440,400,200,fill=skyblue",
                 "--add-ellipse",
-                "0,30,centerX,centerY,100,100,fill=darkgreen",
+                "0,30,50%,50%,100,100,fill=darkgreen",
                 "--edit",
                 "none",
                 "--cut-out",
@@ -421,8 +421,8 @@ def main(sys_args: Optional[List[str]] = None):
             [
                 "example.mp4",
                 "--add-ellipse",
-                "0,60,centerX,centerY,300,300,fill=darkgreen",
-                "0,30,centerX,centerY,200,200,fill=green",
+                "0,60,50%,50%,300,300,fill=darkgreen",
+                "0,30,50%,50%,200,200,fill=green",
                 "--edit",
                 "none",
                 "--cut-out",
@@ -435,7 +435,7 @@ def main(sys_args: Optional[List[str]] = None):
 
     def check_font_error():
         check_for_error(
-            ["example.mp4", "--add-text", "0,30,text,0,0,30,notafont"], "not found"
+            ["example.mp4", "--add-text", "0,30,text,0,0,notafont"], "not found"
         )
 
     def export_tests():
