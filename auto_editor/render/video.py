@@ -107,16 +107,22 @@ def render_av(
     log: Log,
 ) -> Tuple[str, bool]:
 
-    font_cache: Dict[str, Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]] = {}
+    FontCache = Dict[
+        str, Tuple[Union[ImageFont.FreeTypeFont, ImageFont.ImageFont], float]
+    ]
+
+    font_cache: FontCache = {}
     img_cache: Dict[str, Image.Image] = {}
     for layer in timeline.v:
         for vobj in layer:
-            if isinstance(vobj, TextObj) and vobj.font not in font_cache:
+            if isinstance(vobj, TextObj) and (vobj.font, vobj.size) not in font_cache:
                 try:
                     if vobj.font == "default":
-                        font_cache[vobj.font] = ImageFont.load_default()
+                        font_cache[(vobj.font, vobj.size)] = ImageFont.load_default()
                     else:
-                        font_cache[vobj.font] = ImageFont.truetype(vobj.font, vobj.size)
+                        font_cache[(vobj.font, vobj.size)] = ImageFont.truetype(
+                            vobj.font, vobj.size
+                        )
                 except OSError:
                     log.error(f"Font '{vobj.font}' not found.")
 
@@ -287,13 +293,13 @@ def render_av(
 
                     if isinstance(obj, TextObj):
                         text_w, text_h = draw.textsize(
-                            obj.content, font=font_cache[obj.font]
+                            obj.content, font=font_cache[(obj.font, obj.size)]
                         )
                         pos = apply_anchor(obj.x, obj.y, text_w, text_h, "ce")
                         draw.text(
                             pos,
                             obj.content,
-                            font=font_cache[obj.font],
+                            font=font_cache[(obj.font, obj.size)],
                             fill=obj.fill,
                             align=obj.align,
                             stroke_width=obj.stroke,

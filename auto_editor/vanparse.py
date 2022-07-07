@@ -267,12 +267,10 @@ class ArgumentParser:
             option = get_option(arg, options)
 
             if option is None:
-                if oplist_name is not None:
-                    if oplist_name == "pool":
-                        option_list.append((op_key, arg))
-                    else:
-                        option_list.append(oplist_coerce(arg))
-
+                if oplist_name == "pool":
+                    option_list.append((op_key, arg))
+                elif oplist_name is not None:
+                    option_list.append(oplist_coerce(arg))
                 elif requireds and not arg.startswith("--"):
                     if requireds[0].nargs == 1:
                         ns.__setattr__(req_list_name, parse_value(requireds[0], arg))
@@ -294,9 +292,7 @@ class ArgumentParser:
                         )
                     Log().error(f"Unknown {label}: {arg}")
             else:
-                if oplist_name == "pool":
-                    ns.pool += option_list
-                elif oplist_name is not None:
+                if oplist_name is not None and oplist_name != "pool":
                     ns.__setattr__(oplist_name, option_list)
 
                 if not option.pool:

@@ -35,24 +35,30 @@ def edit_media(
     progress = ProgressBar(args.progress)
     timeline = None
 
-    path_ext = os.path.splitext(paths[0])[1]
-    if path_ext == ".json":
-        from auto_editor.formats.json import read_json
+    if paths:
+        path_ext = os.path.splitext(paths[0])[1]
+        if path_ext == ".json":
+            from auto_editor.formats.json import read_json
 
-        timeline = read_json(paths[0], ffmpeg, log)
-        inputs: List[FileInfo] = timeline.inputs
+            timeline = read_json(paths[0], ffmpeg, log)
+            inputs: List[FileInfo] = timeline.inputs
+        else:
+            inputs = [FileInfo(path, ffmpeg, log) for path in paths]
     else:
-        inputs = [FileInfo(path, ffmpeg, log) for path in paths]
-
+        inputs = []
     del paths
-    inp = inputs[0]
 
-    if args.output_file is None:
-        output = set_output_name(inp.path, inp.ext, args.export)
+    if inputs:
+        inp = inputs[0]
+        if args.output_file is None:
+            output = set_output_name(inp.path, inp.ext, args.export)
+        else:
+            output = args.output_file
+            if os.path.splitext(output)[1] == "":
+                output = set_output_name(output, inp.ext, args.export)
+        del inp
     else:
-        output = args.output_file
-        if os.path.splitext(output)[1] == "":
-            output = set_output_name(output, inp.ext, args.export)
+        output = "out.mp4" if args.output_file is None else args.output_file
 
     out_ext = os.path.splitext(output)[1].replace(".", "")
 
@@ -67,7 +73,10 @@ def edit_media(
     if vcodec == "uncompressed":
         vcodec = "mpeg4"
     if vcodec == "copy":
-        vcodec = inp.videos[0].codec
+        if inputs:
+            vcodec = inputs[0].videos[0].codec
+        else:
+            log.error("No input video to copy its codec from.")
 
     if vcodec != "auto":
         if ctr.vstrict:
@@ -104,13 +113,15 @@ def edit_media(
             os.remove(output)
 
     # Extract subtitles in their native format.
-    if len(inp.subtitles) > 0:
+    if inputs and len(inputs[0].subtitles) > 0:
+        inp = inputs[0]
         cmd = ["-i", inp.path, "-hide_banner"]
         for s, sub in enumerate(inp.subtitles):
             cmd.extend(["-map", f"0:s:{s}"])
         for s, sub in enumerate(inp.subtitles):
             cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
         ffmpeg.run(cmd)
+        del inp
 
     log.conwrite("Extracting audio")
 
@@ -120,7 +131,10 @@ def edit_media(
     cmd.append("-hide_banner")
 
     if args.sample_rate is None:
-        samplerate = inputs[0].get_samplerate()
+        if inputs:
+            samplerate = inputs[0].get_samplerate()
+        else:
+            samplerate = 48000
     else:
         samplerate = args.sample_rate
 
@@ -181,13 +195,14 @@ def edit_media(
         shotcut_xml(output, timeline)
         return output
 
-    def make_media(inp: FileInfo, timeline: Timeline, output: str) -> None:
+    def make_media(timeline: Timeline, output: str) -> None:
         from auto_editor.output import mux_quality_media
         from auto_editor.render.video import render_av
 
         visual_output = []
         audio_output = []
         apply_later = False
+        inp = timeline.inputs[0]
 
         if ctr.allow_subtitle:
             from auto_editor.render.subtitle import cut_subtitles
@@ -260,12 +275,8 @@ def edit_media(
                 _c,
             )
 
-            make_media(
-                inp,
-                my_timeline,
-                append_filename(output, f"-{clip_num}"),
-            )
+            make_media(my_timeline, append_filename(output, f"-{clip_num}"))
             clip_num += 1
     else:
-        make_media(inp, timeline, output)
+        make_media(timeline, output)
     return output

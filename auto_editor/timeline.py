@@ -14,7 +14,16 @@ from auto_editor.objects import (
 from auto_editor.utils.func import chunkify, chunks_len, parse_dataclass
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import Align, Args, Chunks, align, anchor, color, number
+from auto_editor.utils.types import (
+    Align,
+    Args,
+    Chunks,
+    align,
+    anchor,
+    color,
+    number,
+    pos,
+)
 
 
 class Clip(NamedTuple):
@@ -52,7 +61,14 @@ def _values(
     _vars: Dict[str, int],
     log: Log,
 ) -> Any:
-    if _type is float:
+    if name in ("x", "width"):
+        return pos((val, _vars["width"]))
+    elif name in ("y", "height"):
+        return pos((val, _vars["height"]))
+    elif name == "content":
+        assert isinstance(val, str)
+        return val.replace("\\n", "\n").replace("\\;", ",")
+    elif _type is float:
         _type = number
     elif _type == Align:
         _type = align
@@ -71,7 +87,7 @@ def _values(
     except TypeError as e:
         log.error(e)
     except Exception:
-        log.error(f"variable '{val}' is not defined.")
+        log.error(f"{name}: variable '{val}' is not defined.")
 
     return _type(val)
 
@@ -215,8 +231,6 @@ def make_timeline(
     _vars: Dict[str, int] = {
         "width": w,
         "height": h,
-        "centerX": w // 2,
-        "centerY": h // 2,
         "start": 0,
         "end": timeline.end,
     }

@@ -32,12 +32,12 @@ class TextObj:
     start: int
     dur: int
     content: str
-    x: int = "centerX"  # type: ignore
-    y: int = "centerY"  # type: ignore
-    size: int = 55
+    x: int = "50%"  # type: ignore
+    y: int = "50%"  # type: ignore
     font: str = "Arial"
-    align: Align = "left"
+    size: int = 55
     fill: str = "#FFF"
+    align: Align = "left"
     stroke: int = 0
     strokecolor: str = "#000"
 
@@ -47,8 +47,8 @@ class ImageObj:
     start: int
     dur: int
     src: str
-    x: int = "centerX"  # type: ignore
-    y: int = "centerY"  # type: ignore
+    x: int = "50%"  # type: ignore
+    y: int = "50%"  # type: ignore
     opacity: float = 1
     anchor: str = "ce"
     rotate: float = 0  # in degrees
