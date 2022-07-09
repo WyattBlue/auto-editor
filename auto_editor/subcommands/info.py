@@ -2,7 +2,7 @@ import json
 import os.path
 import sys
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, Dict, List, Literal, Optional, TypedDict
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.func import aspect_ratio
@@ -40,13 +40,53 @@ def info_options(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-def main(sys_args=sys.argv[1:]):
+class VideoJson(TypedDict):
+    codec: str
+    fps: float
+    resolution: List[int]
+    aspect_ratio: List[int]
+    pix_fmt: str
+    color_range: Optional[str]
+    color_space: Optional[str]
+    color_primaries: Optional[str]
+    color_transfer: Optional[str]
+    timebase: str
+    bitrate: Optional[str]
+    lang: Optional[str]
+
+
+class AudioJson(TypedDict):
+    codec: str
+    samplerate: int
+    bitrate: Optional[str]
+    lang: Optional[str]
+
+
+class SubtitleJson(TypedDict):
+    codec: str
+    lang: Optional[str]
+
+
+class ContainerJson(TypedDict):
+    bitrate: Optional[str]
+    fps_mode: Optional[str]
+
+
+class MediaJson(TypedDict, total=False):
+    video: List[VideoJson]
+    audio: List[AudioJson]
+    subtitle: List[SubtitleJson]
+    container: ContainerJson
+    media: Literal["invalid"]
+
+
+def main(sys_args=sys.argv[1:]) -> None:
     args = info_options(ArgumentParser("info")).parse_args(InfoArgs, sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
     log = Log(quiet=not args.json)
 
-    file_info = {}
+    file_info: Dict[str, MediaJson] = {}
 
     for file in args.input:
         if not os.path.isfile(file):
@@ -62,47 +102,43 @@ def main(sys_args=sys.argv[1:]):
             "video": [],
             "audio": [],
             "subtitle": [],
-            "container": {},
+            "container": {"bitrate": inp.bitrate, "fps_mode": None},
         }
 
-        for track, stream in enumerate(inp.videos):
-            w, h = stream.width, stream.height
-            w_, h_ = aspect_ratio(w, h)
-
-            fps = stream.fps
+        for track, v in enumerate(inp.videos):
+            w, h = v.width, v.height
+            fps = v.fps
             if fps is not None and int(fps) == float(fps):
                 fps = int(fps)
 
-            vid = {
-                "codec": stream.codec,
+            vid: VideoJson = {
+                "codec": v.codec,
                 "fps": fps,
                 "resolution": [w, h],
-                "aspect ratio": [w_, h_],
-                "pix_fmt": stream.pix_fmt,
-                "color_range": stream.color_range,
-                "color_space": stream.color_space,
-                "color_primaries": stream.color_primaries,
-                "color_transfer": stream.color_transfer,
-                "timebase": str(stream.time_base),
-                "bitrate": stream.bitrate,
-                "lang": stream.lang,
+                "aspect_ratio": list(aspect_ratio(w, h)),
+                "pix_fmt": v.pix_fmt,
+                "color_range": v.color_range,
+                "color_space": v.color_space,
+                "color_primaries": v.color_primaries,
+                "color_transfer": v.color_transfer,
+                "timebase": str(v.time_base),
+                "bitrate": v.bitrate,
+                "lang": v.lang,
             }
             file_info[file]["video"].append(vid)
 
-        for track, stream in enumerate(inp.audios):
-            aud = {
-                "codec": stream.codec,
-                "samplerate": stream.samplerate,
-                "bitrate": stream.bitrate,
-                "lang": stream.lang,
+        for track, a in enumerate(inp.audios):
+            aud: AudioJson = {
+                "codec": a.codec,
+                "samplerate": a.samplerate,
+                "bitrate": a.bitrate,
+                "lang": a.lang,
             }
             file_info[file]["audio"].append(aud)
 
-        for track, stream in enumerate(inp.subtitles):
-            sub = {"codec": stream.codec, "lang": stream.lang}
+        for track, s_stream in enumerate(inp.subtitles):
+            sub: SubtitleJson = {"codec": s_stream.codec, "lang": s_stream.lang}
             file_info[file]["subtitle"].append(sub)
-
-        cont = {"bitrate": inp.bitrate}
 
         if args.include_vfr:
             fps_mode = ffmpeg.pipe(
@@ -121,15 +157,13 @@ def main(sys_args=sys.argv[1:]):
             if "VFR:" in fps_mode:
                 fps_mode = (fps_mode[fps_mode.index("VFR:") :]).strip()
 
-            cont["fps_mode"] = fps_mode
-
-        file_info[file]["container"] = cont
+            file_info[file]["container"]["fps_mode"] = fps_mode
 
     if args.json:
         print(json.dumps(file_info, indent=4))
         return
 
-    def stream_to_text(text: str, label: str, streams) -> str:
+    def stream_to_text(text: str, label: str, streams: List[Dict[str, Any]]) -> str:
         if len(streams) > 0:
             text += f" - {label}:\n"
 
@@ -137,6 +171,7 @@ def main(sys_args=sys.argv[1:]):
             text += f"   - track {s}:\n"
             for key, value in stream.items():
                 if value is not None:
+                    key = key.replace("_", " ")
                     if isinstance(value, list):
                         sep = "x" if key == "resolution" else ":"
                         value = sep.join([str(x) for x in value])
@@ -155,8 +190,10 @@ def main(sys_args=sys.argv[1:]):
             if isinstance(streams, dict):
                 text += " - container:\n"
                 for key, value in streams.items():
-                    text += f"   - {key}: {value}\n"
+                    if value is not None:
+                        text += f"   - {key}: {value}\n"
             else:
+                assert isinstance(streams, list)
                 text = stream_to_text(text, label, streams)
         text += "\n"
 
