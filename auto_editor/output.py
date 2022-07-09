@@ -1,5 +1,5 @@
 import os.path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.container import Container
@@ -7,8 +7,8 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 
 
-def fset(cmd: List[str], option: str, value: str) -> List[str]:
-    if value == "unset":
+def fset(cmd: List[str], option: str, value: Optional[str]) -> List[str]:
+    if value is None or value == "unset":
         return cmd
     return cmd + [option] + [value]
 
@@ -83,6 +83,8 @@ def mux_quality_media(
     v_tracks = 0 if not ctr.allow_video else len(visual_output)
 
     cmd = ["-hide_banner", "-y", "-i", inp.path]
+
+    same_container = inp.ext == os.path.splitext(output_path)[1]
 
     for is_video, path in visual_output:
         if is_video or ctr.allow_image:
@@ -160,7 +162,7 @@ def mux_quality_media(
 
     if s_tracks > 0:
         scodec = inp.subtitles[0].codec
-        if inp.ext == os.path.splitext(output_path)[1]:
+        if same_container:
             cmd.extend(["-c:s", scodec])
         elif ctr.scodecs is not None:
             if scodec not in ctr.scodecs:
@@ -172,6 +174,12 @@ def mux_quality_media(
 
         cmd = fset(cmd, "-c:a", acodec)
         cmd = fset(cmd, "-b:a", args.audio_bitrate)
+
+    if same_container and v_tracks > 0:
+        cmd = fset(cmd, "-color_range", inp.videos[0].color_range)
+        cmd = fset(cmd, "-colorspace", inp.videos[0].color_space)
+        cmd = fset(cmd, "-color_primaries", inp.videos[0].color_primaries)
+        cmd = fset(cmd, "-color_trc", inp.videos[0].color_transfer)
 
     if args.extras is not None:
         cmd.extend(args.extras.split(" "))
