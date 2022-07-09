@@ -4,14 +4,10 @@ import sys
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-import av
-
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.func import aspect_ratio
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
-
-av.logging.set_level(av.logging.PANIC)
 
 
 @dataclass
@@ -48,6 +44,7 @@ def main(sys_args=sys.argv[1:]):
     args = info_options(ArgumentParser("info")).parse_args(InfoArgs, sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
+    log = Log(quiet=not args.json)
 
     file_info = {}
 
@@ -55,7 +52,7 @@ def main(sys_args=sys.argv[1:]):
         if not os.path.isfile(file):
             Log().error(f"Could not find file: {file}")
 
-        inp = FileInfo(file, ffmpeg, Log())
+        inp = FileInfo(file, ffmpeg, log)
 
         if len(inp.videos) + len(inp.audios) + len(inp.subtitles) == 0:
             file_info[file] = {"media": "invalid"}
@@ -68,12 +65,7 @@ def main(sys_args=sys.argv[1:]):
             "container": {},
         }
 
-        cn = av.open(file, "r")
-
         for track, stream in enumerate(inp.videos):
-            pix_fmt = cn.streams.video[track].pix_fmt
-            time_base = str(cn.streams.video[track].time_base)
-            cc_time_base = str(cn.streams.video[track].codec_context.time_base)
             w, h = stream.width, stream.height
             w_, h_ = aspect_ratio(w, h)
 
@@ -83,12 +75,15 @@ def main(sys_args=sys.argv[1:]):
 
             vid = {
                 "codec": stream.codec,
-                "pix_fmt": pix_fmt,
                 "fps": fps,
                 "resolution": [w, h],
                 "aspect ratio": [w_, h_],
-                "timebase": time_base,
-                "cc timebase": cc_time_base,
+                "pix_fmt": stream.pix_fmt,
+                "color_range": stream.color_range,
+                "color_space": stream.color_space,
+                "color_primaries": stream.color_primaries,
+                "color_transfer": stream.color_transfer,
+                "timebase": str(stream.time_base),
                 "bitrate": stream.bitrate,
                 "lang": stream.lang,
             }

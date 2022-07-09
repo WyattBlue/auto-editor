@@ -10,9 +10,32 @@ from pathlib import Path, PureWindowsPath
 from platform import system
 from typing import Union
 
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import Timeline
 
 from .utils import indent
+
+
+def get_colorspace(inp: FileInfo) -> str:
+    # See: https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/asset#3686496
+
+    if len(inp.videos) == 0:
+        return "1-1-1 (Rec. 709)"
+
+    s = inp.videos[0]
+    if s.pix_fmt == "rgb24":
+        return "sRGB IEC61966-2.1"
+    if s.color_space == "smpte170m":
+        return "6-1-6 (Rec. 601 NTSC)"
+    if s.color_space == "bt470bg":
+        return "5-1-6 (Rec. 601 PAL)"
+    if s.color_primaries == "bt2020":
+        # See: https://video.stackexchange.com/questions/22059/how-to-identify-hdr-video
+        if s.color_transfer in ("arib-std-b67", "smpte2084"):
+            return "9-18-9 (Rec. 2020 HLG)"
+        return "9-1-9 (Rec. 2020)"
+
+    return "1-1-1 (Rec. 709)"
 
 
 def fraction(_a: Union[int, float], _fps: float) -> str:
@@ -71,6 +94,8 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
     group_name = "Auto-Editor {} Group".format("Audio" if audio_file else "Video")
     name = inp.basename
 
+    colorspace = get_colorspace(inp)
+
     with open(output, "w", encoding="utf-8") as outfile:
         outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n')
         outfile.write("<!DOCTYPE fcpxml>\n\n")
@@ -80,11 +105,11 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
             f'\t\t<format id="r1" name="FFVideoFormat{height}p{fps}" '
             f'frameDuration="{frame_duration}" '
             f'width="{width}" height="{height}" '
-            'colorSpace="1-1-1 (Rec. 709)"/>\n'
+            f'colorSpace="{colorspace}"/>\n'
         )
         outfile.write(
             f'\t\t<asset id="r2" name="{name}" start="0s" hasVideo="1" format="r1" '
-            'hasAudio="1" audioSources="1" audioChannels="2" '
+            f'hasAudio="1" audioSources="1" audioChannels="2" colorSpace="{colorspace}" '
             f'duration="{fraction(total_dur, fps)}">\n'
         )
         outfile.write(

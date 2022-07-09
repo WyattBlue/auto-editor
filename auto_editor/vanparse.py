@@ -8,6 +8,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Iterator,
     List,
     Literal,
     Optional,
@@ -21,7 +22,7 @@ from typing import (
 import auto_editor
 from auto_editor.utils.log import Log
 
-T = TypeVar("T", bound=Callable)
+T = TypeVar("T", bound=type)
 Nargs = Union[int, Literal["*"]]
 
 
@@ -57,7 +58,7 @@ def indent(text: str, prefix: str) -> str:
     def predicate(line: str) -> str:
         return line.strip()
 
-    def prefixed_lines():
+    def prefixed_lines() -> Iterator[str]:
         for line in text.splitlines(True):
             yield (prefix + line if predicate(line) else line)
 
