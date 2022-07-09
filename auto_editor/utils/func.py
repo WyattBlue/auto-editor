@@ -271,9 +271,9 @@ def get_stdout(cmd: List[str]) -> str:
     return stdout.decode("utf-8", "replace")
 
 
-def aspect_ratio(width: int, height: int) -> Union[Tuple[int, int], Tuple[None, None]]:
+def aspect_ratio(width: int, height: int) -> Tuple[int, int]:
     if height == 0:
-        return None, None
+        return (0, 0)
 
     def gcd(a: int, b: int) -> int:
         while b:
