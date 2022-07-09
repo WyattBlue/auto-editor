@@ -7,7 +7,7 @@ from fractions import Fraction
 from platform import system
 from re import search
 from subprocess import PIPE, Popen
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
@@ -148,6 +148,12 @@ class VideoStream:
     height: int
     codec: str
     fps: float
+    time_base: Fraction
+    pix_fmt: str
+    color_range: Optional[str]
+    color_space: Optional[str]
+    color_primaries: Optional[str]
+    color_transfer: Optional[str]
     bitrate: Optional[str]
     lang: Optional[str]
 
@@ -231,6 +237,19 @@ class FileInfo:
         except FileNotFoundError:
             log.error(f"Could not find: {ffprobe}")
 
+        def get_attr(name: str, dic: Dict[str, Any], default=-1) -> str:
+            if name in dic:
+                if isinstance(dic[name], str):
+                    return dic[name]
+                log.error(f"'{name}' must be a string")
+            if default == -1:
+                log.error(f"'{name}' must be in ffprobe json")
+            if default is not None:
+                log.warning(
+                    f"'{name}' not found. Using value '{default}' as a placeholder."
+                )
+            return default
+
         try:
             json_info = json.loads(info)
             if "streams" not in json_info:
@@ -240,7 +259,9 @@ class FileInfo:
         except Exception as e:
             log.error(f"{path}: Could not read ffprobe JSON: {e}")
 
-        self.bitrate = json_info["format"]["bit_rate"]
+        self.bitrate: Optional[str] = None
+        if "bit_rate" in json_info["format"]:
+            self.bitrate = json_info["format"]["bit_rate"]
         if (
             "tags" in json_info["format"]
             and "description" in json_info["format"]["tags"]
@@ -255,30 +276,26 @@ class FileInfo:
             if "bit_rate" in stream:
                 br = stream["bit_rate"]
 
-            if "codec_type" not in stream:
-                log.error("'codec_type' must be in ffprobe json")
-            codec_type = stream["codec_type"]
-            if not isinstance(codec_type, str):
-                log.error("'codec_type' must be a string")
+            codec_type = get_attr("codec_type", stream)
 
             if codec_type in ("video", "audio", "subtitle"):
-                if "codec_name" not in stream:
-                    log.error("'codec_name' must be in ffprobe json")
-                codec = stream["codec_name"]
-
-                if not isinstance(codec, str):
-                    log.error("'codec_name' must be a string")
+                codec = get_attr("codec_name", stream)
 
             if codec_type == "video":
-                codec = stream["codec_name"]
+                pix_fmt = get_attr("pix_fmt", stream)
+                color_range = get_attr("color_range", stream, default=None)
+                color_space = get_attr("color_space", stream, default=None)
+                color_primaries = get_attr("color_primaries", stream, default=None)
+                color_transfer = get_attr("color_transfer", stream, default=None)
+                fps_str = get_attr("avg_frame_rate", stream)
+                time_base_str = get_attr("time_base", stream)
+
                 try:
-                    fps = float(Fraction(stream["avg_frame_rate"]))
+                    fps = float(Fraction(fps_str))
                 except ZeroDivisionError:
                     fps = 0
                 except ValueError:
-                    log.error(
-                        f"Could not convert fps '{stream['avg_frame_rate']}' to float"
-                    )
+                    log.error(f"Could not convert fps '{fps_str}' to float")
 
                 if fps < 1:
                     if codec in IMG_CODECS:
@@ -286,8 +303,30 @@ class FileInfo:
                     else:
                         log.error("fps cannot be less than 1.")
 
+                try:
+                    time_base = Fraction(time_base_str)
+                except (ValueError, ZeroDivisionError):
+                    if codec not in IMG_CODECS:
+                        log.error(
+                            f"Could not convert time_base '{time_base_str}' to Fraction"
+                        )
+                    time_base = Fraction(0, 1)
+
                 self.videos.append(
-                    VideoStream(stream["width"], stream["height"], codec, fps, br, lang)
+                    VideoStream(
+                        stream["width"],
+                        stream["height"],
+                        codec,
+                        fps,
+                        time_base,
+                        pix_fmt,
+                        color_range,
+                        color_space,
+                        color_primaries,
+                        color_transfer,
+                        br,
+                        lang,
+                    )
                 )
             if codec_type == "audio":
                 sr = int(stream["sample_rate"])
