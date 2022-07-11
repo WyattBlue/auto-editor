@@ -166,7 +166,7 @@ def clipify(chunks: Chunks, src: int, start: float) -> List[Clip]:
 def make_av(
     all_clips: List[List[Clip]], inputs: List[FileInfo]
 ) -> Tuple[VSpace, ASpace]:
-    vclips: VSpace = [[]]
+    vclips: VSpace = []
 
     max_a = 0
     for inp in inputs:
@@ -177,9 +177,12 @@ def make_av(
     for clips, inp in zip(all_clips, inputs):
         if len(inp.videos) > 0:
             for clip in clips:
-                vclips[0].append(
-                    VideoObj(clip.start, clip.dur, clip.offset, clip.speed, clip.src)
+                vclip_ = VideoObj(
+                    clip.start, clip.dur, clip.offset, clip.speed, clip.src
                 )
+                if len(vclips) == 0:
+                    vclips = [[vclip_]]
+                vclips[0].append(vclip_)
         if len(inp.audios) > 0:
             for clip in clips:
                 for a, _ in enumerate(inp.audios):

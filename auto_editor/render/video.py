@@ -1,7 +1,7 @@
 import os.path
-import subprocess
 from dataclasses import dataclass
 from math import ceil
+from subprocess import DEVNULL, PIPE
 from typing import Dict, List, Tuple, Union
 
 import av
@@ -9,7 +9,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
-from auto_editor.output import get_vcodec, video_quality
+from auto_editor.output import video_quality
 from auto_editor.timeline import Timeline, Visual
 from auto_editor.utils.container import Container
 from auto_editor.utils.encoder import encoders
@@ -144,24 +144,38 @@ def render_av(
     decoders = []
     tous = []
     pix_fmts = []
+    seek_cost = []
     for cn in cns:
-        stream = cn.streams.video[0]
-        stream.thread_type = "AUTO"
+        if len(cn.streams.video) == 0:
+            decoders.append(None)
+            tous.append(None)
+            pix_fmts.append(None)
+            seek_cost.append(None)
+        else:
+            stream = cn.streams.video[0]
+            stream.thread_type = "AUTO"
 
-        tous.append(int(stream.time_base.denominator / stream.average_rate))
-        pix_fmts.append(stream.pix_fmt)
-        decoders.append(cn.decode(stream))
+            # Keyframes are usually spread out every 5 seconds or less.
+            seek_cost.append(
+                4294967295
+                if args.no_seek
+                else int(cn.streams.video[0].average_rate * 5)
+            )
+            tous.append(int(stream.time_base.denominator / stream.average_rate))
+            pix_fmts.append(stream.pix_fmt)
+            decoders.append(cn.decode(stream))
 
     log.debug(f"Tous: {tous}")
     log.debug(f"Clips: {timeline.v}")
 
     target_pix_fmt = pix_fmts[0] if pix_fmts[0] in allowed_pix_fmt else "yuv420p"
-    my_codec = get_vcodec(args.video_codec, inp, ctr)
 
     apply_video_later = True
 
-    if my_codec in encoders:
-        apply_video_later = encoders[my_codec]["pix_fmt"].isdisjoint(allowed_pix_fmt)
+    if args.video_codec in encoders:
+        apply_video_later = encoders[args.video_codec]["pix_fmt"].isdisjoint(
+            allowed_pix_fmt
+        )
 
     if args.scale != 1:
         apply_video_later = False
@@ -194,24 +208,16 @@ def render_av(
         cmd.extend(["-c:v", "mpeg4", "-qscale:v", "1"])
     else:
         cmd = video_quality(cmd, args, inp, ctr)
-
     cmd.append(spedup)
 
-    process2 = ffmpeg.Popen(
-        cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
+    process2 = ffmpeg.Popen(cmd, stdin=PIPE, stdout=DEVNULL, stderr=DEVNULL)
     assert process2.stdin is not None
 
+    # First few frames can have an abnormal keyframe count, so never seek there.
     seek = 10
+
     seek_frame = None
     frames_saved = 0
-
-    # Keyframes are usually spread out every 5 seconds or less.
-    if args.no_seek:
-        SEEK_COST = 4294967295
-    else:
-        SEEK_COST = int(cns[0].streams.video[0].average_rate * 5)
-    SEEK_RETRY = SEEK_COST // 2
 
     progress.start(timeline.end, "Creating new video")
 
@@ -244,15 +250,21 @@ def render_av(
             for obj in obj_list:
                 if isinstance(obj, VideoFrame):
                     if frame_index > obj.index:
-                        log.debug(f"Seek: {frame_index} -> beginning")
+                        log.debug(f"Seek: {frame_index} -> 0")
                         cns[obj.src].seek(0)
-                        frame = next(decoders[obj.src])
-                        frame_index = round(frame.time * timeline.fps)
+                        try:
+                            frame = next(decoders[obj.src])
+                            frame_index = round(frame.time * timeline.fps)
+                        except StopIteration:
+                            pass
 
                     while frame_index < obj.index:
                         # Check if skipping ahead is worth it.
-                        if obj.index - frame_index > SEEK_COST and frame_index > seek:
-                            seek = frame_index + SEEK_RETRY
+                        if (
+                            obj.index - frame_index > seek_cost[obj.src]
+                            and frame_index > seek
+                        ):
+                            seek = frame_index + (seek_cost[obj.src] // 2)
                             seek_frame = frame_index
                             log.debug(f"Seek: {frame_index} -> {obj.index}")
                             cns[obj.src].seek(

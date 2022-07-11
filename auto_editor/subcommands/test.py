@@ -382,6 +382,23 @@ def main(sys_args: Optional[List[str]] = None):
             assert cn.streams.video[0].height == 380
             assert cn.streams.audio[0].rate == 48000
 
+    def obj_makes_video():
+        run_program(
+            [
+                "resources/new-commentary.mp3",
+                "--add-rectangle",
+                "0,30,0,0,300,300,fill=blue",
+                "-o",
+                "out.mp4",
+            ]
+        )
+        with av.open("out.mp4") as cn:
+            assert len(cn.streams.video) == 1
+            assert len(cn.streams.audio) == 1
+            assert cn.streams.video[0].width == 1920
+            assert cn.streams.video[0].height == 1080
+            assert cn.streams.video[0].average_rate == 30
+
     def various_errors_test():
         check_for_error(
             ["example.mp4", "--add_rectangle", "0,60", "--cut_out", "60,end"]
@@ -642,6 +659,7 @@ def main(sys_args: Optional[List[str]] = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                obj_makes_video,
                 edit_positive_tests,
                 edit_negative_tests,
                 multi_track_edit,
