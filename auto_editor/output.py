@@ -13,54 +13,16 @@ def fset(cmd: List[str], option: str, value: Optional[str]) -> List[str]:
     return cmd + [option] + [value]
 
 
-def get_vcodec(vcodec: str, inp: FileInfo, ctr: Container) -> str:
-    if vcodec == "auto":
-        vcodec = inp.videos[0].codec
-
-        if ctr.vcodecs is not None:
-            if ctr.vstrict and vcodec not in ctr.vcodecs:
-                return ctr.vcodecs[0]
-
-            if vcodec in ctr.disallow_v:
-                return ctr.vcodecs[0]
-
-    if vcodec == "copy":
-        return inp.videos[0].codec
-
-    if vcodec == "uncompressed":
-        return "mpeg4"
-    return vcodec
-
-
-def get_acodec(acodec: str, inp: FileInfo, ctr: Container) -> str:
-    if acodec == "auto":
-        acodec = inp.audios[0].codec
-
-        if ctr.acodecs is not None:  # Just in case, but shouldn't happen
-            if ctr.astrict and acodec not in ctr.acodecs:
-                # Input codec can't be used for output, so use a new safe codec.
-                return ctr.acodecs[0]
-
-            if acodec in ctr.disallow_a:
-                return ctr.acodecs[0]
-
-    if acodec == "copy":
-        return inp.audios[0].codec
-    return acodec
-
-
 def video_quality(
     cmd: List[str], args: Args, inp: FileInfo, ctr: Container
 ) -> List[str]:
     cmd = fset(cmd, "-b:v", args.video_bitrate)
 
     qscale = args.video_quality_scale
-    if args.video_codec == "uncompressed" and qscale == "unset":
+    if args.video_codec == "mpeg4" and qscale == "unset":
         qscale = "1"
 
-    vcodec = get_vcodec(args.video_codec, inp, ctr)
-
-    cmd.extend(["-c:v", vcodec])
+    cmd.extend(["-c:v", args.video_codec])
     cmd = fset(cmd, "-qscale:v", qscale)
     cmd.extend(["-movflags", "faststart"])
     return cmd
@@ -170,9 +132,7 @@ def mux_quality_media(
             cmd.extend(["-c:s", scodec])
 
     if a_tracks > 0:
-        acodec = get_acodec(args.audio_codec, inp, ctr)
-
-        cmd = fset(cmd, "-c:a", acodec)
+        cmd = fset(cmd, "-c:a", args.audio_codec)
         cmd = fset(cmd, "-b:a", args.audio_bitrate)
 
     if same_container and v_tracks > 0:

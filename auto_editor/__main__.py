@@ -361,16 +361,16 @@ def main() -> None:
     if args.video_speed <= 0 or args.video_speed > 99999:
         args.video_speed = 99999
 
-    inputs = valid_input(args.input, ffmpeg, args, log)
+    paths = valid_input(args.input, ffmpeg, args, log)
 
-    if exporting_to_editor and len(inputs) > 1:
+    if exporting_to_editor and len(paths) > 1:
         cmd = []
-        for inp in inputs:
-            cmd.extend(["-i", inp])
+        for path in paths:
+            cmd.extend(["-i", path])
         cmd.extend(
             [
                 "-filter_complex",
-                f"[0:v]concat=n={len(inputs)}:v=1:a=1",
+                f"[0:v]concat=n={len(paths)}:v=1:a=1",
                 "-codec:v",
                 "h264",
                 "-pix_fmt",
@@ -381,9 +381,9 @@ def main() -> None:
             ]
         )
         ffmpeg.run(cmd)
-        inputs = ["combined.mp4"]
+        paths = ["combined.mp4"]
     try:
-        output = edit_media(inputs, ffmpeg, args, temp, log)
+        output = edit_media(paths, ffmpeg, args, temp, log)
 
         if not args.preview and not args.timeline:
             timer.stop()

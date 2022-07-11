@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
-from auto_editor.utils.container import container_constructor
+from auto_editor.utils.container import Container, container_constructor
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args, Chunk, Chunks
@@ -28,6 +28,75 @@ def set_output_name(path: str, inp_ext: str, export: str) -> str:
     return f"{root}_ALTERED{ext}"
 
 
+codec_error = "'{}' codec is not supported in '{}' container."
+
+
+def set_video_codec(
+    codec: str, inp: Optional[FileInfo], out_ext: str, ctr: Container, log: Log
+) -> str:
+    if codec == "auto":
+        codec = "h264" if (inp is None or not inp.videos) else inp.videos[0].codec
+        if ctr.vcodecs is not None:
+            if ctr.vstrict and codec not in ctr.vcodecs:
+                return ctr.vcodecs[0]
+
+            if codec in ctr.disallow_v:
+                return ctr.vcodecs[0]
+        return codec
+
+    if codec == "copy":
+        if inp is None:
+            log.error("No input to copy its codec from.")
+        if not inp.videos:
+            log.error("Input file does not have a video stream to copy codec from.")
+        codec = inp.videos[0].codec
+
+    if codec == "uncompressed":
+        codec = "mpeg4"
+
+    if ctr.vstrict:
+        assert ctr.vcodecs is not None
+        if codec not in ctr.vcodecs:
+            log.error(codec_error.format(codec, out_ext))
+
+    if codec in ctr.disallow_v:
+        log.error(codec_error.format(codec, out_ext))
+
+    return codec
+
+
+def set_audio_codec(
+    codec: str, inp: Optional[FileInfo], out_ext: str, ctr: Container, log: Log
+) -> str:
+    if codec == "auto":
+        codec = "aac" if (inp is None or not inp.audios) else inp.audios[0].codec
+        if ctr.acodecs is not None:
+            if ctr.astrict and codec not in ctr.acodecs:
+                return ctr.acodecs[0]
+
+            if codec in ctr.disallow_a:
+                return ctr.acodecs[0]
+        return codec
+
+    if codec == "copy":
+        if inp is None:
+            log.error("No input to copy its codec from.")
+        if not inp.audios:
+            log.error("Input file does not have an audio stream to copy codec from.")
+        codec = inp.audios[0].codec
+
+    if codec != "unset":
+        if ctr.astrict:
+            assert ctr.acodecs is not None
+            if codec not in ctr.acodecs:
+                log.error(codec_error.format(codec, out_ext))
+
+        if codec in ctr.disallow_a:
+            log.error(codec_error.format(codec, out_ext))
+
+    return codec
+
+
 def edit_media(
     paths: List[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
 ) -> Optional[str]:
@@ -48,58 +117,28 @@ def edit_media(
         inputs = []
     del paths
 
-    if inputs:
-        inp = inputs[0]
+    inp = None if not inputs else inputs[0]
+
+    if inp is None:
+        output = "out.mp4" if args.output_file is None else args.output_file
+    else:
         if args.output_file is None:
             output = set_output_name(inp.path, inp.ext, args.export)
         else:
             output = args.output_file
             if os.path.splitext(output)[1] == "":
                 output = set_output_name(output, inp.ext, args.export)
-        del inp
-    else:
-        output = "out.mp4" if args.output_file is None else args.output_file
 
     out_ext = os.path.splitext(output)[1].replace(".", "")
 
     # Check if export options make sense.
     ctr = container_constructor(out_ext)
-    codec_error = "'{}' codec is not supported in '{}' container."
 
     if ctr.samplerate is not None and args.sample_rate not in ctr.samplerate:
         log.error(f"'{out_ext}' container only supports samplerates: {ctr.samplerate}")
 
-    vcodec = args.video_codec
-    if vcodec == "uncompressed":
-        vcodec = "mpeg4"
-    if vcodec == "copy":
-        if inputs:
-            vcodec = inputs[0].videos[0].codec
-        else:
-            log.error("No input video to copy its codec from.")
-
-    if vcodec != "auto":
-        if ctr.vstrict:
-            assert ctr.vcodecs is not None
-            if vcodec not in ctr.vcodecs:
-                log.error(codec_error.format(vcodec, out_ext))
-
-        if vcodec in ctr.disallow_v:
-            log.error(codec_error.format(vcodec, out_ext))
-
-    acodec = args.audio_codec
-    if acodec == "copy":
-        acodec = inp.audios[0].codec
-        log.debug(f"Settings acodec to {acodec}")
-
-    if acodec not in ("unset", "auto"):
-        if ctr.astrict:
-            assert ctr.acodecs is not None
-            if acodec not in ctr.acodecs:
-                log.error(codec_error.format(acodec, out_ext))
-
-        if acodec in ctr.disallow_a:
-            log.error(codec_error.format(acodec, out_ext))
+    args.video_codec = set_video_codec(args.video_codec, inp, out_ext, ctr, log)
+    args.audio_codec = set_audio_codec(args.audio_codec, inp, out_ext, ctr, log)
 
     if args.keep_tracks_separate and ctr.max_audios == 1:
         log.warning(f"'{out_ext}' container doesn't support multiple audio tracks.")
@@ -113,8 +152,7 @@ def edit_media(
             os.remove(output)
 
     # Extract subtitles in their native format.
-    if inputs and len(inputs[0].subtitles) > 0:
-        inp = inputs[0]
+    if inp is not None and len(inp.subtitles) > 0:
         cmd = ["-i", inp.path, "-hide_banner"]
         for s, sub in enumerate(inp.subtitles):
             cmd.extend(["-map", f"0:s:{s}"])
@@ -215,13 +253,14 @@ def edit_media(
             audio_output = make_new_audio(timeline, progress, temp, log)
 
         if ctr.allow_video:
-            for v, vid in enumerate(inp.videos):
-                if vid.codec not in ("png", "mjpeg", "webp") and v == 0:
-                    out_path, apply_later = render_av(
-                        ffmpeg, timeline, args, progress, ctr, temp, log
-                    )
-                    visual_output.append((True, out_path))
-                elif ctr.allow_image:
+            if len(timeline.v) > 0:
+                out_path, apply_later = render_av(
+                    ffmpeg, timeline, args, progress, ctr, temp, log
+                )
+                visual_output.append((True, out_path))
+
+            for v, vid in enumerate(inp.videos, start=1):
+                if ctr.allow_image and vid.codec in ("png", "mjpeg", "webp"):
                     out_path = os.path.join(temp, f"{v}.{vid.codec}")
                     # fmt: off
                     ffmpeg.run(["-i", inp.path, "-map", "0:v", "-map", "-0:V",
@@ -248,7 +287,6 @@ def edit_media(
         if chunks is None:
             log.error("Timeline to complex to use clip-sequence export")
 
-        total_frames = chunks[-1][1] - 1
         from auto_editor.timeline import clipify, make_av
         from auto_editor.utils.func import append_filename
 
@@ -257,6 +295,7 @@ def edit_media(
             end = [] if chunk[1] == total else [(chunk[1], total, 99999.0)]
             return start + [chunk] + end
 
+        total_frames = chunks[-1][1] - 1
         clip_num = 0
         for chunk in chunks:
             if chunk[2] == 99999:
