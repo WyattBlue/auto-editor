@@ -109,7 +109,7 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
         )
         outfile.write(
             f'\t\t<asset id="r2" name="{name}" start="0s" hasVideo="1" format="r1" '
-            f'hasAudio="1" audioSources="1" audioChannels="2" colorSpace="{colorspace}" '
+            'hasAudio="1" audioSources="1" audioChannels="2" '
             f'duration="{fraction(total_dur, fps)}">\n'
         )
         outfile.write(
