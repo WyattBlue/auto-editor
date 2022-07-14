@@ -137,9 +137,9 @@ auto-editor --scale --help
  - [Note on GPU Acceleration](https://auto-editor.com/gpu)
 
 ## Copyright
-Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all files besides the ones listed below. Auto-Editor was created by [these people.](https://github.com/WyattBlue/auto-editor/blob/master/AUTHORS.md)
+Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all directories besides the ones listed below. Auto-Editor was created by [these people.](https://github.com/WyattBlue/auto-editor/blob/master/AUTHORS.md)
 
-The binaries under auto_editor/ffmpeg are subject to the [LGPLv3 License](https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/ffmpeg/LICENSE.txt). The FFmpeg and FFprobe programs were created by the FFmpeg team and purposely compiled by WyattBlue for use in auto-editor.
+ae-ffmpeg is under the [LGPLv3 License](https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/ffmpeg/LICENSE.txt). The FFmpeg and FFprobe programs were created by the FFmpeg team and purposely compiled by WyattBlue for use in auto-editor.
 
 ## Issues
 If you encounter a bug or have a feature request, you can [create a new issue](https://github.com/WyattBlue/auto-editor/issues/new). If you'll like to discuss this project, and chat with other users, you can use the [discord server](https://discord.com/invite/kMHAWJJ).

@@ -36,23 +36,14 @@ setup(
     keywords="video audio media editor editing processing nonlinear automatic "
     "silence-detect silence-removal silence-speedup motion-detection",
     packages=find_packages(),
-    package_data={
-        "auto_editor": [
-            "help.json",
-            "ffmpeg/LICENSE.txt",
-            "ffmpeg/Windows/ffmpeg.exe",
-            "ffmpeg/Windows/ffprobe.exe",
-            "ffmpeg/Windows/libopenh264.dll",
-            "ffmpeg/Darwin/ffmpeg",
-            "ffmpeg/Darwin/ffprobe",
-        ],
-    },
+    package_data={"auto_editor": ["help.json"]},
     include_package_data=True,
     zip_safe=False,
     install_requires=[
         "numpy>=1.22.0",
         "pillow==9.2.0",
         "av==9.2.0",
+        "ae-ffmpeg==1.0.0",
     ],
     python_requires=">=3.8",
     classifiers=[
