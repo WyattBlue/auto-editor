@@ -22,20 +22,20 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
         cd ae-ffmpeg
-        mv ae_ffmpeg/ffmpeg/Windows ./
+        mv ae_ffmpeg/Windows ./
         python setup.py bdist_wheel --plat-name=macosx_10_9_x86_64
 
         twine upload dist/*
         rm -rf dist build
 
-        mv Windows ae_ffmpeg/ffmpeg
-        mv ae_ffmpeg/ffmpeg/Darwin ./
+        mv Windows ae_ffmpeg
+        mv ae_ffmpeg/Darwin ./
 
         python setup.py bdist_wheel --plat-name=win_amd64
         twine upload dist/*
         rm -rf dist build
 
-        mv ae_ffmpeg/ffmpeg/Windows ./
+        mv ae_ffmpeg/Windows ./
 
         python setup.py sdist bdist_wheel
         twine upload dist/*
