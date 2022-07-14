@@ -8,6 +8,7 @@ on:
       - '**.txt'
       - '**.png'
       - 'auto_editor/__init__.py'
+      - 'ae-ffmpeg/**/*'
       - 'site/**/*'
     branches:
       - master

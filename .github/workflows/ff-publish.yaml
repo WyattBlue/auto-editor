@@ -1,10 +1,8 @@
 # This workflows will upload a Python Package using Twine when a release is created
 # For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
 
-name: Upload Python Package
-on:
-  release:
-    types: [created]
+name: Upload ae-ffmpeg Package
+on: workflow_dispatch
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -23,7 +21,7 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        cd ff
+        cd ae-ffmpeg
         mv ae_ffmpeg/ffmpeg/Windows ./
         python setup.py bdist_wheel --plat-name=macosx_10_9_x86_64
 
