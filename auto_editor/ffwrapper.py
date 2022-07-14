@@ -9,6 +9,8 @@ from re import search
 from subprocess import PIPE, Popen
 from typing import Any, Dict, List, Optional, Tuple
 
+import ae_ffmpeg
+
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
@@ -19,24 +21,6 @@ SUB_EXTS = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
 class FFmpeg:
     __slots__ = ("debug", "path", "version")
 
-    @staticmethod
-    def _set_ff_path(ff_location: Optional[str], my_ffmpeg: bool) -> str:
-        if ff_location is not None:
-            return ff_location
-        if my_ffmpeg or system() not in ("Windows", "Darwin"):
-            return "ffmpeg"
-
-        # Assumming accessing __file__ is somewhat expensive.
-        program = "ffmpeg.exe" if system() == "Windows" else "ffmpeg"
-        dirpath = os.path.dirname(os.path.realpath(__file__))
-        file_path = os.path.join(dirpath, "ffmpeg", system(), program)
-
-        # May not exist because auto-editor doesn't bundle every architecture.
-        if os.path.isfile(file_path):
-            return file_path
-
-        return "ffmpeg"
-
     def __init__(
         self,
         ff_location: Optional[str] = None,
@@ -44,8 +28,16 @@ class FFmpeg:
         debug: bool = False,
     ) -> None:
 
+        def _set_ff_path(ff_location: Optional[str], my_ffmpeg: bool) -> str:
+            if ff_location is not None:
+                return ff_location
+            if my_ffmpeg:
+                return "ffmpeg"
+
+            return ae_ffmpeg.get_path()
+
         self.debug = debug
-        self.path = self._set_ff_path(ff_location, my_ffmpeg)
+        self.path = _set_ff_path(ff_location, my_ffmpeg)
         try:
             _version = get_stdout([self.path, "-version"]).split("\n")[0]
             _version = _version.replace("ffmpeg version", "").strip()

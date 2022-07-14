@@ -20,8 +20,24 @@ jobs:
         pip install setuptools wheel twine
     - name: Build and publish
       env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PIP_PASSWORD }}
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
+        cd ff
+        mv ae_ffmpeg/ffmpeg/Windows ./
+        python setup.py bdist_wheel --plat-name=macosx_10_9_x86_64
+
+        twine upload dist/*
+        rm -rf dist build
+
+        mv Windows ae_ffmpeg/ffmpeg
+        mv ae_ffmpeg/ffmpeg/Darwin ./
+
+        python setup.py bdist_wheel --plat-name=win_amd64
+        twine upload dist/*
+        rm -rf dist build
+
+        mv ae_ffmpeg/ffmpeg/Windows ./
+
         python setup.py sdist bdist_wheel
         twine upload dist/*
