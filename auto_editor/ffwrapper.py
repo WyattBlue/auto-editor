@@ -9,8 +9,6 @@ from re import search
 from subprocess import PIPE, Popen
 from typing import Any, Dict, List, Optional, Tuple
 
-import ae_ffmpeg
-
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
@@ -27,11 +25,15 @@ class FFmpeg:
         my_ffmpeg: bool = False,
         debug: bool = False,
     ) -> None:
-
         def _set_ff_path(ff_location: Optional[str], my_ffmpeg: bool) -> str:
             if ff_location is not None:
                 return ff_location
             if my_ffmpeg:
+                return "ffmpeg"
+
+            try:
+                import ae_ffmpeg
+            except ImportError:
                 return "ffmpeg"
 
             return ae_ffmpeg.get_path()
@@ -45,13 +47,12 @@ class FFmpeg:
         except FileNotFoundError:
             if system() == "Darwin":
                 Log().error(
-                    "No ffmpeg found, download via homebrew or restore the "
-                    "included binary."
+                    "No ffmpeg found, download via homebrew or install ae-ffmpeg."
                 )
             if system() == "Windows":
                 Log().error(
                     "No ffmpeg found, download ffmpeg with your favorite package "
-                    "manager (ex chocolatey), or restore the included binary."
+                    "manager (ex chocolatey), or install ae-ffmpeg."
                 )
 
             Log().error("ffmpeg must be installed and on PATH.")
