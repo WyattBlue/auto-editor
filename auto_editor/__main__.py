@@ -17,6 +17,7 @@ from auto_editor.utils.types import (
     resolution,
     sample_rate,
     speed_range,
+    threshold,
     time,
     time_range,
 )
@@ -233,7 +234,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--silent-threshold",
         "-t",
-        type=number,
+        type=threshold,
         help="Set the volume that frames audio needs to surpass to be marked loud.",
     )
     parser.add_argument(

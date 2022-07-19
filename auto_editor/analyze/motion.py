@@ -14,11 +14,11 @@ def new_size(size: tuple[int, int], width: int) -> tuple[int, int]:
 
 
 def motion_detection(
-    path: str, fps: float, progress: ProgressBar, width: int, blur: int
+    path: str, track: int, fps: float, progress: ProgressBar, width: int, blur: int
 ) -> NDArray[np.float_]:
     container = av.open(path, "r")
 
-    stream = container.streams.video[0]
+    stream = container.streams.video[track]
     stream.thread_type = "AUTO"
 
     inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)

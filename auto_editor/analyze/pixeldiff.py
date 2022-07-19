@@ -7,11 +7,11 @@ from auto_editor.utils.progressbar import ProgressBar
 
 
 def pixel_difference(
-    path: str, fps: float, progress: ProgressBar
+    path: str, track: int, fps: float, progress: ProgressBar
 ) -> NDArray[np.uint64]:
     container = av.open(path, "r")
 
-    stream = container.streams.video[0]
+    stream = container.streams.video[track]
     stream.thread_type = "AUTO"
 
     inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)
