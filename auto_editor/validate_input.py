@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import os
 import re
 import subprocess
 from platform import system
-from typing import List
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.func import get_stdout
@@ -65,7 +66,7 @@ def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
     return location
 
 
-def valid_input(inputs: List[str], ffmpeg: FFmpeg, args: Args, log: Log) -> List[str]:
+def valid_input(inputs: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> list[str]:
     new_inputs = []
 
     for my_input in inputs:
