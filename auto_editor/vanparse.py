@@ -1,23 +1,12 @@
+from __future__ import annotations
+
 import difflib
 import re
 import sys
 import textwrap
 from dataclasses import dataclass
 from shutil import get_terminal_size
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Literal,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, Callable, Iterator, Literal, Sequence, TypeVar, Union
 
 import auto_editor
 from auto_editor.utils.log import Log
@@ -31,7 +20,7 @@ class Required:
     names: Sequence[str]
     nargs: Nargs = "*"
     type: type = str
-    choices: Optional[Sequence[str]] = None
+    choices: Sequence[str] | None = None
     help: str = ""
     _type: str = "required"
 
@@ -42,7 +31,7 @@ class Options:
     nargs: Nargs = 1
     type: type = str
     flag: bool = False
-    choices: Optional[Sequence[str]] = None
+    choices: Sequence[str] | None = None
     pool: bool = False
     help: str = ""
     _type: str = "option"
@@ -82,9 +71,7 @@ def out(text: str) -> None:
     print("\n".join(wrapped_lines))
 
 
-def print_program_help(
-    reqs: List[Required], args: List[Union[Options, OptionText]]
-) -> None:
+def print_program_help(reqs: list[Required], args: list[Options | OptionText]) -> None:
     text = ""
     for arg in args:
         if isinstance(arg, OptionText):
@@ -97,7 +84,7 @@ def print_program_help(
     out(text)
 
 
-def get_help_data() -> Dict[str, Dict[str, str]]:
+def get_help_data() -> dict[str, dict[str, str]]:
     import json
     import os.path
 
@@ -115,7 +102,7 @@ def to_underscore(name: str) -> str:
     return name[:2] + name[2:].replace("-", "_")
 
 
-def to_key(op: Union[Options, Required]) -> str:
+def to_key(op: Options | Required) -> str:
     """Convert option name to arg key.  e.g. --hello-world -> hello_world"""
     return op.names[0][:2].replace("-", "") + op.names[0][2:].replace("-", "_")
 
@@ -137,7 +124,7 @@ def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
         bar_len = len(_add)
         text += _add
 
-        default: Optional[str] = None
+        default: str | None = None
         try:
             default = getattr(ns_obj, to_key(option))
         except AttributeError:
@@ -163,14 +150,14 @@ def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
     out(text)
 
 
-def get_option(name: str, options: List[Options]) -> Optional[Options]:
+def get_option(name: str, options: list[Options]) -> Options | None:
     for option in options:
         if name in option.names or name in map(to_underscore, option.names):
             return option
     return None
 
 
-def parse_value(option: Union[Options, Required], val: Optional[str]) -> Any:
+def parse_value(option: Options | Required, val: str | None) -> Any:
     if val is None and option.nargs == 1:
         Log().error(f"{option.names[0]} needs argument.")
 
@@ -192,9 +179,9 @@ def parse_value(option: Union[Options, Required], val: Optional[str]) -> Any:
 class ArgumentParser:
     def __init__(self, program_name: str) -> None:
         self.program_name = program_name
-        self.requireds: List[Required] = []
-        self.options: List[Options] = []
-        self.args: List[Union[Options, OptionText]] = []
+        self.requireds: list[Required] = []
+        self.options: list[Options] = []
+        self.args: list[Options | OptionText] = []
 
     def add_argument(self, *args: str, **kwargs) -> None:
         x = Options(args, **kwargs)
@@ -213,8 +200,8 @@ class ArgumentParser:
     def parse_args(
         self,
         ns_obj: T,
-        sys_args: List[str],
-        macros: Optional[List[Tuple[Set[str], List[str]]]] = None,
+        sys_args: list[str],
+        macros: list[tuple[set[str], list[str]]] | None = None,
     ) -> T:
         if len(sys_args) == 0:
             out(get_help_data()[self.program_name]["_"])
@@ -235,7 +222,7 @@ class ArgumentParser:
         del macros
 
         ns = ns_obj()
-        option_names: List[str] = []
+        option_names: list[str] = []
 
         program_name = self.program_name
         requireds = self.requireds
@@ -251,15 +238,15 @@ class ArgumentParser:
         args.append(builtin_help)
 
         # Figure out command line options changed by user.
-        used_options: List[Options] = []
+        used_options: list[Options] = []
 
-        req_list: List[str] = []
+        req_list: list[str] = []
         req_list_name = requireds[0].names[0]
         setting_req_list = requireds[0].nargs != 1
 
         option_list: Any = []
         op_key: str = ""
-        oplist_name: Optional[str] = None
+        oplist_name: str | None = None
         oplist_coerce: Callable[[str], str] = str
 
         i = 0

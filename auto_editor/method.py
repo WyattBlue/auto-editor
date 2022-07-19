@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import os
 import random
 import re
-from dataclasses import asdict, dataclass, fields
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from dataclasses import dataclass
+from typing import Any, Callable, NamedTuple, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
@@ -15,7 +17,6 @@ from auto_editor.utils.func import (
     apply_margin,
     apply_mark_as,
     cook,
-    parse_dataclass,
     seconds_to_frames,
     set_range,
     to_speed_list,
@@ -32,20 +33,20 @@ BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
 @dataclass
 class Audio:
-    stream: Stream = 0
-    threshold: float = -1
+    stream: Stream
+    threshold: float
 
 
 @dataclass
 class Motion:
-    threshold: float = 0.02
-    blur: int = 9
-    width: int = 400
+    threshold: float
+    blur: int
+    width: int
 
 
 @dataclass
 class Pixeldiff:
-    threshold: int = 1
+    threshold: int
 
 
 @dataclass
@@ -54,28 +55,80 @@ class Random:
     seed: int = -1
 
 
-def get_attributes(attrs_str: str, dataclass: T, log: Log) -> T:
-    attrs = parse_dataclass(attrs_str, dataclass, log)
+class Attr(NamedTuple):
+    names: tuple[str]
+    coerce: Any
+    default: Any
 
-    dic_value = asdict(attrs)
-    dic_type: Dict[str, Union[type, Callable[[Any], Any]]] = {}
-    for field in fields(attrs):
-        dic_type[field.name] = field.type
 
-    # Convert to the correct types
-    for k, _type in dic_type.items():
+audio_builder = [Attr(("stream", "track"), stream, 0), Attr(("threshold",), number, -1)]
+motion_builder = [
+    Attr(("threshold",), number, 0.02),
+    Attr(("blur",), int, 9),
+    Attr(("width",), int, 400),
+]
+pixeldiff_builder = [Attr(("threshold",), int, 1)]
+random_builder = [Attr(("cutchance",), number, 0.5), Attr(("seed",), int, -1)]
 
-        if _type == float:
-            _type = number
-        elif _type == Stream:
-            _type = stream
 
-        try:
-            attrs.__setattr__(k, _type(dic_value[k]))
-        except (ValueError, TypeError) as e:
-            log.error(e)
+def get_attributes(attrs_str: str, dataclass: T, builder: list[Attr], log: Log) -> T:
+    kwargs: dict[str, Any] = {}
+    for attr in builder:
+        kwargs[attr.names[0]] = attr.default
 
-    return attrs
+    if attrs_str == "":
+        return dataclass(**kwargs)
+
+    ARG_SEP = ","
+    KEYWORD_SEP = "="
+    d_name = dataclass.__name__
+    allow_positional_args = True
+
+    for i, arg in enumerate(attrs_str.split(ARG_SEP)):
+        if i + 1 > len(builder):
+            log.error(f"{d_name} has too many arguments, starting with '{arg}'.")
+
+        if KEYWORD_SEP in arg:
+            allow_positional_args = False
+
+            parameters = arg.split(KEYWORD_SEP)
+            if len(parameters) > 2:
+                log.error(f"{d_name} invalid syntax: '{arg}'.")
+
+            key, val = parameters
+            found = False
+            for attr in builder:
+                if key in attr.names:
+                    try:
+                        kwargs[attr.names[0]] = attr.coerce(val)
+                    except (TypeError, ValueError) as e:
+                        log.error(e)
+                    found = True
+                    break
+
+            if not found:
+                from difflib import get_close_matches
+
+                keys = set()
+                for attr in builder:
+                    for name in attr.names:
+                        keys.add(name)
+
+                more = ""
+                if matches := get_close_matches(key, keys):
+                    more = f"\n    Did you mean:\n        {', '.join(matches)}"
+
+                log.error(f"{d_name} got an unexpected keyword '{key}'\n{more}")
+
+        elif allow_positional_args:
+            try:
+                kwargs[builder[i].names[0]] = builder[i].coerce(arg)
+            except (TypeError, ValueError) as e:
+                log.error(e)
+        else:
+            log.error(f"{d_name} positional argument follows keyword argument.")
+
+    return dataclass(**kwargs)
 
 
 def get_media_duration(path: str, i: int, fps: float, temp: str, log: Log) -> int:
@@ -137,7 +190,7 @@ def get_stream_data(
     attrs_str: str,
     args: Args,
     i: int,
-    inputs: List[FileInfo],
+    inputs: list[FileInfo],
     fps: float,
     progress: ProgressBar,
     temp: str,
@@ -154,13 +207,13 @@ def get_stream_data(
     if method == "all":
         return get_all_list(inp.path, i, fps, temp, log)
     if method == "random":
-        robj = get_attributes(attrs_str, Random, log)
-        if robj.cutchance > 1 or robj.cutchance < 0:
-            log.error(f"random:cutchance must be between 0 and 1")
+        robj = get_attributes(attrs_str, Random, random_builder, log)
         if robj.seed == -1:
             robj.seed = random.randint(0, 2147483647)
-        l = get_media_duration(inp.path, i, fps, temp, log) - 1
+        if robj.cutchance > 1 or robj.cutchance < 0:
+            log.error(f"random:cutchance must be between 0 and 1")
 
+        l = get_media_duration(inp.path, i, fps, temp, log) - 1
         random.seed(robj.seed)
         log.debug(f"Seed: {robj.seed}")
 
@@ -168,11 +221,11 @@ def get_stream_data(
 
         return np.asarray(a, dtype=np.bool_)
     if method == "audio":
-        audio = get_attributes(attrs_str, Audio, log)
+        audio = get_attributes(attrs_str, Audio, audio_builder, log)
         if audio.threshold == -1:
             audio.threshold = args.silent_threshold
         if audio.stream == "all":
-            total_list: Optional[NDArray[np.bool_]] = None
+            total_list: NDArray[np.bool_] | None = None
             for s in range(len(inp.audios)):
                 try:
                     audio_list = get_audio_list(
@@ -209,7 +262,7 @@ def get_stream_data(
                 return get_all_list(inp.path, i, fps, temp, log)
             log.error("Video stream '0' does not exist.")
 
-        mobj = get_attributes(attrs_str, Motion, log)
+        mobj = get_attributes(attrs_str, Motion, motion_builder, log)
         motion_list = motion_detection(inp.path, fps, progress, mobj.width, mobj.blur)
         return np.fromiter((x >= mobj.threshold for x in motion_list), dtype=np.bool_)
 
@@ -219,7 +272,7 @@ def get_stream_data(
                 return get_all_list(inp.path, i, fps, temp, log)
             log.error("Video stream '0' does not exist.")
 
-        pobj = get_attributes(attrs_str, Pixeldiff, log)
+        pobj = get_attributes(attrs_str, Pixeldiff, pixeldiff_builder, log)
         pixel_list = pixel_difference(inp.path, fps, progress)
         return np.fromiter((x >= pobj.threshold for x in pixel_list), dtype=np.bool_)
 
@@ -229,7 +282,7 @@ def get_stream_data(
 def get_has_loud(
     token_str: str,
     i: int,
-    inputs: List[FileInfo],
+    inputs: list[FileInfo],
     fps: float,
     progress: ProgressBar,
     temp: str,
@@ -240,10 +293,10 @@ def get_has_loud(
     METHOD_ATTRS_SEP = ":"
     METHODS = ("audio", "motion", "pixeldiff", "random", "none", "all")
 
-    result_array: Optional[NDArray[np.bool_]] = None
-    operand: Optional[str] = None
+    result_array: NDArray[np.bool_] | None = None
+    operand: str | None = None
 
-    logic_funcs: Dict[str, BoolOperand] = {
+    logic_funcs: dict[str, BoolOperand] = {
         "and": np.logical_and,
         "or": np.logical_or,
         "xor": np.logical_xor,
@@ -299,7 +352,7 @@ def get_has_loud(
 
 def get_speed_list(
     i: int,
-    inputs: List[FileInfo],
+    inputs: list[FileInfo],
     fps: float,
     args: Args,
     progress: ProgressBar,

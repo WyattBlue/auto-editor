@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 from statistics import fmean, median
-from typing import List, Optional, Tuple
 
 from auto_editor.method import get_media_duration
 from auto_editor.timeline import Timeline
@@ -7,9 +8,7 @@ from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
 
 
-def time_frame(
-    title: str, frames: float, fps: float, per: Optional[str] = None
-) -> None:
+def time_frame(title: str, frames: float, fps: float, per: str | None = None) -> None:
     tc = to_timecode(frames / fps, "ass")
 
     tp = 9 if tc.startswith("-") else 10
@@ -40,7 +39,7 @@ def preview(timeline: Timeline, temp: str, log: Log) -> None:
     clip_lens = [clip.dur / clip.speed for clip in timeline.a[0]]
 
     # Calculate cuts
-    oe: List[Tuple[int, int]] = []
+    oe: list[tuple[int, int]] = []
 
     # TODO: Make offset_end_pairs work on overlapping clips.
     for clip in timeline.a[0]:

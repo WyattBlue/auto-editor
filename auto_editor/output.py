@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import os.path
-from typing import List, Optional, Tuple
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.container import Container
@@ -7,15 +8,15 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 
 
-def fset(cmd: List[str], option: str, value: Optional[str]) -> List[str]:
+def fset(cmd: list[str], option: str, value: str | None) -> list[str]:
     if value is None or value == "unset":
         return cmd
     return cmd + [option] + [value]
 
 
 def video_quality(
-    cmd: List[str], args: Args, inp: FileInfo, ctr: Container
-) -> List[str]:
+    cmd: list[str], args: Args, inp: FileInfo, ctr: Container
+) -> list[str]:
     cmd = fset(cmd, "-b:v", args.video_bitrate)
 
     qscale = args.video_quality_scale
@@ -30,8 +31,8 @@ def video_quality(
 
 def mux_quality_media(
     ffmpeg: FFmpeg,
-    visual_output: List[Tuple[bool, str]],
-    audio_output: List[str],
+    visual_output: list[tuple[bool, str]],
+    audio_output: list[str],
     apply_v: bool,
     ctr: Container,
     output_path: str,
