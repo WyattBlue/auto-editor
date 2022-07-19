@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import io
 import struct
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Union
 
 import numpy as np
 
@@ -14,7 +16,7 @@ Endian = Literal[">", "<"]  # Big Endian, Little Endian
 
 def _read_fmt_chunk(
     fid: io.BufferedReader, en: Endian
-) -> Tuple[int, int, int, int, int]:
+) -> tuple[int, int, int, int, int]:
     size: int = struct.unpack(f"{en}I", fid.read(4))[0]
 
     if size < 16:
@@ -65,7 +67,7 @@ def _read_data_chunk(
     bit_depth: int,
     en: Endian,
     block_align: int,
-    data_size: Optional[int],
+    data_size: int | None,
 ) -> AudioData:
 
     size: int = struct.unpack(f"{en}I", fid.read(4))[0]
@@ -122,7 +124,7 @@ def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
         _handle_pad_byte(fid, size)
 
 
-def _read_rf64_chunk(fid: io.BufferedReader) -> Tuple[int, int, Endian]:
+def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
 
     # https://tech.ebu.ch/docs/tech/tech3306v1_0.pdf
     # https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.2088-1-201910-I!!PDF-E.pdf
@@ -155,7 +157,7 @@ def _read_rf64_chunk(fid: io.BufferedReader) -> Tuple[int, int, Endian]:
     return data_size, file_size, en
 
 
-def _read_riff_chunk(sig: bytes, fid: io.BufferedReader) -> Tuple[None, int, Endian]:
+def _read_riff_chunk(sig: bytes, fid: io.BufferedReader) -> tuple[None, int, Endian]:
     en: Endian = "<" if sig == b"RIFF" else ">"
     file_size: int = struct.unpack(f"{en}I", fid.read(4))[0] + 8
 
@@ -171,7 +173,7 @@ def _handle_pad_byte(fid: io.BufferedReader, size: int) -> None:
         fid.seek(1, 1)
 
 
-def read(filename: str) -> Tuple[int, AudioData]:
+def read(filename: str) -> tuple[int, AudioData]:
     fid = open(filename, "rb")
 
     try:

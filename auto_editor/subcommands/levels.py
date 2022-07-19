@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import os
 import sys
 import tempfile
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -17,10 +18,10 @@ from auto_editor.vanparse import ArgumentParser
 class LevelArgs:
     kind: str = "audio"
     track: int = 0
-    ffmpeg_location: Optional[str] = None
+    ffmpeg_location: str | None = None
     my_ffmpeg: bool = False
     help: bool = False
-    input: List[str] = field(default_factory=list)
+    input: list[str] = field(default_factory=list)
 
 
 def levels_options(parser: ArgumentParser) -> ArgumentParser:

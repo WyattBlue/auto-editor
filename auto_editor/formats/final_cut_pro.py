@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from pathlib import Path, PureWindowsPath
+from platform import system
+
+from auto_editor.ffwrapper import FileInfo
+from auto_editor.timeline import Timeline
+
+from .utils import indent
+
 """
 Export a FCPXML 9 file readable with Final Cut Pro 10.4.9 or later.
 
@@ -5,15 +15,6 @@ See docs here:
 https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference
 
 """
-
-from pathlib import Path, PureWindowsPath
-from platform import system
-from typing import Union
-
-from auto_editor.ffwrapper import FileInfo
-from auto_editor.timeline import Timeline
-
-from .utils import indent
 
 
 def get_colorspace(inp: FileInfo) -> str:
@@ -38,7 +39,7 @@ def get_colorspace(inp: FileInfo) -> str:
     return "1-1-1 (Rec. 709)"
 
 
-def fraction(_a: Union[int, float], _fps: float) -> str:
+def fraction(_a: int | float, _fps: float) -> str:
     from fractions import Fraction
 
     if _a == 0:

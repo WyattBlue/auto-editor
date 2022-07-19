@@ -1,4 +1,4 @@
-from typing import Tuple
+from __future__ import annotations
 
 import av
 import numpy as np
@@ -8,7 +8,7 @@ from PIL import ImageChops, ImageFilter, ImageOps
 from auto_editor.utils.progressbar import ProgressBar
 
 
-def new_size(size: Tuple[int, int], width: int) -> Tuple[int, int]:
+def new_size(size: tuple[int, int], width: int) -> tuple[int, int]:
     h, w = size
     return width, int(h * (width / w))
 

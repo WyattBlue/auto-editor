@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import os.path
 from dataclasses import dataclass
 from math import ceil
 from subprocess import DEVNULL, PIPE
-from typing import Dict, List, Tuple, Union
+from typing import Dict, Tuple, Union
 
 import av
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
@@ -52,7 +54,7 @@ allowed_pix_fmt = {
 
 def apply_anchor(
     x: int, y: int, width: int, height: int, anchor: str
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     if anchor == "ce":
         x = int((x * 2 - width) / 2)
         y = int((y * 2 - height) / 2)
@@ -69,7 +71,7 @@ def apply_anchor(
 
 def one_pos_two_pos(
     x: int, y: int, width: int, height: int, anchor: str
-) -> Tuple[int, int, int, int]:
+) -> tuple[int, int, int, int]:
     """Convert: x, y, width, height -> x1, y1, x2, y2"""
 
     if anchor == "ce":
@@ -105,14 +107,14 @@ def render_av(
     ctr: Container,
     temp: str,
     log: Log,
-) -> Tuple[str, bool]:
+) -> tuple[str, bool]:
 
     FontCache = Dict[
         str, Tuple[Union[ImageFont.FreeTypeFont, ImageFont.ImageFont], float]
     ]
 
     font_cache: FontCache = {}
-    img_cache: Dict[str, Image.Image] = {}
+    img_cache: dict[str, Image.Image] = {}
     for layer in timeline.v:
         for vobj in layer:
             if isinstance(vobj, TextObj) and (vobj.font, vobj.size) not in font_cache:
@@ -228,7 +230,7 @@ def render_av(
     try:
         for index in range(timeline.end):
             # Add objects to obj_list
-            obj_list: List[Union[VideoFrame, Visual]] = []
+            obj_list: list[VideoFrame | Visual] = []
             for layer in timeline.v:
                 for lobj in layer:
                     if isinstance(lobj, VideoObj):

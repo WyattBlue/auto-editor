@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import os
 import sys
 import tempfile
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.log import Log
@@ -11,10 +12,10 @@ from auto_editor.vanparse import ArgumentParser
 
 @dataclass
 class SubArgs:
-    ffmpeg_location: Optional[str] = None
+    ffmpeg_location: str | None = None
     my_ffmpeg: bool = False
     help: bool = False
-    input: List[str] = field(default_factory=list)
+    input: list[str] = field(default_factory=list)
 
 
 def subdump_options(parser: ArgumentParser) -> ArgumentParser:

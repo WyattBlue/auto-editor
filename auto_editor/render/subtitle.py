@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import os
 import re
 from dataclasses import dataclass
-from typing import List, Tuple
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.timeline import Timeline
@@ -29,7 +30,7 @@ class SubtitleParser:
 
         self.fps = fps
         self.codec = codec
-        self.contents: List[SerialSub] = []
+        self.contents: list[SerialSub] = []
 
         if codec == "ass":
             time_code = re.compile(r"(.*)(\d+:\d+:[\d.]+)(.*)(\d+:\d+:[\d.]+)(.*)")
@@ -60,7 +61,7 @@ class SubtitleParser:
         else:
             self.footer = text[reg.span()[1] :]
 
-    def edit(self, chunks: List[Tuple[int, int, float]]) -> None:
+    def edit(self, chunks: list[tuple[int, int, float]]) -> None:
         for cut in reversed(chunks):
             the_speed = cut[2]
             speed_factor = 1 if the_speed == 99999 else 1 - (1 / the_speed)

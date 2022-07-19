@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import os
 import re
 import sys
 import tempfile
 from dataclasses import dataclass, field
-from typing import List, Optional, Type
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.log import Log
@@ -13,15 +14,15 @@ from auto_editor.vanparse import ArgumentParser
 @dataclass
 class GrepArgs:
     no_filename: bool = False
-    max_count: Optional[int] = None
+    max_count: int | None = None
     count: bool = False
     ignore_case: bool = False
     timecode: bool = False
     time: bool = False
-    ffmpeg_location: Optional[str] = None
+    ffmpeg_location: str | None = None
     my_ffmpeg: bool = False
     help: bool = False
-    input: List[str] = field(default_factory=list)
+    input: list[str] = field(default_factory=list)
 
 
 def grep_options(parser: ArgumentParser) -> ArgumentParser:
@@ -73,7 +74,7 @@ def grep_file(
     media_file: str,
     add_prefix: bool,
     ffmpeg: FFmpeg,
-    args: Type[GrepArgs],
+    args: type[GrepArgs],
     log: Log,
     TEMP: str,
 ) -> None:

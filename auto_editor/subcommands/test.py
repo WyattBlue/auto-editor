@@ -1,4 +1,5 @@
 # type: ignore
+from __future__ import annotations
 
 import logging
 import os
@@ -8,7 +9,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from time import perf_counter
-from typing import Callable, List, NoReturn, Optional, Tuple
+from typing import Callable, NoReturn
 
 import av
 import numpy as np
@@ -20,7 +21,7 @@ av.logging.set_level(av.logging.PANIC)
 
 @dataclass
 class TestArgs:
-    only: List[str] = field(default_factory=list)
+    only: list[str] = field(default_factory=list)
     help: bool = False
     category: str = "cli"
 
@@ -36,7 +37,7 @@ def test_options(parser):
     return parser
 
 
-def pipe_to_console(cmd: List[str]) -> Tuple[int, str, str]:
+def pipe_to_console(cmd: list[str]) -> tuple[int, str, str]:
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     return process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
@@ -61,13 +62,13 @@ def clean_all() -> None:
     cleanup(os.getcwd())
 
 
-def get_runner() -> List[str]:
+def get_runner() -> list[str]:
     if platform.system() == "Windows":
         return ["py", "-m", "auto_editor"]
     return ["python3", "-m", "auto_editor"]
 
 
-def run_program(cmd: List[str]) -> None:
+def run_program(cmd: list[str]) -> None:
     no_open = "." in cmd[0]
     cmd = get_runner() + cmd
 
@@ -79,7 +80,7 @@ def run_program(cmd: List[str]) -> None:
         raise Exception(f"{stdout}\n{stderr}\n")
 
 
-def check_for_error(cmd: List[str], match=None) -> None:
+def check_for_error(cmd: list[str], match=None) -> None:
     returncode, stdout, stderr = pipe_to_console(get_runner() + cmd)
     if returncode > 0:
         if "Error!" in stderr:
@@ -160,7 +161,7 @@ class Tester:
         sys.exit(0)
 
 
-def main(sys_args: Optional[List[str]] = None):
+def main(sys_args: list[str] | None = None):
     if sys_args is None:
         sys_args = sys.argv[1:]
 

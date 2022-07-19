@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import sys
 from datetime import timedelta
 from shutil import get_terminal_size, rmtree
 from time import perf_counter, sleep
-from typing import NoReturn, Optional, Union
+from typing import NoReturn
 
 
 class Timer:
@@ -24,7 +26,7 @@ class Log:
     __slots__ = ("is_debug", "quiet", "temp")
 
     def __init__(
-        self, show_debug: bool = False, quiet: bool = False, temp: Optional[str] = None
+        self, show_debug: bool = False, quiet: bool = False, temp: str | None = None
     ) -> None:
         self.is_debug = show_debug
         self.quiet = quiet
@@ -56,7 +58,7 @@ class Log:
             buffer = " " * (get_terminal_size().columns - len(message) - 3)
             sys.stdout.write(f"  {message}{buffer}\r")
 
-    def error(self, message: Union[str, Exception]) -> NoReturn:
+    def error(self, message: str | Exception) -> NoReturn:
         self.conwrite("")
         # if isinstance(message, Exception):
         #     raise message

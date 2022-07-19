@@ -1,16 +1,18 @@
-"""
-Make a pre-edited file reference that can be inputted back into auto-editor.
-"""
+from __future__ import annotations
 
 import json
 import os
 import sys
-from typing import Any, Optional, Union
+from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, clipify, make_av
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Chunks
+
+"""
+Make a pre-edited file reference that can be inputted back into auto-editor.
+"""
 
 
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
@@ -34,7 +36,7 @@ def validate_chunks(chunks: object, log: Log) -> Chunks:
         log.error("Chunks are empty!")
 
     new_chunks = []
-    prev_end: Optional[int] = None
+    prev_end: int | None = None
 
     for i, chunk in enumerate(chunks):
         if len(chunk) != 3:
@@ -117,7 +119,7 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
 
 def make_json_timeline(
     _version: str,
-    out: Union[str, int],
+    out: str | int,
     timeline: Timeline,
     log: Log,
 ) -> None:

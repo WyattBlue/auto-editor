@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import json
 import os.path
 import sys
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, TypedDict
+from typing import Any, Literal, TypedDict
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.func import aspect_ratio
@@ -14,10 +16,10 @@ from auto_editor.vanparse import ArgumentParser
 class InfoArgs:
     json: bool = False
     include_vfr: bool = False
-    ffmpeg_location: Optional[str] = None
+    ffmpeg_location: str | None = None
     my_ffmpeg: bool = False
     help: bool = False
-    input: List[str] = field(default_factory=list)
+    input: list[str] = field(default_factory=list)
 
 
 def info_options(parser: ArgumentParser) -> ArgumentParser:
@@ -43,39 +45,39 @@ def info_options(parser: ArgumentParser) -> ArgumentParser:
 class VideoJson(TypedDict):
     codec: str
     fps: float
-    resolution: List[int]
-    aspect_ratio: List[int]
+    resolution: list[int]
+    aspect_ratio: list[int]
     pix_fmt: str
-    color_range: Optional[str]
-    color_space: Optional[str]
-    color_primaries: Optional[str]
-    color_transfer: Optional[str]
+    color_range: str | None
+    color_space: str | None
+    color_primaries: str | None
+    color_transfer: str | None
     timebase: str
-    bitrate: Optional[str]
-    lang: Optional[str]
+    bitrate: str | None
+    lang: str | None
 
 
 class AudioJson(TypedDict):
     codec: str
     samplerate: int
-    bitrate: Optional[str]
-    lang: Optional[str]
+    bitrate: str | None
+    lang: str | None
 
 
 class SubtitleJson(TypedDict):
     codec: str
-    lang: Optional[str]
+    lang: str | None
 
 
 class ContainerJson(TypedDict):
-    bitrate: Optional[str]
-    fps_mode: Optional[str]
+    bitrate: str | None
+    fps_mode: str | None
 
 
 class MediaJson(TypedDict, total=False):
-    video: List[VideoJson]
-    audio: List[AudioJson]
-    subtitle: List[SubtitleJson]
+    video: list[VideoJson]
+    audio: list[AudioJson]
+    subtitle: list[SubtitleJson]
     container: ContainerJson
     media: Literal["invalid"]
 
@@ -86,7 +88,7 @@ def main(sys_args=sys.argv[1:]) -> None:
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
     log = Log(quiet=not args.json)
 
-    file_info: Dict[str, MediaJson] = {}
+    file_info: dict[str, MediaJson] = {}
 
     for file in args.input:
         if not os.path.isfile(file):
@@ -163,7 +165,7 @@ def main(sys_args=sys.argv[1:]) -> None:
         print(json.dumps(file_info, indent=4))
         return
 
-    def stream_to_text(text: str, label: str, streams: List[Dict[str, Any]]) -> str:
+    def stream_to_text(text: str, label: str, streams: list[dict[str, Any]]) -> str:
         if len(streams) > 0:
             text += f" - {label}:\n"
 

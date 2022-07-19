@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import os
 import wave
-from typing import List
 
 from auto_editor.render.tsm.phasevocoder import phasevocoder
 from auto_editor.timeline import Timeline
@@ -11,7 +12,7 @@ from auto_editor.wavfile import read
 
 def make_new_audio(
     timeline: Timeline, progress: ProgressBar, temp: str, log: Log
-) -> List[str]:
+) -> list[str]:
     samplerate = timeline.samplerate
     fps = timeline.fps
     output = []
