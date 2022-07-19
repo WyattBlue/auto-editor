@@ -93,21 +93,20 @@ def main(sys_args=sys.argv[1:]) -> None:
             audio_detection(audio_samples, sample_rate, fps, progress, log)
         )
 
-    if args.kind == "motion":
-        if args.track >= len(inp.videos):
-            log.error(f"Video track '{args.track}' does not exist.")
+    if args.kind in ("motion", "pixeldiff") and args.track >= len(inp.videos):
+        log.error(f"Video stream '{args.track}' does not exist.")
 
+    if args.kind == "motion":
         from auto_editor.analyze.motion import motion_detection
 
-        print_float_list(motion_detection(inp.path, fps, progress, width=400, blur=9))
+        print_float_list(
+            motion_detection(inp.path, args.track, fps, progress, width=400, blur=9)
+        )
 
     if args.kind == "pixeldiff":
-        if args.track >= len(inp.videos):
-            log.error(f"Video track '{args.track}' does not exist.")
-
         from auto_editor.analyze.pixeldiff import pixel_difference
 
-        print_int_list(pixel_difference(inp.path, fps, progress))
+        print_int_list(pixel_difference(inp.path, args.track, fps, progress))
 
     log.cleanup()
 

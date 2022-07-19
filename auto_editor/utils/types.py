@@ -67,9 +67,16 @@ def number(val: str | float) -> float:
         return vs[0] / vs[1]
 
     num, unit = _split_num_str(val)
-    _unit_check(unit, ("", "%"))
     if unit == "%":
         return num / 100
+    _unit_check(unit, ("",))
+    return num
+
+
+def threshold(val: str | float) -> float:
+    num = number(val)
+    if num > 1 or num < 0:
+        raise TypeError(f"'{val}': Threshold must be between 0-1 (0%-100%)")
     return num
 
 

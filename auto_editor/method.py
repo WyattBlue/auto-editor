@@ -24,7 +24,7 @@ from auto_editor.utils.func import (
 )
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import Args, Stream, number, stream
+from auto_editor.utils.types import Args, Stream, natural, stream, threshold
 from auto_editor.wavfile import read
 
 BoolList = NDArray[np.bool_]
@@ -33,13 +33,14 @@ BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
 @dataclass
 class Audio:
-    stream: Stream
     threshold: float
+    stream: Stream
 
 
 @dataclass
 class Motion:
     threshold: float
+    stream: int
     blur: int
     width: int
 
@@ -47,6 +48,7 @@ class Motion:
 @dataclass
 class Pixeldiff:
     threshold: int
+    stream: int
 
 
 @dataclass
@@ -55,14 +57,21 @@ class Random:
     seed: int = -1
 
 
-audio_builder = [Attr(("stream", "track"), stream, 0), Attr(("threshold",), number, -1)]
-motion_builder = [
-    Attr(("threshold",), number, 0.02),
-    Attr(("blur",), int, 9),
-    Attr(("width",), int, 400),
+audio_builder = [
+    Attr(("threshold",), threshold, -1),
+    Attr(("stream", "track"), stream, 0),
 ]
-pixeldiff_builder = [Attr(("threshold",), int, 1)]
-random_builder = [Attr(("cutchance",), number, 0.5), Attr(("seed",), int, -1)]
+motion_builder = [
+    Attr(("threshold",), threshold, 0.02),
+    Attr(("stream", "track"), natural, 0),
+    Attr(("blur",), natural, 9),
+    Attr(("width",), natural, 400),
+]
+pixeldiff_builder = [
+    Attr(("threshold",), natural, 1),
+    Attr(("stream", "track"), natural, 0),
+]
+random_builder = [Attr(("cutchance",), threshold, 0.5), Attr(("seed",), int, -1)]
 
 
 def get_media_duration(path: str, i: int, fps: float, temp: str, log: Log) -> int:
@@ -144,8 +153,6 @@ def get_stream_data(
         robj = parse_dataclass(attrs_str, Random, random_builder, log)
         if robj.seed == -1:
             robj.seed = random.randint(0, 2147483647)
-        if robj.cutchance > 1 or robj.cutchance < 0:
-            log.error(f"random:cutchance must be between 0 and 1")
 
         l = get_media_duration(inp.path, i, fps, temp, log) - 1
         random.seed(robj.seed)
@@ -191,23 +198,27 @@ def get_stream_data(
                     return get_all_list(inp.path, i, fps, temp, log)
                 log.error(e)
     if method == "motion":
-        if len(inp.videos) == 0:
+        mobj = parse_dataclass(attrs_str, Motion, motion_builder, log)
+
+        if mobj.stream >= len(inp.videos):
             if not strict:
                 return get_all_list(inp.path, i, fps, temp, log)
-            log.error("Video stream '0' does not exist.")
+            log.error(f"Video stream '{mobj.stream}' does not exist.")
 
-        mobj = parse_dataclass(attrs_str, Motion, motion_builder, log)
-        motion_list = motion_detection(inp.path, fps, progress, mobj.width, mobj.blur)
+        motion_list = motion_detection(
+            inp.path, mobj.stream, fps, progress, mobj.width, mobj.blur
+        )
         return np.fromiter((x >= mobj.threshold for x in motion_list), dtype=np.bool_)
 
     if method == "pixeldiff":
-        if len(inp.videos) == 0:
+        pobj = parse_dataclass(attrs_str, Pixeldiff, pixeldiff_builder, log)
+
+        if pobj.stream >= len(inp.videos):
             if not strict:
                 return get_all_list(inp.path, i, fps, temp, log)
-            log.error("Video stream '0' does not exist.")
+            log.error(f"Video stream '{pobj.stream}' does not exist.")
 
-        pobj = parse_dataclass(attrs_str, Pixeldiff, pixeldiff_builder, log)
-        pixel_list = pixel_difference(inp.path, fps, progress)
+        pixel_list = pixel_difference(inp.path, pobj.stream, fps, progress)
         return np.fromiter((x >= pobj.threshold for x in pixel_list), dtype=np.bool_)
 
     raise ValueError(f"Unreachable. {method=}")

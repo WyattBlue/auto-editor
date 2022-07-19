@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import NamedTuple, TypeVar, Any
+from typing import Any, NamedTuple, TypeVar
 
-from auto_editor.utils.types import Align, align, anchor, color, natural, number, pos
 from auto_editor.utils.log import Log
+from auto_editor.utils.types import Align, align, anchor, color, natural, number, pos
 
 # start - When the clip starts in the timeline
 # dur - The duration of the clip in the timeline before speed is applied
