@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass, field
-from typing import List, Literal, Optional, Tuple, Type, Union
+from typing import List, Literal, Tuple, Type, Union
 
 
-def _comma_coerce(name: str, val: str, num_args: int) -> List[str]:
+def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
     vals = val.strip().split(",")
     if num_args > len(vals):
         raise TypeError(f"Too few arguments for {name}.")
@@ -12,7 +14,7 @@ def _comma_coerce(name: str, val: str, num_args: int) -> List[str]:
     return vals
 
 
-def _split_num_str(val: Union[str, float]) -> Tuple[float, str]:
+def _split_num_str(val: str | float) -> tuple[float, str]:
     if isinstance(val, (float, int)):
         return val, ""
 
@@ -30,7 +32,7 @@ def _split_num_str(val: Union[str, float]) -> Tuple[float, str]:
     return float(num), unit
 
 
-def _unit_check(unit: str, allowed_units: Tuple[str, ...]) -> None:
+def _unit_check(unit: str, allowed_units: tuple[str, ...]) -> None:
     if unit not in allowed_units:
         raise TypeError(f"Unknown unit: '{unit}'")
 
@@ -40,7 +42,7 @@ Chunks = List[Chunk]
 
 
 # Numbers: 0, 1, 2, 3, ...
-def natural(val: Union[str, float]) -> int:
+def natural(val: str | float) -> int:
     num, unit = _split_num_str(val)
     if unit != "":
         raise TypeError(f"'{val}': Natural does not allow units.")
@@ -51,7 +53,7 @@ def natural(val: Union[str, float]) -> int:
     return int(num)
 
 
-def number(val: Union[str, float]) -> float:
+def number(val: str | float) -> float:
     if isinstance(val, str) and "/" in val:
         nd = val.split("/")
         if len(nd) != 2:
@@ -79,7 +81,7 @@ def sample_rate(val: str) -> int:
     return natural(num)
 
 
-def time(val: str) -> Union[int, str]:
+def time(val: str) -> int | str:
     num, unit = _split_num_str(val)
     if unit in ("s", "sec", "secs", "second", "seconds"):
         return str(num)
@@ -113,11 +115,11 @@ def margin(val: str) -> Margin:
     return time(vals[0]), time(vals[1])
 
 
-def time_range(val: str) -> List[str]:
+def time_range(val: str) -> list[str]:
     return _comma_coerce("time_range", val, 2)
 
 
-def speed_range(val: str) -> Tuple[float, str, str]:
+def speed_range(val: str) -> tuple[float, str, str]:
     a = _comma_coerce("speed_range", val, 3)
     return number(a[0]), a[1], a[2]
 
@@ -168,7 +170,7 @@ def color(val: str) -> str:
     raise ValueError(f"Invalid Color: '{color}'")
 
 
-def resolution(val: Optional[str]) -> Optional[Tuple[int, int]]:
+def resolution(val: str | None) -> tuple[int, int] | None:
     if val is None:
         return None
     vals = val.strip().split(",")
@@ -178,7 +180,7 @@ def resolution(val: Optional[str]) -> Optional[Tuple[int, int]]:
     return natural(vals[0]), natural(vals[1])
 
 
-def pos(val: Tuple[Union[float, str], int]) -> int:
+def pos(val: tuple[float | str, int]) -> int:
     num, unit = _split_num_str(val[0])
     if unit == "%":
         return round((num / 100) * val[1])
@@ -188,35 +190,35 @@ def pos(val: Tuple[Union[float, str], int]) -> int:
 
 @dataclass
 class MainArgs:
-    pool: List[Tuple[str, str]] = field(default_factory=list)
+    pool: list[tuple[str, str]] = field(default_factory=list)
     yt_dlp_location: str = "yt-dlp"
-    download_format: Optional[str] = None
-    output_format: Optional[str] = None
-    yt_dlp_extras: Optional[str] = None
+    download_format: str | None = None
+    output_format: str | None = None
+    yt_dlp_extras: str | None = None
     video_codec: str = "auto"
     audio_codec: str = "auto"
     video_bitrate: str = "10m"
     audio_bitrate: str = "unset"
     video_quality_scale: str = "unset"
     scale: float = 1.0
-    extras: Optional[str] = None
+    extras: str | None = None
     no_seek: bool = False
-    cut_out: List[List[str]] = field(default_factory=list)
-    add_in: List[List[str]] = field(default_factory=list)
-    mark_as_loud: List[List[str]] = field(default_factory=list)
-    mark_as_silent: List[List[str]] = field(default_factory=list)
-    set_speed_for_range: List[Tuple[float, str, str]] = field(default_factory=list)
-    frame_rate: Optional[float] = None
-    sample_rate: Optional[int] = None
-    resolution: Optional[Tuple[int, int]] = None
+    cut_out: list[list[str]] = field(default_factory=list)
+    add_in: list[list[str]] = field(default_factory=list)
+    mark_as_loud: list[list[str]] = field(default_factory=list)
+    mark_as_silent: list[list[str]] = field(default_factory=list)
+    set_speed_for_range: list[tuple[float, str, str]] = field(default_factory=list)
+    frame_rate: float | None = None
+    sample_rate: int | None = None
+    resolution: tuple[int, int] | None = None
     background: str = "#000"
     edit_based_on: str = "audio"
     keep_tracks_separate: bool = False
     export: str = "default"
-    player: Optional[str] = None
+    player: str | None = None
     no_open: bool = False
-    temp_dir: Optional[str] = None
-    ffmpeg_location: Optional[str] = None
+    temp_dir: str | None = None
+    ffmpeg_location: str | None = None
     my_ffmpeg: bool = False
     progress: str = "modern"
     version: bool = False
@@ -230,11 +232,11 @@ class MainArgs:
     frame_margin: Margin = (6, 6)
     silent_speed: float = 99999.0
     video_speed: float = 1.0
-    min_clip_length: Union[int, str] = 3
-    min_cut_length: Union[int, str] = 6
-    output_file: Optional[str] = None
+    min_clip_length: int | str = 3
+    min_cut_length: int | str = 6
+    output_file: str | None = None
     help: bool = False
-    input: List[str] = field(default_factory=list)
+    input: list[str] = field(default_factory=list)
 
 
 Args = Type[MainArgs]

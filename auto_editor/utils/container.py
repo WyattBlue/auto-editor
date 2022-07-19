@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 pcm_formats = [
     "pcm_s16le",  # default format
@@ -71,7 +73,7 @@ ogg = {
     "astrict": True,
 }
 
-containers: Dict[str, Dict[str, Any]] = {
+containers: dict[str, dict[str, Any]] = {
     # Aliases section
     "aac": aac,
     "adts": aac,
@@ -246,23 +248,23 @@ containers: Dict[str, Dict[str, Any]] = {
 
 @dataclass
 class Container:
-    name: Optional[str] = None
+    name: str | None = None
     allow_video: bool = False
     allow_audio: bool = False
     allow_subtitle: bool = False
     allow_image: bool = False
-    max_videos: Optional[int] = None
-    max_audios: Optional[int] = None
-    max_subtitles: Optional[int] = None
-    vcodecs: Optional[List[str]] = None
-    acodecs: Optional[List[str]] = None
-    scodecs: Optional[List[str]] = None
+    max_videos: int | None = None
+    max_audios: int | None = None
+    max_subtitles: int | None = None
+    vcodecs: list[str] | None = None
+    acodecs: list[str] | None = None
+    scodecs: list[str] | None = None
     vstrict: bool = False
     astrict: bool = False
     sstrict: bool = False
-    disallow_v: List[str] = field(default_factory=list)
-    disallow_a: List[str] = field(default_factory=list)
-    samplerate: Optional[List[int]] = None  # Any samplerate is allowed
+    disallow_v: list[str] = field(default_factory=list)
+    disallow_a: list[str] = field(default_factory=list)
+    samplerate: list[int] | None = None  # Any samplerate is allowed
 
 
 def container_constructor(key: str) -> Container:

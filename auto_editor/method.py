@@ -4,7 +4,7 @@ import os
 import random
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, NamedTuple, TypeVar
+from typing import Callable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -13,6 +13,7 @@ from auto_editor.analyze.audio import audio_detection
 from auto_editor.analyze.motion import motion_detection
 from auto_editor.analyze.pixeldiff import pixel_difference
 from auto_editor.ffwrapper import FileInfo
+from auto_editor.objects import Attr, parse_dataclass
 from auto_editor.utils.func import (
     apply_margin,
     apply_mark_as,
@@ -26,7 +27,6 @@ from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args, Stream, number, stream
 from auto_editor.wavfile import read
 
-T = TypeVar("T", bound=type)
 BoolList = NDArray[np.bool_]
 BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
@@ -55,12 +55,6 @@ class Random:
     seed: int = -1
 
 
-class Attr(NamedTuple):
-    names: tuple[str]
-    coerce: Any
-    default: Any
-
-
 audio_builder = [Attr(("stream", "track"), stream, 0), Attr(("threshold",), number, -1)]
 motion_builder = [
     Attr(("threshold",), number, 0.02),
@@ -69,66 +63,6 @@ motion_builder = [
 ]
 pixeldiff_builder = [Attr(("threshold",), int, 1)]
 random_builder = [Attr(("cutchance",), number, 0.5), Attr(("seed",), int, -1)]
-
-
-def get_attributes(attrs_str: str, dataclass: T, builder: list[Attr], log: Log) -> T:
-    kwargs: dict[str, Any] = {}
-    for attr in builder:
-        kwargs[attr.names[0]] = attr.default
-
-    if attrs_str == "":
-        return dataclass(**kwargs)
-
-    ARG_SEP = ","
-    KEYWORD_SEP = "="
-    d_name = dataclass.__name__
-    allow_positional_args = True
-
-    for i, arg in enumerate(attrs_str.split(ARG_SEP)):
-        if i + 1 > len(builder):
-            log.error(f"{d_name} has too many arguments, starting with '{arg}'.")
-
-        if KEYWORD_SEP in arg:
-            allow_positional_args = False
-
-            parameters = arg.split(KEYWORD_SEP)
-            if len(parameters) > 2:
-                log.error(f"{d_name} invalid syntax: '{arg}'.")
-
-            key, val = parameters
-            found = False
-            for attr in builder:
-                if key in attr.names:
-                    try:
-                        kwargs[attr.names[0]] = attr.coerce(val)
-                    except (TypeError, ValueError) as e:
-                        log.error(e)
-                    found = True
-                    break
-
-            if not found:
-                from difflib import get_close_matches
-
-                keys = set()
-                for attr in builder:
-                    for name in attr.names:
-                        keys.add(name)
-
-                more = ""
-                if matches := get_close_matches(key, keys):
-                    more = f"\n    Did you mean:\n        {', '.join(matches)}"
-
-                log.error(f"{d_name} got an unexpected keyword '{key}'\n{more}")
-
-        elif allow_positional_args:
-            try:
-                kwargs[builder[i].names[0]] = builder[i].coerce(arg)
-            except (TypeError, ValueError) as e:
-                log.error(e)
-        else:
-            log.error(f"{d_name} positional argument follows keyword argument.")
-
-    return dataclass(**kwargs)
 
 
 def get_media_duration(path: str, i: int, fps: float, temp: str, log: Log) -> int:
@@ -207,7 +141,7 @@ def get_stream_data(
     if method == "all":
         return get_all_list(inp.path, i, fps, temp, log)
     if method == "random":
-        robj = get_attributes(attrs_str, Random, random_builder, log)
+        robj = parse_dataclass(attrs_str, Random, random_builder, log)
         if robj.seed == -1:
             robj.seed = random.randint(0, 2147483647)
         if robj.cutchance > 1 or robj.cutchance < 0:
@@ -221,7 +155,7 @@ def get_stream_data(
 
         return np.asarray(a, dtype=np.bool_)
     if method == "audio":
-        audio = get_attributes(attrs_str, Audio, audio_builder, log)
+        audio = parse_dataclass(attrs_str, Audio, audio_builder, log)
         if audio.threshold == -1:
             audio.threshold = args.silent_threshold
         if audio.stream == "all":
@@ -262,7 +196,7 @@ def get_stream_data(
                 return get_all_list(inp.path, i, fps, temp, log)
             log.error("Video stream '0' does not exist.")
 
-        mobj = get_attributes(attrs_str, Motion, motion_builder, log)
+        mobj = parse_dataclass(attrs_str, Motion, motion_builder, log)
         motion_list = motion_detection(inp.path, fps, progress, mobj.width, mobj.blur)
         return np.fromiter((x >= mobj.threshold for x in motion_list), dtype=np.bool_)
 
@@ -272,7 +206,7 @@ def get_stream_data(
                 return get_all_list(inp.path, i, fps, temp, log)
             log.error("Video stream '0' does not exist.")
 
-        pobj = get_attributes(attrs_str, Pixeldiff, pixeldiff_builder, log)
+        pobj = parse_dataclass(attrs_str, Pixeldiff, pixeldiff_builder, log)
         pixel_list = pixel_difference(inp.path, fps, progress)
         return np.fromiter((x >= pobj.threshold for x in pixel_list), dtype=np.bool_)
 

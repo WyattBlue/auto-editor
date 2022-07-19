@@ -1,4 +1,6 @@
-from typing import List, Tuple, TypeVar, Union, overload
+from __future__ import annotations
+
+from typing import overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,11 +13,9 @@ To prevent duplicate code being pasted between scripts, common functions should 
 put here. Every function should be pure with no side effects.
 """
 
-T = TypeVar("T", bound=type)
-
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]
-def chunkify(arr: Union[np.ndarray, List[int]]) -> Chunks:
+def chunkify(arr: np.ndarray | list[int]) -> Chunks:
     arr_length = len(arr)
 
     chunks = []
@@ -87,7 +87,7 @@ def remove_small(
 @overload
 def set_range(
     arr: NDArray[np.float_],
-    range_syntax: List[List[str]],
+    range_syntax: list[list[str]],
     fps: float,
     with_: float,
     log: Log,
@@ -98,7 +98,7 @@ def set_range(
 @overload
 def set_range(
     arr: NDArray[np.bool_],
-    range_syntax: List[List[str]],
+    range_syntax: list[list[str]],
     fps: float,
     with_: float,
     log: Log,
@@ -132,7 +132,7 @@ def set_range(arr, range_syntax, fps, with_, log):
     return arr
 
 
-def seconds_to_frames(value: Union[int, str], fps: float) -> int:
+def seconds_to_frames(value: int | str, fps: float) -> int:
     if isinstance(value, str):
         return int(float(value) * fps)
     return value
@@ -212,66 +212,14 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> NDArray[np.bool_]:
     return result
 
 
-def parse_dataclass(unsplit_arguments: str, dataclass: T, log: Log) -> T:
-    from dataclasses import fields
-
-    # Positional Arguments
-    #    --rectangle 0,end,10,20,20,30,#000, ...
-    # Keyword Arguments
-    #    --rectangle start=0,end=end,x1=10, ...
-
-    ARG_SEP = ","
-    KEYWORD_SEP = "="
-
-    d_name = dataclass.__name__
-
-    keys = [field.name for field in fields(dataclass)]
-    kwargs = {}
-    args = []
-
-    allow_positional_args = True
-
-    if unsplit_arguments == "":
-        dataclass_instance: T = dataclass()
-        return dataclass_instance
-
-    for i, arg in enumerate(unsplit_arguments.split(ARG_SEP)):
-        if i + 1 > len(keys):
-            log.error(f"{d_name} has too many arguments, starting with '{arg}'.")
-
-        if KEYWORD_SEP in arg:
-            allow_positional_args = False
-
-            parameters = arg.split(KEYWORD_SEP)
-            if len(parameters) > 2:
-                log.error(f"{d_name} invalid syntax: '{arg}'.")
-            key, val = parameters
-            if key not in keys:
-                log.error(f"{d_name} got an unexpected keyword '{key}'")
-
-            kwargs[key] = val
-        elif allow_positional_args:
-            args.append(arg)
-        else:
-            log.error(f"{d_name} positional argument follows keyword argument.")
-
-    try:
-        dataclass_instance = dataclass(*args, **kwargs)
-    except TypeError as err:
-        err_list = [d_name] + str(err).split(" ")[1:]
-        log.error(f"'{unsplit_arguments}' : " + " ".join(err_list))
-
-    return dataclass_instance
-
-
-def get_stdout(cmd: List[str]) -> str:
+def get_stdout(cmd: list[str]) -> str:
     from subprocess import PIPE, STDOUT, Popen
 
     stdout, _ = Popen(cmd, stdout=PIPE, stderr=STDOUT).communicate()
     return stdout.decode("utf-8", "replace")
 
 
-def aspect_ratio(width: int, height: int) -> Tuple[int, int]:
+def aspect_ratio(width: int, height: int) -> tuple[int, int]:
     if height == 0:
         return (0, 0)
 

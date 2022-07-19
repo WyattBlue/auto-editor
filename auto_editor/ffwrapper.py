@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os.path
 import subprocess
@@ -7,7 +9,7 @@ from fractions import Fraction
 from platform import system
 from re import search
 from subprocess import PIPE, Popen
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
@@ -21,11 +23,11 @@ class FFmpeg:
 
     def __init__(
         self,
-        ff_location: Optional[str] = None,
+        ff_location: str | None = None,
         my_ffmpeg: bool = False,
         debug: bool = False,
     ) -> None:
-        def _set_ff_path(ff_location: Optional[str], my_ffmpeg: bool) -> str:
+        def _set_ff_path(ff_location: str | None, my_ffmpeg: bool) -> str:
             if ff_location is not None:
                 return ff_location
             if my_ffmpeg:
@@ -61,11 +63,11 @@ class FFmpeg:
         if self.debug:
             sys.stderr.write(f"FFmpeg: {message}\n")
 
-    def print_cmd(self, cmd: List[str]) -> None:
+    def print_cmd(self, cmd: list[str]) -> None:
         if self.debug:
             sys.stderr.write(f"FFmpeg run: {' '.join(cmd)}\n")
 
-    def run(self, cmd: List[str]) -> None:
+    def run(self, cmd: list[str]) -> None:
         cmd = [self.path, "-y", "-hide_banner"] + cmd
         if not self.debug:
             cmd.extend(["-nostats", "-loglevel", "error"])
@@ -74,12 +76,12 @@ class FFmpeg:
 
     def run_check_errors(
         self,
-        cmd: List[str],
+        cmd: list[str],
         log: Log,
         show_out: bool = False,
-        path: Optional[str] = None,
+        path: str | None = None,
     ) -> None:
-        def _run(cmd: List[str]) -> str:
+        def _run(cmd: list[str]) -> str:
             process = self.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 
             _, stderr = process.communicate()
@@ -121,12 +123,12 @@ class FFmpeg:
         elif show_out and not self.debug:
             print(f"stderr: {output}")
 
-    def Popen(self, cmd: List[str], stdin=None, stdout=PIPE, stderr=None) -> Popen:
+    def Popen(self, cmd: list[str], stdin=None, stdout=PIPE, stderr=None) -> Popen:
         cmd = [self.path] + cmd
         self.print_cmd(cmd)
         return Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr)
 
-    def pipe(self, cmd: List[str]) -> str:
+    def pipe(self, cmd: list[str]) -> str:
         cmd = [self.path, "-y"] + cmd
 
         self.print_cmd(cmd)
@@ -143,27 +145,27 @@ class VideoStream:
     fps: float
     time_base: Fraction
     pix_fmt: str
-    color_range: Optional[str]
-    color_space: Optional[str]
-    color_primaries: Optional[str]
-    color_transfer: Optional[str]
-    bitrate: Optional[str]
-    lang: Optional[str]
+    color_range: str | None
+    color_space: str | None
+    color_primaries: str | None
+    color_transfer: str | None
+    bitrate: str | None
+    lang: str | None
 
 
 @dataclass
 class AudioStream:
     codec: str
     samplerate: int
-    bitrate: Optional[str]
-    lang: Optional[str]
+    bitrate: str | None
+    lang: str | None
 
 
 @dataclass
 class SubtitleStream:
     codec: str
     ext: str
-    lang: Optional[str]
+    lang: str | None
 
 
 class FileInfo:
@@ -181,7 +183,7 @@ class FileInfo:
         "subtitles",
     )
 
-    def get_res(self) -> Tuple[int, int]:
+    def get_res(self) -> tuple[int, int]:
         if len(self.videos) > 0:
             return self.videos[0].width, self.videos[0].height
         return 1920, 1080
@@ -205,9 +207,9 @@ class FileInfo:
         self.dirname = os.path.dirname(os.path.abspath(path))
         self.name, self.ext = os.path.splitext(path)
 
-        self.videos: List[VideoStream] = []
-        self.audios: List[AudioStream] = []
-        self.subtitles: List[SubtitleStream] = []
+        self.videos: list[VideoStream] = []
+        self.audios: list[AudioStream] = []
+        self.subtitles: list[SubtitleStream] = []
         self.description = None
 
         _dir = os.path.dirname(ffmpeg.path)
@@ -230,7 +232,7 @@ class FileInfo:
         except FileNotFoundError:
             log.error(f"Could not find: {ffprobe}")
 
-        def get_attr(name: str, dic: Dict[str, Any], default=-1) -> str:
+        def get_attr(name: str, dic: dict[str, Any], default=-1) -> str:
             if name in dic:
                 if isinstance(dic[name], str):
                     return dic[name]
@@ -252,7 +254,7 @@ class FileInfo:
         except Exception as e:
             log.error(f"{path}: Could not read ffprobe JSON: {e}")
 
-        self.bitrate: Optional[str] = None
+        self.bitrate: str | None = None
         if "bit_rate" in json_info["format"]:
             self.bitrate = json_info["format"]["bit_rate"]
         if (

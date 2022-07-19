@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import os
-from typing import List, Optional
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
@@ -32,7 +33,7 @@ codec_error = "'{}' codec is not supported in '{}' container."
 
 
 def set_video_codec(
-    codec: str, inp: Optional[FileInfo], out_ext: str, ctr: Container, log: Log
+    codec: str, inp: FileInfo | None, out_ext: str, ctr: Container, log: Log
 ) -> str:
     if codec == "auto":
         codec = "h264" if (inp is None or not inp.videos) else inp.videos[0].codec
@@ -66,7 +67,7 @@ def set_video_codec(
 
 
 def set_audio_codec(
-    codec: str, inp: Optional[FileInfo], out_ext: str, ctr: Container, log: Log
+    codec: str, inp: FileInfo | None, out_ext: str, ctr: Container, log: Log
 ) -> str:
     if codec == "auto":
         codec = "aac" if (inp is None or not inp.audios) else inp.audios[0].codec
@@ -98,8 +99,8 @@ def set_audio_codec(
 
 
 def edit_media(
-    paths: List[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
-) -> Optional[str]:
+    paths: list[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
+) -> str | None:
 
     progress = ProgressBar(args.progress)
     timeline = None
@@ -110,7 +111,7 @@ def edit_media(
             from auto_editor.formats.json import read_json
 
             timeline = read_json(paths[0], ffmpeg, log)
-            inputs: List[FileInfo] = timeline.inputs
+            inputs: list[FileInfo] = timeline.inputs
         else:
             inputs = [FileInfo(path, ffmpeg, log) for path in paths]
     else:

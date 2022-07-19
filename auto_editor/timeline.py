@@ -1,5 +1,7 @@
-from dataclasses import asdict, dataclass, fields
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Type, Union
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, NamedTuple, Type, Union
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.method import get_speed_list
@@ -10,20 +12,16 @@ from auto_editor.objects import (
     RectangleObj,
     TextObj,
     VideoObj,
+    ellipse_builder,
+    img_builder,
+    parse_dataclass,
+    rect_builder,
+    text_builder,
 )
-from auto_editor.utils.func import chunkify, chunks_len, parse_dataclass
+from auto_editor.utils.func import chunkify, chunks_len
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import (
-    Align,
-    Args,
-    Chunks,
-    align,
-    anchor,
-    color,
-    number,
-    pos,
-)
+from auto_editor.utils.types import Args, Chunks
 
 
 class Clip(NamedTuple):
@@ -42,7 +40,7 @@ ALayer = List[AudioObj]
 ASpace = List[ALayer]
 
 
-def merge_chunks(all_chunks: List[Chunks]) -> Chunks:
+def merge_chunks(all_chunks: list[Chunks]) -> Chunks:
     chunks = []
     start = 0
     for _chunks in all_chunks:
@@ -54,54 +52,16 @@ def merge_chunks(all_chunks: List[Chunks]) -> Chunks:
     return chunks
 
 
-def _values(
-    name: str,
-    val: Union[float, str],
-    _type: Union[type, Callable[[Any], Any]],
-    _vars: Dict[str, int],
-    log: Log,
-) -> Any:
-    if name in ("x", "width"):
-        return pos((val, _vars["width"]))
-    elif name in ("y", "height"):
-        return pos((val, _vars["height"]))
-    elif name == "content":
-        assert isinstance(val, str)
-        return val.replace("\\n", "\n").replace("\\;", ",")
-    elif _type is float:
-        _type = number
-    elif _type == Align:
-        _type = align
-    elif name == "anchor":
-        _type = anchor
-    elif name in ("fill", "strokecolor"):
-        _type = color
-
-    if _type is int:
-        for key, item in _vars.items():
-            if val == key:
-                return item
-
-    try:
-        _type(val)
-    except TypeError as e:
-        log.error(e)
-    except Exception:
-        log.error(f"{name}: variable '{val}' is not defined.")
-
-    return _type(val)
-
-
 @dataclass
 class Timeline:
-    inputs: List[FileInfo]
+    inputs: list[FileInfo]
     fps: float
     samplerate: int
-    res: Tuple[int, int]
+    res: tuple[int, int]
     background: str
     v: VSpace
     a: ASpace
-    chunks: Optional[Chunks] = None
+    chunks: Chunks | None = None
 
     @property
     def inp(self) -> FileInfo:
@@ -142,8 +102,8 @@ class Timeline:
         return out_len
 
 
-def clipify(chunks: Chunks, src: int, start: float) -> List[Clip]:
-    clips: List[Clip] = []
+def clipify(chunks: Chunks, src: int, start: float) -> list[Clip]:
+    clips: list[Clip] = []
     # Add "+1" to match how chunks are rendered in 22w18a
     i = 0
     for chunk in chunks:
@@ -164,8 +124,8 @@ def clipify(chunks: Chunks, src: int, start: float) -> List[Clip]:
 
 
 def make_av(
-    all_clips: List[List[Clip]], inputs: List[FileInfo]
-) -> Tuple[VSpace, ASpace]:
+    all_clips: list[list[Clip]], inputs: list[FileInfo]
+) -> tuple[VSpace, ASpace]:
     vclips: VSpace = []
 
     max_a = 0
@@ -178,7 +138,7 @@ def make_av(
         if len(inp.videos) > 0:
             for clip in clips:
                 vclip_ = VideoObj(
-                    clip.start, clip.dur, clip.offset, clip.speed, clip.src
+                    clip.start, clip.dur, clip.offset, clip.speed, clip.src, 0
                 )
                 if len(vclips) == 0:
                     vclips = [[vclip_]]
@@ -196,7 +156,7 @@ def make_av(
 
 
 def make_timeline(
-    inputs: List[FileInfo],
+    inputs: list[FileInfo],
     args: Args,
     sr: int,
     progress: ProgressBar,
@@ -210,10 +170,10 @@ def make_timeline(
     else:
         fps, res = 30.0, (1920, 1080)
 
-    def make_layers(inputs: List[FileInfo]) -> Tuple[Chunks, VSpace, ASpace]:
+    def make_layers(inputs: list[FileInfo]) -> tuple[Chunks, VSpace, ASpace]:
         start = 0.0
-        all_clips: List[List[Clip]] = []
-        all_chunks: List[Chunks] = []
+        all_clips: list[list[Clip]] = []
+        all_chunks: list[Chunks] = []
 
         for i in range(len(inputs)):
             _chunks = chunkify(
@@ -231,38 +191,35 @@ def make_timeline(
     timeline = Timeline(inputs, fps, sr, res, args.background, vclips, aclips, chunks)
 
     w, h = res
-    _vars: Dict[str, int] = {
+    _vars: dict[str, int] = {
         "width": w,
         "height": h,
         "start": 0,
         "end": timeline.end,
     }
 
-    pool: List[Visual] = []
+    pool: list[Visual] = []
     for key, obj_str in args.pool:
         if key == "add_text":
-            pool.append(parse_dataclass(obj_str, TextObj, log))
+            pool.append(
+                parse_dataclass(obj_str, TextObj, text_builder, log, _vars, True)
+            )
         if key == "add_rectangle":
-            pool.append(parse_dataclass(obj_str, RectangleObj, log))
+            pool.append(
+                parse_dataclass(obj_str, RectangleObj, rect_builder, log, _vars, True)
+            )
         if key == "add_ellipse":
-            pool.append(parse_dataclass(obj_str, EllipseObj, log))
+            pool.append(
+                parse_dataclass(obj_str, EllipseObj, ellipse_builder, log, _vars, True)
+            )
         if key == "add_image":
-            pool.append(parse_dataclass(obj_str, ImageObj, log))
+            pool.append(
+                parse_dataclass(obj_str, ImageObj, img_builder, log, _vars, True)
+            )
 
     for obj in pool:
-        dic_value = asdict(obj)
-        dic_type: Dict[str, Callable[[Any], Any]] = {}
-        for field in fields(obj):
-            dic_type[field.name] = field.type
-
-        # Convert to the correct types
-        for k, _type in dic_type.items():
-            setattr(obj, k, _values(k, dic_value[k], _type, _vars, log))
-
-        if obj.dur < 1:
-            log.error(f"dur's value must be greater than 0. Was '{obj.dur}'.")
-
         # Higher layers are visually on top
+        # TODO: Use less layers.
         timeline.v.append([obj])
 
     return timeline

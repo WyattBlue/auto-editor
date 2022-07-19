@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import sys
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.log import Log
@@ -9,9 +10,9 @@ from auto_editor.vanparse import ArgumentParser
 
 @dataclass
 class DescArgs:
-    ffmpeg_location: Optional[str] = None
+    ffmpeg_location: str | None = None
     help: bool = False
-    input: List[str] = field(default_factory=list)
+    input: list[str] = field(default_factory=list)
 
 
 def desc_options(parser: ArgumentParser) -> ArgumentParser:
