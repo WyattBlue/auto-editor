@@ -76,7 +76,7 @@ def number(val: str | float) -> float:
 def threshold(val: str | float) -> float:
     num = number(val)
     if num > 1 or num < 0:
-        raise TypeError(f"'{val}': Threshold must be between 0-1 (0%-100%)")
+        raise TypeError(f"'{val}': Threshold must be between 0 and 1 (0%-100%)")
     return num
 
 
