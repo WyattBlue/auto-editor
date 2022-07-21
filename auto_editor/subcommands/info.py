@@ -44,7 +44,7 @@ def info_options(parser: ArgumentParser) -> ArgumentParser:
 
 class VideoJson(TypedDict):
     codec: str
-    fps: float
+    fps: str
     resolution: list[int]
     aspect_ratio: list[int]
     pix_fmt: str
@@ -109,13 +109,10 @@ def main(sys_args=sys.argv[1:]) -> None:
 
         for track, v in enumerate(inp.videos):
             w, h = v.width, v.height
-            fps = v.fps
-            if fps is not None and int(fps) == float(fps):
-                fps = int(fps)
 
             vid: VideoJson = {
                 "codec": v.codec,
-                "fps": fps,
+                "fps": v.fps_str,
                 "resolution": [w, h],
                 "aspect_ratio": list(aspect_ratio(w, h)),
                 "pix_fmt": v.pix_fmt,

@@ -6,7 +6,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from fractions import Fraction
-from platform import system
+from platform import machine, system
 from re import search
 from subprocess import PIPE, Popen
 from typing import Any
@@ -35,10 +35,10 @@ class FFmpeg:
 
             try:
                 import ae_ffmpeg
+
+                return ae_ffmpeg.get_path()
             except ImportError:
                 return "ffmpeg"
-
-            return ae_ffmpeg.get_path()
 
         self.debug = debug
         self.path = _set_ff_path(ff_location, my_ffmpeg)
@@ -48,6 +48,8 @@ class FFmpeg:
             self.version = _version.split(" ")[0]
         except FileNotFoundError:
             if system() == "Darwin":
+                if machine() == "arm64":
+                    Log().error("No ffmpeg found, download via homebrew.")
                 Log().error(
                     "No ffmpeg found, download via homebrew or install ae-ffmpeg."
                 )
@@ -143,6 +145,7 @@ class VideoStream:
     height: int
     codec: str
     fps: float
+    fps_str: str
     time_base: Fraction
     pix_fmt: str
     color_range: str | None
@@ -313,6 +316,7 @@ class FileInfo:
                         stream["height"],
                         codec,
                         fps,
+                        fps_str,
                         time_base,
                         pix_fmt,
                         color_range,
