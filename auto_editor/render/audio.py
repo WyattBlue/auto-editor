@@ -14,7 +14,7 @@ def make_new_audio(
     timeline: Timeline, progress: ProgressBar, temp: str, log: Log
 ) -> list[str]:
     samplerate = timeline.samplerate
-    fps = timeline.fps
+    tb = timeline.timebase
     output = []
     samples = {}
 
@@ -37,8 +37,8 @@ def make_new_audio(
 
             samp_list = samples[f"{clip.src}-{clip.stream}"]
 
-            samp_start = int(clip.offset / fps * samplerate)
-            samp_end = int((clip.offset + clip.dur) / fps * samplerate)
+            samp_start = clip.offset * samplerate // tb
+            samp_end = (clip.offset + clip.dur) * samplerate // tb
             if samp_end > len(samp_list):
                 samp_end = len(samp_list)
 

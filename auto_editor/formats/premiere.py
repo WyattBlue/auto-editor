@@ -2,6 +2,7 @@ import os.path
 from os.path import abspath
 from platform import system
 from shutil import move
+from fractions import Fraction
 from urllib.parse import quote
 
 from auto_editor.timeline import Timeline
@@ -86,19 +87,19 @@ def premiere_xml(
 
     audio_file = len(inp.videos) == 0 and len(inp.audios) == 1
 
-    # This is not at all how timebase works in actual media but that's how it works here.
-    timebase = int(fps)
+    # See chart: https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/FrameRate/FrameRate.html#//apple_ref/doc/uid/TP30001158-TPXREF103
 
-    if fps == 23.98 or fps == 23.97602397 or fps == 23.976:
+    if fps == 23.98 or fps == 23.97602397 or fps == 23.976 or fps == Fraction(24000, 1001):
         timebase = 24
         ntsc = "TRUE"
-    elif fps == 29.97 or fps == 29.97002997:
+    elif fps == 29.97 or fps == 29.97002997 or fps == Fraction(30000, 1001):
         timebase = 30
         ntsc = "TRUE"
     elif fps == 59.94 or fps == 59.94005994:
         timebase = 60
         ntsc = "TRUE"
     else:
+        timebase = int(fps)
         ntsc = "FALSE"
 
     duration = chunks[-1][1]

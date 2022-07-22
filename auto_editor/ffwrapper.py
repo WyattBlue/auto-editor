@@ -144,8 +144,7 @@ class VideoStream:
     width: int
     height: int
     codec: str
-    fps: float
-    fps_str: str
+    fps: Fraction
     time_base: Fraction
     pix_fmt: str
     color_range: str | None
@@ -191,12 +190,11 @@ class FileInfo:
             return self.videos[0].width, self.videos[0].height
         return 1920, 1080
 
-    def get_fps(self) -> float:
-        fps = None
-        if len(self.videos) > 0:
-            fps = self.videos[0].fps
 
-        return 30 if fps is None else fps
+    def get_fps(self) -> Fraction:
+        if len(self.videos) > 0:
+            return self.videos[0].fps
+        return Fraction(30)
 
     def get_samplerate(self) -> int:
         if len(self.audios) > 0:
@@ -289,17 +287,16 @@ class FileInfo:
                 time_base_str = get_attr("time_base", stream)
 
                 try:
-                    fps = float(Fraction(fps_str))
+                    fps = Fraction(fps_str)
                 except ZeroDivisionError:
-                    fps = 0
+                    fps = Fraction(0)
                 except ValueError:
                     log.error(f"Could not convert fps '{fps_str}' to float")
 
                 if fps < 1:
-                    if codec in IMG_CODECS:
-                        fps = 25
-                    else:
+                    if codec not in IMG_CODECS:
                         log.error("fps cannot be less than 1.")
+                    fps = Fraction(25)
 
                 try:
                     time_base = Fraction(time_base_str)
@@ -316,7 +313,6 @@ class FileInfo:
                         stream["height"],
                         codec,
                         fps,
-                        fps_str,
                         time_base,
                         pix_fmt,
                         color_range,

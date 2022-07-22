@@ -23,12 +23,12 @@ class SubtitleParser:
     def __init__(self) -> None:
         self.supported_codecs = ("ass", "webvtt", "mov_text")
 
-    def parse(self, text, fps: float, codec: str) -> None:
+    def parse(self, text, timebase: int, codec: str) -> None:
 
         if codec not in self.supported_codecs:
             raise ValueError(f"codec {codec} not supported.")
 
-        self.fps = fps
+        self.timebase = timebase
         self.codec = codec
         self.contents: list[SerialSub] = []
 
@@ -96,8 +96,8 @@ class SubtitleParser:
             file.write(self.header)
             for c in self.contents:
                 file.write(
-                    f"{c.before}{to_timecode(c.start / self.fps, self.codec)}"
-                    f"{c.middle}{to_timecode(c.end / self.fps, self.codec)}"
+                    f"{c.before}{to_timecode(c.start / self.timebase, self.codec)}"
+                    f"{c.middle}{to_timecode(c.end / self.timebase, self.codec)}"
                     f"{c.after}"
                 )
             file.write(self.footer)
@@ -114,7 +114,7 @@ class SubtitleParser:
         hours, minutes, seconds = nums.groups()
         seconds = seconds.replace(",", ".", 1)
         return round(
-            (int(hours) * 3600 + int(minutes) * 60 + float(seconds)) * self.fps
+            (int(hours) * 3600 + int(minutes) * 60 + float(seconds)) * self.timebase
         )
 
 
@@ -138,12 +138,12 @@ def cut_subtitles(
 
         if sub.codec in parser.supported_codecs:
             with open(file_path) as file:
-                parser.parse(file.read(), timeline.fps, sub.codec)
+                parser.parse(file.read(), timeline.timebase, sub.codec)
         else:
             convert_path = os.path.join(temp, f"{s}s_convert.vtt")
             ffmpeg.run(["-i", file_path, convert_path])
             with open(convert_path) as file:
-                parser.parse(file.read(), timeline.fps, "webvtt")
+                parser.parse(file.read(), timeline.timebase, "webvtt")
 
         parser.edit(chunks)
         parser.write(new_path)

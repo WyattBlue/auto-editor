@@ -4,12 +4,13 @@ import os
 import random
 import re
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Callable
 
 import numpy as np
 from numpy.typing import NDArray
 
-from auto_editor.analyze.audio import audio_detection
+from auto_editor.analyze.audio import audio_detection, audio_length
 from auto_editor.analyze.motion import motion_detection
 from auto_editor.analyze.pixeldiff import pixel_difference
 from auto_editor.ffwrapper import FileInfo
@@ -74,26 +75,24 @@ pixeldiff_builder = [
 random_builder = [Attr(("cutchance",), threshold, 0.5), Attr(("seed",), int, -1)]
 
 
-def get_media_duration(path: str, i: int, fps: float, temp: str, log: Log) -> int:
+def get_media_length(path: str, i: int, timebase: int, temp: str, log: Log) -> int:
+    # Read first audio track.
+
     audio_path = os.path.join(temp, f"{i}-0.wav")
     if os.path.isfile(audio_path):
-        sample_rate, audio_samples = read(audio_path)
-        sample_rate_per_frame = sample_rate / fps
+        sr, samples = read(audio_path)
+        return audio_length(len(samples), sr, timebase, log)
 
-        dur = round(audio_samples.shape[0] / sample_rate_per_frame)
-        log.debug(f"Dur (audio): {dur}")
-        return dur
-
+    # If there's no audio, get length in video metadata.
     import av
 
     cn = av.open(path, "r")
-
     if len(cn.streams.video) < 1:
         log.error("Could not get media duration")
 
     video = cn.streams.video[0]
-    dur = int(float(video.duration * video.time_base) * fps)
-    log.debug(f"Dur (video): {dur}")
+    dur = int(video.duration * video.time_base * timebase)
+    log.debug(f"Video duration: {dur}")
     return dur
 
 
@@ -101,7 +100,7 @@ def get_audio_list(
     i: int,
     stream: int,
     threshold: float,
-    fps: float,
+    timebase: int,
     progress: ProgressBar,
     temp: str,
     log: Log,
@@ -111,7 +110,7 @@ def get_audio_list(
     else:
         raise TypeError(f"Audio stream '{stream}' does not exist.")
 
-    audio_list = audio_detection(audio_samples, sample_rate, fps, progress, log)
+    audio_list = audio_detection(audio_samples, sample_rate, timebase, progress, log)
     return np.fromiter((x > threshold for x in audio_list), dtype=np.bool_)
 
 
@@ -124,8 +123,8 @@ def operand_combine(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
     return call(a, b)
 
 
-def get_all_list(path: str, i: int, fps: float, temp: str, log: Log) -> BoolList:
-    return np.zeros(get_media_duration(path, i, fps, temp, log) - 1, dtype=np.bool_)
+def get_all_list(path: str, i: int, tb: int, temp: str, log: Log) -> BoolList:
+    return np.zeros(get_media_length(path, i, tb, temp, log) - 1, dtype=np.bool_)
 
 
 def get_stream_data(
@@ -134,7 +133,8 @@ def get_stream_data(
     args: Args,
     i: int,
     inputs: list[FileInfo],
-    fps: float,
+    fps: Fraction,
+    timebase: int,
     progress: ProgressBar,
     temp: str,
     log: Log,
@@ -145,16 +145,16 @@ def get_stream_data(
 
     if method == "none":
         return np.ones(
-            get_media_duration(inp.path, i, fps, temp, log) - 1, dtype=np.bool_
+            get_media_length(inp.path, i, timebase, temp, log) - 1, dtype=np.bool_
         )
     if method == "all":
-        return get_all_list(inp.path, i, fps, temp, log)
+        return get_all_list(inp.path, i, timebase, temp, log)
     if method == "random":
         robj = parse_dataclass(attrs_str, Random, random_builder, log)
         if robj.seed == -1:
             robj.seed = random.randint(0, 2147483647)
 
-        l = get_media_duration(inp.path, i, fps, temp, log) - 1
+        l = get_media_length(inp.path, i, timebase, temp, log) - 1
         random.seed(robj.seed)
         log.debug(f"Seed: {robj.seed}")
 
@@ -170,7 +170,7 @@ def get_stream_data(
             for s in range(len(inp.audios)):
                 try:
                     audio_list = get_audio_list(
-                        i, s, audio.threshold, fps, progress, temp, log
+                        i, s, audio.threshold, timebase, progress, temp, log
                     )
                     if total_list is None:
                         total_list = audio_list
@@ -180,33 +180,33 @@ def get_stream_data(
                         )
                 except TypeError as e:
                     if not strict:
-                        return get_all_list(inp.path, i, fps, temp, log)
+                        return get_all_list(inp.path, i, timebase, temp, log)
                     log.error(e)
 
             if total_list is None:
                 if not strict:
-                    return get_all_list(inp.path, i, fps, temp, log)
+                    return get_all_list(inp.path, i, timebase, temp, log)
                 log.error("Input has no audio streams.")
             return total_list
         else:
             try:
                 return get_audio_list(
-                    i, audio.stream, audio.threshold, fps, progress, temp, log
+                    i, audio.stream, audio.threshold, timebase, progress, temp, log
                 )
             except TypeError as e:
                 if not strict:
-                    return get_all_list(inp.path, i, fps, temp, log)
+                    return get_all_list(inp.path, i, timebase, temp, log)
                 log.error(e)
     if method == "motion":
         mobj = parse_dataclass(attrs_str, Motion, motion_builder, log)
 
         if mobj.stream >= len(inp.videos):
             if not strict:
-                return get_all_list(inp.path, i, fps, temp, log)
+                return get_all_list(inp.path, i, timebase, temp, log)
             log.error(f"Video stream '{mobj.stream}' does not exist.")
 
         motion_list = motion_detection(
-            inp.path, mobj.stream, fps, progress, mobj.width, mobj.blur
+            inp.path, mobj.stream, timebase, progress, mobj.width, mobj.blur
         )
         return np.fromiter((x >= mobj.threshold for x in motion_list), dtype=np.bool_)
 
@@ -215,10 +215,10 @@ def get_stream_data(
 
         if pobj.stream >= len(inp.videos):
             if not strict:
-                return get_all_list(inp.path, i, fps, temp, log)
+                return get_all_list(inp.path, i, timebase, temp, log)
             log.error(f"Video stream '{pobj.stream}' does not exist.")
 
-        pixel_list = pixel_difference(inp.path, pobj.stream, fps, progress)
+        pixel_list = pixel_difference(inp.path, pobj.stream, timebase, progress)
         return np.fromiter((x >= pobj.threshold for x in pixel_list), dtype=np.bool_)
 
     raise ValueError(f"Unreachable. {method=}")
@@ -228,7 +228,8 @@ def get_has_loud(
     token_str: str,
     i: int,
     inputs: list[FileInfo],
-    fps: float,
+    fps: Fraction,
+    timebase: int,
     progress: ProgressBar,
     temp: str,
     log: Log,
@@ -261,7 +262,7 @@ def get_has_loud(
                 log.error("Logic operator must be between two editing methods.")
 
             stream_data = get_stream_data(
-                token, attrs_str, args, i, inputs, fps, progress, temp, log
+                token, attrs_str, args, i, inputs, fps, timebase, progress, temp, log
             )
 
             if operand == "not":
@@ -298,7 +299,8 @@ def get_has_loud(
 def get_speed_list(
     i: int,
     inputs: list[FileInfo],
-    fps: float,
+    fps: Fraction,
+    timebase: int,
     args: Args,
     progress: ProgressBar,
     temp: str,
@@ -313,7 +315,7 @@ def get_speed_list(
     min_cut = seconds_to_frames(args.min_cut_length, fps)
 
     has_loud = get_has_loud(
-        args.edit_based_on, i, inputs, fps, progress, temp, log, args
+        args.edit_based_on, i, inputs, fps, timebase, progress, temp, log, args
     )
     has_loud_length = len(has_loud)
 

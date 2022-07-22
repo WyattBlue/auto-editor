@@ -112,7 +112,7 @@ def main(sys_args=sys.argv[1:]) -> None:
 
             vid: VideoJson = {
                 "codec": v.codec,
-                "fps": v.fps_str,
+                "fps": str(v.fps),
                 "resolution": [w, h],
                 "aspect_ratio": list(aspect_ratio(w, h)),
                 "pix_fmt": v.pix_fmt,
