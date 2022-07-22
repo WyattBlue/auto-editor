@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from statistics import fmean, median
+from fractions import Fraction
 
-from auto_editor.method import get_media_duration
+from auto_editor.method import get_media_length
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
 
 
-def time_frame(title: str, frames: float, fps: float, per: str | None = None) -> None:
+def time_frame(title: str, frames: float, fps: Fraction, per: str | None = None) -> None:
     tc = to_timecode(frames / fps, "ass")
 
     tp = 9 if tc.startswith("-") else 10
@@ -25,7 +26,7 @@ def preview(timeline: Timeline, temp: str, log: Log) -> None:
     # Calculate input videos length
     in_len = 0
     for i, inp in enumerate(timeline.inputs):
-        in_len += get_media_duration(inp.path, i, inp.get_fps(), temp, log)
+        in_len += get_media_length(inp.path, i, timeline.timebase, temp, log)
 
     out_len = timeline.out_len()
 

@@ -69,7 +69,7 @@ def main(sys_args=sys.argv[1:]) -> None:
     log = Log(temp=temp)
 
     inp = FileInfo(args.input[0], ffmpeg, log)
-    fps = inp.get_fps()
+    timebase = round(inp.get_fps())
 
     if args.kind == "audio":
         from auto_editor.analyze.audio import audio_detection
@@ -90,7 +90,7 @@ def main(sys_args=sys.argv[1:]) -> None:
         sample_rate, audio_samples = read(read_track)
 
         print_float_list(
-            audio_detection(audio_samples, sample_rate, fps, progress, log)
+            audio_detection(audio_samples, sample_rate, timebase, progress, log)
         )
 
     if args.kind in ("motion", "pixeldiff") and args.track >= len(inp.videos):
@@ -100,13 +100,13 @@ def main(sys_args=sys.argv[1:]) -> None:
         from auto_editor.analyze.motion import motion_detection
 
         print_float_list(
-            motion_detection(inp.path, args.track, fps, progress, width=400, blur=9)
+            motion_detection(inp.path, args.track, timebase, progress, width=400, blur=9)
         )
 
     if args.kind == "pixeldiff":
         from auto_editor.analyze.pixeldiff import pixel_difference
 
-        print_int_list(pixel_difference(inp.path, args.track, fps, progress))
+        print_int_list(pixel_difference(inp.path, args.track, timebase, progress))
 
     log.cleanup()
 

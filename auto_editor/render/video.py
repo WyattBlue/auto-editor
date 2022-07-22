@@ -251,6 +251,7 @@ def render_av(
             frame = null_frame
             for obj in obj_list:
                 if isinstance(obj, VideoFrame):
+                    my_stream = cns[obj.src].streams.video[0]
                     if frame_index > obj.index:
                         log.debug(f"Seek: {frame_index} -> 0")
                         cns[obj.src].seek(0)
@@ -271,14 +272,14 @@ def render_av(
                             log.debug(f"Seek: {frame_index} -> {obj.index}")
                             cns[obj.src].seek(
                                 obj.index * tous[obj.src],
-                                stream=cns[obj.src].streams.video[0],
+                                stream=my_stream,
                             )
 
                         try:
                             frame = next(decoders[obj.src])
                             frame_index = round(frame.time * timeline.fps)
                         except StopIteration:
-                            log.debug(f"No source frame at {index=}. Using null frame")
+                            log.warning(f"No source frame at {index=}. Using null frame")
                             frame = null_frame
                             break
 

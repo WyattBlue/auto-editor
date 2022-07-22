@@ -15,6 +15,7 @@ from auto_editor.utils.types import (
     margin,
     number,
     resolution,
+    frame_rate,
     sample_rate,
     speed_range,
     threshold,
@@ -144,7 +145,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--frame-rate",
         "-fps",
         "-r",
-        type=number,
+        type=frame_rate,
         help="Set the frame rate for the timeline and output media.",
     )
     parser.add_argument(

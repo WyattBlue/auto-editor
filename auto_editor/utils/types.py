@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from typing import List, Literal, Tuple, Type, Union
+from fractions import Fraction
 
 
 def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
@@ -64,6 +65,8 @@ def number(val: str | float) -> float:
                 vs.append(int(v))
             except ValueError:
                 raise TypeError(f"'{val}': Numerator and Denominator must be integers.")
+        if vs[1] == 0:
+            raise TypeError(f"'{val}': Denominator must not be zero.")
         return vs[0] / vs[1]
 
     num, unit = _split_num_str(val)
@@ -78,6 +81,18 @@ def threshold(val: str | float) -> float:
     if num > 1 or num < 0:
         raise TypeError(f"'{val}': Threshold must be between 0 and 1 (0%-100%)")
     return num
+
+
+def frame_rate(val: str) -> Fraction:
+    if val == "ntsc":
+        return Fraction(30000, 1001)
+    if val == "ntsc_film":
+        return Fraction(24000, 1001)
+    if val == "pal":
+        return Fraction(25)
+    if val == "film":
+        return Fraction(24)
+    return Fraction(number(val))
 
 
 def sample_rate(val: str) -> int:
@@ -215,7 +230,7 @@ class MainArgs:
     mark_as_loud: list[list[str]] = field(default_factory=list)
     mark_as_silent: list[list[str]] = field(default_factory=list)
     set_speed_for_range: list[tuple[float, str, str]] = field(default_factory=list)
-    frame_rate: float | None = None
+    frame_rate: Fraction | None = None
     sample_rate: int | None = None
     resolution: tuple[int, int] | None = None
     background: str = "#000"

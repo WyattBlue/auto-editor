@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List, NamedTuple, Type, Union
+from fractions import Fraction
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.method import get_speed_list
@@ -55,7 +56,7 @@ def merge_chunks(all_chunks: list[Chunks]) -> Chunks:
 @dataclass
 class Timeline:
     inputs: list[FileInfo]
-    fps: float
+    fps: Fraction
     samplerate: int
     res: tuple[int, int]
     background: str
@@ -66,6 +67,10 @@ class Timeline:
     @property
     def inp(self) -> FileInfo:
         return self.inputs[0]
+
+    @property
+    def timebase(self) -> int:
+        return round(self.fps)
 
     @property
     def end(self) -> int:
@@ -168,7 +173,9 @@ def make_timeline(
         fps = inputs[0].get_fps() if args.frame_rate is None else args.frame_rate
         res = inputs[0].get_res() if args.resolution is None else args.resolution
     else:
-        fps, res = 30.0, (1920, 1080)
+        fps, res = Fraction(30), (1920, 1080)
+
+    timebase = round(fps)
 
     def make_layers(inputs: list[FileInfo]) -> tuple[Chunks, VSpace, ASpace]:
         start = 0.0
@@ -177,7 +184,7 @@ def make_timeline(
 
         for i in range(len(inputs)):
             _chunks = chunkify(
-                get_speed_list(i, inputs, fps, args, progress, temp, log)
+                get_speed_list(i, inputs, fps, timebase, args, progress, temp, log)
             )
             all_chunks.append(_chunks)
             all_clips.append(clipify(_chunks, i, start))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import overload
+from fractions import Fraction
 
 import numpy as np
 from numpy.typing import NDArray
@@ -88,7 +89,7 @@ def remove_small(
 def set_range(
     arr: NDArray[np.float_],
     range_syntax: list[list[str]],
-    fps: float,
+    fps: Fraction,
     with_: float,
     log: Log,
 ) -> NDArray[np.float_]:
@@ -99,7 +100,7 @@ def set_range(
 def set_range(
     arr: NDArray[np.bool_],
     range_syntax: list[list[str]],
-    fps: float,
+    fps: Fraction,
     with_: float,
     log: Log,
 ) -> NDArray[np.bool_]:
@@ -107,7 +108,7 @@ def set_range(
 
 
 def set_range(arr, range_syntax, fps, with_, log):
-    def replace_variables_to_values(val: str, fps: float, log: Log) -> int:
+    def replace_variables_to_values(val: str, fps: Fraction, log: Log) -> int:
         if val == "start":
             return 0
         if val == "end":
@@ -132,7 +133,7 @@ def set_range(arr, range_syntax, fps, with_, log):
     return arr
 
 
-def seconds_to_frames(value: int | str, fps: float) -> int:
+def seconds_to_frames(value: int | str, fps: Fraction) -> int:
     if isinstance(value, str):
         return int(float(value) * fps)
     return value
@@ -177,7 +178,7 @@ def apply_margin(
 
 
 def apply_mark_as(
-    has_loud: NDArray[np.bool_], has_loud_length: int, fps: float, args: Args, log: Log
+    has_loud: NDArray[np.bool_], has_loud_length: int, fps: Fraction, args: Args, log: Log
 ) -> NDArray[np.bool_]:
 
     if len(args.mark_as_loud) > 0:

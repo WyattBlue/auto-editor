@@ -6,6 +6,8 @@ from platform import system
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import Timeline
 
+from fractions import Fraction
+
 from .utils import indent
 
 """
@@ -39,9 +41,7 @@ def get_colorspace(inp: FileInfo) -> str:
     return "1-1-1 (Rec. 709)"
 
 
-def fraction(_a: int | float, _fps: float) -> str:
-    from fractions import Fraction
-
+def fraction(_a: int | float, fps: Fraction) -> str:
     if _a == 0:
         return "0s"
 
@@ -49,8 +49,6 @@ def fraction(_a: int | float, _fps: float) -> str:
         a = Fraction(_a)
     else:
         a = _a
-
-    fps = Fraction(_fps)
 
     frac = Fraction(a, fps).limit_denominator()
     num = frac.numerator
@@ -103,7 +101,7 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
         outfile.write('<fcpxml version="1.9">\n')
         outfile.write("\t<resources>\n")
         outfile.write(
-            f'\t\t<format id="r1" name="FFVideoFormat{height}p{fps}" '
+            f'\t\t<format id="r1" name="FFVideoFormat{height}p{float(fps)}" '
             f'frameDuration="{frame_duration}" '
             f'width="{width}" height="{height}" '
             f'colorSpace="{colorspace}"/>\n'

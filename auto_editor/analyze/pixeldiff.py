@@ -7,7 +7,7 @@ from auto_editor.utils.progressbar import ProgressBar
 
 
 def pixel_difference(
-    path: str, track: int, fps: float, progress: ProgressBar
+    path: str, track: int, timebase: int, progress: ProgressBar
 ) -> NDArray[np.uint64]:
     container = av.open(path, "r")
 
@@ -30,7 +30,7 @@ def pixel_difference(
         else:
             prev_image = image
 
-        index = int(frame.time * fps)
+        index = int(frame.time * timebase)
         progress.tick(index)
 
         if index > len(threshold_list) - 1:

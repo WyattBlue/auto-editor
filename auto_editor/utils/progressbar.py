@@ -9,7 +9,6 @@ from .func import get_stdout
 
 class ProgressBar:
     def __init__(self, bar_type: str) -> None:
-
         self.machine = False
         self.hide = False
 
@@ -62,7 +61,7 @@ class ProgressBar:
         if self.hide:
             return
 
-        progress = min(1, max(0, index / self.total))
+        progress = 0.0 if self.total == 0 else min(1, max(0, index / self.total))
         rate = 0.0 if progress == 0 else (time() - self.begin_time) / progress
 
         if self.machine:
