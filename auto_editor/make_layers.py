@@ -1,23 +1,23 @@
 from __future__ import annotations
-from typing import List, NamedTuple, Type, Union
 
 from fractions import Fraction
-from auto_editor.ffwrapper import FileInfo
-from auto_editor.utils.progressbar import ProgressBar
+from typing import List, NamedTuple, Type, Union
 
-from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.method import get_has_loud
-from auto_editor.utils.func import apply_margin, cook, set_range
 from auto_editor.objects import (
-    VideoObj,
     AudioObj,
     EllipseObj,
     ImageObj,
     RectangleObj,
     TextObj,
+    VideoObj,
 )
-from auto_editor.utils.types import Margin
+from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
+from auto_editor.utils.func import apply_margin, cook, set_range
 from auto_editor.utils.log import Log
+from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.utils.types import Margin
 
 Visual = Type[Union[TextObj, ImageObj, RectangleObj, EllipseObj]]
 VLayer = List[Union[VideoObj, Visual]]

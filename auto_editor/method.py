@@ -17,7 +17,7 @@ from auto_editor.ffwrapper import FileInfo
 from auto_editor.objects import Attr, parse_dataclass
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import Args, Stream, natural, stream, threshold
+from auto_editor.utils.types import Stream, natural, stream, threshold
 from auto_editor.wavfile import read
 
 BoolList = NDArray[np.bool_]

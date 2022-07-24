@@ -6,10 +6,10 @@ import sys
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.timeline import Timeline
 from auto_editor.make_layers import clipify, make_av
-from auto_editor.utils.log import Log
+from auto_editor.timeline import Timeline
 from auto_editor.utils.chunks import Chunks
+from auto_editor.utils.log import Log
 
 """
 Make a pre-edited file reference that can be inputted back into auto-editor.

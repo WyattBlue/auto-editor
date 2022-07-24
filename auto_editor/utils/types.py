@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import List, Literal, Tuple, Type, Union
+from typing import Literal, Tuple, Type, Union
 
 
 def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
@@ -246,7 +246,6 @@ class MainArgs:
     preview: bool = False
     timeline: bool = False
     api: str = "1.0.0"
-    silent_threshold: float = 0.04
     frame_margin: Margin = (6, 6)
     silent_speed: float = 99999.0
     video_speed: float = 1.0

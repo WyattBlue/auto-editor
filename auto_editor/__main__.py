@@ -18,7 +18,6 @@ from auto_editor.utils.types import (
     resolution,
     sample_rate,
     speed_range,
-    threshold,
     time,
     time_range,
 )

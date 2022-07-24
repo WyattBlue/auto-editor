@@ -1,5 +1,5 @@
-from math import ceil
 from fractions import Fraction
+from math import ceil
 
 import numpy as np
 import numpy.typing as npt

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import numpy as np
-from typing import List, Tuple
 from fractions import Fraction
+from typing import List, Tuple
+
+import numpy as np
 
 Chunk = Tuple[int, int, float]
 Chunks = List[Chunk]

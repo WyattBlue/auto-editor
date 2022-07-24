@@ -10,10 +10,10 @@ import av
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
 from auto_editor.ffwrapper import FFmpeg
+from auto_editor.make_layers import Visual
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
 from auto_editor.output import video_quality
 from auto_editor.timeline import Timeline
-from auto_editor.make_layers import Visual
 from auto_editor.utils.container import Container
 from auto_editor.utils.encoder import encoders
 from auto_editor.utils.log import Log

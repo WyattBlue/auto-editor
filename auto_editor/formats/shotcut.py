@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from fractions import Fraction
+
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import aspect_ratio, to_timecode
 
-from fractions import Fraction
 
 def timecode_to_frames(timecode: str, tb: Fraction) -> int:
     _h, _m, _s = timecode.split(":")

@@ -7,9 +7,10 @@ from fractions import Fraction
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.timeline import Timeline
+from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
-from auto_editor.utils.chunks import Chunks
+
 
 @dataclass
 class SerialSub:

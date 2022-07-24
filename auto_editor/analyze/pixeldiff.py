@@ -1,7 +1,8 @@
+from fractions import Fraction
+
 import av
 import numpy as np
 from numpy.typing import NDArray
-from fractions import Fraction
 from PIL import ImageChops
 
 from auto_editor.utils.progressbar import ProgressBar

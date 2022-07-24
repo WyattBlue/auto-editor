@@ -4,11 +4,11 @@ import os
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
+from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.container import Container, container_constructor
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args
-from auto_editor.utils.chunks import Chunks, Chunk
 
 
 def set_output_name(path: str, inp_ext: str, export: str) -> str:
