@@ -1,43 +1,21 @@
 from __future__ import annotations
 
-from typing import overload
 from fractions import Fraction
+from typing import overload
 
 import numpy as np
 from numpy.typing import NDArray
 
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import Args, Chunks, time
+from auto_editor.utils.types import Args, time
 
 """
 To prevent duplicate code being pasted between scripts, common functions should be
 put here. Every function should be pure with no side effects.
 """
 
-# Turn long silent/loud array to formatted chunk list.
-# Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]
-def chunkify(arr: np.ndarray | list[int]) -> Chunks:
-    arr_length = len(arr)
 
-    chunks = []
-    start = 0
-    for j in range(1, arr_length):
-        if arr[j] != arr[j - 1]:
-            chunks.append((start, j, arr[j - 1]))
-            start = j
-    chunks.append((start, arr_length, arr[j]))
-    return chunks
-
-
-def chunks_len(chunks: Chunks) -> int:
-    _len = 0.0
-    for chunk in chunks:
-        if chunk[2] != 99999:
-            _len += (chunk[1] - chunk[0]) / chunk[2]
-    return round(_len)
-
-
-def to_timecode(secs: float, fmt: str) -> str:
+def to_timecode(secs: float | Fraction, fmt: str) -> str:
     sign = ""
     if secs < 0:
         sign = "-"
@@ -89,7 +67,7 @@ def remove_small(
 def set_range(
     arr: NDArray[np.float_],
     range_syntax: list[list[str]],
-    fps: Fraction,
+    tb: Fraction,
     with_: float,
     log: Log,
 ) -> NDArray[np.float_]:
@@ -100,15 +78,15 @@ def set_range(
 def set_range(
     arr: NDArray[np.bool_],
     range_syntax: list[list[str]],
-    fps: Fraction,
+    tb: Fraction,
     with_: float,
     log: Log,
 ) -> NDArray[np.bool_]:
     pass
 
 
-def set_range(arr, range_syntax, fps, with_, log):
-    def replace_variables_to_values(val: str, fps: Fraction, log: Log) -> int:
+def set_range(arr, range_syntax, tb, with_, log):
+    def replace_variables_to_values(val: str, tb: Fraction, log: Log) -> int:
         if val == "start":
             return 0
         if val == "end":
@@ -120,23 +98,17 @@ def set_range(arr, range_syntax, fps, with_, log):
             log.error(e)
         if isinstance(value, int):
             return value
-        return round(float(value) * fps)
+        return round(float(value) * tb)
 
     for _range in range_syntax:
         pair = []
         for val in _range:
-            num = replace_variables_to_values(val, fps, log)
+            num = replace_variables_to_values(val, tb, log)
             if num < 0:
                 num += len(arr)
             pair.append(num)
         arr[pair[0] : pair[1]] = with_
     return arr
-
-
-def seconds_to_frames(value: int | str, fps: Fraction) -> int:
-    if isinstance(value, str):
-        return int(float(value) * fps)
-    return value
 
 
 def cook(has_loud: NDArray[np.bool_], min_clip: int, min_cut: int) -> NDArray[np.bool_]:
@@ -175,31 +147,6 @@ def apply_margin(
             has_loud[max(i + end_m, 0) : i] = False
 
     return has_loud
-
-
-def apply_mark_as(
-    has_loud: NDArray[np.bool_], has_loud_length: int, fps: Fraction, args: Args, log: Log
-) -> NDArray[np.bool_]:
-
-    if len(args.mark_as_loud) > 0:
-        has_loud = set_range(has_loud, args.mark_as_loud, fps, args.video_speed, log)
-
-    if len(args.mark_as_silent) > 0:
-        has_loud = set_range(has_loud, args.mark_as_silent, fps, args.silent_speed, log)
-    return has_loud
-
-
-def to_speed_list(
-    has_loud: NDArray[np.bool_], video_speed: float, silent_speed: float
-) -> NDArray[np.float_]:
-
-    speed_list = has_loud.astype(float)
-
-    # WARN: This breaks if speed is allowed to be 0
-    speed_list[speed_list == 1] = video_speed
-    speed_list[speed_list == 0] = silent_speed
-
-    return speed_list
 
 
 def merge(start_list: np.ndarray, end_list: np.ndarray) -> NDArray[np.bool_]:

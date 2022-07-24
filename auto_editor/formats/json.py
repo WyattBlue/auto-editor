@@ -6,9 +6,10 @@ import sys
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.timeline import Timeline, clipify, make_av
+from auto_editor.timeline import Timeline
+from auto_editor.make_layers import clipify, make_av
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import Chunks
+from auto_editor.utils.chunks import Chunks
 
 """
 Make a pre-edited file reference that can be inputted back into auto-editor.
@@ -101,11 +102,11 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
 
         vspace, aspace = make_av([clipify(chunks, 0, 0)], [inp])
 
-        fps = inp.get_fps()
+        tb = inp.get_fps()
         sr = inp.get_samplerate()
         res = inp.get_res()
 
-        return Timeline([inp], fps, sr, res, "#000", vspace, aspace, chunks)
+        return Timeline([inp], tb, sr, res, "#000", vspace, aspace, chunks)
 
     if version == (2, 0) or version == (0, 2):
         check_attrs(data, log, "timeline")
@@ -143,7 +144,7 @@ def make_json_timeline(
             "timeline": {
                 "background": timeline.background,
                 "resolution": timeline.res,
-                "fps": timeline.fps,
+                "timebase": str(timeline.timebase),
                 "samplerate": timeline.samplerate,
                 "video": timeline.v,
                 "audio": timeline.a,

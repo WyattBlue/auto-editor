@@ -190,7 +190,6 @@ class FileInfo:
             return self.videos[0].width, self.videos[0].height
         return 1920, 1080
 
-
     def get_fps(self) -> Fraction:
         if len(self.videos) > 0:
             return self.videos[0].fps

@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import aspect_ratio, to_timecode
 
+from fractions import Fraction
 
-def timecode_to_frames(timecode: str, fps: float) -> int:
+def timecode_to_frames(timecode: str, tb: Fraction) -> int:
     _h, _m, _s = timecode.split(":")
     h = int(_h)
     m = int(_m)
     s = float(_s)
-    return round((h * 3600 + m * 60 + s) * fps)
+    return round((h * 3600 + m * 60 + s) * tb)
 
 
 def shotcut_xml(
@@ -20,10 +23,10 @@ def shotcut_xml(
     chunks = timeline.chunks
     if chunks is None:
         raise ValueError("Timeline too complex")
-    fps = timeline.fps
+    tb = timeline.timebase
     inp = timeline.inp
 
-    global_out = to_timecode(timeline.out_len() / fps, "standard")
+    global_out = to_timecode(timeline.out_len() / tb, "standard")
     version = "21.05.18"
 
     with open(output, "w", encoding="utf-8") as out:
@@ -37,7 +40,7 @@ def shotcut_xml(
             f'width="{width}" height="{height}" '
             'progressive="1" sample_aspect_num="1" sample_aspect_den="1" '
             f'display_aspect_num="{num}" display_aspect_den="{den}" '
-            f'frame_rate_num="{fps}" frame_rate_den="1" colorspace="709"/>\n'
+            f'frame_rate_num="{tb}" frame_rate_den="1" colorspace="709"/>\n'
         )
         out.write('\t<playlist id="main_bin">\n')
         out.write('\t\t<property name="xml_retain">1</property>\n')
@@ -71,8 +74,8 @@ def shotcut_xml(
 
             speed = clip[2]
 
-            _out = to_timecode(clip[1] / speed / fps, "standard")
-            length = to_timecode((clip[1] / speed + 1) / fps, "standard")
+            _out = to_timecode(clip[1] / speed / tb, "standard")
+            length = to_timecode((clip[1] / speed + 1) / tb, "standard")
 
             if speed == 1:
                 resource = inp.path
@@ -141,8 +144,8 @@ def shotcut_xml(
 
             out_len = max((clip[1] - 2) / speed, 0)
 
-            _in = to_timecode(in_len / fps, "standard")
-            _out = to_timecode(out_len / fps, "standard")
+            _in = to_timecode(in_len / tb, "standard")
+            _out = to_timecode(out_len / tb, "standard")
 
             tag_name = f"chain{i}"
             if speed != 1:
