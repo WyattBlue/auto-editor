@@ -351,7 +351,7 @@ def main(sys_args: list[str] | None = None):
         run_program(["example.mp4", "--progress", "none"])
         run_program(["example.mp4", "--progress", "ascii"])
 
-    def t_threshold():
+    def silent_threshold():
         run_program(["resources/new-commentary.mp3", "--edit", "audio:threshold=0.1"])
 
     def track_tests():

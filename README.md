@@ -25,12 +25,12 @@ See [Installing](https://auto-editor.com/installing) for additional information.
 
 <h2 align="center">Cutting</h2>
 
-Change the **pace** of the edited video by using `--frame-margin`.
+Change the **pace** of the edited video by using `--margin`.
 
-`--frame-margin` will including small sections that are next to loud parts. A frame margin of 8 will add up to 8 frames before and 8 frames after the loud part.
+`--margin` will including small sections that are next to loud parts. A frame margin of 8 will add up to 8 frames before and 8 frames after the loud part.
 
 ```
-auto-editor example.mp4 --frame-margin 8
+auto-editor example.mp4 --margin 0.2sec
 ```
 
 <h3>Set how cuts are made</h3>
