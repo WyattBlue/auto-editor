@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from fractions import Fraction
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
-
+from auto_editor.utils.chunks import Chunks
 
 @dataclass
 class SerialSub:
@@ -23,7 +24,7 @@ class SubtitleParser:
     def __init__(self) -> None:
         self.supported_codecs = ("ass", "webvtt", "mov_text")
 
-    def parse(self, text, timebase: int, codec: str) -> None:
+    def parse(self, text, timebase: Fraction, codec: str) -> None:
 
         if codec not in self.supported_codecs:
             raise ValueError(f"codec {codec} not supported.")
@@ -61,7 +62,7 @@ class SubtitleParser:
         else:
             self.footer = text[reg.span()[1] :]
 
-    def edit(self, chunks: list[tuple[int, int, float]]) -> None:
+    def edit(self, chunks: Chunks) -> None:
         for cut in reversed(chunks):
             the_speed = cut[2]
             speed_factor = 1 if the_speed == 99999 else 1 - (1 / the_speed)

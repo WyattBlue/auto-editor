@@ -7,7 +7,8 @@ from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.container import Container, container_constructor
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
-from auto_editor.utils.types import Args, Chunk, Chunks
+from auto_editor.utils.types import Args
+from auto_editor.utils.chunks import Chunks, Chunk
 
 
 def set_output_name(path: str, inp_ext: str, export: str) -> str:
@@ -288,7 +289,7 @@ def edit_media(
         if chunks is None:
             log.error("Timeline to complex to use clip-sequence export")
 
-        from auto_editor.timeline import clipify, make_av
+        from auto_editor.make_layers import clipify, make_av
         from auto_editor.utils.func import append_filename
 
         def pad_chunk(chunk: Chunk, total: int) -> Chunks:
@@ -306,7 +307,7 @@ def edit_media(
             vspace, aspace = make_av([clipify(_c, 0, 0)], [inp])
             my_timeline = Timeline(
                 timeline.inputs,
-                timeline.fps,
+                timeline.timebase,
                 timeline.samplerate,
                 timeline.res,
                 "#000",

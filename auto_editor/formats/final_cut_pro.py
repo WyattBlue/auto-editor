@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+from fractions import Fraction
 from pathlib import Path, PureWindowsPath
 from platform import system
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import Timeline
-
-from fractions import Fraction
 
 from .utils import indent
 
@@ -41,7 +40,7 @@ def get_colorspace(inp: FileInfo) -> str:
     return "1-1-1 (Rec. 709)"
 
 
-def fraction(_a: int | float, fps: Fraction) -> str:
+def fraction(_a: int | float, tb: Fraction) -> str:
     if _a == 0:
         return "0s"
 
@@ -50,7 +49,7 @@ def fraction(_a: int | float, fps: Fraction) -> str:
     else:
         a = _a
 
-    frac = Fraction(a, fps).limit_denominator()
+    frac = Fraction(a, tb).limit_denominator()
     num = frac.numerator
     dem = frac.denominator
 
@@ -73,7 +72,7 @@ def fraction(_a: int | float, fps: Fraction) -> str:
 
 def fcp_xml(output: str, timeline: Timeline) -> None:
     inp = timeline.inp
-    fps = timeline.fps
+    tb = timeline.timebase
     chunks = timeline.chunks
 
     if chunks is None:
@@ -87,7 +86,7 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
         pathurl = Path(inp.abspath).as_uri()
 
     width, height = timeline.res
-    frame_duration = fraction(1, fps)
+    frame_duration = fraction(1, tb)
 
     audio_file = len(inp.videos) == 0 and len(inp.audios) > 0
     group_name = "Auto-Editor {} Group".format("Audio" if audio_file else "Video")
@@ -101,7 +100,7 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
         outfile.write('<fcpxml version="1.9">\n')
         outfile.write("\t<resources>\n")
         outfile.write(
-            f'\t\t<format id="r1" name="FFVideoFormat{height}p{float(fps)}" '
+            f'\t\t<format id="r1" name="FFVideoFormat{height}p{float(tb)}" '
             f'frameDuration="{frame_duration}" '
             f'width="{width}" height="{height}" '
             f'colorSpace="{colorspace}"/>\n'
@@ -109,7 +108,7 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
         outfile.write(
             f'\t\t<asset id="r2" name="{name}" start="0s" hasVideo="1" format="r1" '
             'hasAudio="1" audioSources="1" audioChannels="2" '
-            f'duration="{fraction(total_dur, fps)}">\n'
+            f'duration="{fraction(total_dur, tb)}">\n'
         )
         outfile.write(
             f'\t\t\t<media-rep kind="original-media" src="{pathurl}"></media-rep>\n'
@@ -133,7 +132,7 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
                 continue
 
             clip_dur = (clip[1] - clip[0] + 1) / clip[2]
-            dur = fraction(clip_dur, fps)
+            dur = fraction(clip_dur, tb)
 
             close = "/" if clip[2] == 1 else ""
 
@@ -145,8 +144,8 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
                     )
                 )
             else:
-                start = fraction(clip[0] / clip[2], fps)
-                off = fraction(last_dur, fps)
+                start = fraction(clip[0] / clip[2], tb)
+                off = fraction(last_dur, tb)
                 outfile.write(
                     indent(
                         6,
@@ -160,8 +159,8 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
                 # See the "Time Maps" section.
                 # https://developer.apple.com/library/archive/documentation/FinalCutProX/Reference/FinalCutProXXMLFormat/StoryElements/StoryElements.html
 
-                frac_total = fraction(total_dur, fps)
-                speed_dur = fraction(total_dur / clip[2], fps)
+                frac_total = fraction(total_dur, tb)
+                speed_dur = fraction(total_dur / clip[2], tb)
 
                 outfile.write(
                     indent(

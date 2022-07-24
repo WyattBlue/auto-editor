@@ -272,7 +272,7 @@ def main(sys_args: list[str] | None = None):
         run_program(["example.mp4", "--margin", "3_0"])
         run_program(["example.mp4", "--sample_rate", "44100 Hz"])
         run_program(["example.mp4", "--sample_rate", "44.1 kHz"])
-        run_program(["example.mp4", "--silent_threshold", "4%"])
+        run_program(["example.mp4", "--edit", "audio:threshold=4%"])
 
     def backwards_range_test():
         """
@@ -351,8 +351,8 @@ def main(sys_args: list[str] | None = None):
         run_program(["example.mp4", "--progress", "none"])
         run_program(["example.mp4", "--progress", "ascii"])
 
-    def silent_threshold():
-        run_program(["resources/new-commentary.mp3", "--silent_threshold", "0.1"])
+    def t_threshold():
+        run_program(["resources/new-commentary.mp3", "--edit", "audio:threshold=0.1"])
 
     def track_tests():
         run_program(["resources/multi-track.mov", "--keep_tracks_seperate"])

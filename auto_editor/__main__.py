@@ -12,10 +12,10 @@ from auto_editor.utils.log import Log, Timer
 from auto_editor.utils.types import (
     MainArgs,
     color,
+    frame_rate,
     margin,
     number,
     resolution,
-    frame_rate,
     sample_rate,
     speed_range,
     threshold,
@@ -225,19 +225,16 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_argument("--quiet", "-q", flag=True, help="Display less output.")
     parser.add_argument(
-        "--preview", flag=True, help="Show stats on how the input will be cut and halt."
+        "--preview",
+        "--stats",
+        flag=True,
+        help="Show stats on how the input will be cut and halt.",
     )
     parser.add_argument(
         "--timeline", flag=True, help="Show auto-editor JSON timeline file and halt."
     )
     parser.add_argument("--api", help="Set what version of the timeline to use.")
     parser.add_text("Global Editing Options")
-    parser.add_argument(
-        "--silent-threshold",
-        "-t",
-        type=threshold,
-        help="Set the volume that frames audio needs to surpass to be marked loud.",
-    )
     parser.add_argument(
         "--frame-margin",
         "--margin",

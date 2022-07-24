@@ -12,7 +12,8 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
 from auto_editor.output import video_quality
-from auto_editor.timeline import Timeline, Visual
+from auto_editor.timeline import Timeline
+from auto_editor.make_layers import Visual
 from auto_editor.utils.container import Container
 from auto_editor.utils.encoder import encoders
 from auto_editor.utils.log import Log
@@ -199,7 +200,7 @@ def render_av(
         "-s",
         f"{width}*{height}",
         "-framerate",
-        f"{timeline.fps}",
+        f"{timeline.timebase}",
         "-i",
         "-",
         "-pix_fmt",
@@ -257,7 +258,7 @@ def render_av(
                         cns[obj.src].seek(0)
                         try:
                             frame = next(decoders[obj.src])
-                            frame_index = round(frame.time * timeline.fps)
+                            frame_index = round(frame.time * timeline.timebase)
                         except StopIteration:
                             pass
 
@@ -277,9 +278,11 @@ def render_av(
 
                         try:
                             frame = next(decoders[obj.src])
-                            frame_index = round(frame.time * timeline.fps)
+                            frame_index = round(frame.time * timeline.timebase)
                         except StopIteration:
-                            log.warning(f"No source frame at {index=}. Using null frame")
+                            log.warning(
+                                f"No source frame at {index=}. Using null frame"
+                            )
                             frame = null_frame
                             break
 

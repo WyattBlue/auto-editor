@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Literal, Tuple, Type, Union
 from fractions import Fraction
+from typing import List, Literal, Tuple, Type, Union
 
 
 def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
@@ -36,10 +36,6 @@ def _split_num_str(val: str | float) -> tuple[float, str]:
 def _unit_check(unit: str, allowed_units: tuple[str, ...]) -> None:
     if unit not in allowed_units:
         raise TypeError(f"Unknown unit: '{unit}'")
-
-
-Chunk = Tuple[int, int, float]
-Chunks = List[Chunk]
 
 
 # Numbers: 0, 1, 2, 3, ...

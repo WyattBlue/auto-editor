@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import os.path
+from fractions import Fraction
 from os.path import abspath
 from platform import system
 from shutil import move
-from fractions import Fraction
 from urllib.parse import quote
 
 from auto_editor.timeline import Timeline
@@ -82,17 +84,21 @@ def premiere_xml(
     if chunks is None:
         raise ValueError("Timeline too complex")
 
-    fps = timeline.fps
+    fps = timeline.timebase
     samplerate = timeline.samplerate
 
     audio_file = len(inp.videos) == 0 and len(inp.audios) == 1
 
     # See chart: https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/FrameRate/FrameRate.html#//apple_ref/doc/uid/TP30001158-TPXREF103
 
-    if fps == 23.98 or fps == 23.97602397 or fps == 23.976 or fps == Fraction(24000, 1001):
+    if (
+        fps == 23.98
+        or fps == 23.976
+        or fps == Fraction(24000, 1001)
+    ):
         timebase = 24
         ntsc = "TRUE"
-    elif fps == 29.97 or fps == 29.97002997 or fps == Fraction(30000, 1001):
+    elif fps == 29.97 or fps == Fraction(30000, 1001):
         timebase = 30
         ntsc = "TRUE"
     elif fps == 59.94 or fps == 59.94005994:

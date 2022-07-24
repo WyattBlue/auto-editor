@@ -1,13 +1,14 @@
 import av
 import numpy as np
 from numpy.typing import NDArray
+from fractions import Fraction
 from PIL import ImageChops
 
 from auto_editor.utils.progressbar import ProgressBar
 
 
 def pixel_difference(
-    path: str, track: int, timebase: int, progress: ProgressBar
+    path: str, track: int, tb: Fraction, progress: ProgressBar
 ) -> NDArray[np.uint64]:
     container = av.open(path, "r")
 
@@ -25,12 +26,9 @@ def pixel_difference(
     threshold_list = np.zeros((1024), dtype=np.uint64)
 
     for frame in container.decode(stream):
-        if image is None:
-            prev_image = None
-        else:
-            prev_image = image
+        prev_image = image
 
-        index = int(frame.time * timebase)
+        index = int(frame.time * tb)
         progress.tick(index)
 
         if index > len(threshold_list) - 1:

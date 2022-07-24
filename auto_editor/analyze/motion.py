@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from fractions import Fraction
+
 import av
 import numpy as np
 from numpy.typing import NDArray
@@ -14,7 +16,7 @@ def new_size(size: tuple[int, int], width: int) -> tuple[int, int]:
 
 
 def motion_detection(
-    path: str, track: int, timebase: int, progress: ProgressBar, width: int, blur: int
+    path: str, track: int, tb: Fraction, progress: ProgressBar, width: int, blur: int
 ) -> NDArray[np.float_]:
     container = av.open(path, "r")
 
@@ -33,13 +35,9 @@ def motion_detection(
     threshold_list = np.zeros((1024), dtype=np.float_)
 
     for frame in container.decode(stream):
-        if image is None:
-            prev_image = None
-        else:
-            prev_image = image
+        prev_image = image
 
-        index = int(frame.time * timebase)
-
+        index = int(frame.time * tb)
         progress.tick(index)
 
         if index > len(threshold_list) - 1:
