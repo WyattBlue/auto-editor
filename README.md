@@ -27,7 +27,7 @@ See [Installing](https://auto-editor.com/installing) for additional information.
 
 Change the **pace** of the edited video by using `--margin`.
 
-`--margin` adds in "silent" to make the editing feel nicer. Setting `--margin` to `0.2sec` will add up to 0.2 seconds in front of and 0.2 seconds behind the original clip.
+`--margin` adds in some "silent" sections to make the editing feel nicer. Setting `--margin` to `0.2sec` will add up to 0.2 seconds in front of and 0.2 seconds behind the original clip.
 
 ```
 auto-editor example.mp4 --margin 0.2sec
