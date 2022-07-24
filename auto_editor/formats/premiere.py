@@ -91,11 +91,7 @@ def premiere_xml(
 
     # See chart: https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/FrameRate/FrameRate.html#//apple_ref/doc/uid/TP30001158-TPXREF103
 
-    if (
-        fps == 23.98
-        or fps == 23.976
-        or fps == Fraction(24000, 1001)
-    ):
+    if fps == 23.98 or fps == 23.976 or fps == Fraction(24000, 1001):
         timebase = 24
         ntsc = "TRUE"
     elif fps == 29.97 or fps == Fraction(30000, 1001):

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from auto_editor.ffwrapper import FileInfo
+from auto_editor.make_layers import ASpace, Visual, VSpace, make_layers
 from auto_editor.objects import (
-    AudioObj,
     EllipseObj,
     ImageObj,
     RectangleObj,
@@ -17,12 +17,10 @@ from auto_editor.objects import (
     rect_builder,
     text_builder,
 )
+from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.log import Log
 from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args
-from auto_editor.utils.chunks import Chunks
-from auto_editor.make_layers import make_layers, VSpace, ASpace, Visual
-
 
 
 @dataclass

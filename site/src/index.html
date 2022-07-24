@@ -15,9 +15,9 @@
 <p><a href="/installing.html">See Installing</a> for additional information.</p>
 
 <h2>Cutting</h2>
-<p>Change the pace of a video by using <code>--frame-margin</code>.
-<p><code>--frame-margin</code> will add small sections that are next to loud sections. A frame margin of 8 will add up to 8 frames before and 8 frames after.</p>
-<pre><code>auto-editor example.mp4 --frame-margin 8</code></pre>
+<p>Change the pace of a video by using <code>--margin</code>.
+<p><code>--margin</code> adds in "silent" to make the editing feel nicer. Setting <code>--margin</code> to <code>0.2sec</code> will add up to 0.2 seconds in front of and 0.2 seconds behind the original clip.
+<pre><code>auto-editor example.mp4 --margin 0.2sec</code></pre>
 
 <h3>Set how cuts are made</h3>
 <p>Use the <code>--edit</code> option. to change how auto-editor makes automated cuts.</p>
@@ -25,10 +25,13 @@
 <pre><code><i># cut out sections where percentage of motion is less than 2.</i>
 auto-editor example.mp4 --edit motion:threshold=2%</code>
 
-<code><i># --edit is set to "audio" by default</i></code>
-<code>auto-editor example.mp4 --silent-threshold 4%</code>
+<code><i># --edit is set to "audio:threshold=4%" by default</i></code>
+<code>auto-editor example.mp4</code>
 
-<code><i># audio and motion thresholds are toggled independently</i></code>
+<code><i># Different tracks can be set with different attributes</i></code>
+<code>auto-editor multi-track.mov --edit 'audio:stream=0 or audio:threshold=10%,stream=1'</code>
+
+<code><i># Different editing methods can be used together.</i></code>
 <code>auto-editor example.mp4 --edit 'audio:threshold=3% or motion:threshold=6%'</code>
 </pre>
 

@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import Args, time
+from auto_editor.utils.types import time
 
 """
 To prevent duplicate code being pasted between scripts, common functions should be

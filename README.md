@@ -27,7 +27,7 @@ See [Installing](https://auto-editor.com/installing) for additional information.
 
 Change the **pace** of the edited video by using `--margin`.
 
-`--margin` will including small sections that are next to loud parts. A frame margin of 8 will add up to 8 frames before and 8 frames after the loud part.
+`--margin` adds in "silent" to make the editing feel nicer. Setting `--margin` to `0.2sec` will add up to 0.2 seconds in front of and 0.2 seconds behind the original clip.
 
 ```
 auto-editor example.mp4 --margin 0.2sec
@@ -39,15 +39,17 @@ Use the `--edit` option to change how auto-editor makes automated cuts.
 
 For example, edit out motionlessness in a video by setting `--edit motion`.
 
-
 ```
 # cut out sections where percentage of motion is less than 2.
 auto-editor example.mp4 --edit motion:threshold=2%
 
-# --edit is set to "audio" by default
-auto-editor example.mp4 --silent-threshold 4%
+# --edit is set to "audio:threshold=4%" by default.
+auto-editor example.mp4
 
-# audio and motion thresholds are toggled independently
+# Different tracks can be set with different attribute.
+auto-editor multi-track.mov --edit 'audio:stream=0 or audio:threshold=10%,stream=1'
+
+# Different editing methods can be used together.
 auto-editor example.mp4 --edit 'audio:threshold=3% or motion:threshold=6%'
 ```
 
@@ -67,10 +69,10 @@ Create an XML file that can be imported to Adobe Premiere Pro using this command
 auto-editor example.mp4 --export premiere
 ```
 
-Similar commands exist for:
+Auto-Editor can also export to:
 
-- `--export final-cut-pro` for Final Cut Pro.
-- `--export shotcut` for ShotCut.
+- Final Cut Pro with `--export final-cut-pro`
+- ShotCut with `--export shotcut`
 
 Other editors, like Sony Vegas, can understand the `premiere` format. If your favorite editor doesn't, you can use ` --export clip-sequence` which creates many video clips that can be imported and manipulated like normal.
 
