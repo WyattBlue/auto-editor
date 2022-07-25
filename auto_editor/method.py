@@ -94,7 +94,7 @@ def get_audio_list(
     stream: int,
     threshold: float,
     tb: Fraction,
-    bar: ProgressBar,
+    bar: Bar,
     temp: str,
     log: Log,
 ) -> BoolList:

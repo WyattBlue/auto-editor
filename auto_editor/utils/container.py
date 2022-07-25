@@ -1,7 +1,49 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TypedDict
+
+
+class DictContainer(TypedDict, total=False):
+    name: str | None
+    allow_video: bool
+    allow_audio: bool
+    allow_subtitle: bool
+    allow_image: bool
+    max_videos: int | None
+    max_audios: int | None
+    max_subtitles: int | None
+    vcodecs: list[str] | None
+    acodecs: list[str] | None
+    scodecs: list[str] | None
+    vstrict: bool
+    astrict: bool
+    sstrict: bool
+    disallow_v: list[str]
+    disallow_a: list[str]
+    samplerate: list[int] | None
+
+
+@dataclass
+class Container:
+    name: str | None = None
+    allow_video: bool = False
+    allow_audio: bool = False
+    allow_subtitle: bool = False
+    allow_image: bool = False
+    max_videos: int | None = None
+    max_audios: int | None = None
+    max_subtitles: int | None = None
+    vcodecs: list[str] | None = None
+    acodecs: list[str] | None = None
+    scodecs: list[str] | None = None
+    vstrict: bool = False
+    astrict: bool = False
+    sstrict: bool = False
+    disallow_v: list[str] = field(default_factory=list)
+    disallow_a: list[str] = field(default_factory=list)
+    samplerate: list[int] | None = None  # Any samplerate is allowed
+
 
 pcm_formats = [
     "pcm_s16le",  # default format
@@ -28,31 +70,31 @@ pcm_formats = [
 ]
 
 # Define aliases
-h265 = {
+h265: DictContainer = {
     "name": "H.265 / High Efficiency Video Coding (HEVC) / MPEG-H Part 2",
     "allow_video": True,
     "vcodecs": ["hevc", "mpeg4", "h264"],
 }
-h264 = {
+h264: DictContainer = {
     "name": "H.264 / Advanced Video Coding (AVC) / MPEG-4 Part 10",
     "allow_video": True,
     "vcodecs": ["h264", "mpeg4", "hevc"],
 }
-aac = {
+aac: DictContainer = {
     "name": "Advanced Audio Coding",
     "allow_audio": True,
     "max_audios": 1,
     "acodecs": ["aac"],
     "astrict": True,
 }
-ass = {
+ass: DictContainer = {
     "name": "SubStation Alpha",
     "allow_subtitle": True,
     "scodecs": ["ass", "ssa"],
     "max_subtitles": 1,
     "sstrict": True,
 }
-mp4 = {
+mp4: DictContainer = {
     "name": "MP4 / MPEG-4 Part 14",
     "allow_video": True,
     "allow_audio": True,
@@ -63,7 +105,7 @@ mp4 = {
     "disallow_v": ["prores", "apng", "gif", "msmpeg4v3", "flv1", "vp8", "rawvideo"],
     "disallow_a": pcm_formats,
 }
-ogg = {
+ogg: DictContainer = {
     "allow_video": True,
     "allow_audio": True,
     "allow_subtitle": True,
@@ -73,7 +115,7 @@ ogg = {
     "astrict": True,
 }
 
-containers: dict[str, dict[str, Any]] = {
+containers: dict[str, DictContainer] = {
     # Aliases section
     "aac": aac,
     "adts": aac,
@@ -244,27 +286,6 @@ containers: dict[str, dict[str, Any]] = {
         "allow_subtitle": True,
     },
 }
-
-
-@dataclass
-class Container:
-    name: str | None = None
-    allow_video: bool = False
-    allow_audio: bool = False
-    allow_subtitle: bool = False
-    allow_image: bool = False
-    max_videos: int | None = None
-    max_audios: int | None = None
-    max_subtitles: int | None = None
-    vcodecs: list[str] | None = None
-    acodecs: list[str] | None = None
-    scodecs: list[str] | None = None
-    vstrict: bool = False
-    astrict: bool = False
-    sstrict: bool = False
-    disallow_v: list[str] = field(default_factory=list)
-    disallow_a: list[str] = field(default_factory=list)
-    samplerate: list[int] | None = None  # Any samplerate is allowed
 
 
 def container_constructor(key: str) -> Container:
