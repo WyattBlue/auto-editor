@@ -151,19 +151,22 @@ def render_av(
     for c, cn in enumerate(cns):
         if len(cn.streams.video) == 0:
             decoders.append(None)
-            tous.append(None)
-            seek_cost.append(None)
+            tous.append(0)
+            seek_cost.append(0)
         else:
             stream = cn.streams.video[0]
             stream.thread_type = "AUTO"
 
-            # Keyframes are usually spread out every 5 seconds or less.
-            seek_cost.append(
-                4294967295
-                if args.no_seek
-                else int(cn.streams.video[0].average_rate * 5)
-            )
-            tous.append(int(stream.time_base.denominator / stream.average_rate))
+            if args.no_seek or stream.average_rate is None:
+                sc_val = 4294967295  # 2 ** 32 - 1
+                tou = 0
+            else:
+                # Keyframes are usually spread out every 5 seconds or less.
+                sc_val = int(stream.average_rate * 5)
+                tou = int(stream.time_base.denominator / stream.average_rate)
+
+            seek_cost.append(sc_val)
+            tous.append(tou)
             decoders.append(cn.decode(stream))
 
             if c == 0:

@@ -107,7 +107,11 @@ def main(sys_args=sys.argv[1:]) -> None:
             "video": [],
             "audio": [],
             "subtitle": [],
-            "container": {"duration": inp.duration, "bitrate": inp.bitrate, "fps_mode": None},
+            "container": {
+                "duration": inp.duration,
+                "bitrate": inp.bitrate,
+                "fps_mode": None,
+            },
         }
 
         for track, v in enumerate(inp.videos):

@@ -116,8 +116,7 @@ class FFmpeg:
             print(f"stderr: {output}")
 
         for item in error_list:
-            check = search(item, output)
-            if check:
+            if check := search(item, output):
                 log.error(check.group())
 
         if path is not None and not os.path.isfile(path):
@@ -301,9 +300,10 @@ class FileInfo:
                     log.error(f"Could not convert fps '{fps_str}' to float")
 
                 if fps < 1:
-                    if codec not in IMG_CODECS:
-                        log.error("fps cannot be less than 1.")
-                    fps = Fraction(25)
+                    if codec in IMG_CODECS:
+                        fps = Fraction(25)
+                    elif fps == 0:
+                        fps = Fraction(30)
 
                 try:
                     time_base = Fraction(time_base_str)
