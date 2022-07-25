@@ -47,6 +47,7 @@ class VideoJson(TypedDict):
     fps: str
     resolution: list[int]
     aspect_ratio: list[int]
+    duration: str | None
     pix_fmt: str
     color_range: str | None
     color_space: str | None
@@ -60,6 +61,7 @@ class VideoJson(TypedDict):
 class AudioJson(TypedDict):
     codec: str
     samplerate: int
+    duration: str | None
     bitrate: str | None
     lang: str | None
 
@@ -70,6 +72,7 @@ class SubtitleJson(TypedDict):
 
 
 class ContainerJson(TypedDict):
+    duration: str
     bitrate: str | None
     fps_mode: str | None
 
@@ -104,7 +107,7 @@ def main(sys_args=sys.argv[1:]) -> None:
             "video": [],
             "audio": [],
             "subtitle": [],
-            "container": {"bitrate": inp.bitrate, "fps_mode": None},
+            "container": {"duration": inp.duration, "bitrate": inp.bitrate, "fps_mode": None},
         }
 
         for track, v in enumerate(inp.videos):
@@ -115,6 +118,7 @@ def main(sys_args=sys.argv[1:]) -> None:
                 "fps": str(v.fps),
                 "resolution": [w, h],
                 "aspect_ratio": list(aspect_ratio(w, h)),
+                "duration": v.duration,
                 "pix_fmt": v.pix_fmt,
                 "color_range": v.color_range,
                 "color_space": v.color_space,
@@ -130,6 +134,7 @@ def main(sys_args=sys.argv[1:]) -> None:
             aud: AudioJson = {
                 "codec": a.codec,
                 "samplerate": a.samplerate,
+                "duration": a.duration,
                 "bitrate": a.bitrate,
                 "lang": a.lang,
             }

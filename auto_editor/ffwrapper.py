@@ -145,6 +145,7 @@ class VideoStream:
     height: int
     codec: str
     fps: Fraction
+    duration: str | None
     time_base: Fraction
     pix_fmt: str
     color_range: str | None
@@ -159,6 +160,7 @@ class VideoStream:
 class AudioStream:
     codec: str
     samplerate: int
+    duration: str | None
     bitrate: str | None
     lang: str | None
 
@@ -179,6 +181,7 @@ class FileInfo:
         "name",
         "ext",
         "bitrate",
+        "duration",
         "description",
         "videos",
         "audios",
@@ -211,6 +214,7 @@ class FileInfo:
         self.audios: list[AudioStream] = []
         self.subtitles: list[SubtitleStream] = []
         self.description = None
+        self.duration = ""
 
         _dir = os.path.dirname(ffmpeg.path)
         _ext = os.path.splitext(ffmpeg.path)[1]
@@ -263,6 +267,9 @@ class FileInfo:
         ):
             self.description = json_info["format"]["tags"]["description"]
 
+        if "duration" in json_info["format"]:
+            self.duration = json_info["format"]["duration"]
+
         for stream in json_info["streams"]:
             lang = None
             br = None
@@ -278,6 +285,7 @@ class FileInfo:
 
             if codec_type == "video":
                 pix_fmt = get_attr("pix_fmt", stream)
+                vduration = get_attr("duration", stream, default=None)
                 color_range = get_attr("color_range", stream, default=None)
                 color_space = get_attr("color_space", stream, default=None)
                 color_primaries = get_attr("color_primaries", stream, default=None)
@@ -312,6 +320,7 @@ class FileInfo:
                         stream["height"],
                         codec,
                         fps,
+                        vduration,
                         time_base,
                         pix_fmt,
                         color_range,
@@ -324,7 +333,8 @@ class FileInfo:
                 )
             if codec_type == "audio":
                 sr = int(stream["sample_rate"])
-                self.audios.append(AudioStream(codec, sr, br, lang))
+                adur = get_attr("duration", stream, default=None)
+                self.audios.append(AudioStream(codec, sr, adur, br, lang))
             if codec_type == "subtitle":
                 ext = SUB_EXTS.get(codec, "vtt")
                 self.subtitles.append(SubtitleStream(codec, ext, lang))
