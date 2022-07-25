@@ -646,6 +646,9 @@ def main(sys_args: list[str] | None = None):
             "Logic operator must be between two editing methods",
         )
 
+    def yuv442p():
+        run_program(["resources/example_yuv422p.mp4"])
+
     tests = []
 
     if args.category in ("unit", "all"):
@@ -660,6 +663,7 @@ def main(sys_args: list[str] | None = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                yuv442p,
                 obj_makes_video,
                 edit_positive_tests,
                 edit_negative_tests,
