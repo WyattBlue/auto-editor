@@ -289,7 +289,7 @@ class FileInfo:
                 color_space = get_attr("color_space", stream, default=None)
                 color_primaries = get_attr("color_primaries", stream, default=None)
                 color_transfer = get_attr("color_transfer", stream, default=None)
-                fps_str = get_attr("avg_frame_rate", stream)
+                fps_str = get_attr("r_frame_rate", stream)
                 time_base_str = get_attr("time_base", stream)
 
                 try:
