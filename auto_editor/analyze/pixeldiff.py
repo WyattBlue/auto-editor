@@ -5,11 +5,11 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import ImageChops
 
-from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.utils.bar import Bar
 
 
 def pixel_difference(
-    path: str, track: int, tb: Fraction, progress: ProgressBar
+    path: str, track: int, tb: Fraction, bar: Bar
 ) -> NDArray[np.uint64]:
     container = av.open(path, "r")
 
@@ -18,7 +18,7 @@ def pixel_difference(
 
     inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)
 
-    progress.start(inaccurate_dur, "Analyzing pixel diffs")
+    bar.start(inaccurate_dur, "Analyzing pixel diffs")
 
     prev_image = None
     image = None
@@ -30,7 +30,7 @@ def pixel_difference(
         prev_image = image
 
         index = int(frame.time * tb)
-        progress.tick(index)
+        bar.tick(index)
 
         if index > len(threshold_list) - 1:
             threshold_list = np.concatenate(
@@ -45,5 +45,5 @@ def pixel_difference(
                 ImageChops.difference(prev_image, image)
             )
 
-    progress.end()
+    bar.end()
     return threshold_list[:index]

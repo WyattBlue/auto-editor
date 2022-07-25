@@ -9,8 +9,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.vanparse import ArgumentParser
 
 
@@ -64,7 +64,7 @@ def main(sys_args=sys.argv[1:]) -> None:
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
-    progress = ProgressBar("none")
+    bar = Bar("none")
     temp = tempfile.mkdtemp()
     log = Log(temp=temp)
 
@@ -87,11 +87,8 @@ def main(sys_args=sys.argv[1:]) -> None:
         if not os.path.isfile(read_track):
             log.error("Audio track file not found!")
 
-        sample_rate, audio_samples = read(read_track)
-
-        print_float_list(
-            audio_detection(audio_samples, sample_rate, timebase, progress, log)
-        )
+        sr, samples = read(read_track)
+        print_float_list(audio_detection(samples, sr, timebase, bar, log))
 
     if args.kind in ("motion", "pixeldiff") and args.track >= len(inp.videos):
         log.error(f"Video stream '{args.track}' does not exist.")
@@ -100,15 +97,13 @@ def main(sys_args=sys.argv[1:]) -> None:
         from auto_editor.analyze.motion import motion_detection
 
         print_float_list(
-            motion_detection(
-                inp.path, args.track, timebase, progress, width=400, blur=9
-            )
+            motion_detection(inp.path, args.track, timebase, bar, width=400, blur=9)
         )
 
     if args.kind == "pixeldiff":
         from auto_editor.analyze.pixeldiff import pixel_difference
 
-        print_int_list(pixel_difference(inp.path, args.track, timebase, progress))
+        print_int_list(pixel_difference(inp.path, args.track, timebase, bar))
 
     log.cleanup()
 

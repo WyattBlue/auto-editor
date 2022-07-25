@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import ImageChops, ImageFilter, ImageOps
 
-from auto_editor.utils.progressbar import ProgressBar
+from auto_editor.utils.bar import Bar
 
 
 def new_size(size: tuple[int, int], width: int) -> tuple[int, int]:
@@ -16,7 +16,7 @@ def new_size(size: tuple[int, int], width: int) -> tuple[int, int]:
 
 
 def motion_detection(
-    path: str, track: int, tb: Fraction, progress: ProgressBar, width: int, blur: int
+    path: str, track: int, tb: Fraction, bar: Bar, width: int, blur: int
 ) -> NDArray[np.float_]:
     container = av.open(path, "r")
 
@@ -25,7 +25,7 @@ def motion_detection(
 
     inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)
 
-    progress.start(inaccurate_dur, "Analyzing motion")
+    bar.start(inaccurate_dur, "Analyzing motion")
 
     prev_image = None
     image = None
@@ -38,7 +38,7 @@ def motion_detection(
         prev_image = image
 
         index = int(frame.time * tb)
-        progress.tick(index)
+        bar.tick(index)
 
         if index > len(threshold_list) - 1:
             threshold_list = np.concatenate(
@@ -62,5 +62,5 @@ def motion_detection(
 
             threshold_list[index] = count / total_pixels
 
-    progress.end()
+    bar.end()
     return threshold_list[:index]

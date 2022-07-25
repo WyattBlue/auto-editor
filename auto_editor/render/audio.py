@@ -5,21 +5,19 @@ import wave
 
 from auto_editor.render.tsm.phasevocoder import phasevocoder
 from auto_editor.timeline import Timeline
+from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.wavfile import read
 
 
-def make_new_audio(
-    timeline: Timeline, progress: ProgressBar, temp: str, log: Log
-) -> list[str]:
+def make_new_audio(timeline: Timeline, bar: Bar, temp: str, log: Log) -> list[str]:
     samplerate = timeline.samplerate
     tb = timeline.timebase
     output = []
     samples = {}
 
     for l, layer in enumerate(timeline.a):
-        progress.start(len(layer), "Creating new audio")
+        bar.start(len(layer), "Creating new audio")
 
         # See: https://github.com/python/cpython/blob/3.10/Lib/wave.py
         path = os.path.join(temp, f"new{l}.wav")
@@ -49,9 +47,9 @@ def make_new_audio(
                 if data.shape[0] != 0:
                     writer.writeframesraw(data)  # type: ignore
 
-            progress.tick(c)
+            bar.tick(c)
 
         writer.close()
-        progress.end()
+        bar.end()
 
     return output

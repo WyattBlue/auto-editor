@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from math import floor
 from platform import system
@@ -7,22 +9,22 @@ from time import localtime, time
 from .func import get_stdout
 
 
-class ProgressBar:
+class Bar:
     def __init__(self, bar_type: str) -> None:
         self.machine = False
         self.hide = False
 
         self.icon = "⏳"
-        self.chars = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
+        self.chars: tuple[str, ...] = (" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█")
         self.brackets = ("|", "|")
 
         if bar_type == "classic":
             self.icon = "⏳"
-            self.chars = ["░", "█"]
+            self.chars = ("░", "█")
             self.brackets = ("[", "]")
         if bar_type == "ascii":
             self.icon = "& "
-            self.chars = ["-", "#"]
+            self.chars = ("-", "#")
             self.brackets = ("[", "]")
         if bar_type == "machine":
             self.machine = True
@@ -80,7 +82,7 @@ class ProgressBar:
         p_pad = " " * (4 - len(str(percent)))
         columns = get_terminal_size().columns
         bar_len = max(1, columns - (self.len_title + 32))
-        bar_str = self.progress_bar_str(progress, bar_len)
+        bar_str = self._bar_str(progress, bar_len)
 
         bar = f"  {self.icon}{self.title} {bar_str} {p_pad}{percent}%  ETA {new_time}"
 
@@ -101,11 +103,11 @@ class ProgressBar:
             self.tick(0)
         except UnicodeEncodeError:
             self.icon = "& "
-            self.chars = ["-", "#"]
+            self.chars = ("-", "#")
             self.brackets = ("[", "]")
             self.part_width = 1
 
-    def progress_bar_str(self, progress: float, width: int) -> str:
+    def _bar_str(self, progress: float, width: int) -> str:
         whole_width = floor(progress * width)
         remainder_width = (progress * width) % 1
         part_width = floor(remainder_width * self.part_width)
