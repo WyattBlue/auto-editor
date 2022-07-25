@@ -4,10 +4,10 @@ import os
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import Timeline, make_timeline
+from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.container import Container, container_constructor
 from auto_editor.utils.log import Log
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args
 
 
@@ -103,7 +103,7 @@ def edit_media(
     paths: list[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
 ) -> str | None:
 
-    progress = ProgressBar(args.progress)
+    bar = Bar(args.progress)
     timeline = None
 
     if paths:
@@ -197,7 +197,7 @@ def edit_media(
     ffmpeg.run(cmd)
 
     if timeline is None:
-        timeline = make_timeline(inputs, args, samplerate, progress, temp, log)
+        timeline = make_timeline(inputs, args, samplerate, bar, temp, log)
 
     if args.timeline:
         from auto_editor.formats.json import make_json_timeline
@@ -252,12 +252,12 @@ def edit_media(
         if ctr.allow_audio:
             from auto_editor.render.audio import make_new_audio
 
-            audio_output = make_new_audio(timeline, progress, temp, log)
+            audio_output = make_new_audio(timeline, bar, temp, log)
 
         if ctr.allow_video:
             if len(timeline.v) > 0:
                 out_path, apply_later = render_av(
-                    ffmpeg, timeline, args, progress, ctr, temp, log
+                    ffmpeg, timeline, args, bar, ctr, temp, log
                 )
                 visual_output.append((True, out_path))
 

@@ -15,8 +15,8 @@ from auto_editor.analyze.motion import motion_detection
 from auto_editor.analyze.pixeldiff import pixel_difference
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.objects import Attr, parse_dataclass
+from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Stream, natural, stream, threshold
 from auto_editor.wavfile import read
 
@@ -126,7 +126,7 @@ def get_stream_data(
     i: int,
     inputs: list[FileInfo],
     timebase: Fraction,
-    progress: ProgressBar,
+    bar: Bar,
     temp: str,
     log: Log,
 ) -> BoolList:
@@ -159,7 +159,7 @@ def get_stream_data(
             for s in range(len(inp.audios)):
                 try:
                     audio_list = get_audio_list(
-                        i, s, audio.threshold, timebase, progress, temp, log
+                        i, s, audio.threshold, timebase, bar, temp, log
                     )
                     if total_list is None:
                         total_list = audio_list
@@ -180,7 +180,7 @@ def get_stream_data(
         else:
             try:
                 return get_audio_list(
-                    i, audio.stream, audio.threshold, timebase, progress, temp, log
+                    i, audio.stream, audio.threshold, timebase, bar, temp, log
                 )
             except TypeError as e:
                 if not strict:
@@ -195,7 +195,7 @@ def get_stream_data(
             log.error(f"Video stream '{mobj.stream}' does not exist.")
 
         motion_list = motion_detection(
-            inp.path, mobj.stream, timebase, progress, mobj.width, mobj.blur
+            inp.path, mobj.stream, timebase, bar, mobj.width, mobj.blur
         )
         return np.fromiter((x >= mobj.threshold for x in motion_list), dtype=np.bool_)
 
@@ -207,7 +207,7 @@ def get_stream_data(
                 return get_all_list(inp.path, i, timebase, temp, log)
             log.error(f"Video stream '{pobj.stream}' does not exist.")
 
-        pixel_list = pixel_difference(inp.path, pobj.stream, timebase, progress)
+        pixel_list = pixel_difference(inp.path, pobj.stream, timebase, bar)
         return np.fromiter((x >= pobj.threshold for x in pixel_list), dtype=np.bool_)
 
     raise ValueError(f"Unreachable. {method=}")
@@ -218,7 +218,7 @@ def get_has_loud(
     i: int,
     inputs: list[FileInfo],
     timebase: Fraction,
-    progress: ProgressBar,
+    bar: Bar,
     temp: str,
     log: Log,
 ) -> NDArray[np.bool_]:
@@ -249,7 +249,7 @@ def get_has_loud(
                 log.error("Logic operator must be between two editing methods.")
 
             stream_data = get_stream_data(
-                token, attrs_str, i, inputs, timebase, progress, temp, log
+                token, attrs_str, i, inputs, timebase, bar, temp, log
             )
 
             if operand == "not":

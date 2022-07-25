@@ -13,10 +13,10 @@ from auto_editor.objects import (
     TextObj,
     VideoObj,
 )
+from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import apply_margin, cook, set_range
 from auto_editor.utils.log import Log
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Margin
 
 Visual = Type[Union[TextObj, ImageObj, RectangleObj, EllipseObj]]
@@ -102,7 +102,7 @@ def make_layers(
     set_speed_for_range: list[tuple[float, str, str]],
     silent_speed: float,
     loud_speed: float,
-    bar: ProgressBar,
+    bar: Bar,
     temp: str,
     log: Log,
 ) -> tuple[Chunks, VSpace, ASpace]:

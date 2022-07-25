@@ -14,10 +14,10 @@ from auto_editor.make_layers import Visual
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
 from auto_editor.output import video_quality
 from auto_editor.timeline import Timeline
+from auto_editor.utils.bar import Bar
 from auto_editor.utils.container import Container
 from auto_editor.utils.encoder import encoders
 from auto_editor.utils.log import Log
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args
 
 av.logging.set_level(av.logging.PANIC)
@@ -104,7 +104,7 @@ def render_av(
     ffmpeg: FFmpeg,
     timeline: Timeline,
     args: Args,
-    progress: ProgressBar,
+    bar: Bar,
     ctr: Container,
     temp: str,
     log: Log,
@@ -222,7 +222,7 @@ def render_av(
     seek_frame = None
     frames_saved = 0
 
-    progress.start(timeline.end, "Creating new video")
+    bar.start(timeline.end, "Creating new video")
 
     null_img = Image.new("RGB", (width, height), args.background)
     null_frame = av.VideoFrame.from_image(null_img).reformat(format=target_pix_fmt)
@@ -355,13 +355,13 @@ def render_av(
             process2.stdin.write(frame.to_ndarray().tobytes())
 
             if index % 3 == 0:
-                progress.tick(index)
+                bar.tick(index)
 
-        progress.end()
+        bar.end()
         process2.stdin.close()
         process2.wait()
     except (OSError, BrokenPipeError):
-        progress.end()
+        bar.end()
         ffmpeg.run_check_errors(cmd, log, True)
         log.error("FFmpeg Error!")
 

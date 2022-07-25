@@ -17,9 +17,9 @@ from auto_editor.objects import (
     rect_builder,
     text_builder,
 )
+from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.log import Log
-from auto_editor.utils.progressbar import ProgressBar
 from auto_editor.utils.types import Args
 
 
@@ -74,12 +74,7 @@ class Timeline:
 
 
 def make_timeline(
-    inputs: list[FileInfo],
-    args: Args,
-    sr: int,
-    progress: ProgressBar,
-    temp: str,
-    log: Log,
+    inputs: list[FileInfo], args: Args, sr: int, bar: Bar, temp: str, log: Log
 ) -> Timeline:
 
     if inputs:
@@ -102,7 +97,7 @@ def make_timeline(
         args.set_speed_for_range,
         args.silent_speed,
         args.video_speed,
-        progress,
+        bar,
         temp,
         log,
     )
