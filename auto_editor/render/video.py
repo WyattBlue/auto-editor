@@ -144,15 +144,14 @@ def render_av(
     inp = timeline.inp
     cns = [av.open(inp.path, "r") for inp in timeline.inputs]
 
+    target_pix_fmt = "yuv420p"  # Reasonable default
     decoders = []
     tous = []
-    pix_fmts = []
     seek_cost = []
-    for cn in cns:
+    for c, cn in enumerate(cns):
         if len(cn.streams.video) == 0:
             decoders.append(None)
             tous.append(None)
-            pix_fmts.append(None)
             seek_cost.append(None)
         else:
             stream = cn.streams.video[0]
@@ -165,13 +164,16 @@ def render_av(
                 else int(cn.streams.video[0].average_rate * 5)
             )
             tous.append(int(stream.time_base.denominator / stream.average_rate))
-            pix_fmts.append(stream.pix_fmt)
             decoders.append(cn.decode(stream))
+
+            if c == 0:
+                target_pix_fmt = stream.pix_fmt
 
     log.debug(f"Tous: {tous}")
     log.debug(f"Clips: {timeline.v}")
 
-    target_pix_fmt = pix_fmts[0] if pix_fmts[0] in allowed_pix_fmt else "yuv420p"
+    target_pix_fmt = target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
+    log.debug(f"Target pix_fmt: {target_pix_fmt}")
 
     apply_video_later = True
 
@@ -352,6 +354,8 @@ def render_av(
                     img = Image.alpha_composite(img, obj_img)
                     frame = frame.from_image(img).reformat(format=target_pix_fmt)
 
+            if frame.format.name != target_pix_fmt:
+                frame = frame.reformat(format=target_pix_fmt)
             process2.stdin.write(frame.to_ndarray().tobytes())
 
             if index % 3 == 0:
