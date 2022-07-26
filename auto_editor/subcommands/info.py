@@ -122,6 +122,7 @@ def main(sys_args=sys.argv[1:]) -> None:
                 "fps": str(v.fps),
                 "resolution": [w, h],
                 "aspect_ratio": list(aspect_ratio(w, h)),
+                "pixel_aspect_ratio": v.sar,
                 "duration": v.duration,
                 "pix_fmt": v.pix_fmt,
                 "color_range": v.color_range,

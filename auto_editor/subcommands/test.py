@@ -10,6 +10,7 @@ import sys
 from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Callable, NoReturn
+from fractions import Fraction
 
 import av
 import numpy as np
@@ -647,7 +648,13 @@ def main(sys_args: list[str] | None = None):
         )
 
     def yuv442p():
-        run_program(["resources/example_yuv422p.mp4"])
+        run_program(["resources/test_yuv422p.mp4"])
+
+    #  Issue 280
+    def SAR():
+        run_program(["resources/SAR-2by3.mp4"])
+        with av.open("resources/SAR-2by3_ALTERED.mp4") as cn:
+            assert cn.streams.video[0].sample_aspect_ratio == Fraction(2, 3)
 
     tests = []
 
@@ -663,6 +670,7 @@ def main(sys_args: list[str] | None = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                SAR,
                 yuv442p,
                 obj_makes_video,
                 edit_positive_tests,

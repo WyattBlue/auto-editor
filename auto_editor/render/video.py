@@ -216,6 +216,12 @@ def render_av(
         cmd.extend(["-c:v", "mpeg4", "-qscale:v", "1"])
     else:
         cmd = video_quality(cmd, args, inp, ctr)
+
+    # Setting SAR requires re-encoding so we do it here.
+    if timeline.inputs and timeline.inputs[0].videos:
+        if (sar := timeline.inputs[0].videos[0].sar) is not None:
+            cmd.extend(["-vf", f"setsar={sar.replace(':', '/')}"])
+
     cmd.append(spedup)
 
     process2 = ffmpeg.Popen(cmd, stdin=PIPE, stdout=DEVNULL, stderr=DEVNULL)
@@ -285,9 +291,7 @@ def render_av(
                             frame = next(decoders[obj.src])
                             frame_index = round(frame.time * timeline.timebase)
                         except StopIteration:
-                            log.warning(
-                                f"No source frame at {index=}. Using null frame"
-                            )
+                            log.debug(f"No source frame at {index=}. Using null frame")
                             frame = null_frame
                             break
 
