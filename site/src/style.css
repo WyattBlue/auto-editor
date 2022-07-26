@@ -149,7 +149,7 @@ g-emoji {
   justify-content: space-between;
 }
 
-p, .paragraph {max-width: 75ch;}
+p, .paragraph {max-width: 88ch;}
 p {
   display: block;
   margin-block-start: 0.4em;
@@ -171,7 +171,7 @@ table {
 .huge-lite {font-size: 4rem}
 h1, .bigger {font-size: 2.5rem}
 h2, .big {font-size: 2rem}
-h3, .medium {font-size: 1.65rem}
+h3, .medium {font-size: 1.75rem}
 h4, .smedium {font-size: 1.5rem}
 p, li, th, pre, blockquote, .small {font-size: 1.28rem}
 .tiny {font-size: 1rem}
@@ -180,14 +180,17 @@ p, li, th, pre, blockquote, .small {font-size: 1.28rem}
   .huge {font-size: 4.5rem}
   .huge-lite {font-size: 3.4rem}
   h1, .bigger {font-size: 2.3rem}
-  h2, .big {font-size: 1.8rem}
-  h3, .medium {font-size: 1.5rem}
+  h2, .big {font-size: 1.9rem}
+  h3, .medium {font-size: 1.6rem}
   h4, .smedium {font-size: 1.3rem}
   p, li, th, pre, blockquote, .small {font-size: 1.2rem}
 }
 
 @media (max-width: 55em){
   .huge {font-size: 4rem}
+  .h1, .bigger {font-size: 2rem}
+  .h2, .big {font-size: 1.7rem}
+  .h3, .medium {font-size: 1.5rem}
 }
 
 #icon {
@@ -205,6 +208,8 @@ h1, h2 {text-align: center}
 h1, h2, th, .bold {font-weight: bold}
 .underline {text-decoration: underline}
 
+.author, .date {line-height: 1}
+.author {margin-bottom: 0.5rem}
 
 /* Column Styles */
 
@@ -232,7 +237,7 @@ h1, h2, th, .bold {font-weight: bold}
 html {background-color: white}
 .hero {background-color: #EAEAEA}
 hr {background-color: #EAEAEA}
-h1, h2, h3, p, code, pre, th {color: #323232}
+h1, h2, h3, h4, p, code, pre, th {color: #323232}
 blockquote {border-left: 5px solid #EAEAEA}
 blockquote > p {color: #696969}
 pre {background-color: #F9F5F5}
@@ -250,7 +255,7 @@ li {color: black; text-decoration: black;}
   html {background-color: #262626}
   .hero {background-color: #4A4A4A}
   hr {background-color: #4A4A4A}
-  h1, h2, h3, p, code, pre, th {color: #F9F7F7}
+  h1, h2, h3, h4, p, code, pre, th {color: #F9F7F7}
   blockquote {border-left: 5px solid #4A4A4A}
   blockquote > p {color: #DBDBDB}
   pre {background-color: #323232}
