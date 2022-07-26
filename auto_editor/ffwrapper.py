@@ -145,6 +145,7 @@ class VideoStream:
     codec: str
     fps: Fraction
     duration: str | None
+    sar: str | None
     time_base: Fraction
     pix_fmt: str
     color_range: str | None
@@ -289,6 +290,7 @@ class FileInfo:
                 color_space = get_attr("color_space", stream, default=None)
                 color_primaries = get_attr("color_primaries", stream, default=None)
                 color_transfer = get_attr("color_transfer", stream, default=None)
+                sar = get_attr("sample_aspect_ratio", stream, default=None)
                 fps_str = get_attr("r_frame_rate", stream)
                 time_base_str = get_attr("time_base", stream)
 
@@ -297,7 +299,7 @@ class FileInfo:
                 except ZeroDivisionError:
                     fps = Fraction(0)
                 except ValueError:
-                    log.error(f"Could not convert fps '{fps_str}' to float")
+                    log.error(f"Could not convert fps '{fps_str}' to Fraction.")
 
                 if fps < 1:
                     if codec in IMG_CODECS:
@@ -310,7 +312,7 @@ class FileInfo:
                 except (ValueError, ZeroDivisionError):
                     if codec not in IMG_CODECS:
                         log.error(
-                            f"Could not convert time_base '{time_base_str}' to Fraction"
+                            f"Could not convert time_base '{time_base_str}' to Fraction."
                         )
                     time_base = Fraction(0, 1)
 
@@ -321,6 +323,7 @@ class FileInfo:
                         codec,
                         fps,
                         vduration,
+                        sar,
                         time_base,
                         pix_fmt,
                         color_range,
