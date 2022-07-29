@@ -8,9 +8,9 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from fractions import Fraction
 from time import perf_counter
 from typing import Callable, NoReturn
-from fractions import Fraction
 
 import av
 import numpy as np
