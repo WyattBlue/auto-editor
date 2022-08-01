@@ -4,15 +4,15 @@ import os.path
 from dataclasses import dataclass
 from math import ceil
 from subprocess import DEVNULL, PIPE
-from typing import Dict, Tuple, Union
 
 import av
-from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageOps
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.make_layers import Visual
-from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj, VideoObj
+from auto_editor.objects import VideoObj
 from auto_editor.output import video_quality
+from auto_editor.render.image import make_caches, render_image
 from auto_editor.timeline import Timeline
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.container import Container
@@ -53,53 +53,6 @@ allowed_pix_fmt = {
 }
 
 
-def apply_anchor(
-    x: int, y: int, width: int, height: int, anchor: str
-) -> tuple[int, int]:
-    if anchor == "ce":
-        x = int((x * 2 - width) / 2)
-        y = int((y * 2 - height) / 2)
-    if anchor == "tr":
-        x -= width
-    if anchor == "bl":
-        y -= height
-    if anchor == "br":
-        x -= width
-        y -= height
-    # Pillow uses 'tl' by default
-    return x, y
-
-
-def one_pos_two_pos(
-    x: int, y: int, width: int, height: int, anchor: str
-) -> tuple[int, int, int, int]:
-    """Convert: x, y, width, height -> x1, y1, x2, y2"""
-
-    if anchor == "ce":
-        x1 = x - int(width / 2)
-        x2 = x + int(width / 2)
-        y1 = y - int(height / 2)
-        y2 = y + int(height / 2)
-
-        return x1, y1, x2, y2
-
-    if anchor in ("tr", "br"):
-        x1 = x - width
-        x2 = x
-    else:
-        x1 = x
-        x2 = x + width
-
-    if anchor in ("tl", "tr"):
-        y1 = y
-        y2 = y + height
-    else:
-        y1 = y
-        y2 = y - height
-
-    return x1, y1, x2, y2
-
-
 def render_av(
     ffmpeg: FFmpeg,
     timeline: Timeline,
@@ -110,39 +63,10 @@ def render_av(
     log: Log,
 ) -> tuple[str, bool]:
 
-    FontCache = Dict[
-        str, Tuple[Union[ImageFont.FreeTypeFont, ImageFont.ImageFont], float]
-    ]
-
-    font_cache: FontCache = {}
-    img_cache: dict[str, Image.Image] = {}
-    for layer in timeline.v:
-        for vobj in layer:
-            if isinstance(vobj, TextObj) and (vobj.font, vobj.size) not in font_cache:
-                try:
-                    if vobj.font == "default":
-                        font_cache[(vobj.font, vobj.size)] = ImageFont.load_default()
-                    else:
-                        font_cache[(vobj.font, vobj.size)] = ImageFont.truetype(
-                            vobj.font, vobj.size
-                        )
-                except OSError:
-                    log.error(f"Font '{vobj.font}' not found.")
-
-            if isinstance(vobj, ImageObj) and vobj.src not in img_cache:
-                source = Image.open(vobj.src)
-                source = source.convert("RGBA")
-                source = source.rotate(vobj.rotate, expand=True)
-                source = ImageChops.multiply(
-                    source,
-                    Image.new(
-                        "RGBA", source.size, (255, 255, 255, int(vobj.opacity * 255))
-                    ),
-                )
-                img_cache[vobj.src] = source
-
     inp = timeline.inp
     cns = [av.open(inp.path, "r") for inp in timeline.inputs]
+
+    font_cache, img_cache = make_caches(timeline.v, log)
 
     target_pix_fmt = "yuv420p"  # Reasonable default
     decoders = []
@@ -312,61 +236,16 @@ def render_av(
                         img = ImageOps.pad(img, (width, height), color=args.background)
                         frame = frame.from_image(img).reformat(format=target_pix_fmt)
 
-                # Render visual objects
                 else:
-                    img = frame.to_image().convert("RGBA")
-                    obj_img = Image.new("RGBA", img.size, (255, 255, 255, 0))
-                    draw = ImageDraw.Draw(obj_img)
-
-                    if isinstance(obj, TextObj):
-                        text_w, text_h = draw.textsize(
-                            obj.content, font=font_cache[(obj.font, obj.size)]
-                        )
-                        pos = apply_anchor(obj.x, obj.y, text_w, text_h, "ce")
-                        draw.text(
-                            pos,
-                            obj.content,
-                            font=font_cache[(obj.font, obj.size)],
-                            fill=obj.fill,
-                            align=obj.align,
-                            stroke_width=obj.stroke,
-                            stroke_fill=obj.strokecolor,
-                        )
-
-                    if isinstance(obj, RectangleObj):
-                        draw.rectangle(
-                            one_pos_two_pos(
-                                obj.x, obj.y, obj.width, obj.height, obj.anchor
-                            ),
-                            fill=obj.fill,
-                            width=obj.stroke,
-                            outline=obj.strokecolor,
-                        )
-
-                    if isinstance(obj, EllipseObj):
-                        draw.ellipse(
-                            one_pos_two_pos(
-                                obj.x, obj.y, obj.width, obj.height, obj.anchor
-                            ),
-                            fill=obj.fill,
-                            width=obj.stroke,
-                            outline=obj.strokecolor,
-                        )
-
-                    if isinstance(obj, ImageObj):
-                        img_w, img_h = img_cache[obj.src].size
-                        pos = apply_anchor(obj.x, obj.y, img_w, img_h, obj.anchor)
-                        obj_img.paste(img_cache[obj.src], pos)
-
-                    img = Image.alpha_composite(img, obj_img)
-                    frame = frame.from_image(img).reformat(format=target_pix_fmt)
+                    frame = render_image(frame, obj, font_cache, img_cache)
 
             if frame.format.name != target_pix_fmt:
                 frame = frame.reformat(format=target_pix_fmt)
-            process2.stdin.write(frame.to_ndarray().tobytes())
-
-            if index % 3 == 0:
                 bar.tick(index)
+            elif index % 3 == 0:
+                bar.tick(index)
+
+            process2.stdin.write(frame.to_ndarray().tobytes())
 
         bar.end()
         process2.stdin.close()
