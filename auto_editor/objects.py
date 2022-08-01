@@ -4,7 +4,16 @@ from dataclasses import dataclass
 from typing import Any, NamedTuple, TypeVar
 
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import Align, align, anchor, color, natural, number, pos
+from auto_editor.utils.types import (
+    Align,
+    align,
+    anchor,
+    color,
+    natural,
+    number,
+    pos,
+    threshold,
+)
 
 # start - When the clip starts in the timeline
 # dur - The duration of the clip in the timeline before speed is applied
@@ -150,8 +159,11 @@ class TextObj:
     y: int
     font: str
     size: int
-    fill: str
     align: Align
+    opacity: float
+    anchor: str
+    rotate: float
+    fill: str
     stroke: int
     strokecolor: str
 
@@ -166,6 +178,8 @@ class ImageObj:
     opacity: float
     anchor: str
     rotate: float
+    stroke: int
+    strokecolor: str
 
 
 @dataclass
@@ -176,7 +190,9 @@ class RectangleObj:
     y: int
     width: int
     height: int
+    opacity: float
     anchor: str
+    rotate: float
     fill: str
     stroke: int
     strokecolor: str
@@ -190,7 +206,9 @@ class EllipseObj:
     y: int
     width: int
     height: int
+    opacity: float
     anchor: str
+    rotate: float
     fill: str
     stroke: int
     strokecolor: str
@@ -218,8 +236,11 @@ text_builder = [
     Attr(("y",), int, "50%"),
     Attr(("font",), str, "Arial"),
     Attr(("size",), natural, 55),
-    Attr(("fill", "color"), str, "#FFF"),
     Attr(("align",), align, "left"),
+    Attr(("opacity",), threshold, 1),
+    Attr(("anchor",), anchor, "ce"),
+    Attr(("rotate",), number, 0),
+    Attr(("fill", "color"), str, "#FFF"),
     Attr(("stroke",), natural, 0),
     Attr(("strokecolor",), color, "#000"),
 ]
@@ -230,9 +251,11 @@ img_builder = [
     Attr(("src",), str, None),
     Attr(("x",), int, "50%"),
     Attr(("y",), int, "50%"),
-    Attr(("opacity",), number, 1),
+    Attr(("opacity",), threshold, 1),
     Attr(("anchor",), anchor, "ce"),
     Attr(("rotate",), number, 0),
+    Attr(("stroke",), natural, 0),
+    Attr(("strokecolor",), color, "#000"),
 ]
 
 rect_builder = [
@@ -242,7 +265,9 @@ rect_builder = [
     Attr(("y",), int, None),
     Attr(("width",), int, None),
     Attr(("height",), int, None),
+    Attr(("opacity",), threshold, 1),
     Attr(("anchor",), anchor, "ce"),
+    Attr(("rotate",), number, 0),
     Attr(("fill", "color"), color, "#c4c4c4"),
     Attr(("stroke",), natural, 0),
     Attr(("strokecolor",), color, "#000"),
