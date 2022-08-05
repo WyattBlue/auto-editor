@@ -75,7 +75,8 @@ def make_av(
                 )
                 if len(vclips) == 0:
                     vclips = [[vclip_]]
-                vclips[0].append(vclip_)
+                else:
+                    vclips[0].append(vclip_)
         if len(inp.audios) > 0:
             for clip in clips:
                 for a, _ in enumerate(inp.audios):
