@@ -151,67 +151,44 @@ class AudioObj:
 
 
 @dataclass
-class TextObj:
+class Visual:
     start: int
     dur: int
-    content: str
     x: int
     y: int
+    anchor: str
+    opacity: float
+    rotate: float
+    stroke: int
+    strokecolor: str
+
+
+@dataclass
+class TextObj(Visual):
+    content: str
     font: str
     size: int
     align: Align
-    opacity: float
-    anchor: str
-    rotate: float
     fill: str
-    stroke: int
-    strokecolor: str
 
 
 @dataclass
-class ImageObj:
-    start: int
-    dur: int
+class ImageObj(Visual):
     src: str
-    x: int
-    y: int
-    opacity: float
-    anchor: str
-    rotate: float
-    stroke: int
-    strokecolor: str
 
 
 @dataclass
-class RectangleObj:
-    start: int
-    dur: int
-    x: int
-    y: int
+class RectangleObj(Visual):
     width: int
     height: int
-    opacity: float
-    anchor: str
-    rotate: float
     fill: str
-    stroke: int
-    strokecolor: str
 
 
 @dataclass
-class EllipseObj:
-    start: int
-    dur: int
-    x: int
-    y: int
+class EllipseObj(Visual):
     width: int
     height: int
-    opacity: float
-    anchor: str
-    rotate: float
     fill: str
-    stroke: int
-    strokecolor: str
 
 
 video_builder = [

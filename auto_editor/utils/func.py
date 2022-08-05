@@ -161,9 +161,9 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> NDArray[np.bool_]:
 
 
 def get_stdout(cmd: list[str]) -> str:
-    from subprocess import PIPE, STDOUT, Popen
+    from subprocess import PIPE, Popen
 
-    stdout, _ = Popen(cmd, stdout=PIPE, stderr=STDOUT).communicate()
+    stdout, _ = Popen(cmd, stdout=PIPE, stderr=PIPE).communicate()
     return stdout.decode("utf-8", "replace")
 
 
