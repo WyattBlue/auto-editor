@@ -9,7 +9,6 @@ from fractions import Fraction
 from platform import machine, system
 from re import search
 from subprocess import PIPE, Popen
-from typing import Any
 
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
@@ -83,21 +82,13 @@ class FFmpeg:
         show_out: bool = False,
         path: str | None = None,
     ) -> None:
-        def _run(cmd: list[str]) -> str:
-            process = self.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 
-            _, stderr = process.communicate()
+        process = self.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        _, stderr = process.communicate()
 
-            if process.stdin is not None:
-                process.stdin.close()
-            return stderr.decode("utf-8", "replace")
-
-        output = _run(cmd)
-
-        if "Try -allow_sw 1" in output:
-            cmd.insert(-1, "-allow_sw")
-            cmd.insert(-1, "1")
-            output = _run(cmd)
+        if process.stdin is not None:
+            process.stdin.close()
+        output = stderr.decode("utf-8", "replace")
 
         error_list = [
             r"Unknown encoder '.*'",
@@ -236,7 +227,7 @@ class FileInfo:
         except FileNotFoundError:
             log.error(f"Could not find: {ffprobe}")
 
-        def get_attr(name: str, dic: dict[str, Any], default=-1) -> str:
+        def get_attr(name: str, dic: dict, default=-1) -> str:
             if name in dic:
                 if isinstance(dic[name], str):
                     return dic[name]

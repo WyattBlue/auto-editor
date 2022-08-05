@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Dict, Tuple, Union
 
 import av
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
 from auto_editor.make_layers import Visual, VSpace
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj
@@ -16,8 +16,8 @@ av.logging.set_level(av.logging.PANIC)
 
 def apply_anchor(x: int, y: int, w: int, h: int, anchor: str) -> tuple[int, int]:
     if anchor == "ce":
-        x = int((x * 2 - w) / 2)
-        y = int((y * 2 - h) / 2)
+        x = (x * 2 - w) // 2
+        y = (y * 2 - h) // 2
     if anchor == "tr":
         x -= w
     if anchor == "bl":
@@ -27,35 +27,6 @@ def apply_anchor(x: int, y: int, w: int, h: int, anchor: str) -> tuple[int, int]
         y -= h
     # Pillow uses 'tl' by default
     return x, y
-
-
-def one_pos_two_pos(
-    x: int, y: int, w: int, h: int, anchor: str
-) -> tuple[int, int, int, int]:
-    # Convert: x, y, width, height -> x1, y1, x2, y2
-    if anchor == "ce":
-        x1 = x - int(w / 2)
-        x2 = x + int(w / 2)
-        y1 = y - int(h / 2)
-        y2 = y + int(h / 2)
-
-        return x1, y1, x2, y2
-
-    if anchor in ("tr", "br"):
-        x1 = x - w
-        x2 = x
-    else:
-        x1 = x
-        x2 = x + w
-
-    if anchor in ("tl", "tr"):
-        y1 = y
-        y2 = y + h
-    else:
-        y1 = y
-        y2 = y - h
-
-    return x1, y1, x2, y2
 
 
 FontCache = Dict[str, Tuple[Union[ImageFont.FreeTypeFont, ImageFont.ImageFont], float]]
@@ -89,8 +60,16 @@ def render_image(
 ) -> av.VideoFrame:
     img = frame.to_image().convert("RGBA")
 
+    if isinstance(obj, EllipseObj):
+        # Adding +1 to width makes Ellipse look better.
+        obj_img = Image.new("RGBA", (obj.width + 1, obj.height), (255, 255, 255, 0))
+    if isinstance(obj, RectangleObj):
+        obj_img = Image.new("RGBA", (obj.width, obj.height), (255, 255, 255, 0))
     if isinstance(obj, ImageObj):
         obj_img = img_cache[obj.src]
+        if obj.stroke > 0:
+            obj_img = ImageOps.expand(obj_img, border=obj.stroke, fill=obj.strokecolor)
+
     if isinstance(obj, TextObj):
         obj_img = Image.new("RGBA", img.size)
         _draw = ImageDraw.Draw(obj_img)
@@ -98,8 +77,6 @@ def render_image(
             obj.content, font=font_cache[(obj.font, obj.size)], stroke_width=obj.stroke
         )
         obj_img = Image.new("RGBA", (text_w, text_h), (255, 255, 255, 0))
-    if isinstance(obj, (RectangleObj, EllipseObj)):
-        obj_img = Image.new("RGBA", (obj.width + 1, obj.height), (255, 255, 255, 0))
 
     draw = ImageDraw.Draw(obj_img)
 
