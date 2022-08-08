@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.make_layers import clipify, make_av
@@ -100,7 +99,7 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         chunks = validate_chunks(data["chunks"], log)
         inp = FileInfo(data["source"], ffmpeg, log)
 
-        vspace, aspace = make_av([clipify(chunks, 0, 0)], [inp])
+        vspace, aspace = make_av([clipify(chunks, 0)], [inp])
 
         tb = inp.get_fps()
         sr = inp.get_samplerate()
@@ -131,7 +130,7 @@ def make_json_timeline(
         if timeline.chunks is None:
             log.error("Timeline too complex to convert to version 1.0")
 
-        data: Any = {
+        data: dict = {
             "version": "1.0.0",
             "source": os.path.abspath(timeline.inp.path),
             "chunks": timeline.chunks,

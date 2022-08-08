@@ -35,7 +35,7 @@ class Clip(NamedTuple):
     src: int
 
 
-def clipify(chunks: Chunks, src: int, start: float) -> list[Clip]:
+def clipify(chunks: Chunks, src: int, start: Fraction = Fraction(0)) -> list[Clip]:
     clips: list[Clip] = []
     # Add "+1" to match how chunks are rendered in 22w18a
     i = 0
@@ -107,7 +107,7 @@ def make_layers(
     temp: str,
     log: Log,
 ) -> tuple[Chunks, VSpace, ASpace]:
-    start = 0.0
+    start = Fraction(0)
     all_clips: list[list[Clip]] = []
     all_chunks: list[Chunks] = []
 
