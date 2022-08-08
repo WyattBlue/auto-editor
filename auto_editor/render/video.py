@@ -163,6 +163,7 @@ def render_av(
     null_frame = av.VideoFrame.from_image(null_img).reformat(format=target_pix_fmt)
 
     frame_index = -1
+    frame = null_frame
     try:
         for index in range(timeline.end):
             # Add objects to obj_list
@@ -184,7 +185,6 @@ def render_av(
                         obj_list.append(lobj)
 
             # Render obj_list
-            frame = null_frame
             for obj in obj_list:
                 if isinstance(obj, VideoFrame):
                     my_stream = cns[obj.src].streams.video[0]
@@ -244,6 +244,9 @@ def render_av(
                 bar.tick(index)
             elif index % 3 == 0:
                 bar.tick(index)
+
+            # if frame == null_frame:
+            #     raise ValueError("no null frame allowed")
 
             process2.stdin.write(frame.to_ndarray().tobytes())
 
