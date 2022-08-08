@@ -13,7 +13,6 @@ from time import perf_counter
 from typing import Callable, NoReturn
 
 import av
-import numpy as np
 
 from auto_editor.vanparse import ArgumentParser
 
@@ -93,38 +92,6 @@ def check_for_error(cmd: list[str], match=None) -> None:
         raise Exception("Program should not respond with a code 0.")
 
 
-def make_np_list(in_file: str, compare_file: str, the_speed: float) -> None:
-    from auto_editor.render.tsm.phasevocoder import phasevocoder
-    from auto_editor.wavfile import read
-
-    _, sped_chunk = read(in_file)
-    channels = 2
-
-    spedup_audio = phasevocoder(channels, the_speed, sped_chunk)
-    loaded = np.load(compare_file)
-
-    if not np.array_equal(spedup_audio, loaded["a"]):
-        if spedup_audio.shape == loaded["a"].shape:
-            print(f"Both shapes ({spedup_audio.shape}) are same")
-        else:
-            print(spedup_audio.shape)
-            print(loaded["a"].shape)
-
-        result = np.subtract(spedup_audio, loaded["a"])
-
-        print(f"result non-zero: {np.count_nonzero(result)}")
-        print(f"len of spedup_audio: {len(spedup_audio)}")
-
-        print(
-            np.count_nonzero(result) / spedup_audio.shape[0],
-            "difference between arrays",
-        )
-
-        raise Exception(f"file {compare_file} doesn't match array.")
-
-    # np.savez_compressed(out_file, a=spedup_audio)
-
-
 class Tester:
     def __init__(self, args: TestArgs) -> None:
         self.passed_tests = 0
@@ -201,20 +168,6 @@ def main(sys_args: list[str] | None = None):
 
     def parser_test():
         check_for_error(["example.mp4", "--video-speed"], "needs argument")
-
-    def tsm_1a5_test():
-        make_np_list(
-            "resources/wav/example-cut-s16le.wav",
-            "resources/data/example_1.5_speed.npz",
-            1.5,
-        )
-
-    def tsm_2a0_test():
-        make_np_list(
-            "resources/wav/example-cut-s16le.wav",
-            "resources/data/example_2.0_speed.npz",
-            2,
-        )
 
     def info():
         run_program(["info", "example.mp4"])
@@ -657,9 +610,6 @@ def main(sys_args: list[str] | None = None):
             assert cn.streams.video[0].sample_aspect_ratio == Fraction(2, 3)
 
     tests = []
-
-    if args.category in ("unit", "all"):
-        tests.extend([tsm_1a5_test, tsm_2a0_test])
 
     if args.category in ("api", "all"):
         tests.append(read_api_0_1)

@@ -100,7 +100,7 @@ def make_layers(
     add_in: list[list[str]],
     mark_silent: list[list[str]],
     mark_loud: list[list[str]],
-    set_speed_for_range: list[tuple[float, str, str]],
+    speed_range: list[tuple[float, str, str]],
     silent_speed: float,
     loud_speed: float,
     bar: Bar,
@@ -152,7 +152,7 @@ def make_layers(
         if len(add_in) > 0:
             speed_list = set_range(speed_list, add_in, tb, loud_speed, log)
 
-        for item in set_speed_for_range:
+        for item in speed_range:
             speed_list = set_range(speed_list, [list(item[1:])], tb, item[0], log)
 
         _chunks = chunkify(speed_list)
