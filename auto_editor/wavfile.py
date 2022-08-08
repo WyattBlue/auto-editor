@@ -131,7 +131,7 @@ def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
 
     heading = fid.read(12)
     if heading != b"\xff\xff\xff\xffWAVEds64":
-        raise ValueError(f"Wrong heading: {repr(heading)}")
+        raise ValueError(f"Wrong heading: {heading}")
 
     chunk_size = fid.read(4)
 
@@ -163,7 +163,7 @@ def _read_riff_chunk(sig: bytes, fid: io.BufferedReader) -> tuple[None, int, End
 
     form = fid.read(4)
     if form != b"WAVE":
-        raise ValueError(f"Not a WAV file. RIFF form type is {repr(form)}.")
+        raise ValueError(f"Not a WAV file. RIFF form type is {form}.")
 
     return None, file_size, en
 
@@ -183,7 +183,7 @@ def read(filename: str) -> tuple[int, AudioData]:
         elif file_sig == b"RF64":
             data_size, file_size, en = _read_rf64_chunk(fid)
         else:
-            raise ValueError(f"File format {repr(file_sig)} not supported.")
+            raise ValueError(f"File format {file_sig} not supported.")
 
         fmt_chunk_received = False
         data_chunk_received = False
@@ -192,15 +192,11 @@ def read(filename: str) -> tuple[int, AudioData]:
 
             if not chunk_id:
                 if data_chunk_received:
-                    # EOF but data successfully read
-                    break
-                else:
-                    raise ValueError("Unexpected end of file.")
-            elif len(chunk_id) < 4:
-                if fmt_chunk_received and data_chunk_received:
-                    pass
-                else:
-                    raise ValueError(f"Incomplete chunk ID: {repr(chunk_id)}")
+                    break  # EOF but data successfully read
+                raise ValueError("Unexpected end of file.")
+
+            elif len(chunk_id) < 4 and not (fmt_chunk_received and data_chunk_received):
+                raise ValueError(f"Incomplete chunk ID: {chunk_id}")
 
             if chunk_id == b"fmt ":
                 fmt_chunk_received = True

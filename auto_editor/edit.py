@@ -252,7 +252,7 @@ def edit_media(
         if ctr.allow_audio:
             from auto_editor.render.audio import make_new_audio
 
-            audio_output = make_new_audio(timeline, bar, temp, log)
+            audio_output = make_new_audio(timeline, ffmpeg, bar, temp, log)
 
         if ctr.allow_video:
             if len(timeline.v) > 0:
