@@ -25,8 +25,13 @@ def make_new_audio(
         path = os.path.join(temp, f"new{l}.wav")
         output.append(path)
 
+        if len(layer) == 0:
+            leng = 0
+        else:
+            leng = (layer[-1].start + layer[-1].dur) * sr // tb
+
         arr: AudioData = np.memmap(
-            os.path.join(temp, "asdf.map"), mode="w+", dtype=np.int16, shape=(sr * 5, 2)
+            os.path.join(temp, "asdf.map"), mode="w+", dtype=np.int16, shape=(leng, 2)
         )
 
         for c, clip in enumerate(layer):
@@ -72,26 +77,16 @@ def make_new_audio(
 
                 clip_arr = read(tsm_out)[1]
 
-            # Pad clip_arr because of 'clip.start'
-            if clip.start > 0:
-                clip_arr = np.concatenate(
-                    (np.zeros((clip.start * sr // tb, 2), dtype=np.int16), clip_arr),
-                    axis=0,
-                )
-
-            # Pad arrays for mixing
-            if clip_arr.shape[0] > arr.shape[0]:
-                diff = clip_arr.shape[0] - arr.shape[0]
-                arr = np.concatenate((arr, np.zeros((diff, 2), dtype=np.int16)), axis=0)
-            elif arr.shape[0] > clip_arr.shape[0]:
-                diff = arr.shape[0] - clip_arr.shape[0]
-                clip_arr = np.concatenate(
-                    (clip_arr, np.zeros((diff, 2), dtype=np.int16)), axis=0
-                )
-
             # Mix numpy arrays
-            log.debug(f"arr: {arr.dtype} {arr.shape}")
-            arr += clip_arr
+            start = clip.start * sr // tb
+
+            car_len = clip_arr.shape[0]
+
+            if start+car_len > len(arr):
+                # Clip 'clip_arr' if bigger than expected.
+                arr[start:] += clip_arr[:len(arr) - start]
+            else:
+                arr[start:start+car_len] += clip_arr
 
             bar.tick(c)
 
