@@ -52,7 +52,7 @@ def make_new_audio(
                 writer2.setnchannels(2)
                 writer2.setframerate(samplerate)
                 writer2.setsampwidth(2)
-                writer2.writeframes(samp_list[samp_start:samp_end])
+                writer2.writeframes(samp_list[samp_start:samp_end])  # type: ignore
                 writer2.close()
                 del writer2
 
@@ -78,7 +78,7 @@ def make_new_audio(
 
                 tsm_samps = read(tsm_out)[1]
                 if tsm_samps.shape[0] != 0:
-                    writer.writeframesraw(tsm_samps)
+                    writer.writeframesraw(tsm_samps)  # type:ignore
                 del tsm_samps
 
             bar.tick(c)

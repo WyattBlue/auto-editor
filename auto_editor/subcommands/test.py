@@ -194,6 +194,7 @@ def main(sys_args: list[str] | None = None):
         with av.open("example_ALTERED.mp4") as cn:
             video = cn.streams.video[0]
             assert video.average_rate == 30
+            assert video.time_base == Fraction(1, 30)
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "mpeg4"
@@ -204,6 +205,7 @@ def main(sys_args: list[str] | None = None):
         with av.open("example_ALTERED.mp4") as cn:
             video = cn.streams.video[0]
             assert video.average_rate == 30
+            assert video.time_base == Fraction(1, 30)
             assert video.width == 1280
             assert video.height == 720
             assert video.codec.name == "h264"
@@ -491,6 +493,7 @@ def main(sys_args: list[str] | None = None):
         with av.open("example_ALTERED.mp4", "r") as cn:
             video = cn.streams.video[0]
             assert video.average_rate == 15
+            assert video.time_base == Fraction(1, 15)
             dur = float(video.duration * video.time_base)
             assert dur - 17.33333333333333333333333 < 3
 
@@ -498,6 +501,7 @@ def main(sys_args: list[str] | None = None):
         with av.open("example_ALTERED.mp4", "r") as cn:
             video = cn.streams.video[0]
             assert video.average_rate == 20
+            assert video.time_base == Fraction(1, 20)
             dur = float(video.duration * video.time_base)
             assert dur - 17.33333333333333333333333 < 2
 
@@ -505,6 +509,7 @@ def main(sys_args: list[str] | None = None):
         with av.open("example_ALTERED.mp4", "r") as cn:
             video = cn.streams.video[0]
             assert video.average_rate == 60
+            assert video.time_base == Fraction(1, 60)
             dur = float(video.duration * video.time_base)
             assert dur - 17.33333333333333333333333 < 0.3
 

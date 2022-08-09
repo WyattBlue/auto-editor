@@ -50,7 +50,7 @@ def clipify(chunks: Chunks, src: int, start: Fraction = Fraction(0)) -> list[Cli
 
             if not (len(clips) > 0 and clips[-1].start == round(start)):
                 clips.append(Clip(round(start), dur, offset, chunk[2], src))
-            start += dur / chunk[2]
+            start += Fraction(dur, Fraction(chunk[2]))
             i += 1
 
     return clips

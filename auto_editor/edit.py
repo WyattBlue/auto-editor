@@ -278,6 +278,7 @@ def edit_media(
             apply_later,
             ctr,
             output,
+            timeline.timebase,
             args,
             inp,
             temp,

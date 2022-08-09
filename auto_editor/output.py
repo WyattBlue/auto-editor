@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os.path
+from fractions import Fraction
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.container import Container
@@ -36,6 +37,7 @@ def mux_quality_media(
     apply_v: bool,
     ctr: Container,
     output_path: str,
+    tb: Fraction,
     args: Args,
     inp: FileInfo,
     temp: str,
@@ -98,7 +100,12 @@ def mux_quality_media(
             if apply_v:
                 cmd = video_quality(cmd, args, inp, ctr)
             else:
-                cmd.extend([f"-c:v:{track}", "copy"])
+                # Real video is only allowed on track 0
+                cmd.extend(["-c:v:0", "copy"])
+
+            if float(tb).is_integer():
+                cmd.extend(["-video_track_timescale", f"{tb}"])
+
         elif ctr.allow_image:
             ext = os.path.splitext(path)[1][1:]
             cmd.extend(
