@@ -24,21 +24,31 @@ def make_new_audio(
 
         path = os.path.join(temp, f"new{l}.wav")
         output.append(path)
-
-        if len(layer) == 0:
-            leng = 0
-        else:
-            leng = (layer[-1].start + layer[-1].dur) * sr // tb
-
-        arr: AudioData = np.memmap(
-            os.path.join(temp, "asdf.map"), mode="w+", dtype=np.int16, shape=(leng, 2)
-        )
+        arr: AudioData | None = None
 
         for c, clip in enumerate(layer):
             if f"{clip.src}-{clip.stream}" not in samples:
                 audio_path = os.path.join(temp, f"{clip.src}-{clip.stream}.wav")
                 assert os.path.exists(audio_path), f"{audio_path} Not found"
                 samples[f"{clip.src}-{clip.stream}"] = read(audio_path)[1]
+
+            if arr is None:
+                leng = round(
+                    (layer[-1].start + layer[-1].dur) / layer[-1].speed * sr / tb
+                )
+
+                dtype = np.int32
+                for _samp_arr in samples.values():
+                    dtype = _samp_arr.dtype
+                    break
+
+                arr = np.memmap(
+                    os.path.join(temp, "asdf.map"),
+                    mode="w+",
+                    dtype=dtype,
+                    shape=(leng, 2),
+                )
+                del leng
 
             samp_list = samples[f"{clip.src}-{clip.stream}"]
 
@@ -89,7 +99,13 @@ def make_new_audio(
 
             bar.tick(c)
 
-        write(path, sr, arr)
+        if arr is not None:
+            write(path, sr, arr)
         bar.end()
+
+    try:
+        os.remove(os.path.join(temp, "asdf.map"))
+    except Exception:
+        pass
 
     return output
