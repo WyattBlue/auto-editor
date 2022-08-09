@@ -33,8 +33,11 @@ def make_new_audio(
                 samples[f"{clip.src}-{clip.stream}"] = read(audio_path)[1]
 
             if arr is None:
-                leng = round(
-                    (layer[-1].start + layer[-1].dur) / layer[-1].speed * sr / tb
+                leng = max(
+                    round(
+                        (layer[-1].start + layer[-1].dur) / layer[-1].speed * sr / tb
+                    ),
+                    sr // tb,
                 )
 
                 dtype = np.int32
