@@ -79,14 +79,13 @@ def make_new_audio(
 
             # Mix numpy arrays
             start = clip.start * sr // tb
-
             car_len = clip_arr.shape[0]
 
-            if start+car_len > len(arr):
+            if start + car_len > len(arr):
                 # Clip 'clip_arr' if bigger than expected.
-                arr[start:] += clip_arr[:len(arr) - start]
+                arr[start:] += clip_arr[: len(arr) - start]
             else:
-                arr[start:start+car_len] += clip_arr
+                arr[start : start + car_len] += clip_arr
 
             bar.tick(c)
 
