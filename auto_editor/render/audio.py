@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import os
-import wave
 
+import numpy as np
+
+from auto_editor.ffwrapper import FFmpeg
 from auto_editor.timeline import Timeline
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
-from auto_editor.wavfile import read
-from auto_editor.ffwrapper import FFmpeg
+from auto_editor.wavfile import AudioData, read, write
 
 
 def make_new_audio(
     timeline: Timeline, ffmpeg: FFmpeg, bar: Bar, temp: str, log: Log
 ) -> list[str]:
-    samplerate = timeline.samplerate
+    sr = timeline.samplerate
     tb = timeline.timebase
     output = []
     samples = {}
@@ -21,13 +22,12 @@ def make_new_audio(
     for l, layer in enumerate(timeline.a):
         bar.start(len(layer), "Creating new audio")
 
-        # See: https://github.com/python/cpython/blob/3.10/Lib/wave.py
         path = os.path.join(temp, f"new{l}.wav")
         output.append(path)
-        writer = wave.open(path, "wb")
-        writer.setnchannels(2)
-        writer.setframerate(samplerate)
-        writer.setsampwidth(2)
+
+        arr: AudioData = np.memmap(
+            os.path.join(temp, "asdf.map"), mode="w+", dtype=np.int16, shape=(sr * 5, 2)
+        )
 
         for c, clip in enumerate(layer):
             if f"{clip.src}-{clip.stream}" not in samples:
@@ -37,24 +37,18 @@ def make_new_audio(
 
             samp_list = samples[f"{clip.src}-{clip.stream}"]
 
-            samp_start = clip.offset * samplerate // tb
-            samp_end = (clip.offset + clip.dur) * samplerate // tb
+            samp_start = clip.offset * sr // tb
+            samp_end = (clip.offset + clip.dur) * sr // tb
             if samp_end > len(samp_list):
                 samp_end = len(samp_list)
 
             if clip.speed == 1:
-                writer.writeframesraw(samp_list[samp_start:samp_end])  # type: ignore
+                clip_arr = samp_list[samp_start:samp_end]
             else:
                 tsm = os.path.join(temp, "tsm.wav")
                 tsm_out = os.path.join(temp, "tsm_out.wav")
 
-                writer2 = wave.open(tsm, "wb")
-                writer2.setnchannels(2)
-                writer2.setframerate(samplerate)
-                writer2.setsampwidth(2)
-                writer2.writeframes(samp_list[samp_start:samp_end])  # type: ignore
-                writer2.close()
-                del writer2
+                write(tsm, sr, samp_list[samp_start:samp_end])
 
                 cmd = ["-hide_banner", "-y", "-i", tsm, "-af"]
 
@@ -76,14 +70,32 @@ def make_new_audio(
                 cmd.extend([atempo, tsm_out])
                 ffmpeg.run(cmd)
 
-                tsm_samps = read(tsm_out)[1]
-                if tsm_samps.shape[0] != 0:
-                    writer.writeframesraw(tsm_samps)  # type:ignore
-                del tsm_samps
+                clip_arr = read(tsm_out)[1]
+
+            # Pad clip_arr because of 'clip.start'
+            if clip.start > 0:
+                clip_arr = np.concatenate(
+                    (np.zeros((clip.start * sr // tb, 2), dtype=np.int16), clip_arr),
+                    axis=0,
+                )
+
+            # Pad arrays for mixing
+            if clip_arr.shape[0] > arr.shape[0]:
+                diff = clip_arr.shape[0] - arr.shape[0]
+                arr = np.concatenate((arr, np.zeros((diff, 2), dtype=np.int16)), axis=0)
+            elif arr.shape[0] > clip_arr.shape[0]:
+                diff = arr.shape[0] - clip_arr.shape[0]
+                clip_arr = np.concatenate(
+                    (clip_arr, np.zeros((diff, 2), dtype=np.int16)), axis=0
+                )
+
+            # Mix numpy arrays
+            log.debug(f"arr: {arr.dtype} {arr.shape}")
+            arr += clip_arr
 
             bar.tick(c)
 
-        writer.close()
+        write(path, sr, arr)
         bar.end()
 
     return output
