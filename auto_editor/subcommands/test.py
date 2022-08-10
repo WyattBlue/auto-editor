@@ -1,6 +1,7 @@
 # type: ignore
 from __future__ import annotations
 
+import json
 import logging
 import os
 import platform
@@ -217,6 +218,16 @@ def main(sys_args: list[str] | None = None):
     # PR #260
     def high_speed_test():
         run_program(["example.mp4", "--video-speed", "99998"])
+
+    # Issue #288
+    def expand_chunks():
+        run_program(
+            ["example.mp4", "--silent-speed", "1", "--export", "json", "-o", "out.json"]
+        )
+        with open("out.json") as file:
+            api = json.load(file)
+        assert len(api["chunks"]) > 4, "Chunks should not combine"
+        os.remove("out.json")
 
     # Issue #184
     def unit_tests():
@@ -625,6 +636,7 @@ def main(sys_args: list[str] | None = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                expand_chunks,
                 SAR,
                 yuv442p,
                 obj_makes_video,

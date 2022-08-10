@@ -3,6 +3,8 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import List, NamedTuple, Type, Union
 
+import numpy as np
+
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.method import get_has_loud
 from auto_editor.objects import (
@@ -138,27 +140,40 @@ def make_layers(
         # Remove small clips/cuts created by applying other rules.
         has_loud = cook(has_loud, min_clip, min_cut)
 
-        speed_list = has_loud.astype(float)
-        del has_loud
+        # Setup for handling custom speeds
+        has_loud = has_loud.astype(np.uint)
         del has_loud_length
 
-        # WARN: This breaks if speed is allowed to be 0
-        speed_list[speed_list == 1] = loud_speed
-        speed_list[speed_list == 0] = silent_speed
+        speed_map = [silent_speed, loud_speed]
+        speed_hash = {
+            0: silent_speed,
+            1: loud_speed,
+        }
+
+        def get_speed(speed: float) -> int:
+            if speed in speed_map:
+                return speed_map.index(speed)
+            speed_map.append(speed)
+            speed_hash[len(speed_map) - 1] = speed
+            return len(speed_map) - 1
 
         if len(cut_out) > 0:
-            speed_list = set_range(speed_list, cut_out, tb, 99999, log)
+            index = get_speed(99999)
+            has_loud = set_range(has_loud, cut_out, tb, index, log)
 
         if len(add_in) > 0:
-            speed_list = set_range(speed_list, add_in, tb, loud_speed, log)
+            # Set speed index to 'loud_speed'
+            has_loud = set_range(has_loud, add_in, tb, 1, log)
 
         for item in speed_range:
-            speed_list = set_range(speed_list, [list(item[1:])], tb, item[0], log)
+            index = get_speed(item[0])
+            has_loud = set_range(has_loud, [list(item[1:])], tb, index, log)
 
-        _chunks = chunkify(speed_list)
-        all_chunks.append(_chunks)
-        all_clips.append(clipify(_chunks, i, start))
-        start += round(chunks_len(_chunks))
+        chunks = chunkify(has_loud, speed_hash)
+
+        all_chunks.append(chunks)
+        all_clips.append(clipify(chunks, i, start))
+        start += round(chunks_len(chunks))
 
     vclips, aclips = make_av(all_clips, inputs)
     return merge_chunks(all_chunks), vclips, aclips

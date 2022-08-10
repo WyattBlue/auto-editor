@@ -3,24 +3,22 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import List, Tuple
 
-import numpy as np
-
 Chunk = Tuple[int, int, float]
 Chunks = List[Chunk]
 
 
 # Turn long silent/loud array to formatted chunk list.
-# Example: [1, 1, 1, 2, 2] => [(0, 3, 1), (3, 5, 2)]
-def chunkify(arr: np.ndarray | list[int]) -> Chunks:
+# Example: [1, 1, 1, 2, 2], {1: 1.0, 2: 1.5} => [(0, 3, 1.0), (3, 5, 1.5)]
+def chunkify(arr, smap: dict[int, float]) -> Chunks:
     arr_length = len(arr)
 
     chunks = []
     start = 0
     for j in range(1, arr_length):
         if arr[j] != arr[j - 1]:
-            chunks.append((start, j, arr[j - 1]))
+            chunks.append((start, j, smap[arr[j - 1]]))
             start = j
-    chunks.append((start, arr_length, arr[j]))
+    chunks.append((start, arr_length, smap[arr[j]]))
     return chunks
 
 
