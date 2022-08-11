@@ -241,6 +241,10 @@ def main(sys_args: list[str] | None = None):
         run_program(["example.mp4", "--sample_rate", "44.1 kHz"])
         run_program(["example.mp4", "--edit", "audio:threshold=4%"])
 
+
+    def video_speed():
+        run_program(["example.mp4", "--video-speed", "1.5"])
+
     def backwards_range_test():
         """
         Cut out the last 5 seconds of a media file by using negative number in the
@@ -636,6 +640,7 @@ def main(sys_args: list[str] | None = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                video_speed,
                 expand_chunks,
                 SAR,
                 yuv442p,

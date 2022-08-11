@@ -35,7 +35,7 @@ def make_new_audio(
             if arr is None:
                 leng = max(
                     round(
-                        (layer[-1].start + layer[-1].dur) / layer[-1].speed * sr / tb
+                        (layer[-1].start + (layer[-1].dur / layer[-1].speed)) * sr / tb
                     ),
                     sr // tb,
                 )
