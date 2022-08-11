@@ -222,7 +222,7 @@ def main(sys_args: list[str] | None = None):
     # Issue #288
     def expand_chunks():
         run_program(
-            ["example.mp4", "--silent-speed", "1", "--export", "json", "-o", "out.json"]
+            ["example.mp4", "--silent-speed", "1", "-o", "out.json"]
         )
         with open("out.json") as file:
             api = json.load(file)
