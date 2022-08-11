@@ -211,10 +211,11 @@ def edit_media(
         preview(timeline, temp, log)
         return None
 
-    if args.export == "json":
+    if out_ext == "json":
         from auto_editor.formats.json import make_json_timeline
 
         make_json_timeline(args.api, output, timeline, log)
+        args.no_open = True
         return output
 
     if args.export == "premiere":
