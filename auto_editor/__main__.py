@@ -26,153 +26,171 @@ from auto_editor.vanparse import ArgumentParser
 
 
 def main_options(parser: ArgumentParser) -> ArgumentParser:
-    parser.add_text("Object Options")
+    parser.add_required("input", nargs="*", metavar="[file | url ...] [options]")
+    parser.add_text("Editing Options:")
     parser.add_argument(
-        "--add-text",
-        nargs="*",
-        pool=True,
-        help="Add a text object to the timeline.",
+        "--frame-margin",
+        "--margin",
+        "-m",
+        type=margin,
+        metavar="LENGTH",
+        help='Set sections near "loud" as "loud" too if section is less than LENGTH away.',
     )
     parser.add_argument(
-        "--add-rectangle",
-        nargs="*",
-        pool=True,
-        help="Add a rectangle object to the timeline.",
+        "--min-clip-length",
+        "-minclip",
+        "-mclip",
+        type=time,
+        metavar="LENGTH",
+        help="Set the minimum length a clip can be. If a clip is too short, cut it",
     )
     parser.add_argument(
-        "--add-ellipse",
-        nargs="*",
-        pool=True,
-        help="Add an ellipse object to the timeline.",
+        "--min-cut-length",
+        "-mincut",
+        "-mcut",
+        type=time,
+        metavar="LENGTH",
+        help="Set the minimum length a cut can be. If a cut is too short, don't cut",
     )
     parser.add_argument(
-        "--add-image",
-        nargs="*",
-        pool=True,
-        help="Add an image object onto the timeline.",
-    )
-    parser.add_text("URL Download Options")
-    parser.add_argument("--yt-dlp-location", help="Set a custom path to yt-dlp.")
-    parser.add_argument(
-        "--download-format", help="Set the yt-dlp download format. (--format, -f)"
+        "--edit-based-on",
+        "--edit",
+        metavar="[METHOD:[ATTRS?] OPERAND? ...]",
+        help="Decide which method to use when making edits",
     )
     parser.add_argument(
-        "--output-format", help="Set the yt-dlp output file template. (--output, -o)"
-    )
-    parser.add_argument(
-        "--yt-dlp-extras", help="Add extra options for yt-dlp. Must be in quotes"
-    )
-    parser.add_text("Exporting as Media Options")
-    parser.add_argument(
-        "--video-codec",
-        "-vcodec",
-        "-c:v",
-        help="Set video codec for output media.",
-    )
-    parser.add_argument(
-        "--audio-codec",
-        "-acodec",
-        "-c:a",
-        help="Set audio codec for output media.",
-    )
-    parser.add_argument(
-        "--video-bitrate",
-        "-b:v",
-        help="Set the number of bits per second for video.",
-    )
-    parser.add_argument(
-        "--audio-bitrate",
-        "-b:a",
-        help="Set the number of bits per second for audio.",
-    )
-    parser.add_argument(
-        "--video-quality-scale",
-        "-qscale:v",
-        "-q:v",
-        help="Set a value to the ffmpeg option -qscale:v",
-    )
-    parser.add_argument(
-        "--scale",
+        "--silent-speed",
+        "-s",
         type=number,
-        help="Scale the input video's resolution by the given factor.",
+        metavar="NUM",
+        help='Set speed of sections marked "silent" to NUM',
     )
     parser.add_argument(
-        "--extras",
-        help="Add extra options for ffmpeg for video rendering. Must be in quotes.",
+        "--video-speed",
+        "--sounded-speed",
+        "-v",
+        type=number,
+        metavar="NUM",
+        help='Set speed of sections marked "loud" to NUM',
     )
-    parser.add_argument(
-        "--no-seek",
-        flag=True,
-        help="Disable file seeking when rendering video. Helpful for debugging desync issues.",
-    )
-    parser.add_text("Manual Editing Options")
     parser.add_argument(
         "--cut-out",
         type=time_range,
         nargs="*",
+        metavar="[START,STOP ...]",
         help="The range of media that will be removed completely, regardless of the "
-        "value of silent speed.",
+        "value of silent speed",
     )
     parser.add_argument(
         "--add-in",
         type=time_range,
         nargs="*",
+        metavar="[START,STOP ...]",
         help="The range of media that will be added in, opposite of --cut-out",
     )
-    parser.add_blank()
     parser.add_argument(
         "--mark-as-loud",
         type=time_range,
         nargs="*",
-        help='The range that will be marked as "loud".',
+        metavar="[START,STOP ...]",
+        help='The range that will be marked as "loud"',
     )
     parser.add_argument(
         "--mark-as-silent",
         type=time_range,
         nargs="*",
-        help='The range that will be marked as "silent".',
+        metavar="[START,STOP ...]",
+        help='The range that will be marked as "silent"',
     )
     parser.add_argument(
         "--set-speed-for-range",
         "--set-speed",
         type=speed_range,
         nargs="*",
-        help="SPEED,START,STOP - Set an arbitrary speed for a given range.",
+        metavar="[SPEED,START,STOP ...]",
+        help="Set an arbitrary speed for a given range",
     )
-    parser.add_text("Timeline Options")
+    parser.add_text("Timeline Options:")
     parser.add_argument(
         "--frame-rate",
         "-fps",
         "-r",
         type=frame_rate,
-        help="Set the frame rate for the timeline and output media.",
+        metavar="NUM",
+        help="Set timeline frame rate",
     )
     parser.add_argument(
         "--sample-rate",
         "-ar",
         type=sample_rate,
-        help="Set the sample rate for the timeline and output media.",
+        metavar="NAT",
+        help="Set timeline sample rate",
     )
     parser.add_argument(
-        "--resolution", "-res", type=resolution, help="Set timeline width and height."
+        "--resolution",
+        "-res",
+        type=resolution,
+        metavar="WIDTH,HEIGHT",
+        help="Set timeline width and height",
     )
     parser.add_argument(
         "--background",
         "-b",
         type=color,
-        help="Set the color of the background that is visible when the video is moved.",
-    )
-    parser.add_text("Select Editing Source Options")
-    parser.add_argument(
-        "--edit-based-on",
-        "--edit",
-        help="Decide which method to use when making edits.",
+        metavar="COLOR",
+        help="Set the background as a solid RGB color",
     )
     parser.add_argument(
-        "--keep-tracks-separate",
-        flag=True,
-        help="Don't combine audio tracks when exporting.",
+        "--api",
+        metavar="VERSION",
+        help="Set what version of the timeline to use",
     )
+    parser.add_argument(
+        "--add-text",
+        nargs="*",
+        pool=True,
+        help="Add a text object to the timeline",
+    )
+    parser.add_argument(
+        "--add-rectangle",
+        nargs="*",
+        pool=True,
+        help="Add a rectangle object to the timeline",
+    )
+    parser.add_argument(
+        "--add-ellipse",
+        nargs="*",
+        pool=True,
+        help="Add an ellipse object to the timeline",
+    )
+    parser.add_argument(
+        "--add-image",
+        nargs="*",
+        pool=True,
+        help="Add an image object to the timeline",
+    )
+    parser.add_text("URL Download Options:")
+    parser.add_argument(
+        "--yt-dlp-location",
+        metavar="PATH",
+        help="Set a custom path to yt-dlp",
+    )
+    parser.add_argument(
+        "--download-format",
+        metavar="FORMAT",
+        help="Set the yt-dlp download format (--format, -f)",
+    )
+    parser.add_argument(
+        "--output-format",
+        metavar="TEMPLATE",
+        help="Set the yt-dlp output file template (--output, -o)",
+    )
+    parser.add_argument(
+        "--yt-dlp-extras",
+        metavar="CMD",
+        help="Add extra options for yt-dlp. Must be in quotes",
+    )
+    parser.add_text("Utility Options:")
     parser.add_argument(
         "--export",
         "-ex",
@@ -185,100 +203,116 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
             "audio",
             "clip-sequence",
         ],
-        help="Choose the export mode.",
+        metavar="EXPORT",
+        help="Choose the export mode",
     )
-    parser.add_text("Utility Options")
-    parser.add_argument("--player", "-p", help="Set player to open output media files.")
-    parser.add_argument(
-        "--no-open",
-        flag=True,
-        help="Do not open the output file after editing is done.",
-    )
-    parser.add_argument(
-        "--temp-dir",
-        help="Set where the temporary directory is located.",
-    )
-    parser.add_argument(
-        "--ffmpeg-location",
-        help="Set a custom path to the ffmpeg location.",
-    )
-    parser.add_argument(
-        "--my-ffmpeg",
-        flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged.",
-    )
-    parser.add_text("Display Options")
-    parser.add_argument(
-        "--progress",
-        choices=["modern", "classic", "ascii", "machine", "none"],
-        help="Set what type of progress bar to use.",
-    )
-    parser.add_argument(
-        "--version", flag=True, help="Display the program's version and halt."
-    )
-    parser.add_argument(
-        "--debug", flag=True, help="Show debugging messages and values."
-    )
-    parser.add_argument(
-        "--show-ffmpeg-debug", flag=True, help="Show ffmpeg progress and output."
-    )
-    parser.add_argument("--quiet", "-q", flag=True, help="Display less output.")
-    parser.add_argument(
-        "--preview",
-        "--stats",
-        flag=True,
-        help="Show stats on how the input will be cut and halt.",
-    )
-    parser.add_argument(
-        "--timeline", flag=True, help="Show auto-editor JSON timeline file and halt."
-    )
-    parser.add_argument("--api", help="Set what version of the timeline to use.")
-    parser.add_text("Global Editing Options")
-    parser.add_argument(
-        "--frame-margin",
-        "--margin",
-        "-m",
-        type=margin,
-        help='Set how many "silent" frames on either side of the "loud" sections to include.',
-    )
-    parser.add_argument(
-        "--silent-speed",
-        "-s",
-        type=number,
-        help='Set the speed that "silent" sections should be played at.',
-    )
-    parser.add_argument(
-        "--video-speed",
-        "--sounded-speed",
-        "-v",
-        type=number,
-        help='Set the speed that "loud" sections should be played at.',
-    )
-    parser.add_argument(
-        "--min-clip-length",
-        "-minclip",
-        "-mclip",
-        type=time,
-        help="Set the minimum length a clip can be. If a clip is too short, cut it.",
-    )
-    parser.add_argument(
-        "--min-cut-length",
-        "-mincut",
-        "-mcut",
-        type=time,
-        help="Set the minimum length a cut can be. If a cut is too short, don't cut.",
-    )
-    parser.add_blank()
     parser.add_argument(
         "--output-file",
         "--output",
         "-o",
+        metavar="FILE",
         help="Set the name/path of the new output file.",
     )
-    parser.add_required(
-        "input", nargs="*", help="File(s) or URL(s) that will be edited."
+    parser.add_argument("--player", "-p", help="Set player to open output media files")
+    parser.add_argument(
+        "--no-open",
+        flag=True,
+        help="Do not open the output file after editing is done",
     )
-
+    parser.add_argument(
+        "--temp-dir",
+        metavar="PATH",
+        help="Set where the temporary directory is located",
+    )
+    parser.add_argument(
+        "--ffmpeg-location",
+        metavar="PATH",
+        help="Set a custom path to the ffmpeg location",
+    )
+    parser.add_argument(
+        "--my-ffmpeg",
+        flag=True,
+        help="Use the ffmpeg on your PATH instead of the one packaged",
+    )
+    parser.add_text("Display Options:")
+    parser.add_argument(
+        "--progress",
+        metavar="PROGRESS",
+        choices=["modern", "classic", "ascii", "machine", "none"],
+        help="Set what type of progress bar to use",
+    )
+    parser.add_argument("--debug", flag=True, help="Show debugging messages and values")
+    parser.add_argument(
+        "--show-ffmpeg-debug", flag=True, help="Show ffmpeg progress and output"
+    )
+    parser.add_argument("--quiet", "-q", flag=True, help="Display less output")
+    parser.add_argument(
+        "--preview",
+        "--stats",
+        flag=True,
+        help="Show stats on how the input will be cut and halt",
+    )
+    parser.add_argument(
+        "--timeline", flag=True, help="Show auto-editor JSON timeline file and halt"
+    )
+    parser.add_text("Video Rendering:")
+    parser.add_argument(
+        "--video-codec",
+        "-vcodec",
+        "-c:v",
+        metavar="ENCODER",
+        help="Set video codec for output media",
+    )
+    parser.add_argument(
+        "--video-bitrate",
+        "-b:v",
+        metavar="BITRATE",
+        help="Set the number of bits per second for video",
+    )
+    parser.add_argument(
+        "--video-quality-scale",
+        "-qscale:v",
+        "-q:v",
+        metavar="SCALE",
+        help="Set a value to the ffmpeg option -qscale:v",
+    )
+    parser.add_argument(
+        "--scale",
+        type=number,
+        metavar="NUM",
+        help="Scale the output video's resolution by NUM factor",
+    )
+    parser.add_argument(
+        "--no-seek",
+        flag=True,
+        help="Disable file seeking when rendering video. Helpful for debugging desync issues",
+    )
+    parser.add_text("Audio Rendering:")
+    parser.add_argument(
+        "--audio-codec",
+        "-acodec",
+        "-c:a",
+        metavar="ENCODER",
+        help="Set audio codec for output media",
+    )
+    parser.add_argument(
+        "--audio-bitrate",
+        "-b:a",
+        metavar="BITRATE",
+        help="Set the number of bits per second for audio",
+    )
+    parser.add_argument(
+        "--keep-tracks-separate",
+        flag=True,
+        help="Don't mix all audio tracks into one when exporting",
+    )
+    parser.add_text("Miscellaneous:")
+    parser.add_argument(
+        "--extras",
+        metavar="CMD",
+        help="Add extra options for ffmpeg. Must be in quotes",
+    )
+    parser.add_argument("--version", flag=True, help="Display version and halt")
     return parser
 
 

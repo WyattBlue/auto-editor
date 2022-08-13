@@ -23,21 +23,19 @@ class InfoArgs:
 
 
 def info_options(parser: ArgumentParser) -> ArgumentParser:
-    parser.add_argument("--json", flag=True, help="Export info in JSON format.")
+    parser.add_required("input", nargs="*")
+    parser.add_argument("--json", flag=True, help="Export info in JSON format")
     parser.add_argument(
         "--include-vfr",
         "--has-vfr",
         flag=True,
-        help="Display the number of Variable Frame Rate (VFR) frames.",
+        help="Display the number of Variable Frame Rate (VFR) frames",
     )
-    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
+    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
     parser.add_argument(
         "--my-ffmpeg",
         flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged.",
-    )
-    parser.add_required(
-        "input", nargs="*", help="The path to a file you want inspected."
+        help="Use the ffmpeg on your PATH instead of the one packaged",
     )
     return parser
 

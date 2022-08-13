@@ -19,14 +19,12 @@ class SubArgs:
 
 
 def subdump_options(parser: ArgumentParser) -> ArgumentParser:
-    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
+    parser.add_required("input", nargs="*")
+    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
     parser.add_argument(
         "--my-ffmpeg",
         flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged.",
-    )
-    parser.add_required(
-        "input", nargs="*", help="Path to the file to have its subtitles dumped."
+        help="Use the ffmpeg on your PATH instead of the one packaged",
     )
     return parser
 

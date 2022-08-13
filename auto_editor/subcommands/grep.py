@@ -26,39 +26,37 @@ class GrepArgs:
 
 
 def grep_options(parser: ArgumentParser) -> ArgumentParser:
+    parser.add_required("input", nargs="*", metavar="pattern [file ...]")
     parser.add_argument(
-        "--no-filename", flag=True, help="Never print filenames with output lines."
+        "--no-filename", flag=True, help="Never print filenames with output lines"
     )
     parser.add_argument(
         "--max-count",
         "-m",
         type=int,
-        help="Stop reading a file after NUM matching lines.",
+        help="Stop reading a file after NUM matching lines",
     )
     parser.add_argument(
         "--count",
         "-c",
         flag=True,
-        help="Suppress normal output; instead print count of matching lines for each file.",
+        help="Suppress normal output; instead print count of matching lines for each file",
     )
     parser.add_argument(
         "--ignore-case",
         "-i",
         flag=True,
-        help="Ignore case distinctions for the PATTERN.",
+        help="Ignore case distinctions for the PATTERN",
     )
-    parser.add_argument("--timecode", flag=True, help="Print the match's timecode.")
+    parser.add_argument("--timecode", flag=True, help="Print the match's timecode")
     parser.add_argument(
-        "--time", flag=True, help="Print when the match happens. (Ignore ending)."
+        "--time", flag=True, help="Print when the match happens. (Ignore ending)"
     )
-    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
+    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
     parser.add_argument(
         "--my-ffmpeg",
         flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged.",
-    )
-    parser.add_required(
-        "input", nargs="*", help="The path to a file you want inspected."
+        help="Use the ffmpeg on your PATH instead of the one packaged",
     )
     return parser
 
