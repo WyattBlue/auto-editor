@@ -16,8 +16,8 @@ class DescArgs:
 
 
 def desc_options(parser: ArgumentParser) -> ArgumentParser:
-    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
-    parser.add_required("input", nargs="*", help="Path to file(s)")
+    parser.add_required("input", nargs="*")
+    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
     return parser
 
 

@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
+from auto_editor.utils.types import natural
 from auto_editor.vanparse import ArgumentParser
 
 
@@ -25,25 +26,24 @@ class LevelArgs:
 
 
 def levels_options(parser: ArgumentParser) -> ArgumentParser:
+    parser.add_required("input", nargs="*")
     parser.add_argument(
         "--kind",
         choices=["audio", "motion", "pixeldiff"],
-        help="Select the kind of detection to analyze.",
+        metavar="METHOD",
+        help="Select the kind of detection to analyze",
     )
     parser.add_argument(
         "--track",
-        type=int,
-        help="Select the track to get. If `--kind` is set to motion, track will look "
-        "at video tracks instead of audio.",
+        type=natural,
+        metavar="NAT",
+        help="Select the track/stream index to analyze",
     )
-    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file.")
+    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
     parser.add_argument(
         "--my-ffmpeg",
         flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged.",
-    )
-    parser.add_required(
-        "input", nargs="*", help="Path to the file to have its levels dumped."
+        help="Use the ffmpeg on your PATH instead of the one packaged",
     )
     return parser
 

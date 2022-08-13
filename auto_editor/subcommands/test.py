@@ -32,8 +32,8 @@ def test_options(parser):
     parser.add_required(
         "category",
         nargs=1,
-        choices=["cli", "sub", "api", "unit", "all"],
-        help="Set what category of tests to run.",
+        choices=("cli", "sub", "api", "all"),
+        metavar="category [options]",
     )
     return parser
 
@@ -221,9 +221,7 @@ def main(sys_args: list[str] | None = None):
 
     # Issue #288
     def expand_chunks():
-        run_program(
-            ["example.mp4", "--silent-speed", "1", "-o", "out.json"]
-        )
+        run_program(["example.mp4", "--silent-speed", "1", "-o", "out.json"])
         with open("out.json") as file:
             api = json.load(file)
         assert len(api["chunks"]) > 4, "Chunks should not combine"
@@ -240,7 +238,6 @@ def main(sys_args: list[str] | None = None):
         run_program(["example.mp4", "--sample_rate", "44100 Hz"])
         run_program(["example.mp4", "--sample_rate", "44.1 kHz"])
         run_program(["example.mp4", "--edit", "audio:threshold=4%"])
-
 
     def video_speed():
         run_program(["example.mp4", "--video-speed", "1.5"])

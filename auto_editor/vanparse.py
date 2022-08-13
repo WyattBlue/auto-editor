@@ -20,9 +20,8 @@ class Required:
     names: Sequence[str]
     nargs: Nargs = "*"
     type: type = str
-    choices: Sequence[str] | None = None
-    help: str = ""
-    _type: str = "required"
+    choices: tuple[str] | None = None
+    metavar: str = "[file ...] [options]"
 
 
 @dataclass
@@ -33,14 +32,13 @@ class Options:
     flag: bool = False
     choices: Sequence[str] | None = None
     pool: bool = False
+    metavar: str | None = None
     help: str = ""
-    _type: str = "option"
 
 
 @dataclass
 class OptionText:
     text: str
-    _type: str
 
 
 def indent(text: str, prefix: str) -> str:
@@ -72,16 +70,46 @@ def out(text: str) -> None:
 
 
 def print_program_help(reqs: list[Required], args: list[Options | OptionText]) -> None:
-    text = ""
-    for arg in args:
+    text = f"Usage: {' '.join([req.metavar for req in reqs])}\n\nOptions:"
+
+    width = get_terminal_size().columns - 3
+    split = int(width * 0.44) + 3
+    indent = "  "
+
+    for i, arg in enumerate(args):
         if isinstance(arg, OptionText):
-            text += f"\n  {arg.text}\n" if arg._type == "text" else "\n"
+            if i == 0:
+                text += f"\n  {arg.text}"
+                indent = "    "
+            else:
+                text += f"\n\n  {arg.text}"
         else:
-            text += "  " + ", ".join(arg.names) + f": {arg.help}\n"
-    text += "\n"
-    for req in reqs:
-        text += "  " + ", ".join(req.names) + f": {req.help}\n"
-    out(text)
+            text += "\n"
+            line = f"{indent}{', '.join(reversed(arg.names))}"
+            if arg.metavar is not None:
+                line += f" {arg.metavar}"
+
+            if arg.help == "":
+                pass
+            elif len(line) < split:
+                line = textwrap.fill(
+                    arg.help,
+                    width=width,
+                    initial_indent=f"{line}{' ' * (split - len(line))}",
+                    subsequent_indent=split * " ",
+                ).replace("&", "")
+            else:
+                line += "\n"
+                line += textwrap.fill(
+                    arg.help,
+                    width=width,
+                    initial_indent=split * " ",
+                    subsequent_indent=split * " ",
+                )
+
+            text += line
+    text += "\n\n"
+    sys.stdout.write(text)
 
 
 def get_help_data() -> dict[str, dict[str, str]]:
@@ -192,10 +220,7 @@ class ArgumentParser:
         self.requireds.append(Required(args, **kwargs))
 
     def add_text(self, text: str) -> None:
-        self.args.append(OptionText(text, "text"))
-
-    def add_blank(self) -> None:
-        self.args.append(OptionText("", "blank"))
+        self.args.append(OptionText(text))
 
     def parse_args(
         self,
@@ -232,7 +257,7 @@ class ArgumentParser:
         builtin_help = Options(
             ("--help", "-h"),
             flag=True,
-            help="Show info about this program or option then exit.",
+            help="Show info about this program or option then exit",
         )
         options.append(builtin_help)
         args.append(builtin_help)
