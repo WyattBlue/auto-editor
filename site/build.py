@@ -6,11 +6,11 @@ import re
 import shutil
 import subprocess
 
-import basswood
-
 import auto_editor.vanparse as vanparse
 from auto_editor.__main__ import main_options
-from auto_editor.vanparse import Options, OptionText, Required
+from auto_editor.vanparse import OptionText
+
+import basswood
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--production", "-p", action="store_true")
@@ -49,10 +49,7 @@ with open("src/options.html", "w") as file:
 
     for op in parser.args:
         if isinstance(op, OptionText):
-            if op._type == "text":
-                file.write(f"<h2>{op.text}</h2>\n")
-            else:
-                file.write("<br>\n")
+            file.write(f"<h2>{op.text}</h2>\n")
         else:
             file.write(f"<h3><code>{op.names[0]}</code></h3>\n")
             if len(op.names) > 1:

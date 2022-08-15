@@ -83,14 +83,17 @@ def grep_file(
     (hh:mm:ss.sss) instead of (dd:hh:mm:ss,sss)
     """
 
+    try:
+        flags = re.IGNORECASE if args.ignore_case else 0
+        pattern = re.compile(args.input[0], flags)
+    except re.error as e:
+        log.error(e)
+
+
     out_file = os.path.join(TEMP, "media.vtt")
     ffmpeg.run(["-i", media_file, out_file])
 
     count = 0
-
-    flags = 0
-    if args.ignore_case:
-        flags = re.IGNORECASE
 
     prefix = ""
     if add_prefix:
@@ -98,6 +101,7 @@ def grep_file(
 
     timecode = ""
     line_number = -1
+
     with open(out_file) as file:
         while True:
             line = file.readline()
@@ -119,16 +123,14 @@ def grep_file(
                 continue
 
             line = cleanhtml(line)
-            match = re.search(args.input[0], line, flags)
-            line = line.strip()
 
-            if match:
+            if re.search(pattern, line):
                 count += 1
                 if not args.count:
                     if args.timecode or args.time:
-                        print(prefix + timecode + line)
+                        print(prefix + timecode + line.strip())
                     else:
-                        print(prefix + line)
+                        print(prefix + line.strip())
 
     if args.count:
         print(prefix + str(count))
