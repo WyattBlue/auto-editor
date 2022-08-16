@@ -355,8 +355,8 @@ def main(sys_args: list[str] | None = None):
         run_program(
             [
                 "resources/new-commentary.mp3",
-                "--add-rectangle",
-                "0,30,0,0,300,300,fill=blue",
+                "--add",
+                "rectangle:0,30,0,0,300,300,fill=blue",
                 "-o",
                 "out.mp4",
             ]
@@ -370,7 +370,7 @@ def main(sys_args: list[str] | None = None):
 
     def various_errors_test():
         check_for_error(
-            ["example.mp4", "--add_rectangle", "0,60", "--cut_out", "60,end"]
+            ["example.mp4", "--add", "rectangle:0,60", "--cut_out", "60,end"]
         )
 
     def render_video_objs():
@@ -379,8 +379,8 @@ def main(sys_args: list[str] | None = None):
                 "resources/testsrc.mp4",
                 "--mark_as_loud",
                 "start,end",
-                "--add_rectangle",
-                "0,30,0,200,100,300,fill=#43FA56,stroke=10",
+                "--add",
+                "rectangle:0,30,0,200,100,300,fill=#43FA56,stroke=10",
             ]
         )
         os.remove("resources/testsrc_ALTERED.mp4")
@@ -389,12 +389,10 @@ def main(sys_args: list[str] | None = None):
         run_program(
             [
                 "example.mp4",
-                "--add-ellipse",
-                "0,30,50%,50%,300,300,fill=red",
-                "--add-rectangle",
-                "0,30,500,440,400,200,fill=skyblue",
-                "--add-ellipse",
-                "0,30,50%,50%,100,100,fill=darkgreen",
+                "--add",
+                "ellipse:0,30,50%,50%,300,300,fill=red",
+                "rectangle:0,30,500,440,400,200,fill=skyblue",
+                "ellipse:0,30,50%,50%,100,100,fill=darkgreen",
                 "--edit",
                 "none",
                 "--cut-out",
@@ -406,9 +404,9 @@ def main(sys_args: list[str] | None = None):
         run_program(
             [
                 "example.mp4",
-                "--add-ellipse",
-                "0,60,50%,50%,300,300,fill=darkgreen",
-                "0,30,50%,50%,200,200,fill=green",
+                "--add",
+                "ellipse:0,60,50%,50%,300,300,fill=darkgreen",
+                "ellipse:0,30,50%,50%,200,200,fill=green",
                 "--edit",
                 "none",
                 "--cut-out",
@@ -417,11 +415,11 @@ def main(sys_args: list[str] | None = None):
         )
 
     def render_text():
-        run_program(["example.mp4", "--add-text", "0,30,This is my text,font=default"])
+        run_program(["example.mp4", "--add", "text:0,30,This is my text,font=default"])
 
     def check_font_error():
         check_for_error(
-            ["example.mp4", "--add-text", "0,30,text,0,0,notafont"], "not found"
+            ["example.mp4", "--add", "text:0,30,text,0,0,notafont"], "not found"
         )
 
     def export_tests():

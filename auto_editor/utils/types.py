@@ -208,7 +208,7 @@ def pos(val: tuple[float | str, int]) -> int:
 
 @dataclass
 class MainArgs:
-    pool: list[tuple[str, str]] = field(default_factory=list)
+    add: list[str] = field(default_factory=list)
     yt_dlp_location: str = "yt-dlp"
     download_format: str | None = None
     output_format: str | None = None
