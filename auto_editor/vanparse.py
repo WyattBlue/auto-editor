@@ -31,7 +31,6 @@ class Options:
     type: type = str
     flag: bool = False
     choices: Sequence[str] | None = None
-    pool: bool = False
     metavar: str | None = None
     help: str = ""
 
@@ -136,7 +135,7 @@ def to_key(op: Options | Required) -> str:
 
 
 def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
-    text = f"  {', '.join(option.names)}\n\n"
+    text = f"  {', '.join(option.names)} {'' if option.metavar is None else option.metavar}\n\n"
 
     bar_len = 11
     if option.flag:
@@ -147,10 +146,6 @@ def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
             _add = f"    nargs: {option.nargs}\n"
             bar_len = len(_add)
             text += _add
-
-        _add = f"    type: {option.type.__name__}\n"
-        bar_len = len(_add)
-        text += _add
 
         default: str | None = None
         try:
@@ -269,8 +264,6 @@ class ArgumentParser:
         req_list_name = requireds[0].names[0]
         setting_req_list = requireds[0].nargs != 1
 
-        option_list: Any = []
-        op_key: str = ""
         oplist_name: str | None = None
         oplist_coerce: Callable[[str], str] = str
 
@@ -280,10 +273,12 @@ class ArgumentParser:
             option = get_option(arg, options)
 
             if option is None:
-                if oplist_name == "pool":
-                    option_list.append((op_key, arg))
-                elif oplist_name is not None:
-                    option_list.append(oplist_coerce(arg))
+                if oplist_name is not None:
+                    try:
+                        val = oplist_coerce(arg)
+                        ns.__setattr__(oplist_name, getattr(ns, oplist_name) + [val])
+                    except (TypeError, ValueError) as e:
+                        Log().error(e)
                 elif requireds and not arg.startswith("--"):
                     if requireds[0].nargs == 1:
                         ns.__setattr__(req_list_name, parse_value(requireds[0], arg))
@@ -305,15 +300,11 @@ class ArgumentParser:
                         )
                     Log().error(f"Unknown {label}: {arg}")
             else:
-                if oplist_name is not None and oplist_name != "pool":
-                    ns.__setattr__(oplist_name, option_list)
-
-                if not option.pool:
+                if option.nargs != "*":
                     if option in used_options:
                         Log().error(f"Cannot repeat option {option.names[0]} twice.")
                     used_options.append(option)
 
-                option_list = []
                 oplist_name = None
                 oplist_coerce = option.type
 
@@ -324,25 +315,15 @@ class ArgumentParser:
                     print_option_help(program_name, ns_obj, option)
                     sys.exit()
 
-                if option.nargs != 1:
-                    if option.pool:
-                        oplist_name = "pool"
-                        op_key = key
-                        ns.pool.append((key, next_arg))
-                    else:
-                        oplist_name = key
-                        ns.__setattr__(oplist_name, parse_value(option, next_arg))
-                elif option.flag:
+                if option.flag:
                     ns.__setattr__(key, True)
-                else:
+                elif option.nargs == 1:
                     ns.__setattr__(key, parse_value(option, next_arg))
                     i += 1
-            i += 1
+                else:
+                    oplist_name = key
 
-        if oplist_name == "pool":
-            ns.pool += option_list
-        elif oplist_name is not None:
-            ns.__setattr__(oplist_name, option_list)
+            i += 1
 
         if setting_req_list:
             ns.__setattr__(req_list_name, req_list)

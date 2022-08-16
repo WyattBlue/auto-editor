@@ -89,7 +89,6 @@ def grep_file(
     except re.error as e:
         log.error(e)
 
-
     out_file = os.path.join(TEMP, "media.vtt")
     ffmpeg.run(["-i", media_file, out_file])
 

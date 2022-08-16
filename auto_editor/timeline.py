@@ -6,6 +6,7 @@ from fractions import Fraction
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.make_layers import ASpace, Visual, VSpace, make_layers
 from auto_editor.objects import (
+    Attr,
     EllipseObj,
     ImageObj,
     RectangleObj,
@@ -112,24 +113,31 @@ def make_timeline(
         "end": timeline.end,
     }
 
+    OBJ_ATTRS_SEP = ":"
+    objects: dict[str, tuple[Visual, list[Attr]]] = {
+        "rectangle": (RectangleObj, rect_builder),
+        "ellipse": (EllipseObj, ellipse_builder),
+        "text": (TextObj, text_builder),
+        "image": (ImageObj, img_builder),
+    }
+
     pool: list[Visual] = []
-    for key, obj_str in args.pool:
-        if key == "add_text":
-            pool.append(
-                parse_dataclass(obj_str, TextObj, text_builder, log, _vars, True)
+
+    for obj_attrs_str in args.add:
+        exploded = obj_attrs_str.split(OBJ_ATTRS_SEP)
+        if len(exploded) > 2 or len(exploded) == 0:
+            log.error("Invalid object syntax")
+
+        obj_s = exploded[0]
+        attrs = "" if len(exploded) == 1 else exploded[1]
+        if obj_s not in objects:
+            log.error(f"Unknown object: '{obj_s}'")
+
+        pool.append(
+            parse_dataclass(
+                attrs, objects[obj_s][0], objects[obj_s][1], log, _vars, True
             )
-        if key == "add_rectangle":
-            pool.append(
-                parse_dataclass(obj_str, RectangleObj, rect_builder, log, _vars, True)
-            )
-        if key == "add_ellipse":
-            pool.append(
-                parse_dataclass(obj_str, EllipseObj, ellipse_builder, log, _vars, True)
-            )
-        if key == "add_image":
-            pool.append(
-                parse_dataclass(obj_str, ImageObj, img_builder, log, _vars, True)
-            )
+        )
 
     for obj in pool:
         # Higher layers are visually on top

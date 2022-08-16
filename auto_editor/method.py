@@ -64,7 +64,7 @@ pixeldiff_builder = [
     Attr(("threshold",), natural, 1),
     Attr(("stream", "track"), natural, 0),
 ]
-random_builder = [Attr(("cutchance",), threshold, 0.5), Attr(("seed",), int, -1)]
+random_builder = [Attr(("threshold",), threshold, 0.5), Attr(("seed",), int, -1)]
 
 
 def get_media_length(path: str, i: int, tb: Fraction, temp: str, log: Log) -> int:

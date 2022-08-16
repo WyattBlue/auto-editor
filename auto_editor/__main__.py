@@ -146,28 +146,10 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Set what version of the timeline to use",
     )
     parser.add_argument(
-        "--add-text",
+        "--add",
         nargs="*",
-        pool=True,
-        help="Add a text object to the timeline",
-    )
-    parser.add_argument(
-        "--add-rectangle",
-        nargs="*",
-        pool=True,
-        help="Add a rectangle object to the timeline",
-    )
-    parser.add_argument(
-        "--add-ellipse",
-        nargs="*",
-        pool=True,
-        help="Add an ellipse object to the timeline",
-    )
-    parser.add_argument(
-        "--add-image",
-        nargs="*",
-        pool=True,
-        help="Add an image object to the timeline",
+        metavar="OBJ:START,DUR,ATTRS?",
+        help="Insert an timeline object to the timeline",
     )
     parser.add_text("URL Download Options:")
     parser.add_argument(
@@ -213,7 +195,12 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         metavar="FILE",
         help="Set the name/path of the new output file.",
     )
-    parser.add_argument("--player", "-p", help="Set player to open output media files")
+    parser.add_argument(
+        "--player",
+        "-p",
+        metavar="CMD",
+        help="Set player to open output media files",
+    )
     parser.add_argument(
         "--no-open",
         flag=True,
