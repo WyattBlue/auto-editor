@@ -29,7 +29,7 @@ def levels_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_required("input", nargs="*")
     parser.add_argument(
         "--kind",
-        choices=["audio", "motion", "pixeldiff"],
+        choices=("audio", "motion", "pixeldiff"),
         metavar="METHOD",
         help="Select the kind of detection to analyze",
     )
