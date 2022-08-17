@@ -6,7 +6,7 @@ import sys
 import textwrap
 from dataclasses import dataclass
 from shutil import get_terminal_size
-from typing import Any, Callable, Iterator, Literal, Sequence, TypeVar, Union
+from typing import Any, Callable, Iterator, Literal, TypeVar, Union
 
 import auto_editor
 from auto_editor.utils.log import Log
@@ -17,20 +17,20 @@ Nargs = Union[int, Literal["*"]]
 
 @dataclass
 class Required:
-    names: Sequence[str]
+    names: tuple[str, ...]
     nargs: Nargs = "*"
     type: type = str
-    choices: tuple[str] | None = None
+    choices: tuple[str, ...] | None = None
     metavar: str = "[file ...] [options]"
 
 
 @dataclass
 class Options:
-    names: Sequence[str]
+    names: tuple[str, ...]
     nargs: Nargs = 1
     type: type = str
     flag: bool = False
-    choices: Sequence[str] | None = None
+    choices: tuple[str, ...] | None = None
     metavar: str | None = None
     help: str = ""
 

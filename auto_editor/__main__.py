@@ -176,7 +176,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--export",
         "-ex",
-        choices=[
+        choices=(
             "default",
             "premiere",
             "final-cut-pro",
@@ -184,7 +184,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
             "json",
             "audio",
             "clip-sequence",
-        ],
+        ),
         metavar="EXPORT",
         help="Choose the export mode",
     )
@@ -225,7 +225,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--progress",
         metavar="PROGRESS",
-        choices=["modern", "classic", "ascii", "machine", "none"],
+        choices=("modern", "classic", "ascii", "machine", "none"),
         help="Set what type of progress bar to use",
     )
     parser.add_argument("--debug", flag=True, help="Show debugging messages and values")
