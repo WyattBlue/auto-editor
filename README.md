@@ -133,10 +133,8 @@ auto-editor --scale --help
 ## Articles
  - [How to Install Auto-Editor](https://auto-editor.com/installing)
  - [All the Options (And What They Do)](https://auto-editor.com/options)
- - [Supported Media](https://auto-editor.com/supported_media)
- - [What is Range Syntax](https://auto-editor.com/range_syntax)
- - [Subcommands](https://auto-editor.com/subcommands)
- - [Note on GPU Acceleration](https://auto-editor.com/gpu)
+ - [Docs](https://auto-editor.com/docs)
+ - [Blog](https://auto-editor.com/blog)
 
 ## Copyright
 Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all directories besides the ones listed below. Auto-Editor was created by [these people.](https://github.com/WyattBlue/auto-editor/blob/master/AUTHORS.md)

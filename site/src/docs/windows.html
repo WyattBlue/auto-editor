@@ -1,0 +1,34 @@
+{{ comp.header "Auto-Editor - Using Auto-Editor on Windows" }}
+<body>
+{{ comp.nav }}
+  <section class="section">
+  <div class="container">
+    <h1>Using Auto-Editor on Windows</h1>
+    <h2>Recommended Shell and Terminal</h2>
+    <p>Use the <a href="https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701">Windows Terminal</a> app with PowerShell when running auto-editor commands. Using the CMD shell isn't impossible, but you'll have to write it a little differently then the docs.</p>
+    <h3>Shell vs. Terminal</h3>
+    <p>The shell is the program that actually does stuff and a Terminal is GUI program that displays what the shell is doing and is responsible for tasks like scrolling history and Copy Paste.</p>
+    <!--  More technical answer:
+      A Terminal is a graphical program that runs one or more shells.  A Shell is a
+      program that, using input from your keyboard, gives instructions to the
+      Operating System or composes other programs.
+
+      Technically, Python is also Shell program. It's just not a "Command Line" shell,
+      which is what people usually mean 99% of the time when they say Shell.
+    -->
+    <p>CMD is the older shell Windows keeps around for compatibly with old programs while PowerShell is the relatively newer shell that work with the examples on the docs. 
+    <p>Traditionally, Windows has kept there terminals and shells tightly coupled. The CMD shell could only be accessed by the CMD Terminal and the PowerShell... well... shell could only be used by the PowerShell Terminal. Windows Terminal allows independent of any shell and allows both.</p>
+
+    <h2>Running Auto-Editor on Many Files</h2>
+    <p>Auto-Editor doesn't have an option that batch processes files, but you can achieve the same effect with a simple PowerShell script.</p>
+    <pre><code>
+    <i># Save with the ".ps1" extension</i>
+    $files = "C:\Users\WyattBlue\MyDir\"
+    foreach ($f in Get-ChildItem $files) {
+      auto-editor $(Join-Path -Path $files -ChildPath $f)
+    }
+    </pre></code>
+  </div>
+  </section>
+</body>
+</html>
