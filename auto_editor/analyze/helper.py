@@ -17,8 +17,8 @@ def to_threshold(arr: np.ndarray, t: int | float) -> NDArray[np.bool_]:
 
 def get_media_length(path: str, i: int, tb: Fraction, temp: str, log: Log) -> int:
     # Read first audio track.
-    if os.path.isfile(path := os.path.join(temp, f"{i}-0.wav")):
-        sr, samples = read(path)
+    if os.path.isfile(a_path := os.path.join(temp, f"{i}-0.wav")):
+        sr, samples = read(a_path)
         samp_count = len(samples)
         del samples
 
