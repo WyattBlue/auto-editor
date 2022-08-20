@@ -8,8 +8,6 @@ import numpy as np
 
 from auto_editor.analyze.audio import audio_detection
 from auto_editor.analyze.helper import get_all_list, get_none_list, to_threshold
-from auto_editor.analyze.motion import motion_detection
-from auto_editor.analyze.pixeldiff import pixel_difference
 from auto_editor.analyze.random import random_levels
 from auto_editor.objects import Attr, parse_dataclass
 from auto_editor.utils.types import Stream, natural, stream, threshold
@@ -159,6 +157,8 @@ def get_has_loud(
                     )
 
             if token == "motion":
+                from auto_editor.analyze.motion import motion_detection
+
                 mobj = parse_dataclass(attrs, Motion, motion_builder, log)
                 stream_data = to_threshold(
                     motion_detection(inp, i, mobj, timebase, bar, strict, temp, log),
@@ -166,6 +166,8 @@ def get_has_loud(
                 )
 
             if token == "pixeldiff":
+                from auto_editor.analyze.pixeldiff import pixel_difference
+
                 pobj = parse_dataclass(attrs, Pixeldiff, pixeldiff_builder, log)
                 stream_data = to_threshold(
                     pixel_difference(inp, i, pobj, timebase, bar, strict, temp, log),
