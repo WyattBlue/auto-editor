@@ -1,28 +1,44 @@
-from fractions import Fraction
+from __future__ import annotations
+
+import os
 from math import ceil
+from typing import TYPE_CHECKING
 
 import numpy as np
-import numpy.typing as npt
 
-from auto_editor.utils.bar import Bar
-from auto_editor.utils.log import Log
+from auto_editor.analyze.helper import get_all_list
+from auto_editor.wavfile import read
 
+if TYPE_CHECKING:
+    from fractions import Fraction
 
-def get_max_volume(s: np.ndarray) -> float:
-    return max(float(np.max(s)), -float(np.min(s)))
+    from numpy.typing import NDArray
 
-
-def audio_length(samp_count: int, sr: int, tb: Fraction, log: Log) -> int:
-    samp_per_ticks = sr / tb
-    ticks = ceil(samp_count / samp_per_ticks)
-    log.debug(f"Audio Length: {ticks}")
-    log.debug(f"... without ceil: {float(samp_count / samp_per_ticks)}")
-    return ticks
+    from auto_editor.ffwrapper import FileInfo
+    from auto_editor.utils.bar import Bar
+    from auto_editor.utils.log import Log
 
 
 def audio_detection(
-    samples: np.ndarray, sr: int, tb: Fraction, bar: Bar, log: Log
-) -> npt.NDArray[np.float_]:
+    inp: FileInfo,
+    i: int,
+    s: int,
+    tb: Fraction,
+    bar: Bar,
+    strict: bool,
+    temp: str,
+    log: Log,
+) -> NDArray[np.float_]:
+
+    if os.path.isfile(path := os.path.join(temp, f"{i}-{s}.wav")):
+        sr, samples = read(path)
+    elif not strict:
+        return get_all_list(inp.path, i, tb, temp, log)
+    else:
+        log.error(f"Audio stream '{s}' does not exist.")
+
+    def get_max_volume(s: np.ndarray) -> float:
+        return max(float(np.max(s)), -float(np.min(s)))
 
     max_volume = get_max_volume(samples)
     log.debug(f"Max volume: {max_volume}")
@@ -30,7 +46,10 @@ def audio_detection(
     samp_count = samples.shape[0]
     samp_per_ticks = sr / tb
 
-    audio_ticks = audio_length(samp_count, sr, tb, log)
+    audio_ticks = ceil(samp_count / samp_per_ticks)
+    log.debug(f"Audio Length: {audio_ticks}")
+    log.debug(f"... without ceil: {float(samp_count / samp_per_ticks)}")
+
     bar.start(audio_ticks, "Analyzing audio volume")
 
     threshold_list = np.zeros((audio_ticks), dtype=np.float_)

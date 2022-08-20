@@ -1,19 +1,38 @@
-from fractions import Fraction
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import av
 import numpy as np
-from numpy.typing import NDArray
 from PIL import ImageChops
 
-from auto_editor.utils.bar import Bar
+from auto_editor.analyze.helper import get_all_list
+
+if TYPE_CHECKING:
+    from fractions import Fraction
+
+    from numpy.typing import NDArray
+
+    from auto_editor.ffwrapper import FileInfo
+    from auto_editor.utils.bar import Bar
+    from auto_editor.utils.log import Log
+
+
+av.logging.set_level(av.logging.PANIC)
 
 
 def pixel_difference(
-    path: str, track: int, tb: Fraction, bar: Bar
+    inp: FileInfo, i: int, pobj, tb: Fraction, bar: Bar, strict: bool, temp: str, log: Log
 ) -> NDArray[np.uint64]:
-    container = av.open(path, "r")
 
-    stream = container.streams.video[track]
+    if pobj.stream >= len(inp.videos):
+        if not strict:
+            return get_all_list(inp.path, i, tb, temp, log)
+        log.error(f"Video stream '{pobj.stream}' does not exist.")
+
+    container = av.open(inp.path, "r")
+
+    stream = container.streams.video[pobj.stream]
     stream.thread_type = "AUTO"
 
     inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)

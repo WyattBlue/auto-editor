@@ -3,7 +3,7 @@ from __future__ import annotations
 from fractions import Fraction
 from statistics import fmean, median
 
-from auto_editor.method import get_media_length
+from auto_editor.analyze.helper import get_media_length
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
@@ -59,8 +59,6 @@ def preview(timeline: Timeline, temp: str, log: Log) -> None:
     time_frame("input", in_len, tb, per="100.0%")
     time_frame("output", out_len, tb, per=f"{round((out_len / in_len) * 100, 2)}%")
     time_frame("diff", diff, tb, per=f"{round((diff / in_len) * 100, 2)}%")
-
-    print(f"is v1 compatible:    {'true' if timeline.chunks is not None else 'false'}")
 
     clip_lens = [clip.dur / clip.speed for clip in timeline.a[0]]
     log.debug(clip_lens)
