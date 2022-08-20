@@ -1,13 +1,24 @@
 from __future__ import annotations
 
-from fractions import Fraction
+from typing import TYPE_CHECKING
 
 import av
 import numpy as np
-from numpy.typing import NDArray
 from PIL import ImageChops, ImageFilter, ImageOps
 
-from auto_editor.utils.bar import Bar
+from auto_editor.analyze.helper import get_all_list
+
+if TYPE_CHECKING:
+    from fractions import Fraction
+
+    from numpy.typing import NDArray
+
+    from auto_editor.ffwrapper import FileInfo
+    from auto_editor.utils.bar import Bar
+    from auto_editor.utils.log import Log
+
+
+av.logging.set_level(av.logging.PANIC)
 
 
 def new_size(size: tuple[int, int], width: int) -> tuple[int, int]:
@@ -16,11 +27,17 @@ def new_size(size: tuple[int, int], width: int) -> tuple[int, int]:
 
 
 def motion_detection(
-    path: str, track: int, tb: Fraction, bar: Bar, width: int, blur: int
+    inp: FileInfo, i: int, mobj, tb: Fraction, bar: Bar, strict: bool, temp: str, log: Log
 ) -> NDArray[np.float_]:
-    container = av.open(path, "r")
 
-    stream = container.streams.video[track]
+    if mobj.stream >= len(inp.videos):
+        if not strict:
+            return get_all_list(inp.path, i, tb, temp, log)
+        log.error(f"Video stream '{mobj.stream}' does not exist.")
+
+    container = av.open(inp.path, "r")
+
+    stream = container.streams.video[mobj.stream]
     stream.thread_type = "AUTO"
 
     inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)
@@ -51,11 +68,11 @@ def motion_detection(
         if total_pixels is None:
             total_pixels = image.size[0] * image.size[1]
 
-        image.thumbnail(new_size(image.size, width))
+        image.thumbnail(new_size(image.size, mobj.width))
         image = ImageOps.grayscale(image)
 
-        if blur > 0:
-            image = image.filter(ImageFilter.GaussianBlur(radius=blur))
+        if mobj.blur > 0:
+            image = image.filter(ImageFilter.GaussianBlur(radius=mobj.blur))
 
         if prev_image is not None:
             count = np.count_nonzero(ImageChops.difference(prev_image, image))

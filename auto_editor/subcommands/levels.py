@@ -8,36 +8,60 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 
+from auto_editor.analyze.audio import audio_detection
+from auto_editor.analyze.motion import motion_detection
+from auto_editor.analyze.pixeldiff import pixel_difference
+from auto_editor.analyze.random import random_levels
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.method import (
+    audio_builder,
+    motion_builder,
+    pixeldiff_builder,
+    random_builder,
+)
+from auto_editor.objects import parse_dataclass
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import natural
 from auto_editor.vanparse import ArgumentParser
 
 
 @dataclass
+class Audio:
+    stream: int
+
+
+@dataclass
+class Motion:
+    stream: int
+    blur: int
+    width: int
+
+
+@dataclass
+class Pixeldiff:
+    stream: int
+
+
+@dataclass
+class Random:
+    seed: int
+
+
+@dataclass
 class LevelArgs:
-    kind: str = "audio"
-    track: int = 0
+    input: list[str] = field(default_factory=list)
+    edit: str = "audio"
     ffmpeg_location: str | None = None
     my_ffmpeg: bool = False
     help: bool = False
-    input: list[str] = field(default_factory=list)
 
 
 def levels_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_required("input", nargs="*")
     parser.add_argument(
-        "--kind",
-        choices=("audio", "motion", "pixeldiff"),
-        metavar="METHOD",
-        help="Select the kind of detection to analyze",
-    )
-    parser.add_argument(
-        "--track",
-        type=natural,
-        metavar="NAT",
-        help="Select the track/stream index to analyze",
+        "--edit",
+        metavar="METHOD:[ATTRS?]",
+        help="Select the kind of detection to analyze with attributes",
     )
     parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
     parser.add_argument(
@@ -68,42 +92,58 @@ def main(sys_args=sys.argv[1:]) -> None:
     temp = tempfile.mkdtemp()
     log = Log(temp=temp)
 
-    inp = FileInfo(args.input[0], ffmpeg, log)
-    timebase = inp.get_fps()
+    inputs = [FileInfo(inp, ffmpeg, log) for inp in args.input]
+    timebase = inputs[0].get_fps()
 
-    if args.kind == "audio":
-        from auto_editor.analyze.audio import audio_detection
-        from auto_editor.wavfile import read
+    strict = True
 
-        if args.track >= len(inp.audios):
-            log.error(f"Audio track '{args.track}' does not exist.")
+    METHOD_ATTRS_SEP = ":"
+    METHODS = ("audio", "motion", "pixeldiff", "random")
 
-        read_track = os.path.join(temp, f"{args.track}.wav")
+    if METHOD_ATTRS_SEP in args.edit:
+        method, attrs = args.edit.split(METHOD_ATTRS_SEP)
+    else:
+        method, attrs = args.edit, ""
 
-        ffmpeg.run(
-            ["-i", inp.path, "-ac", "2", "-map", f"0:a:{args.track}", read_track]
-        )
+    if method not in METHODS:
+        log.error(f"Method: {method} not supported")
 
-        if not os.path.isfile(read_track):
-            log.error("Audio track file not found!")
+    for i, inp in enumerate(inputs):
 
-        sr, samples = read(read_track)
-        print_float_list(audio_detection(samples, sr, timebase, bar, log))
+        if method == "random":
+            robj = parse_dataclass(attrs, Random, random_builder[1:], log)
 
-    if args.kind in ("motion", "pixeldiff") and args.track >= len(inp.videos):
-        log.error(f"Video stream '{args.track}' does not exist.")
+            # TODO: Find better way to get media length
+            if len(inp.audios) > 0:
+                read_track = os.path.join(temp, f"{i}-0.wav")
+                ffmpeg.run(["-i", inp.path, "-ac", "2", "-map", f"0:a:0", read_track])
+            print_float_list(random_levels(inp.path, i, robj, timebase, temp, log))
 
-    if args.kind == "motion":
-        from auto_editor.analyze.motion import motion_detection
+        if method == "audio":
+            aobj = parse_dataclass(attrs, Audio, audio_builder[1:], log)
 
-        print_float_list(
-            motion_detection(inp.path, args.track, timebase, bar, width=400, blur=9)
-        )
+            if aobj.stream >= len(inp.audios):
+                log.error(f"Audio track '{aobj.stream}' does not exist.")
 
-    if args.kind == "pixeldiff":
-        from auto_editor.analyze.pixeldiff import pixel_difference
+            read_track = os.path.join(temp, f"{i}-{aobj.stream}.wav")
+            ffmpeg.run(
+                ["-i", inp.path, "-ac", "2", "-map", f"0:a:{aobj.stream}", read_track]
+            )
 
-        print_int_list(pixel_difference(inp.path, args.track, timebase, bar))
+            if not os.path.isfile(read_track):
+                log.error("Audio track file not found!")
+
+            print_float_list(
+                audio_detection(inp, i, aobj.stream, timebase, bar, strict, temp, log)
+            )
+
+        if method == "motion":
+            mobj = parse_dataclass(attrs, Motion, motion_builder[1:], log)
+            print_float_list(motion_detection(inp, i, mobj, timebase, bar, strict, temp, log))
+
+        if method == "pixeldiff":
+            pobj = parse_dataclass(attrs, Pixeldiff, pixeldiff_builder[1:], log)
+            print_int_list(pixel_difference(inp, i, pobj, timebase, bar, strict, temp, log))
 
     log.cleanup()
 
