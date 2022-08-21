@@ -139,11 +139,15 @@ def main(sys_args=sys.argv[1:]) -> None:
 
         if method == "motion":
             mobj = parse_dataclass(attrs, Motion, motion_builder[1:], log)
-            print_float_list(motion_detection(inp, i, mobj, timebase, bar, strict, temp, log))
+            print_float_list(
+                motion_detection(inp, i, mobj, timebase, bar, strict, temp, log)
+            )
 
         if method == "pixeldiff":
             pobj = parse_dataclass(attrs, Pixeldiff, pixeldiff_builder[1:], log)
-            print_int_list(pixel_difference(inp, i, pobj, timebase, bar, strict, temp, log))
+            print_int_list(
+                pixel_difference(inp, i, pobj, timebase, bar, strict, temp, log)
+            )
 
     log.cleanup()
 
