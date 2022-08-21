@@ -22,7 +22,14 @@ av.logging.set_level(av.logging.PANIC)
 
 
 def pixel_difference(
-    inp: FileInfo, i: int, pobj, tb: Fraction, bar: Bar, strict: bool, temp: str, log: Log
+    inp: FileInfo,
+    i: int,
+    pobj,
+    tb: Fraction,
+    bar: Bar,
+    strict: bool,
+    temp: str,
+    log: Log,
 ) -> NDArray[np.uint64]:
 
     if pobj.stream >= len(inp.videos):

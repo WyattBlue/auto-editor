@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import av
 import numpy as np
-from PIL import ImageChops, ImageFilter, ImageOps
+from PIL import ImageChops, ImageFilter
 
 from auto_editor.analyze.helper import get_all_list
 
@@ -21,13 +21,20 @@ if TYPE_CHECKING:
 av.logging.set_level(av.logging.PANIC)
 
 
-def new_size(size: tuple[int, int], width: int) -> tuple[int, int]:
-    h, w = size
-    return width, int(h * (width / w))
+def link_nodes(*nodes):
+    for c, n in zip(nodes, nodes[1:]):
+        c.link_to(n)
 
 
 def motion_detection(
-    inp: FileInfo, i: int, mobj, tb: Fraction, bar: Bar, strict: bool, temp: str, log: Log
+    inp: FileInfo,
+    i: int,
+    mobj,
+    tb: Fraction,
+    bar: Bar,
+    strict: bool,
+    temp: str,
+    log: Log,
 ) -> NDArray[np.float_]:
 
     if mobj.stream >= len(inp.videos):
@@ -49,9 +56,20 @@ def motion_detection(
     total_pixels = None
     index = 0
 
+    graph = av.filter.Graph()
+    link_nodes(
+        graph.add_buffer(template=stream),
+        graph.add("scale", f"{mobj.width}:-1"),
+        graph.add("buffersink"),
+    )
+    graph.configure()
+
     threshold_list = np.zeros((1024), dtype=np.float_)
 
-    for frame in container.decode(stream):
+    for unframe in container.decode(stream):
+        graph.push(unframe)
+        frame = graph.pull()
+
         prev_image = image
 
         index = int(frame.time * tb)
@@ -63,13 +81,10 @@ def motion_detection(
                 axis=0,
             )
 
-        image = frame.to_image()
+        image = frame.to_image().convert("L")
 
         if total_pixels is None:
             total_pixels = image.size[0] * image.size[1]
-
-        image.thumbnail(new_size(image.size, mobj.width))
-        image = ImageOps.grayscale(image)
 
         if mobj.blur > 0:
             image = image.filter(ImageFilter.GaussianBlur(radius=mobj.blur))
