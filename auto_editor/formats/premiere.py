@@ -259,7 +259,7 @@ def premiere_xml(
                     outfile.write(speedup(clip[2] * 100))
 
                 # Linking for video blocks
-                for i in range(max(3, tracks + 1)):
+                for i in range(max(6, tracks + 1)):
                     outfile.write("\t\t\t\t\t\t<link>\n")
                     outfile.write(
                         f"\t\t\t\t\t\t\t<linkclipref>clipitem-{(i*(len(clips)))+j+1}</linkclipref>\n"
@@ -270,6 +270,14 @@ def premiere_xml(
                         outfile.write("\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n")
                     if i == 2:
                         outfile.write("\t\t\t\t\t\t\t<trackindex>2</trackindex>\n")
+                    if i == 3:
+                        outfile.write("\t\t\t\t\t\t\t<trackindex>3</trackindex>\n")
+                    if i == 4:
+                        outfile.write("\t\t\t\t\t\t\t<trackindex>4</trackindex>\n")
+                    if i == 5:
+                        outfile.write("\t\t\t\t\t\t\t<trackindex>5</trackindex>\n")
+                    if i == 6:
+                        outfile.write("\t\t\t\t\t\t\t<trackindex>6</trackindex>\n")
                     else:
                         outfile.write("\t\t\t\t\t\t\t<trackindex>1</trackindex>\n")
                     outfile.write(f"\t\t\t\t\t\t\t<clipindex>{j+1}</clipindex>\n")
