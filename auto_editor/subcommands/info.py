@@ -92,11 +92,11 @@ def main(sys_args=sys.argv[1:]) -> None:
 
     file_info: dict[str, MediaJson] = {}
 
-    for file in args.input:
+    for i, file in enumerate(args.input):
         if not os.path.isfile(file):
             Log().error(f"Could not find file: {file}")
 
-        inp = FileInfo(file, ffmpeg, log)
+        inp = FileInfo(i, file, ffmpeg, log)
 
         if len(inp.videos) + len(inp.audios) + len(inp.subtitles) == 0:
             file_info[file] = {"media": "invalid"}

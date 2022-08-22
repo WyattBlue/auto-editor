@@ -28,7 +28,6 @@ def link_nodes(*nodes):
 
 def motion_detection(
     inp: FileInfo,
-    i: int,
     mobj,
     tb: Fraction,
     bar: Bar,
@@ -39,7 +38,7 @@ def motion_detection(
 
     if mobj.stream >= len(inp.videos):
         if not strict:
-            return get_all_list(inp.path, i, tb, temp, log)
+            return get_all_list(inp, tb, temp, log)
         log.error(f"Video stream '{mobj.stream}' does not exist.")
 
     container = av.open(inp.path, "r")

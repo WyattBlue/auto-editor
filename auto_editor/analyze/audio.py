@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 def audio_detection(
     inp: FileInfo,
-    i: int,
     s: int,
     tb: Fraction,
     bar: Bar,
@@ -30,10 +29,10 @@ def audio_detection(
     log: Log,
 ) -> NDArray[np.float_]:
 
-    if os.path.isfile(path := os.path.join(temp, f"{i}-{s}.wav")):
+    if os.path.isfile(path := os.path.join(temp, f"{inp.index}-{s}.wav")):
         sr, samples = read(path)
     elif not strict:
-        return get_all_list(inp.path, i, tb, temp, log)
+        return get_all_list(inp, tb, temp, log)
     else:
         log.error(f"Audio stream '{s}' does not exist.")
 

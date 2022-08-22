@@ -124,8 +124,11 @@ def make_layers(
     min_clip = seconds_to_ticks(_min_clip, tb)
     min_cut = seconds_to_ticks(_min_cut, tb)
 
-    for i in range(len(inputs)):
-        has_loud = get_has_loud(method, i, inputs, tb, bar, temp, log)
+
+    strict = len(inputs) < 2
+
+    for i, inp in enumerate(inputs):
+        has_loud = get_has_loud(method, inp, strict, tb, bar, temp, log)
         has_loud_length = len(has_loud)
 
         if len(mark_loud) > 0:

@@ -177,6 +177,7 @@ class FileInfo:
         "videos",
         "audios",
         "subtitles",
+        "index",
     )
 
     def get_res(self) -> tuple[int, int]:
@@ -194,7 +195,8 @@ class FileInfo:
             return self.audios[0].samplerate
         return 48000
 
-    def __init__(self, path: str, ffmpeg: FFmpeg, log: Log):
+    def __init__(self, index: int, path: str, ffmpeg: FFmpeg, log: Log):
+        self.index = index
         self.path = path
         self.abspath = os.path.abspath(path)
         self.basename = os.path.basename(path)
