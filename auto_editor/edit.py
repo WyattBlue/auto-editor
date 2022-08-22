@@ -114,7 +114,7 @@ def edit_media(
             timeline = read_json(paths[0], ffmpeg, log)
             inputs: list[FileInfo] = timeline.inputs
         else:
-            inputs = [FileInfo(path, ffmpeg, log) for path in paths]
+            inputs = [FileInfo(i, istr, ffmpeg, log) for i, istr in enumerate(paths)]
     else:
         inputs = []
     del paths
@@ -166,7 +166,7 @@ def edit_media(
     log.conwrite("Extracting audio")
 
     cmd = []
-    for i, inp in enumerate(inputs):
+    for inp in inputs:
         cmd.extend(["-i", inp.path])
     cmd.append("-hide_banner")
 
@@ -178,19 +178,19 @@ def edit_media(
     else:
         samplerate = args.sample_rate
 
-    for i, inp in enumerate(inputs):
+    for inp in inputs:
         for s in range(len(inp.audios)):
             cmd.extend(
                 [
                     "-map",
-                    f"{i}:a:{s}",
+                    f"{inp.index}:a:{s}",
                     "-ac",
                     "2",
                     "-ar",
                     f"{samplerate}",
                     "-rf64",
                     "always",
-                    os.path.join(temp, f"{i}-{s}.wav"),
+                    os.path.join(temp, f"{inp.index}-{s}.wav"),
                 ]
             )
 

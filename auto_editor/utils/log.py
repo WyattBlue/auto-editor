@@ -76,9 +76,6 @@ class Log:
 
                 os._exit(1)
 
-    def import_error(self, lib: str) -> NoReturn:
-        self.error(f"Python module '{lib}' not installed. Run:  pip install {lib}")
-
     def warning(self, message: str) -> None:
         if not self.quiet:
             self.conwrite("")

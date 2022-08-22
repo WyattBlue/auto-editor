@@ -19,6 +19,9 @@ def make_new_audio(
     output = []
     samples = {}
 
+    if len(timeline.a) == 0 or len(timeline.a[0]) == 0:
+        log.error("Trying to audio render empty timeline")
+
     for l, layer in enumerate(timeline.a):
         bar.start(len(layer), "Creating new audio")
 

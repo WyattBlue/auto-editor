@@ -23,7 +23,6 @@ av.logging.set_level(av.logging.PANIC)
 
 def pixel_difference(
     inp: FileInfo,
-    i: int,
     pobj,
     tb: Fraction,
     bar: Bar,
@@ -34,7 +33,7 @@ def pixel_difference(
 
     if pobj.stream >= len(inp.videos):
         if not strict:
-            return get_all_list(inp.path, i, tb, temp, log)
+            return get_all_list(inp, tb, temp, log)
         log.error(f"Video stream '{pobj.stream}' does not exist.")
 
     container = av.open(inp.path, "r")
