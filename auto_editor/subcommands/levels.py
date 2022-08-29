@@ -9,10 +9,7 @@ from fractions import Fraction
 import numpy as np
 from numpy.typing import NDArray
 
-from auto_editor.analyze.audio import audio_detection
-from auto_editor.analyze.motion import motion_detection
-from auto_editor.analyze.pixeldiff import pixel_difference
-from auto_editor.analyze.random import random_levels
+from auto_editor.analyze import audio_levels, motion_levels, pixeldiff_levels, random_levels
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.method import (
     audio_builder,
@@ -143,15 +140,15 @@ def main(sys_args=sys.argv[1:]) -> None:
             if not os.path.isfile(read_track):
                 log.error("Audio track file not found!")
 
-            print_floats(audio_detection(inp, aobj.stream, tb, bar, strict, temp, log))
+            print_floats(audio_levels(inp, aobj.stream, tb, bar, strict, temp, log))
 
         if method == "motion":
             mobj = parse_dataclass(attrs, Motion, motion_builder[1:], log)
-            print_floats(motion_detection(inp, mobj, tb, bar, strict, temp, log))
+            print_floats(motion_levels(inp, mobj, tb, bar, strict, temp, log))
 
         if method == "pixeldiff":
             pobj = parse_dataclass(attrs, Pixeldiff, pixeldiff_builder[1:], log)
-            print_ints(pixel_difference(inp, pobj, tb, bar, strict, temp, log))
+            print_ints(pixeldiff_levels(inp, pobj, tb, bar, strict, temp, log))
 
     log.cleanup()
 
