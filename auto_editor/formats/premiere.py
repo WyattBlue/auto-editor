@@ -269,7 +269,7 @@ def premiere_xml(
                     else:
                         outfile.write("\t\t\t\t\t\t\t<mediatype>audio</mediatype>\n")
                     if 1 <= i <= 6:
-                        outfile.write("\t\t\t\t\t\t\t<trackindex>" + str(i) + "</trackindex>\n")
+                        outfile.write(f"\t\t\t\t\t\t\t<trackindex>{i}</trackindex>\n")
                     else:
                         outfile.write("\t\t\t\t\t\t\t<trackindex>1</trackindex>\n")
                     outfile.write(f"\t\t\t\t\t\t\t<clipindex>{j+1}</clipindex>\n")
