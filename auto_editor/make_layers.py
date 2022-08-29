@@ -124,7 +124,6 @@ def make_layers(
     min_clip = seconds_to_ticks(_min_clip, tb)
     min_cut = seconds_to_ticks(_min_cut, tb)
 
-
     strict = len(inputs) < 2
 
     for i, inp in enumerate(inputs):

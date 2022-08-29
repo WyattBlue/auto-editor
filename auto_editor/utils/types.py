@@ -108,9 +108,9 @@ def time(val: str) -> int | str:
     if unit in ("h", "hour", "hours"):
         return str(num * 3600)
 
-    _unit_check(unit, ("", "f", "frame", "frames"))
+    _unit_check(unit, ("",))
     if not isinstance(num, int) and not num.is_integer():
-        raise TypeError(f"'{val}': Frame unit doesn't accept non-ints.")
+        raise TypeError(f"'{val}': Time uses ticks by default and ticks doesn't accept non-ints.")
     return int(num)
 
 

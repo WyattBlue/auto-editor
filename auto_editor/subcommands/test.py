@@ -289,9 +289,8 @@ def main(sys_args: list[str] | None = None):
         run_program(["example.mp4", "-m", "3"])
         run_program(["example.mp4", "--margin", "3"])
         run_program(["example.mp4", "-m", "0.3sec"])
-        run_program(["example.mp4", "-m", "6f,-3secs"])
-        run_program(["example.mp4", "-m", "3,5 frames"])
-        run_program(["example.mp4", "-m", "0.4 seconds"])
+        run_program(["example.mp4", "-m", "6,-3secs"])
+        run_program(["example.mp4", "-m", "0.4 seconds", "--stats"])
 
     def input_extension():
         """Input file must have an extension. Throw error if none is given."""
