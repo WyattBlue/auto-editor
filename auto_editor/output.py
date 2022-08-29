@@ -9,7 +9,7 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 
 
-def fset(cmd: list[str], option: str, value: str | None) -> list[str]:
+def _ffset(cmd: list[str], option: str, value: str | None) -> list[str]:
     if value is None or value == "unset":
         return cmd
     return cmd + [option] + [value]
@@ -18,14 +18,9 @@ def fset(cmd: list[str], option: str, value: str | None) -> list[str]:
 def video_quality(
     cmd: list[str], args: Args, inp: FileInfo, ctr: Container
 ) -> list[str]:
-    cmd = fset(cmd, "-b:v", args.video_bitrate)
-
-    qscale = args.video_quality_scale
-    if args.video_codec == "mpeg4" and qscale == "unset":
-        qscale = "1"
-
+    cmd = _ffset(cmd, "-b:v", args.video_bitrate)
     cmd.extend(["-c:v", args.video_codec])
-    cmd = fset(cmd, "-qscale:v", qscale)
+    cmd = _ffset(cmd, "-qscale:v", args.video_quality_scale)
     cmd.extend(["-movflags", "faststart"])
     return cmd
 
@@ -43,6 +38,7 @@ def mux_quality_media(
     temp: str,
     log: Log,
 ) -> None:
+
     s_tracks = 0 if not ctr.allow_subtitle else len(inp.subtitles)
     a_tracks = 0 if not ctr.allow_audio else len(audio_output)
     v_tracks = 0 if not ctr.allow_video else len(visual_output)
@@ -140,14 +136,14 @@ def mux_quality_media(
             cmd.extend(["-c:s", scodec])
 
     if a_tracks > 0:
-        cmd = fset(cmd, "-c:a", args.audio_codec)
-        cmd = fset(cmd, "-b:a", args.audio_bitrate)
+        cmd = _ffset(cmd, "-c:a", args.audio_codec)
+        cmd = _ffset(cmd, "-b:a", args.audio_bitrate)
 
     if same_container and v_tracks > 0:
-        cmd = fset(cmd, "-color_range", inp.videos[0].color_range)
-        cmd = fset(cmd, "-colorspace", inp.videos[0].color_space)
-        cmd = fset(cmd, "-color_primaries", inp.videos[0].color_primaries)
-        cmd = fset(cmd, "-color_trc", inp.videos[0].color_transfer)
+        cmd = _ffset(cmd, "-color_range", inp.videos[0].color_range)
+        cmd = _ffset(cmd, "-colorspace", inp.videos[0].color_space)
+        cmd = _ffset(cmd, "-color_primaries", inp.videos[0].color_primaries)
+        cmd = _ffset(cmd, "-color_trc", inp.videos[0].color_transfer)
 
     if args.extras is not None:
         cmd.extend(args.extras.split(" "))

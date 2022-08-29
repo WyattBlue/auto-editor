@@ -190,18 +190,7 @@ def main(sys_args: list[str] | None = None):
     def desc():
         run_program(["desc", "example.mp4"])
 
-    def example_tests():
-        run_program(["example.mp4", "--video_codec", "uncompressed"])
-        with av.open("example_ALTERED.mp4") as cn:
-            video = cn.streams.video[0]
-            assert video.average_rate == 30
-            assert video.time_base == Fraction(1, 30)
-            assert video.width == 1280
-            assert video.height == 720
-            assert video.codec.name == "mpeg4"
-            assert cn.streams.audio[0].codec.name == "aac"
-            assert cn.streams.audio[0].rate == 48000
-
+    def example():
         run_program(["example.mp4"])
         with av.open("example_ALTERED.mp4") as cn:
             video = cn.streams.video[0]
@@ -448,7 +437,7 @@ def main(sys_args: list[str] | None = None):
 
     def combine():
         run_program(["example.mp4", "--mark_as_silent", "0,171", "-o", "hmm.mp4"])
-        run_program(["example.mp4", "hmm.mp4", "--combine-files", "--debug"])
+        run_program(["example.mp4", "hmm.mp4", "--debug"])
         os.remove("hmm.mp4")
 
     # Issue #241
@@ -654,7 +643,7 @@ def main(sys_args: list[str] | None = None):
                 version_test,
                 parser_test,
                 combine,
-                example_tests,
+                example,
                 export_tests,
                 high_speed_test,
                 unit_tests,

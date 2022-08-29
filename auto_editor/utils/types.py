@@ -110,7 +110,9 @@ def time(val: str) -> int | str:
 
     _unit_check(unit, ("",))
     if not isinstance(num, int) and not num.is_integer():
-        raise TypeError(f"'{val}': Time uses ticks by default and ticks doesn't accept non-ints.")
+        raise TypeError(
+            f"'{val}': Time uses ticks by default and ticks doesn't accept non-ints."
+        )
     return int(num)
 
 
