@@ -6,9 +6,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from auto_editor.analyze.audio import audio_detection
-from auto_editor.analyze.helper import get_all_list, get_none_list, to_threshold
-from auto_editor.analyze.random import random_levels
+from auto_editor.analyze import (
+    audio_levels,
+    get_all,
+    get_none,
+    random_levels,
+    to_threshold,
+)
 from auto_editor.objects import Attr, parse_dataclass
 from auto_editor.utils.types import Stream, natural, stream, threshold
 
@@ -114,9 +118,9 @@ def get_has_loud(
                 log.error("Logic operator must be between two editing methods.")
 
             if token == "none":
-                stream_data = get_none_list(inp, timebase, temp, log)
+                stream_data = get_none(inp, timebase, temp, log)
             if token == "all":
-                stream_data = get_all_list(inp, timebase, temp, log)
+                stream_data = get_all(inp, timebase, temp, log)
             if token == "random":
                 robj = parse_dataclass(attrs, Random, random_builder, log)
                 stream_data = to_threshold(
@@ -130,7 +134,7 @@ def get_has_loud(
                     total_list: NDArray[np.bool_] | None = None
                     for s in range(len(inp.audios)):
                         audio_list = to_threshold(
-                            audio_detection(inp, s, timebase, bar, strict, temp, log),
+                            audio_levels(inp, s, timebase, bar, strict, temp, log),
                             aobj.threshold,
                         )
                         if total_list is None:
@@ -142,30 +146,30 @@ def get_has_loud(
                     if total_list is None:
                         if strict:
                             log.error("Input has no audio streams.")
-                        stream_data = get_all_list(inp, timebase, temp, log)
+                        stream_data = get_all(inp, timebase, temp, log)
                     else:
                         stream_data = total_list
                 else:
                     stream_data = to_threshold(
-                        audio_detection(inp, s, timebase, bar, strict, temp, log),
+                        audio_levels(inp, s, timebase, bar, strict, temp, log),
                         aobj.threshold,
                     )
 
             if token == "motion":
-                from auto_editor.analyze.motion import motion_detection
+                from auto_editor.analyze import motion_levels
 
                 mobj = parse_dataclass(attrs, Motion, motion_builder, log)
                 stream_data = to_threshold(
-                    motion_detection(inp, mobj, timebase, bar, strict, temp, log),
+                    motion_levels(inp, mobj, timebase, bar, strict, temp, log),
                     mobj.threshold,
                 )
 
             if token == "pixeldiff":
-                from auto_editor.analyze.pixeldiff import pixel_difference
+                from auto_editor.analyze import pixeldiff_levels
 
                 pobj = parse_dataclass(attrs, Pixeldiff, pixeldiff_builder, log)
                 stream_data = to_threshold(
-                    pixel_difference(inp, pobj, timebase, bar, strict, temp, log),
+                    pixeldiff_levels(inp, pobj, timebase, bar, strict, temp, log),
                     pobj.threshold,
                 )
 

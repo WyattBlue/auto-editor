@@ -3,7 +3,7 @@ from __future__ import annotations
 from fractions import Fraction
 from statistics import fmean, median
 
-from auto_editor.analyze.helper import get_media_length
+from auto_editor.analyze import get_media_length
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
