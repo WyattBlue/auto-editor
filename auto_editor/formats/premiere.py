@@ -8,6 +8,7 @@ from shutil import move
 from urllib.parse import quote
 
 from auto_editor.timeline import Timeline
+from auto_editor.output import Ensure
 
 from .utils import indent, safe_mkdir
 
@@ -73,7 +74,7 @@ def speedup(speed: float) -> str:
 
 
 def premiere_xml(
-    temp: str,
+    ensure: Ensure,
     output: str,
     timeline: Timeline,
 ) -> None:
@@ -122,7 +123,7 @@ def premiere_xml(
 
         for i in range(1, tracks):
             newtrack = os.path.join(fold, f"{i}.wav")
-            move(os.path.join(temp, f"0-{i}.wav"), newtrack)
+            move(ensure.audio(timeline.inputs[0].path, 0, i), newtrack)
             pathurls.append(fix_url(newtrack))
 
     width, height = timeline.res

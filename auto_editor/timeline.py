@@ -18,6 +18,7 @@ from auto_editor.objects import (
     rect_builder,
     text_builder,
 )
+from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.log import Log
@@ -75,7 +76,13 @@ class Timeline:
 
 
 def make_timeline(
-    inputs: list[FileInfo], args: Args, sr: int, bar: Bar, temp: str, log: Log
+    inputs: list[FileInfo],
+    ensure: Ensure,
+    args: Args,
+    sr: int,
+    bar: Bar,
+    temp: str,
+    log: Log,
 ) -> Timeline:
 
     if inputs:
@@ -86,6 +93,7 @@ def make_timeline(
 
     chunks, vclips, aclips = make_layers(
         inputs,
+        ensure,
         tb,
         args.edit_based_on,
         args.frame_margin,

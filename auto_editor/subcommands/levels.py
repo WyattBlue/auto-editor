@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sys
 import tempfile
 from dataclasses import dataclass, field
@@ -9,7 +8,12 @@ from fractions import Fraction
 import numpy as np
 from numpy.typing import NDArray
 
-from auto_editor.analyze import audio_levels, motion_levels, pixeldiff_levels, random_levels
+from auto_editor.analyze import (
+    audio_levels,
+    motion_levels,
+    pixeldiff_levels,
+    random_levels,
+)
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.method import (
     audio_builder,
@@ -18,6 +22,7 @@ from auto_editor.method import (
     random_builder,
 )
 from auto_editor.objects import parse_dataclass
+from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import frame_rate
@@ -102,6 +107,7 @@ def main(sys_args=sys.argv[1:]) -> None:
     inputs = [FileInfo(i, istr, ffmpeg, log) for i, istr in enumerate(args.input)]
 
     tb = inputs[0].get_fps() if args.timebase is None else args.timebase
+    ensure = Ensure(ffmpeg, inputs[0].get_samplerate(), temp, log)
 
     strict = True
 
@@ -119,36 +125,21 @@ def main(sys_args=sys.argv[1:]) -> None:
     for inp in inputs:
         if method == "random":
             robj = parse_dataclass(attrs, Random, random_builder[1:], log)
-
-            # TODO: Find better way to get media length
-            if len(inp.audios) > 0:
-                read_track = os.path.join(temp, f"{inp.index}-0.wav")
-                ffmpeg.run(["-i", inp.path, "-ac", "2", "-map", f"0:a:0", read_track])
-            print_floats(random_levels(inp, robj, tb, temp, log))
+            print_floats(random_levels(ensure, inp, robj, tb, temp, log))
 
         if method == "audio":
             aobj = parse_dataclass(attrs, Audio, audio_builder[1:], log)
-
-            if aobj.stream >= len(inp.audios):
-                log.error(f"Audio track '{aobj.stream}' does not exist.")
-
-            read_track = os.path.join(temp, f"{inp.index}-{aobj.stream}.wav")
-            ffmpeg.run(
-                ["-i", inp.path, "-ac", "2", "-map", f"0:a:{aobj.stream}", read_track]
+            print_floats(
+                audio_levels(ensure, inp, aobj.stream, tb, bar, strict, temp, log)
             )
-
-            if not os.path.isfile(read_track):
-                log.error("Audio track file not found!")
-
-            print_floats(audio_levels(inp, aobj.stream, tb, bar, strict, temp, log))
 
         if method == "motion":
             mobj = parse_dataclass(attrs, Motion, motion_builder[1:], log)
-            print_floats(motion_levels(inp, mobj, tb, bar, strict, temp, log))
+            print_floats(motion_levels(ensure, inp, mobj, tb, bar, strict, temp, log))
 
         if method == "pixeldiff":
             pobj = parse_dataclass(attrs, Pixeldiff, pixeldiff_builder[1:], log)
-            print_ints(pixeldiff_levels(inp, pobj, tb, bar, strict, temp, log))
+            print_ints(pixeldiff_levels(ensure, inp, pobj, tb, bar, strict, temp, log))
 
     log.cleanup()
 

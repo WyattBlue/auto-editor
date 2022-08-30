@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import List, NamedTuple, Type, Union
+from typing import TYPE_CHECKING, List, NamedTuple, Type, Union
 
 import numpy as np
 
-from auto_editor.ffwrapper import FileInfo
 from auto_editor.method import get_has_loud
 from auto_editor.objects import (
     AudioObj,
@@ -15,11 +14,16 @@ from auto_editor.objects import (
     TextObj,
     VideoObj,
 )
-from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import apply_margin, cook, set_range
-from auto_editor.utils.log import Log
-from auto_editor.utils.types import Margin
+
+if TYPE_CHECKING:
+    from auto_editor.ffwrapper import FileInfo
+    from auto_editor.output import Ensure
+    from auto_editor.utils.bar import Bar
+    from auto_editor.utils.log import Log
+    from auto_editor.utils.types import Margin
+
 
 Visual = Type[Union[TextObj, ImageObj, RectangleObj, EllipseObj]]
 VLayer = List[Union[VideoObj, Visual]]
@@ -93,6 +97,7 @@ def make_av(
 
 def make_layers(
     inputs: list[FileInfo],
+    ensure: Ensure,
     tb: Fraction,
     method: str,
     margin: Margin,
@@ -127,7 +132,7 @@ def make_layers(
     strict = len(inputs) < 2
 
     for i, inp in enumerate(inputs):
-        has_loud = get_has_loud(method, inp, strict, tb, bar, temp, log)
+        has_loud = get_has_loud(method, inp, ensure, strict, tb, bar, temp, log)
         has_loud_length = len(has_loud)
 
         if len(mark_loud) > 0:

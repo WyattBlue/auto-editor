@@ -9,6 +9,28 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 
 
+class Ensure:
+    __slots__ = ("_ffmpeg", "_sr", "temp", "log")
+
+    def __init__(self, ffmpeg: FFmpeg, sr: int, temp: str, log: Log) -> None:
+        self._ffmpeg = ffmpeg
+        self._sr = sr
+        self.temp = temp
+        self.log = log
+
+    def audio(self, path: str, index: int, stream: int) -> str:
+        out_path = os.path.join(self.temp, f"{index}-{stream}.wav")
+
+        if not os.path.isfile(out_path):
+            self.log.conwrite("Extracting audio")
+
+            cmd = ["-i", path, "-map", f"0:a:{stream}"]
+            cmd += ["-ac", "2", "-ar", f"{self._sr}", "-rf64", "always", out_path]
+            self._ffmpeg.run(cmd)
+
+        return out_path
+
+
 def _ffset(cmd: list[str], option: str, value: str | None) -> list[str]:
     if value is None or value == "unset":
         return cmd
