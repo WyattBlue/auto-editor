@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.output import Ensure
 from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunk, Chunks
@@ -163,13 +164,6 @@ def edit_media(
         ffmpeg.run(cmd)
         del inp
 
-    log.conwrite("Extracting audio")
-
-    cmd = []
-    for inp in inputs:
-        cmd.extend(["-i", inp.path])
-    cmd.append("-hide_banner")
-
     if args.sample_rate is None:
         if inputs:
             samplerate = inputs[0].get_samplerate()
@@ -178,26 +172,10 @@ def edit_media(
     else:
         samplerate = args.sample_rate
 
-    for inp in inputs:
-        for s in range(len(inp.audios)):
-            cmd.extend(
-                [
-                    "-map",
-                    f"{inp.index}:a:{s}",
-                    "-ac",
-                    "2",
-                    "-ar",
-                    f"{samplerate}",
-                    "-rf64",
-                    "always",
-                    os.path.join(temp, f"{inp.index}-{s}.wav"),
-                ]
-            )
-
-    ffmpeg.run(cmd)
+    ensure = Ensure(ffmpeg, samplerate, temp, log)
 
     if timeline is None:
-        timeline = make_timeline(inputs, args, samplerate, bar, temp, log)
+        timeline = make_timeline(inputs, ensure, args, samplerate, bar, temp, log)
 
     if args.timeline:
         from auto_editor.formats.json import make_json_timeline
@@ -208,7 +186,7 @@ def edit_media(
     if args.preview:
         from auto_editor.preview import preview
 
-        preview(timeline, temp, log)
+        preview(ensure, timeline, temp, log)
         return None
 
     if out_ext == "json":
@@ -221,7 +199,7 @@ def edit_media(
     if args.export == "premiere":
         from auto_editor.formats.premiere import premiere_xml
 
-        premiere_xml(temp, output, timeline)
+        premiere_xml(ensure, output, timeline)
         return output
 
     if args.export == "final-cut-pro":
@@ -253,7 +231,7 @@ def edit_media(
         if ctr.allow_audio:
             from auto_editor.render.audio import make_new_audio
 
-            audio_output = make_new_audio(timeline, ffmpeg, bar, temp, log)
+            audio_output = make_new_audio(timeline, ensure, ffmpeg, bar, temp, log)
 
         if ctr.allow_video:
             if len(timeline.v) > 0:
@@ -306,7 +284,7 @@ def edit_media(
                 continue
 
             _c = pad_chunk(chunk, total_frames)
-            vspace, aspace = make_av([clipify(_c, 0)], [inp])
+            vspace, aspace = make_av([clipify(_c, 0)], [timeline.inputs[0]])
             my_timeline = Timeline(
                 timeline.inputs,
                 timeline.timebase,

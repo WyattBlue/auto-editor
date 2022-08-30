@@ -171,6 +171,7 @@ class FileInfo:
         "dirname",
         "name",
         "ext",
+        "modified",
         "bitrate",
         "duration",
         "description",
@@ -208,6 +209,12 @@ class FileInfo:
         self.subtitles: list[SubtitleStream] = []
         self.description = None
         self.duration = ""
+
+        try:
+            stats = os.stat(path)
+            self.modified = stats.st_mtime
+        except OSError:
+            log.error(f"Could not access: {path}")
 
         _dir = os.path.dirname(ffmpeg.path)
         _ext = os.path.splitext(ffmpeg.path)[1]

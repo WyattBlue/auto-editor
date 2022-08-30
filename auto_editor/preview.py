@@ -4,6 +4,7 @@ from fractions import Fraction
 from statistics import fmean, median
 
 from auto_editor.analyze import get_media_length
+from auto_editor.output import Ensure
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
@@ -19,13 +20,13 @@ def time_frame(title: str, ticks: float, tb: Fraction, per: str | None = None) -
     print(f" - {f'{title}:':<{tp}} {tc:<{tcp}} {f'({ticks:.{preci}f})':<6}{end}")
 
 
-def all_cuts(timeline: Timeline, in_len: int) -> list[int]:
+def all_cuts(tl: Timeline, in_len: int) -> list[int]:
     # Calculate cuts
-    tb = timeline.timebase
+    tb = tl.timebase
     oe: list[tuple[int, int]] = []
 
     # TODO: Make offset_end_pairs work on overlapping clips.
-    for clip in timeline.a[0]:
+    for clip in tl.a[0]:
         oe.append((clip.offset, clip.offset + clip.dur))
 
     cut_lens = []
@@ -42,16 +43,16 @@ def all_cuts(timeline: Timeline, in_len: int) -> list[int]:
     return cut_lens
 
 
-def preview(timeline: Timeline, temp: str, log: Log) -> None:
+def preview(ensure: Ensure, tl: Timeline, temp: str, log: Log) -> None:
     log.conwrite("")
-    tb = timeline.timebase
+    tb = tl.timebase
 
     # Calculate input videos length
     in_len = 0
-    for inp in timeline.inputs:
-        in_len += get_media_length(inp, timeline.timebase, temp, log)
+    for inp in tl.inputs:
+        in_len += get_media_length(ensure, inp, tl.timebase, temp, log)
 
-    out_len = timeline.out_len()
+    out_len = tl.out_len()
 
     diff = out_len - in_len
 
@@ -60,7 +61,7 @@ def preview(timeline: Timeline, temp: str, log: Log) -> None:
     time_frame("output", out_len, tb, per=f"{round((out_len / in_len) * 100, 2)}%")
     time_frame("diff", diff, tb, per=f"{round((diff / in_len) * 100, 2)}%")
 
-    clip_lens = [clip.dur / clip.speed for clip in timeline.a[0]]
+    clip_lens = [clip.dur / clip.speed for clip in tl.a[0]]
     log.debug(clip_lens)
 
     print(f"clips:\n - amount:    {len(clip_lens)}")
@@ -71,7 +72,7 @@ def preview(timeline: Timeline, temp: str, log: Log) -> None:
         time_frame("median", median(clip_lens), tb)
         time_frame("average", fmean(clip_lens), tb)
 
-    cut_lens = all_cuts(timeline, in_len)
+    cut_lens = all_cuts(tl, in_len)
     log.debug(cut_lens)
     print(f"cuts:\n - amount:    {len(clip_lens)}")
     if len(cut_lens) > 0:

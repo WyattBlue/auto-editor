@@ -5,6 +5,7 @@ import os
 import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg
+from auto_editor.output import Ensure
 from auto_editor.timeline import Timeline
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
@@ -12,7 +13,7 @@ from auto_editor.wavfile import AudioData, read, write
 
 
 def make_new_audio(
-    timeline: Timeline, ffmpeg: FFmpeg, bar: Bar, temp: str, log: Log
+    timeline: Timeline, ensure: Ensure, ffmpeg: FFmpeg, bar: Bar, temp: str, log: Log
 ) -> list[str]:
     sr = timeline.samplerate
     tb = timeline.timebase
@@ -20,7 +21,7 @@ def make_new_audio(
     samples = {}
 
     if len(timeline.a) == 0 or len(timeline.a[0]) == 0:
-        log.error("Trying to audio render empty timeline")
+        log.error("Trying to render empty audio timeline")
 
     for l, layer in enumerate(timeline.a):
         bar.start(len(layer), "Creating new audio")
@@ -31,8 +32,9 @@ def make_new_audio(
 
         for c, clip in enumerate(layer):
             if f"{clip.src}-{clip.stream}" not in samples:
-                audio_path = os.path.join(temp, f"{clip.src}-{clip.stream}.wav")
-                assert os.path.exists(audio_path), f"{audio_path} Not found"
+                audio_path = ensure.audio(
+                    timeline.inputs[clip.src].path, clip.src, clip.stream
+                )
                 samples[f"{clip.src}-{clip.stream}"] = read(audio_path)[1]
 
             if arr is None:
@@ -71,7 +73,7 @@ def make_new_audio(
 
                 write(tsm, sr, samp_list[samp_start:samp_end])
 
-                cmd = ["-hide_banner", "-y", "-i", tsm, "-af"]
+                cmd = ["-i", tsm, "-af"]
 
                 if clip.speed > 10_000:
                     atempo = ",".join([f"atempo={clip.speed}^.33333"] * 3)

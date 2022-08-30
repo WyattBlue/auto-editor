@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from auto_editor.ffwrapper import FileInfo
+    from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
 
@@ -85,8 +86,9 @@ def operand_combine(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
 def get_has_loud(
     token_str: str,
     inp: FileInfo,
+    ensure: Ensure,
     strict: bool,
-    timebase: Fraction,
+    tb: Fraction,
     bar: Bar,
     temp: str,
     log: Log,
@@ -118,13 +120,13 @@ def get_has_loud(
                 log.error("Logic operator must be between two editing methods.")
 
             if token == "none":
-                stream_data = get_none(inp, timebase, temp, log)
+                stream_data = get_none(ensure, inp, tb, temp, log)
             if token == "all":
-                stream_data = get_all(inp, timebase, temp, log)
+                stream_data = get_all(ensure, inp, tb, temp, log)
             if token == "random":
                 robj = parse_dataclass(attrs, Random, random_builder, log)
                 stream_data = to_threshold(
-                    random_levels(inp, robj, timebase, temp, log),
+                    random_levels(ensure, inp, robj, tb, temp, log),
                     robj.threshold,
                 )
             if token == "audio":
@@ -134,7 +136,7 @@ def get_has_loud(
                     total_list: NDArray[np.bool_] | None = None
                     for s in range(len(inp.audios)):
                         audio_list = to_threshold(
-                            audio_levels(inp, s, timebase, bar, strict, temp, log),
+                            audio_levels(ensure, inp, s, tb, bar, strict, temp, log),
                             aobj.threshold,
                         )
                         if total_list is None:
@@ -146,12 +148,12 @@ def get_has_loud(
                     if total_list is None:
                         if strict:
                             log.error("Input has no audio streams.")
-                        stream_data = get_all(inp, timebase, temp, log)
+                        stream_data = get_all(ensure, inp, tb, temp, log)
                     else:
                         stream_data = total_list
                 else:
                     stream_data = to_threshold(
-                        audio_levels(inp, s, timebase, bar, strict, temp, log),
+                        audio_levels(ensure, inp, s, tb, bar, strict, temp, log),
                         aobj.threshold,
                     )
 
@@ -160,7 +162,7 @@ def get_has_loud(
 
                 mobj = parse_dataclass(attrs, Motion, motion_builder, log)
                 stream_data = to_threshold(
-                    motion_levels(inp, mobj, timebase, bar, strict, temp, log),
+                    motion_levels(ensure, inp, mobj, tb, bar, strict, temp, log),
                     mobj.threshold,
                 )
 
@@ -169,7 +171,7 @@ def get_has_loud(
 
                 pobj = parse_dataclass(attrs, Pixeldiff, pixeldiff_builder, log)
                 stream_data = to_threshold(
-                    pixeldiff_levels(inp, pobj, timebase, bar, strict, temp, log),
+                    pixeldiff_levels(ensure, inp, pobj, tb, bar, strict, temp, log),
                     pobj.threshold,
                 )
 
