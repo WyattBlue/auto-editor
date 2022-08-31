@@ -54,9 +54,6 @@ def set_video_codec(
             log.error("Input file does not have a video stream to copy codec from.")
         codec = inp.videos[0].codec
 
-    if codec == "uncompressed":
-        codec = "mpeg4"
-
     if ctr.vstrict:
         assert ctr.vcodecs is not None
         if codec not in ctr.vcodecs:

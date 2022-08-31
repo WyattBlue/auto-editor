@@ -322,7 +322,6 @@ def main() -> None:
                 ({"--export-to-shotcut", "-exs"}, ["--export", "shotcut"]),
                 ({"--export-as-json"}, ["--export", "json"]),
                 ({"--export-as-clip-sequence", "-excs"}, ["--export", "clip-sequence"]),
-                ({"--combine-files"}, []),
                 ({"--keep-tracks-seperate"}, ["--keep-tracks-separate"]),
             ],
         )

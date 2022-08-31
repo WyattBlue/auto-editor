@@ -7,8 +7,8 @@ from platform import system
 from shutil import move
 from urllib.parse import quote
 
-from auto_editor.timeline import Timeline
 from auto_editor.output import Ensure
+from auto_editor.timeline import Timeline
 
 from .utils import indent, safe_mkdir
 

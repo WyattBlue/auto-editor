@@ -90,7 +90,9 @@ def _dict_tag(tag: str, tb: Fraction, obj) -> tuple[str, dict]:
     return key, obj_dict
 
 
-def read_cache(inp: FileInfo, tb: Fraction, tag: str, obj, temp: str) -> None | np.ndarray:
+def read_cache(
+    inp: FileInfo, tb: Fraction, tag: str, obj, temp: str
+) -> None | np.ndarray:
     from auto_editor import version
 
     workfile = os.path.join(os.path.dirname(temp), f"ae-{version}", "cache.json")
@@ -112,7 +114,9 @@ def read_cache(inp: FileInfo, tb: Fraction, tag: str, obj, temp: str) -> None | 
     return np.asarray(root[key]["arr"], dtype=root[key]["type"])
 
 
-def cache(tag: str, tb: Fraction, obj, arr: np.ndarray, inp: FileInfo, temp: str) -> np.ndarray:
+def cache(
+    tag: str, tb: Fraction, obj, arr: np.ndarray, inp: FileInfo, temp: str
+) -> np.ndarray:
     from auto_editor import version
 
     workdur = os.path.join(os.path.dirname(temp), f"ae-{version}")
