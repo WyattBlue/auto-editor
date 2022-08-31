@@ -552,7 +552,7 @@ def main(sys_args: list[str] | None = None):
         )
         out2 = run.main(
             ["resources/only-video/man-on-green-screen.mp4"],
-            ["--edit", "motion:threshold=0"],
+            ["--edit", "motion:threshold=0,width=200"],
         )
         return out, out2
 

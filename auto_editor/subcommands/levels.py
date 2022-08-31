@@ -134,7 +134,11 @@ def main(sys_args=sys.argv[1:]) -> None:
             )
 
         if method == "motion":
-            mobj = parse_dataclass(attrs, Motion, motion_builder[1:], log)
+            if inp.videos:
+                _vars = {"width": inp.videos[0].width}
+            else:
+                _vars = {"width": 1}
+            mobj = parse_dataclass(attrs, Motion, motion_builder[1:], log, _vars)
             print_floats(motion_levels(ensure, inp, mobj, tb, bar, strict, temp, log))
 
         if method == "pixeldiff":
