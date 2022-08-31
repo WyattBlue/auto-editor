@@ -160,7 +160,12 @@ def get_has_loud(
             if token == "motion":
                 from auto_editor.analyze import motion_levels
 
-                mobj = parse_dataclass(attrs, Motion, motion_builder, log)
+                if inp.videos:
+                    _vars = {"width": inp.videos[0].width}
+                else:
+                    _vars = {"width": 1}
+
+                mobj = parse_dataclass(attrs, Motion, motion_builder, log, _vars)
                 stream_data = to_threshold(
                     motion_levels(ensure, inp, mobj, tb, bar, strict, temp, log),
                     mobj.threshold,
