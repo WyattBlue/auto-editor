@@ -43,7 +43,7 @@ setup(
         "numpy>=1.22.0",
         "pillow==9.2.0",
         "av==9.2.0",
-        "ae-ffmpeg==1.0.0",
+        "ae-ffmpeg==1.1.0",
     ],
     python_requires=">=3.8",
     classifiers=[
