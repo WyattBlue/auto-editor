@@ -299,7 +299,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         metavar="CMD",
         help="Add extra options for ffmpeg. Must be in quotes",
     )
-    parser.add_argument("--version", flag=True, help="Display version and halt")
+    parser.add_argument("--version", "-V", flag=True, help="Display version and halt")
     return parser
 
 

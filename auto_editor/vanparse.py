@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from shutil import get_terminal_size
 from typing import Any, Callable, Iterator, Literal, TypeVar, Union
 
-import auto_editor
 from auto_editor.utils.log import Log
 
 T = TypeVar("T", bound=type)
@@ -225,10 +224,6 @@ class ArgumentParser:
     ) -> T:
         if len(sys_args) == 0:
             out(get_help_data()[self.program_name]["_"])
-            sys.exit()
-
-        if len(sys_args) == 1 and sys_args[0] in ("-v", "-V"):
-            sys.stdout.write(f"{auto_editor.version} ({auto_editor.__version__})\n")
             sys.exit()
 
         if macros is not None:
