@@ -32,7 +32,7 @@ jobs:
         mv Darwin-arm64 ae_ffmpeg
         mv ae_ffmpeg/Darwin-x86_64 ./
 
-        python setup.py bdist_wheel --plat-name=macosx_10_9_arm64
+        python setup.py bdist_wheel --plat-name=macosx_11_0_arm64
         twine upload dist/*
         rm -rf dist build
 
