@@ -23,13 +23,21 @@ jobs:
       run: |
         cd ae-ffmpeg
         mv ae_ffmpeg/Windows ./
-        python setup.py bdist_wheel --plat-name=macosx_10_9_x86_64
+        mv ae_ffmpeg/Darwin-arm64 ./
 
+        python setup.py bdist_wheel --plat-name=macosx_10_9_x86_64
+        twine upload dist/*
+        rm -rf dist build
+
+        mv Darwin-arm64 ae_ffmpeg
+        mv ae_ffmpeg/Darwin-x86_64 ./
+
+        python setup.py bdist_wheel --plat-name=macosx_10_9_arm64
         twine upload dist/*
         rm -rf dist build
 
         mv Windows ae_ffmpeg
-        mv ae_ffmpeg/Darwin ./
+        mv ae_ffmpeg/Darwin-arm64 ./
 
         python setup.py bdist_wheel --plat-name=win_amd64
         twine upload dist/*
