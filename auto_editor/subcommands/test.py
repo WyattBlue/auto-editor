@@ -180,9 +180,7 @@ def main(sys_args: list[str] | None = None):
     def version_test():
         """Test version flags and debug by itself."""
         run.raw(["--version"])
-        run.raw(["-v"])
         run.raw(["-V"])
-        run.raw(["--debug"])
 
     def parser_test():
         run.check(["example.mp4", "--video-speed"], "needs argument")
