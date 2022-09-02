@@ -1,7 +1,6 @@
 import re
 from setuptools import setup, find_packages
 
-
 def pip_version():
     with open("auto_editor/__init__.py") as f:
         version_content = f.read()
