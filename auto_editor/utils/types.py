@@ -88,7 +88,7 @@ def frame_rate(val: str) -> Fraction:
         return Fraction(25)
     if val == "film":
         return Fraction(24)
-    return Fraction(number(val))
+    return Fraction(val)
 
 
 def sample_rate(val: str) -> int:
@@ -100,6 +100,14 @@ def sample_rate(val: str) -> int:
 
 
 def time(val: str) -> int | str:
+    if ":" in val:
+        boxes = val.split(":")
+        if len(boxes) == 2:
+            return str(int(boxes[0]) * 60 + float(boxes[1]))
+        if len(boxes) == 3:
+            return str(int(boxes[0]) * 3600 + int(boxes[1]) * 60 + float(boxes[2]))
+        raise TypeError(f"'{val}': Invalid time format")
+
     num, unit = _split_num_str(val)
     if unit in ("s", "sec", "secs", "second", "seconds"):
         return str(num)
@@ -111,7 +119,7 @@ def time(val: str) -> int | str:
     _unit_check(unit, ("",))
     if not isinstance(num, int) and not num.is_integer():
         raise TypeError(
-            f"'{val}': Time uses ticks by default and ticks doesn't accept non-ints."
+            f"'{val}': Time uses ticks by default and ticks only accept ints."
         )
     return int(num)
 
