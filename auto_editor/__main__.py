@@ -38,6 +38,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_argument(
         "--min-clip-length",
+        "--min-clip",
         "-minclip",
         "-mclip",
         type=time,
@@ -46,6 +47,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_argument(
         "--min-cut-length",
+        "--min-cut",
         "-mincut",
         "-mcut",
         type=time,
@@ -115,6 +117,8 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--frame-rate",
         "-fps",
         "-r",
+        "--time-base",
+        "-tb",
         type=frame_rate,
         metavar="NUM",
         help="Set timeline frame rate",

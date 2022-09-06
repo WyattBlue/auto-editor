@@ -35,9 +35,7 @@ setup(
     keywords="video audio media editor editing processing nonlinear automatic "
     "silence-detect silence-removal silence-speedup motion-detection",
     packages=find_packages(),
-    package_data={"auto_editor": ["help.json"]},
-    include_package_data=True,
-    zip_safe=False,
+    zip_safe=True,
     install_requires=[
         "numpy>=1.22.0",
         "pillow==9.2.0",
