@@ -95,7 +95,7 @@ def print_program_help(reqs: list[Required], args: list[Options | OptionText]) -
                     width=width,
                     initial_indent=f"{line}{' ' * (split - len(line))}",
                     subsequent_indent=split * " ",
-                ).replace("&", "")
+                )
             else:
                 line += "\n"
                 line += textwrap.fill(
@@ -108,19 +108,6 @@ def print_program_help(reqs: list[Required], args: list[Options | OptionText]) -
             text += line
     text += "\n\n"
     sys.stdout.write(text)
-
-
-def get_help_data() -> dict[str, dict[str, str]]:
-    import json
-    import os.path
-
-    dirpath = os.path.dirname(os.path.realpath(__file__))
-
-    with open(os.path.join(dirpath, "help.json")) as fileobj:
-        data = json.load(fileobj)
-
-    assert isinstance(data, dict)
-    return data
 
 
 def to_underscore(name: str) -> str:
@@ -163,11 +150,14 @@ def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
         if option.choices is not None:
             text += "    choices: " + ", ".join(option.choices) + "\n"
 
-    text += f"    {'-' * (bar_len - 5)}\n\n    {option.help}\n\n"
-    data = get_help_data()
+    text += f"    {'-' * (bar_len - 5)}\n\n"
+
+    from auto_editor.help import data
 
     if option.names[0] in data[program_name]:
         text += indent(data[program_name][option.names[0]], "    ") + "\n"
+    else:
+        text += f"     {option.help}\n\n"
 
     out(text)
 
