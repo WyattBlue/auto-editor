@@ -38,14 +38,14 @@ def main(sys_args=sys.argv[1:]) -> None:
     log = Log(temp=temp)
 
     for i, input_file in enumerate(args.input):
-        inp = FileInfo(i, input_file, ffmpeg, log)
+        src = FileInfo(input_file, i, ffmpeg, log)
 
         cmd = ["-i", input_file]
-        for s, sub in enumerate(inp.subtitles):
+        for s, sub in enumerate(src.subtitles):
             cmd.extend(["-map", f"0:s:{s}", os.path.join(temp, f"{i}s{s}.{sub.ext}")])
         ffmpeg.run(cmd)
 
-        for s, sub in enumerate(inp.subtitles):
+        for s, sub in enumerate(src.subtitles):
             print(f"file: {input_file} ({s}:{sub.lang}:{sub.ext})")
             with open(os.path.join(temp, f"{i}s{s}.{sub.ext}")) as file:
                 print(file.read())

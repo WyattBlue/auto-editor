@@ -155,6 +155,13 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         metavar="OBJ:START,DUR,ATTRS?",
         help="Insert an timeline object to the timeline",
     )
+    parser.add_argument(
+        "--source",
+        "-src",
+        nargs="*",
+        metavar="LABEL:PATH",
+        help="Add a source and associate it with a label",
+    )
     parser.add_text("URL Download Options:")
     parser.add_argument(
         "--yt-dlp-location",

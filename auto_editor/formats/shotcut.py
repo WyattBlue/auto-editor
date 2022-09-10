@@ -25,7 +25,7 @@ def shotcut_xml(
     if chunks is None:
         raise ValueError("Timeline too complex")
     tb = timeline.timebase
-    inp = timeline.inp
+    src = timeline.sources[0]
 
     global_out = to_timecode(timeline.out_len() / tb, "standard")
     version = "21.05.18"
@@ -79,12 +79,12 @@ def shotcut_xml(
             length = to_timecode((clip[1] / speed + 1) / tb, "standard")
 
             if speed == 1:
-                resource = inp.path
-                caption = inp.basename
+                resource = src.path
+                caption = src.basename
                 out.write(f'\t<chain id="chain{chains}" out="{_out}">\n')
             else:
-                resource = f"{speed}:{inp.path}"
-                caption = f"{inp.basename} ({speed}x)"
+                resource = f"{speed}:{src.path}"
+                caption = f"{src.basename} ({speed}x)"
                 out.write(
                     f'\t<producer id="producer{producers}" in="00:00:00.000" out="{_out}">\n'
                 )
@@ -114,7 +114,7 @@ def shotcut_xml(
                 out.write('\t\t<property name="video_index">0</property>\n')
                 out.write('\t\t<property name="mute_on_pause">1</property>\n')
                 out.write(f'\t\t<property name="warp_speed">{speed}</property>\n')
-                out.write(f'\t\t<property name="warp_resource">{inp.path}</property>\n')
+                out.write(f'\t\t<property name="warp_resource">{src.path}</property>\n')
                 out.write('\t\t<property name="mlt_service">timewarp</property>\n')
                 out.write('\t\t<property name="shotcut:producer">avformat</property>\n')
                 out.write('\t\t<property name="video_delay">0</property>\n')

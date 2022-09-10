@@ -63,8 +63,8 @@ def render_av(
     log: Log,
 ) -> tuple[str, bool]:
 
-    inp = timeline.inp
-    cns = [av.open(inp.path, "r") for inp in timeline.inputs]
+    src = None if not timeline.sources else timeline.sources[0]
+    cns = [av.open(src.path, "r") for src in timeline.sources.values()]
 
     font_cache, img_cache = make_caches(timeline.v, log)
 
@@ -139,11 +139,11 @@ def render_av(
     if apply_video_later:
         cmd.extend(["-c:v", "mpeg4", "-qscale:v", "1"])
     else:
-        cmd = video_quality(cmd, args, inp, ctr)
+        cmd = video_quality(cmd, args, ctr)
 
     # Setting SAR requires re-encoding so we do it here.
-    if timeline.inputs and timeline.inputs[0].videos:
-        if (sar := timeline.inputs[0].videos[0].sar) is not None:
+    if src is not None and src.videos:
+        if (sar := src.videos[0].sar) is not None:
             cmd.extend(["-vf", f"setsar={sar.replace(':', '/')}"])
 
     cmd.append(spedup)

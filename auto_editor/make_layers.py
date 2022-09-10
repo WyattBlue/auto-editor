@@ -29,7 +29,7 @@ Visual = Type[Union[TextObj, ImageObj, RectangleObj, EllipseObj]]
 VLayer = List[Union[VideoObj, Visual]]
 VSpace = List[VLayer]
 
-ALayer = List[AudioObj]
+ALayer = List[Type[AudioObj]]
 ASpace = List[ALayer]
 
 
@@ -63,18 +63,19 @@ def clipify(chunks: Chunks, src: int, start: Fraction = Fraction(0)) -> list[Cli
 
 
 def make_av(
-    all_clips: list[list[Clip]], inputs: list[FileInfo]
+    all_clips: list[list[Clip]], sources: dict[int | str, FileInfo], inputs: list[int]
 ) -> tuple[VSpace, ASpace]:
     vclips: VSpace = []
 
     max_a = 0
     for inp in inputs:
-        max_a = max(max_a, len(inp.audios))
+        max_a = max(max_a, len(sources[inp].audios))
 
     aclips: ASpace = [[] for a in range(max_a)]
 
     for clips, inp in zip(all_clips, inputs):
-        if len(inp.videos) > 0:
+        src = sources[inp]
+        if len(src.videos) > 0:
             for clip in clips:
                 vclip_ = VideoObj(
                     clip.start, clip.dur, clip.offset, clip.speed, clip.src, 0
@@ -83,9 +84,9 @@ def make_av(
                     vclips = [[vclip_]]
                 else:
                     vclips[0].append(vclip_)
-        if len(inp.audios) > 0:
+        if len(src.audios) > 0:
             for clip in clips:
-                for a, _ in enumerate(inp.audios):
+                for a, _ in enumerate(src.audios):
                     aclips[a].append(
                         AudioObj(
                             clip.start, clip.dur, clip.offset, clip.speed, clip.src, a
@@ -96,7 +97,8 @@ def make_av(
 
 
 def make_layers(
-    inputs: list[FileInfo],
+    sources: dict[int | str, FileInfo],
+    inputs: list[int],
     ensure: Ensure,
     tb: Fraction,
     method: str,
@@ -131,8 +133,9 @@ def make_layers(
 
     strict = len(inputs) < 2
 
-    for i, inp in enumerate(inputs):
-        has_loud = get_has_loud(method, inp, ensure, strict, tb, bar, temp, log)
+    for i in inputs:
+        src = sources[i]
+        has_loud = get_has_loud(method, src, ensure, strict, tb, bar, temp, log)
         has_loud_length = len(has_loud)
 
         if len(mark_loud) > 0:
@@ -182,5 +185,6 @@ def make_layers(
         all_clips.append(clipify(chunks, i, start))
         start += round(chunks_len(chunks))
 
-    vclips, aclips = make_av(all_clips, inputs)
+    vclips, aclips = make_av(all_clips, sources, inputs)
+
     return merge_chunks(all_chunks), vclips, aclips

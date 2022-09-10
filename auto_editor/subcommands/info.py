@@ -96,9 +96,9 @@ def main(sys_args=sys.argv[1:]) -> None:
         if not os.path.isfile(file):
             Log().error(f"Could not find file: {file}")
 
-        inp = FileInfo(i, file, ffmpeg, log)
+        src = FileInfo(file, i, ffmpeg, log)
 
-        if len(inp.videos) + len(inp.audios) + len(inp.subtitles) == 0:
+        if len(src.videos) + len(src.audios) + len(src.subtitles) == 0:
             file_info[file] = {"media": "invalid"}
             continue
 
@@ -107,13 +107,13 @@ def main(sys_args=sys.argv[1:]) -> None:
             "audio": [],
             "subtitle": [],
             "container": {
-                "duration": inp.duration,
-                "bitrate": inp.bitrate,
+                "duration": src.duration,
+                "bitrate": src.bitrate,
                 "fps_mode": None,
             },
         }
 
-        for track, v in enumerate(inp.videos):
+        for track, v in enumerate(src.videos):
             w, h = v.width, v.height
 
             vid: VideoJson = {
@@ -134,7 +134,7 @@ def main(sys_args=sys.argv[1:]) -> None:
             }
             file_info[file]["video"].append(vid)
 
-        for track, a in enumerate(inp.audios):
+        for track, a in enumerate(src.audios):
             aud: AudioJson = {
                 "codec": a.codec,
                 "samplerate": a.samplerate,
@@ -144,7 +144,7 @@ def main(sys_args=sys.argv[1:]) -> None:
             }
             file_info[file]["audio"].append(aud)
 
-        for track, s_stream in enumerate(inp.subtitles):
+        for track, s_stream in enumerate(src.subtitles):
             sub: SubtitleJson = {"codec": s_stream.codec, "lang": s_stream.lang}
             file_info[file]["subtitle"].append(sub)
 

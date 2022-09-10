@@ -97,15 +97,15 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         check_file(data["source"], log)
 
         chunks = validate_chunks(data["chunks"], log)
-        inp = FileInfo(0, data["source"], ffmpeg, log)
+        src = FileInfo(data["source"], 0, ffmpeg, log)
 
-        vspace, aspace = make_av([clipify(chunks, 0)], [inp])
+        vspace, aspace = make_av([clipify(chunks, 0)], {0: src}, [0])
 
-        tb = inp.get_fps()
-        sr = inp.get_samplerate()
-        res = inp.get_res()
+        tb = src.get_fps()
+        sr = src.get_samplerate()
+        res = src.get_res()
 
-        return Timeline([inp], tb, sr, res, "#000", vspace, aspace, chunks)
+        return Timeline({0: src}, tb, sr, res, "#000", vspace, aspace, chunks)
 
     if version == (2, 0) or version == (0, 2):
         check_attrs(data, log, "timeline")
@@ -130,19 +130,22 @@ def make_json_timeline(
         if timeline.chunks is None:
             log.error("Timeline too complex to convert to version 1.0")
 
+        if 0 not in timeline.sources:
+            log.debug(f"{timeline.sources}")
+            log.error("API version 1 needs one source, got many")
+
         data: dict = {
             "version": "1.0.0",
-            "source": os.path.abspath(timeline.inp.path),
+            "source": os.path.abspath(timeline.sources[0].path),
             "chunks": timeline.chunks,
         }
     elif version == (2, 0) or version == (0, 2):
-        sources = [os.path.abspath(inp.path) for inp in timeline.inputs]
         data = {
             "version": "2.0.0",
-            "sources": sources,
             "timeline": {
                 "background": timeline.background,
                 "resolution": timeline.res,
+                "sources": [src.abspath for src in timeline.sources.values()],
                 "timebase": str(timeline.timebase),
                 "samplerate": timeline.samplerate,
                 "video": timeline.v,

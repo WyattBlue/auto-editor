@@ -165,6 +165,7 @@ class SubtitleStream:
 
 class FileInfo:
     __slots__ = (
+        "index",
         "path",
         "abspath",
         "basename",
@@ -178,7 +179,6 @@ class FileInfo:
         "videos",
         "audios",
         "subtitles",
-        "index",
     )
 
     def get_res(self) -> tuple[int, int]:
@@ -196,7 +196,7 @@ class FileInfo:
             return self.audios[0].samplerate
         return 48000
 
-    def __init__(self, index: int, path: str, ffmpeg: FFmpeg, log: Log):
+    def __init__(self, path: str, index: int | str, ffmpeg: FFmpeg, log: Log):
         self.index = index
         self.path = path
         self.abspath = os.path.abspath(path)

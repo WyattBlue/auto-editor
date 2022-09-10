@@ -21,7 +21,7 @@ from auto_editor.method import (
     pixeldiff_builder,
     random_builder,
 )
-from auto_editor.objects import parse_dataclass
+from auto_editor.objects import parse_dataclass, _Vars
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
@@ -104,10 +104,15 @@ def main(sys_args=sys.argv[1:]) -> None:
     temp = tempfile.mkdtemp()
     log = Log(temp=temp)
 
-    inputs = [FileInfo(i, istr, ffmpeg, log) for i, istr in enumerate(args.input)]
+    sources = {}
+    for i, path in enumerate(args.input):
+        sources[i] = FileInfo(path, i, ffmpeg, log)
 
-    tb = inputs[0].get_fps() if args.timebase is None else args.timebase
-    ensure = Ensure(ffmpeg, inputs[0].get_samplerate(), temp, log)
+    assert 0 in sources
+    src = sources[0]
+
+    tb = src.get_fps() if args.timebase is None else args.timebase
+    ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
 
     strict = True
 
@@ -122,28 +127,28 @@ def main(sys_args=sys.argv[1:]) -> None:
     if method not in METHODS:
         log.error(f"Method: {method} not supported")
 
-    for inp in inputs:
+    for src in sources.values():
         if method == "random":
-            robj = parse_dataclass(attrs, Random, random_builder[1:], log)
-            print_floats(random_levels(ensure, inp, robj, tb, temp, log))
+            robj = parse_dataclass(attrs, (Random, random_builder[1:]), log)
+            print_floats(random_levels(ensure, src, robj, tb, temp, log))
 
         if method == "audio":
-            aobj = parse_dataclass(attrs, Audio, audio_builder[1:], log)
+            aobj = parse_dataclass(attrs, (Audio, audio_builder[1:]), log)
             print_floats(
-                audio_levels(ensure, inp, aobj.stream, tb, bar, strict, temp, log)
+                audio_levels(ensure, src, aobj.stream, tb, bar, strict, temp, log)
             )
 
         if method == "motion":
-            if inp.videos:
-                _vars = {"width": inp.videos[0].width}
+            if src.videos:
+                _vars: _Vars = {"width": src.videos[0].width}
             else:
                 _vars = {"width": 1}
-            mobj = parse_dataclass(attrs, Motion, motion_builder[1:], log, _vars)
-            print_floats(motion_levels(ensure, inp, mobj, tb, bar, strict, temp, log))
+            mobj = parse_dataclass(attrs, (Motion, motion_builder[1:]), log, _vars)
+            print_floats(motion_levels(ensure, src, mobj, tb, bar, strict, temp, log))
 
         if method == "pixeldiff":
-            pobj = parse_dataclass(attrs, Pixeldiff, pixeldiff_builder[1:], log)
-            print_ints(pixeldiff_levels(ensure, inp, pobj, tb, bar, strict, temp, log))
+            pobj = parse_dataclass(attrs, (Pixeldiff, pixeldiff_builder[1:]), log)
+            print_ints(pixeldiff_levels(ensure, src, pobj, tb, bar, strict, temp, log))
 
     log.cleanup()
 

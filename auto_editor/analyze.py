@@ -30,13 +30,13 @@ def to_threshold(arr: np.ndarray, t: int | float) -> NDArray[np.bool_]:
 
 
 def get_media_length(
-    ensure: Ensure, inp: FileInfo, tb: Fraction, temp: str, log: Log
+    ensure: Ensure, src: FileInfo, tb: Fraction, temp: str, log: Log
 ) -> int:
-    if inp.audios:
-        if (arr := read_cache(inp, tb, "audio", {"stream": 0}, temp)) is not None:
+    if src.audios:
+        if (arr := read_cache(src, tb, "audio", {"stream": 0}, temp)) is not None:
             return len(arr)
 
-        sr, samples = read(ensure.audio(inp.path, inp.index, stream=0))
+        sr, samples = read(ensure.audio(src.path, src.index, stream=0))
         samp_count = len(samples)
         del samples
 
@@ -51,7 +51,7 @@ def get_media_length(
 
     av.logging.set_level(av.logging.PANIC)
 
-    with av.open(inp.path, "r") as cn:
+    with av.open(src.path) as cn:
         if len(cn.streams.video) < 1:
             log.error("Could not get media duration")
 
@@ -63,15 +63,15 @@ def get_media_length(
 
 
 def get_all(
-    ensure: Ensure, inp: FileInfo, tb: Fraction, temp: str, log: Log
+    ensure: Ensure, src: FileInfo, tb: Fraction, temp: str, log: Log
 ) -> NDArray[np.bool_]:
-    return np.zeros(get_media_length(ensure, inp, tb, temp, log), dtype=np.bool_)
+    return np.zeros(get_media_length(ensure, src, tb, temp, log), dtype=np.bool_)
 
 
 def get_none(
-    ensure: Ensure, inp: FileInfo, tb: Fraction, temp: str, log: Log
+    ensure: Ensure, src: FileInfo, tb: Fraction, temp: str, log: Log
 ) -> NDArray[np.bool_]:
-    return np.ones(get_media_length(ensure, inp, tb, temp, log), dtype=np.bool_)
+    return np.ones(get_media_length(ensure, src, tb, temp, log), dtype=np.bool_)
 
 
 def _dict_tag(tag: str, tb: Fraction, obj) -> tuple[str, dict]:
@@ -91,7 +91,7 @@ def _dict_tag(tag: str, tb: Fraction, obj) -> tuple[str, dict]:
 
 
 def read_cache(
-    inp: FileInfo, tb: Fraction, tag: str, obj, temp: str
+    src: FileInfo, tb: Fraction, tag: str, obj, temp: str
 ) -> None | np.ndarray:
     from auto_editor import version
 
@@ -103,19 +103,19 @@ def read_cache(
     with open(workfile) as file:
         cache = json.load(file)
 
-    if inp.path not in cache:
+    if src.path not in cache:
         return None
 
     key, obj_dict = _dict_tag(tag, tb, obj)
 
-    if key not in (root := cache[inp.path]):
+    if key not in (root := cache[src.path]):
         return None
 
     return np.asarray(root[key]["arr"], dtype=root[key]["type"])
 
 
 def cache(
-    tag: str, tb: Fraction, obj, arr: np.ndarray, inp: FileInfo, temp: str
+    tag: str, tb: Fraction, obj, arr: np.ndarray, src: FileInfo, temp: str
 ) -> np.ndarray:
     from auto_editor import version
 
@@ -137,10 +137,10 @@ def cache(
         "arr": arr.tolist(),
     }
 
-    if inp.path in json_object:
-        json_object[inp.path][key] = entry
+    if src.path in json_object:
+        json_object[src.path][key] = entry
     else:
-        json_object[inp.path] = {key: entry}
+        json_object[src.path] = {key: entry}
 
     with open(os.path.join(workdur, "cache.json"), "w") as file:
         file.write(json.dumps(json_object))
@@ -150,7 +150,7 @@ def cache(
 
 def audio_levels(
     ensure: Ensure,
-    inp: FileInfo,
+    src: FileInfo,
     s: int,
     tb: Fraction,
     bar: Bar,
@@ -159,15 +159,15 @@ def audio_levels(
     log: Log,
 ) -> NDArray[np.float_]:
 
-    if s > len(inp.audios) - 1:
+    if s > len(src.audios) - 1:
         if strict:
             log.error(f"Audio stream '{s}' does not exist.")
-        return get_all(ensure, inp, tb, temp, log)
+        return get_all(ensure, src, tb, temp, log)
 
-    if (arr := read_cache(inp, tb, "audio", {"stream": s}, temp)) is not None:
+    if (arr := read_cache(src, tb, "audio", {"stream": s}, temp)) is not None:
         return arr
 
-    sr, samples = read(ensure.audio(inp.path, inp.index, s))
+    sr, samples = read(ensure.audio(src.path, src.index, s))
 
     def get_max_volume(s: np.ndarray) -> float:
         return max(float(np.max(s)), -float(np.min(s)))
@@ -200,12 +200,12 @@ def audio_levels(
         threshold_list[i] = get_max_volume(samples[start:end]) / max_volume
 
     bar.end()
-    return cache("audio", tb, {"stream": s}, threshold_list, inp, temp)
+    return cache("audio", tb, {"stream": s}, threshold_list, src, temp)
 
 
 def motion_levels(
     ensure: Ensure,
-    inp: FileInfo,
+    src: FileInfo,
     mobj,
     tb: Fraction,
     bar: Bar,
@@ -218,15 +218,15 @@ def motion_levels(
 
     av.logging.set_level(av.logging.PANIC)
 
-    if mobj.stream >= len(inp.videos):
+    if mobj.stream >= len(src.videos):
         if not strict:
-            return get_all(ensure, inp, tb, temp, log)
+            return get_all(ensure, src, tb, temp, log)
         log.error(f"Video stream '{mobj.stream}' does not exist.")
 
-    if (arr := read_cache(inp, tb, "motion", mobj, temp)) is not None:
+    if (arr := read_cache(src, tb, "motion", mobj, temp)) is not None:
         return arr
 
-    container = av.open(inp.path, "r")
+    container = av.open(src.path, "r")
 
     stream = container.streams.video[mobj.stream]
     stream.thread_type = "AUTO"
@@ -282,12 +282,12 @@ def motion_levels(
     result = threshold_list[:index]
     del threshold_list
 
-    return cache("motion", tb, mobj, result, inp, temp)
+    return cache("motion", tb, mobj, result, src, temp)
 
 
 def pixeldiff_levels(
     ensure: Ensure,
-    inp: FileInfo,
+    src: FileInfo,
     pobj,
     tb: Fraction,
     bar: Bar,
@@ -300,15 +300,15 @@ def pixeldiff_levels(
 
     av.logging.set_level(av.logging.PANIC)
 
-    if pobj.stream >= len(inp.videos):
+    if pobj.stream >= len(src.videos):
         if not strict:
-            return get_all(ensure, inp, tb, temp, log)
+            return get_all(ensure, src, tb, temp, log)
         log.error(f"Video stream '{pobj.stream}' does not exist.")
 
-    if (arr := read_cache(inp, tb, "pixeldiff", pobj, temp)) is not None:
+    if (arr := read_cache(src, tb, "pixeldiff", pobj, temp)) is not None:
         return arr
 
-    container = av.open(inp.path, "r")
+    container = av.open(src.path, "r")
 
     stream = container.streams.video[pobj.stream]
     stream.thread_type = "AUTO"
@@ -346,11 +346,11 @@ def pixeldiff_levels(
     result = threshold_list[:index]
     del threshold_list
 
-    return cache("pixeldiff", tb, pobj, result, inp, temp)
+    return cache("pixeldiff", tb, pobj, result, src, temp)
 
 
 def random_levels(
-    ensure: Ensure, inp: FileInfo, robj, timebase: Fraction, temp: str, log: Log
+    ensure: Ensure, src: FileInfo, robj, timebase: Fraction, temp: str, log: Log
 ) -> NDArray[np.float_]:
     import random
 
@@ -362,6 +362,6 @@ def random_levels(
 
     arr = [
         random.random()
-        for _ in range(get_media_length(ensure, inp, timebase, temp, log))
+        for _ in range(get_media_length(ensure, src, timebase, temp, log))
     ]
     return np.array(arr, dtype=np.float_)

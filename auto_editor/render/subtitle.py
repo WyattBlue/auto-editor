@@ -126,10 +126,9 @@ def cut_subtitles(
     temp: str,
     log: Log,
 ) -> None:
-    inp = timeline.inp
     chunks = timeline.chunks
 
-    for s, sub in enumerate(inp.subtitles):
+    for s, sub in enumerate(timeline.sources[0].subtitles):
         if chunks is None:
             log.error("Timeline too complex for subtitles")
 

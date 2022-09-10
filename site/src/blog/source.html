@@ -1,0 +1,36 @@
+{{ comp.header "New option: --source" }}
+<body>
+{{ comp.blog-nav }}
+<section class="section">
+<div class="container">
+    <!-- Titles Are Capitalized in AP Style -->
+    <h1>Source</h1>
+    <p class="author">Author: <b>WyattBlue</b></p>
+    <p class="date">Date: <b>September 9, 2022</b></p>
+    <hr>
+    <h3>Why Can’t Source Files Be Added Directly?</h3>
+    <p>File paths can have almost any character, including <code>,</code> <code>=</code>, which is a problem because auto-editor uses those characters for syntax.</p>
+    
+    <pre><code>auto-editor movie.mp4 movie2.mp4 --source funydog:/Users/wyattblue/Downloads/dog-123.png \
+--add image:0,30,src=funydog
+</pre></code>
+<p><code>funydog</code> is the label that points to the file path.</p> 
+
+<pre><code>sources:
+  0 -> movie.mp4
+  1 -> movie2.mp4
+  funydog -> /Users/wyattblue/Downloads/dog-123.png
+</pre></code>
+
+<p>Users defined labels cannot:</p>
+<ul>
+    <li>Be greater than 500 characters</li>
+    <li>Start with a digit or a dash</li>
+    <li>Contain <code>, = . : ; ( ) / \ [ ] { }' " | # &lt; &gt; &amp; ^ % $ _ @</code> anywhere</li>
+    <li>Be an invalid UTF-8 character</li>
+    <li>Contain the space character</li>
+</ul>
+</div>
+</section>
+</body>
+</html>
