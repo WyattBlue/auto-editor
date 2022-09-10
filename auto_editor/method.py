@@ -13,7 +13,7 @@ from auto_editor.analyze import (
     random_levels,
     to_threshold,
 )
-from auto_editor.objects import Attr, parse_dataclass, _Vars
+from auto_editor.objects import Attr, _Vars, parse_dataclass
 from auto_editor.utils.types import Stream, natural, stream, threshold
 
 if TYPE_CHECKING:

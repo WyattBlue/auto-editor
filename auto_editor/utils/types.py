@@ -72,6 +72,14 @@ def number(val: str | float) -> float:
     return num
 
 
+def src(val: str) -> int | str:
+    try:
+        if int(val) > 0:
+            return int(val)
+    except ValueError:
+        return val
+
+
 def threshold(val: str | float) -> float:
     num = number(val)
     if num > 1 or num < 0:

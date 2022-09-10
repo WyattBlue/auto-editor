@@ -21,7 +21,7 @@ from auto_editor.method import (
     pixeldiff_builder,
     random_builder,
 )
-from auto_editor.objects import parse_dataclass, _Vars
+from auto_editor.objects import _Vars, parse_dataclass
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
