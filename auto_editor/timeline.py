@@ -147,7 +147,6 @@ def make_timeline(
         "height": h,
         "start": 0,
         "end": timeline.end,
-        "sources": sources,
     }
 
     OBJ_ATTRS_SEP = ":"

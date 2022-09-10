@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, NamedTuple, TypedDict, TypeVar
 
-from auto_editor.ffwrapper import FileInfo
-
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     Align,
@@ -14,6 +12,7 @@ from auto_editor.utils.types import (
     natural,
     number,
     pos,
+    src,
     threshold,
 )
 
@@ -29,7 +28,6 @@ class _Vars(TypedDict, total=False):
     height: int
     start: int
     end: int
-    sources: dict[int | str, FileInfo]
 
 
 class Attr(NamedTuple):
@@ -60,7 +58,7 @@ def parse_dataclass(
         if val is None:
             return None
 
-        if name in ("x", "width", "y", "height", "src"):
+        if name in ("x", "width", "y", "height"):
             if _vars is None:
                 log.error("_vars must be set when constructing obj with special attrs")
 
@@ -70,10 +68,6 @@ def parse_dataclass(
                 return pos((val, _vars["width"]))
             if name in ("y", "height"):
                 return pos((val, _vars["height"]))
-            if name == "src":
-                if val not in _vars["sources"]:
-                    log.error(f"Cannot find label: '{val}'")
-                return _vars["sources"][val]
 
         if _type is int and _vars is not None:
             int_vars = {
@@ -163,7 +157,7 @@ class VideoObj:
     dur: int
     offset: int
     speed: float
-    src: int
+    src: int | str
     stream: int
 
 
@@ -173,7 +167,7 @@ class AudioObj:
     dur: int
     offset: int
     speed: float
-    src: int
+    src: int | str
     stream: int
 
 
@@ -201,7 +195,7 @@ class TextObj(Visual):
 
 @dataclass
 class ImageObj(Visual):
-    src: str
+    src: int | str
 
 
 @dataclass
@@ -221,7 +215,7 @@ class EllipseObj(Visual):
 video_builder = [
     Attr(("start",), natural, None),
     Attr(("dur",), natural, None),
-    Attr(("src",), natural, None),
+    Attr(("src",), src, None),
     Attr(("offset",), natural, 0),
     Attr(("speed",), number, 1),
     Attr(("stream", "track"), natural, 0),
@@ -253,7 +247,7 @@ text_builder = [
 img_builder = [
     Attr(("start",), natural, None),
     Attr(("dur",), natural, None),
-    Attr(("src",), str, None),
+    Attr(("src",), src, None),
     Attr(("x",), int, "50%"),
     Attr(("y",), int, "50%"),
     Attr(("opacity",), threshold, 1),
