@@ -48,7 +48,7 @@ def clipify(chunks: Chunks, src: int, start: Fraction = Fraction(0)) -> list[Cli
     for chunk in chunks:
         if chunk[2] != 99999:
             if i == 0:
-                dur = chunk[1] - chunk[0] + 1
+                dur = chunk[1] - chunk[0]
                 offset = chunk[0]
             else:
                 dur = chunk[1] - chunk[0]

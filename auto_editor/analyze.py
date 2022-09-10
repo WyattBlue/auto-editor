@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-from math import ceil
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -178,8 +177,8 @@ def audio_levels(
     samp_count = samples.shape[0]
     samp_per_ticks = sr / tb
 
-    audio_ticks = ceil(samp_count / samp_per_ticks)
-    log.debug(f"Audio Length: {audio_ticks}")
+    audio_ticks = int(samp_count / samp_per_ticks)
+    log.debug(f"analyze: Audio Length: {audio_ticks}")
     log.debug(f"... no rounding: {float(samp_count / samp_per_ticks)}")
 
     bar.start(audio_ticks, "Analyzing audio volume")
