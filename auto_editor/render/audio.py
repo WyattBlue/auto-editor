@@ -33,7 +33,7 @@ def make_new_audio(
         for c, clip in enumerate(layer):
             if f"{clip.src}-{clip.stream}" not in samples:
                 audio_path = ensure.audio(
-                    timeline.inputs[clip.src].path, clip.src, clip.stream
+                    timeline.sources[clip.src].path, clip.src, clip.stream
                 )
                 samples[f"{clip.src}-{clip.stream}"] = read(audio_path)[1]
 

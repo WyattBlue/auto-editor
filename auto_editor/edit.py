@@ -35,10 +35,10 @@ codec_error = "'{}' codec is not supported in '{}' container."
 
 
 def set_video_codec(
-    codec: str, inp: FileInfo | None, out_ext: str, ctr: Container, log: Log
+    codec: str, src: FileInfo | None, out_ext: str, ctr: Container, log: Log
 ) -> str:
     if codec == "auto":
-        codec = "h264" if (inp is None or not inp.videos) else inp.videos[0].codec
+        codec = "h264" if (src is None or not src.videos) else src.videos[0].codec
         if ctr.vcodecs is not None:
             if ctr.vstrict and codec not in ctr.vcodecs:
                 return ctr.vcodecs[0]
@@ -48,11 +48,11 @@ def set_video_codec(
         return codec
 
     if codec == "copy":
-        if inp is None:
+        if src is None:
             log.error("No input to copy its codec from.")
-        if not inp.videos:
+        if not src.videos:
             log.error("Input file does not have a video stream to copy codec from.")
-        codec = inp.videos[0].codec
+        codec = src.videos[0].codec
 
     if ctr.vstrict:
         assert ctr.vcodecs is not None
@@ -66,10 +66,10 @@ def set_video_codec(
 
 
 def set_audio_codec(
-    codec: str, inp: FileInfo | None, out_ext: str, ctr: Container, log: Log
+    codec: str, src: FileInfo | None, out_ext: str, ctr: Container, log: Log
 ) -> str:
     if codec == "auto":
-        codec = "aac" if (inp is None or not inp.audios) else inp.audios[0].codec
+        codec = "aac" if (src is None or not src.audios) else src.audios[0].codec
         if ctr.acodecs is not None:
             if ctr.astrict and codec not in ctr.acodecs:
                 return ctr.acodecs[0]
@@ -79,11 +79,11 @@ def set_audio_codec(
         return codec
 
     if codec == "copy":
-        if inp is None:
+        if src is None:
             log.error("No input to copy its codec from.")
-        if not inp.audios:
+        if not src.audios:
             log.error("Input file does not have an audio stream to copy codec from.")
-        codec = inp.audios[0].codec
+        codec = src.audios[0].codec
 
     if codec != "unset":
         if ctr.astrict:
@@ -95,6 +95,26 @@ def set_audio_codec(
             log.error(codec_error.format(codec, out_ext))
 
     return codec
+
+
+def make_sources(
+    paths: list[str], ffmpeg: FFmpeg, log: Log
+) -> tuple[dict[str | int, FileInfo], list[int]]:
+
+    used_paths: dict[str, int] = {}
+    sources: dict[int | str, FileInfo] = {}
+    inputs: list[int] = []
+
+    i = 0
+    for path in paths:
+        if path in used_paths:
+            inputs.append(used_paths[path])
+        else:
+            sources[i] = FileInfo(path, i, ffmpeg, log)
+            inputs.append(i)
+            used_paths[path] = i
+            i += 1
+    return sources, inputs
 
 
 def edit_media(
@@ -110,24 +130,24 @@ def edit_media(
             from auto_editor.formats.json import read_json
 
             timeline = read_json(paths[0], ffmpeg, log)
-            inputs: list[FileInfo] = timeline.inputs
+            inputs = [0]
+            sources = timeline.sources
         else:
-            inputs = [FileInfo(i, istr, ffmpeg, log) for i, istr in enumerate(paths)]
-    else:
-        inputs = []
+            sources, inputs = make_sources(paths, ffmpeg, log)
+
     del paths
 
-    inp = None if not inputs else inputs[0]
+    src = None if not inputs else sources[inputs[0]]
 
-    if inp is None:
+    if src is None:
         output = "out.mp4" if args.output_file is None else args.output_file
     else:
         if args.output_file is None:
-            output = set_output_name(inp.path, inp.ext, args.export)
+            output = set_output_name(src.path, src.ext, args.export)
         else:
             output = args.output_file
             if os.path.splitext(output)[1] == "":
-                output = set_output_name(output, inp.ext, args.export)
+                output = set_output_name(output, src.ext, args.export)
 
     out_ext = os.path.splitext(output)[1].replace(".", "")
 
@@ -137,8 +157,8 @@ def edit_media(
     if ctr.samplerate is not None and args.sample_rate not in ctr.samplerate:
         log.error(f"'{out_ext}' container only supports samplerates: {ctr.samplerate}")
 
-    args.video_codec = set_video_codec(args.video_codec, inp, out_ext, ctr, log)
-    args.audio_codec = set_audio_codec(args.audio_codec, inp, out_ext, ctr, log)
+    args.video_codec = set_video_codec(args.video_codec, src, out_ext, ctr, log)
+    args.audio_codec = set_audio_codec(args.audio_codec, src, out_ext, ctr, log)
 
     if args.keep_tracks_separate and ctr.max_audios == 1:
         log.warning(f"'{out_ext}' container doesn't support multiple audio tracks.")
@@ -147,32 +167,30 @@ def edit_media(
         if os.path.isdir(output):
             log.error("Output path already has an existing directory!")
 
-        if os.path.isfile(output) and inputs[0].path != output:
+        if os.path.isfile(output) and src is not None and src.path != output:
             log.debug(f"Removing already existing file: {output}")
             os.remove(output)
 
     # Extract subtitles in their native format.
-    if inp is not None and len(inp.subtitles) > 0:
-        cmd = ["-i", inp.path, "-hide_banner"]
-        for s, sub in enumerate(inp.subtitles):
+    if src is not None and len(src.subtitles) > 0:
+        cmd = ["-i", src.path, "-hide_banner"]
+        for s, sub in enumerate(src.subtitles):
             cmd.extend(["-map", f"0:s:{s}"])
-        for s, sub in enumerate(inp.subtitles):
+        for s, sub in enumerate(src.subtitles):
             cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
         ffmpeg.run(cmd)
-        del inp
 
     if args.sample_rate is None:
-        if inputs:
-            samplerate = inputs[0].get_samplerate()
-        else:
-            samplerate = 48000
+        samplerate = 48000 if src is None else src.get_samplerate()
     else:
         samplerate = args.sample_rate
 
     ensure = Ensure(ffmpeg, samplerate, temp, log)
 
     if timeline is None:
-        timeline = make_timeline(inputs, ensure, args, samplerate, bar, temp, log)
+        timeline = make_timeline(
+            sources, inputs, ffmpeg, ensure, args, samplerate, bar, temp, log
+        )
 
     if args.timeline:
         from auto_editor.formats.json import make_json_timeline
@@ -215,10 +233,11 @@ def edit_media(
         from auto_editor.output import mux_quality_media
         from auto_editor.render.video import render_av
 
+        assert src is not None
+
         visual_output = []
         audio_output = []
         apply_later = False
-        inp = timeline.inputs[0]
 
         if ctr.allow_subtitle:
             from auto_editor.render.subtitle import cut_subtitles
@@ -237,11 +256,11 @@ def edit_media(
                 )
                 visual_output.append((True, out_path))
 
-            for v, vid in enumerate(inp.videos, start=1):
+            for v, vid in enumerate(src.videos, start=1):
                 if ctr.allow_image and vid.codec in ("png", "mjpeg", "webp"):
                     out_path = os.path.join(temp, f"{v}.{vid.codec}")
                     # fmt: off
-                    ffmpeg.run(["-i", inp.path, "-map", "0:v", "-map", "-0:V",
+                    ffmpeg.run(["-i", src.path, "-map", "0:v", "-map", "-0:V",
                         "-c", "copy", out_path])
                     # fmt: on
                     visual_output.append((False, out_path))
@@ -256,7 +275,7 @@ def edit_media(
             output,
             timeline.timebase,
             args,
-            inp,
+            src,
             temp,
             log,
         )
@@ -281,9 +300,10 @@ def edit_media(
                 continue
 
             _c = pad_chunk(chunk, total_frames)
-            vspace, aspace = make_av([clipify(_c, 0)], [timeline.inputs[0]])
+
+            vspace, aspace = make_av([clipify(_c, 0)], timeline.sources, [0])
             my_timeline = Timeline(
-                timeline.inputs,
+                timeline.sources,
                 timeline.timebase,
                 timeline.samplerate,
                 timeline.res,

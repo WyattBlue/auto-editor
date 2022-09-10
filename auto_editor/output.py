@@ -18,7 +18,7 @@ class Ensure:
         self.temp = temp
         self.log = log
 
-    def audio(self, path: str, index: int, stream: int) -> str:
+    def audio(self, path: str, index: int | str, stream: int) -> str:
         out_path = os.path.join(self.temp, f"{index}-{stream}.wav")
 
         if not os.path.isfile(out_path):
@@ -37,9 +37,7 @@ def _ffset(cmd: list[str], option: str, value: str | None) -> list[str]:
     return cmd + [option] + [value]
 
 
-def video_quality(
-    cmd: list[str], args: Args, inp: FileInfo, ctr: Container
-) -> list[str]:
+def video_quality(cmd: list[str], args: Args, ctr: Container) -> list[str]:
     cmd = _ffset(cmd, "-b:v", args.video_bitrate)
     cmd.extend(["-c:v", args.video_codec])
     cmd = _ffset(cmd, "-qscale:v", args.video_quality_scale)
@@ -56,18 +54,18 @@ def mux_quality_media(
     output_path: str,
     tb: Fraction,
     args: Args,
-    inp: FileInfo,
+    src: FileInfo,
     temp: str,
     log: Log,
 ) -> None:
 
-    s_tracks = 0 if not ctr.allow_subtitle else len(inp.subtitles)
+    s_tracks = 0 if not ctr.allow_subtitle else len(src.subtitles)
     a_tracks = 0 if not ctr.allow_audio else len(audio_output)
     v_tracks = 0 if not ctr.allow_video else len(visual_output)
 
-    cmd = ["-hide_banner", "-y", "-i", inp.path]
+    cmd = ["-hide_banner", "-y", "-i", src.path]
 
-    same_container = inp.ext == os.path.splitext(output_path)[1]
+    same_container = src.ext == os.path.splitext(output_path)[1]
 
     for is_video, path in visual_output:
         if is_video or ctr.allow_image:
@@ -102,7 +100,7 @@ def mux_quality_media(
             cmd.extend(["-i", new_a_file])
 
     if s_tracks > 0:
-        for s, sub in enumerate(inp.subtitles):
+        for s, sub in enumerate(src.subtitles):
             cmd.extend(["-i", os.path.join(temp, f"new{s}s.{sub.ext}")])
 
     total_streams = v_tracks + s_tracks + a_tracks
@@ -116,7 +114,7 @@ def mux_quality_media(
     for is_video, path in visual_output:
         if is_video:
             if apply_v:
-                cmd = video_quality(cmd, args, inp, ctr)
+                cmd = video_quality(cmd, args, ctr)
             else:
                 # Real video is only allowed on track 0
                 cmd.extend(["-c:v:0", "copy"])
@@ -132,24 +130,24 @@ def mux_quality_media(
         track += 1
     del track
 
-    for i, vstream in enumerate(inp.videos):
+    for i, vstream in enumerate(src.videos):
         if i > v_tracks:
             break
         if vstream.lang is not None:
             cmd.extend([f"-metadata:s:v:{i}", f"language={vstream.lang}"])
-    for i, astream in enumerate(inp.audios):
+    for i, astream in enumerate(src.audios):
         if i > a_tracks:
             break
         if astream.lang is not None:
             cmd.extend([f"-metadata:s:a:{i}", f"language={astream.lang}"])
-    for i, sstream in enumerate(inp.subtitles):
+    for i, sstream in enumerate(src.subtitles):
         if i > s_tracks:
             break
         if sstream.lang is not None:
             cmd.extend([f"-metadata:s:s:{i}", f"language={sstream.lang}"])
 
     if s_tracks > 0:
-        scodec = inp.subtitles[0].codec
+        scodec = src.subtitles[0].codec
         if same_container:
             cmd.extend(["-c:s", scodec])
         elif ctr.scodecs is not None:
@@ -162,10 +160,10 @@ def mux_quality_media(
         cmd = _ffset(cmd, "-b:a", args.audio_bitrate)
 
     if same_container and v_tracks > 0:
-        cmd = _ffset(cmd, "-color_range", inp.videos[0].color_range)
-        cmd = _ffset(cmd, "-colorspace", inp.videos[0].color_space)
-        cmd = _ffset(cmd, "-color_primaries", inp.videos[0].color_primaries)
-        cmd = _ffset(cmd, "-color_trc", inp.videos[0].color_transfer)
+        cmd = _ffset(cmd, "-color_range", src.videos[0].color_range)
+        cmd = _ffset(cmd, "-colorspace", src.videos[0].color_space)
+        cmd = _ffset(cmd, "-color_primaries", src.videos[0].color_primaries)
+        cmd = _ffset(cmd, "-color_trc", src.videos[0].color_transfer)
 
     if args.extras is not None:
         cmd.extend(args.extras.split(" "))

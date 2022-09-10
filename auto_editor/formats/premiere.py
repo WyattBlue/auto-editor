@@ -79,7 +79,7 @@ def premiere_xml(
     timeline: Timeline,
 ) -> None:
 
-    inp = timeline.inp
+    src = timeline.sources[0]
     chunks = timeline.chunks
 
     if chunks is None:
@@ -88,7 +88,7 @@ def premiere_xml(
     fps = timeline.timebase
     samplerate = timeline.samplerate
 
-    audio_file = len(inp.videos) == 0 and len(inp.audios) == 1
+    audio_file = len(src.videos) == 0 and len(src.audios) == 1
 
     # See chart: https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/FrameRate/FrameRate.html#//apple_ref/doc/uid/TP30001158-TPXREF103
 
@@ -112,18 +112,18 @@ def premiere_xml(
         if chunk[2] != 99999:
             clips.append(chunk)
 
-    pathurls = [fix_url(inp.path)]
+    pathurls = [fix_url(src.path)]
 
-    tracks = len(inp.audios)
+    tracks = len(src.audios)
 
     if tracks > 1:
-        name_without_extension = inp.basename[: inp.basename.rfind(".")]
+        name_without_extension = src.basename[: src.basename.rfind(".")]
 
-        fold = safe_mkdir(os.path.join(inp.dirname, f"{name_without_extension}_tracks"))
+        fold = safe_mkdir(os.path.join(src.dirname, f"{name_without_extension}_tracks"))
 
         for i in range(1, tracks):
             newtrack = os.path.join(fold, f"{i}.wav")
-            move(ensure.audio(timeline.inputs[0].path, 0, i), newtrack)
+            move(ensure.audio(src.path, 0, i), newtrack)
             pathurls.append(fix_url(newtrack))
 
     width, height = timeline.res
@@ -150,7 +150,7 @@ def premiere_xml(
             )
         )
 
-        if len(inp.videos) > 0:
+        if len(src.videos) > 0:
             outfile.write(
                 indent(
                     3,
@@ -170,7 +170,7 @@ def premiere_xml(
             )
         )
 
-        if len(inp.videos) > 0:
+        if len(src.videos) > 0:
             outfile.write(
                 indent(
                     3,
@@ -184,11 +184,11 @@ def premiere_xml(
                 3,
                 "\t\t</samplecharacteristics>",
                 "\t</format>",
-                "</video>" if len(inp.videos) == 0 else "\t<track>",
+                "</video>" if len(src.videos) == 0 else "\t<track>",
             )
         )
 
-        if len(inp.videos) > 0:
+        if len(src.videos) > 0:
             # Handle video clips
 
             total = 0.0
@@ -208,7 +208,7 @@ def premiere_xml(
                         5,
                         f'<clipitem id="clipitem-{j+1}">',
                         "\t<masterclipid>masterclip-2</masterclipid>",
-                        f"\t<name>{inp.basename}</name>",
+                        f"\t<name>{src.basename}</name>",
                         f"\t<start>{_start}</start>",
                         f"\t<end>{_end}</end>",
                         f"\t<in>{_in}</in>",
@@ -221,7 +221,7 @@ def premiere_xml(
                         indent(
                             6,
                             '<file id="file-1">',
-                            f"\t<name>{inp.basename}</name>",
+                            f"\t<name>{src.basename}</name>",
                             f"\t<pathurl>{pathurls[0]}</pathurl>",
                             "\t<rate>",
                             f"\t\t<timebase>{timebase}</timebase>",
@@ -324,7 +324,7 @@ def premiere_xml(
                         5,
                         f'<clipitem id="clipitem-{clip_item_num}" premiereChannelType="stereo">',
                         f"\t<masterclipid>masterclip-{master_id}</masterclipid>",
-                        f"\t<name>{inp.basename}</name>",
+                        f"\t<name>{src.basename}</name>",
                         f"\t<start>{_start}</start>",
                         f"\t<end>{_end}</end>",
                         f"\t<in>{_in}</in>",
@@ -337,7 +337,7 @@ def premiere_xml(
                         indent(
                             6,
                             f'<file id="file-{t+1}">',
-                            f"\t<name>{inp.basename}</name>",
+                            f"\t<name>{src.basename}</name>",
                             f"\t<pathurl>{pathurls[t]}</pathurl>",
                             "\t<rate>",
                             f"\t\t<timebase>{timebase}</timebase>",

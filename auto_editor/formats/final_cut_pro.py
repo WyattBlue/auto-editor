@@ -18,13 +18,13 @@ https://developer.apple.com/documentation/professional_video_applications/fcpxml
 """
 
 
-def get_colorspace(inp: FileInfo) -> str:
+def get_colorspace(src: FileInfo) -> str:
     # See: https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/asset#3686496
 
-    if len(inp.videos) == 0:
+    if len(src.videos) == 0:
         return "1-1-1 (Rec. 709)"
 
-    s = inp.videos[0]
+    s = src.videos[0]
     if s.pix_fmt == "rgb24":
         return "sRGB IEC61966-2.1"
     if s.color_space == "smpte170m":
@@ -40,15 +40,11 @@ def get_colorspace(inp: FileInfo) -> str:
     return "1-1-1 (Rec. 709)"
 
 
-def fraction(_a: int | float, tb: Fraction) -> str:
+def fraction(_a: float, tb: Fraction) -> str:
     if _a == 0:
         return "0s"
 
-    if isinstance(_a, float):
-        a = Fraction(_a)
-    else:
-        a = _a
-
+    a = Fraction(_a)
     frac = Fraction(a, tb).limit_denominator()
     num = frac.numerator
     dem = frac.denominator
@@ -71,7 +67,7 @@ def fraction(_a: int | float, tb: Fraction) -> str:
 
 
 def fcp_xml(output: str, timeline: Timeline) -> None:
-    inp = timeline.inp
+    src = timeline.sources[0]
     tb = timeline.timebase
     chunks = timeline.chunks
 
@@ -81,18 +77,18 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
     total_dur = chunks[-1][1]
 
     if system() == "Windows":
-        pathurl = "file://localhost/" + PureWindowsPath(inp.abspath).as_posix()
+        pathurl = "file://localhost/" + PureWindowsPath(src.abspath).as_posix()
     else:
-        pathurl = Path(inp.abspath).as_uri()
+        pathurl = Path(src.abspath).as_uri()
 
     width, height = timeline.res
     frame_duration = fraction(1, tb)
 
-    audio_file = len(inp.videos) == 0 and len(inp.audios) > 0
+    audio_file = len(src.videos) == 0 and len(src.audios) > 0
     group_name = "Auto-Editor {} Group".format("Audio" if audio_file else "Video")
-    name = inp.basename
+    name = src.basename
 
-    colorspace = get_colorspace(inp)
+    colorspace = get_colorspace(src)
 
     with open(output, "w", encoding="utf-8") as outfile:
         outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n')

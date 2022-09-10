@@ -133,7 +133,7 @@ def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
             bar_len = len(_add)
             text += _add
 
-        default: str | None = None
+        default: str | tuple | None = None
         try:
             default = getattr(ns_obj, to_key(option))
         except AttributeError:
@@ -213,7 +213,9 @@ class ArgumentParser:
         macros: list[tuple[set[str], list[str]]] | None = None,
     ) -> T:
         if len(sys_args) == 0:
-            out(get_help_data()[self.program_name]["_"])
+            from auto_editor.help import data
+
+            out(data[self.program_name]["_"])
             sys.exit()
 
         if macros is not None:

@@ -49,8 +49,8 @@ def make_caches(vtl: VSpace, log: Log) -> tuple[FontCache, ImgCache]:
                 except OSError:
                     log.error(f"Font '{obj.font}' not found.")
 
-            if isinstance(obj, ImageObj) and obj.src not in img_cache:
-                img_cache[obj.src] = Image.open(obj.src).convert("RGBA")
+            if isinstance(obj, ImageObj) and obj.src.path not in img_cache:
+                img_cache[obj.src.path] = Image.open(obj.src.path).convert("RGBA")
 
     return font_cache, img_cache
 
@@ -66,7 +66,7 @@ def render_image(
     if isinstance(obj, RectangleObj):
         obj_img = Image.new("RGBA", (obj.width, obj.height), (255, 255, 255, 0))
     if isinstance(obj, ImageObj):
-        obj_img = img_cache[obj.src]
+        obj_img = img_cache[obj.src.path]
         if obj.stroke > 0:
             obj_img = ImageOps.expand(obj_img, border=obj.stroke, fill=obj.strokecolor)
 

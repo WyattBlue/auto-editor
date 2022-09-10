@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, NamedTuple, TypeVar
+from typing import Any, NamedTuple, TypedDict, TypeVar
+
+from auto_editor.ffwrapper import FileInfo
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -22,6 +24,14 @@ from auto_editor.utils.types import (
 T = TypeVar("T", bound=type)
 
 
+class _Vars(TypedDict, total=False):
+    width: int
+    height: int
+    start: int
+    end: int
+    sources: dict[int | str, FileInfo]
+
+
 class Attr(NamedTuple):
     names: tuple[str, ...]
     coerce: Any
@@ -30,12 +40,14 @@ class Attr(NamedTuple):
 
 def parse_dataclass(
     attrs_str: str,
-    dataclass: T,
-    builder: list[Attr],
+    definition: tuple[T, list[Attr]],
     log: Log,
-    _vars: dict[str, int] = {},
+    _vars: _Vars | None = {},
     coerce_default: bool = False,
 ) -> T:
+
+    dataclass, builder = definition
+
     ARG_SEP = ","
     KEYWORD_SEP = "="
 
@@ -44,16 +56,31 @@ def parse_dataclass(
     # Keyword Arguments
     #    --rectangle start=0,end=end,x1=10, ...
 
-    def _values(name: str, val, _type, _vars: dict[str, int], log: Log):
+    def _values(name: str, val, _type, _vars: _Vars | None, log: Log):
         if val is None:
             return None
-        if name in ("x", "width"):
-            return pos((val, _vars["width"]))
-        elif name in ("y", "height"):
-            return pos((val, _vars["height"]))
 
-        if _type is int:
-            for key, item in _vars.items():
+        if name in ("x", "width", "y", "height", "src"):
+            if _vars is None:
+                log.error("_vars must be set when constructing obj with special attrs")
+
+            assert _vars is not None
+
+            if name in ("x", "width"):
+                return pos((val, _vars["width"]))
+            if name in ("y", "height"):
+                return pos((val, _vars["height"]))
+            if name == "src":
+                if val not in _vars["sources"]:
+                    log.error(f"Cannot find label: '{val}'")
+                return _vars["sources"][val]
+
+        if _type is int and _vars is not None:
+            int_vars = {
+                "width": _vars["width"],
+                "height": _vars["height"],
+            }
+            for key, item in int_vars.items():
                 if val == key:
                     return item
 
@@ -194,8 +221,9 @@ class EllipseObj(Visual):
 video_builder = [
     Attr(("start",), natural, None),
     Attr(("dur",), natural, None),
-    Attr(("offset",), natural, None),
-    Attr(("speed",), number, None),
+    Attr(("src",), natural, None),
+    Attr(("offset",), natural, 0),
+    Attr(("speed",), number, 1),
     Attr(("stream", "track"), natural, 0),
 ]
 audio_builder = video_builder

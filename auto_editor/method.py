@@ -13,7 +13,7 @@ from auto_editor.analyze import (
     random_levels,
     to_threshold,
 )
-from auto_editor.objects import Attr, parse_dataclass
+from auto_editor.objects import Attr, parse_dataclass, _Vars
 from auto_editor.utils.types import Stream, natural, stream, threshold
 
 if TYPE_CHECKING:
@@ -124,13 +124,13 @@ def get_has_loud(
             if token == "all":
                 stream_data = get_all(ensure, inp, tb, temp, log)
             if token == "random":
-                robj = parse_dataclass(attrs, Random, random_builder, log)
+                robj = parse_dataclass(attrs, (Random, random_builder), log)
                 stream_data = to_threshold(
                     random_levels(ensure, inp, robj, tb, temp, log),
                     robj.threshold,
                 )
             if token == "audio":
-                aobj = parse_dataclass(attrs, Audio, audio_builder, log)
+                aobj = parse_dataclass(attrs, (Audio, audio_builder), log)
                 s = aobj.stream
                 if s == "all":
                     total_list: NDArray[np.bool_] | None = None
@@ -161,11 +161,11 @@ def get_has_loud(
                 from auto_editor.analyze import motion_levels
 
                 if inp.videos:
-                    _vars = {"width": inp.videos[0].width}
+                    _vars: _Vars = {"width": inp.videos[0].width}
                 else:
                     _vars = {"width": 1}
 
-                mobj = parse_dataclass(attrs, Motion, motion_builder, log, _vars)
+                mobj = parse_dataclass(attrs, (Motion, motion_builder), log, _vars)
                 stream_data = to_threshold(
                     motion_levels(ensure, inp, mobj, tb, bar, strict, temp, log),
                     mobj.threshold,
@@ -174,7 +174,7 @@ def get_has_loud(
             if token == "pixeldiff":
                 from auto_editor.analyze import pixeldiff_levels
 
-                pobj = parse_dataclass(attrs, Pixeldiff, pixeldiff_builder, log)
+                pobj = parse_dataclass(attrs, (Pixeldiff, pixeldiff_builder), log)
                 stream_data = to_threshold(
                     pixeldiff_levels(ensure, inp, pobj, tb, bar, strict, temp, log),
                     pobj.threshold,
