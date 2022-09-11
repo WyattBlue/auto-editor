@@ -29,7 +29,7 @@ Visual = Type[Union[TextObj, ImageObj, RectangleObj, EllipseObj]]
 VLayer = List[Union[VideoObj, Visual]]
 VSpace = List[VLayer]
 
-ALayer = List[Type[AudioObj]]
+ALayer = List[AudioObj]
 ASpace = List[ALayer]
 
 

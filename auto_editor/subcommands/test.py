@@ -219,6 +219,13 @@ def main(sys_args: list[str] | None = None):
 
         return out
 
+
+    def add_audio():
+        return run.main(
+            ["example.mp4"],
+            ["--source", "snd:resources/wav/pcm-f32le.wav", "--add", "audio:0,30,snd"],
+        )
+
     # PR #260
     def high_speed_test():
         return run.main(inputs=["example.mp4"], cmd=["--video-speed", "99998"])
@@ -621,6 +628,7 @@ def main(sys_args: list[str] | None = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                add_audio,
                 video_speed,
                 expand_chunks,
                 SAR,

@@ -192,6 +192,7 @@ def render_av(
                         log.debug(f"Seek: {frame_index} -> 0")
                         cns[obj.src].seek(0)
                         try:
+                            assert decoders[obj.src] is not None
                             frame = next(decoders[obj.src])
                             frame_index = round(frame.time * timeline.timebase)
                         except StopIteration:

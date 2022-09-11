@@ -161,7 +161,7 @@ def audio_levels(
     if s > len(src.audios) - 1:
         if strict:
             log.error(f"Audio stream '{s}' does not exist.")
-        return get_all(ensure, src, tb, temp, log)
+        return np.zeros(get_media_length(ensure, src, tb, temp, log), dtype=np.float_)
 
     if (arr := read_cache(src, tb, "audio", {"stream": s}, temp)) is not None:
         return arr
@@ -219,7 +219,9 @@ def motion_levels(
 
     if mobj.stream >= len(src.videos):
         if not strict:
-            return get_all(ensure, src, tb, temp, log)
+            return np.zeros(
+                get_media_length(ensure, src, tb, temp, log), dtype=np.float_
+            )
         log.error(f"Video stream '{mobj.stream}' does not exist.")
 
     if (arr := read_cache(src, tb, "motion", mobj, temp)) is not None:
@@ -301,7 +303,9 @@ def pixeldiff_levels(
 
     if pobj.stream >= len(src.videos):
         if not strict:
-            return get_all(ensure, src, tb, temp, log)
+            return np.zeros(
+                get_media_length(ensure, src, tb, temp, log), dtype=np.uint64
+            )
         log.error(f"Video stream '{pobj.stream}' does not exist.")
 
     if (arr := read_cache(src, tb, "pixeldiff", pobj, temp)) is not None:
