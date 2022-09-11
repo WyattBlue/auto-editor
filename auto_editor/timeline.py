@@ -28,6 +28,8 @@ from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 
+from typing import cast
+
 
 @dataclass
 class Timeline:
@@ -162,7 +164,7 @@ def make_timeline(
     }
 
     pool: list[Visual] = []
-    apool: list[type[AudioObj]] = []
+    apool: list[AudioObj] = []
 
     for obj_attrs_str in args.add:
         exploded = obj_attrs_str.split(OBJ_ATTRS_SEP)
@@ -175,7 +177,9 @@ def make_timeline(
         if obj_s in visual_objects:
             pool.append(parse_dataclass(attrs, visual_objects[obj_s], log, _vars, True))
         elif obj_s in audio_objects:
-            apool.append(parse_dataclass(attrs, audio_objects[obj_s], log, _vars, True))
+            _a_dc = parse_dataclass(attrs, audio_objects[obj_s], log, _vars, True)
+            a_dc = cast(AudioObj, _a_dc)  # result is AudioObj, not "type[AudioObj]"
+            apool.append(a_dc)
         else:
             log.error(f"Unknown object: '{obj_s}'")
 

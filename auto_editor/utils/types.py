@@ -77,7 +77,9 @@ def src(val: str) -> int | str:
         if int(val) > 0:
             return int(val)
     except ValueError:
-        return val
+        pass
+
+    return val
 
 
 def threshold(val: str | float) -> float:
