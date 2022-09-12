@@ -89,6 +89,16 @@ def threshold(val: str | float) -> float:
     return num
 
 
+def audio_threshold(val: str) -> str | float:
+    num, unit = _split_num_str(val)
+    if unit == "dB":
+        if num > 0:
+            raise TypeError("dB only goes up to 0")
+        return 10 ** (num / 20)
+
+    return threshold(val)
+
+
 def frame_rate(val: str) -> Fraction:
     if val == "ntsc":
         return Fraction(30000, 1001)
