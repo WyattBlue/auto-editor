@@ -155,9 +155,9 @@ def parse_dataclass(
 class VideoObj:
     start: int
     dur: int
+    src: int | str
     offset: int
     speed: float
-    src: int | str
     stream: int
 
 
@@ -165,9 +165,10 @@ class VideoObj:
 class AudioObj:
     start: int
     dur: int
+    src: int | str
     offset: int
     speed: float
-    src: int | str
+    volume: float
     stream: int
 
 
@@ -220,7 +221,15 @@ video_builder = [
     Attr(("speed",), number, 1),
     Attr(("stream", "track"), natural, 0),
 ]
-audio_builder = video_builder
+audio_builder = [
+    Attr(("start",), natural, None),
+    Attr(("dur",), natural, None),
+    Attr(("src",), src, None),
+    Attr(("offset",), natural, 0),
+    Attr(("speed",), number, 1),
+    Attr(("volume",), number, 1),
+    Attr(("stream", "track"), natural, 0),
+]
 
 
 def content(val: str) -> str:

@@ -78,7 +78,7 @@ def make_av(
         if len(src.videos) > 0:
             for clip in clips:
                 vclip_ = VideoObj(
-                    clip.start, clip.dur, clip.offset, clip.speed, clip.src, 0
+                    clip.start, clip.dur, clip.src, clip.offset, clip.speed, 0
                 )
                 if len(vclips) == 0:
                     vclips = [[vclip_]]
@@ -89,7 +89,7 @@ def make_av(
                 for a, _ in enumerate(src.audios):
                     aclips[a].append(
                         AudioObj(
-                            clip.start, clip.dur, clip.offset, clip.speed, clip.src, a
+                            clip.start, clip.dur, clip.src, clip.offset, clip.speed, 1, a
                         )
                     )
 

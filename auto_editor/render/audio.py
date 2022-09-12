@@ -65,35 +65,37 @@ def make_new_audio(
             if samp_end > len(samp_list):
                 samp_end = len(samp_list)
 
-            if clip.speed == 1:
-                clip_arr = samp_list[samp_start:samp_end]
-            else:
-                tsm = os.path.join(temp, "tsm.wav")
-                tsm_out = os.path.join(temp, "tsm_out.wav")
 
-                write(tsm, sr, samp_list[samp_start:samp_end])
+            filters: list[str] = []
 
-                cmd = ["-i", tsm, "-af"]
-
+            if clip.speed != 1:
                 if clip.speed > 10_000:
-                    atempo = ",".join([f"atempo={clip.speed}^.33333"] * 3)
+                    filters.extend([f"atempo={clip.speed}^.33333"] * 3)
                 elif clip.speed > 100:
-                    atempo = f"atempo=sqrt({clip.speed}),atempo=sqrt({clip.speed})"
+                    filters.extend(
+                        [f"atempo=sqrt({clip.speed})", f"atempo=sqrt({clip.speed})"]
+                    )
                 elif clip.speed >= 0.5:
-                    atempo = f"atempo={clip.speed}"
+                    filters.append(f"atempo={clip.speed}")
                 else:
                     start = 0.5
-                    m = []
                     while start * 0.5 > clip.speed:
                         start *= 0.5
-                        m.append("atempo=0.5")
-                    m.append(f"atempo={clip.speed / start}")
-                    atempo = ",".join(m)
+                        filters.append("atempo=0.5")
+                    filters.append(f"atempo={clip.speed / start}")
 
-                cmd.extend([atempo, tsm_out])
-                ffmpeg.run(cmd)
+            if clip.volume != 1:
+                filters.append(f"volume={clip.volume}")
 
-                clip_arr = read(tsm_out)[1]
+            if not filters:
+                clip_arr = samp_list[samp_start:samp_end]
+            else:
+                af = os.path.join(temp, "af.wav")
+                af_out = os.path.join(temp, "af_out.wav")
+
+                write(af, sr, samp_list[samp_start:samp_end])
+                ffmpeg.run(["-i", af, "-af", ",".join(filters), af_out])
+                clip_arr = read(af_out)[1]
 
             # Mix numpy arrays
             start = clip.start * sr // tb
