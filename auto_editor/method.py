@@ -14,7 +14,7 @@ from auto_editor.analyze import (
     to_threshold,
 )
 from auto_editor.objects import Attr, _Vars, parse_dataclass
-from auto_editor.utils.types import Stream, natural, stream, threshold, audio_threshold
+from auto_editor.utils.types import Stream, db_threshold, natural, stream, threshold
 
 if TYPE_CHECKING:
     from fractions import Fraction
@@ -58,7 +58,7 @@ class Random:
 
 
 audio_builder = [
-    Attr(("threshold",), audio_threshold, 0.04),
+    Attr(("threshold",), db_threshold, 0.04),
     Attr(("stream", "track"), stream, 0),
 ]
 motion_builder = [

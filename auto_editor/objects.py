@@ -9,6 +9,7 @@ from auto_editor.utils.types import (
     align,
     anchor,
     color,
+    db_number,
     natural,
     number,
     pos,
@@ -227,7 +228,7 @@ audio_builder = [
     Attr(("src",), src, None),
     Attr(("offset",), natural, 0),
     Attr(("speed",), number, 1),
-    Attr(("volume",), number, 1),
+    Attr(("volume",), db_number, 1),
     Attr(("stream", "track"), natural, 0),
 ]
 

@@ -89,7 +89,13 @@ def make_av(
                 for a, _ in enumerate(src.audios):
                     aclips[a].append(
                         AudioObj(
-                            clip.start, clip.dur, clip.src, clip.offset, clip.speed, 1, a
+                            clip.start,
+                            clip.dur,
+                            clip.src,
+                            clip.offset,
+                            clip.speed,
+                            1,
+                            a,
                         )
                     )
 

@@ -72,6 +72,14 @@ def number(val: str | float) -> float:
     return num
 
 
+def db_number(val: str) -> float | str:
+    num, unit = _split_num_str(val)
+    if unit == "dB":
+        return val
+
+    return number(val)
+
+
 def src(val: str) -> int | str:
     try:
         if int(val) > 0:
@@ -89,7 +97,7 @@ def threshold(val: str | float) -> float:
     return num
 
 
-def audio_threshold(val: str) -> str | float:
+def db_threshold(val: str) -> str | float:
     num, unit = _split_num_str(val)
     if unit == "dB":
         if num > 0:

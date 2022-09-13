@@ -65,7 +65,6 @@ def make_new_audio(
             if samp_end > len(samp_list):
                 samp_end = len(samp_list)
 
-
             filters: list[str] = []
 
             if clip.speed != 1:

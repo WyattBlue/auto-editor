@@ -3,6 +3,7 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass
 from fractions import Fraction
+from typing import cast
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.make_layers import ASpace, Visual, VSpace, make_layers
@@ -27,8 +28,6 @@ from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
-
-from typing import cast
 
 
 @dataclass
