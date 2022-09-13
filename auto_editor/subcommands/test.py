@@ -219,11 +219,15 @@ def main(sys_args: list[str] | None = None):
 
         return out
 
-
     def add_audio():
         return run.main(
             ["example.mp4"],
-            ["--source", "snd:resources/wav/pcm-f32le.wav", "--add", "audio:0,30,snd,volume=0.3"],
+            [
+                "--source",
+                "snd:resources/wav/pcm-f32le.wav",
+                "--add",
+                "audio:0,30,snd,volume=0.3",
+            ],
         )
 
     # PR #260

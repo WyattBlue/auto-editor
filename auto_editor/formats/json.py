@@ -23,7 +23,7 @@ def check_attrs(data: object, log: Log, *attrs: str) -> None:
             log.error(f"'{attr}' attribute not found!")
 
 
-def check_file(path: str, log: Log):
+def check_file(path: str, log: Log) -> None:
     if not os.path.isfile(path):
         log.error(f"Could not locate media file: '{path}'")
 
@@ -108,11 +108,12 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         return Timeline({0: src}, tb, sr, res, "#000", vspace, aspace, chunks)
 
     if version == (2, 0) or version == (0, 2):
-        check_attrs(data, log, "timeline")
-        # check_file(data["source"], log)
+        check_attrs(data, log, "timeline", "source")
+        for src in data["source"].values():
+            check_file(src, log)
         # return data["background"], data["source"], chunks
 
-        raise ValueError("Incomplete")
+        raise ValueError("Importing v2 timelines not implemented.")
 
     log.error(f"Unsupported version: {version}")
 
@@ -136,20 +137,24 @@ def make_json_timeline(
 
         data: dict = {
             "version": "1.0.0",
-            "source": os.path.abspath(timeline.sources[0].path),
+            "source": timeline.sources[0].abspath,
             "chunks": timeline.chunks,
         }
     elif version == (2, 0) or version == (0, 2):
+        sources = {}
+        for key, src in timeline.sources.items():
+            sources[key] = src.abspath
+
         data = {
             "version": "2.0.0",
             "timeline": {
                 "background": timeline.background,
                 "resolution": timeline.res,
-                "sources": [src.abspath for src in timeline.sources.values()],
+                "sources": sources,
                 "timebase": str(timeline.timebase),
                 "samplerate": timeline.samplerate,
-                "video": timeline.v,
-                "audio": timeline.a,
+                "v": timeline.v,
+                "a": timeline.a,
             },
         }
     else:
