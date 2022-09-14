@@ -283,8 +283,6 @@ class MainArgs:
     show_ffmpeg_debug: bool = False
     quiet: bool = False
     preview: bool = False
-    timeline: bool = False
-    api: str = "1.0.0"
     frame_margin: Margin = (6, 6)
     silent_speed: float = 99999.0
     video_speed: float = 1.0
