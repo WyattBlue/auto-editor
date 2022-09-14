@@ -3,7 +3,6 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import cast
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.make_layers import ASpace, Visual, VSpace, make_layers
@@ -151,7 +150,7 @@ def make_timeline(
     }
 
     OBJ_ATTRS_SEP = ":"
-    visual_objects: dict[str, tuple[Visual, list[Attr]]] = {
+    visual_objects: dict[str, tuple[type[Visual], list[Attr]]] = {
         "rectangle": (RectangleObj, rect_builder),
         "ellipse": (EllipseObj, ellipse_builder),
         "text": (TextObj, text_builder),
@@ -176,9 +175,7 @@ def make_timeline(
         if obj_s in visual_objects:
             pool.append(parse_dataclass(attrs, visual_objects[obj_s], log, _vars, True))
         elif obj_s in audio_objects:
-            _a_dc = parse_dataclass(attrs, audio_objects[obj_s], log, _vars, True)
-            a_dc = cast(AudioObj, _a_dc)  # result is AudioObj, not "type[AudioObj]"
-            apool.append(a_dc)
+            apool.append(parse_dataclass(attrs, audio_objects[obj_s], log, _vars, True))
         else:
             log.error(f"Unknown object: '{obj_s}'")
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, NamedTuple, Type, TypedDict, TypeVar, Union
+from typing import Any, NamedTuple, TypedDict, TypeVar, Union
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -21,7 +21,7 @@ from auto_editor.utils.types import (
 # dur - The duration of the clip in the timeline before speed is applied
 # offset - When from the source to start playing the media at
 
-T = TypeVar("T", bound=type)
+T = TypeVar("T")
 
 
 class _Vars(TypedDict, total=False):
@@ -39,7 +39,7 @@ class Attr(NamedTuple):
 
 def parse_dataclass(
     attrs_str: str,
-    definition: tuple[T, list[Attr]],
+    definition: tuple[type[T], list[Attr]],
     log: Log,
     _vars: _Vars | None = {},
     coerce_default: bool = False,
@@ -174,7 +174,7 @@ class AudioObj:
 
 
 @dataclass
-class Visual:
+class _Visual:
     start: int
     dur: int
     x: int
@@ -187,7 +187,7 @@ class Visual:
 
 
 @dataclass
-class TextObj(Visual):
+class TextObj(_Visual):
     content: str
     font: str
     size: int
@@ -196,19 +196,19 @@ class TextObj(Visual):
 
 
 @dataclass
-class ImageObj(Visual):
+class ImageObj(_Visual):
     src: int | str
 
 
 @dataclass
-class RectangleObj(Visual):
+class RectangleObj(_Visual):
     width: int
     height: int
     fill: str
 
 
 @dataclass
-class EllipseObj(Visual):
+class EllipseObj(_Visual):
     width: int
     height: int
     fill: str
@@ -327,17 +327,15 @@ class EditClipSequence:
     pass
 
 
-Exports = Type[
-    Union[
-        EditDefault,
-        EditPremiere,
-        EditFinalCutPro,
-        EditShotCut,
-        EditJson,
-        EditTimeline,
-        EditAudio,
-        EditClipSequence,
-    ]
+Exports = Union[
+    EditDefault,
+    EditPremiere,
+    EditFinalCutPro,
+    EditShotCut,
+    EditJson,
+    EditTimeline,
+    EditAudio,
+    EditClipSequence,
 ]
 
 timeline_builder = [Attr(("api",), str, "1.0.0")]

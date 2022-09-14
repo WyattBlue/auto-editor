@@ -7,6 +7,7 @@ from typing import Dict, Tuple, Union
 import av
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.make_layers import Visual, VSpace
 from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj
 from auto_editor.utils.log import Log
@@ -33,7 +34,9 @@ FontCache = Dict[str, Tuple[Union[ImageFont.FreeTypeFont, ImageFont.ImageFont], 
 ImgCache = Dict[str, Image.Image]
 
 
-def make_caches(vtl: VSpace, log: Log) -> tuple[FontCache, ImgCache]:
+def make_caches(
+    vtl: VSpace, sources: dict[int | str, FileInfo], log: Log
+) -> tuple[FontCache, ImgCache]:
     font_cache: FontCache = {}
     img_cache: ImgCache = {}
     for layer in vtl:
@@ -49,8 +52,8 @@ def make_caches(vtl: VSpace, log: Log) -> tuple[FontCache, ImgCache]:
                 except OSError:
                     log.error(f"Font '{obj.font}' not found.")
 
-            if isinstance(obj, ImageObj) and obj.src.path not in img_cache:
-                img_cache[obj.src.path] = Image.open(obj.src.path).convert("RGBA")
+            if isinstance(obj, ImageObj) and obj.src not in img_cache:
+                img_cache[obj.src] = Image.open(sources[obj.src].path).convert("RGBA")
 
     return font_cache, img_cache
 
@@ -66,7 +69,7 @@ def render_image(
     if isinstance(obj, RectangleObj):
         obj_img = Image.new("RGBA", (obj.width, obj.height), (255, 255, 255, 0))
     if isinstance(obj, ImageObj):
-        obj_img = img_cache[obj.src.path]
+        obj_img = img_cache[obj.src]
         if obj.stroke > 0:
             obj_img = ImageOps.expand(obj_img, border=obj.stroke, fill=obj.strokecolor)
 
@@ -108,8 +111,10 @@ def render_image(
         )
 
     # Do Anti-Aliasing
-    obj_img = obj_img.resize([s * 3 for s in obj_img.size])
-    obj_img = obj_img.resize([s // 3 for s in obj_img.size], resample=Image.BICUBIC)
+    obj_img = obj_img.resize((obj_img.size[0] * 3, obj_img.size[1] * 3))
+    obj_img = obj_img.resize(
+        (obj_img.size[0] // 3, obj_img.size[1] // 3), resample=Image.BICUBIC
+    )
 
     obj_img = obj_img.rotate(
         obj.rotate, expand=True, resample=Image.BICUBIC, fillcolor=(255, 255, 255, 0)

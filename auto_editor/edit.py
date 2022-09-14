@@ -24,7 +24,7 @@ from auto_editor.utils.log import Log, Timer
 from auto_editor.utils.types import Args
 
 
-def set_output_name(path: str, original_ext: str, export: Exports) -> str | None:
+def set_output_name(path: str, original_ext: str, export: Exports) -> str:
     root, path_ext = os.path.splitext(path)
 
     if isinstance(export, EditPremiere):
@@ -35,8 +35,6 @@ def set_output_name(path: str, original_ext: str, export: Exports) -> str | None
         return f"{root}.mlt"
     if isinstance(export, EditJson):
         return f"{root}.json"
-    if isinstance(export, EditTimeline):
-        return None
     if isinstance(export, EditAudio):
         return f"{root}_ALTERED.wav"
     if path_ext == "":
@@ -140,7 +138,7 @@ def parse_export(export: str, log: Log) -> Exports:
     else:
         name, attrs = exploded
 
-    parsing: dict[str, tuple[Exports, list[Attr]]] = {
+    parsing: dict[str, tuple[type[Exports], list[Attr]]] = {
         "default": (EditDefault, []),
         "premiere": (EditPremiere, []),
         "final-cut-pro": (EditFinalCutPro, []),
@@ -195,7 +193,6 @@ def edit_media(
     else:
         output = "out.mp4" if args.output_file is None else args.output_file
 
-
     if not args.preview and output is not None:
         log.conwrite("Starting")
 
@@ -231,39 +228,38 @@ def edit_media(
         from auto_editor.formats.json import make_json_timeline
 
         make_json_timeline(export, 0, timeline, log)
-        return None
+        return
 
     if args.preview:
         from auto_editor.preview import preview
 
         preview(ensure, timeline, temp, log)
-        return None
+        return
 
     if isinstance(export, EditJson):
         from auto_editor.formats.json import make_json_timeline
 
         make_json_timeline(export, output, timeline, log)
-        return output
+        return
 
     if isinstance(export, EditPremiere):
         from auto_editor.formats.premiere import premiere_xml
 
         premiere_xml(ensure, output, timeline)
-        return output
+        return
 
     if isinstance(export, EditFinalCutPro):
         from auto_editor.formats.final_cut_pro import fcp_xml
 
         fcp_xml(output, timeline)
-        return output
+        return
 
     if isinstance(export, EditShotCut):
         from auto_editor.formats.shotcut import shotcut_xml
 
         shotcut_xml(output, timeline)
-        return output
+        return
 
-    assert output is not None
     out_ext = os.path.splitext(output)[1].replace(".", "")
 
     # Check if export options make sense.
@@ -370,11 +366,7 @@ def edit_media(
     if output is not None:
         timer.stop()
 
-    if (
-        not args.no_open
-        and output is not None
-        and not isinstance(export, (EditPremiere, EditShotCut, EditFinalCutPro))
-    ):
+    if not args.no_open and output is not None:
         if args.player is None:
             from auto_editor.utils.func import open_with_system_default
 

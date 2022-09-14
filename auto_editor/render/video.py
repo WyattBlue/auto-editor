@@ -66,7 +66,7 @@ def render_av(
     src = None if not timeline.sources else timeline.sources[0]
     cns = [av.open(src.path, "r") for src in timeline.sources.values()]
 
-    font_cache, img_cache = make_caches(timeline.v, log)
+    font_cache, img_cache = make_caches(timeline.v, timeline.sources, log)
 
     target_pix_fmt = "yuv420p"  # Reasonable default
     decoders = []

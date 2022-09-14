@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import TYPE_CHECKING, List, NamedTuple, Type, Union
+from typing import TYPE_CHECKING, List, NamedTuple, Union
 
 import numpy as np
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from auto_editor.utils.types import Margin
 
 
-Visual = Type[Union[TextObj, ImageObj, RectangleObj, EllipseObj]]
+Visual = Union[TextObj, ImageObj, RectangleObj, EllipseObj]
 VLayer = List[Union[VideoObj, Visual]]
 VSpace = List[VLayer]
 
