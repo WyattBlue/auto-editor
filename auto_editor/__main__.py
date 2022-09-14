@@ -5,10 +5,9 @@ import sys
 import tempfile
 
 import auto_editor
-import auto_editor.utils.func as usefulfunctions
 from auto_editor.edit import edit_media
 from auto_editor.ffwrapper import FFmpeg
-from auto_editor.utils.log import Log, Timer
+from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     MainArgs,
     color,
@@ -145,11 +144,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Set the background as a solid RGB color",
     )
     parser.add_argument(
-        "--api",
-        metavar="VERSION",
-        help="Set what version of the timeline to use",
-    )
-    parser.add_argument(
         "--add",
         nargs="*",
         metavar="OBJ:START,DUR,ATTRS?",
@@ -187,16 +181,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--export",
         "-ex",
-        choices=(
-            "default",
-            "premiere",
-            "final-cut-pro",
-            "shotcut",
-            "json",
-            "audio",
-            "clip-sequence",
-        ),
-        metavar="EXPORT",
+        metavar="EXPORT:ATTRS?",
         help="Choose the export mode",
     )
     parser.add_argument(
@@ -249,9 +234,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--stats",
         flag=True,
         help="Show stats on how the input will be cut and halt",
-    )
-    parser.add_argument(
-        "--timeline", flag=True, help="Show auto-editor JSON timeline file and halt"
     )
     parser.add_text("Video Rendering:")
     parser.add_argument(
@@ -337,11 +319,11 @@ def main() -> None:
             ],
         )
 
+    if args.version:
+        print(f"{auto_editor.version} ({auto_editor.__version__})")
+        sys.exit()
+
     log = Log(args.debug, args.quiet)
-    timer = Timer(args.quiet)
-
-    exporting_to_editor = args.export in ("premiere", "final-cut-pro", "shotcut")
-
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, args.show_ffmpeg_debug)
 
     if args.debug and args.input == []:
@@ -353,13 +335,6 @@ def main() -> None:
         print(f"FFmpeg Version: {ffmpeg.version}\nFFmpeg Path: {ffmpeg.path}")
         print(f"Auto-Editor Version: {auto_editor.version}")
         sys.exit()
-
-    if args.version:
-        print(f"{auto_editor.version} ({auto_editor.__version__})")
-        sys.exit()
-
-    if args.timeline:
-        args.quiet = True
 
     if args.input == []:
         log.error("You need to give auto-editor an input file.")
@@ -379,11 +354,6 @@ def main() -> None:
     log = Log(args.debug, args.quiet, temp=temp)
     log.debug(f"Temp Directory: {temp}")
 
-    log.conwrite("Starting")
-
-    if args.preview or args.export not in ("audio", "default"):
-        args.no_open = True
-
     if args.silent_speed <= 0 or args.silent_speed > 99999:
         args.silent_speed = 99999
 
@@ -391,6 +361,12 @@ def main() -> None:
         args.video_speed = 99999
 
     paths = valid_input(args.input, ffmpeg, args, log)
+
+    exporting_to_editor = (
+        args.export.startswith("premiere")
+        or args.export.startswith("final-cut-pro")
+        or args.export.startswith("shotcut")
+    )
 
     if exporting_to_editor and len(paths) > 1:
         cmd = []
@@ -412,19 +388,7 @@ def main() -> None:
         ffmpeg.run(cmd)
         paths = ["combined.mp4"]
     try:
-        output = edit_media(paths, ffmpeg, args, temp, log)
-
-        if not args.preview and not args.timeline:
-            timer.stop()
-
-        if not args.no_open and output is not None:
-            if args.player is None:
-                usefulfunctions.open_with_system_default(output, log)
-            else:
-                import subprocess
-                from shlex import split
-
-                subprocess.run(split(args.player) + [output])
+        edit_media(paths, ffmpeg, args, temp, log)
     except KeyboardInterrupt:
         log.error("Keyboard Interrupt")
     log.cleanup()

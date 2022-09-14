@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, NamedTuple, TypedDict, TypeVar
+from typing import Any, NamedTuple, Type, TypedDict, TypeVar, Union
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -282,3 +282,62 @@ rect_builder = [
     Attr(("strokecolor",), color, "#000"),
 ]
 ellipse_builder = rect_builder
+
+
+## Export Objects
+
+
+@dataclass
+class EditDefault:
+    pass
+
+
+@dataclass
+class EditPremiere:
+    pass
+
+
+@dataclass
+class EditFinalCutPro:
+    pass
+
+
+@dataclass
+class EditShotCut:
+    pass
+
+
+@dataclass
+class EditJson:
+    api: str
+
+
+@dataclass
+class EditTimeline:
+    api: str
+
+
+@dataclass
+class EditAudio:
+    pass
+
+
+@dataclass
+class EditClipSequence:
+    pass
+
+
+Exports = Type[
+    Union[
+        EditDefault,
+        EditPremiere,
+        EditFinalCutPro,
+        EditShotCut,
+        EditJson,
+        EditTimeline,
+        EditAudio,
+        EditClipSequence,
+    ]
+]
+
+timeline_builder = [Attr(("api",), str, "1.0.0")]

@@ -6,6 +6,7 @@ import sys
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.make_layers import clipify, make_av
+from auto_editor.objects import EditJson, EditTimeline
 from auto_editor.timeline import Timeline
 from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.log import Log
@@ -109,8 +110,8 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
 
     if version == (2, 0) or version == (0, 2):
         check_attrs(data, log, "timeline", "source")
-        for src in data["source"].values():
-            check_file(src, log)
+        for path in data["source"].values():
+            check_file(path, log)
         # return data["background"], data["source"], chunks
 
         raise ValueError("Importing v2 timelines not implemented.")
@@ -119,13 +120,13 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
 
 
 def make_json_timeline(
-    _version: str,
+    obj: EditJson | EditTimeline,
     out: str | int,
     timeline: Timeline,
     log: Log,
 ) -> None:
 
-    version = Version(_version, log)
+    version = Version(obj.api, log)
 
     if version == (1, 0) or version == (0, 1):
         if timeline.chunks is None:
