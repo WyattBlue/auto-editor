@@ -4,6 +4,7 @@ import os.path
 from dataclasses import dataclass
 from math import ceil
 from subprocess import DEVNULL, PIPE
+from typing import Any
 
 import av
 from PIL import Image, ImageOps
@@ -26,7 +27,7 @@ av.logging.set_level(av.logging.PANIC)
 @dataclass
 class VideoFrame:
     index: int
-    src: int
+    src: int | str
 
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
@@ -64,21 +65,25 @@ def render_av(
 ) -> tuple[str, bool]:
 
     src = None if not timeline.sources else timeline.sources[0]
-    cns = [av.open(src.path, "r") for src in timeline.sources.values()]
 
     font_cache, img_cache = make_caches(timeline.v, timeline.sources, log)
 
+    cns: dict[int | str, Any] = {}
+    decoders: dict[int | str, Any] = {}
+    seek_cost: dict[int | str, int] = {}
+    tous: dict[int | str, int] = {}
+
     target_pix_fmt = "yuv420p"  # Reasonable default
-    decoders = []
-    tous = []
-    seek_cost = []
-    for c, cn in enumerate(cns):
-        if len(cn.streams.video) == 0:
-            decoders.append(None)
-            tous.append(0)
-            seek_cost.append(0)
+
+    for key, src in timeline.sources.items():
+        cns[key] = av.open(src.path)
+
+        if len(cns[key].streams.video) == 0:
+            decoders[key] = None
+            tous[key] = 0
+            seek_cost[key] = 0
         else:
-            stream = cn.streams.video[0]
+            stream = cns[key].streams.video[0]
             stream.thread_type = "AUTO"
 
             if args.no_seek or stream.average_rate is None:
@@ -89,11 +94,11 @@ def render_av(
                 sc_val = int(stream.average_rate * 5)
                 tou = int(stream.time_base.denominator / stream.average_rate)
 
-            seek_cost.append(sc_val)
-            tous.append(tou)
-            decoders.append(cn.decode(stream))
+            seek_cost[key] = sc_val
+            tous[key] = tou
+            decoders[key] = cns[key].decode(stream)
 
-            if c == 0:
+            if key == 0:
                 target_pix_fmt = stream.pix_fmt
 
     log.debug(f"Tous: {tous}")
