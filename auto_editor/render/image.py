@@ -30,8 +30,10 @@ def apply_anchor(x: int, y: int, w: int, h: int, anchor: str) -> tuple[int, int]
     return x, y
 
 
-FontCache = Dict[str, Tuple[Union[ImageFont.FreeTypeFont, ImageFont.ImageFont], float]]
-ImgCache = Dict[str, Image.Image]
+FontCache = Dict[
+    Union[int, str], Tuple[Union[ImageFont.FreeTypeFont, ImageFont.ImageFont], float]
+]
+ImgCache = Dict[Union[int, str], Image.Image]
 
 
 def make_caches(
