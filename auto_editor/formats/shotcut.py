@@ -41,7 +41,7 @@ def shotcut_xml(
             f'width="{width}" height="{height}" '
             'progressive="1" sample_aspect_num="1" sample_aspect_den="1" '
             f'display_aspect_num="{num}" display_aspect_den="{den}" '
-            f'frame_rate_num="{tb}" frame_rate_den="1" colorspace="709"/>\n'
+            f'frame_rate_num="{tb.numerator}" frame_rate_den="{tb.denominator}" colorspace="709"/>\n'
         )
         out.write('\t<playlist id="main_bin">\n')
         out.write('\t\t<property name="xml_retain">1</property>\n')
