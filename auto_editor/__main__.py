@@ -9,7 +9,7 @@ from auto_editor.edit import edit_media
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
-    MainArgs,
+    Args,
     color,
     frame_rate,
     margin,
@@ -307,7 +307,7 @@ def main() -> None:
         sys.exit()
     else:
         args = main_options(ArgumentParser("Auto-Editor")).parse_args(
-            MainArgs,
+            Args,
             sys.argv[1:],
             macros=[
                 ({"--export-to-premiere", "-exp"}, ["--export", "premiere"]),

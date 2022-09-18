@@ -10,7 +10,7 @@ from typing import Any, Callable, Iterator, Literal, TypeVar, Union
 
 from auto_editor.utils.log import Log
 
-T = TypeVar("T", bound=type)
+T = TypeVar("T")
 Nargs = Union[int, Literal["*"]]
 
 
@@ -208,7 +208,7 @@ class ArgumentParser:
 
     def parse_args(
         self,
-        ns_obj: T,
+        ns_obj: type[T],
         sys_args: list[str],
         macros: list[tuple[set[str], list[str]]] | None = None,
     ) -> T:
@@ -289,7 +289,9 @@ class ArgumentParser:
             else:
                 if option.nargs != "*":
                     if option in used_options:
-                        Log().error(f"Cannot repeat option {option.names[0]} twice.")
+                        Log().error(
+                            f"Option {option.names[0]} may not be used more than once."
+                        )
                     used_options.append(option)
 
                 oplist_name = None
@@ -315,7 +317,7 @@ class ArgumentParser:
         if setting_req_list:
             ns.__setattr__(req_list_name, req_list)
 
-        if ns.help:
+        if getattr(ns, "help"):
             print_program_help(requireds, args)
             sys.exit()
 

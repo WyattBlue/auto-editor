@@ -7,6 +7,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from fractions import Fraction
 from time import perf_counter
@@ -66,6 +67,12 @@ class Runner:
 
             if "--export_as_json" in cmd:
                 output = f"{root}.json"
+            elif "-exp" in cmd:
+                output = f"{root}.xml"
+            elif "-exf" in cmd:
+                output = f"{root}.fcpxml"
+            elif "-exs" in cmd:
+                output = f"{root}.mlt"
             else:
                 output = f"{root}_ALTERED{ext}"
 
@@ -453,7 +460,10 @@ def main(sys_args: list[str] | None = None):
             test_file = f"resources/{test_name}"
             results.add(run.main([test_file], []))
             run.main([test_file], ["--edit", "none"])
-            run.main([test_file], ["-exp"])
+            p_xml = run.main([test_file], ["-exp"])
+
+            ET.parse(p_xml)
+
             run.main([test_file], ["-exf"])
             run.main([test_file], ["-exs"])
             run.main([test_file], ["--export_as_clip_sequence"])

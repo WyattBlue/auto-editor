@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Literal, Tuple, Type, Union
+from typing import Literal, Tuple, Union
 
 
 def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
@@ -245,7 +245,7 @@ def pos(val: tuple[float | str, int]) -> int:
 
 
 @dataclass
-class MainArgs:
+class Args:
     add: list[str] = field(default_factory=list)
     source: list[str] = field(default_factory=list)
     yt_dlp_location: str = "yt-dlp"
@@ -291,9 +291,6 @@ class MainArgs:
     output_file: str | None = None
     help: bool = False
     input: list[str] = field(default_factory=list)
-
-
-Args = Type[MainArgs]
 
 
 colormap = {

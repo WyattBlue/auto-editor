@@ -72,7 +72,7 @@ def grep_file(
     media_file: str,
     add_prefix: bool,
     ffmpeg: FFmpeg,
-    args: type[GrepArgs],
+    args: GrepArgs,
     log: Log,
     TEMP: str,
 ) -> None:
