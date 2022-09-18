@@ -99,57 +99,57 @@ class Runner:
             raise Exception("Program should not respond with code 0 but did!")
 
 
-class Tester:
-    def __init__(self) -> None:
-        pass
+def run_tests(tests: list[Callable], args: TestArgs) -> None:
+    def clean_all() -> None:
+        def clean(the_dir: str) -> None:
+            for item in os.listdir(the_dir):
+                item = os.path.join(the_dir, item)
+                if (
+                    "_ALTERED" in item
+                    or item.endswith(".xml")
+                    or item.endswith(".fcpxml")
+                    or item.endswith(".mlt")
+                ):
+                    os.remove(item)
+                if item.endswith("_tracks"):
+                    shutil.rmtree(item)
 
-    def run(self, tests: list[Callable], args: TestArgs) -> None:
-        def clean_all() -> None:
-            def clean(the_dir: str) -> None:
-                for item in os.listdir(the_dir):
-                    item = os.path.join(the_dir, item)
-                    if (
-                        "_ALTERED" in item
-                        or item.endswith(".xml")
-                        or item.endswith(".fcpxml")
-                        or item.endswith(".mlt")
-                    ):
-                        os.remove(item)
-                    if item.endswith("_tracks"):
-                        shutil.rmtree(item)
+        clean("resources")
+        clean(os.getcwd())
 
-            clean("resources")
-            clean(os.getcwd())
+    if args.only != []:
+        tests = list(filter(lambda t: t.__name__ in args.only, tests))
 
-        if args.only != []:
-            tests = list(filter(lambda t: t.__name__ in args.only, tests))
+    total_time = 0
 
-        for passed, test in enumerate(tests):
-            start = perf_counter()
+    for passed, test in enumerate(tests):
+        start = perf_counter()
 
-            try:
-                outputs = test()
-                end = perf_counter() - start
-            except KeyboardInterrupt:
-                print(f"Testing Interrupted by User.")
-                clean_all()
-                sys.exit(1)
-            except Exception as e:
-                print(f"Test '{test.__name__}' ({passed}/{len(tests)}) failed.\n{e}")
-                clean_all()
-                sys.exit(1)
+        try:
+            outputs = test()
+            dur = perf_counter() - start
+            total_time += dur
+        except KeyboardInterrupt:
+            print(f"Testing Interrupted by User.")
+            clean_all()
+            sys.exit(1)
+        except Exception as e:
+            print(f"Test '{test.__name__}' ({passed}/{len(tests)}) failed.\n{e}")
+            clean_all()
+            sys.exit(1)
 
-            print(f"Test '{test.__name__}' passed: {round(end, 2)} secs")
 
-            if outputs is not None:
-                if isinstance(outputs, str):
-                    outputs = [outputs]
+        print(f"{test.__name__:<25} {round(dur, 2)} secs")
 
-                for out in outputs:
-                    if os.path.isfile(out):
-                        os.remove(out)
+        if outputs is not None:
+            if isinstance(outputs, str):
+                outputs = [outputs]
 
-        print(f"{passed+1}/{len(tests)}")
+            for out in outputs:
+                if os.path.isfile(out):
+                    os.remove(out)
+
+    print(f"\nCompleted\n{passed+1}/{len(tests)}\n{round(total_time, 2)} secs")
 
 
 def main(sys_args: list[str] | None = None):
@@ -684,7 +684,7 @@ def main(sys_args: list[str] | None = None):
             ]
         )
 
-    Tester().run(tests, args)
+    run_tests(tests, args)
 
 
 if __name__ == "__main__":
