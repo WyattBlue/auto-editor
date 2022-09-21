@@ -49,6 +49,7 @@ def mux_quality_media(
     ffmpeg: FFmpeg,
     visual_output: list[tuple[bool, str]],
     audio_output: list[str],
+    sub_output: list[str],
     apply_v: bool,
     ctr: Container,
     output_path: str,
@@ -59,9 +60,9 @@ def mux_quality_media(
     log: Log,
 ) -> None:
 
-    s_tracks = 0 if not ctr.allow_subtitle else len(src.subtitles)
-    a_tracks = 0 if not ctr.allow_audio else len(audio_output)
-    v_tracks = 0 if not ctr.allow_video else len(visual_output)
+    v_tracks = len(visual_output)
+    a_tracks = len(audio_output)
+    s_tracks = len(sub_output)
 
     cmd = ["-hide_banner", "-y", "-i", src.path]
 
@@ -99,13 +100,10 @@ def mux_quality_media(
                 new_a_file = audio_output[0]
             cmd.extend(["-i", new_a_file])
 
-    if s_tracks > 0:
-        for s, sub in enumerate(src.subtitles):
-            cmd.extend(["-i", os.path.join(temp, f"new{s}s.{sub.ext}")])
+    for subfile in sub_output:
+        cmd.extend(["-i", subfile])
 
-    total_streams = v_tracks + s_tracks + a_tracks
-
-    for i in range(total_streams):
+    for i in range(v_tracks + s_tracks + a_tracks):
         cmd.extend(["-map", f"{i+1}:0"])
 
     cmd.extend(["-map_metadata", "0"])

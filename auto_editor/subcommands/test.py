@@ -7,7 +7,6 @@ import platform
 import shutil
 import subprocess
 import sys
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from fractions import Fraction
 from time import perf_counter
@@ -130,14 +129,13 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
             dur = perf_counter() - start
             total_time += dur
         except KeyboardInterrupt:
-            print(f"Testing Interrupted by User.")
+            print("Testing Interrupted by User.")
             clean_all()
             sys.exit(1)
         except Exception as e:
             print(f"Test '{test.__name__}' ({passed}/{len(tests)}) failed.\n{e}")
             clean_all()
             sys.exit(1)
-
 
         print(f"{test.__name__:<25} {round(dur, 2)} secs")
 
@@ -460,9 +458,9 @@ def main(sys_args: list[str] | None = None):
             test_file = f"resources/{test_name}"
             results.add(run.main([test_file], []))
             run.main([test_file], ["--edit", "none"])
-            p_xml = run.main([test_file], ["-exp"])
 
-            ET.parse(p_xml)
+            p_xml = run.main([test_file], ["-exp"])
+            run.main([p_xml], [])
 
             run.main([test_file], ["-exf"])
             run.main([test_file], ["-exs"])

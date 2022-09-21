@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import os.path
+import xml.etree.ElementTree as ET
 from fractions import Fraction
 from os.path import abspath
-from platform import system
+from pathlib import Path
 from shutil import move
-from urllib.parse import quote
+from xml.etree.ElementTree import Element
 
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.make_layers import ASpace, VSpace
+from auto_editor.objects import AudioObj, VideoObj
 from auto_editor.output import Ensure
 from auto_editor.timeline import Timeline
+from auto_editor.utils.log import Log
 
 from .utils import indent, safe_mkdir
 
@@ -28,10 +33,21 @@ ANAMORPHIC = "FALSE"
 DEPTH = "16"
 
 
-def fix_url(path: str) -> str:
-    if system() == "Windows":
-        return "file://localhost/" + quote(abspath(path)).replace("%5C", "/")
-    return f"file://localhost{abspath(path)}"
+def path_to_uri(path: str) -> str:
+    return Path(abspath(path)).as_uri()
+
+
+def uri_to_path(uri: str) -> str:
+    from urllib.parse import urlparse
+    from urllib.request import url2pathname
+
+    parsed = urlparse(uri)
+    host = "{0}{0}{mnt}{0}".format(os.path.sep, mnt=parsed.netloc)
+    return os.path.normpath(os.path.join(host, url2pathname(parsed.path)))
+
+    # /Users/wyattblue/projects/auto-editor/example.mp4
+    # file:///Users/wyattblue/projects/auto-editor/example.mp4
+    # file://localhost/Users/wyattblue/projects/auto-editor/example.mp4
 
 
 def speedup(speed: float) -> str:
@@ -73,7 +89,186 @@ def speedup(speed: float) -> str:
     )
 
 
-def premiere_xml(
+def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
+    def show(ele, limit, depth=0):
+        print(
+            f"{' ' * (depth * 4)}<{ele.tag} {ele.attrib}> {ele.text.strip() if ele.text is not None else ''}"
+        )
+        for child in ele:
+            if isinstance(child, Element) and depth < limit:
+                show(child, limit, depth + 1)
+
+    def xml_bool(val: str) -> bool:
+        if val == "TRUE":
+            return True
+        if val == "FALSE":
+            return False
+        raise TypeError("Value must be 'TRUE' or 'FALSE'")
+
+    def check(ele: Element, tag: str) -> None:
+        if tag != ele.tag:
+            log.error(f"Expected '{tag}' tag, got '{ele.tag}'")
+
+    def validate(ele: Element, schema: dict) -> dict:
+        new: dict = {}
+
+        for key, val in schema.items():
+            if isinstance(val, dict) and "__arr" in val:
+                new[key] = []
+
+        is_arr = False
+        for child in ele:
+            if child.tag not in schema:
+                # log.warning(f"Didn't expect '{child.tag}' tag")
+                continue
+
+            if schema[child.tag] is None:
+                new[child.tag] = child
+                continue
+
+            if isinstance(schema[child.tag], dict):
+                val = validate(child, schema[child.tag])
+                is_arr = "__arr" in schema[child.tag]
+            else:
+                val = schema[child.tag](child.text)
+
+            if child.tag in new:
+                if not is_arr:
+                    log.error(f"<{child.tag}> can only occur once")
+                new[child.tag].append(val)
+            else:
+                new[child.tag] = [val] if is_arr else val
+
+        return new
+
+    try:
+        tree = ET.parse(path)
+    except FileNotFoundError:
+        log.error(f"Coud not find file '{path}'")
+
+    root = tree.getroot()
+
+    check(root, "xmeml")
+    check(root[0], "sequence")
+    result = validate(
+        root[0],
+        {
+            "name": str,
+            "duration": int,
+            "rate": {
+                "timebase": Fraction,
+                "ntsc": xml_bool,
+            },
+            "media": None,
+        },
+    )
+
+    tb = result["rate"]["timebase"]
+
+    av = validate(
+        result["media"],
+        {
+            "video": None,
+            "audio": None,
+        },
+    )
+
+    sources: dict[int | str, FileInfo] = {}
+    vobjs: VSpace = []
+    aobjs: ASpace = []
+
+    vclip_schema = {
+        "format": {
+            "samplecharacteristics": {
+                "width": int,
+                "height": int,
+            },
+        },
+        "track": {
+            "__arr": "",
+            "clipitem": {
+                "__arr": "",
+                "start": int,
+                "end": int,
+                "in": int,
+                "out": int,
+                "file": None,
+            },
+        },
+    }
+
+    aclip_schema = {
+        "format": {"samplecharacteristics": {"samplerate": int}},
+        "track": {
+            "__arr": "",
+            "clipitem": {
+                "__arr": "",
+                "start": int,
+                "end": int,
+                "in": int,
+                "out": int,
+                "file": None,
+            },
+        },
+    }
+
+    sr = 48000
+    res = (1920, 1080)
+
+    if "video" in av:
+        tracks = validate(av["video"], vclip_schema)
+
+        width = tracks["format"]["samplecharacteristics"]["width"]
+        height = tracks["format"]["samplecharacteristics"]["height"]
+        res = width, height
+
+        for t, track in enumerate(tracks["track"]):
+            if len(track["clipitem"]) > 0:
+                vobjs.append([])
+            for i, clipitem in enumerate(track["clipitem"]):
+                file_id = clipitem["file"].attrib["id"]
+                if file_id not in sources:
+                    fileobj = validate(clipitem["file"], {"pathurl": str})
+                    sources[file_id] = FileInfo(
+                        uri_to_path(fileobj["pathurl"]), len(sources), ffmpeg, log
+                    )
+
+                start = clipitem["start"]
+                dur = clipitem["end"] - start
+                offset = clipitem["in"]
+
+                vobjs[t].append(
+                    VideoObj(start, dur, file_id, offset, speed=1, stream=0)
+                )
+
+    if "audio" in av:
+        tracks = validate(av["audio"], aclip_schema)
+        sr = tracks["format"]["samplecharacteristics"]["samplerate"]
+
+        for t, track in enumerate(tracks["track"]):
+            if len(track["clipitem"]) > 0:
+                aobjs.append([])
+            for i, clipitem in enumerate(track["clipitem"]):
+                file_id = clipitem["file"].attrib["id"]
+                if file_id not in sources:
+                    fileobj = validate(clipitem["file"], {"pathurl": str})
+                    sources[file_id] = FileInfo(
+                        uri_to_path(fileobj["pathurl"]), len(sources), ffmpeg, log
+                    )
+
+                start = clipitem["start"]
+                dur = clipitem["end"] - start
+                offset = clipitem["in"]
+
+                aobjs[t].append(
+                    AudioObj(start, dur, file_id, offset, speed=1, volume=1, stream=0)
+                )
+
+    timeline = Timeline(sources, tb, sr, res, "#000", vobjs, aobjs, None)
+    return timeline
+
+
+def premiere_write_xml(
     ensure: Ensure,
     output: str,
     timeline: Timeline,
@@ -112,7 +307,7 @@ def premiere_xml(
         if chunk[2] != 99999:
             clips.append(chunk)
 
-    pathurls = [fix_url(src.path)]
+    pathurls = [path_to_uri(src.path)]
 
     tracks = len(src.audios)
 
@@ -124,7 +319,7 @@ def premiere_xml(
         for i in range(1, tracks):
             newtrack = os.path.join(fold, f"{i}.wav")
             move(ensure.audio(src.path, 0, i), newtrack)
-            pathurls.append(fix_url(newtrack))
+            pathurls.append(path_to_uri(newtrack))
 
     width, height = timeline.res
 
@@ -194,7 +389,7 @@ def premiere_xml(
             total = 0.0
             for j, clip in enumerate(clips):
 
-                clip_duration = (clip[1] - clip[0] + 1) / clip[2]
+                clip_duration = (clip[1] - clip[0]) / clip[2]
 
                 _start = int(total)
                 _end = int(total) + int(clip_duration)
@@ -303,7 +498,7 @@ def premiere_xml(
             total = 0
             for j, clip in enumerate(clips):
 
-                clip_duration = (clip[1] - clip[0] + 1) / clip[2]
+                clip_duration = (clip[1] - clip[0]) / clip[2]
 
                 _start = int(total)
                 _end = int(total) + int(clip_duration)

@@ -165,14 +165,23 @@ def edit_media(
 
     if paths:
         path_ext = os.path.splitext(paths[0])[1]
-        if path_ext == ".json":
+        if path_ext == ".xml":
+            from auto_editor.formats.premiere import premiere_read_xml
+
+            timeline = premiere_read_xml(paths[0], ffmpeg, log)
+            src: FileInfo | None = next(iter(timeline.sources.items()))[1]
+            sources = timeline.sources
+
+        elif path_ext == ".json":
             from auto_editor.formats.json import read_json
 
             timeline = read_json(paths[0], ffmpeg, log)
             inputs = [0]
             sources = timeline.sources
+            src = None if not inputs else sources[inputs[0]]
         else:
             sources, inputs = make_sources(paths, ffmpeg, log)
+            src = None if not inputs else sources[inputs[0]]
 
     del paths
 
@@ -180,8 +189,6 @@ def edit_media(
         export = parse_export(args.export, log)
     else:
         export = EditJson(api="1")
-
-    src = None if not inputs else sources[inputs[0]]
 
     if src is not None:
         if args.output_file is None:
@@ -203,23 +210,26 @@ def edit_media(
             log.debug(f"Removing already existing file: {output}")
             os.remove(output)
 
-    # Extract subtitles in their native format.
-    if src is not None and len(src.subtitles) > 0:
-        cmd = ["-i", src.path, "-hide_banner"]
-        for s, sub in enumerate(src.subtitles):
-            cmd.extend(["-map", f"0:s:{s}"])
-        for s, sub in enumerate(src.subtitles):
-            cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
-        ffmpeg.run(cmd)
-
     if args.sample_rate is None:
-        samplerate = 48000 if src is None else src.get_samplerate()
+        if timeline is None:
+            samplerate = 48000 if src is None else src.get_samplerate()
+        else:
+            samplerate = timeline.samplerate
     else:
         samplerate = args.sample_rate
 
     ensure = Ensure(ffmpeg, samplerate, temp, log)
 
     if timeline is None:
+        # Extract subtitles in their native format.
+        if src is not None and len(src.subtitles) > 0:
+            cmd = ["-i", src.path, "-hide_banner"]
+            for s, sub in enumerate(src.subtitles):
+                cmd.extend(["-map", f"0:s:{s}"])
+            for s, sub in enumerate(src.subtitles):
+                cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
+            ffmpeg.run(cmd)
+
         timeline = make_timeline(
             sources, inputs, ffmpeg, ensure, args, samplerate, bar, temp, log
         )
@@ -243,9 +253,9 @@ def edit_media(
         return
 
     if isinstance(export, EditPremiere):
-        from auto_editor.formats.premiere import premiere_xml
+        from auto_editor.formats.premiere import premiere_write_xml
 
-        premiere_xml(ensure, output, timeline)
+        premiere_write_xml(ensure, output, timeline)
         return
 
     if isinstance(export, EditFinalCutPro):
@@ -282,12 +292,13 @@ def edit_media(
 
         visual_output = []
         audio_output = []
+        sub_output = []
         apply_later = False
 
         if ctr.allow_subtitle:
-            from auto_editor.render.subtitle import cut_subtitles
+            from auto_editor.render.subtitle import make_new_subtitles
 
-            cut_subtitles(ffmpeg, timeline, temp, log)
+            sub_output = make_new_subtitles(timeline, ffmpeg, temp, log)
 
         if ctr.allow_audio:
             from auto_editor.render.audio import make_new_audio
@@ -315,6 +326,7 @@ def edit_media(
             ffmpeg,
             visual_output,
             audio_output,
+            sub_output,
             apply_later,
             ctr,
             output,
