@@ -9,7 +9,7 @@ from typing import Any
 import av
 from PIL import Image, ImageOps
 
-from auto_editor.ffwrapper import FFmpeg
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.make_layers import Visual
 from auto_editor.objects import VideoObj
 from auto_editor.output import video_quality
@@ -64,7 +64,13 @@ def render_av(
     log: Log,
 ) -> tuple[str, bool]:
 
-    src = None if not timeline.sources else timeline.sources[0]
+    if not timeline.sources:
+        if 0 in timeline.sources:
+            src: FileInfo | None = timeline.sources[0]
+        else:
+            src = next(iter(timeline.sources.items()))[1]
+    else:
+        src = None
 
     font_cache, img_cache = make_caches(timeline.v, timeline.sources, log)
 

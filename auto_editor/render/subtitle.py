@@ -120,16 +120,20 @@ class SubtitleParser:
         )
 
 
-def cut_subtitles(
-    ffmpeg: FFmpeg,
+def make_new_subtitles(
     timeline: Timeline,
+    ffmpeg: FFmpeg,
     temp: str,
     log: Log,
-) -> None:
-    chunks = timeline.chunks
+) -> list[str]:
+
+    if timeline.chunks is None:
+        return []
+
+    new_paths = []
 
     for s, sub in enumerate(timeline.sources[0].subtitles):
-        if chunks is None:
+        if timeline.chunks is None:
             log.error("Timeline too complex for subtitles")
 
         file_path = os.path.join(temp, f"{s}s.{sub.ext}")
@@ -146,5 +150,8 @@ def cut_subtitles(
             with open(convert_path) as file:
                 parser.parse(file.read(), timeline.timebase, "webvtt")
 
-        parser.edit(chunks)
+        parser.edit(timeline.chunks)
         parser.write(new_path)
+        new_paths.append(new_path)
+
+    return new_paths
