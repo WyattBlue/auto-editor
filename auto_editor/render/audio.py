@@ -20,6 +20,8 @@ def make_new_audio(
     output = []
     samples = {}
 
+    af_tick = 0
+
     if len(timeline.a) == 0 or len(timeline.a[0]) == 0:
         log.error("Trying to render empty audio timeline")
 
@@ -89,8 +91,12 @@ def make_new_audio(
             if not filters:
                 clip_arr = samp_list[samp_start:samp_end]
             else:
-                af = os.path.join(temp, "af.wav")
-                af_out = os.path.join(temp, "af_out.wav")
+                af = os.path.join(temp, f"af{af_tick}.wav")
+                af_out = os.path.join(temp, f"af{af_tick}_out.wav")
+
+                # Windows can't replace a file that's already in use, so we have to 
+                # cycle through file names. 
+                af_tick = (af_tick + 1) % 3
 
                 write(af, sr, samp_list[samp_start:samp_end])
                 ffmpeg.run(["-i", af, "-af", ",".join(filters), af_out])
