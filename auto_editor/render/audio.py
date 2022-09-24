@@ -94,8 +94,8 @@ def make_new_audio(
                 af = os.path.join(temp, f"af{af_tick}.wav")
                 af_out = os.path.join(temp, f"af{af_tick}_out.wav")
 
-                # Windows can't replace a file that's already in use, so we have to 
-                # cycle through file names. 
+                # Windows can't replace a file that's already in use, so we have to
+                # cycle through file names.
                 af_tick = (af_tick + 1) % 3
 
                 write(af, sr, samp_list[samp_start:samp_end])

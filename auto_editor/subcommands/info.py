@@ -81,7 +81,9 @@ class MediaJson(TypedDict, total=False):
     audio: list[AudioJson]
     subtitle: list[SubtitleJson]
     container: ContainerJson
-    media: Literal["invalid"]
+    type: Literal["media", "timeline", "unknown"]
+    version: Literal["v1", "v2"]
+    clips: int
 
 
 def main(sys_args=sys.argv[1:]) -> None:
@@ -94,15 +96,33 @@ def main(sys_args=sys.argv[1:]) -> None:
 
     for i, file in enumerate(args.input):
         if not os.path.isfile(file):
-            Log().error(f"Could not find file: {file}")
+            log.error(f"Could not find file: {file}")
+
+        ext = os.path.splitext(file)[1]
+        if ext == ".json":
+            from auto_editor.formats.json import read_json
+
+            tl = read_json(file, ffmpeg, log)
+            file_info[file] = {"type": "timeline"}
+            file_info[file]["version"] = "v2" if tl.chunks is None else "v1"
+
+            clip_lens = [clip.dur / clip.speed for clip in tl.a[0]]
+            file_info[file]["clips"] = len(clip_lens)
+
+            continue
+
+        if ext in (".xml", ".fcpxml", ".mlt"):
+            file_info[file] = {"type": "timeline"}
+            continue
 
         src = FileInfo(file, i, ffmpeg, log)
 
         if len(src.videos) + len(src.audios) + len(src.subtitles) == 0:
-            file_info[file] = {"media": "invalid"}
+            file_info[file] = {"type": "unknown"}
             continue
 
         file_info[file] = {
+            "type": "media",
             "video": [],
             "audio": [],
             "subtitle": [],
@@ -190,19 +210,18 @@ def main(sys_args=sys.argv[1:]) -> None:
     text = ""
     for name, info in file_info.items():
         text += f"{name}:\n"
-        if "media" in info:
-            text += " - invalid media\n\n"
-            continue
 
         for label, streams in info.items():
-            if isinstance(streams, dict):
+            if isinstance(streams, list):
+                text = stream_to_text(text, label, streams)
+                continue
+            elif isinstance(streams, dict):
                 text += " - container:\n"
                 for key, value in streams.items():
                     if value is not None:
                         text += f"   - {key}: {value}\n"
-            else:
-                assert isinstance(streams, list)
-                text = stream_to_text(text, label, streams)
+            elif label != "type" or streams != "media":
+                text += f" - {label}: {streams}\n"
         text += "\n"
 
     sys.stdout.write(text)

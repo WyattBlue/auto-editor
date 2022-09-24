@@ -14,10 +14,7 @@ def timecode_to_frames(timecode: str, tb: Fraction) -> int:
     return round((h * 3600 + m * 60 + s) * tb)
 
 
-def shotcut_xml(
-    output: str,
-    timeline: Timeline,
-) -> None:
+def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
     width, height = timeline.res
     num, den = aspect_ratio(width, height)
 

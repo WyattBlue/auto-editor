@@ -265,9 +265,9 @@ def edit_media(
         return
 
     if isinstance(export, EditShotCut):
-        from auto_editor.formats.shotcut import shotcut_xml
+        from auto_editor.formats.shotcut import shotcut_write_mlt
 
-        shotcut_xml(output, timeline)
+        shotcut_write_mlt(output, timeline)
         return
 
     out_ext = os.path.splitext(output)[1].replace(".", "")
