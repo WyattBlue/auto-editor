@@ -56,6 +56,8 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
     ET.SubElement(producer, "property", name="length").text = global_out
     ET.SubElement(producer, "property", name="eof").text = "pause"
     ET.SubElement(producer, "property", name="resource").text = "0"
+    ET.SubElement(producer, "property", name="mlt_service").text = "color"
+    ET.SubElement(producer, "property", name="mlt_image_format").text = "rgba"
     ET.SubElement(producer, "property", name="aspect_ratio").text = "1"
 
     playlist = ET.SubElement(mlt, "playlist", attrib={"id": "background"})
