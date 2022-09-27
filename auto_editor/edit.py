@@ -24,23 +24,46 @@ from auto_editor.utils.log import Log, Timer
 from auto_editor.utils.types import Args
 
 
-def set_output_name(path: str, original_ext: str, export: Exports) -> str:
-    root, path_ext = os.path.splitext(path)
+def set_output(
+    out: str | None, _export: str | None, src: FileInfo | None, log: Log
+) -> tuple[str, Exports]:
+
+    export = None if _export is None else parse_export(_export, log)
+
+    if src is None:
+        root, ext = "out", ".mp4"
+    else:
+        root, ext = os.path.splitext(src.path if out is None else out)
+        if ext == "":
+            ext = src.ext
+
+    if export is None:
+        if ext == ".xml":
+            export = EditPremiere()
+        elif ext == ".fcpxml":
+            export = EditFinalCutPro()
+        elif ext == ".mlt":
+            export = EditShotCut()
+        elif ext == ".json":
+            export = EditJson()
+        else:
+            export = EditDefault()
 
     if isinstance(export, EditPremiere):
-        return f"{root}.xml"
+        ext = ".xml"
     if isinstance(export, EditFinalCutPro):
-        return f"{root}.fcpxml"
+        ext = ".fcpxml"
     if isinstance(export, EditShotCut):
-        return f"{root}.mlt"
+        ext = ".mlt"
     if isinstance(export, EditJson):
-        return f"{root}.json"
+        ext = ".json"
     if isinstance(export, EditAudio):
-        return f"{root}_ALTERED.wav"
-    if path_ext == "":
-        return root + original_ext
+        ext = ".wav"
 
-    return f"{root}_ALTERED{path_ext}"
+    if out is None:
+        return f"{root}_ALTERED{ext}", export
+
+    return f"{root}{ext}", export
 
 
 codec_error = "'{}' codec is not supported in '{}' container."
@@ -176,29 +199,15 @@ def edit_media(
             from auto_editor.formats.json import read_json
 
             timeline = read_json(paths[0], ffmpeg, log)
-            inputs = [0]
             sources = timeline.sources
-            src = None if not inputs else sources[inputs[0]]
+            src = sources[0]
         else:
             sources, inputs = make_sources(paths, ffmpeg, log)
             src = None if not inputs else sources[inputs[0]]
 
     del paths
 
-    if args.output_file is None or os.path.splitext(args.output_file)[1] != ".json":
-        export = parse_export(args.export, log)
-    else:
-        export = EditJson(api="1")
-
-    if src is not None:
-        if args.output_file is None:
-            output = set_output_name(src.path, src.ext, export)
-        else:
-            output = args.output_file
-            if os.path.splitext(output)[1] == "":
-                output = set_output_name(output, src.ext, export)
-    else:
-        output = "out.mp4" if args.output_file is None else args.output_file
+    output, export = set_output(args.output_file, args.export, src, log)
 
     if not args.preview and output is not None:
         log.conwrite("Starting")

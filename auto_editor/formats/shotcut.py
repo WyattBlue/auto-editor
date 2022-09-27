@@ -1,184 +1,157 @@
 from __future__ import annotations
 
-from fractions import Fraction
+import sys
+import xml.etree.ElementTree as ET
 
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import aspect_ratio, to_timecode
 
 
-def timecode_to_frames(timecode: str, tb: Fraction) -> int:
-    _h, _m, _s = timecode.split(":")
-    h = int(_h)
-    m = int(_m)
-    s = float(_s)
-    return round((h * 3600 + m * 60 + s) * tb)
-
-
 def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
+    if timeline.chunks is None:
+        raise ValueError("Timeline too complex")
+
+    mlt = ET.Element(
+        "mlt",
+        attrib={
+            "LC_NUMERIC": "C",
+            "version": "7.9.0",
+            "title": "Shotcut version 22.09.23",
+            "producer": "main_bin",
+        },
+    )
+
     width, height = timeline.res
     num, den = aspect_ratio(width, height)
-
-    chunks = timeline.chunks
-    if chunks is None:
-        raise ValueError("Timeline too complex")
     tb = timeline.timebase
     src = timeline.sources[0]
 
+    profile = ET.SubElement(
+        mlt,
+        "profile",
+        attrib={
+            "description": "automatic",
+            "width": f"{width}",
+            "height": f"{height}",
+            "progressive": "1",
+            "sample_aspect_num": "1",
+            "sample_aspect_den": "1",
+            "display_aspect_num": f"{num}",
+            "display_aspect_den": f"{den}",
+            "frame_rate_num": f"{tb.numerator}",
+            "frame_rate_den": f"{tb.denominator}",
+            "colorspace": "709",
+        },
+    )
+
+    playlist_bin = ET.SubElement(mlt, "playlist", attrib={"id": "main_bin"})
+    ET.SubElement(playlist_bin, "property", name="xml_retain").text = "1"
+
     global_out = to_timecode(timeline.out_len() / tb, "standard")
-    version = "21.05.18"
 
-    with open(output, "w", encoding="utf-8") as out:
-        out.write('<?xml version="1.0" standalone="no"?>\n')
-        out.write(
-            '<mlt LC_NUMERIC="C" version="7.1.0" '
-            f'title="Shotcut version {version}" producer="main_bin">\n'
+    producer = ET.SubElement(
+        mlt, "producer", attrib={"id": "black", "in": "00:00:00.000", "out": global_out}
+    )
+
+    ET.SubElement(producer, "property", name="length").text = global_out
+    ET.SubElement(producer, "property", name="eof").text = "pause"
+    ET.SubElement(producer, "property", name="resource").text = "0"
+    ET.SubElement(producer, "property", name="aspect_ratio").text = "1"
+
+    playlist = ET.SubElement(mlt, "playlist", attrib={"id": "background"})
+    ET.SubElement(
+        playlist,
+        "entry",
+        attrib={"producer": "black", "in": "00:00:00.000", "out": global_out},
+    ).text = "1"
+
+    chains = 0
+    producers = 0
+
+    for clip in timeline.chunks:
+        if clip[2] == 99999:
+            continue
+
+        speed = clip[2]
+        _out = to_timecode(clip[1] / speed / tb, "standard")
+        length = to_timecode((clip[1] / speed + 1) / tb, "standard")
+
+        if speed == 1:
+            resource = src.path
+            caption = src.basename
+            chain = ET.SubElement(
+                mlt, "chain", attrib={"id": f"chain{chains}", "out": f"{_out}"}
+            )
+        else:
+            chain = ET.SubElement(
+                mlt, "producer", attrib={"id": f"producer{producers}", "out": f"{_out}"}
+            )
+
+            resource = f"{speed}:{src.path}"
+            caption = f"{src.basename} ({speed}x)"
+
+            producers += 1
+
+        ET.SubElement(chain, "property", name="length").text = length
+        ET.SubElement(chain, "property", name="resource").text = resource
+
+        if speed != 1:
+            ET.SubElement(chain, "property", name="warp_speed").text = str(speed)
+            ET.SubElement(chain, "property", name="warp_pitch").text = "1"
+            ET.SubElement(chain, "property", name="mlt_service").text = "timewarp"
+
+        ET.SubElement(chain, "property", name="caption").text = caption
+
+        chains += 1
+
+    main_playlist = ET.SubElement(mlt, "playlist", id="playlist0")
+    ET.SubElement(main_playlist, "property", name="shotcut:video").text = "1"
+    ET.SubElement(main_playlist, "property", name="shotcut:name").text = "V1"
+
+    producers = 0
+    i = 0
+    for clip in timeline.chunks:
+        if clip[2] == 99999:
+            continue
+
+        speed = clip[2]
+
+        if speed == 1:
+            in_len: float = clip[0] - 1
+        else:
+            in_len = max(clip[0] / speed, 0)
+
+        out_len = max((clip[1] - 2) / speed, 0)
+
+        _in = to_timecode(in_len / tb, "standard")
+        _out = to_timecode(out_len / tb, "standard")
+
+        tag_name = f"chain{i}"
+        if speed != 1:
+            tag_name = f"producer{producers}"
+            producers += 1
+
+        ET.SubElement(
+            main_playlist,
+            "entry",
+            attrib={"producer": tag_name, "in": _in, "out": _out},
         )
-        out.write(
-            '\t<profile description="automatic" '
-            f'width="{width}" height="{height}" '
-            'progressive="1" sample_aspect_num="1" sample_aspect_den="1" '
-            f'display_aspect_num="{num}" display_aspect_den="{den}" '
-            f'frame_rate_num="{tb.numerator}" frame_rate_den="{tb.denominator}" colorspace="709"/>\n'
-        )
-        out.write('\t<playlist id="main_bin">\n')
-        out.write('\t\t<property name="xml_retain">1</property>\n')
-        out.write("\t</playlist>\n")
 
-        # out was the new video length in the original xml
-        out.write(f'\t<producer id="black" in="00:00:00.000" out="{global_out}">\n')
-        out.write(f'\t\t<property name="length">{global_out}</property>\n')
-        out.write('\t\t<property name="eof">pause</property>\n')
-        out.write('\t\t<property name="resource">0</property>\n')
-        out.write('\t\t<property name="aspect_ratio">1</property>\n')
-        out.write('\t\t<property name="mlt_service">color</property>\n')
-        out.write('\t\t<property name="mlt_image_format">rgba</property>\n')
-        out.write('\t\t<property name="set.test_audio">0</property>\n')
-        out.write("\t</producer>\n")
+        i += 1
 
-        out.write('\t<playlist id="background">\n')  # same for this out too.
-        out.write(
-            f'\t\t<entry producer="black" in="00:00:00.000" out="{global_out}"/>\n'
-        )
-        out.write("\t</playlist>\n")
+    tractor = ET.SubElement(
+        mlt,
+        "tractor",
+        attrib={"id": "tractor0", "in": "00:00:00.000", "out": global_out},
+    )
+    ET.SubElement(tractor, "property", name="shotcut").text = "1"
+    ET.SubElement(tractor, "property", name="shotcut:projectAudioChannels").text = "2"
+    ET.SubElement(tractor, "track", producer="background")
+    ET.SubElement(tractor, "track", producer="playlist0")
 
-        chains = 0
-        producers = 0
+    tree = ET.ElementTree(mlt)
 
-        # Speeds like [1.5, 3] don't work because of duration issues, too bad!
+    if sys.version_info >= (3, 9):
+        ET.indent(tree, space="\t", level=0)
 
-        for clip in chunks:
-            if clip[2] == 99999:
-                continue
-
-            speed = clip[2]
-
-            _out = to_timecode(clip[1] / speed / tb, "standard")
-            length = to_timecode((clip[1] / speed + 1) / tb, "standard")
-
-            if speed == 1:
-                resource = src.path
-                caption = src.basename
-                out.write(f'\t<chain id="chain{chains}" out="{_out}">\n')
-            else:
-                resource = f"{speed}:{src.path}"
-                caption = f"{src.basename} ({speed}x)"
-                out.write(
-                    f'\t<producer id="producer{producers}" in="00:00:00.000" out="{_out}">\n'
-                )
-                producers += 1
-            chains += 1
-
-            out.write(f'\t\t<property name="length">{length}</property>\n')
-            out.write('\t\t<property name="eof">pause</property>\n')
-            out.write(f'\t\t<property name="resource">{resource}</property>\n')
-
-            if speed == 1:
-                out.write(
-                    '\t\t<property name="mlt_service">avformat-novalidate</property>\n'
-                )
-                out.write('\t\t<property name="seekable">1</property>\n')
-                out.write('\t\t<property name="audio_index">1</property>\n')
-                out.write('\t\t<property name="video_index">0</property>\n')
-                out.write('\t\t<property name="mute_on_pause">0</property>\n')
-                out.write(
-                    f'\t\t<property name="shotcut:caption">{caption}</property>\n'
-                )
-                out.write('\t\t<property name="xml">was here</property>\n')
-            else:
-                out.write('\t\t<property name="aspect_ratio">1</property>\n')
-                out.write('\t\t<property name="seekable">1</property>\n')
-                out.write('\t\t<property name="audio_index">1</property>\n')
-                out.write('\t\t<property name="video_index">0</property>\n')
-                out.write('\t\t<property name="mute_on_pause">1</property>\n')
-                out.write(f'\t\t<property name="warp_speed">{speed}</property>\n')
-                out.write(f'\t\t<property name="warp_resource">{src.path}</property>\n')
-                out.write('\t\t<property name="mlt_service">timewarp</property>\n')
-                out.write('\t\t<property name="shotcut:producer">avformat</property>\n')
-                out.write('\t\t<property name="video_delay">0</property>\n')
-                out.write(
-                    f'\t\t<property name="shotcut:caption">{caption}</property>\n'
-                )
-                out.write('\t\t<property name="xml">was here</property>\n')
-                out.write('\t\t<property name="warp_pitch">1</property>\n')
-
-            out.write("\t</chain>\n" if speed == 1 else "\t</producer>\n")
-
-        out.write('\t<playlist id="playlist0">\n')
-        out.write('\t\t<property name="shotcut:video">1</property>\n')
-        out.write('\t\t<property name="shotcut:name">V1</property>\n')
-
-        producers = 0
-        i = 0
-        for clip in chunks:
-            if clip[2] == 99999:
-                continue
-
-            speed = clip[2]
-
-            if speed == 1:
-                in_len: float = clip[0] - 1
-            else:
-                in_len = max(clip[0] / speed, 0)
-
-            out_len = max((clip[1] - 2) / speed, 0)
-
-            _in = to_timecode(in_len / tb, "standard")
-            _out = to_timecode(out_len / tb, "standard")
-
-            tag_name = f"chain{i}"
-            if speed != 1:
-                tag_name = f"producer{producers}"
-                producers += 1
-
-            out.write(f'\t\t<entry producer="{tag_name}" in="{_in}" out="{_out}"/>\n')
-            i += 1
-
-        out.write("\t</playlist>\n")
-
-        out.write(
-            f'\t<tractor id="tractor0" title="Shotcut version {version}" '
-            f'in="00:00:00.000" out="{global_out}">\n'
-        )
-        out.write('\t\t<property name="shotcut">1</property>\n')
-        out.write('\t\t<property name="shotcut:projectAudioChannels">2</property>\n')
-        out.write('\t\t<property name="shotcut:projectFolder">0</property>\n')
-        out.write('\t\t<track producer="background"/>\n')
-        out.write('\t\t<track producer="playlist0"/>\n')
-        out.write('\t\t<transition id="transition0">\n')
-        out.write('\t\t\t<property name="a_track">0</property>\n')
-        out.write('\t\t\t<property name="b_track">1</property>\n')
-        out.write('\t\t\t<property name="mlt_service">mix</property>\n')
-        out.write('\t\t\t<property name="always_active">1</property>\n')
-        out.write('\t\t\t<property name="sum">1</property>\n')
-        out.write("\t\t</transition>\n")
-        out.write('\t\t<transition id="transition1">\n')
-        out.write('\t\t\t<property name="a_track">0</property>\n')
-        out.write('\t\t\t<property name="b_track">1</property>\n')
-        out.write('\t\t\t<property name="version">0.9</property>\n')
-        out.write('\t\t\t<property name="mlt_service">frei0r.cairoblend</property>\n')
-        out.write('\t\t\t<property name="threads">0</property>\n')
-        out.write('\t\t\t<property name="disable">1</property>\n')
-        out.write("\t\t</transition>\n")
-
-        out.write("\t</tractor>\n")
-        out.write("</mlt>\n")
+    tree.write(output, xml_declaration=True, encoding="utf-8")

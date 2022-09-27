@@ -309,12 +309,12 @@ class EditShotCut:
 
 @dataclass
 class EditJson:
-    api: str
+    api: str = "1"
 
 
 @dataclass
 class EditTimeline:
-    api: str
+    api: str = "1"
 
 
 @dataclass

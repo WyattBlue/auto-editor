@@ -2,11 +2,7 @@
 *_ALTERED*
 *_tracks
 *example
-*.xml
-*.mlt
-*.fcpxml
 *https*
-example.json
 
 # Website Files
 site/src/app/
