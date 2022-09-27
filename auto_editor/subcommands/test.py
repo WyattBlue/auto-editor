@@ -65,15 +65,15 @@ class Runner:
             root, ext = os.path.splitext(inputs[0])
 
             if "--export_as_json" in cmd:
-                output = f"{root}.json"
+                ext = ".json"
             elif "-exp" in cmd:
-                output = f"{root}.xml"
+                ext = ".xml"
             elif "-exf" in cmd:
-                output = f"{root}.fcpxml"
+                ext = ".fcpxml"
             elif "-exs" in cmd:
-                output = f"{root}.mlt"
-            else:
-                output = f"{root}_ALTERED{ext}"
+                ext = ".mlt"
+
+            output = f"{root}_ALTERED{ext}"
 
         returncode, stdout, stderr = pipe_to_console(cmd)
         if returncode > 0:

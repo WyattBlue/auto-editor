@@ -362,7 +362,7 @@ def main() -> None:
 
     paths = valid_input(args.input, ffmpeg, args, log)
 
-    exporting_to_editor = (
+    exporting_to_editor = args.export is not None and (
         args.export.startswith("premiere")
         or args.export.startswith("final-cut-pro")
         or args.export.startswith("shotcut")

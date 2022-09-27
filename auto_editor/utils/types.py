@@ -271,7 +271,7 @@ class Args:
     background: str = "#000"
     edit_based_on: str = "audio"
     keep_tracks_separate: bool = False
-    export: str = "default"
+    export: str | None = None
     player: str | None = None
     no_open: bool = False
     temp_dir: str | None = None
