@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import TYPE_CHECKING, List, NamedTuple, Union
+from typing import TYPE_CHECKING, NamedTuple, Union
 
 import numpy as np
 
@@ -26,11 +26,11 @@ if TYPE_CHECKING:
 
 
 Visual = Union[TextObj, ImageObj, RectangleObj, EllipseObj]
-VLayer = List[Union[VideoObj, Visual]]
-VSpace = List[VLayer]
+VLayer = list[Union[VideoObj, Visual]]
+VSpace = list[VLayer]
 
-ALayer = List[AudioObj]
-ASpace = List[ALayer]
+ALayer = list[AudioObj]
+ASpace = list[ALayer]
 
 
 class Clip(NamedTuple):

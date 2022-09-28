@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Literal, Tuple, Union
+from typing import Literal, Union
 
 
 def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
@@ -159,7 +159,7 @@ def anchor(val: str) -> str:
     return val
 
 
-Margin = Tuple[Union[int, str], Union[int, str]]
+Margin = tuple[Union[int, str], Union[int, str]]
 
 
 def margin(val: str) -> Margin:

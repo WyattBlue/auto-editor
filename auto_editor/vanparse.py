@@ -4,9 +4,10 @@ import difflib
 import re
 import sys
 import textwrap
+from collections.abc import Iterator
 from dataclasses import dataclass
 from shutil import get_terminal_size
-from typing import Any, Callable, Iterator, Literal, TypeVar, Union
+from typing import Any, Callable, Literal, TypeVar, Union
 
 from auto_editor.utils.log import Log
 

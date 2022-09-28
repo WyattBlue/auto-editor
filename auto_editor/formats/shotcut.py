@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 import xml.etree.ElementTree as ET
 
 from auto_editor.timeline import Timeline
@@ -153,7 +152,6 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
 
     tree = ET.ElementTree(mlt)
 
-    if sys.version_info >= (3, 9):
-        ET.indent(tree, space="\t", level=0)
+    ET.indent(tree, space="\t", level=0)
 
     tree.write(output, xml_declaration=True, encoding="utf-8")
