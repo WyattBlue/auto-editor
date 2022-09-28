@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import os
 import re
 import shlex
 import shutil
 import sys
 from re import Match
-from typing import Any, Callable, NoReturn, Optional
+from typing import Any, Callable, NoReturn
 
 
 def error(msg: str) -> NoReturn:
@@ -12,7 +14,7 @@ def error(msg: str) -> NoReturn:
     sys.exit(1)
 
 
-def regex_match(regex: str, text: str) -> Optional[str]:
+def regex_match(regex: str, text: str) -> str | None:
     match = re.search(regex, text)
     if match:
         return match.groupdict()["match"]
@@ -20,7 +22,7 @@ def regex_match(regex: str, text: str) -> Optional[str]:
 
 
 def match_liquid(text: str, hook: Callable[[list[str]], str]) -> str:
-    def search(text: str) -> Optional[Match[str]]:
+    def search(text: str) -> Match[str] | None:
         return re.search(r"{{\s[^\}]+\s}}", text)
 
     liquid_syntax = search(text)
@@ -101,7 +103,7 @@ class Site:
                 if item.startswith("."):
                     continue
                 comp_name = self._get_filename(item)
-                with open(os.path.join(self.components, item), "r") as file:
+                with open(os.path.join(self.components, item)) as file:
                     components[comp_name] = file.read()
         return components
 
@@ -128,7 +130,7 @@ class Site:
                         shutil.copy(the_file, new_file)
                     continue
 
-                with open(the_file, "r") as file:
+                with open(the_file) as file:
                     contents = file.read().splitlines(True)
 
                 contents = add_components(contents, components)
