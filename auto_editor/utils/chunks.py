@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import List, Tuple
 
-Chunk = Tuple[int, int, float]
-Chunks = List[Chunk]
+Chunk = tuple[int, int, float]
+Chunks = list[Chunk]
 
 
 # Turn long silent/loud array to formatted chunk list.
