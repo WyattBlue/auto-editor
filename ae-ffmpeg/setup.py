@@ -1,5 +1,6 @@
 import re
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 
 def pip_version():
@@ -16,7 +17,7 @@ def pip_version():
     raise ValueError("Unable to find version string.")
 
 
-with open("README.md", "r") as f:
+with open("README.md") as f:
     long_description = f.read()
 
 setup(

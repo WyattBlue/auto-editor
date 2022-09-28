@@ -1,7 +1,8 @@
 __version__ = "1.1.1"
 
 import os.path
-from platform import system, machine
+from platform import machine, system
+
 
 def get_path() -> str:
     _os = system()

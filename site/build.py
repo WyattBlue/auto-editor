@@ -7,10 +7,9 @@ import shutil
 import subprocess
 
 import auto_editor.vanparse as vanparse
+import basswood
 from auto_editor.__main__ import main_options
 from auto_editor.vanparse import OptionText
-
-import basswood
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--production", "-p", action="store_true")
