@@ -5,6 +5,15 @@ import xml.etree.ElementTree as ET
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import aspect_ratio, to_timecode
 
+from .utils import Validator
+
+# https://mltframework.org/docs/mltxml/
+
+
+def shotcut_read_mlt(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
+
+    Validator(log)
+
 
 def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
     if timeline.chunks is None:
@@ -48,13 +57,11 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
 
     global_out = to_timecode(timeline.out_len() / tb, "standard")
 
-    producer = ET.SubElement(
-        mlt, "producer", attrib={"id": "black", "in": "00:00:00.000", "out": global_out}
-    )
+    producer = ET.SubElement(mlt, "producer", id="bg")
 
     ET.SubElement(producer, "property", name="length").text = global_out
     ET.SubElement(producer, "property", name="eof").text = "pause"
-    ET.SubElement(producer, "property", name="resource").text = "0"
+    ET.SubElement(producer, "property", name="resource").text = timeline.background
     ET.SubElement(producer, "property", name="mlt_service").text = "color"
     ET.SubElement(producer, "property", name="mlt_image_format").text = "rgba"
     ET.SubElement(producer, "property", name="aspect_ratio").text = "1"
@@ -63,7 +70,7 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
     ET.SubElement(
         playlist,
         "entry",
-        attrib={"producer": "black", "in": "00:00:00.000", "out": global_out},
+        attrib={"producer": "bg", "in": "00:00:00.000", "out": global_out},
     ).text = "1"
 
     chains = 0

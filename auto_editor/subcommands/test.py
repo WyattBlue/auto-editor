@@ -102,13 +102,7 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
     def clean_all() -> None:
         def clean(the_dir: str) -> None:
             for item in os.listdir(the_dir):
-                item = os.path.join(the_dir, item)
-                if (
-                    "_ALTERED" in item
-                    or item.endswith(".xml")
-                    or item.endswith(".fcpxml")
-                    or item.endswith(".mlt")
-                ):
+                if "_ALTERED" in item:
                     os.remove(item)
                 if item.endswith("_tracks"):
                     shutil.rmtree(item)
