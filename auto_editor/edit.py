@@ -195,6 +195,13 @@ def edit_media(
             src: FileInfo | None = next(iter(timeline.sources.items()))[1]
             sources = timeline.sources
 
+        elif path_ext == ".mlt":
+            from auto_editor.formats.shotcut import shotcut_read_mlt
+
+            timeline = shotcut_read_mlt(paths[0], ffmpeg, log)
+            src = next(iter(timeline.sources.items()))[1]
+            sources = timeline.sources
+
         elif path_ext == ".json":
             from auto_editor.formats.json import read_json
 
@@ -209,7 +216,11 @@ def edit_media(
 
     output, export = set_output(args.output_file, args.export, src, log)
 
-    if not args.preview and output is not None:
+    if isinstance(export, EditTimeline):
+        log.quiet = True
+        timer.quiet = True
+
+    if not args.preview:
         log.conwrite("Starting")
 
         if os.path.isdir(output):
@@ -384,10 +395,9 @@ def edit_media(
     else:
         make_media(timeline, output)
 
-    if output is not None:
-        timer.stop()
+    timer.stop()
 
-    if not args.no_open and output is not None:
+    if not args.no_open and isinstance(export, (EditDefault, EditAudio, EditClipSequence)):
         if args.player is None:
             from auto_editor.utils.func import open_with_system_default
 

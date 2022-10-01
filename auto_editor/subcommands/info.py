@@ -96,7 +96,7 @@ def main(sys_args=sys.argv[1:]) -> None:
 
     for i, file in enumerate(args.input):
         if not os.path.isfile(file):
-            log.error(f"Could not find file: {file}")
+            log.nofile(file)
 
         ext = os.path.splitext(file)[1]
         if ext == ".json":

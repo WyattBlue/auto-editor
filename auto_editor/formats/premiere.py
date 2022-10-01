@@ -119,7 +119,7 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
     try:
         tree = ET.parse(path)
     except FileNotFoundError:
-        log.error(f"Coud not find file '{path}'")
+        log.nofile(path)
 
     root = tree.getroot()
 
