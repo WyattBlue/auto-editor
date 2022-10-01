@@ -5,6 +5,7 @@ from datetime import timedelta
 from shutil import get_terminal_size, rmtree
 from time import perf_counter, sleep
 from typing import NoReturn
+from pathlib import Path
 
 
 class Timer:
@@ -75,6 +76,10 @@ class Log:
                 import os
 
                 os._exit(1)
+
+
+    def nofile(self, path: str | Path) -> NoReturn:
+        self.error(f"Could not find '{path}'")
 
     def warning(self, message: str) -> None:
         if not self.quiet:

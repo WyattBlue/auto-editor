@@ -161,7 +161,7 @@ def main(sys_args=sys.argv[1:]) -> None:
         elif os.path.isfile(path):
             grep_file(path, add_prefix, ffmpeg, args, log, TEMP)
         else:
-            log.error(f"{path}: File does not exist.")
+            log.nofile(path)
 
     log.cleanup()
 

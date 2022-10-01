@@ -4,15 +4,35 @@ import xml.etree.ElementTree as ET
 
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import aspect_ratio, to_timecode
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.log import Log
 
-from .utils import Validator
+from .utils import Validator, show
 
-# https://mltframework.org/docs/mltxml/
+"""
+Shotcut uses the MLT timeline format
+
+See docs here:
+https://mltframework.org/docs/mltxml/
+
+"""
 
 
 def shotcut_read_mlt(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
 
-    Validator(log)
+    try:
+        tree = ET.parse(path)
+    except FileNotFoundError:
+        log.nofile(path)
+
+    valid = Validator(log)
+
+    root = tree.getroot()
+
+    show(root, 10)
+
+    quit()
+
 
 
 def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
@@ -52,7 +72,7 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
         },
     )
 
-    playlist_bin = ET.SubElement(mlt, "playlist", attrib={"id": "main_bin"})
+    playlist_bin = ET.SubElement(mlt, "playlist", id="main_bin")
     ET.SubElement(playlist_bin, "property", name="xml_retain").text = "1"
 
     global_out = to_timecode(timeline.out_len() / tb, "standard")
@@ -66,7 +86,7 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
     ET.SubElement(producer, "property", name="mlt_image_format").text = "rgba"
     ET.SubElement(producer, "property", name="aspect_ratio").text = "1"
 
-    playlist = ET.SubElement(mlt, "playlist", attrib={"id": "background"})
+    playlist = ET.SubElement(mlt, "playlist", id="background")
     ET.SubElement(
         playlist,
         "entry",
