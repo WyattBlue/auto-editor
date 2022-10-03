@@ -16,7 +16,7 @@ from auto_editor.output import Ensure
 from auto_editor.timeline import Timeline
 from auto_editor.utils.log import Log
 
-from .utils import Validator, safe_mkdir
+from .utils import Validator, safe_mkdir, show
 
 """
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format
@@ -32,10 +32,6 @@ PIXEL_ASPECT_RATIO = "square"
 COLORDEPTH = "24"
 ANAMORPHIC = "FALSE"
 DEPTH = "16"
-
-
-def path_to_uri(path: str) -> str:
-    return Path(abspath(path)).as_uri()
 
 
 def uri_to_path(uri: str) -> str:
@@ -206,9 +202,16 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
                 file_id = clipitem["file"].attrib["id"]
                 if file_id not in sources:
                     fileobj = valid.parse(clipitem["file"], {"pathurl": str})
-                    sources[file_id] = FileInfo(
-                        uri_to_path(fileobj["pathurl"]), len(sources), ffmpeg, log
-                    )
+
+                    if "pathurl" in fileobj:
+                        sources[file_id] = FileInfo(
+                            uri_to_path(fileobj["pathurl"]), len(sources), ffmpeg, log
+                        )
+                    else:
+                        show(clipitem["file"], 3)
+                        log.error(
+                            f"'pathurl' child element not found in {clipitem['file'].tag}"
+                        )
 
                 start = clipitem["start"]
                 dur = clipitem["end"] - start
@@ -262,7 +265,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
     audio_file = len(src.videos) == 0 and len(src.audios) == 1
     timebase, ntsc = set_tb_ntsc(timeline.timebase)
 
-    pathurls = [path_to_uri(src.path)]
+    pathurls = [Path(src.abspath).as_uri()]
 
     tracks = len(src.audios)
 
@@ -274,7 +277,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
         for i in range(1, tracks):
             newtrack = os.path.join(fold, f"{i}.wav")
             move(ensure.audio(src.path, 0, i), newtrack)
-            pathurls.append(path_to_uri(newtrack))
+            pathurls.append(Path(abspath(newtrack)).as_uri())
 
     width, height = timeline.res
 

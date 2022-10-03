@@ -397,7 +397,9 @@ def edit_media(
 
     timer.stop()
 
-    if not args.no_open and isinstance(export, (EditDefault, EditAudio, EditClipSequence)):
+    if not args.no_open and isinstance(
+        export, (EditDefault, EditAudio, EditClipSequence)
+    ):
         if args.player is None:
             from auto_editor.utils.func import open_with_system_default
 
