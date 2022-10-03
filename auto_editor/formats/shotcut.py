@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
+from auto_editor.ffwrapper import FFmpeg
 from auto_editor.timeline import Timeline
 from auto_editor.utils.func import aspect_ratio, to_timecode
-from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.log import Log
 
 from .utils import Validator, show
@@ -25,14 +25,13 @@ def shotcut_read_mlt(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
     except FileNotFoundError:
         log.nofile(path)
 
-    valid = Validator(log)
+    Validator(log)
 
     root = tree.getroot()
 
     show(root, 10)
 
     quit()
-
 
 
 def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
