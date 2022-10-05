@@ -103,9 +103,9 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
         def clean(the_dir: str) -> None:
             for item in os.listdir(the_dir):
                 if "_ALTERED" in item:
-                    os.remove(item)
+                    os.remove(os.path.join(the_dir, item))
                 if item.endswith("_tracks"):
-                    shutil.rmtree(item)
+                    shutil.rmtree(os.path.join(the_dir, item))
 
         clean("resources")
         clean(os.getcwd())
@@ -138,8 +138,10 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
                 outputs = [outputs]
 
             for out in outputs:
-                if os.path.isfile(out):
+                try:
                     os.remove(out)
+                except FileNotFoundError:
+                    pass
 
     print(f"\nCompleted\n{passed+1}/{len(tests)}\n{round(total_time, 2)} secs")
 
@@ -570,11 +572,14 @@ def main(sys_args: list[str] | None = None):
     def edit_positive_tests():
         run.main(["resources/multi-track.mov"], ["--edit", "audio:stream=all"])
         run.main(["resources/multi-track.mov"], ["--edit", "not audio:stream=all"])
-        out = run.main(
+        run.main(
             ["resources/multi-track.mov"],
             ["--edit", "not audio:threshold=4% or audio:stream=1"],
         )
-        # '--edit', 'not audio:threshold=4% or not audio:stream=1'
+        out = run.main(
+            ["resources/multi-track.mov"],
+            ["--edit", "not audio:threshold=4% or not audio:stream=1"],
+        )
         return out
 
     def edit_negative_tests():
@@ -586,21 +591,25 @@ def main(sys_args: list[str] | None = None):
             ["resources/only-video/man-on-green-screen.gif", "--edit", "audio"],
             "Audio stream '0' does not exist",
         )
-        run.check(["example.mp4", "--edit", "not"], "Error! Dangling operand: 'not'")
         run.check(
-            ["example.mp4", "--edit", "audio and"], "Error! Dangling operand: 'and'"
+            ["example.mp4", "--edit", "not"],
+            "Error! 'not' operator needs right hand expression",
+        )
+        run.check(
+            ["example.mp4", "--edit", "audio and"],
+            "Error! 'and' operator needs right hand expression",
         )
         run.check(
             ["example.mp4", "--edit", "and"],
-            "Error! 'and' operand needs two arguments.",
+            "Error! 'and' operator needs left and right hand expression",
         )
         run.check(
             ["example.mp4", "--edit", "and audio"],
-            "Error! 'and' operand needs two arguments.",
+            "Error! 'and' operator needs left hand expression",
         )
         run.check(
             ["example.mp4", "--edit", "or audio"],
-            "Error! 'or' operand needs two arguments.",
+            "Error! 'or' operator needs left hand expression",
         )
         run.check(
             ["example.mp4", "--edit", "audio four audio"],
@@ -608,7 +617,11 @@ def main(sys_args: list[str] | None = None):
         )
         run.check(
             ["example.mp4", "--edit", "audio audio"],
-            "Logic operator must be between two editing methods",
+            "Operator must be between two editing methods",
+        )
+        run.check(
+            ["example.mp4", "--edit", "audio (audio)"],
+            "Operator must be between two editing methods",
         )
 
     def yuv442p():
