@@ -1,4 +1,4 @@
-{{ comp.header "New option: --source" }}
+{{ comp.header "The --source option" }}
 <body>
 {{ comp.blog-nav }}
 <section class="section">
@@ -6,13 +6,16 @@
     <!-- Titles Are Capitalized in AP Style -->
     <h1>Source</h1>
     <p class="author">Author: <b>WyattBlue</b></p>
-    <p class="date">Date: <b>September 9, 2022</b></p>
+    <p class="date">Date: <b>October 6, 2022</b></p>
+
     <hr>
-    <h3>Why Can’t Source Files Be Added Directly?</h3>
-    <p>File paths can have almost any character, including <code>,</code> <code>=</code>, which is a problem because auto-editor uses those characters for syntax.</p>
+    <h3>What Are Sources?</h3>
+    <p>A source is mapping from a label to a file path</p>
+    <h3>Why Can't File Paths be Referenced Directly?</h3>
+    <p>Besides colons (<code>:</code>), file paths can have any character, including characters auto-editor uses for syntax.</p>
     
-    <pre><code>auto-editor movie.mp4 movie2.mp4 --source funydog:/Users/wyattblue/Downloads/dog-123.png \
---add image:0,30,src=funydog
+    <pre><code>auto-editor movie.mp4 movie2.mp4 --source dog:/Users/wyattblue/Downloads/dog-123.png \
+--add image:0,30,src=dog
 </pre></code>
 <p><code>funydog</code> is the label that points to the file path.</p> 
 
@@ -24,8 +27,8 @@
 
 <p>Users defined labels cannot:</p>
 <ul>
-    <li>Be greater than 500 characters</li>
-    <li>Start with a digit or a dash</li>
+    <li>Be greater than 55 characters</li>
+    <li>Start with a with a digit or a dash (<code>0 1 2 3 4 5 6 7 8 9 -</code>)</li>
     <li>Contain <code>, = . : ; ( ) / \ [ ] { }' " | # &lt; &gt; &amp; ^ % $ _ @</code> anywhere</li>
     <li>Be an invalid UTF-8 character</li>
     <li>Contain the space character</li>
