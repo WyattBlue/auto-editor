@@ -120,19 +120,19 @@ def make_timeline(
     for raw in args.source:
         exploded = raw.split(":")
         if len(exploded) != 2:
-            log.error("--source must have one :")
+            log.error("source label:path must have one :")
         label, path = exploded
-        if len(label) > 500:
-            log.error("Label must not exceed 500 characters.")
+        if len(label) > 55:
+            log.error("Label must not exceed 55 characters.")
 
         for ill_char in ",.;()/\\[]}{'\"|#&<>^%$_@ ":
             if ill_char in label:
-                log.error(f"{label} Label contains illegal character: {ill_char}")
+                log.error(f"Label '{label}' contains illegal character: {ill_char}")
 
-        if label[0] in tuple("0123456789"):
-            log.error(f"{label} Label must not start with a digit")
+        if label[0] in "0123456789":
+            log.error(f"Label '{label}' must not start with a digit")
         if label[0] == "-":
-            log.error(f"{label} Label must not start with a dash")
+            log.error(f"Label '{label}' must not start with a dash")
 
         if not os.path.isfile(path):
             log.error(f"Path '{path}' is not a file")
