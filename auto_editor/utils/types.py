@@ -283,7 +283,7 @@ class Args:
     show_ffmpeg_debug: bool = False
     quiet: bool = False
     preview: bool = False
-    frame_margin: Margin = (6, 6)
+    margin: Margin = ("0.2", "0.2")
     silent_speed: float = 99999.0
     video_speed: float = 1.0
     min_clip_length: int | str = 3
