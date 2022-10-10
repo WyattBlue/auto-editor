@@ -102,7 +102,7 @@ def make_timeline(
         ensure,
         tb,
         args.edit_based_on,
-        args.frame_margin,
+        args.margin,
         args.min_cut_length,
         args.min_clip_length,
         args.cut_out,

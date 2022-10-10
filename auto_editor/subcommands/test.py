@@ -169,12 +169,11 @@ def main(sys_args: list[str] | None = None):
         """check the help option, its short, and help on options and groups."""
         run.raw(["--help"])
         run.raw(["-h"])
-        run.raw(["--frame_margin", "--help"])
-        run.raw(["--frame_margin", "-h"])
+        run.raw(["--margin", "--help"])
+        run.raw(["--edit", "-h"])
         run.raw(["--help", "--help"])
         run.raw(["-h", "--help"])
         run.raw(["--help", "-h"])
-        run.raw(["-h", "--help"])
 
     def version_test():
         """Test version flags and debug by itself."""

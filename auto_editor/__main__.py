@@ -28,7 +28,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_required("input", nargs="*", metavar="[file | url ...] [options]")
     parser.add_text("Editing Options:")
     parser.add_argument(
-        "--frame-margin",
         "--margin",
         "-m",
         type=margin,
@@ -310,6 +309,7 @@ def main() -> None:
             Args,
             sys.argv[1:],
             macros=[
+                ({"--frame-margin"}, ["--margin"]),
                 ({"--export-to-premiere", "-exp"}, ["--export", "premiere"]),
                 ({"--export-to-final-cut-pro", "-exf"}, ["--export", "final-cut-pro"]),
                 ({"--export-to-shotcut", "-exs"}, ["--export", "shotcut"]),
