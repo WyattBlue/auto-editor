@@ -124,41 +124,30 @@ def to_key(op: Options | Required) -> str:
 def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
     text = f"  {', '.join(option.names)} {'' if option.metavar is None else option.metavar}\n\n"
 
-    bar_len = 11
     if option.flag:
         text += "    type: flag\n"
-        bar_len = 15
     else:
         if option.nargs != 1:
-            _add = f"    nargs: {option.nargs}\n"
-            bar_len = len(_add)
-            text += _add
+            text += f"    nargs: {option.nargs}\n"
 
-        default: str | tuple | None = None
+        default: str | float | int | tuple | None = None
         try:
             default = getattr(ns_obj, to_key(option))
         except AttributeError:
             pass
 
-        if default is not None:
-            if isinstance(default, tuple):
-                _add = f"    default: {','.join(map(str, default))}\n"
-            else:
-                _add = f"    default: {default}\n"
-            bar_len = len(_add)
-            text += _add
+        if default is not None and isinstance(default, (int, float, str)):
+            text += f"    default: {default}\n"
 
         if option.choices is not None:
-            text += "    choices: " + ", ".join(option.choices) + "\n"
-
-    text += f"    {'-' * (bar_len - 5)}\n\n"
+            text += f"    choices: {', '.join(option.choices)}\n"
 
     from auto_editor.help import data
 
     if option.names[0] in data[program_name]:
         text += indent(data[program_name][option.names[0]], "    ") + "\n"
     else:
-        text += f"     {option.help}\n\n"
+        text += f"    {option.help}\n\n"
 
     out(text)
 
@@ -180,10 +169,10 @@ def parse_value(option: Options | Required, val: str | None) -> Any:
         Log().error(e)
 
     if option.choices is not None and value not in option.choices:
-        my_choices = ", ".join(option.choices)
+        choices = ", ".join(option.choices)
 
         Log().error(
-            f"{value} is not a choice for {option.names[0]}\nchoices are:\n  {my_choices}"
+            f"{value} is not a choice for {option.names[0]}\nchoices are:\n  {choices}"
         )
 
     return value
