@@ -11,7 +11,7 @@ from typing import NoReturn
 class Timer:
     __slots__ = ("start_time", "quiet")
 
-    def __init__(self, quiet: bool = False) -> None:
+    def __init__(self, quiet: bool = False):
         self.start_time = perf_counter()
         self.quiet = quiet
 
@@ -28,7 +28,7 @@ class Log:
 
     def __init__(
         self, show_debug: bool = False, quiet: bool = False, temp: str | None = None
-    ) -> None:
+    ):
         self.is_debug = show_debug
         self.quiet = quiet
         self.temp = temp

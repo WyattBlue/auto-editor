@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 Chunk = tuple[int, int, float]
 Chunks = list[Chunk]
 
-
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 2, 2], {1: 1.0, 2: 1.5} => [(0, 3, 1.0), (3, 5, 1.5)]
-def chunkify(arr, smap: dict[int, float]) -> Chunks:
+def chunkify(arr: NDArray, smap: dict[int, float]) -> Chunks:
     arr_length = len(arr)
 
     chunks = []

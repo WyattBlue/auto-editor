@@ -9,6 +9,7 @@ from fractions import Fraction
 from platform import machine, system
 from re import search
 from subprocess import PIPE, Popen
+from typing import Any
 
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
@@ -25,7 +26,7 @@ class FFmpeg:
         ff_location: str | None = None,
         my_ffmpeg: bool = False,
         debug: bool = False,
-    ) -> None:
+    ):
         def _set_ff_path(ff_location: str | None, my_ffmpeg: bool) -> str:
             if ff_location is not None:
                 return ff_location
@@ -115,7 +116,9 @@ class FFmpeg:
         elif show_out and not self.debug:
             print(f"stderr: {output}")
 
-    def Popen(self, cmd: list[str], stdin=None, stdout=PIPE, stderr=None) -> Popen:
+    def Popen(
+        self, cmd: list[str], stdin: Any = None, stdout: Any = PIPE, stderr: Any = None
+    ) -> Popen:
         cmd = [self.path] + cmd
         self.print_cmd(cmd)
         return Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr)
@@ -234,9 +237,9 @@ class FileInfo:
                 ]
             )
         except FileNotFoundError:
-            log.error(f"Could not find: {ffprobe}")
+            log.nofile(ffprobe)
 
-        def get_attr(name: str, dic: dict, default=-1) -> str:
+        def get_attr(name: str, dic: dict[Any, Any], default: Any = -1) -> str:
             if name in dic:
                 if isinstance(dic[name], str):
                     return dic[name]

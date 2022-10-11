@@ -19,7 +19,7 @@ from auto_editor.utils.types import Stream, db_threshold, natural, stream, thres
 
 if TYPE_CHECKING:
     from fractions import Fraction
-    from typing import Callable
+    from typing import Any, Callable
 
     from numpy.typing import NDArray
 
@@ -101,7 +101,7 @@ abc = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'*+,
 class Token:
     __slots__ = ("type", "value")
 
-    def __init__(self, type: str, value) -> None:
+    def __init__(self, type: str, value: Any):
         self.type = type
         self.value = value
 
@@ -115,7 +115,7 @@ class Token:
 class Lexer:
     __slots__ = ("log", "text", "pos", "current_char")
 
-    def __init__(self, text: str, log: Log) -> None:
+    def __init__(self, text: str, log: Log):
         self.log = log
         self.text = text
         self.pos: int = 0
@@ -189,7 +189,7 @@ class Node:
 class UnOp(Node):
     __slots__ = ("value", "op")
 
-    def __init__(self, value, op) -> None:
+    def __init__(self, value: Any, op: Any):
         self.value = value
         self.op = op
 
@@ -200,7 +200,7 @@ class UnOp(Node):
 class BinOp(Node):
     __slots__ = ("left", "op", "right")
 
-    def __init__(self, left, op, right) -> None:
+    def __init__(self, left: Any, op: Any, right: Any):
         self.left = left
         self.op = op
         self.right = right
@@ -212,7 +212,7 @@ class BinOp(Node):
 class ArrObj(Node):
     __slots__ = "val"
 
-    def __init__(self, val: str) -> None:
+    def __init__(self, val: str):
         self.val = val
 
     def __str__(self) -> str:
@@ -222,12 +222,12 @@ class ArrObj(Node):
 class Parser:
     __slots__ = ("lexer", "log", "current_token")
 
-    def __init__(self, lexer: Lexer, log: Log) -> None:
+    def __init__(self, lexer: Lexer, log: Log):
         self.lexer = lexer
         self.log = log
         self.current_token = self.lexer.get_next_token()
 
-    def eat(self, token_type) -> None:
+    def eat(self, token_type: str) -> None:
         if self.current_token.type != token_type:
             raise ValueError(f"{self.current_token.type}, {token_type}")
 
@@ -307,7 +307,7 @@ class Interpreter:
         bar: Bar,
         temp: str,
         log: Log,
-    ) -> None:
+    ):
 
         self.parser = parser
         self.src = src

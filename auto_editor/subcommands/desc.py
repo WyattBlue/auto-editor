@@ -21,7 +21,7 @@ def desc_options(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-def main(sys_args=sys.argv[1:]) -> None:
+def main(sys_args: list[str]) -> None:
     args = desc_options(ArgumentParser("desc")).parse_args(DescArgs, sys_args)
     for i, path in enumerate(args.input):
         src = FileInfo(path, i, FFmpeg(args.ffmpeg_location, debug=False), Log())
@@ -32,4 +32,4 @@ def main(sys_args=sys.argv[1:]) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

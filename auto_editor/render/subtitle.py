@@ -25,8 +25,7 @@ class SubtitleParser:
     def __init__(self) -> None:
         self.supported_codecs = ("ass", "webvtt", "mov_text")
 
-    def parse(self, text, timebase: Fraction, codec: str) -> None:
-
+    def parse(self, text: str, timebase: Fraction, codec: str) -> None:
         if codec not in self.supported_codecs:
             raise ValueError(f"codec {codec} not supported.")
 
@@ -120,22 +119,13 @@ class SubtitleParser:
         )
 
 
-def make_new_subtitles(
-    timeline: Timeline,
-    ffmpeg: FFmpeg,
-    temp: str,
-    log: Log,
-) -> list[str]:
-
-    if timeline.chunks is None:
+def make_new_subtitles(tl: Timeline, ffmpeg: FFmpeg, temp: str, log: Log) -> list[str]:
+    if tl.chunks is None:
         return []
 
     new_paths = []
 
-    for s, sub in enumerate(timeline.sources[0].subtitles):
-        if timeline.chunks is None:
-            log.error("Timeline too complex for subtitles")
-
+    for s, sub in enumerate(tl.sources[0].subtitles):
         file_path = os.path.join(temp, f"{s}s.{sub.ext}")
         new_path = os.path.join(temp, f"new{s}s.{sub.ext}")
 
@@ -143,14 +133,14 @@ def make_new_subtitles(
 
         if sub.codec in parser.supported_codecs:
             with open(file_path) as file:
-                parser.parse(file.read(), timeline.timebase, sub.codec)
+                parser.parse(file.read(), tl.timebase, sub.codec)
         else:
             convert_path = os.path.join(temp, f"{s}s_convert.vtt")
             ffmpeg.run(["-i", file_path, convert_path])
             with open(convert_path) as file:
-                parser.parse(file.read(), timeline.timebase, "webvtt")
+                parser.parse(file.read(), tl.timebase, "webvtt")
 
-        parser.edit(timeline.chunks)
+        parser.edit(tl.chunks)
         parser.write(new_path)
         new_paths.append(new_path)
 

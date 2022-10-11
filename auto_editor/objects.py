@@ -58,7 +58,7 @@ def parse_dataclass(
     # Keyword Arguments
     #    --rectangle start=0,end=end,x1=10, ...
 
-    def _values(name: str, val, _type, _vars: _Vars, log: Log):
+    def _values(name: str, val: Any, _type: Any, _vars: _Vars, log: Log) -> Any:
         if val is None:
             return None
 

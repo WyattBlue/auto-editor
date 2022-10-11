@@ -86,7 +86,7 @@ class MediaJson(TypedDict, total=False):
     clips: int
 
 
-def main(sys_args=sys.argv[1:]) -> None:
+def main(sys_args: list[str]) -> None:
     args = info_options(ArgumentParser("info")).parse_args(InfoArgs, sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
@@ -228,4 +228,4 @@ def main(sys_args=sys.argv[1:]) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
