@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Any, NamedTuple, TypedDict, TypeVar, Union
 
+from auto_editor.utils.func import seconds_to_ticks
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     Align,
@@ -15,6 +17,7 @@ from auto_editor.utils.types import (
     pos,
     src,
     threshold,
+    time,
 )
 
 # start - When the clip starts in the timeline
@@ -27,8 +30,8 @@ T = TypeVar("T")
 class _Vars(TypedDict, total=False):
     width: int
     height: int
-    start: int
     end: int
+    tb: Fraction
 
 
 class Attr(NamedTuple):
@@ -41,7 +44,7 @@ def parse_dataclass(
     attrs_str: str,
     definition: tuple[type[T], list[Attr]],
     log: Log,
-    _vars: _Vars | None = {},
+    _vars: _Vars = {},
     coerce_default: bool = False,
 ) -> T:
 
@@ -55,29 +58,28 @@ def parse_dataclass(
     # Keyword Arguments
     #    --rectangle start=0,end=end,x1=10, ...
 
-    def _values(name: str, val, _type, _vars: _Vars | None, log: Log):
+    def _values(name: str, val, _type, _vars: _Vars, log: Log):
         if val is None:
             return None
 
-        if name in ("x", "width", "y", "height"):
-            if _vars is None:
-                log.error("_vars must be set when constructing obj with special attrs")
+        if name in ("start", "dur"):
+            assert "tb" in _vars and "end" in _vars
+            assert isinstance(val, str)
 
-            assert _vars is not None
+            if val == "start":
+                return 0
+            if val == "end":
+                return _vars["end"]
 
-            if name in ("x", "width"):
-                return pos((val, _vars["width"]))
-            if name in ("y", "height"):
-                return pos((val, _vars["height"]))
+            return seconds_to_ticks(time(val), _vars["tb"])
 
-        if _type is int and _vars is not None:
-            int_vars = {
-                "width": _vars["width"],
-                "height": _vars["height"],
-            }
-            for key, item in int_vars.items():
-                if val == key:
-                    return item
+        if name in ("x", "width"):
+            assert "width" in _vars
+            return pos((val, _vars["width"]))
+
+        if name in ("y", "height"):
+            assert "height" in _vars
+            return pos((val, _vars["height"]))
 
         try:
             _type(val)

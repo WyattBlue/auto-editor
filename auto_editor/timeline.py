@@ -7,7 +7,6 @@ from fractions import Fraction
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.make_layers import ASpace, Visual, VSpace, make_layers
 from auto_editor.objects import (
-    Attr,
     AudioObj,
     EllipseObj,
     ImageObj,
@@ -145,12 +144,12 @@ def make_timeline(
     _vars: _Vars = {
         "width": w,
         "height": h,
-        "start": 0,
         "end": timeline.end,
+        "tb": timeline.timebase,
     }
 
     OBJ_ATTRS_SEP = ":"
-    visual_objects: dict[str, tuple[type[Visual], list[Attr]]] = {
+    visual_objects = {
         "rectangle": (RectangleObj, rect_builder),
         "ellipse": (EllipseObj, ellipse_builder),
         "text": (TextObj, text_builder),
@@ -172,12 +171,19 @@ def make_timeline(
         obj_s = exploded[0]
         attrs = "" if len(exploded) == 1 else exploded[1]
 
-        if obj_s in visual_objects:
-            pool.append(parse_dataclass(attrs, visual_objects[obj_s], log, _vars, True))
-        elif obj_s in audio_objects:
-            apool.append(parse_dataclass(attrs, audio_objects[obj_s], log, _vars, True))
-        else:
-            log.error(f"Unknown object: '{obj_s}'")
+        try:
+            if obj_s in visual_objects:
+                pool.append(
+                    parse_dataclass(attrs, visual_objects[obj_s], log, _vars, True)
+                )
+            elif obj_s in audio_objects:
+                apool.append(
+                    parse_dataclass(attrs, audio_objects[obj_s], log, _vars, True)
+                )
+            else:
+                raise ValueError("Unreachable")
+        except TypeError as e:
+            log.error(e)
 
     for vobj in pool:
         timeline.v.append([vobj])

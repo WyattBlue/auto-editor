@@ -15,6 +15,12 @@ put here. Every function should be pure with no side effects.
 """
 
 
+def seconds_to_ticks(val: int | str, tb: Fraction) -> int:
+    if isinstance(val, str):
+        return int(float(val) * tb)
+    return val
+
+
 def to_timecode(secs: float | Fraction, fmt: str) -> str:
     sign = ""
     if secs < 0:

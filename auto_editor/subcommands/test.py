@@ -226,7 +226,7 @@ def main(sys_args: list[str] | None = None):
                 "--source",
                 "snd:resources/wav/pcm-f32le.wav",
                 "--add",
-                "audio:0,30,snd,volume=0.3",
+                "audio:0.3sec,end,snd,volume=0.3",
             ],
         )
 
