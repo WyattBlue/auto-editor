@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.objects import (
@@ -161,7 +162,7 @@ def parse_export(export: str, log: Log) -> Exports:
     else:
         name, attrs = exploded
 
-    parsing: dict[str, tuple[type[Exports], list[Attr]]] = {
+    parsing: dict[str, tuple[Any, list[Attr]]] = {
         "default": (EditDefault, []),
         "premiere": (EditPremiere, []),
         "final-cut-pro": (EditFinalCutPro, []),
