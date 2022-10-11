@@ -103,21 +103,27 @@ on MacOS, QuickTime can be used as the default player this way:
   auto-editor in.mp4 --player 'open -a "quicktime player"'
 """.strip(),
         "--resolution": """
-If not set, the first input's resolution is used.
-If the input does not have a resolution (audio files) or there is not first input,
-the value '1920x1080' will be used.
+
+When working with media files, resolution will be based on the first input with a
+fallback value of 1920x1080
 """.strip(),
         "--frame-rate": """
-Set (timeline's) timebase and output frame rate.
-It must be a string in the format frame_rate_num/frame_rate_den,
-an integer, a floating point number, or a valid frame rate label.
+Set the timeline's timebase and the output media's frame rate.
+
+When working with media files, frame-rate will be the first input's frame rate
+with a fallback value of 30
+
+The format must be a string in the form:
+ - frame_rate_num/frame_rate_den
+ - an integer
+ - an floating point number
+ - a valid frame rate label
 
 The following labels are recognized:
-
-  ntsc -> 30000/1001
-  ntsc_film -> 24000/1001
-  pal -> 25
-  film -> 24
+ - ntsc -> 30000/1001
+ - ntsc_film -> 24000/1001
+ - pal -> 25
+ - film -> 24
 """.strip(),
         "--temp-dir": """
 If not set, tempdir will be set with Python's tempfile module
@@ -130,9 +136,33 @@ Beware that the temp directory can get quite big.
 Silent threshold is a percentage where 0% represents absolute silence and 100% represents the highest volume in the media file.
 Setting the threshold to `0%` will cut only out areas where area is absolutely silence.
 """.strip(),
-        "--frame-margin": """
-Margin is measured in frames if no units are specified. Seconds can be used. e.g. `0.3secs`
-The starting and ending margins can be set separately with the use of a comma. e.g. `2sec,3sec` `7,10` `-1,6`
+        "--margin": """
+Default value: 0.2sec,0.2sec
+
+Setting margin examples:
+ - `--margin 6`
+ - `--margin 4,10`
+ - `--margin 0.3s,0.5s`
+
+Behind the scenes, margin is a function that operates on boolean arrays
+(where usually 1 represents "loud" and 0 represents "silence")
+
+Here is a list of examples on how margin mutates boolean arrays
+
+(margin 0 0 [0001000])
+> [0001000]
+
+(margin 1 0 [0001000])
+> [0011000]
+
+(margin 1 1 [0001000])
+> [0011100]
+
+(margin 1 2 [0011000010])
+> [0111110111]
+
+(margin -2 2 [0011000])
+> [0000110]
 """.strip(),
         "--silent-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
         "--video-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
