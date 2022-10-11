@@ -94,7 +94,7 @@ def print_ints(arr: NDArray[np.uint64]) -> None:
         sys.stdout.write(f"{a}\n")
 
 
-def main(sys_args=sys.argv[1:]) -> None:
+def main(sys_args: list[str]) -> None:
     parser = levels_options(ArgumentParser("levels"))
     args = parser.parse_args(LevelArgs, sys_args)
 
@@ -154,4 +154,4 @@ def main(sys_args=sys.argv[1:]) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

@@ -10,6 +10,7 @@ from auto_editor.wavfile import read
 
 if TYPE_CHECKING:
     from fractions import Fraction
+    from typing import Any
 
     from numpy.typing import NDArray
 
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from auto_editor.utils.log import Log
 
 
-def link_nodes(*nodes):
+def link_nodes(*nodes: Any) -> None:
     for c, n in zip(nodes, nodes[1:]):
         c.link_to(n)
 
@@ -73,7 +74,7 @@ def get_none(
     return np.ones(get_media_length(ensure, src, tb, temp, log), dtype=np.bool_)
 
 
-def _dict_tag(tag: str, tb: Fraction, obj) -> tuple[str, dict]:
+def _dict_tag(tag: str, tb: Fraction, obj: Any) -> tuple[str, dict]:
     if isinstance(obj, dict):
         obj_dict = obj.copy()
     else:
@@ -90,7 +91,7 @@ def _dict_tag(tag: str, tb: Fraction, obj) -> tuple[str, dict]:
 
 
 def read_cache(
-    src: FileInfo, tb: Fraction, tag: str, obj, temp: str
+    src: FileInfo, tb: Fraction, tag: str, obj: Any, temp: str
 ) -> None | np.ndarray:
     from auto_editor import version
 
@@ -114,7 +115,7 @@ def read_cache(
 
 
 def cache(
-    tag: str, tb: Fraction, obj, arr: np.ndarray, src: FileInfo, temp: str
+    tag: str, tb: Fraction, obj: Any, arr: np.ndarray, src: FileInfo, temp: str
 ) -> np.ndarray:
     from auto_editor import version
 
@@ -205,7 +206,7 @@ def audio_levels(
 def motion_levels(
     ensure: Ensure,
     src: FileInfo,
-    mobj,
+    mobj: Any,
     tb: Fraction,
     bar: Bar,
     strict: bool,
@@ -289,7 +290,7 @@ def motion_levels(
 def pixeldiff_levels(
     ensure: Ensure,
     src: FileInfo,
-    pobj,
+    pobj: Any,
     tb: Fraction,
     bar: Bar,
     strict: bool,
@@ -353,7 +354,7 @@ def pixeldiff_levels(
 
 
 def random_levels(
-    ensure: Ensure, src: FileInfo, robj, timebase: Fraction, temp: str, log: Log
+    ensure: Ensure, src: FileInfo, robj: Any, timebase: Fraction, temp: str, log: Log
 ) -> NDArray[np.float_]:
     import random
 

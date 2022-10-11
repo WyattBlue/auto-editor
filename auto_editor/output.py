@@ -12,7 +12,7 @@ from auto_editor.utils.types import Args
 class Ensure:
     __slots__ = ("_ffmpeg", "_sr", "temp", "log")
 
-    def __init__(self, ffmpeg: FFmpeg, sr: int, temp: str, log: Log) -> None:
+    def __init__(self, ffmpeg: FFmpeg, sr: int, temp: str, log: Log):
         self._ffmpeg = ffmpeg
         self._sr = sr
         self.temp = temp

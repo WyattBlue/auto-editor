@@ -185,12 +185,12 @@ class ArgumentParser:
         self.options: list[Options] = []
         self.args: list[Options | OptionText] = []
 
-    def add_argument(self, *args: str, **kwargs) -> None:
+    def add_argument(self, *args: str, **kwargs: Any) -> None:
         x = Options(args, **kwargs)
         self.options.append(x)
         self.args.append(x)
 
-    def add_required(self, *args: str, **kwargs) -> None:
+    def add_required(self, *args: str, **kwargs: Any) -> None:
         self.requireds.append(Required(args, **kwargs))
 
     def add_text(self, text: str) -> None:
