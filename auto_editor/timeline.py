@@ -20,6 +20,7 @@ from auto_editor.objects import (
     parse_dataclass,
     rect_builder,
     text_builder,
+    video_builder,
 )
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
@@ -30,7 +31,7 @@ from auto_editor.utils.types import Args
 
 @dataclass
 class Timeline:
-    sources: dict[int | str, FileInfo]
+    sources: dict[str, FileInfo]
     timebase: Fraction
     samplerate: int
     res: tuple[int, int]
@@ -75,7 +76,7 @@ class Timeline:
 
 
 def make_timeline(
-    sources: dict[int | str, FileInfo],
+    sources: dict[str, FileInfo],
     inputs: list[int],
     ffmpeg: FFmpeg,
     ensure: Ensure,
@@ -86,7 +87,7 @@ def make_timeline(
     log: Log,
 ) -> Timeline:
 
-    inp = None if not inputs else sources[inputs[0]]
+    inp = None if not inputs else sources[str(inputs[0])]
 
     if inp is None:
         tb, res = Fraction(30), (1920, 1080)
@@ -154,6 +155,7 @@ def make_timeline(
         "ellipse": (EllipseObj, ellipse_builder),
         "text": (TextObj, text_builder),
         "image": (ImageObj, img_builder),
+        "video": (VideoObj, video_builder),
     }
 
     audio_objects = {
@@ -181,7 +183,7 @@ def make_timeline(
                     parse_dataclass(attrs, audio_objects[obj_s], log, _vars, True)
                 )
             else:
-                raise ValueError("Unreachable")
+                log.error(f"Unknown timeline object: '{obj_s}'")
         except TypeError as e:
             log.error(e)
 

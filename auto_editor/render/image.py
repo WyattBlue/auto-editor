@@ -31,11 +31,11 @@ def apply_anchor(x: int, y: int, w: int, h: int, anchor: str) -> tuple[int, int]
 
 
 FontCache = dict[tuple[str, int], Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]]
-ImgCache = dict[Union[int, str], Image.Image]
+ImgCache = dict[str, Image.Image]
 
 
 def make_caches(
-    vtl: VSpace, sources: dict[int | str, FileInfo], log: Log
+    vtl: VSpace, sources: dict[str, FileInfo], log: Log
 ) -> tuple[FontCache, ImgCache]:
     font_cache: FontCache = {}
     img_cache: ImgCache = {}

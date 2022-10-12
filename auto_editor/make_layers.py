@@ -38,10 +38,10 @@ class Clip(NamedTuple):
     dur: int
     offset: int
     speed: float
-    src: int
+    src: str
 
 
-def clipify(chunks: Chunks, src: int, start: Fraction = Fraction(0)) -> list[Clip]:
+def clipify(chunks: Chunks, src: str, start: Fraction = Fraction(0)) -> list[Clip]:
     clips: list[Clip] = []
     # Add "+1" to match how chunks are rendered in 22w18a
     i = 0
@@ -63,18 +63,18 @@ def clipify(chunks: Chunks, src: int, start: Fraction = Fraction(0)) -> list[Cli
 
 
 def make_av(
-    all_clips: list[list[Clip]], sources: dict[int | str, FileInfo], inputs: list[int]
+    all_clips: list[list[Clip]], sources: dict[str, FileInfo], inputs: list[int]
 ) -> tuple[VSpace, ASpace]:
     vclips: VSpace = []
 
     max_a = 0
     for inp in inputs:
-        max_a = max(max_a, len(sources[inp].audios))
+        max_a = max(max_a, len(sources[str(inp)].audios))
 
     aclips: ASpace = [[] for a in range(max_a)]
 
     for clips, inp in zip(all_clips, inputs):
-        src = sources[inp]
+        src = sources[str(inp)]
         if len(src.videos) > 0:
             for clip in clips:
                 vclip_ = VideoObj(
@@ -103,7 +103,7 @@ def make_av(
 
 
 def make_layers(
-    sources: dict[int | str, FileInfo],
+    sources: dict[str, FileInfo],
     inputs: list[int],
     ensure: Ensure,
     tb: Fraction,
@@ -135,7 +135,7 @@ def make_layers(
     strict = len(inputs) < 2
 
     for i in inputs:
-        src = sources[i]
+        src = sources[str(i)]
         has_loud = get_has_loud(method, src, ensure, strict, tb, bar, temp, log)
         has_loud_length = len(has_loud)
 
@@ -183,7 +183,7 @@ def make_layers(
         chunks = chunkify(has_loud, speed_hash)
 
         all_chunks.append(chunks)
-        all_clips.append(clipify(chunks, i, start))
+        all_clips.append(clipify(chunks, str(i), start))
         start += round(chunks_len(chunks))
 
     vclips, aclips = make_av(all_clips, sources, inputs)

@@ -146,7 +146,7 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         },
     )
 
-    sources: dict[int | str, FileInfo] = {}
+    sources: dict[str, FileInfo] = {}
     vobjs: VSpace = []
     aobjs: ASpace = []
 
@@ -260,7 +260,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
             clips.append(chunk)
 
     samplerate = timeline.samplerate
-    src = timeline.sources[0]
+    src = timeline.sources["0"]
 
     audio_file = len(src.videos) == 0 and len(src.audios) == 1
     timebase, ntsc = set_tb_ntsc(timeline.timebase)

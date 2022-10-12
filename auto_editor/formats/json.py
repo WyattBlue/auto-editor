@@ -6,7 +6,16 @@ import sys
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.make_layers import clipify, make_av
-from auto_editor.objects import EditJson, EditTimeline
+from auto_editor.objects import (
+    AudioObj,
+    EditJson,
+    EditTimeline,
+    EllipseObj,
+    ImageObj,
+    RectangleObj,
+    TextObj,
+    VideoObj,
+)
 from auto_editor.timeline import Timeline
 from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.log import Log
@@ -100,13 +109,13 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         chunks = validate_chunks(data["chunks"], log)
         src = FileInfo(data["source"], 0, ffmpeg, log)
 
-        vspace, aspace = make_av([clipify(chunks, 0)], {0: src}, [0])
+        vspace, aspace = make_av([clipify(chunks, "0")], {"0": src}, [0])
 
         tb = src.get_fps()
         sr = src.get_samplerate()
         res = src.get_res()
 
-        return Timeline({0: src}, tb, sr, res, "#000", vspace, aspace, chunks)
+        return Timeline({"0": src}, tb, sr, res, "#000", vspace, aspace, chunks)
 
     if version == (2, 0) or version == (0, 2):
         check_attrs(data, log, "timeline", "source")
@@ -117,6 +126,23 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         raise ValueError("Importing v2 timelines not implemented.")
 
     log.error(f"Unsupported version: {version}")
+
+
+def get_name(o: object) -> str:
+    if isinstance(o, VideoObj):
+        return "video"
+    if isinstance(o, AudioObj):
+        return "audio"
+    if isinstance(o, RectangleObj):
+        return "rectangle"
+    if isinstance(o, EllipseObj):
+        return "ellipse"
+    if isinstance(o, ImageObj):
+        return "image"
+    if isinstance(o, TextObj):
+        return "text"
+
+    raise ValueError("Unreachable")
 
 
 def make_json_timeline(
@@ -132,19 +158,35 @@ def make_json_timeline(
         if timeline.chunks is None:
             log.error("Timeline too complex to convert to version 1.0")
 
-        if 0 not in timeline.sources:
+        if "0" not in timeline.sources:
             log.debug(f"{timeline.sources}")
             log.error("API version 1 needs one source, got many")
 
         data: dict = {
             "version": "1.0.0",
-            "source": timeline.sources[0].abspath,
+            "source": timeline.sources["0"].abspath,
             "chunks": timeline.chunks,
         }
     elif version == (2, 0) or version == (0, 2):
         sources = {}
         for key, src in timeline.sources.items():
             sources[key] = src.abspath
+
+        v = []
+        for i, vlayer in enumerate(timeline.v):
+            vb = []
+            for vobj in vlayer:
+                vb.append({"obj": get_name(vobj)} | vobj.__dict__)
+            if len(vb) > 0:
+                v.append(vb)
+
+        a = []
+        for i, alayer in enumerate(timeline.a):
+            ab = []
+            for aobj in alayer:
+                ab.append({"obj": get_name(aobj)} | aobj.__dict__)
+            if len(ab) > 0:
+                a.append(ab)
 
         data = {
             "version": "2.0.0",
@@ -154,8 +196,8 @@ def make_json_timeline(
                 "sources": sources,
                 "timebase": str(timeline.timebase),
                 "samplerate": timeline.samplerate,
-                "v": timeline.v,
-                "a": timeline.a,
+                "v": v,
+                "a": a,
             },
         }
     else:

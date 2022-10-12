@@ -158,7 +158,7 @@ def parse_dataclass(
 class VideoObj:
     start: int
     dur: int
-    src: int | str
+    src: str
     offset: int
     speed: float
     stream: int
@@ -168,7 +168,7 @@ class VideoObj:
 class AudioObj:
     start: int
     dur: int
-    src: int | str
+    src: str
     offset: int
     speed: float
     volume: float
@@ -199,7 +199,7 @@ class TextObj(_Visual):
 
 @dataclass
 class ImageObj(_Visual):
-    src: int | str
+    src: str
 
 
 @dataclass

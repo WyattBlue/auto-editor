@@ -125,7 +125,7 @@ def make_new_subtitles(tl: Timeline, ffmpeg: FFmpeg, temp: str, log: Log) -> lis
 
     new_paths = []
 
-    for s, sub in enumerate(tl.sources[0].subtitles):
+    for s, sub in enumerate(tl.sources["0"].subtitles):
         file_path = os.path.join(temp, f"{s}s.{sub.ext}")
         new_path = os.path.join(temp, f"new{s}s.{sub.ext}")
 
