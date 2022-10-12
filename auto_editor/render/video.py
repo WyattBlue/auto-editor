@@ -27,7 +27,7 @@ av.logging.set_level(av.logging.PANIC)
 @dataclass
 class VideoFrame:
     index: int
-    src: int | str
+    src: str
 
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
@@ -65,8 +65,8 @@ def render_av(
 ) -> tuple[str, bool]:
 
     if not timeline.sources:
-        if 0 in timeline.sources:
-            src: FileInfo | None = timeline.sources[0]
+        if "0" in timeline.sources:
+            src: FileInfo | None = timeline.sources["0"]
         else:
             src = next(iter(timeline.sources.items()))[1]
     else:
@@ -74,10 +74,10 @@ def render_av(
 
     font_cache, img_cache = make_caches(timeline.v, timeline.sources, log)
 
-    cns: dict[int | str, Any] = {}
-    decoders: dict[int | str, Any] = {}
-    seek_cost: dict[int | str, int] = {}
-    tous: dict[int | str, int] = {}
+    cns: dict[str, Any] = {}
+    decoders: dict[str, Any] = {}
+    seek_cost: dict[str, int] = {}
+    tous: dict[str, int] = {}
 
     target_pix_fmt = "yuv420p"  # Reasonable default
 
@@ -104,7 +104,7 @@ def render_av(
             tous[key] = tou
             decoders[key] = cns[key].decode(stream)
 
-            if key == 0:
+            if key == "0":
                 target_pix_fmt = stream.pix_fmt
 
     log.debug(f"Tous: {tous}")

@@ -67,7 +67,7 @@ def fraction(_a: float, tb: Fraction) -> str:
 
 
 def fcp_xml(output: str, timeline: Timeline) -> None:
-    src = timeline.sources[0]
+    src = timeline.sources["0"]
     tb = timeline.timebase
     chunks = timeline.chunks
 

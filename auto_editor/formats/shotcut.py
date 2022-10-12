@@ -19,7 +19,6 @@ https://mltframework.org/docs/mltxml/
 
 
 def shotcut_read_mlt(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
-
     try:
         tree = ET.parse(path)
     except FileNotFoundError:
@@ -51,7 +50,7 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
     width, height = timeline.res
     num, den = aspect_ratio(width, height)
     tb = timeline.timebase
-    src = timeline.sources[0]
+    src = timeline.sources["0"]
 
     profile = ET.SubElement(
         mlt,

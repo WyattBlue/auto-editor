@@ -135,10 +135,10 @@ def set_audio_codec(
 
 def make_sources(
     paths: list[str], ffmpeg: FFmpeg, log: Log
-) -> tuple[dict[str | int, FileInfo], list[int]]:
+) -> tuple[dict[str, FileInfo], list[int]]:
 
     used_paths: dict[str, int] = {}
-    sources: dict[int | str, FileInfo] = {}
+    sources: dict[str, FileInfo] = {}
     inputs: list[int] = []
 
     i = 0
@@ -146,7 +146,7 @@ def make_sources(
         if path in used_paths:
             inputs.append(used_paths[path])
         else:
-            sources[i] = FileInfo(path, i, ffmpeg, log)
+            sources[str(i)] = FileInfo(path, i, ffmpeg, log)
             inputs.append(i)
             used_paths[path] = i
             i += 1
@@ -208,10 +208,10 @@ def edit_media(
 
             timeline = read_json(paths[0], ffmpeg, log)
             sources = timeline.sources
-            src = sources[0]
+            src = sources["0"]
         else:
             sources, inputs = make_sources(paths, ffmpeg, log)
-            src = None if not inputs else sources[inputs[0]]
+            src = None if not inputs else sources[str(inputs[0])]
 
     del paths
 
@@ -379,7 +379,7 @@ def edit_media(
 
             _c = pad_chunk(chunk, total_frames)
 
-            vspace, aspace = make_av([clipify(_c, 0)], timeline.sources, [0])
+            vspace, aspace = make_av([clipify(_c, "0")], timeline.sources, [0])
             my_timeline = Timeline(
                 timeline.sources,
                 timeline.timebase,
