@@ -62,8 +62,11 @@ def parse_dataclass(
         if val is None:
             return None
 
-        if name in ("start", "dur"):
+        if name in ("start", "dur", "offset"):
             assert "tb" in _vars and "end" in _vars
+            if isinstance(val, int):
+                val = str(val)
+
             assert isinstance(val, str)
 
             if val == "start":
