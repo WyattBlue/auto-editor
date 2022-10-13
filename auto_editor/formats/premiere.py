@@ -205,7 +205,7 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
 
                     if "pathurl" in fileobj:
                         sources[file_id] = FileInfo(
-                            uri_to_path(fileobj["pathurl"]), len(sources), ffmpeg, log
+                            uri_to_path(fileobj["pathurl"]), ffmpeg, log, str(len(sources))
                         )
                     else:
                         show(clipitem["file"], 3)
@@ -233,7 +233,7 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
                 if file_id not in sources:
                     fileobj = valid.parse(clipitem["file"], {"pathurl": str})
                     sources[file_id] = FileInfo(
-                        uri_to_path(fileobj["pathurl"]), len(sources), ffmpeg, log
+                        uri_to_path(fileobj["pathurl"]), ffmpeg, log, str(len(sources))
                     )
 
                 start = clipitem["start"]
@@ -276,7 +276,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
 
         for i in range(1, tracks):
             newtrack = os.path.join(fold, f"{i}.wav")
-            move(ensure.audio(src.path, 0, i), newtrack)
+            move(ensure.audio(src.path, "0", i), newtrack)
             pathurls.append(Path(abspath(newtrack)).as_uri())
 
     width, height = timeline.res

@@ -137,7 +137,7 @@ def make_timeline(
         if not os.path.isfile(path):
             log.error(f"Path '{path}' is not a file")
 
-        sources[label] = FileInfo(path, label, ffmpeg, log)
+        sources[label] = FileInfo(path, ffmpeg, log, label)
 
     timeline = Timeline(sources, tb, sr, res, args.background, vclips, aclips, chunks)
 

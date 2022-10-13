@@ -18,8 +18,8 @@ class Ensure:
         self.temp = temp
         self.log = log
 
-    def audio(self, path: str, index: int | str, stream: int) -> str:
-        out_path = os.path.join(self.temp, f"{index}-{stream}.wav")
+    def audio(self, path: str, label: str, stream: int) -> str:
+        out_path = os.path.join(self.temp, f"{label}-{stream}.wav")
 
         if not os.path.isfile(out_path):
             self.log.conwrite("Extracting audio")

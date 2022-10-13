@@ -107,7 +107,7 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         check_file(data["source"], log)
 
         chunks = validate_chunks(data["chunks"], log)
-        src = FileInfo(data["source"], 0, ffmpeg, log)
+        src = FileInfo(data["source"], ffmpeg, log, "0")
 
         vspace, aspace = make_av([clipify(chunks, "0")], {"0": src}, [0])
 
