@@ -176,7 +176,7 @@ def make_json_timeline(
         for i, vlayer in enumerate(timeline.v):
             vb = []
             for vobj in vlayer:
-                vb.append({"obj": get_name(vobj)} | vobj.__dict__)
+                vb.append({"name": get_name(vobj)} | vobj.__dict__)
             if len(vb) > 0:
                 v.append(vb)
 
@@ -184,7 +184,7 @@ def make_json_timeline(
         for i, alayer in enumerate(timeline.a):
             ab = []
             for aobj in alayer:
-                ab.append({"obj": get_name(aobj)} | aobj.__dict__)
+                ab.append({"name": get_name(aobj)} | aobj.__dict__)
             if len(ab) > 0:
                 a.append(ab)
 
