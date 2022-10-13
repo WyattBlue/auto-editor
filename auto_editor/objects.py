@@ -65,7 +65,7 @@ def parse_dataclass(
         if name in ("start", "dur", "offset"):
             assert "tb" in _vars and "end" in _vars
             if isinstance(val, int):
-                val = str(val)
+                return val
 
             assert isinstance(val, str)
 
