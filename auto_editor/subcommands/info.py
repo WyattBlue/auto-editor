@@ -94,7 +94,7 @@ def main(sys_args: list[str]) -> None:
 
     file_info: dict[str, MediaJson] = {}
 
-    for i, file in enumerate(args.input):
+    for file in args.input:
         if not os.path.isfile(file):
             log.nofile(file)
 
@@ -115,7 +115,7 @@ def main(sys_args: list[str]) -> None:
             file_info[file] = {"type": "timeline"}
             continue
 
-        src = FileInfo(file, i, ffmpeg, log)
+        src = FileInfo(file, ffmpeg, log)
 
         if len(src.videos) + len(src.audios) + len(src.subtitles) == 0:
             file_info[file] = {"type": "unknown"}

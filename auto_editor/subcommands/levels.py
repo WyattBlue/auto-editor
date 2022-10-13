@@ -106,10 +106,10 @@ def main(sys_args: list[str]) -> None:
 
     sources = {}
     for i, path in enumerate(args.input):
-        sources[i] = FileInfo(path, i, ffmpeg, log)
+        sources[str(i)] = FileInfo(path, ffmpeg, log, str(i))
 
-    assert 0 in sources
-    src = sources[0]
+    assert "0" in sources
+    src = sources["0"]
 
     tb = src.get_fps() if args.timebase is None else args.timebase
     ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)

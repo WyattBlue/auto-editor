@@ -146,7 +146,7 @@ def make_sources(
         if path in used_paths:
             inputs.append(used_paths[path])
         else:
-            sources[str(i)] = FileInfo(path, i, ffmpeg, log)
+            sources[str(i)] = FileInfo(path, ffmpeg, log, str(i))
             inputs.append(i)
             used_paths[path] = i
             i += 1

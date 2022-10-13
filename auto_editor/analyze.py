@@ -36,7 +36,7 @@ def get_media_length(
         if (arr := read_cache(src, tb, "audio", {"stream": 0}, temp)) is not None:
             return len(arr)
 
-        sr, samples = read(ensure.audio(src.path, src.index, stream=0))
+        sr, samples = read(ensure.audio(src.path, src.label, stream=0))
         samp_count = len(samples)
         del samples
 
@@ -167,7 +167,7 @@ def audio_levels(
     if (arr := read_cache(src, tb, "audio", {"stream": s}, temp)) is not None:
         return arr
 
-    sr, samples = read(ensure.audio(src.path, src.index, s))
+    sr, samples = read(ensure.audio(src.path, src.label, s))
 
     def get_max_volume(s: np.ndarray) -> float:
         return max(float(np.max(s)), -float(np.min(s)))

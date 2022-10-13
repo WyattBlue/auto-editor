@@ -23,8 +23,8 @@ def desc_options(parser: ArgumentParser) -> ArgumentParser:
 
 def main(sys_args: list[str]) -> None:
     args = desc_options(ArgumentParser("desc")).parse_args(DescArgs, sys_args)
-    for i, path in enumerate(args.input):
-        src = FileInfo(path, i, FFmpeg(args.ffmpeg_location, debug=False), Log())
+    for path in args.input:
+        src = FileInfo(path, FFmpeg(args.ffmpeg_location, debug=False), Log())
         if src.description is not None:
             sys.stdout.write(f"\n{src.description}\n\n")
         else:
