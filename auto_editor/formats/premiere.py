@@ -205,7 +205,10 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
 
                     if "pathurl" in fileobj:
                         sources[file_id] = FileInfo(
-                            uri_to_path(fileobj["pathurl"]), ffmpeg, log, str(len(sources))
+                            uri_to_path(fileobj["pathurl"]),
+                            ffmpeg,
+                            log,
+                            str(len(sources)),
                         )
                     else:
                         show(clipitem["file"], 3)
