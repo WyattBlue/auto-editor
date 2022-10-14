@@ -6,16 +6,8 @@ import sys
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.make_layers import clipify, make_av
-from auto_editor.objects import (
-    AudioObj,
-    EditJson,
-    EditTimeline,
-    EllipseObj,
-    ImageObj,
-    RectangleObj,
-    TextObj,
-    VideoObj,
-)
+from auto_editor.objs.export import ExJson, ExTimeline
+from auto_editor.objs.tl import TlAudio, TlEllipse, TlImage, TlRect, TlText, TlVideo
 from auto_editor.timeline import Timeline
 from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.log import Log
@@ -129,24 +121,24 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
 
 
 def get_name(o: object) -> str:
-    if isinstance(o, VideoObj):
+    if isinstance(o, TlVideo):
         return "video"
-    if isinstance(o, AudioObj):
+    if isinstance(o, TlAudio):
         return "audio"
-    if isinstance(o, RectangleObj):
+    if isinstance(o, TlRect):
         return "rectangle"
-    if isinstance(o, EllipseObj):
+    if isinstance(o, TlEllipse):
         return "ellipse"
-    if isinstance(o, ImageObj):
+    if isinstance(o, TlImage):
         return "image"
-    if isinstance(o, TextObj):
+    if isinstance(o, TlText):
         return "text"
 
     raise ValueError("Unreachable")
 
 
 def make_json_timeline(
-    obj: EditJson | EditTimeline,
+    obj: ExJson | ExTimeline,
     out: str | int,
     timeline: Timeline,
     log: Log,

@@ -10,8 +10,7 @@ import av
 from PIL import Image, ImageOps
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.make_layers import Visual
-from auto_editor.objects import VideoObj
+from auto_editor.objs.tl import TlVideo, Visual
 from auto_editor.output import video_quality
 from auto_editor.render.image import make_caches, render_image
 from auto_editor.timeline import Timeline
@@ -181,7 +180,7 @@ def render_av(
             obj_list: list[VideoFrame | Visual] = []
             for layer in timeline.v:
                 for lobj in layer:
-                    if isinstance(lobj, VideoObj):
+                    if isinstance(lobj, TlVideo):
                         if index >= lobj.start and index < lobj.start + ceil(
                             lobj.dur / lobj.speed
                         ):

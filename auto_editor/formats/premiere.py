@@ -10,8 +10,7 @@ from shutil import move
 from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.make_layers import ASpace, VSpace
-from auto_editor.objects import AudioObj, VideoObj
+from auto_editor.objs.tl import ASpace, TlAudio, TlVideo, VSpace
 from auto_editor.output import Ensure
 from auto_editor.timeline import Timeline
 from auto_editor.utils.log import Log
@@ -220,9 +219,7 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
                 dur = clipitem["end"] - start
                 offset = clipitem["in"]
 
-                vobjs[t].append(
-                    VideoObj(start, dur, file_id, offset, speed=1, stream=0)
-                )
+                vobjs[t].append(TlVideo(start, dur, file_id, offset, speed=1, stream=0))
 
     if "audio" in av:
         tracks = valid.parse(av["audio"], aclip_schema)
@@ -244,7 +241,7 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
                 offset = clipitem["in"]
 
                 aobjs[t].append(
-                    AudioObj(start, dur, file_id, offset, speed=1, volume=1, stream=0)
+                    TlAudio(start, dur, file_id, offset, speed=1, volume=1, stream=0)
                 )
 
     timeline = Timeline(sources, tb, sr, res, "#000", vobjs, aobjs, None)

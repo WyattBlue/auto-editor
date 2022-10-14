@@ -5,23 +5,25 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.make_layers import ASpace, Visual, VSpace, make_layers
-from auto_editor.objects import (
-    AudioObj,
-    EllipseObj,
-    ImageObj,
-    RectangleObj,
-    TextObj,
-    VideoObj,
-    _Vars,
+from auto_editor.make_layers import make_layers
+from auto_editor.objs.tl import (
+    ASpace,
+    TlAudio,
+    TlEllipse,
+    TlImage,
+    TlRect,
+    TlText,
+    TlVideo,
+    Visual,
+    VSpace,
     audio_builder,
     ellipse_builder,
     img_builder,
-    parse_dataclass,
     rect_builder,
     text_builder,
     video_builder,
 )
+from auto_editor.objs.util import _Vars, parse_dataclass
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunks
@@ -46,7 +48,7 @@ class Timeline:
         for vclips in self.v:
             if len(vclips) > 0:
                 v = vclips[-1]
-                if isinstance(v, VideoObj):
+                if isinstance(v, TlVideo):
                     end = max(end, max(1, round(v.start + (v.dur / v.speed))))
                 else:
                     end = max(end, v.start + v.dur)
@@ -62,7 +64,7 @@ class Timeline:
         for vclips in self.v:
             dur: float = 0
             for v_obj in vclips:
-                if isinstance(v_obj, VideoObj):
+                if isinstance(v_obj, TlVideo):
                     dur += v_obj.dur / v_obj.speed
                 else:
                     dur += v_obj.dur
@@ -151,19 +153,19 @@ def make_timeline(
 
     OBJ_ATTRS_SEP = ":"
     visual_objects = {
-        "rectangle": (RectangleObj, rect_builder),
-        "ellipse": (EllipseObj, ellipse_builder),
-        "text": (TextObj, text_builder),
-        "image": (ImageObj, img_builder),
-        "video": (VideoObj, video_builder),
+        "rectangle": (TlRect, rect_builder),
+        "ellipse": (TlEllipse, ellipse_builder),
+        "text": (TlText, text_builder),
+        "image": (TlImage, img_builder),
+        "video": (TlVideo, video_builder),
     }
 
     audio_objects = {
-        "audio": (AudioObj, audio_builder),
+        "audio": (TlAudio, audio_builder),
     }
 
     pool: list[Visual] = []
-    apool: list[AudioObj] = []
+    apool: list[TlAudio] = []
 
     for obj_attrs_str in args.add:
         exploded = obj_attrs_str.split(OBJ_ATTRS_SEP)

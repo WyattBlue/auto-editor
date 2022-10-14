@@ -1,5 +1,3 @@
-# Image helper functions
-
 from __future__ import annotations
 
 from typing import Union
@@ -8,8 +6,7 @@ import av
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.make_layers import Visual, VSpace
-from auto_editor.objects import EllipseObj, ImageObj, RectangleObj, TextObj
+from auto_editor.objs.tl import TlEllipse, TlImage, TlRect, TlText, Visual, VSpace
 from auto_editor.utils.log import Log
 
 av.logging.set_level(av.logging.PANIC)
@@ -41,7 +38,7 @@ def make_caches(
     img_cache: ImgCache = {}
     for layer in vtl:
         for obj in layer:
-            if isinstance(obj, TextObj) and (obj.font, obj.size) not in font_cache:
+            if isinstance(obj, TlText) and (obj.font, obj.size) not in font_cache:
                 try:
                     if obj.font == "default":
                         font_cache[(obj.font, obj.size)] = ImageFont.load_default()
@@ -52,7 +49,7 @@ def make_caches(
                 except OSError:
                     log.error(f"Font '{obj.font}' not found.")
 
-            if isinstance(obj, ImageObj) and obj.src not in img_cache:
+            if isinstance(obj, TlImage) and obj.src not in img_cache:
                 img_cache[obj.src] = Image.open(sources[obj.src].path).convert("RGBA")
 
     return font_cache, img_cache
@@ -63,17 +60,17 @@ def render_image(
 ) -> av.VideoFrame:
     img = frame.to_image().convert("RGBA")
 
-    if isinstance(obj, EllipseObj):
+    if isinstance(obj, TlEllipse):
         # Adding +1 to width makes Ellipse look better.
         obj_img = Image.new("RGBA", (obj.width + 1, obj.height), (255, 255, 255, 0))
-    if isinstance(obj, RectangleObj):
+    if isinstance(obj, TlRect):
         obj_img = Image.new("RGBA", (obj.width, obj.height), (255, 255, 255, 0))
-    if isinstance(obj, ImageObj):
+    if isinstance(obj, TlImage):
         obj_img = img_cache[obj.src]
         if obj.stroke > 0:
             obj_img = ImageOps.expand(obj_img, border=obj.stroke, fill=obj.strokecolor)
 
-    if isinstance(obj, TextObj):
+    if isinstance(obj, TlText):
         obj_img = Image.new("RGBA", img.size)
         _draw = ImageDraw.Draw(obj_img)
         text_w, text_h = _draw.textsize(
@@ -83,7 +80,7 @@ def render_image(
 
     draw = ImageDraw.Draw(obj_img)
 
-    if isinstance(obj, TextObj):
+    if isinstance(obj, TlText):
         draw.text(
             (0, 0),
             obj.content,
@@ -94,7 +91,7 @@ def render_image(
             stroke_fill=obj.strokecolor,
         )
 
-    if isinstance(obj, RectangleObj):
+    if isinstance(obj, TlRect):
         draw.rectangle(
             (0, 0, obj.width, obj.height),
             fill=obj.fill,
@@ -102,7 +99,7 @@ def render_image(
             outline=obj.strokecolor,
         )
 
-    if isinstance(obj, EllipseObj):
+    if isinstance(obj, TlEllipse):
         draw.ellipse(
             (0, 0, obj.width, obj.height),
             fill=obj.fill,

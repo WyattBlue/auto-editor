@@ -4,18 +4,18 @@ import os
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.objects import (
-    Attr,
-    EditAudio,
-    EditClipSequence,
-    EditDefault,
-    EditFinalCutPro,
-    EditJson,
-    EditPremiere,
-    EditShotCut,
-    EditTimeline,
+from auto_editor.objs.export import (
+    ExAudio,
+    ExClipSequence,
+    ExDefault,
+    ExFinalCutPro,
+    ExJson,
     Exports,
+    ExPremiere,
+    ExShotCut,
+    ExTimeline,
 )
+from auto_editor.objs.util import Attr
 from auto_editor.output import Ensure
 from auto_editor.timeline import Timeline, make_timeline
 from auto_editor.utils.bar import Bar
@@ -40,25 +40,25 @@ def set_output(
 
     if export is None:
         if ext == ".xml":
-            export = EditPremiere()
+            export = ExPremiere()
         elif ext == ".fcpxml":
-            export = EditFinalCutPro()
+            export = ExFinalCutPro()
         elif ext == ".mlt":
-            export = EditShotCut()
+            export = ExShotCut()
         elif ext == ".json":
-            export = EditJson()
+            export = ExJson()
         else:
-            export = EditDefault()
+            export = ExDefault()
 
-    if isinstance(export, EditPremiere):
+    if isinstance(export, ExPremiere):
         ext = ".xml"
-    if isinstance(export, EditFinalCutPro):
+    if isinstance(export, ExFinalCutPro):
         ext = ".fcpxml"
-    if isinstance(export, EditShotCut):
+    if isinstance(export, ExShotCut):
         ext = ".mlt"
-    if isinstance(export, EditJson):
+    if isinstance(export, ExJson):
         ext = ".json"
-    if isinstance(export, EditAudio):
+    if isinstance(export, ExAudio):
         ext = ".wav"
 
     if out is None:
@@ -154,7 +154,8 @@ def make_sources(
 
 
 def parse_export(export: str, log: Log) -> Exports:
-    from auto_editor.objects import parse_dataclass, timeline_builder
+    from auto_editor.objs.util import parse_dataclass
+    from auto_editor.objs.tl import timeline_builder
 
     exploded = export.split(":", maxsplit=1)
     if len(exploded) == 1:
@@ -163,14 +164,14 @@ def parse_export(export: str, log: Log) -> Exports:
         name, attrs = exploded
 
     parsing: dict[str, tuple[Any, list[Attr]]] = {
-        "default": (EditDefault, []),
-        "premiere": (EditPremiere, []),
-        "final-cut-pro": (EditFinalCutPro, []),
-        "shotcut": (EditShotCut, []),
-        "json": (EditJson, timeline_builder),
-        "timeline": (EditTimeline, timeline_builder),
-        "audio": (EditAudio, []),
-        "clip-sequence": (EditClipSequence, []),
+        "default": (ExDefault, []),
+        "premiere": (ExPremiere, []),
+        "final-cut-pro": (ExFinalCutPro, []),
+        "shotcut": (ExShotCut, []),
+        "json": (ExJson, timeline_builder),
+        "timeline": (ExTimeline, timeline_builder),
+        "audio": (ExAudio, []),
+        "clip-sequence": (ExClipSequence, []),
     }
 
     if name in parsing:
@@ -217,7 +218,7 @@ def edit_media(
 
     output, export = set_output(args.output_file, args.export, src, log)
 
-    if isinstance(export, EditTimeline):
+    if isinstance(export, ExTimeline):
         log.quiet = True
         timer.quiet = True
 
@@ -255,7 +256,7 @@ def edit_media(
             sources, inputs, ffmpeg, ensure, args, samplerate, bar, temp, log
         )
 
-    if isinstance(export, EditTimeline):
+    if isinstance(export, ExTimeline):
         from auto_editor.formats.json import make_json_timeline
 
         make_json_timeline(export, 0, timeline, log)
@@ -267,25 +268,25 @@ def edit_media(
         preview(ensure, timeline, temp, log)
         return
 
-    if isinstance(export, EditJson):
+    if isinstance(export, ExJson):
         from auto_editor.formats.json import make_json_timeline
 
         make_json_timeline(export, output, timeline, log)
         return
 
-    if isinstance(export, EditPremiere):
+    if isinstance(export, ExPremiere):
         from auto_editor.formats.premiere import premiere_write_xml
 
         premiere_write_xml(ensure, output, timeline)
         return
 
-    if isinstance(export, EditFinalCutPro):
+    if isinstance(export, ExFinalCutPro):
         from auto_editor.formats.final_cut_pro import fcp_xml
 
         fcp_xml(output, timeline)
         return
 
-    if isinstance(export, EditShotCut):
+    if isinstance(export, ExShotCut):
         from auto_editor.formats.shotcut import shotcut_write_mlt
 
         shotcut_write_mlt(output, timeline)
@@ -358,7 +359,7 @@ def edit_media(
             log,
         )
 
-    if isinstance(export, EditClipSequence):
+    if isinstance(export, ExClipSequence):
         chunks = timeline.chunks
         if chunks is None:
             log.error("Timeline to complex to use clip-sequence export")
@@ -398,9 +399,7 @@ def edit_media(
 
     timer.stop()
 
-    if not args.no_open and isinstance(
-        export, (EditDefault, EditAudio, EditClipSequence)
-    ):
+    if not args.no_open and isinstance(export, (ExDefault, ExAudio, ExClipSequence)):
         if args.player is None:
             from auto_editor.utils.func import open_with_system_default
 
