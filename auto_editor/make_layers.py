@@ -1,19 +1,12 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import TYPE_CHECKING, NamedTuple, Union
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
 from auto_editor.method import get_has_loud
-from auto_editor.objects import (
-    AudioObj,
-    EllipseObj,
-    ImageObj,
-    RectangleObj,
-    TextObj,
-    VideoObj,
-)
+from auto_editor.objs.tl import ASpace, TlAudio, TlVideo, VSpace
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import apply_margin, cook, seconds_to_ticks, set_range
 
@@ -23,14 +16,6 @@ if TYPE_CHECKING:
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
     from auto_editor.utils.types import Margin
-
-
-Visual = Union[TextObj, ImageObj, RectangleObj, EllipseObj]
-VLayer = list[Union[VideoObj, Visual]]
-VSpace = list[VLayer]
-
-ALayer = list[AudioObj]
-ASpace = list[ALayer]
 
 
 class Clip(NamedTuple):
@@ -43,7 +28,6 @@ class Clip(NamedTuple):
 
 def clipify(chunks: Chunks, src: str, start: Fraction = Fraction(0)) -> list[Clip]:
     clips: list[Clip] = []
-    # Add "+1" to match how chunks are rendered in 22w18a
     i = 0
     for chunk in chunks:
         if chunk[2] != 99999:
@@ -77,7 +61,7 @@ def make_av(
         src = sources[str(inp)]
         if len(src.videos) > 0:
             for clip in clips:
-                vclip_ = VideoObj(
+                vclip_ = TlVideo(
                     clip.start, clip.dur, clip.src, clip.offset, clip.speed, 0
                 )
                 if len(vclips) == 0:
@@ -88,7 +72,7 @@ def make_av(
             for clip in clips:
                 for a, _ in enumerate(src.audios):
                     aclips[a].append(
-                        AudioObj(
+                        TlAudio(
                             clip.start,
                             clip.dur,
                             clip.src,
