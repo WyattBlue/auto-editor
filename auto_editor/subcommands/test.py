@@ -12,12 +12,9 @@ from fractions import Fraction
 from time import perf_counter
 from typing import Callable
 
-import av
-
 from auto_editor.vanparse import ArgumentParser
-
-av.logging.set_level(av.logging.PANIC)
-
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.log import Log
 
 @dataclass
 class TestArgs:
@@ -41,6 +38,15 @@ def pipe_to_console(cmd: list[str]) -> tuple[int, str, str]:
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     return process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
+
+
+class Checker:
+    def __init__(self, ffmpeg: FFmpeg, log: Log):
+        self.ffmpeg = ffmpeg
+        self.log = log
+
+    def check(self, path: str) -> FileInfo:
+        return FileInfo(path, self.ffmpeg, self.log)
 
 
 class Runner:
@@ -153,6 +159,7 @@ def main(sys_args: list[str] | None = None):
     args = test_options(ArgumentParser("test")).parse_args(TestArgs, sys_args)
 
     run = Runner()
+    checker = Checker(FFmpeg(), Log())
 
     ### Tests ###
 
@@ -205,17 +212,18 @@ def main(sys_args: list[str] | None = None):
 
     def example():
         out = run.main(inputs=["example.mp4"], cmd=[])
-        with av.open(out) as cn:
-            video = cn.streams.video[0]
-            assert video.average_rate == 30
-            assert video.time_base == Fraction(1, 30)
-            assert video.width == 1280
-            assert video.height == 720
-            assert video.codec.name == "h264"
-            assert cn.streams.audio[0].codec.name == "aac"
-            assert cn.streams.audio[0].rate == 48000
-            assert video.language == "eng"
-            assert cn.streams.audio[0].language == "eng"
+        cn = checker.check(out)
+        video = cn.videos[0]
+
+        assert video.fps == 30
+        assert video.time_base == Fraction(1, 30)
+        assert video.width == 1280
+        assert video.height == 720
+        assert video.codec == "h264"
+        assert video.lang == "eng"
+        assert cn.audios[0].codec == "aac"
+        assert cn.audios[0].samplerate == 48000
+        assert cn.audios[0].lang == "eng"
 
         return out
 
@@ -305,8 +313,8 @@ def main(sys_args: list[str] | None = None):
         out = run.main(
             ["resources/only-video/man-on-green-screen.gif"], ["--edit", "none"]
         )
-        with av.open(out) as cn:
-            assert cn.streams.video[0].codec.name == "gif"
+        assert checker.check(out).videos[0].codec == "gif"
+
         return out
 
     def margin_tests():
@@ -327,14 +335,13 @@ def main(sys_args: list[str] | None = None):
     def output_extension():
         # Add input extension to output name if no output extension is given.
         out = run.main(inputs=["example.mp4"], cmd=[], output="out")
+
         assert out == "out.mp4"
-        with av.open(out) as cn:
-            assert cn.streams.video[0].codec.name == "h264"
+        assert checker.check(out).videos[0].codec == "h264"
 
         out = run.main(inputs=["resources/testsrc.mkv"], cmd=[], output="out")
         assert out == "out.mkv"
-        with av.open(out) as cn:
-            assert cn.streams.video[0].codec.name == "h264"
+        assert checker.check(out).videos[0].codec == "h264"
 
         return "out.mp4", "out.mkv"
 
@@ -357,24 +364,27 @@ def main(sys_args: list[str] | None = None):
         return out, out2
 
     def resolution_and_scale():
-        with av.open(run.main(["example.mp4"], ["--scale", "1.5"])) as cn:
-            assert cn.streams.video[0].average_rate == 30
-            assert cn.streams.video[0].width == 1920
-            assert cn.streams.video[0].height == 1080
-            assert cn.streams.audio[0].rate == 48000
+        cn = checker.check(run.main(["example.mp4"], ["--scale", "1.5"]))
 
-        with av.open(run.main(["example.mp4"], ["--scale", "0.2"])) as cn:
-            assert cn.streams.video[0].average_rate == 30
-            assert cn.streams.video[0].width == 256
-            assert cn.streams.video[0].height == 144
-            assert cn.streams.audio[0].rate == 48000
+        assert cn.videos[0].fps == 30
+        assert cn.videos[0].width == 1920
+        assert cn.videos[0].height == 1080
+        assert cn.audios[0].samplerate == 48000
+
+        cn = checker.check(run.main(["example.mp4"], ["--scale", "0.2"]))
+
+        assert cn.videos[0].fps == 30
+        assert cn.videos[0].width == 256
+        assert cn.videos[0].height == 144
+        assert cn.audios[0].samplerate == 48000
 
         out = run.main(["example.mp4"], ["-res", "700,380", "-b", "darkgreen"])
-        with av.open(out) as cn:
-            assert cn.streams.video[0].average_rate == 30
-            assert cn.streams.video[0].width == 700
-            assert cn.streams.video[0].height == 380
-            assert cn.streams.audio[0].rate == 48000
+        cn = checker.check(out)
+
+        assert cn.videos[0].fps == 30
+        assert cn.videos[0].width == 700
+        assert cn.videos[0].height == 380
+        assert cn.audios[0].samplerate == 48000
 
         return out
 
@@ -384,12 +394,12 @@ def main(sys_args: list[str] | None = None):
             ["--add", "rectangle:0,30,0,0,300,300,fill=blue"],
             "out.mp4",
         )
-        with av.open(out) as cn:
-            assert len(cn.streams.video) == 1
-            assert len(cn.streams.audio) == 1
-            assert cn.streams.video[0].width == 1920
-            assert cn.streams.video[0].height == 1080
-            assert cn.streams.video[0].average_rate == 30
+        cn = checker.check(out)
+        assert len(cn.videos) == 1
+        assert len(cn.audios) == 1
+        assert cn.videos[0].width == 1920
+        assert cn.videos[0].height == 1080
+        assert cn.videos[0].fps == 30
 
         return out
 
@@ -484,8 +494,7 @@ def main(sys_args: list[str] | None = None):
             ["--edit", "audio:stream=1"],
             "out.mov",
         )
-        with av.open(out) as cn:
-            assert len(cn.streams.audio) == 1
+        assert len(checker.check(out).audios) == 1
 
         return out
 
@@ -496,8 +505,8 @@ def main(sys_args: list[str] | None = None):
 
     def concat_mux_tracks():
         out = run.main(["example.mp4", "resources/multi-track.mov"], [], "out.mov")
-        with av.open(out) as cn:
-            assert len(cn.streams.audio) == 1
+        assert len(checker.check(out).audios) == 1
+
         return out
 
     def concat_multiple_tracks():
@@ -506,63 +515,58 @@ def main(sys_args: list[str] | None = None):
             ["--keep-tracks-separate"],
             "out.mov",
         )
-        with av.open(out) as cn:
-            assert len(cn.streams.audio) == 2, f"audio streams: {len(cn.streams.audio)}"
-
+        assert len(checker.check(out).audios) == 2
         out = run.main(
             ["example.mp4", "resources/multi-track.mov"],
             ["--keep-tracks-separate"],
             "out.mov",
         )
-        with av.open(out) as cn:
-            assert len(cn.streams.audio) == 2
+        assert len(checker.check(out).audios) == 2
 
         return out
 
     def frame_rate():
-        with av.open(run.main(["example.mp4"], ["-r", "15", "--no-seek"])) as cn:
-            video = cn.streams.video[0]
-            assert video.average_rate == 15
-            assert video.time_base == Fraction(1, 15)
-            dur = float(video.duration * video.time_base)
-            assert dur - 17.33333333333333333333333 < 3
+        cn = checker.check(run.main(["example.mp4"], ["-r", "15", "--no-seek"]))
+        video = cn.videos[0]
+        assert video.fps == 15
+        assert video.time_base == Fraction(1, 15)
+        assert float(video.duration) - 17.33333333333333333333333 < 3
 
-        with av.open(run.main(["example.mp4"], ["-r", "20"])) as cn:
-            video = cn.streams.video[0]
-            assert video.average_rate == 20
-            assert video.time_base == Fraction(1, 20)
-            dur = float(video.duration * video.time_base)
-            assert dur - 17.33333333333333333333333 < 2
+        cn = checker.check(run.main(["example.mp4"], ["-r", "20"]))
+        video = cn.videos[0]
+        assert video.fps == 20
+        assert video.time_base == Fraction(1, 20)
+        assert float(video.duration) - 17.33333333333333333333333 < 2
 
-        with av.open(out := run.main(["example.mp4"], ["-r", "60"])) as cn:
-            video = cn.streams.video[0]
-            assert video.average_rate == 60
-            assert video.time_base == Fraction(1, 60)
-            dur = float(video.duration * video.time_base)
-            assert dur - 17.33333333333333333333333 < 0.3
+        cn = checker.check(out := run.main(["example.mp4"], ["-r", "60"]))
+        video = cn.videos[0]
+
+        assert video.fps == 60
+        assert video.time_base == Fraction(1, 60)
+        assert float(video.duration) - 17.33333333333333333333333 < 0.3
 
         return out
 
     def embedded_image():
         out1 = run.main(["resources/embedded-image/h264-png.mp4"], [])
-        with av.open(out1) as cn:
-            assert cn.streams.video[0].codec.name == "h264"
-            assert cn.streams.video[1].codec.name == "png"
+        cn = checker.check(out1)
+        assert cn.videos[0].codec == "h264"
+        assert cn.videos[1].codec == "png"
 
         out2 = run.main(["resources/embedded-image/h264-mjpeg.mp4"], [])
-        with av.open(out2) as cn:
-            assert cn.streams.video[0].codec.name == "h264"
-            assert cn.streams.video[1].codec.name == "mjpeg"
+        cn = checker.check(out2)
+        assert cn.videos[0].codec == "h264"
+        assert cn.videos[1].codec == "mjpeg"
 
         out3 = run.main(["resources/embedded-image/h264-png.mkv"], [])
-        with av.open(out3) as cn:
-            assert cn.streams.video[0].codec.name == "h264"
-            assert cn.streams.video[1].codec.name == "png"
+        cn = checker.check(out3)
+        assert cn.videos[0].codec == "h264"
+        assert cn.videos[1].codec == "png"
 
         out4 = run.main(["resources/embedded-image/h264-mjpeg.mkv"], [])
-        with av.open(out4) as cn:
-            assert cn.streams.video[0].codec.name == "h264"
-            assert cn.streams.video[1].codec.name == "mjpeg"
+        cn = checker.check(out4)
+        assert cn.videos[0].codec == "h264"
+        assert cn.videos[1].codec == "mjpeg"
 
         return out1, out2, out3, out4
 
@@ -638,10 +642,8 @@ def main(sys_args: list[str] | None = None):
     #  Issue 280
     def SAR():
         out = run.main(["resources/SAR-2by3.mp4"], [])
-        with av.open(out) as cn:
-            sar = cn.streams.video[0].sample_aspect_ratio
-            if sar is not None:  # PyAV bug?
-                assert sar == Fraction(2, 3), f"Got: {sar}"
+        assert checker.check(out).videos[0].sar == "2:3"
+
         return out
 
     tests = []
