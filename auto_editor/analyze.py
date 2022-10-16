@@ -239,7 +239,7 @@ def motion_levels(
 
     prev_image = None
     image = None
-    total_pixels = None
+    total_pixels = src.videos[0].width * src.videos[0].height
     index = 0
 
     graph = av.filter.Graph()
@@ -268,9 +268,6 @@ def motion_levels(
             )
 
         image = frame.to_image().convert("L")
-
-        if total_pixels is None:
-            total_pixels = image.size[0] * image.size[1]
 
         if mobj.blur > 0:
             image = image.filter(ImageFilter.GaussianBlur(radius=mobj.blur))

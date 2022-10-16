@@ -154,8 +154,8 @@ def make_sources(
 
 
 def parse_export(export: str, log: Log) -> Exports:
-    from auto_editor.objs.util import parse_dataclass
     from auto_editor.objs.tl import timeline_builder
+    from auto_editor.objs.util import parse_dataclass
 
     exploded = export.split(":", maxsplit=1)
     if len(exploded) == 1:
