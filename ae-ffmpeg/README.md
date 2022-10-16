@@ -7,7 +7,7 @@ pip install ae-ffmpeg
 ```
 
 ## Copyright
-THe FFmpeg/FFprobe binaires used are under the LGPLv3. Only libraries that are compatible with the LGPLv3 are included.
+The FFmpeg/FFprobe binaires used are under the LGPLv3. Only libraries that are compatible with the LGPLv3 are included.
 
 ## How to Compile on MacOS
 Use https://github.com/WyattBlue/ffmpeg-build-script/
