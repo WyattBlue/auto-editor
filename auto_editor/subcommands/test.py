@@ -12,9 +12,10 @@ from fractions import Fraction
 from time import perf_counter
 from typing import Callable
 
-from auto_editor.vanparse import ArgumentParser
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.utils.log import Log
+from auto_editor.vanparse import ArgumentParser
+
 
 @dataclass
 class TestArgs:
