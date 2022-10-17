@@ -27,7 +27,7 @@ from auto_editor.objs.util import _Vars, parse_dataclass
 
 if TYPE_CHECKING:
     from fractions import Fraction
-    from typing import Any, Callable
+    from typing import Callable, Union
 
     from numpy.typing import NDArray
 
@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
     BoolList = NDArray[np.bool_]
     BoolOperand = Callable[[BoolList, BoolList], BoolList]
+    Node = Union[UnOp, BinOp, ArrObj, None]
 
 
 def operand_combine(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
@@ -66,15 +67,12 @@ abc = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'*+,
 class Token:
     __slots__ = ("type", "value")
 
-    def __init__(self, type: str, value: Any):
+    def __init__(self, type: str, value: str):
         self.type = type
         self.value = value
 
-    def __str__(self) -> str:
+    def __str__(self):
         return self.value
-
-    def __repr__(self):
-        return self.__str__()
 
 
 class Lexer:
@@ -147,40 +145,36 @@ class Lexer:
 ###############################################################################
 
 
-class Node:
-    pass
-
-
-class UnOp(Node):
+class UnOp:
     __slots__ = ("value", "op")
 
-    def __init__(self, value: Any, op: Any):
+    def __init__(self, value: Node, op: Token):
         self.value = value
         self.op = op
 
-    def __str__(self) -> str:
+    def __str__(self):
         return f"({self.op} {self.value})"
 
 
-class BinOp(Node):
+class BinOp:
     __slots__ = ("left", "op", "right")
 
-    def __init__(self, left: Any, op: Any, right: Any):
+    def __init__(self, left: Node, op: Token, right: Node):
         self.left = left
         self.op = op
         self.right = right
 
-    def __str__(self) -> str:
-        return f"({self.left} {self.op} {self.right})"
+    def __str__(self):
+        return f"({self.op} {self.left} {self.right})"
 
 
-class ArrObj(Node):
+class ArrObj:
     __slots__ = "val"
 
     def __init__(self, val: str):
         self.val = val
 
-    def __str__(self) -> str:
+    def __str__(self):
         return self.val
 
 
@@ -202,7 +196,7 @@ class Parser:
             self.log.error("Operator must be between two editing methods")
         self.current_token = nt
 
-    def factor(self) -> Node | None:
+    def factor(self) -> Node:
         token = self.current_token
         if token.type == ARR:
             self.eat(ARR)
@@ -216,7 +210,7 @@ class Parser:
 
         return None
 
-    def term(self) -> Node | None:
+    def term(self) -> Node:
         # High predicent operations
         node = self.factor()
 
@@ -227,7 +221,7 @@ class Parser:
 
         return node
 
-    def expr(self) -> Node | None:
+    def expr(self) -> Node:
         # Low precident operations
         node = self.term()
 
@@ -391,7 +385,7 @@ class Interpreter:
 
         return None
 
-    def interpret(self):
+    def interpret(self) -> BoolList:
         tree = self.parser.expr()
         result = self.visit(tree)
 
@@ -399,7 +393,7 @@ class Interpreter:
         return result
 
 
-def get_has_loud(
+def run_interpreter(
     text: str,
     src: FileInfo,
     ensure: Ensure,

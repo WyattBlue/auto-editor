@@ -72,6 +72,13 @@ def number(val: str | float) -> float:
     return num
 
 
+def speed(val: str) -> float:
+    _s = number(val)
+    if _s <= 0 or _s > 99999:
+        return 99999.0
+    return _s
+
+
 def db_number(val: str) -> float | str:
     num, unit = _split_num_str(val)
     if unit == "dB":

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
-from auto_editor.method import get_has_loud
+from auto_editor.interpreter import run_interpreter
 from auto_editor.objs.tl import ASpace, TlAudio, TlVideo, VSpace
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import apply_margin, cook, seconds_to_ticks, set_range
@@ -120,7 +120,7 @@ def make_layers(
 
     for i in inputs:
         src = sources[str(i)]
-        has_loud = get_has_loud(method, src, ensure, strict, tb, bar, temp, log)
+        has_loud = run_interpreter(method, src, ensure, strict, tb, bar, temp, log)
         has_loud_length = len(has_loud)
 
         if len(mark_loud) > 0:
