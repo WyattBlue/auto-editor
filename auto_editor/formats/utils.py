@@ -5,7 +5,7 @@ from xml.etree.ElementTree import Element
 from auto_editor.utils.log import Log
 
 
-def show(ele, limit, depth=0):
+def show(ele: Element, limit: int, depth: int = 0) -> None:
     print(
         f"{' ' * (depth * 4)}<{ele.tag} {ele.attrib}> {ele.text.strip() if ele.text is not None else ''}"
     )
@@ -34,7 +34,7 @@ def indent(base: int, *lines: str) -> str:
 
 
 class Validator:
-    def __init__(self, log: Log) -> None:
+    def __init__(self, log: Log):
         self.log = log
 
     def parse(self, ele: Element, schema: dict) -> dict:

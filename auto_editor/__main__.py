@@ -16,6 +16,7 @@ from auto_editor.utils.types import (
     number,
     resolution,
     sample_rate,
+    speed,
     speed_range,
     time,
     time_range,
@@ -61,7 +62,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--silent-speed",
         "-s",
-        type=number,
+        type=speed,
         metavar="NUM",
         help='Set speed of sections marked "silent" to NUM',
     )
@@ -69,7 +70,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--video-speed",
         "--sounded-speed",
         "-v",
-        type=number,
+        type=speed,
         metavar="NUM",
         help='Set speed of sections marked "loud" to NUM',
     )
@@ -353,12 +354,6 @@ def main() -> None:
 
     log = Log(args.debug, args.quiet, temp=temp)
     log.debug(f"Temp Directory: {temp}")
-
-    if args.silent_speed <= 0 or args.silent_speed > 99999:
-        args.silent_speed = 99999
-
-    if args.video_speed <= 0 or args.video_speed > 99999:
-        args.video_speed = 99999
 
     paths = valid_input(args.input, ffmpeg, args, log)
 
