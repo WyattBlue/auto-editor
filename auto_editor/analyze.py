@@ -233,7 +233,7 @@ def motion_levels(
     stream = container.streams.video[mobj.stream]
     stream.thread_type = "AUTO"
 
-    inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)
+    inaccurate_dur = int(stream.duration * stream.time_base * stream.average_rate)
 
     bar.start(inaccurate_dur, "Analyzing motion")
 
@@ -314,7 +314,7 @@ def pixeldiff_levels(
     stream = container.streams.video[pobj.stream]
     stream.thread_type = "AUTO"
 
-    inaccurate_dur = int(stream.duration * stream.time_base * stream.rate)
+    inaccurate_dur = int(stream.duration * stream.time_base * stream.average_rate)
 
     bar.start(inaccurate_dur, "Analyzing pixel diffs")
 
