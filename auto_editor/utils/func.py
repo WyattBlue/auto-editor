@@ -91,7 +91,9 @@ def set_range(
     pass
 
 
-def set_range(arr, range_syntax, tb, with_, log):
+def set_range(
+    arr: NDArray, range_syntax: list[list[str]], tb: Fraction, with_: float, log: Log
+) -> NDArray:
     def replace_variables_to_values(val: str, tb: Fraction, log: Log) -> int:
         if val == "start":
             return 0
