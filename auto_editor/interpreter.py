@@ -71,7 +71,7 @@ class Token:
         self.type = type
         self.value = value
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
 
 
@@ -152,7 +152,7 @@ class UnOp:
         self.value = value
         self.op = op
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"({self.op} {self.value})"
 
 
@@ -164,7 +164,7 @@ class BinOp:
         self.op = op
         self.right = right
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"({self.op} {self.left} {self.right})"
 
 
@@ -174,7 +174,7 @@ class ArrObj:
     def __init__(self, val: str):
         self.val = val
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.val
 
 
