@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-import tempfile
 from dataclasses import dataclass, field
 from fractions import Fraction
 
@@ -24,6 +23,7 @@ from auto_editor.objs.edit import (
 from auto_editor.objs.util import _Vars, parse_dataclass
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
+from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import frame_rate
 from auto_editor.vanparse import ArgumentParser
@@ -101,7 +101,7 @@ def main(sys_args: list[str]) -> None:
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
     bar = Bar("none")
-    temp = tempfile.mkdtemp()
+    temp = setup_tempdir(None)
     log = Log(temp=temp)
 
     sources = {}
