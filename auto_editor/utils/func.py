@@ -9,10 +9,32 @@ from numpy.typing import NDArray
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import time
 
+BoolList = NDArray[np.bool_]
+
 """
 To prevent duplicate code being pasted between scripts, common functions should be
 put here. Every function should be pure with no side effects.
 """
+
+
+def setup_tempdir(temp: str | None, log: Log) -> str:
+    if temp is None:
+        import tempfile
+
+        return tempfile.mkdtemp()
+
+    import os.path
+    from os import listdir, mkdir
+
+    if os.path.isfile(temp):
+        log.error("Temp directory cannot be an already existing file.")
+    if os.path.isdir(temp):
+        if len(listdir(temp)) != 0:
+            log.error("Temp directory should be empty!")
+    else:
+        mkdir(temp)
+
+    return temp
 
 
 def seconds_to_ticks(val: int | str, tb: Fraction) -> int:
@@ -47,9 +69,7 @@ def to_timecode(secs: float | Fraction, fmt: str) -> str:
     raise ValueError("to_timecode: Unreachable")
 
 
-def remove_small(
-    has_loud: NDArray[np.bool_], lim: int, replace: int, with_: int
-) -> NDArray[np.bool_]:
+def remove_small(has_loud: BoolList, lim: int, replace: int, with_: int) -> BoolList:
     start_p = 0
     active = False
     for j, item in enumerate(has_loud):
@@ -82,12 +102,12 @@ def set_range(
 
 @overload
 def set_range(
-    arr: NDArray[np.bool_],
+    arr: BoolList,
     range_syntax: list[list[str]],
     tb: Fraction,
     with_: float,
     log: Log,
-) -> NDArray[np.bool_]:
+) -> BoolList:
     pass
 
 
@@ -119,22 +139,19 @@ def set_range(
     return arr
 
 
-def cook(has_loud: NDArray[np.bool_], min_clip: int, min_cut: int) -> NDArray[np.bool_]:
+def cook(has_loud: BoolList, min_clip: int, min_cut: int) -> BoolList:
     has_loud = remove_small(has_loud, min_clip, replace=1, with_=0)
     has_loud = remove_small(has_loud, min_cut, replace=0, with_=1)
     return has_loud
 
 
-def apply_margin(
-    has_loud: NDArray[np.bool_], has_loud_length: int, start_m: int, end_m: int
-) -> NDArray[np.bool_]:
-
+def apply_margin(arr: BoolList, arrlen: int, start_m: int, end_m: int) -> BoolList:
     # Find start and end indexes.
     start_index = []
     end_index = []
-    for j in range(1, has_loud_length):
-        if has_loud[j] != has_loud[j - 1]:
-            if has_loud[j]:
+    for j in range(1, arrlen):
+        if arr[j] != arr[j - 1]:
+            if arr[j]:
                 start_index.append(j)
             else:
                 end_index.append(j)
@@ -142,22 +159,22 @@ def apply_margin(
     # Apply margin
     if start_m > 0:
         for i in start_index:
-            has_loud[max(i - start_m, 0) : i] = True
+            arr[max(i - start_m, 0) : i] = True
     if start_m < 0:
         for i in start_index:
-            has_loud[i : min(i - start_m, has_loud_length)] = False
+            arr[i : min(i - start_m, arrlen)] = False
 
     if end_m > 0:
         for i in end_index:
-            has_loud[i : min(i + end_m, has_loud_length)] = True
+            arr[i : min(i + end_m, arrlen)] = True
     if end_m < 0:
         for i in end_index:
-            has_loud[max(i + end_m, 0) : i] = False
+            arr[max(i + end_m, 0) : i] = False
 
-    return has_loud
+    return arr
 
 
-def merge(start_list: np.ndarray, end_list: np.ndarray) -> NDArray[np.bool_]:
+def merge(start_list: np.ndarray, end_list: np.ndarray) -> BoolList:
     result = np.zeros((len(start_list)), dtype=np.bool_)
 
     for i, item in enumerate(start_list):

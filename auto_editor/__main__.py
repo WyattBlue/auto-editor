@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
-import os
 import sys
-import tempfile
 
 import auto_editor
 from auto_editor.edit import edit_media
 from auto_editor.ffwrapper import FFmpeg
+from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     Args,
@@ -297,7 +296,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 def main() -> None:
-    subcommands = ("test", "info", "levels", "grep", "subdump", "desc")
+    subcommands = ("test", "info", "levels", "grep", "subdump", "desc", "repl")
 
     if len(sys.argv) > 1 and sys.argv[1] in subcommands:
         obj = __import__(
@@ -340,18 +339,7 @@ def main() -> None:
     if args.input == []:
         log.error("You need to give auto-editor an input file.")
 
-    if args.temp_dir is None:
-        temp = tempfile.mkdtemp()
-    else:
-        temp = args.temp_dir
-        if os.path.isfile(temp):
-            log.error("Temp directory cannot be an already existing file.")
-        if os.path.isdir(temp):
-            if len(os.listdir(temp)) != 0:
-                log.error("Temp directory should be empty!")
-        else:
-            os.mkdir(temp)
-
+    temp = setup_tempdir(args.temp_dir)
     log = Log(args.debug, args.quiet, temp=temp)
     log.debug(f"Temp Directory: {temp}")
 
