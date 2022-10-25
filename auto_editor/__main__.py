@@ -339,7 +339,7 @@ def main() -> None:
     if args.input == []:
         log.error("You need to give auto-editor an input file.")
 
-    temp = setup_tempdir(args.temp_dir)
+    temp = setup_tempdir(args.temp_dir, Log())
     log = Log(args.debug, args.quiet, temp=temp)
     log.debug(f"Temp Directory: {temp}")
 

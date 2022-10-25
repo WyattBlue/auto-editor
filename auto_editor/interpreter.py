@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
+import sys
 from functools import reduce
 from math import ceil, floor
 from typing import TYPE_CHECKING
@@ -31,7 +32,7 @@ from auto_editor.utils.func import apply_margin, cook, remove_small
 
 if TYPE_CHECKING:
     from fractions import Fraction
-    from typing import Callable, Union
+    from typing import Any, Callable, Union
 
     from numpy.typing import NDArray
 
@@ -43,8 +44,11 @@ if TYPE_CHECKING:
     BoolList = NDArray[np.bool_]
     BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
-    # None represents NoOp
-    Node = Union[Compound, UnOp, BinOp, TerOp, ManyOp, Proc, Num, Str, Bool, BoolArrV]
+    Node = Union[Compound, Var, UnOp, BinOp, TerOp, ManyOp, Proc, Num, Str, Bool, BoolArr]
+
+
+class MyError(Exception):
+    pass
 
 
 def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
@@ -54,6 +58,14 @@ def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
         a = np.resize(a, len(b))
 
     return call(a, b)
+
+
+def print_arr(a: BoolList) -> str:
+    rs = "(boolarr"
+    for item in val:
+        rs += " 1" if item else " 0"
+    rs += ")\n"
+    return rs
 
 
 def is_boolarr(arr: object) -> bool:
@@ -78,25 +90,25 @@ METHODS = ("audio", "motion", "pixeldiff", "random", "none", "all")
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 METHOD_ATTRS_SEP = ":"
 
+DEF, SET, ID = "DEF", "SET", "ID"
+DIS = "DIS"
 NUM, STR, ARR, SEC, LPAREN, RPAREN, EOF = "NUM", "STR", "ARR", "SEC", "(", ")", "EOF"
 NOT, OR, AND, XOR, BOOL = "NOT", "OR", "AND", "XOR", "BOOL"
 PLUS, MINUS, MUL, DIV = "PLUS", "MINUS", "MUL", "DIV"
 ROND, EROND, CEIL, ECEIL, FLR, EFLR = "ROND", "EROND", "CEIL", "ECEIL", "FLR", "EFLR"
 A1, S1, MOD = "A1", "S1", "MOD"
-SA, SU, SD, ST = "SA", "SU", "SD", "ST"
-
-NUMQ, STRQ, BOOLQ, BOOLARRQ = (
-    "NUMQ",
-    "STRQ",
-    "BOOLQ",
-    "BOOLARRQ",
-)
+SA, SU, SD, ST, SL = "SA", "SU", "SD", "ST", "SL"
+NUMQ, STRQ, BOOLQ, BOOLARRQ = "NUMQ", "STRQ", "BOOLQ", "BOOLARRQ"
 EQN, GR, LT, GRE, LTE = "EQN", "GR", "LT", "GRE", "LTE"
 POS, NEG, ZERO, EQ = "POS", "NEG", "ZERO", "EQ"
-
 MARGIN, MCUT, MCLIP, COOK, BOOLARR = "MARGIN", "MCUT", "MCLIP", "COOK", "BOOLARR"
+LEN, CNZ = "LEN", "CNZ"
 
 func_map = {
+    "define": DEF,
+    "set!": SET,
+    "length": LEN,
+    "display": DIS,
     "not": NOT,
     "or": OR,
     "and": AND,
@@ -123,6 +135,7 @@ func_map = {
     "string-upcase": SU,
     "string-downcase": SD,
     "string-titlecase": ST,
+    "string-length": SL,
     "number?": NUMQ,
     "string?": STRQ,
     "boolean?": BOOLQ,
@@ -139,13 +152,14 @@ func_map = {
     "cook": COOK,
     "boolarr": BOOLARR,
     "boolarr?": BOOLARRQ,
+    "count-nonzero": CNZ,
 }
 
 
 class Token:
     __slots__ = ("type", "value")
 
-    def __init__(self, type: str, value: str):
+    def __init__(self, type: str, value: Any):
         self.type = type
         self.value = value
 
@@ -171,7 +185,7 @@ class Lexer:
         else:
             self.char = self.text[self.pos]
 
-    def peek(self):
+    def peek(self) -> str | None:
         peek_pos = self.pos + 1
         if peek_pos > len(self.text) - 1:
             return None
@@ -182,7 +196,7 @@ class Lexer:
         while self.char is not None and self.char in " \t\n\r\x0b\x0c":
             self.advance()
 
-    def num_or_unit(self) -> int | float:
+    def num_or_unit(self) -> Token:
         result = ""
         numerator = None
         has_dot = False
@@ -194,16 +208,16 @@ class Lexer:
         while self.char is not None and self.char in "0123456789./":
             if self.char == "/":
                 if numerator is not None:
-                    raise TypeError("Too many /'s in Fraction literal")
+                    raise MyError("Too many /'s in Fraction literal")
                 try:
                     numerator = int(result)
                 except ValueError:
-                    raise TypeError(f"Numerator '{result}' cannot be converted to int")
+                    raise MyError(f"Numerator '{result}' cannot be converted to int")
                 result = ""
                 self.advance()
             elif self.char == ".":
                 if has_dot:
-                    raise TypeError("Too many .'s in float literal")
+                    raise MyError("Too many .'s in float literal")
                 has_dot = True
                 result += self.char
                 self.advance()
@@ -220,7 +234,7 @@ class Lexer:
                 self.advance()
 
             if unit not in SEC_UNITS:
-                raise TypeError(f"Unknown unit: {unit}")
+                raise MyError(f"Unknown unit: {unit}")
             token = SEC
 
         if numerator is not None:
@@ -236,13 +250,22 @@ class Lexer:
             if self.char == "\\":
                 self.advance()
                 if self.char in 'nt"\\':
-                    result += f"\\{self.char}"
+                    if self.char == "n":
+                        result += "\n"
+                    if self.char == "t":
+                        result += "\t"
+                    if self.char == '"':
+                        result += '"'
+                    if self.char == "\\":
+                        result += "\\"
                     self.advance()
                     continue
 
                 if self.char is None:
-                    raise TypeError("Unexpected EOF while parsing")
-                raise TypeError(f"Unexpected character {nc} during escape sequence")
+                    raise MyError("Unexpected EOF while parsing")
+                raise MyError(
+                    f"Unexpected character {self.char} during escape sequence"
+                )
             else:
                 result += self.char
             self.advance()
@@ -250,30 +273,32 @@ class Lexer:
         self.advance()
         return result
 
-    def symbol(self) -> tuple[str, str]:
+    def symbol(self) -> Token:
         result = ""
         while self.char is not None and self.char in abc:
             result += self.char
             self.advance()
 
-        if result in ("#t", "true"):
-            return BOOL, "true"
+        if result in ("#t", "#true", "true"):
+            return Token(BOOL, True)
 
-        if result in ("#f", "false"):
-            return BOOL, "false"
+        if result in ("#f", "#false", "false"):
+            return Token(BOOL, False)
 
         if result in func_map:
-            return func_map[result], result
+            return Token(func_map[result], result)
 
         for method in METHODS:
-            if result.startswith(method):
-                return ARR, result
+            if result == method or result.startswith(method + ":"):
+                return Token(ARR, result)
 
-        raise TypeError(f"Unknown name: '{result}'")
+        return Token(ID, result)
 
     def get_next_token(self) -> Token:
         while self.char is not None:
             self.skip_whitespace()
+            if self.char is None:
+                continue
 
             if self.char == '"':
                 self.advance()
@@ -288,13 +313,14 @@ class Lexer:
                 return Token(RPAREN, ")")
 
             if self.char == "-":
-                if self.peek() is not None and self.peek() in "0123456789.":
+                _peek = self.peek()
+                if _peek is not None and _peek in "0123456789.":
                     return self.num_or_unit()
 
             if self.char in "0123456789.":
                 return self.num_or_unit()
 
-            return Token(*self.symbol())
+            return self.symbol()
 
         return Token(EOF, "EOF")
 
@@ -375,6 +401,16 @@ class Atom:
     pass
 
 
+class Var(Atom):
+    def __init__(self, token: Token):
+        assert token.type == ID
+        self.token = token
+        self.value = token.value
+
+    def __str__(self) -> str:
+        return f"(Var {self.value})"
+
+
 class Proc(Atom):
     __slots__ = "op"
 
@@ -393,8 +429,7 @@ class Proc(Atom):
 class Num(Atom):
     __slots__ = "val"
 
-    def __init__(self, val):
-        assert isinstance(val, (int, float, Fraction))
+    def __init__(self, val: int | float | Fraction):
         self.val = val
 
     def __str__(self) -> str:
@@ -404,8 +439,7 @@ class Num(Atom):
 class Bool(Atom):
     __slots__ = "val"
 
-    def __init__(self, val):
-        assert isinstance(val, bool)
+    def __init__(self, val: bool):
         self.val = val
 
     def __str__(self) -> str:
@@ -416,15 +450,14 @@ class Bool(Atom):
 class Str(Atom):
     __slots__ = "val"
 
-    def __init__(self, val):
-        assert isinstance(val, str)
+    def __init__(self, val: str):
         self.val = val
 
     def __str__(self) -> str:
         return f"(str {self.val})"
 
 
-class BoolArrV(Atom):
+class BoolArr(Atom):
     __slots__ = "val"
 
     def __init__(self, val: str):
@@ -435,11 +468,9 @@ class BoolArrV(Atom):
 
 
 class Parser:
-    def __init__(self, lexer: Lexer, tb: Fraction):
+    def __init__(self, lexer: Lexer):
         self.lexer = lexer
-        self.tb = tb
         self.current_token = self.lexer.get_next_token()
-
         self.un_ops = {
             # math
             A1,
@@ -448,6 +479,11 @@ class Parser:
             SD,
             SU,
             ST,
+            SL,
+            DIS,
+            # arrays
+            LEN,
+            CNZ,
             # rounding
             ROND,
             EROND,
@@ -465,7 +501,7 @@ class Parser:
             ZERO,
             NOT,
         }
-        self.bin_ops = {MOD, MARGIN, MCUT, MCLIP, EQ, EQN, GR, LT, GRE, LTE}
+        self.bin_ops = {SET, DEF, MOD, MARGIN, MCUT, MCLIP, EQ, EQN, GR, LT, GRE, LTE}
         self.ter_ops = {MARGIN, COOK}
         self.many_ops = {SA, OR, AND, XOR, PLUS, MINUS, MUL, DIV, BOOLARR}
         self.all_ops = (
@@ -474,11 +510,11 @@ class Parser:
 
     def eat(self, token_type: str) -> None:
         if self.current_token.type != token_type:
-            raise TypeError(f"Expected {token_type}, got {self.current_token.type}")
+            raise MyError(f"Expected {token_type}, got {self.current_token.type}")
 
         self.current_token = self.lexer.get_next_token()
 
-    def comp(self) -> list[Node]:
+    def comp(self) -> Compound:
         comp_kids = []
         while self.current_token.type not in (EOF, RPAREN):
             comp_kids.append(self.expr())
@@ -487,13 +523,17 @@ class Parser:
     def expr(self) -> Node:
         token = self.current_token
 
+        if token.type == ID:
+            self.eat(ID)
+            return Var(token)
+
         if token.type == ARR:
             self.eat(ARR)
-            return BoolArrV(token.value)
+            return BoolArr(token.value)
 
         if token.type == BOOL:
             self.eat(BOOL)
-            return Bool(token.value == "true")
+            return Bool(token.value)
 
         if token.type == NUM:
             self.eat(NUM)
@@ -507,11 +547,16 @@ class Parser:
             self.eat(SEC)
             return UnOp(
                 Proc(Token(EROND, "exact-round")),
-                ManyOp(Proc(Token(MUL, "*")), [Num(token.value), Num(self.tb)]),
+                ManyOp(
+                    Proc(Token(MUL, "*")),
+                    [Num(token.value), Var(Token(ID, "timebase"))],
+                ),
             )
 
         if token.type == LPAREN:
             self.eat(LPAREN)
+            if self.current_token.type in (ARR, BOOL, NUM, STR, SEC):
+                raise MyError("Expected procedure")
             node = self.expr()
             self.eat(RPAREN)
             return node
@@ -529,27 +574,26 @@ class Parser:
 
             if len(childs) == 1:
                 if token.type not in self.un_ops:
-                    raise TypeError(
+                    raise MyError(
                         f"{token.value} has wrong number of expressions. got {len(childs)}"
                     )
                 return UnOp(Proc(token), childs[0])
 
             if len(childs) == 2:
                 if token.type not in self.bin_ops:
-                    raise TypeError(
+                    raise MyError(
                         f"{token.value} has wrong number of expressions. got {len(childs)}"
                     )
                 return BinOp(Proc(token), childs[0], childs[1])
 
             if len(childs) == 3:
                 if token.type not in self.ter_ops:
-                    raise TypeError(
+                    raise MyError(
                         f"{token.value} has wrong number of expressions. got {len(childs)}"
                     )
                 return TerOp(Proc(token), childs[0], childs[1], childs[2])
 
-        raise TypeError("Unexpected token type")
-
+        raise MyError("Unexpected token type")
 
     def __str__(self) -> str:
         result = str(self.comp())
@@ -569,6 +613,9 @@ class Parser:
 
 
 class Interpreter:
+
+    GLOBAL_SCOPE: dict[str, Any] = {}
+
     def __init__(
         self,
         parser: Parser,
@@ -590,12 +637,20 @@ class Interpreter:
         self.temp = temp
         self.log = log
 
+        self.GLOBAL_SCOPE["timebase"] = self.tb
+
     def visit(self, node: Node) -> Any:
         if isinstance(node, Atom):
             if isinstance(node, (Num, Str, Bool)):
                 return node.val
 
-            if isinstance(node, BoolArrV):
+            if isinstance(node, Var):
+                val = self.GLOBAL_SCOPE.get(node.value)
+                if val is None:
+                    raise MyError(f"{node.value} is undefined")
+                return val
+
+            if isinstance(node, BoolArr):
                 src, ensure, strict, tb = self.src, self.ensure, self.strict, self.tb
                 bar, temp, log = self.bar, self.temp, self.log
 
@@ -677,6 +732,20 @@ class Interpreter:
             val = self.visit(node.value)
             operator = node.op.name
 
+            if node.op.type == DIS:
+                if val is None:
+                    return None
+                if is_boolarr(val):
+                    result = ""
+                sys.stdout.write(str(val))
+                return None
+
+            if node.op.type == LEN and is_boolarr(val):
+                return len(val)
+
+            if node.op.type == CNZ and is_boolarr(val):
+                return np.count_nonzero(val)
+
             if node.op.type == NUMQ:
                 return is_num(val)
             if node.op.type == STRQ:
@@ -740,13 +809,28 @@ class Interpreter:
                     return val.lower()
                 if node.op.type == ST:
                     return val.title()
+                if node.op.type == SL:
+                    return len(val)
 
             if val is None:
-                raise TypeError(f"{operator} needs a value")
+                raise MyError(f"{operator} needs a value")
 
-            raise TypeError(f"{operator} got value in wrong type: '{val}'")
+            raise MyError(f"{operator} got value in wrong type: '{val}'")
 
         if isinstance(node, BinOp):
+            if node.op.type in (DEF, SET):
+                if not isinstance(node.first, Var):
+                    raise MyError(
+                        f"Variable must be set with a symbol, got {node.first}"
+                    )
+
+                var_name = node.first.value
+                if node.op.type == SET and var_name not in self.GLOBAL_SCOPE:
+                    raise MyError(f"Cannot set variable {var_name} before definition")
+
+                self.GLOBAL_SCOPE[var_name] = self.visit(node.last)
+                return None
+
             first = self.visit(node.first)
             last = self.visit(node.last)
             operator = node.op.name
@@ -761,50 +845,50 @@ class Interpreter:
             if node.op.type == GR:
                 if is_num(first) and is_num(last):
                     return first > last
-                raise TypeError(f"{operator} expects <num, num>")
+                raise MyError(f"{operator} expects <num, num>")
 
             if node.op.type == GRE:
                 if is_num(first) and is_num(last):
                     return first >= last
-                raise TypeError(f"{operator} expects <num, num>")
+                raise MyError(f"{operator} expects <num, num>")
 
             if node.op.type == LT:
                 if is_num(first) and is_num(last):
                     return first < last
-                raise TypeError(f"{operator} expects <num, num>")
+                raise MyError(f"{operator} expects <num, num>")
 
             if node.op.type == LTE:
                 if is_num(first) and is_num(last):
                     return first <= last
-                raise TypeError(f"{operator} expects <num, num>")
+                raise MyError(f"{operator} expects <num, num>")
 
             if node.op.type == EQN:
                 if is_num(first) and is_num(last):
                     return first == last
-                raise TypeError(f"{operator} expects <num, num>")
+                raise MyError(f"{operator} expects <num, num>")
 
             if node.op.type == MCLIP:
                 if isinstance(first, int) and is_boolarr(last):
                     return remove_small(last, first, replace=1, with_=0)
-                raise TypeError(f"{operator} expects <int, boolarr>")
+                raise MyError(f"{operator} expects <int, boolarr>")
 
             if node.op.type == MCUT:
                 if isinstance(first, int) and is_boolarr(last):
                     return remove_small(last, first, replace=0, with_=1)
-                raise TypeError(f"{operator} expects <int, boolarr>")
+                raise MyError(f"{operator} expects <int, boolarr>")
 
             if node.op.type == MARGIN:
                 if isinstance(first, int) and is_boolarr(last):
                     _len = len(last)
                     return apply_margin(last, _len, first, first)
 
-                raise TypeError(f"{operator} expects <int, boolarr>")
+                raise MyError(f"{operator} expects <int, boolarr>")
 
             if node.op.type == MOD:
                 if isinstance(first, int) and isinstance(last, int):
                     return first % last
 
-                raise TypeError(f"{operator} expects <int, int>")
+                raise MyError(f"{operator} expects <int, int>")
 
             raise ValueError("Unreachable")
 
@@ -823,7 +907,7 @@ class Interpreter:
                     # (cook mincut minclip boolarr)
                     return cook(last, middle, first)
 
-                raise TypeError(f"{operator} expects <int, int, boolarr>")
+                raise MyError(f"{operator} expects <int, int, boolarr>")
 
             if node.op.type == MARGIN:
                 if (
@@ -834,35 +918,41 @@ class Interpreter:
                     _len = len(last)
                     return apply_margin(last, _len, first, middle)
 
-                raise TypeError(f"{operator} expects <int, int, boolarr>")
+                raise MyError(f"{operator} expects <int, int, boolarr>")
 
             raise ValueError("Unreachable")
 
         if isinstance(node, ManyOp):
             values = []
-            all_bools = True
-            all_ints = True
-            all_boolarrs = True
+            types: set[Any] = set()
             for child in node.children:
                 _val = self.visit(child)
 
-                if not isinstance(_val, np.ndarray):
-                    all_boolarrs = False
+                if isinstance(_val, bool):
+                    types.add(bool)
+                elif isinstance(_val, int):
+                    types.add(int)
+                elif isinstance(_val, float):
+                    types.add(float)
+                elif isinstance(_val, Fraction):
+                    types.add(Fraction)
+                elif isinstance(_val, str):
+                    types.add(str)
+                elif isinstance(_val, np.ndarray):
+                    types.add(np.ndarray)
 
-                if not isinstance(_val, bool):
-                    all_bools = False
-
-                if isinstance(_val, float):
-                    all_ints = False
                 values.append(_val)
 
             if len(values) == 0:
                 return node.op
 
-            if node.op.type == SA:
+            if node.op.type == BOOLARR and np.ndarray not in types and str not in types:
+                return np.array(values, dtype=np.bool_)
+
+            if node.op.type == SA and types == {str}:
                 return reduce(lambda a, b: a + b, values)
 
-            if all_bools:
+            if types == {bool}:
                 if node.op.type == OR:
                     return reduce(lambda a, b: a or b, values)
                 if node.op.type == AND:
@@ -870,7 +960,7 @@ class Interpreter:
                 if node.op.type == XOR:
                     return reduce(lambda a, b: a ^ b, values)
 
-            if all_boolarrs:
+            if types == {np.ndarray}:
                 if node.op.type == OR:
                     return reduce(lambda a, b: boolop(a, b, np.logical_or), values)
                 if node.op.type == AND:
@@ -878,20 +968,21 @@ class Interpreter:
                 if node.op.type == XOR:
                     return reduce(lambda a, b: boolop(a, b, np.logical_xor), values)
 
-            if node.op.type == PLUS:
-                return reduce(lambda a, b: a + b, values)
-            if node.op.type == MINUS:
-                return reduce(lambda a, b: a - b, values)
-            if node.op.type == MUL:
-                return reduce(lambda a, b: a * b, values)
-            if node.op.type == DIV:
-                if len(values) == 1:
-                    values.insert(0, 1)
-                if all_ints:
-                    return reduce(lambda a, b: Fraction(a, b), values)
-                return reduce(lambda a, b: a / b, values)
+            if np.ndarray not in types and str not in types:
+                if node.op.type == PLUS:
+                    return reduce(lambda a, b: a + b, values)
+                if node.op.type == MINUS:
+                    return reduce(lambda a, b: a - b, values)
+                if node.op.type == MUL:
+                    return reduce(lambda a, b: a * b, values)
+                if node.op.type == DIV:
+                    if len(values) == 1:
+                        values.insert(0, 1)
+                    if float not in types:
+                        return reduce(lambda a, b: Fraction(a, b), values)
+                    return reduce(lambda a, b: a / b, values)
 
-            raise ("Operator got wrong type. This error message does not know the correct type")
+            raise MyError(f"{node.op.name} got wrong type")
 
         if isinstance(node, Compound):
             results = []
@@ -901,7 +992,7 @@ class Interpreter:
 
         raise ValueError(f"Unknown node type: {node}")
 
-    def interpret(self):
+    def interpret(self) -> Any:
         return self.visit(self.parser.comp())
 
 
@@ -918,14 +1009,21 @@ def run_interpreter(
 
     try:
         lexer = Lexer(text)
-        parser = Parser(lexer, tb)
+        parser = Parser(lexer)
         if log.debug:
             log.debug(f"edit: {parser}")
 
         interpreter = Interpreter(parser, src, ensure, strict, tb, bar, temp, log)
-        result = interpreter.interpret()
-    except TypeError as e:
+        results = interpreter.interpret()
+    except MyError as e:
         log.error(e)
+
+    if len(results) == 0:
+        log.error("Expression in --edit must return a boolarr")
+
+    result = results[-1]
+    if not is_boolarr(results[-1]):
+        log.error("Expression in --edit must return a boolarr")
 
     assert isinstance(result, np.ndarray)
     return result
