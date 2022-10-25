@@ -587,11 +587,11 @@ def main(sys_args: list[str] | None = None):
         run.main(["resources/multi-track.mov"], ["--edit", "not audio:stream=all"])
         run.main(
             ["resources/multi-track.mov"],
-            ["--edit", "not audio:threshold=4% or audio:stream=1"],
+            ["--edit", "(or (not audio:threshold=4%) audio:stream=1)"],
         )
         out = run.main(
             ["resources/multi-track.mov"],
-            ["--edit", "not audio:threshold=4% or not audio:stream=1"],
+            ["--edit", "(or (not audio:threshold=4%) (not audio:stream=1))"],
         )
         return out
 
@@ -603,38 +603,6 @@ def main(sys_args: list[str] | None = None):
         run.check(
             ["resources/only-video/man-on-green-screen.gif", "--edit", "audio"],
             "Audio stream '0' does not exist",
-        )
-        run.check(
-            ["example.mp4", "--edit", "not"],
-            "Error! 'not' operator needs right hand expression",
-        )
-        run.check(
-            ["example.mp4", "--edit", "audio and"],
-            "Error! 'and' operator needs right hand expression",
-        )
-        run.check(
-            ["example.mp4", "--edit", "and"],
-            "Error! 'and' operator needs left and right hand expression",
-        )
-        run.check(
-            ["example.mp4", "--edit", "and audio"],
-            "Error! 'and' operator needs left hand expression",
-        )
-        run.check(
-            ["example.mp4", "--edit", "or audio"],
-            "Error! 'or' operator needs left hand expression",
-        )
-        run.check(
-            ["example.mp4", "--edit", "audio four audio"],
-            "Error! Unknown method/operator: 'four'",
-        )
-        run.check(
-            ["example.mp4", "--edit", "audio audio"],
-            "Operator must be between two editing methods",
-        )
-        run.check(
-            ["example.mp4", "--edit", "audio (audio)"],
-            "Operator must be between two editing methods",
         )
 
     def yuv442p():

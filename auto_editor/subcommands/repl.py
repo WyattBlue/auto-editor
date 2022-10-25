@@ -11,7 +11,7 @@ import numpy as np
 
 import auto_editor
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import Interpreter, Lexer, Parser
+from auto_editor.interpreter import Interpreter, Lexer, MyError, Parser, print_arr
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.func import setup_tempdir
@@ -54,24 +54,20 @@ def repl_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 def display_val(val: Any) -> str:
-    if val is True:
-        return "#t"
-    if val is False:
-        return "#f"
     if val is None:
-        return "None"
+        return ""
+    if val is True:
+        return "#t\n"
+    if val is False:
+        return "#f\n"
     if isinstance(val, np.ndarray):
-        rs = "(boolarr"
-        for item in val:
-            rs += " 1" if item else " 0"
-        rs += ")"
-        return rs
+        return print_arr(val)
     if isinstance(val, str):
-        return f'"{val}"'
+        return f'"{val}"\n'
     if isinstance(val, Fraction):
-        return f"{val.numerator}/{val.denominator}"
+        return f"{val.numerator}/{val.denominator}\n"
 
-    return f"{val!r}"
+    return f"{val!r}\n"
 
 
 def main(sys_args: list[str]) -> None:
@@ -100,13 +96,10 @@ def main(sys_args: list[str]) -> None:
 
             try:
                 lexer = Lexer(text)
-                parser = Parser(lexer, tb)
-                parse_result = str(parser)
-            except TypeError as e:
+                parser = Parser(lexer)
+            except MyError as e:
                 print(f"error: {e}")
                 continue
-
-            print(parse_result)
 
             try:
                 interpreter = Interpreter(
@@ -115,11 +108,10 @@ def main(sys_args: list[str]) -> None:
                 result = interpreter.interpret()
                 if isinstance(result, list):
                     for item in result:
-                        print(display_val(item))
+                        sys.stdout.write(display_val(item))
                 else:
-                    print(display_val(result))
-            except TypeError as e:
-                print(f"parser: {parse_result}")
+                    sys.stdout.write(display_val(result))
+            except MyError as e:
                 print(f"error: {e}")
 
     except (KeyboardInterrupt, EOFError):

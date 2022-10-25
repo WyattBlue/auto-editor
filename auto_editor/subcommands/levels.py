@@ -101,7 +101,7 @@ def main(sys_args: list[str]) -> None:
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
 
     bar = Bar("none")
-    temp = setup_tempdir(None)
+    temp = setup_tempdir(None, Log())
     log = Log(temp=temp)
 
     sources = {}
