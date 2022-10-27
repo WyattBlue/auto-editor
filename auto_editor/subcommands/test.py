@@ -657,6 +657,7 @@ def main(sys_args: list[str] | None = None):
         my_try("-3sec", -90)
         my_try("0.2sec", 6)
         my_try("(+ 4 3)", 7)
+        my_try("(+ 4 3 2)", 9)
         my_try("(+ 10.5 3)", 13.5)
         my_try("(+ 3+4i -2-2i)", 1 + 2j)
         my_try("(+ 3+4i -2-2i 5)", 6 + 2j)
@@ -680,6 +681,9 @@ def main(sys_args: list[str] | None = None):
         my_try("(= 1 2)", False)
         my_try("(= 2+3i 2+3i 2+3i)", True)
         my_try("(= 1)", True)
+        my_try("(+)", 0)
+        my_try("(*)", 1)
+        my_try('(define num 13) ; Set number to 13\n"Hello"', "Hello")
 
     tests = []
 
