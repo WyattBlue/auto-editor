@@ -45,9 +45,7 @@ if TYPE_CHECKING:
     BoolList = NDArray[np.bool_]
     BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
-    Node = Union[
-        Compound, Var, UnOp, BinOp, TerOp, ManyOp, Proc, Num, Str, Bool, BoolArr
-    ]
+    Node = Union[Compound, Var, ManyOp, Num, Str, Bool, BoolArr]
 
 
 class MyError(Exception):
@@ -72,21 +70,70 @@ def print_arr(arr: BoolList) -> str:
 
 
 def is_boolarr(arr: object) -> bool:
+    """boolarr?"""
     if isinstance(arr, np.ndarray):
         return arr.dtype.kind == "b"
     return False
 
 
+def is_bool(val: object) -> bool:
+    """boolean?"""
+    return isinstance(val, bool)
+
+
 def is_num(val: object) -> bool:
-    return isinstance(val, (int, float, Fraction, complex))
+    """number?"""
+    return not isinstance(val, bool) and isinstance(
+        val, (int, float, Fraction, complex)
+    )
 
 
 def is_real(val: object) -> bool:
-    return isinstance(val, (int, float, Fraction))
+    """real?"""
+    return not isinstance(val, bool) and isinstance(val, (int, float, Fraction))
+
+
+def exact_int(val: object) -> bool:
+    """exact-integer?"""
+    return not isinstance(val, bool) and isinstance(val, int)
 
 
 def is_exact(val: object) -> bool:
+    """exact?"""
     return isinstance(val, (int, Fraction))
+
+
+def is_str(val: object) -> bool:
+    """string?"""
+    return isinstance(val, str)
+
+
+def check_args(
+    op: Token, values: list[Any], arity: tuple[int, int | None], types: list[Any] | None
+) -> None:
+    lower, upper = arity
+    amount = len(values)
+    o = op.value
+    if upper is not None and lower > upper:
+        raise ValueError("lower must be less than upper")
+    if lower == upper:
+        if len(values) != lower:
+            raise MyError(f"{o}: Arity mismatch. Expected {lower}, got {amount}")
+
+    if upper is None and amount < lower:
+        raise MyError(f"{o}: Arity mismatch. Expected at least {lower}, got {amount}")
+    if upper is not None and (amount > upper or amount < lower):
+        raise MyError(
+            f"{o}: Arity mismatch. Expected between {lower} and {upper}, got {amount}"
+        )
+
+    if types is None:
+        return
+
+    for i, val in enumerate(values):
+        check = types[-1] if i >= len(types) else types[i]
+        if not check(val):
+            raise MyError(f"{o} expects: {' '.join([_t.__doc__ for _t in types])}")
 
 
 ###############################################################################
@@ -99,8 +146,7 @@ METHODS = ("audio", "motion", "pixeldiff", "random", "none", "all")
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 METHOD_ATTRS_SEP = ":"
 
-DEF, SET, ID = "DEF", "SET", "ID"
-DIS = "DIS"
+DEF, SET, ID, DIS = "DEF", "SET", "ID", "DIS"
 NUM, STR, ARR, SEC, LPAREN, RPAREN, EOF = "NUM", "STR", "ARR", "SEC", "(", ")", "EOF"
 NOT, OR, AND, XOR, BOOL = "NOT", "OR", "AND", "XOR", "BOOL"
 PLUS, MINUS, MUL, DIV = "PLUS", "MINUS", "MUL", "DIV"
@@ -111,7 +157,7 @@ NUMQ, REALQ, STRQ, BOOLQ, BOOLARRQ = "NUMQ", "REALQ", "STRQ", "BOOLQ", "BOOLARRQ
 EQN, GR, LT, GRE, LTE = "EQN", "GR", "LT", "GRE", "LTE"
 SQRT, POS, NEG, ZERO, EQ = "SQRT", "POS", "NEG", "ZERO", "EQ"
 MARGIN, MCUT, MCLIP, COOK, BOOLARR = "MARGIN", "MCUT", "MCLIP", "COOK", "BOOLARR"
-LEN, CNZ, EXACTQ = "LEN", "CNZ", "EXACTQ"
+LEN, CNZ, EXACTQ, NTS, EINT = "LEN", "CNZ", "EXACTQ", "NTS", "EINT"
 
 func_map = {
     "define": DEF,
@@ -147,8 +193,10 @@ func_map = {
     "string-downcase": SD,
     "string-titlecase": ST,
     "string-length": SL,
+    "number->string": NTS,
     "number?": NUMQ,
     "real?": REALQ,
+    "exact-integer?": EINT,
     "string?": STRQ,
     "exact?": EXACTQ,
     "boolean?": BOOLQ,
@@ -192,9 +240,9 @@ class Lexer:
             self.char = self.text[self.pos]
 
     def char_is_norm(self) -> bool:
-        # '# is not here'
+        # , and # need to be included to not cause infinite loop
         return (
-            self.char is not None and self.char not in "()[]{}\",'`;|\\ \t\n\r\x0b\x0c"
+            self.char is not None and self.char not in "()[]{}\"'`;|\\ \t\n\r\x0b\x0c"
         )
 
     def advance(self) -> None:
@@ -293,6 +341,11 @@ class Lexer:
             if self.char is None:
                 continue
 
+            if self.char == ";":
+                while self.char is not None and self.char != "\n":
+                    self.advance()
+                continue
+
             if self.char == '"':
                 self.advance()
                 return Token(STR, self.string())
@@ -353,46 +406,10 @@ class Compound:
         return s
 
 
-class UnOp:
-    __slots__ = ("op", "value")
-
-    def __init__(self, op: Proc, value: Node):
-        self.op = op
-        self.value = value
-
-    def __str__(self) -> str:
-        return f"(UnOp {self.op} {self.value})"
-
-
-class BinOp:
-    __slots__ = ("op", "first", "last")
-
-    def __init__(self, op: Proc, first: Node, last: Node):
-        self.op = op
-        self.first = first
-        self.last = last
-
-    def __str__(self) -> str:
-        return f"(BinOp {self.op} {self.first} {self.last})"
-
-
-class TerOp:
-    __slots__ = ("op", "first", "middle", "last")
-
-    def __init__(self, op: Proc, first: Node, middle: Node, last: Node):
-        self.op = op
-        self.first = first
-        self.middle = middle
-        self.last = last
-
-    def __str__(self) -> str:
-        return f"(TerOp {self.op} {self.first} {self.middle} {self.last})"
-
-
 class ManyOp:
     __slots__ = ("op", "children")
 
-    def __init__(self, op: Proc, children: list[Node]):
+    def __init__(self, op: Token, children: list[Node]):
         self.op = op
         self.children = children
 
@@ -418,25 +435,10 @@ class Var(Atom):
         return f"(Var {self.value})"
 
 
-class Proc(Atom):
-    __slots__ = "op"
-
-    def __init__(self, op: Token):
-        assert isinstance(op, Token)
-        self.type = op.type
-        self.name: str = op.value
-
-    def __str__(self) -> str:
-        return f"(Proc {self.name})"
-
-    def __repr__(self) -> str:
-        return f"#<procedure:{self.name}>"
-
-
 class Num(Atom):
     __slots__ = "val"
 
-    def __init__(self, val: int | float | Fraction):
+    def __init__(self, val: int | float | Fraction | complex):
         self.val = val
 
     def __str__(self) -> str:
@@ -478,46 +480,6 @@ class Parser:
     def __init__(self, lexer: Lexer):
         self.lexer = lexer
         self.current_token = self.lexer.get_next_token()
-        self.un_ops = {
-            # math
-            A1,
-            S1,
-            SQRT,
-            ABS,
-            # strings
-            SD,
-            SU,
-            ST,
-            SL,
-            DIS,
-            # arrays
-            LEN,
-            CNZ,
-            # rounding
-            ROND,
-            EROND,
-            CEIL,
-            ECEIL,
-            FLR,
-            EFLR,
-            # bools
-            EXACTQ,
-            NUMQ,
-            REALQ,
-            STRQ,
-            BOOLQ,
-            BOOLARRQ,
-            POS,
-            NEG,
-            ZERO,
-            NOT,
-        }
-        self.bin_ops = {SET, DEF, MOD, MARGIN, MCUT, MCLIP, EQ, GR, LT, GRE, LTE}
-        self.ter_ops = {MARGIN, COOK}
-        self.many_ops = {SA, OR, AND, XOR, PLUS, MINUS, MUL, DIV, BOOLARR, EQN}
-        self.all_ops = (
-            self.many_ops.union(self.un_ops).union(self.bin_ops).union(self.ter_ops)
-        )
 
     def eat(self, token_type: str) -> None:
         if self.current_token.type != token_type:
@@ -538,30 +500,20 @@ class Parser:
             self.eat(ID)
             return Var(token)
 
-        if token.type == ARR:
-            self.eat(ARR)
-            return BoolArr(token.value)
-
-        if token.type == BOOL:
-            self.eat(BOOL)
-            return Bool(token.value)
-
-        if token.type == NUM:
-            self.eat(NUM)
-            return Num(token.value)
-
-        if token.type == STR:
-            self.eat(STR)
-            return Str(token.value)
+        matches = {ARR: BoolArr, BOOL: Bool, NUM: Num, STR: Str}
+        if token.type in matches:
+            self.eat(token.type)
+            return matches[token.type](token.value)
 
         if token.type == SEC:
             self.eat(SEC)
-            return UnOp(
-                Proc(Token(EROND, "exact-round")),
-                ManyOp(
-                    Proc(Token(MUL, "*")),
-                    [Num(token.value), Var(Token(ID, "timebase"))],
-                ),
+            return ManyOp(
+                Token(EROND, "exact-round"),
+                [
+                    ManyOp(
+                        Token(MUL, "*"), [Num(token.value), Var(Token(ID, "timebase"))]
+                    )
+                ],
             )
 
         if token.type == LPAREN:
@@ -572,39 +524,14 @@ class Parser:
             self.eat(RPAREN)
             return node
 
-        while self.current_token.type in self.all_ops:
-            token = self.current_token
-            self.eat(token.type)
+        token = self.current_token
+        self.eat(token.type)
 
-            childs = []
-            while self.current_token.type not in (RPAREN, EOF):
-                childs.append(self.expr())
+        childs = []
+        while self.current_token.type not in (RPAREN, EOF):
+            childs.append(self.expr())
 
-            if token.type in self.many_ops:
-                return ManyOp(Proc(token), children=childs)
-
-            if len(childs) == 1:
-                if token.type not in self.un_ops:
-                    raise MyError(
-                        f"{token.value} has wrong number of expressions. got {len(childs)}"
-                    )
-                return UnOp(Proc(token), childs[0])
-
-            if len(childs) == 2:
-                if token.type not in self.bin_ops:
-                    raise MyError(
-                        f"{token.value} has wrong number of expressions. got {len(childs)}"
-                    )
-                return BinOp(Proc(token), childs[0], childs[1])
-
-            if len(childs) == 3:
-                if token.type not in self.ter_ops:
-                    raise MyError(
-                        f"{token.value} has wrong number of expressions. got {len(childs)}"
-                    )
-                return TerOp(Proc(token), childs[0], childs[1], childs[2])
-
-        raise MyError("Unexpected token type")
+        return ManyOp(token, children=childs)
 
     def __str__(self) -> str:
         result = str(self.comp())
@@ -743,210 +670,22 @@ class Interpreter:
 
             raise ValueError("Unreachable")
 
-        if isinstance(node, UnOp):
-            val = self.visit(node.value)
-            operator = node.op.name
-
-            if node.op.type == DIS:
-                if val is None:
-                    return None
-                if is_boolarr(val):
-                    val = print_arr(val)
-                sys.stdout.write(str(val))
-                return None
-
-            if node.op.type == LEN and is_boolarr(val):
-                return len(val)
-
-            if node.op.type == CNZ and is_boolarr(val):
-                return np.count_nonzero(val)
-
-            if node.op.type == SQRT and is_num(val):
-                _result = cmath.sqrt(val)
-                if _result.imag == 0:
-                    _real = _result.real
-                    if int(_real) == _real:
-                        return int(_real)
-                    return _real
-                return _result
-
-            if node.op.type == EXACTQ and is_num(val):
-                return is_exact(val)
-            if node.op.type == REALQ:
-                return is_real(val)
-            if node.op.type == NUMQ:
-                return is_num(val)
-            if node.op.type == STRQ:
-                return isinstance(val, str)
-            if node.op.type == BOOLQ:
-                return isinstance(val, bool)
-            if node.op.type == BOOLARRQ:
-                return is_boolarr(val)
-
-            if node.op.type == ZERO and is_real(val):
-                return val == 0
-            if node.op.type == POS and is_real(val):
-                return val > 0
-            if node.op.type == NEG and is_real(val):
-                return val < 0
-            if node.op.type == ABS and is_real(val):
-                return abs(val)
-
-            if node.op.type == CEIL:
-                if isinstance(val, float):
-                    return float(math.ceil(val))
-                if isinstance(val, (int, Fraction)):
-                    return math.ceil(val)
-
-            if node.op.type == ECEIL and is_real(val):
-                return math.ceil(val)
-
-            if node.op.type == FLR:
-                if isinstance(val, float):
-                    return float(math.floor(val))
-                if isinstance(val, (int, Fraction)):
-                    return math.floor(val)
-
-            if node.op.type == EFLR and is_real(val):
-                return math.floor(val)
-
-            if node.op.type == ROND:
-                if isinstance(val, float):
-                    return float(round(val))
-                if isinstance(val, (int, Fraction)):
-                    return round(val)
-
-            if node.op.type == EROND and is_real(val):
-                return round(val)
-
-            if node.op.type == NOT:
-                if is_boolarr(val):
-                    return np.logical_not(val)
-
-                if isinstance(val, bool):
-                    return not val
-
-            if node.op.type == A1 and is_num(val):
-                return val + 1
-            if node.op.type == S1 and is_num(val):
-                return val - 1
-
-            if isinstance(val, str):
-                if node.op.type == SU:
-                    return val.upper()
-                if node.op.type == SD:
-                    return val.lower()
-                if node.op.type == ST:
-                    return val.title()
-                if node.op.type == SL:
-                    return len(val)
-
-            if val is None:
-                raise MyError(f"{operator} needs a value")
-
-            raise MyError(f"{operator} got value in wrong type: '{val}'")
-
-        if isinstance(node, BinOp):
+        if isinstance(node, ManyOp):
             if node.op.type in (DEF, SET):
-                if not isinstance(node.first, Var):
+                check_args(node.op, node.children, (2, 2), None)
+
+                if not isinstance(node.children[0], Var):
                     raise MyError(
-                        f"Variable must be set with a symbol, got {node.first}"
+                        f"Variable must be set with a symbol, got {node.children[0]}"
                     )
 
-                var_name = node.first.value
+                var_name = node.children[0].value
                 if node.op.type == SET and var_name not in self.GLOBAL_SCOPE:
                     raise MyError(f"Cannot set variable {var_name} before definition")
 
-                self.GLOBAL_SCOPE[var_name] = self.visit(node.last)
+                self.GLOBAL_SCOPE[var_name] = self.visit(node.children[1])
                 return None
 
-            first = self.visit(node.first)
-            last = self.visit(node.last)
-            operator = node.op.name
-
-            if node.op.type == EQ:
-                if isinstance(first, float) and not isinstance(last, float):
-                    return False
-                if isinstance(last, float) and not isinstance(first, float):
-                    return False
-                return first == last
-
-            if node.op.type == GR:
-                if is_real(first) and is_real(last):
-                    return first > last
-                raise MyError(f"{operator} expects: real? real?")
-
-            if node.op.type == GRE:
-                if is_real(first) and is_real(last):
-                    return first >= last
-                raise MyError(f"{operator} expects: real? real?")
-
-            if node.op.type == LT:
-                if is_real(first) and is_real(last):
-                    return first < last
-                raise MyError(f"{operator} expects: real? real?")
-
-            if node.op.type == LTE:
-                if is_real(first) and is_real(last):
-                    return first <= last
-                raise MyError(f"{operator} expects: real? real?")
-
-            if node.op.type == MCLIP:
-                if isinstance(first, int) and is_boolarr(last):
-                    return remove_small(last, first, replace=1, with_=0)
-                raise MyError(f"{operator} expects: int boolarr")
-
-            if node.op.type == MCUT:
-                if isinstance(first, int) and is_boolarr(last):
-                    return remove_small(last, first, replace=0, with_=1)
-                raise MyError(f"{operator} expects: int boolarr")
-
-            if node.op.type == MARGIN:
-                if isinstance(first, int) and is_boolarr(last):
-                    _len = len(last)
-                    return apply_margin(last, _len, first, first)
-
-                raise MyError(f"{operator} expects: int boolarr")
-
-            if node.op.type == MOD:
-                if isinstance(first, int) and isinstance(last, int):
-                    return first % last
-
-                raise MyError(f"{operator} expects: int int")
-
-            raise ValueError("Unreachable")
-
-        if isinstance(node, TerOp):
-            first = self.visit(node.first)
-            middle = self.visit(node.middle)
-            last = self.visit(node.last)
-            operator = node.op.name
-
-            if node.op.type == COOK:
-                if (
-                    isinstance(first, int)
-                    and isinstance(middle, int)
-                    and is_boolarr(last)
-                ):
-                    # mincut minclip boolarr
-                    return cook(last, middle, first)
-
-                raise MyError(f"{operator} expects: int int boolarr")
-
-            if node.op.type == MARGIN:
-                if (
-                    isinstance(first, int)
-                    and isinstance(middle, int)
-                    and is_boolarr(last)
-                ):
-                    _len = len(last)
-                    return apply_margin(last, _len, first, middle)
-
-                raise MyError(f"{operator} expects: int int boolarr")
-
-            raise ValueError("Unreachable")
-
-        if isinstance(node, ManyOp):
             values = []
             types: set[Any] = set()
             for child in node.children:
@@ -954,18 +693,165 @@ class Interpreter:
                 types.add(type(_val))
                 values.append(_val)
 
-            if len(values) == 0:
-                return node.op
+            if node.op.type == LEN:
+                check_args(node.op, values, (1, 1), [is_boolarr])
+                return len(values[0])
+            if node.op.type == CNZ:
+                check_args(node.op, values, (1, 1), [is_boolarr])
+                return np.count_nonzero(values[0])
+            if node.op.type == SQRT:
+                check_args(node.op, values, (1, 1), [is_num])
+                _result = cmath.sqrt(values[0])
+                if _result.imag == 0:
+                    _real = _result.real
+                    if int(_real) == _real:
+                        return int(_real)
+                    return _real
+                return _result
+            if node.op.type == EXACTQ:
+                check_args(node.op, values, (1, 1), [is_num])
+                return is_exact(values[0])
+            if node.op.type == REALQ:
+                check_args(node.op, values, (1, 1), None)
+                return is_real(values[0])
+            if node.op.type == NUMQ:
+                check_args(node.op, values, (1, 1), None)
+                return is_num(values[0])
+            if node.op.type == STRQ:
+                check_args(node.op, values, (1, 1), None)
+                return is_str(values[0])
+            if node.op.type == BOOLQ:
+                check_args(node.op, values, (1, 1), None)
+                return is_bool(values[0])
+            if node.op.type == BOOLARRQ:
+                check_args(node.op, values, (1, 1), None)
+                return is_boolarr(val)
+
+            if node.op.type == ZERO:
+                check_args(node.op, values, (1, 1), [is_real])
+                return values[0] == 0
+            if node.op.type == POS:
+                check_args(node.op, values, (1, 1), [is_real])
+                return values[0] > 0
+            if node.op.type == NEG:
+                check_args(node.op, values, (1, 1), [is_real])
+                return values[0] < 0
+            if node.op.type == ABS:
+                check_args(node.op, values, (1, 1), [is_real])
+                return abs(values[0])
+            if node.op.type == CEIL:
+                check_args(node.op, values, (1, 1), [is_real])
+                if isinstance(values[0], float):
+                    return float(math.ceil(values[0]))
+                return math.ceil(values[0])
+            if node.op.type == ECEIL:
+                check_args(node.op, values, (1, 1), [is_real])
+                return math.ceil(values[0])
+            if node.op.type == FLR:
+                check_args(node.op, values, (1, 1), [is_real])
+                if isinstance(values[0], float):
+                    return float(math.floor(values[0]))
+                return math.floor(values[0])
+            if node.op.type == EFLR:
+                check_args(node.op, values, (1, 1), [is_real])
+                return math.floor(values[0])
+            if node.op.type == ROND:
+                check_args(node.op, values, (1, 1), [is_real])
+                if isinstance(values[0], float):
+                    return float(round(values[0]))
+                return round(values[0])
+            if node.op.type == EROND:
+                check_args(node.op, values, (1, 1), [is_real])
+                return round(values[0])
+            if node.op.type == A1:
+                check_args(node.op, values, (1, 1), [is_num])
+                return values[0] + 1
+            if node.op.type == S1:
+                check_args(node.op, values, (1, 1), [is_num])
+                return values[0] - 1
+            if node.op.type == SU:
+                check_args(node.op, values, (1, 1), [is_str])
+                return values[0].upper()
+            if node.op.type == SD:
+                check_args(node.op, values, (1, 1), [is_str])
+                return values[0].lower()
+            if node.op.type == ST:
+                check_args(node.op, values, (1, 1), [is_str])
+                return values[0].title()
+            if node.op.type == SL:
+                check_args(node.op, values, (1, 1), [is_str])
+                return len(values[0])
+            if node.op.type == NTS:
+                check_args(node.op, values, (1, 1), [is_num])
+                return str(values[0])
+
+            if node.op.type == EQ:
+                check_args(node.op, values, (2, 2), None)
+                if isinstance(values[0], float) and not isinstance(values[1], float):
+                    return False
+                if isinstance(values[1], float) and not isinstance(values[0], float):
+                    return False
+                return values[0] == values[1]
+
+            if node.op.type == GR:
+                check_args(node.op, values, (2, 2), [is_real, is_real])
+                return values[0] > values[1]
+
+            if node.op.type == GRE:
+                check_args(node.op, values, (2, 2), [is_real, is_real])
+                return values[0] >= values[1]
+
+            if node.op.type == LT:
+                check_args(node.op, values, (2, 2), [is_real, is_real])
+                return values[0] < values[1]
+
+            if node.op.type == LTE:
+                check_args(node.op, values, (2, 2), [is_real, is_real])
+                return values[0] <= values[1]
+
+            if node.op.type == MCLIP:
+                check_args(node.op, values, (2, 2), [exact_int, is_boolarr])
+                return remove_small(values[1], values[0], replace=1, with_=0)
+
+            if node.op.type == MCUT:
+                check_args(node.op, values, (2, 2), [exact_int, is_boolarr])
+                return remove_small(values[1], values[0], replace=0, with_=1)
+
+            if node.op.type == MARGIN:
+                check_args(node.op, values, (2, 2), [exact_int, is_boolarr])
+                return apply_margin(values[1], len(values[1]), values[0], values[0])
+
+            if node.op.type == MOD:
+                check_args(node.op, values, (2, 2), [exact_int, exact_int])
+                return values[0] % values[1]
+
+            if node.op.type == DIS:
+                check_args(node.op, values, (1, 1), None)
+                if (val := values[0]) is None:
+                    return None
+                if is_boolarr(val):
+                    val = print_arr(val)
+                sys.stdout.write(str(val))
+                return None
+
+            if node.op.type == NOT:
+                check_args(node.op, values, (1, 1), None)
+                if is_boolarr(val := values[0]):
+                    return np.logical_not(val)
+                if is_bool(val):
+                    return not val
+                raise MyError(f"{node.op.value} expects: boolean? or boolarr?")
+
+            if node.op.type == COOK:
+                check_args(node.op, values, (3, 3), [exact_int, exact_int, is_boolarr])
+                return cook(values[2], values[1], values[0])
+
+            if node.op.type == MARGIN:
+                check_args(node.op, values, (3, 3), [exact_int, exact_int, is_boolarr])
+                return apply_margin(values[2], len(values[2]), values[0], values[1])
 
             if node.op.type == EQN:
-                if {np.ndarray, str}.intersection(types):
-                    raise MyError(f"{node.op.name} expects: number?")
-
-                if len(values) == 0:
-                    raise MyError(
-                        f"{node.op.name}: Arity mismatch, expected at least 1"
-                    )
-
+                check_args(node.op, values, (1, None), [is_num])
                 for i in range(1, len(values)):
                     if values[0] != values[i]:
                         return False
@@ -997,21 +883,29 @@ class Interpreter:
 
             if not {np.ndarray, str}.intersection(types):
                 if node.op.type == PLUS:
+                    if len(values) == 0:
+                        return 0
                     return reduce(lambda a, b: a + b, values)
                 if node.op.type == MINUS:
+                    if len(values) == 0:
+                        raise MyError("-: Arity mismatch, expected 1")
                     if len(values) == 1:
                         return -values[0]
                     return reduce(lambda a, b: a - b, values)
                 if node.op.type == MUL:
+                    if len(values) == 0:
+                        return 1
                     return reduce(lambda a, b: a * b, values)
                 if node.op.type == DIV:
+                    if len(values) == 0:
+                        raise MyError("/: Arity mismatch, expected 1")
                     if len(values) == 1:
                         values.insert(0, 1)
                     if not {float, complex}.intersection(types):
                         return reduce(lambda a, b: Fraction(a, b), values)
                     return reduce(lambda a, b: a / b, values)
 
-            raise MyError(f"{node.op.name} got wrong type")
+            raise MyError(f"{node.op.value} got wrong type")
 
         if isinstance(node, Compound):
             results = []
