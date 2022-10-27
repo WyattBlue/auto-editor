@@ -13,6 +13,10 @@ from time import perf_counter
 from typing import Callable
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.interpreter import Interpreter, Lexer, MyError, Parser
+from auto_editor.output import Ensure
+from auto_editor.utils.bar import Bar
+from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -29,7 +33,7 @@ def test_options(parser):
     parser.add_required(
         "category",
         nargs=1,
-        choices=("cli", "sub", "api", "all"),
+        choices=("unit", "cli", "sub", "api", "all"),
         metavar="category [options]",
     )
     return parser
@@ -615,7 +619,72 @@ def main(sys_args: list[str] | None = None):
 
         return out
 
+    def inter():
+        ffmpeg = FFmpeg("ffmpeg", True, False)
+        temp = setup_tempdir(None, Log())
+        log = Log(quiet=True, temp=temp)
+        strict = True
+
+        sources = {}
+        for i, path in enumerate(["example.mp4"]):
+            sources[str(i)] = FileInfo(path, ffmpeg, log, str(i))
+        src = sources["0"]
+
+        tb = src.get_fps()
+        ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
+        bar = Bar("none")
+
+        def my_try(text: str, expected: Any) -> Any:
+            try:
+                lexer = Lexer(text)
+                parser = Parser(lexer)
+                interpreter = Interpreter(
+                    parser, src, ensure, strict, tb, bar, temp, log
+                )
+                results = interpreter.interpret()
+            except MyError as e:
+                raise ValueError(f"{text}\nMyError: {e}")
+
+            if expected != results[-1]:
+                raise ValueError(f"{text}: Expected: {expected}, got {results[-1]}")
+
+        my_try("345", 345)
+        my_try("238.5", 238.5)
+        my_try("-34", -34)
+        my_try("-98.3", -98.3)
+        my_try("+3i", 3j)
+        my_try("3sec", 90)
+        my_try("-3sec", -90)
+        my_try("0.2sec", 6)
+        my_try("(+ 4 3)", 7)
+        my_try("(+ 10.5 3)", 13.5)
+        my_try("(+ 3+4i -2-2i)", 1 + 2j)
+        my_try("(+ 3+4i -2-2i 5)", 6 + 2j)
+        my_try("(- 4 3)", 1)
+        my_try("(- 3)", -3)
+        my_try("(- 10.5 3)", 7.5)
+        my_try("(* 11.5 3)", 34.5)
+        my_try("(/ 3/4 4)", Fraction(3, 16))
+        my_try("(/ 5)", Fraction(1, 5))
+        my_try("(sqrt -4)", 2j)
+        my_try("(abs 1.0)", 1.0)
+        my_try("(abs -1)", 1)
+        my_try("(boolean? -4)", False)
+        my_try("(boolean? false)", True)
+        my_try("(boolean? #t)", True)
+        my_try("(exact? 3.0)", False)
+        my_try("(exact? 3)", True)
+        my_try('(string-append "Hello" " World")', "Hello World")
+        my_try('(define apple "Red Wood") apple', "Red Wood")
+        my_try("(= 1 1.0)", True)
+        my_try("(= 1 2)", False)
+        my_try("(= 2+3i 2+3i 2+3i)", True)
+        my_try("(= 1)", True)
+
     tests = []
+
+    if args.category in ("unit", "all"):
+        tests.append(inter)
 
     if args.category in ("api", "all"):
         tests.append(read_api_0_1)
@@ -673,21 +742,3 @@ def main(sys_args: list[str] | None = None):
 
 if __name__ == "__main__":
     main()
-
-# TODO
-"""
-(/ 3/4 4)
-3/16
-
-(+ 4 3)
-7
-
-(- 4 3)
-1
-
-3sec
-90
-
--3sec
--90
-"""

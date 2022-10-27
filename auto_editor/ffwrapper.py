@@ -6,7 +6,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from fractions import Fraction
-from platform import machine, system
+from platform import system
 from re import search
 from subprocess import PIPE, Popen
 from typing import Any
@@ -48,8 +48,6 @@ class FFmpeg:
             self.version = _version.split(" ")[0]
         except FileNotFoundError:
             if system() == "Darwin":
-                if machine() == "arm64":
-                    Log().error("No ffmpeg found, download via homebrew.")
                 Log().error(
                     "No ffmpeg found, download via homebrew or install ae-ffmpeg."
                 )

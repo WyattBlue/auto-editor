@@ -60,6 +60,9 @@ def display_val(val: Any) -> str:
         return "#t\n"
     if val is False:
         return "#f\n"
+    if isinstance(val, complex):
+        join = "" if val.imag < 0 else "+"
+        return f"{val.real}{join}{val.imag}i\n"
     if isinstance(val, np.ndarray):
         return print_arr(val)
     if isinstance(val, str):

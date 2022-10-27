@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from fractions import Fraction
+import cmath
+import math
 import sys
+from fractions import Fraction
 from functools import reduce
-from math import ceil, floor
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -44,7 +45,9 @@ if TYPE_CHECKING:
     BoolList = NDArray[np.bool_]
     BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
-    Node = Union[Compound, Var, UnOp, BinOp, TerOp, ManyOp, Proc, Num, Str, Bool, BoolArr]
+    Node = Union[
+        Compound, Var, UnOp, BinOp, TerOp, ManyOp, Proc, Num, Str, Bool, BoolArr
+    ]
 
 
 class MyError(Exception):
@@ -60,9 +63,9 @@ def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
     return call(a, b)
 
 
-def print_arr(a: BoolList) -> str:
+def print_arr(arr: BoolList) -> str:
     rs = "(boolarr"
-    for item in val:
+    for item in arr:
         rs += " 1" if item else " 0"
     rs += ")\n"
     return rs
@@ -75,7 +78,15 @@ def is_boolarr(arr: object) -> bool:
 
 
 def is_num(val: object) -> bool:
+    return isinstance(val, (int, float, Fraction, complex))
+
+
+def is_real(val: object) -> bool:
     return isinstance(val, (int, float, Fraction))
+
+
+def is_exact(val: object) -> bool:
+    return isinstance(val, (int, Fraction))
 
 
 ###############################################################################
@@ -83,8 +94,6 @@ def is_num(val: object) -> bool:
 #  LEXER                                                                      #
 #                                                                             #
 ###############################################################################
-
-abc = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'*+,_-./:;<=>?@\\^`|~"
 
 METHODS = ("audio", "motion", "pixeldiff", "random", "none", "all")
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
@@ -96,13 +105,13 @@ NUM, STR, ARR, SEC, LPAREN, RPAREN, EOF = "NUM", "STR", "ARR", "SEC", "(", ")", 
 NOT, OR, AND, XOR, BOOL = "NOT", "OR", "AND", "XOR", "BOOL"
 PLUS, MINUS, MUL, DIV = "PLUS", "MINUS", "MUL", "DIV"
 ROND, EROND, CEIL, ECEIL, FLR, EFLR = "ROND", "EROND", "CEIL", "ECEIL", "FLR", "EFLR"
-A1, S1, MOD = "A1", "S1", "MOD"
+A1, S1, MOD, ABS = "A1", "S1", "MOD", "ABS"
 SA, SU, SD, ST, SL = "SA", "SU", "SD", "ST", "SL"
-NUMQ, STRQ, BOOLQ, BOOLARRQ = "NUMQ", "STRQ", "BOOLQ", "BOOLARRQ"
+NUMQ, REALQ, STRQ, BOOLQ, BOOLARRQ = "NUMQ", "REALQ", "STRQ", "BOOLQ", "BOOLARRQ"
 EQN, GR, LT, GRE, LTE = "EQN", "GR", "LT", "GRE", "LTE"
-POS, NEG, ZERO, EQ = "POS", "NEG", "ZERO", "EQ"
+SQRT, POS, NEG, ZERO, EQ = "SQRT", "POS", "NEG", "ZERO", "EQ"
 MARGIN, MCUT, MCLIP, COOK, BOOLARR = "MARGIN", "MCUT", "MCLIP", "COOK", "BOOLARR"
-LEN, CNZ = "LEN", "CNZ"
+LEN, CNZ, EXACTQ = "LEN", "CNZ", "EXACTQ"
 
 func_map = {
     "define": DEF,
@@ -129,6 +138,8 @@ func_map = {
     "floor": FLR,
     "exact-floor": EFLR,
     "modulo": MOD,
+    "abs": ABS,
+    "sqrt": SQRT,
     "add1": A1,
     "sub1": S1,
     "string-append": SA,
@@ -137,7 +148,9 @@ func_map = {
     "string-titlecase": ST,
     "string-length": SL,
     "number?": NUMQ,
+    "real?": REALQ,
     "string?": STRQ,
+    "exact?": EXACTQ,
     "boolean?": BOOLQ,
     "positive?": POS,
     "negative?": NEG,
@@ -178,6 +191,12 @@ class Lexer:
         else:
             self.char = self.text[self.pos]
 
+    def char_is_norm(self) -> bool:
+        # '# is not here'
+        return (
+            self.char is not None and self.char not in "()[]{}\",'`;|\\ \t\n\r\x0b\x0c"
+        )
+
     def advance(self) -> None:
         self.pos += 1
         if self.pos > len(self.text) - 1:
@@ -195,54 +214,6 @@ class Lexer:
     def skip_whitespace(self) -> None:
         while self.char is not None and self.char in " \t\n\r\x0b\x0c":
             self.advance()
-
-    def num_or_unit(self) -> Token:
-        result = ""
-        numerator = None
-        has_dot = False
-        sign = 1
-        if self.char == "-":
-            sign = -1
-            self.advance()
-
-        while self.char is not None and self.char in "0123456789./":
-            if self.char == "/":
-                if numerator is not None:
-                    raise MyError("Too many /'s in Fraction literal")
-                try:
-                    numerator = int(result)
-                except ValueError:
-                    raise MyError(f"Numerator '{result}' cannot be converted to int")
-                result = ""
-                self.advance()
-            elif self.char == ".":
-                if has_dot:
-                    raise MyError("Too many .'s in float literal")
-                has_dot = True
-                result += self.char
-                self.advance()
-            else:
-                result += self.char
-                self.advance()
-
-        token = NUM
-
-        if self.char is not None and self.char in abc:
-            unit = ""
-            while self.char is not None and self.char in abc:
-                unit += self.char
-                self.advance()
-
-            if unit not in SEC_UNITS:
-                raise MyError(f"Unknown unit: {unit}")
-            token = SEC
-
-        if numerator is not None:
-            return Token(token, Fraction(numerator * sign, int(result)))
-
-        if has_dot:
-            return Token(token, float(result) * sign)
-        return Token(token, int(result) * sign)
 
     def string(self) -> str:
         result = ""
@@ -273,26 +244,48 @@ class Lexer:
         self.advance()
         return result
 
-    def symbol(self) -> Token:
+    def number(self) -> Token:
         result = ""
-        while self.char is not None and self.char in abc:
+        token = NUM
+
+        while self.char is not None and self.char in "+-0123456789./":
             result += self.char
             self.advance()
 
-        if result in ("#t", "#true", "true"):
-            return Token(BOOL, True)
+        unit = ""
+        if self.char_is_norm():
+            while self.char_is_norm():
+                assert self.char is not None
+                unit += self.char
+                self.advance()
 
-        if result in ("#f", "#false", "false"):
-            return Token(BOOL, False)
+            if unit in SEC_UNITS:
+                token = SEC
+            elif unit != "i":
+                return Token(ID, result + unit)
 
-        if result in func_map:
-            return Token(func_map[result], result)
+        if unit == "i":
+            try:
+                return Token(NUM, complex(result + "j"))
+            except ValueError:
+                return Token(ID, result + unit)
 
-        for method in METHODS:
-            if result == method or result.startswith(method + ":"):
-                return Token(ARR, result)
+        if "/" in result:
+            try:
+                return Token(token, Fraction(result))
+            except ValueError:
+                return Token(ID, result + unit)
 
-        return Token(ID, result)
+        if "." in result:
+            try:
+                return Token(token, float(result))
+            except ValueError:
+                return Token(ID, result + unit)
+
+        try:
+            return Token(token, int(result))
+        except ValueError:
+            return Token(ID, result + unit)
 
     def get_next_token(self) -> Token:
         while self.char is not None:
@@ -303,24 +296,38 @@ class Lexer:
             if self.char == '"':
                 self.advance()
                 return Token(STR, self.string())
-
             if self.char == "(":
                 self.advance()
                 return Token(LPAREN, "(")
-
             if self.char == ")":
                 self.advance()
                 return Token(RPAREN, ")")
 
-            if self.char == "-":
+            if self.char in "+-":
                 _peek = self.peek()
                 if _peek is not None and _peek in "0123456789.":
-                    return self.num_or_unit()
+                    return self.number()
 
             if self.char in "0123456789.":
-                return self.num_or_unit()
+                return self.number()
 
-            return self.symbol()
+            result = ""
+            while self.char_is_norm():
+                result += self.char
+                self.advance()
+
+            if result in ("#t", "#true"):
+                return Token(BOOL, True)
+            if result in ("#f", "#false"):
+                return Token(BOOL, False)
+            if result in func_map:
+                return Token(func_map[result], result)
+
+            for method in METHODS:
+                if result == method or result.startswith(method + ":"):
+                    return Token(ARR, result)
+
+            return Token(ID, result)
 
         return Token(EOF, "EOF")
 
@@ -475,6 +482,8 @@ class Parser:
             # math
             A1,
             S1,
+            SQRT,
+            ABS,
             # strings
             SD,
             SU,
@@ -492,7 +501,9 @@ class Parser:
             FLR,
             EFLR,
             # bools
+            EXACTQ,
             NUMQ,
+            REALQ,
             STRQ,
             BOOLQ,
             BOOLARRQ,
@@ -501,9 +512,9 @@ class Parser:
             ZERO,
             NOT,
         }
-        self.bin_ops = {SET, DEF, MOD, MARGIN, MCUT, MCLIP, EQ, EQN, GR, LT, GRE, LTE}
+        self.bin_ops = {SET, DEF, MOD, MARGIN, MCUT, MCLIP, EQ, GR, LT, GRE, LTE}
         self.ter_ops = {MARGIN, COOK}
-        self.many_ops = {SA, OR, AND, XOR, PLUS, MINUS, MUL, DIV, BOOLARR}
+        self.many_ops = {SA, OR, AND, XOR, PLUS, MINUS, MUL, DIV, BOOLARR, EQN}
         self.all_ops = (
             self.many_ops.union(self.un_ops).union(self.bin_ops).union(self.ter_ops)
         )
@@ -614,7 +625,11 @@ class Parser:
 
 class Interpreter:
 
-    GLOBAL_SCOPE: dict[str, Any] = {}
+    GLOBAL_SCOPE: dict[str, Any] = {
+        "true": True,
+        "false": False,
+        "pi": math.pi,
+    }
 
     def __init__(
         self,
@@ -736,7 +751,7 @@ class Interpreter:
                 if val is None:
                     return None
                 if is_boolarr(val):
-                    result = ""
+                    val = print_arr(val)
                 sys.stdout.write(str(val))
                 return None
 
@@ -746,6 +761,19 @@ class Interpreter:
             if node.op.type == CNZ and is_boolarr(val):
                 return np.count_nonzero(val)
 
+            if node.op.type == SQRT and is_num(val):
+                _result = cmath.sqrt(val)
+                if _result.imag == 0:
+                    _real = _result.real
+                    if int(_real) == _real:
+                        return int(_real)
+                    return _real
+                return _result
+
+            if node.op.type == EXACTQ and is_num(val):
+                return is_exact(val)
+            if node.op.type == REALQ:
+                return is_real(val)
             if node.op.type == NUMQ:
                 return is_num(val)
             if node.op.type == STRQ:
@@ -755,30 +783,32 @@ class Interpreter:
             if node.op.type == BOOLARRQ:
                 return is_boolarr(val)
 
-            if node.op.type == ZERO and is_num(val):
+            if node.op.type == ZERO and is_real(val):
                 return val == 0
-            if node.op.type == POS and is_num(val):
+            if node.op.type == POS and is_real(val):
                 return val > 0
-            if node.op.type == NEG and is_num(val):
+            if node.op.type == NEG and is_real(val):
                 return val < 0
+            if node.op.type == ABS and is_real(val):
+                return abs(val)
 
             if node.op.type == CEIL:
                 if isinstance(val, float):
-                    return float(ceil(val))
+                    return float(math.ceil(val))
                 if isinstance(val, (int, Fraction)):
-                    return ceil(val)
+                    return math.ceil(val)
 
-            if node.op.type == ECEIL and is_num(val):
-                return ceil(val)
+            if node.op.type == ECEIL and is_real(val):
+                return math.ceil(val)
 
             if node.op.type == FLR:
                 if isinstance(val, float):
-                    return float(floor(val))
+                    return float(math.floor(val))
                 if isinstance(val, (int, Fraction)):
-                    return floor(val)
+                    return math.floor(val)
 
-            if node.op.type == EFLR and is_num(val):
-                return floor(val)
+            if node.op.type == EFLR and is_real(val):
+                return math.floor(val)
 
             if node.op.type == ROND:
                 if isinstance(val, float):
@@ -786,7 +816,7 @@ class Interpreter:
                 if isinstance(val, (int, Fraction)):
                     return round(val)
 
-            if node.op.type == EROND and is_num(val):
+            if node.op.type == EROND and is_real(val):
                 return round(val)
 
             if node.op.type == NOT:
@@ -796,11 +826,10 @@ class Interpreter:
                 if isinstance(val, bool):
                     return not val
 
-            if is_num(val):
-                if node.op.type == A1:
-                    return val + 1
-                if node.op.type == S1:
-                    return val - 1
+            if node.op.type == A1 and is_num(val):
+                return val + 1
+            if node.op.type == S1 and is_num(val):
+                return val - 1
 
             if isinstance(val, str):
                 if node.op.type == SU:
@@ -843,52 +872,47 @@ class Interpreter:
                 return first == last
 
             if node.op.type == GR:
-                if is_num(first) and is_num(last):
+                if is_real(first) and is_real(last):
                     return first > last
-                raise MyError(f"{operator} expects <num, num>")
+                raise MyError(f"{operator} expects: real? real?")
 
             if node.op.type == GRE:
-                if is_num(first) and is_num(last):
+                if is_real(first) and is_real(last):
                     return first >= last
-                raise MyError(f"{operator} expects <num, num>")
+                raise MyError(f"{operator} expects: real? real?")
 
             if node.op.type == LT:
-                if is_num(first) and is_num(last):
+                if is_real(first) and is_real(last):
                     return first < last
-                raise MyError(f"{operator} expects <num, num>")
+                raise MyError(f"{operator} expects: real? real?")
 
             if node.op.type == LTE:
-                if is_num(first) and is_num(last):
+                if is_real(first) and is_real(last):
                     return first <= last
-                raise MyError(f"{operator} expects <num, num>")
-
-            if node.op.type == EQN:
-                if is_num(first) and is_num(last):
-                    return first == last
-                raise MyError(f"{operator} expects <num, num>")
+                raise MyError(f"{operator} expects: real? real?")
 
             if node.op.type == MCLIP:
                 if isinstance(first, int) and is_boolarr(last):
                     return remove_small(last, first, replace=1, with_=0)
-                raise MyError(f"{operator} expects <int, boolarr>")
+                raise MyError(f"{operator} expects: int boolarr")
 
             if node.op.type == MCUT:
                 if isinstance(first, int) and is_boolarr(last):
                     return remove_small(last, first, replace=0, with_=1)
-                raise MyError(f"{operator} expects <int, boolarr>")
+                raise MyError(f"{operator} expects: int boolarr")
 
             if node.op.type == MARGIN:
                 if isinstance(first, int) and is_boolarr(last):
                     _len = len(last)
                     return apply_margin(last, _len, first, first)
 
-                raise MyError(f"{operator} expects <int, boolarr>")
+                raise MyError(f"{operator} expects: int boolarr")
 
             if node.op.type == MOD:
                 if isinstance(first, int) and isinstance(last, int):
                     return first % last
 
-                raise MyError(f"{operator} expects <int, int>")
+                raise MyError(f"{operator} expects: int int")
 
             raise ValueError("Unreachable")
 
@@ -904,10 +928,10 @@ class Interpreter:
                     and isinstance(middle, int)
                     and is_boolarr(last)
                 ):
-                    # (cook mincut minclip boolarr)
+                    # mincut minclip boolarr
                     return cook(last, middle, first)
 
-                raise MyError(f"{operator} expects <int, int, boolarr>")
+                raise MyError(f"{operator} expects: int int boolarr")
 
             if node.op.type == MARGIN:
                 if (
@@ -918,7 +942,7 @@ class Interpreter:
                     _len = len(last)
                     return apply_margin(last, _len, first, middle)
 
-                raise MyError(f"{operator} expects <int, int, boolarr>")
+                raise MyError(f"{operator} expects: int int boolarr")
 
             raise ValueError("Unreachable")
 
@@ -927,26 +951,29 @@ class Interpreter:
             types: set[Any] = set()
             for child in node.children:
                 _val = self.visit(child)
-
-                if isinstance(_val, bool):
-                    types.add(bool)
-                elif isinstance(_val, int):
-                    types.add(int)
-                elif isinstance(_val, float):
-                    types.add(float)
-                elif isinstance(_val, Fraction):
-                    types.add(Fraction)
-                elif isinstance(_val, str):
-                    types.add(str)
-                elif isinstance(_val, np.ndarray):
-                    types.add(np.ndarray)
-
+                types.add(type(_val))
                 values.append(_val)
 
             if len(values) == 0:
                 return node.op
 
-            if node.op.type == BOOLARR and np.ndarray not in types and str not in types:
+            if node.op.type == EQN:
+                if {np.ndarray, str}.intersection(types):
+                    raise MyError(f"{node.op.name} expects: number?")
+
+                if len(values) == 0:
+                    raise MyError(
+                        f"{node.op.name}: Arity mismatch, expected at least 1"
+                    )
+
+                for i in range(1, len(values)):
+                    if values[0] != values[i]:
+                        return False
+                return True
+
+            if node.op.type == BOOLARR and not {np.ndarray, str, complex}.intersection(
+                types
+            ):
                 return np.array(values, dtype=np.bool_)
 
             if node.op.type == SA and types == {str}:
@@ -968,17 +995,19 @@ class Interpreter:
                 if node.op.type == XOR:
                     return reduce(lambda a, b: boolop(a, b, np.logical_xor), values)
 
-            if np.ndarray not in types and str not in types:
+            if not {np.ndarray, str}.intersection(types):
                 if node.op.type == PLUS:
                     return reduce(lambda a, b: a + b, values)
                 if node.op.type == MINUS:
+                    if len(values) == 1:
+                        return -values[0]
                     return reduce(lambda a, b: a - b, values)
                 if node.op.type == MUL:
                     return reduce(lambda a, b: a * b, values)
                 if node.op.type == DIV:
                     if len(values) == 1:
                         values.insert(0, 1)
-                    if float not in types:
+                    if not {float, complex}.intersection(types):
                         return reduce(lambda a, b: Fraction(a, b), values)
                     return reduce(lambda a, b: a / b, values)
 
