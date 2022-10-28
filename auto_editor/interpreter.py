@@ -54,9 +54,9 @@ class MyError(Exception):
 
 def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
     if len(a) > len(b):
-        b = np.resize(b, len(a))
+        b.resize(len(a), refcheck=False)
     if len(b) > len(a):
-        a = np.resize(a, len(b))
+        a.resize(len(b), refcheck=False)
 
     return call(a, b)
 
@@ -686,12 +686,7 @@ class Interpreter:
                 self.GLOBAL_SCOPE[var_name] = self.visit(node.children[1])
                 return None
 
-            values = []
-            types: set[Any] = set()
-            for child in node.children:
-                _val = self.visit(child)
-                types.add(type(_val))
-                values.append(_val)
+            values = [self.visit(child) for child in node.children]
 
             if node.op.type == LEN:
                 check_args(node.op, values, (1, 1), [is_boolarr])
@@ -783,10 +778,17 @@ class Interpreter:
                 return len(values[0])
             if node.op.type == NTS:
                 check_args(node.op, values, (1, 1), [is_num])
+                if isinstance(val := values[0], complex):
+                    join = "" if val.imag < 0 else "+"
+                    return f"{val.real}{join}{val.imag}i"
                 return str(values[0])
 
             if node.op.type == EQ:
                 check_args(node.op, values, (2, 2), None)
+                if isinstance(values[0], np.ndarray) or isinstance(
+                    values[1], np.ndarray
+                ):
+                    return np.array_equal(values[0], values[1])
                 if isinstance(values[0], float) and not isinstance(values[1], float):
                     return False
                 if isinstance(values[1], float) and not isinstance(values[0], float):
@@ -818,8 +820,11 @@ class Interpreter:
                 return remove_small(values[1], values[0], replace=0, with_=1)
 
             if node.op.type == MARGIN:
-                check_args(node.op, values, (2, 2), [exact_int, is_boolarr])
-                return apply_margin(values[1], len(values[1]), values[0], values[0])
+                if len(values) == 2:
+                    check_args(node.op, values, (2, 2), [exact_int, is_boolarr])
+                    return apply_margin(values[1], len(values[1]), values[0], values[0])
+                check_args(node.op, values, (3, 3), [exact_int, exact_int, is_boolarr])
+                return apply_margin(values[2], len(values[2]), values[0], values[1])
 
             if node.op.type == MOD:
                 check_args(node.op, values, (2, 2), [exact_int, exact_int])
@@ -846,64 +851,57 @@ class Interpreter:
                 check_args(node.op, values, (3, 3), [exact_int, exact_int, is_boolarr])
                 return cook(values[2], values[1], values[0])
 
-            if node.op.type == MARGIN:
-                check_args(node.op, values, (3, 3), [exact_int, exact_int, is_boolarr])
-                return apply_margin(values[2], len(values[2]), values[0], values[1])
-
             if node.op.type == EQN:
                 check_args(node.op, values, (1, None), [is_num])
-                for i in range(1, len(values)):
-                    if values[0] != values[i]:
-                        return False
-                return True
+                return all(values[0] == val for val in values[1:])
 
-            if node.op.type == BOOLARR and not {np.ndarray, str, complex}.intersection(
-                types
-            ):
+            if node.op.type == BOOLARR:
+                check_args(node.op, values, (1, None), [exact_int])
                 return np.array(values, dtype=np.bool_)
 
-            if node.op.type == SA and types == {str}:
-                return reduce(lambda a, b: a + b, values)
+            if node.op.type == SA:
+                check_args(node.op, values, (0, None), [is_str])
+                return reduce(lambda a, b: a + b, values, "")
 
-            if types == {bool}:
+            if node.op.type == XOR:
+                check_args(node.op, values, (2, None), None)
+                if is_boolarr(values[0]):
+                    check_args(node.op, values, (2, None), [is_boolarr])
+                    return reduce(lambda a, b: boolop(a, b, np.logical_xor), values)
+                check_args(node.op, values, (2, None), [is_bool])
+                return reduce(lambda a, b: a ^ b, values)
+
+            if node.op.type in (OR, AND):
+                check_args(node.op, values, (1, None), None)
+                if is_boolarr(values[0]):
+                    check_args(node.op, values, (2, None), [is_boolarr])
+                    if node.op.type == OR:
+                        return reduce(lambda a, b: boolop(a, b, np.logical_or), values)
+                    return reduce(lambda a, b: boolop(a, b, np.logical_and), values)
+                check_args(node.op, values, (1, None), [is_bool])
                 if node.op.type == OR:
                     return reduce(lambda a, b: a or b, values)
-                if node.op.type == AND:
-                    return reduce(lambda a, b: a and b, values)
-                if node.op.type == XOR:
-                    return reduce(lambda a, b: a ^ b, values)
+                return reduce(lambda a, b: a and b, values)
 
-            if types == {np.ndarray}:
-                if node.op.type == OR:
-                    return reduce(lambda a, b: boolop(a, b, np.logical_or), values)
-                if node.op.type == AND:
-                    return reduce(lambda a, b: boolop(a, b, np.logical_and), values)
-                if node.op.type == XOR:
-                    return reduce(lambda a, b: boolop(a, b, np.logical_xor), values)
+            if node.op.type == PLUS:
+                check_args(node.op, values, (0, None), [is_num])
+                return sum(values)
+            if node.op.type == MUL:
+                check_args(node.op, values, (0, None), [is_num])
+                return reduce(lambda a, b: a * b, values, 1)
 
-            if not {np.ndarray, str}.intersection(types):
-                if node.op.type == PLUS:
-                    if len(values) == 0:
-                        return 0
-                    return reduce(lambda a, b: a + b, values)
-                if node.op.type == MINUS:
-                    if len(values) == 0:
-                        raise MyError("-: Arity mismatch, expected 1")
-                    if len(values) == 1:
-                        return -values[0]
-                    return reduce(lambda a, b: a - b, values)
-                if node.op.type == MUL:
-                    if len(values) == 0:
-                        return 1
-                    return reduce(lambda a, b: a * b, values)
-                if node.op.type == DIV:
-                    if len(values) == 0:
-                        raise MyError("/: Arity mismatch, expected 1")
-                    if len(values) == 1:
-                        values.insert(0, 1)
-                    if not {float, complex}.intersection(types):
-                        return reduce(lambda a, b: Fraction(a, b), values)
-                    return reduce(lambda a, b: a / b, values)
+            if node.op.type == MINUS:
+                check_args(node.op, values, (1, None), [is_num])
+                if len(values) == 1:
+                    return -values[0]
+                return reduce(lambda a, b: a - b, values)
+            if node.op.type == DIV:
+                check_args(node.op, values, (1, None), [is_num])
+                if len(values) == 1:
+                    values.insert(0, 1)
+                if not {float, complex}.intersection({type(val) for val in values}):
+                    return reduce(lambda a, b: Fraction(a, b), values)
+                return reduce(lambda a, b: a / b, values)
 
             raise MyError(f"{node.op.value} got wrong type")
 
