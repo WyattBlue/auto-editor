@@ -689,6 +689,10 @@ def main(sys_args: list[str] | None = None):
         my_try("(+)", 0)
         my_try("(*)", 1)
         my_try('(define num 13) ; Set number to 13\n"Hello"', "Hello")
+        my_try('(if #t "Hello" apple)', "Hello")
+        my_try('(if #f mango "Hi")', "Hi")
+        my_try('{if (= [+ 3 4] 7) "yes" "no"}', "yes")
+        my_try("(when (positive? 3) 17)", 17)
         my_try(
             "(margin 0 (boolarr 0 0 0 1 0 0 0))",
             np.array([0, 0, 0, 1, 0, 0, 0], dtype=np.bool_),
