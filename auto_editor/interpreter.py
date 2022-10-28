@@ -146,8 +146,9 @@ METHODS = ("audio", "motion", "pixeldiff", "random", "none", "all")
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 METHOD_ATTRS_SEP = ":"
 
-DEF, SET, ID, DIS = "DEF", "SET", "ID", "DIS"
+DEF, SET, ID, DIS, IF, WHEN = "DEF", "SET", "ID", "DIS", "IF", "WHEN"
 NUM, STR, ARR, SEC, LPAREN, RPAREN, EOF = "NUM", "STR", "ARR", "SEC", "(", ")", "EOF"
+LBRAC, RBRAC, LCUR, RCUR = "[", "]", "{", "}"
 NOT, OR, AND, XOR, BOOL = "NOT", "OR", "AND", "XOR", "BOOL"
 PLUS, MINUS, MUL, DIV = "PLUS", "MINUS", "MUL", "DIV"
 ROND, EROND, CEIL, ECEIL, FLR, EFLR = "ROND", "EROND", "CEIL", "ECEIL", "FLR", "EFLR"
@@ -162,6 +163,8 @@ LEN, CNZ, EXACTQ, NTS, EINT = "LEN", "CNZ", "EXACTQ", "NTS", "EINT"
 func_map = {
     "define": DEF,
     "set!": SET,
+    "if": IF,
+    "when": WHEN,
     "length": LEN,
     "display": DIS,
     "not": NOT,
@@ -240,10 +243,7 @@ class Lexer:
             self.char = self.text[self.pos]
 
     def char_is_norm(self) -> bool:
-        # , and # need to be included to not cause infinite loop
-        return (
-            self.char is not None and self.char not in "()[]{}\"'`;|\\ \t\n\r\x0b\x0c"
-        )
+        return self.char is not None and self.char not in '()[]{}"; \t\n\r\x0b\x0c'
 
     def advance(self) -> None:
         self.pos += 1
@@ -349,12 +349,11 @@ class Lexer:
             if self.char == '"':
                 self.advance()
                 return Token(STR, self.string())
-            if self.char == "(":
+
+            if self.char in "(){}[]":
+                _par = self.char
                 self.advance()
-                return Token(LPAREN, "(")
-            if self.char == ")":
-                self.advance()
-                return Token(RPAREN, ")")
+                return Token(_par, _par)
 
             if self.char in "+-":
                 _peek = self.peek()
@@ -365,8 +364,14 @@ class Lexer:
                 return self.number()
 
             result = ""
+            has_hash = False
+            has_illegal = False
             while self.char_is_norm():
                 result += self.char
+                if self.char == "#":
+                    has_hash = True
+                if self.char in "'`|\\":
+                    has_illegal = True
                 self.advance()
 
             if result in ("#t", "#true"):
@@ -379,6 +384,12 @@ class Lexer:
             for method in METHODS:
                 if result == method or result.startswith(method + ":"):
                     return Token(ARR, result)
+
+            if has_illegal:
+                raise MyError(f"Token has illegal character(s): {result}")
+
+            if has_hash:
+                raise MyError(f"Unknown hash literal: {result}")
 
             return Token(ID, result)
 
@@ -489,7 +500,7 @@ class Parser:
 
     def comp(self) -> Compound:
         comp_kids = []
-        while self.current_token.type not in (EOF, RPAREN):
+        while self.current_token.type not in (EOF, RPAREN, RBRAC, RCUR):
             comp_kids.append(self.expr())
         return Compound(comp_kids)
 
@@ -516,19 +527,36 @@ class Parser:
                 ],
             )
 
-        if token.type == LPAREN:
-            self.eat(LPAREN)
+        def check_func():
             if self.current_token.type in (ARR, BOOL, NUM, STR, SEC):
                 raise MyError("Expected procedure")
+
+        if token.type == LPAREN:
+            self.eat(LPAREN)
+            check_func()
             node = self.expr()
             self.eat(RPAREN)
+            return node
+
+        if token.type == LBRAC:
+            self.eat(LBRAC)
+            check_func()
+            node = self.expr()
+            self.eat(RBRAC)
+            return node
+
+        if token.type == LCUR:
+            self.eat(LCUR)
+            check_func()
+            node = self.expr()
+            self.eat(RCUR)
             return node
 
         token = self.current_token
         self.eat(token.type)
 
         childs = []
-        while self.current_token.type not in (RPAREN, EOF):
+        while self.current_token.type not in (RPAREN, RBRAC, RCUR, EOF):
             childs.append(self.expr())
 
         return ManyOp(token, children=childs)
@@ -686,6 +714,24 @@ class Interpreter:
                 self.GLOBAL_SCOPE[var_name] = self.visit(node.children[1])
                 return None
 
+            if node.op.type == IF:
+                check_args(node.op, node.children, (3, 3), None)
+                test_expr = self.visit(node.children[0])
+                if not isinstance(test_expr, bool):
+                    raise MyError(f"if: test-expr arg must be: boolean?")
+                if test_expr:
+                    return self.visit(node.children[1])
+                return self.visit(node.children[2])
+
+            if node.op.type == WHEN:
+                check_args(node.op, node.children, (2, 2), None)
+                test_expr = self.visit(node.children[0])
+                if not isinstance(test_expr, bool):
+                    raise MyError(f"when: test-expr arg must be: boolean?")
+                if test_expr:
+                    return self.visit(node.children[1])
+                return None
+
             values = [self.visit(child) for child in node.children]
 
             if node.op.type == LEN:
@@ -720,7 +766,7 @@ class Interpreter:
                 return is_bool(values[0])
             if node.op.type == BOOLARRQ:
                 check_args(node.op, values, (1, 1), None)
-                return is_boolarr(val)
+                return is_boolarr(values[0])
 
             if node.op.type == ZERO:
                 check_args(node.op, values, (1, 1), [is_real])
@@ -899,9 +945,12 @@ class Interpreter:
                 check_args(node.op, values, (1, None), [is_num])
                 if len(values) == 1:
                     values.insert(0, 1)
-                if not {float, complex}.intersection({type(val) for val in values}):
-                    return reduce(lambda a, b: Fraction(a, b), values)
-                return reduce(lambda a, b: a / b, values)
+                try:
+                    if not {float, complex}.intersection({type(val) for val in values}):
+                        return reduce(lambda a, b: Fraction(a, b), values)
+                    return reduce(lambda a, b: a / b, values)
+                except ZeroDivisionError:
+                    raise MyError("division by zero")
 
             raise MyError(f"{node.op.value} got wrong type")
 
