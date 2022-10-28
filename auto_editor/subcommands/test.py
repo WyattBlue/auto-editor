@@ -12,6 +12,8 @@ from fractions import Fraction
 from time import perf_counter
 from typing import Callable
 
+import numpy as np
+
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import Interpreter, Lexer, MyError, Parser
 from auto_editor.output import Ensure
@@ -122,7 +124,7 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
         clean(os.getcwd())
 
     if args.only != []:
-        tests = list(filter(lambda t: t.__name__ in args.only, tests))
+        tests = filter(lambda t: t.__name__ in args.only, tests)
 
     total_time = 0
 
@@ -645,7 +647,10 @@ def main(sys_args: list[str] | None = None):
             except MyError as e:
                 raise ValueError(f"{text}\nMyError: {e}")
 
-            if expected != results[-1]:
+            if isinstance(expected, np.ndarray):
+                if not np.array_equal(expected, results[-1]):
+                    raise ValueError(f"{text}: Numpy arrays don't match")
+            elif expected != results[-1]:
                 raise ValueError(f"{text}: Expected: {expected}, got {results[-1]}")
 
         my_try("345", 345)
@@ -684,6 +689,24 @@ def main(sys_args: list[str] | None = None):
         my_try("(+)", 0)
         my_try("(*)", 1)
         my_try('(define num 13) ; Set number to 13\n"Hello"', "Hello")
+        my_try(
+            "(margin 0 (boolarr 0 0 0 1 0 0 0))",
+            np.array([0, 0, 0, 1, 0, 0, 0], dtype=np.bool_),
+        )
+        my_try(
+            "(margin -2 2 (boolarr 0 0 1 1 0 0 0))",
+            np.array([0, 0, 0, 0, 1, 1, 0], dtype=np.bool_),
+        )
+        my_try("(equal? 3 3)", True)
+        my_try("(equal? 3 3.0)", False)
+        my_try('(equal? 16.3 "Editor")', False)
+        my_try("(equal? (boolarr 1 1 0) (boolarr 1 1 0))", True)
+        my_try("(equal? (boolarr 0 1 0) (boolarr 1 1 0))", False)
+        my_try("(equal? (boolarr 0 1 0) (boolarr 0 1 0 0))", False)
+        my_try(
+            "(or (boolarr 1 0 0) (boolarr 0 0 0 1))",
+            np.array([1, 0, 0, 1], dtype=np.bool_),
+        )
 
     tests = []
 

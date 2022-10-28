@@ -149,20 +149,20 @@ Behind the scenes, margin is a function that operates on boolean arrays
 
 Here is a list of examples on how margin mutates boolean arrays
 
-(margin 0 0 [0001000])
-> [0001000]
+(margin 0 0 (boolarr 0 0 0 1 0 0 0))
+> (boolarr 0 0 0 1 0 0 0)
 
-(margin 1 0 [0001000])
-> [0011000]
+(margin 1 0 (boolarr 0 0 0 1 0 0 0))
+> (boolarr 0 0 1 1 0 0 0)
 
-(margin 1 1 [0001000])
-> [0011100]
+(margin 1 1 (boolarr 0 0 0 1 0 0 0))
+> (boolarr 0 0 1 1 1 0 0)
 
-(margin 1 2 [0011000010])
-> [0111110111]
+(margin 1 2 (boolarr 0 0 1 1 0 0 0 0 1 0))
+> (boolarr 0 1 1 1 1 1 0 1 1 1)
 
-(margin -2 2 [0011000])
-> [0000110]
+(margin -2 2 (boolarr 0 0 1 1 0 0 0))
+> (boolarr 0 0 0 0 1 1 0)
 """.strip(),
         "--silent-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
         "--video-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
