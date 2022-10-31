@@ -52,11 +52,32 @@ class MyError(Exception):
     pass
 
 
+class CharType:
+    __slots__ = ("val")
+
+    def __init__(self, val: str):
+        assert len(val) == 1
+        self.val = val
+
+    __str__: Callable[[CharType], str] = lambda self: self.val
+
+    def __repr__(self) -> str:
+        names = {" ": "space", "\n": "newline", "\t": "tab"}
+        return f"#\\{self.val}" if self.val not in names else f"#\\{names[self.val]}"
+
+    def __radd__(self, obj2: str) -> str:
+        return obj2 + self.val
+
+
 def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
     if len(a) > len(b):
-        b.resize(len(a), refcheck=False)
+        k = np.copy(b)
+        k.resize(len(a))
+        b = k
     if len(b) > len(a):
-        a.resize(len(b), refcheck=False)
+        k = np.copy(a)
+        k.resize(len(b))
+        a = k
 
     return call(a, b)
 
@@ -108,6 +129,11 @@ def is_str(val: object) -> bool:
     return isinstance(val, str)
 
 
+def is_char(val: object) -> bool:
+    """char?"""
+    return isinstance(val, CharType)
+
+
 def check_args(
     op: Token, values: list[Any], arity: tuple[int, int | None], types: list[Any] | None
 ) -> None:
@@ -147,8 +173,8 @@ SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 METHOD_ATTRS_SEP = ":"
 
 DEF, SET, ID, DIS, IF, WHEN = "DEF", "SET", "ID", "DIS", "IF", "WHEN"
-NUM, STR, ARR, SEC, LPAREN, RPAREN, EOF = "NUM", "STR", "ARR", "SEC", "(", ")", "EOF"
-LBRAC, RBRAC, LCUR, RCUR = "[", "]", "{", "}"
+NUM, STR, ARR, SEC, CHAR, EOF = "NUM", "STR", "ARR", "SEC", "CHAR", "EOF"
+LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR =  "(", ")", "[", "]", "{", "}"
 NOT, OR, AND, XOR, BOOL = "NOT", "OR", "AND", "XOR", "BOOL"
 PLUS, MINUS, MUL, DIV = "PLUS", "MINUS", "MUL", "DIV"
 ROND, EROND, CEIL, ECEIL, FLR, EFLR = "ROND", "EROND", "CEIL", "ECEIL", "FLR", "EFLR"
@@ -158,14 +184,14 @@ NUMQ, REALQ, STRQ, BOOLQ, BOOLARRQ = "NUMQ", "REALQ", "STRQ", "BOOLQ", "BOOLARRQ
 EQN, GR, LT, GRE, LTE = "EQN", "GR", "LT", "GRE", "LTE"
 SQRT, POS, NEG, ZERO, EQ = "SQRT", "POS", "NEG", "ZERO", "EQ"
 MARGIN, MCUT, MCLIP, COOK, BOOLARR = "MARGIN", "MCUT", "MCLIP", "COOK", "BOOLARR"
-LEN, CNZ, EXACTQ, NTS, EINT = "LEN", "CNZ", "EXACTQ", "NTS", "EINT"
+ALEN, CNZ, EXACTQ, NTS, EINT = "ALEN", "CNZ", "EXACTQ", "NTS", "EINT"
+CHARQ, SR, STRF = "CHARQ", "SR", "STRF"
 
 func_map = {
     "define": DEF,
     "set!": SET,
     "if": IF,
     "when": WHEN,
-    "length": LEN,
     "display": DIS,
     "not": NOT,
     "or": OR,
@@ -191,16 +217,19 @@ func_map = {
     "sqrt": SQRT,
     "add1": A1,
     "sub1": S1,
+    "string": STRF,
     "string-append": SA,
     "string-upcase": SU,
     "string-downcase": SD,
     "string-titlecase": ST,
     "string-length": SL,
+    "string-ref": SR,
     "number->string": NTS,
     "number?": NUMQ,
     "real?": REALQ,
     "exact-integer?": EINT,
     "string?": STRQ,
+    "char?": CHARQ,
     "exact?": EXACTQ,
     "boolean?": BOOLQ,
     "positive?": POS,
@@ -216,6 +245,7 @@ func_map = {
     "cook": COOK,
     "boolarr": BOOLARR,
     "boolarr?": BOOLARRQ,
+    "array-length": ALEN,
     "count-nonzero": CNZ,
 }
 
@@ -227,9 +257,7 @@ class Token:
         self.type = type
         self.value = value
 
-    def __str__(self) -> str:
-        return f"(Token {self.type} {self.value})"
-
+    __str__: Callable[[Token], str] = lambda self: f"(Token {self.type} {self.value})"
 
 class Lexer:
     __slots__ = ("log", "text", "pos", "char")
@@ -335,6 +363,31 @@ class Lexer:
         except ValueError:
             return Token(ID, result + unit)
 
+
+    def hash_literal(self) -> Token:
+        if self.char == "\\":
+            self.advance()
+            if self.char is None:
+                raise MyError("Expected a character after #\\")
+
+            char = self.char
+            self.advance()
+            return Token(CHAR, CharType(char))
+
+        result = ""
+        while self.char_is_norm():
+            assert self.char is not None
+            result += self.char
+            self.advance()
+
+        if result in ("t", "true"):
+            return Token(BOOL, True)
+
+        if result in ("f", "false"):
+            return Token(BOOL, False)
+
+        raise MyError(f"Unknown hash literal: {result}")
+
     def get_next_token(self) -> Token:
         while self.char is not None:
             self.skip_whitespace()
@@ -363,33 +416,27 @@ class Lexer:
             if self.char in "0123456789.":
                 return self.number()
 
+            if self.char == "#":
+                self.advance()
+                return self.hash_literal()
+
             result = ""
-            has_hash = False
             has_illegal = False
             while self.char_is_norm():
                 result += self.char
-                if self.char == "#":
-                    has_hash = True
                 if self.char in "'`|\\":
                     has_illegal = True
                 self.advance()
 
-            if result in ("#t", "#true"):
-                return Token(BOOL, True)
-            if result in ("#f", "#false"):
-                return Token(BOOL, False)
+            if has_illegal:
+                raise MyError(f"Token has illegal character(s): {result}")
+
             if result in func_map:
                 return Token(func_map[result], result)
 
             for method in METHODS:
                 if result == method or result.startswith(method + ":"):
                     return Token(ARR, result)
-
-            if has_illegal:
-                raise MyError(f"Token has illegal character(s): {result}")
-
-            if has_hash:
-                raise MyError(f"Unknown hash literal: {result}")
 
             return Token(ID, result)
 
@@ -442,8 +489,7 @@ class Var(Atom):
         self.token = token
         self.value = token.value
 
-    def __str__(self) -> str:
-        return f"(Var {self.value})"
+    __str__: Callable[[Var], str] = lambda self: f"(Var {self.value})"
 
 
 class Num(Atom):
@@ -452,8 +498,7 @@ class Num(Atom):
     def __init__(self, val: int | float | Fraction | complex):
         self.val = val
 
-    def __str__(self) -> str:
-        return f"(num {self.val})"
+    __str__: Callable[[Num], str] = lambda self: f"(num {self.val})"
 
 
 class Bool(Atom):
@@ -462,9 +507,7 @@ class Bool(Atom):
     def __init__(self, val: bool):
         self.val = val
 
-    def __str__(self) -> str:
-        b = "#t" if self.val else "#f"
-        return f"(bool {b})"
+    __str__: Callable[[Bool], str] = lambda self: f"(bool {'#t' if self.val else '#f'})"
 
 
 class Str(Atom):
@@ -473,9 +516,16 @@ class Str(Atom):
     def __init__(self, val: str):
         self.val = val
 
-    def __str__(self) -> str:
-        return f"(str {self.val})"
+    __str__: Callable[[Str], str] = lambda self: f"(str {self.val})"
 
+
+class Char(Atom):
+    __slots__ = "val"
+
+    def __init__(self, val: str):
+        self.val = val
+
+    __str__: Callable[[Char], str] = lambda self: f"(char {self.val})"
 
 class BoolArr(Atom):
     __slots__ = "val"
@@ -483,8 +533,7 @@ class BoolArr(Atom):
     def __init__(self, val: str):
         self.val = val
 
-    def __str__(self) -> str:
-        return f"(boolarr {self.val})"
+    __str__: Callable[[BoolArr], str] = lambda self: f"(boolarr {self.val})"
 
 
 class Parser:
@@ -511,7 +560,7 @@ class Parser:
             self.eat(ID)
             return Var(token)
 
-        matches = {ARR: BoolArr, BOOL: Bool, NUM: Num, STR: Str}
+        matches = {ARR: BoolArr, BOOL: Bool, NUM: Num, STR: Str, CHAR: Char}
         if token.type in matches:
             self.eat(token.type)
             return matches[token.type](token.value)
@@ -527,7 +576,7 @@ class Parser:
                 ],
             )
 
-        def check_func():
+        def check_func() -> None:
             if self.current_token.type in (ARR, BOOL, NUM, STR, SEC):
                 raise MyError("Expected procedure")
 
@@ -611,7 +660,7 @@ class Interpreter:
 
     def visit(self, node: Node) -> Any:
         if isinstance(node, Atom):
-            if isinstance(node, (Num, Str, Bool)):
+            if isinstance(node, (Num, Str, Bool, Char)):
                 return node.val
 
             if isinstance(node, Var):
@@ -734,7 +783,7 @@ class Interpreter:
 
             values = [self.visit(child) for child in node.children]
 
-            if node.op.type == LEN:
+            if node.op.type == ALEN:
                 check_args(node.op, values, (1, 1), [is_boolarr])
                 return len(values[0])
             if node.op.type == CNZ:
@@ -764,10 +813,16 @@ class Interpreter:
             if node.op.type == BOOLQ:
                 check_args(node.op, values, (1, 1), None)
                 return is_bool(values[0])
+            if node.op.type == CHARQ:
+                check_args(node.op, values, (1, 1), None)
+                return is_char(values[0])
             if node.op.type == BOOLARRQ:
                 check_args(node.op, values, (1, 1), None)
                 return is_boolarr(values[0])
 
+            if node.op.type == STRF:
+                check_args(node.op, values, (0, None), [is_char])
+                return reduce(lambda a, b: a + b, values, "")
             if node.op.type == ZERO:
                 check_args(node.op, values, (1, 1), [is_real])
                 return values[0] == 0
@@ -822,6 +877,12 @@ class Interpreter:
             if node.op.type == SL:
                 check_args(node.op, values, (1, 1), [is_str])
                 return len(values[0])
+            if node.op.type == SR:
+                check_args(node.op, values, (2, 2), [is_str, is_real])
+                try:
+                    return CharType(values[0][values[1]])
+                except IndexError:
+                    raise MyError(f"string index {values[1]} is out of range")
             if node.op.type == NTS:
                 check_args(node.op, values, (1, 1), [is_num])
                 if isinstance(val := values[0], complex):
@@ -859,18 +920,20 @@ class Interpreter:
 
             if node.op.type == MCLIP:
                 check_args(node.op, values, (2, 2), [exact_int, is_boolarr])
-                return remove_small(values[1], values[0], replace=1, with_=0)
+                return remove_small(np.copy(values[1]), values[0], replace=1, with_=0)
 
             if node.op.type == MCUT:
                 check_args(node.op, values, (2, 2), [exact_int, is_boolarr])
-                return remove_small(values[1], values[0], replace=0, with_=1)
+                return remove_small(np.copy(values[1]), values[0], replace=0, with_=1)
 
             if node.op.type == MARGIN:
                 if len(values) == 2:
                     check_args(node.op, values, (2, 2), [exact_int, is_boolarr])
-                    return apply_margin(values[1], len(values[1]), values[0], values[0])
+                    arr = np.copy(values[1])
+                    return apply_margin(arr, len(arr), values[0], values[0])
                 check_args(node.op, values, (3, 3), [exact_int, exact_int, is_boolarr])
-                return apply_margin(values[2], len(values[2]), values[0], values[1])
+                arr = np.copy(values[2])
+                return apply_margin(arr, len(arr), values[0], values[1])
 
             if node.op.type == MOD:
                 check_args(node.op, values, (2, 2), [exact_int, exact_int])
@@ -895,7 +958,7 @@ class Interpreter:
 
             if node.op.type == COOK:
                 check_args(node.op, values, (3, 3), [exact_int, exact_int, is_boolarr])
-                return cook(values[2], values[1], values[0])
+                return cook(np.copy(values[2]), values[1], values[0])
 
             if node.op.type == EQN:
                 check_args(node.op, values, (1, None), [is_num])

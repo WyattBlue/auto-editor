@@ -29,10 +29,10 @@ auto-editor example.mp4 --edit motion:threshold=2%</code>
 <code>auto-editor example.mp4</code>
 
 <code><i># Different tracks can be set with different attributes</i></code>
-<code>auto-editor multi-track.mov --edit 'audio:stream=0 or audio:threshold=10%,stream=1'</code>
+<code>auto-editor multi-track.mov --edit '(or audio:stream=0 audio:threshold=10%,stream=1)'</code>
 
 <code><i># Different editing methods can be used together.</i></code>
-<code>auto-editor example.mp4 --edit 'audio:threshold=3% or motion:threshold=6%'</code>
+<code>auto-editor example.mp4 --edit '(or audio:threshold=3% motion:threshold=6%)'</code>
 </pre>
 
 <h2>Exporting to Editors</h2>
