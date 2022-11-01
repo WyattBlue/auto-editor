@@ -11,7 +11,14 @@ import numpy as np
 
 import auto_editor
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import Interpreter, Lexer, MyError, Parser, print_arr
+from auto_editor.interpreter import (
+    FileSetup,
+    Interpreter,
+    Lexer,
+    MyError,
+    Parser,
+    print_arr,
+)
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.func import setup_tempdir
@@ -74,22 +81,25 @@ def display_val(val: Any) -> str:
 
 
 def main(sys_args: list[str]) -> None:
-    parser = repl_options(ArgumentParser("levels"))
+    parser = repl_options(ArgumentParser(None))
     args = parser.parse_args(REPL_Args, sys_args)
 
-    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
-    temp = setup_tempdir(args.temp_dir, Log())
-    log = Log(quiet=True, temp=temp)
-    strict = len(args.input) < 2
+    if len(args.input) == 0:
+        filesetup = None
+        log = Log(quiet=True)
+    else:
+        temp = setup_tempdir(args.temp_dir, Log())
+        log = Log(quiet=True, temp=temp)
+        ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
+        strict = len(args.input) < 2
+        sources = {}
+        for i, path in enumerate(args.input):
+            sources[str(i)] = FileInfo(path, ffmpeg, log, str(i))
 
-    sources = {}
-    for i, path in enumerate(args.input):
-        sources[str(i)] = FileInfo(path, ffmpeg, log, str(i))
-
-    src = sources["0"]
-    tb = src.get_fps() if args.timebase is None else args.timebase
-    ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
-    bar = Bar("none")
+        src = sources["0"]
+        tb = src.get_fps() if args.timebase is None else args.timebase
+        ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
+        filesetup = FileSetup(src, ensure, strict, tb, Bar("none"), temp, log)
 
     print(f"Auto-Editor {auto_editor.version} ({auto_editor.__version__})")
 
@@ -105,9 +115,7 @@ def main(sys_args: list[str]) -> None:
                 continue
 
             try:
-                interpreter = Interpreter(
-                    parser, src, ensure, strict, tb, bar, temp, log
-                )
+                interpreter = Interpreter(parser, filesetup)
                 result = interpreter.interpret()
                 if isinstance(result, list):
                     for item in result:

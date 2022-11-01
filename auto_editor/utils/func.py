@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import overload
+from typing import overload, Callable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -10,11 +10,26 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import time
 
 BoolList = NDArray[np.bool_]
+BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
 """
 To prevent duplicate code being pasted between scripts, common functions should be
 put here. Every function should be pure with no side effects.
 """
+
+
+def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
+    if len(a) > len(b):
+        k = np.copy(b)
+        k.resize(len(a))
+        b = k
+    if len(b) > len(a):
+        k = np.copy(a)
+        k.resize(len(b))
+        a = k
+
+    return call(a, b)
+
 
 
 def setup_tempdir(temp: str | None, log: Log) -> str:

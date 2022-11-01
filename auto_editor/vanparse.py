@@ -121,7 +121,7 @@ def to_key(op: Options | Required) -> str:
     return op.names[0][:2].replace("-", "") + op.names[0][2:].replace("-", "_")
 
 
-def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
+def print_option_help(program_name: str | None, ns_obj: T, option: Options) -> None:
     text = f"  {', '.join(option.names)} {'' if option.metavar is None else option.metavar}\n\n"
 
     if option.flag:
@@ -144,7 +144,7 @@ def print_option_help(program_name: str, ns_obj: T, option: Options) -> None:
 
     from auto_editor.help import data
 
-    if option.names[0] in data[program_name]:
+    if program_name is not None and option.names[0] in data[program_name]:
         text += indent(data[program_name][option.names[0]], "    ") + "\n"
     else:
         text += f"    {option.help}\n\n"
@@ -179,7 +179,7 @@ def parse_value(option: Options | Required, val: str | None) -> Any:
 
 
 class ArgumentParser:
-    def __init__(self, program_name: str) -> None:
+    def __init__(self, program_name: str | None):
         self.program_name = program_name
         self.requireds: list[Required] = []
         self.options: list[Options] = []
@@ -202,7 +202,7 @@ class ArgumentParser:
         sys_args: list[str],
         macros: list[tuple[set[str], list[str]]] | None = None,
     ) -> T:
-        if len(sys_args) == 0:
+        if len(sys_args) == 0 and self.program_name is not None:
             from auto_editor.help import data
 
             out(data[self.program_name]["_"])

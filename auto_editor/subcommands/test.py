@@ -622,27 +622,12 @@ def main(sys_args: list[str] | None = None):
         return out
 
     def inter():
-        ffmpeg = FFmpeg("ffmpeg", True, False)
-        temp = setup_tempdir(None, Log())
-        log = Log(quiet=True, temp=temp)
-        strict = True
-
-        sources = {}
-        for i, path in enumerate(["example.mp4"]):
-            sources[str(i)] = FileInfo(path, ffmpeg, log, str(i))
-        src = sources["0"]
-
-        tb = src.get_fps()
-        ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
-        bar = Bar("none")
-
         def my_try(text: str, expected: Any) -> Any:
             try:
                 lexer = Lexer(text)
                 parser = Parser(lexer)
-                interpreter = Interpreter(
-                    parser, src, ensure, strict, tb, bar, temp, log
-                )
+                interpreter = Interpreter(parser, None)
+                interpreter.GLOBAL_SCOPE["timebase"] = Fraction(30)
                 results = interpreter.interpret()
             except MyError as e:
                 raise ValueError(f"{text}\nMyError: {e}")
