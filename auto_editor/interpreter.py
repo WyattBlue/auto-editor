@@ -3,33 +3,15 @@ from __future__ import annotations
 import cmath
 import math
 import sys
+from dataclasses import dataclass
 from fractions import Fraction
 from functools import reduce
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from auto_editor.analyze import (
-    audio_levels,
-    get_all,
-    get_none,
-    motion_levels,
-    pixeldiff_levels,
-    random_levels,
-    to_threshold,
-)
-from auto_editor.objs.edit import (
-    Audio,
-    Motion,
-    Pixeldiff,
-    Random,
-    audio_builder,
-    motion_builder,
-    pixeldiff_builder,
-    random_builder,
-)
-from auto_editor.objs.util import _Vars, parse_dataclass
-from auto_editor.utils.func import apply_margin, cook, remove_small
+from auto_editor.analyze import edit_method
+from auto_editor.utils.func import apply_margin, cook, remove_small, boolop
 
 if TYPE_CHECKING:
     from fractions import Fraction
@@ -42,10 +24,7 @@ if TYPE_CHECKING:
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
 
-    BoolList = NDArray[np.bool_]
-    BoolOperand = Callable[[BoolList, BoolList], BoolList]
-
-    Node = Union[Compound, Var, ManyOp, Num, Str, Bool, BoolArr]
+    Node = Union[Compound, ManyOp, Var, Num, Str, Bool, BoolArr]
 
 
 class MyError(Exception):
@@ -53,7 +32,7 @@ class MyError(Exception):
 
 
 class CharType:
-    __slots__ = ("val")
+    __slots__ = "val"
 
     def __init__(self, val: str):
         assert len(val) == 1
@@ -69,20 +48,7 @@ class CharType:
         return obj2 + self.val
 
 
-def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
-    if len(a) > len(b):
-        k = np.copy(b)
-        k.resize(len(a))
-        b = k
-    if len(b) > len(a):
-        k = np.copy(a)
-        k.resize(len(b))
-        a = k
-
-    return call(a, b)
-
-
-def print_arr(arr: BoolList) -> str:
+def print_arr(arr: NDArray[np.bool_]) -> str:
     rs = "(boolarr"
     for item in arr:
         rs += " 1" if item else " 0"
@@ -174,7 +140,7 @@ METHOD_ATTRS_SEP = ":"
 
 DEF, SET, ID, DIS, IF, WHEN = "DEF", "SET", "ID", "DIS", "IF", "WHEN"
 NUM, STR, ARR, SEC, CHAR, EOF = "NUM", "STR", "ARR", "SEC", "CHAR", "EOF"
-LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR =  "(", ")", "[", "]", "{", "}"
+LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR = "(", ")", "[", "]", "{", "}"
 NOT, OR, AND, XOR, BOOL = "NOT", "OR", "AND", "XOR", "BOOL"
 PLUS, MINUS, MUL, DIV = "PLUS", "MINUS", "MUL", "DIV"
 ROND, EROND, CEIL, ECEIL, FLR, EFLR = "ROND", "EROND", "CEIL", "ECEIL", "FLR", "EFLR"
@@ -258,6 +224,7 @@ class Token:
         self.value = value
 
     __str__: Callable[[Token], str] = lambda self: f"(Token {self.type} {self.value})"
+
 
 class Lexer:
     __slots__ = ("log", "text", "pos", "char")
@@ -362,7 +329,6 @@ class Lexer:
             return Token(token, int(result))
         except ValueError:
             return Token(ID, result + unit)
-
 
     def hash_literal(self) -> Token:
         if self.char == "\\":
@@ -527,6 +493,7 @@ class Char(Atom):
 
     __str__: Callable[[Char], str] = lambda self: f"(char {self.val})"
 
+
 class BoolArr(Atom):
     __slots__ = "val"
 
@@ -627,6 +594,17 @@ class Parser:
 ###############################################################################
 
 
+@dataclass
+class FileSetup:
+    src: FileInfo
+    ensure: Ensure
+    strict: bool
+    tb: Fraction
+    bar: Bar
+    temp: str
+    log: Log
+
+
 class Interpreter:
 
     GLOBAL_SCOPE: dict[str, Any] = {
@@ -635,28 +613,12 @@ class Interpreter:
         "pi": math.pi,
     }
 
-    def __init__(
-        self,
-        parser: Parser,
-        src: FileInfo,
-        ensure: Ensure,
-        strict: bool,
-        tb: Fraction,
-        bar: Bar,
-        temp: str,
-        log: Log,
-    ):
-
+    def __init__(self, parser: Parser, filesetup: FileSetup | None):
         self.parser = parser
-        self.src = src
-        self.ensure = ensure
-        self.strict = strict
-        self.tb = tb
-        self.bar = bar
-        self.temp = temp
-        self.log = log
+        self.filesetup = filesetup
 
-        self.GLOBAL_SCOPE["timebase"] = self.tb
+        if filesetup is not None:
+            self.GLOBAL_SCOPE["timebase"] = filesetup.tb
 
     def visit(self, node: Node) -> Any:
         if isinstance(node, Atom):
@@ -670,80 +632,9 @@ class Interpreter:
                 return val
 
             if isinstance(node, BoolArr):
-                src, ensure, strict, tb = self.src, self.ensure, self.strict, self.tb
-                bar, temp, log = self.bar, self.temp, self.log
-
-                if METHOD_ATTRS_SEP in node.val:
-                    method, attrs = node.val.split(METHOD_ATTRS_SEP)
-                    if method not in METHODS:
-                        log.error(f"'{method}' not allowed to have attributes")
-                else:
-                    method, attrs = node.val, ""
-
-                if method == "none":
-                    return get_none(ensure, src, tb, temp, log)
-
-                if method == "all":
-                    return get_all(ensure, src, tb, temp, log)
-
-                if method == "random":
-                    robj = parse_dataclass(attrs, (Random, random_builder), log)
-                    return to_threshold(
-                        random_levels(ensure, src, robj, tb, temp, log), robj.threshold
-                    )
-
-                if method == "audio":
-                    aobj = parse_dataclass(attrs, (Audio, audio_builder), log)
-                    s = aobj.stream
-                    if s == "all":
-                        total_list: BoolList | None = None
-                        for s in range(len(src.audios)):
-                            audio_list = to_threshold(
-                                audio_levels(
-                                    ensure, src, s, tb, bar, strict, temp, log
-                                ),
-                                aobj.threshold,
-                            )
-                            if total_list is None:
-                                total_list = audio_list
-                            else:
-                                total_list = boolop(
-                                    total_list, audio_list, np.logical_or
-                                )
-                        if total_list is None:
-                            if strict:
-                                log.error("Input has no audio streams.")
-                            stream_data = get_all(ensure, src, tb, temp, log)
-                        else:
-                            stream_data = total_list
-                    else:
-                        stream_data = to_threshold(
-                            audio_levels(ensure, src, s, tb, bar, strict, temp, log),
-                            aobj.threshold,
-                        )
-
-                    return stream_data
-
-                if method == "motion":
-                    if src.videos:
-                        _vars: _Vars = {"width": src.videos[0].width}
-                    else:
-                        _vars = {"width": 1}
-
-                    mobj = parse_dataclass(attrs, (Motion, motion_builder), log, _vars)
-                    return to_threshold(
-                        motion_levels(ensure, src, mobj, tb, bar, strict, temp, log),
-                        mobj.threshold,
-                    )
-
-                if method == "pixeldiff":
-                    pobj = parse_dataclass(attrs, (Pixeldiff, pixeldiff_builder), log)
-                    return to_threshold(
-                        pixeldiff_levels(ensure, src, pobj, tb, bar, strict, temp, log),
-                        pobj.threshold,
-                    )
-
-                raise ValueError("Unreachable")
+                if self.filesetup is None:
+                    raise MyError("Can't use edit methods if there's no input files")
+                return edit_method(node.val, self.filesetup)
 
             raise ValueError("Unreachable")
 
@@ -1027,36 +918,3 @@ class Interpreter:
 
     def interpret(self) -> Any:
         return self.visit(self.parser.comp())
-
-
-def run_interpreter(
-    text: str,
-    src: FileInfo,
-    ensure: Ensure,
-    strict: bool,
-    tb: Fraction,
-    bar: Bar,
-    temp: str,
-    log: Log,
-) -> BoolList:
-
-    try:
-        lexer = Lexer(text)
-        parser = Parser(lexer)
-        if log.debug:
-            log.debug(f"edit: {parser}")
-
-        interpreter = Interpreter(parser, src, ensure, strict, tb, bar, temp, log)
-        results = interpreter.interpret()
-    except MyError as e:
-        log.error(e)
-
-    if len(results) == 0:
-        log.error("Expression in --edit must return a boolarr")
-
-    result = results[-1]
-    if not is_boolarr(results[-1]):
-        log.error("Expression in --edit must return a boolarr")
-
-    assert isinstance(result, np.ndarray)
-    return result

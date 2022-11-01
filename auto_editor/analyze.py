@@ -6,7 +6,19 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from auto_editor.objs.edit import (
+    Audio,
+    Motion,
+    Pixeldiff,
+    Random,
+    audio_builder,
+    motion_builder,
+    pixeldiff_builder,
+    random_builder,
+)
+from auto_editor.objs.util import _Vars, parse_dataclass
 from auto_editor.wavfile import read
+from auto_editor.utils.func import boolop
 
 if TYPE_CHECKING:
     from fractions import Fraction
@@ -15,6 +27,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from auto_editor.ffwrapper import FileInfo
+    from auto_editor.interpreter import FileSetup
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
@@ -366,3 +379,84 @@ def random_levels(
         for _ in range(get_media_length(ensure, src, timebase, temp, log))
     ]
     return np.array(arr, dtype=np.float_)
+
+
+def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
+    src = filesetup.src
+    tb = filesetup.tb
+    ensure = filesetup.ensure
+    strict = filesetup.strict
+
+    bar = filesetup.bar
+    temp = filesetup.temp
+    log = filesetup.log
+
+    METHODS = ("audio", "motion", "pixeldiff", "random", "none", "all")
+
+    if ":" in val:
+        method, attrs = val.split(":")
+        if method not in METHODS:
+            log.error(f"'{method}' not allowed to have attributes")
+    else:
+        method, attrs = val, ""
+
+    if method == "none":
+        return get_none(ensure, src, tb, temp, log)
+
+    if method == "all":
+        return get_all(ensure, src, tb, temp, log)
+
+    if method == "random":
+        robj = parse_dataclass(attrs, (Random, random_builder), log)
+        return to_threshold(
+            random_levels(ensure, src, robj, tb, temp, log), robj.threshold
+        )
+
+    if method == "audio":
+        aobj = parse_dataclass(attrs, (Audio, audio_builder), log)
+        s = aobj.stream
+        if s == "all":
+            total_list: NDArray[np.bool_] | None = None
+            for s in range(len(src.audios)):
+                audio_list = to_threshold(
+                    audio_levels(ensure, src, s, tb, bar, strict, temp, log),
+                    aobj.threshold,
+                )
+                if total_list is None:
+                    total_list = audio_list
+                else:
+                    total_list = boolop(total_list, audio_list, np.logical_or)
+            if total_list is None:
+                if strict:
+                    log.error("Input has no audio streams.")
+                stream_data = get_all(ensure, src, tb, temp, log)
+            else:
+                stream_data = total_list
+        else:
+            stream_data = to_threshold(
+                audio_levels(ensure, src, s, tb, bar, strict, temp, log),
+                aobj.threshold,
+            )
+
+        return stream_data
+
+    if method == "motion":
+        if src.videos:
+            _vars: _Vars = {"width": src.videos[0].width}
+        else:
+            _vars = {"width": 1}
+
+        mobj = parse_dataclass(attrs, (Motion, motion_builder), log, _vars)
+        return to_threshold(
+            motion_levels(ensure, src, mobj, tb, bar, strict, temp, log),
+            mobj.threshold,
+        )
+
+    if method == "pixeldiff":
+        pobj = parse_dataclass(attrs, (Pixeldiff, pixeldiff_builder), log)
+        return to_threshold(
+            pixeldiff_levels(ensure, src, pobj, tb, bar, strict, temp, log),
+            pobj.threshold,
+        )
+
+    raise ValueError("Unreachable")

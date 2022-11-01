@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
-from auto_editor.interpreter import run_interpreter
+from auto_editor.interpreter import Lexer, Parser, Interpreter, FileSetup, MyError, is_boolarr
 from auto_editor.objs.tl import ASpace, TlAudio, TlVideo, VSpace
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import apply_margin, cook, seconds_to_ticks, set_range
@@ -16,6 +16,10 @@ if TYPE_CHECKING:
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
     from auto_editor.utils.types import Margin
+
+    from numpy.typing import NDArray
+
+    BoolList = NDArray[np.bool_]
 
 
 class Clip(NamedTuple):
@@ -86,6 +90,34 @@ def make_av(
     return vclips, aclips
 
 
+def run_interpreter(
+    text: str,
+    filesetup: FileSetup,
+    log: Log,
+) -> NDArray[np.bool_]:
+
+    try:
+        lexer = Lexer(text)
+        parser = Parser(lexer)
+        if log.debug:
+            log.debug(f"edit: {parser}")
+
+        interpreter = Interpreter(parser, filesetup)
+        results = interpreter.interpret()
+    except MyError as e:
+        log.error(e)
+
+    if len(results) == 0:
+        log.error("Expression in --edit must return a boolarr")
+
+    result = results[-1]
+    if not is_boolarr(results[-1]):
+        log.error("Expression in --edit must return a boolarr")
+
+    assert isinstance(result, np.ndarray)
+    return result
+
+
 def make_layers(
     sources: dict[str, FileInfo],
     inputs: list[int],
@@ -119,8 +151,9 @@ def make_layers(
     strict = len(inputs) < 2
 
     for i in inputs:
-        src = sources[str(i)]
-        has_loud = run_interpreter(method, src, ensure, strict, tb, bar, temp, log)
+        filesetup = FileSetup(sources[str(i)], ensure, strict, tb, bar, temp, log)
+
+        has_loud = run_interpreter(method, filesetup, log)
         has_loud_length = len(has_loud)
 
         if len(mark_loud) > 0:
