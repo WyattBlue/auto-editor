@@ -16,9 +16,6 @@ import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import Interpreter, Lexer, MyError, Parser
-from auto_editor.output import Ensure
-from auto_editor.utils.bar import Bar
-from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -657,12 +654,17 @@ def main(sys_args: list[str] | None = None):
         my_try("(* 11.5 3)", 34.5)
         my_try("(/ 3/4 4)", Fraction(3, 16))
         my_try("(/ 5)", Fraction(1, 5))
+        my_try("(/ 6 1)", 6)
         my_try("(sqrt -4)", 2j)
+        my_try("(expt 2 3)", 8)
+        my_try("(expt 4 0.5)", 2.0)
         my_try("(abs 1.0)", 1.0)
         my_try("(abs -1)", 1)
         my_try("(boolean? -4)", False)
         my_try("(boolean? false)", True)
         my_try("(boolean? #t)", True)
+        my_try("(integer? 3.0)", True)
+        my_try("(integer? 4/5)", False)
         my_try("(exact? 3.0)", False)
         my_try("(exact? 3)", True)
         my_try('(string-append "Hello" " World")', "Hello World")
@@ -677,6 +679,9 @@ def main(sys_args: list[str] | None = None):
         my_try('(if #t "Hello" apple)', "Hello")
         my_try('(if #f mango "Hi")', "Hi")
         my_try('{if (= [+ 3 4] 7) "yes" "no"}', "yes")
+        my_try("((if #t + -) 3 4)", 7)
+        my_try("((if #t + oops) 3+3i 4-2i)", 7+1j)
+        my_try("((if #f + -) 3 4)", -1)
         my_try("(when (positive? 3) 17)", 17)
         my_try("(string)", "")
         my_try("(string #\\a)", "a")

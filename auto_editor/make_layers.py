@@ -5,19 +5,26 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
-from auto_editor.interpreter import Lexer, Parser, Interpreter, FileSetup, MyError, is_boolarr
+from auto_editor.interpreter import (
+    FileSetup,
+    Interpreter,
+    Lexer,
+    MyError,
+    Parser,
+    is_boolarr,
+)
 from auto_editor.objs.tl import ASpace, TlAudio, TlVideo, VSpace
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import apply_margin, cook, seconds_to_ticks, set_range
 
 if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
     from auto_editor.ffwrapper import FileInfo
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
     from auto_editor.utils.types import Margin
-
-    from numpy.typing import NDArray
 
     BoolList = NDArray[np.bool_]
 
