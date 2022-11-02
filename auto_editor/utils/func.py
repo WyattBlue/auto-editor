@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import overload, Callable
+from typing import Callable, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -29,7 +29,6 @@ def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
         a = k
 
     return call(a, b)
-
 
 
 def setup_tempdir(temp: str | None, log: Log) -> str:

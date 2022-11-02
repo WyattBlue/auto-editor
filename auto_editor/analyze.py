@@ -17,8 +17,8 @@ from auto_editor.objs.edit import (
     random_builder,
 )
 from auto_editor.objs.util import _Vars, parse_dataclass
-from auto_editor.wavfile import read
 from auto_editor.utils.func import boolop
+from auto_editor.wavfile import read
 
 if TYPE_CHECKING:
     from fractions import Fraction
