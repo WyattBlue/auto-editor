@@ -34,6 +34,43 @@ class MyError(Exception):
     pass
 
 
+class Null:
+    def __init__(self):
+        pass
+
+    def __eq__(self, obj: object) -> bool:
+        return isinstance(obj, Null)
+
+    def __str__(self) -> str:
+        return "'()"
+
+    __repr__ = __str__
+
+
+class ConsType:
+    __slots__ = ("a", "d")
+
+    def __init__(self, a: Any, d: Any):
+        self.a = a
+        self.d = d
+
+    def __repr__(self) -> str:
+        result = f"({self.a}"
+        tail = self.d
+        while isinstance(tail, ConsType):
+            result += f" {tail.a}"
+            tail = tail.d
+
+        if isinstance(tail, Null):
+            return f"{result})"
+        return f"{result} . {tail})"
+
+    def __eq__(self, obj: object) -> bool:
+        if isinstance(obj, ConsType):
+            return self.a == obj.a and self.d == obj.d
+        return False
+
+
 class CharType:
     __slots__ = "val"
 
@@ -46,6 +83,11 @@ class CharType:
     def __repr__(self) -> str:
         names = {" ": "space", "\n": "newline", "\t": "tab"}
         return f"#\\{self.val}" if self.val not in names else f"#\\{names[self.val]}"
+
+    def __eq__(self, obj: object) -> bool:
+        if isinstance(obj, CharType):
+            return self.val == obj.val
+        return False
 
     def __radd__(self, obj2: str) -> str:
         return obj2 + self.val
@@ -76,6 +118,11 @@ def is_num(val: object) -> bool:
     return not isinstance(val, bool) and isinstance(
         val, (int, float, Fraction, complex)
     )
+
+
+def is_pair(val: object) -> bool:
+    """pair?"""
+    return isinstance(val, ConsType)
 
 
 def is_real(val: object) -> bool:
@@ -256,6 +303,23 @@ class Lexer:
 
         raise MyError(f"Unknown hash literal: {result}")
 
+    def quote_literal(self) -> Token:
+        result = ""
+        if self.char == "(":
+            result += self.char
+            self.advance()
+            while self.char is not None:
+                result += self.char
+                if self.char == ")":
+                    self.advance()
+                    break
+                self.advance()
+
+        if result == "()":
+            return Token(ID, "null")
+
+        raise MyError(f"Unknown quote literal: {result}")
+
     def get_next_token(self) -> Token:
         while self.char is not None:
             self.skip_whitespace()
@@ -288,6 +352,10 @@ class Lexer:
                 self.advance()
                 return self.hash_literal()
 
+            if self.char == "'":
+                self.advance()
+                return self.quote_literal()
+
             result = ""
             has_illegal = False
             while self.char_is_norm():
@@ -297,7 +365,7 @@ class Lexer:
                 self.advance()
 
             if has_illegal:
-                raise MyError(f"Token has illegal character(s): {result}")
+                raise MyError(f"Symbol has illegal character(s): {result}")
 
             for method in METHODS:
                 if result == method or result.startswith(method + ":"):
@@ -887,6 +955,62 @@ def boolarr_proc(op: Token, values: list[Any]) -> BoolList:
     return np.array(values, dtype=np.bool_)
 
 
+def cons(op: Token, values: list[Any]) -> ConsType:
+    check_args(op, values, (2, 2), None)
+    return ConsType(values[0], values[1])
+
+
+def _list(op: Token, values: list[Any]) -> ConsType | Null:
+    result = Null()
+    for val in reversed(values):
+        result = ConsType(val, result)
+    return result
+
+
+def list_ref(op: Token, values: list[Any]) -> Any:
+    check_args(op, values, (2, 2), [is_pair, exact_int])
+    result, ref = values
+
+    if ref < 0:
+        raise MyError(f"{ref}: Invalid index")
+    while ref > 0:
+        ref -= 1
+        result = result.d
+        if isinstance(result, Null):
+            raise MyError(f"{values[1]}: Invalid index")
+        if not isinstance(result, ConsType):
+            raise MyError(f"{op.value}: 1st arg must be a list")
+    return result.a
+
+
+def listq(op: Token, values: list[Any]) -> bool:
+    check_args(op, values, (1, 1), None)
+    val = values[0]
+    while isinstance(val, ConsType):
+        val = val.d
+    return isinstance(val, Null)
+
+
+def nullq(op: Token, values: list[Any]) -> bool:
+    check_args(op, values, (1, 1), None)
+    return isinstance(values[0], Null)
+
+
+def car(op: Token, values: list[Any]) -> Any:
+    check_args(op, values, (1, 1), [is_pair])
+    return values[0].a
+
+
+def cdr(op: Token, values: list[Any]) -> Any:
+    check_args(op, values, (1, 1), [is_pair])
+    return values[0].d
+
+
+def pairq(op: Token, values: list[Any]) -> bool:
+    check_args(op, values, (1, 1), None)
+    return isinstance(values[0], ConsType)
+
+
 ###############################################################################
 #                                                                             #
 #  INTERPRETER                                                                #
@@ -911,6 +1035,7 @@ class Interpreter:
         # constants
         "true": True,
         "false": False,
+        "null": Null(),
         "pi": math.pi,
         # actions
         "display": display,
@@ -926,6 +1051,9 @@ class Interpreter:
         "xor": _xor,
         # questions
         "equal?": equalq,
+        "list?": listq,
+        "pair?": pairq,
+        "null?": nullq,
         "number?": numq,
         "exact?": exactq,
         "inexact?": inexactq,
@@ -938,6 +1066,12 @@ class Interpreter:
         "boolean?": boolq,
         "string?": stringq,
         "char?": charq,
+        # cons/list
+        "cons": cons,
+        "car": car,
+        "cdr": cdr,
+        "list": _list,
+        "list-ref": list_ref,
         # strings
         "string": string_proc,
         "string-append": string_append,
@@ -957,11 +1091,14 @@ class Interpreter:
         "expt": expt,
         "sqrt": _sqrt,
         "mod": modulo,
+        "modulo": modulo,
         "real-part": real_part,
         "imag-part": imag_part,
         # reals
         "abs": absolute,
+        "ceil": ceiling,
         "ceiling": ceiling,
+        "exact-ceil": exact_ceiling,
         "exact-ceiling": exact_ceiling,
         "floor": floor,
         "exact-floor": exact_floor,

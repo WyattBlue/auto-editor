@@ -15,7 +15,7 @@ from typing import Callable
 import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import Interpreter, Lexer, MyError, Parser
+from auto_editor.interpreter import ConsType, Interpreter, Lexer, MyError, Null, Parser
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -680,7 +680,7 @@ def main(sys_args: list[str] | None = None):
         my_try('(if #f mango "Hi")', "Hi")
         my_try('{if (= [+ 3 4] 7) "yes" "no"}', "yes")
         my_try("((if #t + -) 3 4)", 7)
-        my_try("((if #t + oops) 3+3i 4-2i)", 7+1j)
+        my_try("((if #t + oops) 3+3i 4-2i)", 7 + 1j)
         my_try("((if #f + -) 3 4)", -1)
         my_try("(when (positive? 3) 17)", 17)
         my_try("(string)", "")
@@ -701,10 +701,20 @@ def main(sys_args: list[str] | None = None):
         my_try("(equal? (boolarr 1 1 0) (boolarr 1 1 0))", True)
         my_try("(equal? (boolarr 0 1 0) (boolarr 1 1 0))", False)
         my_try("(equal? (boolarr 0 1 0) (boolarr 0 1 0 0))", False)
+        my_try("(equal? #\\a #\\a)", True)
         my_try(
             "(or (boolarr 1 0 0) (boolarr 0 0 0 1))",
             np.array([1, 0, 0, 1], dtype=np.bool_),
         )
+
+        my_try("(list 1 2 3)", ConsType(1, ConsType(2, ConsType(3, Null()))))
+        my_try("(list-ref (list 0 10 20) 2)", 20)
+        my_try("(list-ref (list 0 10 20) 0)", 0)
+        my_try("(car (cons 3 4))", 3)
+        my_try("(car (list 3 4))", 3)
+        my_try("(cdr (cons 3 4))", 4)
+        my_try("(cdr (list 3 4))", ConsType(4, Null()))
+        my_try("'()", Null())
 
     tests = []
 
