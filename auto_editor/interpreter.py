@@ -35,7 +35,7 @@ class MyError(Exception):
 
 
 class Null:
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def __eq__(self, obj: object) -> bool:
@@ -99,55 +99,6 @@ def print_arr(arr: BoolList) -> str:
         rs += " 1" if item else " 0"
     rs += ")\n"
     return rs
-
-
-def is_boolarr(arr: object) -> bool:
-    """boolarr?"""
-    if isinstance(arr, np.ndarray):
-        return arr.dtype.kind == "b"
-    return False
-
-
-def is_bool(val: object) -> bool:
-    """boolean?"""
-    return isinstance(val, bool)
-
-
-def is_num(val: object) -> bool:
-    """number?"""
-    return not isinstance(val, bool) and isinstance(
-        val, (int, float, Fraction, complex)
-    )
-
-
-def is_pair(val: object) -> bool:
-    """pair?"""
-    return isinstance(val, ConsType)
-
-
-def is_real(val: object) -> bool:
-    """real?"""
-    return not isinstance(val, bool) and isinstance(val, (int, float, Fraction))
-
-
-def exact_int(val: object) -> bool:
-    """exact-integer?"""
-    return not isinstance(val, bool) and isinstance(val, int)
-
-
-def is_exact(val: object) -> bool:
-    """exact?"""
-    return isinstance(val, (int, Fraction))
-
-
-def is_str(val: object) -> bool:
-    """string?"""
-    return isinstance(val, str)
-
-
-def is_char(val: object) -> bool:
-    """char?"""
-    return isinstance(val, CharType)
 
 
 ###############################################################################
@@ -414,11 +365,7 @@ class ManyOp:
     __repr__ = __str__
 
 
-class Atom:
-    pass
-
-
-class Var(Atom):
+class Var:
     def __init__(self, token: Token):
         assert token.type == ID
         self.token = token
@@ -427,7 +374,7 @@ class Var(Atom):
     __str__: Callable[[Var], str] = lambda self: f"(Var {self.value})"
 
 
-class Num(Atom):
+class Num:
     __slots__ = "val"
 
     def __init__(self, val: int | float | Fraction | complex):
@@ -436,7 +383,7 @@ class Num(Atom):
     __str__: Callable[[Num], str] = lambda self: f"(num {self.val})"
 
 
-class Bool(Atom):
+class Bool:
     __slots__ = "val"
 
     def __init__(self, val: bool):
@@ -445,7 +392,7 @@ class Bool(Atom):
     __str__: Callable[[Bool], str] = lambda self: f"(bool {'#t' if self.val else '#f'})"
 
 
-class Str(Atom):
+class Str:
     __slots__ = "val"
 
     def __init__(self, val: str):
@@ -454,7 +401,7 @@ class Str(Atom):
     __str__: Callable[[Str], str] = lambda self: f"(str {self.val})"
 
 
-class Char(Atom):
+class Char:
     __slots__ = "val"
 
     def __init__(self, val: str):
@@ -463,7 +410,7 @@ class Char(Atom):
     __str__: Callable[[Char], str] = lambda self: f"(char {self.val})"
 
 
-class BoolArr(Atom):
+class BoolArr:
     __slots__ = "val"
 
     def __init__(self, val: str):
@@ -571,11 +518,10 @@ class Parser:
 
 
 def check_args(
-    op: Token, values: list[Any], arity: tuple[int, int | None], types: list[Any] | None
+    o: str, values: list | tuple, arity: tuple[int, int | None], types: list[Any] | None
 ) -> None:
     lower, upper = arity
     amount = len(values)
-    o = op.value
     if upper is not None and lower > upper:
         raise ValueError("lower must be less than upper")
     if lower == upper:
@@ -598,417 +544,253 @@ def check_args(
             raise MyError(f"{o} expects: {' '.join([_t.__doc__ for _t in types])}")
 
 
-def display(op: Token, values: list[Any]) -> None:
-    check_args(op, values, (1, 1), None)
-    if (val := values[0]) is None:
+def is_boolarr(arr: object) -> bool:
+    """boolarr?"""
+    if isinstance(arr, np.ndarray):
+        return arr.dtype.kind == "b"
+    return False
+
+
+def is_bool(val: object) -> bool:
+    """boolean?"""
+    return isinstance(val, bool)
+
+
+def is_num(val: object) -> bool:
+    """number?"""
+    return not isinstance(val, bool) and isinstance(
+        val, (int, float, Fraction, complex)
+    )
+
+
+def is_pair(val: object) -> bool:
+    """pair?"""
+    return isinstance(val, ConsType)
+
+
+def is_real(val: object) -> bool:
+    """real?"""
+    return not isinstance(val, bool) and isinstance(val, (int, float, Fraction))
+
+
+def is_eint(val: object) -> bool:
+    """exact-integer?"""
+    return not isinstance(val, bool) and isinstance(val, int)
+
+
+def is_exact(val: object) -> bool:
+    """exact?"""
+    return isinstance(val, (int, Fraction))
+
+
+def is_str(val: object) -> bool:
+    """string?"""
+    return isinstance(val, str)
+
+
+def is_char(val: object) -> bool:
+    """char?"""
+    return isinstance(val, CharType)
+
+
+def is_iterable(val: object) -> bool:
+    """iterable?"""
+    return isinstance(val, (list, range, np.ndarray, ConsType, Null))
+
+
+def is_int(val: object) -> bool:
+    """integer?"""
+    if isinstance(val, float):
+        return val.is_integer()
+    if isinstance(val, Fraction):
+        return int(val) == val
+    return isinstance(val, int)
+
+
+def raise_(msg: str) -> None:
+    raise MyError(msg)
+
+
+def display(val: Any) -> None:
+    if val is None:
         return
     if is_boolarr(val):
         val = print_arr(val)
     sys.stdout.write(str(val))
 
 
-def equalq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (2, 2), None)
-    if isinstance(values[0], np.ndarray) or isinstance(values[1], np.ndarray):
-        return np.array_equal(values[0], values[1])
-    if isinstance(values[0], float) and not isinstance(values[1], float):
+def is_equal(a: object, b: object) -> bool:
+    if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
+        return np.array_equal(a, b)
+    if isinstance(a, float) and not isinstance(b, float):
         return False
-    if isinstance(values[1], float) and not isinstance(values[0], float):
+    if not isinstance(a, float) and isinstance(b, float):
         return False
-    return values[0] == values[1]
+    return a == b
 
 
-def stringq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    return is_str(values[0])
-
-
-def exactq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), [is_num])
-    return is_exact(values[0])
-
-
-def inexactq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), [is_num])
-    return not is_exact(values[0])
-
-
-def numq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    return is_num(values[0])
-
-
-def realq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    return is_real(values[0])
-
-
-def intq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    if isinstance(values[0], float):
-        return values[0].is_integer()
-    if isinstance(values[0], Fraction):
-        return int(values[0]) == values[0]
-    return isinstance(values[0], int)
-
-
-def _exact_int(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    return exact_int(values[0])
-
-
-def boolq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    return is_bool(values[0])
-
-
-def charq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    return is_char(values[0])
-
-
-def boolarrq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    return is_boolarr(values[0])
-
-
-def greater(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (2, 2), [is_real, is_real])
-    return values[0] > values[1]
-
-
-def greater_equal(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (2, 2), [is_real, is_real])
-    return values[0] >= values[1]
-
-
-def lesser(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (2, 2), [is_real, is_real])
-    return values[0] < values[1]
-
-
-def lesser_equal(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (2, 2), [is_real, is_real])
-    return values[0] <= values[1]
-
-
-def equal_num(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, None), [is_num])
+def equal_num(*values: object) -> bool:
     return all(values[0] == val for val in values[1:])
 
 
-def zero(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), [is_real])
-    return values[0] == 0
+def mul(*vals: Any) -> Number:
+    return reduce(lambda a, b: a * b, vals, 1)
 
 
-def pos(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), [is_real])
-    return values[0] > 0
+def minus(*vals: Number) -> Number:
+    if len(vals) == 1:
+        return -vals[0]
+    return reduce(lambda a, b: a - b, vals)
 
 
-def neg(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), [is_real])
-    return values[0] < 0
-
-
-def add1(op: Token, values: list[Any]) -> Number:
-    check_args(op, values, (1, 1), [is_num])
-    return values[0] + 1
-
-
-def sub1(op: Token, values: list[Any]) -> Number:
-    check_args(op, values, (1, 1), [is_num])
-    return values[0] - 1
-
-
-def plus(op: Token, values: list[Any]) -> Number:
-    check_args(op, values, (0, None), [is_num])
-    return sum(values)
-
-
-def mul(op: Token, values: list[Any]) -> Number:
-    check_args(op, values, (0, None), [is_num])
-    return reduce(lambda a, b: a * b, values, 1)
-
-
-def minus(op: Token, values: list[Any]) -> Number:
-    check_args(op, values, (1, None), [is_num])
-    if len(values) == 1:
-        return -values[0]
-    return reduce(lambda a, b: a - b, values)
-
-
-def div(op: Token, values: list[Any]) -> Number:
-    check_args(op, values, (1, None), [is_num])
-    if len(values) == 1:
-        values.insert(0, 1)
+def div(*vals: Any) -> Number:
+    if len(vals) == 1:
+        vals = (1, vals[0])
     try:
-        if not {float, complex}.intersection({type(val) for val in values}):
-            result = reduce(lambda a, b: Fraction(a, b), values)
+        if not {float, complex}.intersection({type(val) for val in vals}):
+            result = reduce(lambda a, b: Fraction(a, b), vals)
             if result.denominator == 1:
                 return result.numerator
             return result
-        return reduce(lambda a, b: a / b, values)
+        return reduce(lambda a, b: a / b, vals)
     except ZeroDivisionError:
         raise MyError("division by zero")
 
 
-def expt(op: Token, values: list[Any]) -> Real:
-    check_args(op, values, (2, 2), [is_real])
-    return pow(values[0], values[1])
+def _sqrt(v: Number) -> Number:
+    r = cmath.sqrt(v)
+    if r.imag == 0:
+        if int(r.real) == r.real:
+            return int(r.real)
+        return r.real
+    return r
 
 
-def _sqrt(op: Token, values: list[Any]) -> Number:
-    check_args(op, values, (1, 1), [is_num])
-    result = cmath.sqrt(values[0])
-    if result.imag == 0:
-        _real = result.real
-        if int(_real) == _real:
-            return int(_real)
-        return _real
-    return result
+def ceiling(val: Real) -> Real:
+    if isinstance(val, float):
+        return float(math.ceil(val))
+    return math.ceil(val)
 
 
-def real_part(op: Token, values: list[Any]) -> Number:
-    check_args(op, values, (1, 1), [is_num])
-    return values[0].real
+def floor(val: Real) -> Real:
+    if isinstance(val, float):
+        return float(math.floor(val))
+    return math.floor(val)
 
 
-def imag_part(op: Token, values: list[Any]) -> Number:
-    check_args(op, values, (1, 1), [is_num])
-    return values[0].imag
+def _round(val: Real) -> Real:
+    if isinstance(val, float):
+        return float(round(val))
+    return round(val)
 
 
-def absolute(op: Token, values: list[Any]) -> Real:
-    check_args(op, values, (1, 1), [is_real])
-    return abs(values[0])
-
-
-def ceiling(op: Token, values: list[Any]) -> Real:
-    check_args(op, values, (1, 1), [is_real])
-    if isinstance(values[0], float):
-        return float(math.ceil(values[0]))
-    return math.ceil(values[0])
-
-
-def exact_ceiling(op: Token, values: list[Any]) -> int:
-    check_args(op, values, (1, 1), [is_real])
-    return math.ceil(values[0])
-
-
-def floor(op: Token, values: list[Any]) -> Real:
-    check_args(op, values, (1, 1), [is_real])
-    if isinstance(values[0], float):
-        return float(math.floor(values[0]))
-    return math.floor(values[0])
-
-
-def exact_floor(op: Token, values: list[Any]) -> int:
-    check_args(op, values, (1, 1), [is_real])
-    return math.floor(values[0])
-
-
-def _round(op: Token, values: list[Any]) -> Real:
-    check_args(op, values, (1, 1), [is_real])
-    if isinstance(values[0], float):
-        return float(round(values[0]))
-    return round(values[0])
-
-
-def exact_round(op: Token, values: list[Any]) -> int:
-    check_args(op, values, (1, 1), [is_real])
-    return round(values[0])
-
-
-def modulo(op: Token, values: list[Any]) -> int:
-    check_args(op, values, (2, 2), [exact_int, exact_int])
-    return values[0] % values[1]
-
-
-def _max(op: Token, values: list[Any]) -> Real:
-    check_args(op, values, (1, None), [is_real])
-    return max(values)
-
-
-def _min(op: Token, values: list[Any]) -> Real:
-    check_args(op, values, (1, None), [is_real])
-    return min(values)
-
-
-def _not(op: Token, values: list[Any]) -> bool | BoolList:
-    check_args(op, values, (1, 1), None)
-    if is_boolarr(val := values[0]):
+def _not(val: Any) -> bool | BoolList:
+    if is_boolarr(val):
         return np.logical_not(val)
     if is_bool(val):
         return not val
-    raise MyError(f"{op.value} expects: boolean? or boolarr?")
+    raise MyError("not expects: boolean? or boolarr?")
 
 
-def _and(op: Token, values: list[Any]) -> bool | BoolList:
-    check_args(op, values, (1, None), None)
-    if is_boolarr(values[0]):
-        check_args(op, values, (2, None), [is_boolarr])
-        return reduce(lambda a, b: boolop(a, b, np.logical_and), values)
-    return reduce(lambda a, b: a and b, values)
+def _and(*vals: Any) -> bool | BoolList:
+    if is_boolarr(vals[0]):
+        check_args("and", vals, (2, None), [is_boolarr])
+        return reduce(lambda a, b: boolop(a, b, np.logical_and), vals)
+    check_args("and", vals, (1, None), [is_bool])
+    return reduce(lambda a, b: a and b, vals)
 
 
-def _or(op: Token, values: list[Any]) -> bool | BoolList:
-    check_args(op, values, (1, None), None)
-    if is_boolarr(values[0]):
-        check_args(op, values, (2, None), [is_boolarr])
-        return reduce(lambda a, b: boolop(a, b, np.logical_or), values)
-    return reduce(lambda a, b: a or b, values)
+def _or(*vals: Any) -> bool | BoolList:
+    if is_boolarr(vals[0]):
+        check_args("or", vals, (2, None), [is_boolarr])
+        return reduce(lambda a, b: boolop(a, b, np.logical_or), vals)
+    check_args("or", vals, (1, None), [is_bool])
+    return reduce(lambda a, b: a or b, vals)
 
 
-def _xor(op: Token, values: list[Any]) -> bool | BoolList:
-    check_args(op, values, (2, None), None)
-    if is_boolarr(values[0]):
-        check_args(op, values, (2, None), [is_boolarr])
-        return reduce(lambda a, b: boolop(a, b, np.logical_xor), values)
-    return reduce(lambda a, b: a ^ b, values)
+def _xor(*vals: Any) -> bool | BoolList:
+    if is_boolarr(vals[0]):
+        check_args("xor", vals, (2, None), [is_boolarr])
+        return reduce(lambda a, b: boolop(a, b, np.logical_xor), vals)
+    check_args("xor", vals, (2, None), [is_bool])
+    return reduce(lambda a, b: a ^ b, vals)
 
 
-def string_proc(op: Token, values: list[Any]) -> str:
-    check_args(op, values, (0, None), [is_char])
-    return reduce(lambda a, b: a + b, values, "")
+def string_append(*vals: str | CharType) -> str:
+    return reduce(lambda a, b: a + b, vals, "")
 
 
-def string_append(op: Token, values: list[Any]) -> str:
-    check_args(op, values, (0, None), [is_str])
-    return reduce(lambda a, b: a + b, values, "")
-
-
-def string_upcase(op: Token, values: list[Any]) -> str:
-    check_args(op, values, (1, 1), [is_str])
-    return values[0].upper()
-
-
-def string_downcase(op: Token, values: list[Any]) -> str:
-    check_args(op, values, (1, 1), [is_str])
-    return values[0].lower()
-
-
-def string_titlecase(op: Token, values: list[Any]) -> str:
-    check_args(op, values, (1, 1), [is_str])
-    return values[0].title()
-
-
-def string_length(op: Token, values: list[Any]) -> int:
-    check_args(op, values, (1, 1), [is_str])
-    return len(values[0])
-
-
-def string_ref(op: Token, values: list[Any]) -> CharType:
-    check_args(op, values, (2, 2), [is_str, is_real])
+def string_ref(s: str, ref: int) -> CharType:
     try:
-        return CharType(values[0][values[1]])
+        return CharType(s[ref])
     except IndexError:
-        raise MyError(f"string index {values[1]} is out of range")
+        raise MyError(f"string index {ref} is out of range")
 
 
-def number_to_string(op: Token, values: list[Any]) -> str:
-    check_args(op, values, (1, 1), [is_num])
-    if isinstance(val := values[0], complex):
+def number_to_string(val: Number) -> str:
+    if isinstance(val, complex):
         join = "" if val.imag < 0 else "+"
         return f"{val.real}{join}{val.imag}i"
-    return str(values[0])
+    return f"{val}"
 
 
-def array_length(op: Token, values: list[Any]) -> int:
-    check_args(op, values, (1, 1), [is_boolarr])
-    return len(values[0])
+def length(val: Any) -> int:
+    if isinstance(val, (ConsType, Null)):
+        count = 0
+        while isinstance(val, ConsType):
+            val = val.d
+            count += 1
+        if not isinstance(val, Null):
+            raise MyError("length expects: list?")
+        return count
+
+    return len(val)
 
 
-def count_nonzero(op: Token, values: list[Any]) -> int:
-    check_args(op, values, (1, 1), [is_boolarr])
-    return np.count_nonzero(values[0])
+def minclip(arr: BoolList, _min: int) -> BoolList:
+    return remove_small(np.copy(arr), _min, replace=1, with_=0)
 
 
-def minclip(op: Token, values: list[Any]) -> BoolList:
-    check_args(op, values, (2, 2), [exact_int, is_boolarr])
-    return remove_small(np.copy(values[1]), values[0], replace=1, with_=0)
+def mincut(arr: BoolList, _min: int) -> BoolList:
+    return remove_small(np.copy(arr), _min, replace=0, with_=1)
 
 
-def mincut(op: Token, values: list[Any]) -> BoolList:
-    check_args(op, values, (2, 2), [exact_int, is_boolarr])
-    return remove_small(np.copy(values[1]), values[0], replace=0, with_=1)
+def margin(a: Any, b: Any, c: Any = None) -> BoolList:
+    if c is None:
+        check_args("margin", [a, b], (2, 2), [is_eint, is_boolarr])
+        arr = b
+        start, end = a, a
+    else:
+        check_args("margin", [a, b, c], (3, 3), [is_eint, is_eint, is_boolarr])
+        arr = c
+        start, end = a, b
+    return apply_margin(np.copy(arr), len(arr), start, end)
 
 
-def margin(op: Token, values: list[Any]) -> BoolList:
-    if len(values) == 2:
-        check_args(op, values, (2, 2), [exact_int, is_boolarr])
-        arr = np.copy(values[1])
-        return apply_margin(arr, len(arr), values[0], values[0])
-    check_args(op, values, (3, 3), [exact_int, exact_int, is_boolarr])
-    arr = np.copy(values[2])
-    return apply_margin(arr, len(arr), values[0], values[1])
-
-
-def _cook(op: Token, values: list[Any]) -> BoolList:
-    check_args(op, values, (3, 3), [exact_int, exact_int, is_boolarr])
-    return cook(np.copy(values[2]), values[1], values[0])
-
-
-def boolarr_proc(op: Token, values: list[Any]) -> BoolList:
-    check_args(op, values, (1, None), [exact_int])
-    return np.array(values, dtype=np.bool_)
-
-
-def cons(op: Token, values: list[Any]) -> ConsType:
-    check_args(op, values, (2, 2), None)
-    return ConsType(values[0], values[1])
-
-
-def _list(op: Token, values: list[Any]) -> ConsType | Null:
-    result = Null()
+def _list(*values: Any) -> ConsType | Null:
+    result: ConsType | Null = Null()
     for val in reversed(values):
         result = ConsType(val, result)
     return result
 
 
-def list_ref(op: Token, values: list[Any]) -> Any:
-    check_args(op, values, (2, 2), [is_pair, exact_int])
-    result, ref = values
-
+def list_ref(result: ConsType, ref: int) -> Any:
     if ref < 0:
         raise MyError(f"{ref}: Invalid index")
     while ref > 0:
         ref -= 1
         result = result.d
         if isinstance(result, Null):
-            raise MyError(f"{values[1]}: Invalid index")
+            raise MyError(f"{ref}: Invalid index")
         if not isinstance(result, ConsType):
-            raise MyError(f"{op.value}: 1st arg must be a list")
+            raise MyError("list-ref: 1st arg must be a list")
     return result.a
 
 
-def listq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    val = values[0]
+def listq(val: Any) -> bool:
     while isinstance(val, ConsType):
         val = val.d
     return isinstance(val, Null)
-
-
-def nullq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    return isinstance(values[0], Null)
-
-
-def car(op: Token, values: list[Any]) -> Any:
-    check_args(op, values, (1, 1), [is_pair])
-    return values[0].a
-
-
-def cdr(op: Token, values: list[Any]) -> Any:
-    check_args(op, values, (1, 1), [is_pair])
-    return values[0].d
-
-
-def pairq(op: Token, values: list[Any]) -> bool:
-    check_args(op, values, (1, 1), None)
-    return isinstance(values[0], ConsType)
 
 
 ###############################################################################
@@ -1029,6 +811,19 @@ class FileSetup:
     log: Log
 
 
+@dataclass
+class Proc:
+    name: str
+    proc: Callable
+    arity: tuple[int, int | None] = (1, None)
+    contracts: list[Any] | None = None
+
+    def __str__(self) -> str:
+        return f"#<procedure:{self.name}>"
+
+    __repr__ = __str__
+
+
 class Interpreter:
 
     GLOBAL_SCOPE: dict[str, Any] = {
@@ -1038,85 +833,99 @@ class Interpreter:
         "null": Null(),
         "pi": math.pi,
         # actions
-        "display": display,
+        "begin": Proc("begin", lambda *x: None if not x else x[-1], (0, None)),
+        "display": Proc("display", display, (1, 1)),
+        "exit": Proc("exit", sys.exit, (1, None)),
+        "error": Proc("error", raise_, (1, 1), [is_str]),
         # booleans
-        ">": greater,
-        ">=": greater_equal,
-        "<": lesser,
-        "<=": lesser_equal,
-        "=": equal_num,
-        "not": _not,
-        "and": _and,
-        "or": _or,
-        "xor": _xor,
+        ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
+        ">=": Proc(">=", lambda a, b: a >= b, (2, 2), [is_real, is_real]),
+        "<": Proc("<", lambda a, b: a < b, (2, 2), [is_real, is_real]),
+        "<=": Proc("<=", lambda a, b: a <= b, (2, 2), [is_real, is_real]),
+        "=": Proc("=", equal_num, (1, None), [is_num]),
+        "not": Proc("not", _not, (1, 1)),
+        "and": Proc("and", _and, (1, None)),
+        "or": Proc("or", _or, (1, None)),
+        "xor": Proc("xor", _xor, (2, None)),
         # questions
-        "equal?": equalq,
-        "list?": listq,
-        "pair?": pairq,
-        "null?": nullq,
-        "number?": numq,
-        "exact?": exactq,
-        "inexact?": inexactq,
-        "real?": realq,
-        "integer?": intq,
-        "exact-integer?": _exact_int,
-        "positive?": pos,
-        "negative?": neg,
-        "zero?": zero,
-        "boolean?": boolq,
-        "string?": stringq,
-        "char?": charq,
+        "equal?": Proc("equal?", is_equal, (2, 2)),
+        "list?": Proc("list?", listq, (1, 1)),
+        "pair?": Proc("pair?", is_pair, (1, 1)),
+        "null?": Proc("null?", lambda val: isinstance(val, Null), (1, 1)),
+        "number?": Proc("number?", is_num, (1, 1)),
+        "exact?": Proc("exact?", is_exact, (1, 1)),
+        "inexact?": Proc("inexact?", lambda v: not is_exact(v), (1, 1)),
+        "real?": Proc("real?", is_real, (1, 1)),
+        "integer?": Proc("integer?", is_int, (1, 1)),
+        "exact-integer?": Proc("exact-integer?", is_eint, (1, 1)),
+        "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
+        "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
+        "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_real]),
+        "boolean?": Proc("boolean?", is_bool, (1, 1)),
+        "string?": Proc("string?", is_str, (1, 1)),
+        "char?": Proc("char?", is_char, (1, 1)),
         # cons/list
-        "cons": cons,
-        "car": car,
-        "cdr": cdr,
-        "list": _list,
-        "list-ref": list_ref,
+        "cons": Proc("cons", lambda a, b: ConsType(a, b), (2, 2)),
+        "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
+        "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
+        "list": Proc("list", _list, (0, None)),
+        "list-ref": Proc("list-ref", list_ref, (2, 2), [is_pair, is_eint]),
+        "length": Proc("length", length, (1, 1), [is_iterable]),
         # strings
-        "string": string_proc,
-        "string-append": string_append,
-        "string-upcase": string_upcase,
-        "string-downcase": string_downcase,
-        "string-titlecase": string_titlecase,
-        "string-length": string_length,
-        "string-ref": string_ref,
-        "number->string": number_to_string,
+        "string": Proc("string", string_append, (0, None), [is_char]),
+        "string-append": Proc("string-append", string_append, (0, None), [is_str]),
+        "string-upcase": Proc("string-upcase", lambda s: s.upper(), (1, 1), [is_str]),
+        "string-downcase": Proc(
+            "string-downcase", lambda s: s.lower(), (1, 1), [is_str]
+        ),
+        "string-titlecase": Proc(
+            "string-titlecase", lambda s: s.title(), (1, 1), [is_str]
+        ),
+        "string-length": Proc("string-length", len, (1, 1), [is_str]),
+        "string-ref": Proc("string-ref", string_ref, (2, 2), [is_str, is_eint]),
+        "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
         # numbers
-        "+": plus,
-        "-": minus,
-        "*": mul,
-        "/": div,
-        "add1": add1,
-        "sub1": sub1,
-        "expt": expt,
-        "sqrt": _sqrt,
-        "mod": modulo,
-        "modulo": modulo,
-        "real-part": real_part,
-        "imag-part": imag_part,
+        "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
+        "-": Proc("-", minus, (1, None), [is_num]),
+        "*": Proc("*", mul, (0, None), [is_num]),
+        "/": Proc("/", div, (1, None), [is_num]),
+        "add1": Proc("add1", lambda v: v + 1, (1, 1), [is_num]),
+        "sub1": Proc("sub1", lambda v: v - 1, (1, 1), [is_num]),
+        "expt": Proc("expt", pow, (2, 2), [is_real]),
+        "sqrt": Proc("sqrt", _sqrt, (1, 1), [is_num]),
+        "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
+        "modulo": Proc("modulo", lambda a, b: a % b, (2, 2), [is_int, is_int]),
+        "real-part": Proc("real-part", lambda v: v.real, (1, 1), [is_num]),
+        "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
         # reals
-        "abs": absolute,
-        "ceil": ceiling,
-        "ceiling": ceiling,
-        "exact-ceil": exact_ceiling,
-        "exact-ceiling": exact_ceiling,
-        "floor": floor,
-        "exact-floor": exact_floor,
-        "round": _round,
-        "exact-round": exact_round,
-        "max": _max,
-        "min": _min,
+        "abs": Proc("abs", abs, (1, 1), [is_real]),
+        "ceil": Proc("ceil", ceiling, (1, 1), [is_real]),
+        "ceiling": Proc("ceiling", ceiling, (1, 1), [is_real]),
+        "exact-ceil": Proc("exact-ceil", math.ceil, (1, 1), [is_real]),
+        "exact-ceiling": Proc("exact-ceiling", math.ceil, (1, 1), [is_real]),
+        "floor": Proc("floor", floor, (1, 1), [is_real]),
+        "exact-floor": Proc("exact-floor", math.floor, (1, 1), [is_real]),
+        "round": Proc("round", _round, (1, 1), [is_real]),
+        "exact-round": Proc("exact-round", round, (1, 1), [is_real]),
+        "max": Proc("max", lambda *v: max(v), (1, None), [is_real]),
+        "min": Proc("min", lambda *v: min(v), (1, None), [is_real]),
         # ae extensions
-        "margin": margin,
-        "mcut": mincut,
-        "mincut": mincut,
-        "mclip": minclip,
-        "minclip": minclip,
-        "cook": _cook,
-        "boolarr": boolarr_proc,
-        "array-length": array_length,
-        "count-nonzero": count_nonzero,
-        "boolarr?": boolarrq,
+        "margin": Proc("margin", margin, (2, 3), None),
+        "mcut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
+        "mincut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
+        "mclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
+        "minclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
+        "cook": Proc(
+            "cook",
+            lambda a, b, c: cook(np.copy(c), b, a),
+            (3, 3),
+            [is_eint, is_eint, is_boolarr],
+        ),
+        "boolarr": Proc(
+            "boolarr", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_eint]
+        ),
+        "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_boolarr]),
+        "boolarr?": Proc("boolarr?", is_boolarr, (1, 1)),
     }
 
     def __init__(self, parser: Parser, filesetup: FileSetup | None):
@@ -1127,22 +936,19 @@ class Interpreter:
             self.GLOBAL_SCOPE["timebase"] = filesetup.tb
 
     def visit(self, node: Node) -> Any:
-        if isinstance(node, Atom):
-            if isinstance(node, (Num, Str, Bool, Char)):
-                return node.val
+        if isinstance(node, (Num, Str, Bool, Char)):
+            return node.val
 
-            if isinstance(node, Var):
-                val = self.GLOBAL_SCOPE.get(node.value)
-                if val is None:
-                    raise MyError(f"{node.value} is undefined")
-                return val
+        if isinstance(node, Var):
+            val = self.GLOBAL_SCOPE.get(node.value)
+            if val is None:
+                raise MyError(f"{node.value} is undefined")
+            return val
 
-            if isinstance(node, BoolArr):
-                if self.filesetup is None:
-                    raise MyError("Can't use edit methods if there's no input files")
-                return edit_method(node.val, self.filesetup)
-
-            raise ValueError("Unreachable")
+        if isinstance(node, BoolArr):
+            if self.filesetup is None:
+                raise MyError("Can't use edit methods if there's no input files")
+            return edit_method(node.val, self.filesetup)
 
         if isinstance(node, ManyOp):
             if isinstance(node.op, Var):
@@ -1151,7 +957,7 @@ class Interpreter:
                 name = None
 
             if name == "if":
-                check_args(node.op, node.children, (3, 3), None)
+                check_args("if", node.children, (3, 3), None)
                 test_expr = self.visit(node.children[0])
                 if not isinstance(test_expr, bool):
                     raise MyError(f"if: test-expr arg must be: boolean?")
@@ -1160,7 +966,7 @@ class Interpreter:
                 return self.visit(node.children[2])
 
             if name == "when":
-                check_args(node.op, node.children, (2, 2), None)
+                check_args("when", node.children, (2, 2), None)
                 test_expr = self.visit(node.children[0])
                 if not isinstance(test_expr, bool):
                     raise MyError(f"when: test-expr arg must be: boolean?")
@@ -1169,7 +975,7 @@ class Interpreter:
                 return None
 
             if name in ("define", "set!"):
-                check_args(node.op, node.children, (2, 2), None)
+                check_args(name, node.children, (2, 2), None)
 
                 if not isinstance(node.children[0], Var):
                     raise MyError(
@@ -1183,11 +989,12 @@ class Interpreter:
                 self.GLOBAL_SCOPE[var_name] = self.visit(node.children[1])
                 return None
 
-            if not callable(oper := self.visit(node.op)):
+            if not isinstance(oper := self.visit(node.op), Proc):
                 raise MyError(f"{oper}, expected procedure")
 
             values = [self.visit(child) for child in node.children]
-            return oper(Token(ID, str(oper)), values)
+            check_args(oper.name, values, oper.arity, oper.contracts)
+            return oper.proc(*values)
 
         if isinstance(node, Compound):
             results = []
