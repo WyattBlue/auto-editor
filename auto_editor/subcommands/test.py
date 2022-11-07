@@ -695,6 +695,7 @@ def main(sys_args: list[str] | None = None):
             "(margin -2 2 (boolarr 0 0 1 1 0 0 0))",
             np.array([0, 0, 0, 0, 1, 1, 0], dtype=np.bool_),
         )
+        my_try("(count-nonzero (boolarr 0 0 1 1 0 1))", 3)
         my_try("(equal? 3 3)", True)
         my_try("(equal? 3 3.0)", False)
         my_try('(equal? 16.3 "Editor")', False)
@@ -715,6 +716,11 @@ def main(sys_args: list[str] | None = None):
         my_try("(cdr (cons 3 4))", 4)
         my_try("(cdr (list 3 4))", ConsType(4, Null()))
         my_try("'()", Null())
+        my_try("(length (list 1 2 3))", 3)
+        my_try("(length (list))", 0)
+        my_try("(length (boolarr 0 1 0))", 3)
+        my_try("(begin)", None)
+        my_try("(begin (define r 10) (* pi (* r r)))", 314.1592653589793)
 
     tests = []
 
