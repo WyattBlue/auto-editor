@@ -71,21 +71,21 @@ class ConsType:
         return False
 
 
-class CharType:
+class Char:
     __slots__ = "val"
 
     def __init__(self, val: str):
-        assert len(val) == 1
+        assert isinstance(val, str) and len(val) == 1
         self.val = val
 
-    __str__: Callable[[CharType], str] = lambda self: self.val
+    __str__: Callable[[Char], str] = lambda self: self.val
 
     def __repr__(self) -> str:
         names = {" ": "space", "\n": "newline", "\t": "tab"}
         return f"#\\{self.val}" if self.val not in names else f"#\\{names[self.val]}"
 
     def __eq__(self, obj: object) -> bool:
-        if isinstance(obj, CharType):
+        if isinstance(obj, Char):
             return self.val == obj.val
         return False
 
@@ -238,7 +238,7 @@ class Lexer:
 
             char = self.char
             self.advance()
-            return Token(CHAR, CharType(char))
+            return Token(CHAR, Char(char))
 
         result = ""
         while self.char_is_norm():
@@ -351,27 +351,27 @@ class Compound:
 class ManyOp:
     __slots__ = ("op", "children")
 
-    def __init__(self, op: Node, children: list[Node]):
+    def __init__(self, op: Node | None, children: list[Node]):
         self.op = op
         self.children = children
 
     def __str__(self) -> str:
         s = f"(ManyOp {self.op}"
-        for child in self.children:
-            s += f" {child}"
-        s += ")"
-        return s
+        for c in self.children:
+            s += f" {c}"
+        return s + ")"
 
     __repr__ = __str__
 
 
 class Var:
-    def __init__(self, token: Token):
-        assert token.type == ID
-        self.token = token
-        self.value = token.value
+    __slots__ = "val"
 
-    __str__: Callable[[Var], str] = lambda self: f"(Var {self.value})"
+    def __init__(self, val: str):
+        self.val = val
+
+    __str__: Callable[[Var], str] = lambda self: f"(var {self.val})"
+    __repr__: Callable[[Var], str] = lambda self: f"{self.val}"
 
 
 class Num:
@@ -381,6 +381,7 @@ class Num:
         self.val = val
 
     __str__: Callable[[Num], str] = lambda self: f"(num {self.val})"
+    __repr__: Callable[[Num], str] = lambda self: f"{self.val}"
 
 
 class Bool:
@@ -390,6 +391,7 @@ class Bool:
         self.val = val
 
     __str__: Callable[[Bool], str] = lambda self: f"(bool {'#t' if self.val else '#f'})"
+    __repr__: Callable[[Bool], str] = lambda self: "#t" if self.val else "#f"
 
 
 class Str:
@@ -399,15 +401,7 @@ class Str:
         self.val = val
 
     __str__: Callable[[Str], str] = lambda self: f"(str {self.val})"
-
-
-class Char:
-    __slots__ = "val"
-
-    def __init__(self, val: str):
-        self.val = val
-
-    __str__: Callable[[Char], str] = lambda self: f"(char {self.val})"
+    __repr__: Callable[[Str], str] = lambda self: f'"{self.val}"'
 
 
 class BoolArr:
@@ -439,11 +433,11 @@ class Parser:
     def expr(self) -> Node:
         token = self.current_token
 
-        if token.type == ID:
-            self.eat(ID)
-            return Var(token)
+        if token.type == CHAR:
+            self.eat(token.type)
+            return token.value
 
-        matches = {ARR: BoolArr, BOOL: Bool, NUM: Num, STR: Str, CHAR: Char}
+        matches = {ID: Var, ARR: BoolArr, BOOL: Bool, NUM: Num, STR: Str}
         if token.type in matches:
             self.eat(token.type)
             return matches[token.type](token.value)
@@ -451,54 +445,34 @@ class Parser:
         if token.type == SEC:
             self.eat(SEC)
             return ManyOp(
-                Var(Token(ID, "exact-round")),
-                [
-                    ManyOp(
-                        Var(Token(ID, "*")),
-                        [Num(token.value), Var(Token(ID, "timebase"))],
-                    )
-                ],
+                Var("exact-round"),
+                [ManyOp(Var("*"), [Num(token.value), Var("timebase")])],
             )
 
-        if token.type == LPAREN:
+        pars = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
+        if token.type in pars:
             self.eat(token.type)
+            closing = pars[token.type]
+
             childs = []
-            while self.current_token.type != RPAREN:
+            while self.current_token.type != closing:
                 if self.current_token.type == EOF:
                     raise MyError("Unexpected EOF")
                 childs.append(self.expr())
 
-            self.eat(RPAREN)
-            return ManyOp(childs[0], children=childs[1:])
-
-        if token.type == LBRAC:
-            self.eat(token.type)
-            childs = []
-            while self.current_token.type != RBRAC:
-                if self.current_token.type == EOF:
-                    raise MyError("Unexpected EOF")
-                childs.append(self.expr())
-
-            self.eat(RBRAC)
-            return ManyOp(childs[0], children=childs[1:])
-
-        if token.type == LCUR:
-            self.eat(token.type)
-            childs = []
-            while self.current_token.type != RCUR:
-                if self.current_token.type == EOF:
-                    raise MyError("Unexpected EOF")
-                childs.append(self.expr())
-
-            self.eat(RCUR)
-            return ManyOp(childs[0], children=childs[1:])
+            self.eat(closing)
+            if len(childs) == 0:
+                return ManyOp(None, [])
+            return ManyOp(childs[0], childs[1:])
 
         self.eat(token.type)
         childs = []
         while self.current_token.type not in (RPAREN, RBRAC, RCUR, EOF):
             childs.append(self.expr())
 
-        return ManyOp(childs[0], children=childs[1:])
+        if len(childs) == 0:
+            return ManyOp(None, [])
+        return ManyOp(childs[0], childs[1:])
 
     def __str__(self) -> str:
         result = str(self.comp())
@@ -590,7 +564,7 @@ def is_str(val: object) -> bool:
 
 def is_char(val: object) -> bool:
     """char?"""
-    return isinstance(val, CharType)
+    return isinstance(val, Char)
 
 
 def is_iterable(val: object) -> bool:
@@ -716,13 +690,13 @@ def _xor(*vals: Any) -> bool | BoolList:
     return reduce(lambda a, b: a ^ b, vals)
 
 
-def string_append(*vals: str | CharType) -> str:
+def string_append(*vals: str | Char) -> str:
     return reduce(lambda a, b: a + b, vals, "")
 
 
-def string_ref(s: str, ref: int) -> CharType:
+def string_ref(s: str, ref: int) -> Char:
     try:
-        return CharType(s[ref])
+        return Char(s[ref])
     except IndexError:
         raise MyError(f"string index {ref} is out of range")
 
@@ -825,7 +799,6 @@ class Proc:
 
 
 class Interpreter:
-
     GLOBAL_SCOPE: dict[str, Any] = {
         # constants
         "true": True,
@@ -936,13 +909,15 @@ class Interpreter:
             self.GLOBAL_SCOPE["timebase"] = filesetup.tb
 
     def visit(self, node: Node) -> Any:
-        if isinstance(node, (Num, Str, Bool, Char)):
+        if isinstance(node, Char):
+            return node
+        if isinstance(node, (Num, Str, Bool)):
             return node.val
 
         if isinstance(node, Var):
-            val = self.GLOBAL_SCOPE.get(node.value)
+            val = self.GLOBAL_SCOPE.get(node.val)
             if val is None:
-                raise MyError(f"{node.value} is undefined")
+                raise MyError(f"{node.val} is undefined")
             return val
 
         if isinstance(node, BoolArr):
@@ -951,13 +926,14 @@ class Interpreter:
             return edit_method(node.val, self.filesetup)
 
         if isinstance(node, ManyOp):
-            if isinstance(node.op, Var):
-                name: str | None = node.op.value
-            else:
-                name = None
+            if node.op is None:
+                raise MyError("(): Missing procedure expression")
+
+            name: str | None = None if not isinstance(node.op, Var) else node.op.val
 
             if name == "if":
-                check_args("if", node.children, (3, 3), None)
+                if len(node.children) != 3:
+                    raise MyError("if: bad syntax")
                 test_expr = self.visit(node.children[0])
                 if not isinstance(test_expr, bool):
                     raise MyError(f"if: test-expr arg must be: boolean?")
@@ -966,7 +942,8 @@ class Interpreter:
                 return self.visit(node.children[2])
 
             if name == "when":
-                check_args("when", node.children, (2, 2), None)
+                if len(node.children) != 2:
+                    raise MyError("when: bad syntax")
                 test_expr = self.visit(node.children[0])
                 if not isinstance(test_expr, bool):
                     raise MyError(f"when: test-expr arg must be: boolean?")
@@ -974,33 +951,51 @@ class Interpreter:
                     return self.visit(node.children[1])
                 return None
 
-            if name in ("define", "set!"):
-                check_args(name, node.children, (2, 2), None)
+            if name == "quote":
+                if len(node.children) != 1:
+                    raise MyError("quote: bad syntax")
+                args = node.children[0]
+                if isinstance(args, ManyOp):
+                    if args.op is None:
+                        return Null()
+                    pre_args = [args.op] + args.children
+                    list_args = [self.visit(c) for c in pre_args]
+                    return _list(*list_args)
+                return self.visit(args)  # return literal
 
+            if name == "define":
+                if len(node.children) != 2:
+                    raise MyError("define: bad syntax")
                 if not isinstance(node.children[0], Var):
-                    raise MyError(
-                        f"Variable must be set with a symbol, got {node.children[0]}"
-                    )
+                    raise MyError("define: Must use symbol")
 
-                var_name = node.children[0].value
-                if name == "set!" and var_name not in self.GLOBAL_SCOPE:
-                    raise MyError(f"Cannot set variable {var_name} before definition")
-
-                self.GLOBAL_SCOPE[var_name] = self.visit(node.children[1])
+                symbol = node.children[0].val
+                self.GLOBAL_SCOPE[symbol] = self.visit(node.children[1])
                 return None
 
-            if not isinstance(oper := self.visit(node.op), Proc):
+            if name == "set!":
+                if len(node.children) != 2:
+                    raise MyError("set!: bad syntax")
+                if not isinstance(node.children[0], Var):
+                    raise MyError("set!: Must use symbol")
+
+                symbol = node.children[0].val
+                if symbol not in self.GLOBAL_SCOPE:
+                    raise MyError(f"Cannot set variable {symbol} before definition")
+                self.GLOBAL_SCOPE[symbol] = self.visit(node.children[1])
+                return None
+
+            oper = self.visit(node.op)
+
+            if not isinstance(oper, Proc):
                 raise MyError(f"{oper}, expected procedure")
 
-            values = [self.visit(child) for child in node.children]
+            values = [self.visit(c) for c in node.children]
             check_args(oper.name, values, oper.arity, oper.contracts)
             return oper.proc(*values)
 
         if isinstance(node, Compound):
-            results = []
-            for child in node.children:
-                results.append(self.visit(child))
-            return results
+            return [self.visit(c) for c in node.children]
 
         raise ValueError(f"Unknown node type: {node}")
 
