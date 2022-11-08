@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Callable, overload
+from typing import Callable
 
 import numpy as np
 from numpy.typing import NDArray
 
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import time
 
 BoolList = NDArray[np.bool_]
 BoolOperand = Callable[[BoolList, BoolList], BoolList]
@@ -49,12 +48,6 @@ def setup_tempdir(temp: str | None, log: Log) -> str:
         mkdir(temp)
 
     return temp
-
-
-def seconds_to_ticks(val: int | str, tb: Fraction) -> int:
-    if isinstance(val, str):
-        return int(float(val) * tb)
-    return val
 
 
 def to_timecode(secs: float | Fraction, fmt: str) -> str:
@@ -101,56 +94,6 @@ def remove_small(has_loud: BoolList, lim: int, replace: int, with_: int) -> Bool
                     has_loud[start_p:j] = with_
                 active = False
     return has_loud
-
-
-@overload
-def set_range(
-    arr: NDArray[np.float_],
-    range_syntax: list[list[str]],
-    tb: Fraction,
-    with_: float,
-    log: Log,
-) -> NDArray[np.float_]:
-    pass
-
-
-@overload
-def set_range(
-    arr: BoolList,
-    range_syntax: list[list[str]],
-    tb: Fraction,
-    with_: float,
-    log: Log,
-) -> BoolList:
-    pass
-
-
-def set_range(
-    arr: NDArray, range_syntax: list[list[str]], tb: Fraction, with_: float, log: Log
-) -> NDArray:
-    def replace_variables_to_values(val: str, tb: Fraction, log: Log) -> int:
-        if val == "start":
-            return 0
-        if val == "end":
-            return len(arr)
-
-        try:
-            value = time(val)
-        except TypeError as e:
-            log.error(e)
-        if isinstance(value, int):
-            return value
-        return round(float(value) * tb)
-
-    for _range in range_syntax:
-        pair = []
-        for val in _range:
-            num = replace_variables_to_values(val, tb, log)
-            if num < 0:
-                num += len(arr)
-            pair.append(num)
-        arr[pair[0] : pair[1]] = with_
-    return arr
 
 
 def cook(has_loud: BoolList, min_clip: int, min_cut: int) -> BoolList:
