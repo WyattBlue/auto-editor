@@ -139,7 +139,7 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
         except Exception as e:
             print(f"Test '{test.__name__}' ({passed}/{len(tests)}) failed.\n{e}")
             clean_all()
-            sys.exit(1)
+            raise e
 
         print(f"{test.__name__:<25} {round(dur, 2)} secs")
 
@@ -721,6 +721,15 @@ def main(sys_args: list[str] | None = None):
         my_try("(length (boolarr 0 1 0))", 3)
         my_try("(begin)", None)
         my_try("(begin (define r 10) (* pi (* r r)))", 314.1592653589793)
+
+        my_try("(quote ())", Null())
+        my_try("(quote (3))", ConsType(3, Null()))
+        my_try(
+            '(quote (3 2 "apple"))', ConsType(3, ConsType(2, ConsType("apple", Null())))
+        )
+        my_try("(quote +3i)", 3j)
+        my_try("(quote 23.4)", 23.4)
+        my_try('(quote "hello")', "hello")
 
     tests = []
 

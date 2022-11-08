@@ -12,6 +12,7 @@ import numpy as np
 import auto_editor
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import (
+    ConsType,
     FileSetup,
     Interpreter,
     Lexer,
@@ -67,6 +68,8 @@ def display_val(val: Any) -> str:
         return "#t\n"
     if val is False:
         return "#f\n"
+    if isinstance(val, ConsType):
+        return f"'{val!r}\n"
     if isinstance(val, complex):
         join = "" if val.imag < 0 else "+"
         return f"{val.real}{join}{val.imag}i\n"
