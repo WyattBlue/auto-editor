@@ -15,7 +15,8 @@ from auto_editor.interpreter import (
 )
 from auto_editor.objs.tl import ASpace, TlAudio, TlVideo, VSpace
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
-from auto_editor.utils.func import apply_margin, cook, seconds_to_ticks, set_range
+from auto_editor.utils.func import apply_margin, cook
+from auto_editor.utils.types import time
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -106,7 +107,7 @@ def run_interpreter(
     try:
         lexer = Lexer(text)
         parser = Parser(lexer)
-        if log.debug:
+        if log.is_debug:
             log.debug(f"edit: {parser}")
 
         interpreter = Interpreter(parser, filesetup)
@@ -149,13 +150,48 @@ def make_layers(
     all_clips: list[list[Clip]] = []
     all_chunks: list[Chunks] = []
 
-    start_margin, end_margin = margin
-    start_margin = seconds_to_ticks(start_margin, tb)
-    end_margin = seconds_to_ticks(end_margin, tb)
-    min_clip = seconds_to_ticks(_min_clip, tb)
-    min_cut = seconds_to_ticks(_min_cut, tb)
+    def seconds_to_ticks(val: int | str) -> int:
+        if isinstance(val, str):
+            return round(float(val) * tb)
+        return val
+
+    start_margin = seconds_to_ticks(margin[0])
+    end_margin = seconds_to_ticks(margin[1])
+    min_clip = seconds_to_ticks(_min_clip)
+    min_cut = seconds_to_ticks(_min_cut)
 
     strict = len(inputs) < 2
+
+    speed_map = [silent_speed, loud_speed]
+    speed_hash = {
+        0: silent_speed,
+        1: loud_speed,
+    }
+
+    def get_or_set_speed(speed: float) -> int:
+        if speed in speed_map:
+            return speed_map.index(speed)
+        speed_map.append(speed)
+        speed_hash[len(speed_map) - 1] = speed
+        return len(speed_map) - 1
+
+    def parse_time(val: str, arr: NDArray) -> int:
+        if val == "start":
+            return 0
+        if val == "end":
+            return len(arr)
+        try:
+            num = seconds_to_ticks(time(val))
+            return num if num >= 0 else num + len(arr)
+        except TypeError as e:
+            log.error(e)
+
+    def set_range(arr: NDArray, range_syntax: list[list[str]], with_: float) -> NDArray:
+        for _range in range_syntax:
+            assert len(_range) == 2
+            pair = [parse_time(val, arr) for val in _range]
+            arr[pair[0] : pair[1]] = with_
+        return arr
 
     for i in inputs:
         filesetup = FileSetup(sources[str(i)], ensure, strict, tb, bar, temp, log)
@@ -164,10 +200,10 @@ def make_layers(
         has_loud_length = len(has_loud)
 
         if len(mark_loud) > 0:
-            has_loud = set_range(has_loud, mark_loud, tb, loud_speed, log)
+            has_loud = set_range(has_loud, mark_loud, loud_speed)
 
         if len(mark_silent) > 0:
-            has_loud = set_range(has_loud, mark_silent, tb, silent_speed, log)
+            has_loud = set_range(has_loud, mark_silent, silent_speed)
 
         has_loud = cook(has_loud, min_clip, min_cut)
         has_loud = apply_margin(has_loud, has_loud_length, start_margin, end_margin)
@@ -179,30 +215,17 @@ def make_layers(
         has_loud = has_loud.astype(np.uint)
         del has_loud_length
 
-        speed_map = [silent_speed, loud_speed]
-        speed_hash = {
-            0: silent_speed,
-            1: loud_speed,
-        }
-
-        def get_speed(speed: float) -> int:
-            if speed in speed_map:
-                return speed_map.index(speed)
-            speed_map.append(speed)
-            speed_hash[len(speed_map) - 1] = speed
-            return len(speed_map) - 1
-
         if len(cut_out) > 0:
-            index = get_speed(99999)
-            has_loud = set_range(has_loud, cut_out, tb, index, log)
+            index = get_or_set_speed(99999)
+            has_loud = set_range(has_loud, cut_out, index)
 
         if len(add_in) > 0:
             # Set speed index to 'loud_speed'
-            has_loud = set_range(has_loud, add_in, tb, 1, log)
+            has_loud = set_range(has_loud, add_in, 1)
 
         for item in speed_range:
-            index = get_speed(item[0])
-            has_loud = set_range(has_loud, [list(item[1:])], tb, index, log)
+            index = get_or_set_speed(item[0])
+            has_loud = set_range(has_loud, [list(item[1:])], index)
 
         chunks = chunkify(has_loud, speed_hash)
 

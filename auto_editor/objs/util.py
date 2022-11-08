@@ -3,7 +3,6 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import Any, NamedTuple, TypedDict, TypeVar
 
-from auto_editor.utils.func import seconds_to_ticks
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import pos, time
 
@@ -57,7 +56,14 @@ def parse_dataclass(
             if val == "end":
                 return _vars["end"]
 
-            return seconds_to_ticks(time(val), _vars["tb"])
+            try:
+                _val = time(val)
+            except TypeError as e:
+                log.error(e)
+
+            if isinstance(_val, str):
+                return round(float(_val) * _vars["tb"])
+            return _val
 
         if name in ("x", "width"):
             assert "width" in _vars
