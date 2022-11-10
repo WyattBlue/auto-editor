@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from auto_editor.analyze import edit_method
-from auto_editor.utils.func import apply_margin, boolop, cook, remove_small
+from auto_editor.utils.func import boolop, mut_margin
 
 if TYPE_CHECKING:
     from fractions import Fraction
@@ -721,24 +721,57 @@ def length(val: Any) -> int:
     return len(val)
 
 
-def minclip(arr: BoolList, _min: int) -> BoolList:
-    return remove_small(np.copy(arr), _min, replace=1, with_=0)
+def mut_remove_small(arr: BoolList, lim: int, replace: int, with_: int) -> None:
+    start_p = 0
+    active = False
+    for j, item in enumerate(arr):
+        if item == replace:
+            if not active:
+                start_p = j
+                active = True
+            # Special case for end.
+            if j == len(arr) - 1:
+                if j - start_p < lim:
+                    arr[start_p : j + 1] = with_
+        else:
+            if active:
+                if j - start_p < lim:
+                    arr[start_p:j] = with_
+                active = False
 
 
-def mincut(arr: BoolList, _min: int) -> BoolList:
-    return remove_small(np.copy(arr), _min, replace=0, with_=1)
+def minclip(oarr: BoolList, _min: int) -> BoolList:
+    arr = np.copy(oarr)
+    mut_remove_small(arr, _min, replace=1, with_=0)
+    return arr
+
+
+def mincut(oarr: BoolList, _min: int) -> BoolList:
+    arr = np.copy(oarr)
+    mut_remove_small(arr, _min, replace=0, with_=1)
+    return arr
 
 
 def margin(a: Any, b: Any, c: Any = None) -> BoolList:
     if c is None:
         check_args("margin", [a, b], (2, 2), [is_eint, is_boolarr])
-        arr = b
+        oarr = b
         start, end = a, a
     else:
         check_args("margin", [a, b, c], (3, 3), [is_eint, is_eint, is_boolarr])
-        arr = c
+        oarr = c
         start, end = a, b
-    return apply_margin(np.copy(arr), len(arr), start, end)
+
+    arr = np.copy(oarr)
+    mut_margin(arr, start, end)
+    return arr
+
+
+def cook(min_clip: int, min_cut: int, oarr: BoolList) -> BoolList:
+    arr = np.copy(oarr)
+    mut_remove_small(arr, min_clip, replace=1, with_=0)
+    mut_remove_small(arr, min_cut, replace=0, with_=1)
+    return arr
 
 
 def _list(*values: Any) -> ConsType | Null:
@@ -888,12 +921,7 @@ class Interpreter:
         "mincut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
         "mclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
         "minclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
-        "cook": Proc(
-            "cook",
-            lambda a, b, c: cook(np.copy(c), b, a),
-            (3, 3),
-            [is_eint, is_eint, is_boolarr],
-        ),
+        "cook": Proc("cook", cook, (3, 3), [is_eint, is_eint, is_boolarr]),
         "boolarr": Proc(
             "boolarr", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_eint]
         ),
