@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 
@@ -11,11 +11,12 @@ from auto_editor.interpreter import (
     Lexer,
     MyError,
     Parser,
+    cook,
     is_boolarr,
 )
 from auto_editor.objs.tl import ASpace, TlAudio, TlVideo, VSpace
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
-from auto_editor.utils.func import apply_margin, cook
+from auto_editor.utils.func import mut_margin
 from auto_editor.utils.types import time
 
 if TYPE_CHECKING:
@@ -139,7 +140,7 @@ def make_layers(
     add_in: list[list[str]],
     mark_silent: list[list[str]],
     mark_loud: list[list[str]],
-    speed_range: list[tuple[float, str, str]],
+    speed_ranges: list[tuple[float, str, str]],
     silent_speed: float,
     loud_speed: float,
     bar: Bar,
@@ -160,15 +161,13 @@ def make_layers(
     min_clip = seconds_to_ticks(_min_clip)
     min_cut = seconds_to_ticks(_min_cut)
 
-    strict = len(inputs) < 2
-
     speed_map = [silent_speed, loud_speed]
     speed_hash = {
         0: silent_speed,
         1: loud_speed,
     }
 
-    def get_or_set_speed(speed: float) -> int:
+    def get_speed_index(speed: float) -> int:
         if speed in speed_map:
             return speed_map.index(speed)
         speed_map.append(speed)
@@ -186,51 +185,48 @@ def make_layers(
         except TypeError as e:
             log.error(e)
 
-    def set_range(arr: NDArray, range_syntax: list[list[str]], with_: float) -> NDArray:
-        for _range in range_syntax:
+    def mut_set_range(arr: NDArray, _ranges: list[list[str]], index: Any) -> None:
+        for _range in _ranges:
             assert len(_range) == 2
             pair = [parse_time(val, arr) for val in _range]
-            arr[pair[0] : pair[1]] = with_
-        return arr
+            arr[pair[0] : pair[1]] = index
 
-    for i in inputs:
-        filesetup = FileSetup(sources[str(i)], ensure, strict, tb, bar, temp, log)
-
+    for i in map(str, inputs):
+        filesetup = FileSetup(sources[i], ensure, len(inputs) < 2, tb, bar, temp, log)
         has_loud = run_interpreter(method, filesetup, log)
-        has_loud_length = len(has_loud)
 
         if len(mark_loud) > 0:
-            has_loud = set_range(has_loud, mark_loud, loud_speed)
+            mut_set_range(has_loud, mark_loud, loud_speed)
 
         if len(mark_silent) > 0:
-            has_loud = set_range(has_loud, mark_silent, silent_speed)
+            mut_set_range(has_loud, mark_silent, silent_speed)
 
-        has_loud = cook(has_loud, min_clip, min_cut)
-        has_loud = apply_margin(has_loud, has_loud_length, start_margin, end_margin)
+        has_loud = cook(min_clip, min_cut, has_loud)
+        mut_margin(has_loud, start_margin, end_margin)
 
         # Remove small clips/cuts created by applying other rules.
-        has_loud = cook(has_loud, min_clip, min_cut)
+        has_loud = cook(min_clip, min_cut, has_loud)
 
         # Setup for handling custom speeds
         has_loud = has_loud.astype(np.uint)
-        del has_loud_length
 
         if len(cut_out) > 0:
-            index = get_or_set_speed(99999)
-            has_loud = set_range(has_loud, cut_out, index)
+            # always cut out even if 'silent_speed' is not 99,999
+            mut_set_range(has_loud, cut_out, get_speed_index(99_999))
 
         if len(add_in) > 0:
-            # Set speed index to 'loud_speed'
-            has_loud = set_range(has_loud, add_in, 1)
+            # set to 'video_speed' index
+            mut_set_range(has_loud, add_in, 1)
 
-        for item in speed_range:
-            index = get_or_set_speed(item[0])
-            has_loud = set_range(has_loud, [list(item[1:])], index)
+        for speed_range in speed_ranges:
+            speed = speed_range[0]
+            _range = list(speed_range[1:])
+            mut_set_range(has_loud, [_range], get_speed_index(speed))
 
         chunks = chunkify(has_loud, speed_hash)
 
         all_chunks.append(chunks)
-        all_clips.append(clipify(chunks, str(i), start))
+        all_clips.append(clipify(chunks, i, start))
         start += round(chunks_len(chunks))
 
     vclips, aclips = make_av(all_clips, sources, inputs)

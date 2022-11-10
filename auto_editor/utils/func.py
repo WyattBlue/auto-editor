@@ -11,11 +11,6 @@ from auto_editor.utils.log import Log
 BoolList = NDArray[np.bool_]
 BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
-"""
-To prevent duplicate code being pasted between scripts, common functions should be
-put here. Every function should be pure with no side effects.
-"""
-
 
 def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
     if len(a) > len(b):
@@ -76,36 +71,11 @@ def to_timecode(secs: float | Fraction, fmt: str) -> str:
     raise ValueError("to_timecode: Unreachable")
 
 
-def remove_small(has_loud: BoolList, lim: int, replace: int, with_: int) -> BoolList:
-    start_p = 0
-    active = False
-    for j, item in enumerate(has_loud):
-        if item == replace:
-            if not active:
-                start_p = j
-                active = True
-            # Special case for end.
-            if j == len(has_loud) - 1:
-                if j - start_p < lim:
-                    has_loud[start_p : j + 1] = with_
-        else:
-            if active:
-                if j - start_p < lim:
-                    has_loud[start_p:j] = with_
-                active = False
-    return has_loud
-
-
-def cook(has_loud: BoolList, min_clip: int, min_cut: int) -> BoolList:
-    has_loud = remove_small(has_loud, min_clip, replace=1, with_=0)
-    has_loud = remove_small(has_loud, min_cut, replace=0, with_=1)
-    return has_loud
-
-
-def apply_margin(arr: BoolList, arrlen: int, start_m: int, end_m: int) -> BoolList:
-    # Find start and end indexes.
+def mut_margin(arr: BoolList, start_m: int, end_m: int) -> None:
+    # Find start and end indexes
     start_index = []
     end_index = []
+    arrlen = len(arr)
     for j in range(1, arrlen):
         if arr[j] != arr[j - 1]:
             if arr[j]:
@@ -127,8 +97,6 @@ def apply_margin(arr: BoolList, arrlen: int, start_m: int, end_m: int) -> BoolLi
     if end_m < 0:
         for i in end_index:
             arr[max(i + end_m, 0) : i] = False
-
-    return arr
 
 
 def merge(start_list: np.ndarray, end_list: np.ndarray) -> BoolList:
