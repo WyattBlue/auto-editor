@@ -29,7 +29,6 @@ Editing Methods:
  - audio: General audio detection
  - motion: Motion detection specialized for real life noisy video
  - pixeldiff: Detect when a certain amount of pixels have changed between frames
- - random: Set silent/loud randomly based on a random or preset seed
  - none: Do not modify the media in anyway (Mark all sections as "loud")
  - all: Cut out everything out (Mark all sections as "silent")
 
@@ -45,19 +44,7 @@ Attribute Defaults:
  - pixeldiff
     - threshold: 1 (natural)
     - stream: 0 (natural | "all")
- - random
-    - threshold: 0.5 (number)
-    - seed: RANDOMLY-GENERATED (int)
 
-Operators:
- - and
-   - usage: $METHOD and $METHOD
- - or
-   - usage: $METHOD or $METHOD
- - xor
-   - usage: $METHOD xor $METHOD
- - not
-   - usage: not $METHOD
 Examples:
   --edit audio
   --edit audio:stream=1
@@ -65,7 +52,7 @@ Examples:
   --edit audio:threshold=0.03
   --edit motion
   --edit motion:threshold=2%,blur=3
-  --edit audio:threshold=4% or motion:threshold=2%,blur=3
+  --edit (or audio:threshold=4% motion:threshold=2%,blur=3)
   --edit none
   --edit all
 """.strip(),

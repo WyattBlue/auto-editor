@@ -107,7 +107,7 @@ def print_arr(arr: BoolList) -> str:
 #                                                                             #
 ###############################################################################
 
-METHODS = ("audio", "motion", "pixeldiff", "random", "none", "all")
+METHODS = ("audio", "motion", "pixeldiff", "none", "all")
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 ID, NUM, BOOL, STR, ARR, SEC, CHAR = "ID", "NUM", "BOOL", "STR", "ARR", "SEC", "CHAR"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
