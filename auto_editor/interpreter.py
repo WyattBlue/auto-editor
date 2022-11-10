@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import cmath
 import math
+import random
 import sys
 from dataclasses import dataclass
 from fractions import Fraction
@@ -35,7 +36,8 @@ class MyError(Exception):
 
 
 class Null:
-    def __init__(self) -> None:
+    @staticmethod
+    def __init__() -> None:
         pass
 
     def __eq__(self, obj: object) -> bool:
@@ -47,6 +49,31 @@ class Null:
     __repr__ = __str__
 
 
+def print_arr(arr: BoolList) -> str:
+    rs = "(boolarr"
+    for item in arr:
+        rs += " 1" if item else " 0"
+    rs += ")\n"
+    return rs
+
+
+def print_val(val: object) -> str:
+    if val is True:
+        return "#t"
+    if val is False:
+        return "#f"
+    if isinstance(val, np.ndarray):
+        return print_arr(val)
+    if isinstance(val, complex):
+        join = "" if val.imag < 0 else "+"
+        return f"{val.real}{join}{val.imag}i"
+
+    if isinstance(val, str):
+        return f'"{val}"'
+
+    return f"{val!r}"
+
+
 class ConsType:
     __slots__ = ("a", "d")
 
@@ -55,15 +82,15 @@ class ConsType:
         self.d = d
 
     def __repr__(self) -> str:
-        result = f"({self.a}"
+        result = f"({print_val(self.a)}"
         tail = self.d
         while isinstance(tail, ConsType):
-            result += f" {tail.a}"
+            result += f" {print_val(tail.a)}"
             tail = tail.d
 
         if isinstance(tail, Null):
             return f"{result})"
-        return f"{result} . {tail})"
+        return f"{result} . {print_val(tail)})"
 
     def __eq__(self, obj: object) -> bool:
         if isinstance(obj, ConsType):
@@ -91,14 +118,6 @@ class Char:
 
     def __radd__(self, obj2: str) -> str:
         return obj2 + self.val
-
-
-def print_arr(arr: BoolList) -> str:
-    rs = "(boolarr"
-    for item in arr:
-        rs += " 1" if item else " 0"
-    rs += ")\n"
-    return rs
 
 
 ###############################################################################
@@ -518,6 +537,11 @@ def check_args(
             raise MyError(f"{o} expects: {' '.join([_t.__doc__ for _t in types])}")
 
 
+def is_any(val: object) -> bool:
+    """any?"""
+    return True
+
+
 def is_boolarr(arr: object) -> bool:
     """boolarr?"""
     if isinstance(arr, np.ndarray):
@@ -570,6 +594,16 @@ def is_char(val: object) -> bool:
 def is_iterable(val: object) -> bool:
     """iterable?"""
     return isinstance(val, (list, range, np.ndarray, ConsType, Null))
+
+
+def is_stream(val: object) -> bool:
+    """stream?"""
+    return isinstance(val, range)
+
+
+def is_vector(val: object) -> bool:
+    """vector?"""
+    return isinstance(val, list)
 
 
 def is_int(val: object) -> bool:
@@ -781,9 +815,32 @@ def _list(*values: Any) -> ConsType | Null:
     return result
 
 
+def list_to_vector(val: ConsType | Null) -> list:
+    result = []
+    while not isinstance(val, Null):
+        result.append(val.a)
+        val = val.d
+    return result
+
+
+def vector_to_list(values: list) -> ConsType | Null:
+    result: ConsType | Null = Null()
+    for val in reversed(values):
+        result = ConsType(val, result)
+    return result
+
+
+def vector_append(vec: list, val: Any) -> None:
+    vec.append(val)
+
+
+def string_to_list(s: str) -> ConsType | Null:
+    return vector_to_list([Char(s) for s in s])
+
+
 def list_ref(result: ConsType, ref: int) -> Any:
     if ref < 0:
-        raise MyError(f"{ref}: Invalid index")
+        raise MyError(f"list-ref: {ref}: Invalid index")
     while ref > 0:
         ref -= 1
         result = result.d
@@ -794,10 +851,40 @@ def list_ref(result: ConsType, ref: int) -> Any:
     return result.a
 
 
-def listq(val: Any) -> bool:
+def is_list(val: Any) -> bool:
     while isinstance(val, ConsType):
         val = val.d
     return isinstance(val, Null)
+
+
+def palet_random(*args: int) -> int | float:
+    if len(args) == 0:
+        return random.random()
+
+    if args[0] < 1:
+        raise MyError(f"random: arg1 ({args[0]}) must be greater than zero")
+
+    if len(args) == 1:
+        return random.randrange(0, args[0])
+
+    if args[0] >= args[1]:
+        raise MyError(f"random: arg2 ({args[1]}) must be greater than arg1")
+    return random.randrange(args[0], args[1])
+
+
+def ref(arr: list | NDArray, ref: int) -> Any:
+    try:
+        return arr[ref]
+    except IndexError:
+        kind = "vector" if isinstance(arr, list) else "array"
+        raise MyError(f"{kind}-ref: {ref}: Invalid index")
+
+
+def stream_to_list(s: range) -> ConsType | Null:
+    result: ConsType | Null = Null()
+    for item in reversed(s):
+        result = ConsType(item, result)
+    return result
 
 
 ###############################################################################
@@ -841,7 +928,7 @@ class Interpreter:
         # actions
         "begin": Proc("begin", lambda *x: None if not x else x[-1], (0, None)),
         "display": Proc("display", display, (1, 1)),
-        "exit": Proc("exit", sys.exit, (1, None)),
+        "exit": Proc("exit", sys.exit, (0, None)),
         "error": Proc("error", raise_, (1, 1), [is_str]),
         # booleans
         ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
@@ -853,31 +940,32 @@ class Interpreter:
         "and": Proc("and", _and, (1, None)),
         "or": Proc("or", _or, (1, None)),
         "xor": Proc("xor", _xor, (2, None)),
-        # questions
+        # compares
         "equal?": Proc("equal?", is_equal, (2, 2)),
-        "list?": Proc("list?", listq, (1, 1)),
-        "pair?": Proc("pair?", is_pair, (1, 1)),
         "null?": Proc("null?", lambda val: isinstance(val, Null), (1, 1)),
-        "number?": Proc("number?", is_num, (1, 1)),
-        "exact?": Proc("exact?", is_exact, (1, 1)),
-        "inexact?": Proc("inexact?", lambda v: not is_exact(v), (1, 1)),
-        "real?": Proc("real?", is_real, (1, 1)),
-        "integer?": Proc("integer?", is_int, (1, 1)),
-        "exact-integer?": Proc("exact-integer?", is_eint, (1, 1)),
-        "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
-        "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
-        "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_real]),
         "boolean?": Proc("boolean?", is_bool, (1, 1)),
-        "string?": Proc("string?", is_str, (1, 1)),
-        "char?": Proc("char?", is_char, (1, 1)),
+        # random
+        "random": Proc("random", palet_random, (0, 2), [is_eint]),
         # cons/list
+        "list?": Proc("list?", is_list, (1, 1)),
+        "pair?": Proc("pair?", is_pair, (1, 1)),
         "cons": Proc("cons", lambda a, b: ConsType(a, b), (2, 2)),
         "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
         "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
         "list": Proc("list", _list, (0, None)),
         "list-ref": Proc("list-ref", list_ref, (2, 2), [is_pair, is_eint]),
         "length": Proc("length", length, (1, 1), [is_iterable]),
+        # vectors
+        "vector?": Proc("vector?", is_vector, (1, 1)),
+        "vector": Proc("vector", lambda *a: list(a), (0, None)),
+        "vector-length": Proc("vector-length", len, (1, 1), [is_vector]),
+        "vector-ref": Proc("vector-ref", ref, (2, 2), [is_vector, is_real]),
+        "pop!": Proc("pop!", lambda v: v.pop(), (1, 1), [is_vector]),
+        "vector-pop!": Proc("pop!", lambda v: v.pop(), (1, 1), [is_vector]),
+        "vector-add!": Proc("vector-add!", vector_append, (2, 2), [is_vector, is_any]),
         # strings
+        "string?": Proc("string?", is_str, (1, 1)),
+        "char?": Proc("char?", is_char, (1, 1)),
         "string": Proc("string", string_append, (0, None), [is_char]),
         "string-append": Proc("string-append", string_append, (0, None), [is_str]),
         "string-upcase": Proc("string-upcase", lambda s: s.upper(), (1, 1), [is_str]),
@@ -889,7 +977,16 @@ class Interpreter:
         ),
         "string-length": Proc("string-length", len, (1, 1), [is_str]),
         "string-ref": Proc("string-ref", string_ref, (2, 2), [is_str, is_eint]),
-        "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
+        # number questions
+        "number?": Proc("number?", is_num, (1, 1)),
+        "exact?": Proc("exact?", is_exact, (1, 1)),
+        "inexact?": Proc("inexact?", lambda v: not is_exact(v), (1, 1)),
+        "real?": Proc("real?", is_real, (1, 1)),
+        "integer?": Proc("integer?", is_int, (1, 1)),
+        "exact-integer?": Proc("exact-integer?", is_eint, (1, 1)),
+        "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
+        "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
+        "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_real]),
         # numbers
         "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
         "-": Proc("-", minus, (1, None), [is_num]),
@@ -900,21 +997,43 @@ class Interpreter:
         "expt": Proc("expt", pow, (2, 2), [is_real]),
         "sqrt": Proc("sqrt", _sqrt, (1, 1), [is_num]),
         "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
-        "modulo": Proc("modulo", lambda a, b: a % b, (2, 2), [is_int, is_int]),
+        "modulo": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
         "real-part": Proc("real-part", lambda v: v.real, (1, 1), [is_num]),
         "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
         # reals
         "abs": Proc("abs", abs, (1, 1), [is_real]),
         "ceil": Proc("ceil", ceiling, (1, 1), [is_real]),
-        "ceiling": Proc("ceiling", ceiling, (1, 1), [is_real]),
+        "ceiling": Proc("ceil", ceiling, (1, 1), [is_real]),
         "exact-ceil": Proc("exact-ceil", math.ceil, (1, 1), [is_real]),
-        "exact-ceiling": Proc("exact-ceiling", math.ceil, (1, 1), [is_real]),
+        "exact-ceiling": Proc("exact-ceil", math.ceil, (1, 1), [is_real]),
         "floor": Proc("floor", floor, (1, 1), [is_real]),
         "exact-floor": Proc("exact-floor", math.floor, (1, 1), [is_real]),
         "round": Proc("round", _round, (1, 1), [is_real]),
         "exact-round": Proc("exact-round", round, (1, 1), [is_real]),
         "max": Proc("max", lambda *v: max(v), (1, None), [is_real]),
         "min": Proc("min", lambda *v: min(v), (1, None), [is_real]),
+        # streams
+        "stream?": Proc("stream?", is_stream, (1, 1)),
+        "in-range": Proc(
+            "in-range", lambda *a: range(*a), (1, 3), [is_real, is_real, is_real]
+        ),
+        # conversions
+        "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
+        "string->list": Proc("string->list", string_to_list, (1, 1), [is_str]),
+        "string->vector": Proc(
+            "string->vector", lambda s: [Char(s) for s in s], (1, 1), [is_str]
+        ),
+        "list->vector": Proc("list->vector", list_to_vector, (1, 1), [is_pair]),
+        "vector->list": Proc("vector->list", vector_to_list, (1, 1), [is_vector]),
+        "stream->list": Proc("stream->list", stream_to_list, (1, 1), [is_stream]),
+        "stream->vector": Proc("stream->vector", list, (1, 1), [is_stream]),
+        # arrays
+        "boolarr?": Proc("boolarr?", is_boolarr, (1, 1)),
+        "boolarr": Proc(
+            "boolarr", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_eint]
+        ),
+        "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_boolarr]),
+        "array-ref": Proc("array-ref", ref, (2, 2), [is_boolarr, is_real]),
         # ae extensions
         "margin": Proc("margin", margin, (2, 3), None),
         "mcut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
@@ -922,11 +1041,6 @@ class Interpreter:
         "mclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
         "minclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
         "cook": Proc("cook", cook, (3, 3), [is_eint, is_eint, is_boolarr]),
-        "boolarr": Proc(
-            "boolarr", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_eint]
-        ),
-        "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_boolarr]),
-        "boolarr?": Proc("boolarr?", is_boolarr, (1, 1)),
     }
 
     def __init__(self, parser: Parser, filesetup: FileSetup | None):

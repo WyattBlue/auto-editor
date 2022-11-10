@@ -9,11 +9,7 @@ from numpy.typing import NDArray
 
 from auto_editor.analyze import audio_levels, motion_levels, pixeldiff_levels
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.objs.edit import (
-    audio_builder,
-    motion_builder,
-    pixeldiff_builder,
-)
+from auto_editor.objs.edit import audio_builder, motion_builder, pixeldiff_builder
 from auto_editor.objs.util import _Vars, parse_dataclass
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar

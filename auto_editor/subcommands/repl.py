@@ -7,8 +7,6 @@ import sys
 from dataclasses import dataclass, field
 from fractions import Fraction
 
-import numpy as np
-
 import auto_editor
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import (
@@ -18,7 +16,7 @@ from auto_editor.interpreter import (
     Lexer,
     MyError,
     Parser,
-    print_arr,
+    print_val,
 )
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
@@ -64,23 +62,19 @@ def repl_options(parser: ArgumentParser) -> ArgumentParser:
 def display_val(val: Any) -> str:
     if val is None:
         return ""
-    if val is True:
-        return "#t\n"
-    if val is False:
-        return "#f\n"
+    if isinstance(val, list):
+        if len(val) == 0:
+            return "(vector)"
+        result = f"(vector {print_val(val[0])}"
+        for item in val[1:]:
+            result += f" {print_val(item)}"
+        return result + ")\n"
     if isinstance(val, ConsType):
-        return f"'{val!r}\n"
-    if isinstance(val, complex):
-        join = "" if val.imag < 0 else "+"
-        return f"{val.real}{join}{val.imag}i\n"
-    if isinstance(val, np.ndarray):
-        return print_arr(val)
-    if isinstance(val, str):
-        return f'"{val}"\n'
+        return f"'{print_val(val)}\n"
     if isinstance(val, Fraction):
         return f"{val.numerator}/{val.denominator}\n"
 
-    return f"{val!r}\n"
+    return f"{print_val(val)}\n"
 
 
 def main(sys_args: list[str]) -> None:
@@ -119,11 +113,7 @@ def main(sys_args: list[str]) -> None:
 
             try:
                 interpreter = Interpreter(parser, filesetup)
-                result = interpreter.interpret()
-                if isinstance(result, list):
-                    for item in result:
-                        sys.stdout.write(display_val(item))
-                else:
+                for result in interpreter.interpret():
                     sys.stdout.write(display_val(result))
             except MyError as e:
                 print(f"error: {e}")
