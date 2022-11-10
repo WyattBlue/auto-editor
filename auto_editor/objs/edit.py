@@ -27,12 +27,6 @@ class Pixeldiff:
     stream: int
 
 
-@dataclass
-class Random:
-    threshold: float
-    seed: int
-
-
 audio_builder = [
     Attr(("threshold",), db_threshold, 0.04),
     Attr(("stream", "track"), stream, 0),
@@ -47,4 +41,3 @@ pixeldiff_builder = [
     Attr(("threshold",), natural, 1),
     Attr(("stream", "track"), natural, 0),
 ]
-random_builder = [Attr(("threshold",), threshold, 0.5), Attr(("seed",), int, -1)]

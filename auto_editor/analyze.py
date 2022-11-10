@@ -10,11 +10,9 @@ from auto_editor.objs.edit import (
     Audio,
     Motion,
     Pixeldiff,
-    Random,
     audio_builder,
     motion_builder,
     pixeldiff_builder,
-    random_builder,
 )
 from auto_editor.objs.util import _Vars, parse_dataclass
 from auto_editor.utils.func import boolop
@@ -363,24 +361,6 @@ def pixeldiff_levels(
     return cache("pixeldiff", tb, pobj, result, src, temp)
 
 
-def random_levels(
-    ensure: Ensure, src: FileInfo, robj: Any, timebase: Fraction, temp: str, log: Log
-) -> NDArray[np.float_]:
-    import random
-
-    if robj.seed == -1:
-        robj.seed = random.randint(0, 2147483647)
-
-    random.seed(robj.seed)
-    log.debug(f"Seed: {robj.seed}")
-
-    arr = [
-        random.random()
-        for _ in range(get_media_length(ensure, src, timebase, temp, log))
-    ]
-    return np.array(arr, dtype=np.float_)
-
-
 def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
     src = filesetup.src
     tb = filesetup.tb
@@ -391,7 +371,7 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
     temp = filesetup.temp
     log = filesetup.log
 
-    METHODS = ("audio", "motion", "pixeldiff", "random", "none", "all")
+    METHODS = ("audio", "motion", "pixeldiff", "none", "all")
 
     if ":" in val:
         method, attrs = val.split(":")
@@ -405,12 +385,6 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
 
     if method == "all":
         return get_all(ensure, src, tb, temp, log)
-
-    if method == "random":
-        robj = parse_dataclass(attrs, (Random, random_builder), log)
-        return to_threshold(
-            random_levels(ensure, src, robj, tb, temp, log), robj.threshold
-        )
 
     if method == "audio":
         aobj = parse_dataclass(attrs, (Audio, audio_builder), log)

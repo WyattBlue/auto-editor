@@ -7,18 +7,12 @@ from fractions import Fraction
 import numpy as np
 from numpy.typing import NDArray
 
-from auto_editor.analyze import (
-    audio_levels,
-    motion_levels,
-    pixeldiff_levels,
-    random_levels,
-)
+from auto_editor.analyze import audio_levels, motion_levels, pixeldiff_levels
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.objs.edit import (
     audio_builder,
     motion_builder,
     pixeldiff_builder,
-    random_builder,
 )
 from auto_editor.objs.util import _Vars, parse_dataclass
 from auto_editor.output import Ensure
@@ -44,11 +38,6 @@ class Motion:
 @dataclass
 class Pixeldiff:
     stream: int
-
-
-@dataclass
-class Random:
-    seed: int
 
 
 @dataclass
@@ -115,12 +104,10 @@ def main(sys_args: list[str]) -> None:
     ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
 
     strict = True
+    METHODS = ("audio", "motion", "pixeldiff")
 
-    METHOD_ATTRS_SEP = ":"
-    METHODS = ("audio", "motion", "pixeldiff", "random")
-
-    if METHOD_ATTRS_SEP in args.edit:
-        method, attrs = args.edit.split(METHOD_ATTRS_SEP)
+    if ":" in args.edit:
+        method, attrs = args.edit.split(":")
     else:
         method, attrs = args.edit, ""
 
@@ -128,10 +115,6 @@ def main(sys_args: list[str]) -> None:
         log.error(f"Method: {method} not supported")
 
     for src in sources.values():
-        if method == "random":
-            robj = parse_dataclass(attrs, (Random, random_builder[1:]), log)
-            print_floats(random_levels(ensure, src, robj, tb, temp, log))
-
         if method == "audio":
             aobj = parse_dataclass(attrs, (Audio, audio_builder[1:]), log)
             print_floats(
