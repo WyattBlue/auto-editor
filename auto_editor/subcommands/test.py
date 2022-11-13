@@ -703,6 +703,12 @@ def main(sys_args: list[str] | None = None):
         my_try("(equal? (boolarr 0 1 0) (boolarr 1 1 0))", False)
         my_try("(equal? (boolarr 0 1 0) (boolarr 0 1 0 0))", False)
         my_try("(equal? #\\a #\\a)", True)
+        my_try('(equal? "a" #\\a)', False)
+        my_try("(equal? (list 1 2 3) (vector 1 2 3))", False)
+        my_try("(equal? (vector 1 2 3) (vector 1 2 3))", True)
+        my_try("(equal? (list 1 2 3) (list 1 2 3))", True)
+        my_try("(equal? (list 1 2 3) (cons 1 (cons 2 (cons 3 '()))))", True)
+        my_try("(equal? (list 1 2 3) (list 1 2 4))", False)
         my_try(
             "(or (boolarr 1 0 0) (boolarr 0 0 0 1))",
             np.array([1, 0, 0, 1], dtype=np.bool_),
@@ -730,6 +736,7 @@ def main(sys_args: list[str] | None = None):
         my_try("(quote +3i)", 3j)
         my_try("(quote 23.4)", 23.4)
         my_try('(quote "hello")', "hello")
+        my_try("(for/vector ([i (vector 0 1 2)]) i)", [0, 1, 2])
 
     tests = []
 

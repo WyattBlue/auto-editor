@@ -62,14 +62,7 @@ def repl_options(parser: ArgumentParser) -> ArgumentParser:
 def display_val(val: Any) -> str:
     if val is None:
         return ""
-    if isinstance(val, list):
-        if len(val) == 0:
-            return "(vector)"
-        result = f"(vector {print_val(val[0])}"
-        for item in val[1:]:
-            result += f" {print_val(item)}"
-        return result + ")\n"
-    if isinstance(val, ConsType):
+    if isinstance(val, (list, ConsType)):
         return f"'{print_val(val)}\n"
     if isinstance(val, Fraction):
         return f"{val.numerator}/{val.denominator}\n"
