@@ -32,7 +32,7 @@ class Ensure:
 
 
 def _ffset(cmd: list[str], option: str, value: str | None) -> list[str]:
-    if value is None or value == "unset":
+    if value is None or value == "unset" or value == "reserved":
         return cmd
     return cmd + [option] + [value]
 
