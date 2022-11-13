@@ -49,21 +49,25 @@ class Null:
     __repr__ = __str__
 
 
-def print_arr(arr: BoolList) -> str:
-    rs = "(boolarr"
-    for item in arr:
-        rs += " 1" if item else " 0"
-    rs += ")\n"
-    return rs
-
-
 def print_val(val: object) -> str:
     if val is True:
         return "#t"
     if val is False:
         return "#f"
+    if isinstance(val, list):
+        if len(val) == 0:
+            return "#()"
+        result = f"#({print_val(val[0])}"
+        for item in val[1:]:
+            result += f" {print_val(item)}"
+        return result + ")"
+    if isinstance(val, range):
+        return "#<stream>"
     if isinstance(val, np.ndarray):
-        return print_arr(val)
+        result = "(boolarr"
+        for item in val:
+            result += " 1" if item else " 0"
+        return result + ")"
     if isinstance(val, complex):
         join = "" if val.imag < 0 else "+"
         return f"{val.real}{join}{val.imag}i"
@@ -368,17 +372,21 @@ class Compound:
 
 
 class ManyOp:
-    __slots__ = ("op", "children")
+    __slots__ = "children"
 
-    def __init__(self, op: Node | None, children: list[Node]):
-        self.op = op
+    def __init__(self, children: list[Node]):
         self.children = children
 
+    @property
+    def first(self) -> Node:
+        return self.children[0]
+
     def __str__(self) -> str:
-        s = f"(ManyOp {self.op}"
-        for c in self.children:
-            s += f" {c}"
-        return s + ")"
+        s = "(ManyOp"
+        for child in self.children:
+            s += f" {child}"
+        s += ")"
+        return s
 
     __repr__ = __str__
 
@@ -464,8 +472,10 @@ class Parser:
         if token.type == SEC:
             self.eat(SEC)
             return ManyOp(
-                Var("exact-round"),
-                [ManyOp(Var("*"), [Num(token.value), Var("timebase")])],
+                [
+                    Var("exact-round"),
+                    ManyOp([Var("*"), Num(token.value), Var("timebase")]),
+                ]
             )
 
         pars = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
@@ -480,18 +490,13 @@ class Parser:
                 childs.append(self.expr())
 
             self.eat(closing)
-            if len(childs) == 0:
-                return ManyOp(None, [])
-            return ManyOp(childs[0], childs[1:])
+            return ManyOp(childs)
 
         self.eat(token.type)
         childs = []
         while self.current_token.type not in (RPAREN, RBRAC, RCUR, EOF):
             childs.append(self.expr())
-
-        if len(childs) == 0:
-            return ManyOp(None, [])
-        return ManyOp(childs[0], childs[1:])
+        return ManyOp(childs)
 
     def __str__(self) -> str:
         result = str(self.comp())
@@ -547,6 +552,11 @@ def is_boolarr(arr: object) -> bool:
     if isinstance(arr, np.ndarray):
         return arr.dtype.kind == "b"
     return False
+
+
+def is_proc(val: object) -> bool:
+    """procedure?"""
+    return isinstance(val, Proc)
 
 
 def is_bool(val: object) -> bool:
@@ -622,19 +632,15 @@ def raise_(msg: str) -> None:
 def display(val: Any) -> None:
     if val is None:
         return
-    if is_boolarr(val):
-        val = print_arr(val)
-    sys.stdout.write(str(val))
+    if isinstance(val, str):
+        sys.stdout.write(val)
+    sys.stdout.write(print_val(val))
 
 
 def is_equal(a: object, b: object) -> bool:
     if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
         return np.array_equal(a, b)
-    if isinstance(a, float) and not isinstance(b, float):
-        return False
-    if not isinstance(a, float) and isinstance(b, float):
-        return False
-    return a == b
+    return type(a) == type(b) and a == b
 
 
 def equal_num(*values: object) -> bool:
@@ -808,6 +814,20 @@ def cook(min_clip: int, min_cut: int, oarr: BoolList) -> BoolList:
     return arr
 
 
+def reverse_list(lst: ConsType | Null) -> ConsType | Null:
+    result: ConsType | Null = Null()
+    while not isinstance(lst, Null):
+        result = ConsType(lst.a, result)
+        lst = lst.d
+    return result
+
+
+def reverse(lst: list | range | ConsType | Null) -> Any:
+    if isinstance(lst, (list, range)):
+        return reversed(lst)
+    return reverse_list(lst)
+
+
 def _list(*values: Any) -> ConsType | Null:
     result: ConsType | Null = Null()
     for val in reversed(values):
@@ -872,6 +892,23 @@ def palet_random(*args: int) -> int | float:
     return random.randrange(args[0], args[1])
 
 
+def palet_map(proc: Proc, lst: ConsType | Null | list) -> Any:
+    if isinstance(lst, list):
+        return list(map(proc.proc, lst))
+
+    result: ConsType | Null = Null()
+    while isinstance(lst, ConsType):
+        result = ConsType(proc.proc(lst.a), result)
+        lst = lst.d
+    return reverse_list(result)
+
+
+def apply(proc: Proc, lst: ConsType | Null | list) -> Any:
+    if isinstance(lst, list):
+        return reduce(proc.proc, lst)
+    return reduce(proc.proc, list_to_vector(lst))
+
+
 def ref(arr: list | NDArray, ref: int) -> Any:
     try:
         return arr[ref]
@@ -930,6 +967,9 @@ class Interpreter:
         "display": Proc("display", display, (1, 1)),
         "exit": Proc("exit", sys.exit, (0, None)),
         "error": Proc("error", raise_, (1, 1), [is_str]),
+        "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
+        "apply": Proc("apply", apply, (2, 2), [is_proc, is_iterable]),
+        "reverse": Proc("reverse", reverse, (1, 1), [is_iterable]),
         # booleans
         ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
         ">=": Proc(">=", lambda a, b: a >= b, (2, 2), [is_real, is_real]),
@@ -942,6 +982,7 @@ class Interpreter:
         "xor": Proc("xor", _xor, (2, None)),
         # compares
         "equal?": Proc("equal?", is_equal, (2, 2)),
+        "procedure?": Proc("procedure?", is_proc, (1, 1)),
         "null?": Proc("null?", lambda val: isinstance(val, Null), (1, 1)),
         "boolean?": Proc("boolean?", is_bool, (1, 1)),
         # random
@@ -958,9 +999,11 @@ class Interpreter:
         # vectors
         "vector?": Proc("vector?", is_vector, (1, 1)),
         "vector": Proc("vector", lambda *a: list(a), (0, None)),
+        "make-vector": Proc(
+            "make-vector", lambda size, v=0: [v] * size, (1, 2), [is_eint, is_any]
+        ),
         "vector-length": Proc("vector-length", len, (1, 1), [is_vector]),
         "vector-ref": Proc("vector-ref", ref, (2, 2), [is_vector, is_real]),
-        "pop!": Proc("pop!", lambda v: v.pop(), (1, 1), [is_vector]),
         "vector-pop!": Proc("pop!", lambda v: v.pop(), (1, 1), [is_vector]),
         "vector-add!": Proc("vector-add!", vector_append, (2, 2), [is_vector, is_any]),
         # strings
@@ -1014,14 +1057,12 @@ class Interpreter:
         "min": Proc("min", lambda *v: min(v), (1, None), [is_real]),
         # streams
         "stream?": Proc("stream?", is_stream, (1, 1)),
-        "in-range": Proc(
-            "in-range", lambda *a: range(*a), (1, 3), [is_real, is_real, is_real]
-        ),
+        "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
         # conversions
         "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
         "string->list": Proc("string->list", string_to_list, (1, 1), [is_str]),
         "string->vector": Proc(
-            "string->vector", lambda s: [Char(s) for s in s], (1, 1), [is_str]
+            "string->vector", lambda s: [Char(c) for c in s], (1, 1), [is_str]
         ),
         "list->vector": Proc("list->vector", list_to_vector, (1, 1), [is_pair]),
         "vector->list": Proc("vector->list", vector_to_list, (1, 1), [is_vector]),
@@ -1036,9 +1077,7 @@ class Interpreter:
         "array-ref": Proc("array-ref", ref, (2, 2), [is_boolarr, is_real]),
         # ae extensions
         "margin": Proc("margin", margin, (2, 3), None),
-        "mcut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
         "mincut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
-        "mclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
         "minclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
         "cook": Proc("cook", cook, (3, 3), [is_eint, is_eint, is_boolarr]),
     }
@@ -1068,71 +1107,95 @@ class Interpreter:
             return edit_method(node.val, self.filesetup)
 
         if isinstance(node, ManyOp):
-            if node.op is None:
+            if len(node.children) == 0:
                 raise MyError("(): Missing procedure expression")
 
-            name: str | None = None if not isinstance(node.op, Var) else node.op.val
+            name = "" if not isinstance(node.first, Var) else node.first.val
+
+            if name == "for/vector":
+                if len(node.children) < 2:
+                    raise MyError("for/vector: bad syntax")
+
+                if len(node.children) == 2:
+                    raise MyError("for/vector: missing body")
+
+                assert isinstance(node.children[1], ManyOp)
+                assert isinstance(node.children[1].first, ManyOp)
+                var = node.children[1].first.first
+                if not isinstance(var, Var):
+                    raise MyError("for/vector: binding must be var")
+                iter_vector = self.visit(node.children[1].first.children[1])
+                if not isinstance(iter_vector, list):
+                    raise MyError("for/vector: got iterable other than vector?")
+
+                results = []
+                for item in iter_vector:
+                    self.GLOBAL_SCOPE[var.val] = item
+                    childs = [self.visit(c) for c in node.children[2:]]
+                    results.append(childs[-1])
+
+                del self.GLOBAL_SCOPE[var.val]
+                return results
 
             if name == "if":
-                if len(node.children) != 3:
+                if len(node.children) != 4:
                     raise MyError("if: bad syntax")
-                test_expr = self.visit(node.children[0])
+                test_expr = self.visit(node.children[1])
                 if not isinstance(test_expr, bool):
                     raise MyError(f"if: test-expr arg must be: boolean?")
                 if test_expr:
-                    return self.visit(node.children[1])
-                return self.visit(node.children[2])
+                    return self.visit(node.children[2])
+                return self.visit(node.children[3])
 
             if name == "when":
-                if len(node.children) != 2:
+                if len(node.children) != 3:
                     raise MyError("when: bad syntax")
-                test_expr = self.visit(node.children[0])
+                test_expr = self.visit(node.children[1])
                 if not isinstance(test_expr, bool):
                     raise MyError(f"when: test-expr arg must be: boolean?")
                 if test_expr:
-                    return self.visit(node.children[1])
+                    return self.visit(node.children[2])
                 return None
 
             if name == "quote":
-                if len(node.children) != 1:
+                if len(node.children) != 2:
                     raise MyError("quote: bad syntax")
-                args = node.children[0]
+                args = node.children[1]
                 if isinstance(args, ManyOp):
-                    if args.op is None:
+                    if len(args.children) == 0:
                         return Null()
-                    pre_args = [args.op] + args.children
-                    list_args = [self.visit(c) for c in pre_args]
+                    list_args = [self.visit(c) for c in args.children]
                     return _list(*list_args)
                 return self.visit(args)  # return literal
 
             if name == "define":
-                if len(node.children) != 2:
+                if len(node.children) != 3:
                     raise MyError("define: bad syntax")
-                if not isinstance(node.children[0], Var):
+                if not isinstance(node.children[1], Var):
                     raise MyError("define: Must use symbol")
 
-                symbol = node.children[0].val
-                self.GLOBAL_SCOPE[symbol] = self.visit(node.children[1])
+                symbol = node.children[1].val
+                self.GLOBAL_SCOPE[symbol] = self.visit(node.children[2])
                 return None
 
             if name == "set!":
-                if len(node.children) != 2:
+                if len(node.children) != 3:
                     raise MyError("set!: bad syntax")
-                if not isinstance(node.children[0], Var):
+                if not isinstance(node.children[1], Var):
                     raise MyError("set!: Must use symbol")
 
-                symbol = node.children[0].val
+                symbol = node.children[1].val
                 if symbol not in self.GLOBAL_SCOPE:
                     raise MyError(f"Cannot set variable {symbol} before definition")
-                self.GLOBAL_SCOPE[symbol] = self.visit(node.children[1])
+                self.GLOBAL_SCOPE[symbol] = self.visit(node.children[2])
                 return None
 
-            oper = self.visit(node.op)
+            oper = self.visit(node.first)
 
             if not isinstance(oper, Proc):
                 raise MyError(f"{oper}, expected procedure")
 
-            values = [self.visit(c) for c in node.children]
+            values = [self.visit(c) for c in node.children[1:]]
             check_args(oper.name, values, oper.arity, oper.contracts)
             return oper.proc(*values)
 
