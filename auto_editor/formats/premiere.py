@@ -355,7 +355,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
                 aschar = ET.SubElement(audiodef, "samplecharacteristics")
                 ET.SubElement(aschar, "depth").text = DEPTH
                 ET.SubElement(aschar, "samplerate").text = str(samplerate)
-                ET.SubElement(audiodef, "channelcount").text = "10"
+                ET.SubElement(audiodef, "channelcount").text = "2"
 
             if clip[2] != 1:
                 clipitem.append(speedup(clip[2] * 100))
