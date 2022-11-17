@@ -3,11 +3,17 @@
 import argparse
 import os
 import re
+import sys
 import shutil
 import subprocess
 
-import auto_editor.vanparse as vanparse
 import basswood
+import paletdoc
+
+sys.path.insert(0, '/Users/wyattblue/projects/auto-editor')
+
+import auto_editor
+import auto_editor.vanparse as vanparse
 from auto_editor.__main__ import main_options
 from auto_editor.vanparse import OptionText
 
@@ -36,8 +42,14 @@ def get_link_name(item: str) -> str:
 
 parser = vanparse.ArgumentParser("Auto-Editor")
 parser = main_options(parser)
+ver = auto_editor.__version__
 
-with open("src/options.html", "w") as file:
+try:
+    os.mkdir(f"src/ref/{ver}")
+except Exception:
+    pass
+
+with open(f"src/ref/{ver}/options.html", "w") as file:
     file.write(
         '{{ comp.header "Options" }}\n'
         "<body>\n"
@@ -62,6 +74,7 @@ with open("src/options.html", "w") as file:
 
     file.write("</div>\n</section>\n</body>\n</html>\n\n")
 
+
 if os.path.exists("binaries"):
     with open(f"./src/{SECRET}/more.html", "w") as file:
         file.write(
@@ -84,6 +97,7 @@ site.make()
 
 if args.production:
     SECRET2 = os.getenv("AE_SECRET2")
+    assert SECRET2 is not None
     subprocess.run(["rsync", "-rtvzP", "binaries/", SECRET2])
     subprocess.run(
         ["rsync", "-rtvzP", "auto-editor/", "root@auto-editor.com:/var/www/auto-editor"]
@@ -91,10 +105,10 @@ if args.production:
 else:
     site.serve(port=8080)
 
-print("Removing temporary files.")
+print("Removing auto-generated files.")
 try:
     shutil.rmtree("./auto-editor")
 except FileNotFoundError:
     pass
-os.remove("./src/options.html")
+
 os.remove(f"./src/{SECRET}/more.html")

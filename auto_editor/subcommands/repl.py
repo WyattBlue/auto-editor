@@ -70,7 +70,7 @@ def display_val(val: Any) -> str:
     return f"{print_val(val)}\n"
 
 
-def main(sys_args: list[str]) -> None:
+def main(sys_args: list[str] = sys.argv[1:]) -> None:
     parser = repl_options(ArgumentParser(None))
     args = parser.parse_args(REPL_Args, sys_args)
 
@@ -116,4 +116,4 @@ def main(sys_args: list[str]) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

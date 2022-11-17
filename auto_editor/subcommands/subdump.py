@@ -29,7 +29,7 @@ def subdump_options(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-def main(sys_args: list[str]) -> None:
+def main(sys_args: list[str] = sys.argv[1:]) -> None:
     args = subdump_options(ArgumentParser("subdump")).parse_args(SubArgs, sys_args)
 
     ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
@@ -55,4 +55,4 @@ def main(sys_args: list[str]) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
