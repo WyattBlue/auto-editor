@@ -49,6 +49,19 @@ class Null:
     __repr__ = __str__
 
 
+def display_dtype(dtype: np.dtype) -> str:
+    if dtype.kind == "b":
+        return "bool"
+
+    if dtype.kind == "i":
+        return f"int{dtype.itemsize * 8}"
+
+    if dtype.kind == "u":
+        return f"uint{dtype.itemsize * 8}"
+
+    return f"float{dtype.itemsize * 8}"
+
+
 def print_val(val: object) -> str:
     if val is True:
         return "#t"
@@ -64,9 +77,14 @@ def print_val(val: object) -> str:
     if isinstance(val, range):
         return "#<stream>"
     if isinstance(val, np.ndarray):
-        result = "(boolarr"
-        for item in val:
-            result += " 1" if item else " 0"
+        kind = val.dtype.kind
+        result = f"(array {display_dtype(val.dtype)}"
+        if kind == "b":
+            for item in val:
+                result += " 1" if item else " 0"
+        else:
+            for item in val:
+                result += f" {item}"
         return result + ")"
     if isinstance(val, complex):
         join = "" if val.imag < 0 else "+"
@@ -547,13 +565,6 @@ def is_any(val: object) -> bool:
     return True
 
 
-def is_boolarr(arr: object) -> bool:
-    """boolarr?"""
-    if isinstance(arr, np.ndarray):
-        return arr.dtype.kind == "b"
-    return False
-
-
 def is_proc(val: object) -> bool:
     """procedure?"""
     return isinstance(val, Proc)
@@ -616,6 +627,16 @@ def is_vector(val: object) -> bool:
     return isinstance(val, list)
 
 
+def is_boolarr(arr: object) -> bool:
+    """bool-array?"""
+    return isinstance(arr, np.ndarray) and arr.dtype.kind == "b"
+
+
+def is_array(arr: object) -> bool:
+    """array?"""
+    return isinstance(arr, np.ndarray)
+
+
 def is_int(val: object) -> bool:
     """integer?"""
     if isinstance(val, float):
@@ -623,6 +644,11 @@ def is_int(val: object) -> bool:
     if isinstance(val, Fraction):
         return int(val) == val
     return isinstance(val, int)
+
+
+def us_int(val: object) -> bool:  # (U)n(S)igned (Int)eger
+    """exact-nonnegative-integer?"""
+    return isinstance(val, int) and val > -1
 
 
 def raise_(msg: str) -> None:
@@ -703,7 +729,7 @@ def _not(val: Any) -> bool | BoolList:
         return np.logical_not(val)
     if is_bool(val):
         return not val
-    raise MyError("not expects: boolean? or boolarr?")
+    raise MyError("not expects: boolean? or bool-array?")
 
 
 def _and(*vals: Any) -> bool | BoolList:
@@ -761,6 +787,26 @@ def length(val: Any) -> int:
     return len(val)
 
 
+def array_proc(kind_str: str, *vals: Any) -> np.ndarray:
+    kind_map = {
+        "bool": np.bool_,
+        "int8": np.int8,
+        "int16": np.int16,
+        "int32": np.int32,
+        "int64": np.int64,
+        "uint8": np.uint8,
+        "uint16": np.uint16,
+        "uint32": np.uint32,
+        "uint64": np.uint64,
+        "float32": np.float32,
+        "float64": np.float64,
+    }
+    kind = kind_map.get(kind_str)
+    if kind is None:
+        raise MyError(f"Invalid array type: {kind_str}")
+    return np.ndarray(vals, dtype=kind)
+
+
 def mut_remove_small(arr: BoolList, lim: int, replace: int, with_: int) -> None:
     start_p = 0
     active = False
@@ -816,7 +862,7 @@ def cook(min_clip: int, min_cut: int, oarr: BoolList) -> BoolList:
 
 def reverse_list(lst: ConsType | Null) -> ConsType | Null:
     result: ConsType | Null = Null()
-    while not isinstance(lst, Null):
+    while isinstance(lst, ConsType):
         result = ConsType(lst.a, result)
         lst = lst.d
     return result
@@ -837,7 +883,7 @@ def _list(*values: Any) -> ConsType | Null:
 
 def list_to_vector(val: ConsType | Null) -> list:
     result = []
-    while not isinstance(val, Null):
+    while isinstance(val, ConsType):
         result.append(val.a)
         val = val.d
     return result
@@ -854,18 +900,30 @@ def vector_append(vec: list, val: Any) -> None:
     vec.append(val)
 
 
+def vector_set(vec: list, pos: int, v: Any) -> None:
+    try:
+        vec[pos] = v
+    except IndexError:
+        raise MyError(f"vector-set: Invalid index {pos}")
+
+
+def vector_extend(vec: list, *more_vecs: list) -> None:
+    for more in more_vecs:
+        vec.extend(more)
+
+
 def string_to_list(s: str) -> ConsType | Null:
     return vector_to_list([Char(s) for s in s])
 
 
 def list_ref(result: ConsType, ref: int) -> Any:
     if ref < 0:
-        raise MyError(f"list-ref: {ref}: Invalid index")
+        raise MyError(f"list-ref: Invalid index {ref}")
     while ref > 0:
         ref -= 1
         result = result.d
         if isinstance(result, Null):
-            raise MyError(f"{ref}: Invalid index")
+            raise MyError(f"list-ref: Invalid index {ref}")
         if not isinstance(result, ConsType):
             raise MyError("list-ref: 1st arg must be a list")
     return result.a
@@ -914,7 +972,7 @@ def ref(arr: list | NDArray, ref: int) -> Any:
         return arr[ref]
     except IndexError:
         kind = "vector" if isinstance(arr, list) else "array"
-        raise MyError(f"{kind}-ref: {ref}: Invalid index")
+        raise MyError(f"{kind}-ref: Invalid index {ref}")
 
 
 def stream_to_list(s: range) -> ConsType | Null:
@@ -987,25 +1045,6 @@ class Interpreter:
         "boolean?": Proc("boolean?", is_bool, (1, 1)),
         # random
         "random": Proc("random", palet_random, (0, 2), [is_eint]),
-        # cons/list
-        "list?": Proc("list?", is_list, (1, 1)),
-        "pair?": Proc("pair?", is_pair, (1, 1)),
-        "cons": Proc("cons", lambda a, b: ConsType(a, b), (2, 2)),
-        "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
-        "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
-        "list": Proc("list", _list, (0, None)),
-        "list-ref": Proc("list-ref", list_ref, (2, 2), [is_pair, is_eint]),
-        "length": Proc("length", length, (1, 1), [is_iterable]),
-        # vectors
-        "vector?": Proc("vector?", is_vector, (1, 1)),
-        "vector": Proc("vector", lambda *a: list(a), (0, None)),
-        "make-vector": Proc(
-            "make-vector", lambda size, v=0: [v] * size, (1, 2), [is_eint, is_any]
-        ),
-        "vector-length": Proc("vector-length", len, (1, 1), [is_vector]),
-        "vector-ref": Proc("vector-ref", ref, (2, 2), [is_vector, is_real]),
-        "vector-pop!": Proc("pop!", lambda v: v.pop(), (1, 1), [is_vector]),
-        "vector-add!": Proc("vector-add!", vector_append, (2, 2), [is_vector, is_any]),
         # strings
         "string?": Proc("string?", is_str, (1, 1)),
         "char?": Proc("char?", is_char, (1, 1)),
@@ -1027,6 +1066,9 @@ class Interpreter:
         "real?": Proc("real?", is_real, (1, 1)),
         "integer?": Proc("integer?", is_int, (1, 1)),
         "exact-integer?": Proc("exact-integer?", is_eint, (1, 1)),
+        "exact-nonnegative-integer?": Proc(
+            "exact-nonnegative-integer?", us_int, (1, 1)
+        ),
         "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
         "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
         "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_real]),
@@ -1058,6 +1100,36 @@ class Interpreter:
         # streams
         "stream?": Proc("stream?", is_stream, (1, 1)),
         "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
+        "length": Proc("length", length, (1, 1), [is_iterable]),
+        # vectors
+        "vector?": Proc("vector?", is_vector, (1, 1)),
+        "vector": Proc("vector", lambda *a: list(a), (0, None)),
+        "vector-length": Proc("vector-length", len, (1, 1), [is_vector]),
+        "vector-ref": Proc("vector-ref", ref, (2, 2), [is_vector, is_real]),
+        "make-vector": Proc(
+            "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, is_any]
+        ),
+        "vector-pop!": Proc("pop!", lambda v: v.pop(), (1, 1), [is_vector]),
+        "vector-add!": Proc("vector-add!", vector_append, (2, 2), [is_vector, is_any]),
+        "vector-set!": Proc("vector-set!", vector_set, (3, 3), [is_vector, is_eint, is_any]),
+        "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
+        # cons/list
+        "list?": Proc("list?", is_list, (1, 1)),
+        "pair?": Proc("pair?", is_pair, (1, 1)),
+        "cons": Proc("cons", lambda a, b: ConsType(a, b), (2, 2)),
+        "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
+        "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
+        "list": Proc("list", _list, (0, None)),
+        "list-ref": Proc("list-ref", list_ref, (2, 2), [is_pair, us_int]),
+        # arrays
+        "array?": Proc("array?", is_array, (1, 1)),
+        "array": Proc("array", array_proc, (2, None), [is_str, is_eint]),
+        "bool-array?": Proc("bool-array?", is_boolarr, (1, 1)),
+        "bool-array": Proc(
+            "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [us_int]
+        ),
+        "array-ref": Proc("array-ref", ref, (2, 2), [is_boolarr, is_real]),
+        "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
         # conversions
         "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
         "string->list": Proc("string->list", string_to_list, (1, 1), [is_str]),
@@ -1068,13 +1140,6 @@ class Interpreter:
         "vector->list": Proc("vector->list", vector_to_list, (1, 1), [is_vector]),
         "stream->list": Proc("stream->list", stream_to_list, (1, 1), [is_stream]),
         "stream->vector": Proc("stream->vector", list, (1, 1), [is_stream]),
-        # arrays
-        "boolarr?": Proc("boolarr?", is_boolarr, (1, 1)),
-        "boolarr": Proc(
-            "boolarr", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_eint]
-        ),
-        "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_boolarr]),
-        "array-ref": Proc("array-ref", ref, (2, 2), [is_boolarr, is_real]),
         # ae extensions
         "margin": Proc("margin", margin, (2, 3), None),
         "mincut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
