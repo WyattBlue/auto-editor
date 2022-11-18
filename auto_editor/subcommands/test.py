@@ -688,20 +688,20 @@ def main(sys_args: list[str] | None = None):
         my_try("(string #\\a #\\b)", "ab")
         my_try("(string #\\a #\\b #\\c)", "abc")
         my_try(
-            "(margin 0 (boolarr 0 0 0 1 0 0 0))",
+            "(margin 0 (bool-array 0 0 0 1 0 0 0))",
             np.array([0, 0, 0, 1, 0, 0, 0], dtype=np.bool_),
         )
         my_try(
-            "(margin -2 2 (boolarr 0 0 1 1 0 0 0))",
+            "(margin -2 2 (bool-array 0 0 1 1 0 0 0))",
             np.array([0, 0, 0, 0, 1, 1, 0], dtype=np.bool_),
         )
-        my_try("(count-nonzero (boolarr 0 0 1 1 0 1))", 3)
+        my_try("(count-nonzero (bool-array 0 0 1 1 0 1))", 3)
         my_try("(equal? 3 3)", True)
         my_try("(equal? 3 3.0)", False)
         my_try('(equal? 16.3 "Editor")', False)
-        my_try("(equal? (boolarr 1 1 0) (boolarr 1 1 0))", True)
-        my_try("(equal? (boolarr 0 1 0) (boolarr 1 1 0))", False)
-        my_try("(equal? (boolarr 0 1 0) (boolarr 0 1 0 0))", False)
+        my_try("(equal? (bool-array 1 1 0) (bool-array 1 1 0))", True)
+        my_try("(equal? (bool-array 0 1 0) (bool-array 1 1 0))", False)
+        my_try("(equal? (bool-array 0 1 0) (bool-array 0 1 0 0))", False)
         my_try("(equal? #\\a #\\a)", True)
         my_try('(equal? "a" #\\a)', False)
         my_try("(equal? (list 1 2 3) (vector 1 2 3))", False)
@@ -710,7 +710,7 @@ def main(sys_args: list[str] | None = None):
         my_try("(equal? (list 1 2 3) (cons 1 (cons 2 (cons 3 '()))))", True)
         my_try("(equal? (list 1 2 3) (list 1 2 4))", False)
         my_try(
-            "(or (boolarr 1 0 0) (boolarr 0 0 0 1))",
+            "(or (bool-array 1 0 0) (bool-array 0 0 0 1))",
             np.array([1, 0, 0, 1], dtype=np.bool_),
         )
 
@@ -724,7 +724,7 @@ def main(sys_args: list[str] | None = None):
         my_try("'()", Null())
         my_try("(length (list 1 2 3))", 3)
         my_try("(length (list))", 0)
-        my_try("(length (boolarr 0 1 0))", 3)
+        my_try("(length (bool-array 0 1 0))", 3)
         my_try("(begin)", None)
         my_try("(begin (define r 10) (* pi (* r r)))", 314.1592653589793)
 

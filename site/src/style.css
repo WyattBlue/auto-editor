@@ -106,6 +106,11 @@ code, pre {
   font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
 }
 
+.mono {
+  font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  font-size: 110%;
+}
+
 pre {
   padding: 1.25rem 1.5rem;
   white-space: pre;
@@ -233,12 +238,28 @@ h1, h2, th, .bold {font-weight: bold}
   }
 }
 
+.palet-block {
+ padding-left: 7px;
+ padding-bottom: 7px;
+ padding-top: 7px;
+ margin-top: 30px;
+ margin-bottom: 6px;
+}
+.palet-block > p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 /* Light Theme Colors */
 html {background-color: white}
 .hero {background-color: #EAEAEA}
 hr {background-color: #EAEAEA}
 h1, h2, h3, h4, p, code, pre, th {color: #323232}
 blockquote {border-left: 5px solid #EAEAEA}
+.palet-block {
+  background-color: #F9F5F5;
+  border-top: 3px solid #EAEAEA;
+}
 blockquote > p {color: #696969}
 pre {background-color: #F9F5F5}
 code {background-color: #EAEAEA}
@@ -257,6 +278,10 @@ li {color: black; text-decoration: black;}
   hr {background-color: #4A4A4A}
   h1, h2, h3, h4, p, code, pre, th {color: #F9F7F7}
   blockquote {border-left: 5px solid #4A4A4A}
+  .palet-block {
+    background-color: #323232;
+    border-top: 3px solid #4A4A4A;
+  }
   blockquote > p {color: #DBDBDB}
   pre {background-color: #323232}
   code {background-color: #4A4A4A}

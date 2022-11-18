@@ -6,6 +6,7 @@
 
 # Website Files
 site/src/app/
+site/src/ref
 site/binaries/
 
 # Python Generated Files
