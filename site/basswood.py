@@ -15,8 +15,7 @@ def error(msg: str) -> NoReturn:
 
 
 def regex_match(regex: str, text: str) -> str | None:
-    match = re.search(regex, text)
-    if match:
+    if match := re.search(regex, text):
         return match.groupdict()["match"]
     return None
 
@@ -83,7 +82,7 @@ def safe_rm_dir(path: str) -> None:
 
 
 class Site:
-    def __init__(self, source: str, output_dir: str) -> None:
+    def __init__(self, source: str, output_dir: str):
         self.source = source
         self.output_dir = output_dir
         self.components = os.path.join(source, "components")
@@ -92,26 +91,18 @@ class Site:
         if not os.path.isdir(self.components):
             error(f"components dir: '{self.components}' not found")
 
-    @staticmethod
-    def _get_filename(path: str) -> str:
-        return os.path.splitext(os.path.basename(path))[0]
-
-    def _get_components(self) -> dict[str, str]:
-        components = {}
-        if os.path.exists(self.components):
-            for item in os.listdir(self.components):
-                if item.startswith("."):
-                    continue
-                comp_name = self._get_filename(item)
-                with open(os.path.join(self.components, item)) as file:
-                    components[comp_name] = file.read()
-        return components
 
     def make(self) -> None:
         join = os.path.join
-        components = self._get_components()
+        components = {}
+        for item in os.listdir(self.components):
+            if item.startswith("."):
+                continue
+            comp_name = os.path.splitext(os.path.basename(item))[0]
+            with open(os.path.join(self.components, item)) as file:
+                components[comp_name] = file.read()
 
-        def fix_files(path: str, OUT: str, root: str) -> None:
+        def fix_files(path: str, OUT: str) -> None:
             safe_rm_dir(OUT)
             for item in os.listdir(path):
                 the_file = join(path, item)
@@ -120,7 +111,7 @@ class Site:
                 if os.path.isdir(the_file):
                     if the_file != self.components:
                         shutil.copytree(the_file, new_file)
-                        fix_files(the_file, new_file, root)
+                        fix_files(the_file, new_file)
                     continue
 
                 ext = os.path.splitext(the_file)[1]
@@ -135,26 +126,20 @@ class Site:
 
                 contents = add_components(contents, components)
 
-                def remove_html_links(n):
-                    return n.replace(".html", "")
+                if ext == ".html" and self.production:
+                    if "index" not in item:
+                        # remove .html files
+                        new_file = f"{os.path.splitext(new_file)[0]}.html"
+                        if os.path.exists(new_file):
+                            os.remove(new_file)
 
-                if ext == ".html":
-                    if self.production:
-                        if "index" not in item:
-                            new_file = os.path.splitext(new_file)[0]
-
-                            # remove bad html files with liquid syntax.
-                            if os.path.exists(new_file + ".html"):
-                                os.remove(new_file + ".html")
-
-                        # remove .html links
-                        contents = list(map(remove_html_links, contents))
+                    # remove .html links
+                    contents = list(map(lambda n: n.replace(".html", ""), contents))
 
                 with open(new_file, "w") as file:
                     file.writelines(contents)
 
-        root = os.path.abspath(self.source)
-        fix_files(self.source, self.output_dir, root)
+        fix_files(self.source, self.output_dir)
 
     def serve(self, port: int) -> None:
         import http.server

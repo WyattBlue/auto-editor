@@ -14,26 +14,40 @@ class text:
 @dataclass
 class proc:
     name: str
-    procsig: tuple[list[str], str]
+    sig: tuple[list[str], str]
     argsig: list[tuple[str, str] | tuple[str, str, str]]
     summary: text
 
 
 @dataclass
-class syntax
+class syntax:
     name: str
+    body: str
     summary: text
 
 
 @dataclass
 class value:
     name: str
-    argsig: str
+    sig: str
     summary: text
 
-doc: dict[str, list[proc | value]] = {
-    "Syntax": [
-        syntax("define", )
+doc: dict[str, list[proc | value | syntax]] = {
+    "Basic Syntax": [
+        syntax(
+            "define",
+            "id expr",
+            text(["Set ", code("id"), " to the result of ", code("expr"), "."]),
+        ),
+        syntax(
+            "set!",
+            "id expr",
+            text([
+                "Set the result of ", code("expr"), " to ", code("id"), " if ",
+                code("id"), " is already defined. If ", code("id"),
+                " is not defined, raise an error.",
+            ]),
+        ),
     ],
     "Equality": [
         proc(
@@ -44,7 +58,7 @@ doc: dict[str, list[proc | value]] = {
                 "Returns ", code("#t"), " if ", code("v1"), " and ", code("v2"),
                 " are the same type and have the same value, ", code("#f"), " otherwise."
             ]),
-        )
+        ),
     ],
     "Booleans": [
         proc(
@@ -58,6 +72,25 @@ doc: dict[str, list[proc | value]] = {
         ),
         value("true", "boolean?", text(["An alias for ", code("#t"), "."])),
         value("false", "boolean?", text(["An alias for ", code("#f"), "."])),
+        syntax(
+            "if",
+            "test-expr then-expr else-expr",
+            text([
+                "Evaluates ", code("test-expr"), ". If ", code("#t"), " then evaluate ",
+                code("then-expr"), " else evaluate ", code("else-expr"),
+                ". An error will be raised if evaluated ",
+                code("test-expr"), " is not a ", code("boolean?"), ".",
+            ]),
+        ),
+        syntax(
+            "when",
+            "test-expr body",
+            text([
+                "Evaluates ", code("test-expr"), ". If ", code("#t"), " then evaluate ",
+                code("body"), " else do nothing. An error will be raised if evaluated ",
+                code("test-expr"), " is not a ", code("boolean?"), ".",
+            ]),
+        ),
     ],
     "Number Types": [
         proc(
@@ -102,8 +135,9 @@ doc: dict[str, list[proc | value]] = {
             (["v"], "boolean?"),
             [("v", "any")],
             text([
-                "Returns ", code("#t"), " if ", code("v"), " is an exact integer and "
-                code("v"), "is greater than -1, ", code("#f"), " otherwise.",
+                "Returns ", code("#t"), " if ", code("v"), " is an exact integer and ",
+                code("v"), " is greater than ", code("-1"), ", ", code("#f"),
+                " otherwise.",
             ]),
         ),
         proc(
@@ -111,8 +145,8 @@ doc: dict[str, list[proc | value]] = {
             (["v"], "boolean?"),
             [("v", "any")],
             text([
-                "Returns ", code("#t"), " if ", code("v"), " is ", code("0"), ", ", code("#f"),
-                " otherwise."
+                "Returns ", code("#t"), " if ", code("v"), " is equal to ", code("0"),
+                ", ", code("#f"), " otherwise."
             ]),
         ),
         proc(
@@ -120,8 +154,8 @@ doc: dict[str, list[proc | value]] = {
             (["v"], "boolean?"),
             [("v", "any")],
             text([
-                "Returns ", code("#t"), " if ", code("v"), " is greater than 0, ", code("#f"),
-                " otherwise."
+                "Returns ", code("#t"), " if ", code("v"), " is greater than ",
+                code("0"), ", ", code("#f"), " otherwise."
             ]),
         ),
         proc(
@@ -129,8 +163,8 @@ doc: dict[str, list[proc | value]] = {
             (["v"], "boolean?"),
             [("v", "any")],
             text([
-                "Returns ", code("#t"), " if ", code("v"), " is less than 0, ", code("#f"),
-                " otherwise."
+                "Returns ", code("#t"), " if ", code("v"), " is less than ", code("0"),
+                ", ", code("#f"), " otherwise."
             ]),
         ),
     ],
@@ -150,7 +184,7 @@ doc: dict[str, list[proc | value]] = {
             (["z", "w", "..."], "number?"),
             [("z", "number?"), ("w", "number?")],
             text([
-                "When no ", code("w"), "s are applied, return", code("(- 0 z)"),
+                "When no ", code("w"), "s are applied, return ", code("(- 0 z)"),
                 ". Otherwise, return the subtraction of ", code("w"), "s of ", code("z"),
                 ".",
             ]),
@@ -330,6 +364,17 @@ doc: dict[str, list[proc | value]] = {
             text([
                 "Append all elements of ", code("vec2"), " to the end of ",
                 code("vec"), " in order.",
+            ]),
+        ),
+    ],
+    "Pairs and Lists": [
+        proc(
+            "pair?",
+            (["v"], "boolean?"),
+            [("v", "any")],
+            text([
+                "Returns ", code("#t"), " if ", code("v"), " is a pair, ", code("#f"),
+                " otherwise."
             ]),
         ),
     ],

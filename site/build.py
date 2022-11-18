@@ -2,6 +2,8 @@
 
 import argparse
 import os
+import pathlib
+from pathlib import Path
 import re
 import sys
 import shutil
@@ -9,6 +11,7 @@ import subprocess
 
 import basswood
 import paletdoc
+from paletdoc import proc, text, value, syntax, code
 
 sys.path.insert(0, '/Users/wyattblue/projects/auto-editor')
 
@@ -42,14 +45,11 @@ def get_link_name(item: str) -> str:
 
 parser = vanparse.ArgumentParser("Auto-Editor")
 parser = main_options(parser)
-ver = auto_editor.__version__
 
-try:
-    os.mkdir(f"src/ref/{ver}")
-except Exception:
-    pass
+ref = Path(f"src/ref/{auto_editor.version}")
+ref.mkdir(parents=True, exist_ok=True)
 
-with open(f"src/ref/{ver}/options.html", "w") as file:
+with open(ref / "options.html", "w") as file:
     file.write(
         '{{ comp.header "Options" }}\n'
         "<body>\n"
@@ -57,7 +57,6 @@ with open(f"src/ref/{ver}/options.html", "w") as file:
         '<section class="section">\n'
         '<div class="container">\n'
     )
-
     for op in parser.args:
         if isinstance(op, OptionText):
             file.write(f"<h2>{op.text}</h2>\n")
@@ -73,6 +72,69 @@ with open(f"src/ref/{ver}/options.html", "w") as file:
             file.write(f"<p>{op.help}</p>\n")
 
     file.write("</div>\n</section>\n</body>\n</html>\n\n")
+
+
+with open(ref / "palet.html", 'w') as file:
+    file.write(
+        '{{ comp.header "Palet Scripting Reference" }}\n'
+        "<body>\n"
+        "{{ comp.nav }}\n"
+        '<section class="section">\n'
+        '<div class="container">\n'
+        '<h1>Palet Scripting Reference</h1>\n'
+        '<p>This manual describes the complete overview of the palet scripting language.'
+        "<p>Palet is an anagram-acronym of the words: "
+        "(A)uto-(E)ditor's (T)iny (P)rocedural (L)anguage</p>"
+    )
+
+    def text_to_str(t: text) -> str:
+        s = ""
+        for c in t.children:
+            s += f"<code>{c.child}</code>" if isinstance(c, code) else c
+        return s
+
+
+
+    for category, somethings in paletdoc.doc.items():
+        file.write(f'<h2 class="left">{category}</h2>\n')
+        for some in somethings:
+            if isinstance(some, syntax):
+                file.write(
+                    f'<div class="palet-block"><p id="{some.name}" class="mono">\n'
+                    f'(<b>{some.name}</b>&nbsp;{some.body})</p>\n</div>\n'
+                    f"<p>{text_to_str(some.summary)}</p>\n"
+                )
+            if isinstance(some, proc):
+                rname = some.sig[1]
+                file.write(
+                    f'<div class="palet-block">\n'
+                    f'<p id="{some.name}" class="mono">(<b>{some.name}</b>&nbsp;{"&nbsp;".join(some.sig[0])})'
+                    f'&nbsp;→&nbsp;<a href="#{rname}">{rname}</a></p>\n'
+
+                )
+                for argsig in some.argsig:
+                    if len(argsig) == 2:
+                        var, sig = argsig
+                        file.write(
+                            f'<p class="mono">&nbsp;{var}&nbsp;:&nbsp;<a href="#{sig}">{sig}</a></p>\n'
+                        )
+                    else:
+                        var, sig, default = argsig
+                        file.write(
+                            f'<p class="mono">&nbsp;{var}&nbsp;:&nbsp;<a href="#{sig}">{sig}</a>&nbsp;=&nbsp;{default}</p>\n'
+                        )
+
+                file.write(
+                    '</div>\n'
+                    f"<p>{text_to_str(some.summary)}</p>\n"
+                )
+            if isinstance(some, value):
+                file.write(
+                    f'<div class="palet-block">\n<p class="mono">{some.name}'
+                    f'&nbsp;:&nbsp;<a href="#{some.sig}">{some.sig}</a></p>\n</div>\n'
+                    f"<p>{text_to_str(some.summary)}</p>\n"
+                )
+
 
 
 if os.path.exists("binaries"):
