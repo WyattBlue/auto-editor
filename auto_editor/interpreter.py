@@ -1039,9 +1039,9 @@ class Interpreter:
         "or": Proc("or", _or, (1, None)),
         "xor": Proc("xor", _xor, (2, None)),
         # compares
+        "any/c": Proc("any/c", is_any, (1, 1)),
         "equal?": Proc("equal?", is_equal, (2, 2)),
         "procedure?": Proc("procedure?", is_proc, (1, 1)),
-        "null?": Proc("null?", lambda val: isinstance(val, Null), (1, 1)),
         "boolean?": Proc("boolean?", is_bool, (1, 1)),
         # random
         "random": Proc("random", palet_random, (0, 2), [is_eint]),
@@ -1114,11 +1114,12 @@ class Interpreter:
         "vector-set!": Proc("vector-set!", vector_set, (3, 3), [is_vector, is_eint, is_any]),
         "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
         # cons/list
-        "list?": Proc("list?", is_list, (1, 1)),
         "pair?": Proc("pair?", is_pair, (1, 1)),
+        "null?": Proc("null?", lambda val: isinstance(val, Null), (1, 1)),
         "cons": Proc("cons", lambda a, b: ConsType(a, b), (2, 2)),
         "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
         "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
+        "list?": Proc("list?", is_list, (1, 1)),
         "list": Proc("list", _list, (0, None)),
         "list-ref": Proc("list-ref", list_ref, (2, 2), [is_pair, us_int]),
         # arrays
