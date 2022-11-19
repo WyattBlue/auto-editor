@@ -67,10 +67,7 @@ def add_components(lines: list[str], components: dict[str, str]) -> list[str]:
         error(f"Cannot use variable: {var}")
         return " ".join(args)
 
-    new_lines = []
-    for line in lines:
-        new_lines.append(match_liquid(line, comp_hook))
-    return new_lines
+    return [match_liquid(l, comp_hook) for l in lines]
 
 
 def safe_rm_dir(path: str) -> None:
@@ -82,11 +79,11 @@ def safe_rm_dir(path: str) -> None:
 
 
 class Site:
-    def __init__(self, source: str, output_dir: str):
+    def __init__(self, prod: bool, source: str, output_dir: str):
         self.source = source
         self.output_dir = output_dir
         self.components = os.path.join(source, "components")
-        self.production = False
+        self.production = prod
 
         if not os.path.isdir(self.components):
             error(f"components dir: '{self.components}' not found")
@@ -158,7 +155,7 @@ class Site:
                     httpd.serve_forever()
                 except KeyboardInterrupt:
                     pass
-                print("\nClosing server.")
+                print("\nclosing server")
                 httpd.server_close()
 
         try:

@@ -250,6 +250,10 @@ h1, h2, th, .bold {font-weight: bold}
   margin-bottom: 0;
 }
 
+.palet-var {
+  font-style: italic;
+}
+
 /* Light Theme Colors */
 html {background-color: white}
 .hero {background-color: #EAEAEA}
