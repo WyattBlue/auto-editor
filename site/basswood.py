@@ -123,15 +123,12 @@ class Site:
 
                 contents = add_components(contents, components)
 
-                if ext == ".html" and self.production:
-                    if "index" not in item:
-                        # remove .html files
-                        new_file = f"{os.path.splitext(new_file)[0]}.html"
-                        if os.path.exists(new_file):
-                            os.remove(new_file)
-
+                if self.production and ext == ".html":
                     # remove .html links
                     contents = list(map(lambda n: n.replace(".html", ""), contents))
+                    if "index" not in new_file:
+                        # rename file so new pages don't have .html ext
+                        new_file = new_file.replace(".html", "")
 
                 with open(new_file, "w") as file:
                     file.writelines(contents)

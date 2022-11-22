@@ -319,12 +319,6 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
         proc(
-            "vector-length",
-            (["vec"], "exact-nonnegative-integer?"),
-            [("vec", "vector?")],
-            text(["Returns the length of ", var("vec"), "."]),
-        ),
-        proc(
             "vector-ref",
             (["vec", "pos"], "any/c"),
             [("vec", "vector?"), ("pos", "exact-integer?")],

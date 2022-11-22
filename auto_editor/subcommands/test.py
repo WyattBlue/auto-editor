@@ -15,7 +15,15 @@ from typing import Callable
 import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import ConsType, Interpreter, Lexer, MyError, Null, Parser
+from auto_editor.interpreter import (
+    Cons,
+    Interpreter,
+    Lexer,
+    MyError,
+    Null,
+    Parser,
+    Symbol,
+)
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -618,130 +626,144 @@ def main(sys_args: list[str] | None = None):
 
         return out
 
-    def inter():
-        def my_try(text: str, expected: Any) -> Any:
-            try:
-                lexer = Lexer(text)
-                parser = Parser(lexer)
-                interpreter = Interpreter(parser, None)
-                interpreter.GLOBAL_SCOPE["timebase"] = Fraction(30)
-                results = interpreter.interpret()
-            except MyError as e:
-                raise ValueError(f"{text}\nMyError: {e}")
+    def palet():
+        def cases(*cases: tuple[str, Any]) -> None:
+            for text, expected in cases:
+                try:
+                    parser = Parser(Lexer(text))
+                    interpreter = Interpreter(parser, None)
+                    interpreter.GLOBAL_SCOPE["timebase"] = Fraction(30)
+                    results = interpreter.interpret()
+                except MyError as e:
+                    raise ValueError(f"{text}\nMyError: {e}")
 
-            if isinstance(expected, np.ndarray):
-                if not np.array_equal(expected, results[-1]):
-                    raise ValueError(f"{text}: Numpy arrays don't match")
-            elif expected != results[-1]:
-                raise ValueError(f"{text}: Expected: {expected}, got {results[-1]}")
+                if isinstance(expected, np.ndarray):
+                    if not np.array_equal(expected, results[-1]):
+                        raise ValueError(f"{text}: Numpy arrays don't match")
+                elif expected != results[-1]:
+                    raise ValueError(f"{text}: Expected: {expected}, got {results[-1]}")
 
-        my_try("345", 345)
-        my_try("238.5", 238.5)
-        my_try("-34", -34)
-        my_try("-98.3", -98.3)
-        my_try("+3i", 3j)
-        my_try("3sec", 90)
-        my_try("-3sec", -90)
-        my_try("0.2sec", 6)
-        my_try("(+ 4 3)", 7)
-        my_try("(+ 4 3 2)", 9)
-        my_try("(+ 10.5 3)", 13.5)
-        my_try("(+ 3+4i -2-2i)", 1 + 2j)
-        my_try("(+ 3+4i -2-2i 5)", 6 + 2j)
-        my_try("(- 4 3)", 1)
-        my_try("(- 3)", -3)
-        my_try("(- 10.5 3)", 7.5)
-        my_try("(* 11.5 3)", 34.5)
-        my_try("(/ 3/4 4)", Fraction(3, 16))
-        my_try("(/ 5)", Fraction(1, 5))
-        my_try("(/ 6 1)", 6)
-        my_try("(sqrt -4)", 2j)
-        my_try("(expt 2 3)", 8)
-        my_try("(expt 4 0.5)", 2.0)
-        my_try("(abs 1.0)", 1.0)
-        my_try("(abs -1)", 1)
-        my_try("(boolean? -4)", False)
-        my_try("(boolean? false)", True)
-        my_try("(boolean? #t)", True)
-        my_try("(integer? 3.0)", True)
-        my_try("(integer? 4/5)", False)
-        my_try("(exact? 3.0)", False)
-        my_try("(exact? 3)", True)
-        my_try('(string-append "Hello" " World")', "Hello World")
-        my_try('(define apple "Red Wood") apple', "Red Wood")
-        my_try("(= 1 1.0)", True)
-        my_try("(= 1 2)", False)
-        my_try("(= 2+3i 2+3i 2+3i)", True)
-        my_try("(= 1)", True)
-        my_try("(+)", 0)
-        my_try("(*)", 1)
-        my_try('(define num 13) ; Set number to 13\n"Hello"', "Hello")
-        my_try('(if #t "Hello" apple)', "Hello")
-        my_try('(if #f mango "Hi")', "Hi")
-        my_try('{if (= [+ 3 4] 7) "yes" "no"}', "yes")
-        my_try("((if #t + -) 3 4)", 7)
-        my_try("((if #t + oops) 3+3i 4-2i)", 7 + 1j)
-        my_try("((if #f + -) 3 4)", -1)
-        my_try("(when (positive? 3) 17)", 17)
-        my_try("(string)", "")
-        my_try("(string #\\a)", "a")
-        my_try("(string #\\a #\\b)", "ab")
-        my_try("(string #\\a #\\b #\\c)", "abc")
-        my_try(
-            "(margin 0 (bool-array 0 0 0 1 0 0 0))",
-            np.array([0, 0, 0, 1, 0, 0, 0], dtype=np.bool_),
+        cases(
+            ("345", 345),
+            ("238.5", 238.5),
+            ("-34", -34),
+            ("-98.3", -98.3),
+            ("+3i", 3j),
+            ("3sec", 90),
+            ("-3sec", -90),
+            ("0.2sec", 6),
+            ("(+ 4 3)", 7),
+            ("(+ 4 3 2)", 9),
+            ("(+ 10.5 3)", 13.5),
+            ("(+ 3+4i -2-2i)", 1 + 2j),
+            ("(+ 3+4i -2-2i 5)", 6 + 2j),
+            ("(- 4 3)", 1),
+            ("(- 3)", -3),
+            ("(- 10.5 3)", 7.5),
+            ("(* 11.5 3)", 34.5),
+            ("(/ 3/4 4)", Fraction(3, 16)),
+            ("(/ 5)", Fraction(1, 5)),
+            ("(/ 6 1)", 6),
+            ("(sqrt -4)", 2j),
+            ("(expt 2 3)", 8),
+            ("(expt 4 0.5)", 2.0),
+            ("(abs 1.0)", 1.0),
+            ("(abs -1)", 1),
+            ("(round 3.5)", 4),
+            ("(round 2.5)", 2),
+            ("(ceil 2.1)", 3),
+            ("(ceil 2.9)", 3),
+            ("(floor 2.1)", 2),
+            ("(floor 2.9)", 2),
+            ("(boolean? #t)", True),
+            ("(boolean? #f)", True),
+            ("(boolean? 0)", False),
+            ("(boolean? 1)", False),
+            ("(boolean? false)", True),
+            ("(integer? 3.0)", True),
+            ("(integer? #f)", False),
+            ("(integer? 4/5)", False),
+            ("(exact? 3.0)", False),
+            ("(exact? 3)", True),
+            ("(exact? #t)", False),
+            ("(exact-integer? 2)", True),
+            ("(exact-integer? 0+2i)", False),
+            ("(exact-integer? 3.0)", False),
+            ("(exact-integer? #t)", False),
+            ('(string-append "Hello" " World")', "Hello World"),
+            ('(define apple "Red Wood") apple', "Red Wood"),
+            ("(= 1 1.0)", True),
+            ("(= 1 2)", False),
+            ("(= 2+3i 2+3i 2+3i)", True),
+            ("(= 1)", True),
+            ("(+)", 0),
+            ("(*)", 1),
+            ('(define num 13) ; Set number to 13\n"Hello"', "Hello"),
+            ('(if #t "Hello" apple)', "Hello"),
+            ('(if #f mango "Hi")', "Hi"),
+            ('{if (= [+ 3 4] 7) "yes" "no"}', "yes"),
+            ("((if #t + -) 3 4)", 7),
+            ("((if #t + oops) 3+3i 4-2i)", 7 + 1j),
+            ("((if #f + -) 3 4)", -1),
+            ("(when (positive? 3) 17)", 17),
+            ("(string)", ""),
+            ("(string #\\a)", "a"),
+            ("(string #\\a #\\b)", "ab"),
+            ("(string #\\a #\\b #\\c)", "abc"),
+            (
+                "(margin 0 (bool-array 0 0 0 1 0 0 0))",
+                np.array([0, 0, 0, 1, 0, 0, 0], dtype=np.bool_),
+            ),
+            (
+                "(margin -2 2 (bool-array 0 0 1 1 0 0 0))",
+                np.array([0, 0, 0, 0, 1, 1, 0], dtype=np.bool_),
+            ),
+            ("(count-nonzero (bool-array 0 0 1 1 0 1))", 3),
+            ("(equal? 3 3)", True),
+            ("(equal? 3 3.0)", False),
+            ('(equal? 16.3 "Editor")', False),
+            ("(equal? (bool-array 1 1 0) (bool-array 1 1 0))", True),
+            ("(equal? (bool-array 0 1 0) (bool-array 1 1 0))", False),
+            ("(equal? (bool-array 0 1 0) (bool-array 0 1 0 0))", False),
+            ("(equal? #\\a #\\a)", True),
+            ('(equal? "a" #\\a)', False),
+            ("(equal? (list 1 2 3) (vector 1 2 3))", False),
+            ("(equal? (vector 1 2 3) (vector 1 2 3))", True),
+            ("(equal? (list 1 2 3) (list 1 2 3))", True),
+            ("(equal? (list 1 2 3) (cons 1 (cons 2 (cons 3 '()))))", True),
+            ("(equal? (list 1 2 3) (list 1 2 4))", False),
+            (
+                "(or (bool-array 1 0 0) (bool-array 0 0 0 1))",
+                np.array([1, 0, 0, 1], dtype=np.bool_),
+            ),
+            ("(list 1 2 3)", Cons(1, Cons(2, Cons(3, Null())))),
+            ("(list-ref (list 0 10 20) 2)", 20),
+            ("(list-ref (list 0 10 20) 0)", 0),
+            ("(car (cons 3 4))", 3),
+            ("(car (list 3 4))", 3),
+            ("(cdr (cons 3 4))", 4),
+            ("(cdr (list 3 4))", Cons(4, Null())),
+            ("'()", Null()),
+            ("(length (list 1 2 3))", 3),
+            ("(length (vector 1 2 4))", 3),
+            ("(length (list))", 0),
+            ("(length (bool-array 0 1 0))", 3),
+            ("(begin)", None),
+            ("(begin (define r 10) (* pi (* r r)))", 314.1592653589793),
+            ("(quote ())", Null()),
+            ("(quote hello)", Symbol("hello")),
+            ("(quote (3))", Cons(3, Null())),
+            ('(quote (3 2 "apple"))', Cons(3, Cons(2, Cons("apple", Null())))),
+            ("(quote +3i)", 3j),
+            ("(quote 23.4)", 23.4),
+            ('(quote "hello")', "hello"),
+            ("(for/vector ([i (vector 0 1 2)]) i)", [0, 1, 2]),
         )
-        my_try(
-            "(margin -2 2 (bool-array 0 0 1 1 0 0 0))",
-            np.array([0, 0, 0, 0, 1, 1, 0], dtype=np.bool_),
-        )
-        my_try("(count-nonzero (bool-array 0 0 1 1 0 1))", 3)
-        my_try("(equal? 3 3)", True)
-        my_try("(equal? 3 3.0)", False)
-        my_try('(equal? 16.3 "Editor")', False)
-        my_try("(equal? (bool-array 1 1 0) (bool-array 1 1 0))", True)
-        my_try("(equal? (bool-array 0 1 0) (bool-array 1 1 0))", False)
-        my_try("(equal? (bool-array 0 1 0) (bool-array 0 1 0 0))", False)
-        my_try("(equal? #\\a #\\a)", True)
-        my_try('(equal? "a" #\\a)', False)
-        my_try("(equal? (list 1 2 3) (vector 1 2 3))", False)
-        my_try("(equal? (vector 1 2 3) (vector 1 2 3))", True)
-        my_try("(equal? (list 1 2 3) (list 1 2 3))", True)
-        my_try("(equal? (list 1 2 3) (cons 1 (cons 2 (cons 3 '()))))", True)
-        my_try("(equal? (list 1 2 3) (list 1 2 4))", False)
-        my_try(
-            "(or (bool-array 1 0 0) (bool-array 0 0 0 1))",
-            np.array([1, 0, 0, 1], dtype=np.bool_),
-        )
-
-        my_try("(list 1 2 3)", ConsType(1, ConsType(2, ConsType(3, Null()))))
-        my_try("(list-ref (list 0 10 20) 2)", 20)
-        my_try("(list-ref (list 0 10 20) 0)", 0)
-        my_try("(car (cons 3 4))", 3)
-        my_try("(car (list 3 4))", 3)
-        my_try("(cdr (cons 3 4))", 4)
-        my_try("(cdr (list 3 4))", ConsType(4, Null()))
-        my_try("'()", Null())
-        my_try("(length (list 1 2 3))", 3)
-        my_try("(length (list))", 0)
-        my_try("(length (bool-array 0 1 0))", 3)
-        my_try("(begin)", None)
-        my_try("(begin (define r 10) (* pi (* r r)))", 314.1592653589793)
-
-        my_try("(quote ())", Null())
-        my_try("(quote (3))", ConsType(3, Null()))
-        my_try(
-            '(quote (3 2 "apple"))', ConsType(3, ConsType(2, ConsType("apple", Null())))
-        )
-        my_try("(quote +3i)", 3j)
-        my_try("(quote 23.4)", 23.4)
-        my_try('(quote "hello")', "hello")
-        my_try("(for/vector ([i (vector 0 1 2)]) i)", [0, 1, 2])
 
     tests = []
 
     if args.category in ("unit", "all"):
-        tests.append(inter)
+        tests.append(palet)
 
     if args.category in ("api", "all"):
         tests.append(read_api_0_1)

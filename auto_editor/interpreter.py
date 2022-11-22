@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
 
-    Node = Union[Compound, ManyOp, Var, Num, Str, Bool, BoolArr]
     Number = Union[int, float, complex, Fraction]
     Real = Union[int, float, Fraction]
     BoolList = NDArray[np.bool_]
@@ -67,8 +66,10 @@ def print_val(val: object) -> str:
         return "#t"
     if val is False:
         return "#f"
+    if isinstance(val, Symbol):
+        return f"'{val}"
     if isinstance(val, list):
-        if len(val) == 0:
+        if not val:
             return "#()"
         result = f"#({print_val(val[0])}"
         for item in val[1:]:
@@ -96,7 +97,7 @@ def print_val(val: object) -> str:
     return f"{val!r}"
 
 
-class ConsType:
+class Cons:
     __slots__ = ("a", "d")
 
     def __init__(self, a: Any, d: Any):
@@ -106,7 +107,7 @@ class ConsType:
     def __repr__(self) -> str:
         result = f"({print_val(self.a)}"
         tail = self.d
-        while isinstance(tail, ConsType):
+        while isinstance(tail, Cons):
             result += f" {print_val(tail.a)}"
             tail = tail.d
 
@@ -115,9 +116,7 @@ class ConsType:
         return f"{result} . {print_val(tail)})"
 
     def __eq__(self, obj: object) -> bool:
-        if isinstance(obj, ConsType):
-            return self.a == obj.a and self.d == obj.d
-        return False
+        return isinstance(obj, Cons) and self.a == obj.a and self.d == obj.d
 
 
 class Char:
@@ -134,12 +133,23 @@ class Char:
         return f"#\\{self.val}" if self.val not in names else f"#\\{names[self.val]}"
 
     def __eq__(self, obj: object) -> bool:
-        if isinstance(obj, Char):
-            return self.val == obj.val
-        return False
+        return isinstance(obj, Char) and self.val == obj.val
 
     def __radd__(self, obj2: str) -> str:
         return obj2 + self.val
+
+
+class Symbol:
+    __slots__ = "val"
+
+    def __init__(self, val: str):
+        self.val = val
+
+    __str__: Callable[[Symbol], str] = lambda self: self.val
+    __repr__ = __str__
+
+    def __eq__(self, obj: object) -> bool:
+        return isinstance(obj, Symbol) and self.val == obj.val
 
 
 ###############################################################################
@@ -165,32 +175,23 @@ class Token:
 
 
 class Lexer:
-    __slots__ = ("log", "text", "pos", "char")
+    __slots__ = ("text", "pos", "char")
 
     def __init__(self, text: str):
         self.text = text
         self.pos: int = 0
-        if len(text) == 0:
-            self.char: str | None = None
-        else:
-            self.char = self.text[self.pos]
+        self.char: str | None = self.text[self.pos] if text else None
 
     def char_is_norm(self) -> bool:
         return self.char is not None and self.char not in '()[]{}"; \t\n\r\x0b\x0c'
 
     def advance(self) -> None:
         self.pos += 1
-        if self.pos > len(self.text) - 1:
-            self.char = None
-        else:
-            self.char = self.text[self.pos]
+        self.char = None if self.pos > len(self.text) - 1 else self.text[self.pos]
 
     def peek(self) -> str | None:
         peek_pos = self.pos + 1
-        if peek_pos > len(self.text) - 1:
-            return None
-        else:
-            return self.text[peek_pos]
+        return None if peek_pos > len(self.text) - 1 else self.text[peek_pos]
 
     def skip_whitespace(self) -> None:
         while self.char is not None and self.char in " \t\n\r\x0b\x0c":
@@ -378,7 +379,7 @@ class Lexer:
 class Compound:
     __slots__ = "children"
 
-    def __init__(self, children: list[Node]):
+    def __init__(self, children: list):
         self.children = children
 
     def __str__(self) -> str:
@@ -387,66 +388,6 @@ class Compound:
             s += f" {child}"
         s += "}"
         return s
-
-
-class ManyOp:
-    __slots__ = "children"
-
-    def __init__(self, children: list[Node]):
-        self.children = children
-
-    @property
-    def first(self) -> Node:
-        return self.children[0]
-
-    def __str__(self) -> str:
-        s = "(ManyOp"
-        for child in self.children:
-            s += f" {child}"
-        s += ")"
-        return s
-
-    __repr__ = __str__
-
-
-class Var:
-    __slots__ = "val"
-
-    def __init__(self, val: str):
-        self.val = val
-
-    __str__: Callable[[Var], str] = lambda self: f"(var {self.val})"
-    __repr__: Callable[[Var], str] = lambda self: f"{self.val}"
-
-
-class Num:
-    __slots__ = "val"
-
-    def __init__(self, val: int | float | Fraction | complex):
-        self.val = val
-
-    __str__: Callable[[Num], str] = lambda self: f"(num {self.val})"
-    __repr__: Callable[[Num], str] = lambda self: f"{self.val}"
-
-
-class Bool:
-    __slots__ = "val"
-
-    def __init__(self, val: bool):
-        self.val = val
-
-    __str__: Callable[[Bool], str] = lambda self: f"(bool {'#t' if self.val else '#f'})"
-    __repr__: Callable[[Bool], str] = lambda self: "#t" if self.val else "#f"
-
-
-class Str:
-    __slots__ = "val"
-
-    def __init__(self, val: str):
-        self.val = val
-
-    __str__: Callable[[Str], str] = lambda self: f"(str {self.val})"
-    __repr__: Callable[[Str], str] = lambda self: f'"{self.val}"'
 
 
 class BoolArr:
@@ -475,26 +416,21 @@ class Parser:
             comp_kids.append(self.expr())
         return Compound(comp_kids)
 
-    def expr(self) -> Node:
+    def expr(self) -> Any:
         token = self.current_token
 
-        if token.type == CHAR:
+        if token.type in {CHAR, NUM, STR, BOOL}:
             self.eat(token.type)
             return token.value
 
-        matches = {ID: Var, ARR: BoolArr, BOOL: Bool, NUM: Num, STR: Str}
+        matches = {ID: Symbol, ARR: BoolArr}
         if token.type in matches:
             self.eat(token.type)
             return matches[token.type](token.value)
 
         if token.type == SEC:
             self.eat(SEC)
-            return ManyOp(
-                [
-                    Var("exact-round"),
-                    ManyOp([Var("*"), Num(token.value), Var("timebase")]),
-                ]
-            )
+            return [Symbol("round"), [Symbol("*"), token.value, Symbol("timebase")]]
 
         pars = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
         if token.type in pars:
@@ -508,13 +444,13 @@ class Parser:
                 childs.append(self.expr())
 
             self.eat(closing)
-            return ManyOp(childs)
+            return childs
 
         self.eat(token.type)
         childs = []
         while self.current_token.type not in (RPAREN, RBRAC, RCUR, EOF):
             childs.append(self.expr())
-        return ManyOp(childs)
+        return childs
 
     def __str__(self) -> str:
         result = str(self.comp())
@@ -533,8 +469,22 @@ class Parser:
 ###############################################################################
 
 
+class Contract:
+    __slots__ = ("name", "c")
+
+    def __init__(self, name: str, c: Callable[[object], bool]):
+        self.name = name
+        self.c = c
+
+    def __call__(self, v: object) -> bool:
+        return self.c(v)
+
+
 def check_args(
-    o: str, values: list | tuple, arity: tuple[int, int | None], types: list[Any] | None
+    o: str,
+    values: list | tuple,
+    arity: tuple[int, int | None],
+    types: list[Contract] | None,
 ) -> None:
     lower, upper = arity
     amount = len(values)
@@ -557,98 +507,57 @@ def check_args(
     for i, val in enumerate(values):
         check = types[-1] if i >= len(types) else types[i]
         if not check(val):
-            raise MyError(f"{o} expects: {' '.join([_t.__doc__ for _t in types])}")
+            raise MyError(f"{o} expects: {' '.join([c.name for c in types])}")
 
 
-def is_any(val: object) -> bool:
-    """any?"""
-    return True
+any_c = Contract("any/c", lambda v: True)
+is_proc = Contract("procedure?", lambda v: isinstance(v, Proc))
+is_bool = Contract("boolean?", lambda v: isinstance(v, bool))
+is_num = Contract(
+    "number?",
+    lambda v: not isinstance(v, bool)
+    and isinstance(v, (int, float, Fraction, complex)),
+)
+is_pair = Contract("pair?", lambda v: isinstance(v, Cons))
+is_null = Contract("null?", lambda v: isinstance(v, Null))
+is_real = Contract(
+    "real?", lambda v: not isinstance(v, bool) and isinstance(v, (int, float, Fraction))
+)
+is_eint = Contract(
+    "exact-integer?", lambda v: not isinstance(v, bool) and isinstance(v, int)
+)
+is_exact = Contract(
+    "exact?", lambda v: not isinstance(v, bool) and isinstance(v, (int, Fraction))
+)
+is_inexact = Contract("inexact?", lambda v: not isinstance(v, (int, Fraction)))
+is_symbol = Contract("symbol?", lambda v: isinstance(v, Symbol))
+is_str = Contract("string?", lambda v: isinstance(v, str))
+is_char = Contract("char?", lambda v: isinstance(v, Char))
+is_iterable = Contract(
+    "iterable?",
+    lambda v: isinstance(v, (str, list, range, np.ndarray, Cons, Null)),
+)
+is_stream = Contract("stream?", lambda v: isinstance(v, range))
+is_vector = Contract("vector?", lambda v: isinstance(v, list))
+is_boolarr = Contract(
+    "bool-array?",
+    lambda v: isinstance(v, np.ndarray) and v.dtype.kind == "b",
+)
+is_array = Contract("array?", lambda v: isinstance(v, np.ndarray))
 
 
-def is_proc(val: object) -> bool:
-    """procedure?"""
-    return isinstance(val, Proc)
-
-
-def is_bool(val: object) -> bool:
-    """boolean?"""
-    return isinstance(val, bool)
-
-
-def is_num(val: object) -> bool:
-    """number?"""
-    return not isinstance(val, bool) and isinstance(
-        val, (int, float, Fraction, complex)
-    )
-
-
-def is_pair(val: object) -> bool:
-    """pair?"""
-    return isinstance(val, ConsType)
-
-
-def is_real(val: object) -> bool:
-    """real?"""
-    return not isinstance(val, bool) and isinstance(val, (int, float, Fraction))
-
-
-def is_eint(val: object) -> bool:
-    """exact-integer?"""
-    return not isinstance(val, bool) and isinstance(val, int)
-
-
-def is_exact(val: object) -> bool:
-    """exact?"""
-    return isinstance(val, (int, Fraction))
-
-
-def is_str(val: object) -> bool:
-    """string?"""
-    return isinstance(val, str)
-
-
-def is_char(val: object) -> bool:
-    """char?"""
-    return isinstance(val, Char)
-
-
-def is_iterable(val: object) -> bool:
-    """iterable?"""
-    return isinstance(val, (list, range, np.ndarray, ConsType, Null))
-
-
-def is_stream(val: object) -> bool:
-    """stream?"""
-    return isinstance(val, range)
-
-
-def is_vector(val: object) -> bool:
-    """vector?"""
-    return isinstance(val, list)
-
-
-def is_boolarr(arr: object) -> bool:
-    """bool-array?"""
-    return isinstance(arr, np.ndarray) and arr.dtype.kind == "b"
-
-
-def is_array(arr: object) -> bool:
-    """array?"""
-    return isinstance(arr, np.ndarray)
-
-
-def is_int(val: object) -> bool:
-    """integer?"""
+def _is_int(val: object) -> bool:
     if isinstance(val, float):
         return val.is_integer()
     if isinstance(val, Fraction):
         return int(val) == val
-    return isinstance(val, int)
+    return not isinstance(val, bool) and isinstance(val, int)
 
 
-def us_int(val: object) -> bool:  # (U)n(S)igned (Int)eger
-    """exact-nonnegative-integer?"""
-    return isinstance(val, int) and val > -1
+is_int = Contract("integer?", _is_int)
+
+# (U)n(S)igned (Int)eger
+us_int = Contract("exact-nonnegative-integer?", lambda v: isinstance(v, int) and v > -1)
 
 
 def raise_(msg: str) -> None:
@@ -706,24 +615,6 @@ def _sqrt(v: Number) -> Number:
     return r
 
 
-def ceiling(val: Real) -> Real:
-    if isinstance(val, float):
-        return float(math.ceil(val))
-    return math.ceil(val)
-
-
-def floor(val: Real) -> Real:
-    if isinstance(val, float):
-        return float(math.floor(val))
-    return math.floor(val)
-
-
-def _round(val: Real) -> Real:
-    if isinstance(val, float):
-        return float(round(val))
-    return round(val)
-
-
 def _not(val: Any) -> bool | BoolList:
     if is_boolarr(val):
         return np.logical_not(val)
@@ -775,9 +666,9 @@ def number_to_string(val: Number) -> str:
 
 
 def length(val: Any) -> int:
-    if isinstance(val, (ConsType, Null)):
+    if isinstance(val, (Cons, Null)):
         count = 0
-        while isinstance(val, ConsType):
+        while isinstance(val, Cons):
             val = val.d
             count += 1
         if not isinstance(val, Null):
@@ -838,7 +729,7 @@ def mincut(oarr: BoolList, _min: int) -> BoolList:
     return arr
 
 
-def margin(a: Any, b: Any, c: Any = None) -> BoolList:
+def margin(a: int, b: Any, c: Any = None) -> BoolList:
     if c is None:
         check_args("margin", [a, b], (2, 2), [is_eint, is_boolarr])
         oarr = b
@@ -860,39 +751,39 @@ def cook(min_clip: int, min_cut: int, oarr: BoolList) -> BoolList:
     return arr
 
 
-def reverse_list(lst: ConsType | Null) -> ConsType | Null:
-    result: ConsType | Null = Null()
-    while isinstance(lst, ConsType):
-        result = ConsType(lst.a, result)
+def reverse_list(lst: Cons | Null) -> Cons | Null:
+    result: Cons | Null = Null()
+    while isinstance(lst, Cons):
+        result = Cons(lst.a, result)
         lst = lst.d
     return result
 
 
-def reverse(lst: list | range | ConsType | Null) -> Any:
-    if isinstance(lst, (list, range)):
-        return reversed(lst)
-    return reverse_list(lst)
+def reverse(seq: str | list | range | Cons | Null) -> Any:
+    if isinstance(seq, str):
+        return seq[::-1]
+    return reverse_list(seq) if isinstance(seq, (Cons, Null)) else reversed(seq)
 
 
-def _list(*values: Any) -> ConsType | Null:
-    result: ConsType | Null = Null()
+def _list(*values: Any) -> Cons | Null:
+    result: Cons | Null = Null()
     for val in reversed(values):
-        result = ConsType(val, result)
+        result = Cons(val, result)
     return result
 
 
-def list_to_vector(val: ConsType | Null) -> list:
+def list_to_vector(val: Cons | Null) -> list:
     result = []
-    while isinstance(val, ConsType):
+    while isinstance(val, Cons):
         result.append(val.a)
         val = val.d
     return result
 
 
-def vector_to_list(values: list) -> ConsType | Null:
-    result: ConsType | Null = Null()
+def vector_to_list(values: list) -> Cons | Null:
+    result: Cons | Null = Null()
     for val in reversed(values):
-        result = ConsType(val, result)
+        result = Cons(val, result)
     return result
 
 
@@ -912,11 +803,11 @@ def vector_extend(vec: list, *more_vecs: list) -> None:
         vec.extend(more)
 
 
-def string_to_list(s: str) -> ConsType | Null:
+def string_to_list(s: str) -> Cons | Null:
     return vector_to_list([Char(s) for s in s])
 
 
-def list_ref(result: ConsType, ref: int) -> Any:
+def list_ref(result: Cons, ref: int) -> Any:
     if ref < 0:
         raise MyError(f"list-ref: Invalid index {ref}")
     while ref > 0:
@@ -924,19 +815,19 @@ def list_ref(result: ConsType, ref: int) -> Any:
         result = result.d
         if isinstance(result, Null):
             raise MyError(f"list-ref: Invalid index {ref}")
-        if not isinstance(result, ConsType):
+        if not isinstance(result, Cons):
             raise MyError("list-ref: 1st arg must be a list")
     return result.a
 
 
 def is_list(val: Any) -> bool:
-    while isinstance(val, ConsType):
+    while isinstance(val, Cons):
         val = val.d
     return isinstance(val, Null)
 
 
 def palet_random(*args: int) -> int | float:
-    if len(args) == 0:
+    if not args:
         return random.random()
 
     if args[0] < 1:
@@ -950,21 +841,23 @@ def palet_random(*args: int) -> int | float:
     return random.randrange(args[0], args[1])
 
 
-def palet_map(proc: Proc, lst: ConsType | Null | list) -> Any:
-    if isinstance(lst, list):
-        return list(map(proc.proc, lst))
+def palet_map(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
+    if isinstance(seq, (list, range)):
+        return list(map(proc.proc, seq))
+    if isinstance(seq, str):
+        return str(map(proc.proc, seq))
 
-    result: ConsType | Null = Null()
-    while isinstance(lst, ConsType):
-        result = ConsType(proc.proc(lst.a), result)
-        lst = lst.d
+    result: Cons | Null = Null()
+    while isinstance(seq, Cons):
+        result = Cons(proc.proc(seq.a), result)
+        seq = seq.d
     return reverse_list(result)
 
 
-def apply(proc: Proc, lst: ConsType | Null | list) -> Any:
-    if isinstance(lst, list):
-        return reduce(proc.proc, lst)
-    return reduce(proc.proc, list_to_vector(lst))
+def apply(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
+    if isinstance(seq, (Cons, Null)):
+        return reduce(proc.proc, list_to_vector(seq))
+    return reduce(proc.proc, seq)
 
 
 def ref(arr: list | NDArray, ref: int) -> Any:
@@ -975,10 +868,10 @@ def ref(arr: list | NDArray, ref: int) -> Any:
         raise MyError(f"{kind}-ref: Invalid index {ref}")
 
 
-def stream_to_list(s: range) -> ConsType | Null:
-    result: ConsType | Null = Null()
+def stream_to_list(s: range) -> Cons | Null:
+    result: Cons | Null = Null()
     for item in reversed(s):
-        result = ConsType(item, result)
+        result = Cons(item, result)
     return result
 
 
@@ -1012,6 +905,9 @@ class Proc:
 
     __repr__ = __str__
 
+    def __call__(self, *vals: Any) -> Any:
+        return self.proc(*vals)
+
 
 class Interpreter:
     GLOBAL_SCOPE: dict[str, Any] = {
@@ -1025,9 +921,6 @@ class Interpreter:
         "display": Proc("display", display, (1, 1)),
         "exit": Proc("exit", sys.exit, (0, None)),
         "error": Proc("error", raise_, (1, 1), [is_str]),
-        "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
-        "apply": Proc("apply", apply, (2, 2), [is_proc, is_iterable]),
-        "reverse": Proc("reverse", reverse, (1, 1), [is_iterable]),
         # booleans
         ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
         ">=": Proc(">=", lambda a, b: a >= b, (2, 2), [is_real, is_real]),
@@ -1039,15 +932,18 @@ class Interpreter:
         "or": Proc("or", _or, (1, None)),
         "xor": Proc("xor", _xor, (2, None)),
         # compares
-        "any/c": Proc("any/c", is_any, (1, 1)),
+        "any/c": any_c,
         "equal?": Proc("equal?", is_equal, (2, 2)),
-        "procedure?": Proc("procedure?", is_proc, (1, 1)),
-        "boolean?": Proc("boolean?", is_bool, (1, 1)),
-        # random
-        "random": Proc("random", palet_random, (0, 2), [is_eint]),
+        "boolean?": is_bool,
+        # symbols
+        "symbol?": is_symbol,
+        "symbol->string": Proc(
+            "symbol->string", lambda sym: sym.val, (1, 1), [is_symbol]
+        ),
+        "string->symbol": Proc("string->symbol", Symbol, (1, 1), [is_str]),
         # strings
-        "string?": Proc("string?", is_str, (1, 1)),
-        "char?": Proc("char?", is_char, (1, 1)),
+        "string?": is_str,
+        "char?": is_char,
         "string": Proc("string", string_append, (0, None), [is_char]),
         "string-append": Proc("string-append", string_append, (0, None), [is_str]),
         "string-upcase": Proc("string-upcase", lambda s: s.upper(), (1, 1), [is_str]),
@@ -1057,18 +953,15 @@ class Interpreter:
         "string-titlecase": Proc(
             "string-titlecase", lambda s: s.title(), (1, 1), [is_str]
         ),
-        "string-length": Proc("string-length", len, (1, 1), [is_str]),
         "string-ref": Proc("string-ref", string_ref, (2, 2), [is_str, is_eint]),
         # number questions
-        "number?": Proc("number?", is_num, (1, 1)),
-        "exact?": Proc("exact?", is_exact, (1, 1)),
-        "inexact?": Proc("inexact?", lambda v: not is_exact(v), (1, 1)),
-        "real?": Proc("real?", is_real, (1, 1)),
-        "integer?": Proc("integer?", is_int, (1, 1)),
-        "exact-integer?": Proc("exact-integer?", is_eint, (1, 1)),
-        "exact-nonnegative-integer?": Proc(
-            "exact-nonnegative-integer?", us_int, (1, 1)
-        ),
+        "number?": is_num,
+        "exact?": is_exact,
+        "inexact?": is_inexact,
+        "real?": is_real,
+        "integer?": is_int,
+        "exact-integer?": is_eint,
+        "exact-nonnegative-integer?": us_int,
         "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
         "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
         "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_real]),
@@ -1087,50 +980,52 @@ class Interpreter:
         "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
         # reals
         "abs": Proc("abs", abs, (1, 1), [is_real]),
-        "ceil": Proc("ceil", ceiling, (1, 1), [is_real]),
-        "ceiling": Proc("ceil", ceiling, (1, 1), [is_real]),
-        "exact-ceil": Proc("exact-ceil", math.ceil, (1, 1), [is_real]),
-        "exact-ceiling": Proc("exact-ceil", math.ceil, (1, 1), [is_real]),
-        "floor": Proc("floor", floor, (1, 1), [is_real]),
-        "exact-floor": Proc("exact-floor", math.floor, (1, 1), [is_real]),
-        "round": Proc("round", _round, (1, 1), [is_real]),
-        "exact-round": Proc("exact-round", round, (1, 1), [is_real]),
+        "ceil": Proc("ceil", math.ceil, (1, 1), [is_real]),
+        "floor": Proc("floor", math.floor, (1, 1), [is_real]),
+        "round": Proc("round", round, (1, 1), [is_real]),
         "max": Proc("max", lambda *v: max(v), (1, None), [is_real]),
         "min": Proc("min", lambda *v: min(v), (1, None), [is_real]),
-        # streams
-        "stream?": Proc("stream?", is_stream, (1, 1)),
+        "random": Proc("random", palet_random, (0, 2), [is_eint]),
+        # sequences
+        "stream?": is_stream,
         "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
         "length": Proc("length", length, (1, 1), [is_iterable]),
+        "reverse": Proc("reverse", reverse, (1, 1), [is_iterable]),
         # vectors
-        "vector?": Proc("vector?", is_vector, (1, 1)),
+        "vector?": is_vector,
         "vector": Proc("vector", lambda *a: list(a), (0, None)),
-        "vector-length": Proc("vector-length", len, (1, 1), [is_vector]),
-        "vector-ref": Proc("vector-ref", ref, (2, 2), [is_vector, is_real]),
+        "vector-ref": Proc("vector-ref", ref, (2, 2), [is_vector, is_eint]),
         "make-vector": Proc(
-            "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, is_any]
+            "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, any_c]
         ),
         "vector-pop!": Proc("pop!", lambda v: v.pop(), (1, 1), [is_vector]),
-        "vector-add!": Proc("vector-add!", vector_append, (2, 2), [is_vector, is_any]),
-        "vector-set!": Proc("vector-set!", vector_set, (3, 3), [is_vector, is_eint, is_any]),
+        "vector-add!": Proc("vector-add!", vector_append, (2, 2), [is_vector, any_c]),
+        "vector-set!": Proc(
+            "vector-set!", vector_set, (3, 3), [is_vector, is_eint, any_c]
+        ),
         "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
         # cons/list
-        "pair?": Proc("pair?", is_pair, (1, 1)),
-        "null?": Proc("null?", lambda val: isinstance(val, Null), (1, 1)),
-        "cons": Proc("cons", lambda a, b: ConsType(a, b), (2, 2)),
+        "pair?": is_pair,
+        "null?": is_null,
+        "cons": Proc("cons", Cons, (2, 2)),
         "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
         "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
-        "list?": Proc("list?", is_list, (1, 1)),
+        "list?": is_list,
         "list": Proc("list", _list, (0, None)),
         "list-ref": Proc("list-ref", list_ref, (2, 2), [is_pair, us_int]),
         # arrays
-        "array?": Proc("array?", is_array, (1, 1)),
+        "array?": is_array,
         "array": Proc("array", array_proc, (2, None), [is_str, is_eint]),
-        "bool-array?": Proc("bool-array?", is_boolarr, (1, 1)),
+        "bool-array?": is_boolarr,
         "bool-array": Proc(
             "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [us_int]
         ),
-        "array-ref": Proc("array-ref", ref, (2, 2), [is_boolarr, is_real]),
+        "array-ref": Proc("array-ref", ref, (2, 2), [is_array, is_real]),
         "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
+        # procedures
+        "procedure?": is_proc,
+        "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
+        "apply": Proc("apply", apply, (2, 2), [is_proc, is_iterable]),
         # conversions
         "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
         "string->list": Proc("string->list", string_to_list, (1, 1), [is_str]),
@@ -1155,13 +1050,8 @@ class Interpreter:
         if filesetup is not None:
             self.GLOBAL_SCOPE["timebase"] = filesetup.tb
 
-    def visit(self, node: Node) -> Any:
-        if isinstance(node, Char):
-            return node
-        if isinstance(node, (Num, Str, Bool)):
-            return node.val
-
-        if isinstance(node, Var):
+    def visit(self, node: Any) -> Any:
+        if isinstance(node, Symbol):
             val = self.GLOBAL_SCOPE.get(node.val)
             if val is None:
                 raise MyError(f"{node.val} is undefined")
@@ -1172,103 +1062,101 @@ class Interpreter:
                 raise MyError("Can't use edit methods if there's no input files")
             return edit_method(node.val, self.filesetup)
 
-        if isinstance(node, ManyOp):
-            if len(node.children) == 0:
+        if isinstance(node, Compound):
+            return [self.visit(c) for c in node.children]
+
+        if isinstance(node, list):
+            if not node:
                 raise MyError("(): Missing procedure expression")
 
-            name = "" if not isinstance(node.first, Var) else node.first.val
+            name = node[0].val if isinstance(node[0], Symbol) else ""
 
             if name == "for/vector":
-                if len(node.children) < 2:
+                if len(node) < 2:
                     raise MyError("for/vector: bad syntax")
 
-                if len(node.children) == 2:
+                if len(node) == 2:
                     raise MyError("for/vector: missing body")
 
-                assert isinstance(node.children[1], ManyOp)
-                assert isinstance(node.children[1].first, ManyOp)
-                var = node.children[1].first.first
-                if not isinstance(var, Var):
-                    raise MyError("for/vector: binding must be var")
-                iter_vector = self.visit(node.children[1].first.children[1])
+                assert isinstance(node[1], list)
+                assert isinstance(node[1][0], list)
+                var = node[1][0][0]
+                if not isinstance(var, Symbol):
+                    raise MyError("for/vector: binding must be a symbol?")
+                iter_vector = self.visit(node[1][0][1])
                 if not isinstance(iter_vector, list):
                     raise MyError("for/vector: got iterable other than vector?")
 
                 results = []
                 for item in iter_vector:
                     self.GLOBAL_SCOPE[var.val] = item
-                    childs = [self.visit(c) for c in node.children[2:]]
-                    results.append(childs[-1])
+                    results.append([self.visit(c) for c in node[2:]][-1])
 
                 del self.GLOBAL_SCOPE[var.val]
                 return results
 
             if name == "if":
-                if len(node.children) != 4:
+                if len(node) != 4:
                     raise MyError("if: bad syntax")
-                test_expr = self.visit(node.children[1])
+                test_expr = self.visit(node[1])
                 if not isinstance(test_expr, bool):
                     raise MyError(f"if: test-expr arg must be: boolean?")
                 if test_expr:
-                    return self.visit(node.children[2])
-                return self.visit(node.children[3])
+                    return self.visit(node[2])
+                return self.visit(node[3])
 
             if name == "when":
-                if len(node.children) != 3:
+                if len(node) != 3:
                     raise MyError("when: bad syntax")
-                test_expr = self.visit(node.children[1])
+                test_expr = self.visit(node[1])
                 if not isinstance(test_expr, bool):
                     raise MyError(f"when: test-expr arg must be: boolean?")
                 if test_expr:
-                    return self.visit(node.children[2])
+                    return self.visit(node[2])
                 return None
 
             if name == "quote":
-                if len(node.children) != 2:
+                if len(node) != 2:
                     raise MyError("quote: bad syntax")
-                args = node.children[1]
-                if isinstance(args, ManyOp):
-                    if len(args.children) == 0:
-                        return Null()
-                    list_args = [self.visit(c) for c in args.children]
-                    return _list(*list_args)
-                return self.visit(args)  # return literal
+                if isinstance(node[1], list):
+                    return _list(*node[1])
+                return node[1]
 
             if name == "define":
-                if len(node.children) != 3:
+                if len(node) != 3:
                     raise MyError("define: bad syntax")
-                if not isinstance(node.children[1], Var):
+                if not isinstance(node[1], Symbol):
                     raise MyError("define: Must use symbol")
 
-                symbol = node.children[1].val
-                self.GLOBAL_SCOPE[symbol] = self.visit(node.children[2])
+                symbol = node[1].val
+                self.GLOBAL_SCOPE[symbol] = self.visit(node[2])
                 return None
 
             if name == "set!":
-                if len(node.children) != 3:
+                if len(node) != 3:
                     raise MyError("set!: bad syntax")
-                if not isinstance(node.children[1], Var):
+                if not isinstance(node[1], Symbol):
                     raise MyError("set!: Must use symbol")
 
-                symbol = node.children[1].val
+                symbol = node[1].val
                 if symbol not in self.GLOBAL_SCOPE:
                     raise MyError(f"Cannot set variable {symbol} before definition")
-                self.GLOBAL_SCOPE[symbol] = self.visit(node.children[2])
+                self.GLOBAL_SCOPE[symbol] = self.visit(node[2])
                 return None
 
-            oper = self.visit(node.first)
+            oper = self.visit(node[0])
 
-            if not isinstance(oper, Proc):
+            if not callable(oper):
                 raise MyError(f"{oper}, expected procedure")
 
-            values = [self.visit(c) for c in node.children[1:]]
-            check_args(oper.name, values, oper.arity, oper.contracts)
-            return oper.proc(*values)
+            values = [self.visit(c) for c in node[1:]]
+            if isinstance(oper, Contract):
+                check_args(oper.name, values, (1, 1), None)
+            else:
+                check_args(oper.name, values, oper.arity, oper.contracts)
+            return oper(*values)
 
-        if isinstance(node, Compound):
-            return [self.visit(c) for c in node.children]
-
-        raise ValueError(f"Unknown node type: {node}")
+        return node
 
     def interpret(self) -> Any:
         return self.visit(self.parser.comp())

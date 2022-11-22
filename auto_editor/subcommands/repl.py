@@ -10,7 +10,7 @@ from fractions import Fraction
 import auto_editor
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import (
-    ConsType,
+    Cons,
     FileSetup,
     Interpreter,
     Lexer,
@@ -62,7 +62,7 @@ def repl_options(parser: ArgumentParser) -> ArgumentParser:
 def display_val(val: Any) -> str:
     if val is None:
         return ""
-    if isinstance(val, (list, ConsType)):
+    if isinstance(val, (list, Cons)):
         return f"'{print_val(val)}\n"
     if isinstance(val, Fraction):
         return f"{val.numerator}/{val.denominator}\n"
