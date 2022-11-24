@@ -16,6 +16,7 @@ from auto_editor.interpreter import (
     Lexer,
     MyError,
     Parser,
+    Symbol,
     print_val,
 )
 from auto_editor.output import Ensure
@@ -62,7 +63,7 @@ def repl_options(parser: ArgumentParser) -> ArgumentParser:
 def display_val(val: Any) -> str:
     if val is None:
         return ""
-    if isinstance(val, (list, Cons)):
+    if isinstance(val, (list, Cons, Symbol)):
         return f"'{print_val(val)}\n"
     if isinstance(val, Fraction):
         return f"{val.numerator}/{val.denominator}\n"
@@ -100,6 +101,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             try:
                 lexer = Lexer(text)
                 parser = Parser(lexer)
+                print(parser)
             except MyError as e:
                 print(f"error: {e}")
                 continue
@@ -108,7 +110,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 interpreter = Interpreter(parser, filesetup)
                 for result in interpreter.interpret():
                     sys.stdout.write(display_val(result))
-            except MyError as e:
+            except (MyError, ZeroDivisionError) as e:
                 print(f"error: {e}")
 
     except (KeyboardInterrupt, EOFError):
