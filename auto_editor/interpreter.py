@@ -34,20 +34,6 @@ class MyError(Exception):
     pass
 
 
-class Null:
-    @staticmethod
-    def __init__() -> None:
-        pass
-
-    def __eq__(self, obj: object) -> bool:
-        return isinstance(obj, Null)
-
-    def __str__(self) -> str:
-        return "'()"
-
-    __repr__ = __str__
-
-
 def display_dtype(dtype: np.dtype) -> str:
     if dtype.kind == "b":
         return "bool"
@@ -67,7 +53,7 @@ def print_val(val: object) -> str:
     if val is False:
         return "#f"
     if isinstance(val, Symbol):
-        return f"'{val}"
+        return f"{val}"
     if isinstance(val, list):
         if not val:
             return "#()"
@@ -76,10 +62,10 @@ def print_val(val: object) -> str:
             result += f" {print_val(item)}"
         return result + ")"
     if isinstance(val, range):
-        return "#<stream>"
+        return "#<range>"
     if isinstance(val, np.ndarray):
         kind = val.dtype.kind
-        result = f"(array {display_dtype(val.dtype)}"
+        result = f"(array '{display_dtype(val.dtype)}"
         if kind == "b":
             for item in val:
                 result += " 1" if item else " 0"
@@ -95,6 +81,29 @@ def print_val(val: object) -> str:
         return f'"{val}"'
 
     return f"{val!r}"
+
+
+class Null:
+    @staticmethod
+    def __init__() -> None:
+        pass
+
+    def __eq__(self, obj: object) -> bool:
+        return isinstance(obj, Null)
+
+    def __len__(self) -> int:
+        return 0
+
+    def __next__(self) -> StopIteration:
+        raise StopIteration
+
+    def __getitem__(self, ref: int | slice) -> None:
+        raise IndexError
+
+    def __str__(self) -> str:
+        return "'()"
+
+    __repr__ = __str__
 
 
 class Cons:
@@ -118,6 +127,70 @@ class Cons:
     def __eq__(self, obj: object) -> bool:
         return isinstance(obj, Cons) and self.a == obj.a and self.d == obj.d
 
+    def __len__(self) -> int:
+        count = 0
+        while isinstance(self, Cons):
+            self = self.d
+            count += 1
+        if not isinstance(self, Null):
+            raise MyError("length expects: list?")
+        return count
+
+    def __next__(self) -> Any:
+        if isinstance(self.d, Cons):
+            return self.d
+        raise StopIteration
+
+    def __getitem__(self, ref: int | slice) -> Any:
+        if isinstance(ref, int):
+            if ref < 0:
+                raise MyError(f"ref: negative index not allowed")
+            pos = ref
+            while pos > 0:
+                pos -= 1
+                self = self.d
+                if not isinstance(self, Cons):
+                    raise MyError(f"ref: Index {ref} out of range")
+
+            return self.a
+
+        lst: Cons | Null = Null()
+        steps: int = -1
+        i: int = 0
+
+        do_reverse = True
+        start, stop, step = ref.start, ref.stop, ref.step
+        if start is None:
+            start = 0
+        if step < 0:
+            do_reverse = False
+            step = -step
+
+            if stop is None:
+                stop = float("inf")
+            else:
+                start, stop = stop + 1, start
+
+        while isinstance(self, Cons):
+            if i > stop - 1:
+                break
+            if i >= start:
+                steps = (steps + 1) % step
+                if steps == 0:
+                    lst = Cons(self.a, lst)
+
+            self = self.d
+            i += 1
+
+        if not do_reverse:
+            return lst
+
+        result: Cons | Null = Null()
+        while isinstance(lst, Cons):
+            result = Cons(lst.a, result)
+            lst = lst.d
+        return result
+
 
 class Char:
     __slots__ = "val"
@@ -140,16 +213,20 @@ class Char:
 
 
 class Symbol:
-    __slots__ = "val"
+    __slots__ = ("val", "hash")
 
     def __init__(self, val: str):
         self.val = val
+        self.hash = hash(val)
 
     __str__: Callable[[Symbol], str] = lambda self: self.val
     __repr__ = __str__
 
+    def __hash__(self) -> int:
+        return self.hash
+
     def __eq__(self, obj: object) -> bool:
-        return isinstance(obj, Symbol) and self.val == obj.val
+        return isinstance(obj, Symbol) and self.hash == obj.hash
 
 
 ###############################################################################
@@ -161,6 +238,7 @@ class Symbol:
 METHODS = ("audio", "motion", "pixeldiff", "none", "all")
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 ID, NUM, BOOL, STR, ARR, SEC, CHAR = "ID", "NUM", "BOOL", "STR", "ARR", "SEC", "CHAR"
+QUOTE = "QUOTE"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
 
 
@@ -296,23 +374,6 @@ class Lexer:
 
         raise MyError(f"Unknown hash literal: {result}")
 
-    def quote_literal(self) -> Token:
-        result = ""
-        if self.char == "(":
-            result += self.char
-            self.advance()
-            while self.char is not None:
-                result += self.char
-                if self.char == ")":
-                    self.advance()
-                    break
-                self.advance()
-
-        if result == "()":
-            return Token(ID, "null")
-
-        raise MyError(f"Unknown quote literal: {result}")
-
     def get_next_token(self) -> Token:
         while self.char is not None:
             self.skip_whitespace()
@@ -327,6 +388,10 @@ class Lexer:
             if self.char == '"':
                 self.advance()
                 return Token(STR, self.string())
+
+            if self.char == "'":
+                self.advance()
+                return Token(QUOTE, "'")
 
             if self.char in "(){}[]":
                 _par = self.char
@@ -344,10 +409,6 @@ class Lexer:
             if self.char == "#":
                 self.advance()
                 return self.hash_literal()
-
-            if self.char == "'":
-                self.advance()
-                return self.quote_literal()
 
             result = ""
             has_illegal = False
@@ -432,15 +493,18 @@ class Parser:
             self.eat(SEC)
             return [Symbol("round"), [Symbol("*"), token.value, Symbol("timebase")]]
 
+        if token.type == QUOTE:
+            self.eat(token.type)
+            return [Symbol("quote"), self.expr()]
+
         pars = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
         if token.type in pars:
             self.eat(token.type)
             closing = pars[token.type]
-
             childs = []
             while self.current_token.type != closing:
                 if self.current_token.type == EOF:
-                    raise MyError("Unexpected EOF")
+                    raise MyError(f"Expected closing '{closing}' before end")
                 childs.append(self.expr())
 
             self.eat(closing)
@@ -513,23 +577,8 @@ def check_args(
 any_c = Contract("any/c", lambda v: True)
 is_proc = Contract("procedure?", lambda v: isinstance(v, Proc))
 is_bool = Contract("boolean?", lambda v: isinstance(v, bool))
-is_num = Contract(
-    "number?",
-    lambda v: not isinstance(v, bool)
-    and isinstance(v, (int, float, Fraction, complex)),
-)
 is_pair = Contract("pair?", lambda v: isinstance(v, Cons))
 is_null = Contract("null?", lambda v: isinstance(v, Null))
-is_real = Contract(
-    "real?", lambda v: not isinstance(v, bool) and isinstance(v, (int, float, Fraction))
-)
-is_eint = Contract(
-    "exact-integer?", lambda v: not isinstance(v, bool) and isinstance(v, int)
-)
-is_exact = Contract(
-    "exact?", lambda v: not isinstance(v, bool) and isinstance(v, (int, Fraction))
-)
-is_inexact = Contract("inexact?", lambda v: not isinstance(v, (int, Fraction)))
 is_symbol = Contract("symbol?", lambda v: isinstance(v, Symbol))
 is_str = Contract("string?", lambda v: isinstance(v, str))
 is_char = Contract("char?", lambda v: isinstance(v, Char))
@@ -544,6 +593,28 @@ is_boolarr = Contract(
     lambda v: isinstance(v, np.ndarray) and v.dtype.kind == "b",
 )
 is_array = Contract("array?", lambda v: isinstance(v, np.ndarray))
+is_num = Contract(
+    "number?",
+    lambda v: not isinstance(v, bool)
+    and isinstance(v, (int, float, Fraction, complex)),
+)
+is_real = Contract(
+    "real?", lambda v: not isinstance(v, bool) and isinstance(v, (int, float, Fraction))
+)
+is_exact = Contract(
+    "exact?", lambda v: not isinstance(v, bool) and isinstance(v, (int, Fraction))
+)
+is_inexact = Contract(
+    "inexact?",
+    lambda v: isinstance(v, bool) or not isinstance(v, (int, Fraction)),
+)
+is_eint = Contract(
+    "exact-integer?",
+    lambda v: not isinstance(v, bool) and isinstance(v, int),
+)
+is_frac = Contract("fraction?", lambda v: isinstance(v, Fraction))
+is_float = Contract("float?", lambda v: isinstance(v, float))
+us_int = Contract("exact-nonnegative-integer?", lambda v: isinstance(v, int) and v > -1)
 
 
 def _is_int(val: object) -> bool:
@@ -555,9 +626,6 @@ def _is_int(val: object) -> bool:
 
 
 is_int = Contract("integer?", _is_int)
-
-# (U)n(S)igned (Int)eger
-us_int = Contract("exact-nonnegative-integer?", lambda v: isinstance(v, int) and v > -1)
 
 
 def raise_(msg: str) -> None:
@@ -595,15 +663,13 @@ def minus(*vals: Number) -> Number:
 def div(*vals: Any) -> Number:
     if len(vals) == 1:
         vals = (1, vals[0])
-    try:
-        if not {float, complex}.intersection({type(val) for val in vals}):
-            result = reduce(lambda a, b: Fraction(a, b), vals)
-            if result.denominator == 1:
-                return result.numerator
-            return result
-        return reduce(lambda a, b: a / b, vals)
-    except ZeroDivisionError:
-        raise MyError("division by zero")
+
+    if not {float, complex}.intersection({type(val) for val in vals}):
+        result = reduce(lambda a, b: Fraction(a, b), vals)
+        if result.denominator == 1:
+            return result.numerator
+        return result
+    return reduce(lambda a, b: a / b, vals)
 
 
 def _sqrt(v: Number) -> Number:
@@ -665,37 +731,24 @@ def number_to_string(val: Number) -> str:
     return f"{val}"
 
 
-def length(val: Any) -> int:
-    if isinstance(val, (Cons, Null)):
-        count = 0
-        while isinstance(val, Cons):
-            val = val.d
-            count += 1
-        if not isinstance(val, Null):
-            raise MyError("length expects: list?")
-        return count
-
-    return len(val)
-
-
-def array_proc(kind_str: str, *vals: Any) -> np.ndarray:
-    kind_map = {
-        "bool": np.bool_,
-        "int8": np.int8,
-        "int16": np.int16,
-        "int32": np.int32,
-        "int64": np.int64,
-        "uint8": np.uint8,
-        "uint16": np.uint16,
-        "uint32": np.uint32,
-        "uint64": np.uint64,
-        "float32": np.float32,
-        "float64": np.float64,
+def array_proc(dtype: Symbol, *vals: Any) -> np.ndarray:
+    dtype_map = {
+        Symbol("bool"): np.bool_,
+        Symbol("int8"): np.int8,
+        Symbol("int16"): np.int16,
+        Symbol("int32"): np.int32,
+        Symbol("int64"): np.int64,
+        Symbol("uint8"): np.uint8,
+        Symbol("uint16"): np.uint16,
+        Symbol("uint32"): np.uint32,
+        Symbol("uint64"): np.uint64,
+        Symbol("float32"): np.float32,
+        Symbol("float64"): np.float64,
     }
-    kind = kind_map.get(kind_str)
-    if kind is None:
-        raise MyError(f"Invalid array type: {kind_str}")
-    return np.ndarray(vals, dtype=kind)
+    np_dtype = dtype_map.get(dtype)
+    if np_dtype is None:
+        raise MyError(f"Invalid array type: {dtype}")
+    return np.array(vals, dtype=np_dtype)
 
 
 def mut_remove_small(arr: BoolList, lim: int, replace: int, with_: int) -> None:
@@ -751,23 +804,19 @@ def cook(min_clip: int, min_cut: int, oarr: BoolList) -> BoolList:
     return arr
 
 
-def reverse_list(lst: Cons | Null) -> Cons | Null:
-    result: Cons | Null = Null()
-    while isinstance(lst, Cons):
-        result = Cons(lst.a, result)
-        lst = lst.d
-    return result
-
-
-def reverse(seq: str | list | range | Cons | Null) -> Any:
-    if isinstance(seq, str):
-        return seq[::-1]
-    return reverse_list(seq) if isinstance(seq, (Cons, Null)) else reversed(seq)
-
-
 def _list(*values: Any) -> Cons | Null:
     result: Cons | Null = Null()
     for val in reversed(values):
+        result = Cons(val, result)
+    return result
+
+
+# convert nested vectors to nested lists
+def deep_list(vec: list) -> Cons | Null:
+    result: Cons | Null = Null()
+    for val in reversed(vec):
+        if isinstance(val, list):
+            val = deep_list(val)
         result = Cons(val, result)
     return result
 
@@ -807,19 +856,6 @@ def string_to_list(s: str) -> Cons | Null:
     return vector_to_list([Char(s) for s in s])
 
 
-def list_ref(result: Cons, ref: int) -> Any:
-    if ref < 0:
-        raise MyError(f"list-ref: Invalid index {ref}")
-    while ref > 0:
-        ref -= 1
-        result = result.d
-        if isinstance(result, Null):
-            raise MyError(f"list-ref: Invalid index {ref}")
-        if not isinstance(result, Cons):
-            raise MyError("list-ref: 1st arg must be a list")
-    return result.a
-
-
 def is_list(val: Any) -> bool:
     while isinstance(val, Cons):
         val = val.d
@@ -851,7 +887,7 @@ def palet_map(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
     while isinstance(seq, Cons):
         result = Cons(proc.proc(seq.a), result)
         seq = seq.d
-    return reverse_list(result)
+    return result[::-1]
 
 
 def apply(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
@@ -860,12 +896,23 @@ def apply(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
     return reduce(proc.proc, seq)
 
 
-def ref(arr: list | NDArray, ref: int) -> Any:
+def ref(seq: str | list | range | Cons | Null | NDArray, ref: int) -> Any:
     try:
-        return arr[ref]
+        return Char(seq[ref]) if isinstance(seq, str) else seq[ref]
     except IndexError:
-        kind = "vector" if isinstance(arr, list) else "array"
-        raise MyError(f"{kind}-ref: Invalid index {ref}")
+        raise MyError(f"ref: Invalid index {ref}")
+
+
+def p_slice(
+    seq: str | list | range | NDArray,
+    start: int = 0,
+    end: int | None = None,
+    step: int = 1,
+) -> Any:
+    if end is None:
+        end = len(seq)
+
+    return seq[start:end:step]
 
 
 def stream_to_list(s: range) -> Cons | Null:
@@ -917,29 +964,72 @@ class Interpreter:
         "null": Null(),
         "pi": math.pi,
         # actions
-        "begin": Proc("begin", lambda *x: None if not x else x[-1], (0, None)),
+        "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
         "display": Proc("display", display, (1, 1)),
         "exit": Proc("exit", sys.exit, (0, None)),
         "error": Proc("error", raise_, (1, 1), [is_str]),
         # booleans
+        "boolean?": is_bool,
         ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
         ">=": Proc(">=", lambda a, b: a >= b, (2, 2), [is_real, is_real]),
         "<": Proc("<", lambda a, b: a < b, (2, 2), [is_real, is_real]),
         "<=": Proc("<=", lambda a, b: a <= b, (2, 2), [is_real, is_real]),
         "=": Proc("=", equal_num, (1, None), [is_num]),
+        "eq?": Proc("eq?", lambda a, b: a is b, (2, 2)),
+        "equal?": Proc("equal?", is_equal, (2, 2)),
         "not": Proc("not", _not, (1, 1)),
         "and": Proc("and", _and, (1, None)),
         "or": Proc("or", _or, (1, None)),
         "xor": Proc("xor", _xor, (2, None)),
-        # compares
-        "any/c": any_c,
-        "equal?": Proc("equal?", is_equal, (2, 2)),
-        "boolean?": is_bool,
+        # number questions
+        "number?": is_num,
+        "real?": is_real,
+        "exact?": is_exact,
+        "inexact?": is_inexact,
+        "integer?": is_int,
+        "fraction?": is_frac,
+        "float?": is_float,
+        "exact-integer?": is_eint,
+        "exact-nonnegative-integer?": us_int,
+        "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
+        "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
+        "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_real]),
+        # numbers
+        "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
+        "-": Proc("-", minus, (1, None), [is_num]),
+        "*": Proc("*", mul, (0, None), [is_num]),
+        "/": Proc("/", div, (1, None), [is_num]),
+        "add1": Proc("add1", lambda v: v + 1, (1, 1), [is_num]),
+        "sub1": Proc("sub1", lambda v: v - 1, (1, 1), [is_num]),
+        "sqrt": Proc("sqrt", _sqrt, (1, 1), [is_num]),
+        "real-part": Proc("real-part", lambda v: v.real, (1, 1), [is_num]),
+        "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
+        # reals
+        "expt": Proc("expt", pow, (2, 2), [is_real]),
+        "exp": Proc("exp", math.exp, (1, 1), [is_real]),
+        "abs": Proc("abs", abs, (1, 1), [is_real]),
+        "ceil": Proc("ceil", math.ceil, (1, 1), [is_real]),
+        "floor": Proc("floor", math.floor, (1, 1), [is_real]),
+        "round": Proc("round", round, (1, 1), [is_real]),
+        "max": Proc("max", lambda *v: max(v), (1, None), [is_real]),
+        "min": Proc("min", lambda *v: min(v), (1, None), [is_real]),
+        "sin": Proc("sin", math.sin, (1, 1), [is_real]),
+        "cos": Proc("cos", math.cos, (1, 1), [is_real]),
+        "log": Proc("log", math.log, (1, 2), [is_real, is_real]),
+        "tan": Proc("tan", math.tan, (1, 1), [is_real]),
+        "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
+        "modulo": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
+        "random": Proc("random", palet_random, (0, 2), [is_eint]),
+        # sequences
+        "stream?": is_stream,
+        "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
+        "length": Proc("length", len, (1, 1), [is_iterable]),
+        "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_iterable]),
+        "ref": Proc("ref", ref, (2, 2), [is_iterable, is_eint]),
+        "slice": Proc("slice", p_slice, (2, 4), [is_iterable, is_eint]),
         # symbols
         "symbol?": is_symbol,
-        "symbol->string": Proc(
-            "symbol->string", lambda sym: sym.val, (1, 1), [is_symbol]
-        ),
+        "symbol->string": Proc("symbol->string", str, (1, 1), [is_symbol]),
         "string->symbol": Proc("string->symbol", Symbol, (1, 1), [is_str]),
         # strings
         "string?": is_str,
@@ -953,48 +1043,9 @@ class Interpreter:
         "string-titlecase": Proc(
             "string-titlecase", lambda s: s.title(), (1, 1), [is_str]
         ),
-        "string-ref": Proc("string-ref", string_ref, (2, 2), [is_str, is_eint]),
-        # number questions
-        "number?": is_num,
-        "exact?": is_exact,
-        "inexact?": is_inexact,
-        "real?": is_real,
-        "integer?": is_int,
-        "exact-integer?": is_eint,
-        "exact-nonnegative-integer?": us_int,
-        "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
-        "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
-        "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_real]),
-        # numbers
-        "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
-        "-": Proc("-", minus, (1, None), [is_num]),
-        "*": Proc("*", mul, (0, None), [is_num]),
-        "/": Proc("/", div, (1, None), [is_num]),
-        "add1": Proc("add1", lambda v: v + 1, (1, 1), [is_num]),
-        "sub1": Proc("sub1", lambda v: v - 1, (1, 1), [is_num]),
-        "expt": Proc("expt", pow, (2, 2), [is_real]),
-        "sqrt": Proc("sqrt", _sqrt, (1, 1), [is_num]),
-        "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
-        "modulo": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
-        "real-part": Proc("real-part", lambda v: v.real, (1, 1), [is_num]),
-        "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
-        # reals
-        "abs": Proc("abs", abs, (1, 1), [is_real]),
-        "ceil": Proc("ceil", math.ceil, (1, 1), [is_real]),
-        "floor": Proc("floor", math.floor, (1, 1), [is_real]),
-        "round": Proc("round", round, (1, 1), [is_real]),
-        "max": Proc("max", lambda *v: max(v), (1, None), [is_real]),
-        "min": Proc("min", lambda *v: min(v), (1, None), [is_real]),
-        "random": Proc("random", palet_random, (0, 2), [is_eint]),
-        # sequences
-        "stream?": is_stream,
-        "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
-        "length": Proc("length", length, (1, 1), [is_iterable]),
-        "reverse": Proc("reverse", reverse, (1, 1), [is_iterable]),
         # vectors
         "vector?": is_vector,
         "vector": Proc("vector", lambda *a: list(a), (0, None)),
-        "vector-ref": Proc("vector-ref", ref, (2, 2), [is_vector, is_eint]),
         "make-vector": Proc(
             "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, any_c]
         ),
@@ -1012,15 +1063,14 @@ class Interpreter:
         "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
         "list?": is_list,
         "list": Proc("list", _list, (0, None)),
-        "list-ref": Proc("list-ref", list_ref, (2, 2), [is_pair, us_int]),
+        "list-ref": Proc("list-ref", ref, (2, 2), [is_pair, us_int]),
         # arrays
         "array?": is_array,
-        "array": Proc("array", array_proc, (2, None), [is_str, is_eint]),
+        "array": Proc("array", array_proc, (2, None), [is_symbol, is_real]),
         "bool-array?": is_boolarr,
         "bool-array": Proc(
             "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [us_int]
         ),
-        "array-ref": Proc("array-ref", ref, (2, 2), [is_array, is_real]),
         "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
         # procedures
         "procedure?": is_proc,
@@ -1036,6 +1086,8 @@ class Interpreter:
         "vector->list": Proc("vector->list", vector_to_list, (1, 1), [is_vector]),
         "stream->list": Proc("stream->list", stream_to_list, (1, 1), [is_stream]),
         "stream->vector": Proc("stream->vector", list, (1, 1), [is_stream]),
+        # contracts
+        "any/c": any_c,
         # ae extensions
         "margin": Proc("margin", margin, (2, 3), None),
         "mincut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
@@ -1118,15 +1170,17 @@ class Interpreter:
             if name == "quote":
                 if len(node) != 2:
                     raise MyError("quote: bad syntax")
+
                 if isinstance(node[1], list):
-                    return _list(*node[1])
+                    return deep_list(node[1])
                 return node[1]
 
             if name == "define":
                 if len(node) != 3:
                     raise MyError("define: bad syntax")
+
                 if not isinstance(node[1], Symbol):
-                    raise MyError("define: Must use symbol")
+                    raise MyError("define: Must be an identifier")
 
                 symbol = node[1].val
                 self.GLOBAL_SCOPE[symbol] = self.visit(node[2])

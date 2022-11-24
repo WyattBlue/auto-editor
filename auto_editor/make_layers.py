@@ -113,15 +113,15 @@ def run_interpreter(
 
         interpreter = Interpreter(parser, filesetup)
         results = interpreter.interpret()
-    except MyError as e:
+    except (MyError, ZeroDivisionError) as e:
         log.error(e)
 
     if len(results) == 0:
-        log.error("Expression in --edit must return a boolarr")
+        log.error("Expression in --edit must return a bool-array")
 
     result = results[-1]
-    if not is_boolarr(results[-1]):
-        log.error("Expression in --edit must return a boolarr")
+    if not is_boolarr(result):
+        log.error("Expression in --edit must return a bool-array")
 
     assert isinstance(result, np.ndarray)
     return result

@@ -96,7 +96,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
     ],
-    "Number Types": [
+    "Number Predicates": [
         proc(
             "number?",
             (["v"], "boolean?"),
@@ -147,7 +147,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         proc(
             "zero?",
             (["v"], "boolean?"),
-            [("v", "any/c")],
+            [("v", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is equal to ", code("0"),
                 ", ", code("#f"), " otherwise."
@@ -156,7 +156,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         proc(
             "positive?",
             (["v"], "boolean?"),
-            [("v", "any/c")],
+            [("v", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is greater than ",
                 code("0"), ", ", code("#f"), " otherwise."
@@ -165,7 +165,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         proc(
             "negative?",
             (["v"], "boolean?"),
-            [("v", "any/c")],
+            [("v", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is less than ", code("0"),
                 ", ", code("#f"), " otherwise."
@@ -314,18 +314,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["v", "..."], "vector?"),
             [("v", "any/c")],
             text([
-                "Returns a new vector with ",
-                var("v"), "s filled its slots in order."
-            ]),
-        ),
-        proc(
-            "vector-ref",
-            (["vec", "pos"], "any/c"),
-            [("vec", "vector?"), ("pos", "exact-integer?")],
-            text([
-                "Returns the element in slot ", var("pos"), " of ", var("vec"),
-                ". Vectors are 0-index based. ", code("-1"), " and ", code("-2"),
-                " will return the last and the second last elements respectively.",
+                "Returns a new vector with the ",
+                var("v"), " args filled with its slots in order."
             ]),
         ),
         proc(
@@ -364,6 +354,27 @@ doc: dict[str, list[proc | value | syntax | text]] = {
                 var("vec"), " in order.",
             ]),
         ),
+    ],
+    "Arrays": [
+        proc(
+            "array?",
+            (["v"], "boolean?"),
+            [("v", "any/c")],
+            text([
+                "Returns ", code("#t"), " if ", var("v"), " is an array, ", code("#f"),
+                " otherwise."
+            ]),
+        ),
+        proc(
+            "array",
+            (["dtype", "v", "..."], "array?"),
+            [("dtype", "string?"), ("v", "any/c")],
+            text([
+                "Returns a freshly allocated array with ", var("dtype"), " as its ",
+                "datatype and the ", var("v"), " args as its values filled in order."
+            ]),
+        ),
+
     ],
     "Pairs and Lists": [
         proc(
@@ -419,13 +430,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
     ],
+    "Generic Sequence "
     "Contracts": [
-        text([
-            "Contracts are special procedures that check procedure arguments and ",
-            "will raise an error if the arguments don't match the contract. ",
-            "Any procedure that takes in one argument and returns a ",
-            code("boolean?"), " is a contract.",
-        ]),
         proc(
             "any/c",
             (["v"], "boolean?"),
