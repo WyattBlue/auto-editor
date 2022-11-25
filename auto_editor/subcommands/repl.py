@@ -101,7 +101,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             try:
                 lexer = Lexer(text)
                 parser = Parser(lexer)
-                print(parser)
             except MyError as e:
                 print(f"error: {e}")
                 continue

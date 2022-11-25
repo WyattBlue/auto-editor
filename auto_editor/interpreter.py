@@ -84,8 +84,7 @@ def print_val(val: object) -> str:
 
 
 class Null:
-    @staticmethod
-    def __init__() -> None:
+    def __init__(self) -> None:
         pass
 
     def __eq__(self, obj: object) -> bool:
@@ -195,9 +194,12 @@ class Cons:
 class Char:
     __slots__ = "val"
 
-    def __init__(self, val: str):
-        assert isinstance(val, str) and len(val) == 1
-        self.val = val
+    def __init__(self, val: str | int):
+        if isinstance(val, int):
+            self.val: str = chr(val)
+        else:
+            assert isinstance(val, str) and len(val) == 1
+            self.val = val
 
     __str__: Callable[[Char], str] = lambda self: self.val
 
@@ -534,6 +536,7 @@ class Parser:
 
 
 class Contract:
+    # Convenient flat contract class
     __slots__ = ("name", "c")
 
     def __init__(self, name: str, c: Callable[[object], bool]):
@@ -575,7 +578,7 @@ def check_args(
 
 
 any_c = Contract("any/c", lambda v: True)
-is_proc = Contract("procedure?", lambda v: isinstance(v, Proc))
+is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
 is_bool = Contract("boolean?", lambda v: isinstance(v, bool))
 is_pair = Contract("pair?", lambda v: isinstance(v, Cons))
 is_null = Contract("null?", lambda v: isinstance(v, Null))
@@ -586,7 +589,7 @@ is_iterable = Contract(
     "iterable?",
     lambda v: isinstance(v, (str, list, range, np.ndarray, Cons, Null)),
 )
-is_stream = Contract("stream?", lambda v: isinstance(v, range))
+is_range = Contract("range?", lambda v: isinstance(v, range))
 is_vector = Contract("vector?", lambda v: isinstance(v, list))
 is_boolarr = Contract(
     "bool-array?",
@@ -717,6 +720,10 @@ def string_append(*vals: str | Char) -> str:
     return reduce(lambda a, b: a + b, vals, "")
 
 
+def vector_append(*vals: list) -> list:
+    return reduce(lambda a, b: a + b, vals, [])
+
+
 def string_ref(s: str, ref: int) -> Char:
     try:
         return Char(s[ref])
@@ -731,7 +738,7 @@ def number_to_string(val: Number) -> str:
     return f"{val}"
 
 
-def array_proc(dtype: Symbol, *vals: Any) -> np.ndarray:
+def _dtype_to_np(dtype: Symbol) -> type[np.generic]:
     dtype_map = {
         Symbol("bool"): np.bool_,
         Symbol("int8"): np.int8,
@@ -747,8 +754,22 @@ def array_proc(dtype: Symbol, *vals: Any) -> np.ndarray:
     }
     np_dtype = dtype_map.get(dtype)
     if np_dtype is None:
-        raise MyError(f"Invalid array type: {dtype}")
-    return np.array(vals, dtype=np_dtype)
+        raise MyError(f"Invalid array dtype: {dtype}")
+    return np_dtype
+
+
+def array_proc(dtype: Symbol, *vals: Any) -> np.ndarray:
+    try:
+        return np.array(vals, dtype=_dtype_to_np(dtype))
+    except OverflowError:
+        raise MyError(f"number too large to be converted to {dtype}")
+
+
+def make_array(dtype: Symbol, size: int, v: int = 0) -> np.ndarray:
+    try:
+        return np.array([v] * size, dtype=_dtype_to_np(dtype))
+    except OverflowError:
+        raise MyError(f"number too large to be converted to {dtype}")
 
 
 def mut_remove_small(arr: BoolList, lim: int, replace: int, with_: int) -> None:
@@ -836,7 +857,7 @@ def vector_to_list(values: list) -> Cons | Null:
     return result
 
 
-def vector_append(vec: list, val: Any) -> None:
+def vector_add(vec: list, val: Any) -> None:
     vec.append(val)
 
 
@@ -904,7 +925,7 @@ def ref(seq: str | list | range | Cons | Null | NDArray, ref: int) -> Any:
 
 
 def p_slice(
-    seq: str | list | range | NDArray,
+    seq: str | list | range | NDArray | Cons | Null,
     start: int = 0,
     end: int | None = None,
     step: int = 1,
@@ -913,6 +934,12 @@ def p_slice(
         end = len(seq)
 
     return seq[start:end:step]
+
+
+def splice(
+    arr: NDArray, v: int, start: int | None = None, end: int | None = None
+) -> None:
+    arr[start:end] = v
 
 
 def stream_to_list(s: range) -> Cons | Null:
@@ -1021,7 +1048,7 @@ class Interpreter:
         "modulo": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
         "random": Proc("random", palet_random, (0, 2), [is_eint]),
         # sequences
-        "stream?": is_stream,
+        "range?": is_range,
         "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
         "length": Proc("length", len, (1, 1), [is_iterable]),
         "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_iterable]),
@@ -1043,14 +1070,17 @@ class Interpreter:
         "string-titlecase": Proc(
             "string-titlecase", lambda s: s.title(), (1, 1), [is_str]
         ),
+        "char->integer": Proc("char->integer", lambda c: ord(c.val), (1, 1), [is_char]),
+        "integer->char": Proc("integer->char", Char, (1, 1), [is_eint]),
         # vectors
         "vector?": is_vector,
         "vector": Proc("vector", lambda *a: list(a), (0, None)),
         "make-vector": Proc(
             "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, any_c]
         ),
-        "vector-pop!": Proc("pop!", lambda v: v.pop(), (1, 1), [is_vector]),
-        "vector-add!": Proc("vector-add!", vector_append, (2, 2), [is_vector, any_c]),
+        "vector-append": Proc("vector-append", vector_append, (0, None), [is_vector]),
+        "vector-pop!": Proc("vector-pop!", lambda v: v.pop(), (1, 1), [is_vector]),
+        "vector-add!": Proc("vector-add!", vector_add, (2, 2), [is_vector, any_c]),
         "vector-set!": Proc(
             "vector-set!", vector_set, (3, 3), [is_vector, is_eint, any_c]
         ),
@@ -1067,6 +1097,12 @@ class Interpreter:
         # arrays
         "array?": is_array,
         "array": Proc("array", array_proc, (2, None), [is_symbol, is_real]),
+        "make-array": Proc(
+            "make-array", make_array, (2, 3), [is_symbol, us_int, is_real]
+        ),
+        "array-splice!": Proc(
+            "array-splice!", splice, (2, 4), [is_array, is_real, is_eint, is_eint]
+        ),
         "bool-array?": is_boolarr,
         "bool-array": Proc(
             "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [us_int]
@@ -1084,8 +1120,8 @@ class Interpreter:
         ),
         "list->vector": Proc("list->vector", list_to_vector, (1, 1), [is_pair]),
         "vector->list": Proc("vector->list", vector_to_list, (1, 1), [is_vector]),
-        "stream->list": Proc("stream->list", stream_to_list, (1, 1), [is_stream]),
-        "stream->vector": Proc("stream->vector", list, (1, 1), [is_stream]),
+        "range->list": Proc("range->list", stream_to_list, (1, 1), [is_range]),
+        "range->vector": Proc("range->vector", list, (1, 1), [is_range]),
         # contracts
         "any/c": any_c,
         # ae extensions

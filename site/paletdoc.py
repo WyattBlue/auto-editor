@@ -63,6 +63,15 @@ doc: dict[str, list[proc | value | syntax | text]] = {
                 " are the same type and have the same value, ", code("#f"), " otherwise."
             ]),
         ),
+        proc(
+            "eq?",
+            (["v1", "v2"], "boolean?"),
+            [("v1", "any/c"), ("v2", "any/c")],
+            text([
+                "Returns ", code("#t"), " if ", var("v1"), " and ", var("v2"),
+                " refer to the same object in memory, ", code("#f"), " otherwise."
+            ]),
+        ),
     ],
     "Booleans": [
         proc(
@@ -96,7 +105,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
     ],
-    "Number Predicates": [
+    "Number Types": [
         proc(
             "number?",
             (["v"], "boolean?"),
@@ -430,7 +439,9 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
     ],
-    "Generic Sequence "
+    "Generic Sequences": [
+
+    ],
     "Contracts": [
         proc(
             "any/c",
