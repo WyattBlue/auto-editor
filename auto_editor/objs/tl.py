@@ -18,18 +18,23 @@ from auto_editor.utils.types import (
 from .util import Attr
 
 
+class Tl:
+    pass
+
+
 @dataclass
-class TlVideo:
+class TlVideo(Tl):
     start: int
     dur: int
     src: str
     offset: int
     speed: float
     stream: int
+    name: str = "video"
 
 
 @dataclass
-class TlAudio:
+class TlAudio(Tl):
     start: int
     dur: int
     src: str
@@ -37,10 +42,11 @@ class TlAudio:
     speed: float
     volume: float
     stream: int
+    name: str = "audio"
 
 
 @dataclass
-class _Visual:
+class _Visual(Tl):
     start: int
     dur: int
     x: int
@@ -59,11 +65,13 @@ class TlText(_Visual):
     size: int
     align: Align
     fill: str
+    name: str = "text"
 
 
 @dataclass
 class TlImage(_Visual):
     src: str
+    name: str = "image"
 
 
 @dataclass
@@ -71,6 +79,7 @@ class TlRect(_Visual):
     width: int
     height: int
     fill: str
+    name: str = "rectangle"
 
 
 @dataclass
@@ -78,6 +87,7 @@ class TlEllipse(_Visual):
     width: int
     height: int
     fill: str
+    name: str = "ellipse"
 
 
 video_builder = [
@@ -149,7 +159,7 @@ rect_builder = [
 ]
 ellipse_builder = rect_builder
 
-timeline_builder = [Attr(("api",), str, "1.0.0")]
+timeline_builder = [Attr(("api",), str, "2.0.0")]
 
 Visual = Union[TlText, TlImage, TlRect, TlEllipse]
 VLayer = list[Union[TlVideo, Visual]]

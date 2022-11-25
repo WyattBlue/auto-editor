@@ -76,6 +76,50 @@ class Timeline:
             out_len = max(out_len, dur)
         return out_len
 
+    def as_dict(self) -> dict:
+        sources = {}
+        for key, src in self.sources.items():
+            sources[key] = src.abspath
+
+        v = []
+        for i, vlayer in enumerate(self.v):
+            vb = [vobj.__dict__ for vobj in vlayer]
+            if vb:
+                v.append(vb)
+
+        a = []
+        for i, alayer in enumerate(self.a):
+            ab = [aobj.__dict__ for aobj in alayer]
+            if ab:
+                a.append(ab)
+
+        tb = self.timebase
+
+        return {
+            "version": "2.0.0",
+            "timeline": {
+                "resolution": self.res,
+                "timebase": f"{tb.numerator}/{tb.denominator}",
+                "samplerate": self.samplerate,
+                "sources": sources,
+                "background": self.background,
+                "v": v,
+                "a": a,
+            },
+        }
+
+visual_objects = {
+    "rectangle": (TlRect, rect_builder),
+    "ellipse": (TlEllipse, ellipse_builder),
+    "text": (TlText, text_builder),
+    "image": (TlImage, img_builder),
+    "video": (TlVideo, video_builder),
+}
+
+audio_objects = {
+    "audio": (TlAudio, audio_builder),
+}
+
 
 def make_timeline(
     sources: dict[str, FileInfo],
@@ -127,7 +171,7 @@ def make_timeline(
         if len(label) > 55:
             log.error("Label must not exceed 55 characters.")
 
-        for ill_char in ",.;()/\\[]}{'\"|#&<>^%$_@ ":
+        for ill_char in ",.;()/\\[]}{'\"|#&<>^%$=@ ":
             if ill_char in label:
                 log.error(f"Label '{label}' contains illegal character: {ill_char}")
 
@@ -152,17 +196,6 @@ def make_timeline(
     }
 
     OBJ_ATTRS_SEP = ":"
-    visual_objects = {
-        "rectangle": (TlRect, rect_builder),
-        "ellipse": (TlEllipse, ellipse_builder),
-        "text": (TlText, text_builder),
-        "image": (TlImage, img_builder),
-        "video": (TlVideo, video_builder),
-    }
-
-    audio_objects = {
-        "audio": (TlAudio, audio_builder),
-    }
 
     pool: list[Visual] = []
     apool: list[TlAudio] = []

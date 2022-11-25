@@ -22,17 +22,19 @@ class Attr(NamedTuple):
     default: Any
 
 
+
+
+
 def parse_dataclass(
     attrs_str: str,
     definition: tuple[type[T], list[Attr]],
     log: Log,
-    _vars: _Vars = {},
+    _vars: _Vars | None = {},
     coerce_default: bool = False,
 ) -> T:
 
     dataclass, builder = definition
 
-    ARG_SEP = ","
     KEYWORD_SEP = "="
 
     # Positional Arguments
@@ -40,38 +42,39 @@ def parse_dataclass(
     # Keyword Arguments
     #    --rectangle start=0,dur=end,x1=10, ...
 
-    def _values(name: str, val: Any, _type: Any, _vars: _Vars, log: Log) -> Any:
+    def _values(name: str, val: Any, _type: Any, _vars: _Vars | None, log: Log) -> Any:
         if val is None:
             return None
 
-        if name in ("start", "dur", "offset"):
-            assert "tb" in _vars and "end" in _vars
-            if isinstance(val, int):
-                return val
+        if _vars is not None:
+            if name in ("start", "dur", "offset"):
+                assert "tb" in _vars and "end" in _vars
+                if isinstance(val, int):
+                    return val
 
-            assert isinstance(val, str)
+                assert isinstance(val, str)
 
-            if val == "start":
-                return 0
-            if val == "end":
-                return _vars["end"]
+                if val == "start":
+                    return 0
+                if val == "end":
+                    return _vars["end"]
 
-            try:
-                _val = time(val)
-            except TypeError as e:
-                log.error(e)
+                try:
+                    _val = time(val)
+                except TypeError as e:
+                    log.error(e)
 
-            if isinstance(_val, str):
-                return round(float(_val) * _vars["tb"])
-            return _val
+                if isinstance(_val, str):
+                    return round(float(_val) * _vars["tb"])
+                return _val
 
-        if name in ("x", "width"):
-            assert "width" in _vars
-            return pos((val, _vars["width"]))
+            if name in ("x", "width"):
+                assert "width" in _vars
+                return pos((val, _vars["width"]))
 
-        if name in ("y", "height"):
-            assert "height" in _vars
-            return pos((val, _vars["height"]))
+            if name in ("y", "height"):
+                assert "height" in _vars
+                return pos((val, _vars["height"]))
 
         try:
             _type(val)
@@ -99,7 +102,7 @@ def parse_dataclass(
     d_name = dataclass.__name__
     allow_positional_args = True
 
-    for i, arg in enumerate(attrs_str.split(ARG_SEP)):
+    for i, arg in enumerate(attrs_str.split(",")):
         if i + 1 > len(builder):
             log.error(f"{d_name} has too many arguments, starting with '{arg}'.")
 

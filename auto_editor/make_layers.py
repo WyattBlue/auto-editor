@@ -51,7 +51,7 @@ def clipify(chunks: Chunks, src: str, start: Fraction = Fraction(0)) -> list[Cli
                 dur = chunk[1] - chunk[0]
                 offset = chunk[0] + 1
 
-            if not (len(clips) > 0 and clips[-1].start == round(start)):
+            if not (clips and clips[-1].start == round(start)):
                 clips.append(Clip(round(start), dur, offset, chunk[2], src))
             start += Fraction(dur, Fraction(chunk[2]))
             i += 1
@@ -60,43 +60,28 @@ def clipify(chunks: Chunks, src: str, start: Fraction = Fraction(0)) -> list[Cli
 
 
 def make_av(
-    all_clips: list[list[Clip]], sources: dict[str, FileInfo], inputs: list[int]
+    all_clips: list[list[Clip]], sources: dict[str, FileInfo], _inputs: list[int]
 ) -> tuple[VSpace, ASpace]:
-    vclips: VSpace = []
 
-    max_a = 0
-    for inp in inputs:
-        max_a = max(max_a, len(sources[str(inp)].audios))
+    if len(_inputs) > 1000:
+        raise ValueError("Number of file inputs can't be greater than 1000")
 
-    aclips: ASpace = [[] for a in range(max_a)]
+    inputs = [str(i) for i in _inputs]
+    vtl: VSpace = []
+    atl: ASpace = [[] for _ in range(max(len(sources[i].audios) for i in inputs))]
 
     for clips, inp in zip(all_clips, inputs):
-        src = sources[str(inp)]
-        if len(src.videos) > 0:
-            for clip in clips:
-                vclip_ = TlVideo(
-                    clip.start, clip.dur, clip.src, clip.offset, clip.speed, 0
-                )
-                if len(vclips) == 0:
-                    vclips = [[vclip_]]
-                else:
-                    vclips[0].append(vclip_)
-        if len(src.audios) > 0:
-            for clip in clips:
-                for a, _ in enumerate(src.audios):
-                    aclips[a].append(
-                        TlAudio(
-                            clip.start,
-                            clip.dur,
-                            clip.src,
-                            clip.offset,
-                            clip.speed,
-                            1,
-                            a,
-                        )
-                    )
+        src = sources[inp]
+        if src.videos:
+            vtl.append(
+                [TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0) for c in clips]
+            )
 
-    return vclips, aclips
+        for c in clips:
+            for a in range(len(src.audios)):
+                atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
+
+    return vtl, atl
 
 
 def run_interpreter(

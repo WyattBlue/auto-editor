@@ -1,7 +1,6 @@
 # type: ignore
 from __future__ import annotations
 
-import json
 import os
 import platform
 import shutil
@@ -41,7 +40,7 @@ def test_options(parser):
     parser.add_required(
         "category",
         nargs=1,
-        choices=("unit", "cli", "sub", "api", "all"),
+        choices=("unit", "cli", "sub", "all"),
         metavar="category [options]",
     )
     return parser
@@ -178,13 +177,6 @@ def main(sys_args: list[str] | None = None):
 
     ## API Tests ##
 
-    def read_api_0_1():
-        run.check(
-            ["resources/json/0.1-non-zero-start.json"],
-            "Error! First chunk must start with 0",
-        )
-        run.check(["resources/json/0.1-disjoint.json"], "Error! Chunk disjointed at")
-
     def help_tests():
         """check the help option, its short, and help on options and groups."""
         run.raw(["--help"])
@@ -264,29 +256,15 @@ def main(sys_args: list[str] | None = None):
     def high_speed_test():
         return run.main(inputs=["example.mp4"], cmd=["--video-speed", "99998"])
 
-    # Issue #288
-    def expand_chunks():
-        out = run.main(
-            inputs=["example.mp4"],
-            cmd=["--silent-speed", "1"],
-            output="out.json",
-        )
-        with open(out) as file:
-            api = json.load(file)
-        assert len(api["chunks"]) > 4, "Chunks should not combine"
-        return out
-
     # Issue #184
     def units():
         run.main(["example.mp4"], ["--mark_as_loud", "20s,22sec", "25secs,26.5seconds"])
         run.main(["example.mp4"], ["--edit", "all", "--set-speed", "125%,-30,end"])
-        run.main(["example.mp4"], ["--margin", "3_0"])
         return run.main(["example.mp4"], ["--edit", "audio:threshold=4%"])
 
     def sr_units():
         run.main(["example.mp4"], ["--sample_rate", "44100 Hz"])
-        run.main(["example.mp4"], ["--sample_rate", "44.1 kHz"])
-        return run.main(["example.mp4"], ["--sample_rate", "44_100"])
+        return run.main(["example.mp4"], ["--sample_rate", "44.1 kHz"])
 
     def video_speed():
         return run.main(["example.mp4"], ["--video-speed", "1.5"])
@@ -754,7 +732,7 @@ def main(sys_args: list[str] | None = None):
             ("(quote +3i)", 3j),
             ("(quote 23.4)", 23.4),
             ('(quote "hello")', "hello"),
-            ('(quote (1 (2 3)))', Cons(1, Cons(Cons(2, Cons(3, Null())), Null()))),
+            ("(quote (1 (2 3)))", Cons(1, Cons(Cons(2, Cons(3, Null())), Null()))),
             ("(list 1 2 3)", Cons(1, Cons(2, Cons(3, Null())))),
             ("(list-ref '(0 10 20) 2)", 20),
             ("(list-ref '(0 10 20) 0)", 0),
@@ -783,39 +761,34 @@ def main(sys_args: list[str] | None = None):
     if args.category in ("unit", "all"):
         tests.append(palet)
 
-    if args.category in ("api", "all"):
-        tests.append(read_api_0_1)
-
     if args.category in ("sub", "all"):
         tests.extend([info, levels, subdump, grep, desc])
 
     if args.category in ("cli", "all"):
         tests.extend(
             [
-                add_audio,
-                video_speed,
-                expand_chunks,
                 SAR,
                 yuv442p,
-                obj_makes_video,
-                edit_positive_tests,
+                check_font_error,
                 edit_negative_tests,
+                edit_positive_tests,
+                json_tests,
+                high_speed_test,
+                video_speed,
+                obj_makes_video,
                 multi_track_edit,
                 concat_mux_tracks,
                 concat_multiple_tracks,
                 render_video_objs,
-                resolution_and_scale,
                 various_errors,
                 render_text,
-                check_font_error,
+                add_audio,
                 frame_rate,
                 help_tests,
                 version_test,
                 parser_test,
                 concat,
                 example,
-                export,
-                high_speed_test,
                 units,
                 sr_units,
                 backwards_range,
@@ -828,9 +801,10 @@ def main(sys_args: list[str] | None = None):
                 progress,
                 silent_threshold,
                 track_tests,
-                json_tests,
                 codec_tests,
                 motion,
+                export,
+                resolution_and_scale,
             ]
         )
 

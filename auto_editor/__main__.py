@@ -345,31 +345,6 @@ def main() -> None:
 
     paths = valid_input(args.input, ffmpeg, args, log)
 
-    exporting_to_editor = args.export is not None and (
-        args.export.startswith("premiere")
-        or args.export.startswith("final-cut-pro")
-        or args.export.startswith("shotcut")
-    )
-
-    if exporting_to_editor and len(paths) > 1:
-        cmd = []
-        for path in paths:
-            cmd.extend(["-i", path])
-        cmd.extend(
-            [
-                "-filter_complex",
-                f"[0:v]concat=n={len(paths)}:v=1:a=1",
-                "-codec:v",
-                "h264",
-                "-pix_fmt",
-                "yuv420p",
-                "-strict",
-                "-2",
-                "combined.mp4",
-            ]
-        )
-        ffmpeg.run(cmd)
-        paths = ["combined.mp4"]
     try:
         edit_media(paths, ffmpeg, args, temp, log)
     except KeyboardInterrupt:

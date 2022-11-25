@@ -3,14 +3,16 @@ from __future__ import annotations
 import json
 import os
 import sys
+from typing import Any
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.make_layers import clipify, make_av
+from fractions import Fraction
+
+from auto_editor.ffwrapper import FFmpeg
 from auto_editor.objs.export import ExJson, ExTimeline
-from auto_editor.objs.tl import TlAudio, TlEllipse, TlImage, TlRect, TlText, TlVideo
-from auto_editor.timeline import Timeline
-from auto_editor.utils.chunks import Chunks
+from auto_editor.timeline import Timeline, visual_objects, audio_objects
 from auto_editor.utils.log import Log
+from auto_editor.objs.util import parse_dataclass
+from auto_editor.ffwrapper import FileInfo
 
 """
 Make a pre-edited file reference that can be inputted back into auto-editor.
@@ -28,39 +30,6 @@ def check_attrs(data: object, log: Log, *attrs: str) -> None:
 def check_file(path: str, log: Log) -> None:
     if not os.path.isfile(path):
         log.error(f"Could not locate media file: '{path}'")
-
-
-def validate_chunks(chunks: object, log: Log) -> Chunks:
-    if not isinstance(chunks, (list, tuple)):
-        log.error("Chunks must be a list")
-
-    if len(chunks) == 0:
-        log.error("Chunks are empty!")
-
-    new_chunks = []
-    prev_end: int | None = None
-
-    for i, chunk in enumerate(chunks):
-        if len(chunk) != 3:
-            log.error("Chunk must have a length of 3.")
-
-        if i == 0 and chunk[0] != 0:
-            log.error("First chunk must start with 0")
-
-        if chunk[1] - chunk[0] < 1:
-            log.error("Chunk duration must be at least 1")
-
-        if chunk[2] <= 0 or chunk[2] > 99999:
-            log.error("Chunk speed range must be >0 and <=99999")
-
-        if prev_end is not None and chunk[0] != prev_end:
-            log.error(f"Chunk disjointed at {chunk}")
-
-        prev_end = chunk[1]
-
-        new_chunks.append((chunk[0], chunk[1], float(chunk[2])))
-
-    return new_chunks
 
 
 class Version:
@@ -94,113 +63,87 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
     check_attrs(data, log, "version")
     version = Version(data["version"], log)
 
-    if version == (1, 0) or version == (0, 1):
-        check_attrs(data, log, "source", "chunks")
-        check_file(data["source"], log)
-
-        chunks = validate_chunks(data["chunks"], log)
-        src = FileInfo(data["source"], ffmpeg, log, "0")
-
-        vspace, aspace = make_av([clipify(chunks, "0")], {"0": src}, [0])
-
-        tb = src.get_fps()
-        sr = src.get_samplerate()
-        res = src.get_res()
-
-        return Timeline({"0": src}, tb, sr, res, "#000", vspace, aspace, chunks)
-
     if version == (2, 0) or version == (0, 2):
-        check_attrs(data, log, "timeline", "source")
-        for path in data["source"].values():
+        check_attrs(data, log, "timeline")
+        tl = data["timeline"]
+        check_attrs(
+            tl, log, "sources", "background", "v", "a", "timebase", "resolution", "samplerate"
+        )
+
+        sources: dict[str, FileInfo] = {}
+        for _id, path in tl["sources"].items():
             check_file(path, log)
-        # return data["background"], data["source"], chunks
+            sources[_id] = FileInfo(path, ffmpeg, log)
 
-        raise ValueError("Importing v2 timelines not implemented.")
+        bg = tl["background"]
+        sr = tl["samplerate"]
+        res = (tl["resolution"][0], tl["resolution"][1])
+        tb = Fraction(tl["timebase"])
 
-    log.error(f"Unsupported version: {version}")
+        v: Any = []
+        a: Any = []
+
+        def dict_to_args(d: dict) -> str:
+            attrs = []
+            for k, v in d.items():
+                if k != "name":
+                    attrs.append(f"{k}={v}")
+            return ",".join(attrs)
 
 
-def get_name(o: object) -> str:
-    if isinstance(o, TlVideo):
-        return "video"
-    if isinstance(o, TlAudio):
-        return "audio"
-    if isinstance(o, TlRect):
-        return "rectangle"
-    if isinstance(o, TlEllipse):
-        return "ellipse"
-    if isinstance(o, TlImage):
-        return "image"
-    if isinstance(o, TlText):
-        return "text"
+        for vlayers in tl["v"]:
+            if vlayers:
+                v_out = []
+                for vdict in vlayers:
+                    if "name" not in vdict:
+                        log.error("Invalid video object: name not specified")
+                    if vdict["name"] not in visual_objects:
+                        log.error(f"Unknown video object: {vdict['name']}")
+                    my_obj = visual_objects[vdict["name"]]
+                    attr_str = dict_to_args(vdict)
+                    vobj = parse_dataclass(attr_str, my_obj, log, None, True)
+                    v_out.append(vobj)
+                v.append(v_out)
 
-    raise ValueError("Unreachable")
+        for alayers in tl["a"]:
+            if alayers:
+                a_out = []
+                for adict in alayers:
+                    if "name" not in adict:
+                        log.error("Invalid audio object: name not specified")
+                    if adict["name"] not in audio_objects:
+                        log.error(f"Unknown audio object: {adict['name']}")
+                    my_obj = audio_objects[adict["name"]]
+                    attr_str = dict_to_args(adict)
+                    aobj = parse_dataclass(attr_str, my_obj, log, None, True)
+                    a_out.append(aobj)
+                a.append(a_out)
+
+        return Timeline(sources, tb, sr, res, bg, v, a)
+
+    log.error(f"Importing version {version} timelines is not supported.")
 
 
 def make_json_timeline(
     obj: ExJson | ExTimeline,
     out: str | int,
-    timeline: Timeline,
+    tl: Timeline,
     log: Log,
 ) -> None:
 
-    version = Version(obj.api, log)
-
-    if version == (1, 0) or version == (0, 1):
-        if timeline.chunks is None:
-            log.error("Timeline too complex to convert to version 1.0")
-
-        if "0" not in timeline.sources:
-            log.debug(f"{timeline.sources}")
-            log.error("API version 1 needs one source, got many")
-
-        data: dict = {
-            "version": "1.0.0",
-            "source": timeline.sources["0"].abspath,
-            "chunks": timeline.chunks,
-        }
-    elif version == (2, 0) or version == (0, 2):
-        sources = {}
-        for key, src in timeline.sources.items():
-            sources[key] = src.abspath
-
-        v = []
-        for i, vlayer in enumerate(timeline.v):
-            vb = []
-            for vobj in vlayer:
-                vb.append({"name": get_name(vobj)} | vobj.__dict__)
-            if len(vb) > 0:
-                v.append(vb)
-
-        a = []
-        for i, alayer in enumerate(timeline.a):
-            ab = []
-            for aobj in alayer:
-                ab.append({"name": get_name(aobj)} | aobj.__dict__)
-            if len(ab) > 0:
-                a.append(ab)
-
-        data = {
-            "version": "2.0.0",
-            "timeline": {
-                "background": timeline.background,
-                "resolution": timeline.res,
-                "sources": sources,
-                "timebase": str(timeline.timebase),
-                "samplerate": timeline.samplerate,
-                "v": v,
-                "a": a,
-            },
-        }
-    else:
+    if (version := Version(obj.api, log)) != (2, 0) and version != (0, 2):
         log.error(f"Version {version} is not supported!")
 
     if isinstance(out, str):
         if not out.endswith(".json"):
             log.error("Output extension must be .json")
-
-        with open(out, "w") as outfile:
-            json.dump(data, outfile, indent=2, default=lambda o: o.__dict__)
+        outfile: Any = open(out, "w")
     else:
-        json.dump(data, sys.stdout, indent=2, default=lambda o: o.__dict__)
+        outfile = sys.stdout
+
+    json.dump(tl.as_dict(), outfile, indent=2, default=lambda o: o.__dict__)
+
+    if isinstance(out, str):
+        outfile.close()
+    else:
         print("")  # Flush stdout
