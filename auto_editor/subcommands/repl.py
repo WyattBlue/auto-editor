@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import readline  # noqa
 import sys
 from dataclasses import dataclass, field
 from fractions import Fraction
@@ -26,6 +25,10 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import frame_rate
 from auto_editor.vanparse import ArgumentParser
 
+try:
+    import readline  # noqa
+except ImportError:
+    pass
 
 @dataclass
 class REPL_Args:
