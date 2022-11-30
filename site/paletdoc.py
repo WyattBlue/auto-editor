@@ -1,9 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
+
 @dataclass
 class code:
     val: str
+
 
 @dataclass
 class var:
@@ -35,6 +37,7 @@ class value:
     name: str
     sig: str
     summary: text
+
 
 doc: dict[str, list[proc | value | syntax | text]] = {
     "Basic Syntax": [
@@ -148,26 +151,16 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["v"], "boolean?"),
             [("v", "any/c")],
             text([
-                "Returns ", code("#t"), " if ", var("v"),
-                " is an integer or a number that can be coerced to an integer without changing value, ",
+                "Returns ", code("#t"), " if ", var("v"), " is an integer, ",
                 code("#f"), " otherwise.",
             ]),
         ),
         proc(
-            "exact-integer?",
+            "nonnegative-integer?",
             (["v"], "boolean?"),
             [("v", "any/c")],
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is an integer and exact, ",
-                code("#f"), " otherwise.",
-            ]),
-        ),
-        proc(
-            "exact-nonnegative-integer?",
-            (["v"], "boolean?"),
-            [("v", "any/c")],
-            text([
-                "Returns ", code("#t"), " if ", var("v"), " is an exact integer and ",
+                "Returns ", code("#t"), " if ", var("v"), " is an integer and ",
                 var("v"), " is greater than ", code("-1"), ", ", code("#f"),
                 " otherwise.",
             ]),
@@ -205,40 +198,67 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "+",
             (["z", "..."], "number?"),
             [("z", "number?")],
-            text([
-                "Return the sum of ", var("z"),
-                "s. Add from left to right. If no arguments are provided, the result is ",
-                code("0"), ".",
-            ]),
+            text(
+                [
+                    "Return the sum of ",
+                    var("z"),
+                    "s. Add from left to right. If no arguments are provided, the result is ",
+                    code("0"),
+                    ".",
+                ]
+            ),
         ),
         proc(
             "-",
             (["z", "w", "..."], "number?"),
             [("z", "number?"), ("w", "number?")],
-            text([
-                "When no ", var("w"), "s are applied, return ", code("(- 0 z)"),
-                ". Otherwise, return the subtraction of ", var("w"), "s of ", var("z"),
-                ".",
-            ]),
+            text(
+                [
+                    "When no ",
+                    var("w"),
+                    "s are applied, return ",
+                    code("(- 0 z)"),
+                    ". Otherwise, return the subtraction of ",
+                    var("w"),
+                    "s of ",
+                    var("z"),
+                    ".",
+                ]
+            ),
         ),
         proc(
             "*",
             (["z", "..."], "number?"),
             [("z", "number?")],
-            text([
-                "Return the product of ", var("z"), "s. If no ", var("z"),
-                "s are supplied, the result is ", code("1"), ".",
-            ]),
+            text(
+                [
+                    "Return the product of ",
+                    var("z"),
+                    "s. If no ",
+                    var("z"),
+                    "s are supplied, the result is ",
+                    code("1"),
+                    ".",
+                ]
+            ),
         ),
         proc(
             "/",
             (["z", "w", "..."], "number?"),
             [("z", "number?"), ("w", "number?")],
-            text([
-                "When no ", var("w"), "s are applied, return ", code("(/ 1 z)"),
-                ". Otherwise, return the division of ", var("w"), "s of ", var("z"),
-                ".",
-            ]),
+            text(
+                [
+                    "When no ",
+                    var("w"),
+                    "s are applied, return ",
+                    code("(/ 1 z)"),
+                    ". Otherwise, return the division of ",
+                    var("w"),
+                    "s of ",
+                    var("z"),
+                    ".",
+                ]
+            ),
         ),
         proc(
             "mod",
@@ -248,8 +268,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "modulo",
-            (["n", "m"], "integer?"),
-            [("n", "integer?"), ("m", "integer?")],
+            (["n", "m"], "real?"),
+            [("n", "real?"), ("m", "real?")],
             text(["Clone of ", code("mod"), "."]),
         ),
         proc(
@@ -258,7 +278,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             [("z", "number?")],
             text(["Returns ", code("(+ z 1)"), "."]),
         ),
-        proc("sub1",
+        proc(
+            "sub1",
             (["z"], "number?"),
             [("z", "number?")],
             text(["Returns ", code("(- z 1)"), "."]),
@@ -267,19 +288,33 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "=",
             (["z", "w", "..."], "boolean?"),
             [("z", "number?"), ("w", "number?")],
-            text([
-                "Returns ", code("#t"), " if all arguments are numerically equal, ",
-                code("#f"), " otherwise.",
-            ]),
+            text(
+                [
+                    "Returns ",
+                    code("#t"),
+                    " if all arguments are numerically equal, ",
+                    code("#f"),
+                    " otherwise.",
+                ]
+            ),
         ),
         proc(
             "<",
             (["x", "y"], "boolean?"),
             [("x", "real?"), ("y", "real?")],
-            text([
-                "Returns ", code("#t"), " if ", var("x"), " is less than ", var("y"),
-                ", ", code("#f"), " otherwise.",
-            ]),
+            text(
+                [
+                    "Returns ",
+                    code("#t"),
+                    " if ",
+                    var("x"),
+                    " is less than ",
+                    var("y"),
+                    ", ",
+                    code("#f"),
+                    " otherwise.",
+                ]
+            ),
         ),
         proc(
             "<=",
@@ -295,8 +330,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["x", "y"], "boolean?"),
             [("x", "real?"), ("y", "real?")],
             text([
-                "Returns ", code("#t"), " if ", var("x"), " is greater than ", code("y"),
-                ", ", code("#f"), " otherwise.",
+                "Returns ", code("#t"), " if ", var("x"), " is greater than ",
+                code("y"), ", ", code("#f"), " otherwise.",
             ]),
         ),
         proc(
@@ -304,8 +339,9 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["x", "y"], "boolean?"),
             [("x", "real?"), ("y", "real?")],
             text([
-                "Returns ", code("#t"), " if ", var("x"), " is greater than or equal to ",
-                var("y"), ", ", code("#f"), " otherwise.",
+                "Returns ", code("#t"), " if ", var("x"),
+                " is greater than or equal to ", var("y"), ", ", code("#f"),
+                " otherwise.",
             ]),
         ),
         proc(
@@ -333,8 +369,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["v"], "boolean?"),
             [("v", "any/c")],
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a vector, ",
-                code("#f"), " otherwise."
+                "Returns ", code("#t"), " if ", var("v"), " is a vector, ", code("#f"),
+                " otherwise.",
             ]),
         ),
         proc(
@@ -342,17 +378,17 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["v", "..."], "vector?"),
             [("v", "any/c")],
             text([
-                "Returns a new vector with the ",
-                var("v"), " args filled with its slots in order."
+                "Returns a new vector with the ", var("v"),
+                " args filled with its slots in order.",
             ]),
         ),
         proc(
             "make-vector",
             (["size", "[v]"], "vector?"),
-            [("size", "exact-nonnegative-integer?"), ("v", "any/c", "0")],
+            [("size", "nonnegative-integer?"), ("v", "any/c", "0")],
             text([
-                "Returns a new vector with ", var("size"),
-                " slots, all filled with ", var("v"), "s."
+                "Returns a new vector with ", var("size"), " slots, all filled with ",
+                var("v"), "s.",
             ]),
         ),
         proc(
@@ -370,7 +406,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         proc(
             "vector-set!",
             (["vec", "pos", "v"], "none"),
-            [("vec", "vector?"), ("pos", "exact-integer?"), ("v", "any/c")],
+            [("vec", "vector?"), ("pos", "integer?"), ("v", "any/c")],
             text(["Set slot ", var("pos"), " of ", var("vec"), " to ", var("v"), "."]),
         ),
         proc(
@@ -378,8 +414,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["vec", "vec2", "..."], "none"),
             [("vec", "vector?"), ("vec2", "vector?")],
             text([
-                "Append all elements of ", var("vec2"), " to the end of ",
-                var("vec"), " in order.",
+                "Append all elements of ", var("vec2"), " to the end of ", var("vec"),
+                " in order.",
             ]),
         ),
     ],
@@ -389,19 +425,23 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["v"], "boolean?"),
             [("v", "any/c")],
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is an array, ", code("#f"),
-                " otherwise."
+                "Returns ", code("#t"), " if ", var("v"), " is an array, ",
+                code("#f"), " otherwise.",
             ]),
         ),
         proc(
             "array",
             (["dtype", "v", "..."], "array?"),
             [("dtype", "symbol?"), ("v", "any/c")],
-            text([
-                "Returns a freshly allocated array with ", var("dtype"),
-                " as its datatype and the ", var("v"),
-                " args as its values filled in order.",
-            ]),
+            text(
+                [
+                    "Returns a freshly allocated array with ",
+                    var("dtype"),
+                    " as its datatype and the ",
+                    var("v"),
+                    " args as its values filled in order.",
+                ]
+            ),
         ),
         proc(
             "array-splice!",
@@ -409,13 +449,12 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             [
                 ("arr", "array?"),
                 ("v", "real?"),
-                ("start", "exact-integer?", "0"),
-                ("end", "exact-integer?", "(length arr)"),
+                ("start", "integer?", "0"),
+                ("stop", "integer?", "(length arr)"),
             ],
             text([
-                "Modify ", var("arr"), " from  ", var("start")
-                " as its datatype and the ", var("v"),
-                " args as its values filled in order.",
+                "Modify ", var("arr"), " by setting ", var("start"), " to ",
+                var("stop"), "to ", var("v"),  ".",
             ]),
         ),
     ],
@@ -425,8 +464,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["v"], "boolean?"),
             [("v", "any/c")],
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a pair, ", code("#f"),
-                " otherwise."
+                "Returns ", code("#t"), " if ", var("v"), " is a pair, ",
+                code("#f"), " otherwise.",
             ]),
         ),
         proc(
@@ -434,8 +473,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["v"], "boolean?"),
             [("v", "any/c")],
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is an empty list, ", code("#f"),
-                " otherwise."
+                "Returns ", code("#t"), " if ", var("v"), " is an empty list, ",
+                code("#f"), " otherwise.",
             ]),
         ),
         proc(
@@ -469,7 +508,21 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             [("v", "any/c")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
-                " is an empty list or a pair whose second element is a list.",
+                 " is an empty list or a pair whose second element is a list.",
+            ]),
+        ),
+        proc(
+            "list",
+            (["v", "..."], "list?"),
+            [("v", "any/c")],
+            text(["Returns a list with ", var("v"), " in order."]),
+        ),
+        proc(
+            "list-ref",
+            (["lst", "pos"], "any/c"),
+            [("lst", "list?"), ("pos", "nonnegative-integer?")],
+            text([
+                "Returns the element of ", var("lst"), " at position ", var("pos"), ".",
             ]),
         ),
     ],
@@ -479,17 +532,17 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["v"], "boolean?"),
             [("v", "any/c")],
             text([
-                "Returns ", code("#t"), " if ", var("v"),
-                " is a range object, ", code("#f"), " otherwise.",
+                "Returns ", code("#t"), " if ", var("v"), " is a range object, ",
+                code("#f"), " otherwise.",
             ]),
         ),
         proc(
             "in-range",
             (["start", "stop", "[step]"], "range?"),
             [
-                ("start", "exact-integer?"),
-                ("stop", "exact-integer?"),
-                ("step", "exact-integer?", "1"),
+                ("start", "integer?"),
+                ("stop", "integer?"),
+                ("step", "integer?", "1"),
             ],
             text(["Returns a range object."]),
         ),
@@ -499,24 +552,25 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "iterable?",
             (["v"], "boolean?"),
             [("v", "any/c")],
-            text(["Returns ", code("#t"), " if ", var("v"),
+            text([
+                "Returns ", code("#t"), " if ", var("v"),
                 " is a vector, array, string, pair, or range, ", code("#f"),
                 " otherwise.",
             ]),
         ),
         proc(
             "length",
-            (["seq"], "exact-nonnegative-integer?"),
+            (["seq"], "nonnegative-integer?"),
             [("seq", "iterable?")],
             text(["Returns the length of ", var("seq"), "."]),
         ),
         proc(
             "ref",
             (["seq", "pos"], "any/c"),
-            [("seq", "iterable?"), ("pos", "exact-integer?")],
+            [("seq", "iterable?"), ("pos", "integer?")],
             text([
-                "Returns the element of ", var("seq"), " at position ", var("pos"),
-                ", where the first element is at position", code("0"),
+                "Returns the element of ", var("seq"), " at position ",
+                var("pos"), ", where the first element is at position", code("0"),
                 ". For sequences other than pair?, negative positions are allowed.",
             ]),
         ),
@@ -525,9 +579,9 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["seq", "start", "[stop]", "[step]"], "iterable?"),
             [
                 ("seq", "iterable?"),
-                ("start", "exact-integer?"),
-                ("stop", "exact-integer?", "(length seq)"),
-                ("step", "exact-integer?", "1"),
+                ("start", "integer?"),
+                ("stop", "integer?", "(length seq)"),
+                ("step", "integer?", "1"),
             ],
             text([
                 "Returns the elements of ", var("seq"), " from ", var("start"),
