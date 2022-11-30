@@ -586,11 +586,11 @@ is_iterable = Contract(
 )
 is_range = Contract("range?", lambda v: isinstance(v, range))
 is_vector = Contract("vector?", lambda v: isinstance(v, list))
+is_array = Contract("array?", lambda v: isinstance(v, np.ndarray))
 is_boolarr = Contract(
     "bool-array?",
     lambda v: isinstance(v, np.ndarray) and v.dtype.kind == "b",
 )
-is_array = Contract("array?", lambda v: isinstance(v, np.ndarray))
 is_num = Contract(
     "number?",
     lambda v: not isinstance(v, bool)
@@ -599,28 +599,13 @@ is_num = Contract(
 is_real = Contract(
     "real?", lambda v: not isinstance(v, bool) and isinstance(v, (int, float, Fraction))
 )
-is_exact = Contract(
-    "exact?", lambda v: not isinstance(v, bool) and isinstance(v, (int, Fraction))
-)
-is_inexact = Contract("inexact?", lambda v: not is_exact(v))
-is_eint = Contract(
-    "exact-integer?",
+is_int = Contract(
+    "integer?",
     lambda v: not isinstance(v, bool) and isinstance(v, int),
 )
 is_frac = Contract("fraction?", lambda v: isinstance(v, Fraction))
 is_float = Contract("float?", lambda v: isinstance(v, float))
-us_int = Contract("exact-nonnegative-integer?", lambda v: isinstance(v, int) and v > -1)
-
-
-def _is_int(val: object) -> bool:
-    if isinstance(val, float):
-        return val.is_integer()
-    if isinstance(val, Fraction):
-        return int(val) == val
-    return not isinstance(val, bool) and isinstance(val, int)
-
-
-is_int = Contract("integer?", _is_int)
+us_int = Contract("nonnegative-integer?", lambda v: isinstance(v, int) and v > -1)
 
 
 def raise_(msg: str) -> None:
@@ -798,11 +783,11 @@ def mincut(oarr: BoolList, _min: int) -> BoolList:
 
 def margin(a: int, b: Any, c: Any = None) -> BoolList:
     if c is None:
-        check_args("margin", [a, b], (2, 2), [is_eint, is_boolarr])
+        check_args("margin", [a, b], (2, 2), [is_int, is_boolarr])
         oarr = b
         start, end = a, a
     else:
-        check_args("margin", [a, b, c], (3, 3), [is_eint, is_eint, is_boolarr])
+        check_args("margin", [a, b, c], (3, 3), [is_int, is_int, is_boolarr])
         oarr = c
         start, end = a, b
 
@@ -1010,16 +995,13 @@ class Interpreter:
         # number questions
         "number?": is_num,
         "real?": is_real,
-        "exact?": is_exact,
-        "inexact?": is_inexact,
         "integer?": is_int,
-        "fraction?": is_frac,
+        "nonnegative-integer?": us_int,
         "float?": is_float,
-        "exact-integer?": is_eint,
-        "exact-nonnegative-integer?": us_int,
+        "fraction?": is_frac,
         "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
         "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
-        "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_real]),
+        "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_num]),
         # numbers
         "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
         "-": Proc("-", minus, (1, None), [is_num]),
@@ -1045,7 +1027,7 @@ class Interpreter:
         "tan": Proc("tan", math.tan, (1, 1), [is_real]),
         "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
         "modulo": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
-        "random": Proc("random", palet_random, (0, 2), [is_eint]),
+        "random": Proc("random", palet_random, (0, 2), [is_int]),
         # symbols
         "symbol?": is_symbol,
         "symbol->string": Proc("symbol->string", str, (1, 1), [is_symbol]),
@@ -1063,7 +1045,7 @@ class Interpreter:
             "string-titlecase", lambda s: s.title(), (1, 1), [is_str]
         ),
         "char->integer": Proc("char->integer", lambda c: ord(c.val), (1, 1), [is_char]),
-        "integer->char": Proc("integer->char", Char, (1, 1), [is_eint]),
+        "integer->char": Proc("integer->char", Char, (1, 1), [is_int]),
         # vectors
         "vector?": is_vector,
         "vector": Proc("vector", lambda *a: list(a), (0, None)),
@@ -1074,7 +1056,7 @@ class Interpreter:
         "vector-pop!": Proc("vector-pop!", lambda v: v.pop(), (1, 1), [is_vector]),
         "vector-add!": Proc("vector-add!", vector_add, (2, 2), [is_vector, any_c]),
         "vector-set!": Proc(
-            "vector-set!", vector_set, (3, 3), [is_vector, is_eint, any_c]
+            "vector-set!", vector_set, (3, 3), [is_vector, is_int, any_c]
         ),
         "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
         # cons/list
@@ -1093,7 +1075,7 @@ class Interpreter:
             "make-array", make_array, (2, 3), [is_symbol, us_int, is_real]
         ),
         "array-splice!": Proc(
-            "array-splice!", splice, (2, 4), [is_array, is_real, is_eint, is_eint]
+            "array-splice!", splice, (2, 4), [is_array, is_real, is_int, is_int]
         ),
         "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
         # bool arrays
@@ -1102,9 +1084,9 @@ class Interpreter:
             "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [us_int]
         ),
         "margin": Proc("margin", margin, (2, 3), None),
-        "mincut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
-        "minclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
-        "cook": Proc("cook", cook, (3, 3), [is_eint, is_eint, is_boolarr]),
+        "mincut": Proc("mincut", mincut, (2, 2), [is_int, is_boolarr]),
+        "minclip": Proc("minclip", minclip, (2, 2), [is_int, is_boolarr]),
+        "cook": Proc("cook", cook, (3, 3), [is_int, is_int, is_boolarr]),
         # ranges
         "range?": is_range,
         "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
@@ -1112,8 +1094,8 @@ class Interpreter:
         "iterable?": is_iterable,
         "length": Proc("length", len, (1, 1), [is_iterable]),
         "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_iterable]),
-        "ref": Proc("ref", ref, (2, 2), [is_iterable, is_eint]),
-        "slice": Proc("slice", p_slice, (2, 4), [is_iterable, is_eint]),
+        "ref": Proc("ref", ref, (2, 2), [is_iterable, is_int]),
+        "slice": Proc("slice", p_slice, (2, 4), [is_iterable, is_int]),
         # procedures
         "procedure?": is_proc,
         "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
@@ -1181,7 +1163,6 @@ class Interpreter:
                     raise MyError(f"{name}: got non-iterable in iter slot")
 
                 return var, my_iter
-
 
             if name == "for":
                 var, my_iter = check_for_syntax("for", node)

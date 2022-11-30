@@ -22,9 +22,6 @@ class Attr(NamedTuple):
     default: Any
 
 
-
-
-
 def parse_dataclass(
     attrs_str: str,
     definition: tuple[type[T], list[Attr]],
