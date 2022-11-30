@@ -108,6 +108,7 @@ class Timeline:
             },
         }
 
+
 visual_objects = {
     "rectangle": (TlRect, rect_builder),
     "ellipse": (TlEllipse, ellipse_builder),

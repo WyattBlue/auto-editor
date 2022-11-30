@@ -98,25 +98,33 @@ with open(ref / "palet.html", "w") as file:
         return s
 
     def build_sig(vec: list[str]) -> str:
-        results = [v if v == "..." else f'<span class="palet-var">{v}</span>' for v in vec]
+        results = [
+            v if v == "..." else f'<span class="palet-var">{v}</span>' for v in vec
+        ]
         return "&nbsp;".join(results)
-
 
     for category, somethings in paletdoc.doc.items():
         file.write(f'<h2 class="left">{category}</h2>\n')
         for some in somethings:
             if isinstance(some, syntax):
+                _body = build_sig(some.body.split(" "))
                 file.write(
-                    f'<div class="palet-block"><p id="{some.name}" class="mono">\n'
-                    f'(<b>{some.name}</b>&nbsp;{build_sig(some.body.split(" "))})</p>\n</div>\n'
+                    f'<div id="{some.name}" class="palet-block">\n'
+                    f'<p class="mono"><b>Syntax</b></p>\n'
+                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{_body})</p>\n</div>\n'
                     f"<p>{text_to_str(some.summary)}</p>\n"
                 )
             if isinstance(some, proc):
                 rname = some.sig[1]
                 file.write(
-                    f'<div class="palet-block">\n'
-                    f'<p id="{some.name}" class="mono">(<b>{some.name}</b>&nbsp;{build_sig(some.sig[0])})'
-                    + ("</p>\n" if rname == "none" else f'&nbsp;→&nbsp;<a href="#{rname}">{rname}</a></p>\n')
+                    f'<div id="{some.name}" class="palet-block">\n'
+                    f'<p class="mono"><b>Procedure</b></p>\n'
+                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{build_sig(some.sig[0])})'
+                    + (
+                        "</p>\n"
+                        if rname == "none"
+                        else f'&nbsp;→&nbsp;<a href="#{rname}">{rname}</a></p>\n'
+                    )
                 )
                 for argsig in some.argsig:
                     name = argsig[0]
@@ -124,13 +132,19 @@ with open(ref / "palet.html", "w") as file:
                     default = argsig[2] if len(argsig) > 2 else None
                     file.write(
                         f'<p class="mono">&nbsp;<span class="palet-var">{name}</span>&nbsp;:&nbsp;<a href="#{sig}">{sig}</a>'
-                        + ("</p>\n" if default is None else f"&nbsp;=&nbsp;{default}</p>\n")
+                        + (
+                            "</p>\n"
+                            if default is None
+                            else f"&nbsp;=&nbsp;{default}</p>\n"
+                        )
                     )
 
                 file.write("</div>\n" f"<p>{text_to_str(some.summary)}</p>\n")
             if isinstance(some, value):
                 file.write(
-                    f'<div class="palet-block">\n<p class="mono">{some.name}'
+                    f'<div class="palet-block">\n'
+                    f'<p class="mono"><b>Value</b></p>\n'
+                    f'<p class="mono">{some.name}\n'
                     f'&nbsp;:&nbsp;<a href="#{some.sig}">{some.sig}</a></p>\n</div>\n'
                     f"<p>{text_to_str(some.summary)}</p>\n"
                 )
