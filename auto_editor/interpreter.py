@@ -237,10 +237,10 @@ class Symbol:
 #                                                                             #
 ###############################################################################
 
-METHODS = ("audio", "motion", "pixeldiff", "none", "all")
-SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
-ID, NUM, BOOL, STR, ARR, SEC, CHAR = "ID", "NUM", "BOOL", "STR", "ARR", "SEC", "CHAR"
-QUOTE = "QUOTE"
+METHODS = {"audio", "motion", "pixeldiff", "none", "all"}
+SEC_UNITS = {"s", "sec", "secs", "second", "seconds"}
+ID, QUOTE, NUM, BOOL, STR, CHAR = "ID", "QUOTE", "NUM", "BOOL", "STR", "CHAR"
+ARR, SEC, DB = "ARR", "SEC", "DB"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
 
 
@@ -323,32 +323,23 @@ class Lexer:
 
             if unit in SEC_UNITS:
                 token = SEC
+            elif unit == "dB":
+                token = DB
             elif unit != "i":
                 return Token(ID, result + unit)
 
-        if unit == "i":
-            try:
+        try:
+            if unit == "i":
                 return Token(NUM, complex(result + "j"))
-            except ValueError:
-                return Token(ID, result + unit)
-
-        if "/" in result:
-            try:
+            elif "/" in result:
                 val = Fraction(result)
                 if val.denominator == 1:
                     return Token(token, val.numerator)
                 return Token(token, val)
-            except ValueError:
-                return Token(ID, result + unit)
-
-        if "." in result:
-            try:
+            elif "." in result:
                 return Token(token, float(result))
-            except ValueError:
-                return Token(ID, result + unit)
-
-        try:
-            return Token(token, int(result))
+            else:
+                return Token(token, int(result))
         except ValueError:
             return Token(ID, result + unit)
 
@@ -495,8 +486,12 @@ class Parser:
             self.eat(SEC)
             return [Symbol("round"), [Symbol("*"), token.value, Symbol("timebase")]]
 
+        if token.type == DB:
+            self.eat(DB)
+            return [Symbol("expt"), 10, [Symbol("/"), token.value, 20]]
+
         if token.type == QUOTE:
-            self.eat(token.type)
+            self.eat(QUOTE)
             return [Symbol("quote"), self.expr()]
 
         pars = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
@@ -607,10 +602,7 @@ is_real = Contract(
 is_exact = Contract(
     "exact?", lambda v: not isinstance(v, bool) and isinstance(v, (int, Fraction))
 )
-is_inexact = Contract(
-    "inexact?",
-    lambda v: isinstance(v, bool) or not isinstance(v, (int, Fraction)),
-)
+is_inexact = Contract("inexact?", lambda v: not is_exact(v))
 is_eint = Contract(
     "exact-integer?",
     lambda v: not isinstance(v, bool) and isinstance(v, int),
@@ -640,7 +632,8 @@ def display(val: Any) -> None:
         return
     if isinstance(val, str):
         sys.stdout.write(val)
-    sys.stdout.write(print_val(val))
+    else:
+        sys.stdout.write(print_val(val))
 
 
 def is_equal(a: object, b: object) -> bool:
@@ -898,11 +891,17 @@ def palet_random(*args: int) -> int | float:
     return random.randrange(args[0], args[1])
 
 
-def palet_map(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
+def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | Null) -> Any:
     if isinstance(seq, (list, range)):
         return list(map(proc.proc, seq))
     if isinstance(seq, str):
         return str(map(proc.proc, seq))
+
+    if isinstance(seq, np.ndarray):
+        if proc.arity[0] != 0:
+            raise MyError(f"map: procedure must take at least one arg")
+        check_args(proc.name, [0], (1, 1), None)
+        return proc.proc(seq)
 
     result: Cons | Null = Null()
     while isinstance(seq, Cons):
@@ -1047,13 +1046,6 @@ class Interpreter:
         "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
         "modulo": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
         "random": Proc("random", palet_random, (0, 2), [is_eint]),
-        # sequences
-        "range?": is_range,
-        "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
-        "length": Proc("length", len, (1, 1), [is_iterable]),
-        "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_iterable]),
-        "ref": Proc("ref", ref, (2, 2), [is_iterable, is_eint]),
-        "slice": Proc("slice", p_slice, (2, 4), [is_iterable, is_eint]),
         # symbols
         "symbol?": is_symbol,
         "symbol->string": Proc("symbol->string", str, (1, 1), [is_symbol]),
@@ -1103,11 +1095,25 @@ class Interpreter:
         "array-splice!": Proc(
             "array-splice!", splice, (2, 4), [is_array, is_real, is_eint, is_eint]
         ),
+        "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
+        # bool arrays
         "bool-array?": is_boolarr,
         "bool-array": Proc(
             "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [us_int]
         ),
-        "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
+        "margin": Proc("margin", margin, (2, 3), None),
+        "mincut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
+        "minclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
+        "cook": Proc("cook", cook, (3, 3), [is_eint, is_eint, is_boolarr]),
+        # ranges
+        "range?": is_range,
+        "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
+        # generic iterables
+        "iterable?": is_iterable,
+        "length": Proc("length", len, (1, 1), [is_iterable]),
+        "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_iterable]),
+        "ref": Proc("ref", ref, (2, 2), [is_iterable, is_eint]),
+        "slice": Proc("slice", p_slice, (2, 4), [is_iterable, is_eint]),
         # procedures
         "procedure?": is_proc,
         "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
@@ -1124,11 +1130,6 @@ class Interpreter:
         "range->vector": Proc("range->vector", list, (1, 1), [is_range]),
         # contracts
         "any/c": any_c,
-        # ae extensions
-        "margin": Proc("margin", margin, (2, 3), None),
-        "mincut": Proc("mincut", mincut, (2, 2), [is_eint, is_boolarr]),
-        "minclip": Proc("minclip", minclip, (2, 2), [is_eint, is_boolarr]),
-        "cook": Proc("cook", cook, (3, 3), [is_eint, is_eint, is_boolarr]),
     }
 
     def __init__(self, parser: Parser, filesetup: FileSetup | None):
@@ -1159,24 +1160,41 @@ class Interpreter:
 
             name = node[0].val if isinstance(node[0], Symbol) else ""
 
-            if name == "for/vector":
+            def check_for_syntax(name: str, node: list) -> Any:
                 if len(node) < 2:
-                    raise MyError("for/vector: bad syntax")
+                    raise MyError(f"{name}: bad syntax")
 
                 if len(node) == 2:
-                    raise MyError("for/vector: missing body")
+                    raise MyError(f"{name}: missing body")
 
                 assert isinstance(node[1], list)
                 assert isinstance(node[1][0], list)
+
                 var = node[1][0][0]
                 if not isinstance(var, Symbol):
-                    raise MyError("for/vector: binding must be a symbol?")
-                iter_vector = self.visit(node[1][0][1])
-                if not isinstance(iter_vector, list):
-                    raise MyError("for/vector: got iterable other than vector?")
+                    raise MyError(f"{name}: binding must be an identifier")
+                my_iter = self.visit(node[1][0][1])
 
+                if not is_iterable(my_iter):
+                    if isinstance(my_iter, int):
+                        return var, range(my_iter)
+                    raise MyError(f"{name}: got non-iterable in iter slot")
+
+                return var, my_iter
+
+
+            if name == "for":
+                var, my_iter = check_for_syntax("for", node)
+                for item in my_iter:
+                    self.GLOBAL_SCOPE[var.val] = item
+                    for c in node[2:]:
+                        self.visit(c)
+                return None
+
+            if name == "for/vector":
                 results = []
-                for item in iter_vector:
+                var, my_iter = check_for_syntax("for", node)
+                for item in my_iter:
                     self.GLOBAL_SCOPE[var.val] = item
                     results.append([self.visit(c) for c in node[2:]][-1])
 
@@ -1226,7 +1244,7 @@ class Interpreter:
                 if len(node) != 3:
                     raise MyError("set!: bad syntax")
                 if not isinstance(node[1], Symbol):
-                    raise MyError("set!: Must use symbol")
+                    raise MyError("set!: Must be an identifier")
 
                 symbol = node[1].val
                 if symbol not in self.GLOBAL_SCOPE:

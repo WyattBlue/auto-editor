@@ -52,6 +52,44 @@ doc: dict[str, list[proc | value | syntax | text]] = {
                 " is not defined, raise an error.",
             ]),
         ),
+        syntax(
+            "if",
+            "test-expr then-expr else-expr",
+            text([
+                "Evaluates ", var("test-expr"), ". If ", code("#t"), " then evaluate ",
+                var("then-expr"), " else evaluate ", var("else-expr"),
+                ". An error will be raised if evaluated ",
+                var("test-expr"), " is not a ", code("boolean?"), ".",
+            ]),
+        ),
+        syntax(
+            "when",
+            "test-expr body",
+            text([
+                "Evaluates ", var("test-expr"), ". If ", code("#t"), " then evaluate ",
+                var("body"), " else do nothing. An error will be raised if evaluated ",
+                var("test-expr"), " is not a ", code("boolean?"), ".",
+            ]),
+        ),
+    ],
+    "Loops": [
+        syntax(
+            "for",
+            "([id seq-expr] ...) body",
+            text([
+                "Loop over ", var("seq-expr"), " by setting the variable ", var("id"),
+                " to the nth item of ", var("seq-expr"), " and evaluating ",
+                var("body"), ".",
+            ]),
+        ),
+        syntax(
+            "for/vector",
+            "([id seq-expr] ...) body",
+            text(["Like ", code("for"),
+                " but returns a vector with the last evaluated elements of ",
+                code("body"), ".",
+            ]),
+        ),
     ],
     "Equality": [
         proc(
@@ -85,25 +123,6 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         value("true", "boolean?", text(["An alias for ", code("#t"), "."])),
         value("false", "boolean?", text(["An alias for ", code("#f"), "."])),
-        syntax(
-            "if",
-            "test-expr then-expr else-expr",
-            text([
-                "Evaluates ", var("test-expr"), ". If ", code("#t"), " then evaluate ",
-                var("then-expr"), " else evaluate ", var("else-expr"),
-                ". An error will be raised if evaluated ",
-                var("test-expr"), " is not a ", code("boolean?"), ".",
-            ]),
-        ),
-        syntax(
-            "when",
-            "test-expr body",
-            text([
-                "Evaluates ", var("test-expr"), ". If ", code("#t"), " then evaluate ",
-                var("body"), " else do nothing. An error will be raised if evaluated ",
-                var("test-expr"), " is not a ", code("boolean?"), ".",
-            ]),
-        ),
     ],
     "Number Types": [
         proc(
@@ -330,7 +349,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         proc(
             "make-vector",
             (["size", "[v]"], "vector?"),
-            [("size", "exact-nonnegative-integer"), ("v", "any/c", "0")],
+            [("size", "exact-nonnegative-integer?"), ("v", "any/c", "0")],
             text([
                 "Returns a new vector with ", var("size"),
                 " slots, all filled with ", var("v"), "s."
@@ -377,13 +396,28 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         proc(
             "array",
             (["dtype", "v", "..."], "array?"),
-            [("dtype", "string?"), ("v", "any/c")],
+            [("dtype", "symbol?"), ("v", "any/c")],
             text([
-                "Returns a freshly allocated array with ", var("dtype"), " as its ",
-                "datatype and the ", var("v"), " args as its values filled in order."
+                "Returns a freshly allocated array with ", var("dtype"),
+                " as its datatype and the ", var("v"),
+                " args as its values filled in order.",
             ]),
         ),
-
+        proc(
+            "array-splice!",
+            (["arr", "v", "[start]", "[stop]"], "array?"),
+            [
+                ("arr", "array?"),
+                ("v", "real?"),
+                ("start", "exact-integer?", "0"),
+                ("end", "exact-integer?", "(length arr)"),
+            ],
+            text([
+                "Modify ", var("arr"), " from  ", var("start")
+                " as its datatype and the ", var("v"),
+                " args as its values filled in order.",
+            ]),
+        ),
     ],
     "Pairs and Lists": [
         proc(
@@ -409,8 +443,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["a", "d"], "pair?"),
             [("a", "any/c"), ("d", "any/c")],
             text([
-                "Returns a newly allocated pair where ", var("a"),
-                " is the first item and, ", var("d"), " is the second."
+                "Returns a newly allocated pair where the first item is set to ",
+                var("a"), " and the second item set to ", var("d"), ".",
             ]),
         ),
         proc(
@@ -439,8 +473,75 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
     ],
+    "Ranges": [
+        proc(
+            "range?",
+            (["v"], "boolean?"),
+            [("v", "any/c")],
+            text([
+                "Returns ", code("#t"), " if ", var("v"),
+                " is a range object, ", code("#f"), " otherwise.",
+            ]),
+        ),
+        proc(
+            "in-range",
+            (["start", "stop", "[step]"], "range?"),
+            [
+                ("start", "exact-integer?"),
+                ("stop", "exact-integer?"),
+                ("step", "exact-integer?", "1"),
+            ],
+            text(["Returns a range object."]),
+        ),
+    ],
     "Generic Sequences": [
-
+        proc(
+            "iterable?",
+            (["v"], "boolean?"),
+            [("v", "any/c")],
+            text(["Returns ", code("#t"), " if ", var("v"),
+                " is a vector, array, string, pair, or range, ", code("#f"),
+                " otherwise.",
+            ]),
+        ),
+        proc(
+            "length",
+            (["seq"], "exact-nonnegative-integer?"),
+            [("seq", "iterable?")],
+            text(["Returns the length of ", var("seq"), "."]),
+        ),
+        proc(
+            "ref",
+            (["seq", "pos"], "any/c"),
+            [("seq", "iterable?"), ("pos", "exact-integer?")],
+            text([
+                "Returns the element of ", var("seq"), " at position ", var("pos"),
+                ", where the first element is at position", code("0"),
+                ". For sequences other than pair?, negative positions are allowed.",
+            ]),
+        ),
+        proc(
+            "slice",
+            (["seq", "start", "[stop]", "[step]"], "iterable?"),
+            [
+                ("seq", "iterable?"),
+                ("start", "exact-integer?"),
+                ("stop", "exact-integer?", "(length seq)"),
+                ("step", "exact-integer?", "1"),
+            ],
+            text([
+                "Returns the elements of ", var("seq"), " from ", var("start"),
+                " inclusively to ", var("stop"), " exclusively. If ", var("step"),
+                " is negative, then ", var("stop"), " is inclusive and  ",
+                var("start"), " is exclusive.",
+            ]),
+        ),
+        proc(
+            "reverse",
+            (["seq"], "iterable?"),
+            [("seq", "iterable?")],
+            text(["Returns ", var("seq"), " in reverse order."]),
+        ),
     ],
     "Contracts": [
         proc(
