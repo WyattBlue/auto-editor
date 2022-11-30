@@ -88,7 +88,6 @@ class Site:
         if not os.path.isdir(self.components):
             error(f"components dir: '{self.components}' not found")
 
-
     def make(self) -> None:
         join = os.path.join
         components = {}

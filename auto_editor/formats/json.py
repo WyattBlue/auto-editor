@@ -3,16 +3,14 @@ from __future__ import annotations
 import json
 import os
 import sys
+from fractions import Fraction
 from typing import Any
 
-from fractions import Fraction
-
-from auto_editor.ffwrapper import FFmpeg
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.objs.export import ExJson, ExTimeline
-from auto_editor.timeline import Timeline, visual_objects, audio_objects
-from auto_editor.utils.log import Log
 from auto_editor.objs.util import parse_dataclass
-from auto_editor.ffwrapper import FileInfo
+from auto_editor.timeline import Timeline, audio_objects, visual_objects
+from auto_editor.utils.log import Log
 
 """
 Make a pre-edited file reference that can be inputted back into auto-editor.
@@ -67,7 +65,15 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
         check_attrs(data, log, "timeline")
         tl = data["timeline"]
         check_attrs(
-            tl, log, "sources", "background", "v", "a", "timebase", "resolution", "samplerate"
+            tl,
+            log,
+            "sources",
+            "background",
+            "v",
+            "a",
+            "timebase",
+            "resolution",
+            "samplerate",
         )
 
         sources: dict[str, FileInfo] = {}
@@ -89,7 +95,6 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
                 if k != "name":
                     attrs.append(f"{k}={v}")
             return ",".join(attrs)
-
 
         for vlayers in tl["v"]:
             if vlayers:
