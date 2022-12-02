@@ -1037,13 +1037,9 @@ class Interpreter:
         "char?": is_char,
         "string": Proc("string", string_append, (0, None), [is_char]),
         "string-append": Proc("string-append", string_append, (0, None), [is_str]),
-        "string-upcase": Proc("string-upcase", lambda s: s.upper(), (1, 1), [is_str]),
-        "string-downcase": Proc(
-            "string-downcase", lambda s: s.lower(), (1, 1), [is_str]
-        ),
-        "string-titlecase": Proc(
-            "string-titlecase", lambda s: s.title(), (1, 1), [is_str]
-        ),
+        "string-upcase": Proc("string-upcase", str.upper, (1, 1), [is_str]),
+        "string-downcase": Proc("string-downcase", str.lower, (1, 1), [is_str]),
+        "string-titlecase": Proc("string-titlecase", str.title, (1, 1), [is_str]),
         "char->integer": Proc("char->integer", lambda c: ord(c.val), (1, 1), [is_char]),
         "integer->char": Proc("integer->char", Char, (1, 1), [is_int]),
         # vectors
@@ -1053,7 +1049,7 @@ class Interpreter:
             "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, any_c]
         ),
         "vector-append": Proc("vector-append", vector_append, (0, None), [is_vector]),
-        "vector-pop!": Proc("vector-pop!", lambda v: v.pop(), (1, 1), [is_vector]),
+        "vector-pop!": Proc("vector-pop!", list.pop, (1, 1), [is_vector]),
         "vector-add!": Proc("vector-add!", vector_add, (2, 2), [is_vector, any_c]),
         "vector-set!": Proc(
             "vector-set!", vector_set, (3, 3), [is_vector, is_int, any_c]

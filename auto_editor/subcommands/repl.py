@@ -30,6 +30,7 @@ try:
 except ImportError:
     pass
 
+
 @dataclass
 class REPL_Args:
     input: list[str] = field(default_factory=list)
