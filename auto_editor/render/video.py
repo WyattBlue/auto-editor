@@ -4,21 +4,25 @@ import os.path
 from dataclasses import dataclass
 from math import ceil
 from subprocess import DEVNULL, PIPE
-from typing import Any
+from typing import TYPE_CHECKING
 
 import av
 from PIL import Image, ImageOps
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.objs.tl import TlVideo, Visual
 from auto_editor.output import video_quality
 from auto_editor.render.image import make_caches, render_image
-from auto_editor.timeline import Timeline
-from auto_editor.utils.bar import Bar
-from auto_editor.utils.container import Container
 from auto_editor.utils.encoder import encoders
-from auto_editor.utils.log import Log
-from auto_editor.utils.types import Args
+from auto_editor.objs.tl import TlVideo, Visual
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    from auto_editor.ffwrapper import FFmpeg, FileInfo
+    from auto_editor.timeline import Timeline
+    from auto_editor.utils.bar import Bar
+    from auto_editor.utils.container import Container
+    from auto_editor.utils.log import Log
+    from auto_editor.utils.types import Args
 
 av.logging.set_level(av.logging.PANIC)
 
@@ -147,9 +151,9 @@ def render_av(
     ]
 
     if apply_video_later:
-        cmd.extend(["-c:v", "mpeg4", "-qscale:v", "1"])
+        cmd += ["-c:v", "mpeg4", "-qscale:v", "1"]
     else:
-        cmd = video_quality(cmd, args, ctr)
+        cmd += video_quality(args, ctr)
 
     # Setting SAR requires re-encoding so we do it here.
     if src is not None and src.videos:
