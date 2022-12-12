@@ -15,7 +15,6 @@ from auto_editor.analyze import edit_method
 from auto_editor.utils.func import boolop, mut_margin
 
 if TYPE_CHECKING:
-    from fractions import Fraction
     from typing import Any, Callable, Union
 
     from numpy.typing import NDArray

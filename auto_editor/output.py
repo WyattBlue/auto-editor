@@ -31,18 +31,19 @@ class Ensure:
         return out_path
 
 
-def _ffset(cmd: list[str], option: str, value: str | None) -> list[str]:
+def _ffset(option: str, value: str | None) -> list[str]:
     if value is None or value == "unset" or value == "reserved":
-        return cmd
-    return cmd + [option] + [value]
+        return []
+    return [option] + [value]
 
 
-def video_quality(cmd: list[str], args: Args, ctr: Container) -> list[str]:
-    cmd = _ffset(cmd, "-b:v", args.video_bitrate)
-    cmd.extend(["-c:v", args.video_codec])
-    cmd = _ffset(cmd, "-qscale:v", args.video_quality_scale)
-    cmd.extend(["-movflags", "faststart"])
-    return cmd
+def video_quality(args: Args, ctr: Container) -> list[str]:
+    return (
+        _ffset("-b:v", args.video_bitrate)
+        + ["-c:v", args.video_codec]
+        + _ffset("-qscale:v", args.video_quality_scale)
+        + ["-movflags", "faststart"]
+    )
 
 
 def mux_quality_media(
@@ -112,19 +113,18 @@ def mux_quality_media(
     for is_video, path in visual_output:
         if is_video:
             if apply_v:
-                cmd = video_quality(cmd, args, ctr)
+                cmd += video_quality(args, ctr)
             else:
                 # Real video is only allowed on track 0
-                cmd.extend(["-c:v:0", "copy"])
+                cmd += ["-c:v:0", "copy"]
 
             if float(tb).is_integer():
-                cmd.extend(["-video_track_timescale", f"{tb}"])
+                cmd += ["-video_track_timescale", f"{tb}"]
 
         elif ctr.allow_image:
             ext = os.path.splitext(path)[1][1:]
-            cmd.extend(
-                [f"-c:v:{track}", ext, f"-disposition:v:{track}", "attached_pic"]
-            )
+            cmd += [f"-c:v:{track}", ext, f"-disposition:v:{track}", "attached_pic"]
+
         track += 1
     del track
 
@@ -154,14 +154,15 @@ def mux_quality_media(
             cmd.extend(["-c:s", scodec])
 
     if a_tracks > 0:
-        cmd = _ffset(cmd, "-c:a", args.audio_codec)
-        cmd = _ffset(cmd, "-b:a", args.audio_bitrate)
+        cmd += _ffset("-c:a", args.audio_codec) + _ffset("-b:a", args.audio_bitrate)
 
     if same_container and v_tracks > 0:
-        cmd = _ffset(cmd, "-color_range", src.videos[0].color_range)
-        cmd = _ffset(cmd, "-colorspace", src.videos[0].color_space)
-        cmd = _ffset(cmd, "-color_primaries", src.videos[0].color_primaries)
-        cmd = _ffset(cmd, "-color_trc", src.videos[0].color_transfer)
+        cmd += (
+            _ffset("-color_range", src.videos[0].color_range)
+            + _ffset("-colorspace", src.videos[0].color_space)
+            + _ffset("-color_primaries", src.videos[0].color_primaries)
+            + _ffset("-color_trc", src.videos[0].color_transfer)
+        )
 
     if args.extras is not None:
         cmd.extend(args.extras.split(" "))
