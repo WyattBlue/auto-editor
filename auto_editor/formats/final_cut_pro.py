@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from pathlib import PureWindowsPath
-from platform import system
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import Timeline
@@ -75,11 +73,7 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
         raise ValueError("Timeline too complex")
 
     total_dur = chunks[-1][1]
-
-    if system() == "Windows":
-        pathurl = "file://localhost/" + PureWindowsPath(src.path.resolve()).as_posix()
-    else:
-        pathurl = src.path.resolve().as_uri()
+    pathurl = src.path.resolve().as_uri()
 
     width, height = timeline.res
     frame_duration = fraction(1, tb)

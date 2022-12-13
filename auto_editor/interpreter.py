@@ -239,7 +239,7 @@ class Symbol:
 METHODS = {"audio", "motion", "pixeldiff", "none", "all"}
 SEC_UNITS = {"s", "sec", "secs", "second", "seconds"}
 ID, QUOTE, NUM, BOOL, STR, CHAR = "ID", "QUOTE", "NUM", "BOOL", "STR", "CHAR"
-ARR, SEC, DB = "ARR", "SEC", "DB"
+ARR, SEC, DB, PER = "ARR", "SEC", "DB", "PER"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
 
 
@@ -324,6 +324,8 @@ class Lexer:
                 token = SEC
             elif unit == "dB":
                 token = DB
+            elif unit == "%":
+                token = PER
             elif unit != "i":
                 return Token(ID, result + unit)
 
@@ -488,6 +490,10 @@ class Parser:
         if token.type == DB:
             self.eat(DB)
             return [Symbol("expt"), 10, [Symbol("/"), token.value, 20]]
+
+        if token.type == PER:
+            self.eat(PER)
+            return [Symbol("/"), token.value, 100.0]
 
         if token.type == QUOTE:
             self.eat(QUOTE)
