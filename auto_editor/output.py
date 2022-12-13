@@ -65,9 +65,9 @@ def mux_quality_media(
     a_tracks = len(audio_output)
     s_tracks = len(sub_output)
 
-    cmd = ["-hide_banner", "-y", "-i", src.path]
+    cmd = ["-hide_banner", "-y", "-i", f"{src.path}"]
 
-    same_container = src.ext == os.path.splitext(output_path)[1]
+    same_container = src.path.suffix == os.path.splitext(output_path)[1]
 
     for is_video, path in visual_output:
         if is_video or ctr.allow_image:

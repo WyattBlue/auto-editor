@@ -4,8 +4,6 @@ import os.path
 import xml.etree.ElementTree as ET
 from fractions import Fraction
 from math import ceil
-from os.path import abspath
-from pathlib import Path
 from shutil import move
 from xml.etree.ElementTree import Element
 
@@ -265,19 +263,18 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
     audio_file = len(src.videos) == 0 and len(src.audios) == 1
     timebase, ntsc = set_tb_ntsc(timeline.timebase)
 
-    pathurls = [Path(src.abspath).as_uri()]
+    pathurls = [src.path.resolve().as_uri()]
 
     tracks = len(src.audios)
 
     if tracks > 1:
-        name_without_extension = src.basename[: src.basename.rfind(".")]
-
-        fold = safe_mkdir(os.path.join(src.dirname, f"{name_without_extension}_tracks"))
+        fold = src.path.parent / f"{src.path.stem}_tracks"
+        safe_mkdir(fold)
 
         for i in range(1, tracks):
-            newtrack = os.path.join(fold, f"{i}.wav")
-            move(ensure.audio(src.path, "0", i), newtrack)
-            pathurls.append(Path(abspath(newtrack)).as_uri())
+            newtrack = fold / f"{i}.wav"
+            move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
+            pathurls.append(newtrack.resolve().as_uri())
 
     width, height = timeline.res
 
@@ -321,7 +318,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
 
             clipitem = ET.SubElement(track, "clipitem", id=f"clipitem-{j+1}")
             ET.SubElement(clipitem, "masterclipid").text = "masterclip-2"
-            ET.SubElement(clipitem, "name").text = src.basename
+            ET.SubElement(clipitem, "name").text = src.path.stem
             ET.SubElement(clipitem, "start").text = str(_start)
             ET.SubElement(clipitem, "end").text = str(_end)
             ET.SubElement(clipitem, "in").text = str(_in)
@@ -330,7 +327,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
             filedef = ET.SubElement(clipitem, "file", id="file-1")
 
             if j == 0:
-                ET.SubElement(filedef, "name").text = src.basename
+                ET.SubElement(filedef, "name").text = src.path.stem
                 ET.SubElement(filedef, "pathurl").text = pathurls[0]
 
                 rate = ET.SubElement(filedef, "rate")
@@ -410,7 +407,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
                 premiereChannelType="stereo",
             )
             ET.SubElement(clipitem, "masterclipid").text = f"masterclip-{master_id}"
-            ET.SubElement(clipitem, "name").text = src.basename
+            ET.SubElement(clipitem, "name").text = src.path.stem
             ET.SubElement(clipitem, "start").text = str(_start)
             ET.SubElement(clipitem, "end").text = str(_end)
             ET.SubElement(clipitem, "in").text = str(_in)
@@ -418,7 +415,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
 
             filedef = ET.SubElement(clipitem, "file", id=f"file-{t+1}")
             if j == 0 and (audio_file or t > 0):
-                ET.SubElement(filedef, "name").text = src.basename
+                ET.SubElement(filedef, "name").text = src.path.stem
                 ET.SubElement(filedef, "pathurl").text = pathurls[t]
 
                 rate = ET.SubElement(filedef, "rate")

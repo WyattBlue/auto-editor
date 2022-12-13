@@ -6,6 +6,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from fractions import Fraction
+from pathlib import Path
 from platform import system
 from re import search
 from subprocess import PIPE, Popen
@@ -167,11 +168,6 @@ class SubtitleStream:
 class FileInfo:
     __slots__ = (
         "path",
-        "abspath",
-        "basename",
-        "dirname",
-        "name",
-        "ext",
         "modified",
         "bitrate",
         "duration",
@@ -199,12 +195,7 @@ class FileInfo:
 
     def __init__(self, path: str, ffmpeg: FFmpeg, log: Log, label: str = ""):
         self.label = label
-        self.path = path
-        self.abspath = os.path.abspath(path)
-        self.basename = os.path.basename(path)
-        self.dirname = os.path.dirname(os.path.abspath(path))
-        self.name, self.ext = os.path.splitext(path)
-
+        self.path = Path(path)
         self.videos: list[VideoStream] = []
         self.audios: list[AudioStream] = []
         self.subtitles: list[SubtitleStream] = []

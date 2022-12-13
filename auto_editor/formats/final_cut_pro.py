@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from pathlib import Path, PureWindowsPath
+from pathlib import PureWindowsPath
 from platform import system
 
 from auto_editor.ffwrapper import FileInfo
@@ -77,16 +77,16 @@ def fcp_xml(output: str, timeline: Timeline) -> None:
     total_dur = chunks[-1][1]
 
     if system() == "Windows":
-        pathurl = "file://localhost/" + PureWindowsPath(src.abspath).as_posix()
+        pathurl = "file://localhost/" + PureWindowsPath(src.path.resolve()).as_posix()
     else:
-        pathurl = Path(src.abspath).as_uri()
+        pathurl = src.path.resolve().as_uri()
 
     width, height = timeline.res
     frame_duration = fraction(1, tb)
 
     audio_file = len(src.videos) == 0 and len(src.audios) > 0
-    group_name = "Auto-Editor {} Group".format("Audio" if audio_file else "Video")
-    name = src.basename
+    group_name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
+    name = src.path.stem
 
     colorspace = get_colorspace(src)
 

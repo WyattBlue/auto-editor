@@ -50,7 +50,7 @@ def make_caches(
                     log.error(f"Font '{obj.font}' not found.")
 
             if isinstance(obj, TlImage) and obj.src not in img_cache:
-                img_cache[obj.src] = Image.open(sources[obj.src].path).convert("RGBA")
+                img_cache[obj.src] = Image.open(f"{sources[obj.src].path}").convert("RGBA")
 
     return font_cache, img_cache
 

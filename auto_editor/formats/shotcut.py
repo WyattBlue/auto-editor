@@ -103,8 +103,8 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
         length = to_timecode((clip[1] / speed + 1) / tb, "standard")
 
         if speed == 1:
-            resource = src.path
-            caption = src.basename
+            resource = f"{src.path}"
+            caption = f"{src.path.stem}"
             chain = ET.SubElement(
                 mlt, "chain", attrib={"id": f"chain{chains}", "out": f"{_out}"}
             )
@@ -114,7 +114,7 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
             )
 
             resource = f"{speed}:{src.path}"
-            caption = f"{src.basename} ({speed}x)"
+            caption = f"{src.path.stem} ({speed}x)"
 
             producers += 1
 
