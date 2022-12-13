@@ -79,7 +79,7 @@ class Timeline:
     def as_dict(self) -> dict:
         sources = {}
         for key, src in self.sources.items():
-            sources[key] = src.abspath
+            sources[key] = f"{src.path.resolve()}"
 
         v = []
         for i, vlayer in enumerate(self.v):

@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING
 import av
 from PIL import Image, ImageOps
 
+from auto_editor.objs.tl import TlVideo, Visual
 from auto_editor.output import video_quality
 from auto_editor.render.image import make_caches, render_image
 from auto_editor.utils.encoder import encoders
-from auto_editor.objs.tl import TlVideo, Visual
 
 if TYPE_CHECKING:
     from typing import Any
@@ -85,7 +85,7 @@ def render_av(
     target_pix_fmt = "yuv420p"  # Reasonable default
 
     for key, src in timeline.sources.items():
-        cns[key] = av.open(src.path)
+        cns[key] = av.open(f"{src.path}")
 
         if len(cns[key].streams.video) == 0:
             decoders[key] = None

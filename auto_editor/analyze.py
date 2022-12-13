@@ -47,7 +47,7 @@ def get_media_length(
         if (arr := read_cache(src, tb, "audio", {"stream": 0}, temp)) is not None:
             return len(arr)
 
-        sr, samples = read(ensure.audio(src.path, src.label, stream=0))
+        sr, samples = read(ensure.audio(f"{src.path.resolve()}", src.label, stream=0))
         samp_count = len(samples)
         del samples
 
@@ -62,7 +62,7 @@ def get_media_length(
 
     av.logging.set_level(av.logging.PANIC)
 
-    with av.open(src.path) as cn:
+    with av.open(f"{src.path}") as cn:
         if len(cn.streams.video) < 1:
             log.error("Could not get media duration")
 
@@ -108,18 +108,18 @@ def read_cache(
 
     workfile = os.path.join(os.path.dirname(temp), f"ae-{version}", "cache.json")
 
-    if not os.path.isfile(workfile):
+    try:
+        with open(workfile) as file:
+            cache = json.load(file)
+    except Exception:
         return None
 
-    with open(workfile) as file:
-        cache = json.load(file)
-
-    if src.path not in cache:
+    if f"{src.path.resolve()}" not in cache:
         return None
 
     key, obj_dict = _dict_tag(tag, tb, obj)
 
-    if key not in (root := cache[src.path]):
+    if key not in (root := cache[f"{src.path.resolve()}"]):
         return None
 
     return np.asarray(root[key]["arr"], dtype=root[key]["type"])
@@ -137,10 +137,10 @@ def cache(
 
     key, obj_dict = _dict_tag(tag, tb, obj)
 
-    if os.path.isfile(workfile):
+    try:
         with open(workfile) as file:
             json_object = json.load(file)
-    else:
+    except Exception:
         json_object = {}
 
     entry = {
@@ -148,10 +148,12 @@ def cache(
         "arr": arr.tolist(),
     }
 
-    if src.path in json_object:
-        json_object[src.path][key] = entry
+    src_key = f"{src.path}"
+
+    if src_key in json_object:
+        json_object[src_key][key] = entry
     else:
-        json_object[src.path] = {key: entry}
+        json_object[src_key] = {key: entry}
 
     with open(os.path.join(workdur, "cache.json"), "w") as file:
         file.write(json.dumps(json_object))
@@ -178,7 +180,7 @@ def audio_levels(
     if (arr := read_cache(src, tb, "audio", {"stream": s}, temp)) is not None:
         return arr
 
-    sr, samples = read(ensure.audio(src.path, src.label, s))
+    sr, samples = read(ensure.audio(f"{src.path.resolve()}", src.label, s))
 
     def get_max_volume(s: np.ndarray) -> float:
         return max(float(np.max(s)), -float(np.min(s)))
@@ -239,7 +241,7 @@ def motion_levels(
     if (arr := read_cache(src, tb, "motion", mobj, temp)) is not None:
         return arr
 
-    container = av.open(src.path, "r")
+    container = av.open(f"{src.path}", "r")
 
     stream = container.streams.video[mobj.stream]
     stream.thread_type = "AUTO"
@@ -323,7 +325,7 @@ def pixeldiff_levels(
     if (arr := read_cache(src, tb, "pixeldiff", pobj, temp)) is not None:
         return arr
 
-    container = av.open(src.path, "r")
+    container = av.open(f"{src.path}", "r")
 
     stream = container.streams.video[pobj.stream]
     stream.thread_type = "AUTO"

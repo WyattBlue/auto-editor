@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from xml.etree.ElementTree import Element
 
 from auto_editor.utils.log import Log
@@ -14,7 +15,7 @@ def show(ele: Element, limit: int, depth: int = 0) -> None:
             show(child, limit, depth + 1)
 
 
-def safe_mkdir(path: str) -> str:
+def safe_mkdir(path: str | Path) -> None:
     from os import mkdir
     from shutil import rmtree
 
@@ -23,7 +24,6 @@ def safe_mkdir(path: str) -> str:
     except OSError:
         rmtree(path)
         mkdir(path)
-    return path
 
 
 def indent(base: int, *lines: str) -> str:

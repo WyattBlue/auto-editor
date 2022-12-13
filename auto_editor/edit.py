@@ -34,9 +34,9 @@ def set_output(
     if src is None:
         root, ext = "out", ".mp4"
     else:
-        root, ext = os.path.splitext(src.path if out is None else out)
+        root, ext = os.path.splitext(str(src.path) if out is None else out)
         if ext == "":
-            ext = src.ext
+            ext = src.path.suffix
 
     if export is None:
         if ext == ".xml":
@@ -245,7 +245,7 @@ def edit_media(
     if timeline is None:
         # Extract subtitles in their native format.
         if src is not None and len(src.subtitles) > 0:
-            cmd = ["-i", src.path, "-hide_banner"]
+            cmd = ["-i", f"{src.path}", "-hide_banner"]
             for s, sub in enumerate(src.subtitles):
                 cmd.extend(["-map", f"0:s:{s}"])
             for s, sub in enumerate(src.subtitles):
@@ -338,7 +338,7 @@ def edit_media(
                 if ctr.allow_image and vid.codec in ("png", "mjpeg", "webp"):
                     out_path = os.path.join(temp, f"{v}.{vid.codec}")
                     # fmt: off
-                    ffmpeg.run(["-i", src.path, "-map", "0:v", "-map", "-0:V",
+                    ffmpeg.run(["-i", f"{src.path}", "-map", "0:v", "-map", "-0:V",
                         "-c", "copy", out_path])
                     # fmt: on
                     visual_output.append((False, out_path))
