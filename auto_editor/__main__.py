@@ -304,20 +304,20 @@ def main() -> None:
         )
         obj.main(sys.argv[2:])
         sys.exit()
-    else:
-        args = main_options(ArgumentParser("Auto-Editor")).parse_args(
-            Args,
-            sys.argv[1:],
-            macros=[
-                ({"--frame-margin"}, ["--margin"]),
-                ({"--export-to-premiere", "-exp"}, ["--export", "premiere"]),
-                ({"--export-to-final-cut-pro", "-exf"}, ["--export", "final-cut-pro"]),
-                ({"--export-to-shotcut", "-exs"}, ["--export", "shotcut"]),
-                ({"--export-as-json"}, ["--export", "json"]),
-                ({"--export-as-clip-sequence", "-excs"}, ["--export", "clip-sequence"]),
-                ({"--keep-tracks-seperate"}, ["--keep-tracks-separate"]),
-            ],
-        )
+
+    args = main_options(ArgumentParser("Auto-Editor")).parse_args(
+        Args,
+        sys.argv[1:],
+        macros=[
+            ({"--frame-margin"}, ["--margin"]),
+            ({"--export-to-premiere", "-exp"}, ["--export", "premiere"]),
+            ({"--export-to-final-cut-pro", "-exf"}, ["--export", "final-cut-pro"]),
+            ({"--export-to-shotcut", "-exs"}, ["--export", "shotcut"]),
+            ({"--export-as-json"}, ["--export", "json"]),
+            ({"--export-as-clip-sequence", "-excs"}, ["--export", "clip-sequence"]),
+            ({"--keep-tracks-seperate"}, ["--keep-tracks-separate"]),
+        ],
+    )
 
     if args.version:
         print(f"{auto_editor.version} ({auto_editor.__version__})")

@@ -154,6 +154,7 @@ containers: dict[str, DictContainer] = {
     "ast": {
         "name": "AST / Audio Stream",
         "allow_audio": True,
+        "max_audios": 1,
         "acodecs": ["pcm_s16be_planar"],
     },
     "mp3": {
