@@ -189,7 +189,7 @@ def edit_media(
     timeline = None
 
     if paths:
-        path_ext = os.path.splitext(paths[0])[1]
+        path_ext = os.path.splitext(paths[0])[1].lower()
         if path_ext == ".xml":
             from auto_editor.formats.premiere import premiere_read_xml
 
@@ -295,7 +295,7 @@ def edit_media(
     out_ext = os.path.splitext(output)[1].replace(".", "")
 
     # Check if export options make sense.
-    ctr = container_constructor(out_ext)
+    ctr = container_constructor(out_ext.lower())
 
     if ctr.samplerate is not None and args.sample_rate not in ctr.samplerate:
         log.error(f"'{out_ext}' container only supports samplerates: {ctr.samplerate}")
