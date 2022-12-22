@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.make_layers import make_timeline
 from auto_editor.objs.export import (
     ExAudio,
     ExClipSequence,
@@ -17,7 +18,7 @@ from auto_editor.objs.export import (
 )
 from auto_editor.objs.util import Attr
 from auto_editor.output import Ensure
-from auto_editor.timeline import Timeline, make_timeline
+from auto_editor.timeline import Timeline
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.container import Container, container_constructor
@@ -154,8 +155,8 @@ def make_sources(
 
 
 def parse_export(export: str, log: Log) -> Exports:
-    from auto_editor.objs.tl import timeline_builder
     from auto_editor.objs.util import parse_dataclass
+    from auto_editor.timeline import timeline_builder
 
     exploded = export.split(":", maxsplit=1)
     if len(exploded) == 1:
