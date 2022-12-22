@@ -26,12 +26,12 @@ class ExShotCut:
 
 @dataclass
 class ExJson:
-    api: str = "1"
+    api: str = "3"
 
 
 @dataclass
 class ExTimeline:
-    api: str = "1"
+    api: str = "3"
 
 
 @dataclass

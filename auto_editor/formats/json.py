@@ -34,6 +34,9 @@ class Version:
     __slots__ = ("major", "minor", "micro")
 
     def __init__(self, val: str, log: Log) -> None:
+        if val.startswith("unstable:"):
+            val = val[9:]
+
         ver_str = val.split(".")
         if len(ver_str) > 3:
             log.error("Version string: Too many separators!")
@@ -61,7 +64,7 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
     check_attrs(data, log, "version")
     version = Version(data["version"], log)
 
-    if version == (2, 0) or version == (0, 2):
+    if version == (3, 0):
         check_attrs(data, log, "timeline")
         tl = data["timeline"]
         check_attrs(
@@ -136,7 +139,7 @@ def make_json_timeline(
     log: Log,
 ) -> None:
 
-    if (version := Version(obj.api, log)) != (2, 0) and version != (0, 2):
+    if (version := Version(obj.api, log)) != (3, 0):
         log.error(f"Version {version} is not supported!")
 
     if isinstance(out, str):

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import (
     FileSetup,
     Interpreter,
@@ -14,10 +16,20 @@ from auto_editor.interpreter import (
     cook,
     is_boolarr,
 )
-from auto_editor.objs.tl import ASpace, TlAudio, TlVideo, VSpace
+from auto_editor.objs.util import _Vars, parse_dataclass
+from auto_editor.timeline import (
+    ASpace,
+    Timeline,
+    TlAudio,
+    TlVideo,
+    Visual,
+    VSpace,
+    audio_objects,
+    visual_objects,
+)
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import mut_margin
-from auto_editor.utils.types import time
+from auto_editor.utils.types import Args, time
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -110,6 +122,116 @@ def run_interpreter(
 
     assert isinstance(result, np.ndarray)
     return result
+
+
+def make_timeline(
+    sources: dict[str, FileInfo],
+    inputs: list[int],
+    ffmpeg: FFmpeg,
+    ensure: Ensure,
+    args: Args,
+    sr: int,
+    bar: Bar,
+    temp: str,
+    log: Log,
+) -> Timeline:
+
+    inp = None if not inputs else sources[str(inputs[0])]
+
+    if inp is None:
+        tb, res = Fraction(30), (1920, 1080)
+    else:
+        tb = inp.get_fps() if args.frame_rate is None else args.frame_rate
+        res = inp.get_res() if args.resolution is None else args.resolution
+    del inp
+
+    chunks, vclips, aclips = make_layers(
+        sources,
+        inputs,
+        ensure,
+        tb,
+        args.edit_based_on,
+        args.margin,
+        args.min_cut_length,
+        args.min_clip_length,
+        args.cut_out,
+        args.add_in,
+        args.mark_as_silent,
+        args.mark_as_loud,
+        args.set_speed_for_range,
+        args.silent_speed,
+        args.video_speed,
+        bar,
+        temp,
+        log,
+    )
+
+    for raw in args.source:
+        exploded = raw.split(":")
+        if len(exploded) != 2:
+            log.error("source label:path must have one :")
+        label, path = exploded
+        if len(label) > 55:
+            log.error("Label must not exceed 55 characters.")
+
+        for ill_char in ",.;()/\\[]}{'\"|#&<>^%$=@ ":
+            if ill_char in label:
+                log.error(f"Label '{label}' contains illegal character: {ill_char}")
+
+        if label[0] in "0123456789":
+            log.error(f"Label '{label}' must not start with a digit")
+        if label[0] == "-":
+            log.error(f"Label '{label}' must not start with a dash")
+
+        if not os.path.isfile(path):
+            log.error(f"Path '{path}' is not a file")
+
+        sources[label] = FileInfo(path, ffmpeg, log, label)
+
+    timeline = Timeline(sources, tb, sr, res, args.background, vclips, aclips, chunks)
+
+    w, h = res
+    _vars: _Vars = {
+        "width": w,
+        "height": h,
+        "end": timeline.end,
+        "tb": timeline.timebase,
+    }
+
+    OBJ_ATTRS_SEP = ":"
+
+    pool: list[Visual] = []
+    apool: list[TlAudio] = []
+
+    for obj_attrs_str in args.add:
+        exploded = obj_attrs_str.split(OBJ_ATTRS_SEP)
+        if len(exploded) > 2 or len(exploded) == 0:
+            log.error("Invalid object syntax")
+
+        obj_s = exploded[0]
+        attrs = "" if len(exploded) == 1 else exploded[1]
+
+        try:
+            if obj_s in visual_objects:
+                pool.append(
+                    parse_dataclass(attrs, visual_objects[obj_s], log, _vars, True)
+                )
+            elif obj_s in audio_objects:
+                apool.append(
+                    parse_dataclass(attrs, audio_objects[obj_s], log, _vars, True)
+                )
+            else:
+                log.error(f"Unknown timeline object: '{obj_s}'")
+        except TypeError as e:
+            log.error(e)
+
+    for vobj in pool:
+        timeline.v.append([vobj])
+
+    for aobj in apool:
+        timeline.a.append([aobj])
+
+    return timeline
 
 
 def make_layers(

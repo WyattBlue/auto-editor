@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 import av
 from PIL import Image, ImageOps
 
-from auto_editor.objs.tl import TlVideo, Visual
 from auto_editor.output import video_quality
 from auto_editor.render.image import make_caches, render_image
+from auto_editor.timeline import TlVideo, Visual
 from auto_editor.utils.encoder import encoders
 
 if TYPE_CHECKING:

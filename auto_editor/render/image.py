@@ -6,7 +6,7 @@ import av
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.objs.tl import TlEllipse, TlImage, TlRect, TlText, Visual, VSpace
+from auto_editor.timeline import TlEllipse, TlImage, TlRect, TlText, Visual, VSpace
 from auto_editor.utils.log import Log
 
 av.logging.set_level(av.logging.PANIC)

@@ -457,6 +457,19 @@ doc: dict[str, list[proc | value | syntax | text]] = {
                 var("stop"), "to ", var("v"),  ".",
             ]),
         ),
+        proc(
+            "margin",
+            (["left", "[right]", "arr"], "bool-array?"),
+            [
+                ("left", "integer?"),
+                ("right", "integer?", "left"),
+                ("arr", "bool-array?"),
+            ],
+            text([
+                "Returns a new ", code("bool-array?"), " with ", var("left"), " and",
+                var("right"), " margin applied."
+            ]),
+        ),
     ],
     "Pairs and Lists": [
         proc(

@@ -8,9 +8,8 @@ from shutil import move
 from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.objs.tl import ASpace, TlAudio, TlVideo, VSpace
 from auto_editor.output import Ensure
-from auto_editor.timeline import Timeline
+from auto_editor.timeline import ASpace, Timeline, TlAudio, TlVideo, VSpace
 from auto_editor.utils.log import Log
 
 from .utils import Validator, safe_mkdir, show
