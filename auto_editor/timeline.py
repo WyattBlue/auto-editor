@@ -200,7 +200,7 @@ rect_builder = [
 ]
 ellipse_builder = rect_builder
 
-timeline_builder = [Attr(("api",), str, "2.0.0")]
+timeline_builder = [Attr(("api",), str, "3.0.0")]
 
 Visual = Union[TlText, TlImage, TlRect, TlEllipse]
 VLayer = list[Union[TlVideo, Visual]]
