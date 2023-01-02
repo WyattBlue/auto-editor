@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from auto_editor.ffwrapper import FFmpeg, FileInfo
-    from auto_editor.timeline import Timeline
+    from auto_editor.timeline import v3
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.container import Container
     from auto_editor.utils.log import Log
@@ -59,7 +59,7 @@ allowed_pix_fmt = {
 
 def render_av(
     ffmpeg: FFmpeg,
-    timeline: Timeline,
+    tl: v3,
     args: Args,
     bar: Bar,
     ctr: Container,
@@ -67,15 +67,15 @@ def render_av(
     log: Log,
 ) -> tuple[str, bool]:
 
-    if not timeline.sources:
-        if "0" in timeline.sources:
-            src: FileInfo | None = timeline.sources["0"]
+    if not tl.sources:
+        if "0" in tl.sources:
+            src: FileInfo | None = tl.sources["0"]
         else:
-            src = next(iter(timeline.sources.items()))[1]
+            src = next(iter(tl.sources.items()))[1]
     else:
         src = None
 
-    font_cache, img_cache = make_caches(timeline.v, timeline.sources, log)
+    font_cache, img_cache = make_caches(tl.v, tl.sources, log)
 
     cns: dict[str, Any] = {}
     decoders: dict[str, Any] = {}
@@ -84,7 +84,7 @@ def render_av(
 
     target_pix_fmt = "yuv420p"  # Reasonable default
 
-    for key, src in timeline.sources.items():
+    for key, src in tl.sources.items():
         cns[key] = av.open(f"{src.path}")
 
         if len(cns[key].streams.video) == 0:
@@ -111,7 +111,7 @@ def render_av(
                 target_pix_fmt = stream.pix_fmt
 
     log.debug(f"Tous: {tous}")
-    log.debug(f"Clips: {timeline.v}")
+    log.debug(f"Clips: {tl.v}")
 
     target_pix_fmt = target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
     log.debug(f"Target pix_fmt: {target_pix_fmt}")
@@ -128,7 +128,7 @@ def render_av(
 
     log.debug(f"apply video quality settings now: {not apply_video_later}")
 
-    width, height = timeline.res
+    width, height = tl.res
     spedup = os.path.join(temp, "spedup0.mp4")
 
     cmd = [
@@ -143,7 +143,7 @@ def render_av(
         "-s",
         f"{width}*{height}",
         "-framerate",
-        f"{timeline.timebase}",
+        f"{tl.tb}",
         "-i",
         "-",
         "-pix_fmt",
@@ -171,7 +171,7 @@ def render_av(
     seek_frame = None
     frames_saved = 0
 
-    bar.start(timeline.end, "Creating new video")
+    bar.start(tl.end, "Creating new video")
 
     null_img = Image.new("RGB", (width, height), args.background)
     null_frame = av.VideoFrame.from_image(null_img).reformat(format=target_pix_fmt)
@@ -179,10 +179,10 @@ def render_av(
     frame_index = -1
     frame = null_frame
     try:
-        for index in range(timeline.end):
+        for index in range(tl.end):
             # Add objects to obj_list
             obj_list: list[VideoFrame | Visual] = []
-            for layer in timeline.v:
+            for layer in tl.v:
                 for lobj in layer:
                     if isinstance(lobj, TlVideo):
                         if index >= lobj.start and index < lobj.start + ceil(
@@ -208,7 +208,7 @@ def render_av(
                         try:
                             assert decoders[obj.src] is not None
                             frame = next(decoders[obj.src])
-                            frame_index = round(frame.time * timeline.timebase)
+                            frame_index = round(frame.time * tl.tb)
                         except StopIteration:
                             pass
 
@@ -228,7 +228,7 @@ def render_av(
 
                         try:
                             frame = next(decoders[obj.src])
-                            frame_index = round(frame.time * timeline.timebase)
+                            frame_index = round(frame.time * tl.tb)
                         except StopIteration:
                             log.debug(f"No source frame at {index=}. Using null frame")
                             frame = null_frame

@@ -3,7 +3,7 @@ from __future__ import annotations
 from fractions import Fraction
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.timeline import Timeline
+from auto_editor.timeline import v3
 
 from .utils import indent
 
@@ -64,18 +64,16 @@ def fraction(_a: float, tb: Fraction) -> str:
     return f"{num}/{dem}s"
 
 
-def fcp_xml(output: str, timeline: Timeline) -> None:
-    src = timeline.sources["0"]
-    tb = timeline.timebase
-    chunks = timeline.chunks
-
-    if chunks is None:
-        raise ValueError("Timeline too complex")
+def fcp_xml(output: str, tl: v3) -> None:
+    assert tl.v1 is not None
+    src = tl.v1.source
+    chunks = tl.v1.chunks
+    tb = tl.tb
 
     total_dur = chunks[-1][1]
     pathurl = src.path.resolve().as_uri()
 
-    width, height = timeline.res
+    width, height = tl.res
     frame_duration = fraction(1, tb)
 
     audio_file = len(src.videos) == 0 and len(src.audios) > 0

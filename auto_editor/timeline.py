@@ -49,12 +49,15 @@ class v2:
 
     sources: list[FileInfo]
     tb: Fraction
+    sr: int
+    res: tuple[int, int]
     chunks: v2Chunks
 
     def as_dict(self) -> dict:
         return {
             "version": "2.0",
             "timebase": f"{self.tb.numerator}/{self.tb.denominator}",
+            "samplerate": self.sr,
             "sources": [s.path.resolve() for s in self.sources],
             "chunks": self.chunks,
         }
@@ -211,15 +214,15 @@ ASpace = list[ALayer]
 
 
 @dataclass
-class Timeline:
+class v3:
     sources: dict[str, FileInfo]
-    timebase: Fraction
-    samplerate: int
+    tb: Fraction
+    sr: int
     res: tuple[int, int]
     background: str
     v: VSpace
     a: ASpace
-    chunks: Chunks | None = None
+    v1: v1 | None  # v1 compatible?
 
     @property
     def end(self) -> int:
@@ -256,9 +259,7 @@ class Timeline:
         return out_len
 
     def as_dict(self) -> dict:
-        sources = {}
-        for key, src in self.sources.items():
-            sources[key] = f"{src.path.resolve()}"
+        sources = {key: f"{src.path.resolve()}" for key, src in self.sources.items()}
 
         v = []
         for i, vlayer in enumerate(self.v):
@@ -272,14 +273,12 @@ class Timeline:
             if ab:
                 a.append(ab)
 
-        tb = self.timebase
-
         return {
             "version": "unstable:3.0",
             "timeline": {
                 "resolution": self.res,
-                "timebase": f"{tb.numerator}/{tb.denominator}",
-                "samplerate": self.samplerate,
+                "timebase": f"{self.tb.numerator}/{self.tb.denominator}",
+                "samplerate": self.sr,
                 "sources": sources,
                 "background": self.background,
                 "v": v,

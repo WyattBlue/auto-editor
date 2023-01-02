@@ -3,11 +3,9 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 
 from auto_editor.ffwrapper import FFmpeg
-from auto_editor.timeline import Timeline
+from auto_editor.timeline import v3
 from auto_editor.utils.func import aspect_ratio, to_timecode
 from auto_editor.utils.log import Log
-
-from .utils import Validator, show
 
 """
 Shotcut uses the MLT timeline format
@@ -18,25 +16,11 @@ https://mltframework.org/docs/mltxml/
 """
 
 
-def shotcut_read_mlt(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
-    try:
-        tree = ET.parse(path)
-    except FileNotFoundError:
-        log.nofile(path)
-
-    Validator(log)
-
-    root = tree.getroot()
-
-    show(root, 10)
-
-    quit()
+def shotcut_read_mlt(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
+    raise NotImplemented
 
 
-def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
-    if timeline.chunks is None:
-        raise ValueError("Timeline too complex")
-
+def shotcut_write_mlt(output: str, tl: v3) -> None:
     mlt = ET.Element(
         "mlt",
         attrib={
@@ -47,10 +31,12 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
         },
     )
 
-    width, height = timeline.res
+    assert tl.v1 is not None
+
+    width, height = tl.res
     num, den = aspect_ratio(width, height)
-    tb = timeline.timebase
-    src = timeline.sources["0"]
+    tb = tl.tb
+    src = tl.v1.source
 
     profile = ET.SubElement(
         mlt,
@@ -73,13 +59,13 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
     playlist_bin = ET.SubElement(mlt, "playlist", id="main_bin")
     ET.SubElement(playlist_bin, "property", name="xml_retain").text = "1"
 
-    global_out = to_timecode(timeline.out_len() / tb, "standard")
+    global_out = to_timecode(tl.out_len() / tb, "standard")
 
     producer = ET.SubElement(mlt, "producer", id="bg")
 
     ET.SubElement(producer, "property", name="length").text = global_out
     ET.SubElement(producer, "property", name="eof").text = "pause"
-    ET.SubElement(producer, "property", name="resource").text = timeline.background
+    ET.SubElement(producer, "property", name="resource").text = "#000"  # background
     ET.SubElement(producer, "property", name="mlt_service").text = "color"
     ET.SubElement(producer, "property", name="mlt_image_format").text = "rgba"
     ET.SubElement(producer, "property", name="aspect_ratio").text = "1"
@@ -94,7 +80,7 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
     chains = 0
     producers = 0
 
-    for clip in timeline.chunks:
+    for clip in tl.v1.chunks:
         if clip[2] == 99999:
             continue
 
@@ -136,7 +122,7 @@ def shotcut_write_mlt(output: str, timeline: Timeline) -> None:
 
     producers = 0
     i = 0
-    for clip in timeline.chunks:
+    for clip in tl.v1.chunks:
         if clip[2] == 99999:
             continue
 

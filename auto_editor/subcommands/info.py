@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.timeline import v3
 from auto_editor.utils.func import aspect_ratio
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
@@ -82,7 +83,7 @@ class MediaJson(TypedDict, total=False):
     subtitle: list[SubtitleJson]
     container: ContainerJson
     type: Literal["media", "timeline", "unknown"]
-    version: Literal["v1", "v2"]
+    version: Literal["v1", "v2", "v3"]
     clips: int
 
 
@@ -104,7 +105,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
             tl = read_json(file, ffmpeg, log)
             file_info[file] = {"type": "timeline"}
-            file_info[file]["version"] = "v2" if tl.chunks is None else "v1"
+            file_info[file]["version"] = "v3" if isinstance(tl, v3) else "v1"
 
             clip_lens = [clip.dur / clip.speed for clip in tl.a[0]]
             file_info[file]["clips"] = len(clip_lens)

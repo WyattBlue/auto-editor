@@ -3,13 +3,17 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
-from fractions import Fraction
+from typing import TYPE_CHECKING
 
-from auto_editor.ffwrapper import FFmpeg
-from auto_editor.timeline import Timeline
-from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.func import to_timecode
-from auto_editor.utils.log import Log
+
+if TYPE_CHECKING:
+    from fractions import Fraction
+
+    from auto_editor.ffwrapper import FFmpeg
+    from auto_editor.timeline import v3
+    from auto_editor.utils.chunks import Chunks
+    from auto_editor.utils.log import Log
 
 
 @dataclass
@@ -119,13 +123,13 @@ class SubtitleParser:
         )
 
 
-def make_new_subtitles(tl: Timeline, ffmpeg: FFmpeg, temp: str, log: Log) -> list[str]:
-    if tl.chunks is None:
+def make_new_subtitles(tl: v3, ffmpeg: FFmpeg, temp: str, log: Log) -> list[str]:
+    if tl.v1 is None:
         return []
 
     new_paths = []
 
-    for s, sub in enumerate(tl.sources["0"].subtitles):
+    for s, sub in enumerate(tl.v1.source.subtitles):
         file_path = os.path.join(temp, f"{s}s.{sub.ext}")
         new_path = os.path.join(temp, f"new{s}s.{sub.ext}")
 
@@ -133,14 +137,14 @@ def make_new_subtitles(tl: Timeline, ffmpeg: FFmpeg, temp: str, log: Log) -> lis
 
         if sub.codec in parser.supported_codecs:
             with open(file_path) as file:
-                parser.parse(file.read(), tl.timebase, sub.codec)
+                parser.parse(file.read(), tl.tb, sub.codec)
         else:
             convert_path = os.path.join(temp, f"{s}s_convert.vtt")
             ffmpeg.run(["-i", file_path, convert_path])
             with open(convert_path) as file:
-                parser.parse(file.read(), tl.timebase, "webvtt")
+                parser.parse(file.read(), tl.tb, "webvtt")
 
-        parser.edit(tl.chunks)
+        parser.edit(tl.v1.chunks)
         parser.write(new_path)
         new_paths.append(new_path)
 
