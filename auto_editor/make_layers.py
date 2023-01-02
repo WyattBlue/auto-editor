@@ -19,12 +19,13 @@ from auto_editor.interpreter import (
 from auto_editor.objs.util import _Vars, parse_dataclass
 from auto_editor.timeline import (
     ASpace,
-    Timeline,
     TlAudio,
     TlVideo,
     Visual,
     VSpace,
     audio_objects,
+    v1,
+    v3,
     visual_objects,
 )
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
@@ -134,7 +135,7 @@ def make_timeline(
     bar: Bar,
     temp: str,
     log: Log,
-) -> Timeline:
+) -> v3:
 
     inp = None if not inputs else sources[str(inputs[0])]
 
@@ -143,7 +144,6 @@ def make_timeline(
     else:
         tb = inp.get_fps() if args.frame_rate is None else args.frame_rate
         res = inp.get_res() if args.resolution is None else args.resolution
-    del inp
 
     chunks, vclips, aclips = make_layers(
         sources,
@@ -188,14 +188,15 @@ def make_timeline(
 
         sources[label] = FileInfo(path, ffmpeg, log, label)
 
-    timeline = Timeline(sources, tb, sr, res, args.background, vclips, aclips, chunks)
+    v1_compatiable = None if inp is None else v1(inp, chunks)
+    tl = v3(sources, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
 
     w, h = res
     _vars: _Vars = {
         "width": w,
         "height": h,
-        "end": timeline.end,
-        "tb": timeline.timebase,
+        "end": tl.end,
+        "tb": tl.tb,
     }
 
     OBJ_ATTRS_SEP = ":"
@@ -226,12 +227,12 @@ def make_timeline(
             log.error(e)
 
     for vobj in pool:
-        timeline.v.append([vobj])
+        tl.v.append([vobj])
 
     for aobj in apool:
-        timeline.a.append([aobj])
+        tl.a.append([aobj])
 
-    return timeline
+    return tl
 
 
 def make_layers(

@@ -9,7 +9,7 @@ from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.output import Ensure
-from auto_editor.timeline import ASpace, Timeline, TlAudio, TlVideo, VSpace
+from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
 from auto_editor.utils.log import Log
 
 from .utils import Validator, safe_mkdir, show
@@ -100,7 +100,7 @@ def speedup(speed: float) -> Element:
     return fil
 
 
-def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
+def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     def xml_bool(val: str) -> bool:
         if val == "TRUE":
             return True
@@ -241,26 +241,23 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
                     TlAudio(start, dur, file_id, offset, speed=1, volume=1, stream=0)
                 )
 
-    timeline = Timeline(sources, tb, sr, res, "#000", vobjs, aobjs, None)
-    return timeline
+    return v3(sources, tb, sr, res, "#000", vobjs, aobjs, None)
 
 
-def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
-
-    if timeline.chunks is None:
-        raise ValueError("Timeline too complex")
+def premiere_write_xml(ensure: Ensure, output: str, tl: v3) -> None:
+    assert tl.v1 is not None
 
     clips = []
-    duration = timeline.chunks[-1][1]
-    for chunk in timeline.chunks:
+    duration = tl.v1.chunks[-1][1]
+    for chunk in tl.v1.chunks:
         if chunk[2] != 99999:
             clips.append(chunk)
 
-    samplerate = timeline.samplerate
-    src = timeline.sources["0"]
+    src = tl.v1.source
+    width, height = tl.res
 
     audio_file = len(src.videos) == 0 and len(src.audios) == 1
-    timebase, ntsc = set_tb_ntsc(timeline.timebase)
+    timebase, ntsc = set_tb_ntsc(tl.tb)
 
     pathurls = [src.path.resolve().as_uri()]
 
@@ -274,8 +271,6 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
             newtrack = fold / f"{i}.wav"
             move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
             pathurls.append(newtrack.resolve().as_uri())
-
-    width, height = timeline.res
 
     group_name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
 
@@ -350,7 +345,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
                 audiodef = ET.SubElement(mediadef, "audio")
                 aschar = ET.SubElement(audiodef, "samplecharacteristics")
                 ET.SubElement(aschar, "depth").text = DEPTH
-                ET.SubElement(aschar, "samplerate").text = str(samplerate)
+                ET.SubElement(aschar, "samplerate").text = str(tl.sr)
                 ET.SubElement(audiodef, "channelcount").text = "2"
 
             if clip[2] != 1:
@@ -373,7 +368,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
     aformat = ET.SubElement(audio, "format")
     aschar = ET.SubElement(aformat, "samplecharacteristics")
     ET.SubElement(aschar, "depth").text = DEPTH
-    ET.SubElement(aschar, "samplerate").text = str(samplerate)
+    ET.SubElement(aschar, "samplerate").text = str(tl.sr)
 
     for t in range(tracks):
         track = ET.Element(
@@ -425,7 +420,7 @@ def premiere_write_xml(ensure: Ensure, output: str, timeline: Timeline) -> None:
                 media_audio = ET.SubElement(media, "audio")
                 maschar = ET.SubElement(media_audio, "samplecharacteristics")
                 ET.SubElement(maschar, "depth").text = DEPTH
-                ET.SubElement(maschar, "samplerate").text = str(samplerate)
+                ET.SubElement(maschar, "samplerate").text = str(tl.sr)
                 ET.SubElement(media_audio, "channelcount").text = "2"
 
             sourcetrack = ET.SubElement(clipitem, "sourcetrack")

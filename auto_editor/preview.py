@@ -5,7 +5,7 @@ from statistics import fmean, median
 
 from auto_editor.analyze import get_media_length
 from auto_editor.output import Ensure
-from auto_editor.timeline import Timeline
+from auto_editor.timeline import v3
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
 
@@ -20,9 +20,9 @@ def time_frame(title: str, ticks: float, tb: Fraction, per: str | None = None) -
     print(f" - {f'{title}:':<{tp}} {tc:<{tcp}} {f'({ticks:.{preci}f})':<6}{end}")
 
 
-def all_cuts(tl: Timeline, in_len: int) -> list[int]:
+def all_cuts(tl: v3, in_len: int) -> list[int]:
     # Calculate cuts
-    tb = tl.timebase
+    tb = tl.tb
     oe: list[tuple[int, int]] = []
 
     # TODO: Make offset_end_pairs work on overlapping clips.
@@ -43,14 +43,14 @@ def all_cuts(tl: Timeline, in_len: int) -> list[int]:
     return cut_lens
 
 
-def preview(ensure: Ensure, tl: Timeline, temp: str, log: Log) -> None:
+def preview(ensure: Ensure, tl: v3, temp: str, log: Log) -> None:
     log.conwrite("")
-    tb = tl.timebase
+    tb = tl.tb
 
     # Calculate input videos length
     in_len = 0
     for src in tl.sources.values():
-        in_len += get_media_length(ensure, src, tl.timebase, temp, log)
+        in_len += get_media_length(ensure, src, tl.tb, temp, log)
 
     out_len = tl.out_len()
 

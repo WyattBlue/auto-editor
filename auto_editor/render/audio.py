@@ -6,26 +6,26 @@ import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.output import Ensure
-from auto_editor.timeline import Timeline
+from auto_editor.timeline import v3
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
 from auto_editor.wavfile import AudioData, read, write
 
 
 def make_new_audio(
-    timeline: Timeline, ensure: Ensure, ffmpeg: FFmpeg, bar: Bar, temp: str, log: Log
+    tl: v3, ensure: Ensure, ffmpeg: FFmpeg, bar: Bar, temp: str, log: Log
 ) -> list[str]:
-    sr = timeline.samplerate
-    tb = timeline.timebase
+    sr = tl.sr
+    tb = tl.tb
     output = []
     samples = {}
 
     af_tick = 0
 
-    if len(timeline.a) == 0 or len(timeline.a[0]) == 0:
+    if not tl.a or not tl.a[0]:
         log.error("Trying to render empty audio timeline")
 
-    for l, layer in enumerate(timeline.a):
+    for l, layer in enumerate(tl.a):
         bar.start(len(layer), "Creating new audio")
 
         path = os.path.join(temp, f"new{l}.wav")
@@ -35,7 +35,7 @@ def make_new_audio(
         for c, clip in enumerate(layer):
             if f"{clip.src}-{clip.stream}" not in samples:
                 audio_path = ensure.audio(
-                    f"{timeline.sources[clip.src].path.resolve()}",
+                    f"{tl.sources[clip.src].path.resolve()}",
                     clip.src,
                     clip.stream,
                 )

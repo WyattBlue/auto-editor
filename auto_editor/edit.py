@@ -16,9 +16,12 @@ from auto_editor.objs.export import (
     ExShotCut,
     ExTimeline,
 )
-from auto_editor.objs.util import Attr
-from auto_editor.output import Ensure
-from auto_editor.timeline import Timeline
+from auto_editor.objs.util import Attr, parse_dataclass
+from auto_editor.output import Ensure, mux_quality_media
+from auto_editor.render.audio import make_new_audio
+from auto_editor.render.subtitle import make_new_subtitles
+from auto_editor.render.video import render_av
+from auto_editor.timeline import timeline_builder, v1, v3
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.container import Container, container_constructor
@@ -47,7 +50,7 @@ def set_output(
         elif ext == ".mlt":
             export = ExShotCut()
         elif ext == ".json":
-            export = ExJson()
+            export = ExJson("3")
         else:
             export = ExDefault()
 
@@ -155,9 +158,6 @@ def make_sources(
 
 
 def parse_export(export: str, log: Log) -> Exports:
-    from auto_editor.objs.util import parse_dataclass
-    from auto_editor.timeline import timeline_builder
-
     exploded = export.split(":", maxsplit=1)
     if len(exploded) == 1:
         name, attrs = exploded[0], ""
@@ -187,29 +187,29 @@ def edit_media(
 
     timer = Timer(args.quiet)
     bar = Bar(args.progress)
-    timeline = None
+    tl = None
 
     if paths:
         path_ext = os.path.splitext(paths[0])[1].lower()
         if path_ext == ".xml":
             from auto_editor.formats.premiere import premiere_read_xml
 
-            timeline = premiere_read_xml(paths[0], ffmpeg, log)
-            src: FileInfo | None = next(iter(timeline.sources.items()))[1]
-            sources = timeline.sources
+            tl = premiere_read_xml(paths[0], ffmpeg, log)
+            src: FileInfo | None = next(iter(tl.sources.items()))[1]
+            sources = tl.sources
 
         elif path_ext == ".mlt":
             from auto_editor.formats.shotcut import shotcut_read_mlt
 
-            timeline = shotcut_read_mlt(paths[0], ffmpeg, log)
-            src = next(iter(timeline.sources.items()))[1]
-            sources = timeline.sources
+            tl = shotcut_read_mlt(paths[0], ffmpeg, log)
+            src = next(iter(tl.sources.items()))[1]
+            sources = tl.sources
 
         elif path_ext == ".json":
             from auto_editor.formats.json import read_json
 
-            timeline = read_json(paths[0], ffmpeg, log)
-            sources = timeline.sources
+            tl = read_json(paths[0], ffmpeg, log)
+            sources = tl.sources
             src = sources["0"]
         else:
             sources, inputs = make_sources(paths, ffmpeg, log)
@@ -234,16 +234,16 @@ def edit_media(
             os.remove(output)
 
     if args.sample_rate is None:
-        if timeline is None:
+        if tl is None:
             samplerate = 48000 if src is None else src.get_samplerate()
         else:
-            samplerate = timeline.samplerate
+            samplerate = tl.sr
     else:
         samplerate = args.sample_rate
 
     ensure = Ensure(ffmpeg, samplerate, temp, log)
 
-    if timeline is None:
+    if tl is None:
         # Extract subtitles in their native format.
         if src is not None and len(src.subtitles) > 0:
             cmd = ["-i", f"{src.path}", "-hide_banner"]
@@ -253,44 +253,44 @@ def edit_media(
                 cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
             ffmpeg.run(cmd)
 
-        timeline = make_timeline(
+        tl = make_timeline(
             sources, inputs, ffmpeg, ensure, args, samplerate, bar, temp, log
         )
 
     if isinstance(export, ExTimeline):
         from auto_editor.formats.json import make_json_timeline
 
-        make_json_timeline(export, 0, timeline, log)
+        make_json_timeline(export, 0, tl, log)
         return
 
     if args.preview:
         from auto_editor.preview import preview
 
-        preview(ensure, timeline, temp, log)
+        preview(ensure, tl, temp, log)
         return
 
     if isinstance(export, ExJson):
         from auto_editor.formats.json import make_json_timeline
 
-        make_json_timeline(export, output, timeline, log)
+        make_json_timeline(export, output, tl, log)
         return
 
     if isinstance(export, ExPremiere):
         from auto_editor.formats.premiere import premiere_write_xml
 
-        premiere_write_xml(ensure, output, timeline)
+        premiere_write_xml(ensure, output, tl)
         return
 
     if isinstance(export, ExFinalCutPro):
         from auto_editor.formats.final_cut_pro import fcp_xml
 
-        fcp_xml(output, timeline)
+        fcp_xml(output, tl)
         return
 
     if isinstance(export, ExShotCut):
         from auto_editor.formats.shotcut import shotcut_write_mlt
 
-        shotcut_write_mlt(output, timeline)
+        shotcut_write_mlt(output, tl)
         return
 
     out_ext = os.path.splitext(output)[1].replace(".", "")
@@ -307,10 +307,7 @@ def edit_media(
     if args.keep_tracks_separate and ctr.max_audios == 1:
         log.warning(f"'{out_ext}' container doesn't support multiple audio tracks.")
 
-    def make_media(timeline: Timeline, output: str) -> None:
-        from auto_editor.output import mux_quality_media
-        from auto_editor.render.video import render_av
-
+    def make_media(tl: v3, output: str) -> None:
         assert src is not None
 
         visual_output = []
@@ -319,20 +316,14 @@ def edit_media(
         apply_later = False
 
         if ctr.allow_subtitle:
-            from auto_editor.render.subtitle import make_new_subtitles
-
-            sub_output = make_new_subtitles(timeline, ffmpeg, temp, log)
+            sub_output = make_new_subtitles(tl, ffmpeg, temp, log)
 
         if ctr.allow_audio:
-            from auto_editor.render.audio import make_new_audio
-
-            audio_output = make_new_audio(timeline, ensure, ffmpeg, bar, temp, log)
+            audio_output = make_new_audio(tl, ensure, ffmpeg, bar, temp, log)
 
         if ctr.allow_video:
-            if len(timeline.v) > 0:
-                out_path, apply_later = render_av(
-                    ffmpeg, timeline, args, bar, ctr, temp, log
-                )
+            if tl.v:
+                out_path, apply_later = render_av(ffmpeg, tl, args, bar, ctr, temp, log)
                 visual_output.append((True, out_path))
 
             for v, vid in enumerate(src.videos, start=1):
@@ -353,7 +344,7 @@ def edit_media(
             apply_later,
             ctr,
             output,
-            timeline.timebase,
+            tl.tb,
             args,
             src,
             temp,
@@ -361,9 +352,10 @@ def edit_media(
         )
 
     if isinstance(export, ExClipSequence):
-        chunks = timeline.chunks
-        if chunks is None:
+        if tl.v1 is None:
             log.error("Timeline to complex to use clip-sequence export")
+
+        sources = {"0": tl.v1.source}
 
         from auto_editor.make_layers import clipify, make_av
         from auto_editor.utils.func import append_filename
@@ -373,30 +365,30 @@ def edit_media(
             end = [] if chunk[1] == total else [(chunk[1], total, 99999.0)]
             return start + [chunk] + end
 
-        total_frames = chunks[-1][1] - 1
+        total_frames = tl.v1.chunks[-1][1] - 1
         clip_num = 0
-        for chunk in chunks:
+        for chunk in tl.v1.chunks:
             if chunk[2] == 99999:
                 continue
 
-            _c = pad_chunk(chunk, total_frames)
+            padded_chunks = pad_chunk(chunk, total_frames)
 
-            vspace, aspace = make_av([clipify(_c, "0")], timeline.sources, [0])
-            my_timeline = Timeline(
-                timeline.sources,
-                timeline.timebase,
-                timeline.samplerate,
-                timeline.res,
+            vspace, aspace = make_av([clipify(padded_chunks, "0")], sources, [0])
+            my_timeline = v3(
+                sources,
+                tl.tb,
+                tl.sr,
+                tl.res,
                 "#000",
                 vspace,
                 aspace,
-                _c,
+                v1(tl.v1.source, padded_chunks),
             )
 
             make_media(my_timeline, append_filename(output, f"-{clip_num}"))
             clip_num += 1
     else:
-        make_media(timeline, output)
+        make_media(tl, output)
 
     timer.stop()
 

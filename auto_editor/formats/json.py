@@ -9,7 +9,7 @@ from typing import Any
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.objs.export import ExJson, ExTimeline
 from auto_editor.objs.util import parse_dataclass
-from auto_editor.timeline import Timeline, audio_objects, visual_objects
+from auto_editor.timeline import audio_objects, v3, visual_objects
 from auto_editor.utils.log import Log
 
 """
@@ -57,7 +57,7 @@ class Version:
         return f"{self.major}.{self.minor}.{self.micro}"
 
 
-def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
+def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     with open(path) as f:
         data = json.load(f)
 
@@ -127,7 +127,7 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
                     a_out.append(aobj)
                 a.append(a_out)
 
-        return Timeline(sources, tb, sr, res, bg, v, a)
+        return v3(sources, tb, sr, res, bg, v, a, None)
 
     log.error(f"Importing version {version} timelines is not supported.")
 
@@ -135,12 +135,15 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> Timeline:
 def make_json_timeline(
     obj: ExJson | ExTimeline,
     out: str | int,
-    tl: Timeline,
+    tl: object,
     log: Log,
 ) -> None:
 
     if (version := Version(obj.api, log)) != (3, 0):
         log.error(f"Version {version} is not supported!")
+
+    if not isinstance(tl, v3):
+        raise ValueError("Wrong tl object!")
 
     if isinstance(out, str):
         if not out.endswith(".json"):
