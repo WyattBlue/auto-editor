@@ -16,7 +16,7 @@ from auto_editor.interpreter import (
     cook,
     is_boolarr,
 )
-from auto_editor.objs.util import _Vars, parse_dataclass
+from auto_editor.objs.util import ParserError, parse_dataclass
 from auto_editor.timeline import (
     ASpace,
     TlAudio,
@@ -30,7 +30,7 @@ from auto_editor.timeline import (
 )
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import mut_margin
-from auto_editor.utils.types import Args, time
+from auto_editor.utils.types import Args, CoerceError, pos, time
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -192,12 +192,26 @@ def make_timeline(
     tl = v3(sources, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
 
     w, h = res
-    _vars: _Vars = {
-        "width": w,
-        "height": h,
-        "end": tl.end,
-        "tb": tl.tb,
-    }
+
+    def my_var_f(name: str, val: Any, coerce: Any) -> Any:
+        if name in ("x", "width"):
+            return pos((val, res[0]))
+        if name in ("y", "height"):
+            return pos((val, res[1]))
+        if val == "start":
+            return 0
+        if val == "end":
+            return tl.end
+        if val == "tb":
+            return tl.tb
+        if name in ("start", "dur", "offset"):
+            if isinstance(val, int):
+                return val
+            _temp = time(val)
+            if isinstance(_temp, str):
+                return int(float(_temp) * tl.tb)
+            return _temp
+        return coerce(val)
 
     OBJ_ATTRS_SEP = ":"
 
@@ -215,15 +229,15 @@ def make_timeline(
         try:
             if obj_s in visual_objects:
                 pool.append(
-                    parse_dataclass(attrs, visual_objects[obj_s], log, _vars, True)
+                    parse_dataclass(attrs, visual_objects[obj_s], my_var_f, True)
                 )
             elif obj_s in audio_objects:
                 apool.append(
-                    parse_dataclass(attrs, audio_objects[obj_s], log, _vars, True)
+                    parse_dataclass(attrs, audio_objects[obj_s], my_var_f, True)
                 )
             else:
                 log.error(f"Unknown timeline object: '{obj_s}'")
-        except TypeError as e:
+        except (ParserError, CoerceError) as e:
             log.error(e)
 
     for vobj in pool:

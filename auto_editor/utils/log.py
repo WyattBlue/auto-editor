@@ -51,8 +51,8 @@ class Log:
             try:
                 rmtree(self.temp)
                 self.debug("Removed Temp Directory.")
-            except Exception:
-                self.debug("Failed to delete temp dir.")
+            except Exception as e:
+                self.debug(f"Failed to delete temp dir:\n{e}")
 
     def conwrite(self, message: str) -> None:
         if not self.quiet:
@@ -60,9 +60,11 @@ class Log:
             sys.stdout.write(f"  {message}{buffer}\r")
 
     def error(self, message: str | Exception) -> NoReturn:
+        if self.is_debug and isinstance(message, Exception):
+            self.cleanup()
+            raise message
+
         self.conwrite("")
-        # if isinstance(message, Exception):
-        #     raise message
         sys.stderr.write(f"Error! {message}\n")
         self.cleanup()
         from platform import system

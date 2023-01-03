@@ -2,21 +2,26 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
-from fractions import Fraction
+from typing import TYPE_CHECKING
 
 import numpy as np
-from numpy.typing import NDArray
 
 from auto_editor.analyze import audio_levels, motion_levels, pixeldiff_levels
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.objs.edit import audio_builder, motion_builder, pixeldiff_builder
-from auto_editor.objs.util import _Vars, parse_dataclass
+from auto_editor.objs.util import ParserError, parse_dataclass
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import frame_rate
+from auto_editor.utils.types import frame_rate, pos
 from auto_editor.vanparse import ArgumentParser
+
+if TYPE_CHECKING:
+    from fractions import Fraction
+    from typing import Any
+
+    from numpy.typing import NDArray
 
 
 @dataclass
@@ -100,34 +105,50 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
 
     strict = True
-    METHODS = ("audio", "motion", "pixeldiff")
 
     if ":" in args.edit:
         method, attrs = args.edit.split(":")
     else:
         method, attrs = args.edit, ""
 
-    if method not in METHODS:
-        log.error(f"Method: {method} not supported")
+    def my_var_f(name: str, val: str, coerce: Any) -> Any:
+        if src.videos:
+            if name in ("x", "width"):
+                return pos((val, src.videos[0].width))
+            if name in ("y", "height"):
+                return pos((val, src.videos[0].height))
+        return coerce(val)
 
     for src in sources.values():
         if method == "audio":
-            aobj = parse_dataclass(attrs, (Audio, audio_builder[1:]), log)
+            try:
+                aobj = parse_dataclass(attrs, (Audio, audio_builder[1:]))
+            except ParserError as e:
+                log.error(e)
+
             print_floats(
                 audio_levels(ensure, src, aobj.stream, tb, bar, strict, temp, log)
             )
 
-        if method == "motion":
-            if src.videos:
-                _vars: _Vars = {"width": src.videos[0].width}
-            else:
-                _vars = {"width": 1}
-            mobj = parse_dataclass(attrs, (Motion, motion_builder[1:]), log, _vars)
+        elif method == "motion":
+            try:
+                mobj = parse_dataclass(attrs, (Motion, motion_builder[1:]), my_var_f)
+            except ParserError as e:
+                log.error(e)
+
             print_floats(motion_levels(ensure, src, mobj, tb, bar, strict, temp, log))
 
-        if method == "pixeldiff":
-            pobj = parse_dataclass(attrs, (Pixeldiff, pixeldiff_builder[1:]), log)
+        elif method == "pixeldiff":
+            try:
+                pobj = parse_dataclass(
+                    attrs, (Pixeldiff, pixeldiff_builder[1:]), my_var_f
+                )
+            except ParserError as e:
+                log.error(e)
+
             print_ints(pixeldiff_levels(ensure, src, pobj, tb, bar, strict, temp, log))
+        else:
+            log.error(f"Method: {method} not supported")
 
     log.cleanup()
 

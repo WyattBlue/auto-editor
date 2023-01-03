@@ -10,6 +10,7 @@ from shutil import get_terminal_size
 from typing import Any, Callable, Literal, TypeVar, Union
 
 from auto_editor.utils.log import Log
+from auto_editor.utils.types import CoerceError
 
 T = TypeVar("T")
 Nargs = Union[int, Literal["*"]]
@@ -41,12 +42,9 @@ class OptionText:
 
 
 def indent(text: str, prefix: str) -> str:
-    def predicate(line: str) -> str:
-        return line.strip()
-
     def prefixed_lines() -> Iterator[str]:
         for line in text.splitlines(True):
-            yield (prefix + line if predicate(line) else line)
+            yield (prefix + line if line.strip() else line)
 
     return "".join(prefixed_lines())
 
@@ -165,7 +163,7 @@ def parse_value(option: Options | Required, val: str | None) -> Any:
 
     try:
         value = option.type(val)
-    except TypeError as e:
+    except CoerceError as e:
         Log().error(e)
 
     if option.choices is not None and value not in option.choices:
@@ -202,7 +200,7 @@ class ArgumentParser:
         sys_args: list[str],
         macros: list[tuple[set[str], list[str]]] | None = None,
     ) -> T:
-        if len(sys_args) == 0 and self.program_name is not None:
+        if not sys_args and self.program_name is not None:
             from auto_editor.help import data
 
             out(data[self.program_name]["_"])
@@ -254,7 +252,7 @@ class ArgumentParser:
                     try:
                         val = oplist_coerce(arg)
                         ns.__setattr__(oplist_name, getattr(ns, oplist_name) + [val])
-                    except (TypeError, ValueError) as e:
+                    except (CoerceError, ValueError) as e:
                         Log().error(e)
                 elif requireds and not arg.startswith("--"):
                     if requireds[0].nargs == 1:

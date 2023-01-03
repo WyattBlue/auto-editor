@@ -16,7 +16,7 @@ from auto_editor.objs.export import (
     ExShotCut,
     ExTimeline,
 )
-from auto_editor.objs.util import Attr, parse_dataclass
+from auto_editor.objs.util import Attr, ParserError, parse_dataclass
 from auto_editor.output import Ensure, mux_quality_media
 from auto_editor.render.audio import make_new_audio
 from auto_editor.render.subtitle import make_new_subtitles
@@ -176,7 +176,10 @@ def parse_export(export: str, log: Log) -> Exports:
     }
 
     if name in parsing:
-        return parse_dataclass(attrs, parsing[name], log)
+        try:
+            return parse_dataclass(attrs, parsing[name])
+        except ParserError as e:
+            log.error(e)
 
     log.error(f"'{name}': Export must be [{', '.join([s for s in parsing.keys()])}]")
 
