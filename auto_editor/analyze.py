@@ -14,8 +14,9 @@ from auto_editor.objs.edit import (
     motion_builder,
     pixeldiff_builder,
 )
-from auto_editor.objs.util import _Vars, parse_dataclass
+from auto_editor.objs.util import ParserError, parse_dataclass
 from auto_editor.utils.func import boolop
+from auto_editor.utils.types import pos
 from auto_editor.wavfile import read
 
 if TYPE_CHECKING:
@@ -394,8 +395,20 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
     if method == "all":
         return get_all(ensure, src, tb, temp, log)
 
+    def my_var_f(name: str, val: str, coerce: Any) -> Any:
+        if src.videos:
+            if name in ("x", "width"):
+                return pos((val, src.videos[0].width))
+            if name in ("y", "height"):
+                return pos((val, src.videos[0].height))
+        return coerce(val)
+
     if method == "audio":
-        aobj = parse_dataclass(attrs, (Audio, audio_builder), log)
+        try:
+            aobj = parse_dataclass(attrs, (Audio, audio_builder))
+        except ParserError as e:
+            log.error(e)
+
         s = aobj.stream
         if s == "all":
             total_list: NDArray[np.bool_] | None = None
@@ -423,19 +436,20 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
         return stream_data
 
     if method == "motion":
-        if src.videos:
-            _vars: _Vars = {"width": src.videos[0].width}
-        else:
-            _vars = {"width": 1}
-
-        mobj = parse_dataclass(attrs, (Motion, motion_builder), log, _vars)
+        try:
+            mobj = parse_dataclass(attrs, (Motion, motion_builder), my_var_f)
+        except ParserError as e:
+            log.error(e)
         return to_threshold(
             motion_levels(ensure, src, mobj, tb, bar, strict, temp, log),
             mobj.threshold,
         )
 
     if method == "pixeldiff":
-        pobj = parse_dataclass(attrs, (Pixeldiff, pixeldiff_builder), log)
+        try:
+            pobj = parse_dataclass(attrs, (Pixeldiff, pixeldiff_builder), my_var_f)
+        except ParserError as e:
+            log.error(e)
         return to_threshold(
             pixeldiff_levels(ensure, src, pobj, tb, bar, strict, temp, log),
             pobj.threshold,

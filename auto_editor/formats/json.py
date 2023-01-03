@@ -8,8 +8,8 @@ from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.objs.export import ExJson, ExTimeline
-from auto_editor.objs.util import parse_dataclass
-from auto_editor.timeline import audio_objects, v3, visual_objects
+from auto_editor.objs.util import ParserError, parse_dataclass
+from auto_editor.timeline import Visual, audio_objects, v3, visual_objects
 from auto_editor.utils.log import Log
 
 """
@@ -101,16 +101,19 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
 
         for vlayers in tl["v"]:
             if vlayers:
-                v_out = []
+                v_out: list[Visual] = []
                 for vdict in vlayers:
                     if "name" not in vdict:
                         log.error("Invalid video object: name not specified")
                     if vdict["name"] not in visual_objects:
                         log.error(f"Unknown video object: {vdict['name']}")
                     my_obj = visual_objects[vdict["name"]]
-                    attr_str = dict_to_args(vdict)
-                    vobj = parse_dataclass(attr_str, my_obj, log, None, True)
-                    v_out.append(vobj)
+                    text = dict_to_args(vdict)
+                    try:
+                        v_out.append(parse_dataclass(text, my_obj, coerce_default=True))
+                    except ParserError as e:
+                        log.error(e)
+
                 v.append(v_out)
 
         for alayers in tl["a"]:
@@ -122,9 +125,12 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                     if adict["name"] not in audio_objects:
                         log.error(f"Unknown audio object: {adict['name']}")
                     my_obj = audio_objects[adict["name"]]
-                    attr_str = dict_to_args(adict)
-                    aobj = parse_dataclass(attr_str, my_obj, log, None, True)
-                    a_out.append(aobj)
+                    text = dict_to_args(adict)
+                    try:
+                        a_out.append(parse_dataclass(text, my_obj, coerce_default=True))
+                    except ParserError as e:
+                        log.error(e)
+
                 a.append(a_out)
 
         return v3(sources, tb, sr, res, bg, v, a, None)

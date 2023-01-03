@@ -6,12 +6,16 @@ from fractions import Fraction
 from typing import Literal, Union
 
 
+class CoerceError(Exception):
+    pass
+
+
 def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
     vals = val.strip().split(",")
     if num_args > len(vals):
-        raise TypeError(f"Too few arguments for {name}.")
+        raise CoerceError(f"Too few arguments for {name}.")
     if len(vals) > num_args:
-        raise TypeError(f"Too many arguments for {name}.")
+        raise CoerceError(f"Too many arguments for {name}.")
     return vals
 
 
@@ -29,24 +33,24 @@ def _split_num_str(val: str | float) -> tuple[float, str]:
     try:
         float(num)
     except ValueError:
-        raise TypeError(f"Invalid number: '{val}'")
+        raise CoerceError(f"Invalid number: '{val}'")
     return float(num), unit
 
 
 def _unit_check(unit: str, allowed_units: tuple[str, ...]) -> None:
     if unit not in allowed_units:
-        raise TypeError(f"Unknown unit: '{unit}'")
+        raise CoerceError(f"Unknown unit: '{unit}'")
 
 
 # Numbers: 0, 1, 2, 3, ...
 def natural(val: str | float) -> int:
     num, unit = _split_num_str(val)
     if unit != "":
-        raise TypeError(f"'{val}': Natural does not allow units.")
+        raise CoerceError(f"'{val}': Natural does not allow units.")
     if num < 0:
-        raise TypeError(f"'{val}': Natural cannot be negative.")
+        raise CoerceError(f"'{val}': Natural cannot be negative.")
     if not isinstance(num, int) and not num.is_integer():
-        raise TypeError(f"'{val}': Natural must be an integer.")
+        raise CoerceError(f"'{val}': Natural must be an integer.")
     return int(num)
 
 
@@ -54,15 +58,17 @@ def number(val: str | float) -> float:
     if isinstance(val, str) and "/" in val:
         nd = val.split("/")
         if len(nd) != 2:
-            raise TypeError(f"'{val}': One divisor allowed.")
+            raise CoerceError(f"'{val}': One divisor allowed.")
         vs = []
         for v in nd:
             try:
                 vs.append(int(v))
             except ValueError:
-                raise TypeError(f"'{val}': Numerator and Denominator must be integers.")
+                raise CoerceError(
+                    f"'{val}': Numerator and Denominator must be integers."
+                )
         if vs[1] == 0:
-            raise TypeError(f"'{val}': Denominator must not be zero.")
+            raise CoerceError(f"'{val}': Denominator must not be zero.")
         return vs[0] / vs[1]
 
     num, unit = _split_num_str(val)
@@ -100,7 +106,7 @@ def src(val: str) -> int | str:
 def threshold(val: str | float) -> float:
     num = number(val)
     if num > 1 or num < 0:
-        raise TypeError(f"'{val}': Threshold must be between 0 and 1 (0%-100%)")
+        raise CoerceError(f"'{val}': Threshold must be between 0 and 1 (0%-100%)")
     return num
 
 
@@ -108,7 +114,7 @@ def db_threshold(val: str) -> str | float:
     num, unit = _split_num_str(val)
     if unit == "dB":
         if num > 0:
-            raise TypeError("dB only goes up to 0")
+            raise CoerceError("dB only goes up to 0")
         return 10 ** (num / 20)
 
     return threshold(val)
@@ -141,28 +147,26 @@ def time(val: str) -> int | str:
             return str(int(boxes[0]) * 60 + float(boxes[1]))
         if len(boxes) == 3:
             return str(int(boxes[0]) * 3600 + int(boxes[1]) * 60 + float(boxes[2]))
-        raise TypeError(f"'{val}': Invalid time format")
+        raise CoerceError(f"'{val}': Invalid time format")
 
     num, unit = _split_num_str(val)
-    if unit in ("s", "sec", "secs", "second", "seconds"):
+    if unit in {"s", "sec", "secs", "second", "seconds"}:
         return str(num)
-    if unit in ("m", "min", "mins", "minute", "minutes"):
+    if unit in {"m", "min", "mins", "minute", "minutes"}:
         return str(num * 60)
     if unit in ("h", "hour", "hours"):
         return str(num * 3600)
 
     _unit_check(unit, ("",))
     if not isinstance(num, int) and not num.is_integer():
-        raise TypeError(
-            f"'{val}': Time uses ticks by default and ticks only accept ints."
-        )
+        raise CoerceError(f"'{val}': Time specifier expects: integer?.")
     return int(num)
 
 
 def anchor(val: str) -> str:
     allowed = ("tl", "tr", "bl", "br", "ce")
     if val not in allowed:
-        raise TypeError("Anchor must be: " + " ".join(allowed))
+        raise CoerceError(f"Anchor must be: {' '.join(allowed)}")
     return val
 
 
@@ -174,7 +178,7 @@ def margin(val: str) -> Margin:
     if len(vals) == 1:
         vals.append(vals[0])
     if len(vals) != 2:
-        raise TypeError("--margin has too many arguments.")
+        raise CoerceError("--margin has too many arguments.")
     return time(vals[0]), time(vals[1])
 
 
@@ -197,7 +201,7 @@ def align(val: str) -> Align:
         return "center"
     if val == "right":
         return "right"
-    raise TypeError("Align must be 'left', 'right', or 'center'")
+    raise CoerceError("Align must be 'left', 'right', or 'center'")
 
 
 Stream = Union[int, Literal["all"]]
@@ -238,7 +242,7 @@ def resolution(val: str | None) -> tuple[int, int] | None:
         return None
     vals = val.strip().split(",")
     if len(vals) != 2:
-        raise TypeError(f"'{val}': Resolution takes two numbers")
+        raise CoerceError(f"'{val}': Resolution takes two numbers")
 
     return natural(vals[0]), natural(vals[1])
 
