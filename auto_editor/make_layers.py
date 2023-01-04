@@ -198,19 +198,17 @@ def make_timeline(
             return pos((val, res[0]))
         if name in ("y", "height"):
             return pos((val, res[1]))
-        if val == "start":
-            return 0
-        if val == "end":
-            return tl.end
-        if val == "tb":
-            return tl.tb
         if name in ("start", "dur", "offset"):
             if isinstance(val, int):
                 return val
-            _temp = time(val)
-            if isinstance(_temp, str):
-                return int(float(_temp) * tl.tb)
-            return _temp
+            if val == "start":
+                return 0
+            if val == "end":
+                return tl.end
+            _val = time(val)
+            if isinstance(_val, str):
+                return round(float(_val) * tl.tb)
+            return _val
         return coerce(val)
 
     OBJ_ATTRS_SEP = ":"
