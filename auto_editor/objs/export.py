@@ -11,7 +11,7 @@ class ExDefault:
 
 @dataclass
 class ExPremiere:
-    pass
+    name: str | None = None
 
 
 @dataclass
@@ -26,7 +26,7 @@ class ExShotCut:
 
 @dataclass
 class ExJson:
-    api: str
+    api: str = "3"
 
 
 @dataclass

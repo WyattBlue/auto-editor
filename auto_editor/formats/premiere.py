@@ -5,14 +5,18 @@ import xml.etree.ElementTree as ET
 from fractions import Fraction
 from math import ceil
 from shutil import move
+from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.output import Ensure
 from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
-from auto_editor.utils.log import Log
 
 from .utils import Validator, safe_mkdir, show
+
+if TYPE_CHECKING:
+    from auto_editor.objs.export import ExPremiere
+    from auto_editor.output import Ensure
+    from auto_editor.utils.log import Log
 
 """
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format
@@ -35,7 +39,8 @@ def uri_to_path(uri: str) -> str:
     from urllib.request import url2pathname
 
     parsed = urlparse(uri)
-    host = "{0}{0}{mnt}{0}".format(os.path.sep, mnt=parsed.netloc)
+    s = os.path.sep
+    host = f"{s}{s}{parsed.netloc}{s}"
     return os.path.normpath(os.path.join(host, url2pathname(parsed.path)))
 
     # /Users/wyattblue/projects/auto-editor/example.mp4
@@ -244,14 +249,11 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     return v3(sources, tb, sr, res, "#000", vobjs, aobjs, None)
 
 
-def premiere_write_xml(ensure: Ensure, output: str, tl: v3) -> None:
+def premiere_write_xml(ex: ExPremiere, ensure: Ensure, output: str, tl: v3) -> None:
     assert tl.v1 is not None
 
-    clips = []
+    clips = list(filter(lambda c: c[2] != 99999, tl.v1.chunks))
     duration = tl.v1.chunks[-1][1]
-    for chunk in tl.v1.chunks:
-        if chunk[2] != 99999:
-            clips.append(chunk)
 
     src = tl.v1.source
     width, height = tl.res
@@ -272,11 +274,14 @@ def premiere_write_xml(ensure: Ensure, output: str, tl: v3) -> None:
             move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
             pathurls.append(newtrack.resolve().as_uri())
 
-    group_name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
+    if ex.name is None:
+        name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
+    else:
+        name = ex.name
 
     xmeml = ET.Element("xmeml", version="4")
     sequence = ET.SubElement(xmeml, "sequence")
-    ET.SubElement(sequence, "name").text = group_name
+    ET.SubElement(sequence, "name").text = name
     ET.SubElement(sequence, "duration").text = str(duration)
     rate = ET.SubElement(sequence, "rate")
     ET.SubElement(rate, "timebase").text = str(timebase)
