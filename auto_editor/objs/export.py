@@ -16,7 +16,7 @@ class ExPremiere:
 
 @dataclass
 class ExFinalCutPro:
-    pass
+    name: str | None = None
 
 
 @dataclass

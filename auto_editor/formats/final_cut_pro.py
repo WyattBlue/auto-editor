@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from typing import TYPE_CHECKING
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import v3
 
 from .utils import indent
+
+if TYPE_CHECKING:
+    from auto_editor.objs.export import ExFinalCutPro
 
 """
 Export a FCPXML 9 file readable with Final Cut Pro 10.4.9 or later.
@@ -64,7 +68,7 @@ def fraction(_a: float, tb: Fraction) -> str:
     return f"{num}/{dem}s"
 
 
-def fcp_xml(output: str, tl: v3) -> None:
+def fcp_xml(ex: ExFinalCutPro, output: str, tl: v3) -> None:
     assert tl.v1 is not None
     src = tl.v1.source
     chunks = tl.v1.chunks
@@ -72,13 +76,14 @@ def fcp_xml(output: str, tl: v3) -> None:
 
     total_dur = chunks[-1][1]
     pathurl = src.path.resolve().as_uri()
-
     width, height = tl.res
-    frame_duration = fraction(1, tb)
-
-    audio_file = len(src.videos) == 0 and len(src.audios) > 0
-    group_name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
     name = src.path.stem
+
+    if ex.name is None:
+        is_audio = not src.videos and src.audios
+        group_name = f"Auto-Editor {'Audio' if is_audio else 'Video'} Group"
+    else:
+        group_name = ex.name
 
     colorspace = get_colorspace(src)
 
@@ -89,7 +94,7 @@ def fcp_xml(output: str, tl: v3) -> None:
         outfile.write("\t<resources>\n")
         outfile.write(
             f'\t\t<format id="r1" name="FFVideoFormat{height}p{float(tb)}" '
-            f'frameDuration="{frame_duration}" '
+            f'frameDuration="{fraction(1, tb)}" '
             f'width="{width}" height="{height}" '
             f'colorSpace="{colorspace}"/>\n'
         )
