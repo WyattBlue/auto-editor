@@ -306,7 +306,7 @@ class FileInfo:
                         log.error(
                             f"Could not convert time_base '{time_base_str}' to Fraction."
                         )
-                    time_base = Fraction(0, 1)
+                    time_base = Fraction(0)
 
                 self.videos.append(
                     VideoStream(
