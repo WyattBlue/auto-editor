@@ -5,7 +5,7 @@ from fractions import Fraction
 from typing import Union
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.objs.util import Attr
+from auto_editor.objs.util import Attr, Required
 from auto_editor.utils.chunks import Chunks, v2Chunks
 from auto_editor.utils.types import (
     Align,
@@ -141,26 +141,28 @@ class TlEllipse(_Visual):
 
 
 video_builder = [
-    Attr(("start",), natural, None),
-    Attr(("dur",), natural, None),
-    Attr(("src",), src, None),
+    Attr(("start",), natural, Required),
+    Attr(("dur",), natural, Required),
+    Attr(("src",), src, Required),
     Attr(("offset",), natural, 0),
     Attr(("speed",), number, 1),
     Attr(("stream", "track"), natural, 0),
 ]
 audio_builder = [
-    Attr(("start",), natural, None),
-    Attr(("dur",), natural, None),
-    Attr(("src",), src, None),
+    Attr(("start",), natural, Required),
+    Attr(("dur",), natural, Required),
+    Attr(("src",), src, Required),
     Attr(("offset",), natural, 0),
     Attr(("speed",), number, 1),
     Attr(("volume",), db_number, 1),
     Attr(("stream", "track"), natural, 0),
 ]
 text_builder = [
-    Attr(("start",), natural, None),
-    Attr(("dur",), natural, None),
-    Attr(("content",), lambda val: val.replace("\\n", "\n").replace("\\;", ","), None),
+    Attr(("start",), natural, Required),
+    Attr(("dur",), natural, Required),
+    Attr(
+        ("content",), lambda val: val.replace("\\n", "\n").replace("\\;", ","), Required
+    ),
     Attr(("x",), int, "50%"),
     Attr(("y",), int, "50%"),
     Attr(("font",), str, "Arial"),
@@ -175,9 +177,9 @@ text_builder = [
 ]
 
 img_builder = [
-    Attr(("start",), natural, None),
-    Attr(("dur",), natural, None),
-    Attr(("src",), src, None),
+    Attr(("start",), natural, Required),
+    Attr(("dur",), natural, Required),
+    Attr(("src",), src, Required),
     Attr(("x",), int, "50%"),
     Attr(("y",), int, "50%"),
     Attr(("opacity",), threshold, 1),
@@ -188,12 +190,12 @@ img_builder = [
 ]
 
 rect_builder = [
-    Attr(("start",), natural, None),
-    Attr(("dur",), natural, None),
-    Attr(("x",), int, None),
-    Attr(("y",), int, None),
-    Attr(("width",), int, None),
-    Attr(("height",), int, None),
+    Attr(("start",), natural, Required),
+    Attr(("dur",), natural, Required),
+    Attr(("x",), int, Required),
+    Attr(("y",), int, Required),
+    Attr(("width",), int, Required),
+    Attr(("height",), int, Required),
     Attr(("opacity",), threshold, 1),
     Attr(("anchor",), anchor, "ce"),
     Attr(("rotate",), number, 0),

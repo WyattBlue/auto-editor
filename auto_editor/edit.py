@@ -50,7 +50,7 @@ def set_output(
         elif ext == ".mlt":
             export = ExShotCut()
         elif ext == ".json":
-            export = ExJson("3")
+            export = ExJson()
         else:
             export = ExDefault()
 
@@ -166,7 +166,7 @@ def parse_export(export: str, log: Log) -> Exports:
 
     parsing: dict[str, tuple[Any, list[Attr]]] = {
         "default": (ExDefault, []),
-        "premiere": (ExPremiere, []),
+        "premiere": (ExPremiere, [Attr(("name",), str, None)]),
         "final-cut-pro": (ExFinalCutPro, []),
         "shotcut": (ExShotCut, []),
         "json": (ExJson, timeline_builder),
@@ -281,7 +281,7 @@ def edit_media(
     if isinstance(export, ExPremiere):
         from auto_editor.formats.premiere import premiere_write_xml
 
-        premiere_write_xml(ensure, output, tl)
+        premiere_write_xml(export, ensure, output, tl)
         return
 
     if isinstance(export, ExFinalCutPro):

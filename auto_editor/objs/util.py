@@ -13,6 +13,10 @@ class ParserError(Exception):
     pass
 
 
+class Required:
+    pass
+
+
 class Attr(NamedTuple):
     names: tuple[str, ...]
     coerce: Any
@@ -50,7 +54,7 @@ def parse_dataclass(
     kwargs: dict[str, Any] = {}
     for attr in builder:
         key = attr.names[0]
-        if coerce_default and attr.default is not None:
+        if coerce_default and attr.default is not Required:
             kwargs[key] = var_f(key, attr.default, attr.coerce)
         else:
             kwargs[key] = attr.default
@@ -95,7 +99,7 @@ def parse_dataclass(
             raise ParserError(f"{d_name} positional argument follows keyword argument.")
 
     for k, v in kwargs.items():
-        if v is None:
+        if v is Required:
             raise ParserError(f"'{k}' must be specified.")
 
     return dataclass(**kwargs)
