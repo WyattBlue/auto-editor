@@ -33,9 +33,23 @@ Change the **pace** of the edited video by using `--margin`.
 auto-editor example.mp4 --margin 0.2sec
 ```
 
-<h3>Set how cuts are made</h3>
+<h3>Working With Multiple Audio Tracks</h3>
+By default, only the first audio track will used for editing (track 0). You can change this with these commands.
 
-Use the `--edit` option to change how auto-editor makes automated cuts.
+Use all audio tracks for editing:
+```
+auto-editor multi-track.mov --edit audio:stream=all
+```
+
+Use only the second, fourth, and sixth audio track:
+```
+# track numbers start at 0
+auto-editor so-many-tracks.mp4 --edit "(or audio:stream=1 audio:stream=3 audio:stream=5)"
+```
+
+<h3>Methods for Making Automatic Cuts</h3>
+
+The `--edit` option is how auto-editor makes automated cuts.
 
 For example, edit out motionlessness in a video by setting `--edit motion`.
 
@@ -48,12 +62,16 @@ auto-editor example.mp4
 
 # Different tracks can be set with different attribute.
 auto-editor multi-track.mov --edit "(or audio:stream=0 audio:threshold=10%,stream=1)"
-
-# Different editing methods can be used together.
-auto-editor example.mp4 --edit "(or audio:threshold=3% motion:threshold=6%)"
 ```
 
-<h3>See what auto-editor cuts out</h3>
+Different editing methods can be used together.
+```
+# 'threshold' is always the first argument for edit-method objects
+auto-editor example.mp4 --edit "(or audio:3% motion:6%)"
+```
+
+
+<h3>See What Auto-Editor Cuts Out</h3>
 
 To export what auto-editor normally cuts out. Set `--video-speed` to `99999` and `--silent-speed` to `1`. This is the reverse of the usual default values.  
 
