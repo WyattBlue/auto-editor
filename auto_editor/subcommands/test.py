@@ -209,9 +209,6 @@ def main(sys_args: list[str] | None = None):
     def subdump():
         run.raw(["subdump", "resources/subtitle.mp4"])
 
-    def grep():
-        run.raw(["grep", "boop", "resources/subtitle.mp4"])
-
     def desc():
         run.raw(["desc", "example.mp4"])
 
@@ -760,7 +757,7 @@ def main(sys_args: list[str] | None = None):
         tests.append(palet)
 
     if args.category in ("sub", "all"):
-        tests.extend([info, levels, subdump, grep, desc])
+        tests.extend([info, levels, subdump, desc])
 
     if args.category in ("cli", "all"):
         tests.extend(

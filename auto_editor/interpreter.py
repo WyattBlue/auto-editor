@@ -210,8 +210,8 @@ class Symbol:
 #                                                                             #
 ###############################################################################
 
-METHODS = {"audio", "motion", "pixeldiff", "none", "all"}
-SEC_UNITS = {"s", "sec", "secs", "second", "seconds"}
+METHODS = ("audio", "motion", "pixeldiff", "subtitle", "none", "all")
+SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 ID, QUOTE, NUM, BOOL, STR, CHAR = "ID", "QUOTE", "NUM", "BOOL", "STR", "CHAR"
 ARR, SEC, DB, PER = "ARR", "SEC", "DB", "PER"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
@@ -632,6 +632,7 @@ def display_str(val: object) -> str:
 
     return f"{val!r}"
 
+
 def print_str(val: object) -> str:
     if isinstance(val, (Symbol, list, Cons)):
         return "'" + display_str(val)
@@ -654,6 +655,7 @@ def displayln(val: Any) -> None:
 def palet_print(val: Any) -> None:
     if result := print_str(val):
         sys.stdout.write(result)
+
 
 def is_equal(a: object, b: object) -> bool:
     if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):

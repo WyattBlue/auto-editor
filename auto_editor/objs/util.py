@@ -35,6 +35,11 @@ def _default_var_f(name: str, val: str, coerce: Any) -> Any:
     return coerce(val)
 
 
+def _norm_name(s: str) -> str:
+    # Python does not allow - in variable names
+    return s.replace("-", "_")
+
+
 def parse_dataclass(
     text: str,
     definition: tuple[type[T], list[Attr]],
@@ -55,9 +60,9 @@ def parse_dataclass(
     for attr in builder:
         key = attr.names[0]
         if coerce_default and attr.default is not Required:
-            kwargs[key] = var_f(key, attr.default, attr.coerce)
+            kwargs[_norm_name(key)] = var_f(key, attr.default, attr.coerce)
         else:
-            kwargs[key] = attr.default
+            kwargs[_norm_name(key)] = attr.default
 
     allow_positional_args = True
 
@@ -78,7 +83,9 @@ def parse_dataclass(
 
             for attr in builder:
                 if key in attr.names:
-                    kwargs[attr.names[0]] = var_f(attr.names[0], val, attr.coerce)
+                    kwargs[_norm_name(attr.names[0])] = var_f(
+                        attr.names[0], val, attr.coerce
+                    )
                     found = True
                     break
 
@@ -93,7 +100,7 @@ def parse_dataclass(
 
         elif allow_positional_args:
             key = builder[i].names[0]
-            kwargs[key] = var_f(key, arg, builder[i].coerce)
+            kwargs[_norm_name(key)] = var_f(key, arg, builder[i].coerce)
         else:
             raise ParserError(f"{d_name} positional argument follows keyword argument.")
 

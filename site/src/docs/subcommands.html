@@ -6,9 +6,6 @@
 <h1>Subcommands</h1>
 <p>Subcommands are programs that have their own options, separate from the main auto-editor program. They typically serve an auxiliary function.</p>
 <p>Examples:</p>
-<pre><code>auto-editor info example.mp4
-auto-editor grep "pattern" file_with_subtitles.mp4
-</code></pre>
 <p>Subcommands can also be called by themselves with the ae prefix:</p>
 <pre><code>aeinfo example.mp4
 aegrep "pattern" file_with_subtitles.mp4
@@ -68,16 +65,12 @@ file: example.mp4
    - duration: 00:00:42.45
    - bitrate: 569 kb/s
 </code></pre>
-<h2>Grep</h2>
-<p>The <code>grep</code> subcommand searches and displays regex matches in media subtitles.</p>
-<pre><code># search for the pattern "the" in the Movie.mkv subtitles.
-auto-editor grep the_movie.mkv</code></pre>
 <p>List of all subcommands currently available:</p>
 <ul>
   <li>info</li>
-  <li>grep</li>
   <li>levels</li>
   <li>subdump</li>
+  <li>repl</li>
   <li>test (for devs, cannot be called with an ae prefix)</li>
 </ul>
 </div>

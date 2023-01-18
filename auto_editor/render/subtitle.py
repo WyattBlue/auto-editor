@@ -26,23 +26,38 @@ class SerialSub:
 
 
 class SubtitleParser:
-    def __init__(self) -> None:
+    def __init__(self, tb: Fraction) -> None:
         self.supported_codecs = ("ass", "webvtt", "mov_text")
-
-    def parse(self, text: str, timebase: Fraction, codec: str) -> None:
-        if codec not in self.supported_codecs:
-            raise ValueError(f"codec {codec} not supported.")
-
-        self.timebase = timebase
-        self.codec = codec
+        self.tb = tb
         self.contents: list[SerialSub] = []
+        self.header = ""
+        self.footer = ""
+
+    @staticmethod
+    def to_tick(text: str, codec: str, tb: Fraction) -> int:
+        boxes = text.replace(",", ".").split(":")
+        assert len(boxes) < 4
+
+        boxes.reverse()
+        multiply = (1, 60, 3600)
+        seconds = 0.0
+        for box, mul in zip(boxes, multiply):
+            seconds += float(box) * mul
+
+        return round(seconds * tb)
+
+    def parse(self, text: str, codec: str) -> None:
+        self.codec = codec
+        self.contents = []
 
         if codec == "ass":
             time_code = re.compile(r"(.*)(\d+:\d+:[\d.]+)(.*)(\d+:\d+:[\d.]+)(.*)")
-        if codec == "webvtt":
+        elif codec == "webvtt":
             time_code = re.compile(r"()(\d+:[\d.]+)( --> )(\d+:[\d.]+)(\n.*)")
-        if codec == "mov_text":
+        elif codec == "mov_text":
             time_code = re.compile(r"()(\d+:\d+:[\d,]+)( --> )(\d+:\d+:[\d,]+)(\n.*)")
+        else:
+            raise ValueError(f"codec {codec} not supported.")
 
         i = 0
         for reg in re.finditer(time_code, text):
@@ -52,8 +67,8 @@ class SubtitleParser:
 
             self.contents.append(
                 SerialSub(
-                    self.to_frame(reg.group(2)),
-                    self.to_frame(reg.group(4)),
+                    self.to_tick(reg.group(2), self.codec, self.tb),
+                    self.to_tick(reg.group(4), self.codec, self.tb),
                     reg.group(1),
                     reg.group(3),
                     f"{reg.group(5)}\n",
@@ -101,26 +116,11 @@ class SubtitleParser:
             file.write(self.header)
             for c in self.contents:
                 file.write(
-                    f"{c.before}{to_timecode(c.start / self.timebase, self.codec)}"
-                    f"{c.middle}{to_timecode(c.end / self.timebase, self.codec)}"
+                    f"{c.before}{to_timecode(c.start / self.tb, self.codec)}"
+                    f"{c.middle}{to_timecode(c.end / self.tb, self.codec)}"
                     f"{c.after}"
                 )
             file.write(self.footer)
-
-    def to_frame(self, text: str) -> int:
-        if self.codec == "mov_text":
-            time_format = r"(\d+):?(\d+):([\d,]+)"
-        else:
-            time_format = r"(\d+):?(\d+):([\d.]+)"
-
-        nums = re.match(time_format, text)
-        assert nums is not None
-
-        hours, minutes, seconds = nums.groups()
-        seconds = seconds.replace(",", ".", 1)
-        return round(
-            (int(hours) * 3600 + int(minutes) * 60 + float(seconds)) * self.timebase
-        )
 
 
 def make_new_subtitles(tl: v3, ffmpeg: FFmpeg, temp: str, log: Log) -> list[str]:
@@ -133,16 +133,16 @@ def make_new_subtitles(tl: v3, ffmpeg: FFmpeg, temp: str, log: Log) -> list[str]
         file_path = os.path.join(temp, f"{s}s.{sub.ext}")
         new_path = os.path.join(temp, f"new{s}s.{sub.ext}")
 
-        parser = SubtitleParser()
+        parser = SubtitleParser(tl.tb)
 
         if sub.codec in parser.supported_codecs:
             with open(file_path) as file:
-                parser.parse(file.read(), tl.tb, sub.codec)
+                parser.parse(file.read(), sub.codec)
         else:
             convert_path = os.path.join(temp, f"{s}s_convert.vtt")
             ffmpeg.run(["-i", file_path, convert_path])
             with open(convert_path) as file:
-                parser.parse(file.read(), tl.tb, "webvtt")
+                parser.parse(file.read(), "webvtt")
 
         parser.edit(tl.v1.chunks)
         parser.write(new_path)

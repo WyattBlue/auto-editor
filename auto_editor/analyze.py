@@ -2,19 +2,24 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import TYPE_CHECKING
 
 import numpy as np
 
+from auto_editor import version
 from auto_editor.objs.edit import (
     Audio,
     Motion,
     Pixeldiff,
+    Subtitle,
     audio_builder,
     motion_builder,
     pixeldiff_builder,
+    subtitle_builder,
 )
 from auto_editor.objs.util import ParserError, parse_dataclass
+from auto_editor.render.subtitle import SubtitleParser
 from auto_editor.utils.func import boolop
 from auto_editor.utils.types import pos
 from auto_editor.wavfile import read
@@ -105,7 +110,6 @@ def _dict_tag(tag: str, tb: Fraction, obj: Any) -> tuple[str, dict]:
 def read_cache(
     src: FileInfo, tb: Fraction, tag: str, obj: Any, temp: str
 ) -> None | np.ndarray:
-    from auto_editor import version
 
     workfile = os.path.join(os.path.dirname(temp), f"ae-{version}", "cache.json")
 
@@ -129,7 +133,6 @@ def read_cache(
 def cache(
     tag: str, tb: Fraction, obj: Any, arr: np.ndarray, src: FileInfo, temp: str
 ) -> np.ndarray:
-    from auto_editor import version
 
     workdur = os.path.join(os.path.dirname(temp), f"ae-{version}")
     workfile = os.path.join(workdur, "cache.json")
@@ -215,6 +218,59 @@ def audio_levels(
 
     bar.end()
     return cache("audio", tb, {"stream": s}, threshold_list, src, temp)
+
+
+def subtitle_levels(
+    ensure: Ensure,
+    src: FileInfo,
+    sobj: Any,
+    tb: Fraction,
+    bar: Bar,
+    strict: bool,
+    temp: str,
+    log: Log,
+) -> NDArray[np.bool_]:
+
+    if sobj.stream >= len(src.subtitles):
+        if not strict:
+            return np.zeros(
+                get_media_length(ensure, src, tb, temp, log), dtype=np.float_
+            )
+        log.error(f"Subtitle stream '{sobj.stream}' does not exist.")
+
+    try:
+        flags = re.IGNORECASE if sobj.ignore_case else 0
+        pattern = re.compile(sobj.pattern, flags)
+    except re.error as e:
+        log.error(e)
+
+    sub_file = ensure.subtitle(f"{src.path.resolve()}", src.label, stream=sobj.stream)
+    parser = SubtitleParser(tb)
+
+    with open(sub_file) as file:
+        parser.parse(file.read(), "webvtt")
+
+    # stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string
+    def cleanhtml(raw_html: str) -> str:
+        cleanr = re.compile("<.*?>")
+        return re.sub(cleanr, "", raw_html)
+
+    if not parser.contents:
+        log.error("subtitle has no valid entries")
+
+    result = np.zeros((parser.contents[-1].end), dtype=np.bool_)
+
+    count = 0
+    for content in parser.contents:
+        if sobj.max_count is not None and count >= sobj.max_count:
+            break
+
+        line = cleanhtml(content.after.strip())
+        if line and re.search(pattern, line):
+            result[content.start : content.end] = 1
+            count += 1
+
+    return result
 
 
 def motion_levels(
@@ -380,7 +436,7 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
     temp = filesetup.temp
     log = filesetup.log
 
-    METHODS = ("audio", "motion", "pixeldiff", "none", "all")
+    METHODS = ("audio", "motion", "pixeldiff", "subtitle", "none", "all")
 
     if ":" in val:
         method, attrs = val.split(":")
@@ -444,6 +500,14 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
             motion_levels(ensure, src, mobj, tb, bar, strict, temp, log),
             mobj.threshold,
         )
+
+    if method == "subtitle":
+        try:
+            sobj = parse_dataclass(attrs, (Subtitle, subtitle_builder))
+        except ParserError as e:
+            log.error(e)
+
+        return subtitle_levels(ensure, src, sobj, tb, bar, strict, temp, log)
 
     if method == "pixeldiff":
         try:

@@ -30,6 +30,17 @@ class Ensure:
 
         return out_path
 
+    def subtitle(self, path: str, label: str, stream: int) -> str:
+        out_path = os.path.join(self.temp, f"{label}-{stream}.vtt")
+
+        if not os.path.isfile(out_path):
+            self.log.conwrite("Extracting subtitle")
+
+            cmd = ["-i", path, "-map", f"0:s:{stream}", out_path]
+            self._ffmpeg.run(cmd)
+
+        return out_path
+
 
 def _ffset(option: str, value: str | None) -> list[str]:
     if value is None or value == "unset" or value == "reserved":
