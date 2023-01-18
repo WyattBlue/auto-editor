@@ -296,7 +296,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 def main() -> None:
-    subcommands = ("test", "info", "levels", "grep", "subdump", "desc", "repl")
+    subcommands = ("test", "info", "levels", "subdump", "desc", "repl")
 
     if len(sys.argv) > 1 and sys.argv[1] in subcommands:
         obj = __import__(

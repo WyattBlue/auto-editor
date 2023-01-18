@@ -2,9 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from auto_editor.utils.types import Stream, db_threshold, natural, stream, threshold
+from auto_editor.utils.types import (
+    Stream,
+    bool_coerce,
+    db_threshold,
+    natural,
+    natural_or_none,
+    stream,
+    threshold,
+)
 
-from .util import Attr
+from .util import Attr, Required
 
 
 @dataclass
@@ -27,6 +35,14 @@ class Pixeldiff:
     stream: int
 
 
+@dataclass
+class Subtitle:
+    pattern: str
+    stream: int
+    ignore_case: bool = False
+    max_count: int | None = None
+
+
 audio_builder = [
     Attr(("threshold",), db_threshold, 0.04),
     Attr(("stream", "track"), stream, 0),
@@ -40,4 +56,10 @@ motion_builder = [
 pixeldiff_builder = [
     Attr(("threshold",), natural, 1),
     Attr(("stream", "track"), natural, 0),
+]
+subtitle_builder = [
+    Attr(("pattern",), str, Required),
+    Attr(("stream", "track"), stream, 0),
+    Attr(("ignore-case",), bool_coerce, False),
+    Attr(("max-count",), natural_or_none, None),
 ]

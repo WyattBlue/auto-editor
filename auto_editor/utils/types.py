@@ -47,11 +47,23 @@ def natural(val: str | float) -> int:
     num, unit = _split_num_str(val)
     if unit != "":
         raise CoerceError(f"'{val}': Natural does not allow units.")
+    if not isinstance(num, int) and not num.is_integer():
+        raise CoerceError(f"'{val}': Natural must be a valid integer.")
     if num < 0:
         raise CoerceError(f"'{val}': Natural cannot be negative.")
-    if not isinstance(num, int) and not num.is_integer():
-        raise CoerceError(f"'{val}': Natural must be an integer.")
     return int(num)
+
+
+def natural_or_none(val: str | float | None) -> int | None:
+    return None if val is None else natural(val)
+
+
+def bool_coerce(val: str) -> bool:
+    if val in ("#t", "#true", "true"):
+        return True
+    if val in ("#f", "#false", "false"):
+        return False
+    raise CoerceError(f"'{val}': Invalid boolean")
 
 
 def number(val: str | float) -> float:
