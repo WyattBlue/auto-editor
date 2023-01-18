@@ -46,42 +46,6 @@ def display_dtype(dtype: np.dtype) -> str:
     return f"float{dtype.itemsize * 8}"
 
 
-def print_val(val: object) -> str:
-    if val is True:
-        return "#t"
-    if val is False:
-        return "#f"
-    if isinstance(val, Symbol):
-        return f"{val}"
-    if isinstance(val, list):
-        if not val:
-            return "#()"
-        result = f"#({print_val(val[0])}"
-        for item in val[1:]:
-            result += f" {print_val(item)}"
-        return result + ")"
-    if isinstance(val, range):
-        return "#<range>"
-    if isinstance(val, np.ndarray):
-        kind = val.dtype.kind
-        result = f"(array '{display_dtype(val.dtype)}"
-        if kind == "b":
-            for item in val:
-                result += " 1" if item else " 0"
-        else:
-            for item in val:
-                result += f" {item}"
-        return result + ")"
-    if isinstance(val, complex):
-        join = "" if val.imag < 0 else "+"
-        return f"{val.real}{join}{val.imag}i"
-
-    if isinstance(val, str):
-        return f'"{val}"'
-
-    return f"{val!r}"
-
-
 class Null:
     def __init__(self) -> None:
         pass
@@ -104,6 +68,13 @@ class Null:
     __repr__ = __str__
 
 
+class PaletObject:
+    __slots__ = "attributes"
+
+    def __init__(self, attrs: dict[str, Any]):
+        self.attributes = attrs
+
+
 class Cons:
     __slots__ = ("a", "d")
 
@@ -112,15 +83,18 @@ class Cons:
         self.d = d
 
     def __repr__(self) -> str:
-        result = f"({print_val(self.a)}"
+        if not isinstance(self.d, (Cons, Null)):
+            return f"(cons {self.a} {self.d})"
+
+        result = f"({display_str(self.a)}"
         tail = self.d
         while isinstance(tail, Cons):
-            result += f" {print_val(tail.a)}"
+            if not isinstance(tail.d, (Null, Cons)):
+                return f"{result} (cons {tail.a} {tail.d}))"
+            result += f" {display_str(tail.a)}"
             tail = tail.d
 
-        if isinstance(tail, Null):
-            return f"{result})"
-        return f"{result} . {print_val(tail)})"
+        return f"{result})"
 
     def __eq__(self, obj: object) -> bool:
         return isinstance(obj, Cons) and self.a == obj.a and self.d == obj.d
@@ -577,7 +551,7 @@ def check_args(
             raise MyError(f"{o} expects: {' '.join([c.name for c in types])}")
 
 
-any_c = Contract("any/c", lambda v: True)
+any_p = Contract("any_p", lambda v: True)
 is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
 is_bool = Contract("boolean?", lambda v: isinstance(v, bool))
 is_pair = Contract("pair?", lambda v: isinstance(v, Cons))
@@ -611,20 +585,75 @@ is_int = Contract(
 is_frac = Contract("fraction?", lambda v: isinstance(v, Fraction))
 is_float = Contract("float?", lambda v: isinstance(v, float))
 us_int = Contract("nonnegative-integer?", lambda v: isinstance(v, int) and v > -1)
+is_hash = Contract("hash?", lambda v: isinstance(v, dict))
 
 
 def raise_(msg: str) -> None:
     raise MyError(msg)
 
 
-def display(val: Any) -> None:
+def display_str(val: object) -> str:
     if val is None:
-        return
+        return ""
+    if val is True:
+        return "#t"
+    if val is False:
+        return "#f"
+    if isinstance(val, Symbol):
+        return val.val
     if isinstance(val, str):
-        sys.stdout.write(val)
-    else:
-        sys.stdout.write(print_val(val))
+        return val
+    if isinstance(val, Fraction):
+        return f"{val.numerator}/{val.denominator}"
+    if isinstance(val, Symbol):
+        return val.val
+    if isinstance(val, list):
+        if not val:
+            return "#()"
+        result = f"#({display_str(val[0])}"
+        for item in val[1:]:
+            result += f" {display_str(item)}"
+        return result + ")"
+    if isinstance(val, range):
+        return "#<range>"
+    if isinstance(val, np.ndarray):
+        kind = val.dtype.kind
+        result = f"(array '{display_dtype(val.dtype)}"
+        if kind == "b":
+            for item in val:
+                result += " 1" if item else " 0"
+        else:
+            for item in val:
+                result += f" {item}"
+        return result + ")"
+    if isinstance(val, complex):
+        join = "" if val.imag < 0 else "+"
+        return f"{val.real}{join}{val.imag}i"
 
+    return f"{val!r}"
+
+def print_str(val: object) -> str:
+    if isinstance(val, (Symbol, list, Cons)):
+        return "'" + display_str(val)
+    if isinstance(val, str):
+        return f'"{val}"'
+
+    return display_str(val)
+
+
+def display(val: Any) -> None:
+    if result := display_str(val):
+        sys.stdout.write(result)
+
+
+def displayln(val: Any) -> None:
+    if result := display_str(val):
+        sys.stdout.write(result + "\n")
+
+
+def palet_print(val: Any) -> None:
+    if result := print_str(val):
+        sys.stdout.write(result)
 
 def is_equal(a: object, b: object) -> bool:
     if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
@@ -651,7 +680,7 @@ def div(*vals: Any) -> Number:
         vals = (1, vals[0])
 
     if not {float, complex}.intersection({type(val) for val in vals}):
-        result = reduce(lambda a, b: Fraction(a, b), vals)
+        result = reduce(Fraction, vals)
         if result.denominator == 1:
             return result.numerator
         return result
@@ -721,20 +750,22 @@ def number_to_string(val: Number) -> str:
     return f"{val}"
 
 
+dtype_map = {
+    Symbol("bool"): np.bool_,
+    Symbol("int8"): np.int8,
+    Symbol("int16"): np.int16,
+    Symbol("int32"): np.int32,
+    Symbol("int64"): np.int64,
+    Symbol("uint8"): np.uint8,
+    Symbol("uint16"): np.uint16,
+    Symbol("uint32"): np.uint32,
+    Symbol("uint64"): np.uint64,
+    Symbol("float32"): np.float32,
+    Symbol("float64"): np.float64,
+}
+
+
 def _dtype_to_np(dtype: Symbol) -> type[np.generic]:
-    dtype_map = {
-        Symbol("bool"): np.bool_,
-        Symbol("int8"): np.int8,
-        Symbol("int16"): np.int16,
-        Symbol("int32"): np.int32,
-        Symbol("int64"): np.int64,
-        Symbol("uint8"): np.uint8,
-        Symbol("uint16"): np.uint16,
-        Symbol("uint32"): np.uint32,
-        Symbol("uint64"): np.uint64,
-        Symbol("float32"): np.float32,
-        Symbol("float64"): np.float64,
-    }
     np_dtype = dtype_map.get(dtype)
     if np_dtype is None:
         raise MyError(f"Invalid array dtype: {dtype}")
@@ -840,10 +871,6 @@ def vector_to_list(values: list) -> Cons | Null:
     return result
 
 
-def vector_add(vec: list, val: Any) -> None:
-    vec.append(val)
-
-
 def vector_set(vec: list, pos: int, v: Any) -> None:
     try:
         vec[pos] = v
@@ -938,6 +965,15 @@ def stream_to_list(s: range) -> Cons | Null:
     return result
 
 
+def palet_hash(*args: Any) -> dict:
+    result = {}
+    if len(args) % 2 == 1:
+        raise MyError("hash: number of args must be even")
+    for key, item in zip(args[0::2], args[1::2]):
+        result[key] = item
+    return result
+
+
 ###############################################################################
 #                                                                             #
 #  INTERPRETER                                                                #
@@ -982,6 +1018,8 @@ class Interpreter:
         # actions
         "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
         "display": Proc("display", display, (1, 1)),
+        "displayln": Proc("display", displayln, (1, 1)),
+        "print": Proc("print", palet_print, (1, 1)),
         "exit": Proc("exit", sys.exit, (0, None)),
         "error": Proc("error", raise_, (1, 1), [is_str]),
         # booleans
@@ -1051,13 +1089,13 @@ class Interpreter:
         "vector?": is_vector,
         "vector": Proc("vector", lambda *a: list(a), (0, None)),
         "make-vector": Proc(
-            "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, any_c]
+            "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, any_p]
         ),
         "vector-append": Proc("vector-append", vector_append, (0, None), [is_vector]),
         "vector-pop!": Proc("vector-pop!", list.pop, (1, 1), [is_vector]),
-        "vector-add!": Proc("vector-add!", vector_add, (2, 2), [is_vector, any_c]),
+        "vector-add!": Proc("vector-add!", list.append, (2, 2), [is_vector, any_p]),
         "vector-set!": Proc(
-            "vector-set!", vector_set, (3, 3), [is_vector, is_int, any_c]
+            "vector-set!", vector_set, (3, 3), [is_vector, is_int, any_p]
         ),
         "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
         # cons/list
@@ -1090,7 +1128,7 @@ class Interpreter:
         "cook": Proc("cook", cook, (3, 3), [is_int, is_int, is_boolarr]),
         # ranges
         "range?": is_range,
-        "in-range": Proc("in-range", range, (1, 3), [is_real, is_real, is_real]),
+        "range": Proc("range", range, (1, 3), [is_real, is_real, is_real]),
         # generic iterables
         "iterable?": is_iterable,
         "length": Proc("length", len, (1, 1), [is_iterable]),
@@ -1101,6 +1139,13 @@ class Interpreter:
         "procedure?": is_proc,
         "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
         "apply": Proc("apply", apply, (2, 2), [is_proc, is_iterable]),
+        # hashs
+        "hash?": is_hash,
+        "hash": Proc("hash", palet_hash),
+        "hash-count": Proc("hash-count", len, (1, 1), [is_hash]),
+        "hash-has-key?": Proc(
+            "hash-has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]
+        ),
         # conversions
         "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
         "string->list": Proc("string->list", string_to_list, (1, 1), [is_str]),
@@ -1111,8 +1156,8 @@ class Interpreter:
         "vector->list": Proc("vector->list", vector_to_list, (1, 1), [is_vector]),
         "range->list": Proc("range->list", stream_to_list, (1, 1), [is_range]),
         "range->vector": Proc("range->vector", list, (1, 1), [is_range]),
-        # contracts
-        "any/c": any_c,
+        # predicates
+        "any": any_p,
     }
 
     def __init__(self, parser: Parser, filesetup: FileSetup | None):
@@ -1233,6 +1278,67 @@ class Interpreter:
                     raise MyError(f"Cannot set variable {symbol} before definition")
                 self.GLOBAL_SCOPE[symbol] = self.visit(node[2])
                 return None
+
+            if name == "with-open":
+                if len(node) < 2:
+                    raise MyError("with-open: wrong number of args")
+                if len(node[1]) != 2 and len(node[1]) != 3:
+                    raise MyError("with-open: wrong number of args")
+
+                if not isinstance(node[1][0], Symbol):
+                    raise MyError("with-open: as must be an identifier")
+
+                file_binding = node[1][0].val
+
+                file_name = self.visit(node[1][1])
+                if not isinstance(file_name, str):
+                    raise MyError("with-open: file name must be string?")
+
+                if len(node[1]) == 3:
+                    file_mode = self.visit(node[1][2])
+                    if not isinstance(file_mode, Symbol):
+                        raise MyError("with-open: file-mode must be a symbol?")
+                    if file_mode not in (Symbol("w"), Symbol("a"), Symbol("r")):
+                        raise MyError("with-open: file mode must be either: 'w 'r 'a")
+                else:
+                    file_mode = Symbol("w")
+
+                with open(file_name, file_mode.val) as file:
+                    if file_mode.val == "r":
+                        open_file = PaletObject(
+                            {
+                                "read": Proc("read", file.read, (0, 0)),
+                                "readlines": Proc("readlines", file.readlines, (0, 0)),
+                            }
+                        )
+                    else:
+                        open_file = PaletObject(
+                            {"write": Proc("write", file.write, (1, 1), [is_str])}
+                        )
+
+                    self.GLOBAL_SCOPE[file_binding] = open_file
+                    for c in node[2:]:
+                        self.visit(c)
+
+                del self.GLOBAL_SCOPE[file_binding]
+                return None
+
+            if name == ".":
+                if len(node) != 3:
+                    raise MyError(".: not enough args")
+
+                my_obj = self.visit(node[1])
+                if not isinstance(my_obj, PaletObject):
+                    raise MyError(f".: expected an object, got {my_obj}")
+
+                if not isinstance(node[2], Symbol):
+                    raise MyError(".: attribute must be an identifier")
+                my_attr = node[2].val
+
+                if my_attr not in my_obj.attributes:
+                    raise MyError(f".: No such attribute: {my_attr}")
+
+                return my_obj.attributes[my_attr]
 
             oper = self.visit(node[0])
 

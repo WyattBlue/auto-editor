@@ -9,14 +9,12 @@ from fractions import Fraction
 import auto_editor
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import (
-    Cons,
     FileSetup,
     Interpreter,
     Lexer,
     MyError,
     Parser,
-    Symbol,
-    print_val,
+    print_str,
 )
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
@@ -64,17 +62,6 @@ def repl_options(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-def display_val(val: Any) -> str:
-    if val is None:
-        return ""
-    if isinstance(val, (list, Cons, Symbol)):
-        return f"'{print_val(val)}\n"
-    if isinstance(val, Fraction):
-        return f"{val.numerator}/{val.denominator}\n"
-
-    return f"{print_val(val)}\n"
-
-
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
     parser = repl_options(ArgumentParser(None))
     args = parser.parse_args(REPL_Args, sys_args)
@@ -112,7 +99,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             try:
                 interpreter = Interpreter(parser, filesetup)
                 for result in interpreter.interpret():
-                    sys.stdout.write(display_val(result))
+                    if repr_result := print_str(result):
+                        sys.stdout.write(f"{repr_result}\n")
             except (MyError, ZeroDivisionError) as e:
                 print(f"error: {e}")
 

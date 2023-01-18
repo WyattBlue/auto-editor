@@ -84,7 +84,6 @@ def parse_dataclass(
 
             if not found:
                 all_names = _get_builder_names(builder)
-                more = ""
                 if matches := get_close_matches(key, all_names):
                     more = f"\n    Did you mean:\n        {', '.join(matches)}"
                 else:
