@@ -748,7 +748,7 @@ def main(sys_args: list[str] | None = None):
             ("(equal? (reverse (vector 0 1 2)) (vector 2 1 0))", True),
             ('(ref "Zyx" 1)', Char("y")),
             ("(ref (vector 0.3 #\\a 2) 2)", 2),
-            ("(ref (in-range 0 10) 2)", 2),
+            ("(ref (range 0 10) 2)", 2),
             ("(begin)", None),
             ("(begin (define r 10) (* pi (* r r)))", 314.1592653589793),
             ("(for/vector ([i (vector 0 1 2)]) i)", [0, 1, 2]),
