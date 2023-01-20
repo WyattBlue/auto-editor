@@ -162,9 +162,9 @@ def time(val: str) -> int | str:
         raise CoerceError(f"'{val}': Invalid time format")
 
     num, unit = _split_num_str(val)
-    if unit in {"s", "sec", "secs", "second", "seconds"}:
+    if unit in ("s", "sec", "secs", "second", "seconds"):
         return str(num)
-    if unit in {"m", "min", "mins", "minute", "minutes"}:
+    if unit in ("m", "min", "mins", "minute", "minutes"):
         return str(num * 60)
     if unit in ("h", "hour", "hours"):
         return str(num * 3600)
@@ -309,8 +309,6 @@ class Args:
     margin: Margin = ("0.2", "0.2")
     silent_speed: float = 99999.0
     video_speed: float = 1.0
-    min_clip_length: int | str = 3
-    min_cut_length: int | str = 6
     output_file: str | None = None
     help: bool = False
     input: list[str] = field(default_factory=list)

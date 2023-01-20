@@ -13,7 +13,6 @@ from auto_editor.interpreter import (
     Lexer,
     MyError,
     Parser,
-    cook,
     is_boolarr,
 )
 from auto_editor.objs.util import ParserError, parse_dataclass
@@ -152,8 +151,6 @@ def make_timeline(
         tb,
         args.edit_based_on,
         args.margin,
-        args.min_cut_length,
-        args.min_clip_length,
         args.cut_out,
         args.add_in,
         args.mark_as_silent,
@@ -211,16 +208,11 @@ def make_timeline(
             return _val
         return coerce(val)
 
-    OBJ_ATTRS_SEP = ":"
-
     pool: list[Visual] = []
     apool: list[TlAudio] = []
 
     for obj_attrs_str in args.add:
-        exploded = obj_attrs_str.split(OBJ_ATTRS_SEP)
-        if len(exploded) > 2 or len(exploded) == 0:
-            log.error("Invalid object syntax")
-
+        exploded = obj_attrs_str.split(":", 1)
         obj_s = exploded[0]
         attrs = "" if len(exploded) == 1 else exploded[1]
 
@@ -254,8 +246,6 @@ def make_layers(
     tb: Fraction,
     method: str,
     margin: Margin,
-    _min_cut: str | int,
-    _min_clip: str | int,
     cut_out: list[list[str]],
     add_in: list[list[str]],
     mark_silent: list[list[str]],
@@ -278,8 +268,6 @@ def make_layers(
 
     start_margin = seconds_to_ticks(margin[0])
     end_margin = seconds_to_ticks(margin[1])
-    min_clip = seconds_to_ticks(_min_clip)
-    min_cut = seconds_to_ticks(_min_cut)
 
     speed_map = [silent_speed, loud_speed]
     speed_hash = {
@@ -321,11 +309,7 @@ def make_layers(
         if len(mark_silent) > 0:
             mut_set_range(has_loud, mark_silent, silent_speed)
 
-        has_loud = cook(min_clip, min_cut, has_loud)
         mut_margin(has_loud, start_margin, end_margin)
-
-        # Remove small clips/cuts created by applying other rules.
-        has_loud = cook(min_clip, min_cut, has_loud)
 
         # Setup for handling custom speeds
         has_loud = has_loud.astype(np.uint)

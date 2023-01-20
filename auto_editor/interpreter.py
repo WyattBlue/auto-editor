@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from auto_editor.analyze import edit_method
+from auto_editor.analyze import edit_method, mut_remove_small
 from auto_editor.utils.func import boolop, mut_margin
 
 if TYPE_CHECKING:
@@ -788,25 +788,6 @@ def make_array(dtype: Symbol, size: int, v: int = 0) -> np.ndarray:
         raise MyError(f"number too large to be converted to {dtype}")
 
 
-def mut_remove_small(arr: BoolList, lim: int, replace: int, with_: int) -> None:
-    start_p = 0
-    active = False
-    for j, item in enumerate(arr):
-        if item == replace:
-            if not active:
-                start_p = j
-                active = True
-            # Special case for end.
-            if j == len(arr) - 1:
-                if j - start_p < lim:
-                    arr[start_p : j + 1] = with_
-        else:
-            if active:
-                if j - start_p < lim:
-                    arr[start_p:j] = with_
-                active = False
-
-
 def minclip(oarr: BoolList, _min: int) -> BoolList:
     arr = np.copy(oarr)
     mut_remove_small(arr, _min, replace=1, with_=0)
@@ -831,13 +812,6 @@ def margin(a: int, b: Any, c: Any = None) -> BoolList:
 
     arr = np.copy(oarr)
     mut_margin(arr, start, end)
-    return arr
-
-
-def cook(min_clip: int, min_cut: int, oarr: BoolList) -> BoolList:
-    arr = np.copy(oarr)
-    mut_remove_small(arr, min_clip, replace=1, with_=0)
-    mut_remove_small(arr, min_cut, replace=0, with_=1)
     return arr
 
 
@@ -1127,7 +1101,6 @@ class Interpreter:
         "margin": Proc("margin", margin, (2, 3), None),
         "mincut": Proc("mincut", mincut, (2, 2), [is_int, is_boolarr]),
         "minclip": Proc("minclip", minclip, (2, 2), [is_int, is_boolarr]),
-        "cook": Proc("cook", cook, (3, 3), [is_int, is_int, is_boolarr]),
         # ranges
         "range?": is_range,
         "range": Proc("range", range, (1, 3), [is_real, is_real, is_real]),

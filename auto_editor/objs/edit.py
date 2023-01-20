@@ -10,6 +10,7 @@ from auto_editor.utils.types import (
     natural_or_none,
     stream,
     threshold,
+    time,
 )
 
 from .util import Attr, Required
@@ -19,6 +20,8 @@ from .util import Attr, Required
 class Audio:
     threshold: float
     stream: Stream
+    mincut: int | str
+    minclip: int | str
 
 
 @dataclass
@@ -44,22 +47,24 @@ class Subtitle:
 
 
 audio_builder = [
-    Attr(("threshold",), db_threshold, 0.04),
-    Attr(("stream", "track"), stream, 0),
+    Attr("threshold", db_threshold, 0.04),
+    Attr("stream", stream, 0),
+    Attr("mincut", time, 6),
+    Attr("minclip", time, 3),
 ]
 motion_builder = [
-    Attr(("threshold",), threshold, 0.02),
-    Attr(("stream", "track"), natural, 0),
-    Attr(("blur",), natural, 9),
-    Attr(("width",), natural, 400),
+    Attr("threshold", threshold, 0.02),
+    Attr("stream", natural, 0),
+    Attr("blur", natural, 9),
+    Attr("width", natural, 400),
 ]
 pixeldiff_builder = [
-    Attr(("threshold",), natural, 1),
-    Attr(("stream", "track"), natural, 0),
+    Attr("threshold", natural, 1),
+    Attr("stream", natural, 0),
 ]
 subtitle_builder = [
-    Attr(("pattern",), str, Required),
-    Attr(("stream", "track"), stream, 0),
-    Attr(("ignore-case",), bool_coerce, False),
-    Attr(("max-count",), natural_or_none, None),
+    Attr("pattern", str, Required),
+    Attr("stream", stream, 0),
+    Attr("ignore-case", bool_coerce, False),
+    Attr("max-count", natural_or_none, None),
 ]
