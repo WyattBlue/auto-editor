@@ -561,7 +561,7 @@ def main(sys_args: list[str] | None = None):
     def motion():
         out = run.main(
             ["resources/only-video/man-on-green-screen.mp4"],
-            ["--edit", "motion", "--margin", "0", "-mcut", "0", "-mclip", "0"],
+            ["--edit", "motion", "--margin", "0"],
         )
         out2 = run.main(
             ["resources/only-video/man-on-green-screen.mp4"],

@@ -17,7 +17,6 @@ from auto_editor.utils.types import (
     sample_rate,
     speed,
     speed_range,
-    time,
     time_range,
 )
 from auto_editor.validate_input import valid_input
@@ -33,24 +32,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         type=margin,
         metavar="LENGTH",
         help='Set sections near "loud" as "loud" too if section is less than LENGTH away.',
-    )
-    parser.add_argument(
-        "--min-clip-length",
-        "--min-clip",
-        "-minclip",
-        "-mclip",
-        type=time,
-        metavar="LENGTH",
-        help="Set the minimum length a clip can be. If a clip is too short, cut it",
-    )
-    parser.add_argument(
-        "--min-cut-length",
-        "--min-cut",
-        "-mincut",
-        "-mcut",
-        type=time,
-        metavar="LENGTH",
-        help="Set the minimum length a cut can be. If a cut is too short, don't cut",
     )
     parser.add_argument(
         "--edit-based-on",

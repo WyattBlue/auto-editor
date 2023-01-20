@@ -141,71 +141,69 @@ class TlEllipse(_Visual):
 
 
 video_builder = [
-    Attr(("start",), natural, Required),
-    Attr(("dur",), natural, Required),
-    Attr(("src",), src, Required),
-    Attr(("offset",), natural, 0),
-    Attr(("speed",), number, 1),
-    Attr(("stream", "track"), natural, 0),
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("src", src, Required),
+    Attr("offset", natural, 0),
+    Attr("speed", number, 1),
+    Attr("stream", natural, 0),
 ]
 audio_builder = [
-    Attr(("start",), natural, Required),
-    Attr(("dur",), natural, Required),
-    Attr(("src",), src, Required),
-    Attr(("offset",), natural, 0),
-    Attr(("speed",), number, 1),
-    Attr(("volume",), db_number, 1),
-    Attr(("stream", "track"), natural, 0),
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("src", src, Required),
+    Attr("offset", natural, 0),
+    Attr("speed", number, 1),
+    Attr("volume", db_number, 1),
+    Attr("stream", natural, 0),
 ]
 text_builder = [
-    Attr(("start",), natural, Required),
-    Attr(("dur",), natural, Required),
-    Attr(
-        ("content",), lambda val: val.replace("\\n", "\n").replace("\\;", ","), Required
-    ),
-    Attr(("x",), int, "50%"),
-    Attr(("y",), int, "50%"),
-    Attr(("font",), str, "Arial"),
-    Attr(("size",), natural, 55),
-    Attr(("align",), align, "left"),
-    Attr(("opacity",), threshold, 1),
-    Attr(("anchor",), anchor, "ce"),
-    Attr(("rotate",), number, 0),
-    Attr(("fill", "color"), str, "#FFF"),
-    Attr(("stroke",), natural, 0),
-    Attr(("strokecolor",), color, "#000"),
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("content", lambda s: s.replace("\\n", "\n").replace("\\;", ","), Required),
+    Attr("x", int, "50%"),
+    Attr("y", int, "50%"),
+    Attr("font", str, "Arial"),
+    Attr("size", natural, 55),
+    Attr("align", align, "left"),
+    Attr("opacity", threshold, 1),
+    Attr("anchor", anchor, "ce"),
+    Attr("rotate", number, 0),
+    Attr("fill", str, "#FFF"),
+    Attr("stroke", natural, 0),
+    Attr("strokecolor", color, "#000"),
 ]
 
 img_builder = [
-    Attr(("start",), natural, Required),
-    Attr(("dur",), natural, Required),
-    Attr(("src",), src, Required),
-    Attr(("x",), int, "50%"),
-    Attr(("y",), int, "50%"),
-    Attr(("opacity",), threshold, 1),
-    Attr(("anchor",), anchor, "ce"),
-    Attr(("rotate",), number, 0),
-    Attr(("stroke",), natural, 0),
-    Attr(("strokecolor",), color, "#000"),
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("src", src, Required),
+    Attr("x", int, "50%"),
+    Attr("y", int, "50%"),
+    Attr("opacity", threshold, 1),
+    Attr("anchor", anchor, "ce"),
+    Attr("rotate", number, 0),
+    Attr("stroke", natural, 0),
+    Attr("strokecolor", color, "#000"),
 ]
 
 rect_builder = [
-    Attr(("start",), natural, Required),
-    Attr(("dur",), natural, Required),
-    Attr(("x",), int, Required),
-    Attr(("y",), int, Required),
-    Attr(("width",), int, Required),
-    Attr(("height",), int, Required),
-    Attr(("opacity",), threshold, 1),
-    Attr(("anchor",), anchor, "ce"),
-    Attr(("rotate",), number, 0),
-    Attr(("fill", "color"), color, "#c4c4c4"),
-    Attr(("stroke",), natural, 0),
-    Attr(("strokecolor",), color, "#000"),
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("x", int, Required),
+    Attr("y", int, Required),
+    Attr("width", int, Required),
+    Attr("height", int, Required),
+    Attr("opacity", threshold, 1),
+    Attr("anchor", anchor, "ce"),
+    Attr("rotate", number, 0),
+    Attr("fill", color, "#c4c4c4"),
+    Attr("stroke", natural, 0),
+    Attr("strokecolor", color, "#000"),
 ]
 ellipse_builder = rect_builder
 
-timeline_builder = [Attr(("api",), str, "3.0.0")]
+timeline_builder = [Attr("api", str, "3.0.0")]
 
 Visual = Union[TlText, TlImage, TlRect, TlEllipse]
 VLayer = list[Union[TlVideo, Visual]]

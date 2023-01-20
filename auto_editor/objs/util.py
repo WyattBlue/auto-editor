@@ -18,17 +18,9 @@ class Required:
 
 
 class Attr(NamedTuple):
-    names: tuple[str, ...]
+    n: str
     coerce: Any
     default: Any
-
-
-def _get_builder_names(builder: list[Attr]) -> set[str]:
-    keys: set[str] = set()
-    for attr in builder:
-        keys = keys.union(attr.names)
-
-    return keys
 
 
 def _default_var_f(name: str, val: str, coerce: Any) -> Any:
@@ -58,11 +50,10 @@ def parse_dataclass(
 
     kwargs: dict[str, Any] = {}
     for attr in builder:
-        key = attr.names[0]
         if coerce_default and attr.default is not Required:
-            kwargs[_norm_name(key)] = var_f(key, attr.default, attr.coerce)
+            kwargs[_norm_name(attr.n)] = var_f(attr.n, attr.default, attr.coerce)
         else:
-            kwargs[_norm_name(key)] = attr.default
+            kwargs[_norm_name(attr.n)] = attr.default
 
     allow_positional_args = True
 
@@ -82,15 +73,13 @@ def parse_dataclass(
             found = False
 
             for attr in builder:
-                if key in attr.names:
-                    kwargs[_norm_name(attr.names[0])] = var_f(
-                        attr.names[0], val, attr.coerce
-                    )
+                if key == attr.n:
+                    kwargs[_norm_name(attr.n)] = var_f(attr.n, val, attr.coerce)
                     found = True
                     break
 
             if not found:
-                all_names = _get_builder_names(builder)
+                all_names = {attr.n for attr in builder}
                 if matches := get_close_matches(key, all_names):
                     more = f"\n    Did you mean:\n        {', '.join(matches)}"
                 else:
@@ -99,8 +88,8 @@ def parse_dataclass(
                 raise ParserError(f"{d_name} got an unexpected keyword '{key}'\n{more}")
 
         elif allow_positional_args:
-            key = builder[i].names[0]
-            kwargs[_norm_name(key)] = var_f(key, arg, builder[i].coerce)
+            name = builder[i].n
+            kwargs[_norm_name(name)] = var_f(name, arg, builder[i].coerce)
         else:
             raise ParserError(f"{d_name} positional argument follows keyword argument.")
 

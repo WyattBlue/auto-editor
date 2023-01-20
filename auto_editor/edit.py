@@ -166,8 +166,8 @@ def parse_export(export: str, log: Log) -> Exports:
 
     parsing: dict[str, tuple[Any, list[Attr]]] = {
         "default": (ExDefault, []),
-        "premiere": (ExPremiere, [Attr(("name",), str, None)]),
-        "final-cut-pro": (ExFinalCutPro, [Attr(("name",), str, None)]),
+        "premiere": (ExPremiere, [Attr("name", str, None)]),
+        "final-cut-pro": (ExFinalCutPro, [Attr("name", str, None)]),
         "shotcut": (ExShotCut, []),
         "json": (ExJson, timeline_builder),
         "timeline": (ExTimeline, timeline_builder),

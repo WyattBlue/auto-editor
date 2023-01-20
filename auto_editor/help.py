@@ -38,12 +38,17 @@ Attribute Defaults:
     - stream: 0 (natural | "all")
  - motion
     - threshold: 2% (number)
-    - stream: 0 (natural | "all")
+    - stream: 0 (natural)
     - blur: 9 (natural)
     - width: 400 (natural)
  - pixeldiff
     - threshold: 1 (natural)
-    - stream: 0 (natural | "all")
+    - stream: 0 (natural)
+ - subtitle
+    - pattern: Required (str)
+    - stream: 0 (natural)
+    - ignore-case: false (bool)
+    - max-count: None (natural | None)
 
 Examples:
   --edit audio

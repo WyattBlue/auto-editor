@@ -6,9 +6,19 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from auto_editor.analyze import audio_levels, motion_levels, pixeldiff_levels
+from auto_editor.analyze import (
+    audio_levels,
+    motion_levels,
+    pixeldiff_levels,
+    subtitle_levels,
+)
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.objs.edit import audio_builder, motion_builder, pixeldiff_builder
+from auto_editor.objs.edit import (
+    audio_builder,
+    motion_builder,
+    pixeldiff_builder,
+    subtitle_builder,
+)
 from auto_editor.objs.util import ParserError, parse_dataclass
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
@@ -27,6 +37,8 @@ if TYPE_CHECKING:
 @dataclass
 class Audio:
     stream: int
+    mincut: int
+    minclip: int
 
 
 @dataclass
@@ -39,6 +51,14 @@ class Motion:
 @dataclass
 class Pixeldiff:
     stream: int
+
+
+@dataclass
+class Subtitle:
+    pattern: str
+    stream: int
+    ignore_case: bool = False
+    max_count: int | None = None
 
 
 @dataclass
@@ -79,7 +99,7 @@ def print_floats(arr: NDArray[np.float_]) -> None:
         sys.stdout.write(f"{a:.20f}\n")
 
 
-def print_ints(arr: NDArray[np.uint64]) -> None:
+def print_ints(arr: NDArray[np.uint64] | NDArray[np.bool_]) -> None:
     for a in arr:
         sys.stdout.write(f"{a}\n")
 
@@ -92,7 +112,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
     bar = Bar("none")
     temp = setup_tempdir(None, Log())
-    log = Log(temp=temp)
+    log = Log(quiet=True, temp=temp)
 
     sources = {}
     for i, path in enumerate(args.input):
@@ -107,7 +127,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     strict = True
 
     if ":" in args.edit:
-        method, attrs = args.edit.split(":")
+        method, attrs = args.edit.split(":", 1)
     else:
         method, attrs = args.edit, ""
 
@@ -147,6 +167,13 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 log.error(e)
 
             print_ints(pixeldiff_levels(ensure, src, pobj, tb, bar, strict, temp, log))
+        elif method == "subtitle":
+            try:
+                sobj = parse_dataclass(attrs, (Subtitle, subtitle_builder))
+            except ParserError as e:
+                log.error(e)
+
+            print_ints(subtitle_levels(ensure, src, sobj, tb, bar, strict, temp, log))
         else:
             log.error(f"Method: {method} not supported")
 

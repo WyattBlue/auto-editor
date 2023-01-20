@@ -46,6 +46,27 @@ def to_threshold(arr: np.ndarray, t: int | float) -> NDArray[np.bool_]:
     return np.fromiter((x >= t for x in arr), dtype=np.bool_)
 
 
+def mut_remove_small(
+    arr: NDArray[np.bool_], lim: int, replace: int, with_: int
+) -> None:
+    start_p = 0
+    active = False
+    for j, item in enumerate(arr):
+        if item == replace:
+            if not active:
+                start_p = j
+                active = True
+            # Special case for end.
+            if j == len(arr) - 1:
+                if j - start_p < lim:
+                    arr[start_p : j + 1] = with_
+        else:
+            if active:
+                if j - start_p < lim:
+                    arr[start_p:j] = with_
+                active = False
+
+
 def get_media_length(
     ensure: Ensure, src: FileInfo, tb: Fraction, temp: str, log: Log
 ) -> int:
@@ -431,17 +452,12 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
     tb = filesetup.tb
     ensure = filesetup.ensure
     strict = filesetup.strict
-
     bar = filesetup.bar
     temp = filesetup.temp
     log = filesetup.log
 
-    METHODS = ("audio", "motion", "pixeldiff", "subtitle", "none", "all")
-
     if ":" in val:
-        method, attrs = val.split(":")
-        if method not in METHODS:
-            log.error(f"'{method}' not allowed to have attributes")
+        method, attrs = val.split(":", 1)
     else:
         method, attrs = val, ""
 
@@ -488,6 +504,14 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
                 audio_levels(ensure, src, s, tb, bar, strict, temp, log),
                 aobj.threshold,
             )
+
+        def st(val: int | str) -> int:
+            if isinstance(val, str):
+                return round(float(val) * tb)
+            return val
+
+        mut_remove_small(stream_data, st(aobj.minclip), replace=1, with_=0)
+        mut_remove_small(stream_data, st(aobj.mincut), replace=0, with_=1)
 
         return stream_data
 
