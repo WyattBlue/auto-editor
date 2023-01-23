@@ -567,6 +567,16 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
+                " is a vector, array, string, hash, pair, or range, ", code("#f"),
+                " otherwise.",
+            ]),
+        ),
+        proc(
+            "sequence?",
+            (["v"], "boolean?"),
+            [("v", "any")],
+            text([
+                "Returns ", code("#t"), " if ", var("v"),
                 " is a vector, array, string, pair, or range, ", code("#f"),
                 " otherwise.",
             ]),
@@ -589,9 +599,9 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "slice",
-            (["seq", "start", "[stop]", "[step]"], "iterable?"),
+            (["seq", "start", "[stop]", "[step]"], "sequence?"),
             [
-                ("seq", "iterable?"),
+                ("seq", "sequence?"),
                 ("start", "integer?"),
                 ("stop", "integer?", "(length seq)"),
                 ("step", "integer?", "1"),
@@ -605,8 +615,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "reverse",
-            (["seq"], "iterable?"),
-            [("seq", "iterable?")],
+            (["seq"], "sequence?"),
+            [("seq", "sequence?")],
             text(["Returns ", var("seq"), " in reverse order."]),
         ),
     ],
@@ -630,15 +640,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
         proc(
-            "hash-count",
-            (["hash"], "nonnegative-integer?"),
-            [("hash", "hash?")],
-            text([
-                "Returns how many entries are in the hash."
-            ]),
-        ),
-        proc(
-            "hash-has-key?",
+            "has-key?",
             (["hash", "key"], "bool?"),
             [("hash", "hash?"), ("key", "any")],
             text([
@@ -671,7 +673,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "with-open",
             "(file-binding file-path file-mode) body-expr",
             text(["In the block, the file object to ", code("file-binding"), "\n."
-                code("(with-open (file \"hello.txt\" 'a) ((. file write) \"buy milk\"))"),
+                code("(with-open (file \"todo.txt\" 'a) ((. file write) \"buy milk\"))"),
             ]),
         ),
     ],
@@ -681,7 +683,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "obj attr",
             text(["Returns the specified attribute on the object."]),
         ),
-    "Predicates": [
+    "Misc. Predicates": [
         proc(
             "any",
             (["v"], "boolean?"),

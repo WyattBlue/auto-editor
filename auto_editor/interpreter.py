@@ -561,6 +561,10 @@ is_str = Contract("string?", lambda v: isinstance(v, str))
 is_char = Contract("char?", lambda v: isinstance(v, Char))
 is_iterable = Contract(
     "iterable?",
+    lambda v: isinstance(v, (str, list, dict, range, np.ndarray, Cons, Null)),
+)
+is_sequence = Contract(
+    "sequence?",
     lambda v: isinstance(v, (str, list, range, np.ndarray, Cons, Null)),
 )
 is_range = Contract("range?", lambda v: isinstance(v, range))
@@ -586,6 +590,7 @@ is_frac = Contract("fraction?", lambda v: isinstance(v, Fraction))
 is_float = Contract("float?", lambda v: isinstance(v, float))
 us_int = Contract("nonnegative-integer?", lambda v: isinstance(v, int) and v > -1)
 is_hash = Contract("hash?", lambda v: isinstance(v, dict))
+is_void = Contract("void?", lambda v: v is None)
 
 
 def raise_(msg: str) -> None:
@@ -909,7 +914,7 @@ def apply(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
     return reduce(proc.proc, seq)
 
 
-def ref(seq: str | list | range | Cons | Null | NDArray, ref: int) -> Any:
+def ref(seq: Any, ref: int) -> Any:
     try:
         return Char(seq[ref]) if isinstance(seq, str) else seq[ref]
     except IndexError:
@@ -998,6 +1003,8 @@ class Interpreter:
         "print": Proc("print", palet_print, (1, 1)),
         "exit": Proc("exit", sys.exit, (0, None)),
         "error": Proc("error", raise_, (1, 1), [is_str]),
+        "void": Proc("void", lambda: None, (0, 0)),
+        "void?": is_void,
         # booleans
         "boolean?": is_bool,
         ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
@@ -1011,7 +1018,7 @@ class Interpreter:
         "and": Proc("and", _and, (1, None)),
         "or": Proc("or", _or, (1, None)),
         "xor": Proc("xor", _xor, (2, None)),
-        # number questions
+        # number predicates
         "number?": is_num,
         "real?": is_real,
         "integer?": is_int,
@@ -1032,7 +1039,7 @@ class Interpreter:
         "real-part": Proc("real-part", lambda v: v.real, (1, 1), [is_num]),
         "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
         # reals
-        "expt": Proc("expt", pow, (2, 2), [is_real]),
+        "pow": Proc("pow", pow, (2, 2), [is_real]),
         "exp": Proc("exp", math.exp, (1, 1), [is_real]),
         "abs": Proc("abs", abs, (1, 1), [is_real]),
         "ceil": Proc("ceil", math.ceil, (1, 1), [is_real]),
@@ -1045,7 +1052,6 @@ class Interpreter:
         "log": Proc("log", math.log, (1, 2), [is_real, is_real]),
         "tan": Proc("tan", math.tan, (1, 1), [is_real]),
         "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
-        "modulo": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
         "random": Proc("random", palet_random, (0, 2), [is_int]),
         # symbols
         "symbol?": is_symbol,
@@ -1106,10 +1112,11 @@ class Interpreter:
         "range": Proc("range", range, (1, 3), [is_real, is_real, is_real]),
         # generic iterables
         "iterable?": is_iterable,
+        "sequence?": is_sequence,
         "length": Proc("length", len, (1, 1), [is_iterable]),
-        "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_iterable]),
+        "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_sequence]),
         "ref": Proc("ref", ref, (2, 2), [is_iterable, is_int]),
-        "slice": Proc("slice", p_slice, (2, 4), [is_iterable, is_int]),
+        "slice": Proc("slice", p_slice, (2, 4), [is_sequence, is_int]),
         # procedures
         "procedure?": is_proc,
         "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
@@ -1117,10 +1124,7 @@ class Interpreter:
         # hashs
         "hash?": is_hash,
         "hash": Proc("hash", palet_hash),
-        "hash-count": Proc("hash-count", len, (1, 1), [is_hash]),
-        "hash-has-key?": Proc(
-            "hash-has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]
-        ),
+        "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
         # conversions
         "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
         "string->list": Proc("string->list", string_to_list, (1, 1), [is_str]),
@@ -1318,6 +1322,17 @@ class Interpreter:
             oper = self.visit(node[0])
 
             if not callable(oper):
+                """
+                ...No one wants to write (aref a x y) when they could write a[x,y].
+
+                In this particular case there is a way to finesse our way out of the
+                problem. If we treat data structures as if they were functions on indexes,
+                we could write (a x y) instead, which is even shorter than the Perl form.
+                """
+                if is_iterable(oper):
+                    values = [self.visit(c) for c in node[1:]]
+                    return ref(oper, *values)
+
                 raise MyError(f"{oper}, expected procedure")
 
             values = [self.visit(c) for c in node[1:]]
