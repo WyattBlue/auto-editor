@@ -966,18 +966,18 @@ class Proc:
 class UserProc:
     """A user-defined procedure."""
 
-    def __init__(self, env: dict[str, Any], visit_f: Any, parms: list, body: list):
+    def __init__(self, name: str, env: dict[str, Any], visit_f: Any, parms: list, body: list):
         self.visit_f = visit_f
         self.parms = list(map(str, parms))
         self.body = body
         self.env = env
 
-        self.name = ""
+        self.name = name
         self.arity = len(parms), len(parms)
         self.contracts = None
 
     def __str__(self) -> str:
-        return f"#<procedure:>"
+        return f"#<procedure:{self.name}>"
 
     __repr__ = __str__
 
@@ -1208,16 +1208,26 @@ class Interpreter:
 
                 parameters = node[1]
                 body = node[2:]
-                return UserProc(self.env, self.visit, parameters, body)
+                return UserProc("", self.env, self.visit, parameters, body)
 
             if name == "define":
-                if len(node) != 3:
+                if len(node) < 3:
                     raise MyError("define: bad syntax")
 
                 if not isinstance(node[1], Symbol):
                     raise MyError("define: Must be an identifier")
 
-                self.env[node[1].val] = self.visit(node[2])
+                if isinstance(node[2], list):
+                    if node[2][0] == Symbol("lambda") or node[2][0] == Symbol("λ"):
+                        parameters = node[2][1]
+                        body = node[2][2:]
+                    else:
+                        parameters = node[2]
+                        body = node[3:]
+                    n = node[1].val
+                    self.env[n] = UserProc(n, self.env, self.visit, parameters, body)
+                else:
+                    self.env[node[1].val] = self.visit(node[2])
                 return None
 
             if name == "set!":

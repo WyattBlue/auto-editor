@@ -750,14 +750,12 @@ def main(sys_args: list[str] | None = None):
             ("(begin (define r 10) (* pi (* r r)))", 314.1592653589793),
             ("(for/vector ([i (vector 0 1 2)]) i)", [0, 1, 2]),
             ("(vector -20dB 0dB 20dB)", [0.1, 1, 10]),
+            ("(define ca (lambda (r) (* pi (* r r)))) (ca 5)", 78.53981633974483),
             (
                 "(define ca (lambda (r) (void) (* pi (* r r)))) (ca 5)",
                 78.53981633974483,
             ),
-            (
-                "(define ca (lambda (r) (void) (* pi (* r r)))) (ca 5)",
-                78.53981633974483,
-            ),
+            ("(define my-pow2 (a) (* a a)) (my-pow2 30)", 900),
         )
 
     tests = []
