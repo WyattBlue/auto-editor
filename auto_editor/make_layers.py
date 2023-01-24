@@ -13,6 +13,7 @@ from auto_editor.interpreter import (
     Lexer,
     MyError,
     Parser,
+    env,
     is_boolarr,
 )
 from auto_editor.objs.util import ParserError, parse_dataclass
@@ -108,7 +109,7 @@ def run_interpreter(
         if log.is_debug:
             log.debug(f"edit: {parser}")
 
-        interpreter = Interpreter(parser, filesetup)
+        interpreter = Interpreter(env, parser, filesetup)
         results = interpreter.interpret()
     except (MyError, ZeroDivisionError) as e:
         log.error(e)

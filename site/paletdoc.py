@@ -56,6 +56,14 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
         syntax(
+            "lambda / λ",
+            "args body",
+            text([
+                "Produces a procedure that accepts ", var("args"),
+                " arguments and runs ", var("body"), " when called.",
+            ]),
+        )
+        syntax(
             "if",
             "test-expr then-expr else-expr",
             text([
@@ -127,7 +135,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         value("true", "boolean?", text(["An alias for ", code("#t"), "."])),
         value("false", "boolean?", text(["An alias for ", code("#f"), "."])),
     ],
-    "Number Types": [
+    "Number Predicates": [
         proc(
             "number?",
             (["v"], "boolean?"),
@@ -361,6 +369,12 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["x", "..."], "real?"),
             [("x", "real?")],
             text(["Returns smallest value of the ", var("x"), "s."]),
+        ),
+        proc(
+            "pow",
+            (["z", "w"], "real?"),
+            [("z", "real?"), ("w", "real?")],
+            text(["Returns ", var("z"), " raised to the ", var("w"), " power."]),
         ),
     ],
     "Vectors": [

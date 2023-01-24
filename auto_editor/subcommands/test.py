@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import platform
 import shutil
 import subprocess
 import sys
@@ -23,6 +22,7 @@ from auto_editor.interpreter import (
     Null,
     Parser,
     Symbol,
+    env,
 )
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
@@ -63,10 +63,7 @@ class Checker:
 
 class Runner:
     def __init__(self) -> None:
-        if platform.system() == "Windows":
-            self.program = ["py", "-m", "auto_editor"]
-        else:
-            self.program = ["python3", "-m", "auto_editor"]
+        self.program = [sys.executable, "-m", "auto_editor"]
 
     def main(
         self, inputs: list[str], cmd: list[str], output: str | None = None
@@ -607,8 +604,8 @@ def main(sys_args: list[str] | None = None):
             for text, expected in cases:
                 try:
                     parser = Parser(Lexer(text))
-                    interpreter = Interpreter(parser, None)
-                    interpreter.GLOBAL_SCOPE["timebase"] = Fraction(30)
+                    env["timebase"] = Fraction(30)
+                    interpreter = Interpreter(env, parser, None)
                     results = interpreter.interpret()
                 except MyError as e:
                     raise ValueError(f"{text}\nMyError: {e}")
@@ -752,6 +749,15 @@ def main(sys_args: list[str] | None = None):
             ("(void)", None),
             ("(begin (define r 10) (* pi (* r r)))", 314.1592653589793),
             ("(for/vector ([i (vector 0 1 2)]) i)", [0, 1, 2]),
+            ("(vector -20dB 0dB 20dB)", [0.1, 1, 10]),
+            (
+                "(define ca (lambda (r) (void) (* pi (* r r)))) (ca 5)",
+                78.53981633974483,
+            ),
+            (
+                "(define ca (lambda (r) (void) (* pi (* r r)))) (ca 5)",
+                78.53981633974483,
+            ),
         )
 
     tests = []

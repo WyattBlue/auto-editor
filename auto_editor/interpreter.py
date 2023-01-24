@@ -405,20 +405,6 @@ class Lexer:
 ###############################################################################
 
 
-class Compound:
-    __slots__ = "children"
-
-    def __init__(self, children: list):
-        self.children = children
-
-    def __str__(self) -> str:
-        s = "{Compound"
-        for child in self.children:
-            s += f" {child}"
-        s += "}"
-        return s
-
-
 class BoolArr:
     __slots__ = "val"
 
@@ -439,12 +425,6 @@ class Parser:
 
         self.current_token = self.lexer.get_next_token()
 
-    def comp(self) -> Compound:
-        comp_kids = []
-        while self.current_token.type not in (EOF, RPAREN, RBRAC, RCUR):
-            comp_kids.append(self.expr())
-        return Compound(comp_kids)
-
     def expr(self) -> Any:
         token = self.current_token
 
@@ -463,7 +443,7 @@ class Parser:
 
         if token.type == DB:
             self.eat(DB)
-            return [Symbol("expt"), 10, [Symbol("/"), token.value, 20]]
+            return [Symbol("pow"), 10, [Symbol("/"), token.value, 20]]
 
         if token.type == PER:
             self.eat(PER)
@@ -493,7 +473,7 @@ class Parser:
         return childs
 
     def __str__(self) -> str:
-        result = str(self.comp())
+        result = str(self.expr())
 
         self.lexer.pos = 0
         self.lexer.char = self.lexer.text[0]
@@ -516,6 +496,11 @@ class Contract:
     def __init__(self, name: str, c: Callable[[object], bool]):
         self.name = name
         self.c = c
+
+    def __str__(self) -> str:
+        return f"<procedure:{self.name}>"
+
+    __repr__ = __str__
 
     def __call__(self, v: object) -> bool:
         return self.c(v)
@@ -957,20 +942,9 @@ def palet_hash(*args: Any) -> dict:
 
 ###############################################################################
 #                                                                             #
-#  INTERPRETER                                                                #
+#  ENVIRONMENT                                                                #
 #                                                                             #
 ###############################################################################
-
-
-@dataclass
-class FileSetup:
-    src: FileInfo
-    ensure: Ensure
-    strict: bool
-    tb: Fraction
-    bar: Bar
-    temp: str
-    log: Log
 
 
 @dataclass
@@ -989,166 +963,208 @@ class Proc:
         return self.proc(*vals)
 
 
-class Interpreter:
-    GLOBAL_SCOPE: dict[str, Any] = {
-        # constants
-        "true": True,
-        "false": False,
-        "null": Null(),
-        "pi": math.pi,
-        # actions
-        "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
-        "display": Proc("display", display, (1, 1)),
-        "displayln": Proc("display", displayln, (1, 1)),
-        "print": Proc("print", palet_print, (1, 1)),
-        "exit": Proc("exit", sys.exit, (0, None)),
-        "error": Proc("error", raise_, (1, 1), [is_str]),
-        "void": Proc("void", lambda: None, (0, 0)),
-        "void?": is_void,
-        # booleans
-        "boolean?": is_bool,
-        ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
-        ">=": Proc(">=", lambda a, b: a >= b, (2, 2), [is_real, is_real]),
-        "<": Proc("<", lambda a, b: a < b, (2, 2), [is_real, is_real]),
-        "<=": Proc("<=", lambda a, b: a <= b, (2, 2), [is_real, is_real]),
-        "=": Proc("=", equal_num, (1, None), [is_num]),
-        "eq?": Proc("eq?", lambda a, b: a is b, (2, 2)),
-        "equal?": Proc("equal?", is_equal, (2, 2)),
-        "not": Proc("not", _not, (1, 1)),
-        "and": Proc("and", _and, (1, None)),
-        "or": Proc("or", _or, (1, None)),
-        "xor": Proc("xor", _xor, (2, None)),
-        # number predicates
-        "number?": is_num,
-        "real?": is_real,
-        "integer?": is_int,
-        "nonnegative-integer?": us_int,
-        "float?": is_float,
-        "fraction?": is_frac,
-        "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
-        "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
-        "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_num]),
-        # numbers
-        "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
-        "-": Proc("-", minus, (1, None), [is_num]),
-        "*": Proc("*", mul, (0, None), [is_num]),
-        "/": Proc("/", div, (1, None), [is_num]),
-        "add1": Proc("add1", lambda v: v + 1, (1, 1), [is_num]),
-        "sub1": Proc("sub1", lambda v: v - 1, (1, 1), [is_num]),
-        "sqrt": Proc("sqrt", _sqrt, (1, 1), [is_num]),
-        "real-part": Proc("real-part", lambda v: v.real, (1, 1), [is_num]),
-        "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
-        # reals
-        "pow": Proc("pow", pow, (2, 2), [is_real]),
-        "exp": Proc("exp", math.exp, (1, 1), [is_real]),
-        "abs": Proc("abs", abs, (1, 1), [is_real]),
-        "ceil": Proc("ceil", math.ceil, (1, 1), [is_real]),
-        "floor": Proc("floor", math.floor, (1, 1), [is_real]),
-        "round": Proc("round", round, (1, 1), [is_real]),
-        "max": Proc("max", lambda *v: max(v), (1, None), [is_real]),
-        "min": Proc("min", lambda *v: min(v), (1, None), [is_real]),
-        "sin": Proc("sin", math.sin, (1, 1), [is_real]),
-        "cos": Proc("cos", math.cos, (1, 1), [is_real]),
-        "log": Proc("log", math.log, (1, 2), [is_real, is_real]),
-        "tan": Proc("tan", math.tan, (1, 1), [is_real]),
-        "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
-        "random": Proc("random", palet_random, (0, 2), [is_int]),
-        # symbols
-        "symbol?": is_symbol,
-        "symbol->string": Proc("symbol->string", str, (1, 1), [is_symbol]),
-        "string->symbol": Proc("string->symbol", Symbol, (1, 1), [is_str]),
-        # strings
-        "string?": is_str,
-        "char?": is_char,
-        "string": Proc("string", string_append, (0, None), [is_char]),
-        "string-append": Proc("string-append", string_append, (0, None), [is_str]),
-        "string-upcase": Proc("string-upcase", str.upper, (1, 1), [is_str]),
-        "string-downcase": Proc("string-downcase", str.lower, (1, 1), [is_str]),
-        "string-titlecase": Proc("string-titlecase", str.title, (1, 1), [is_str]),
-        "char->integer": Proc("char->integer", lambda c: ord(c.val), (1, 1), [is_char]),
-        "integer->char": Proc("integer->char", Char, (1, 1), [is_int]),
-        # vectors
-        "vector?": is_vector,
-        "vector": Proc("vector", lambda *a: list(a), (0, None)),
-        "make-vector": Proc(
-            "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, any_p]
-        ),
-        "vector-append": Proc("vector-append", vector_append, (0, None), [is_vector]),
-        "vector-pop!": Proc("vector-pop!", list.pop, (1, 1), [is_vector]),
-        "vector-add!": Proc("vector-add!", list.append, (2, 2), [is_vector, any_p]),
-        "vector-set!": Proc(
-            "vector-set!", vector_set, (3, 3), [is_vector, is_int, any_p]
-        ),
-        "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
-        # cons/list
-        "pair?": is_pair,
-        "null?": is_null,
-        "cons": Proc("cons", Cons, (2, 2)),
-        "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
-        "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
-        "list?": is_list,
-        "list": Proc("list", _list, (0, None)),
-        "list-ref": Proc("list-ref", ref, (2, 2), [is_pair, us_int]),
-        # arrays
-        "array?": is_array,
-        "array": Proc("array", array_proc, (2, None), [is_symbol, is_real]),
-        "make-array": Proc(
-            "make-array", make_array, (2, 3), [is_symbol, us_int, is_real]
-        ),
-        "array-splice!": Proc(
-            "array-splice!", splice, (2, 4), [is_array, is_real, is_int, is_int]
-        ),
-        "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
-        # bool arrays
-        "bool-array?": is_boolarr,
-        "bool-array": Proc(
-            "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [us_int]
-        ),
-        "margin": Proc("margin", margin, (2, 3), None),
-        "mincut": Proc("mincut", mincut, (2, 2), [is_int, is_boolarr]),
-        "minclip": Proc("minclip", minclip, (2, 2), [is_int, is_boolarr]),
-        # ranges
-        "range?": is_range,
-        "range": Proc("range", range, (1, 3), [is_real, is_real, is_real]),
-        # generic iterables
-        "iterable?": is_iterable,
-        "sequence?": is_sequence,
-        "length": Proc("length", len, (1, 1), [is_iterable]),
-        "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_sequence]),
-        "ref": Proc("ref", ref, (2, 2), [is_iterable, is_int]),
-        "slice": Proc("slice", p_slice, (2, 4), [is_sequence, is_int]),
-        # procedures
-        "procedure?": is_proc,
-        "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
-        "apply": Proc("apply", apply, (2, 2), [is_proc, is_iterable]),
-        # hashs
-        "hash?": is_hash,
-        "hash": Proc("hash", palet_hash),
-        "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
-        # conversions
-        "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
-        "string->list": Proc("string->list", string_to_list, (1, 1), [is_str]),
-        "string->vector": Proc(
-            "string->vector", lambda s: [Char(c) for c in s], (1, 1), [is_str]
-        ),
-        "list->vector": Proc("list->vector", list_to_vector, (1, 1), [is_pair]),
-        "vector->list": Proc("vector->list", vector_to_list, (1, 1), [is_vector]),
-        "range->list": Proc("range->list", stream_to_list, (1, 1), [is_range]),
-        "range->vector": Proc("range->vector", list, (1, 1), [is_range]),
-        # predicates
-        "any": any_p,
-    }
+class UserProc:
+    """A user-defined procedure."""
 
-    def __init__(self, parser: Parser, filesetup: FileSetup | None):
+    def __init__(self, env: dict[str, Any], visit_f: Any, parms: list, body: list):
+        self.visit_f = visit_f
+        self.parms = list(map(str, parms))
+        self.body = body
+        self.env = env
+
+        self.name = ""
+        self.arity = len(parms), len(parms)
+        self.contracts = None
+
+    def __str__(self) -> str:
+        return f"#<procedure:>"
+
+    __repr__ = __str__
+
+    def __call__(self, *args: Any) -> Any:
+        self.env.update(zip(self.parms, args))
+        return self.visit_f(self.body[-1])
+
+
+env: dict[str, Any] = {
+    # constants
+    "true": True,
+    "false": False,
+    "null": Null(),
+    "pi": math.pi,
+    # actions
+    "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
+    "display": Proc("display", display, (1, 1)),
+    "displayln": Proc("display", displayln, (1, 1)),
+    "print": Proc("print", palet_print, (1, 1)),
+    "exit": Proc("exit", sys.exit, (0, None)),
+    "error": Proc("error", raise_, (1, 1), [is_str]),
+    "void": Proc("void", lambda: None, (0, 0)),
+    "void?": is_void,
+    # booleans
+    "boolean?": is_bool,
+    ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
+    ">=": Proc(">=", lambda a, b: a >= b, (2, 2), [is_real, is_real]),
+    "<": Proc("<", lambda a, b: a < b, (2, 2), [is_real, is_real]),
+    "<=": Proc("<=", lambda a, b: a <= b, (2, 2), [is_real, is_real]),
+    "=": Proc("=", equal_num, (1, None), [is_num]),
+    "eq?": Proc("eq?", lambda a, b: a is b, (2, 2)),
+    "equal?": Proc("equal?", is_equal, (2, 2)),
+    "not": Proc("not", _not, (1, 1)),
+    "and": Proc("and", _and, (1, None)),
+    "or": Proc("or", _or, (1, None)),
+    "xor": Proc("xor", _xor, (2, None)),
+    # number predicates
+    "number?": is_num,
+    "real?": is_real,
+    "integer?": is_int,
+    "nonnegative-integer?": us_int,
+    "float?": is_float,
+    "fraction?": is_frac,
+    "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
+    "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
+    "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_num]),
+    # numbers
+    "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
+    "-": Proc("-", minus, (1, None), [is_num]),
+    "*": Proc("*", mul, (0, None), [is_num]),
+    "/": Proc("/", div, (1, None), [is_num]),
+    "add1": Proc("add1", lambda v: v + 1, (1, 1), [is_num]),
+    "sub1": Proc("sub1", lambda v: v - 1, (1, 1), [is_num]),
+    "sqrt": Proc("sqrt", _sqrt, (1, 1), [is_num]),
+    "real-part": Proc("real-part", lambda v: v.real, (1, 1), [is_num]),
+    "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
+    # reals
+    "pow": Proc("pow", pow, (2, 2), [is_real]),
+    "exp": Proc("exp", math.exp, (1, 1), [is_real]),
+    "abs": Proc("abs", abs, (1, 1), [is_real]),
+    "ceil": Proc("ceil", math.ceil, (1, 1), [is_real]),
+    "floor": Proc("floor", math.floor, (1, 1), [is_real]),
+    "round": Proc("round", round, (1, 1), [is_real]),
+    "max": Proc("max", lambda *v: max(v), (1, None), [is_real]),
+    "min": Proc("min", lambda *v: min(v), (1, None), [is_real]),
+    "sin": Proc("sin", math.sin, (1, 1), [is_real]),
+    "cos": Proc("cos", math.cos, (1, 1), [is_real]),
+    "log": Proc("log", math.log, (1, 2), [is_real, is_real]),
+    "tan": Proc("tan", math.tan, (1, 1), [is_real]),
+    "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
+    "random": Proc("random", palet_random, (0, 2), [is_int]),
+    # symbols
+    "symbol?": is_symbol,
+    "symbol->string": Proc("symbol->string", str, (1, 1), [is_symbol]),
+    "string->symbol": Proc("string->symbol", Symbol, (1, 1), [is_str]),
+    # strings
+    "string?": is_str,
+    "char?": is_char,
+    "string": Proc("string", string_append, (0, None), [is_char]),
+    "string-append": Proc("string-append", string_append, (0, None), [is_str]),
+    "string-upcase": Proc("string-upcase", str.upper, (1, 1), [is_str]),
+    "string-downcase": Proc("string-downcase", str.lower, (1, 1), [is_str]),
+    "string-titlecase": Proc("string-titlecase", str.title, (1, 1), [is_str]),
+    "char->integer": Proc("char->integer", lambda c: ord(c.val), (1, 1), [is_char]),
+    "integer->char": Proc("integer->char", Char, (1, 1), [is_int]),
+    # vectors
+    "vector?": is_vector,
+    "vector": Proc("vector", lambda *a: list(a), (0, None)),
+    "make-vector": Proc(
+        "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, any_p]
+    ),
+    "vector-append": Proc("vector-append", vector_append, (0, None), [is_vector]),
+    "vector-pop!": Proc("vector-pop!", list.pop, (1, 1), [is_vector]),
+    "vector-add!": Proc("vector-add!", list.append, (2, 2), [is_vector, any_p]),
+    "vector-set!": Proc("vector-set!", vector_set, (3, 3), [is_vector, is_int, any_p]),
+    "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
+    # cons/list
+    "pair?": is_pair,
+    "null?": is_null,
+    "cons": Proc("cons", Cons, (2, 2)),
+    "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
+    "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
+    "list?": is_list,
+    "list": Proc("list", _list, (0, None)),
+    "list-ref": Proc("list-ref", ref, (2, 2), [is_pair, us_int]),
+    # arrays
+    "array?": is_array,
+    "array": Proc("array", array_proc, (2, None), [is_symbol, is_real]),
+    "make-array": Proc("make-array", make_array, (2, 3), [is_symbol, us_int, is_real]),
+    "array-splice!": Proc(
+        "array-splice!", splice, (2, 4), [is_array, is_real, is_int, is_int]
+    ),
+    "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
+    # bool arrays
+    "bool-array?": is_boolarr,
+    "bool-array": Proc(
+        "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [us_int]
+    ),
+    "margin": Proc("margin", margin, (2, 3), None),
+    "mincut": Proc("mincut", mincut, (2, 2), [is_int, is_boolarr]),
+    "minclip": Proc("minclip", minclip, (2, 2), [is_int, is_boolarr]),
+    # ranges
+    "range?": is_range,
+    "range": Proc("range", range, (1, 3), [is_real, is_real, is_real]),
+    # generic iterables
+    "iterable?": is_iterable,
+    "sequence?": is_sequence,
+    "length": Proc("length", len, (1, 1), [is_iterable]),
+    "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_sequence]),
+    "ref": Proc("ref", ref, (2, 2), [is_iterable, is_int]),
+    "slice": Proc("slice", p_slice, (2, 4), [is_sequence, is_int]),
+    # procedures
+    "procedure?": is_proc,
+    "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
+    "apply": Proc("apply", apply, (2, 2), [is_proc, is_iterable]),
+    # hashs
+    "hash?": is_hash,
+    "hash": Proc("hash", palet_hash),
+    "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
+    # conversions
+    "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
+    "string->list": Proc("string->list", string_to_list, (1, 1), [is_str]),
+    "string->vector": Proc(
+        "string->vector", lambda s: [Char(c) for c in s], (1, 1), [is_str]
+    ),
+    "list->vector": Proc("list->vector", list_to_vector, (1, 1), [is_pair]),
+    "vector->list": Proc("vector->list", vector_to_list, (1, 1), [is_vector]),
+    "range->list": Proc("range->list", stream_to_list, (1, 1), [is_range]),
+    "range->vector": Proc("range->vector", list, (1, 1), [is_range]),
+    # predicates
+    "any": any_p,
+}
+
+
+###############################################################################
+#                                                                             #
+#  INTERPRETER                                                                #
+#                                                                             #
+###############################################################################
+
+
+@dataclass
+class FileSetup:
+    src: FileInfo
+    ensure: Ensure
+    strict: bool
+    tb: Fraction
+    bar: Bar
+    temp: str
+    log: Log
+
+
+class Interpreter:
+    def __init__(
+        self, env: dict[str, Any], parser: Parser, filesetup: FileSetup | None
+    ):
         self.parser = parser
         self.filesetup = filesetup
 
         if filesetup is not None:
-            self.GLOBAL_SCOPE["timebase"] = filesetup.tb
+            env["timebase"] = filesetup.tb
+
+        self.env = env
 
     def visit(self, node: Any) -> Any:
         if isinstance(node, Symbol):
-            val = self.GLOBAL_SCOPE.get(node.val)
+            val = self.env.get(node.val)
             if val is None:
                 raise MyError(f"{node.val} is undefined")
             return val
@@ -1157,9 +1173,6 @@ class Interpreter:
             if self.filesetup is None:
                 raise MyError("Can't use edit methods if there's no input files")
             return edit_method(node.val, self.filesetup)
-
-        if isinstance(node, Compound):
-            return [self.visit(c) for c in node.children]
 
         if isinstance(node, list):
             if not node:
@@ -1189,10 +1202,40 @@ class Interpreter:
 
                 return var, my_iter
 
+            if name == "lambda" or name == "λ":
+                if not isinstance(node[1], list):
+                    raise MyError("lambda: bad syntax")
+
+                parameters = node[1]
+                body = node[2:]
+                return UserProc(self.env, self.visit, parameters, body)
+
+            if name == "define":
+                if len(node) != 3:
+                    raise MyError("define: bad syntax")
+
+                if not isinstance(node[1], Symbol):
+                    raise MyError("define: Must be an identifier")
+
+                self.env[node[1].val] = self.visit(node[2])
+                return None
+
+            if name == "set!":
+                if len(node) != 3:
+                    raise MyError("set!: bad syntax")
+                if not isinstance(node[1], Symbol):
+                    raise MyError("set!: Must be an identifier")
+
+                symbol = node[1].val
+                if symbol not in self.env:
+                    raise MyError(f"Cannot set variable {symbol} before definition")
+                self.env[symbol] = self.visit(node[2])
+                return None
+
             if name == "for":
                 var, my_iter = check_for_syntax("for", node)
                 for item in my_iter:
-                    self.GLOBAL_SCOPE[var.val] = item
+                    self.env[var.val] = item
                     for c in node[2:]:
                         self.visit(c)
                 return None
@@ -1201,10 +1244,10 @@ class Interpreter:
                 results = []
                 var, my_iter = check_for_syntax("for", node)
                 for item in my_iter:
-                    self.GLOBAL_SCOPE[var.val] = item
+                    self.env[var.val] = item
                     results.append([self.visit(c) for c in node[2:]][-1])
 
-                del self.GLOBAL_SCOPE[var.val]
+                del self.env[var.val]
                 return results
 
             if name == "if":
@@ -1234,29 +1277,6 @@ class Interpreter:
                 if isinstance(node[1], list):
                     return deep_list(node[1])
                 return node[1]
-
-            if name == "define":
-                if len(node) != 3:
-                    raise MyError("define: bad syntax")
-
-                if not isinstance(node[1], Symbol):
-                    raise MyError("define: Must be an identifier")
-
-                symbol = node[1].val
-                self.GLOBAL_SCOPE[symbol] = self.visit(node[2])
-                return None
-
-            if name == "set!":
-                if len(node) != 3:
-                    raise MyError("set!: bad syntax")
-                if not isinstance(node[1], Symbol):
-                    raise MyError("set!: Must be an identifier")
-
-                symbol = node[1].val
-                if symbol not in self.GLOBAL_SCOPE:
-                    raise MyError(f"Cannot set variable {symbol} before definition")
-                self.GLOBAL_SCOPE[symbol] = self.visit(node[2])
-                return None
 
             if name == "with-open":
                 if len(node) < 2:
@@ -1295,11 +1315,11 @@ class Interpreter:
                             {"write": Proc("write", file.write, (1, 1), [is_str])}
                         )
 
-                    self.GLOBAL_SCOPE[file_binding] = open_file
+                    self.env[file_binding] = open_file
                     for c in node[2:]:
                         self.visit(c)
 
-                del self.GLOBAL_SCOPE[file_binding]
+                del self.env[file_binding]
                 return None
 
             if name == ".":
@@ -1345,4 +1365,7 @@ class Interpreter:
         return node
 
     def interpret(self) -> Any:
-        return self.visit(self.parser.comp())
+        result = []
+        while self.parser.current_token.type not in (EOF, RPAREN, RBRAC, RCUR):
+            result.append(self.visit(self.parser.expr()))
+        return result
