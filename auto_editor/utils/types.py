@@ -303,7 +303,8 @@ class Args:
     progress: str = "modern"
     version: bool = False
     debug: bool = False
-    show_ffmpeg_debug: bool = False
+    show_ffmpeg_commands: bool = False
+    show_ffmpeg_output: bool = False
     quiet: bool = False
     preview: bool = False
     margin: Margin = ("0.2", "0.2")

@@ -20,12 +20,13 @@ SUB_EXTS = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
 
 
 class FFmpeg:
-    __slots__ = ("debug", "path", "version")
+    __slots__ = ("debug", "show_cmd", "path", "version")
 
     def __init__(
         self,
         ff_location: str | None = None,
         my_ffmpeg: bool = False,
+        show_cmd: bool = False,
         debug: bool = False,
     ):
         def _set_ff_path(ff_location: str | None, my_ffmpeg: bool) -> str:
@@ -42,6 +43,7 @@ class FFmpeg:
                 return "ffmpeg"
 
         self.debug = debug
+        self.show_cmd = show_cmd
         self.path = _set_ff_path(ff_location, my_ffmpeg)
         try:
             _version = get_stdout([self.path, "-version"]).split("\n")[0]
@@ -65,11 +67,11 @@ class FFmpeg:
             sys.stderr.write(f"FFmpeg: {message}\n")
 
     def print_cmd(self, cmd: list[str]) -> None:
-        if self.debug:
-            sys.stderr.write(f"FFmpeg run: {' '.join(cmd)}\n")
+        if self.show_cmd:
+            sys.stderr.write(f"{' '.join(cmd)}\n\n")
 
     def run(self, cmd: list[str]) -> None:
-        cmd = [self.path, "-y", "-hide_banner"] + cmd
+        cmd = [self.path, "-hide_banner", "-y"] + cmd
         if not self.debug:
             cmd.extend(["-nostats", "-loglevel", "error"])
         self.print_cmd(cmd)

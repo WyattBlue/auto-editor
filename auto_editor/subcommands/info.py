@@ -90,7 +90,7 @@ class MediaJson(TypedDict, total=False):
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
     args = info_options(ArgumentParser("info")).parse_args(InfoArgs, sys_args)
 
-    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
+    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg)
     log = Log(quiet=not args.json)
 
     file_info: dict[str, MediaJson] = {}
