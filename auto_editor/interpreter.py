@@ -966,7 +966,9 @@ class Proc:
 class UserProc:
     """A user-defined procedure."""
 
-    def __init__(self, name: str, env: dict[str, Any], visit_f: Any, parms: list, body: list):
+    def __init__(
+        self, name: str, env: dict[str, Any], visit_f: Any, parms: list, body: list
+    ):
         self.visit_f = visit_f
         self.parms = list(map(str, parms))
         self.body = body

@@ -108,7 +108,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     parser = levels_options(ArgumentParser("levels"))
     args = parser.parse_args(LevelArgs, sys_args)
 
-    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
+    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg)
 
     bar = Bar("none")
     temp = setup_tempdir(None, Log())

@@ -206,7 +206,10 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_argument("--debug", flag=True, help="Show debugging messages and values")
     parser.add_argument(
-        "--show-ffmpeg-debug", flag=True, help="Show ffmpeg progress and output"
+        "--show-ffmpeg-commands", flag=True, help="Show ffmpeg commands"
+    )
+    parser.add_argument(
+        "--show-ffmpeg-output", flag=True, help="Show ffmpeg stdout and stderr"
     )
     parser.add_argument("--quiet", "-q", flag=True, help="Display less output")
     parser.add_argument(
@@ -305,7 +308,12 @@ def main() -> None:
         sys.exit()
 
     log = Log(args.debug, args.quiet)
-    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, args.show_ffmpeg_debug)
+    ffmpeg = FFmpeg(
+        args.ffmpeg_location,
+        args.my_ffmpeg,
+        args.show_ffmpeg_commands,
+        args.show_ffmpeg_output,
+    )
 
     if args.debug and args.input == []:
         import platform as plat
