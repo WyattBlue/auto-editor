@@ -69,7 +69,6 @@ setup(
             "aedesc=auto_editor.subcommands.desc:main",
             "aeinfo=auto_editor.subcommands.info:main",
             "aesubdump=auto_editor.subcommands.subdump:main",
-            "aegrep=auto_editor.subcommands.grep:main",
             "aelevels=auto_editor.subcommands.levels:main",
         ]
     },
