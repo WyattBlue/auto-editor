@@ -9,6 +9,7 @@ from fractions import Fraction
 import auto_editor
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import (
+    ClosingError,
     FileSetup,
     Interpreter,
     Lexer,
@@ -85,25 +86,34 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         filesetup = FileSetup(src, ensure, strict, tb, Bar("none"), temp, log)
 
     print(f"Auto-Editor {auto_editor.version} ({auto_editor.__version__})")
+    text = None
 
     try:
         while True:
-            text = input("> ")
+            if text is None:
+                text = input("> ")
+            else:
+                text += " " + input("   ")
 
             try:
                 lexer = Lexer(text)
                 parser = Parser(lexer)
             except MyError as e:
+                text = None
                 print(f"error: {e}")
                 continue
-
             try:
                 interpreter = Interpreter(env, parser, filesetup)
                 for result in interpreter.interpret():
                     if repr_result := print_str(result):
                         sys.stdout.write(f"{repr_result}\n")
+            except ClosingError:
+                continue
             except (MyError, ZeroDivisionError) as e:
+                text = None
                 print(f"error: {e}")
+
+            text = None
 
     except (KeyboardInterrupt, EOFError):
         print("")

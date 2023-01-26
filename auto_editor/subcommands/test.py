@@ -755,7 +755,9 @@ def main(sys_args: list[str] | None = None):
                 "(define ca (lambda (r) (void) (* pi (* r r)))) (ca 5)",
                 78.53981633974483,
             ),
-            ("(define my-pow2 (a) (* a a)) (my-pow2 30)", 900),
+            ("(define (my-pow2 a) (* a a)) (my-pow2 30)", 900),
+            ("(define (my-pow2 a) (void) (* a a)) (my-pow2 30)", 900),
+            # ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
         )
 
     tests = []
