@@ -33,6 +33,10 @@ class MyError(Exception):
     pass
 
 
+class ClosingError(MyError):
+    pass
+
+
 def display_dtype(dtype: np.dtype) -> str:
     if dtype.kind == "b":
         return "bool"
@@ -460,7 +464,7 @@ class Parser:
             childs = []
             while self.current_token.type != closing:
                 if self.current_token.type == EOF:
-                    raise MyError(f"Expected closing '{closing}' before end")
+                    raise ClosingError(f"Expected closing '{closing}' before end")
                 childs.append(self.expr())
 
             self.eat(closing)
@@ -1216,16 +1220,31 @@ class Interpreter:
                 if len(node) < 3:
                     raise MyError("define: bad syntax")
 
-                if not isinstance(node[1], Symbol):
+                if isinstance(node[1], list):
+                    if len(node[1]) < 1 or not isinstance(node[1][0], Symbol):
+                        raise MyError("define: bad syntax")
+
+                    n = node[1][0].val
+                    parameters = node[1][1:]
+                    body = node[2:]
+                    self.env[n] = UserProc(n, self.env, self.visit, parameters, body)
+                    return None
+                elif not isinstance(node[1], Symbol):
                     raise MyError("define: Must be an identifier")
 
-                if isinstance(node[2], list):
-                    if node[2][0] == Symbol("lambda") or node[2][0] == Symbol("λ"):
-                        parameters = node[2][1]
-                        body = node[2][2:]
-                    else:
-                        parameters = node[2]
-                        body = node[3:]
+                if len(node) > 3:
+                    raise MyError(
+                        "define: bad syntax (multiple expressions after identifier)"
+                    )
+
+                if (
+                    isinstance(node[2], list)
+                    and node[2]
+                    and isinstance(node[2][0], Symbol)
+                    and node[2][0].val in ("lambda", "λ")
+                ):
+                    parameters = node[2][1]
+                    body = node[2][2:]
                     n = node[1].val
                     self.env[n] = UserProc(n, self.env, self.visit, parameters, body)
                 else:
