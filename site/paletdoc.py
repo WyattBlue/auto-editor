@@ -62,7 +62,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
                 "Produces a procedure that accepts ", var("args"),
                 " arguments and runs ", var("body"), " when called.",
             ]),
-        )
+        ),
         syntax(
             "if",
             "test-expr then-expr else-expr",
@@ -70,7 +70,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
                 "Evaluates ", var("test-expr"), ". If ", code("#t"), " then evaluate ",
                 var("then-expr"), " else evaluate ", var("else-expr"),
                 ". An error will be raised if evaluated ",
-                var("test-expr"), " is not a ", code("boolean?"), ".",
+                var("test-expr"), " is not a ", code("bool?"), ".",
             ]),
         ),
         syntax(
@@ -79,7 +79,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             text([
                 "Evaluates ", var("test-expr"), ". If ", code("#t"), " then evaluate ",
                 var("body"), " else do nothing. An error will be raised if evaluated ",
-                var("test-expr"), " is not a ", code("boolean?"), ".",
+                var("test-expr"), " is not a ", code("bool?"), ".",
             ]),
         ),
     ],
@@ -105,7 +105,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
     "Equality": [
         proc(
             "equal?",
-            (["v1", "v2"], "boolean?"),
+            (["v1", "v2"], "bool?"),
             [("v1", "any"), ("v2", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v1"), " and ", var("v2"),
@@ -114,7 +114,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "eq?",
-            (["v1", "v2"], "boolean?"),
+            (["v1", "v2"], "bool?"),
             [("v1", "any"), ("v2", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v1"), " and ", var("v2"),
@@ -124,21 +124,21 @@ doc: dict[str, list[proc | value | syntax | text]] = {
     ],
     "Booleans": [
         proc(
-            "boolean?",
-            (["v"], "boolean?"),
+            "bool?",
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is ", code("#t"), " or ",
                 code("#f"), ", ", code("#f"), " otherwise."
             ]),
         ),
-        value("true", "boolean?", text(["An alias for ", code("#t"), "."])),
-        value("false", "boolean?", text(["An alias for ", code("#f"), "."])),
+        value("true", "bool?", text(["An alias for ", code("#t"), "."])),
+        value("false", "bool?", text(["An alias for ", code("#f"), "."])),
     ],
     "Number Predicates": [
         proc(
             "number?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a number, ", code("#f"),
@@ -147,7 +147,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "real?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a real number, ",
@@ -155,8 +155,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
         proc(
-            "integer?",
-            (["v"], "boolean?"),
+            "int?",
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is an integer, ",
@@ -164,8 +164,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
         proc(
-            "nonnegative-integer?",
-            (["v"], "boolean?"),
+            "uint?",
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is an integer and ",
@@ -175,7 +175,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "zero?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is equal to ", code("0"),
@@ -184,7 +184,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "positive?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is greater than ",
@@ -193,7 +193,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "negative?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is less than ", code("0"),
@@ -270,8 +270,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "mod",
-            (["n", "m"], "integer?"),
-            [("n", "integer?"), ("m", "integer?")],
+            (["n", "m"], "int?"),
+            [("n", "int?"), ("m", "int?")],
             text(["Return the modulo of ", var("n"), " and ", var("m"), "."]),
         ),
         proc(
@@ -294,7 +294,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "=",
-            (["z", "w", "..."], "boolean?"),
+            (["z", "w", "..."], "bool?"),
             [("z", "number?"), ("w", "number?")],
             text(
                 [
@@ -308,7 +308,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "<",
-            (["x", "y"], "boolean?"),
+            (["x", "y"], "bool?"),
             [("x", "real?"), ("y", "real?")],
             text(
                 [
@@ -326,7 +326,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "<=",
-            (["x", "y"], "boolean?"),
+            (["x", "y"], "bool?"),
             [("x", "real?"), ("y", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("x"), " is less than or equal to ",
@@ -335,7 +335,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             ">",
-            (["x", "y"], "boolean?"),
+            (["x", "y"], "bool?"),
             [("x", "real?"), ("y", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("x"), " is greater than ",
@@ -344,7 +344,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             ">=",
-            (["x", "y"], "boolean?"),
+            (["x", "y"], "bool?"),
             [("x", "real?"), ("y", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("x"),
@@ -380,7 +380,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
     "Vectors": [
         proc(
             "vector?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a vector, ", code("#f"),
@@ -399,7 +399,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         proc(
             "make-vector",
             (["size", "[v]"], "vector?"),
-            [("size", "nonnegative-integer?"), ("v", "any", "0")],
+            [("size", "uint?"), ("v", "any", "0")],
             text([
                 "Returns a new vector with ", var("size"), " slots, all filled with ",
                 var("v"), "s.",
@@ -420,7 +420,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         proc(
             "vector-set!",
             (["vec", "pos", "v"], "none"),
-            [("vec", "vector?"), ("pos", "integer?"), ("v", "any")],
+            [("vec", "vector?"), ("pos", "int?"), ("v", "any")],
             text(["Set slot ", var("pos"), " of ", var("vec"), " to ", var("v"), "."]),
         ),
         proc(
@@ -436,7 +436,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
     "Arrays": [
         proc(
             "array?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is an array, ",
@@ -463,8 +463,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             [
                 ("arr", "array?"),
                 ("v", "real?"),
-                ("start", "integer?", "0"),
-                ("stop", "integer?", "(length arr)"),
+                ("start", "int?", "0"),
+                ("stop", "int?", "(length arr)"),
             ],
             text([
                 "Modify ", var("arr"), " by setting ", var("start"), " to ",
@@ -475,8 +475,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "margin",
             (["left", "[right]", "arr"], "bool-array?"),
             [
-                ("left", "integer?"),
-                ("right", "integer?", "left"),
+                ("left", "int?"),
+                ("right", "int?", "left"),
                 ("arr", "bool-array?"),
             ],
             text([
@@ -488,7 +488,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
     "Pairs and Lists": [
         proc(
             "pair?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a pair, ",
@@ -497,7 +497,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "null?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is an empty list, ",
@@ -531,7 +531,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "list?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
@@ -547,7 +547,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         proc(
             "list-ref",
             (["lst", "pos"], "any"),
-            [("lst", "list?"), ("pos", "nonnegative-integer?")],
+            [("lst", "list?"), ("pos", "uint?")],
             text([
                 "Returns the element of ", var("lst"), " at position ", var("pos"), ".",
             ]),
@@ -556,7 +556,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
     "Ranges": [
         proc(
             "range?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a range object, ",
@@ -567,9 +567,9 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "range",
             (["start", "stop", "[step]"], "range?"),
             [
-                ("start", "integer?"),
-                ("stop", "integer?"),
-                ("step", "integer?", "1"),
+                ("start", "int?"),
+                ("stop", "int?"),
+                ("step", "int?", "1"),
             ],
             text(["Returns a range object."]),
         ),
@@ -577,7 +577,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
     "Generic Sequences": [
         proc(
             "iterable?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
@@ -587,7 +587,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "sequence?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
@@ -597,14 +597,14 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
         proc(
             "length",
-            (["seq"], "nonnegative-integer?"),
+            (["seq"], "uint?"),
             [("seq", "iterable?")],
             text(["Returns the length of ", var("seq"), "."]),
         ),
         proc(
             "ref",
             (["seq", "pos"], "any"),
-            [("seq", "iterable?"), ("pos", "integer?")],
+            [("seq", "iterable?"), ("pos", "int?")],
             text([
                 "Returns the element of ", var("seq"), " at position ",
                 var("pos"), ", where the first element is at position", code("0"),
@@ -616,9 +616,9 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["seq", "start", "[stop]", "[step]"], "sequence?"),
             [
                 ("seq", "sequence?"),
-                ("start", "integer?"),
-                ("stop", "integer?", "(length seq)"),
-                ("step", "integer?", "1"),
+                ("start", "int?"),
+                ("stop", "int?", "(length seq)"),
+                ("step", "int?", "1"),
             ],
             text([
                 "Returns the elements of ", var("seq"), " from ", var("start"),
@@ -637,7 +637,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
     "Hashmaps": [
         proc(
             "hash?",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
@@ -675,7 +675,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "displayln",
             (["datum"], "void?"),
             [("datum", "any")],
-            text(["Display ", var("datum"), ", then a newline character to stdout."]),
+            text(["Display ", var("datum"), ", to stdout with a newline character."]),
         ),
         proc(
             "print",
@@ -683,24 +683,31 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             [("datum", "any")],
             text(["Display ", var("datum"), ", like REPL does."]),
         ),
+        proc(
+            "println",
+            (["datum"], "void?"),
+            [("datum", "any")],
+            text(["Display ", var("datum"), ", like REPL does with a newline character."]),
+        ),
         syntax(
             "with-open",
             "(file-binding file-path file-mode) body-expr",
-            text(["In the block, the file object to ", code("file-binding"), "\n."
+            text(["In the block, the file object to ", code("file-binding"), "\n.",
                 code("(with-open (file \"todo.txt\" 'a) ((. file write) \"buy milk\"))"),
             ]),
         ),
     ],
-    "Objects":
+    "Objects": [
         syntax(
             ".",
             "obj attr",
             text(["Returns the specified attribute on the object."]),
         ),
+    ],
     "Misc. Predicates": [
         proc(
             "any",
-            (["v"], "boolean?"),
+            (["v"], "bool?"),
             [("v", "any")],
             text([
                 "Returns ", code("#t"), " regardless of the value of ", var("v"), ".",
