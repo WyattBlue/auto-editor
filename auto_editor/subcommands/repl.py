@@ -7,10 +7,10 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 import auto_editor
+from auto_editor.analyze import FileSetup
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import (
     ClosingError,
-    FileSetup,
     Interpreter,
     Lexer,
     MyError,
@@ -84,6 +84,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         tb = src.get_fps() if args.timebase is None else args.timebase
         ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
         filesetup = FileSetup(src, ensure, strict, tb, Bar("none"), temp, log)
+        env["timebase"] = tb
+        env["@filesetup"] = filesetup
 
     print(f"Auto-Editor {auto_editor.version} ({auto_editor.__version__})")
     text = None
@@ -103,7 +105,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 print(f"error: {e}")
                 continue
             try:
-                interpreter = Interpreter(env, parser, filesetup)
+                interpreter = Interpreter(env, parser)
                 for result in interpreter.interpret():
                     if result is not None:
                         sys.stdout.write(f"{print_str(result)}\n")

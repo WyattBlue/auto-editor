@@ -19,14 +19,10 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from auto_editor.ffwrapper import FileInfo
-    from auto_editor.output import Ensure
-    from auto_editor.utils.bar import Bar
-    from auto_editor.utils.log import Log
-
     Number = Union[int, float, complex, Fraction]
     Real = Union[int, float, Fraction]
     BoolList = NDArray[np.bool_]
+    Env = dict[str, Any]
 
 
 class MyError(Exception):
@@ -947,10 +943,7 @@ class Proc:
 class UserProc:
     """A user-defined procedure."""
 
-    def __init__(
-        self, name: str, env: dict[str, Any], visit_f: Any, parms: list, body: list
-    ):
-        self.visit_f = visit_f
+    def __init__(self, name: str, env: Env, parms: list, body: list):
         self.parms = list(map(str, parms))
         self.body = body
         self.env = env
@@ -966,7 +959,277 @@ class UserProc:
 
     def __call__(self, *args: Any) -> Any:
         self.env.update(zip(self.parms, args))
-        return self.visit_f(self.body[-1])
+        return my_eval(self.env, self.body[-1])
+
+
+class Syntax:
+    __slots__ = "syn"
+
+    def __init__(self, syn: Callable[[Env, list], Any]):
+        self.syn = syn
+
+    def __call__(self, env: Env, node: list) -> Any:
+        return self.syn(env, node)
+
+
+def check_for_syntax(env: Env, node: list) -> Any:
+    name = node[0]
+    if len(node) < 2:
+        raise MyError(f"{name}: bad syntax")
+
+    if len(node) == 2:
+        raise MyError(f"{name}: missing body")
+
+    assert isinstance(node[1], list)
+    assert isinstance(node[1][0], list)
+
+    var = node[1][0][0]
+    if not isinstance(var, Symbol):
+        raise MyError(f"{name}: binding must be an identifier")
+    my_iter = my_eval(env, node[1][0][1])
+
+    if not is_iterable(my_iter):
+        if isinstance(my_iter, int):
+            return var, range(my_iter)
+        raise MyError(f"{name}: got non-iterable in iter slot")
+
+    return var, my_iter
+
+
+def syn_lambda(env: Env, node: list) -> Any:
+    if not isinstance(node[1], list):
+        raise MyError(f"{node[0]}: bad syntax")
+
+    return UserProc("", env, node[1], node[2:])  # parms, body
+
+
+def syn_define(env: Env, node: list) -> Any:
+    if len(node) < 3:
+        raise MyError("define: bad syntax")
+
+    if isinstance(node[1], list):
+        if len(node[1]) < 1 or not isinstance(node[1][0], Symbol):
+            raise MyError(f"{node[0]}: bad syntax")
+
+        n = node[1][0].val
+        parameters = node[1][1:]
+        body = node[2:]
+        env[n] = UserProc(n, env, parameters, body)
+        return None
+    elif not isinstance(node[1], Symbol):
+        raise MyError(f"{node[0]}: Must be an identifier")
+
+    n = node[1].val
+
+    if len(node) > 3:
+        raise MyError(f"{node[0]}: bad syntax (multiple expressions after identifier)")
+
+    if (
+        isinstance(node[2], list)
+        and node[2]
+        and isinstance(node[2][0], Symbol)
+        and node[2][0].val in ("lambda", "λ")
+    ):
+        parameters = node[2][1]
+        body = node[2][2:]
+        env[n] = UserProc(n, env, parameters, body)
+    else:
+        env[n] = my_eval(env, node[2])
+    return None
+
+
+def syn_set(env: Env, node: list) -> None:
+    if len(node) != 3:
+        raise MyError(f"{node[0]}: bad syntax")
+    if not isinstance(node[1], Symbol):
+        raise MyError(f"{node[0]}: Must be an identifier")
+
+    name = node[1].val
+    if name not in env:
+        raise MyError(f"{node[0]}: Cannot set variable {name} before definition")
+    env[name] = my_eval(env, node[2])
+    return None
+
+
+def syn_for(env: Env, node: list) -> None:
+    var, my_iter = check_for_syntax(env, node)
+
+    for item in my_iter:
+        env[var.val] = item
+        for c in node[2:]:
+            my_eval(env, c)
+
+    return None
+
+
+def syn_for_vec(env: Env, node: list) -> list:
+    results = []
+    var, my_iter = check_for_syntax(env, node)
+
+    for item in my_iter:
+        env[var.val] = item
+        results.append([my_eval(env, c) for c in node[2:]][-1])
+
+    return results
+
+
+def syn_if(env: Env, node: list) -> Any:
+    if len(node) != 4:
+        raise MyError(f"{node[0]}: bad syntax")
+    test_expr = my_eval(env, node[1])
+
+    if type(test_expr) is not bool:
+        raise MyError(f"{node[0]}: test-expr arg must be: bool?")
+
+    return my_eval(env, node[2] if test_expr else node[3])
+
+
+def syn_when(env: Env, node: list) -> Any:
+    if len(node) != 3:
+        raise MyError(f"{node[0]}: bad syntax")
+    test_expr = my_eval(env, node[1])
+
+    if type(test_expr) is not bool:
+        raise MyError(f"{node[0]}: test-expr arg must be: bool?")
+
+    return my_eval(env, node[2]) if test_expr else None
+
+
+def syn_cond(env: Env, node: list) -> Any:
+    for test_expr in node[1:]:
+        if not isinstance(test_expr, list) or not test_expr:
+            raise MyError(f"{node[0]}: bad syntax, clause is not a test-value pair")
+
+        if test_expr[0] == Symbol("else"):
+            if len(test_expr) == 1:
+                raise MyError(f"{node[0]}: missing expression in else clause")
+            test_clause = True
+        else:
+            test_clause = my_eval(env, test_expr[0])
+            if not isinstance(test_clause, bool):
+                raise MyError(f"{node[0]}: test-expr must be: bool?")
+
+        if test_clause:
+            if len(test_expr) == 1:
+                return True
+
+            for rest_clause in test_expr[1:-1]:
+                my_eval(env, rest_clause)
+            return my_eval(env, test_expr[-1])
+
+    return None
+
+
+def syn_quote(env: Env, node: list) -> Any:
+    if len(node) != 2:
+        raise MyError("quote: bad syntax")
+
+    if isinstance(node[1], list):
+        return deep_list(node[1])
+    return node[1]
+
+
+def syn_with_open(env: Env, node: list) -> None:
+    if len(node) < 2:
+        raise MyError(f"{node[0]}: wrong number of args")
+    if len(node[1]) != 2 and len(node[1]) != 3:
+        raise MyError(f"{node[0]}: wrong number of args")
+
+    if not isinstance(node[1][0], Symbol):
+        raise MyError(f"{node[0]}: as must be an identifier")
+
+    file_binding = node[1][0].val
+
+    file_name = my_eval(env, node[1][1])
+    if not isinstance(file_name, str):
+        raise MyError(f"{node[0]}: file-name must be string?")
+
+    if len(node[1]) == 3:
+        file_mode = my_eval(env, node[1][2])
+        if not isinstance(file_mode, Symbol):
+            raise MyError(f"{node[0]}: file-mode must be a symbol?")
+        if file_mode not in (Symbol("w"), Symbol("a"), Symbol("r")):
+            raise MyError(f"{node[0]}: file-mode must be either: 'w 'r 'a")
+    else:
+        file_mode = Symbol("w")
+
+    with open(file_name, file_mode.val) as file:
+        if file_mode.val == "r":
+            open_file = PaletObject(
+                {
+                    "read": Proc("read", file.read, (0, 0)),
+                    "readlines": Proc("readlines", file.readlines, (0, 0)),
+                }
+            )
+        else:
+            open_file = PaletObject(
+                {"write": Proc("write", file.write, (1, 1), [is_str])}
+            )
+
+        env[file_binding] = open_file
+        for c in node[2:]:
+            my_eval(env, c)
+
+    del env[file_binding]
+    return None
+
+
+def syn_dot(env: Env, node: list) -> Any:
+    if len(node) != 3:
+        raise MyError(".: not enough args")
+
+    my_obj = my_eval(env, node[1])
+    if not isinstance(my_obj, PaletObject):
+        raise MyError(f".: expected an object, got {my_obj}")
+
+    if not isinstance(node[2], Symbol):
+        raise MyError(".: attribute must be an identifier")
+    my_attr = node[2].val
+
+    if my_attr not in my_obj.attributes:
+        raise MyError(f".: No such attribute: {my_attr}")
+
+    return my_obj.attributes[my_attr]
+
+
+def my_eval(env: Env, node: list) -> Any:
+    if isinstance(node, Symbol):
+        val = env.get(node.val)
+        if val is None:
+            raise MyError(f"{node.val} is undefined")
+        return val
+
+    if isinstance(node, BoolArr):
+        if "@filesetup" not in env:
+            raise MyError("Can't use edit methods if there's no input files")
+        return edit_method(node.val, env["@filesetup"])
+
+    if isinstance(node, list):
+        oper = my_eval(env, node[0])
+        if not callable(oper):
+            """
+            ...No one wants to write (aref a x y) when they could write a[x,y].
+            In this particular case there is a way to finesse our way out of the
+            problem. If we treat data structures as if they were functions on indexes,
+            we could write (a x y) instead, which is even shorter than the Perl form.
+            """
+            if is_iterable(oper):
+                values = [my_eval(env, c) for c in node[1:]]
+                return ref(oper, *values)
+
+            raise MyError(f"{oper}, expected procedure")
+
+        if isinstance(oper, Syntax):
+            return oper(env, node)
+
+        values = [my_eval(env, c) for c in node[1:]]
+        if isinstance(oper, Contract):
+            check_args(oper.name, values, (1, 1), None)
+        else:
+            check_args(oper.name, values, oper.arity, oper.contracts)
+        return oper(*values)
+
+    return node
 
 
 def my_write(v: Any) -> None:
@@ -974,12 +1237,25 @@ def my_write(v: Any) -> None:
     return None
 
 
-env: dict[str, Any] = {
+env: Env = {
     # constants
     "true": True,
     "false": False,
     "null": Null(),
     "pi": math.pi,
+    # syntax
+    "lambda": Syntax(syn_lambda),
+    "λ": Syntax(syn_lambda),
+    "define": Syntax(syn_define),
+    "set!": Syntax(syn_set),
+    "quote": Syntax(syn_quote),
+    "if": Syntax(syn_if),
+    "when": Syntax(syn_when),
+    "cond": Syntax(syn_cond),
+    "for": Syntax(syn_for),
+    "for/vector": Syntax(syn_for_vec),
+    "with-open": Syntax(syn_with_open),
+    ".": Syntax(syn_dot),
     # actions
     "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
     "display": Proc("display", lambda v: my_write(display_str(v)), (1, 1)),
@@ -1131,284 +1407,15 @@ env: dict[str, Any] = {
 ###############################################################################
 
 
-@dataclass
-class FileSetup:
-    src: FileInfo
-    ensure: Ensure
-    strict: bool
-    tb: Fraction
-    bar: Bar
-    temp: str
-    log: Log
-
-
 class Interpreter:
-    def __init__(
-        self, env: dict[str, Any], parser: Parser, filesetup: FileSetup | None
-    ):
+    __slots__ = ("parser", "env")
+
+    def __init__(self, env: Env, parser: Parser):
         self.parser = parser
-        self.filesetup = filesetup
-
-        if filesetup is not None:
-            env["timebase"] = filesetup.tb
-
         self.env = env
-
-    def visit(self, node: Any) -> Any:
-        if isinstance(node, Symbol):
-            val = self.env.get(node.val)
-            if val is None:
-                raise MyError(f"{node.val} is undefined")
-            return val
-
-        if isinstance(node, BoolArr):
-            if self.filesetup is None:
-                raise MyError("Can't use edit methods if there's no input files")
-            return edit_method(node.val, self.filesetup)
-
-        if isinstance(node, list):
-            if not node:
-                raise MyError("(): Missing procedure expression")
-
-            name = node[0].val if isinstance(node[0], Symbol) else ""
-
-            def check_for_syntax(name: str, node: list) -> Any:
-                if len(node) < 2:
-                    raise MyError(f"{name}: bad syntax")
-
-                if len(node) == 2:
-                    raise MyError(f"{name}: missing body")
-
-                assert isinstance(node[1], list)
-                assert isinstance(node[1][0], list)
-
-                var = node[1][0][0]
-                if not isinstance(var, Symbol):
-                    raise MyError(f"{name}: binding must be an identifier")
-                my_iter = self.visit(node[1][0][1])
-
-                if not is_iterable(my_iter):
-                    if isinstance(my_iter, int):
-                        return var, range(my_iter)
-                    raise MyError(f"{name}: got non-iterable in iter slot")
-
-                return var, my_iter
-
-            if name == "lambda" or name == "λ":
-                if not isinstance(node[1], list):
-                    raise MyError("lambda: bad syntax")
-
-                parameters = node[1]
-                body = node[2:]
-                return UserProc("", self.env, self.visit, parameters, body)
-
-            if name == "define":
-                if len(node) < 3:
-                    raise MyError("define: bad syntax")
-
-                if isinstance(node[1], list):
-                    if len(node[1]) < 1 or not isinstance(node[1][0], Symbol):
-                        raise MyError("define: bad syntax")
-
-                    n = node[1][0].val
-                    parameters = node[1][1:]
-                    body = node[2:]
-                    self.env[n] = UserProc(n, self.env, self.visit, parameters, body)
-                    return None
-                elif not isinstance(node[1], Symbol):
-                    raise MyError("define: Must be an identifier")
-
-                if len(node) > 3:
-                    raise MyError(
-                        "define: bad syntax (multiple expressions after identifier)"
-                    )
-
-                if (
-                    isinstance(node[2], list)
-                    and node[2]
-                    and isinstance(node[2][0], Symbol)
-                    and node[2][0].val in ("lambda", "λ")
-                ):
-                    parameters = node[2][1]
-                    body = node[2][2:]
-                    n = node[1].val
-                    self.env[n] = UserProc(n, self.env, self.visit, parameters, body)
-                else:
-                    self.env[node[1].val] = self.visit(node[2])
-                return None
-
-            if name == "set!":
-                if len(node) != 3:
-                    raise MyError("set!: bad syntax")
-                if not isinstance(node[1], Symbol):
-                    raise MyError("set!: Must be an identifier")
-
-                symbol = node[1].val
-                if symbol not in self.env:
-                    raise MyError(f"Cannot set variable {symbol} before definition")
-                self.env[symbol] = self.visit(node[2])
-                return None
-
-            if name == "for":
-                var, my_iter = check_for_syntax("for", node)
-                for item in my_iter:
-                    self.env[var.val] = item
-                    for c in node[2:]:
-                        self.visit(c)
-                return None
-
-            if name == "for/vector":
-                results = []
-                var, my_iter = check_for_syntax("for", node)
-                for item in my_iter:
-                    self.env[var.val] = item
-                    results.append([self.visit(c) for c in node[2:]][-1])
-
-                del self.env[var.val]
-                return results
-
-            if name == "if":
-                if len(node) != 4:
-                    raise MyError("if: bad syntax")
-                test_expr = self.visit(node[1])
-                if not isinstance(test_expr, bool):
-                    raise MyError(f"if: test-expr arg must be: bool?")
-                if test_expr:
-                    return self.visit(node[2])
-                return self.visit(node[3])
-
-            if name == "when":
-                if len(node) != 3:
-                    raise MyError("when: bad syntax")
-                test_expr = self.visit(node[1])
-                if not isinstance(test_expr, bool):
-                    raise MyError("when: test-expr arg must be: bool?")
-                if test_expr:
-                    return self.visit(node[2])
-                return None
-
-            if name == "cond":
-                for test_expr in node[1:]:
-                    if not isinstance(test_expr, list) or not test_expr:
-                        raise MyError(
-                            "cond: bad syntax, clause is not a test-value pair"
-                        )
-
-                    if test_expr[0] == Symbol("else"):
-                        if len(test_expr) == 1:
-                            raise MyError("cond: missing expression in else clause")
-                        test_clause = True
-                    else:
-                        test_clause = self.visit(test_expr[0])
-                        if not isinstance(test_clause, bool):
-                            raise MyError("cond: test-expr must be: bool?")
-
-                    if test_clause:
-                        if len(test_expr) == 1:
-                            return True
-
-                        for rest_clause in test_expr[1:-1]:
-                            self.visit(rest_clause)
-                        return self.visit(test_expr[-1])
-
-                return None
-
-            if name == "quote":
-                if len(node) != 2:
-                    raise MyError("quote: bad syntax")
-
-                if isinstance(node[1], list):
-                    return deep_list(node[1])
-                return node[1]
-
-            if name == "with-open":
-                if len(node) < 2:
-                    raise MyError("with-open: wrong number of args")
-                if len(node[1]) != 2 and len(node[1]) != 3:
-                    raise MyError("with-open: wrong number of args")
-
-                if not isinstance(node[1][0], Symbol):
-                    raise MyError("with-open: as must be an identifier")
-
-                file_binding = node[1][0].val
-
-                file_name = self.visit(node[1][1])
-                if not isinstance(file_name, str):
-                    raise MyError("with-open: file-name must be string?")
-
-                if len(node[1]) == 3:
-                    file_mode = self.visit(node[1][2])
-                    if not isinstance(file_mode, Symbol):
-                        raise MyError("with-open: file-mode must be a symbol?")
-                    if file_mode not in (Symbol("w"), Symbol("a"), Symbol("r")):
-                        raise MyError("with-open: file-mode must be either: 'w 'r 'a")
-                else:
-                    file_mode = Symbol("w")
-
-                with open(file_name, file_mode.val) as file:
-                    if file_mode.val == "r":
-                        open_file = PaletObject(
-                            {
-                                "read": Proc("read", file.read, (0, 0)),
-                                "readlines": Proc("readlines", file.readlines, (0, 0)),
-                            }
-                        )
-                    else:
-                        open_file = PaletObject(
-                            {"write": Proc("write", file.write, (1, 1), [is_str])}
-                        )
-
-                    self.env[file_binding] = open_file
-                    for c in node[2:]:
-                        self.visit(c)
-
-                del self.env[file_binding]
-                return None
-
-            if name == ".":
-                if len(node) != 3:
-                    raise MyError(".: not enough args")
-
-                my_obj = self.visit(node[1])
-                if not isinstance(my_obj, PaletObject):
-                    raise MyError(f".: expected an object, got {my_obj}")
-
-                if not isinstance(node[2], Symbol):
-                    raise MyError(".: attribute must be an identifier")
-                my_attr = node[2].val
-
-                if my_attr not in my_obj.attributes:
-                    raise MyError(f".: No such attribute: {my_attr}")
-
-                return my_obj.attributes[my_attr]
-
-            oper = self.visit(node[0])
-
-            if not callable(oper):
-                """
-                ...No one wants to write (aref a x y) when they could write a[x,y].
-
-                In this particular case there is a way to finesse our way out of the
-                problem. If we treat data structures as if they were functions on indexes,
-                we could write (a x y) instead, which is even shorter than the Perl form.
-                """
-                if is_iterable(oper):
-                    values = [self.visit(c) for c in node[1:]]
-                    return ref(oper, *values)
-
-                raise MyError(f"{oper}, expected procedure")
-
-            values = [self.visit(c) for c in node[1:]]
-            if isinstance(oper, Contract):
-                check_args(oper.name, values, (1, 1), None)
-            else:
-                check_args(oper.name, values, oper.arity, oper.contracts)
-            return oper(*values)
-
-        return node
 
     def interpret(self) -> Any:
         result = []
         while self.parser.current_token.type not in (EOF, RPAREN, RBRAC, RCUR):
-            result.append(self.visit(self.parser.expr()))
+            result.append(my_eval(self.env, self.parser.expr()))
         return result

@@ -126,7 +126,7 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
         clean(os.getcwd())
 
     if args.only != []:
-        tests = filter(lambda t: t.__name__ in args.only, tests)
+        tests = list(filter(lambda t: t.__name__ in args.only, tests))
 
     total_time = 0
 
@@ -459,11 +459,12 @@ def main(sys_args: list[str] | None = None):
             run.main([test_file], ["--edit", "none"])
 
             p_xml = run.main([test_file], ["-exp"])
-            run.main([p_xml], [])
+            results.add(p_xml)
+            results.add(run.main([p_xml], []))
 
-            run.main([test_file], ["-exf"])
-            run.main([test_file], ["-exs"])
-            run.main([test_file], ["--export_as_clip_sequence"])
+            results.add(run.main([test_file], ["-exf"]))
+            results.add(run.main([test_file], ["-exs"]))
+            results.add(run.main([test_file], ["--export_as_clip_sequence"]))
             run.main([test_file], ["--stats"])
 
         return tuple(results)
@@ -605,8 +606,7 @@ def main(sys_args: list[str] | None = None):
                 try:
                     parser = Parser(Lexer(text))
                     env["timebase"] = Fraction(30)
-                    interpreter = Interpreter(env, parser, None)
-                    results = interpreter.interpret()
+                    results = Interpreter(env, parser).interpret()
                 except MyError as e:
                     raise ValueError(f"{text}\nMyError: {e}")
 
