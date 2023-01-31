@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -31,10 +32,20 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from auto_editor.ffwrapper import FileInfo
-    from auto_editor.interpreter import FileSetup
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
+
+
+@dataclass
+class FileSetup:
+    src: FileInfo
+    ensure: Ensure
+    strict: bool
+    tb: Fraction
+    bar: Bar
+    temp: str
+    log: Log
 
 
 def link_nodes(*nodes: Any) -> None:
@@ -448,6 +459,7 @@ def pixeldiff_levels(
 
 
 def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
+    assert isinstance(filesetup, FileSetup)
     src = filesetup.src
     tb = filesetup.tb
     ensure = filesetup.ensure

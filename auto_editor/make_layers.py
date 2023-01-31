@@ -6,16 +6,9 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 
+from auto_editor.analyze import FileSetup
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import (
-    FileSetup,
-    Interpreter,
-    Lexer,
-    MyError,
-    Parser,
-    env,
-    is_boolarr,
-)
+from auto_editor.interpreter import Interpreter, Lexer, MyError, Parser, env, is_boolarr
 from auto_editor.objs.util import ParserError, parse_dataclass
 from auto_editor.timeline import (
     ASpace,
@@ -35,7 +28,6 @@ from auto_editor.utils.types import Args, CoerceError, pos, time
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from auto_editor.ffwrapper import FileInfo
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
@@ -109,7 +101,10 @@ def run_interpreter(
         if log.is_debug:
             log.debug(f"edit: {parser}")
 
-        interpreter = Interpreter(env, parser, filesetup)
+        env["timebase"] = filesetup.tb
+        env["@filesetup"] = filesetup
+
+        interpreter = Interpreter(env, parser)
         results = interpreter.interpret()
     except (MyError, ZeroDivisionError) as e:
         log.error(e)
