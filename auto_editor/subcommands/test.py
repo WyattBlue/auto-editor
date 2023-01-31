@@ -40,7 +40,7 @@ def test_options(parser):
     parser.add_required(
         "category",
         nargs=1,
-        choices=("unit", "cli", "sub", "all"),
+        choices=("palet", "cli", "sub", "all"),
         metavar="category [options]",
     )
     return parser
@@ -649,19 +649,19 @@ def main(sys_args: list[str] | None = None):
             ("(ceil 2.9)", 3),
             ("(floor 2.1)", 2),
             ("(floor 2.9)", 2),
-            ("(boolean? #t)", True),
-            ("(boolean? #f)", True),
-            ("(boolean? 0)", False),
-            ("(boolean? 1)", False),
-            ("(boolean? false)", True),
-            ("(integer? 2)", True),
-            ("(integer? 3.0)", False),
-            ("(integer? #t)", False),
-            ("(integer? #f)", False),
-            ("(integer? 4/5)", False),
-            ("(integer? 0+2i)", False),
-            ('(integer? "hello")', False),
-            ('(integer? "3")', False),
+            ("(bool? #t)", True),
+            ("(bool? #f)", True),
+            ("(bool? 0)", False),
+            ("(bool? 1)", False),
+            ("(bool? false)", True),
+            ("(int? 2)", True),
+            ("(int? 3.0)", False),
+            ("(int? #t)", False),
+            ("(int? #f)", False),
+            ("(int? 4/5)", False),
+            ("(int? 0+2i)", False),
+            ('(int? "hello")', False),
+            ('(int? "3")', False),
             ("(float? -23.4)", True),
             ("(float? 3.0)", True),
             ("(float? #f)", False),
@@ -757,12 +757,19 @@ def main(sys_args: list[str] | None = None):
             ),
             ("(define (my-pow2 a) (* a a)) (my-pow2 30)", 900),
             ("(define (my-pow2 a) (void) (* a a)) (my-pow2 30)", 900),
+            ("(cond)", None),
+            ("(cond [(positive? -5) 1])", None),
+            ("(cond [(positive? 5) 3])", 3),
+            ("(cond [(positive? 5)])", True),
+            ("(cond [(positive? -5) 1] [else 2])", 2),
+            ("(cond [(positive? -5) 1] [(zero? -5) 2] [(negative? -5) 3])", 3),
+            ("(cond [else 5])", 5),
             # ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
         )
 
     tests = []
 
-    if args.category in ("unit", "all"):
+    if args.category in ("palet", "all"):
         tests.append(palet)
 
     if args.category in ("sub", "all"):

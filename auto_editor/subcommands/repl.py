@@ -105,8 +105,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             try:
                 interpreter = Interpreter(env, parser, filesetup)
                 for result in interpreter.interpret():
-                    if repr_result := print_str(result):
-                        sys.stdout.write(f"{repr_result}\n")
+                    if result is not None:
+                        sys.stdout.write(f"{print_str(result)}\n")
             except ClosingError:
                 continue
             except (MyError, ZeroDivisionError) as e:

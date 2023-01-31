@@ -117,6 +117,11 @@ class Cons:
             return self.d
         raise StopIteration
 
+    def __iter__(self) -> Any:
+        while isinstance(self, Cons):
+            yield self.a
+            self = self.d
+
     def __getitem__(self, ref: int | slice) -> Any:
         if isinstance(ref, int):
             if ref < 0:
@@ -542,9 +547,9 @@ def check_args(
 
 any_p = Contract("any_p", lambda v: True)
 is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
-is_bool = Contract("boolean?", lambda v: isinstance(v, bool))
-is_pair = Contract("pair?", lambda v: isinstance(v, Cons))
-is_null = Contract("null?", lambda v: isinstance(v, Null))
+is_bool = Contract("bool?", lambda v: type(v) is bool)
+is_pair = Contract("pair?", lambda v: type(v) is Cons)
+is_null = Contract("null?", lambda v: type(v) is Null)
 is_symbol = Contract("symbol?", lambda v: isinstance(v, Symbol))
 is_str = Contract("string?", lambda v: isinstance(v, str))
 is_char = Contract("char?", lambda v: isinstance(v, Char))
@@ -563,21 +568,12 @@ is_boolarr = Contract(
     "bool-array?",
     lambda v: isinstance(v, np.ndarray) and v.dtype.kind == "b",
 )
-is_num = Contract(
-    "number?",
-    lambda v: not isinstance(v, bool)
-    and isinstance(v, (int, float, Fraction, complex)),
-)
-is_real = Contract(
-    "real?", lambda v: not isinstance(v, bool) and isinstance(v, (int, float, Fraction))
-)
-is_int = Contract(
-    "integer?",
-    lambda v: not isinstance(v, bool) and isinstance(v, int),
-)
-is_frac = Contract("fraction?", lambda v: isinstance(v, Fraction))
-is_float = Contract("float?", lambda v: isinstance(v, float))
-us_int = Contract("nonnegative-integer?", lambda v: isinstance(v, int) and v > -1)
+is_num = Contract("number?", lambda v: type(v) in (int, float, Fraction, complex))
+is_real = Contract("real?", lambda v: type(v) in (int, float, Fraction))
+is_int = Contract("int?", lambda v: type(v) is int)
+is_uint = Contract("uint?", lambda v: type(v) is int and v > -1)
+is_frac = Contract("fraction?", lambda v: type(v) is Fraction)
+is_float = Contract("float?", lambda v: type(v) is float)
 is_hash = Contract("hash?", lambda v: isinstance(v, dict))
 is_void = Contract("void?", lambda v: v is None)
 
@@ -588,7 +584,7 @@ def raise_(msg: str) -> None:
 
 def display_str(val: object) -> str:
     if val is None:
-        return ""
+        return "#<void>"
     if val is True:
         return "#t"
     if val is False:
@@ -634,21 +630,6 @@ def print_str(val: object) -> str:
         return f'"{val}"'
 
     return display_str(val)
-
-
-def display(val: Any) -> None:
-    if result := display_str(val):
-        sys.stdout.write(result)
-
-
-def displayln(val: Any) -> None:
-    if result := display_str(val):
-        sys.stdout.write(result + "\n")
-
-
-def palet_print(val: Any) -> None:
-    if result := print_str(val):
-        sys.stdout.write(result)
 
 
 def is_equal(a: object, b: object) -> bool:
@@ -697,7 +678,7 @@ def _not(val: Any) -> bool | BoolList:
         return np.logical_not(val)
     if is_bool(val):
         return not val
-    raise MyError("not expects: boolean? or bool-array?")
+    raise MyError("not expects: bool? or bool-array?")
 
 
 def _and(*vals: Any) -> bool | BoolList:
@@ -834,7 +815,7 @@ def list_to_vector(val: Cons | Null) -> list:
     return result
 
 
-def vector_to_list(values: list) -> Cons | Null:
+def vec_to_list(values: list) -> Cons | Null:
     result: Cons | Null = Null()
     for val in reversed(values):
         result = Cons(val, result)
@@ -851,10 +832,6 @@ def vector_set(vec: list, pos: int, v: Any) -> None:
 def vector_extend(vec: list, *more_vecs: list) -> None:
     for more in more_vecs:
         vec.extend(more)
-
-
-def string_to_list(s: str) -> Cons | Null:
-    return vector_to_list([Char(s) for s in s])
 
 
 def is_list(val: Any) -> bool:
@@ -992,6 +969,11 @@ class UserProc:
         return self.visit_f(self.body[-1])
 
 
+def my_write(v: Any) -> None:
+    sys.stdout.write(v)
+    return None
+
+
 env: dict[str, Any] = {
     # constants
     "true": True,
@@ -1000,15 +982,16 @@ env: dict[str, Any] = {
     "pi": math.pi,
     # actions
     "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
-    "display": Proc("display", display, (1, 1)),
-    "displayln": Proc("display", displayln, (1, 1)),
-    "print": Proc("print", palet_print, (1, 1)),
+    "display": Proc("display", lambda v: my_write(display_str(v)), (1, 1)),
+    "displayln": Proc("displayln", lambda v: my_write(display_str(v) + "\n"), (1, 1)),
+    "print": Proc("print", lambda v: my_write(print_str(v)), (1, 1)),
+    "println": Proc("println", lambda v: my_write(print_str(v) + "\n"), (1, 1)),
     "exit": Proc("exit", sys.exit, (0, None)),
     "error": Proc("error", raise_, (1, 1), [is_str]),
     "void": Proc("void", lambda: None, (0, 0)),
     "void?": is_void,
     # booleans
-    "boolean?": is_bool,
+    "bool?": is_bool,
     ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
     ">=": Proc(">=", lambda a, b: a >= b, (2, 2), [is_real, is_real]),
     "<": Proc("<", lambda a, b: a < b, (2, 2), [is_real, is_real]),
@@ -1023,8 +1006,8 @@ env: dict[str, Any] = {
     # number predicates
     "number?": is_num,
     "real?": is_real,
-    "integer?": is_int,
-    "nonnegative-integer?": us_int,
+    "int?": is_int,
+    "uint?": is_uint,
     "float?": is_float,
     "fraction?": is_frac,
     "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
@@ -1054,6 +1037,7 @@ env: dict[str, Any] = {
     "log": Proc("log", math.log, (1, 2), [is_real, is_real]),
     "tan": Proc("tan", math.tan, (1, 1), [is_real]),
     "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
+    "modulo": Proc("modulo", lambda a, b: a % b, (2, 2), [is_int, is_int]),
     "random": Proc("random", palet_random, (0, 2), [is_int]),
     # symbols
     "symbol?": is_symbol,
@@ -1067,13 +1051,13 @@ env: dict[str, Any] = {
     "string-upcase": Proc("string-upcase", str.upper, (1, 1), [is_str]),
     "string-downcase": Proc("string-downcase", str.lower, (1, 1), [is_str]),
     "string-titlecase": Proc("string-titlecase", str.title, (1, 1), [is_str]),
-    "char->integer": Proc("char->integer", lambda c: ord(c.val), (1, 1), [is_char]),
-    "integer->char": Proc("integer->char", Char, (1, 1), [is_int]),
+    "char->int": Proc("char->int", lambda c: ord(c.val), (1, 1), [is_char]),
+    "int->char": Proc("int->char", Char, (1, 1), [is_int]),
     # vectors
     "vector?": is_vector,
     "vector": Proc("vector", lambda *a: list(a), (0, None)),
     "make-vector": Proc(
-        "make-vector", lambda size, a=0: [a] * size, (1, 2), [us_int, any_p]
+        "make-vector", lambda size, a=0: [a] * size, (1, 2), [is_uint, any_p]
     ),
     "vector-append": Proc("vector-append", vector_append, (0, None), [is_vector]),
     "vector-pop!": Proc("vector-pop!", list.pop, (1, 1), [is_vector]),
@@ -1088,11 +1072,11 @@ env: dict[str, Any] = {
     "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
     "list?": is_list,
     "list": Proc("list", _list, (0, None)),
-    "list-ref": Proc("list-ref", ref, (2, 2), [is_pair, us_int]),
+    "list-ref": Proc("list-ref", ref, (2, 2), [is_pair, is_uint]),
     # arrays
     "array?": is_array,
     "array": Proc("array", array_proc, (2, None), [is_symbol, is_real]),
-    "make-array": Proc("make-array", make_array, (2, 3), [is_symbol, us_int, is_real]),
+    "make-array": Proc("make-array", make_array, (2, 3), [is_symbol, is_uint, is_real]),
     "array-splice!": Proc(
         "array-splice!", splice, (2, 4), [is_array, is_real, is_int, is_int]
     ),
@@ -1100,7 +1084,7 @@ env: dict[str, Any] = {
     # bool arrays
     "bool-array?": is_boolarr,
     "bool-array": Proc(
-        "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [us_int]
+        "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_uint]
     ),
     "margin": Proc("margin", margin, (2, 3), None),
     "mincut": Proc("mincut", mincut, (2, 2), [is_int, is_boolarr]),
@@ -1125,12 +1109,14 @@ env: dict[str, Any] = {
     "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
     # conversions
     "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
-    "string->list": Proc("string->list", string_to_list, (1, 1), [is_str]),
+    "string->list": Proc(
+        "string->list", lambda s: vec_to_list([Char(c) for c in s]), (1, 1), [is_str]
+    ),
     "string->vector": Proc(
         "string->vector", lambda s: [Char(c) for c in s], (1, 1), [is_str]
     ),
     "list->vector": Proc("list->vector", list_to_vector, (1, 1), [is_pair]),
-    "vector->list": Proc("vector->list", vector_to_list, (1, 1), [is_vector]),
+    "vector->list": Proc("vector->list", vec_to_list, (1, 1), [is_vector]),
     "range->list": Proc("range->list", stream_to_list, (1, 1), [is_range]),
     "range->vector": Proc("range->vector", list, (1, 1), [is_range]),
     # predicates
@@ -1286,7 +1272,7 @@ class Interpreter:
                     raise MyError("if: bad syntax")
                 test_expr = self.visit(node[1])
                 if not isinstance(test_expr, bool):
-                    raise MyError(f"if: test-expr arg must be: boolean?")
+                    raise MyError(f"if: test-expr arg must be: bool?")
                 if test_expr:
                     return self.visit(node[2])
                 return self.visit(node[3])
@@ -1296,9 +1282,35 @@ class Interpreter:
                     raise MyError("when: bad syntax")
                 test_expr = self.visit(node[1])
                 if not isinstance(test_expr, bool):
-                    raise MyError(f"when: test-expr arg must be: boolean?")
+                    raise MyError("when: test-expr arg must be: bool?")
                 if test_expr:
                     return self.visit(node[2])
+                return None
+
+            if name == "cond":
+                for test_expr in node[1:]:
+                    if not isinstance(test_expr, list) or not test_expr:
+                        raise MyError(
+                            "cond: bad syntax, clause is not a test-value pair"
+                        )
+
+                    if test_expr[0] == Symbol("else"):
+                        if len(test_expr) == 1:
+                            raise MyError("cond: missing expression in else clause")
+                        test_clause = True
+                    else:
+                        test_clause = self.visit(test_expr[0])
+                        if not isinstance(test_clause, bool):
+                            raise MyError("cond: test-expr must be: bool?")
+
+                    if test_clause:
+                        if len(test_expr) == 1:
+                            return True
+
+                        for rest_clause in test_expr[1:-1]:
+                            self.visit(rest_clause)
+                        return self.visit(test_expr[-1])
+
                 return None
 
             if name == "quote":
@@ -1322,14 +1334,14 @@ class Interpreter:
 
                 file_name = self.visit(node[1][1])
                 if not isinstance(file_name, str):
-                    raise MyError("with-open: file name must be string?")
+                    raise MyError("with-open: file-name must be string?")
 
                 if len(node[1]) == 3:
                     file_mode = self.visit(node[1][2])
                     if not isinstance(file_mode, Symbol):
                         raise MyError("with-open: file-mode must be a symbol?")
                     if file_mode not in (Symbol("w"), Symbol("a"), Symbol("r")):
-                        raise MyError("with-open: file mode must be either: 'w 'r 'a")
+                        raise MyError("with-open: file-mode must be either: 'w 'r 'a")
                 else:
                     file_mode = Symbol("w")
 
