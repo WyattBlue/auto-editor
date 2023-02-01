@@ -84,7 +84,6 @@ class FFmpeg:
         show_out: bool = False,
         path: str | None = None,
     ) -> None:
-
         process = self.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         _, stderr = process.communicate()
 

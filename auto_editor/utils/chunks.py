@@ -12,6 +12,7 @@ Chunks = list[Chunk]
 v2Chunk = tuple[int, int, float, int]
 v2Chunks = list[v2Chunk]
 
+
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 2, 2], {1: 1.0, 2: 1.5} => [(0, 3, 1.0), (3, 5, 1.5)]
 def chunkify(arr: NDArray, smap: dict[int, float]) -> Chunks:

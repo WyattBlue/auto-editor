@@ -144,7 +144,6 @@ def make_json_timeline(
     tl: object,
     log: Log,
 ) -> None:
-
     if (version := Version(obj.api, log)) != (3, 0):
         log.error(f"Version {version} is not supported!")
 

@@ -305,7 +305,6 @@ def premiere_write_xml(ex: ExPremiere, ensure: Ensure, output: str, tl: v3) -> N
 
         total = 0.0
         for j, clip in enumerate(clips):
-
             clip_duration = (clip[1] - clip[0]) / clip[2]
 
             _start = int(total)
@@ -382,7 +381,6 @@ def premiere_write_xml(ex: ExPremiere, ensure: Ensure, output: str, tl: v3) -> N
 
         total = 0
         for j, clip in enumerate(clips):
-
             clip_duration = (clip[1] - clip[0]) / clip[2]
 
             _start = int(total)

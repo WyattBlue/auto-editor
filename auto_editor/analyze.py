@@ -142,7 +142,6 @@ def _dict_tag(tag: str, tb: Fraction, obj: Any) -> tuple[str, dict]:
 def read_cache(
     src: FileInfo, tb: Fraction, tag: str, obj: Any, temp: str
 ) -> None | np.ndarray:
-
     workfile = os.path.join(os.path.dirname(temp), f"ae-{version}", "cache.json")
 
     try:
@@ -165,7 +164,6 @@ def read_cache(
 def cache(
     tag: str, tb: Fraction, obj: Any, arr: np.ndarray, src: FileInfo, temp: str
 ) -> np.ndarray:
-
     workdur = os.path.join(os.path.dirname(temp), f"ae-{version}")
     workfile = os.path.join(workdur, "cache.json")
     if not os.path.exists(workdur):
@@ -207,7 +205,6 @@ def audio_levels(
     temp: str,
     log: Log,
 ) -> NDArray[np.float_]:
-
     if s > len(src.audios) - 1:
         if strict:
             log.error(f"Audio stream '{s}' does not exist.")
@@ -262,7 +259,6 @@ def subtitle_levels(
     temp: str,
     log: Log,
 ) -> NDArray[np.bool_]:
-
     if sobj.stream >= len(src.subtitles):
         if not strict:
             return np.zeros(

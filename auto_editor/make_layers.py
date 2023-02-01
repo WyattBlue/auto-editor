@@ -67,7 +67,6 @@ def clipify(chunks: Chunks, src: str, start: Fraction = Fraction(0)) -> list[Cli
 def make_av(
     all_clips: list[list[Clip]], sources: dict[str, FileInfo], _inputs: list[int]
 ) -> tuple[VSpace, ASpace]:
-
     if len(_inputs) > 1000:
         raise ValueError("Number of file inputs can't be greater than 1000")
 
@@ -94,7 +93,6 @@ def run_interpreter(
     filesetup: FileSetup,
     log: Log,
 ) -> NDArray[np.bool_]:
-
     try:
         lexer = Lexer(text)
         parser = Parser(lexer)
@@ -131,7 +129,6 @@ def make_timeline(
     temp: str,
     log: Log,
 ) -> v3:
-
     inp = None if not inputs else sources[str(inputs[0])]
 
     if inp is None:
