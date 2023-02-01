@@ -171,6 +171,52 @@ if binaries.exists():
 
         file.write("</div>\n</section>\n</body>\n</html>\n\n")
 
+ref = Path("src/ref")
+if ref.exists():
+    with open(ref / "index.html", "w") as file:
+        file.write(
+            '{{ comp.header "Reference" }}\n'
+            "<body>\n"
+            "{{ comp.nav }}\n"
+            '<section class="section">\n'
+            '<div class="container">\n'
+            '<h2 class="left">Reference</h2>\n'
+            '<hr>\n'
+        )
+        for child in sorted(ref.iterdir(), reverse=True):
+            if child.is_dir():
+                file.write(f'<h3><a href="./{child.stem}">{child.stem}</a></h3>\n')
+                file.write(
+                    "<ul>\n"
+                    f'<li><a href="./{child.stem}/options.html">options</a></li>\n'
+                    f'<li><a href="./{child.stem}/palet.html">palet</a></li>\n'
+                    "</ul>\n"
+                )
+                with open(child / "index.html", "w") as innerfile:
+                    innerfile.write(
+                        '{{ comp.header "' + child.stem + ' - Reference" }}\n'
+                        "<body>\n"
+                        "{{ comp.nav }}\n"
+                        '<section class="section">\n'
+                        '<div class="container">\n'
+                        f'<h2 class="left">{child.stem} Reference</h2>\n'
+                    )
+                    if not child.stem.endswith("dev"):
+                        innerfile.write(
+                            '<p><a href="https://github.com/WyattBlue/auto-editor/'
+                            f'releases/tag/{child.stem}">GitHub Release</a></p>\n'
+                        )
+                    innerfile.write(
+                        '<hr>\n'
+                        '<h3><a href="./options.html">options</a></h3>\n'
+                        '<h3><a href="./palet.html">palet</a></h3>\n'
+                        "</div>\n</section>\n</body>\n</html>\n\n"
+                    )
+
+        file.write('<br><p>See also: <a href="../docs">docs</a></p>\n')
+        file.write("</div>\n</section>\n</body>\n</html>\n\n")
+
+
 site = basswood.Site(args.production, source="src", output_dir="auto-editor")
 site.make()
 
