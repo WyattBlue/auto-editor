@@ -32,7 +32,6 @@ from auto_editor.utils.types import Args
 def set_output(
     out: str | None, _export: str | None, src: FileInfo | None, log: Log
 ) -> tuple[str, Exports]:
-
     export = None if _export is None else parse_export(_export, log)
 
     if src is None:
@@ -140,7 +139,6 @@ def set_audio_codec(
 def make_sources(
     paths: list[str], ffmpeg: FFmpeg, log: Log
 ) -> tuple[dict[str, FileInfo], list[int]]:
-
     used_paths: dict[str, int] = {}
     sources: dict[str, FileInfo] = {}
     inputs: list[int] = []
@@ -187,7 +185,6 @@ def parse_export(export: str, log: Log) -> Exports:
 def edit_media(
     paths: list[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
 ) -> None:
-
     timer = Timer(args.quiet)
     bar = Bar(args.progress)
     tl = None

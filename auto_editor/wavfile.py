@@ -70,7 +70,6 @@ def _read_data_chunk(
     block_align: int,
     data_size: int | None,
 ) -> AudioData:
-
     size: int = struct.unpack(f"{en}I", fid.read(4))[0]
     if data_size is not None:
         # size is only 32-bits here, so get real size from header.
@@ -126,7 +125,6 @@ def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
 
 
 def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
-
     # https://tech.ebu.ch/docs/tech/tech3306v1_0.pdf
     # https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.2088-1-201910-I!!PDF-E.pdf
 

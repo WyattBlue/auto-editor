@@ -89,7 +89,6 @@ class SubtitleParser:
             new_content = []
             for content in self.contents:
                 if cut[0] <= content.end and cut[1] > content.start:
-
                     diff = int(
                         (min(cut[1], content.end) - max(cut[0], content.start))
                         * speed_factor

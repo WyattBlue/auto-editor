@@ -71,7 +71,6 @@ def mux_quality_media(
     temp: str,
     log: Log,
 ) -> None:
-
     v_tracks = len(visual_output)
     a_tracks = len(audio_output)
     s_tracks = len(sub_output)

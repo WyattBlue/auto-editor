@@ -38,7 +38,6 @@ def parse_dataclass(
     var_f: Callable[[str, str, Any], Any] = _default_var_f,
     coerce_default: bool = False,
 ) -> T:
-
     # Positional Arguments
     #    --rectangle 0,end,10,20,20,30,#000, ...
     # Keyword Arguments

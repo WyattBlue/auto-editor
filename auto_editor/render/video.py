@@ -66,7 +66,6 @@ def render_av(
     temp: str,
     log: Log,
 ) -> tuple[str, bool]:
-
     if not tl.sources:
         if "0" in tl.sources:
             src: FileInfo | None = tl.sources["0"]
