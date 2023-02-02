@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from functools import reduce
 from typing import TYPE_CHECKING
+from time import sleep
 
 import numpy as np
 
@@ -176,7 +177,7 @@ class Char:
         if isinstance(val, int):
             self.val: str = chr(val)
         else:
-            assert isinstance(val, str) and len(val) == 1
+            assert type(val) is str and len(val) == 1
             self.val = val
 
     __str__: Callable[[Char], str] = lambda self: self.val
@@ -546,18 +547,18 @@ is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
 is_bool = Contract("bool?", lambda v: type(v) is bool)
 is_pair = Contract("pair?", lambda v: type(v) is Cons)
 is_null = Contract("null?", lambda v: type(v) is Null)
-is_symbol = Contract("symbol?", lambda v: isinstance(v, Symbol))
-is_str = Contract("string?", lambda v: isinstance(v, str))
-is_char = Contract("char?", lambda v: isinstance(v, Char))
+is_symbol = Contract("symbol?", lambda v: type(v) is Symbol)
+is_str = Contract("string?", lambda v: type(v) is str)
+is_char = Contract("char?", lambda v: type(v) is Char)
 is_iterable = Contract(
     "iterable?",
-    lambda v: isinstance(v, (str, list, dict, range, np.ndarray, Cons, Null)),
+    lambda v: type(v) in (str, range, Cons, Null) or isinstance(v, (list, dict, np.ndarray)),
 )
 is_sequence = Contract(
     "sequence?",
-    lambda v: isinstance(v, (str, list, range, np.ndarray, Cons, Null)),
+    lambda v: type(v) in (str, range, Cons, Null) or isinstance(v, (list, np.ndarray)),
 )
-is_range = Contract("range?", lambda v: isinstance(v, range))
+is_range = Contract("range?", lambda v: type(v) is range)
 is_vector = Contract("vector?", lambda v: isinstance(v, list))
 is_array = Contract("array?", lambda v: isinstance(v, np.ndarray))
 is_boolarr = Contract(
@@ -585,14 +586,20 @@ def display_str(val: object) -> str:
         return "#t"
     if val is False:
         return "#f"
-    if isinstance(val, Symbol):
+    if type(val) is Symbol:
         return val.val
-    if isinstance(val, str):
+    if type(val) is str:
         return val
+    if type(val) is Char:
+        return f"{val}"
+    if type(val) is range:
+        return "#<range>"
+    if type(val) is complex:
+        join = "" if val.imag < 0 else "+"
+        return f"{val.real}{join}{val.imag}i"
+
     if isinstance(val, Fraction):
         return f"{val.numerator}/{val.denominator}"
-    if isinstance(val, Symbol):
-        return val.val
     if isinstance(val, list):
         if not val:
             return "#()"
@@ -600,8 +607,6 @@ def display_str(val: object) -> str:
         for item in val[1:]:
             result += f" {display_str(item)}"
         return result + ")"
-    if isinstance(val, range):
-        return "#<range>"
     if isinstance(val, np.ndarray):
         kind = val.dtype.kind
         result = f"(array '{display_dtype(val.dtype)}"
@@ -612,18 +617,17 @@ def display_str(val: object) -> str:
             for item in val:
                 result += f" {item}"
         return result + ")"
-    if isinstance(val, complex):
-        join = "" if val.imag < 0 else "+"
-        return f"{val.real}{join}{val.imag}i"
 
     return f"{val!r}"
 
 
 def print_str(val: object) -> str:
-    if isinstance(val, (Symbol, list, Cons)):
-        return "'" + display_str(val)
-    if isinstance(val, str):
+    if type(val) is str:
         return f'"{val}"'
+    if type(val) is Char:
+        return f"{val!r}"
+    if type(val) is Symbol or isinstance(val, (list, Cons)):
+        return "'" + display_str(val)
 
     return display_str(val)
 
@@ -852,10 +856,10 @@ def palet_random(*args: int) -> int | float:
 
 
 def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | Null) -> Any:
+    if type(seq) is str:
+        return str(map(proc.proc, seq))
     if isinstance(seq, (list, range)):
         return list(map(proc.proc, seq))
-    if isinstance(seq, str):
-        return str(map(proc.proc, seq))
 
     if isinstance(seq, np.ndarray):
         if proc.arity[0] != 0:
@@ -878,7 +882,7 @@ def apply(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
 
 def ref(seq: Any, ref: int) -> Any:
     try:
-        return Char(seq[ref]) if isinstance(seq, str) else seq[ref]
+        return Char(seq[ref]) if type(seq) is str else seq[ref]
     except IndexError:
         raise MyError(f"ref: Invalid index {ref}")
 
@@ -984,7 +988,7 @@ def check_for_syntax(env: Env, node: list) -> Any:
     assert isinstance(node[1][0], list)
 
     var = node[1][0][0]
-    if not isinstance(var, Symbol):
+    if type(var) is not Symbol:
         raise MyError(f"{name}: binding must be an identifier")
     my_iter = my_eval(env, node[1][0][1])
 
@@ -1141,12 +1145,12 @@ def syn_with_open(env: Env, node: list) -> None:
     file_binding = node[1][0].val
 
     file_name = my_eval(env, node[1][1])
-    if not isinstance(file_name, str):
+    if type(file_name) is not str:
         raise MyError(f"{node[0]}: file-name must be string?")
 
     if len(node[1]) == 3:
         file_mode = my_eval(env, node[1][2])
-        if not isinstance(file_mode, Symbol):
+        if type(file_name) is not Symbol:
             raise MyError(f"{node[0]}: file-mode must be a symbol?")
         if file_mode not in (Symbol("w"), Symbol("a"), Symbol("r")):
             raise MyError(f"{node[0]}: file-mode must be either: 'w 'r 'a")
@@ -1193,7 +1197,7 @@ def syn_dot(env: Env, node: list) -> Any:
 
 
 def my_eval(env: Env, node: list) -> Any:
-    if isinstance(node, Symbol):
+    if type(node) is Symbol:
         val = env.get(node.val)
         if val is None:
             raise MyError(f"{node.val} is undefined")
@@ -1219,11 +1223,11 @@ def my_eval(env: Env, node: list) -> Any:
 
             raise MyError(f"{oper}, expected procedure")
 
-        if isinstance(oper, Syntax):
+        if type(oper) is Syntax:
             return oper(env, node)
 
         values = [my_eval(env, c) for c in node[1:]]
-        if isinstance(oper, Contract):
+        if type(oper) is Contract:
             check_args(oper.name, values, (1, 1), None)
         else:
             check_args(oper.name, values, oper.arity, oper.contracts)
@@ -1233,7 +1237,10 @@ def my_eval(env: Env, node: list) -> Any:
 
 
 def my_write(v: Any) -> None:
-    sys.stdout.write(v)
+    try:
+        sys.stdout.write(v)
+    except UnicodeEncodeError as e:
+        raise MyError(e)
     return None
 
 
@@ -1252,10 +1259,11 @@ env: Env = {
     "if": Syntax(syn_if),
     "when": Syntax(syn_when),
     "cond": Syntax(syn_cond),
+    ".": Syntax(syn_dot),
+    "with-open": Syntax(syn_with_open),
+    # loops
     "for": Syntax(syn_for),
     "for/vector": Syntax(syn_for_vec),
-    "with-open": Syntax(syn_with_open),
-    ".": Syntax(syn_dot),
     # actions
     "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
     "display": Proc("display", lambda v: my_write(display_str(v)), (1, 1)),
@@ -1264,8 +1272,10 @@ env: Env = {
     "println": Proc("println", lambda v: my_write(print_str(v) + "\n"), (1, 1)),
     "exit": Proc("exit", sys.exit, (0, None)),
     "error": Proc("error", raise_, (1, 1), [is_str]),
-    "void": Proc("void", lambda: None, (0, 0)),
+    "sleep": Proc("sleep", sleep, (1, 1), [lambda t: is_int(t) or is_float(t)]),
+    # void
     "void?": is_void,
+    "void": Proc("void", lambda *v: None, (0, 0)),
     # booleans
     "bool?": is_bool,
     ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
@@ -1329,6 +1339,9 @@ env: Env = {
     "string-titlecase": Proc("string-titlecase", str.title, (1, 1), [is_str]),
     "char->int": Proc("char->int", lambda c: ord(c.val), (1, 1), [is_char]),
     "int->char": Proc("int->char", Char, (1, 1), [is_int]),
+    "~a": Proc("~a", lambda *v: "".join([display_str(a) for a in v]), (0, None)),
+    "~s": Proc("~s", lambda *v: " ".join([display_str(a) for a in v]), (0, None)),
+    "~v": Proc("~v", lambda *v: " ".join([print_str(a) for a in v]), (0, None)),
     # vectors
     "vector?": is_vector,
     "vector": Proc("vector", lambda *a: list(a), (0, None)),

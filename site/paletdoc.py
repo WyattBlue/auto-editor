@@ -26,6 +26,12 @@ class proc:
 
 
 @dataclass
+class pred:  # predicate
+    name: str
+    summary: text
+
+
+@dataclass
 class syntax:
     name: str
     body: str
@@ -39,7 +45,7 @@ class value:
     summary: text
 
 
-doc: dict[str, list[proc | value | syntax | text]] = {
+doc = {
     "Basic Syntax": [
         syntax(
             "define",
@@ -56,13 +62,14 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ]),
         ),
         syntax(
-            "lambda / λ",
+            "lambda",
             "args body",
             text([
                 "Produces a procedure that accepts ", var("args"),
                 " arguments and runs ", var("body"), " when called.",
             ]),
         ),
+        syntax("λ", "args body", text(["Clone of ", var("lambda"), "."])),
         syntax(
             "if",
             "test-expr then-expr else-expr",
@@ -123,10 +130,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
     ],
     "Booleans": [
-        proc(
+        pred(
             "bool?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is ", code("#t"), " or ",
                 code("#f"), ", ", code("#f"), " otherwise."
@@ -136,65 +141,65 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         value("false", "bool?", text(["An alias for ", code("#f"), "."])),
     ],
     "Number Predicates": [
-        proc(
+        pred(
             "number?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a number, ", code("#f"),
                 " otherwise.",
             ]),
         ),
-        proc(
+        pred(
             "real?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a real number, ",
                 code("#f"), " otherwise.",
             ]),
         ),
-        proc(
+        pred(
             "int?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is an integer, ",
                 code("#f"), " otherwise.",
             ]),
         ),
-        proc(
+        pred(
             "uint?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is an integer and ",
                 var("v"), " is greater than ", code("-1"), ", ", code("#f"),
                 " otherwise.",
             ]),
         ),
-        proc(
+        pred(
+            "float?",
+            text([
+                "Returns ", code("#t"), " if ", var("v"), " is a float, ",
+                code("#f"), " otherwise.",
+            ]),
+        ),
+        pred(
+            "fraction?",
+            text([
+                "Returns ", code("#t"), " if ", var("v"), " is a fraction",
+                " (a rational number), ", code("#f"), " otherwise.",
+            ]),
+        ),
+        pred(
             "zero?",
-            (["v"], "bool?"),
-            [("v", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is equal to ", code("0"),
                 ", ", code("#f"), " otherwise."
             ]),
         ),
-        proc(
+        pred(
             "positive?",
-            (["v"], "bool?"),
-            [("v", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is greater than ",
                 code("0"), ", ", code("#f"), " otherwise."
             ]),
         ),
-        proc(
+        pred(
             "negative?",
-            (["v"], "bool?"),
-            [("v", "real?")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is less than ", code("0"),
                 ", ", code("#f"), " otherwise."
@@ -206,15 +211,10 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "+",
             (["z", "..."], "number?"),
             [("z", "number?")],
-            text(
-                [
-                    "Return the sum of ",
-                    var("z"),
-                    "s. Add from left to right. If no arguments are provided, the result is ",
-                    code("0"),
-                    ".",
-                ]
-            ),
+            text([
+                "Return the sum of ", var("z"), "s. Add from left to right. "
+                "If no arguments are provided, the result is ", code("0"), ".",
+            ]),
         ),
         proc(
             "-",
@@ -370,18 +370,152 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             [("x", "real?")],
             text(["Returns smallest value of the ", var("x"), "s."]),
         ),
+    ],
+    "Exponents": [
         proc(
             "pow",
             (["z", "w"], "real?"),
             [("z", "real?"), ("w", "real?")],
             text(["Returns ", var("z"), " raised to the ", var("w"), " power."]),
         ),
+        proc(
+            "sqrt",
+            (["z"], "number?"),
+            [("z", "number?")],
+            text(["Returns the square root of ", var("z"), "."]),
+        ),
+        proc(
+            "exp",
+            (["x"], "float?"),
+            [("x", "real?")],
+            text(["Returns Euler's number raised to the ", var("z"), " power."]),
+        ),
+        proc(
+            "log",
+            (["x", "b"], "float?"),
+            [("x", "real?"), ("b", "real?", "(exp 1)")],
+            text([
+                "Returns the natural logarithm of ", var("x"), ".\n"
+                "If ", var("b"), " is provided, it serves as an alternative base."
+            ]),
+        ),
+    ],
+    "Geometry": [
+        proc(
+            "sin",
+            (["z"], "float?"),
+            [("z", "real?")],
+            text(["Returns the sine of ", var("z"), " in radians."])
+        ),
+        proc(
+            "cos",
+            (["z"], "float?"),
+            [("z", "real?")],
+            text(["Returns the cosine of ", var("z"), " in radians."])
+        ),
+        proc(
+            "tan",
+            (["z"], "float?"),
+            [("z", "real?")],
+            text(["Returns the tangent of ", var("z"), " in radians."])
+        ),
+        value(
+            "pi",
+            "float?",
+            text([
+                "A floating point approximation of 𝜋: "
+                "the circumference of a circle divided by its diameter."
+            ]),
+        ),
+    ],
+    "Symbols": [
+        pred(
+            "symbol?",
+            text([
+                "Returns ", code("#t"), " if ", var("v"), " is a symbol, ", code("#f"),
+                " otherwise.",
+            ]),
+        ),
+        proc(
+            "symbol->string",
+            (["sym"], "string?"),
+            [("sym", "symbol?")],
+            text([
+                "Returns a new string whose characters are the same as in ", var("sym"), "."
+            ]),
+        ),
+        proc(
+            "string->symbol",
+            (["str"], "symbol?"),
+            [("str", "string?")],
+            text([
+                "Returns a symbol whose characters are the same as ", var("str"), "."
+            ]),
+        ),
+    ],
+    "Strings": [
+        pred(
+            "string?",
+            text([
+                "Returns ", code("#t"), " if ", var("v"), " is a string, ", code("#f"),
+                " otherwise.",
+            ]),
+        ),
+        pred(
+            "char?",
+            text([
+                "Returns ", code("#t"), " if ", var("v"), " is a char, ",
+                code("#f"), " otherwise.",
+            ]),
+        ),
+        proc(
+            "string",
+            (["char", "..."], "string?"),
+            [("char", "char?")],
+            text(["Returns a new string from the given ", var("char"), "s."]),
+        ),
+        proc(
+            "string-append",
+            (["str", "..."], "string?"),
+            [("str", "string?")],
+            text(["Returns a new string concatenated from the given ", var("str"), "s"])
+        ),
+        proc(
+            "string-upcase",
+            (["s"], "string?"),
+            [("s", "string?")],
+            text(["Returns the string ", var("s"), " in upper case."]),
+        ),
+        proc(
+            "string-downcase",
+            (["s"], "string?"),
+            [("s", "string?")],
+            text(["Returns the string ", var("s"), " in lower case."]),
+        ),
+        proc(
+            "string-titlecase",
+            (["s"], "string?"),
+            [("s", "string?")],
+            text(["Returns the string ", var("s"), " in title case. "
+                "The first letter of every word is capitalized and the rest is lower cased."
+            ]),
+        ),
+        proc(
+            "char->int",
+            (["char"], "int?"),
+            [("char", "char?")],
+            text(["Returns the corresponding int to the given ", var("char"), "."]),
+        ),
+        proc(
+            "int->char",
+            (["k"], "char?"),
+            [("k", "int?")],
+            text(["Returns the character corresponding to ", var("k"), "."]),
+        ),
     ],
     "Vectors": [
-        proc(
+        pred(
             "vector?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a vector, ", code("#f"),
                 " otherwise.",
@@ -434,10 +568,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
     ],
     "Arrays": [
-        proc(
+        pred(
             "array?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is an array, ",
                 code("#f"), " otherwise.",
@@ -447,15 +579,11 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             "array",
             (["dtype", "v", "..."], "array?"),
             [("dtype", "symbol?"), ("v", "any")],
-            text(
-                [
-                    "Returns a freshly allocated array with ",
-                    var("dtype"),
-                    " as its datatype and the ",
-                    var("v"),
-                    " args as its values filled in order.",
-                ]
-            ),
+            text([
+                "Returns a freshly allocated array with ", var("dtype"),
+                " as its datatype and the ", var("v"),
+                " args as its values filled in order.",
+            ]),
         ),
         proc(
             "array-splice!",
@@ -468,7 +596,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             ],
             text([
                 "Modify ", var("arr"), " by setting ", var("start"), " to ",
-                var("stop"), "to ", var("v"),  ".",
+                var("stop"), " to the value, ", var("v"),  ".",
             ]),
         ),
         proc(
@@ -480,25 +608,21 @@ doc: dict[str, list[proc | value | syntax | text]] = {
                 ("arr", "bool-array?"),
             ],
             text([
-                "Returns a new ", code("bool-array?"), " with ", var("left"), " and",
+                "Returns a new ", code("bool-array?"), " with ", var("left"), " and ",
                 var("right"), " margin applied."
             ]),
         ),
     ],
     "Pairs and Lists": [
-        proc(
+        pred(
             "pair?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a pair, ",
                 code("#f"), " otherwise.",
             ]),
         ),
-        proc(
+        pred(
             "null?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is an empty list, ",
                 code("#f"), " otherwise.",
@@ -518,7 +642,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["p"], "any?"),
             [("p", "pair?")],
             text([
-                "Returns the first element of the pair ", var("p"), ".",
+                "Returns the first element of pair ", var("p"), ".",
             ]),
         ),
         proc(
@@ -526,13 +650,12 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["p"], "any?"),
             [("p", "pair?")],
             text([
-                "Returns the second element of the pair ", var("p"), ".",
+                "Returns the second element of pair ", var("p"), ".",
             ]),
         ),
-        proc(
+        value("null", "null?", text(["The empty list."])),
+        pred(
             "list?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
                  " is an empty list or a pair whose second element is a list.",
@@ -554,10 +677,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
     ],
     "Ranges": [
-        proc(
+        pred(
             "range?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"), " is a range object, ",
                 code("#f"), " otherwise.",
@@ -575,20 +696,16 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
     ],
     "Generic Sequences": [
-        proc(
+        pred(
             "iterable?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
                 " is a vector, array, string, hash, pair, or range, ", code("#f"),
                 " otherwise.",
             ]),
         ),
-        proc(
+        pred(
             "sequence?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
                 " is a vector, array, string, pair, or range, ", code("#f"),
@@ -635,10 +752,8 @@ doc: dict[str, list[proc | value | syntax | text]] = {
         ),
     ],
     "Hashmaps": [
-        proc(
+        pred(
             "hash?",
-            (["v"], "bool?"),
-            [("v", "any")],
             text([
                 "Returns ", code("#t"), " if ", var("v"),
                 " is a hash table, ", code("#f"),
@@ -650,7 +765,7 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             (["key", "val", "..."], "hash?"),
             [("key", "any"), ("val", "any")],
             text([
-                "Returns a newly contructed hash map from key-value pairs."
+                "Returns a newly constructed hash map from key-value pairs."
             ]),
         ),
         proc(
@@ -662,6 +777,20 @@ doc: dict[str, list[proc | value | syntax | text]] = {
                 " is in the hash map, ", code("#f"),
                 " otherwise.",
             ]),
+        ),
+    ],
+    "Actions": [
+        proc(
+            "sleep",
+            (["time"], "void?"),
+            [("time", "(or int? float?)")],
+            text(["Adds a delay by ", code("time"), "seconds."]),
+        ),
+        proc(
+            "error",
+            (["msg"], "void?"),
+            [("msg", "string?")],
+            text(["Raises an exception with ", code("msg"), " as the message."])
         ),
     ],
     "Input / Output": [
@@ -704,11 +833,33 @@ doc: dict[str, list[proc | value | syntax | text]] = {
             text(["Returns the specified attribute on the object."]),
         ),
     ],
-    "Misc. Predicates": [
+    "Void": [
+        pred(
+            "void?",
+            text([
+                "Returns ", code("#t"), " if ", var("v"), " is ", code("#<void>"), ", ",
+                code("#f"), " otherwise.",
+            ]),
+        ),
         proc(
-            "any",
-            (["v"], "bool?"),
+            "void",
+            (["v", "..."], "void?"),
             [("v", "any")],
+            text([
+                "Returns the constant ", code("#<void>"),
+                ". All ", var("v"), " arguments are ignored."
+            ]),
+        ),
+    ],
+    "Misc. Predicates": [
+        pred(
+            "procedure?",
+            text([
+                "Returns ", code("#t"), " if ", var("v"), " is a procedure.",
+            ]),
+        ),
+        pred(
+            "any",
             text([
                 "Returns ", code("#t"), " regardless of the value of ", var("v"), ".",
             ]),
