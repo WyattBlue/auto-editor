@@ -764,6 +764,9 @@ def main(sys_args: list[str] | None = None):
             ("(cond [(positive? -5) 1] [else 2])", 2),
             ("(cond [(positive? -5) 1] [(zero? -5) 2] [(negative? -5) 3])", 3),
             ("(cond [else 5])", 5),
+            ("(~a 3 4 'a)", "34a"),
+            ("(~s 3 4 'a)", "3 4 a"),
+            ("(~v 3 4 'a)", "3 4 'a"),
             # ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
         )
 

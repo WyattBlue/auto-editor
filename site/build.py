@@ -10,7 +10,7 @@ from shutil import rmtree
 
 import basswood
 import paletdoc
-from paletdoc import code, proc, syntax, text, value, var
+from paletdoc import code, proc, syntax, text, value, var, pred
 
 sys.path.insert(0, "/Users/wyattblue/projects/auto-editor")
 
@@ -18,6 +18,7 @@ from auto_editor import version
 import auto_editor.vanparse as vanparse
 from auto_editor.__main__ import main_options
 from auto_editor.vanparse import OptionText
+from auto_editor.interpreter import env
 
 argp = ArgumentParser()
 argp.add_argument("--production", "-p", action="store_true")
@@ -103,15 +104,39 @@ with open(ref / "palet.html", "w") as file:
         ]
         return "&nbsp;".join(results)
 
+    pt_vars = []
     for category, somethings in paletdoc.doc.items():
         file.write(f'<h2 class="left">{category}</h2>\n')
         for some in somethings:
+            if isinstance(some, text):
+                file.write(f"<p>{text_to_str(some)}</p>\n")
+                continue
+
+            pt_vars.append(some.name)
+            if isinstance(some, value):
+                file.write(
+                    '<div class="palet-block">\n'
+                    '<p class="mono"><b>Value</b></p>\n'
+                    f'<p class="mono">{some.name}\n'
+                    f'&nbsp;:&nbsp;<a href="#{some.sig}">{some.sig}</a></p>\n</div>\n'
+                    f"<p>{text_to_str(some.summary)}</p>\n"
+                )
             if isinstance(some, syntax):
                 _body = build_sig(some.body.split(" "))
                 file.write(
                     f'<div id="{some.name}" class="palet-block">\n'
-                    f'<p class="mono"><b>Syntax</b></p>\n'
+                    '<p class="mono"><b>Syntax</b></p>\n'
                     f'<p class="mono">(<b>{some.name}</b>&nbsp;{_body})</p>\n</div>\n'
+                    f"<p>{text_to_str(some.summary)}</p>\n"
+                )
+            if isinstance(some, pred):
+                file.write(
+                    f'<div id="{some.name}" class="palet-block">\n'
+                    '<p class="mono"><b>Procedure</b></p>\n'
+                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{build_sig(["v"])})'
+                    '&nbsp;→&nbsp;<a href="#bool?">bool?</a></p>\n'
+                    f'<p class="mono">&nbsp;<span class="palet-var">v</span>'
+                    '&nbsp;:&nbsp;<a href="#any?">any?</a></p></div>\n'
                     f"<p>{text_to_str(some.summary)}</p>\n"
                 )
             if isinstance(some, proc):
@@ -140,16 +165,15 @@ with open(ref / "palet.html", "w") as file:
                     )
 
                 file.write("</div>\n" f"<p>{text_to_str(some.summary)}</p>\n")
-            if isinstance(some, value):
-                file.write(
-                    f'<div class="palet-block">\n'
-                    f'<p class="mono"><b>Value</b></p>\n'
-                    f'<p class="mono">{some.name}\n'
-                    f'&nbsp;:&nbsp;<a href="#{some.sig}">{some.sig}</a></p>\n</div>\n'
-                    f"<p>{text_to_str(some.summary)}</p>\n"
-                )
-            if isinstance(some, text):
-                file.write(f"<p>{text_to_str(some)}</p>\n")
+
+
+    for _var in pt_vars:
+        if _var not in env:
+            raise ValueError(f"{_var} not in env")
+
+    for key in env:
+        if key not in pt_vars:
+            print(f"missing docs for {key}")
 
 
 binaries = Path("binaries")
