@@ -612,6 +612,19 @@ doc = {
                 var("right"), " margin applied."
             ]),
         ),
+        proc(
+            "mincut",
+            (["left", "[right]", "arr"], "bool-array?"),
+            [
+                ("left", "int?"),
+                ("right", "int?", "left"),
+                ("arr", "bool-array?"),
+            ],
+            text([
+                "Returns a new ", code("bool-array?"), " with ", var("left"), " and ",
+                var("right"), " margin applied."
+            ]),
+        ),
     ],
     "Pairs and Lists": [
         pred(
@@ -848,6 +861,16 @@ doc = {
             text([
                 "Returns the constant ", code("#<void>"),
                 ". All ", var("v"), " arguments are ignored."
+            ]),
+        ),
+    ],
+    "Reflection": [
+        syntax(
+            "eval",
+            "body",
+            text([
+                "Evaluate body, if body is a vector or list, "
+                "evaluate the vector/list, else return the value."
             ]),
         ),
     ],

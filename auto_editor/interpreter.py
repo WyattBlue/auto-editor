@@ -7,8 +7,8 @@ import sys
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import reduce
-from typing import TYPE_CHECKING
 from time import sleep
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -52,7 +52,7 @@ class Null:
         pass
 
     def __eq__(self, obj: object) -> bool:
-        return isinstance(obj, Null)
+        return type(obj) is Null
 
     def __len__(self) -> int:
         return 0
@@ -84,13 +84,13 @@ class Cons:
         self.d = d
 
     def __repr__(self) -> str:
-        if not isinstance(self.d, (Cons, Null)):
+        if type(self.d) not in (Cons, Null):
             return f"(cons {self.a} {self.d})"
 
         result = f"({display_str(self.a)}"
         tail = self.d
-        while isinstance(tail, Cons):
-            if not isinstance(tail.d, (Null, Cons)):
+        while type(tail) is Cons:
+            if type(tail.d) not in (Cons, Null):
                 return f"{result} (cons {tail.a} {tail.d}))"
             result += f" {display_str(tail.a)}"
             tail = tail.d
@@ -98,39 +98,44 @@ class Cons:
         return f"{result})"
 
     def __eq__(self, obj: object) -> bool:
-        return isinstance(obj, Cons) and self.a == obj.a and self.d == obj.d
+        return type(obj) is Cons and self.a == obj.a and self.d == obj.d
 
-    def __len__(self) -> int:
+    def __len__(self: Cons | Null) -> int:
         count = 0
-        while isinstance(self, Cons):
+        while type(self) is Cons:
             self = self.d
             count += 1
-        if not isinstance(self, Null):
+        if type(self) is not Null:
             raise MyError("length expects: list?")
         return count
 
     def __next__(self) -> Any:
-        if isinstance(self.d, Cons):
+        if type(self.d) is Cons:
             return self.d
         raise StopIteration
 
     def __iter__(self) -> Any:
-        while isinstance(self, Cons):
+        while type(self) is Cons:
             yield self.a
             self = self.d
 
-    def __getitem__(self, ref: int | slice) -> Any:
-        if isinstance(ref, int):
+    def __getitem__(self, ref: object) -> Any:
+        if type(ref) is not int and type(ref) is not slice:
+            raise MyError(f"ref: not a valid index: {print_str(ref)}")
+
+        if type(ref) is int:
             if ref < 0:
-                raise MyError(f"ref: negative index not allowed")
+                raise MyError(f"ref: negative index not allowed: {ref}")
             pos = ref
             while pos > 0:
                 pos -= 1
                 self = self.d
-                if not isinstance(self, Cons):
-                    raise MyError(f"ref: Index {ref} out of range")
+                if type(self) is not Cons:
+                    raise MyError(f"ref: index out of range: {ref}")
 
             return self.a
+
+        assert type(ref) is slice
 
         lst: Cons | Null = Null()
         steps: int = -1
@@ -149,7 +154,7 @@ class Cons:
             else:
                 start, stop = stop + 1, start
 
-        while isinstance(self, Cons):
+        while type(self) is Cons:
             if i > stop - 1:
                 break
             if i >= start:
@@ -164,7 +169,7 @@ class Cons:
             return lst
 
         result: Cons | Null = Null()
-        while isinstance(lst, Cons):
+        while type(lst) is Cons:
             result = Cons(lst.a, result)
             lst = lst.d
         return result
@@ -174,7 +179,7 @@ class Char:
     __slots__ = "val"
 
     def __init__(self, val: str | int):
-        if isinstance(val, int):
+        if type(val) is int:
             self.val: str = chr(val)
         else:
             assert type(val) is str and len(val) == 1
@@ -187,7 +192,7 @@ class Char:
         return f"#\\{self.val}" if self.val not in names else f"#\\{names[self.val]}"
 
     def __eq__(self, obj: object) -> bool:
-        return isinstance(obj, Char) and self.val == obj.val
+        return type(obj) is Char and self.val == obj.val
 
     def __radd__(self, obj2: str) -> str:
         return obj2 + self.val
@@ -207,7 +212,7 @@ class Symbol:
         return self.hash
 
     def __eq__(self, obj: object) -> bool:
-        return isinstance(obj, Symbol) and self.hash == obj.hash
+        return type(obj) is Symbol and self.hash == obj.hash
 
 
 ###############################################################################
@@ -434,7 +439,7 @@ class Parser:
     def expr(self) -> Any:
         token = self.current_token
 
-        if token.type in {CHAR, NUM, STR, BOOL}:
+        if token.type in (CHAR, NUM, STR, BOOL):
             self.eat(token.type)
             return token.value
 
@@ -552,7 +557,8 @@ is_str = Contract("string?", lambda v: type(v) is str)
 is_char = Contract("char?", lambda v: type(v) is Char)
 is_iterable = Contract(
     "iterable?",
-    lambda v: type(v) in (str, range, Cons, Null) or isinstance(v, (list, dict, np.ndarray)),
+    lambda v: type(v) in (str, range, Cons, Null)
+    or isinstance(v, (list, dict, np.ndarray)),
 )
 is_sequence = Contract(
     "sequence?",
@@ -626,8 +632,8 @@ def print_str(val: object) -> str:
         return f'"{val}"'
     if type(val) is Char:
         return f"{val!r}"
-    if type(val) is Symbol or isinstance(val, (list, Cons)):
-        return "'" + display_str(val)
+    if type(val) is Symbol or type(val) is Cons or isinstance(val, list):
+        return f"'{display_str(val)}"
 
     return display_str(val)
 
@@ -809,7 +815,7 @@ def deep_list(vec: list) -> Cons | Null:
 
 def list_to_vector(val: Cons | Null) -> list:
     result = []
-    while isinstance(val, Cons):
+    while type(val) is Cons:
         result.append(val.a)
         val = val.d
     return result
@@ -835,9 +841,9 @@ def vector_extend(vec: list, *more_vecs: list) -> None:
 
 
 def is_list(val: Any) -> bool:
-    while isinstance(val, Cons):
+    while type(val) is Cons:
         val = val.d
-    return isinstance(val, Null)
+    return type(val) is Null
 
 
 def palet_random(*args: int) -> int | float:
@@ -868,7 +874,7 @@ def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | Null) -> An
         return proc.proc(seq)
 
     result: Cons | Null = Null()
-    while isinstance(seq, Cons):
+    while type(seq) is Cons:
         result = Cons(proc.proc(seq.a), result)
         seq = seq.d
     return result[::-1]
@@ -883,8 +889,10 @@ def apply(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
 def ref(seq: Any, ref: int) -> Any:
     try:
         return Char(seq[ref]) if type(seq) is str else seq[ref]
+    except KeyError:
+        raise MyError(f"ref: Invalid key: {print_str(ref)}")
     except IndexError:
-        raise MyError(f"ref: Invalid index {ref}")
+        raise MyError(f"ref: Invalid index: {print_str(ref)}")
 
 
 def p_slice(
@@ -993,7 +1001,7 @@ def check_for_syntax(env: Env, node: list) -> Any:
     my_iter = my_eval(env, node[1][0][1])
 
     if not is_iterable(my_iter):
-        if isinstance(my_iter, int):
+        if type(my_iter) is int:
             return var, range(my_iter)
         raise MyError(f"{name}: got non-iterable in iter slot")
 
@@ -1012,7 +1020,7 @@ def syn_define(env: Env, node: list) -> Any:
         raise MyError("define: bad syntax")
 
     if isinstance(node[1], list):
-        if len(node[1]) < 1 or not isinstance(node[1][0], Symbol):
+        if not node[1] or type(node[1][0]) is not Symbol:
             raise MyError(f"{node[0]}: bad syntax")
 
         n = node[1][0].val
@@ -1020,8 +1028,8 @@ def syn_define(env: Env, node: list) -> Any:
         body = node[2:]
         env[n] = UserProc(n, env, parameters, body)
         return None
-    elif not isinstance(node[1], Symbol):
-        raise MyError(f"{node[0]}: Must be an identifier")
+    elif type(node[1]) is not Symbol:
+        raise MyError(f"{node[0]}: must be an identifier")
 
     n = node[1].val
 
@@ -1031,7 +1039,7 @@ def syn_define(env: Env, node: list) -> Any:
     if (
         isinstance(node[2], list)
         and node[2]
-        and isinstance(node[2][0], Symbol)
+        and type(node[2][0]) is Symbol
         and node[2][0].val in ("lambda", "λ")
     ):
         parameters = node[2][1]
@@ -1045,12 +1053,12 @@ def syn_define(env: Env, node: list) -> Any:
 def syn_set(env: Env, node: list) -> None:
     if len(node) != 3:
         raise MyError(f"{node[0]}: bad syntax")
-    if not isinstance(node[1], Symbol):
-        raise MyError(f"{node[0]}: Must be an identifier")
+    if type(node[1]) is not Symbol:
+        raise MyError(f"{node[0]}: must be an identifier")
 
     name = node[1].val
     if name not in env:
-        raise MyError(f"{node[0]}: Cannot set variable {name} before definition")
+        raise MyError(f"{node[0]}: cannot set variable {name} before definition")
     env[name] = my_eval(env, node[2])
     return None
 
@@ -1110,7 +1118,7 @@ def syn_cond(env: Env, node: list) -> Any:
             test_clause = True
         else:
             test_clause = my_eval(env, test_expr[0])
-            if not isinstance(test_clause, bool):
+            if type(test_clause) is not bool:
                 raise MyError(f"{node[0]}: test-expr must be: bool?")
 
         if test_clause:
@@ -1139,7 +1147,7 @@ def syn_with_open(env: Env, node: list) -> None:
     if len(node[1]) != 2 and len(node[1]) != 3:
         raise MyError(f"{node[0]}: wrong number of args")
 
-    if not isinstance(node[1][0], Symbol):
+    if type(node[1][0]) is not Symbol:
         raise MyError(f"{node[0]}: as must be an identifier")
 
     file_binding = node[1][0].val
@@ -1150,9 +1158,9 @@ def syn_with_open(env: Env, node: list) -> None:
 
     if len(node[1]) == 3:
         file_mode = my_eval(env, node[1][2])
-        if type(file_name) is not Symbol:
+        if type(file_mode) is not Symbol:
             raise MyError(f"{node[0]}: file-mode must be a symbol?")
-        if file_mode not in (Symbol("w"), Symbol("a"), Symbol("r")):
+        if file_mode.val not in ("w", "r", "a"):
             raise MyError(f"{node[0]}: file-mode must be either: 'w 'r 'a")
     else:
         file_mode = Symbol("w")
@@ -1196,7 +1204,7 @@ def syn_dot(env: Env, node: list) -> Any:
     return my_obj.attributes[my_attr]
 
 
-def my_eval(env: Env, node: list) -> Any:
+def my_eval(env: Env, node: object) -> Any:
     if type(node) is Symbol:
         val = env.get(node.val)
         if val is None:
@@ -1236,6 +1244,19 @@ def my_eval(env: Env, node: list) -> Any:
     return node
 
 
+def syn_eval(env: Env, v: list) -> Any:
+    if len(v) != 2:
+        raise MyError(f"eval: Arity mismatch, expected 1, given {len(v) - 1}")
+
+    node = my_eval(env, v[1])
+    if isinstance(node, list):
+        return my_eval(env, node)
+    if isinstance(node, Cons):
+        return my_eval(env, list_to_vector(node))
+
+    return node
+
+
 def my_write(v: Any) -> None:
     try:
         sys.stdout.write(v)
@@ -1261,6 +1282,7 @@ env: Env = {
     "cond": Syntax(syn_cond),
     ".": Syntax(syn_dot),
     "with-open": Syntax(syn_with_open),
+    "eval": Syntax(syn_eval),
     # loops
     "for": Syntax(syn_for),
     "for/vector": Syntax(syn_for_vec),

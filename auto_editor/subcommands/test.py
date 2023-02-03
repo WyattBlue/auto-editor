@@ -767,6 +767,11 @@ def main(sys_args: list[str] | None = None):
             ("(~a 3 4 'a)", "34a"),
             ("(~s 3 4 'a)", "3 4 a"),
             ("(~v 3 4 'a)", "3 4 'a"),
+            ("(eval 3)", 3),
+            ('(eval "hello")', "hello"),
+            ("(eval '(+ 3 4))", 7),
+            ("(eval (list + 3 4))", 7),
+            ("(eval (vector + 3 4))", 7),
             # ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
         )
 
