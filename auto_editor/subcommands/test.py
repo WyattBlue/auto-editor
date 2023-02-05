@@ -21,7 +21,7 @@ from auto_editor.interpreter import (
     MyError,
     Null,
     Parser,
-    Symbol,
+    Sym,
     env,
 )
 from auto_editor.utils.log import Log
@@ -715,8 +715,8 @@ def main(sys_args: list[str] | None = None):
             ),
             ("(quote ())", Null()),
             ("'()", Null()),
-            ("(quote hello)", Symbol("hello")),
-            ("'hello", Symbol("hello")),
+            ("(quote hello)", Sym("hello")),
+            ("'hello", Sym("hello")),
             ("(quote (3))", Cons(3, Null())),
             ("'(3)", Cons(3, Null())),
             ('(quote (3 2 "apple"))', Cons(3, Cons(2, Cons("apple", Null())))),
@@ -772,7 +772,7 @@ def main(sys_args: list[str] | None = None):
             ("(eval '(+ 3 4))", 7),
             ("(eval (list + 3 4))", 7),
             ("(eval (vector + 3 4))", 7),
-            # ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
+            ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
         )
 
     tests = []

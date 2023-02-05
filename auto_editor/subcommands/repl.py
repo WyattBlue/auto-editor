@@ -92,10 +92,17 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
     try:
         while True:
-            if text is None:
-                text = input("> ")
-            else:
-                text += " " + input("   ")
+            try:
+                if text is None:
+                    text = input("> ")
+                else:
+                    text += " " + input("   ")
+            except KeyboardInterrupt as e:
+                if text is None:
+                    raise e
+                text = None
+                print("")
+                continue
 
             try:
                 lexer = Lexer(text)
@@ -110,9 +117,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                     if result is not None:
                         sys.stdout.write(f"{print_str(result)}\n")
             except ClosingError:
-                continue
+                continue  # Allow user to continue adding text
             except (MyError, ZeroDivisionError) as e:
-                text = None
                 print(f"error: {e}")
 
             text = None

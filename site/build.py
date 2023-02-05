@@ -116,25 +116,24 @@ with open(ref / "palet.html", "w") as file:
             if isinstance(some, value):
                 file.write(
                     '<div class="palet-block">\n'
-                    '<p class="mono"><b>Value</b></p>\n'
                     f'<p class="mono">{some.name}\n'
-                    f'&nbsp;:&nbsp;<a href="#{some.sig}">{some.sig}</a></p>\n</div>\n'
+                    f'&nbsp;:&nbsp;<a href="#{some.sig}">{some.sig}</a>'
+                    '&nbsp;&nbsp;Value</p>\n</div>\n'
                     f"<p>{text_to_str(some.summary)}</p>\n"
                 )
             if isinstance(some, syntax):
                 _body = build_sig(some.body.split(" "))
                 file.write(
                     f'<div id="{some.name}" class="palet-block">\n'
-                    '<p class="mono"><b>Syntax</b></p>\n'
-                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{_body})</p>\n</div>\n'
+                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{_body})'
+                    '&nbsp;&nbsp;Syntax</p>\n</div>\n'
                     f"<p>{text_to_str(some.summary)}</p>\n"
                 )
             if isinstance(some, pred):
                 file.write(
                     f'<div id="{some.name}" class="palet-block">\n'
-                    '<p class="mono"><b>Procedure</b></p>\n'
                     f'<p class="mono">(<b>{some.name}</b>&nbsp;{build_sig(["v"])})'
-                    '&nbsp;→&nbsp;<a href="#bool?">bool?</a></p>\n'
+                    '&nbsp;→&nbsp;<a href="#bool?">bool?</a>&nbsp;&nbsp;Procedure</p>\n'
                     f'<p class="mono">&nbsp;<span class="palet-var">v</span>'
                     '&nbsp;:&nbsp;<a href="#any?">any?</a></p></div>\n'
                     f"<p>{text_to_str(some.summary)}</p>\n"
@@ -143,13 +142,13 @@ with open(ref / "palet.html", "w") as file:
                 rname = some.sig[1]
                 file.write(
                     f'<div id="{some.name}" class="palet-block">\n'
-                    f'<p class="mono"><b>Procedure</b></p>\n'
                     f'<p class="mono">(<b>{some.name}</b>&nbsp;{build_sig(some.sig[0])})'
                     + (
-                        "</p>\n"
+                        ""
                         if rname == "none"
-                        else f'&nbsp;→&nbsp;<a href="#{rname}">{rname}</a></p>\n'
+                        else f'&nbsp;→&nbsp;<a href="#{rname}">{rname}</a>'
                     )
+                    + '&nbsp;&nbsp;Procedure</p>\n'
                 )
                 for argsig in some.argsig:
                     name = argsig[0]

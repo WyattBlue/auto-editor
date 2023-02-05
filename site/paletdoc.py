@@ -370,6 +370,36 @@ doc = {
             [("x", "real?")],
             text(["Returns smallest value of the ", var("x"), "s."]),
         ),
+        proc(
+            "real-part",
+            (["z"], "real?"),
+            [("z", "number?")],
+            text(["TODO"]),
+        ),
+        proc(
+            "imag-part",
+            (["z"], "real?"),
+            [("z", "number?")],
+            text(["TODO"]),
+        ),
+        proc(
+            "round",
+            (["x"], "int?"),
+            [("x", "real?")],
+            text(["TODO"]),
+        ),
+        proc(
+            "ceil",
+            (["x"], "int?"),
+            [("x", "real?")],
+            text(["TODO"]),
+        ),
+        proc(
+            "floor",
+            (["x"], "int?"),
+            [("x", "real?")],
+            text(["TODO"]),
+        ),
     ],
     "Exponents": [
         proc(
@@ -512,6 +542,24 @@ doc = {
             [("k", "int?")],
             text(["Returns the character corresponding to ", var("k"), "."]),
         ),
+        proc(
+            "~a",
+            (["v"], "string?"),
+            [("v", "datum?")],
+            text(["TODO"]),
+        ),
+        proc(
+            "~s",
+            (["v"], "string?"),
+            [("v", "datum?")],
+            text(["TODO"]),
+        ),
+        proc(
+            "~v",
+            (["v"], "string?"),
+            [("v", "datum?")],
+            text(["TODO"]),
+        ),
     ],
     "Vectors": [
         pred(
@@ -586,6 +634,15 @@ doc = {
             ]),
         ),
         proc(
+            "make-array",
+            (["dtype", "size", "v"], "array?"),
+            [("dtype", "symbol?"), ("size", "uint?"), ("v", "int?", "0")],
+            text([
+                "Returns a freshly allocated array with ", var("dtype"),
+                " as its datatype and the value ", var("v"), " filled.",
+            ]),
+        ),
+        proc(
             "array-splice!",
             (["arr", "v", "[start]", "[stop]"], "array?"),
             [
@@ -597,6 +654,27 @@ doc = {
             text([
                 "Modify ", var("arr"), " by setting ", var("start"), " to ",
                 var("stop"), " to the value, ", var("v"),  ".",
+            ]),
+        ),
+        proc(
+            "count-nonzero",
+            (["arr"], "uint?"),
+            [("arr", "array?")],
+            text(["Returns the number of non-zeros in ", var("arr"), "."]),
+        ),
+        pred(
+            "bool-array?",
+            text([
+                "Returns ", code("#t"), " if ", var("v"),
+                " is an array with 'bool as its datatype, ", code("#f"), " otherwise."
+            ]),
+        ),
+        proc(
+            "bool-array",
+            (["v", "..."], "bool-array?"),
+            [("v", "uint?")],
+            text([
+                "Returns a new boolean array with ", var("v"), " as its values."
             ]),
         ),
         proc(
@@ -614,15 +692,18 @@ doc = {
         ),
         proc(
             "mincut",
-            (["left", "[right]", "arr"], "bool-array?"),
-            [
-                ("left", "int?"),
-                ("right", "int?", "left"),
-                ("arr", "bool-array?"),
-            ],
+            (["arr", "x"], "bool-array?"),
+            [("arr", "bool-array?"), ("x", "int?")],
             text([
-                "Returns a new ", code("bool-array?"), " with ", var("left"), " and ",
-                var("right"), " margin applied."
+                "TODO"
+            ]),
+        ),
+        proc(
+            "minclip",
+            (["arr", "x"], "bool-array?"),
+            [("arr", "bool-array?"), ("x", "int?")],
+            text([
+                "TODO"
             ]),
         ),
     ],
@@ -839,13 +920,6 @@ doc = {
             ]),
         ),
     ],
-    "Objects": [
-        syntax(
-            ".",
-            "obj attr",
-            text(["Returns the specified attribute on the object."]),
-        ),
-    ],
     "Void": [
         pred(
             "void?",
@@ -864,6 +938,47 @@ doc = {
             ]),
         ),
     ],
+    "Procedures": [
+        pred(
+            "procedure?",
+            text([
+                "Returns ", code("#t"), " if ", var("v"), " is a procedure.",
+            ]),
+        ),
+        proc(
+            "map",
+            (["proc", "seq"], "any"),
+            [("proc", "procedure?"), ("seq", "sequence?")],
+            text([
+                "TODO"
+            ]),
+        ),
+        proc(
+            "apply",
+            (["proc", "seq"], "any"),
+            [("proc", "procedure?"), ("seq", "sequence?")],
+            text([
+                "TODO"
+            ]),
+        ),
+    ],
+    "Objects": [
+        pred(
+            "object?",
+            text(["Returns ", code("#t"), " if ", var("v") " is an object, ",
+                code("#f"), " otherwise. Anything that's not an object is a primitive."
+            ]),
+        ),
+        proc(
+            "attrs",
+            ([]),
+        ),
+        syntax(
+            ".",
+            "obj attr",
+            text(["Returns the specified attribute on the object."]),
+        ),
+    ],
     "Reflection": [
         syntax(
             "eval",
@@ -874,13 +989,7 @@ doc = {
             ]),
         ),
     ],
-    "Misc. Predicates": [
-        pred(
-            "procedure?",
-            text([
-                "Returns ", code("#t"), " if ", var("v"), " is a procedure.",
-            ]),
-        ),
+    "Miscellaneous Predicates": [
         pred(
             "any",
             text([
