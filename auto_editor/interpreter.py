@@ -5,6 +5,7 @@ import math
 import random
 import sys
 from dataclasses import dataclass
+from difflib import get_close_matches
 from fractions import Fraction
 from functools import reduce
 from time import sleep
@@ -67,13 +68,6 @@ class Null:
         return "'()"
 
     __repr__ = __str__
-
-
-class PaletObject:
-    __slots__ = "attributes"
-
-    def __init__(self, attrs: dict[str, Any]):
-        self.attributes = attrs
 
 
 class Cons:
@@ -198,21 +192,21 @@ class Char:
         return obj2 + self.val
 
 
-class Symbol:
+class Sym:
     __slots__ = ("val", "hash")
 
     def __init__(self, val: str):
         self.val = val
         self.hash = hash(val)
 
-    __str__: Callable[[Symbol], str] = lambda self: self.val
+    __str__: Callable[[Sym], str] = lambda self: self.val
     __repr__ = __str__
 
     def __hash__(self) -> int:
         return self.hash
 
     def __eq__(self, obj: object) -> bool:
-        return type(obj) is Symbol and self.hash == obj.hash
+        return type(obj) is Sym and self.hash == obj.hash
 
 
 ###############################################################################
@@ -443,26 +437,26 @@ class Parser:
             self.eat(token.type)
             return token.value
 
-        matches = {ID: Symbol, ARR: BoolArr}
+        matches = {ID: Sym, ARR: BoolArr}
         if token.type in matches:
             self.eat(token.type)
             return matches[token.type](token.value)
 
         if token.type == SEC:
             self.eat(SEC)
-            return [Symbol("round"), [Symbol("*"), token.value, Symbol("timebase")]]
+            return [Sym("round"), [Sym("*"), token.value, Sym("timebase")]]
 
         if token.type == DB:
             self.eat(DB)
-            return [Symbol("pow"), 10, [Symbol("/"), token.value, 20]]
+            return [Sym("pow"), 10, [Sym("/"), token.value, 20]]
 
         if token.type == PER:
             self.eat(PER)
-            return [Symbol("/"), token.value, 100.0]
+            return [Sym("/"), token.value, 100.0]
 
         if token.type == QUOTE:
             self.eat(QUOTE)
-            return [Symbol("quote"), self.expr()]
+            return [Sym("quote"), self.expr()]
 
         pars = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
         if token.type in pars:
@@ -552,7 +546,7 @@ is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
 is_bool = Contract("bool?", lambda v: type(v) is bool)
 is_pair = Contract("pair?", lambda v: type(v) is Cons)
 is_null = Contract("null?", lambda v: type(v) is Null)
-is_symbol = Contract("symbol?", lambda v: type(v) is Symbol)
+is_symbol = Contract("symbol?", lambda v: type(v) is Sym)
 is_str = Contract("string?", lambda v: type(v) is str)
 is_char = Contract("char?", lambda v: type(v) is Char)
 is_iterable = Contract(
@@ -592,7 +586,7 @@ def display_str(val: object) -> str:
         return "#t"
     if val is False:
         return "#f"
-    if type(val) is Symbol:
+    if type(val) is Sym:
         return val.val
     if type(val) is str:
         return val
@@ -632,7 +626,7 @@ def print_str(val: object) -> str:
         return f'"{val}"'
     if type(val) is Char:
         return f"{val!r}"
-    if type(val) is Symbol or type(val) is Cons or isinstance(val, list):
+    if type(val) is Sym or type(val) is Cons or isinstance(val, list):
         return f"'{display_str(val)}"
 
     return display_str(val)
@@ -734,35 +728,35 @@ def number_to_string(val: Number) -> str:
 
 
 dtype_map = {
-    Symbol("bool"): np.bool_,
-    Symbol("int8"): np.int8,
-    Symbol("int16"): np.int16,
-    Symbol("int32"): np.int32,
-    Symbol("int64"): np.int64,
-    Symbol("uint8"): np.uint8,
-    Symbol("uint16"): np.uint16,
-    Symbol("uint32"): np.uint32,
-    Symbol("uint64"): np.uint64,
-    Symbol("float32"): np.float32,
-    Symbol("float64"): np.float64,
+    Sym("bool"): np.bool_,
+    Sym("int8"): np.int8,
+    Sym("int16"): np.int16,
+    Sym("int32"): np.int32,
+    Sym("int64"): np.int64,
+    Sym("uint8"): np.uint8,
+    Sym("uint16"): np.uint16,
+    Sym("uint32"): np.uint32,
+    Sym("uint64"): np.uint64,
+    Sym("float32"): np.float32,
+    Sym("float64"): np.float64,
 }
 
 
-def _dtype_to_np(dtype: Symbol) -> type[np.generic]:
+def _dtype_to_np(dtype: Sym) -> type[np.generic]:
     np_dtype = dtype_map.get(dtype)
     if np_dtype is None:
         raise MyError(f"Invalid array dtype: {dtype}")
     return np_dtype
 
 
-def array_proc(dtype: Symbol, *vals: Any) -> np.ndarray:
+def array_proc(dtype: Sym, *vals: Any) -> np.ndarray:
     try:
         return np.array(vals, dtype=_dtype_to_np(dtype))
     except OverflowError:
         raise MyError(f"number too large to be converted to {dtype}")
 
 
-def make_array(dtype: Symbol, size: int, v: int = 0) -> np.ndarray:
+def make_array(dtype: Sym, size: int, v: int = 0) -> np.ndarray:
     try:
         return np.array([v] * size, dtype=_dtype_to_np(dtype))
     except OverflowError:
@@ -955,14 +949,13 @@ class Proc:
 class UserProc:
     """A user-defined procedure."""
 
-    def __init__(self, name: str, env: Env, parms: list, body: list):
+    def __init__(self, name: str, parms: list, body: list, contracts: list[Any] | None = None):
         self.parms = list(map(str, parms))
         self.body = body
-        self.env = env
 
         self.name = name
         self.arity = len(parms), len(parms)
-        self.contracts = None
+        self.contracts = contracts
 
     def __str__(self) -> str:
         return f"#<procedure:{self.name}>"
@@ -970,8 +963,10 @@ class UserProc:
     __repr__ = __str__
 
     def __call__(self, *args: Any) -> Any:
-        self.env.update(zip(self.parms, args))
-        return my_eval(self.env, self.body[-1])
+        env.update(zip(self.parms, args))
+        for item in self.body[0:-1]:
+            my_eval(env, item)
+        return my_eval(env, self.body[-1])
 
 
 class Syntax:
@@ -982,6 +977,9 @@ class Syntax:
 
     def __call__(self, env: Env, node: list) -> Any:
         return self.syn(env, node)
+
+    __str__: Callable[[Syntax], str] = lambda self: "#<syntax>"
+    __repr__ = __str__
 
 
 def check_for_syntax(env: Env, node: list) -> Any:
@@ -996,7 +994,7 @@ def check_for_syntax(env: Env, node: list) -> Any:
     assert isinstance(node[1][0], list)
 
     var = node[1][0][0]
-    if type(var) is not Symbol:
+    if type(var) is not Sym:
         raise MyError(f"{name}: binding must be an identifier")
     my_iter = my_eval(env, node[1][0][1])
 
@@ -1012,7 +1010,7 @@ def syn_lambda(env: Env, node: list) -> Any:
     if not isinstance(node[1], list):
         raise MyError(f"{node[0]}: bad syntax")
 
-    return UserProc("", env, node[1], node[2:])  # parms, body
+    return UserProc("", node[1], node[2:])  # parms, body
 
 
 def syn_define(env: Env, node: list) -> Any:
@@ -1020,15 +1018,15 @@ def syn_define(env: Env, node: list) -> Any:
         raise MyError("define: bad syntax")
 
     if isinstance(node[1], list):
-        if not node[1] or type(node[1][0]) is not Symbol:
+        if not node[1] or type(node[1][0]) is not Sym:
             raise MyError(f"{node[0]}: bad syntax")
 
         n = node[1][0].val
         parameters = node[1][1:]
         body = node[2:]
-        env[n] = UserProc(n, env, parameters, body)
+        env[n] = UserProc(n, parameters, body)
         return None
-    elif type(node[1]) is not Symbol:
+    elif type(node[1]) is not Sym:
         raise MyError(f"{node[0]}: must be an identifier")
 
     n = node[1].val
@@ -1039,21 +1037,24 @@ def syn_define(env: Env, node: list) -> Any:
     if (
         isinstance(node[2], list)
         and node[2]
-        and type(node[2][0]) is Symbol
+        and type(node[2][0]) is Sym
         and node[2][0].val in ("lambda", "λ")
     ):
         parameters = node[2][1]
         body = node[2][2:]
-        env[n] = UserProc(n, env, parameters, body)
+        env[n] = UserProc(n, parameters, body)
     else:
-        env[n] = my_eval(env, node[2])
+        for item in node[2:-1]:
+            my_eval(env, item)
+        env[n] = my_eval(env, node[-1])
+
     return None
 
 
 def syn_set(env: Env, node: list) -> None:
     if len(node) != 3:
         raise MyError(f"{node[0]}: bad syntax")
-    if type(node[1]) is not Symbol:
+    if type(node[1]) is not Sym:
         raise MyError(f"{node[0]}: must be an identifier")
 
     name = node[1].val
@@ -1112,7 +1113,7 @@ def syn_cond(env: Env, node: list) -> Any:
         if not isinstance(test_expr, list) or not test_expr:
             raise MyError(f"{node[0]}: bad syntax, clause is not a test-value pair")
 
-        if test_expr[0] == Symbol("else"):
+        if test_expr[0] == Sym("else"):
             if len(test_expr) == 1:
                 raise MyError(f"{node[0]}: missing expression in else clause")
             test_clause = True
@@ -1147,7 +1148,7 @@ def syn_with_open(env: Env, node: list) -> None:
     if len(node[1]) != 2 and len(node[1]) != 3:
         raise MyError(f"{node[0]}: wrong number of args")
 
-    if type(node[1][0]) is not Symbol:
+    if type(node[1][0]) is not Sym:
         raise MyError(f"{node[0]}: as must be an identifier")
 
     file_binding = node[1][0].val
@@ -1158,12 +1159,12 @@ def syn_with_open(env: Env, node: list) -> None:
 
     if len(node[1]) == 3:
         file_mode = my_eval(env, node[1][2])
-        if type(file_mode) is not Symbol:
+        if type(file_mode) is not Sym:
             raise MyError(f"{node[0]}: file-mode must be a symbol?")
         if file_mode.val not in ("w", "r", "a"):
             raise MyError(f"{node[0]}: file-mode must be either: 'w 'r 'a")
     else:
-        file_mode = Symbol("w")
+        file_mode = Sym("w")
 
     with open(file_name, file_mode.val) as file:
         if file_mode.val == "r":
@@ -1186,29 +1187,94 @@ def syn_with_open(env: Env, node: list) -> None:
     return None
 
 
+class PaletObject:
+    __slots__ = "attributes"
+
+    def __init__(self, attrs: dict[str, Any]):
+        self.attributes = attrs
+
+
+is_obj = Contract(
+    "object?",
+    lambda v: type(v) is str or isinstance(v, (list, Proc, UserProc, PaletObject)),
+)
+
+
+def get_attrs(obj: object) -> dict[str, Any]:
+    if isinstance(obj, str):
+        return {
+            "split": Proc("split", obj.split, (0, 1)),
+            "strip": Proc("strip", obj.strip, (0, 0)),
+            "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
+            "startswith": Proc("startswith", obj.startswith, (1, 1), [is_str]),
+            "endswith": Proc("endswith", obj.endswith, (1, 1), [is_str]),
+            "replace": Proc("replace", obj.replace, (1, 2), [is_str, is_int]),
+            "@len": Proc("@len", obj.__len__, (0, 0)),
+            "@name": "string",
+        }
+    if isinstance(obj, list):
+
+        def _join(s: str) -> str:
+            try:
+                assert isinstance(obj, list)
+                return s.join(obj)
+            except TypeError:
+                raise MyError("join: every item must be a string")
+
+        return {
+            "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
+            "pop": Proc("pop", obj.pop, (0, 0)),
+            "join": Proc("join", _join, (1, 1), [is_str]),
+            "sort": Proc("sort", obj.sort, (0, 0)),
+            "@len": Proc("@len", obj.__len__, (0, 0)),
+            "@name": "vector",
+        }
+    if isinstance(obj, (Proc, UserProc)):
+        return {
+            "arity-min": obj.arity[0],
+            "arity-max": obj.arity[1],
+            "name": obj.name,
+            "@name": "procedure",
+        }
+    if isinstance(obj, Contract):
+        return {
+            "arity-min": 1,
+            "arity-max": 1,
+            "name": obj.name,
+            "@name": "procedure",
+        }
+    if isinstance(obj, PaletObject):
+        return obj.attributes
+    raise MyError("")
+
+
 def syn_dot(env: Env, node: list) -> Any:
     if len(node) != 3:
         raise MyError(".: not enough args")
 
-    my_obj = my_eval(env, node[1])
-    if not isinstance(my_obj, PaletObject):
-        raise MyError(f".: expected an object, got {my_obj}")
-
-    if not isinstance(node[2], Symbol):
+    if not isinstance(node[2], Sym):
         raise MyError(".: attribute must be an identifier")
     my_attr = node[2].val
+    my_obj = my_eval(env, node[1])
 
-    if my_attr not in my_obj.attributes:
-        raise MyError(f".: No such attribute: {my_attr}")
-
-    return my_obj.attributes[my_attr]
+    try:
+        attrs = get_attrs(my_obj)
+    except MyError:
+        raise MyError(f".: expected an object, got {print_str(my_obj)}")
+    if my_attr not in attrs:
+        if mat := get_close_matches(my_attr, attrs):
+            raise MyError(f".: No such attribute: '{my_attr}'. Did you mean: {mat[0]}")
+        raise MyError(f".: No such attribute: '{my_attr}'")
+    return attrs[my_attr]
 
 
 def my_eval(env: Env, node: object) -> Any:
-    if type(node) is Symbol:
+    if type(node) is Sym:
         val = env.get(node.val)
         if val is None:
-            raise MyError(f"{node.val} is undefined")
+            if mat := get_close_matches(node.val, env):
+                raise MyError(f"'{node.val}' not found. Did you mean: {mat[0]}")
+            raise MyError(f"'{node.val}' not found.")
         return val
 
     if isinstance(node, BoolArr):
@@ -1280,7 +1346,6 @@ env: Env = {
     "if": Syntax(syn_if),
     "when": Syntax(syn_when),
     "cond": Syntax(syn_cond),
-    ".": Syntax(syn_dot),
     "with-open": Syntax(syn_with_open),
     "eval": Syntax(syn_eval),
     # loops
@@ -1318,16 +1383,18 @@ env: Env = {
     "uint?": is_uint,
     "float?": is_float,
     "fraction?": is_frac,
-    "positive?": Proc("positive?", lambda v: v > 0, (1, 1), [is_real]),
-    "negative?": Proc("negative?", lambda v: v < 0, (1, 1), [is_real]),
-    "zero?": Proc("zero?", lambda v: v == 0, (1, 1), [is_num]),
+    "zero?": UserProc("zero?", ["z"], [[Sym("="), Sym("z"), 0]], [is_num]),
+    "positive?": UserProc("positive?", ["x"], [[Sym(">"), Sym("x"), 0]], [is_real]),
+    "negative?": UserProc("negative?", ["x"], [[Sym("<"), Sym("x"), 0]], [is_real]),
+    "even?": UserProc("even?", ["n"], [[Sym("zero?"), [Sym("mod"), Sym("n"), 2]]], [is_int]),
+    "odd?": UserProc("odd?", ["n"], [[Sym("not"), [Sym("even?"), Sym("n")]]], [is_int]),
     # numbers
     "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
     "-": Proc("-", minus, (1, None), [is_num]),
     "*": Proc("*", mul, (0, None), [is_num]),
     "/": Proc("/", div, (1, None), [is_num]),
-    "add1": Proc("add1", lambda v: v + 1, (1, 1), [is_num]),
-    "sub1": Proc("sub1", lambda v: v - 1, (1, 1), [is_num]),
+    "add1": UserProc("add1", ["z"], [[Sym("+"), Sym("z"), 1]], [is_num]),
+    "sub1": UserProc("sub1", ["z"], [[Sym("-"), Sym("z"), 1]], [is_num]),
     "sqrt": Proc("sqrt", _sqrt, (1, 1), [is_num]),
     "real-part": Proc("real-part", lambda v: v.real, (1, 1), [is_num]),
     "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
@@ -1350,7 +1417,7 @@ env: Env = {
     # symbols
     "symbol?": is_symbol,
     "symbol->string": Proc("symbol->string", str, (1, 1), [is_symbol]),
-    "string->symbol": Proc("string->symbol", Symbol, (1, 1), [is_str]),
+    "string->symbol": Proc("string->symbol", Sym, (1, 1), [is_str]),
     # strings
     "string?": is_str,
     "char?": is_char,
@@ -1381,6 +1448,9 @@ env: Env = {
     "cons": Proc("cons", Cons, (2, 2)),
     "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
     "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
+    "caar": UserProc("caar", ["v"], [[Sym("car"), [Sym("car"), Sym("v")]]]),
+    "cdar": UserProc("cdar", ["v"], [[Sym("cdr"), [Sym("car"), Sym("v")]]]),
+    "cddr": UserProc("cddr", ["v"], [[Sym("cdr"), [Sym("cdr"), Sym("v")]]]),
     "list?": is_list,
     "list": Proc("list", _list, (0, None)),
     "list-ref": Proc("list-ref", ref, (2, 2), [is_pair, is_uint]),
@@ -1412,8 +1482,8 @@ env: Env = {
     "slice": Proc("slice", p_slice, (2, 4), [is_sequence, is_int]),
     # procedures
     "procedure?": is_proc,
-    "map": Proc("map", palet_map, (2, 2), [is_proc, is_iterable]),
-    "apply": Proc("apply", apply, (2, 2), [is_proc, is_iterable]),
+    "map": Proc("map", palet_map, (2, 2), [is_proc, is_sequence]),
+    "apply": Proc("apply", apply, (2, 2), [is_proc, is_sequence]),
     # hashs
     "hash?": is_hash,
     "hash": Proc("hash", palet_hash),
@@ -1430,6 +1500,10 @@ env: Env = {
     "vector->list": Proc("vector->list", vec_to_list, (1, 1), [is_vector]),
     "range->list": Proc("range->list", stream_to_list, (1, 1), [is_range]),
     "range->vector": Proc("range->vector", list, (1, 1), [is_range]),
+    # objects
+    "object?": is_obj,
+    "attrs": Proc("attrs", lambda v: list(get_attrs(v).keys()), (1, 1), [is_obj]),
+    ".": Syntax(syn_dot),
     # predicates
     "any": any_p,
 }
