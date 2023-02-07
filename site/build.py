@@ -89,19 +89,29 @@ with open(ref / "palet.html", "w") as file:
 
     def text_to_str(t: text) -> str:
         s = ""
+
+        def san(s: str) -> str:
+            return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
         for c in t.children:
             if isinstance(c, code):
-                s += f"<code>{c.val}</code>"
+                s += f"<code>{san(c.val)}</code>"
             elif isinstance(c, var):
-                s += f'<span class="palet-var">{c.val}</span>'
+                s += f'<span class="palet-var">{san(c.val)}</span>'
             else:
-                s += c
+                s += san(c)
         return s
 
-    def build_sig(vec: list[str]) -> str:
-        results = [
-            v if v == "..." else f'<span class="palet-var">{v}</span>' for v in vec
-        ]
+    def build_sig(vec: list[str | tuple]) -> str:
+        results = []
+        for v in vec:
+            if v == "...":
+                results.append(v)
+                continue
+            if len(v) == 3:
+                results.append(f'<span class="palet-var">[{v[0]}]</span>')
+            else:
+                results.append(f'<span class="palet-var">{v[0]}</span>')
         return "&nbsp;".join(results)
 
     pt_vars = []
@@ -150,19 +160,18 @@ with open(ref / "palet.html", "w") as file:
                     )
                     + '&nbsp;&nbsp;Procedure</p>\n'
                 )
-                for argsig in some.argsig:
-                    name = argsig[0]
-                    sig = argsig[1]
-                    default = argsig[2] if len(argsig) > 2 else None
+                for s in some.sig[0]:
+                    if isinstance(s, str):
+                        if s == "...":
+                            break
+                        raise ValueError(f"bad signature: {some.sig[0]}")
+                    name = s[0]
+                    sig = s[1]
+                    default = f"&nbsp;=&nbsp;{s[2]}</p>\n" if len(s) > 2 else "</p>\n"
                     file.write(
-                        f'<p class="mono">&nbsp;<span class="palet-var">{name}</span>&nbsp;:&nbsp;<a href="#{sig}">{sig}</a>'
-                        + (
-                            "</p>\n"
-                            if default is None
-                            else f"&nbsp;=&nbsp;{default}</p>\n"
-                        )
+                        f'<p class="mono">&nbsp;<span class="palet-var">{name}</span>'
+                        f'&nbsp;:&nbsp;<a href="#{sig}">{sig}</a>{default}'
                     )
-
                 file.write("</div>\n" f"<p>{text_to_str(some.summary)}</p>\n")
 
 
