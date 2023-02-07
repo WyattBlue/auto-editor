@@ -20,8 +20,7 @@ class text:
 @dataclass
 class proc:
     name: str
-    sig: tuple[list[str], str]
-    argsig: list[tuple[str, str] | tuple[str, str, str]]
+    sig: tuple[list, str]
     summary: text
 
 
@@ -44,6 +43,9 @@ class value:
     sig: str
     summary: text
 
+
+bool_t = code("#t")
+bool_f = code("#f")
 
 doc = {
     "Basic Syntax": [
@@ -74,7 +76,7 @@ doc = {
             "if",
             "test-expr then-expr else-expr",
             text([
-                "Evaluates ", var("test-expr"), ". If ", code("#t"), " then evaluate ",
+                "Evaluates ", var("test-expr"), ". If ", bool_t, " then evaluate ",
                 var("then-expr"), " else evaluate ", var("else-expr"),
                 ". An error will be raised if evaluated ",
                 var("test-expr"), " is not a ", code("bool?"), ".",
@@ -84,7 +86,7 @@ doc = {
             "when",
             "test-expr body",
             text([
-                "Evaluates ", var("test-expr"), ". If ", code("#t"), " then evaluate ",
+                "Evaluates ", var("test-expr"), ". If ", bool_t, " then evaluate ",
                 var("body"), " else do nothing. An error will be raised if evaluated ",
                 var("test-expr"), " is not a ", code("bool?"), ".",
             ]),
@@ -112,20 +114,18 @@ doc = {
     "Equality": [
         proc(
             "equal?",
-            (["v1", "v2"], "bool?"),
-            [("v1", "any"), ("v2", "any")],
+            ([("v1", "any"), ("v2", "any")], "bool?"),
             text([
-                "Returns ", code("#t"), " if ", var("v1"), " and ", var("v2"),
-                " are the same type and have the same value, ", code("#f"), " otherwise."
+                "Returns ", bool_t, " if ", var("v1"), " and ", var("v2"),
+                " are the same type and have the same value, ", bool_f, " otherwise."
             ]),
         ),
         proc(
             "eq?",
-            (["v1", "v2"], "bool?"),
-            [("v1", "any"), ("v2", "any")],
+            ([("v1", "any"), ("v2", "any")], "bool?"),
             text([
-                "Returns ", code("#t"), " if ", var("v1"), " and ", var("v2"),
-                " refer to the same object in memory, ", code("#f"), " otherwise."
+                "Returns ", bool_t, " if ", var("v1"), " and ", var("v2"),
+                " refer to the same object in memory, ", bool_f, " otherwise."
             ]),
         ),
     ],
@@ -133,297 +133,244 @@ doc = {
         pred(
             "bool?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is ", code("#t"), " or ",
-                code("#f"), ", ", code("#f"), " otherwise."
+                "Returns ", bool_t, " if ", var("v"), " is ", bool_t, " or ",
+                bool_f, ", ", bool_f, " otherwise."
             ]),
         ),
-        value("true", "bool?", text(["An alias for ", code("#t"), "."])),
-        value("false", "bool?", text(["An alias for ", code("#f"), "."])),
+        value("true", "bool?", text(["An alias for ", bool_t, "."])),
+        value("false", "bool?", text(["An alias for ", bool_f, "."])),
     ],
     "Number Predicates": [
         pred(
             "number?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a number, ", code("#f"),
+                "Returns ", bool_t, " if ", var("v"), " is a number, ", bool_f,
                 " otherwise.",
             ]),
         ),
         pred(
             "real?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a real number, ",
-                code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is a real number, ",
+                bool_f, " otherwise.",
             ]),
         ),
         pred(
             "int?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is an integer, ",
-                code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is an integer, ",
+                bool_f, " otherwise.",
             ]),
         ),
         pred(
             "uint?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is an integer and ",
-                var("v"), " is greater than ", code("-1"), ", ", code("#f"),
-                " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is an integer and ",
+                var("v"), " is greater than -1, ", bool_f, " otherwise.",
+            ]),
+        ),
+        pred(
+            "nat?",
+            text([
+                "Returns ", bool_t, " if ", var("v"), " is an integer and ",
+                var("v"), " is greater than 0, ", bool_f, " otherwise.",
             ]),
         ),
         pred(
             "float?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a float, ",
-                code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is a float, ",
+                bool_f, " otherwise.",
             ]),
         ),
         pred(
-            "fraction?",
+            "frac?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a fraction",
-                " (a rational number), ", code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is a fraction",
+                " (a rational number), ", bool_f, " otherwise.",
             ]),
         ),
         pred(
             "zero?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is equal to ", code("0"),
-                ", ", code("#f"), " otherwise."
+                "Returns ", bool_t, " if ", var("v"), " is equal to 0, ", bool_f,
+                " otherwise."
             ]),
         ),
         pred(
             "positive?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is greater than ",
-                code("0"), ", ", code("#f"), " otherwise."
+                "Returns ", bool_t, " if ", var("v"), " is greater than 0, ", bool_f,
+                " otherwise."
             ]),
         ),
         pred(
             "negative?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is less than ", code("0"),
-                ", ", code("#f"), " otherwise."
+                "Returns ", bool_t, " if ", var("v"), " is less than 0, ", bool_f,
+                " otherwise."
             ]),
         ),
     ],
     "Numbers": [
         proc(
             "+",
-            (["z", "..."], "number?"),
-            [("z", "number?")],
+            ([("z", "number?"), "..."], "number?"),
             text([
                 "Return the sum of ", var("z"), "s. Add from left to right. "
-                "If no arguments are provided, the result is ", code("0"), ".",
+                "If no arguments are provided, the result is 0.",
             ]),
         ),
         proc(
             "-",
-            (["z", "w", "..."], "number?"),
-            [("z", "number?"), ("w", "number?")],
-            text(
-                [
-                    "When no ",
-                    var("w"),
-                    "s are applied, return ",
-                    code("(- 0 z)"),
-                    ". Otherwise, return the subtraction of ",
-                    var("w"),
-                    "s of ",
-                    var("z"),
-                    ".",
-                ]
-            ),
+            ([("z", "number?"), ("w", "number?"), "..."], "number?"),
+            text([
+                "When no ", var("w"), "s are applied, return ", code("(- 0 z)"),
+                ". Otherwise, return the subtraction of ", var("w"), "s of ",
+                var("z"), ".",
+            ]),
         ),
         proc(
             "*",
-            (["z", "..."], "number?"),
-            [("z", "number?")],
-            text(
-                [
-                    "Return the product of ",
-                    var("z"),
-                    "s. If no ",
-                    var("z"),
-                    "s are supplied, the result is ",
-                    code("1"),
-                    ".",
-                ]
-            ),
+            ([("z", "number?"), "..."], "number?"),
+            text([
+                "Return the product of ", var("z"), "s. If no ",
+                var("z"), "s are supplied, the result is 1.",
+            ]),
         ),
         proc(
             "/",
-            (["z", "w", "..."], "number?"),
-            [("z", "number?"), ("w", "number?")],
-            text(
-                [
-                    "When no ",
-                    var("w"),
-                    "s are applied, return ",
-                    code("(/ 1 z)"),
-                    ". Otherwise, return the division of ",
-                    var("w"),
-                    "s of ",
-                    var("z"),
-                    ".",
-                ]
-            ),
+            ([("z", "number?"), ("w", "number?"), "..."], "number?"),
+            text([
+                "When no ", var("w"), "s are applied, return ", code("(/ 1 z)"),
+                ". Otherwise, return the division of ", var("w"), "s of ", var("z"),
+                ".",
+            ]),
         ),
         proc(
             "mod",
-            (["n", "m"], "int?"),
-            [("n", "int?"), ("m", "int?")],
+            ([("n", "int?"), ("m", "int?")], "int?"),
             text(["Return the modulo of ", var("n"), " and ", var("m"), "."]),
         ),
         proc(
             "modulo",
-            (["n", "m"], "real?"),
-            [("n", "real?"), ("m", "real?")],
+            ([("n", "int?"), ("m", "int?")], "int?"),
             text(["Clone of ", code("mod"), "."]),
         ),
         proc(
             "add1",
-            (["z"], "number?"),
-            [("z", "number?")],
+            ([("z", "number?")], "number?"),
             text(["Returns ", code("(+ z 1)"), "."]),
         ),
         proc(
             "sub1",
-            (["z"], "number?"),
-            [("z", "number?")],
+            ([("z", "number?")], "number?"),
             text(["Returns ", code("(- z 1)"), "."]),
         ),
         proc(
             "=",
-            (["z", "w", "..."], "bool?"),
-            [("z", "number?"), ("w", "number?")],
-            text(
-                [
-                    "Returns ",
-                    code("#t"),
-                    " if all arguments are numerically equal, ",
-                    code("#f"),
-                    " otherwise.",
-                ]
-            ),
+            ([("z", "number?"), ("w", "number?"), "..."], "bool?"),
+            text([
+                "Returns ", bool_t, " if all arguments are numerically equal, ",
+                bool_f, " otherwise.",
+            ]),
         ),
         proc(
             "<",
-            (["x", "y"], "bool?"),
-            [("x", "real?"), ("y", "real?")],
-            text(
-                [
-                    "Returns ",
-                    code("#t"),
-                    " if ",
-                    var("x"),
-                    " is less than ",
-                    var("y"),
-                    ", ",
-                    code("#f"),
-                    " otherwise.",
-                ]
-            ),
+            ([("x", "real?"), ("y", "real?")], "bool?"),
+            text([
+                "Returns ", bool_t, " if ", var("x"), " is less than ", var("y"),
+                ", ", bool_f, " otherwise.",
+            ]),
         ),
         proc(
             "<=",
-            (["x", "y"], "bool?"),
-            [("x", "real?"), ("y", "real?")],
+            ([("x", "real?"), ("y", "real?")], "bool?"),
             text([
-                "Returns ", code("#t"), " if ", var("x"), " is less than or equal to ",
-                var("y"), ", ", code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("x"), " is less than or equal to ",
+                var("y"), ", ", bool_f, " otherwise.",
             ]),
         ),
         proc(
             ">",
-            (["x", "y"], "bool?"),
-            [("x", "real?"), ("y", "real?")],
+            ([("x", "real?"), ("y", "real?")], "bool?"),
             text([
-                "Returns ", code("#t"), " if ", var("x"), " is greater than ",
-                code("y"), ", ", code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("x"), " is greater than ",
+                var("y"), ", ", bool_f, " otherwise.",
             ]),
         ),
         proc(
             ">=",
-            (["x", "y"], "bool?"),
-            [("x", "real?"), ("y", "real?")],
+            ([("x", "real?"), ("y", "real?")], "bool?"),
             text([
-                "Returns ", code("#t"), " if ", var("x"),
-                " is greater than or equal to ", var("y"), ", ", code("#f"),
+                "Returns ", bool_t, " if ", var("x"),
+                " is greater than or equal to ", var("y"), ", ", bool_f,
                 " otherwise.",
             ]),
         ),
         proc(
             "abs",
-            (["x"], "real?"),
-            [("x", "real?")],
+            ([("x", "real?")], "real?"),
             text(["Returns the absolute value of ", var("x"), "."]),
         ),
         proc(
             "max",
-            (["x", "..."], "real?"),
-            [("x", "real?")],
+            ([("x", "real?"), "..."], "real?"),
             text(["Returns largest value of the ", var("x"), "s."]),
         ),
         proc(
             "min",
-            (["x", "..."], "real?"),
-            [("x", "real?")],
+            ([("x", "real?"), "..."], "real?"),
             text(["Returns smallest value of the ", var("x"), "s."]),
         ),
         proc(
             "real-part",
-            (["z"], "real?"),
-            [("z", "number?")],
-            text(["TODO"]),
+            ([("z", "number?")], "real?"),
+            text(["Returns the real part of ", var("z"), "."]),
         ),
         proc(
             "imag-part",
-            (["z"], "real?"),
-            [("z", "number?")],
-            text(["TODO"]),
+            ([("z", "number?")], "real?"),
+            text(["Returns the imaginary part of ", var("z"), "."]),
         ),
         proc(
             "round",
-            (["x"], "int?"),
-            [("x", "real?")],
-            text(["TODO"]),
+            ([("x", "real?")], "int?"),
+            text([
+                "Returns the closest integer to ", var("x"),
+                ", resolving ties in favor of even numbers."
+            ]),
         ),
         proc(
             "ceil",
-            (["x"], "int?"),
-            [("x", "real?")],
-            text(["TODO"]),
+            ([("x", "real?")], "int?"),
+            text(["Returns the smallest integer bigger than ", var("x"), "."]),
         ),
         proc(
             "floor",
-            (["x"], "int?"),
-            [("x", "real?")],
-            text(["TODO"]),
+            ([("x", "real?")], "int?"),
+            text(["Returns the largest integer less than ", var("x"), "."]),
         ),
     ],
     "Exponents": [
         proc(
             "pow",
-            (["z", "w"], "real?"),
-            [("z", "real?"), ("w", "real?")],
+            ([("z", "real?"), ("w", "real?")], "real?"),
             text(["Returns ", var("z"), " raised to the ", var("w"), " power."]),
         ),
         proc(
             "sqrt",
-            (["z"], "number?"),
-            [("z", "number?")],
+            ([("z", "number?")], "number?"),
             text(["Returns the square root of ", var("z"), "."]),
         ),
         proc(
             "exp",
-            (["x"], "float?"),
-            [("x", "real?")],
+            ([("x", "real?")], "float?"),
             text(["Returns Euler's number raised to the ", var("z"), " power."]),
         ),
         proc(
             "log",
-            (["x", "b"], "float?"),
-            [("x", "real?"), ("b", "real?", "(exp 1)")],
+            ([("x", "real?"), ("b", "real?", "(exp 1)")], "float?"),
             text([
                 "Returns the natural logarithm of ", var("x"), ".\n"
                 "If ", var("b"), " is provided, it serves as an alternative base."
@@ -433,20 +380,17 @@ doc = {
     "Geometry": [
         proc(
             "sin",
-            (["z"], "float?"),
-            [("z", "real?")],
+            ([("z", "real?")], "float?"),
             text(["Returns the sine of ", var("z"), " in radians."])
         ),
         proc(
             "cos",
-            (["z"], "float?"),
-            [("z", "real?")],
+            ([("z", "real?")], "float?"),
             text(["Returns the cosine of ", var("z"), " in radians."])
         ),
         proc(
             "tan",
-            (["z"], "float?"),
-            [("z", "real?")],
+            ([("z", "real?")], "float?"),
             text(["Returns the tangent of ", var("z"), " in radians."])
         ),
         value(
@@ -462,22 +406,20 @@ doc = {
         pred(
             "symbol?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a symbol, ", code("#f"),
+                "Returns ", bool_t, " if ", var("v"), " is a symbol, ", bool_f,
                 " otherwise.",
             ]),
         ),
         proc(
             "symbol->string",
-            (["sym"], "string?"),
-            [("sym", "symbol?")],
+            ([("sym", "symbol?")], "string?"),
             text([
                 "Returns a new string whose characters are the same as in ", var("sym"), "."
             ]),
         ),
         proc(
             "string->symbol",
-            (["str"], "symbol?"),
-            [("str", "string?")],
+            ([("str", "string?")], "symbol?"),
             text([
                 "Returns a symbol whose characters are the same as ", var("str"), "."
             ]),
@@ -487,77 +429,67 @@ doc = {
         pred(
             "string?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a string, ", code("#f"),
+                "Returns ", bool_t, " if ", var("v"), " is a string, ", bool_f,
                 " otherwise.",
             ]),
         ),
         pred(
             "char?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a char, ",
-                code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is a char, ",
+                bool_f, " otherwise.",
             ]),
         ),
         proc(
             "string",
-            (["char", "..."], "string?"),
-            [("char", "char?")],
+            ([("char", "char?"), "..."], "string?"),
             text(["Returns a new string from the given ", var("char"), "s."]),
         ),
         proc(
             "string-append",
-            (["str", "..."], "string?"),
-            [("str", "string?")],
+            ([("str", "string?"), "..."], "string?"),
             text(["Returns a new string concatenated from the given ", var("str"), "s"])
         ),
         proc(
             "string-upcase",
-            (["s"], "string?"),
-            [("s", "string?")],
+            ([("s", "string?")], "string?"),
             text(["Returns the string ", var("s"), " in upper case."]),
         ),
         proc(
             "string-downcase",
-            (["s"], "string?"),
-            [("s", "string?")],
+            ([("s", "string?")], "string?"),
             text(["Returns the string ", var("s"), " in lower case."]),
         ),
         proc(
             "string-titlecase",
-            (["s"], "string?"),
-            [("s", "string?")],
+            ([("s", "string?")], "string?"),
             text(["Returns the string ", var("s"), " in title case. "
                 "The first letter of every word is capitalized and the rest is lower cased."
             ]),
         ),
         proc(
             "char->int",
-            (["char"], "int?"),
-            [("char", "char?")],
+            ([("char", "char?")], "int?"),
             text(["Returns the corresponding int to the given ", var("char"), "."]),
         ),
         proc(
             "int->char",
-            (["k"], "char?"),
-            [("k", "int?")],
+            ([("k", "int?")], "char?"),
             text(["Returns the character corresponding to ", var("k"), "."]),
         ),
         proc(
             "~a",
-            (["v"], "string?"),
-            [("v", "datum?")],
+            ([("v", "datum?")], "string?"),
             text(["TODO"]),
         ),
         proc(
             "~s",
-            (["v"], "string?"),
-            [("v", "datum?")],
+            ([("v", "datum?")], "string?"),
             text(["TODO"]),
         ),
         proc(
             "~v",
-            (["v"], "string?"),
-            [("v", "datum?")],
+            ([("v", "datum?")], "string?"),
             text(["TODO"]),
         ),
     ],
@@ -565,14 +497,13 @@ doc = {
         pred(
             "vector?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a vector, ", code("#f"),
+                "Returns ", bool_t, " if ", var("v"), " is a vector, ", bool_f,
                 " otherwise.",
             ]),
         ),
         proc(
             "vector",
-            (["v", "..."], "vector?"),
-            [("v", "any")],
+            ([("v", "any"), "..."], "vector?"),
             text([
                 "Returns a new vector with the ", var("v"),
                 " args filled with its slots in order.",
@@ -580,8 +511,7 @@ doc = {
         ),
         proc(
             "make-vector",
-            (["size", "[v]"], "vector?"),
-            [("size", "uint?"), ("v", "any", "0")],
+            ([("size", "uint?"), ("v", "any", "0")], "vector?"),
             text([
                 "Returns a new vector with ", var("size"), " slots, all filled with ",
                 var("v"), "s.",
@@ -589,26 +519,22 @@ doc = {
         ),
         proc(
             "vector-pop!",
-            (["vec"], "any"),
-            [("vec", "vector?")],
+            ([("vec", "vector?")], "any"),
             text(["Remove the last element of ", var("vec"), " and return it."]),
         ),
         proc(
             "vector-add!",
-            (["vec", "v"], "none"),
-            [("vec", "vector?"), ("v", "any")],
+            ([("vec", "vector?"), ("v", "any")], "none"),
             text(["Append ", var("v"), " to the end of ", var("vec"), "."]),
         ),
         proc(
             "vector-set!",
-            (["vec", "pos", "v"], "none"),
-            [("vec", "vector?"), ("pos", "int?"), ("v", "any")],
+            ([("vec", "vector?"), ("pos", "int?"), ("v", "any")], "none"),
             text(["Set slot ", var("pos"), " of ", var("vec"), " to ", var("v"), "."]),
         ),
         proc(
             "vector-extend!",
-            (["vec", "vec2", "..."], "none"),
-            [("vec", "vector?"), ("vec2", "vector?")],
+            ([("vec", "vector?"), ("vec2", "vector?"), "..."], "none"),
             text([
                 "Append all elements of ", var("vec2"), " to the end of ", var("vec"),
                 " in order.",
@@ -619,14 +545,13 @@ doc = {
         pred(
             "array?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is an array, ",
-                code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is an array, ",
+                bool_f, " otherwise.",
             ]),
         ),
         proc(
             "array",
-            (["dtype", "v", "..."], "array?"),
-            [("dtype", "symbol?"), ("v", "any")],
+            ([("dtype", "symbol?"), ("v", "any"), "..."], "array?"),
             text([
                 "Returns a freshly allocated array with ", var("dtype"),
                 " as its datatype and the ", var("v"),
@@ -635,8 +560,7 @@ doc = {
         ),
         proc(
             "make-array",
-            (["dtype", "size", "v"], "array?"),
-            [("dtype", "symbol?"), ("size", "uint?"), ("v", "int?", "0")],
+            ([("dtype", "symbol?"), ("size", "uint?"), ("v", "int?", "0")], "array?"),
             text([
                 "Returns a freshly allocated array with ", var("dtype"),
                 " as its datatype and the value ", var("v"), " filled.",
@@ -644,13 +568,12 @@ doc = {
         ),
         proc(
             "array-splice!",
-            (["arr", "v", "[start]", "[stop]"], "array?"),
-            [
+            ([
                 ("arr", "array?"),
                 ("v", "real?"),
                 ("start", "int?", "0"),
                 ("stop", "int?", "(length arr)"),
-            ],
+            ], "array?"),
             text([
                 "Modify ", var("arr"), " by setting ", var("start"), " to ",
                 var("stop"), " to the value, ", var("v"),  ".",
@@ -658,33 +581,30 @@ doc = {
         ),
         proc(
             "count-nonzero",
-            (["arr"], "uint?"),
-            [("arr", "array?")],
+            ([("arr", "array?")], "uint?"),
             text(["Returns the number of non-zeros in ", var("arr"), "."]),
         ),
         pred(
             "bool-array?",
             text([
-                "Returns ", code("#t"), " if ", var("v"),
-                " is an array with 'bool as its datatype, ", code("#f"), " otherwise."
+                "Returns ", bool_t, " if ", var("v"),
+                " is an array with 'bool as its datatype, ", bool_f, " otherwise."
             ]),
         ),
         proc(
             "bool-array",
-            (["v", "..."], "bool-array?"),
-            [("v", "uint?")],
+            ([("v", "uint?"), "..."], "bool-array?"),
             text([
                 "Returns a new boolean array with ", var("v"), " as its values."
             ]),
         ),
         proc(
             "margin",
-            (["left", "[right]", "arr"], "bool-array?"),
-            [
+            ([
                 ("left", "int?"),
                 ("right", "int?", "left"),
                 ("arr", "bool-array?"),
-            ],
+            ], "bool-array?"),
             text([
                 "Returns a new ", code("bool-array?"), " with ", var("left"), " and ",
                 var("right"), " margin applied."
@@ -692,16 +612,14 @@ doc = {
         ),
         proc(
             "mincut",
-            (["arr", "x"], "bool-array?"),
-            [("arr", "bool-array?"), ("x", "int?")],
+            ([("arr", "bool-array?"), ("x", "int?")], "bool-array?"),
             text([
                 "TODO"
             ]),
         ),
         proc(
             "minclip",
-            (["arr", "x"], "bool-array?"),
-            [("arr", "bool-array?"), ("x", "int?")],
+            ([("arr", "bool-array?"), ("x", "int?")], "bool-array?"),
             text([
                 "TODO"
             ]),
@@ -711,21 +629,20 @@ doc = {
         pred(
             "pair?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a pair, ",
-                code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is a pair, ",
+                bool_f, " otherwise.",
             ]),
         ),
         pred(
             "null?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is an empty list, ",
-                code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is an empty list, ",
+                bool_f, " otherwise.",
             ]),
         ),
         proc(
             "cons",
-            (["a", "d"], "pair?"),
-            [("a", "any"), ("d", "any")],
+            ([("a", "any"), ("d", "any")], "pair?"),
             text([
                 "Returns a newly allocated pair where the first item is set to ",
                 var("a"), " and the second item set to ", var("d"), ".",
@@ -733,16 +650,14 @@ doc = {
         ),
         proc(
             "car",
-            (["p"], "any?"),
-            [("p", "pair?")],
+            ([("p", "pair?")], "any?"),
             text([
                 "Returns the first element of pair ", var("p"), ".",
             ]),
         ),
         proc(
             "cdr",
-            (["p"], "any?"),
-            [("p", "pair?")],
+            ([("p", "pair?")], "any?"),
             text([
                 "Returns the second element of pair ", var("p"), ".",
             ]),
@@ -751,20 +666,18 @@ doc = {
         pred(
             "list?",
             text([
-                "Returns ", code("#t"), " if ", var("v"),
+                "Returns ", bool_t, " if ", var("v"),
                  " is an empty list or a pair whose second element is a list.",
             ]),
         ),
         proc(
             "list",
-            (["v", "..."], "list?"),
-            [("v", "any")],
+            ([("v", "any"), "..."], "list?"),
             text(["Returns a list with ", var("v"), " in order."]),
         ),
         proc(
             "list-ref",
-            (["lst", "pos"], "any"),
-            [("lst", "list?"), ("pos", "uint?")],
+            ([("lst", "list?"), ("pos", "uint?")], "any"),
             text([
                 "Returns the element of ", var("lst"), " at position ", var("pos"), ".",
             ]),
@@ -774,18 +687,17 @@ doc = {
         pred(
             "range?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is a range object, ",
-                code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is a range object, ",
+                bool_f, " otherwise.",
             ]),
         ),
         proc(
             "range",
-            (["start", "stop", "[step]"], "range?"),
-            [
+            ([
                 ("start", "int?"),
                 ("stop", "int?"),
                 ("step", "int?", "1"),
-            ],
+            ], "range?"),
             text(["Returns a range object."]),
         ),
     ],
@@ -793,44 +705,41 @@ doc = {
         pred(
             "iterable?",
             text([
-                "Returns ", code("#t"), " if ", var("v"),
-                " is a vector, array, string, hash, pair, or range, ", code("#f"),
+                "Returns ", bool_t, " if ", var("v"),
+                " is a vector, array, string, hash, pair, or range, ", bool_f,
                 " otherwise.",
             ]),
         ),
         pred(
             "sequence?",
             text([
-                "Returns ", code("#t"), " if ", var("v"),
-                " is a vector, array, string, pair, or range, ", code("#f"),
+                "Returns ", bool_t, " if ", var("v"),
+                " is a vector, array, string, pair, or range, ", bool_f,
                 " otherwise.",
             ]),
         ),
         proc(
             "length",
-            (["seq"], "uint?"),
-            [("seq", "iterable?")],
+            ([("seq", "iterable?")], "uint?"),
             text(["Returns the length of ", var("seq"), "."]),
         ),
         proc(
             "ref",
-            (["seq", "pos"], "any"),
-            [("seq", "iterable?"), ("pos", "int?")],
+            ([("seq", "iterable?"), ("pos", "int?")], "any"),
             text([
                 "Returns the element of ", var("seq"), " at position ",
-                var("pos"), ", where the first element is at position", code("0"),
-                ". For sequences other than pair?, negative positions are allowed.",
+                var("pos"), ", where the first element is at position 0. ",
+                "For sequences other than pair?, negative positions are allowed.",
             ]),
         ),
         proc(
             "slice",
-            (["seq", "start", "[stop]", "[step]"], "sequence?"),
-            [
+            ([
                 ("seq", "sequence?"),
                 ("start", "int?"),
                 ("stop", "int?", "(length seq)"),
                 ("step", "int?", "1"),
-            ],
+            ], "sequence?"),
             text([
                 "Returns the elements of ", var("seq"), " from ", var("start"),
                 " inclusively to ", var("stop"), " exclusively. If ", var("step"),
@@ -840,8 +749,7 @@ doc = {
         ),
         proc(
             "reverse",
-            (["seq"], "sequence?"),
-            [("seq", "sequence?")],
+            ([("seq", "sequence?")], "sequence?"),
             text(["Returns ", var("seq"), " in reverse order."]),
         ),
     ],
@@ -849,26 +757,20 @@ doc = {
         pred(
             "hash?",
             text([
-                "Returns ", code("#t"), " if ", var("v"),
-                " is a hash table, ", code("#f"),
+                "Returns ", bool_t, " if ", var("v"), " is a hash table, ", bool_f,
                 " otherwise.",
             ]),
         ),
         proc(
             "hash",
-            (["key", "val", "..."], "hash?"),
-            [("key", "any"), ("val", "any")],
-            text([
-                "Returns a newly constructed hash map from key-value pairs."
-            ]),
+            ([("key", "any"), ("val", "any"), "..."], "hash?"),
+            text(["Returns a newly constructed hash map from key-value pairs."]),
         ),
         proc(
             "has-key?",
-            (["hash", "key"], "bool?"),
-            [("hash", "hash?"), ("key", "any")],
+            ([("hash", "hash?"), ("key", "any")], "bool?"),
             text([
-                "Returns ", code("#t"), " if ", var("key"),
-                " is in the hash map, ", code("#f"),
+                "Returns ", bool_t, " if ", var("key"), " is in the hash map, ", bool_f,
                 " otherwise.",
             ]),
         ),
@@ -876,40 +778,34 @@ doc = {
     "Actions": [
         proc(
             "sleep",
-            (["time"], "void?"),
-            [("time", "(or int? float?)")],
-            text(["Adds a delay by ", code("time"), "seconds."]),
+            ([("time", "(or int? float?)")], "void?"),
+            text(["Adds a delay by ", var("time"), "seconds."]),
         ),
         proc(
             "error",
-            (["msg"], "void?"),
-            [("msg", "string?")],
-            text(["Raises an exception with ", code("msg"), " as the message."])
+            ([("msg", "string?")], "void?"),
+            text(["Raises an exception with ", var("msg"), " as the message."])
         ),
     ],
     "Input / Output": [
         proc(
             "display",
-            (["datum"], "void?"),
-            [("datum", "any")],
+            ([("datum", "any")], "void?"),
             text(["Display ", var("datum"), " to stdout."]),
         ),
         proc(
             "displayln",
-            (["datum"], "void?"),
-            [("datum", "any")],
+            ([("datum", "any")], "void?"),
             text(["Display ", var("datum"), ", to stdout with a newline character."]),
         ),
         proc(
             "print",
-            (["datum"], "void?"),
-            [("datum", "any")],
+            ([("datum", "any")], "void?"),
             text(["Display ", var("datum"), ", like REPL does."]),
         ),
         proc(
             "println",
-            (["datum"], "void?"),
-            [("datum", "any")],
+            ([("datum", "any")], "void?"),
             text(["Display ", var("datum"), ", like REPL does with a newline character."]),
         ),
         syntax(
@@ -924,54 +820,50 @@ doc = {
         pred(
             "void?",
             text([
-                "Returns ", code("#t"), " if ", var("v"), " is ", code("#<void>"), ", ",
-                code("#f"), " otherwise.",
+                "Returns ", bool_t, " if ", var("v"), " is ", code("#<void>"), ", ",
+                bool_f, " otherwise.",
             ]),
         ),
         proc(
             "void",
-            (["v", "..."], "void?"),
-            [("v", "any")],
+            ([("v", "any"), "..."], "void?"),
             text([
-                "Returns the constant ", code("#<void>"),
-                ". All ", var("v"), " arguments are ignored."
+                "Returns the constant ", code("#<void>"), ". All ", var("v"),
+                " arguments are ignored."
             ]),
         ),
     ],
     "Procedures": [
         pred(
             "procedure?",
-            text([
-                "Returns ", code("#t"), " if ", var("v"), " is a procedure.",
-            ]),
+            text(["Returns ", bool_t, " if ", var("v"), " is a procedure."]),
         ),
         proc(
             "map",
-            (["proc", "seq"], "any"),
-            [("proc", "procedure?"), ("seq", "sequence?")],
+            ([("proc", "procedure?"), ("seq", "sequence?")], "any"),
             text([
                 "TODO"
             ]),
         ),
         proc(
             "apply",
-            (["proc", "seq"], "any"),
-            [("proc", "procedure?"), ("seq", "sequence?")],
+            ([("proc", "procedure?"), ("seq", "sequence?")], "any"),
             text([
-                "TODO"
+                "Applies ", var("proc"), " given the ", var("seq"), " as the arguments."
             ]),
         ),
     ],
     "Objects": [
         pred(
             "object?",
-            text(["Returns ", code("#t"), " if ", var("v") " is an object, ",
-                code("#f"), " otherwise. Anything that's not an object is a primitive."
+            text(["Returns ", bool_t, " if ", var("v"), " is an object, ", bool_f,
+                " otherwise. Anything that's not an object is a primitive."
             ]),
         ),
         proc(
             "attrs",
-            ([]),
+            ([("obj", "object?")], "vector?"),
+            text(["Returns all attributes of ", var("obj"), " as a vector of strings."]),
         ),
         syntax(
             ".",
@@ -985,16 +877,14 @@ doc = {
             "body",
             text([
                 "Evaluate body, if body is a vector or list, "
-                "evaluate the vector/list, else return the value."
+                "evaluate the vector/list, otherwise return the value."
             ]),
         ),
     ],
     "Miscellaneous Predicates": [
         pred(
             "any",
-            text([
-                "Returns ", code("#t"), " regardless of the value of ", var("v"), ".",
-            ]),
+            text(["Returns ", bool_t, " regardless of the value of ", var("v"), "."]),
         ),
     ],
 }

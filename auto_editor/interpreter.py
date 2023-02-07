@@ -48,12 +48,15 @@ def display_dtype(dtype: np.dtype) -> str:
     return f"float{dtype.itemsize * 8}"
 
 
-class Null:
+class NullType:
+    def __new__(cls: type[NullType]) -> NullType:
+        return Null
+
     def __init__(self) -> None:
         pass
 
     def __eq__(self, obj: object) -> bool:
-        return type(obj) is Null
+        return obj is Null
 
     def __len__(self) -> int:
         return 0
@@ -67,7 +70,19 @@ class Null:
     def __str__(self) -> str:
         return "'()"
 
+    def __copy__(self) -> NullType:
+        return Null
+
+    def __deepcopy__(self, memo: Any) -> NullType:
+        return Null
+
+    def __reduce__(self) -> tuple:
+        return (Null, ())
+
     __repr__ = __str__
+
+
+Null = object.__new__(NullType)
 
 
 class Cons:
@@ -78,13 +93,13 @@ class Cons:
         self.d = d
 
     def __repr__(self) -> str:
-        if type(self.d) not in (Cons, Null):
+        if type(self.d) not in (Cons, NullType):
             return f"(cons {self.a} {self.d})"
 
         result = f"({display_str(self.a)}"
         tail = self.d
         while type(tail) is Cons:
-            if type(tail.d) not in (Cons, Null):
+            if type(tail.d) not in (Cons, NullType):
                 return f"{result} (cons {tail.a} {tail.d}))"
             result += f" {display_str(tail.a)}"
             tail = tail.d
@@ -94,12 +109,12 @@ class Cons:
     def __eq__(self, obj: object) -> bool:
         return type(obj) is Cons and self.a == obj.a and self.d == obj.d
 
-    def __len__(self: Cons | Null) -> int:
+    def __len__(self: Cons | NullType) -> int:
         count = 0
         while type(self) is Cons:
             self = self.d
             count += 1
-        if type(self) is not Null:
+        if self is not Null:
             raise MyError("length expects: list?")
         return count
 
@@ -131,7 +146,7 @@ class Cons:
 
         assert type(ref) is slice
 
-        lst: Cons | Null = Null()
+        lst: Cons | NullType = Null
         steps: int = -1
         i: int = 0
 
@@ -162,7 +177,7 @@ class Cons:
         if not do_reverse:
             return lst
 
-        result: Cons | Null = Null()
+        result: Cons | NullType = Null
         while type(lst) is Cons:
             result = Cons(lst.a, result)
             lst = lst.d
@@ -541,22 +556,21 @@ def check_args(
             raise MyError(f"{o} expects: {' '.join([c.name for c in types])}")
 
 
-any_p = Contract("any_p", lambda v: True)
 is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
-is_bool = Contract("bool?", lambda v: type(v) is bool)
-is_pair = Contract("pair?", lambda v: type(v) is Cons)
-is_null = Contract("null?", lambda v: type(v) is Null)
 is_symbol = Contract("symbol?", lambda v: type(v) is Sym)
 is_str = Contract("string?", lambda v: type(v) is str)
 is_char = Contract("char?", lambda v: type(v) is Char)
 is_iterable = Contract(
     "iterable?",
-    lambda v: type(v) in (str, range, Cons, Null)
+    lambda v: v is Null
+    or type(v) in (str, range, Cons)
     or isinstance(v, (list, dict, np.ndarray)),
 )
 is_sequence = Contract(
     "sequence?",
-    lambda v: type(v) in (str, range, Cons, Null) or isinstance(v, (list, np.ndarray)),
+    lambda v: v is Null
+    or type(v) in (str, range, Cons)
+    or isinstance(v, (list, np.ndarray)),
 )
 is_range = Contract("range?", lambda v: type(v) is range)
 is_vector = Contract("vector?", lambda v: isinstance(v, list))
@@ -567,12 +581,6 @@ is_boolarr = Contract(
 )
 is_num = Contract("number?", lambda v: type(v) in (int, float, Fraction, complex))
 is_real = Contract("real?", lambda v: type(v) in (int, float, Fraction))
-is_int = Contract("int?", lambda v: type(v) is int)
-is_uint = Contract("uint?", lambda v: type(v) is int and v > -1)
-is_frac = Contract("fraction?", lambda v: type(v) is Fraction)
-is_float = Contract("float?", lambda v: type(v) is float)
-is_hash = Contract("hash?", lambda v: isinstance(v, dict))
-is_void = Contract("void?", lambda v: v is None)
 
 
 def raise_(msg: str) -> None:
@@ -790,16 +798,16 @@ def margin(a: int, b: Any, c: Any = None) -> BoolList:
     return arr
 
 
-def _list(*values: Any) -> Cons | Null:
-    result: Cons | Null = Null()
+def _list(*values: Any) -> Cons | NullType:
+    result: Cons | NullType = Null
     for val in reversed(values):
         result = Cons(val, result)
     return result
 
 
 # convert nested vectors to nested lists
-def deep_list(vec: list) -> Cons | Null:
-    result: Cons | Null = Null()
+def deep_list(vec: list) -> Cons | NullType:
+    result: Cons | NullType = Null
     for val in reversed(vec):
         if isinstance(val, list):
             val = deep_list(val)
@@ -807,7 +815,7 @@ def deep_list(vec: list) -> Cons | Null:
     return result
 
 
-def list_to_vector(val: Cons | Null) -> list:
+def list_to_vector(val: Cons | NullType) -> list:
     result = []
     while type(val) is Cons:
         result.append(val.a)
@@ -815,8 +823,8 @@ def list_to_vector(val: Cons | Null) -> list:
     return result
 
 
-def vec_to_list(values: list) -> Cons | Null:
-    result: Cons | Null = Null()
+def vec_to_list(values: list) -> Cons | NullType:
+    result: Cons | NullType = Null
     for val in reversed(values):
         result = Cons(val, result)
     return result
@@ -837,7 +845,7 @@ def vector_extend(vec: list, *more_vecs: list) -> None:
 def is_list(val: Any) -> bool:
     while type(val) is Cons:
         val = val.d
-    return type(val) is Null
+    return val is Null
 
 
 def palet_random(*args: int) -> int | float:
@@ -855,7 +863,7 @@ def palet_random(*args: int) -> int | float:
     return random.randrange(args[0], args[1])
 
 
-def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | Null) -> Any:
+def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | NullType) -> Any:
     if type(seq) is str:
         return str(map(proc.proc, seq))
     if isinstance(seq, (list, range)):
@@ -867,15 +875,15 @@ def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | Null) -> An
         check_args(proc.name, [0], (1, 1), None)
         return proc.proc(seq)
 
-    result: Cons | Null = Null()
+    result: Cons | NullType = Null
     while type(seq) is Cons:
         result = Cons(proc.proc(seq.a), result)
         seq = seq.d
     return result[::-1]
 
 
-def apply(proc: Proc, seq: str | list | range | Cons | Null) -> Any:
-    if isinstance(seq, (Cons, Null)):
+def apply(proc: Proc, seq: str | list | range | Cons | NullType) -> Any:
+    if isinstance(seq, (Cons, NullType)):
         return reduce(proc.proc, list_to_vector(seq))
     return reduce(proc.proc, seq)
 
@@ -890,7 +898,7 @@ def ref(seq: Any, ref: int) -> Any:
 
 
 def p_slice(
-    seq: str | list | range | NDArray | Cons | Null,
+    seq: str | list | range | NDArray | Cons | NullType,
     start: int = 0,
     end: int | None = None,
     step: int = 1,
@@ -907,8 +915,8 @@ def splice(
     arr[start:end] = v
 
 
-def stream_to_list(s: range) -> Cons | Null:
-    result: Cons | Null = Null()
+def stream_to_list(s: range) -> Cons | NullType:
+    result: Cons | NullType = Null
     for item in reversed(s):
         result = Cons(item, result)
     return result
@@ -949,7 +957,9 @@ class Proc:
 class UserProc:
     """A user-defined procedure."""
 
-    def __init__(self, name: str, parms: list, body: list, contracts: list[Any] | None = None):
+    def __init__(
+        self, name: str, parms: list, body: list, contracts: list[Any] | None = None
+    ):
         self.parms = list(map(str, parms))
         self.body = body
 
@@ -1335,7 +1345,7 @@ env: Env = {
     # constants
     "true": True,
     "false": False,
-    "null": Null(),
+    "null": Null,
     "pi": math.pi,
     # syntax
     "lambda": Syntax(syn_lambda),
@@ -1351,6 +1361,31 @@ env: Env = {
     # loops
     "for": Syntax(syn_for),
     "for/vector": Syntax(syn_for_vec),
+    # contracts
+    "number?": is_num,
+    "real?": is_real,
+    "int?": (is_int := Contract("int?", lambda v: type(v) is int)),
+    "uint?": (is_uint := Contract("uint?", lambda v: type(v) is int and v > -1)),
+    "nat?": Contract("nat?", lambda v: type(v) is int and v > 0),
+    "float?": (is_float := Contract("float?", lambda v: type(v) is float)),
+    "frac?": (is_frac := Contract("frac?", lambda v: type(v) is Fraction)),
+    "any": (any_p := Contract("any_p", lambda v: True)),
+    "bool?": (is_bool := Contract("bool?", lambda v: type(v) is bool)),
+    "void?": (is_void := Contract("void?", lambda v: v is None)),
+    "symbol?": is_symbol,
+    "string?": is_str,
+    "char?": is_char,
+    "vector?": is_vector,
+    "array?": is_array,
+    "bool-array?": is_boolarr,
+    "pair?": (is_pair := Contract("pair?", lambda v: type(v) is Cons)),
+    "null?": Contract("null?", lambda v: v is Null),
+    "list?": is_list,
+    "range?": is_range,
+    "iterable?": is_iterable,
+    "sequence?": is_sequence,
+    "procedure?": is_proc,
+    "hash?": (is_hash := Contract("hash?", lambda v: isinstance(v, dict))),
     # actions
     "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
     "display": Proc("display", lambda v: my_write(display_str(v)), (1, 1)),
@@ -1361,10 +1396,8 @@ env: Env = {
     "error": Proc("error", raise_, (1, 1), [is_str]),
     "sleep": Proc("sleep", sleep, (1, 1), [lambda t: is_int(t) or is_float(t)]),
     # void
-    "void?": is_void,
     "void": Proc("void", lambda *v: None, (0, 0)),
     # booleans
-    "bool?": is_bool,
     ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
     ">=": Proc(">=", lambda a, b: a >= b, (2, 2), [is_real, is_real]),
     "<": Proc("<", lambda a, b: a < b, (2, 2), [is_real, is_real]),
@@ -1376,17 +1409,12 @@ env: Env = {
     "and": Proc("and", _and, (1, None)),
     "or": Proc("or", _or, (1, None)),
     "xor": Proc("xor", _xor, (2, None)),
-    # number predicates
-    "number?": is_num,
-    "real?": is_real,
-    "int?": is_int,
-    "uint?": is_uint,
-    "float?": is_float,
-    "fraction?": is_frac,
     "zero?": UserProc("zero?", ["z"], [[Sym("="), Sym("z"), 0]], [is_num]),
     "positive?": UserProc("positive?", ["x"], [[Sym(">"), Sym("x"), 0]], [is_real]),
     "negative?": UserProc("negative?", ["x"], [[Sym("<"), Sym("x"), 0]], [is_real]),
-    "even?": UserProc("even?", ["n"], [[Sym("zero?"), [Sym("mod"), Sym("n"), 2]]], [is_int]),
+    "even?": UserProc(
+        "even?", ["n"], [[Sym("zero?"), [Sym("mod"), Sym("n"), 2]]], [is_int]
+    ),
     "odd?": UserProc("odd?", ["n"], [[Sym("not"), [Sym("even?"), Sym("n")]]], [is_int]),
     # numbers
     "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
@@ -1415,12 +1443,9 @@ env: Env = {
     "modulo": Proc("modulo", lambda a, b: a % b, (2, 2), [is_int, is_int]),
     "random": Proc("random", palet_random, (0, 2), [is_int]),
     # symbols
-    "symbol?": is_symbol,
     "symbol->string": Proc("symbol->string", str, (1, 1), [is_symbol]),
     "string->symbol": Proc("string->symbol", Sym, (1, 1), [is_str]),
     # strings
-    "string?": is_str,
-    "char?": is_char,
     "string": Proc("string", string_append, (0, None), [is_char]),
     "string-append": Proc("string-append", string_append, (0, None), [is_str]),
     "string-upcase": Proc("string-upcase", str.upper, (1, 1), [is_str]),
@@ -1432,7 +1457,6 @@ env: Env = {
     "~s": Proc("~s", lambda *v: " ".join([display_str(a) for a in v]), (0, None)),
     "~v": Proc("~v", lambda *v: " ".join([print_str(a) for a in v]), (0, None)),
     # vectors
-    "vector?": is_vector,
     "vector": Proc("vector", lambda *a: list(a), (0, None)),
     "make-vector": Proc(
         "make-vector", lambda size, a=0: [a] * size, (1, 2), [is_uint, any_p]
@@ -1443,19 +1467,15 @@ env: Env = {
     "vector-set!": Proc("vector-set!", vector_set, (3, 3), [is_vector, is_int, any_p]),
     "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
     # cons/list
-    "pair?": is_pair,
-    "null?": is_null,
     "cons": Proc("cons", Cons, (2, 2)),
     "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
     "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
     "caar": UserProc("caar", ["v"], [[Sym("car"), [Sym("car"), Sym("v")]]]),
     "cdar": UserProc("cdar", ["v"], [[Sym("cdr"), [Sym("car"), Sym("v")]]]),
     "cddr": UserProc("cddr", ["v"], [[Sym("cdr"), [Sym("cdr"), Sym("v")]]]),
-    "list?": is_list,
     "list": Proc("list", _list, (0, None)),
     "list-ref": Proc("list-ref", ref, (2, 2), [is_pair, is_uint]),
     # arrays
-    "array?": is_array,
     "array": Proc("array", array_proc, (2, None), [is_symbol, is_real]),
     "make-array": Proc("make-array", make_array, (2, 3), [is_symbol, is_uint, is_real]),
     "array-splice!": Proc(
@@ -1463,7 +1483,6 @@ env: Env = {
     ),
     "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
     # bool arrays
-    "bool-array?": is_boolarr,
     "bool-array": Proc(
         "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_uint]
     ),
@@ -1471,21 +1490,16 @@ env: Env = {
     "mincut": Proc("mincut", mincut, (2, 2), [is_int, is_boolarr]),
     "minclip": Proc("minclip", minclip, (2, 2), [is_int, is_boolarr]),
     # ranges
-    "range?": is_range,
     "range": Proc("range", range, (1, 3), [is_real, is_real, is_real]),
     # generic iterables
-    "iterable?": is_iterable,
-    "sequence?": is_sequence,
     "length": Proc("length", len, (1, 1), [is_iterable]),
     "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_sequence]),
     "ref": Proc("ref", ref, (2, 2), [is_iterable, is_int]),
     "slice": Proc("slice", p_slice, (2, 4), [is_sequence, is_int]),
     # procedures
-    "procedure?": is_proc,
     "map": Proc("map", palet_map, (2, 2), [is_proc, is_sequence]),
     "apply": Proc("apply", apply, (2, 2), [is_proc, is_sequence]),
     # hashs
-    "hash?": is_hash,
     "hash": Proc("hash", palet_hash),
     "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
     # conversions
@@ -1504,8 +1518,6 @@ env: Env = {
     "object?": is_obj,
     "attrs": Proc("attrs", lambda v: list(get_attrs(v).keys()), (1, 1), [is_obj]),
     ".": Syntax(syn_dot),
-    # predicates
-    "any": any_p,
 }
 
 
