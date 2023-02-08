@@ -557,9 +557,6 @@ def check_args(
 
 
 is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
-is_symbol = Contract("symbol?", lambda v: type(v) is Sym)
-is_str = Contract("string?", lambda v: type(v) is str)
-is_char = Contract("char?", lambda v: type(v) is Char)
 is_iterable = Contract(
     "iterable?",
     lambda v: v is Null
@@ -572,9 +569,6 @@ is_sequence = Contract(
     or type(v) in (str, range, Cons)
     or isinstance(v, (list, np.ndarray)),
 )
-is_range = Contract("range?", lambda v: type(v) is range)
-is_vector = Contract("vector?", lambda v: isinstance(v, list))
-is_array = Contract("array?", lambda v: isinstance(v, np.ndarray))
 is_boolarr = Contract(
     "bool-array?",
     lambda v: isinstance(v, np.ndarray) and v.dtype.kind == "b",
@@ -1357,7 +1351,6 @@ env: Env = {
     "when": Syntax(syn_when),
     "cond": Syntax(syn_cond),
     "with-open": Syntax(syn_with_open),
-    "eval": Syntax(syn_eval),
     # loops
     "for": Syntax(syn_for),
     "for/vector": Syntax(syn_for_vec),
@@ -1372,16 +1365,16 @@ env: Env = {
     "any": (any_p := Contract("any_p", lambda v: True)),
     "bool?": (is_bool := Contract("bool?", lambda v: type(v) is bool)),
     "void?": (is_void := Contract("void?", lambda v: v is None)),
-    "symbol?": is_symbol,
-    "string?": is_str,
-    "char?": is_char,
-    "vector?": is_vector,
-    "array?": is_array,
+    "symbol?": (is_symbol := Contract("symbol?", lambda v: type(v) is Sym)),
+    "string?": (is_str := Contract("string?", lambda v: type(v) is str)),
+    "char?": (is_char := Contract("char?", lambda v: type(v) is Char)),
+    "vector?": (is_vector := Contract("vector?", lambda v: isinstance(v, list))),
+    "array?": (is_array := Contract("array?", lambda v: isinstance(v, np.ndarray))),
     "bool-array?": is_boolarr,
     "pair?": (is_pair := Contract("pair?", lambda v: type(v) is Cons)),
     "null?": Contract("null?", lambda v: v is Null),
-    "list?": is_list,
-    "range?": is_range,
+    "list?": Contract("list?", is_list),
+    "range?": (is_range := Contract("range?", lambda v: type(v) is range)),
     "iterable?": is_iterable,
     "sequence?": is_sequence,
     "procedure?": is_proc,
@@ -1490,7 +1483,7 @@ env: Env = {
     "mincut": Proc("mincut", mincut, (2, 2), [is_int, is_boolarr]),
     "minclip": Proc("minclip", minclip, (2, 2), [is_int, is_boolarr]),
     # ranges
-    "range": Proc("range", range, (1, 3), [is_real, is_real, is_real]),
+    "range": Proc("range", range, (1, 3), [is_int, is_int, is_int]),
     # generic iterables
     "length": Proc("length", len, (1, 1), [is_iterable]),
     "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_sequence]),
@@ -1518,6 +1511,9 @@ env: Env = {
     "object?": is_obj,
     "attrs": Proc("attrs", lambda v: list(get_attrs(v).keys()), (1, 1), [is_obj]),
     ".": Syntax(syn_dot),
+    # reflection
+    "eval": Syntax(syn_eval),
+    "var-exists?": Proc("var-exists?", lambda sym: sym.val in env, (1, 1), [is_symbol]),
 }
 
 

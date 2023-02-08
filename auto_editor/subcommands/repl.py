@@ -68,10 +68,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     parser = repl_options(ArgumentParser(None))
     args = parser.parse_args(REPL_Args, sys_args)
 
-    if len(args.input) == 0:
-        filesetup = None
-        log = Log(quiet=True)
-    else:
+    if args.input:
         temp = setup_tempdir(args.temp_dir, Log())
         log = Log(quiet=True, temp=temp)
         ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)

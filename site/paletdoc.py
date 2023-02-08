@@ -778,7 +778,7 @@ doc = {
     "Actions": [
         proc(
             "sleep",
-            ([("time", "(or int? float?)")], "void?"),
+            ([("time", "(or/c int? float?)")], "void?"),
             text(["Adds a delay by ", var("time"), "seconds."]),
         ),
         proc(
@@ -878,6 +878,14 @@ doc = {
             text([
                 "Evaluate body, if body is a vector or list, "
                 "evaluate the vector/list, otherwise return the value."
+            ]),
+        ),
+        proc(
+            "var-exists?",
+            ([("sym", "symbol?")], "bool?"),
+            text([
+                "Returns", bool_t, " if the variable corresponding to ", var("sym"),
+                " is defined in the current environment, ", bool_f, " otherwise."
             ]),
         ),
     ],
