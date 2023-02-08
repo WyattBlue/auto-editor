@@ -70,6 +70,7 @@ setup(
             "aeinfo=auto_editor.subcommands.info:main",
             "aesubdump=auto_editor.subcommands.subdump:main",
             "aelevels=auto_editor.subcommands.levels:main",
+            "palet=auto_editor.subcommands.palet:main",
         ]
     },
 )

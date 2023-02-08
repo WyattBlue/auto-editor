@@ -775,6 +775,8 @@ def main(sys_args: list[str] | None = None):
             ("(eval (list + 3 4))", 7),
             ("(eval (vector + 3 4))", 7),
             ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
+            ("(var-exists? 'my-func)", True),
+            ("(var-exists? 'asdf)", False),
         )
 
     tests = []

@@ -132,10 +132,9 @@ with open(ref / "palet.html", "w") as file:
                     f"<p>{text_to_str(some.summary)}</p>\n"
                 )
             if isinstance(some, syntax):
-                _body = build_sig(some.body.split(" "))
                 file.write(
                     f'<div id="{some.name}" class="palet-block">\n'
-                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{_body})'
+                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{some.body})'
                     '&nbsp;&nbsp;Syntax</p>\n</div>\n'
                     f"<p>{text_to_str(some.summary)}</p>\n"
                 )
