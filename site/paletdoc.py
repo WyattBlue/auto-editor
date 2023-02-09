@@ -48,15 +48,13 @@ bool_t = code("#t")
 bool_f = code("#f")
 
 doc = {
-    "Basic Syntax": [
+    "Definitions": [
         syntax(
-            "define",
-            "id expr",
+            "define", "id expr",
             text(["Set ", var("id"), " to the result of ", var("expr"), "."]),
         ),
         syntax(
-            "set!",
-            "id expr",
+            "set!", "id expr",
             text([
                 "Set the result of ", var("expr"), " to ", var("id"), " if ",
                 var("id"), " is already defined. If ", var("id"),
@@ -64,17 +62,17 @@ doc = {
             ]),
         ),
         syntax(
-            "lambda",
-            "args body",
+            "lambda", "args body",
             text([
                 "Produces a procedure that accepts ", var("args"),
                 " arguments and runs ", var("body"), " when called.",
             ]),
         ),
         syntax("λ", "args body", text(["Clone of ", var("lambda"), "."])),
+    ],
+    "Control Flow": [
         syntax(
-            "if",
-            "test-expr then-expr else-expr",
+            "if", "test-expr then-expr else-expr",
             text([
                 "Evaluates ", var("test-expr"), ". If ", bool_t, " then evaluate ",
                 var("then-expr"), " else evaluate ", var("else-expr"),
@@ -83,12 +81,22 @@ doc = {
             ]),
         ),
         syntax(
-            "when",
-            "test-expr body",
+            "when", "test-expr body",
             text([
                 "Evaluates ", var("test-expr"), ". If ", bool_t, " then evaluate ",
                 var("body"), " else do nothing. An error will be raised if evaluated ",
                 var("test-expr"), " is not a ", code("bool?"), ".",
+            ]),
+        ),
+        syntax(
+            "cond", "([test-clause then-body]... [else then-body])",
+            text([
+                "Evaluate each ", var("cond-clause"), ", if the clause is evaluated to ",
+                bool_t, " then evaluate and return ", var("then-body"),
+                ". If the clause is ", bool_f, ", continue to the next clause. ",
+                "If there are no clauses left, return ", code("#<void>"),
+                ". If the last ", var("test-clause"), " is ", var("else"),
+                ", then its evaluated ", var("then-body"), ".",
             ]),
         ),
     ],
@@ -190,26 +198,30 @@ doc = {
                 " (a rational number), ", bool_f, " otherwise.",
             ]),
         ),
-        pred(
+        proc(
             "zero?",
-            text([
-                "Returns ", bool_t, " if ", var("v"), " is equal to 0, ", bool_f,
-                " otherwise."
-            ]),
+            ([("z", "number?")], "bool?"),
+            text(["Returns ", code("(= z 0)")])
         ),
-        pred(
+        proc(
             "positive?",
-            text([
-                "Returns ", bool_t, " if ", var("v"), " is greater than 0, ", bool_f,
-                " otherwise."
-            ]),
+            ([("x", "real?")], "bool?"),
+            text(["Returns ", code("(> x 0)")])
         ),
-        pred(
+        proc(
             "negative?",
-            text([
-                "Returns ", bool_t, " if ", var("v"), " is less than 0, ", bool_f,
-                " otherwise."
-            ]),
+            ([("x", "real?")], "bool?"),
+            text(["Returns ", code("(< x 0)")])
+        ),
+        proc(
+            "even?",
+            ([("n", "int?")], "bool?"),
+            text(["Returns ", code("(zero? (mod n 2))")]),
+        ),
+        proc(
+            "odd?",
+            ([("n", "int?")], "bool?"),
+            text(["Returns ", code("(not (even? n))")]),
         ),
     ],
     "Numbers": [
@@ -351,6 +363,23 @@ doc = {
             ([("x", "real?")], "int?"),
             text(["Returns the largest integer less than ", var("x"), "."]),
         ),
+        proc(
+            "random",
+            ([], "float?"),
+            text(["Returns a random number between 0.0 inclusive to 1.0 exclusive."])
+        ),
+        proc(
+            "randrange",
+            ([
+                ("start", "int?"),
+                ("stop", "int?"),
+                ("step", "(or/c (not/c 0) int?)", "1"),
+            ], "int?"),
+            text([
+                "Returns a random int between ", var("start"), " and ", var("stop"),
+                " inclusive."
+            ]),
+        ),
     ],
     "Exponents": [
         proc(
@@ -478,6 +507,11 @@ doc = {
             text(["Returns the character corresponding to ", var("k"), "."]),
         ),
         proc(
+            "number->string",
+            ([("z", "number?")], "string?"),
+            text(["Returns ", var("z"), " as a string."]),
+        ),
+        proc(
             "~a",
             ([("v", "datum?")], "string?"),
             text(["TODO"]),
@@ -533,12 +567,25 @@ doc = {
             text(["Set slot ", var("pos"), " of ", var("vec"), " to ", var("v"), "."]),
         ),
         proc(
+            "vector-append",
+            ([("vec", "vector?"), "..."], "vector?"),
+            text([
+                "Returns a new vector with all elements of ", var("vec"),
+                "s appended in order."
+            ]),
+        ),
+        proc(
             "vector-extend!",
             ([("vec", "vector?"), ("vec2", "vector?"), "..."], "none"),
             text([
-                "Append all elements of ", var("vec2"), " to the end of ", var("vec"),
-                " in order.",
+                "Modify ", var("vec"), " so that all elements of", var("vec2"),
+                "s are appended to the end of ", var("vec"), " in order.",
             ]),
+        ),
+        proc(
+            "string->vector",
+            ([("str", "string?")], "vector?"),
+            text(["Returns a new string filled with the characters of ", var("str"), "."])
         ),
     ],
     "Arrays": [
@@ -609,6 +656,43 @@ doc = {
                 "Returns a new ", code("bool-array?"), " with ", var("left"), " and ",
                 var("right"), " margin applied."
             ]),
+        ),
+        syntax(
+            "and", "first-expr rest-expr ...",
+            text([
+                "Evaluate ", var("first-expr"), ", if the result is a bool-array?, ",
+                "evaluate all ", var("rest-expr"), "s and return the logical-and of all arrays.",
+                " If the result is ", bool_f, ", evaluate ", var("rest-expr"),
+                " one at a time. Return immediately if any arg is ", bool_f,
+                ", return ", bool_t, " if all values are ", bool_t, ".",
+            ]),
+        ),
+        syntax(
+            "or", "first-expr rest-expr ...",
+            text([
+                "Evaluate ", var("first-expr"), ", if the result is a bool-array?, ",
+                "evaluate all ", var("rest-expr"), "s and return the logical-and of all arrays.",
+                " If the result is ", bool_t, ", evaluate ", var("rest-expr"),
+                " one at a time. Return immediately if any arg is ", bool_t,
+                ", return ", bool_f, " if all values are ", bool_f, ".",
+            ]),
+        ),
+        proc(
+            "xor",
+            ([
+                ("expr1", "(or/c bool? bool-array?)"),
+                ("expr2", "(or/c bool? bool-array?)"),
+            ], "(or/c bool? bool-array?)"),
+            text([
+                "Returns a new boolean or boolean-array based on the exclusive-or of ",
+                var("expr1"), " and ", var("expr2"), ". ", var("expr2"),
+                " must be the same type as ", var("expr1"), "."
+            ]),
+        ),
+        proc(
+            "not",
+            ([("h", "(or/c bool? bool-array?)")], "(or/c bool? bool-array?)"),
+            text(["Returns the inverse of ", var("h"), "."]),
         ),
         proc(
             "mincut",
@@ -682,6 +766,41 @@ doc = {
                 "Returns the element of ", var("lst"), " at position ", var("pos"), ".",
             ]),
         ),
+        proc(
+            "vector->list",
+            ([("vec", "vector?")], "list?"),
+            text(["Returns a new list based on ", var("vec"), "."])
+        ),
+        proc(
+            "list->vector",
+            ([("lst", "list?")], "vector?"),
+            text(["Returns a new vector based on ", var("lst"), "."])
+        ),
+        proc(
+            "string->list",
+            ([("str", "string?")], "list?"),
+            text(["Returns a new list filled with the characters of ", var("str"), "."])
+        ),
+        proc(
+            "caar",
+            ([("v", "any")], "any"),
+            text(["Returns ", code("(car (car v))")]),
+        ),
+        proc(
+            "cadr",
+            ([("v", "any")], "any"),
+            text(["Returns ", code("(car (cdr v))")]),
+        ),
+        proc(
+            "cdar",
+            ([("v", "any")], "any"),
+            text(["Returns ", code("(cdr (car v))")]),
+        ),
+        proc(
+            "cddr",
+            ([("v", "any")], "any"),
+            text(["Returns ", code("(cdr (cdr v))")]),
+        ),
     ],
     "Ranges": [
         pred(
@@ -696,9 +815,19 @@ doc = {
             ([
                 ("start", "int?"),
                 ("stop", "int?"),
-                ("step", "int?", "1"),
+                ("step", "(or/c (not/c 0) int?)", "1"),
             ], "range?"),
             text(["Returns a range object."]),
+        ),
+        proc(
+            "range->vector",
+            ([("rng", "range?")], "vector?"),
+            text(["Returns a new vector based on ", var("rng"), "."])
+        ),
+        proc(
+            "range->list",
+            ([("rng", "range?")], "list?"),
+            text(["Returns a new list based on ", var("rng"), "."])
         ),
     ],
     "Generic Sequences": [
@@ -783,8 +912,18 @@ doc = {
         ),
         proc(
             "error",
-            ([("msg", "string?")], "void?"),
+            ([("msg", "string?")], "none"),
             text(["Raises an exception with ", var("msg"), " as the message."])
+        ),
+        proc(
+            "exit",
+            ([("status", "uint?", "1")], "none"),
+            text(["Immediately terminates the program."])
+        ),
+        proc(
+            "begin",
+            ([("datum", "any"), "..."], "any"),
+            text(["Evaluates all arguments and returns the last one."])
         ),
     ],
     "Input / Output": [
@@ -840,9 +979,10 @@ doc = {
         ),
         proc(
             "map",
-            ([("proc", "procedure?"), ("seq", "sequence?")], "any"),
+            ([("proc", "procedure?"), ("seq", "sequence?")], "sequence?"),
             text([
-                "TODO"
+                "Returns a new sequence with the results of ", var("proc"),
+                " applied to each element."
             ]),
         ),
         proc(
@@ -873,11 +1013,17 @@ doc = {
     ],
     "Reflection": [
         syntax(
-            "eval",
-            "body",
+            "eval", "body",
             text([
                 "Evaluate body, if body is a vector or list, "
                 "evaluate the vector/list, otherwise return the value."
+            ]),
+        ),
+        syntax(
+            "quote", "body",
+            text([
+                "Returns ", var("body"), " as its \"literalized\" form, "
+                "a constant value with its binding names copied.",
             ]),
         ),
         proc(

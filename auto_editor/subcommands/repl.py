@@ -1,5 +1,3 @@
-# type: ignore
-
 from __future__ import annotations
 
 import sys
@@ -65,8 +63,7 @@ def repl_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
-    parser = repl_options(ArgumentParser(None))
-    args = parser.parse_args(REPL_Args, sys_args)
+    args = repl_options(ArgumentParser(None)).parse_args(REPL_Args, sys_args)
 
     if args.input:
         temp = setup_tempdir(args.temp_dir, Log())

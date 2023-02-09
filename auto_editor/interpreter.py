@@ -573,6 +573,12 @@ is_boolarr = Contract(
     "bool-array?",
     lambda v: isinstance(v, np.ndarray) and v.dtype.kind == "b",
 )
+bool_or_barr = Contract(
+    "(or/c bool? bool-array?)",
+    lambda v: type(v) is bool or is_boolarr(v),
+)
+is_int = Contract("int?", lambda v: type(v) is int)
+int_not_zero = Contract("(or/c (not/c 0) int?)", lambda v: v != 0 and is_int(v))
 is_num = Contract("number?", lambda v: type(v) in (int, float, Fraction, complex))
 is_real = Contract("real?", lambda v: type(v) in (int, float, Fraction))
 
@@ -673,30 +679,6 @@ def _sqrt(v: Number) -> Number:
             return int(r.real)
         return r.real
     return r
-
-
-def _not(val: Any) -> bool | BoolList:
-    if is_boolarr(val):
-        return np.logical_not(val)
-    if is_bool(val):
-        return not val
-    raise MyError("not expects: bool? or bool-array?")
-
-
-def _and(*vals: Any) -> bool | BoolList:
-    if is_boolarr(vals[0]):
-        check_args("and", vals, (2, None), [is_boolarr])
-        return reduce(lambda a, b: boolop(a, b, np.logical_and), vals)
-    check_args("and", vals, (1, None), [is_bool])
-    return reduce(lambda a, b: a and b, vals)
-
-
-def _or(*vals: Any) -> bool | BoolList:
-    if is_boolarr(vals[0]):
-        check_args("or", vals, (2, None), [is_boolarr])
-        return reduce(lambda a, b: boolop(a, b, np.logical_or), vals)
-    check_args("or", vals, (1, None), [is_bool])
-    return reduce(lambda a, b: a or b, vals)
 
 
 def _xor(*vals: Any) -> bool | BoolList:
@@ -842,19 +824,11 @@ def is_list(val: Any) -> bool:
     return val is Null
 
 
-def palet_random(*args: int) -> int | float:
-    if not args:
-        return random.random()
-
-    if args[0] < 1:
-        raise MyError(f"random: arg1 ({args[0]}) must be greater than zero")
-
-    if len(args) == 1:
-        return random.randrange(0, args[0])
-
-    if args[0] >= args[1]:
-        raise MyError(f"random: arg2 ({args[1]}) must be greater than arg1")
-    return random.randrange(args[0], args[1])
+def randrange(*args: int) -> int:
+    try:
+        return random.randrange(*args)
+    except ValueError:
+        raise MyError("randrange: got empty range")
 
 
 def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | NullType) -> Any:
@@ -1146,27 +1120,75 @@ def syn_quote(env: Env, node: list) -> Any:
     return node[1]
 
 
+def syn_and(env: Env, node: list) -> Any:
+    if len(node) == 1:
+        raise MyError(f"{node[0]}: Arity mismatch: Expected 1. got 0")
+
+    first = my_eval(env, node[1])
+    if first is False:
+        return False
+    if first is True:
+        for n in node[2:]:
+            val = my_eval(env, n)
+            if val is False:
+                return False
+            if val is not True:
+                raise MyError(f"{node[0]} args must be bool?")
+        return True
+
+    if is_boolarr(first):
+        vals = [first] + [my_eval(env, n) for n in node[2:]]
+        check_args(node[0], vals, (2, None), [is_boolarr])
+        return reduce(lambda a, b: boolop(a, b, np.logical_and), vals)
+
+    raise MyError(f"{node[0]} expects (or/c bool? bool-array?)")
+
+
+def syn_or(env: Env, node: list) -> Any:
+    if len(node) == 1:
+        raise MyError(f"{node[0]}: Arity mismatch: Expected 1. got 0")
+
+    first = my_eval(env, node[1])
+    if first is True:
+        return True
+    if first is False:
+        for n in node[2:]:
+            val = my_eval(env, n)
+            if val is True:
+                return True
+            if val is not False:
+                raise MyError(f"{node[0]} args must be bool?")
+        return False
+
+    if is_boolarr(first):
+        vals = [first] + [my_eval(env, n) for n in node[2:]]
+        check_args(node[0], vals, (2, None), [is_boolarr])
+        return reduce(lambda a, b: boolop(a, b, np.logical_or), vals)
+
+    raise MyError(f"{node[0]} expects (or/c bool? bool-array?)")
+
+
 def syn_with_open(env: Env, node: list) -> None:
     if len(node) < 2:
-        raise MyError(f"{node[0]}: wrong number of args")
+        raise MyError(f"{node[0]} has too few args")
     if len(node[1]) != 2 and len(node[1]) != 3:
-        raise MyError(f"{node[0]}: wrong number of args")
+        raise MyError(f"{node[0]} has too many args")
 
     if type(node[1][0]) is not Sym:
-        raise MyError(f"{node[0]}: as must be an identifier")
+        raise MyError(f'{node[0]}\'s "as" must be an identifier')
 
     file_binding = node[1][0].val
 
     file_name = my_eval(env, node[1][1])
     if type(file_name) is not str:
-        raise MyError(f"{node[0]}: file-name must be string?")
+        raise MyError(f"{node[0]} file-name must be string?")
 
     if len(node[1]) == 3:
         file_mode = my_eval(env, node[1][2])
         if type(file_mode) is not Sym:
-            raise MyError(f"{node[0]}: file-mode must be a symbol?")
+            raise MyError(f"{node[0]} file-mode must be symbol?")
         if file_mode.val not in ("w", "r", "a"):
-            raise MyError(f"{node[0]}: file-mode must be either: 'w 'r 'a")
+            raise MyError(f"{node[0]} file-mode must be (or/c 'w 'r 'a)")
     else:
         file_mode = Sym("w")
 
@@ -1357,12 +1379,12 @@ env: Env = {
     # contracts
     "number?": is_num,
     "real?": is_real,
-    "int?": (is_int := Contract("int?", lambda v: type(v) is int)),
+    "int?": is_int,
     "uint?": (is_uint := Contract("uint?", lambda v: type(v) is int and v > -1)),
     "nat?": Contract("nat?", lambda v: type(v) is int and v > 0),
     "float?": (is_float := Contract("float?", lambda v: type(v) is float)),
     "frac?": (is_frac := Contract("frac?", lambda v: type(v) is Fraction)),
-    "any": (any_p := Contract("any_p", lambda v: True)),
+    "any": (any_p := Contract("any", lambda v: True)),
     "bool?": (is_bool := Contract("bool?", lambda v: type(v) is bool)),
     "void?": (is_void := Contract("void?", lambda v: v is None)),
     "symbol?": (is_symbol := Contract("symbol?", lambda v: type(v) is Sym)),
@@ -1385,11 +1407,21 @@ env: Env = {
     "displayln": Proc("displayln", lambda v: my_write(display_str(v) + "\n"), (1, 1)),
     "print": Proc("print", lambda v: my_write(print_str(v)), (1, 1)),
     "println": Proc("println", lambda v: my_write(print_str(v) + "\n"), (1, 1)),
-    "exit": Proc("exit", sys.exit, (0, None)),
+    "exit": Proc("exit", sys.exit, (0, 1), [is_uint]),
     "error": Proc("error", raise_, (1, 1), [is_str]),
     "sleep": Proc("sleep", sleep, (1, 1), [lambda t: is_int(t) or is_float(t)]),
     # void
     "void": Proc("void", lambda *v: None, (0, 0)),
+    # control / b-arrays
+    "not": Proc(
+        "not",
+        lambda v: not v if type(v) is bool else np.logical_not(v),
+        (1, 1),
+        [bool_or_barr],
+    ),
+    "and": Syntax(syn_and),
+    "or": Syntax(syn_or),
+    "xor": Proc("xor", _xor, (2, None), [bool_or_barr]),
     # booleans
     ">": Proc(">", lambda a, b: a > b, (2, 2), [is_real, is_real]),
     ">=": Proc(">=", lambda a, b: a >= b, (2, 2), [is_real, is_real]),
@@ -1398,10 +1430,6 @@ env: Env = {
     "=": Proc("=", equal_num, (1, None), [is_num]),
     "eq?": Proc("eq?", lambda a, b: a is b, (2, 2)),
     "equal?": Proc("equal?", is_equal, (2, 2)),
-    "not": Proc("not", _not, (1, 1)),
-    "and": Proc("and", _and, (1, None)),
-    "or": Proc("or", _or, (1, None)),
-    "xor": Proc("xor", _xor, (2, None)),
     "zero?": UserProc("zero?", ["z"], [[Sym("="), Sym("z"), 0]], [is_num]),
     "positive?": UserProc("positive?", ["x"], [[Sym(">"), Sym("x"), 0]], [is_real]),
     "negative?": UserProc("negative?", ["x"], [[Sym("<"), Sym("x"), 0]], [is_real]),
@@ -1432,9 +1460,10 @@ env: Env = {
     "cos": Proc("cos", math.cos, (1, 1), [is_real]),
     "log": Proc("log", math.log, (1, 2), [is_real, is_real]),
     "tan": Proc("tan", math.tan, (1, 1), [is_real]),
-    "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int, is_int]),
-    "modulo": Proc("modulo", lambda a, b: a % b, (2, 2), [is_int, is_int]),
-    "random": Proc("random", palet_random, (0, 2), [is_int]),
+    "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int]),
+    "modulo": Proc("modulo", lambda a, b: a % b, (2, 2), [is_int]),
+    "random": Proc("random", random.random, (0, 0)),
+    "randrange": Proc("randrange", randrange, (1, 3), [is_int, is_int, int_not_zero]),
     # symbols
     "symbol->string": Proc("symbol->string", str, (1, 1), [is_symbol]),
     "string->symbol": Proc("string->symbol", Sym, (1, 1), [is_str]),
@@ -1464,6 +1493,7 @@ env: Env = {
     "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
     "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
     "caar": UserProc("caar", ["v"], [[Sym("car"), [Sym("car"), Sym("v")]]]),
+    "cadr": UserProc("cdar", ["v"], [[Sym("car"), [Sym("cdr"), Sym("v")]]]),
     "cdar": UserProc("cdar", ["v"], [[Sym("cdr"), [Sym("car"), Sym("v")]]]),
     "cddr": UserProc("cddr", ["v"], [[Sym("cdr"), [Sym("cdr"), Sym("v")]]]),
     "list": Proc("list", _list, (0, None)),
@@ -1483,7 +1513,7 @@ env: Env = {
     "mincut": Proc("mincut", mincut, (2, 2), [is_int, is_boolarr]),
     "minclip": Proc("minclip", minclip, (2, 2), [is_int, is_boolarr]),
     # ranges
-    "range": Proc("range", range, (1, 3), [is_int, is_int, is_int]),
+    "range": Proc("range", range, (1, 3), [is_int, is_int, int_not_zero]),
     # generic iterables
     "length": Proc("length", len, (1, 1), [is_iterable]),
     "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_sequence]),

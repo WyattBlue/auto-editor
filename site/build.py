@@ -180,7 +180,9 @@ with open(ref / "palet.html", "w") as file:
 
     for key in env:
         if key not in pt_vars:
-            print(f"missing docs for {key}")
+            raise ValueError(f"missing docs for {key}")
+
+    print(f"built {len(env)} variables")
 
 
 binaries = Path("binaries")
