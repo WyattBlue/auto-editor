@@ -220,7 +220,7 @@ Stream = Union[int, Literal["all"]]
 
 
 def stream(val: str) -> Stream:
-    if val == "all":
+    if val == "all" or val == "'all":
         return "all"
     return natural(val)
 
