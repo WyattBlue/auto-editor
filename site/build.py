@@ -102,6 +102,7 @@ with open(ref / "palet.html", "w") as file:
                 s += san(c)
         return s
 
+
     def build_sig(vec: list[str | tuple]) -> str:
         results = []
         for v in vec:
@@ -113,6 +114,35 @@ with open(ref / "palet.html", "w") as file:
             else:
                 results.append(f'<span class="palet-var">{v[0]}</span>')
         return "&nbsp;".join(results)
+
+
+    def build_var(v: str) -> str:
+        result = ""
+        for p in v.replace("(", " ( ").replace(")", " ) ").strip().split(" "):
+            if p in env:
+                result += f'<a href="#{p}">{p}</a> '
+            elif p == "(":
+                result += "("
+            elif p == ")":
+                result = result[:-1] + ")"
+            else:
+                result += f"{p} "
+        return result.strip()
+
+    def build_var_sig(sigs: list[str | tuple]) -> str:
+        result = ""
+        for s in sigs:
+            if isinstance(s, str):
+                if s == "...":
+                    return result
+                raise ValueError(f"bad signature: {sigs}")
+
+            name, sig, *_ = s
+            result += f'<p class="mono">&nbsp;<span class="palet-var">{name}</span>'
+            result += f'&nbsp;:&nbsp;{build_var(sig)}'
+
+            result += f"&nbsp;=&nbsp;{build_var(s[2])}</p>\n" if len(s) > 2 else "</p>\n"
+        return result
 
     pt_vars = []
     for category, somethings in paletdoc.doc.items():
@@ -152,25 +182,10 @@ with open(ref / "palet.html", "w") as file:
                 file.write(
                     f'<div id="{some.name}" class="palet-block">\n'
                     f'<p class="mono">(<b>{some.name}</b>&nbsp;{build_sig(some.sig[0])})'
-                    + (
-                        ""
-                        if rname == "none"
-                        else f'&nbsp;→&nbsp;<a href="#{rname}">{rname}</a>'
-                    )
+                    + ("" if rname == "none" else f'&nbsp;→&nbsp;{build_var(rname)}')
                     + '&nbsp;&nbsp;Procedure</p>\n'
                 )
-                for s in some.sig[0]:
-                    if isinstance(s, str):
-                        if s == "...":
-                            break
-                        raise ValueError(f"bad signature: {some.sig[0]}")
-                    name = s[0]
-                    sig = s[1]
-                    default = f"&nbsp;=&nbsp;{s[2]}</p>\n" if len(s) > 2 else "</p>\n"
-                    file.write(
-                        f'<p class="mono">&nbsp;<span class="palet-var">{name}</span>'
-                        f'&nbsp;:&nbsp;<a href="#{sig}">{sig}</a>{default}'
-                    )
+                file.write(build_var_sig(some.sig[0]))
                 file.write("</div>\n" f"<p>{text_to_str(some.summary)}</p>\n")
 
 

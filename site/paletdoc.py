@@ -373,7 +373,7 @@ doc = {
             ([
                 ("start", "int?"),
                 ("stop", "int?"),
-                ("step", "(or/c (not/c 0) int?)", "1"),
+                ("step", "(and/c (not/c 0) int?)", "1"),
             ], "int?"),
             text([
                 "Returns a random int between ", var("start"), " and ", var("stop"),
@@ -815,7 +815,7 @@ doc = {
             ([
                 ("start", "int?"),
                 ("stop", "int?"),
-                ("step", "(or/c (not/c 0) int?)", "1"),
+                ("step", "(and/c (not/c 0) int?)", "1"),
             ], "range?"),
             text(["Returns a range object."]),
         ),
