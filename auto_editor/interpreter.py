@@ -4,7 +4,6 @@ import cmath
 import math
 import random
 import sys
-from dataclasses import dataclass
 from difflib import get_close_matches
 from fractions import Fraction
 from functools import reduce
@@ -536,9 +535,8 @@ def check_args(
     amount = len(values)
     if upper is not None and lower > upper:
         raise ValueError("lower must be less than upper")
-    if lower == upper:
-        if len(values) != lower:
-            raise MyError(f"{o}: Arity mismatch. Expected {lower}, got {amount}")
+    if lower == upper and len(values) != lower:
+        raise MyError(f"{o}: Arity mismatch. Expected {lower}, got {amount}")
 
     if upper is None and amount < lower:
         raise MyError(f"{o}: Arity mismatch. Expected at least {lower}, got {amount}")
@@ -906,24 +904,34 @@ def palet_hash(*args: Any) -> dict:
 ###############################################################################
 
 
-@dataclass
 class Proc:
-    name: str
-    proc: Callable
-    arity: tuple[int, int | None] = (1, None)
-    contracts: list[Any] | None = None
+    __slots__ = ("name", "proc", "arity", "contracts")
+
+    def __init__(
+        self,
+        name: str,
+        proc: Callable,
+        arity: tuple[int, int | None] = (1, None),
+        contracts: list[Any] | None = None,
+    ):
+        self.name = name
+        self.proc = proc
+        self.arity = arity
+        self.contracts = contracts
 
     def __str__(self) -> str:
         return f"#<procedure:{self.name}>"
 
     __repr__ = __str__
 
-    def __call__(self, *vals: Any) -> Any:
-        return self.proc(*vals)
+    def __call__(self, *args: Any) -> Any:
+        return self.proc(*args)
 
 
-class UserProc:
+class UserProc(Proc):
     """A user-defined procedure."""
+
+    __slots__ = ("parms", "body", "name", "arity", "contracts")
 
     def __init__(
         self, name: str, parms: list, body: list, contracts: list[Any] | None = None
@@ -935,16 +943,21 @@ class UserProc:
         self.arity = len(parms), len(parms)
         self.contracts = contracts
 
-    def __str__(self) -> str:
-        return f"#<procedure:{self.name}>"
-
-    __repr__ = __str__
-
     def __call__(self, *args: Any) -> Any:
+        saved_env: Env = {}
+        for item in self.parms:
+            if item in env:
+                saved_env[item] = env[item]
+
         env.update(zip(self.parms, args))
         for item in self.body[0:-1]:
             my_eval(env, item)
-        return my_eval(env, self.body[-1])
+        result = my_eval(env, self.body[-1])
+
+        for item in self.parms:
+            del env[item]
+        env.update(saved_env)
+        return result
 
 
 class Syntax:
@@ -1222,7 +1235,7 @@ class PaletObject:
 
 is_obj = Contract(
     "object?",
-    lambda v: type(v) is str or isinstance(v, (list, Proc, UserProc, PaletObject)),
+    lambda v: type(v) is str or isinstance(v, (list, Proc, PaletObject)),
 )
 
 
@@ -1255,7 +1268,7 @@ def get_attrs(obj: object) -> dict[str, Any]:
             "@len": Proc("@len", obj.__len__, (0, 0)),
             "@name": "vector",
         }
-    if isinstance(obj, (Proc, UserProc)):
+    if isinstance(obj, Proc):
         return {
             "arity-min": obj.arity[0],
             "arity-max": obj.arity[1],
