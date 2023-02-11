@@ -61,6 +61,7 @@ class VideoJson(TypedDict):
 class AudioJson(TypedDict):
     codec: str
     samplerate: int
+    channels: int
     duration: str | None
     bitrate: str | None
     lang: str | None
@@ -159,6 +160,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             aud: AudioJson = {
                 "codec": a.codec,
                 "samplerate": a.samplerate,
+                "channels": a.channels,
                 "duration": a.duration,
                 "bitrate": a.bitrate,
                 "lang": a.lang,

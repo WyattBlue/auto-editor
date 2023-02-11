@@ -154,6 +154,7 @@ class VideoStream:
 class AudioStream:
     codec: str
     samplerate: int
+    channels: int
     duration: str | None
     bitrate: str | None
     lang: str | None
@@ -329,8 +330,13 @@ class FileInfo:
                 )
             if codec_type == "audio":
                 sr = int(stream["sample_rate"])
+
+                if "channels" not in stream:
+                    log.error("audio stream has no 'channels' data")
+                c = int(stream["channels"])
+
                 adur = get_attr("duration", stream, default=None)
-                self.audios.append(AudioStream(codec, sr, adur, br, lang))
+                self.audios.append(AudioStream(codec, sr, c, adur, br, lang))
             if codec_type == "subtitle":
                 ext = SUB_EXTS.get(codec, "vtt")
                 self.subtitles.append(SubtitleStream(codec, ext, lang))
