@@ -7,10 +7,9 @@ from argparse import ArgumentParser
 from os import getenv
 from pathlib import Path
 from shutil import rmtree
+from copy import deepcopy
 
 import basswood
-import paletdoc
-from paletdoc import code, proc, syntax, text, value, var, pred
 
 sys.path.insert(0, "/Users/wyattblue/projects/auto-editor")
 
@@ -18,7 +17,7 @@ from auto_editor import version
 import auto_editor.vanparse as vanparse
 from auto_editor.__main__ import main_options
 from auto_editor.vanparse import OptionText
-from auto_editor.interpreter import env
+from auto_editor.interpreter import env, interpret, Parser, Lexer, Sym
 
 argp = ArgumentParser()
 argp.add_argument("--production", "-p", action="store_true")
@@ -87,19 +86,28 @@ with open(ref / "palet.html", "w") as file:
         "(A)uto-(E)ditor's (T)iny (P)rocedural (L)anguage</p>"
     )
 
-    def text_to_str(t: text) -> str:
+    def text_to_str(t: dict) -> str:
         s = ""
 
         def san(s: str) -> str:
             return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-        for c in t.children:
-            if isinstance(c, code):
-                s += f"<code>{san(c.val)}</code>"
-            elif isinstance(c, var):
+        for c in t["children"]:
+            if c is True:
+                s += '<span class="palet-val">#t</span>'
+            elif c is False:
+                s += '<span class="palet-val">#f</span>'
+            elif c is None:
+                s += '<span class="palet-val">#&lt;void&gt;</span>'
+            elif type(c) is Sym:
                 s += f'<span class="palet-var">{san(c.val)}</span>'
-            else:
+            elif isinstance(c, str):
                 s += san(c)
+            elif c["tag"] == "code":
+                s += f"<code>{san(c['val'])}</code>"
+            else:
+                raise ValueError(c)
+
         return s
 
 
@@ -145,59 +153,69 @@ with open(ref / "palet.html", "w") as file:
         return result
 
     pt_vars = []
-    for category, somethings in paletdoc.doc.items():
+
+    with open("paletdoc.pt", "r") as sourcefile:
+        source = sourcefile.read()[:]
+
+    canonical_env = deepcopy(env)
+    result = interpret(env, Parser(Lexer(source)))
+    doc = env["doc"].copy()
+
+    for category, somethings in doc.items():
         file.write(f'<h2 class="left">{category}</h2>\n')
         for some in somethings:
-            if isinstance(some, text):
+            if some["tag"] == "text":
                 file.write(f"<p>{text_to_str(some)}</p>\n")
                 continue
 
-            pt_vars.append(some.name)
-            if isinstance(some, value):
+            pt_vars.append(some["name"])
+            if some["tag"] == "value":
                 file.write(
                     '<div class="palet-block">\n'
-                    f'<p class="mono">{some.name}\n'
-                    f'&nbsp;:&nbsp;<a href="#{some.sig}">{some.sig}</a>'
+                    f'<p class="mono">{some["name"]}\n'
+                    f'&nbsp;:&nbsp;<a href="#{some["sig"]}">{some["sig"]}</a>'
                     '&nbsp;&nbsp;Value</p>\n</div>\n'
-                    f"<p>{text_to_str(some.summary)}</p>\n"
+                    f"<p>{text_to_str(some['summary'])}</p>\n"
                 )
-            if isinstance(some, syntax):
+            if some["tag"] == "syntax":
                 file.write(
-                    f'<div id="{some.name}" class="palet-block">\n'
-                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{some.body})'
+                    f'<div id="{some["name"]}" class="palet-block">\n'
+                    f'<p class="mono">(<b>{some["name"]}</b>&nbsp;{some["body"]})'
                     '&nbsp;&nbsp;Syntax</p>\n</div>\n'
-                    f"<p>{text_to_str(some.summary)}</p>\n"
+                    f"<p>{text_to_str(some['summary'])}</p>\n"
                 )
-            if isinstance(some, pred):
+            if some["tag"] == "pred":
                 file.write(
-                    f'<div id="{some.name}" class="palet-block">\n'
-                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{build_sig(["v"])})'
+                    f'<div id="{some["name"]}" class="palet-block">\n'
+                    f'<p class="mono">(<b>{some["name"]}</b>&nbsp;{build_sig(["v"])})'
                     '&nbsp;→&nbsp;<a href="#bool?">bool?</a>&nbsp;&nbsp;Procedure</p>\n'
                     f'<p class="mono">&nbsp;<span class="palet-var">v</span>'
                     '&nbsp;:&nbsp;<a href="#any?">any?</a></p></div>\n'
-                    f"<p>{text_to_str(some.summary)}</p>\n"
+                    f"<p>{text_to_str(some['summary'])}</p>\n"
                 )
-            if isinstance(some, proc):
-                rname = some.sig[1]
+            if some["tag"] == "proc":
+                rname = some["sig"][-1]
+                varsigs = some["sig"][:-1]
+                assert isinstance(rname, str), rname
                 file.write(
-                    f'<div id="{some.name}" class="palet-block">\n'
-                    f'<p class="mono">(<b>{some.name}</b>&nbsp;{build_sig(some.sig[0])})'
+                    f'<div id="{some["name"]}" class="palet-block">\n'
+                    f'<p class="mono">(<b>{some["name"]}</b>&nbsp;{build_sig(varsigs)})'
                     + ("" if rname == "none" else f'&nbsp;→&nbsp;{build_var(rname)}')
                     + '&nbsp;&nbsp;Procedure</p>\n'
                 )
-                file.write(build_var_sig(some.sig[0]))
-                file.write("</div>\n" f"<p>{text_to_str(some.summary)}</p>\n")
+                file.write(build_var_sig(varsigs))
+                file.write(f"</div>\n<p>{text_to_str(some['summary'])}</p>\n")
 
 
     for _var in pt_vars:
-        if _var not in env:
+        if _var not in canonical_env:
             raise ValueError(f"{_var} not in env")
 
-    for key in env:
+    for key in canonical_env:
         if key not in pt_vars:
             raise ValueError(f"missing docs for {key}")
 
-    print(f"built {len(env)} variables")
+    print(f"built {len(canonical_env)} variables")
 
 
 binaries = Path("binaries")

@@ -8,7 +8,7 @@ import numpy as np
 
 from auto_editor.analyze import FileSetup
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import Interpreter, Lexer, MyError, Parser, env, is_boolarr
+from auto_editor.interpreter import Lexer, MyError, Parser, env, interpret, is_boolarr
 from auto_editor.objs.util import ParserError, parse_dataclass
 from auto_editor.timeline import (
     ASpace,
@@ -94,16 +94,14 @@ def run_interpreter(
     log: Log,
 ) -> NDArray[np.bool_]:
     try:
-        lexer = Lexer(text)
-        parser = Parser(lexer)
+        parser = Parser(Lexer(text))
         if log.is_debug:
             log.debug(f"edit: {parser}")
 
         env["timebase"] = filesetup.tb
         env["@filesetup"] = filesetup
 
-        interpreter = Interpreter(env, parser)
-        results = interpreter.interpret()
+        results = interpret(env, parser)
     except (MyError, ZeroDivisionError) as e:
         log.error(e)
 

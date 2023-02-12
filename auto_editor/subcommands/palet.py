@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from auto_editor.interpreter import Interpreter, Lexer, MyError, Parser, env
+from auto_editor.interpreter import Lexer, MyError, Parser, env, interpret
 
 
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
@@ -11,7 +11,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             program_text = file.read()
 
         try:
-            Interpreter(env, Parser(Lexer(program_text))).interpret()
+            interpret(env, Parser(Lexer(program_text)))
         except (MyError, ZeroDivisionError) as e:
             print(f"error: {e}", file=sys.stderr)
 

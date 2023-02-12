@@ -1,0 +1,923 @@
+(define vec vector)
+(define (code val) (hash "tag" "code" "val" val))
+
+(define (text children ...) (hash "tag" "text" "children" children))
+
+(define (proc name sig summary)
+    (hash "tag" "proc" "name" name "sig" sig "summary" summary)
+)
+(define (pred name summary) (hash "tag" "pred" "name" name "summary" summary))
+
+(define (syntax name body summary)
+    (hash "tag" "syntax" "name" name "body" body "summary" summary)
+)
+
+(define ( value name sig summary)
+    (hash "tag" "value" "name" name "sig" sig "summary" summary)
+)
+
+(define doc {hash
+    "Assignment" [vec
+        (syntax "define" "id expr"
+            (text "Set " 'id " to the result of " 'expr ".")
+        )
+        (syntax "set!" "id expr"
+            (text
+                "Set the result of " 'expr " to " 'id " if "
+                'id " is already defined. If " 'id
+                " is not defined raise an error."
+            )
+        )
+        (syntax
+            "lambda" "args body"
+            (text
+                "Produces a procedure that accepts " 'args
+                " arguments and runs " 'body " when called."
+            )
+        )
+        (syntax "λ" "args body" (text "Clone of " 'lambda "."))
+        (syntax
+            "define/c" "(proc-bind [id-binding contract]... )"
+            (text "Define a procedure with contracts.")
+        )
+    ]
+    "Control Flow" [vec
+        (syntax
+            "if" "test-expr then-expr else-expr"
+            (text
+                "Evaluates " 'test-expr ". If " #t " then evaluate "
+                'then-expr " else evaluate " 'else-expr
+                ". An error will be raised if evaluated "
+                'test-expr " is not a " (code "bool?") "."
+            )
+        )
+        (syntax
+            "when" "test-expr body"
+            (text
+                "Evaluates " 'test-expr ". If " #t " then evaluate "
+                'body " else do nothing. An error will be raised if evaluated "
+                'test-expr " is not a " (code "bool?") "."
+            )
+        )
+        (syntax
+            "cond" "([test-clause then-body]... [else then-body)"
+            (text
+                "Evaluate each " 'cond-clause " if the clause is evaluated to "
+                #t " then evaluate and return " 'then-body
+                ". If the clause is " #f " continue to the next clause. "
+                "If there are no clauses left return " (void)
+                ". If the last " 'test-clause " is " 'else
+                " then its evaluated " 'then-body "."
+            )
+        )
+    ]
+    "Loops" [vec
+        (syntax
+            "for"
+            "([id seq-expr] ...) body"
+            (text
+                "Loop over " 'seq-expr " by setting the variable " 'id
+                " to the nth item of " 'seq-expr " and evaluating " 'body "."
+            )
+        )
+        (syntax
+            "for/vector"
+            "([id seq-expr] ...) body"
+            (text
+                "Like " (code "for")
+                " but returns a vec with the last evaluated elements of " 'body "."
+            )
+        )
+    ]
+    "Equality" [vec
+        (proc
+            "equal?"
+            (vec (vec "v1" "any") (vec "v2" "any") "bool?")
+            (text
+                "Returns " #t " if " 'v1 " and " 'v2
+                " are the same type and have the same value, " #f " otherwise."
+            )
+        )
+        (proc
+            "eq?"
+            (vec (vec "v1" "any") (vec "v2" "any") "bool?")
+            (text
+                "Returns " #t " if " 'v1 " and " 'v2
+                " refer to the same object in memory, " #f " otherwise."
+            )
+        )
+    ]
+    "Booleans" [vec
+        (pred
+            "bool?"
+            (text "Returns " #t " if " 'v " is " #t " or " #f ", " #f " otherwise.")
+        )
+        (value "true" "bool?" (text "An alias for " #t "."))
+        (value "false" "bool?" (text "An alias for " #f "."))
+    ]
+    "Number Predicates" [vec
+        (pred
+            "number?"
+            (text "Returns " #t " if " 'v " is a number, " #f " otherwise.")
+        )
+        (pred
+            "real?"
+            (text "Returns " #t " if " 'v " is a real number, " #f " otherwise.")
+        )
+        (pred
+            "int?"
+            (text "Returns " #t " if " 'v " is an integer, " #f " otherwise.")
+        )
+        (pred
+            "uint?"
+            (text
+                "Returns " #t " if " 'v " is an integer and " 'v " is greater than -1, "
+                #f " otherwise."
+            )
+        )
+        (pred
+            "nat?"
+            (text
+                "Returns " #t " if " 'v " is an integer and " 'v " is greater than 0, "
+                #f " otherwise."
+            )
+        )
+        (pred "float?" (text "Returns " #t " if " 'v " is a float, " #f " otherwise."))
+        (pred
+            "frac?"
+            (text
+                "Returns " #t " if " 'v " is a fraction (a rational number), "
+                #f " otherwise."
+            )
+        )
+        (proc "zero?" (vec (vec "z" "number?") "bool?") (text "Returns " (code "(= z 0)")))
+        (proc
+            "positive?"
+            (vec (vec "x" "real?") "bool?")
+            (text "Returns " (code "(> x 0)"))
+        )
+        (proc"negative?" (vec (vec "x" "real?") "bool?") (text "Returns " (code "(< x 0)")))
+        (proc
+            "even?"
+            (vec (vec "n" "int?") "bool?")
+            (text "Returns " (code "(zero? (mod n 2))"))
+        )
+        (proc
+            "odd?"
+            (vec (vec "n" "int?") "bool?")
+            (text "Returns " (code "(not (even? n))"))
+        )
+    ]
+    "Numbers" [vec
+        (proc
+            "+"
+            (vec (vec "z" "number?") "..." "number?")
+            (text
+                "Return the sum of " 'z "s. Add from left to right. "
+                "If no arguments are provided the result is 0."
+            )
+        )
+        (proc
+            "-"
+            (vec (vec "z" "number?") (vec "w" "number?") "..." "number?")
+            (text
+                "When no " 'w "s are applied return " (code "(- 0 z)")
+                ", otherwise return the subtraction of " 'w "s of " 'z "."
+            )
+        )
+        (proc
+            "*"
+            (vec (vec "z" "number?") "..." "number?")
+            (text
+                "Return the product of " 'z "s. If no " 'z
+                "s are supplied the result is 1."
+            )
+        )
+        (proc
+            "/"
+            (vec (vec "z" "number?") (vec "w" "number?") "..." "number?")
+            (text
+                "When no " 'w "s are applied return " (code "(/ 1 z)")
+                ". Otherwise return the division of " 'w "s of " 'z "."
+            )
+        )
+        (proc
+            "mod"
+            (vec (vec "n" "int?") (vec "m" "int?") "int?")
+            (text "Return the modulo of " 'n " and " 'm ".")
+        )
+        (proc
+            "modulo"
+            (vec (vec "n" "int?") (vec "m" "int?") "int?")
+            (text "Clone of " (code "mod") ".")
+        )
+        (proc
+            "add1"
+            (vec (vec "z" "number?") "number?")
+            (text "Returns " (code "(+ z 1)") ".")
+        )
+        (proc
+            "sub1"
+            (vec (vec "z" "number?") "number?")
+            (text "Returns " (code "(- z 1)") ".")
+        )
+        (proc
+            "="
+            (vec (vec "z" "number?") (vec "w" "number?") "..." "bool?")
+            (text
+                "Returns " #t " if all arguments are numerically equal, "
+                #f " otherwise."
+            )
+        )
+        (proc
+            "<"
+            (vec (vec "x" "real?") (vec "y" "real?") "bool?")
+            (text "Returns " #t " if " 'x " is less than " 'y ", " #f " otherwise.")
+        )
+        (proc
+            "<="
+            (vec (vec "x" "real?") (vec "y" "real?") "bool?")
+            (text
+                "Returns " #t " if " 'x " is less than or equal to "
+                'y ", " #f " otherwise."
+            )
+        )
+        (proc
+            ">"
+            (vec (vec "x" "real?") (vec "y" "real?") "bool?")
+            (text "Returns " #t " if " 'x " is greater than " 'y ", " #f " otherwise.")
+        )
+        (proc
+            ">="
+            (vec (vec "x" "real?") (vec "y" "real?") "bool?")
+            (text
+                "Returns " #t " if " 'x " is greater than or equal to " 'y ", " #f
+                " otherwise."
+            )
+        )
+        (proc
+            "abs"
+            (vec (vec "x" "real?") "real?")
+            (text "Returns the absolute value of " 'x ".")
+        )
+        (proc
+            "max"
+            (vec (vec "x" "real?") "..." "real?")
+            (text "Returns largest value of the " 'x "s.")
+        )
+        (proc
+            "min"
+            (vec (vec "x" "real?") "..." "real?")
+            (text "Returns smallest value of the " 'x "s.")
+        )
+        (proc
+            "real-part"
+            (vec (vec "z" "number?") "real?")
+            (text "Returns the real part of " 'z ".")
+        )
+        (proc
+            "imag-part"
+            (vec (vec "z" "number?") "real?")
+            (text "Returns the imaginary part of " 'z ".")
+        )
+        (proc
+            "round"
+            (vec (vec "x" "real?") "int?")
+            (text
+                "Returns the closest integer to " 'x
+                " resolving ties in favor of even numbers."
+            )
+        )
+        (proc
+            "ceil"
+            (vec (vec "x" "real?") "int?")
+            (text "Returns the smallest integer bigger than " 'x ".")
+        )
+        (proc
+            "floor"
+            (vec (vec "x" "real?") "int?")
+            (text "Returns the largest integer less than " 'x ".")
+        )
+        (proc
+            "random"
+            (vec "float?")
+            (text "Returns a random number between 0.0 inclusive to 1.0 exclusive.")
+        )
+        (proc
+            "randrange"
+            (vec
+                (vec "start" "int?")
+                (vec "stop" "int?")
+                (vec "step" "(and/c (not/c 0) int?)" "1")
+            "int?")
+            (text "Returns a random int between " 'start " and " 'stop " inclusive.")
+        )
+    ]
+    "Exponents" [vec
+        (proc
+            "pow"
+            (vec (vec "z" "real?") (vec "w" "real?") "real?")
+            (text "Returns " 'z " raised to the " 'w " power.")
+        )
+        (proc
+            "sqrt"
+            (vec (vec "z" "number?") "number?")
+            (text "Returns the square root of " 'z ".")
+        )
+        (proc
+            "exp"
+            (vec (vec "x" "real?") "float?")
+            (text "Returns Euler's number raised to the " 'z " power.")
+        )
+        (proc
+            "log"
+            (vec (vec "x" "real?") (vec "b" "real?" "(exp 1)") "float?")
+            (text
+                "Returns the natural logarithm of " 'x ".\n"
+                "If " 'b " is provided it serves as an alternative base."
+            )
+        )
+    ]
+    "Geometry" [vec
+        (proc
+            "sin"
+            (vec (vec "z" "real?") "float?")
+            (text "Returns the sine of " 'z " in radians.")
+        )
+        (proc
+            "cos"
+            (vec (vec "z" "real?") "float?")
+            (text "Returns the cosine of " 'z " in radians.")
+        )
+        (proc
+            "tan"
+            (vec (vec "z" "real?") "float?")
+            (text "Returns the tangent of " 'z " in radians.")
+        )
+        (value "pi" "float?"
+            (text
+                "A floating point approximation of 𝜋: "
+                "the circumference of a circle divided by its diameter."
+            )
+        )
+    ]
+    "Symbols" [vec
+        (pred
+            "symbol?"
+            (text "Returns " #t " if " 'v " is a symbol, " #f " otherwise.")
+        )
+        (proc
+            "symbol->string"
+            (vec (vec "sym" "symbol?") "string?")
+            (text "Returns a new string whose characters are the same as in " 'sym ".")
+        )
+        (proc
+            "string->symbol"
+            (vec (vec "str" "string?") "symbol?")
+            (text "Returns a symbol whose characters are the same as " 'str ".")
+        )
+    ]
+    "Strings" [vec
+        (pred
+            "string?"
+            (text "Returns " #t " if " 'v " is a string, " #f " otherwise.")
+        )
+        (pred
+            "char?"
+            (text "Returns " #t " if " 'v " is a char, " #f " otherwise.")
+        )
+        (proc
+            "string"
+            (vec (vec "char" "char?") "..." "string?")
+            (text "Returns a new string from the given " 'char "s.")
+        )
+        (proc
+            "string-append"
+            (vec (vec "str" "string?") "..." "string?")
+            (text "Returns a new string concatenated from the given " 'str "s")
+        )
+        (proc
+            "string-upcase"
+            (vec (vec "s" "string?") "string?")
+            (text "Returns the string " 's " in upper case.")
+        )
+        (proc
+            "string-downcase"
+            (vec (vec "s" "string?") "string?")
+            (text "Returns the string " 's " in lower case.")
+        )
+        (proc
+            "string-titlecase"
+            (vec (vec "s" "string?") "string?")
+            (text
+                "Returns the string " 's " in title case. "
+                "The first letter of every word is capitalized while the rest is lower cased."
+            )
+        )
+        (proc
+            "char->int"
+            (vec (vec "char" "char?") "int?")
+            (text "Returns the corresponding int to the given " 'char ".")
+        )
+        (proc
+            "int->char"
+            (vec (vec "k" "int?") "char?")
+            (text "Returns the character corresponding to " 'k ".")
+        )
+        (proc
+            "number->string"
+            (vec (vec "z" "number?") "string?")
+            (text "Returns " 'z " as a string.")
+        )
+        (proc
+            "~a"
+            (vec (vec "v" "datum?") "string?")
+            (text "TODO")
+        )
+        (proc
+            "~s"
+            (vec (vec "v" "datum?") "string?")
+            (text "TODO")
+        )
+        (proc
+            "~v"
+            (vec (vec "v" "datum?") "string?")
+            (text "TODO")
+        )
+    ]
+    "Vectors" [vec
+        (pred
+            "vector?"
+            (text "Returns " #t " if " 'v " is a vector, " #f " otherwise.")
+        )
+        (proc
+            "vector"
+            (vec (vec "v" "any") "..." "vector?")
+            (text
+                "Returns a new vec with the " 'v " args filled with its slots in order."
+            )
+        )
+        (proc
+            "make-vector"
+            (vec (vec "size" "uint?") (vec "v" "any" "0") "vector?")
+            (text
+                "Returns a new vector with " 'size " slots all filled with " 'v "s."
+            )
+        )
+        (proc
+            "vector-pop!"
+            (vec (vec "vec" "vector?") "any")
+            (text "Remove the last element of " 'vec " and return it.")
+        )
+        (proc
+            "vector-add!"
+            (vec (vec "vec" "vector?") (vec "v" "any") "none")
+            (text "Append " 'v " to the end of " 'vec ".")
+        )
+        (proc
+            "vector-set!"
+            (vec (vec "vec" "vector?") (vec "pos" "int?") (vec "v" "any") "none")
+            (text "Set slot " 'pos " of " 'vec " to " 'v ".")
+        )
+        (proc
+            "vector-append"
+            (vec (vec "vec" "vector?") "..." "vector?")
+            (text
+                "Returns a new vector with all elements of " 'vec "s appended in order."
+            )
+        )
+        (proc
+            "vector-extend!"
+            (vec (vec "vec" "vector?") (vec "vec2" "vector?") "..." "none")
+            (text
+                "Modify " 'vec " so that all elements of " 'vec2
+                "s are appended to the end of " 'vec " in order."
+            )
+        )
+        (proc
+            "string->vector"
+            (vec (vec "str" "string?") "vector?")
+            (text "Returns a new string filled with the characters of " 'str ".")
+        )
+    ]
+    "Arrays" [vec
+        (pred
+            "array?"
+            (text "Returns " #t " if " 'v " is an array, " #f " otherwise.")
+        )
+        (proc
+            "array"
+            (vec (vec "dtype" "symbol?") (vec "v" "any") "..." "array?")
+            (text
+                "Returns a freshly allocated array with " 'dtype
+                " as its datatype and the " 'v " args as its values filled in order."
+            )
+        )
+        (proc
+            "make-array"
+            (vec
+                (vec "dtype" "symbol?")
+                (vec "size" "uint?")
+                (vec "v" "int?" "0")
+            "array?")
+            (text
+                "Returns a freshly allocated array with " 'dtype
+                " as its datatype and the value " 'v " filled."
+            )
+        )
+        (proc
+            "array-splice!"
+            (vec
+                (vec "arr" "array?")
+                (vec "v" "real?")
+                (vec "start" "int?" "0")
+                (vec "stop" "int?" "(length arr)")
+            "array?")
+            (text
+                "Modify " 'arr " by setting " 'start " to " 'stop " into the value " 'v "."
+            )
+        )
+        (proc
+            "count-nonzero"
+            (vec (vec "arr" "array?") "uint?")
+            (text "Returns the number of non-zeros in " 'arr ".")
+        )
+        (pred
+            "bool-array?"
+            (text
+                "Returns " #t " if " 'v
+                " is an array with 'bool as its datatype, " #f " otherwise."
+            )
+        )
+        (proc
+            "bool-array"
+            (vec (vec "v" "uint?") "..." "bool-array?")
+            (text "Returns a new boolean array with " 'v " as its values.")
+        )
+        (proc
+            "margin"
+            (vec
+                (vec "left" "int?")
+                (vec "right" "int?" "left")
+                (vec "arr" "bool-array?")
+            "bool-array?")
+            (text
+                "Returns a new " (code "bool-array?") " with " 'left " and " 'right
+                " margin applied."
+            )
+        )
+        (syntax
+            "and" "first-expr rest-expr ..."
+            (text
+                "Evaluate " 'first-expr " if the result is a bool-array? "
+                "evaluate all " 'rest-expr "s and return the logical-and of all arrays."
+                " If the result is " #f " evaluate " 'rest-expr
+                " one at a time. Return immediately if any arg is " #f
+                ", return " #t " if all values are " #t "."
+            )
+        )
+        (syntax
+            "or" "first-expr rest-expr ..."
+            (text
+                "Evaluate " 'first-expr " if the result is a bool-array? "
+                "evaluate all " 'rest-expr "s and return the logical-and of all arrays."
+                " If the result is " #t " evaluate " 'rest-expr
+                " one at a time. Return immediately if any arg is " #t
+                ", return " #f " if all values are " #f "."
+            )
+        )
+        (proc
+            "xor"
+            (vec
+                (vec "expr1" "(or/c bool? bool-array?)")
+                (vec "expr2" "(or/c bool? bool-array?)")
+             "(or/c bool? bool-array?)")
+            (text
+                "Returns a new boolean or boolean-array based on the exclusive-or of "
+                'expr1 " and " 'expr2 ". " 'expr2
+                " must be the same type as " 'expr1 "."
+            )
+        )
+        (proc
+            "not"
+            (vec (vec "h" "(or/c bool? bool-array?)") "(or/c bool? bool-array?)")
+            (text "Returns the inverse of " 'h ".")
+        )
+        (proc
+            "mincut"
+            (vec (vec "arr" "bool-array?") (vec "x" "int?") "bool-array?")
+            (text
+                "TODO"
+            )
+        )
+        (proc
+            "minclip"
+            (vec (vec "arr" "bool-array?") (vec "x" "int?") "bool-array?")
+            (text
+                "TODO"
+            )
+        )
+    ]
+    "Pairs and Lists" [vec
+        (pred
+            "pair?"
+            (text "Returns " #t " if " 'v " is a pair, " #f " otherwise.")
+        )
+        (pred
+            "null?"
+            (text "Returns " #t " if " 'v " is an empty list, " #f " otherwise.")
+        )
+        (proc
+            "cons"
+            (vec (vec "a" "any") (vec "d" "any") "pair?")
+            (text
+                "Returns a newly allocated pair where the first item is set to "
+                'a " and the second item set to " 'd "."
+            )
+        )
+        (proc
+            "car"
+            (vec (vec "p" "pair?") "any?")
+            (text "Returns the first element of pair " 'p ".")
+        )
+        (proc
+            "cdr"
+            (vec (vec "p" "pair?") "any?")
+            (text "Returns the second element of pair " 'p ".")
+        )
+        (value "null" "null?" (text "The empty list."))
+        (pred
+            "list?"
+            (text
+                "Returns " #t " if " 'v
+                 " is an empty list or a pair whose second element is a list, "
+                 #f " otherwise."
+            )
+        )
+        (proc
+            "list"
+            (vec (vec "v" "any") "..." "list?")
+            (text "Returns a list with " 'v " in order.")
+        )
+        (proc
+            "list-ref"
+            (vec (vec "lst" "list?") (vec "pos" "uint?") "any")
+            (text
+                "Returns the element of " 'lst " at position " 'pos "."
+            )
+        )
+        (proc
+            "vector->list"
+            (vec (vec "vec" "vector?") "list?")
+            (text "Returns a new list based on " 'vec ".")
+        )
+        (proc
+            "list->vector"
+            (vec (vec "lst" "list?") "vector?")
+            (text "Returns a new vector based on " 'lst ".")
+        )
+        (proc
+            "string->list"
+            (vec (vec "str" "string?") "list?")
+            (text "Returns a new list filled with the characters of " 'str ".")
+        )
+        (proc
+            "caar"
+            (vec (vec "v" "any") "any")
+            (text "Returns " (code "(car (car v))"))
+        )
+        (proc
+            "cadr"
+            (vec (vec "v" "any") "any")
+            (text "Returns " (code "(car (cdr v))"))
+        )
+        (proc
+            "cdar"
+            (vec (vec "v" "any") "any")
+            (text "Returns " (code "(cdr (car v))"))
+        )
+        (proc
+            "cddr"
+            (vec (vec "v" "any") "any")
+            (text "Returns " (code "(cdr (cdr v))"))
+        )
+    ]
+    "Ranges" [vec
+        (pred
+            "range?"
+            (text "Returns " #t " if " 'v " is a range object, " #f " otherwise.")
+        )
+        (proc
+            "range"
+            (vec
+                (vec "start" "int?")
+                (vec "stop" "int?")
+                (vec "step" "(and/c (not/c 0) int?)" "1")
+             "range?")
+            (text "Returns a range object.")
+        )
+        (proc
+            "range->vector"
+            (vec (vec "rng" "range?") "vector?")
+            (text "Returns a new vec based on " 'rng ".")
+        )
+        (proc
+            "range->list"
+            (vec (vec "rng" "range?") "list?")
+            (text "Returns a new list based on " 'rng ".")
+        )
+    ]
+    "Generic Sequences" [vec
+        (pred
+            "iterable?"
+            (text
+                "Returns " #t " if " 'v
+                " is a vector array string hash pair or range, " #f " otherwise."
+            )
+        )
+        (pred
+            "sequence?"
+            (text
+                "Returns " #t " if " 'v
+                " is a vector array string pair or range, " #f " otherwise."
+            )
+        )
+        (proc
+            "length"
+            (vec (vec "seq" "iterable?") "uint?")
+            (text "Returns the length of " 'seq ".")
+        )
+        (proc
+            "ref"
+            (vec (vec "seq" "iterable?") (vec "pos" "int?") "any")
+            (text
+                "Returns the element of " 'seq " at position "
+                'pos " where the first element is at position 0. "
+                "For sequences other than pair? negative positions are allowed."
+            )
+        )
+        (proc
+            "slice"
+            (vec
+                (vec "seq" "sequence?")
+                (vec "start" "int?")
+                (vec "stop" "int?" "(length seq)")
+                (vec "step" "int?" "1")
+            "sequence?")
+            (text
+                "Returns the elements of " 'seq " from " 'start
+                " inclusively to " 'stop " exclusively. If " 'step
+                " is negative then " 'stop " is inclusive and  "
+                'start " is exclusive."
+            )
+        )
+        (proc
+            "reverse"
+            (vec (vec "seq" "sequence?") "sequence?")
+            (text "Returns " 'seq " in reverse order.")
+        )
+    ]
+    "Hashmaps" [vec
+        (pred
+            "hash?"
+            (text "Returns " #t " if " 'v " is a hash table, " #f " otherwise.")
+        )
+        (proc
+            "hash"
+            (vec (vec "key" "any") (vec "val" "any") "..." "hash?")
+            (text "Returns a newly vectructed hash map from key-value pairs.")
+        )
+        (proc
+            "has-key?"
+            (vec (vec "hash" "hash?") (vec "key" "any") "bool?")
+            (text "Returns " #t " if " 'key " is in the hash map, " #f " otherwise.")
+        )
+    ]
+    "Actions" [vec
+        (proc
+            "sleep"
+            (vec (vec "time" "(or/c int? float?)") "void?")
+            (text "Adds a delay by " 'time "seconds.")
+        )
+        (proc
+            "error"
+            (vec (vec "msg" "string?") "none")
+            (text "Raises an exception with " 'msg " as the message.")
+        )
+        (proc
+            "exit"
+            (vec (vec "status" "uint?" "1") "none")
+            (text "Immediately terminates the program.")
+        )
+        (proc
+            "begin"
+            (vec (vec "datum" "any") "..." "any")
+            (text "Evaluates all arguments and returns the last one.")
+        )
+    ]
+    "Input / Output" [vec
+        (proc
+            "display"
+            (vec (vec "datum" "any") "void?")
+            (text "Display " 'datum " to stdout.")
+        )
+        (proc
+            "displayln"
+            (vec (vec "datum" "any") "void?")
+            (text "Display " 'datum " to stdout with a newline character.")
+        )
+        (proc
+            "print"
+            (vec (vec "datum" "any") "void?")
+            (text "Display " 'datum " like REPL does.")
+        )
+        (proc
+            "println"
+            (vec (vec "datum" "any") "void?")
+            (text "Display " 'datum " like REPL does with a newline character.")
+        )
+        (syntax
+            "with-open"
+            "(file-binding file-path file-mode) body-expr"
+            (text "In the block the file object to " (code "file-binding") "\n."
+                (code "(with-open (file \"todo.txt\" 'a) ((. file write) \"buy milk\"))")
+            )
+        )
+    ]
+    "Void" [vec
+        (pred
+            "void?"
+            (text "Returns " #t " if " 'v " is " (void) ", " #f " otherwise.")
+        )
+        (proc
+            "void"
+            (vec (vec "v" "any") "..." "void?")
+            (text  "Returns the constant " (void) ". All " 'v " arguments are ignored.")
+        )
+    ]
+    "Procedures" [vec
+        (pred
+            "procedure?"
+            (text "Returns " #t " if " 'v " is a procedure, " #f " otherwise.")
+        )
+        (pred
+            "contract?"
+            (text "Returns " #t " if " 'v " is a contract, " #f " otherwise.")
+        )
+        (proc
+            "map"
+            (vec (vec "proc" "procedure?") (vec "seq" "sequence?") "sequence?")
+            (text
+                "Returns a new sequence with the results of " 'proc
+                " applied to each element."
+            )
+        )
+        (proc
+            "apply"
+            (vec (vec "proc" "procedure?") (vec "seq" "sequence?") "any")
+            (text "Applies " 'proc " given " 'seq " as its arguments.")
+        )
+        (pred
+            "any"
+            (text "Always returns " #t " regardless of the value of " 'v ".")
+        )
+    ]
+    "Objects" [vec
+        (pred
+            "object?"
+            (text "Returns " #t " if " 'v " is an object, " #f
+                " otherwise. Anything that's not an object is a primitive."
+            )
+        )
+        (proc
+            "attrs"
+            (vec (vec "obj" "object?") "vector?")
+            (text "Returns all attributes of " 'obj " as a vector of strings.")
+        )
+        (syntax "." "obj attr" (text "Returns the specified attribute on the object."))
+    ]
+    "Reflection" [vec
+        (syntax
+            "eval" "body"
+            (text
+                "Evaluate body if body is a vector or list, "
+                "evaluate the vector/list otherwise return the value."
+            )
+        )
+        (syntax
+            "quote" "body"
+            (text
+                "Returns " 'body " as its \"literalized\" form, "
+                "a constant value with its binding names copied."
+            )
+        )
+        (proc
+            "var-exists?"
+            (vec (vec "sym" "symbol?") "bool?")
+            (text
+                "Returns " #t " if the variable corresponding to " 'sym
+                " is defined in the current environment, " #f " otherwise."
+            )
+        )
+    ]
+})
