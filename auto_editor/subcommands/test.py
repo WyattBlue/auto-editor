@@ -16,13 +16,13 @@ from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import (
     Char,
     Cons,
-    Interpreter,
     Lexer,
     MyError,
     Null,
     Parser,
     Sym,
     env,
+    interpret,
 )
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
@@ -606,7 +606,7 @@ def main(sys_args: list[str] | None = None):
                 try:
                     parser = Parser(Lexer(text))
                     env["timebase"] = Fraction(30)
-                    results = Interpreter(env, parser).interpret()
+                    results = interpret(env, parser)
                 except MyError as e:
                     raise ValueError(f"{text}\nMyError: {e}")
 
@@ -777,6 +777,11 @@ def main(sys_args: list[str] | None = None):
             ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
             ("(var-exists? 'my-func)", True),
             ("(var-exists? 'asdf)", False),
+            ("(define (text child ...) child)", None),
+            ("(text)", []),
+            ("(text 1)", [1]),
+            ("(text 2 1)", [2, 1]),
+            ("(text 3 2 1)", [3, 2, 1]),
         )
 
     tests = []

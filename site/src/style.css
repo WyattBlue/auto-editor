@@ -250,9 +250,8 @@ h1, h2, th, .bold {font-weight: bold}
   margin-bottom: 0;
 }
 
-.palet-var {
-  font-style: italic;
-}
+.palet-var {font-style: italic}
+.palet-val {color: #11dd01; font-family: monospace;}
 
 /* Light Theme Colors */
 html {background-color: white}

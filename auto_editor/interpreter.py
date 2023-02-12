@@ -229,10 +229,9 @@ class Sym:
 #                                                                             #
 ###############################################################################
 
-METHODS = ("audio", "motion", "pixeldiff", "subtitle", "none", "all")
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 ID, QUOTE, NUM, BOOL, STR, CHAR = "ID", "QUOTE", "NUM", "BOOL", "STR", "CHAR"
-ARR, SEC, DB, PER = "ARR", "SEC", "DB", "PER"
+METHOD, SEC, DB, PER = "METHOD", "SEC", "DB", "PER"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
 
 
@@ -408,9 +407,9 @@ class Lexer:
             if has_illegal:
                 raise MyError(f"Symbol has illegal character(s): {result}")
 
-            for method in METHODS:
+            for method in ("audio", "motion", "pixeldiff", "subtitle", "none", "all"):
                 if result == method or result.startswith(method + ":"):
-                    return Token(ARR, result)
+                    return Token(METHOD, result)
 
             return Token(ID, result)
 
@@ -424,13 +423,11 @@ class Lexer:
 ###############################################################################
 
 
-class BoolArr:
+class Method:
     __slots__ = "val"
 
     def __init__(self, val: str):
         self.val = val
-
-    __str__: Callable[[BoolArr], str] = lambda self: f"(boolarr {self.val})"
 
 
 class Parser:
@@ -451,10 +448,13 @@ class Parser:
             self.eat(token.type)
             return token.value
 
-        matches = {ID: Sym, ARR: BoolArr}
-        if token.type in matches:
-            self.eat(token.type)
-            return matches[token.type](token.value)
+        if token.type == ID:
+            self.eat(ID)
+            return Sym(token.value)
+
+        if token.type == METHOD:
+            self.eat(METHOD)
+            return Method(token.value)
 
         if token.type == SEC:
             self.eat(SEC)
@@ -551,10 +551,19 @@ def check_args(
     for i, val in enumerate(values):
         check = types[-1] if i >= len(types) else types[i]
         if not check(val):
-            raise MyError(f"{o} expects: {' '.join([c.name for c in types])}")
+            raise MyError(f"{o} expected a {check.name}, got {print_str(val)}")
 
 
 is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
+is_cont = Contract(
+    "contract?",
+    lambda v: isinstance(v, Contract)
+    or (
+        isinstance(v, Proc)
+        and v.arity[0] < 2  # type: ignore
+        and (v.arity[1] is None or v.arity[1] > 0)  # type: ignore
+    ),
+)
 is_iterable = Contract(
     "iterable?",
     lambda v: v is Null
@@ -934,13 +943,22 @@ class UserProc(Proc):
     __slots__ = ("parms", "body", "name", "arity", "contracts")
 
     def __init__(
-        self, name: str, parms: list, body: list, contracts: list[Any] | None = None
+        self,
+        name: str,
+        parms: list,
+        body: list,
+        contracts: list[Any] | None = None,
+        eat_last: bool = False,
     ):
         self.parms = list(map(str, parms))
         self.body = body
-
         self.name = name
-        self.arity = len(parms), len(parms)
+
+        if eat_last:
+            self.arity: tuple[int, int | None] = len(parms) - 1, None
+        else:
+            self.arity = len(parms), len(parms)
+
         self.contracts = contracts
 
     def __call__(self, *args: Any) -> Any:
@@ -948,6 +966,10 @@ class UserProc(Proc):
         for item in self.parms:
             if item in env:
                 saved_env[item] = env[item]
+
+        if self.arity[1] is None:
+            largs = list(args)
+            args = tuple([largs[len(self.parms) - 1 :]])
 
         env.update(zip(self.parms, args))
         for item in self.body[0:-1]:
@@ -1006,16 +1028,23 @@ def syn_lambda(env: Env, node: list) -> Any:
 
 def syn_define(env: Env, node: list) -> Any:
     if len(node) < 3:
-        raise MyError("define: bad syntax")
+        raise MyError(f"{node[0]}: too few args")
 
     if isinstance(node[1], list):
         if not node[1] or type(node[1][0]) is not Sym:
-            raise MyError(f"{node[0]}: bad syntax")
+            raise MyError(f"{node[0]}: proc-binding must be an identifier")
 
         n = node[1][0].val
-        parameters = node[1][1:]
+
+        eat_last = False
+        if node[1][1:] and node[1][-1] == Sym("..."):
+            eat_last = True
+            parameters = node[1][1:-1]
+        else:
+            parameters = node[1][1:]
+
         body = node[2:]
-        env[n] = UserProc(n, parameters, body)
+        env[n] = UserProc(n, parameters, body, eat_last=eat_last)
         return None
     elif type(node[1]) is not Sym:
         raise MyError(f"{node[0]}: must be an identifier")
@@ -1039,6 +1068,37 @@ def syn_define(env: Env, node: list) -> Any:
             my_eval(env, item)
         env[n] = my_eval(env, node[-1])
 
+    return None
+
+
+def syn_definec(env: Env, node: list) -> Any:
+    if len(node) < 3:
+        raise MyError(f"{node[0]}: bad syntax")
+
+    if not isinstance(node[1], list):
+        raise MyError(f"{node[0]} only allows procedure declarations")
+
+    if not node[1] or type(node[1][0]) is not Sym:
+        raise MyError(f"{node[0]}: bad proc-binding syntax")
+
+    n = node[1][0].val
+
+    contracts: list[Proc | Contract] = []
+    parameters: list[Sym] = []
+    for item in node[1][1:]:
+        if len(item) != 2:
+            raise MyError(f"{node[0]}: bad var-binding syntax")
+        if type(item[0]) is not Sym:
+            raise MyError(f"{node[0]}: binding must be identifier")
+
+        parameters.append(item[0])
+        con = my_eval(env, item[1])
+        if not is_cont(con):
+            raise MyError(f"{node[0]}: {print_str(con)} is not a valid contract")
+
+        contracts.append(con)
+
+    env[n] = UserProc(n, parameters, node[2:], contracts)
     return None
 
 
@@ -1316,7 +1376,7 @@ def my_eval(env: Env, node: object) -> Any:
             raise MyError(f"'{node.val}' not found.")
         return val
 
-    if isinstance(node, BoolArr):
+    if isinstance(node, Method):
         if "@filesetup" not in env:
             raise MyError("Can't use edit methods if there's no input files")
         return edit_method(node.val, env["@filesetup"])
@@ -1332,9 +1392,13 @@ def my_eval(env: Env, node: object) -> Any:
             """
             if is_iterable(oper):
                 values = [my_eval(env, c) for c in node[1:]]
-                return ref(oper, *values)
+                if values:
+                    if isinstance(values[0], str) or len(values) > 1:
+                        raise MyError(f"{node}: Bad ref")
+                    else:
+                        return ref(oper, *values)
 
-            raise MyError(f"{oper}, expected procedure")
+            raise MyError(f"{print_str(oper)}, expected procedure")
 
         if type(oper) is Syntax:
             return oper(env, node)
@@ -1380,6 +1444,7 @@ env: Env = {
     "lambda": Syntax(syn_lambda),
     "λ": Syntax(syn_lambda),
     "define": Syntax(syn_define),
+    "define/c": Syntax(syn_definec),
     "set!": Syntax(syn_set),
     "quote": Syntax(syn_quote),
     "if": Syntax(syn_if),
@@ -1413,6 +1478,7 @@ env: Env = {
     "iterable?": is_iterable,
     "sequence?": is_sequence,
     "procedure?": is_proc,
+    "contract?": is_cont,
     "hash?": (is_hash := Contract("hash?", lambda v: isinstance(v, dict))),
     # actions
     "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
@@ -1567,15 +1633,8 @@ env: Env = {
 ###############################################################################
 
 
-class Interpreter:
-    __slots__ = ("parser", "env")
-
-    def __init__(self, env: Env, parser: Parser):
-        self.parser = parser
-        self.env = env
-
-    def interpret(self) -> Any:
-        result = []
-        while self.parser.current_token.type not in (EOF, RPAREN, RBRAC, RCUR):
-            result.append(my_eval(self.env, self.parser.expr()))
-        return result
+def interpret(env: Env, parser: Parser) -> Any:
+    result = []
+    while parser.current_token.type not in (EOF, RPAREN, RBRAC, RCUR):
+        result.append(my_eval(env, parser.expr()))
+    return result

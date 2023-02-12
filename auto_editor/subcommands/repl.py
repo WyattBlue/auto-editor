@@ -9,11 +9,11 @@ from auto_editor.analyze import FileSetup
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import (
     ClosingError,
-    Interpreter,
     Lexer,
     MyError,
     Parser,
     env,
+    interpret,
     print_str,
 )
 from auto_editor.output import Ensure
@@ -106,8 +106,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 print(f"error: {e}")
                 continue
             try:
-                interpreter = Interpreter(env, parser)
-                for result in interpreter.interpret():
+                for result in interpret(env, parser):
                     if result is not None:
                         sys.stdout.write(f"{print_str(result)}\n")
             except ClosingError:
