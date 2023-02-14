@@ -14,7 +14,6 @@ from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
 from .utils import Validator, safe_mkdir, show
 
 if TYPE_CHECKING:
-    from auto_editor.objs.export import ExPremiere
     from auto_editor.output import Ensure
     from auto_editor.utils.log import Log
 
@@ -249,7 +248,7 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     return v3(sources, tb, sr, res, "#000", vobjs, aobjs, None)
 
 
-def premiere_write_xml(ex: ExPremiere, ensure: Ensure, output: str, tl: v3) -> None:
+def premiere_write_xml(_name: str | None, ensure: Ensure, output: str, tl: v3) -> None:
     assert tl.v1 is not None
 
     clips = list(filter(lambda c: c[2] != 99999, tl.v1.chunks))
@@ -274,10 +273,10 @@ def premiere_write_xml(ex: ExPremiere, ensure: Ensure, output: str, tl: v3) -> N
             move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
             pathurls.append(newtrack.resolve().as_uri())
 
-    if ex.name is None:
+    if _name is None:
         name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
     else:
-        name = ex.name
+        name = _name
 
     xmeml = ET.Element("xmeml", version="4")
     sequence = ET.SubElement(xmeml, "sequence")

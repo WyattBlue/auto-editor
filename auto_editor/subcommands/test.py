@@ -108,7 +108,9 @@ class Runner:
                 if match is not None and match not in stderr:
                     raise Exception(f'Could\'t find "{match}"')
             else:
-                raise Exception(f"Program crashed.\n{stdout}\n{stderr}")
+                raise Exception(
+                    f"Program crashed.\n{' '.join(cmd)}\n{stdout}\n{stderr}"
+                )
         else:
             raise Exception("Program should not respond with code 0 but did!")
 
@@ -583,11 +585,11 @@ def main(sys_args: list[str] | None = None):
     def edit_negative_tests():
         run.check(
             ["resources/wav/example-cut-s16le.wav", "--edit", "motion"],
-            "Video stream '0' does not exist",
+            "video stream '0' does not ",
         )
         run.check(
             ["resources/only-video/man-on-green-screen.gif", "--edit", "audio"],
-            "Audio stream '0' does not exist",
+            "audio stream '0' does not ",
         )
 
     def yuv442p():

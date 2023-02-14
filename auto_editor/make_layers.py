@@ -209,13 +209,15 @@ def make_timeline(
 
         try:
             if obj_s in visual_objects:
-                pool.append(
-                    parse_dataclass(attrs, visual_objects[obj_s], my_var_f, True)
+                dic_obj = parse_dataclass(
+                    attrs, visual_objects[obj_s][1], my_var_f, True
                 )
+                pool.append(visual_objects[obj_s][0](**dic_obj))
             elif obj_s in audio_objects:
-                apool.append(
-                    parse_dataclass(attrs, audio_objects[obj_s], my_var_f, True)
+                dic_obj = parse_dataclass(
+                    attrs, audio_objects[obj_s][1], my_var_f, True
                 )
+                apool.append(audio_objects[obj_s][0](**dic_obj))
             else:
                 log.error(f"Unknown timeline object: '{obj_s}'")
         except (ParserError, CoerceError) as e:

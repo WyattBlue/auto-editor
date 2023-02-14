@@ -12,7 +12,7 @@
     (hash "tag" "syntax" "name" name "body" body "summary" summary)
 )
 
-(define ( value name sig summary)
+(define (value name sig summary)
     (hash "tag" "value" "name" name "sig" sig "summary" summary)
 )
 
@@ -431,18 +431,24 @@
         )
         (proc
             "~a"
-            (vec (vec "v" "datum?") "string?")
-            (text "TODO")
+            (vec (vec "v" "datum?" "...") "string?")
+            (text
+                "Converts all" 'v "s to a string using display with \"\" as the joiner."
+            )
         )
         (proc
             "~s"
-            (vec (vec "v" "datum?") "string?")
-            (text "TODO")
+            (vec (vec "v" "datum?" "...") "string?")
+            (text
+                "Converts all" 'v "s to a string using display with \" \" as the joiner."
+            )
         )
         (proc
             "~v"
-            (vec (vec "v" "datum?") "string?")
-            (text "TODO")
+            (vec (vec "v" "datum?" "...") "string?")
+            (text
+                "Converts all" 'v " to a string using print with \" \" as the joiner."
+            )
         )
     ]
     "Vectors" [vec
@@ -605,14 +611,14 @@
         )
         (proc
             "mincut"
-            (vec (vec "arr" "bool-array?") (vec "x" "int?") "bool-array?")
+            (vec (vec "arr" "bool-array?") (vec "x" "uint?") "bool-array?")
             (text
                 "TODO"
             )
         )
         (proc
             "minclip"
-            (vec (vec "arr" "bool-array?") (vec "x" "int?") "bool-array?")
+            (vec (vec "arr" "bool-array?") (vec "x" "uint?") "bool-array?")
             (text
                 "TODO"
             )
@@ -765,10 +771,9 @@
                 (vec "step" "int?" "1")
             "sequence?")
             (text
-                "Returns the elements of " 'seq " from " 'start
-                " inclusively to " 'stop " exclusively. If " 'step
-                " is negative then " 'stop " is inclusive and  "
-                'start " is exclusive."
+                "Returns the elements of " 'seq " from " 'start " inclusively to "
+                'stop " exclusively. If " 'step " is negative then " 'stop
+                " is inclusive and " 'start " is exclusive."
             )
         )
         (proc

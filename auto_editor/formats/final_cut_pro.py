@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import TYPE_CHECKING
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import v3
 
 from .utils import indent
-
-if TYPE_CHECKING:
-    from auto_editor.objs.export import ExFinalCutPro
 
 """
 Export a FCPXML 9 file readable with Final Cut Pro 10.4.9 or later.
@@ -68,7 +64,7 @@ def fraction(_a: float, tb: Fraction) -> str:
     return f"{num}/{dem}s"
 
 
-def fcp_xml(ex: ExFinalCutPro, output: str, tl: v3) -> None:
+def fcp_xml(_group_name: str | None, output: str, tl: v3) -> None:
     assert tl.v1 is not None
     src = tl.v1.source
     chunks = tl.v1.chunks
@@ -79,11 +75,11 @@ def fcp_xml(ex: ExFinalCutPro, output: str, tl: v3) -> None:
     width, height = tl.res
     name = src.path.stem
 
-    if ex.name is None:
+    if _group_name is None:
         is_audio = not src.videos and src.audios
         group_name = f"Auto-Editor {'Audio' if is_audio else 'Video'} Group"
     else:
-        group_name = ex.name
+        group_name = _group_name
 
     colorspace = get_colorspace(src)
 

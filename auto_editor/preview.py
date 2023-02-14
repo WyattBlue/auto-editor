@@ -3,9 +3,10 @@ from __future__ import annotations
 from fractions import Fraction
 from statistics import fmean, median
 
-from auto_editor.analyze import get_media_length
+from auto_editor.analyze import Levels
 from auto_editor.output import Ensure
 from auto_editor.timeline import v3
+from auto_editor.utils.bar import Bar
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
 
@@ -50,7 +51,8 @@ def preview(ensure: Ensure, tl: v3, temp: str, log: Log) -> None:
     # Calculate input videos length
     in_len = 0
     for src in tl.sources.values():
-        in_len += get_media_length(ensure, src, tl.tb, temp, log)
+        levels = Levels(ensure, src, tb, Bar("none"), temp, log).media_length
+        in_len += levels
 
     out_len = tl.out_len()
 

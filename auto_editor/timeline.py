@@ -5,7 +5,7 @@ from fractions import Fraction
 from typing import Union
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.objs.util import Attr, Required
+from auto_editor.objs.util import Attr, Attrs, Required
 from auto_editor.utils.chunks import Chunks, v2Chunks
 from auto_editor.utils.types import (
     Align,
@@ -140,15 +140,17 @@ class TlEllipse(_Visual):
     name: str = "ellipse"
 
 
-video_builder = [
+video_builder = Attrs(
+    "video",
     Attr("start", natural, Required),
     Attr("dur", natural, Required),
     Attr("src", src, Required),
     Attr("offset", natural, 0),
     Attr("speed", number, 1),
     Attr("stream", natural, 0),
-]
-audio_builder = [
+)
+audio_builder = Attrs(
+    "audio",
     Attr("start", natural, Required),
     Attr("dur", natural, Required),
     Attr("src", src, Required),
@@ -156,11 +158,12 @@ audio_builder = [
     Attr("speed", number, 1),
     Attr("volume", db_number, 1),
     Attr("stream", natural, 0),
-]
-text_builder = [
+)
+text_builder = Attrs(
+    "text",
     Attr("start", natural, Required),
     Attr("dur", natural, Required),
-    Attr("content", lambda s: s.replace("\\n", "\n").replace("\\;", ","), Required),
+    Attr("content", str, Required),
     Attr("x", int, "50%"),
     Attr("y", int, "50%"),
     Attr("font", str, "Arial"),
@@ -172,9 +175,10 @@ text_builder = [
     Attr("fill", str, "#FFF"),
     Attr("stroke", natural, 0),
     Attr("strokecolor", color, "#000"),
-]
+)
 
-img_builder = [
+img_builder = Attrs(
+    "image",
     Attr("start", natural, Required),
     Attr("dur", natural, Required),
     Attr("src", src, Required),
@@ -185,9 +189,10 @@ img_builder = [
     Attr("rotate", number, 0),
     Attr("stroke", natural, 0),
     Attr("strokecolor", color, "#000"),
-]
+)
 
-rect_builder = [
+rect_builder = Attrs(
+    "rect",
     Attr("start", natural, Required),
     Attr("dur", natural, Required),
     Attr("x", int, Required),
@@ -200,10 +205,10 @@ rect_builder = [
     Attr("fill", color, "#c4c4c4"),
     Attr("stroke", natural, 0),
     Attr("strokecolor", color, "#000"),
-]
+)
 ellipse_builder = rect_builder
 
-timeline_builder = [Attr("api", str, "3.0.0")]
+timeline_builder = Attrs("timeline", Attr("api", str, "3.0.0"))
 
 Visual = Union[TlText, TlImage, TlRect, TlEllipse]
 VLayer = list[Union[TlVideo, Visual]]
