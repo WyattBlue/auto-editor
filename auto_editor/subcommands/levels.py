@@ -2,16 +2,11 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from auto_editor.analyze import (
-    audio_levels,
-    motion_levels,
-    pixeldiff_levels,
-    subtitle_levels,
-)
+from auto_editor.analyze import Levels
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.objs.edit import (
     audio_builder,
@@ -29,36 +24,8 @@ from auto_editor.vanparse import ArgumentParser
 
 if TYPE_CHECKING:
     from fractions import Fraction
-    from typing import Any
 
     from numpy.typing import NDArray
-
-
-@dataclass
-class Audio:
-    stream: int
-    mincut: int
-    minclip: int
-
-
-@dataclass
-class Motion:
-    stream: int
-    blur: int
-    width: int
-
-
-@dataclass
-class Pixeldiff:
-    stream: int
-
-
-@dataclass
-class Subtitle:
-    pattern: str
-    stream: int
-    ignore_case: bool = False
-    max_count: int | None = None
 
 
 @dataclass
@@ -124,8 +91,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     tb = src.get_fps() if args.timebase is None else args.timebase
     ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
 
-    strict = True
-
     if ":" in args.edit:
         method, attrs = args.edit.split(":", 1)
     else:
@@ -140,40 +105,40 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         return coerce(val)
 
     for src in sources.values():
+        method_map = {
+            "audio": audio_builder,
+            "motion": motion_builder,
+            "pixeldiff": pixeldiff_builder,
+            "subtitle": subtitle_builder,
+        }
+        levels = Levels(ensure, src, tb, bar, temp, log)
+
+        if method in method_map:
+            builder = method_map[method]
+
+            try:
+                obj = parse_dataclass(attrs, builder)
+            except ParserError as e:
+                log.error(e)
+
+            if "threshold" in obj:
+                del obj["threshold"]
+
         if method == "audio":
-            try:
-                aobj = parse_dataclass(attrs, (Audio, audio_builder[1:]))
-            except ParserError as e:
-                log.error(e)
-
-            print_floats(
-                audio_levels(ensure, src, aobj.stream, tb, bar, strict, temp, log)
-            )
-
+            print_floats(levels.audio(obj["stream"]))
         elif method == "motion":
-            try:
-                mobj = parse_dataclass(attrs, (Motion, motion_builder[1:]), my_var_f)
-            except ParserError as e:
-                log.error(e)
-
-            print_floats(motion_levels(ensure, src, mobj, tb, bar, strict, temp, log))
-
+            print_floats(levels.motion(obj["stream"], obj["blur"], obj["width"]))
         elif method == "pixeldiff":
-            try:
-                pobj = parse_dataclass(
-                    attrs, (Pixeldiff, pixeldiff_builder[1:]), my_var_f
-                )
-            except ParserError as e:
-                log.error(e)
-
-            print_ints(pixeldiff_levels(ensure, src, pobj, tb, bar, strict, temp, log))
+            print_ints(levels.pixeldiff(obj["stream"]))
         elif method == "subtitle":
-            try:
-                sobj = parse_dataclass(attrs, (Subtitle, subtitle_builder))
-            except ParserError as e:
-                log.error(e)
-
-            print_ints(subtitle_levels(ensure, src, sobj, tb, bar, strict, temp, log))
+            print_ints(
+                levels.subtitle(
+                    obj["pattern"],
+                    obj["stream"],
+                    obj["ignore_case"],
+                    obj["max_count"],
+                )
+            )
         else:
             log.error(f"Method: {method} not supported")
 

@@ -75,9 +75,6 @@ class NullType:
     def __deepcopy__(self, memo: Any) -> NullType:
         return Null
 
-    def __reduce__(self) -> tuple:
-        return (Null, ())
-
     __repr__ = __str__
 
 
@@ -1589,8 +1586,8 @@ env: Env = {
         "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_uint]
     ),
     "margin": Proc("margin", margin, (2, 3), None),
-    "mincut": Proc("mincut", mincut, (2, 2), [is_int, is_boolarr]),
-    "minclip": Proc("minclip", minclip, (2, 2), [is_int, is_boolarr]),
+    "mincut": Proc("mincut", mincut, (2, 2), [is_boolarr, is_uint]),
+    "minclip": Proc("minclip", minclip, (2, 2), [is_boolarr, is_uint]),
     # ranges
     "range": Proc("range", range, (1, 3), [is_int, is_int, int_not_zero]),
     # generic iterables

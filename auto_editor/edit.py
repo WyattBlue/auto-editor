@@ -5,18 +5,7 @@ from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.make_layers import make_timeline
-from auto_editor.objs.export import (
-    ExAudio,
-    ExClipSequence,
-    ExDefault,
-    ExFinalCutPro,
-    ExJson,
-    Exports,
-    ExPremiere,
-    ExShotCut,
-    ExTimeline,
-)
-from auto_editor.objs.util import Attr, ParserError, parse_dataclass
+from auto_editor.objs.util import Attr, Attrs, ParserError, parse_dataclass
 from auto_editor.output import Ensure, mux_quality_media
 from auto_editor.render.audio import make_new_audio
 from auto_editor.render.subtitle import make_new_subtitles
@@ -31,9 +20,7 @@ from auto_editor.utils.types import Args
 
 def set_output(
     out: str | None, _export: str | None, src: FileInfo | None, log: Log
-) -> tuple[str, Exports]:
-    export = None if _export is None else parse_export(_export, log)
-
+) -> tuple[str, dict[str, Any]]:
     if src is None:
         root, ext = "out", ".mp4"
     else:
@@ -41,28 +28,29 @@ def set_output(
         if ext == "":
             ext = src.path.suffix
 
-    if export is None:
+    if _export is None:
         if ext == ".xml":
-            export = ExPremiere()
+            export = {"export": "premiere"}
         elif ext == ".fcpxml":
-            export = ExFinalCutPro()
+            export = {"export": "final-cut-pro"}
         elif ext == ".mlt":
-            export = ExShotCut()
+            export = {"export": "shotcut"}
         elif ext == ".json":
-            export = ExJson()
+            export = {"export": "json"}
         else:
-            export = ExDefault()
+            export = {"export": "default"}
+    else:
+        export = parse_export(_export, log)
 
-    if isinstance(export, ExPremiere):
-        ext = ".xml"
-    if isinstance(export, ExFinalCutPro):
-        ext = ".fcpxml"
-    if isinstance(export, ExShotCut):
-        ext = ".mlt"
-    if isinstance(export, ExJson):
-        ext = ".json"
-    if isinstance(export, ExAudio):
-        ext = ".wav"
+    ext_map = {
+        "premiere": ".xml",
+        "final-cut-pro": ".fcpxml",
+        "shotcut": ".mlt",
+        "json": ".json",
+        "audio": ".wav",
+    }
+    if export["export"] in ext_map:
+        ext = ext_map[export["export"]]
 
     if out is None:
         return f"{root}_ALTERED{ext}", export
@@ -155,27 +143,29 @@ def make_sources(
     return sources, inputs
 
 
-def parse_export(export: str, log: Log) -> Exports:
+def parse_export(export: str, log: Log) -> dict[str, Any]:
     exploded = export.split(":", maxsplit=1)
     if len(exploded) == 1:
-        name, attrs = exploded[0], ""
+        name, text = exploded[0], ""
     else:
-        name, attrs = exploded
+        name, text = exploded
 
-    parsing: dict[str, tuple[Any, list[Attr]]] = {
-        "default": (ExDefault, []),
-        "premiere": (ExPremiere, [Attr("name", str, None)]),
-        "final-cut-pro": (ExFinalCutPro, [Attr("name", str, None)]),
-        "shotcut": (ExShotCut, []),
-        "json": (ExJson, timeline_builder),
-        "timeline": (ExTimeline, timeline_builder),
-        "audio": (ExAudio, []),
-        "clip-sequence": (ExClipSequence, []),
+    parsing: dict[str, Attrs] = {
+        "default": Attrs("default"),
+        "premiere": Attrs("premiere", Attr("name", str, None)),
+        "final-cut-pro": Attrs("final-cut-pro", Attr("name", str, None)),
+        "shotcut": Attrs("shotcut"),
+        "json": timeline_builder,
+        "timeline": timeline_builder,
+        "audio": Attrs("audio"),
+        "clip-sequence": Attrs("clip-sequence"),
     }
 
     if name in parsing:
         try:
-            return parse_dataclass(attrs, parsing[name])
+            _tmp = parse_dataclass(text, parsing[name])
+            _tmp["export"] = name
+            return _tmp
         except ParserError as e:
             log.error(e)
 
@@ -218,8 +208,9 @@ def edit_media(
     del paths
 
     output, export = set_output(args.output_file, args.export, src, log)
+    assert "export" in export
 
-    if isinstance(export, ExTimeline):
+    if export["export"] == "timeline":
         log.quiet = True
         timer.quiet = True
 
@@ -257,10 +248,10 @@ def edit_media(
             sources, inputs, ffmpeg, ensure, args, samplerate, bar, temp, log
         )
 
-    if isinstance(export, ExTimeline):
+    if export["export"] == "timeline":
         from auto_editor.formats.json import make_json_timeline
 
-        make_json_timeline(export, 0, tl, log)
+        make_json_timeline(export["api"], 0, tl, log)
         return
 
     if args.preview:
@@ -269,25 +260,25 @@ def edit_media(
         preview(ensure, tl, temp, log)
         return
 
-    if isinstance(export, ExJson):
+    if export["export"] == "json":
         from auto_editor.formats.json import make_json_timeline
 
-        make_json_timeline(export, output, tl, log)
+        make_json_timeline(export["api"], output, tl, log)
         return
 
-    if isinstance(export, ExPremiere):
+    if export["export"] == "premiere":
         from auto_editor.formats.premiere import premiere_write_xml
 
-        premiere_write_xml(export, ensure, output, tl)
+        premiere_write_xml(export["name"], ensure, output, tl)
         return
 
-    if isinstance(export, ExFinalCutPro):
+    if export["export"] == "final-cut-pro":
         from auto_editor.formats.final_cut_pro import fcp_xml
 
-        fcp_xml(export, output, tl)
+        fcp_xml(export["name"], output, tl)
         return
 
-    if isinstance(export, ExShotCut):
+    if export["export"] == "shotcut":
         from auto_editor.formats.shotcut import shotcut_write_mlt
 
         shotcut_write_mlt(output, tl)
@@ -351,7 +342,7 @@ def edit_media(
             log,
         )
 
-    if isinstance(export, ExClipSequence):
+    if export["export"] == "clip-sequence":
         if tl.v1 is None:
             log.error("Timeline to complex to use clip-sequence export")
 
@@ -392,7 +383,7 @@ def edit_media(
 
     timer.stop()
 
-    if not args.no_open and isinstance(export, (ExDefault, ExAudio, ExClipSequence)):
+    if not args.no_open and export["export"] in ("default", "audio", "clip-sequence"):
         if args.player is None:
             from auto_editor.utils.func import open_with_system_default
 

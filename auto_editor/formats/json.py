@@ -7,7 +7,6 @@ from fractions import Fraction
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.objs.export import ExJson, ExTimeline
 from auto_editor.objs.util import ParserError, parse_dataclass
 from auto_editor.timeline import Visual, audio_objects, v3, visual_objects
 from auto_editor.utils.log import Log
@@ -107,10 +106,12 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                         log.error("Invalid video object: name not specified")
                     if vdict["name"] not in visual_objects:
                         log.error(f"Unknown video object: {vdict['name']}")
-                    my_obj = visual_objects[vdict["name"]]
+                    my_vobj, my_build = visual_objects[vdict["name"]]
+
                     text = dict_to_args(vdict)
                     try:
-                        v_out.append(parse_dataclass(text, my_obj, coerce_default=True))
+                        my_dict = parse_dataclass(text, my_build, coerce_default=True)
+                        v_out.append(my_vobj(**my_dict))
                     except ParserError as e:
                         log.error(e)
 
@@ -124,10 +125,12 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                         log.error("Invalid audio object: name not specified")
                     if adict["name"] not in audio_objects:
                         log.error(f"Unknown audio object: {adict['name']}")
-                    my_obj = audio_objects[adict["name"]]
+                    my_aobj, my_build = audio_objects[adict["name"]]
+
                     text = dict_to_args(adict)
                     try:
-                        a_out.append(parse_dataclass(text, my_obj, coerce_default=True))
+                        my_dict = parse_dataclass(text, my_build, coerce_default=True)
+                        a_out.append(my_aobj(**my_dict))
                     except ParserError as e:
                         log.error(e)
 
@@ -138,13 +141,8 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     log.error(f"Importing version {version} timelines is not supported.")
 
 
-def make_json_timeline(
-    obj: ExJson | ExTimeline,
-    out: str | int,
-    tl: object,
-    log: Log,
-) -> None:
-    if (version := Version(obj.api, log)) != (3, 0):
+def make_json_timeline(ver: str, out: str | int, tl: object, log: Log) -> None:
+    if (version := Version(ver, log)) != (3, 0):
         log.error(f"Version {version} is not supported!")
 
     if not isinstance(tl, v3):
