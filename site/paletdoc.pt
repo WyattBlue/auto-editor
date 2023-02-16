@@ -2,6 +2,7 @@
 (define (code val) (hash "tag" "code" "val" val))
 
 (define (text children ...) (hash "tag" "text" "children" children))
+(define/c (link [val symbol?]) (hash "tag" "link" "val" (symbol->string val)))
 
 (define (proc name sig summary)
     (hash "tag" "proc" "name" name "sig" sig "summary" summary)
@@ -23,19 +24,18 @@
         )
         (syntax "set!" "id expr"
             (text
-                "Set the result of " 'expr " to " 'id " if "
-                'id " is already defined. If " 'id
-                " is not defined raise an error."
+                "Set " 'id " to the result of " 'expr " if " 'id
+                " is already defined. If " 'id " is not defined, raise an error."
             )
         )
         (syntax
             "lambda" "args body"
             (text
-                "Produces a procedure that accepts " 'args
-                " arguments and runs " 'body " when called."
+                "Produces a procedure that accepts " 'args " arguments and runs "
+                'body " when called."
             )
         )
-        (syntax "λ" "args body" (text "Clone of " 'lambda "."))
+        (syntax "λ" "args body" (text "Clone of " (link 'lambda) "."))
         (syntax
             "define/c" "(proc-bind [id-binding contract]... )"
             (text "Define a procedure with contracts.")
@@ -48,7 +48,7 @@
                 "Evaluates " 'test-expr ". If " #t " then evaluate "
                 'then-expr " else evaluate " 'else-expr
                 ". An error will be raised if evaluated "
-                'test-expr " is not a " (code "bool?") "."
+                'test-expr " is not a " (link 'bool?) "."
             )
         )
         (syntax
@@ -56,7 +56,7 @@
             (text
                 "Evaluates " 'test-expr ". If " #t " then evaluate "
                 'body " else do nothing. An error will be raised if evaluated "
-                'test-expr " is not a " (code "bool?") "."
+                'test-expr " is not a " (link 'bool?) "."
             )
         )
         (syntax
@@ -84,8 +84,8 @@
             "for/vector"
             "([id seq-expr] ...) body"
             (text
-                "Like " (code "for")
-                " but returns a vec with the last evaluated elements of " 'body "."
+                "Like " (link 'for)
+                " but returns a vector with the last evaluated elements of " 'body "."
             )
         )
     ]
@@ -209,7 +209,7 @@
         (proc
             "modulo"
             (vec (vec "n" "int?") (vec "m" "int?") "int?")
-            (text "Clone of " (code "mod") ".")
+            (text "Clone of " (link 'mod) ".")
         )
         (proc
             "add1"
@@ -431,23 +431,23 @@
         )
         (proc
             "~a"
-            (vec (vec "v" "datum?" "...") "string?")
+            (vec (vec "v" "datum?") "..." "string?")
             (text
-                "Converts all" 'v "s to a string using display with \"\" as the joiner."
+                "Converts all " 'v "s to a string using display with \"\" as the joiner."
             )
         )
         (proc
             "~s"
-            (vec (vec "v" "datum?" "...") "string?")
+            (vec (vec "v" "datum?") "..." "string?")
             (text
-                "Converts all" 'v "s to a string using display with \" \" as the joiner."
+                "Converts all " 'v "s to a string using display with \" \" as the joiner."
             )
         )
         (proc
             "~v"
-            (vec (vec "v" "datum?" "...") "string?")
+            (vec (vec "v" "datum?") "..." "string?")
             (text
-                "Converts all" 'v " to a string using print with \" \" as the joiner."
+                "Converts all " 'v " to a string using print with \" \" as the joiner."
             )
         )
     ]
@@ -460,7 +460,7 @@
             "vector"
             (vec (vec "v" "any") "..." "vector?")
             (text
-                "Returns a new vec with the " 'v " args filled with its slots in order."
+                "Returns a new vector with the " 'v " args filled with its slots in order."
             )
         )
         (proc
@@ -568,15 +568,15 @@
                 (vec "arr" "bool-array?")
             "bool-array?")
             (text
-                "Returns a new " (code "bool-array?") " with " 'left " and " 'right
+                "Returns a new " (link 'bool-array?) " with " 'left " and " 'right
                 " margin applied."
             )
         )
         (syntax
             "and" "first-expr rest-expr ..."
             (text
-                "Evaluate " 'first-expr " if the result is a bool-array? "
-                "evaluate all " 'rest-expr "s and return the logical-and of all arrays."
+                "Evaluate " 'first-expr " if the result is a " (link 'bool-array?)
+                " evaluate all " 'rest-expr "s and return the logical-and of all arrays."
                 " If the result is " #f " evaluate " 'rest-expr
                 " one at a time. Return immediately if any arg is " #f
                 ", return " #t " if all values are " #t "."
@@ -585,8 +585,8 @@
         (syntax
             "or" "first-expr rest-expr ..."
             (text
-                "Evaluate " 'first-expr " if the result is a bool-array? "
-                "evaluate all " 'rest-expr "s and return the logical-and of all arrays."
+                "Evaluate " 'first-expr " if the result is a " (link 'bool-array?)
+                " evaluate all " 'rest-expr "s and return the logical-and of all arrays."
                 " If the result is " #t " evaluate " 'rest-expr
                 " one at a time. Return immediately if any arg is " #t
                 ", return " #f " if all values are " #f "."
@@ -613,14 +613,15 @@
             "mincut"
             (vec (vec "arr" "bool-array?") (vec "x" "uint?") "bool-array?")
             (text
-                "TODO"
+                "Turn all 0s sections that are less than " 'x " in length to 1s. "
+                "0s represent cuts and 1s represent clips."
             )
         )
         (proc
             "minclip"
             (vec (vec "arr" "bool-array?") (vec "x" "uint?") "bool-array?")
             (text
-                "TODO"
+                "Turn all 1s sections that are less than " 'x " in length to 0s "
             )
         )
     ]
@@ -725,7 +726,7 @@
         (proc
             "range->vector"
             (vec (vec "rng" "range?") "vector?")
-            (text "Returns a new vec based on " 'rng ".")
+            (text "Returns a new vector based on " 'rng ".")
         )
         (proc
             "range->list"
@@ -737,15 +738,15 @@
         (pred
             "iterable?"
             (text
-                "Returns " #t " if " 'v
-                " is a vector array string hash pair or range, " #f " otherwise."
+                "Returns " #t " if " 'v " is a vector array string hash pair or range, "
+                #f " otherwise."
             )
         )
         (pred
             "sequence?"
             (text
-                "Returns " #t " if " 'v
-                " is a vector array string pair or range, " #f " otherwise."
+                "Returns " #t " if " 'v " is a vector array string pair or range, "
+                #f " otherwise."
             )
         )
         (proc
@@ -757,9 +758,9 @@
             "ref"
             (vec (vec "seq" "iterable?") (vec "pos" "int?") "any")
             (text
-                "Returns the element of " 'seq " at position "
-                'pos " where the first element is at position 0. "
-                "For sequences other than pair? negative positions are allowed."
+                "Returns the element of " 'seq " at position " 'pos
+                " where the first element is at position 0. For sequences other than "
+                (link 'pair?) ", negative positions are allowed."
             )
         )
         (proc
@@ -790,7 +791,7 @@
         (proc
             "hash"
             (vec (vec "key" "any") (vec "val" "any") "..." "hash?")
-            (text "Returns a newly vectructed hash map from key-value pairs.")
+            (text "Returns a newly constructed hash map from key-value pairs.")
         )
         (proc
             "has-key?"
@@ -844,8 +845,9 @@
         (syntax
             "with-open"
             "(file-binding file-path file-mode) body-expr"
-            (text "In the block the file object to " (code "file-binding") "\n."
-                (code "(with-open (file \"todo.txt\" 'a) ((. file write) \"buy milk\"))")
+            (text
+                "In the block the file object to " 'file-binding "\n."
+                (code "(with-open (file \"shopping.txt\" 'a) ((. file write) \"buy milk\"))")
             )
         )
     ]
@@ -905,8 +907,7 @@
         (syntax
             "eval" "body"
             (text
-                "Evaluate body if body is a vector or list, "
-                "evaluate the vector/list otherwise return the value."
+                "Evaluate value if value is a vector or list, otherwise return the value."
             )
         )
         (syntax
