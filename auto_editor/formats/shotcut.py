@@ -17,7 +17,7 @@ https://mltframework.org/docs/mltxml/
 
 
 def shotcut_read_mlt(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
-    raise NotImplemented
+    raise NotImplementedError
 
 
 def shotcut_write_mlt(output: str, tl: v3) -> None:

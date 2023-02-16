@@ -308,7 +308,7 @@
             (vec
                 (vec "start" "int?")
                 (vec "stop" "int?")
-                (vec "step" "(and/c (not/c 0) int?)" "1")
+                (vec "step" "(and/c int? (not/c 0))" "1")
             "int?")
             (text "Returns a random int between " 'start " and " 'stop " inclusive.")
         )
@@ -719,7 +719,7 @@
             (vec
                 (vec "start" "int?")
                 (vec "stop" "int?")
-                (vec "step" "(and/c (not/c 0) int?)" "1")
+                (vec "step" "(and/c int? (not/c 0))" "1")
              "range?")
             (text "Returns a range object.")
         )
@@ -869,8 +869,13 @@
         )
         (pred
             "contract?"
-            (text "Returns " #t " if " 'v " is a contract, " #f " otherwise.")
+            (text
+                "Returns " #t " if " 'v " is a contract, " #f " otherwise. "
+                "A contract is either a " (link 'bool?) ", " (link 'number?)  ", "
+                (link 'string?) ", " (link 'symbol?) ", or a predicate."
+            )
         )
+        (pred "any" (text "Always returns " #t " regardless of the value of " 'v "."))
         (proc
             "map"
             (vec (vec "proc" "procedure?") (vec "seq" "sequence?") "sequence?")
@@ -884,9 +889,29 @@
             (vec (vec "proc" "procedure?") (vec "seq" "sequence?") "any")
             (text "Applies " 'proc " given " 'seq " as its arguments.")
         )
-        (pred
-            "any"
-            (text "Always returns " #t " regardless of the value of " 'v ".")
+        (proc
+            "and/c"
+            (vec (vec "contract" "contract?") "contract?")
+            (text
+                "Takes any number of contracts and returns a contract predicate that "
+                "accepts any values that satisfies all contracts."
+            )
+        )
+        (proc
+            "or/c"
+            (vec (vec "contract" "contract?") "contract?")
+            (text
+                "Takes any number of contracts and returns a contract predicate that "
+                "accepts any values that can satisfy one or more contracts."
+            )
+        )
+        (proc
+            "not/c"
+            (vec (vec "contract" "contract?") "contract?")
+            (text
+                "Takes one contract and returns a contract that accepts one value and "
+                "satisfies the opposite of the given contract."
+            )
         )
     ]
     "Objects" [vec
