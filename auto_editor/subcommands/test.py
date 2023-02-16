@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass, field
 from fractions import Fraction
 from time import perf_counter
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 
@@ -784,6 +784,11 @@ def main(sys_args: list[str] | None = None):
             ("(text 1)", [1]),
             ("(text 2 1)", [2, 1]),
             ("(text 3 2 1)", [3, 2, 1]),
+            ("((or/c 0 1) 1)", True),
+            ("((or/c 0 1) 2)", False),
+            ("((or/c 0 1) 1)", True),
+            ('((or/c 0 1 string?) "hello")', True),
+            ("((or/c 0 1 string?) 3)", False),
         )
 
     tests = []

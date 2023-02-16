@@ -522,11 +522,48 @@ class Contract:
         return self.c(v)
 
 
+def check_contract(c: object, val: object) -> bool:
+    if isinstance(c, Contract):
+        return c(val)
+    if (
+        isinstance(c, Proc)
+        and c.arity[0] < 2
+        and (c.arity[1] is None or c.arity[1] > 0)
+    ):
+        return c(val)
+    if c is True:
+        return val is True
+    if c is False:
+        return val is False
+    if c is Null:
+        return val is Null
+
+    if type(c) is int:
+        return val == c
+    if type(c) in (int, float, Fraction, complex, str, Sym):
+        return val == c
+    raise MyError(f"Invalid contract, got: {print_str(c)}")
+
+
+def is_contract(c: object) -> bool:
+    if isinstance(c, Contract):
+        return True
+    if (
+        isinstance(c, Proc)
+        and c.arity[0] < 2
+        and (c.arity[1] is None or c.arity[1] > 0)
+    ):
+        return True
+    if c is True or c is False or c is Null:
+        return True
+    return type(c) in (int, float, Fraction, complex, str, Sym)
+
+
 def check_args(
     o: str,
     values: list | tuple,
     arity: tuple[int, int | None],
-    types: list[Contract] | None,
+    cont: list[Contract] | None,
 ) -> None:
     lower, upper = arity
     amount = len(values)
@@ -542,25 +579,17 @@ def check_args(
             f"{o}: Arity mismatch. Expected between {lower} and {upper}, got {amount}"
         )
 
-    if types is None:
+    if cont is None:
         return
 
     for i, val in enumerate(values):
-        check = types[-1] if i >= len(types) else types[i]
-        if not check(val):
+        check = cont[-1] if i >= len(cont) else cont[i]
+        if not check_contract(check, val):
             raise MyError(f"{o} expected a {check.name}, got {print_str(val)}")
 
 
 is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
-is_cont = Contract(
-    "contract?",
-    lambda v: isinstance(v, Contract)
-    or (
-        isinstance(v, Proc)
-        and v.arity[0] < 2  # type: ignore
-        and (v.arity[1] is None or v.arity[1] > 0)  # type: ignore
-    ),
-)
+is_cont = Contract("contract?", is_contract)
 is_iterable = Contract(
     "iterable?",
     lambda v: v is Null
@@ -843,7 +872,7 @@ def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | NullType) -
 
     if isinstance(seq, np.ndarray):
         if proc.arity[0] != 0:
-            raise MyError(f"map: procedure must take at least one arg")
+            raise MyError("map: procedure must take at least one arg")
         check_args(proc.name, [0], (1, 1), None)
         return proc.proc(seq)
 
@@ -901,6 +930,22 @@ def palet_hash(*args: Any) -> dict:
     for key, item in zip(args[0::2], args[1::2]):
         result[key] = item
     return result
+
+
+def andc(*cs: object) -> Proc:
+    return Proc(
+        "flat-and/c", lambda v: all([check_contract(c, v) for c in cs]), (1, 1), [any_p]
+    )
+
+
+def orc(*cs: object) -> Proc:
+    return Proc(
+        "flat-or/c", lambda v: any([check_contract(c, v) for c in cs]), (1, 1), [any_p]
+    )
+
+
+def notc(c: object) -> Proc:
+    return Proc("flat-not/c", lambda v: not check_contract(c, v), (1, 1), [any_p])
 
 
 ###############################################################################
@@ -1518,8 +1563,8 @@ env: Env = {
     "-": Proc("-", minus, (1, None), [is_num]),
     "*": Proc("*", mul, (0, None), [is_num]),
     "/": Proc("/", div, (1, None), [is_num]),
-    "add1": UserProc("add1", ["z"], [[Sym("+"), Sym("z"), 1]], [is_num]),
-    "sub1": UserProc("sub1", ["z"], [[Sym("-"), Sym("z"), 1]], [is_num]),
+    "add1": Proc("add1", lambda z: z + 1, (1, 1), [is_num]),
+    "sub1": Proc("sub1", lambda z: z - 1, (1, 1), [is_num]),
     "sqrt": Proc("sqrt", _sqrt, (1, 1), [is_num]),
     "real-part": Proc("real-part", lambda v: v.real, (1, 1), [is_num]),
     "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), [is_num]),
@@ -1598,6 +1643,9 @@ env: Env = {
     # procedures
     "map": Proc("map", palet_map, (2, 2), [is_proc, is_sequence]),
     "apply": Proc("apply", apply, (2, 2), [is_proc, is_sequence]),
+    "and/c": Proc("and/c", andc, (1, None), [is_cont]),
+    "or/c": Proc("or/c", orc, (1, None), [is_cont]),
+    "not/c": Proc("not/c", notc, (1, 1), [is_cont]),
     # hashs
     "hash": Proc("hash", palet_hash),
     "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
