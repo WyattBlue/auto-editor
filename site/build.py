@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.11
 
 import re
 import subprocess
@@ -73,9 +73,29 @@ with open(ref / "options.html", "w") as file:
     file.write("</div>\n</section>\n</body>\n</html>\n\n")
 
 
+palet_style = """
+.palet-block {
+ padding-left: 7px;
+ padding-bottom: 7px;
+ padding-top: 7px;
+ margin-top: 30px;
+ margin-bottom: 6px;
+}
+.palet-block > p {margin-top: 0; margin-bottom: 0}
+.palet-var {font-style: italic}
+.palet-val {color: #0B65B8; font-family: monospace;}
+
+.palet-block { background-color: #F9F5F5; border-top: 3px solid #EAEAEA}
+@media (prefers-color-scheme: dark) {
+  .palet-block {background-color: #323232; border-top: 3px solid #4A4A4A}
+  .palet-val {color: #A3DEFF}
+}
+"""
+
 with open(ref / "palet.html", "w") as file:
     file.write(
         '{{ comp.header "Palet Scripting Reference" }}\n'
+        f"<style>{palet_style}</style>\n"
         "<body>\n"
         "{{ comp.nav }}\n"
         '<section class="section">\n'
@@ -103,6 +123,9 @@ with open(ref / "palet.html", "w") as file:
                 s += f'<span class="palet-var">{san(c.val)}</span>'
             elif isinstance(c, str):
                 s += san(c)
+            elif c["tag"] == "link":
+                p = san(c["val"])
+                s += f'<a href="#{p}">{p}</a>'
             elif c["tag"] == "code":
                 s += f"<code>{san(c['val'])}</code>"
             else:
