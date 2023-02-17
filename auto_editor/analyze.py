@@ -203,6 +203,9 @@ class Levels:
             self.ensure.audio(f"{self.src.path.resolve()}", self.src.label, s)
         )
 
+        if len(samples) == 0:
+            raise LevelError(f"audio: audio stream '{s}' has length of 0.")
+
         def get_max_volume(s: np.ndarray) -> float:
             return max(float(np.max(s)), -float(np.min(s)))
 
