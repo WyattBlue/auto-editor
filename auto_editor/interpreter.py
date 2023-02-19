@@ -48,11 +48,10 @@ def display_dtype(dtype: np.dtype) -> str:
 
 
 class NullType:
+    __slots__ = ()
+
     def __new__(cls: type[NullType]) -> NullType:
         return Null
-
-    def __init__(self) -> None:
-        pass
 
     def __eq__(self, obj: object) -> bool:
         return obj is Null

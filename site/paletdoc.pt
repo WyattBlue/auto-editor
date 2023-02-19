@@ -19,9 +19,7 @@
 
 (define doc {hash
     "Assignment" [vec
-        (syntax "define" "id expr"
-            (text "Set " 'id " to the result of " 'expr ".")
-        )
+        (syntax "define" "id expr" (text "Set " 'id " to the result of " 'expr "."))
         (syntax "set!" "id expr"
             (text
                 "Set " 'id " to the result of " 'expr " if " 'id
@@ -156,7 +154,11 @@
             (vec (vec "x" "real?") "bool?")
             (text "Returns " (code "(> x 0)"))
         )
-        (proc"negative?" (vec (vec "x" "real?") "bool?") (text "Returns " (code "(< x 0)")))
+        (proc
+            "negative?"
+            (vec (vec "x" "real?") "bool?")
+            (text "Returns " (code "(< x 0)"))
+        )
         (proc
             "even?"
             (vec (vec "n" "int?") "bool?")
