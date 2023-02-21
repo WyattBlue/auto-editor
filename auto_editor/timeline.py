@@ -5,19 +5,10 @@ from fractions import Fraction
 from typing import Union
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.objs.util import Attr, Attrs, Required
+from auto_editor.lib.contracts import *
+from auto_editor.objs.util import Attr, Attrs, Required, smallAttr, smallAttrs
 from auto_editor.utils.chunks import Chunks, v2Chunks
-from auto_editor.utils.types import (
-    Align,
-    align,
-    anchor,
-    color,
-    db_number,
-    natural,
-    number,
-    src,
-    threshold,
-)
+from auto_editor.utils.types import Align
 
 
 @dataclass
@@ -99,8 +90,8 @@ class TlAudio(Tl):
 class _Visual(Tl):
     start: int
     dur: int
-    x: int
-    y: int
+    x: int | float
+    y: int | float
     anchor: str
     opacity: float
     rotate: float
@@ -140,73 +131,84 @@ class TlEllipse(_Visual):
     name: str = "ellipse"
 
 
-video_builder = Attrs(
+video_builder = smallAttrs(
     "video",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("src", src, Required),
-    Attr("offset", natural, 0),
-    Attr("speed", number, 1),
-    Attr("stream", natural, 0),
+    smallAttr("start", Required, is_uint),
+    smallAttr("dur", Required, is_uint),
+    smallAttr("src", Required, any_p),
+    smallAttr("offset", 0, is_int),
+    smallAttr("speed", 1, is_real),
+    smallAttr("stream", 0, is_uint),
 )
-audio_builder = Attrs(
+audio_builder = smallAttrs(
     "audio",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("src", src, Required),
-    Attr("offset", natural, 0),
-    Attr("speed", number, 1),
-    Attr("volume", db_number, 1),
-    Attr("stream", natural, 0),
+    smallAttr("start", Required, is_uint),
+    smallAttr("dur", Required, is_uint),
+    smallAttr("src", Required, any_p),
+    smallAttr("offset", 0, is_int),
+    smallAttr("speed", 1, is_real),
+    smallAttr("volume", 1, is_real),
+    smallAttr("stream", 0, is_uint),
 )
-text_builder = Attrs(
+text_builder = smallAttrs(
     "text",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("content", str, Required),
-    Attr("x", int, "50%"),
-    Attr("y", int, "50%"),
-    Attr("font", str, "Arial"),
-    Attr("size", natural, 55),
-    Attr("align", align, "left"),
-    Attr("opacity", threshold, 1),
-    Attr("anchor", anchor, "ce"),
-    Attr("rotate", number, 0),
-    Attr("fill", str, "#FFF"),
-    Attr("stroke", natural, 0),
-    Attr("strokecolor", color, "#000"),
+    smallAttr("start", Required, is_uint),
+    smallAttr("dur", Required, is_uint),
+    smallAttr("content", Required, is_str),
+    smallAttr("x", 0.5, is_real),
+    smallAttr("y", 0.5, is_real),
+    smallAttr("font", "Arial", is_str),
+    smallAttr("size", 55, is_uint),
+    smallAttr("align", "left", is_str),
+    smallAttr("opacity", 1, is_threshold),
+    smallAttr("anchor", "ce", is_str),
+    smallAttr("rotate", 0, is_real),
+    smallAttr("fill", "#FFF", is_str),
+    smallAttr("stroke", 0, is_uint),
+    smallAttr("strokecolor", "#000", is_str),
 )
 
-img_builder = Attrs(
+img_builder = smallAttrs(
     "image",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("src", src, Required),
-    Attr("x", int, "50%"),
-    Attr("y", int, "50%"),
-    Attr("opacity", threshold, 1),
-    Attr("anchor", anchor, "ce"),
-    Attr("rotate", number, 0),
-    Attr("stroke", natural, 0),
-    Attr("strokecolor", color, "#000"),
+    smallAttr("start", Required, is_uint),
+    smallAttr("dur", Required, is_uint),
+    smallAttr("src", Required, any_p),
+    smallAttr("x", 0.5, is_real),
+    smallAttr("y", 0.5, is_real),
+    smallAttr("opacity", 1, is_threshold),
+    smallAttr("anchor", "ce", is_str),
+    smallAttr("rotate", 0, is_real),
+    smallAttr("stroke", 0, is_uint),
+    smallAttr("strokecolor", "#000", is_str),
 )
 
-rect_builder = Attrs(
+rect_builder = smallAttrs(
     "rect",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("x", int, Required),
-    Attr("y", int, Required),
-    Attr("width", int, Required),
-    Attr("height", int, Required),
-    Attr("opacity", threshold, 1),
-    Attr("anchor", anchor, "ce"),
-    Attr("rotate", number, 0),
-    Attr("fill", color, "#c4c4c4"),
-    Attr("stroke", natural, 0),
-    Attr("strokecolor", color, "#000"),
+    smallAttr("start", Required, is_uint),
+    smallAttr("dur", Required, is_uint),
+    smallAttr("x", Required, is_real),
+    smallAttr("y", Required, is_real),
+    smallAttr("width", Required, is_real),
+    smallAttr("height", Required, is_real),
+    smallAttr("opacity", 1, is_threshold),
+    smallAttr("anchor", "ce", is_str),
+    smallAttr("rotate", 0, is_real),
+    smallAttr("fill", "#c4c4c4", is_str),
+    smallAttr("stroke", 0, is_uint),
+    smallAttr("strokecolor", "#000", is_str),
 )
 ellipse_builder = rect_builder
+visual_objects = {
+    "rectangle": (TlRect, rect_builder),
+    "ellipse": (TlEllipse, ellipse_builder),
+    "text": (TlText, text_builder),
+    "image": (TlImage, img_builder),
+    "video": (TlVideo, video_builder),
+}
+
+audio_objects = {
+    "audio": (TlAudio, audio_builder),
+}
 
 timeline_builder = Attrs("timeline", Attr("api", str, "3.0.0"))
 
@@ -290,16 +292,3 @@ class v3:
                 "a": a,
             },
         }
-
-
-visual_objects = {
-    "rectangle": (TlRect, rect_builder),
-    "ellipse": (TlEllipse, ellipse_builder),
-    "text": (TlText, text_builder),
-    "image": (TlImage, img_builder),
-    "video": (TlVideo, video_builder),
-}
-
-audio_objects = {
-    "audio": (TlAudio, audio_builder),
-}

@@ -7,13 +7,112 @@ from fractions import Fraction
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.objs.util import ParserError, parse_dataclass
-from auto_editor.timeline import Visual, audio_objects, v3, visual_objects
+from auto_editor.objs.util import Attr, Attrs, ParserError, Required, parse_dataclass
+from auto_editor.timeline import (
+    TlAudio,
+    TlEllipse,
+    TlImage,
+    TlRect,
+    TlText,
+    TlVideo,
+    Visual,
+    v3,
+)
 from auto_editor.utils.log import Log
+from auto_editor.utils.types import (
+    align,
+    anchor,
+    color,
+    db_number,
+    natural,
+    number,
+    src,
+    threshold,
+)
 
 """
 Make a pre-edited file reference that can be inputted back into auto-editor.
 """
+
+video_builder = Attrs(
+    "video",
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("src", src, Required),
+    Attr("offset", natural, 0),
+    Attr("speed", number, 1),
+    Attr("stream", natural, 0),
+)
+audio_builder = Attrs(
+    "audio",
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("src", src, Required),
+    Attr("offset", natural, 0),
+    Attr("speed", number, 1),
+    Attr("volume", db_number, 1),
+    Attr("stream", natural, 0),
+)
+text_builder = Attrs(
+    "text",
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("content", str, Required),
+    Attr("x", int, "50%"),
+    Attr("y", int, "50%"),
+    Attr("font", str, "Arial"),
+    Attr("size", natural, 55),
+    Attr("align", align, "left"),
+    Attr("opacity", threshold, 1),
+    Attr("anchor", anchor, "ce"),
+    Attr("rotate", number, 0),
+    Attr("fill", str, "#FFF"),
+    Attr("stroke", natural, 0),
+    Attr("strokecolor", color, "#000"),
+)
+
+img_builder = Attrs(
+    "image",
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("src", src, Required),
+    Attr("x", int, "50%"),
+    Attr("y", int, "50%"),
+    Attr("opacity", threshold, 1),
+    Attr("anchor", anchor, "ce"),
+    Attr("rotate", number, 0),
+    Attr("stroke", natural, 0),
+    Attr("strokecolor", color, "#000"),
+)
+
+rect_builder = Attrs(
+    "rect",
+    Attr("start", natural, Required),
+    Attr("dur", natural, Required),
+    Attr("x", int, Required),
+    Attr("y", int, Required),
+    Attr("width", int, Required),
+    Attr("height", int, Required),
+    Attr("opacity", threshold, 1),
+    Attr("anchor", anchor, "ce"),
+    Attr("rotate", number, 0),
+    Attr("fill", color, "#c4c4c4"),
+    Attr("stroke", natural, 0),
+    Attr("strokecolor", color, "#000"),
+)
+ellipse_builder = rect_builder
+
+visual_objects = {
+    "rectangle": (TlRect, rect_builder),
+    "ellipse": (TlEllipse, ellipse_builder),
+    "text": (TlText, text_builder),
+    "image": (TlImage, img_builder),
+    "video": (TlVideo, video_builder),
+}
+
+audio_objects = {
+    "audio": (TlAudio, audio_builder),
+}
 
 
 def check_attrs(data: object, log: Log, *attrs: str) -> None:

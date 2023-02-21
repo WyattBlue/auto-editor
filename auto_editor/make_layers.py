@@ -9,7 +9,7 @@ import numpy as np
 from auto_editor.analyze import FileSetup
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import Lexer, MyError, Parser, env, interpret, is_boolarr
-from auto_editor.objs.util import ParserError, parse_dataclass
+from auto_editor.objs.util import ParserError, parse_with_palet
 from auto_editor.timeline import (
     ASpace,
     TlAudio,
@@ -23,7 +23,7 @@ from auto_editor.timeline import (
 )
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import mut_margin
-from auto_editor.utils.types import Args, CoerceError, pos, time
+from auto_editor.utils.types import Args, CoerceError, time
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -180,27 +180,11 @@ def make_timeline(
     tl = v3(sources, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
 
     w, h = res
-
-    def my_var_f(name: str, val: Any, coerce: Any) -> Any:
-        if name in ("x", "width"):
-            return pos((val, res[0]))
-        if name in ("y", "height"):
-            return pos((val, res[1]))
-        if name in ("start", "dur", "offset"):
-            if isinstance(val, int):
-                return val
-            if val == "start":
-                return 0
-            if val == "end":
-                return tl.end
-            _val = time(val)
-            if isinstance(_val, str):
-                return round(float(_val) * tl.tb)
-            return _val
-        return coerce(val)
-
     pool: list[Visual] = []
     apool: list[TlAudio] = []
+
+    env["start"] = 0
+    env["end"] = tl.end
 
     for obj_attrs_str in args.add:
         exploded = obj_attrs_str.split(":", 1)
@@ -209,14 +193,10 @@ def make_timeline(
 
         try:
             if obj_s in visual_objects:
-                dic_obj = parse_dataclass(
-                    attrs, visual_objects[obj_s][1], my_var_f, True
-                )
+                dic_obj = parse_with_palet(attrs, visual_objects[obj_s][1], env)
                 pool.append(visual_objects[obj_s][0](**dic_obj))
             elif obj_s in audio_objects:
-                dic_obj = parse_dataclass(
-                    attrs, audio_objects[obj_s][1], my_var_f, True
-                )
+                dic_obj = parse_with_palet(attrs, audio_objects[obj_s][1], env)
                 apool.append(audio_objects[obj_s][0](**dic_obj))
             else:
                 log.error(f"Unknown timeline object: '{obj_s}'")
