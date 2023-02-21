@@ -62,11 +62,24 @@ def render_image(
 ) -> av.VideoFrame:
     img = frame.to_image().convert("RGBA")
 
+    def z(h: int, x: int | float) -> int:
+        if isinstance(x, float):
+            return round(h * x)
+        return x
+
+    x = z(frame.width, obj.x)
+    y = z(frame.height, obj.y)
+
+    if isinstance(obj, (TlRect, TlEllipse)):
+        w = z(frame.width, obj.width)
+        h = z(frame.height, obj.height)
+
     if isinstance(obj, TlEllipse):
         # Adding +1 to width makes Ellipse look better.
-        obj_img = Image.new("RGBA", (obj.width + 1, obj.height), (255, 255, 255, 0))
+        obj_img = Image.new("RGBA", (w + 1, h), (255, 255, 255, 0))
     if isinstance(obj, TlRect):
-        obj_img = Image.new("RGBA", (obj.width, obj.height), (255, 255, 255, 0))
+        obj_img = Image.new("RGBA", (w, h), (255, 255, 255, 0))
+
     if isinstance(obj, TlImage):
         obj_img = img_cache[obj.src]
         if obj.stroke > 0:
@@ -95,7 +108,7 @@ def render_image(
 
     if isinstance(obj, TlRect):
         draw.rectangle(
-            (0, 0, obj.width, obj.height),
+            (0, 0, w, h),
             fill=obj.fill,
             width=obj.stroke,
             outline=obj.strokecolor,
@@ -103,7 +116,7 @@ def render_image(
 
     if isinstance(obj, TlEllipse):
         draw.ellipse(
-            (0, 0, obj.width, obj.height),
+            (0, 0, w, h),
             fill=obj.fill,
             width=obj.stroke,
             outline=obj.strokecolor,
@@ -124,7 +137,7 @@ def render_image(
     )
     img.paste(
         obj_img,
-        apply_anchor(obj.x, obj.y, obj_img.size[0], obj_img.size[1], obj.anchor),
+        apply_anchor(x, y, obj_img.size[0], obj_img.size[1], obj.anchor),
         obj_img,
     )
     return frame.from_image(img)

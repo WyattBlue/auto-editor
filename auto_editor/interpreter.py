@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from auto_editor.analyze import edit_method, mut_remove_small
+from auto_editor.lib.contracts import *
 from auto_editor.utils.func import boolop, mut_margin
 
 if TYPE_CHECKING:
@@ -504,23 +505,6 @@ class Parser:
 ###############################################################################
 
 
-class Contract:
-    # Convenient flat contract class
-    __slots__ = ("name", "c")
-
-    def __init__(self, name: str, c: Callable[[object], bool]):
-        self.name = name
-        self.c = c
-
-    def __str__(self) -> str:
-        return f"<procedure:{self.name}>"
-
-    __repr__ = __str__
-
-    def __call__(self, v: object) -> bool:
-        return self.c(v)
-
-
 def check_contract(c: object, val: object) -> bool:
     if isinstance(c, Contract):
         return c(val)
@@ -609,10 +593,6 @@ bool_or_barr = Contract(
     "(or/c bool? bool-array?)",
     lambda v: type(v) is bool or is_boolarr(v),
 )
-is_int = Contract("int?", lambda v: type(v) is int)
-int_not_zero = Contract("(or/c (not/c 0) int?)", lambda v: v != 0 and is_int(v))
-is_num = Contract("number?", lambda v: type(v) in (int, float, Fraction, complex))
-is_real = Contract("real?", lambda v: type(v) in (int, float, Fraction))
 
 
 def raise_(msg: str) -> None:
@@ -1499,15 +1479,15 @@ env: Env = {
     "number?": is_num,
     "real?": is_real,
     "int?": is_int,
-    "uint?": (is_uint := Contract("uint?", lambda v: type(v) is int and v > -1)),
+    "uint?": is_uint,
     "nat?": Contract("nat?", lambda v: type(v) is int and v > 0),
-    "float?": (is_float := Contract("float?", lambda v: type(v) is float)),
-    "frac?": (is_frac := Contract("frac?", lambda v: type(v) is Fraction)),
-    "any": (any_p := Contract("any", lambda v: True)),
-    "bool?": (is_bool := Contract("bool?", lambda v: type(v) is bool)),
-    "void?": (is_void := Contract("void?", lambda v: v is None)),
+    "float?": is_float,
+    "frac?": is_frac,
+    "any": any_p,
+    "bool?": is_bool,
+    "void?": is_void,
     "symbol?": (is_symbol := Contract("symbol?", lambda v: type(v) is Sym)),
-    "string?": (is_str := Contract("string?", lambda v: type(v) is str)),
+    "string?": is_str,
     "char?": (is_char := Contract("char?", lambda v: type(v) is Char)),
     "vector?": (is_vector := Contract("vector?", lambda v: isinstance(v, list))),
     "array?": (is_array := Contract("array?", lambda v: isinstance(v, np.ndarray))),

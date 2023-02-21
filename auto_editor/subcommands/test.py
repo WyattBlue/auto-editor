@@ -109,7 +109,7 @@ class Runner:
                     raise Exception(f'Could\'t find "{match}"')
             else:
                 raise Exception(
-                    f"Program crashed.\n{' '.join(cmd)}\n{stdout}\n{stderr}"
+                    f"Program crashed but should have shown an error.\n{' '.join(cmd)}\n{stdout}\n{stderr}"
                 )
         else:
             raise Exception("Program should not respond with code 0 but did!")
@@ -235,7 +235,7 @@ def main(sys_args: list[str] | None = None):
                 "--source",
                 "snd:resources/wav/pcm-f32le.wav",
                 "--add",
-                "audio:0.3sec,end,snd,volume=0.3",
+                "audio:0.3sec,end,\"snd\",volume=0.3",
             ],
         )
         return run.main(
@@ -244,7 +244,7 @@ def main(sys_args: list[str] | None = None):
                 "--source",
                 "snd:resources/wav/pcm-f32le.wav",
                 "--add",
-                "audio:2,40,snd,3sec",
+                "audio:2,40,\"snd\",3sec",
             ],
         )
 
@@ -378,7 +378,7 @@ def main(sys_args: list[str] | None = None):
     def obj_makes_video():
         out = run.main(
             ["resources/new-commentary.mp3"],
-            ["--add", "rectangle:0,30,0,0,300,300,fill=blue"],
+            ["--add", "rectangle:0,30,0,0,300,300,fill=\"blue\""],
             "out.mp4",
         )
         cn = checker.check(out)
@@ -400,7 +400,7 @@ def main(sys_args: list[str] | None = None):
                 "--mark_as_loud",
                 "start,end",
                 "--add",
-                "rectangle:0,30,0,200,100,300,fill=#43FA56,stroke=10",
+                "rectangle:0,30,0,200,100,300,fill=\"#43FA56\",stroke=10",
             ],
         )
 
@@ -409,9 +409,9 @@ def main(sys_args: list[str] | None = None):
             ["example.mp4"],
             [
                 "--add",
-                "ellipse:0,30,50%,50%,300,300,fill=red",
-                "rectangle:0,30,500,440,400,200,fill=skyblue",
-                "ellipse:0,30,50%,50%,100,100,fill=darkgreen",
+                "ellipse:0,30,50%,50%,300,300,fill=\"red\"",
+                "rectangle:0,30,500,440,400,200,fill=\"skyblue\"",
+                "ellipse:0,30,50%,50%,100,100,fill=\"darkgreen\"",
                 "--edit",
                 "none",
                 "--cut-out",
@@ -424,8 +424,8 @@ def main(sys_args: list[str] | None = None):
             ["example.mp4"],
             [
                 "--add",
-                "ellipse:0,60,50%,50%,300,300,fill=darkgreen",
-                "ellipse:0,30,50%,50%,200,200,fill=green",
+                "ellipse:0,60,50%,50%,300,300,fill=\"darkgreen\"",
+                "ellipse:0,30,50%,50%,200,200,fill=\"green\"",
                 "--edit",
                 "none",
                 "--cut-out",
@@ -437,11 +437,11 @@ def main(sys_args: list[str] | None = None):
 
     def render_text():
         return run.main(
-            ["example.mp4"], ["--add", "text:0,30,This is my text,font=default"]
+            ["example.mp4"], ["--add", "text:0,30,\"This is my text\",font=\"default\""]
         )
 
     def check_font_error():
-        run.check(["example.mp4", "--add", "text:0,30,text,0,0,notafont"], "not found")
+        run.check(["example.mp4", "--add", "text:0,30,\"text\",0,0,\"notafont\""], "not found")
 
     def export():
         results = set()
