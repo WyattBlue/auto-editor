@@ -4,8 +4,7 @@ from setuptools import find_packages, setup
 
 
 def pip_version():
-    with open("auto_editor/__init__.py") as f:
-        version_content = f.read()
+    with open("auto_editor/__init__.py") as f: version_content = f.read()
 
     version_match = re.search(
         r"^__version__ = ['\"]([^'\"]*)['\"]", version_content, re.M
@@ -42,7 +41,7 @@ setup(
         "numpy>=1.22.0",
         "pillow==9.4.0",
         "av==10.0.0",
-        "ae-ffmpeg==1.1.1",
+        "ae-ffmpeg==1.1.*",
     ],
     python_requires=">=3.9",
     classifiers=[
@@ -70,7 +69,6 @@ setup(
             "aeinfo=auto_editor.subcommands.info:main",
             "aesubdump=auto_editor.subcommands.subdump:main",
             "aelevels=auto_editor.subcommands.levels:main",
-            "palet=auto_editor.subcommands.palet:main",
         ]
     },
 )
