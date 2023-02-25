@@ -215,6 +215,13 @@ class Levels:
         samp_count = samples.shape[0]
         samp_per_ticks = sr / self.tb
 
+        if samp_per_ticks < 1:
+            self.log.error(
+                f"audio: audio stream '{s}'\n  Samplerate ({sr}) must be greater than "
+                f"or equal to timebase ({self.tb})\n"
+                "  Try `-fps 30` and/or `--sample-rate 48000`"
+            )
+
         audio_ticks = int(samp_count / samp_per_ticks)
         self.log.debug(f"analyze: Audio Length: {audio_ticks}")
         self.log.debug(f"... no rounding: {float(samp_count / samp_per_ticks)}")
