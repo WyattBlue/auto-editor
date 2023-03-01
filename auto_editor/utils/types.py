@@ -54,18 +54,6 @@ def natural(val: str | float) -> int:
     return int(num)
 
 
-def natural_or_none(val: str | float | None) -> int | None:
-    return None if val is None else natural(val)
-
-
-def bool_coerce(val: str) -> bool:
-    if val in ("#t", "#true", "true"):
-        return True
-    if val in ("#f", "#false", "false"):
-        return False
-    raise CoerceError(f"'{val}': Invalid boolean")
-
-
 def number(val: str | float) -> float:
     if isinstance(val, str) and "/" in val:
         nd = val.split("/")
@@ -97,14 +85,6 @@ def speed(val: str) -> float:
     return _s
 
 
-def db_number(val: str) -> float | str:
-    num, unit = _split_num_str(val)
-    if unit == "dB":
-        return val
-
-    return number(val)
-
-
 def src(val: str) -> int | str:
     try:
         if int(val) > 0:
@@ -120,16 +100,6 @@ def threshold(val: str | float) -> float:
     if num > 1 or num < 0:
         raise CoerceError(f"'{val}': Threshold must be between 0 and 1 (0%-100%)")
     return num
-
-
-def db_threshold(val: str) -> str | float:
-    num, unit = _split_num_str(val)
-    if unit == "dB":
-        if num > 0:
-            raise CoerceError("dB only goes up to 0")
-        return 10 ** (num / 20)
-
-    return threshold(val)
 
 
 def frame_rate(val: str) -> Fraction:

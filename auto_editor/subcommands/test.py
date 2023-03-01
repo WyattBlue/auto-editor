@@ -13,17 +13,9 @@ from typing import Any, Callable
 import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import (
-    Char,
-    Cons,
-    Lexer,
-    MyError,
-    Null,
-    Parser,
-    Sym,
-    env,
-    interpret,
-)
+from auto_editor.interpreter import Lexer, Parser, env, interpret
+from auto_editor.lib.data_structs import Char, Cons, Null, Sym
+from auto_editor.lib.err import MyError
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -235,7 +227,7 @@ def main(sys_args: list[str] | None = None):
                 "--source",
                 "snd:resources/wav/pcm-f32le.wav",
                 "--add",
-                "audio:0.3sec,end,\"snd\",volume=0.3",
+                'audio:0.3sec,end,"snd",volume=0.3',
             ],
         )
         return run.main(
@@ -244,7 +236,7 @@ def main(sys_args: list[str] | None = None):
                 "--source",
                 "snd:resources/wav/pcm-f32le.wav",
                 "--add",
-                "audio:2,40,\"snd\",3sec",
+                'audio:2,40,"snd",3sec',
             ],
         )
 
@@ -255,7 +247,7 @@ def main(sys_args: list[str] | None = None):
     # Issue #184
     def units():
         run.main(["example.mp4"], ["--mark_as_loud", "20s,22sec", "25secs,26.5seconds"])
-        run.main(["example.mp4"], ["--edit", "all", "--set-speed", "125%,-30,end"])
+        run.main(["example.mp4"], ["--edit", "all/e", "--set-speed", "125%,-30,end"])
         return run.main(["example.mp4"], ["--edit", "audio:threshold=4%"])
 
     def sr_units():
@@ -271,7 +263,7 @@ def main(sys_args: list[str] | None = None):
         range.
         """
         run.main(["example.mp4"], ["--edit", "none", "--cut_out", "-5secs,end"])
-        return run.main(["example.mp4"], ["--edit", "all", "--add_in", "-5secs,end"])
+        return run.main(["example.mp4"], ["--edit", "all/e", "--add_in", "-5secs,end"])
 
     def cut_out():
         run.main(
@@ -289,7 +281,7 @@ def main(sys_args: list[str] | None = None):
         )
         return run.main(
             ["example.mp4"],
-            ["--edit", "all", "--video_speed", "2", "--add_in", "2secs,10secs"],
+            ["--edit", "all/e", "--video_speed", "2", "--add_in", "2secs,10secs"],
         )
 
     def gif():
@@ -378,7 +370,7 @@ def main(sys_args: list[str] | None = None):
     def obj_makes_video():
         out = run.main(
             ["resources/new-commentary.mp3"],
-            ["--add", "rectangle:0,30,0,0,300,300,fill=\"blue\""],
+            ["--add", 'rectangle:0,30,0,0,300,300,fill="blue"'],
             "out.mp4",
         )
         cn = checker.check(out)
@@ -400,7 +392,7 @@ def main(sys_args: list[str] | None = None):
                 "--mark_as_loud",
                 "start,end",
                 "--add",
-                "rectangle:0,30,0,200,100,300,fill=\"#43FA56\",stroke=10",
+                'rectangle:0,30,0,200,100,300,fill="#43FA56",stroke=10',
             ],
         )
 
@@ -409,9 +401,9 @@ def main(sys_args: list[str] | None = None):
             ["example.mp4"],
             [
                 "--add",
-                "ellipse:0,30,50%,50%,300,300,fill=\"red\"",
-                "rectangle:0,30,500,440,400,200,fill=\"skyblue\"",
-                "ellipse:0,30,50%,50%,100,100,fill=\"darkgreen\"",
+                'ellipse:0,30,50%,50%,300,300,fill="red"',
+                'rectangle:0,30,500,440,400,200,fill="skyblue"',
+                'ellipse:0,30,50%,50%,100,100,fill="darkgreen"',
                 "--edit",
                 "none",
                 "--cut-out",
@@ -424,8 +416,8 @@ def main(sys_args: list[str] | None = None):
             ["example.mp4"],
             [
                 "--add",
-                "ellipse:0,60,50%,50%,300,300,fill=\"darkgreen\"",
-                "ellipse:0,30,50%,50%,200,200,fill=\"green\"",
+                'ellipse:0,60,50%,50%,300,300,fill="darkgreen"',
+                'ellipse:0,30,50%,50%,200,200,fill="green"',
                 "--edit",
                 "none",
                 "--cut-out",
@@ -437,11 +429,13 @@ def main(sys_args: list[str] | None = None):
 
     def render_text():
         return run.main(
-            ["example.mp4"], ["--add", "text:0,30,\"This is my text\",font=\"default\""]
+            ["example.mp4"], ["--add", 'text:0,30,"This is my text",font="default"']
         )
 
     def check_font_error():
-        run.check(["example.mp4", "--add", "text:0,30,\"text\",0,0,\"notafont\""], "not found")
+        run.check(
+            ["example.mp4", "--add", 'text:0,30,"text",0,0,"notafont"'], "not found"
+        )
 
     def export():
         results = set()

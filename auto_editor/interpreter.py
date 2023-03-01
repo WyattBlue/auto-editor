@@ -14,6 +14,8 @@ import numpy as np
 
 from auto_editor.analyze import edit_method, mut_remove_small
 from auto_editor.lib.contracts import *
+from auto_editor.lib.data_structs import *
+from auto_editor.lib.err import MyError
 from auto_editor.utils.func import boolop, mut_margin
 
 if TYPE_CHECKING:
@@ -27,197 +29,8 @@ if TYPE_CHECKING:
     Env = dict[str, Any]
 
 
-class MyError(Exception):
-    pass
-
-
 class ClosingError(MyError):
     pass
-
-
-def display_dtype(dtype: np.dtype) -> str:
-    if dtype.kind == "b":
-        return "bool"
-
-    if dtype.kind == "i":
-        return f"int{dtype.itemsize * 8}"
-
-    if dtype.kind == "u":
-        return f"uint{dtype.itemsize * 8}"
-
-    return f"float{dtype.itemsize * 8}"
-
-
-class NullType:
-    __slots__ = ()
-
-    def __new__(cls: type[NullType]) -> NullType:
-        return Null
-
-    def __eq__(self, obj: object) -> bool:
-        return obj is Null
-
-    def __len__(self) -> int:
-        return 0
-
-    def __next__(self) -> StopIteration:
-        raise StopIteration
-
-    def __getitem__(self, ref: int | slice) -> None:
-        raise IndexError
-
-    def __str__(self) -> str:
-        return "'()"
-
-    def __copy__(self) -> NullType:
-        return Null
-
-    def __deepcopy__(self, memo: Any) -> NullType:
-        return Null
-
-    __repr__ = __str__
-
-
-Null = object.__new__(NullType)
-
-
-class Cons:
-    __slots__ = ("a", "d")
-
-    def __init__(self, a: Any, d: Any):
-        self.a = a
-        self.d = d
-
-    def __repr__(self) -> str:
-        if type(self.d) not in (Cons, NullType):
-            return f"(cons {self.a} {self.d})"
-
-        result = f"({display_str(self.a)}"
-        tail = self.d
-        while type(tail) is Cons:
-            if type(tail.d) not in (Cons, NullType):
-                return f"{result} (cons {tail.a} {tail.d}))"
-            result += f" {display_str(tail.a)}"
-            tail = tail.d
-
-        return f"{result})"
-
-    def __eq__(self, obj: object) -> bool:
-        return type(obj) is Cons and self.a == obj.a and self.d == obj.d
-
-    def __len__(self: Cons | NullType) -> int:
-        count = 0
-        while type(self) is Cons:
-            self = self.d
-            count += 1
-        if self is not Null:
-            raise MyError("length expects: list?")
-        return count
-
-    def __next__(self) -> Any:
-        if type(self.d) is Cons:
-            return self.d
-        raise StopIteration
-
-    def __iter__(self) -> Any:
-        while type(self) is Cons:
-            yield self.a
-            self = self.d
-
-    def __getitem__(self, ref: object) -> Any:
-        if type(ref) is not int and type(ref) is not slice:
-            raise MyError(f"ref: not a valid index: {print_str(ref)}")
-
-        if type(ref) is int:
-            if ref < 0:
-                raise MyError(f"ref: negative index not allowed: {ref}")
-            pos = ref
-            while pos > 0:
-                pos -= 1
-                self = self.d
-                if type(self) is not Cons:
-                    raise MyError(f"ref: index out of range: {ref}")
-
-            return self.a
-
-        assert type(ref) is slice
-
-        lst: Cons | NullType = Null
-        steps: int = -1
-        i: int = 0
-
-        do_reverse = True
-        start, stop, step = ref.start, ref.stop, ref.step
-        if start is None:
-            start = 0
-        if step < 0:
-            do_reverse = False
-            step = -step
-
-            if stop is None:
-                stop = float("inf")
-            else:
-                start, stop = stop + 1, start
-
-        while type(self) is Cons:
-            if i > stop - 1:
-                break
-            if i >= start:
-                steps = (steps + 1) % step
-                if steps == 0:
-                    lst = Cons(self.a, lst)
-
-            self = self.d
-            i += 1
-
-        if not do_reverse:
-            return lst
-
-        result: Cons | NullType = Null
-        while type(lst) is Cons:
-            result = Cons(lst.a, result)
-            lst = lst.d
-        return result
-
-
-class Char:
-    __slots__ = "val"
-
-    def __init__(self, val: str | int):
-        if type(val) is int:
-            self.val: str = chr(val)
-        else:
-            assert type(val) is str and len(val) == 1
-            self.val = val
-
-    __str__: Callable[[Char], str] = lambda self: self.val
-
-    def __repr__(self) -> str:
-        names = {" ": "space", "\n": "newline", "\t": "tab"}
-        return f"#\\{self.val}" if self.val not in names else f"#\\{names[self.val]}"
-
-    def __eq__(self, obj: object) -> bool:
-        return type(obj) is Char and self.val == obj.val
-
-    def __radd__(self, obj2: str) -> str:
-        return obj2 + self.val
-
-
-class Sym:
-    __slots__ = ("val", "hash")
-
-    def __init__(self, val: str):
-        self.val = val
-        self.hash = hash(val)
-
-    __str__: Callable[[Sym], str] = lambda self: self.val
-    __repr__ = __str__
-
-    def __hash__(self) -> int:
-        return self.hash
-
-    def __eq__(self, obj: object) -> bool:
-        return type(obj) is Sym and self.hash == obj.hash
 
 
 ###############################################################################
@@ -230,6 +43,7 @@ SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 ID, QUOTE, NUM, BOOL, STR, CHAR = "ID", "QUOTE", "NUM", "BOOL", "STR", "CHAR"
 METHOD, SEC, DB, PER = "METHOD", "SEC", "DB", "PER"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
+METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
 
 
 class Token:
@@ -395,18 +209,36 @@ class Lexer:
 
             result = ""
             has_illegal = False
-            while self.char_is_norm():
+            normal = self.char_is_norm
+            is_method = False
+
+            def handle_strings():
+                if self.char == '"':
+                    self.advance()
+                    result = result + '"' + self.string() + '"'
+                    return handle_strings()
+                else:
+                    return self.char_is_norm()
+
+            while normal():
                 result += self.char
+                if (result + ":") in METHODS:
+                    is_method = True
+                    normal = handle_strings
+
                 if self.char in "'`|\\":
                     has_illegal = True
                 self.advance()
 
+            if is_method:
+                return Token(METHOD, result)
+
+            for method in METHODS:
+                if result == method[:-1]:
+                    return Token(METHOD, result)
+
             if has_illegal:
                 raise MyError(f"Symbol has illegal character(s): {result}")
-
-            for method in ("audio", "motion", "pixeldiff", "subtitle", "none", "all"):
-                if result == method or result.startswith(method + ":"):
-                    return Token(METHOD, result)
 
             return Token(ID, result)
 
@@ -425,6 +257,11 @@ class Method:
 
     def __init__(self, val: str):
         self.val = val
+
+    def __str__(self) -> str:
+        return f'(Method "{self.val}")'
+
+    __repr__ = __str__
 
 
 class Parser:
@@ -505,43 +342,6 @@ class Parser:
 ###############################################################################
 
 
-def check_contract(c: object, val: object) -> bool:
-    if isinstance(c, Contract):
-        return c(val)
-    if (
-        isinstance(c, Proc)
-        and c.arity[0] < 2
-        and (c.arity[1] is None or c.arity[1] > 0)
-    ):
-        return c(val)
-    if c is True:
-        return val is True
-    if c is False:
-        return val is False
-    if c is Null:
-        return val is Null
-
-    if type(c) is int:
-        return val == c
-    if type(c) in (int, float, Fraction, complex, str, Sym):
-        return val == c
-    raise MyError(f"Invalid contract, got: {print_str(c)}")
-
-
-def is_contract(c: object) -> bool:
-    if isinstance(c, Contract):
-        return True
-    if (
-        isinstance(c, Proc)
-        and c.arity[0] < 2
-        and (c.arity[1] is None or c.arity[1] > 0)
-    ):
-        return True
-    if c is True or c is False or c is Null:
-        return True
-    return type(c) in (int, float, Fraction, complex, str, Sym)
-
-
 def check_args(
     o: str,
     values: list | tuple,
@@ -571,7 +371,6 @@ def check_args(
             raise MyError(f"{o} expected a {check.name}, got {print_str(val)}")
 
 
-is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
 is_cont = Contract("contract?", is_contract)
 is_iterable = Contract(
     "iterable?",
@@ -597,59 +396,6 @@ bool_or_barr = Contract(
 
 def raise_(msg: str) -> None:
     raise MyError(msg)
-
-
-def display_str(val: object) -> str:
-    if val is None:
-        return "#<void>"
-    if val is True:
-        return "#t"
-    if val is False:
-        return "#f"
-    if type(val) is Sym:
-        return val.val
-    if type(val) is str:
-        return val
-    if type(val) is Char:
-        return f"{val}"
-    if type(val) is range:
-        return "#<range>"
-    if type(val) is complex:
-        join = "" if val.imag < 0 else "+"
-        return f"{val.real}{join}{val.imag}i"
-
-    if isinstance(val, Fraction):
-        return f"{val.numerator}/{val.denominator}"
-    if isinstance(val, list):
-        if not val:
-            return "#()"
-        result = f"#({display_str(val[0])}"
-        for item in val[1:]:
-            result += f" {display_str(item)}"
-        return result + ")"
-    if isinstance(val, np.ndarray):
-        kind = val.dtype.kind
-        result = f"(array '{display_dtype(val.dtype)}"
-        if kind == "b":
-            for item in val:
-                result += " 1" if item else " 0"
-        else:
-            for item in val:
-                result += f" {item}"
-        return result + ")"
-
-    return f"{val!r}"
-
-
-def print_str(val: object) -> str:
-    if type(val) is str:
-        return f'"{val}"'
-    if type(val) is Char:
-        return f"{val!r}"
-    if type(val) is Sym or type(val) is Cons or isinstance(val, list):
-        return f"'{display_str(val)}"
-
-    return display_str(val)
 
 
 def is_equal(a: object, b: object) -> bool:
@@ -911,51 +657,11 @@ def palet_hash(*args: Any) -> dict:
     return result
 
 
-def andc(*cs: object) -> Proc:
-    return Proc(
-        "flat-and/c", lambda v: all([check_contract(c, v) for c in cs]), (1, 1), [any_p]
-    )
-
-
-def orc(*cs: object) -> Proc:
-    return Proc(
-        "flat-or/c", lambda v: any([check_contract(c, v) for c in cs]), (1, 1), [any_p]
-    )
-
-
-def notc(c: object) -> Proc:
-    return Proc("flat-not/c", lambda v: not check_contract(c, v), (1, 1), [any_p])
-
-
 ###############################################################################
 #                                                                             #
 #  ENVIRONMENT                                                                #
 #                                                                             #
 ###############################################################################
-
-
-class Proc:
-    __slots__ = ("name", "proc", "arity", "contracts")
-
-    def __init__(
-        self,
-        name: str,
-        proc: Callable,
-        arity: tuple[int, int | None] = (1, None),
-        contracts: list[Any] | None = None,
-    ):
-        self.name = name
-        self.proc = proc
-        self.arity = arity
-        self.contracts = contracts
-
-    def __str__(self) -> str:
-        return f"#<procedure:{self.name}>"
-
-    __repr__ = __str__
-
-    def __call__(self, *args: Any) -> Any:
-        return self.proc(*args)
 
 
 class UserProc(Proc):
@@ -1400,7 +1106,7 @@ def my_eval(env: Env, node: object) -> Any:
     if isinstance(node, Method):
         if "@filesetup" not in env:
             raise MyError("Can't use edit methods if there's no input files")
-        return edit_method(node.val, env["@filesetup"])
+        return edit_method(node.val, env["@filesetup"], env)
 
     if isinstance(node, list):
         oper = my_eval(env, node[0])
@@ -1461,6 +1167,7 @@ env: Env = {
     "false": False,
     "null": Null,
     "pi": math.pi,
+    "all": Sym("all"),
     # syntax
     "lambda": Syntax(syn_lambda),
     "λ": Syntax(syn_lambda),
@@ -1480,9 +1187,10 @@ env: Env = {
     "real?": is_real,
     "int?": is_int,
     "uint?": is_uint,
-    "nat?": Contract("nat?", lambda v: type(v) is int and v > 0),
+    "nat?": is_nat,
     "float?": is_float,
     "frac?": is_frac,
+    "threshold?": is_threshold,
     "any": any_p,
     "bool?": is_bool,
     "void?": is_void,

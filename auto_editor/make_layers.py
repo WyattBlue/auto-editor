@@ -8,7 +8,9 @@ import numpy as np
 
 from auto_editor.analyze import FileSetup
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import Lexer, MyError, Parser, env, interpret, is_boolarr
+from auto_editor.interpreter import Lexer, Parser, env, interpret, is_boolarr
+from auto_editor.lib.err import MyError
+from auto_editor.lib.data_structs import print_str
 from auto_editor.objs.util import ParserError, parse_with_palet
 from auto_editor.timeline import (
     ASpace,
@@ -106,11 +108,13 @@ def run_interpreter(
         log.error(e)
 
     if len(results) == 0:
-        log.error("Expression in --edit must return a bool-array")
+        log.error("Expression in --edit must return a bool-array, got nothing")
 
     result = results[-1]
     if not is_boolarr(result):
-        log.error("Expression in --edit must return a bool-array")
+        log.error(
+            f"Expression in --edit must return a bool-array, got {print_str(result)}"
+        )
 
     assert isinstance(result, np.ndarray)
     return result

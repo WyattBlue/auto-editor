@@ -6,15 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from auto_editor.analyze import Levels
+from auto_editor.analyze import Levels, builder_map
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.objs.edit import (
-    audio_builder,
-    motion_builder,
-    pixeldiff_builder,
-    subtitle_builder,
-)
-from auto_editor.objs.util import ParserError, parse_dataclass
+from auto_editor.interpreter import env
+from auto_editor.objs.util import ParserError, parse_with_palet
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.func import setup_tempdir
@@ -105,19 +100,13 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         return coerce(val)
 
     for src in sources.values():
-        method_map = {
-            "audio": audio_builder,
-            "motion": motion_builder,
-            "pixeldiff": pixeldiff_builder,
-            "subtitle": subtitle_builder,
-        }
         levels = Levels(ensure, src, tb, bar, temp, log)
 
-        if method in method_map:
-            builder = method_map[method]
+        if method in builder_map:
+            builder = builder_map[method]
 
             try:
-                obj = parse_dataclass(attrs, builder)
+                obj = parse_with_palet(attrs, builder, env)
             except ParserError as e:
                 log.error(e)
 

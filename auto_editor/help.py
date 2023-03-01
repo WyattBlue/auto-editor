@@ -25,41 +25,46 @@ will set the speed from 400 ticks to 800 ticks to 2.5x
 If timebase is 30, 400 ticks to 800 means 13.33 to 26.66 seconds
 """.strip(),
         "--edit-based-on": """
+Evalutes a palet expression that returns a bool-array?. The array is then used for
+editing.
+
 Editing Methods:
- - audio: General audio detection
- - motion: Motion detection specialized for real life noisy video
- - pixeldiff: Detect when a certain amount of pixels have changed between frames
- - none: Do not modify the media in anyway (Mark all sections as "loud")
- - all: Cut out everything out (Mark all sections as "silent")
+ - audio  ; Audio silence/loudness detection
+    - threshold threshold? : 4%
+    - stream (or/c uint? 'all "all") : 0
+    - mincut uint? : 6
+    - minclip uint? : 3
 
-Attribute Defaults:
- - audio
-    - threshold: 4% (number)
-    - stream: 0 (natural | "all")
- - motion
-    - threshold: 2% (number)
-    - stream: 0 (natural)
-    - blur: 9 (natural)
-    - width: 400 (natural)
- - pixeldiff
-    - threshold: 1 (natural)
-    - stream: 0 (natural)
- - subtitle
-    - pattern: Required (str)
-    - stream: 0 (natural)
-    - ignore-case: false (bool)
-    - max-count: None (natural | None)
+ - motion  ; Motion detection specialized for noisy real-life videos
+    - threshold threshold? : 2%
+    - stream uint? : 0
+    - blur uint? : 9
+    - width nat? : 400
 
-Examples:
+ - none  ;  Do not modify the media in anyway; mark all sections as "loud" (1).
+ - all/e  ; Cut out everything out; mark all sections as "silent" (0).
+
+ - pixeldiff  ; Detect when a certain amount of pixels have changed between frames.
+    - threshold uint? : 1
+    - stream uint? : 0
+
+ - subtitle  ; Detect when subtitle matches pattern as a RegEx string.
+    - pattern string?
+    - stream uint? : 0
+    - ignore-case bool? : #f
+    - max-count (or/c uint? void?) : (void)
+
+Command-line Examples:
   --edit audio
-  --edit audio:stream=1
   --edit audio:threshold=4%
   --edit audio:threshold=0.03
+  --edit audio:stream=1
+  --edit (or audio:4%,stream=0 audio:8%,stream=1) ; `threshold` is first
   --edit motion
   --edit motion:threshold=2%,blur=3
-  --edit (or audio:threshold=4% motion:threshold=2%,blur=3)
+  --edit (or audio:4% motion:2%,blur=3)
   --edit none
-  --edit all
+  --edit all/e
 """.strip(),
         "--export": """
 Instead of exporting a video, export as one of these options instead.
