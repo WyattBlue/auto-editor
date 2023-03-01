@@ -23,7 +23,6 @@ from auto_editor.utils.types import (
     align,
     anchor,
     color,
-    db_number,
     natural,
     number,
     src,
@@ -50,7 +49,7 @@ audio_builder = Attrs(
     Attr("src", src, Required),
     Attr("offset", natural, 0),
     Attr("speed", number, 1),
-    Attr("volume", db_number, 1),
+    Attr("volume", threshold, 1),
     Attr("stream", natural, 0),
 )
 text_builder = Attrs(

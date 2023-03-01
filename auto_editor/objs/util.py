@@ -3,6 +3,8 @@ from __future__ import annotations
 from difflib import get_close_matches
 from typing import TYPE_CHECKING, NamedTuple
 
+from auto_editor.utils.types import CoerceError
+
 if TYPE_CHECKING:
     from typing import Any, Callable
 
@@ -60,7 +62,9 @@ def parse_with_palet(
     build: smallAttrs,
     env: dict,
 ) -> dict[str, Any]:
-    from auto_editor.interpreter import Lexer, MyError, Parser, display_str, interpret
+    from auto_editor.interpreter import Lexer, Parser, interpret
+    from auto_editor.lib.data_structs import display_str
+    from auto_editor.lib.err import MyError
 
     def go(text: str, c: Any) -> Any:
         try:
@@ -174,7 +178,10 @@ def parse_dataclass(
 
             for attr in build.attrs:
                 if key == attr.n:
-                    kwargs[_norm_name(attr.n)] = var_f(attr.n, val, attr.coerce)
+                    try:
+                        kwargs[_norm_name(attr.n)] = var_f(attr.n, val, attr.coerce)
+                    except CoerceError as e:
+                        raise ParserError(e)
                     found = True
                     break
 

@@ -9,13 +9,19 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from auto_editor import version
-from auto_editor.objs.edit import (
-    audio_builder,
-    motion_builder,
-    pixeldiff_builder,
-    subtitle_builder,
+from auto_editor.lib.contracts import (
+    is_bool,
+    is_nat,
+    is_str,
+    is_threshold,
+    is_uint,
+    is_void,
+    orc,
 )
-from auto_editor.objs.util import ParserError, parse_dataclass
+from auto_editor.lib.data_structs import Sym
+from auto_editor.objs.util import ParserError, Required, parse_with_palet
+from auto_editor.objs.util import smallAttr as Attr
+from auto_editor.objs.util import smallAttrs as Attrs
 from auto_editor.render.subtitle import SubtitleParser
 from auto_editor.utils.func import boolop
 from auto_editor.utils.types import pos
@@ -31,6 +37,41 @@ if TYPE_CHECKING:
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
+
+
+audio_builder = Attrs(
+    "audio",
+    Attr("threshold", 0.04, is_threshold),
+    Attr("stream", 0, orc(is_uint, Sym("all"), "all")),
+    Attr("mincut", 6, is_uint),
+    Attr("minclip", 3, is_uint),
+)
+motion_builder = Attrs(
+    "motion",
+    Attr("threshold", 0.02, is_threshold),
+    Attr("stream", 0, is_uint),
+    Attr("blur", 9, is_uint),
+    Attr("width", 400, is_nat),
+)
+pixeldiff_builder = Attrs(
+    "pixeldiff",
+    Attr("threshold", 1, is_uint),
+    Attr("stream", 0, is_uint),
+)
+subtitle_builder = Attrs(
+    "subtitle",
+    Attr("pattern", Required, is_str),
+    Attr("stream", 0, is_uint),
+    Attr("ignore-case", False, is_bool),
+    Attr("max-count", None, orc(is_uint, is_void)),
+)
+
+builder_map = {
+    "audio": audio_builder,
+    "motion": motion_builder,
+    "pixeldiff": pixeldiff_builder,
+    "subtitle": subtitle_builder,
+}
 
 
 @dataclass
@@ -427,7 +468,9 @@ class Levels:
         return self.cache("pixeldiff", pobj, result)
 
 
-def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
+def edit_method(
+    val: str, filesetup: FileSetup, env: dict[str, Any]
+) -> NDArray[np.bool_]:
     assert isinstance(filesetup, FileSetup)
     src = filesetup.src
     tb = filesetup.tb
@@ -450,29 +493,22 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
                 return pos((val, src.videos[0].height))
         return coerce(val)
 
-    builder_map = {
-        "audio": audio_builder,
-        "motion": motion_builder,
-        "pixeldiff": pixeldiff_builder,
-        "subtitle": subtitle_builder,
-    }
-
     levels = Levels(ensure, src, tb, bar, temp, log)
 
     if method == "none":
         return levels.none()
-    if method == "all":
+    if method == "all/e":
         return levels.all()
 
     try:
-        obj = parse_dataclass(attrs, builder_map[method])
+        obj = parse_with_palet(attrs, builder_map[method], env)
     except ParserError as e:
         log.error(e)
 
     try:
         if method == "audio":
             s = obj["stream"]
-            if s == "all":
+            if s == "all" or s == Sym("all"):
                 total_list: NDArray[np.bool_] | None = None
                 for s in range(len(src.audios)):
                     audio_list = to_threshold(levels.audio(s), obj["threshold"])
@@ -488,15 +524,14 @@ def edit_method(val: str, filesetup: FileSetup) -> NDArray[np.bool_]:
                 else:
                     stream_data = total_list
             else:
+                assert isinstance(s, int)
                 stream_data = to_threshold(levels.audio(s), obj["threshold"])
 
-            def st(val: int | str) -> int:
-                if isinstance(val, str):
-                    return round(float(val) * tb)
-                return val
+            assert isinstance(obj["minclip"], int)
+            assert isinstance(obj["mincut"], int)
 
-            mut_remove_small(stream_data, st(obj["minclip"]), replace=1, with_=0)
-            mut_remove_small(stream_data, st(obj["mincut"]), replace=0, with_=1)
+            mut_remove_small(stream_data, obj["minclip"], replace=1, with_=0)
+            mut_remove_small(stream_data, obj["mincut"], replace=0, with_=1)
 
             return stream_data
 

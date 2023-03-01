@@ -7,15 +7,9 @@ from fractions import Fraction
 import auto_editor
 from auto_editor.analyze import FileSetup
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import (
-    ClosingError,
-    Lexer,
-    MyError,
-    Parser,
-    env,
-    interpret,
-    print_str,
-)
+from auto_editor.interpreter import ClosingError, Lexer, Parser, env, interpret
+from auto_editor.lib.data_structs import print_str
+from auto_editor.lib.err import MyError
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.func import setup_tempdir
