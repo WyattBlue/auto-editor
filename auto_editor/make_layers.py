@@ -9,8 +9,8 @@ import numpy as np
 from auto_editor.analyze import FileSetup
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import Lexer, Parser, env, interpret, is_boolarr
-from auto_editor.lib.err import MyError
 from auto_editor.lib.data_structs import print_str
+from auto_editor.lib.err import MyError
 from auto_editor.objs.util import ParserError, parse_with_palet
 from auto_editor.timeline import (
     ASpace,

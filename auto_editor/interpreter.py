@@ -212,7 +212,7 @@ class Lexer:
             normal = self.char_is_norm
             is_method = False
 
-            def handle_strings():
+            def handle_strings() -> bool:
                 if self.char == '"':
                     self.advance()
                     result = result + '"' + self.string() + '"'
