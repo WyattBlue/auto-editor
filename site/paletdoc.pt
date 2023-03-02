@@ -142,6 +142,13 @@
         )
         (pred "float?" (text "Returns " #t " if " 'v " is a float, " #f " otherwise."))
         (pred
+            "threshold?"
+            (text
+                "Returns " #t " if " 'v " is a float and " 'v " is >= 0 and <= 1, "
+                #f " otherwise."
+            )
+        )
+        (pred
             "frac?"
             (text
                 "Returns " #t " if " 'v " is a fraction (a rational number), "
@@ -626,6 +633,9 @@
                 "Turn all 1s sections that are less than " 'x " in length to 0s "
             )
         )
+        (value "all" "'all" (text
+            "The symbol 'all. Exists for backwards compatibility for older auto-editor versions"
+        ))
     ]
     "Pairs and Lists" [vec
         (pred

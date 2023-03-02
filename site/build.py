@@ -43,7 +43,7 @@ def get_link_name(item: Path) -> str:
     if _os is None:
         raise ValueError(f"Unknown suffix: {item.suffix}")
 
-    version = re.search(r"[0-9]\.[0-9]\.[0-9]", item.stem).group()
+    version = re.search(r"[0-9]+\.[0-9]+\.[0-9]+", item.stem).group()
 
     return f"{version} {_os} Download"
 
