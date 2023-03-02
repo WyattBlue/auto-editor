@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from auto_editor.analyze import Levels, builder_map
+from auto_editor.analyze import LevelError, Levels, builder_map
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import env
 from auto_editor.objs.util import ParserError, parse_with_palet
@@ -14,7 +14,7 @@ from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import frame_rate, pos
+from auto_editor.utils.types import frame_rate
 from auto_editor.vanparse import ArgumentParser
 
 if TYPE_CHECKING:
@@ -56,14 +56,16 @@ def levels_options(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-def print_floats(arr: NDArray[np.float_]) -> None:
-    for a in arr:
-        sys.stdout.write(f"{a:.20f}\n")
-
-
-def print_ints(arr: NDArray[np.uint64] | NDArray[np.bool_]) -> None:
-    for a in arr:
-        sys.stdout.write(f"{a}\n")
+def print_arr(arr: NDArray) -> None:
+    if arr.dtype == np.float_:
+        for a in arr:
+            sys.stdout.write(f"{a:.20f}\n")
+    elif arr.dtype == np.bool_:
+        for a in arr:
+            sys.stdout.write(f"{1 if a else 0}\n")
+    else:
+        for a in arr:
+            sys.stdout.write(f"{a}\n")
 
 
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
@@ -91,14 +93,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     else:
         method, attrs = args.edit, ""
 
-    def my_var_f(name: str, val: str, coerce: Any) -> Any:
-        if src.videos:
-            if name in ("x", "width"):
-                return pos((val, src.videos[0].width))
-            if name in ("y", "height"):
-                return pos((val, src.videos[0].height))
-        return coerce(val)
-
     for src in sources.values():
         levels = Levels(ensure, src, tb, bar, temp, log)
 
@@ -113,24 +107,32 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             if "threshold" in obj:
                 del obj["threshold"]
 
-        if method == "audio":
-            print_floats(levels.audio(obj["stream"]))
-        elif method == "motion":
-            print_floats(levels.motion(obj["stream"], obj["blur"], obj["width"]))
-        elif method == "pixeldiff":
-            print_ints(levels.pixeldiff(obj["stream"]))
-        elif method == "subtitle":
-            print_ints(
-                levels.subtitle(
-                    obj["pattern"],
-                    obj["stream"],
-                    obj["ignore_case"],
-                    obj["max_count"],
+        try:
+            if method == "audio":
+                print_arr(levels.audio(obj["stream"]))
+            elif method == "motion":
+                print_arr(levels.motion(obj["stream"], obj["blur"], obj["width"]))
+            elif method == "pixeldiff":
+                print_arr(levels.pixeldiff(obj["stream"]))
+            elif method == "subtitle":
+                print_arr(
+                    levels.subtitle(
+                        obj["pattern"],
+                        obj["stream"],
+                        obj["ignore_case"],
+                        obj["max_count"],
+                    )
                 )
-            )
-        else:
-            log.error(f"Method: {method} not supported")
+            elif method == "none":
+                print_arr(levels.none())
+            elif method == "all":
+                print_arr(levels.all())
+            else:
+                log.error(f"Method: {method} not supported")
+        except LevelError as e:
+            log.error(e)
 
+    sys.stdout.flush()
     log.cleanup()
 
 
