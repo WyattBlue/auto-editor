@@ -93,7 +93,13 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     else:
         method, attrs = args.edit, ""
 
+    start_printed = False
+
     for src in sources.values():
+        if not start_printed:
+            print("")
+            print("@start")
+
         levels = Levels(ensure, src, tb, bar, temp, log)
 
         if method in builder_map:
@@ -133,6 +139,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             log.error(e)
 
     sys.stdout.flush()
+    print('')
     log.cleanup()
 
 
