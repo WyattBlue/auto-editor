@@ -125,7 +125,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 )
             elif method == "none":
                 print_arr(levels.none())
-            elif method == "all":
+            elif method == "all/e":
                 print_arr(levels.all())
             else:
                 log.error(f"Method: {method} not supported")
