@@ -216,28 +216,6 @@ h1, h2, th, .bold {font-weight: bold}
 .author, .date {line-height: 1}
 .author {margin-bottom: 0.5rem}
 
-/* Column Styles */
-
-.column {
-  box-sizing: border-box;
-  float: left;
-  width: 33.3333%;
-  padding: 5px;
-}
-
-/* Clearfix (clear floats) */
-.columns::after {
-  content: "";
-  clear: both;
-  display: table;
-}
-
-@media screen and (max-width: 40em) {
-  .column {
-    width: 100%;
-  }
-}
-
 /* Light Theme Colors */
 html {background-color: white}
 .hero {background-color: #EAEAEA}
