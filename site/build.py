@@ -1,6 +1,5 @@
 #!/usr/bin/env python3.11
 
-import re
 import subprocess
 import sys
 from argparse import ArgumentParser
@@ -43,9 +42,12 @@ def get_link_name(item: Path) -> str:
     if _os is None:
         raise ValueError(f"Unknown suffix: {item.suffix}")
 
-    version = re.search(r"[0-9]+\.[0-9]+\.[0-9]+", item.stem).group()
+    if _os == "MacOS":
+        ver, arch = item.stem.replace("Auto-Editor-", "").split("-")
+        return f"{ver} {_os} {arch} Download"
 
-    return f"{version} {_os} Download"
+    ver, _, _ = item.stem.replace("Auto-Editor-", "").split("-")
+    return f"{ver} {_os} Download"
 
 
 with open(ref / "options.html", "w") as file:

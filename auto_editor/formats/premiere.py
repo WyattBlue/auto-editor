@@ -260,7 +260,7 @@ def premiere_write_xml(_name: str | None, ensure: Ensure, output: str, tl: v3) -
     audio_file = len(src.videos) == 0 and len(src.audios) == 1
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
-    pathurls = [src.path.resolve().as_uri()]
+    pathurls = [str(src.path.resolve())]
 
     tracks = len(src.audios)
 
@@ -271,7 +271,7 @@ def premiere_write_xml(_name: str | None, ensure: Ensure, output: str, tl: v3) -
         for i in range(1, tracks):
             newtrack = fold / f"{i}.wav"
             move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
-            pathurls.append(newtrack.resolve().as_uri())
+            pathurls.append(str(newtrack.resolve()))
 
     if _name is None:
         name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
