@@ -57,6 +57,55 @@ def _norm_name(s: str) -> str:
     return s.replace("-", "_")
 
 
+class PLexer:
+    __slots__ = ("text", "pos", "char")
+
+    def __init__(self, text: str):
+        self.text = text
+        self.pos: int = 0
+        self.char: str | None = self.text[self.pos] if text else None
+
+    def advance(self) -> None:
+        self.pos += 1
+        self.char = None if self.pos > len(self.text) - 1 else self.text[self.pos]
+
+    def string(self) -> str:
+        result = ""
+        while self.char is not None and self.char != '"':
+            if self.char == "\\":
+                self.advance()
+                if self.char is None:
+                    raise ParserError("Unexpected EOF while parsing")
+                elif self.char in 'nt"\\':
+                    result += f"\\{self.char}"
+                    self.advance()
+                else:
+                    raise ParserError(
+                        f"Unexpected character {self.char} during escape sequence"
+                    )
+            else:
+                result += self.char
+            self.advance()
+
+        self.advance()
+        return f'"{result}"'
+
+    def get_next_token(self) -> str | None:
+        while self.char is not None:
+            if self.char == '"':
+                self.advance()
+                return self.string()
+
+            result = ""
+            while self.char is not None and self.char not in ',':
+                result += self.char
+                self.advance()
+
+            self.advance()
+            return result
+        return None
+
+
 def parse_with_palet(
     text: str,  # the string to be parsed
     build: smallAttrs,
@@ -93,7 +142,10 @@ def parse_with_palet(
 
     allow_positional_args = True
 
-    for i, arg in enumerate(text.split(",")):
+    lexer = PLexer(text)
+
+    i = 0
+    while (arg := lexer.get_next_token()) is not None:
         if not arg:
             continue
 
@@ -131,6 +183,7 @@ def parse_with_palet(
             raise ParserError(
                 f"{build.name} positional argument follows keyword argument."
             )
+        i += 1
 
     for k, v in kwargs.items():
         if v is Required:

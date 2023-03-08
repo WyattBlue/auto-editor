@@ -429,7 +429,7 @@ def main(sys_args: list[str] | None = None):
 
     def render_text():
         return run.main(
-            ["example.mp4"], ["--add", 'text:0,30,"This is my text",font="default"']
+            ["example.mp4"], ["--add", 'text:0,30,"This, is my text",font="default"']
         )
 
     def check_font_error():
