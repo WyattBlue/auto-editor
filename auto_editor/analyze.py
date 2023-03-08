@@ -485,14 +485,6 @@ def edit_method(
     else:
         method, attrs = val, ""
 
-    def my_var_f(name: str, val: str, coerce: Any) -> Any:
-        if src.videos:
-            if name in ("x", "width"):
-                return pos((val, src.videos[0].width))
-            if name in ("y", "height"):
-                return pos((val, src.videos[0].height))
-        return coerce(val)
-
     levels = Levels(ensure, src, tb, bar, temp, log)
 
     if method == "none":
