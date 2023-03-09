@@ -97,7 +97,7 @@ class PLexer:
                 return self.string()
 
             result = ""
-            while self.char is not None and self.char not in ',':
+            while self.char is not None and self.char not in ",":
                 result += self.char
                 self.advance()
 

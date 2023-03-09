@@ -24,7 +24,6 @@ from auto_editor.objs.util import smallAttr as Attr
 from auto_editor.objs.util import smallAttrs as Attrs
 from auto_editor.render.subtitle import SubtitleParser
 from auto_editor.utils.func import boolop
-from auto_editor.utils.types import pos
 from auto_editor.wavfile import read
 
 if TYPE_CHECKING:

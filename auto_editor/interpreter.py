@@ -19,7 +19,7 @@ from auto_editor.lib.err import MyError
 from auto_editor.utils.func import boolop, mut_margin
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Union
+    from typing import Any, Callable, NoReturn, Union
 
     from numpy.typing import NDArray
 
@@ -57,27 +57,40 @@ class Token:
 
 
 class Lexer:
-    __slots__ = ("text", "pos", "char")
+    __slots__ = ("text", "pos", "char", "lineno", "column")
 
     def __init__(self, text: str):
         self.text = text
         self.pos: int = 0
+        self.lineno: int = 1
+        self.column: int = 1
         self.char: str | None = self.text[self.pos] if text else None
+
+    def error(self, msg: str) -> NoReturn:
+        raise MyError(f"{msg}\n  at {self.lineno}:{self.column}")
 
     def char_is_norm(self) -> bool:
         return self.char is not None and self.char not in '()[]{}"; \t\n\r\x0b\x0c'
 
     def advance(self) -> None:
+        if self.char == "\n":
+            self.lineno += 1
+            self.column = 0
+
         self.pos += 1
-        self.char = None if self.pos > len(self.text) - 1 else self.text[self.pos]
+
+        if self.pos > len(self.text) - 1:
+            self.char = None
+        else:
+            self.char = self.text[self.pos]
+            self.column += 1
 
     def peek(self) -> str | None:
         peek_pos = self.pos + 1
         return None if peek_pos > len(self.text) - 1 else self.text[peek_pos]
 
-    def skip_whitespace(self) -> None:
-        while self.char is not None and self.char in " \t\n\r\x0b\x0c":
-            self.advance()
+    def is_whitespace(self) -> bool:
+        return self.char is None or self.char in " \t\n\r\x0b\x0c"
 
     def string(self) -> str:
         result = ""
@@ -97,10 +110,8 @@ class Lexer:
                     continue
 
                 if self.char is None:
-                    raise MyError("Unexpected EOF while parsing")
-                raise MyError(
-                    f"Unexpected character {self.char} during escape sequence"
-                )
+                    self.error("Unexpected EOF while parsing")
+                self.error(f"Unexpected character {self.char} during escape sequence")
             else:
                 result += self.char
             self.advance()
@@ -151,7 +162,7 @@ class Lexer:
         if self.char == "\\":
             self.advance()
             if self.char is None:
-                raise MyError("Expected a character after #\\")
+                self.error("Expected a character after #\\")
 
             char = self.char
             self.advance()
@@ -169,11 +180,12 @@ class Lexer:
         if result in ("f", "false"):
             return Token(BOOL, False)
 
-        raise MyError(f"Unknown hash literal: {result}")
+        self.error(f"Unknown hash literal: {result}")
 
     def get_next_token(self) -> Token:
         while self.char is not None:
-            self.skip_whitespace()
+            while self.is_whitespace():
+                self.advance()
             if self.char is None:
                 continue
 
@@ -205,7 +217,17 @@ class Lexer:
 
             if self.char == "#":
                 self.advance()
-                return self.hash_literal()
+                if self.char == "!":
+                    self.advance()
+                    if self.is_whitespace():
+                        self.error("Expected a character after #!")
+                    self.advance()
+                    while not self.is_whitespace():
+                        self.advance()
+                    if self.char is None:
+                        continue
+                else:
+                    return self.hash_literal()
 
             result = ""
             has_illegal = False
@@ -215,7 +237,7 @@ class Lexer:
             def handle_strings() -> bool:
                 if self.char == '"':
                     self.advance()
-                    result = result + '"' + self.string() + '"'
+                    result = f'{result}"{self.string()}"'
                     return handle_strings()
                 else:
                     return self.char_is_norm()
@@ -238,7 +260,7 @@ class Lexer:
                     return Token(METHOD, result)
 
             if has_illegal:
-                raise MyError(f"Symbol has illegal character(s): {result}")
+                self.error(f"Symbol has illegal character(s): {result}")
 
             return Token(ID, result)
 

@@ -139,7 +139,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             log.error(e)
 
     sys.stdout.flush()
-    print('')
+    print("")
     log.cleanup()
 
 
