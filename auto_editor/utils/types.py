@@ -247,7 +247,7 @@ class Args:
     yt_dlp_extras: str | None = None
     video_codec: str = "auto"
     audio_codec: str = "auto"
-    video_bitrate: str = "10m"
+    video_bitrate: str = "10M"
     audio_bitrate: str = "unset"
     video_quality_scale: str = "unset"
     scale: float = 1.0
