@@ -84,7 +84,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 if text is None:
                     text = input("> ")
                 else:
-                    text += " " + input("   ")
+                    text += "\n" + input("   ")
             except KeyboardInterrupt as e:
                 if text is None:
                     raise e
@@ -95,11 +95,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             try:
                 lexer = Lexer(text)
                 parser = Parser(lexer)
-            except MyError as e:
-                text = None
-                print(f"error: {e}")
-                continue
-            try:
+
                 for result in interpret(env, parser):
                     if result is not None:
                         sys.stdout.write(f"{print_str(result)}\n")
