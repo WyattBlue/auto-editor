@@ -239,7 +239,16 @@ def display_str(val: object) -> str:
 
 def print_str(val: object) -> str:
     if type(val) is str:
-        return f'"{val}"'
+
+        def str_escape(val: str) -> str:
+            return (
+                val.replace("\\", "\\\\")
+                .replace('"', '\\"')
+                .replace("\n", "\\n")
+                .replace("\t", "\\t")
+            )
+
+        return f'"{str_escape(val)}"'
     if type(val) is Char:
         return f"{val!r}"
     if type(val) is Sym or type(val) is Cons or isinstance(val, list):

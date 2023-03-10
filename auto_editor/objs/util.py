@@ -75,14 +75,11 @@ class PLexer:
             if self.char == "\\":
                 self.advance()
                 if self.char is None:
-                    raise ParserError("Unexpected EOF while parsing")
-                elif self.char in 'nt"\\':
-                    result += f"\\{self.char}"
-                    self.advance()
-                else:
                     raise ParserError(
-                        f"Unexpected character {self.char} during escape sequence"
+                        "Expected character for escape sequence, got end of file."
                     )
+                result += f"\\{self.char}"
+                self.advance()
             else:
                 result += self.char
             self.advance()

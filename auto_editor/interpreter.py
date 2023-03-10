@@ -97,6 +97,9 @@ class Lexer:
         while self.char is not None and self.char != '"':
             if self.char == "\\":
                 self.advance()
+                if self.char is None:
+                    break
+
                 if self.char in 'nt"\\':
                     if self.char == "n":
                         result += "\n"
@@ -109,12 +112,13 @@ class Lexer:
                     self.advance()
                     continue
 
-                if self.char is None:
-                    self.error("Unexpected EOF while parsing")
-                self.error(f"Unexpected character {self.char} during escape sequence")
+                self.error(f"Unknown escape sequence `\\{self.char}` in string")
             else:
                 result += self.char
             self.advance()
+
+        if self.char is None:
+            raise ClosingError(f'Expected a closing `"`')
 
         self.advance()
         return result
@@ -237,7 +241,7 @@ class Lexer:
             def handle_strings() -> bool:
                 if self.char == '"':
                     self.advance()
-                    result = f'{result}"{self.string()}"'
+                    f'{result}"{self.string()}"'
                     return handle_strings()
                 else:
                     return self.char_is_norm()
