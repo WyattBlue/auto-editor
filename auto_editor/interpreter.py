@@ -41,7 +41,7 @@ class ClosingError(MyError):
 
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 ID, QUOTE, NUM, BOOL, STR, CHAR = "ID", "QUOTE", "NUM", "BOOL", "STR", "CHAR"
-METHOD, SEC, DB, PER = "METHOD", "SEC", "DB", "PER"
+METHOD, SEC, DB, PER, DOT = "METHOD", "SEC", "DB", "PER", "DOT"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
 METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
 
@@ -73,7 +73,7 @@ class Lexer:
         raise ClosingError(f"{msg}\n  at {self.lineno}:{self.column}")
 
     def char_is_norm(self) -> bool:
-        return self.char is not None and self.char not in '()[]{}"; \t\n\r\x0b\x0c'
+        return self.char is not None and self.char not in '.()[]{}"; \t\n\r\x0b\x0c'
 
     def advance(self) -> None:
         if self.char == "\n":
@@ -203,7 +203,11 @@ class Lexer:
 
             if self.char == '"':
                 self.advance()
-                return Token(STR, self.string())
+                my_str = self.string()
+                if self.char == ".":  # handle `object.method` syntax
+                    self.advance()
+                    return Token(DOT, (my_str, self.get_next_token()))
+                return Token(STR, my_str)
 
             if self.char == "'":
                 self.advance()
@@ -271,6 +275,10 @@ class Lexer:
                 if self.char in "'`|\\":
                     has_illegal = True
                 self.advance()
+
+            if self.char == ".":  # handle `object.method` syntax
+                self.advance()
+                return Token(DOT, (Sym(result), self.get_next_token()))
 
             if is_method:
                 return Token(METHOD, result)
@@ -343,6 +351,13 @@ class Parser:
         if token.type == PER:
             self.eat(PER)
             return [Sym("/"), token.value, 100.0]
+
+        if token.type == DOT:
+            self.eat(DOT)
+            if token.value[1].type != ID:
+                raise MyError(". macro: attribute call needs to be an identifier")
+
+            return [Sym("@r"), token.value[0],  Sym(token.value[1].value)]
 
         if token.type == QUOTE:
             self.eat(QUOTE)

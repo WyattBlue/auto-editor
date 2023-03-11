@@ -783,6 +783,10 @@ def main(sys_args: list[str] | None = None):
             ("((or/c 0 1) 1)", True),
             ('((or/c 0 1 string?) "hello")', True),
             ("((or/c 0 1 string?) 3)", False),
+            ('("hello".title)', "Hello"),
+            ('("hello".upper)', "HELLO"),
+            ('("heLlo".lower)', "hello"),
+            ('(define s "hello")(s.title)', "Hello"),
         )
 
     tests = []
