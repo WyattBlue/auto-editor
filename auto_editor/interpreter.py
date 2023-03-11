@@ -73,7 +73,7 @@ class Lexer:
         raise ClosingError(f"{msg}\n  at {self.lineno}:{self.column}")
 
     def char_is_norm(self) -> bool:
-        return self.char is not None and self.char not in '.()[]{}"; \t\n\r\x0b\x0c'
+        return self.char is not None and self.char not in '()[]{}"; \t\n\r\x0b\x0c'
 
     def advance(self) -> None:
         if self.char == "\n":
@@ -276,16 +276,16 @@ class Lexer:
                     has_illegal = True
                 self.advance()
 
-            if self.char == ".":  # handle `object.method` syntax
-                self.advance()
-                return Token(DOT, (Sym(result), self.get_next_token()))
-
             if is_method:
                 return Token(METHOD, result)
 
             for method in METHODS:
                 if result == method[:-1]:
                     return Token(METHOD, result)
+
+            if self.char == ".":  # handle `object.method` syntax
+                self.advance()
+                return Token(DOT, (Sym(result), self.get_next_token()))
 
             if has_illegal:
                 self.error(f"Symbol has illegal character(s): {result}")
