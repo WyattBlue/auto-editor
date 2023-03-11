@@ -188,7 +188,7 @@ class Lexer:
 
     def get_next_token(self) -> Token:
         while self.char is not None:
-            while self.is_whitespace():
+            while self.char is not None and self.is_whitespace():
                 self.advance()
             if self.char is None:
                 continue
@@ -221,7 +221,19 @@ class Lexer:
 
             if self.char == "#":
                 self.advance()
-                if self.char == "!":
+                if self.char == "|":
+                    while self.char is not None:
+                        self.advance()
+
+                        if self.char == "|" and self.peek() == "#":
+                            self.advance()
+                            self.advance()
+                            break
+                    if self.char is None:
+                        self.error("end of file in `#|` comment")
+                    continue
+
+                elif self.char == "!":
                     self.advance()
                     if self.is_whitespace():
                         self.error("Expected a character after #!")
@@ -703,7 +715,7 @@ class UserProc(Proc):
         contracts: list[Any] | None = None,
         eat_last: bool = False,
     ):
-        self.parms = list(map(str, parms))
+        self.parms = [f"{p}" for p in parms]
         self.body = body
         self.name = name
 
