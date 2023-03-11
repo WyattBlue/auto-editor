@@ -406,24 +406,6 @@
             (text "Returns a new string concatenated from the given " 'str "s")
         )
         (proc
-            "string-upcase"
-            (vec (vec "s" "string?") "string?")
-            (text "Returns the string " 's " in upper case.")
-        )
-        (proc
-            "string-downcase"
-            (vec (vec "s" "string?") "string?")
-            (text "Returns the string " 's " in lower case.")
-        )
-        (proc
-            "string-titlecase"
-            (vec (vec "s" "string?") "string?")
-            (text
-                "Returns the string " 's " in title case. "
-                "The first letter of every word is capitalized while the rest is lower cased."
-            )
-        )
-        (proc
             "char->int"
             (vec (vec "char" "char?") "int?")
             (text "Returns the corresponding int to the given " 'char ".")
@@ -938,7 +920,7 @@
             (vec (vec "obj" "object?") "vector?")
             (text "Returns all attributes of " 'obj " as a vector of strings.")
         )
-        (syntax "." "obj attr" (text "Returns the specified attribute on the object."))
+        (syntax "@r" "obj attr" (text "Returns the specified attribute on the object."))
     ]
     "Reflection" [vec
         (syntax

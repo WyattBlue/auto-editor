@@ -69,6 +69,9 @@ class Lexer:
     def error(self, msg: str) -> NoReturn:
         raise MyError(f"{msg}\n  at {self.lineno}:{self.column}")
 
+    def close_err(self, msg: str) -> NoReturn:
+        raise ClosingError(f"{msg}\n  at {self.lineno}:{self.column}")
+
     def char_is_norm(self) -> bool:
         return self.char is not None and self.char not in '()[]{}"; \t\n\r\x0b\x0c'
 
@@ -118,7 +121,7 @@ class Lexer:
             self.advance()
 
         if self.char is None:
-            raise ClosingError(f'Expected a closing `"`')
+            self.close_err(f'Expected a closing `"`')
 
         self.advance()
         return result
@@ -166,7 +169,7 @@ class Lexer:
         if self.char == "\\":
             self.advance()
             if self.char is None:
-                self.error("Expected a character after #\\")
+                self.close_err("Expected a character after #\\")
 
             char = self.char
             self.advance()
@@ -184,7 +187,7 @@ class Lexer:
         if result in ("f", "false"):
             return Token(BOOL, False)
 
-        self.error(f"Unknown hash literal: {result}")
+        self.error(f"Unknown hash literal `#{result}`")
 
     def get_next_token(self) -> Token:
         while self.char is not None:
@@ -222,23 +225,24 @@ class Lexer:
             if self.char == "#":
                 self.advance()
                 if self.char == "|":
+                    success = False
                     while self.char is not None:
                         self.advance()
 
                         if self.char == "|" and self.peek() == "#":
                             self.advance()
                             self.advance()
+                            success = True
                             break
-                    if self.char is None:
-                        self.error("end of file in `#|` comment")
+
+                    if not success and self.char is None:
+                        self.close_err("end of file in `#|` comment")
                     continue
 
-                elif self.char == "!":
+                elif self.char == "!" and self.peek() == "/":
                     self.advance()
-                    if self.is_whitespace():
-                        self.error("Expected a character after #!")
                     self.advance()
-                    while not self.is_whitespace():
+                    while self.char is not None and self.char != "\n":
                         self.advance()
                     if self.char is None:
                         continue
@@ -1073,7 +1077,10 @@ def get_attrs(obj: object) -> dict[str, Any]:
             "startswith": Proc("startswith", obj.startswith, (1, 1), [is_str]),
             "endswith": Proc("endswith", obj.endswith, (1, 1), [is_str]),
             "replace": Proc("replace", obj.replace, (1, 2), [is_str, is_int]),
-            "@len": Proc("@len", obj.__len__, (0, 0)),
+            "title": Proc("title", obj.title, (0, 0)),
+            "lower": Proc("lower", obj.lower, (0, 0)),
+            "upper": Proc("upper", obj.upper, (0, 0)),
+            "length": Proc("length", obj.__len__, (0, 0)),
             "@name": "string",
         }
     if isinstance(obj, list):
@@ -1090,7 +1097,7 @@ def get_attrs(obj: object) -> dict[str, Any]:
             "pop": Proc("pop", obj.pop, (0, 0)),
             "join": Proc("join", _join, (1, 1), [is_str]),
             "sort": Proc("sort", obj.sort, (0, 0)),
-            "@len": Proc("@len", obj.__len__, (0, 0)),
+            "length": Proc("length", obj.__len__, (0, 0)),
             "@name": "vector",
         }
     if isinstance(obj, Proc):
@@ -1112,23 +1119,23 @@ def get_attrs(obj: object) -> dict[str, Any]:
     raise MyError("")
 
 
-def syn_dot(env: Env, node: list) -> Any:
+def attr(env: Env, node: list) -> Any:
     if len(node) != 3:
-        raise MyError(".: not enough args")
+        raise MyError("@r: not enough args")
 
     if not isinstance(node[2], Sym):
-        raise MyError(".: attribute must be an identifier")
+        raise MyError("@r: attribute must be an identifier")
     my_attr = node[2].val
     my_obj = my_eval(env, node[1])
 
     try:
         attrs = get_attrs(my_obj)
     except MyError:
-        raise MyError(f".: expected an object, got {print_str(my_obj)}")
+        raise MyError(f"@r: expected an object, got {print_str(my_obj)}")
     if my_attr not in attrs:
         if mat := get_close_matches(my_attr, attrs):
-            raise MyError(f".: No such attribute: '{my_attr}'. Did you mean: {mat[0]}")
-        raise MyError(f".: No such attribute: '{my_attr}'")
+            raise MyError(f"@r: No such attribute: '{my_attr}'. Did you mean: {mat[0]}")
+        raise MyError(f"@r: No such attribute: '{my_attr}'")
     return attrs[my_attr]
 
 
@@ -1316,9 +1323,6 @@ env: Env = {
     # strings
     "string": Proc("string", string_append, (0, None), [is_char]),
     "string-append": Proc("string-append", string_append, (0, None), [is_str]),
-    "string-upcase": Proc("string-upcase", str.upper, (1, 1), [is_str]),
-    "string-downcase": Proc("string-downcase", str.lower, (1, 1), [is_str]),
-    "string-titlecase": Proc("string-titlecase", str.title, (1, 1), [is_str]),
     "char->int": Proc("char->int", lambda c: ord(c.val), (1, 1), [is_char]),
     "int->char": Proc("int->char", Char, (1, 1), [is_int]),
     "~a": Proc("~a", lambda *v: "".join([display_str(a) for a in v]), (0, None)),
@@ -1389,7 +1393,7 @@ env: Env = {
     # objects
     "object?": is_obj,
     "attrs": Proc("attrs", lambda v: list(get_attrs(v).keys()), (1, 1), [is_obj]),
-    ".": Syntax(syn_dot),
+    "@r": Syntax(attr),
     # reflection
     "eval": Syntax(syn_eval),
     "var-exists?": Proc("var-exists?", lambda sym: sym.val in env, (1, 1), [is_symbol]),
