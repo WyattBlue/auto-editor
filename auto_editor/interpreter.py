@@ -255,8 +255,13 @@ class Lexer:
 
             result = ""
             has_illegal = False
-            normal = self.char_is_norm
             is_method = False
+
+            def normal() -> bool:
+                return (
+                    self.char is not None
+                    and self.char not in '.()[]{}"; \t\n\r\x0b\x0c'
+                )
 
             def handle_strings() -> bool:
                 if self.char == '"':
@@ -357,7 +362,7 @@ class Parser:
             if token.value[1].type != ID:
                 raise MyError(". macro: attribute call needs to be an identifier")
 
-            return [Sym("@r"), token.value[0],  Sym(token.value[1].value)]
+            return [Sym("@r"), token.value[0], Sym(token.value[1].value)]
 
         if token.type == QUOTE:
             self.eat(QUOTE)
