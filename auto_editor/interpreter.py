@@ -151,7 +151,7 @@ class Lexer:
             elif unit == "%":
                 token = PER
             elif unit != "i":
-                return Token(ID, result + unit)
+                return Token(ID, Sym(result + unit))
 
         try:
             if unit == "i":
@@ -166,7 +166,7 @@ class Lexer:
             else:
                 return Token(token, int(result))
         except ValueError:
-            return Token(ID, result + unit)
+            return Token(ID, Sym(result + unit))
 
     def hash_literal(self) -> Token:
         if self.char == "\\":
@@ -285,11 +285,11 @@ class Lexer:
                 self.advance()
 
             if is_method:
-                return Token(METHOD, result)
+                return Token(METHOD, Method(result))
 
             for method in METHODS:
                 if result == method[:-1]:
-                    return Token(METHOD, result)
+                    return Token(METHOD, Method(result))
 
             if self.char == ".":  # handle `object.method` syntax
                 self.advance()
@@ -298,7 +298,7 @@ class Lexer:
             if has_illegal:
                 self.error(f"Symbol has illegal character(s): {result}")
 
-            return Token(ID, result)
+            return Token(ID, Sym(result))
 
         return Token(EOF, "EOF")
 
@@ -327,64 +327,53 @@ class Parser:
         self.lexer = lexer
         self.current_token = self.lexer.get_next_token()
 
-    def eat(self, token_type: str) -> None:
-        if self.current_token.type != token_type:
-            raise MyError(f"Expected {token_type}, got {self.current_token.type}")
-
+    def eat(self) -> None:
         self.current_token = self.lexer.get_next_token()
 
     def expr(self) -> Any:
         token = self.current_token
 
-        if token.type in (CHAR, NUM, STR, BOOL):
-            self.eat(token.type)
+        if token.type in (CHAR, NUM, STR, BOOL, ID, METHOD):
+            self.eat()
             return token.value
 
-        if token.type == ID:
-            self.eat(ID)
-            return Sym(token.value)
-
-        if token.type == METHOD:
-            self.eat(METHOD)
-            return Method(token.value)
-
         if token.type == SEC:
-            self.eat(SEC)
+            self.eat()
             return [Sym("round"), [Sym("*"), token.value, Sym("timebase")]]
 
         if token.type == DB:
-            self.eat(DB)
+            self.eat()
             return [Sym("pow"), 10, [Sym("/"), token.value, 20]]
 
         if token.type == PER:
-            self.eat(PER)
+            self.eat()
             return [Sym("/"), token.value, 100.0]
 
         if token.type == DOT:
-            self.eat(DOT)
-            if token.value[1].type != ID:
+            self.eat()
+            if type(token.value[1].value) is not Sym:
                 raise MyError(". macro: attribute call needs to be an identifier")
 
-            return [Sym("@r"), token.value[0], Sym(token.value[1].value)]
+            return [Sym("@r"), token.value[0], token.value[1].value]
 
         if token.type == QUOTE:
-            self.eat(QUOTE)
+            self.eat()
             return [Sym("quote"), self.expr()]
 
         pars = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
         if token.type in pars:
-            self.eat(token.type)
+            self.eat()
             closing = pars[token.type]
             childs = []
             while self.current_token.type != closing:
                 if self.current_token.type == EOF:
-                    raise ClosingError(f"Expected closing '{closing}' before end")
+                    raise ClosingError(f"Expected closing `{closing}` before end")
                 childs.append(self.expr())
 
-            self.eat(closing)
+            self.eat()
             return childs
 
-        self.eat(token.type)
+        self.eat()
         childs = []
         while self.current_token.type not in (RPAREN, RBRAC, RCUR, EOF):
             childs.append(self.expr())
@@ -1185,6 +1174,9 @@ def my_eval(env: Env, node: object) -> Any:
         return edit_method(node.val, env["@filesetup"], env)
 
     if isinstance(node, list):
+        if not node:
+            raise MyError("Illegal () expression")
+
         oper = my_eval(env, node[0])
         if not callable(oper):
             """
