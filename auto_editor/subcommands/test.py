@@ -787,6 +787,8 @@ def main(sys_args: list[str] | None = None):
             ('("hello".upper)', "HELLO"),
             ('("heLlo".lower)', "hello"),
             ('(define s "hello")(s.title)', "Hello"),
+            ("(define v (vector 2 0 3 -4 5 1 4))(v.sort)", [-4, 0, 1, 2, 3, 4, 5]),
+            ("(define v (vector 2 0 3 -4 5 1 4))(v.sort!)v", [-4, 0, 1, 2, 3, 4, 5]),
         )
 
     tests = []
