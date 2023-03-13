@@ -53,7 +53,10 @@ class Token:
         self.type = type
         self.value = value
 
-    __str__: Callable[[Token], str] = lambda self: f"(Token {self.type} {self.value})"
+    def __str__(self) -> str:
+        return f"(Token {print_str(self.type)} {print_str(self.value)})"
+
+    __repr__ = __str__
 
 
 class Lexer:
@@ -895,7 +898,7 @@ def syn_set(env: Env, node: list) -> None:
     if len(node) != 3:
         raise MyError(f"{node[0]}: bad syntax")
     if type(node[1]) is not Sym:
-        raise MyError(f"{node[0]}: must be an identifier")
+        raise MyError(f"{node[0]} expected identifier, got {print_str(node[1])}")
 
     name = node[1].val
     if name not in env:
@@ -932,7 +935,9 @@ def syn_if(env: Env, node: list) -> Any:
     test_expr = my_eval(env, node[1])
 
     if type(test_expr) is not bool:
-        raise MyError(f"{node[0]}: test-expr arg must be: bool?")
+        raise MyError(
+            f"{node[0]} test-expr: expected bool?, got {print_str(test_expr)}"
+        )
 
     return my_eval(env, node[2] if test_expr else node[3])
 
@@ -943,7 +948,9 @@ def syn_when(env: Env, node: list) -> Any:
     test_expr = my_eval(env, node[1])
 
     if type(test_expr) is not bool:
-        raise MyError(f"{node[0]}: test-expr arg must be: bool?")
+        raise MyError(
+            f"{node[0]} test-expr: expected bool?, got {print_str(test_expr)}"
+        )
 
     return my_eval(env, node[2]) if test_expr else None
 
@@ -960,7 +967,9 @@ def syn_cond(env: Env, node: list) -> Any:
         else:
             test_clause = my_eval(env, test_expr[0])
             if type(test_clause) is not bool:
-                raise MyError(f"{node[0]}: test-expr must be: bool?")
+                raise MyError(
+                    f"{node[0]} test-expr: expected bool?, got {print_str(test_clause)}"
+                )
 
         if test_clause:
             if len(test_expr) == 1:
@@ -1033,26 +1042,27 @@ def syn_or(env: Env, node: list) -> Any:
 def syn_with_open(env: Env, node: list) -> None:
     if len(node) < 2:
         raise MyError(f"{node[0]} has too few args")
-    if len(node[1]) != 2 and len(node[1]) != 3:
+    if len(node) > 3:
         raise MyError(f"{node[0]} has too many args")
 
-    if type(node[1][0]) is not Sym:
-        raise MyError(f'{node[0]}\'s "as" must be an identifier')
-
-    file_binding = node[1][0].val
+    open_as = node[1][0]
+    if type(open_as) is not Sym:
+        raise MyError(f"{node[0]} as: expected identifier, got {print_str(open_as)}")
 
     file_name = my_eval(env, node[1][1])
     if type(file_name) is not str:
-        raise MyError(f"{node[0]} file-name must be string?")
+        raise MyError(
+            f"{node[0]} file-name: expected string, got {print_str(file_name)}"
+        )
 
     if len(node[1]) == 3:
         file_mode = my_eval(env, node[1][2])
-        if type(file_mode) is not Sym:
-            raise MyError(f"{node[0]} file-mode must be symbol?")
-        if file_mode.val not in ("w", "r", "a"):
-            raise MyError(f"{node[0]} file-mode must be (or/c 'w 'r 'a)")
+        if type(file_mode) is not Sym or file_mode.val not in ("w", "r", "a"):
+            raise MyError(
+                f"{node[0]} file-mode: expected (or/c 'w 'r 'a), got {print_str(file_mode)}"
+            )
     else:
-        file_mode = Sym("w")
+        file_mode = Sym("r")
 
     with open(file_name, file_mode.val) as file:
         if file_mode.val == "r":
@@ -1067,11 +1077,11 @@ def syn_with_open(env: Env, node: list) -> None:
                 {"write": Proc("write", file.write, (1, 1), [is_str])}
             )
 
-        env[file_binding] = open_file
+        env[open_as.val] = open_file
         for c in node[2:]:
             my_eval(env, c)
 
-    del env[file_binding]
+    del env[open_as.val]
     return None
 
 
@@ -1088,9 +1098,11 @@ is_obj = Contract(
 )
 
 
-def get_attrs(obj: object) -> dict[str, Any]:
-    if isinstance(obj, str):
+def get_attrs(obj: Any) -> dict[str, Any]:
+    if type(obj) is str:
         return {
+            "@name": "string",
+            "@len": Proc("@len", obj.__len__, (0, 0)),
             "split": Proc("split", obj.split, (0, 1)),
             "strip": Proc("strip", obj.strip, (0, 0)),
             "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
@@ -1100,8 +1112,6 @@ def get_attrs(obj: object) -> dict[str, Any]:
             "title": Proc("title", obj.title, (0, 0)),
             "lower": Proc("lower", obj.lower, (0, 0)),
             "upper": Proc("upper", obj.upper, (0, 0)),
-            "length": Proc("length", obj.__len__, (0, 0)),
-            "@name": "string",
         }
     if isinstance(obj, list):
 
@@ -1113,26 +1123,27 @@ def get_attrs(obj: object) -> dict[str, Any]:
                 raise MyError("join: every item must be a string")
 
         return {
+            "@name": "vector",
+            "@len": Proc("@len", obj.__len__, (0, 0)),
             "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
             "pop": Proc("pop", obj.pop, (0, 0)),
             "join": Proc("join", _join, (1, 1), [is_str]),
-            "sort": Proc("sort", obj.sort, (0, 0)),
-            "length": Proc("length", obj.__len__, (0, 0)),
-            "@name": "vector",
+            "sort": Proc("sort", lambda: sorted(obj), (0, 0)),
+            "sort!": Proc("sort!", obj.sort, (0, 0)),
         }
     if isinstance(obj, Proc):
         return {
+            "@name": "procedure",
             "arity-min": obj.arity[0],
             "arity-max": obj.arity[1],
             "name": obj.name,
-            "@name": "procedure",
         }
     if isinstance(obj, Contract):
         return {
+            "@name": "procedure",
             "arity-min": 1,
             "arity-max": 1,
             "name": obj.name,
-            "@name": "procedure",
         }
     if isinstance(obj, PaletObject):
         return obj.attributes
