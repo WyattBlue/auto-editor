@@ -13,36 +13,39 @@ EXTENSIBLE = 0xFFFE
 
 AudioData = Union[np.memmap, np.ndarray]
 Endian = Literal[">", "<"]  # Big Endian, Little Endian
+ByteOrd = Literal["big", "little"]
 
 
 def _read_fmt_chunk(
-    fid: io.BufferedReader, en: Endian
+    fid: io.BufferedReader, bytes_order: ByteOrd
 ) -> tuple[int, int, int, int, int]:
-    size: int = struct.unpack(f"{en}I", fid.read(4))[0]
+    size = int.from_bytes(fid.read(4), bytes_order)
 
     if size < 16:
         raise ValueError("Binary structure of wave file is not compliant")
 
-    res = struct.unpack(f"{en}HHIIHH", fid.read(16))
+    format_tag = int.from_bytes(fid.read(2), bytes_order)
+    channels = int.from_bytes(fid.read(2), bytes_order)
+    sr = int.from_bytes(fid.read(4), bytes_order)
+    fid.read(4)  # This is bitrate but we don't need it
+    block_align = int.from_bytes(fid.read(2), bytes_order)
+    bit_depth = int.from_bytes(fid.read(2), bytes_order)
     bytes_read = 16
 
-    format_tag, channels, sr, _, block_align, bit_depth = res
-    # underscore is "bitrate"
-
     if format_tag == EXTENSIBLE and size >= 18:
-        ext_chunk_size = struct.unpack(f"{en}H", fid.read(2))[0]
+        ext_chunk_size = int.from_bytes(fid.read(2), bytes_order)
         bytes_read += 2
         if ext_chunk_size >= 22:
             extensible_chunk_data = fid.read(22)
             bytes_read += 22
             raw_guid = extensible_chunk_data[6:22]
 
-            if en == ">":
+            if bytes_order == "big":
                 tail = b"\x00\x00\x00\x10\x80\x00\x00\xAA\x00\x38\x9B\x71"
             else:
                 tail = b"\x00\x00\x10\x00\x80\x00\x00\xAA\x00\x38\x9B\x71"
             if raw_guid.endswith(tail):
-                format_tag = struct.unpack(f"{en}I", raw_guid[:4])[0]
+                format_tag = int.from_bytes(raw_guid[:4], bytes_order)
         else:
             raise ValueError("Binary structure of wave file is not compliant")
 
@@ -70,7 +73,9 @@ def _read_data_chunk(
     block_align: int,
     data_size: int | None,
 ) -> AudioData:
-    size: int = struct.unpack(f"{en}I", fid.read(4))[0]
+    bytes_order: ByteOrd = "big" if en == ">" else "little"
+    size = int.from_bytes(fid.read(4), bytes_order)
+
     if data_size is not None:
         # size is only 32-bits here, so get real size from header.
         size = data_size
@@ -130,7 +135,7 @@ def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
 
     heading = fid.read(12)
     if heading != b"\xff\xff\xff\xffWAVEds64":
-        raise ValueError(f"Wrong heading: {heading!r}")
+        raise ValueError(f"Invalid heading for rf64 chunk: {heading!r}")
 
     chunk_size = fid.read(4)
 
@@ -138,27 +143,25 @@ def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
     bw_size_high = fid.read(4)
 
     en: Endian = ">" if (bw_size_high > bw_size_low) else "<"
+    bytes_order: ByteOrd = "big" if en == ">" else "little"
 
     data_size_low = fid.read(4)
     data_size_high = fid.read(4)
 
-    # Combine bw_size and data_size to 64-bit ints
+    file_size = int.from_bytes(bw_size_low + bw_size_high, "little")
+    data_size = int.from_bytes(data_size_low + data_size_high, "little")
 
-    def combine(a: bytes, b: bytes) -> int:
-        return struct.unpack("<Q", a + b)[0]
-
-    file_size = combine(bw_size_low, bw_size_high)
-    data_size = combine(data_size_low, data_size_high)
-
-    chunk_size = struct.unpack(f"{en}I", chunk_size)[0]
-    fid.read(40 - chunk_size)  # type: ignore
+    int_chunk_size = int.from_bytes(chunk_size, bytes_order)
+    fid.read(40 - int_chunk_size)
 
     return data_size, file_size, en
 
 
 def _read_riff_chunk(sig: bytes, fid: io.BufferedReader) -> tuple[None, int, Endian]:
     en: Endian = "<" if sig == b"RIFF" else ">"
-    file_size: int = struct.unpack(f"{en}I", fid.read(4))[0] + 8
+    bytes_order: ByteOrd = "big" if en == ">" else "little"
+
+    file_size = int.from_bytes(fid.read(4), bytes_order) + 8
 
     form = fid.read(4)
     if form != b"WAVE":
@@ -199,8 +202,9 @@ def read(filename: str) -> tuple[int, AudioData]:
 
             if chunk_id == b"fmt ":
                 fmt_chunk_received = True
+                bytes_order: ByteOrd = "big" if en == ">" else "little"
                 format_tag, channels, sr, block_align, bit_depth = _read_fmt_chunk(
-                    fid, en
+                    fid, bytes_order
                 )
             elif chunk_id == b"data":
                 data_chunk_received = True
