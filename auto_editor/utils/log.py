@@ -89,4 +89,5 @@ class Log:
 
     def print(self, message: str) -> None:
         if not self.quiet:
+            self.conwrite("")
             sys.stdout.write(f"{message}\n")
