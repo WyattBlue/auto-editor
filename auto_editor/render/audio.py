@@ -93,10 +93,14 @@ def apply_audio_normalization(
             end = index + 1
             break
 
-    print(stderr)
+    if start == 0 or end == 0:
+        print(stderr)
+        log.error("Invalid loudnorm stats.")
+
     try:
         parsed = json.loads(b"\n".join(lines[start:end]))
     except json.decoder.JSONDecodeError as e:
+        print(stderr)
         print(start, end)
         raise e
 
