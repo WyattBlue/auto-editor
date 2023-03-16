@@ -9,7 +9,7 @@ import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.interpreter import env
-from auto_editor.lib.contracts import Contract, andc, is_int_or_float
+from auto_editor.lib.contracts import andc, gte_c, is_int_or_float, lte_c
 from auto_editor.objs.util import ParserError, parse_with_palet, smallAttr, smallAttrs
 from auto_editor.output import Ensure
 from auto_editor.timeline import v3
@@ -18,21 +18,17 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 from auto_editor.wavfile import AudioData, read, write
 
-i_range = Contract("i-range", lambda i: i >= -70 and i <= -5)  # type: ignore
-lra_range = Contract("lra-range", lambda i: i >= 1 and i <= 50)  # type: ignore
-tp_range = Contract("tp-range", lambda i: i >= -9 and i <= 0)  # type: ignore
-gain_range = Contract("gain-range", lambda i: i >= -99 and i <= 99)  # type: ignore
-
-ebu_builder = smallAttrs(
-    "ebu",
-    smallAttr("i", -24.0, andc(is_int_or_float, i_range)),
-    smallAttr("lra", 7.0, andc(is_int_or_float, lra_range)),
-    smallAttr("tp", -2.0, andc(is_int_or_float, tp_range)),
-    smallAttr("gain", 0.0, andc(is_int_or_float, gain_range)),
-)
-
 norm_types = {
-    "ebu": ebu_builder,
+    "ebu": smallAttrs(
+        "ebu",
+        smallAttr("i", -24.0, andc(is_int_or_float, gte_c(-70), lte_c(-5))),
+        smallAttr("lra", 7.0, andc(is_int_or_float, gte_c(1), lte_c(50))),
+        smallAttr("tp", -2.0, andc(is_int_or_float, gte_c(-9), lte_c(99))),
+        smallAttr("gain", 0.0, andc(is_int_or_float, gte_c(-99), lte_c(99))),
+    ),
+    "peak": smallAttrs(
+        "peak", smallAttr("t", -8.0, andc(is_int_or_float, gte_c(-99), lte_c(0)))
+    ),
 }
 
 file_null = "NUL" if system() in ("Windows", "cli") else "/dev/null"
@@ -51,37 +47,14 @@ def parse_norm(norm: str, log: Log) -> dict | None:
         log.error(f"Unknown audio normalize object: '{norm_type}'")
 
     try:
-        return parse_with_palet(attrs, obj, env)
+        obj_dict = parse_with_palet(attrs, obj, env)
+        obj_dict["tag"] = norm_type
+        return obj_dict
     except ParserError as e:
         log.error(e)
 
 
-def apply_audio_normalization(
-    ffmpeg: FFmpeg, norm: dict, pre_master: Path, path: Path, log: Log
-) -> None:
-    first_loudnorm = (
-        f"[0]loudnorm=i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:"
-        f"offset={norm['gain']}:print_format=json"
-    )
-    log.debug(f"loudnorm first pass: {first_loudnorm}")
-    stderr = ffmpeg.Popen(
-        [
-            "-hide_banner",
-            "-i",
-            f"{pre_master}",
-            "-filter_complex",
-            first_loudnorm,
-            "-vn",
-            "-sn",
-            "-f",
-            "null",
-            file_null,
-        ],
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=PIPE,
-    ).communicate()[1]
-
+def parse_ebu_bytes(norm: dict, stderr: bytes, log: Log) -> list[str]:
     start = end = 0
     lines = stderr.splitlines()
 
@@ -94,15 +67,12 @@ def apply_audio_normalization(
             break
 
     if start == 0 or end == 0:
-        print(stderr)
-        log.error("Invalid loudnorm stats.")
+        log.error(f"Invalid loudnorm stats.\n{stderr!r}")
 
     try:
         parsed = json.loads(b"\n".join(lines[start:end]))
-    except json.decoder.JSONDecodeError as e:
-        print(stderr)
-        print(start, end)
-        raise e
+    except json.decoder.JSONDecodeError:
+        log.error(f"Invalid loudnorm stats.\n{start=},{end=}\n{stderr!r}")
 
     for key in (
         "input_i",
@@ -126,21 +96,71 @@ def apply_audio_normalization(
     m_thresh = parsed["input_thresh"]
     target_offset = parsed["target_offset"]
 
-    ffmpeg.run(
+    return [
+        "-af",
+        f"loudnorm=i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:offset={target_offset}"
+        f":measured_i={m_i}:measured_lra={m_lra}:measured_tp={m_tp}"
+        f":measured_thresh={m_thresh}:linear=true:print_format=json",
+    ]
+
+
+def parse_peak_bytes(t: float, stderr: bytes, log: Log) -> list[str]:
+    peak_level = None
+    for line in stderr.splitlines():
+        if line.startswith(b"[Parsed_astats_0") and b"Peak level dB:" in line:
+            try:
+                peak_level = float(line.split(b":")[1])
+            except Exception:
+                log.error(f"Invalid `astats` stats.\n{stderr!r}")
+            break
+
+    if peak_level is None:
+        log.error(f"Invalid `astats` stats.\n{stderr!r}")
+
+    adjustment = t - peak_level
+    log.debug(f"current peak level: {peak_level}")
+    log.print(f"peak adjustment: {adjustment}")
+    return ["-af", f"volume={adjustment}"]
+
+
+def apply_audio_normalization(
+    ffmpeg: FFmpeg, norm: dict, pre_master: Path, path: Path, log: Log
+) -> None:
+    if norm["tag"] == "ebu":
+        first_pass = (
+            f"loudnorm=i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:"
+            f"offset={norm['gain']}:print_format=json"
+        )
+    else:
+        first_pass = "astats=measure_overall=Peak_level:measure_perchannel=0"
+
+    log.debug(f"audio norm first pass: {first_pass}")
+
+    stderr = ffmpeg.Popen(
         [
+            "-hide_banner",
             "-i",
             f"{pre_master}",
-            "-filter_complex",
-            f"[0]loudnorm=i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:offset={target_offset}"
-            f":measured_i={m_i}:measured_lra={m_lra}:measured_tp={m_tp}"
-            f":measured_thresh={m_thresh}:linear=true:print_format=json[norm1]",
-            "-map",
-            "[norm1]",
-            "-c:a:0",
-            "pcm_s16le",
-            f"{path}",
-        ]
-    )
+            "-af",
+            first_pass,
+            "-vn",
+            "-sn",
+            "-f",
+            "null",
+            file_null,
+        ],
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=PIPE,
+    ).communicate()[1]
+
+    if norm["tag"] == "ebu":
+        cmd = parse_ebu_bytes(norm, stderr, log)
+    else:
+        assert "t" in norm
+        cmd = parse_peak_bytes(norm["t"], stderr, log)
+
+    ffmpeg.run(["-i", f"{pre_master}"] + cmd + [f"{path}"])
 
 
 def make_new_audio(

@@ -118,3 +118,19 @@ def orc(*cs: object) -> Proc:
 
 def notc(c: object) -> Proc:
     return Proc("flat-not/c", lambda v: not check_contract(c, v), (1, 1), [any_p])
+
+
+def gte_c(n: int | float | Fraction) -> Proc:
+    return Proc(f"(>=/c {n})", lambda i: i >= n, (1, 1), [is_real])
+
+
+def gt_c(n: int | float | Fraction) -> Proc:
+    return Proc(f"(>/c {n})", lambda i: i > n, (1, 1), [is_real])
+
+
+def lte_c(n: int | float | Fraction) -> Proc:
+    return Proc(f"(<=/c {n})", lambda i: i <= n, (1, 1), [is_real])
+
+
+def lt_c(n: int | float | Fraction) -> Proc:
+    return Proc(f"(</c {n})", lambda i: i < n, (1, 1), [is_real])
