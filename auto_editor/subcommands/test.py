@@ -596,9 +596,10 @@ def main(sys_args: list[str] | None = None):
 
         return out
 
+    def audio_norm_f():
+        return run.main(["example.mp4"], ["--audio-normalize", "#f"])
 
-    def audio_norm():
-        run.main(["example.mp4"], ["--audio-normalize", "#f"])
+    def audio_norm_ebu():
         return run.main(["example.mp4"], ["--audio-normalize", "ebu:i=-5,lra=40,gain=5,tp=-1"])
 
 
@@ -813,6 +814,8 @@ def main(sys_args: list[str] | None = None):
                 check_font_error,
                 edit_negative_tests,
                 edit_positive_tests,
+                audio_norm_f,
+                audio_norm_ebu,
                 json_tests,
                 high_speed_test,
                 video_speed,
@@ -824,7 +827,6 @@ def main(sys_args: list[str] | None = None):
                 various_errors,
                 render_text,
                 add_audio,
-                audio_norm,
                 frame_rate,
                 help_tests,
                 version_test,
