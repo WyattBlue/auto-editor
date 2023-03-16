@@ -7,6 +7,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from fractions import Fraction
+from platform import system
 from time import perf_counter
 from typing import Any, Callable
 
@@ -600,8 +601,11 @@ def main(sys_args: list[str] | None = None):
         return run.main(["example.mp4"], ["--audio-normalize", "#f"])
 
     def audio_norm_ebu():
-        return run.main(["example.mp4"], ["--audio-normalize", "ebu:i=-5,lra=40,gain=5,tp=-1"])
-
+        lra = 20 if system() == "Linux" else 40
+        # Some old versions only support lra [1 - 20]
+        return run.main(
+            ["example.mp4"], ["--audio-normalize", f"ebu:i=-5,lra={lra},gain=5,tp=-1"]
+        )
 
     def palet():
         def cases(*cases: tuple[str, Any]) -> None:
