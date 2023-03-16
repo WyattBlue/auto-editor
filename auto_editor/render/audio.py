@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 import numpy as np
 
@@ -28,8 +28,8 @@ def make_new_audio(
     for l, layer in enumerate(tl.a):
         bar.start(len(layer), "Creating new audio")
 
-        path = os.path.join(temp, f"new{l}.wav")
-        output.append(path)
+        path = Path(temp, f"new{l}.wav")
+        output.append(f"{path}")
         arr: AudioData | None = None
 
         for c, clip in enumerate(layer):
@@ -55,7 +55,7 @@ def make_new_audio(
                     break
 
                 arr = np.memmap(
-                    os.path.join(temp, "asdf.map"),
+                    Path(temp, "asdf.map"),
                     mode="w+",
                     dtype=dtype,
                     shape=(leng, 2),
@@ -93,16 +93,18 @@ def make_new_audio(
             if not filters:
                 clip_arr = samp_list[samp_start:samp_end]
             else:
-                af = os.path.join(temp, f"af{af_tick}.wav")
-                af_out = os.path.join(temp, f"af{af_tick}_out.wav")
+                af = Path(temp, f"af{af_tick}.wav")
+                af_out = Path(temp, f"af{af_tick}_out.wav")
 
                 # Windows can't replace a file that's already in use, so we have to
                 # cycle through file names.
                 af_tick = (af_tick + 1) % 3
 
-                write(af, sr, samp_list[samp_start:samp_end])
-                ffmpeg.run(["-i", af, "-af", ",".join(filters), af_out])
-                clip_arr = read(af_out)[1]
+                with open(af, "wb") as fid:
+                    write(fid, sr, samp_list[samp_start:samp_end])
+
+                ffmpeg.run(["-i", f"{af}", "-af", ",".join(filters), f"{af_out}"])
+                clip_arr = read(f"{af_out}")[1]
 
             # Mix numpy arrays
             start = clip.start * sr // tb
@@ -117,12 +119,10 @@ def make_new_audio(
             bar.tick(c)
 
         if arr is not None:
-            write(path, sr, arr)
+            with open(path, "wb") as path_fid:
+                write(path_fid, sr, arr)
         bar.end()
 
-    try:
-        os.remove(os.path.join(temp, "asdf.map"))
-    except Exception:
-        pass
+    Path(temp, "asdf.map").unlink(missing_ok=True)
 
     return output

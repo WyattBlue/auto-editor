@@ -225,10 +225,7 @@ def read(filename: str) -> tuple[int, AudioData]:
     return sr, data
 
 
-def write(filename: str, sr: int, arr: AudioData) -> None:
-    # Write empty samples to 'filename' with properties of given arr
-    fid = open(filename, "wb")
-
+def write(fid: io.BufferedWriter, sr: int, arr: AudioData) -> None:
     # Write RIFF WAV Header
     fid.write(b"RIFF\x00\x00\x00\x00WAVE")
 
@@ -290,5 +287,3 @@ def write(filename: str, sr: int, arr: AudioData) -> None:
     size = fid.tell()
     fid.seek(4)
     fid.write(struct.pack("<I", size - 8))
-
-    fid.close()
