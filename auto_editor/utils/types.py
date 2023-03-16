@@ -23,10 +23,9 @@ def _split_num_str(val: str | float) -> tuple[float, str]:
     if isinstance(val, (float, int)):
         return val, ""
 
-    NUM_CHARS = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "_", " ", ".", "-"}
     index = 0
     for char in val:
-        if char not in NUM_CHARS:
+        if char not in "0123456789_ .-":
             break
         index += 1
     num, unit = val[:index], val[index:]
@@ -264,6 +263,7 @@ class Args:
     background: str = "#000"
     edit_based_on: str = "audio"
     keep_tracks_separate: bool = False
+    audio_normalize: str = "#f"
     export: str | None = None
     player: str | None = None
     no_open: bool = False

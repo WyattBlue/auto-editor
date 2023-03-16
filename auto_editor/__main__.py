@@ -36,7 +36,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--edit-based-on",
         "--edit",
-        metavar="[METHOD:[ATTRS?] OPERAND? ...]",
+        metavar="METHOD",
         help="Decide which method to use when making edits",
     )
     parser.add_argument(
@@ -268,6 +268,11 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--keep-tracks-separate",
         flag=True,
         help="Don't mix all audio tracks into one when exporting",
+    )
+    parser.add_argument(
+        "--audio-normalize",
+        metavar="NORM-TYPE",
+        help="Apply audio rendering to all audio tracks. Applied right before rendering the output file.",
     )
     parser.add_text("Miscellaneous:")
     parser.add_argument(

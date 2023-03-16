@@ -97,6 +97,7 @@ is_frac = Contract("frac?", lambda v: type(v) is Fraction)
 is_str = Contract("string?", lambda v: type(v) is str)
 any_p = Contract("any", lambda v: True)
 is_void = Contract("void?", lambda v: v is None)
+is_int_or_float = Contract("(or/c int? float?)", lambda v: type(v) in (int, float))
 is_threshold = Contract(
     "threshold?", lambda v: type(v) in (int, float) and v >= 0 and v <= 1  # type: ignore
 )

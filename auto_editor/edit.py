@@ -310,7 +310,7 @@ def edit_media(
             sub_output = make_new_subtitles(tl, ffmpeg, temp, log)
 
         if ctr.allow_audio:
-            audio_output = make_new_audio(tl, ensure, ffmpeg, bar, temp, log)
+            audio_output = make_new_audio(tl, ensure, args, ffmpeg, bar, temp, log)
 
         if ctr.allow_video:
             if tl.v:
