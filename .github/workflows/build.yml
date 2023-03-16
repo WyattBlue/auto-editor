@@ -34,4 +34,6 @@ jobs:
     - name: Install Auto-Editor
       run: pip install -e .
     - name: Test
-      run: auto-editor test all
+      run: |
+        auto-editor --debug
+        auto-editor test all
