@@ -136,7 +136,7 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
             clean_all()
             sys.exit(1)
         except Exception as e:
-            print(f"Test '{test.__name__}' ({passed}/{len(tests)}) failed.\n{e}")
+            print(f"Test '{test.__name__}' ({passed}/{len(tests)}) failed.\n")
             clean_all()
             raise e
 
@@ -596,6 +596,12 @@ def main(sys_args: list[str] | None = None):
 
         return out
 
+
+    def audio_norm():
+        run.main(["example.mp4"], ["--audio-normalize", "#f"])
+        return run.main(["example.mp4"], ["--audio-normalize", "ebu:i=-5,lra=40,gain=5,tp=-1"])
+
+
     def palet():
         def cases(*cases: tuple[str, Any]) -> None:
             for text, expected in cases:
@@ -818,6 +824,7 @@ def main(sys_args: list[str] | None = None):
                 various_errors,
                 render_text,
                 add_audio,
+                audio_norm,
                 frame_rate,
                 help_tests,
                 version_test,

@@ -161,6 +161,29 @@ Here is a list of examples on how margin mutates boolean arrays
 (margin -2 2 (bool-array 0 0 1 1 0 0 0))
 > (array 'bool 0 0 0 0 1 1 0)
 """.strip(),
+        "--audio-normalize": """
+Apply audio volume normalization after cutting.
+
+Normalization Methods:
+ - ebu  ; EBU R128 (double pass) loudness normalization
+   ; Integrated loudness target
+   - i (and/c (or/c int? float?) (>=? -70) (<=? -5)) : -24.0
+   ; Loudness range target
+   - lra (and/c (or/c int? float?) (>=? 1) (<=? 50)) : 7.0
+   ; Set maximum true peak
+   - tp (and/c (or/c int? float?) (>=? -9) (<=? 0)) : -2.0
+   ; Set offset gain. Gain is applied before the true-peak limiter
+   - gain (and/c (or/c int? float?) (>=? -99) (<=? 99)) : 0.0
+
+If `#f` is chosen, no audio-normalization will be applied.
+
+Note that this option is a thin layer over the ffmpeg audio filter `loudnorm`
+Check out its docs for more info: https://ffmpeg.org/ffmpeg-filters.html#loudnorm
+
+Examples:
+--audio-normalize #f
+--audio-normalize ebu:i=-5,lra=40,gain=5,tp=-1
+""".strip(),
         "--silent-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
         "--video-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
         "--min-clip-length": "Type: nonnegative-integer?",

@@ -1285,7 +1285,7 @@ env: Env = {
     "println": Proc("println", lambda v: my_write(print_str(v) + "\n"), (1, 1)),
     "exit": Proc("exit", sys.exit, (0, 1), [is_uint]),
     "error": Proc("error", raise_, (1, 1), [is_str]),
-    "sleep": Proc("sleep", sleep, (1, 1), [lambda t: is_int(t) or is_float(t)]),
+    "sleep": Proc("sleep", sleep, (1, 1), [is_int_or_float]),
     # void
     "void": Proc("void", lambda *v: None, (0, 0)),
     # control / b-arrays
