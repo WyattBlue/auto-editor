@@ -284,6 +284,8 @@ def make_new_audio(
 
         bar.end()
 
-    Path(temp, "asdf.map").unlink(missing_ok=True)
-
+    try:
+        Path(temp, "asdf.map").unlink(missing_ok=True)
+    except PermissionError:
+        pass
     return output
