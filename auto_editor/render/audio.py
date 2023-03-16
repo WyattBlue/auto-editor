@@ -93,10 +93,12 @@ def apply_audio_normalization(
             end = index + 1
             break
 
+    print(stderr)
     try:
         parsed = json.loads(b"\n".join(lines[start:end]))
     except json.decoder.JSONDecodeError as e:
-        log.error(e)
+        print(start, end)
+        raise e
 
     for key in (
         "input_i",
