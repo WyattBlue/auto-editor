@@ -94,6 +94,10 @@ palet_style = """
 }
 """
 
+def san(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 with open(ref / "palet.html", "w") as file:
     file.write(
         '{{ comp.header "Palet Scripting Reference" }}\n'
@@ -110,9 +114,6 @@ with open(ref / "palet.html", "w") as file:
 
     def text_to_str(t: dict) -> str:
         s = ""
-
-        def san(s: str) -> str:
-            return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
         for c in t["children"]:
             if c is True:
@@ -143,9 +144,9 @@ with open(ref / "palet.html", "w") as file:
                 results.append(v)
                 continue
             if len(v) == 3:
-                results.append(f'<span class="palet-var">[{v[0]}]</span>')
+                results.append(f'<span class="palet-var">[{san(v[0])}]</span>')
             else:
-                results.append(f'<span class="palet-var">{v[0]}</span>')
+                results.append(f'<span class="palet-var">{san(v[0])}</span>')
         return "&nbsp;".join(results)
 
 
@@ -153,13 +154,13 @@ with open(ref / "palet.html", "w") as file:
         result = ""
         for p in v.replace("(", " ( ").replace(")", " ) ").strip().split(" "):
             if p in env:
-                result += f'<a href="#{p}">{p}</a> '
+                result += f'<a href="#{p}">{san(p)}</a> '
             elif p == "(":
                 result += "("
             elif p == ")":
                 result = result[:-1] + ")"
             else:
-                result += f"{p} "
+                result += f"{san(p)} "
         return result.strip()
 
     def build_var_sig(sigs: list[str | tuple]) -> str:
@@ -171,7 +172,7 @@ with open(ref / "palet.html", "w") as file:
                 raise ValueError(f"bad signature: {sigs}")
 
             name, sig, *_ = s
-            result += f'<p class="mono">&nbsp;<span class="palet-var">{name}</span>'
+            result += f'<p class="mono">&nbsp;<span class="palet-var">{san(name)}</span>'
             result += f'&nbsp;:&nbsp;{build_var(sig)}'
 
             result += f"&nbsp;=&nbsp;{build_var(s[2])}</p>\n" if len(s) > 2 else "</p>\n"
@@ -197,14 +198,14 @@ with open(ref / "palet.html", "w") as file:
             if some["tag"] == "value":
                 file.write(
                     '<div class="palet-block">\n'
-                    f'<p class="mono">{some["name"]}\n'
+                    f'<p class="mono">{san(some["name"])}\n'
                     f'&nbsp;:&nbsp;<a href="#{some["sig"]}">{some["sig"]}</a>'
                     '&nbsp;&nbsp;Value</p>\n</div>\n'
                     f"<p>{text_to_str(some['summary'])}</p>\n"
                 )
             if some["tag"] == "syntax":
                 file.write(
-                    f'<div id="{some["name"]}" class="palet-block">\n'
+                    f'<div id="{san(some["name"])}" class="palet-block">\n'
                     f'<p class="mono">(<b>{some["name"]}</b>&nbsp;{some["body"]})'
                     '&nbsp;&nbsp;Syntax</p>\n</div>\n'
                     f"<p>{text_to_str(some['summary'])}</p>\n"
@@ -212,7 +213,7 @@ with open(ref / "palet.html", "w") as file:
             if some["tag"] == "pred":
                 file.write(
                     f'<div id="{some["name"]}" class="palet-block">\n'
-                    f'<p class="mono">(<b>{some["name"]}</b>&nbsp;{build_sig(["v"])})'
+                    f'<p class="mono">(<b>{san(some["name"])}</b>&nbsp;{build_sig(["v"])})'
                     '&nbsp;→&nbsp;<a href="#bool?">bool?</a>&nbsp;&nbsp;Procedure</p>\n'
                     f'<p class="mono">&nbsp;<span class="palet-var">v</span>'
                     '&nbsp;:&nbsp;<a href="#any?">any?</a></p></div>\n'
@@ -224,7 +225,7 @@ with open(ref / "palet.html", "w") as file:
                 assert isinstance(rname, str), rname
                 file.write(
                     f'<div id="{some["name"]}" class="palet-block">\n'
-                    f'<p class="mono">(<b>{some["name"]}</b>&nbsp;{build_sig(varsigs)})'
+                    f'<p class="mono">(<b>{san(some["name"])}</b>&nbsp;{build_sig(varsigs)})'
                     + ("" if rname == "none" else f'&nbsp;→&nbsp;{build_var(rname)}')
                     + '&nbsp;&nbsp;Procedure</p>\n'
                 )

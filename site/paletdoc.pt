@@ -907,6 +907,29 @@
                 "satisfies the opposite of the given contract."
             )
         )
+        (proc
+            ">=/c"
+            (vec (vec "n" "real?") "contract?")
+            (text
+                "Returns a new contract that requires the input to be " (link 'real?)
+                " and " (link '>=) " than " 'n "."
+            )
+        )
+        (proc
+            ">/c"
+            (vec (vec "n" "real?") "contract?")
+            (text "Like " (link '>=/c) " but for " (link '>) ".")
+        )
+        (proc
+            "<=/c"
+            (vec (vec "n" "real?") "contract?")
+            (text "Like " (link '>=/c) " but for " (link '<=) ".")
+        )
+        (proc
+            "</c"
+            (vec (vec "n" "real?") "contract?")
+            (text "Like " (link '>=/c) " but for " (link '<) ".")
+        )
     ]
     "Objects" [vec
         (pred
