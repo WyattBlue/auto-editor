@@ -18,11 +18,14 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 from auto_editor.wavfile import AudioData, read, write
 
+# only newer versions of ffmpeg support lra to 50.
+# Ubuntu Latest and my static ffmpeg build for Windows are the main blockers
+
 norm_types = {
     "ebu": smallAttrs(
         "ebu",
         smallAttr("i", -24.0, andc(is_int_or_float, gte_c(-70), lte_c(-5))),
-        smallAttr("lra", 7.0, andc(is_int_or_float, gte_c(1), lte_c(50))),
+        smallAttr("lra", 7.0, andc(is_int_or_float, gte_c(1), lte_c(20))),
         smallAttr("tp", -2.0, andc(is_int_or_float, gte_c(-9), lte_c(99))),
         smallAttr("gain", 0.0, andc(is_int_or_float, gte_c(-99), lte_c(99))),
     ),
