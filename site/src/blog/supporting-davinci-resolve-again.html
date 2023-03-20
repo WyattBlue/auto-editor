@@ -3,12 +3,11 @@
 {{ comp.blog-nav }}
 <section class="section">
 <div class="container">
-    <!-- Titles Are Capitalized in AP Style -->
     <h1>Supporting DaVinci Resolve Again</h1>
     <p class="author">Author: <b>WyattBlue</b></p>
     <p class="date">Date: <b>March 20, 2023</b></p>
-    <p>In December of 2021, I removed support for DaVinci Resolve because of then unresolved bugs and because of my frustration working with the editor. Even with the removal, people still tried to use Resolve with the <code>--export premiere</code> export. A large segment of users continued to believe Resolve was still supported, especially by late 2022-2023, even amount some app users. For that reason, I took a second look at supporting DaVinci and concluded that support was possible.</p>
-    <p>In master, <code>resolve</code> is now a possible value for <code>--export</code>. Internally, it uses the same format <code>premiere</code> uses. There are some bugs like multi-track audio timelines not working that I'm currently investigating, but that should be fixed soon.</p>
+    <p>In <a href="https://github.com/WyattBlue/auto-editor/releases/tag/21w50a">December of 2021</a>, I removed support for DaVinci Resolve because of then unresolved bugs and because of my frustration working with the editor. Even with the removal, people still tried to use Resolve with the <code>--export premiere</code> export. A large segment of users continued to believe Resolve was still supported, especially by late 2022-2023, even amount some app users. For that reason, I took a second look at supporting DaVinci and concluded that support was possible.</p>
+    <p>In the branch master, <code>resolve</code> is now a possible value for <code>--export</code>. Internally, it uses the same format <code>premiere</code> uses. While there are some bugs reported by users like multi-track audio timelines not working, I will to investigate and fix those issues.</p>
 </div>
 </section>
 </body>
