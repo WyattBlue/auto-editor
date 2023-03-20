@@ -44,6 +44,7 @@ def set_output(
 
     ext_map = {
         "premiere": ".xml",
+        "resolve": ".xml",
         "final-cut-pro": ".fcpxml",
         "shotcut": ".mlt",
         "json": ".json",
@@ -153,6 +154,7 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
     parsing: dict[str, Attrs] = {
         "default": Attrs("default"),
         "premiere": Attrs("premiere", Attr("name", str, None)),
+        "resolve": Attrs("resolve", Attr("name", str, None)),
         "final-cut-pro": Attrs("final-cut-pro", Attr("name", str, None)),
         "shotcut": Attrs("shotcut"),
         "json": timeline_builder,
@@ -266,7 +268,7 @@ def edit_media(
         make_json_timeline(export["api"], output, tl, log)
         return
 
-    if export["export"] == "premiere":
+    if export["export"] in ("premiere", "resolve"):
         from auto_editor.formats.premiere import premiere_write_xml
 
         premiere_write_xml(export["name"], ensure, output, tl)

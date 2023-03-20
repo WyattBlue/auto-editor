@@ -300,6 +300,7 @@ def main() -> None:
         macros=[
             ({"--frame-margin"}, ["--margin"]),
             ({"--export-to-premiere", "-exp"}, ["--export", "premiere"]),
+            ({"--export-to-resolve", "-exr"}, ["--export", "resolve"]),
             ({"--export-to-final-cut-pro", "-exf"}, ["--export", "final-cut-pro"]),
             ({"--export-to-shotcut", "-exs"}, ["--export", "shotcut"]),
             ({"--export-as-json"}, ["--export", "json"]),

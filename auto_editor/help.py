@@ -67,15 +67,32 @@ Command-line Examples:
   --edit all/e
 """.strip(),
         "--export": """
-Instead of exporting a video, export as one of these options instead.
+This option controls how timelines are exported.
 
-default       : Export as usual
-premiere      : Export as an XML timeline file for Adobe Premiere Pro
-final-cut-pro : Export as an XML timeline file for Final Cut Pro
-shotcut       : Export as an XML timeline file for Shotcut
-json          : Export as an auto-editor JSON timeline file
-audio         : Export as a WAV audio file
-clip-sequence : Export as multiple numbered media files
+Export Methods:
+ - default    ; Export as a regular media file
+
+ - premiere   ; Export as an XML timeline file for Adobe Premiere Pro
+    - name  ; Set the group name
+
+ - resolve    ; Export as an XML timeline file for DaVinci Resolve
+    - name  ; Set the group name
+
+ - final-cut-pro  ; Export as an XML timeline file for Final Cut Pro
+    - name  ; Set the group name
+
+ - shotcut    ; Export as an XML timeline file for Shotcut
+
+ - json       ; Export as an auto-editor JSON timeline file
+    - api  ;  Set the timeline version used
+
+ - timeline   ; Print the auto-editor timeline to stdout
+    - api
+
+ - audio      ; Export as a WAV audio file
+
+ - clip-sequence  ; Export as multiple numbered media files
+
 """.strip(),
         "--player": """
 This option uses shell-like syntax to support using a specific player:
@@ -209,7 +226,6 @@ A typical output will look like this:
     "subdump": {
         "_": "Dump text-based subtitles to stdout with formatting stripped out"
     },
-    "grep": {"_": "Read and match text-based subtitle tracks"},
     "desc": {"_": "Display a media's description metadata"},
     "test": {"_": "Self-Hosted Unit and End-to-End tests"},
 }
