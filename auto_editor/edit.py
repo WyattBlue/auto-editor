@@ -184,9 +184,9 @@ def edit_media(
     if paths:
         path_ext = os.path.splitext(paths[0])[1].lower()
         if path_ext == ".xml":
-            from auto_editor.formats.premiere import premiere_read_xml
+            from auto_editor.formats.fcp7 import fcp7_read_xml
 
-            tl = premiere_read_xml(paths[0], ffmpeg, log)
+            tl = fcp7_read_xml(paths[0], ffmpeg, log)
             src: FileInfo | None = next(iter(tl.sources.items()))[1]
             sources = tl.sources
 
@@ -269,9 +269,9 @@ def edit_media(
         return
 
     if export["export"] in ("premiere", "resolve"):
-        from auto_editor.formats.premiere import premiere_write_xml
+        from auto_editor.formats.fcp7 import fcp7_write_xml
 
-        premiere_write_xml(export["name"], ensure, output, tl)
+        fcp7_write_xml(export["name"], ensure, output, tl, export["export"])
         return
 
     if export["export"] == "final-cut-pro":

@@ -14,6 +14,8 @@ from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
 from .utils import Validator, safe_mkdir, show
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from auto_editor.output import Ensure
     from auto_editor.utils.log import Log
 
@@ -104,7 +106,7 @@ def speedup(speed: float) -> Element:
     return fil
 
 
-def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
+def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     def xml_bool(val: str) -> bool:
         if val == "TRUE":
             return True
@@ -248,7 +250,13 @@ def premiere_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     return v3(sources, tb, sr, res, "#000", vobjs, aobjs, None)
 
 
-def premiere_write_xml(_name: str | None, ensure: Ensure, output: str, tl: v3) -> None:
+def path_resolve(path: Path, flavor: str) -> str:
+    if flavor == "resolve":
+        return path.resolve().as_uri()
+    return f"{path.resolve()}"
+
+
+def fcp7_write_xml(_name: str | None, ensure: Ensure, output: str, tl: v3, flavor: str) -> None:
     assert tl.v1 is not None
 
     clips = list(filter(lambda c: c[2] != 99999, tl.v1.chunks))
@@ -260,7 +268,7 @@ def premiere_write_xml(_name: str | None, ensure: Ensure, output: str, tl: v3) -
     audio_file = len(src.videos) == 0 and len(src.audios) == 1
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
-    pathurls = [str(src.path.resolve())]
+    pathurls = [path_resolve(src.path, flavor)]
 
     tracks = len(src.audios)
 
@@ -271,7 +279,7 @@ def premiere_write_xml(_name: str | None, ensure: Ensure, output: str, tl: v3) -
         for i in range(1, tracks):
             newtrack = fold / f"{i}.wav"
             move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
-            pathurls.append(str(newtrack.resolve()))
+            pathurls.append(path_resolve(newtrack, flavor))
 
     if _name is None:
         name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
