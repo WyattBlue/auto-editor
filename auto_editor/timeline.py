@@ -6,8 +6,8 @@ from typing import Union
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import *
-from auto_editor.objs.util import Attr, Attrs, Required, smallAttr, smallAttrs
 from auto_editor.utils.chunks import Chunks, v2Chunks
+from auto_editor.utils.cmdkw import Required, smallAttr, smallAttrs
 from auto_editor.utils.types import Align
 
 
@@ -209,8 +209,6 @@ visual_objects = {
 audio_objects = {
     "audio": (TlAudio, audio_builder),
 }
-
-timeline_builder = Attrs("timeline", Attr("api", str, "3.0.0"))
 
 Visual = Union[TlText, TlImage, TlRect, TlEllipse]
 VLayer = list[Union[TlVideo, Visual]]

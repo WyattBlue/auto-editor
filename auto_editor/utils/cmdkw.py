@@ -129,7 +129,7 @@ def parse_with_palet(text: str, build: smallAttrs, env: dict) -> dict[str, Any]:
         except MyError as e:
             raise ParserError(e)
 
-        if len(results) == 0:
+        if not results:
             raise ParserError("Results must be of length > 0")
 
         if c(results[-1]) is not True:

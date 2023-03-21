@@ -1436,7 +1436,7 @@ env: Env = {
 ###############################################################################
 
 
-def interpret(env: Env, parser: Parser) -> Any:
+def interpret(env: Env, parser: Parser) -> list:
     result = []
     while parser.current_token.type not in (EOF, RPAREN, RBRAC, RCUR):
         result.append(my_eval(env, parser.expr()))

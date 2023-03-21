@@ -4,15 +4,17 @@ import os
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.lib.contracts import is_str
+from auto_editor.lib.err import MyError
 from auto_editor.make_layers import make_timeline
-from auto_editor.objs.util import Attr, Attrs, ParserError, parse_dataclass
 from auto_editor.output import Ensure, mux_quality_media
 from auto_editor.render.audio import make_new_audio
 from auto_editor.render.subtitle import make_new_subtitles
 from auto_editor.render.video import render_av
-from auto_editor.timeline import timeline_builder, v1, v3
+from auto_editor.timeline import v1, v3
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunk, Chunks
+from auto_editor.utils.cmdkw import parse_with_palet, smallAttr, smallAttrs
 from auto_editor.utils.container import Container, container_constructor
 from auto_editor.utils.log import Log, Timer
 from auto_editor.utils.types import Args
@@ -151,24 +153,26 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
     else:
         name, text = exploded
 
-    parsing: dict[str, Attrs] = {
-        "default": Attrs("default"),
-        "premiere": Attrs("premiere", Attr("name", str, None)),
-        "resolve": Attrs("resolve", Attr("name", str, None)),
-        "final-cut-pro": Attrs("final-cut-pro", Attr("name", str, None)),
-        "shotcut": Attrs("shotcut"),
-        "json": timeline_builder,
-        "timeline": timeline_builder,
-        "audio": Attrs("audio"),
-        "clip-sequence": Attrs("clip-sequence"),
+    name_attr = smallAttr("name", "Auto-Editor Media Group", is_str)
+
+    parsing: dict[str, smallAttrs] = {
+        "default": smallAttrs("default"),
+        "premiere": smallAttrs("premiere", name_attr),
+        "resolve": smallAttrs("resolve", name_attr),
+        "final-cut-pro": smallAttrs("final-cut-pro", name_attr),
+        "shotcut": smallAttrs("shotcut"),
+        "json": smallAttrs("json", smallAttr("api", "3.0.0", is_str)),
+        "timeline": smallAttrs("json", smallAttr("api", "3.0.0", is_str)),
+        "audio": smallAttrs("audio"),
+        "clip-sequence": smallAttrs("clip-sequence"),
     }
 
     if name in parsing:
         try:
-            _tmp = parse_dataclass(text, parsing[name])
+            _tmp = parse_with_palet(text, parsing[name], {})
             _tmp["export"] = name
             return _tmp
-        except ParserError as e:
+        except MyError as e:
             log.error(e)
 
     log.error(f"'{name}': Export must be [{', '.join([s for s in parsing.keys()])}]")

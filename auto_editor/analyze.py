@@ -19,10 +19,10 @@ from auto_editor.lib.contracts import (
     orc,
 )
 from auto_editor.lib.data_structs import Sym
-from auto_editor.objs.util import ParserError, Required, parse_with_palet
-from auto_editor.objs.util import smallAttr as Attr
-from auto_editor.objs.util import smallAttrs as Attrs
 from auto_editor.render.subtitle import SubtitleParser
+from auto_editor.utils.cmdkw import ParserError, Required, parse_with_palet
+from auto_editor.utils.cmdkw import smallAttr as Attr
+from auto_editor.utils.cmdkw import smallAttrs as Attrs
 from auto_editor.utils.func import boolop
 from auto_editor.wavfile import read
 

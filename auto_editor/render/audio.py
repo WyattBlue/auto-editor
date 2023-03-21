@@ -10,10 +10,10 @@ import numpy as np
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.interpreter import env
 from auto_editor.lib.contracts import andc, gte_c, is_int_or_float, lte_c
-from auto_editor.objs.util import ParserError, parse_with_palet, smallAttr, smallAttrs
 from auto_editor.output import Ensure
 from auto_editor.timeline import v3
 from auto_editor.utils.bar import Bar
+from auto_editor.utils.cmdkw import ParserError, parse_with_palet, smallAttr, smallAttrs
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 from auto_editor.wavfile import AudioData, read, write

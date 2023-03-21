@@ -11,7 +11,6 @@ from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
-from auto_editor.objs.util import ParserError, parse_with_palet
 from auto_editor.timeline import (
     ASpace,
     TlAudio,
@@ -24,6 +23,7 @@ from auto_editor.timeline import (
     visual_objects,
 )
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
+from auto_editor.utils.cmdkw import ParserError, parse_with_palet
 from auto_editor.utils.func import mut_margin
 from auto_editor.utils.types import Args, CoerceError, time
 
