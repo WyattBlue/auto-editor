@@ -256,10 +256,12 @@ def path_resolve(path: Path, flavor: str) -> str:
     return f"{path.resolve()}"
 
 
-def fcp7_write_xml(_name: str | None, ensure: Ensure, output: str, tl: v3, flavor: str) -> None:
+def fcp7_write_xml(
+    _name: str | None, ensure: Ensure, output: str, tl: v3, flavor: str
+) -> None:
     assert tl.v1 is not None
 
-    clips = list(filter(lambda c: c[2] != 99999, tl.v1.chunks))
+    clips = [c for c in tl.v1.chunks if c[2] != 99999]
     duration = tl.v1.chunks[-1][1]
 
     src = tl.v1.source

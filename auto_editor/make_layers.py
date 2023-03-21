@@ -96,7 +96,7 @@ def run_interpreter(
     log: Log,
 ) -> NDArray[np.bool_]:
     try:
-        parser = Parser(Lexer(text))
+        parser = Parser(Lexer("`--edit`", text))
         if log.is_debug:
             log.debug(f"edit: {parser}")
 
