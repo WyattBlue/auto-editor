@@ -38,10 +38,11 @@ auto-editor example.mp4 --edit motion:threshold=2%</code>
 <h2>Exporting to Editors</h2>
 <p>Create an XML file that can be imported to Adobe Premiere Pro using this command:</p>
 <pre><code>auto-editor example.mp4 --export premiere</code></pre>
-<p>Similar commands exist for:</p>
+<p>Auto-Editor can also export to:</p>
 <ul>
-  <li><code>--export final-cut-pro</code> for for Final Cut Pro.</li>
-  <li><code>--export shotcut</code> for ShotCut.</li>
+  <li>DaVinci Resolve with <code>--export resolve</code></li>
+  <li>Final Cut Pro with <code>--export final-cut-pro</code></li>
+  <li>ShotCut with <code>--export shotcut</code></li>
 </ul>
 <p>Other editors, like Sony Vegas, can understand the <code>premiere</code> format. If your favorite editor doesn't, you can use <code>--export clip-sequence</code> which creates many video clips that can be imported and manipulated like normal.</p>
 <br>

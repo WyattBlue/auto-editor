@@ -184,7 +184,7 @@ with open(ref / "palet.html", "w") as file:
         source = sourcefile.read()[:]
 
     canonical_env = deepcopy(env)
-    result = interpret(env, Parser(Lexer(source)))
+    result = interpret(env, Parser(Lexer("paletdoc.pt", source)))
     doc = env["doc"].copy()
 
     for category, somethings in doc.items():
