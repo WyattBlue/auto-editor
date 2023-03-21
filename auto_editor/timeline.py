@@ -7,7 +7,7 @@ from typing import Union
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import *
 from auto_editor.utils.chunks import Chunks, v2Chunks
-from auto_editor.utils.cmdkw import Required, smallAttr, smallAttrs
+from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
 from auto_editor.utils.types import Align
 
 
@@ -131,71 +131,71 @@ class TlEllipse(_Visual):
     name: str = "ellipse"
 
 
-video_builder = smallAttrs(
+video_builder = pAttrs(
     "video",
-    smallAttr("start", Required, is_uint),
-    smallAttr("dur", Required, is_uint),
-    smallAttr("src", Required, any_p),
-    smallAttr("offset", 0, is_int),
-    smallAttr("speed", 1, is_real),
-    smallAttr("stream", 0, is_uint),
+    pAttr("start", Required, is_uint),
+    pAttr("dur", Required, is_uint),
+    pAttr("src", Required, any_p),
+    pAttr("offset", 0, is_int),
+    pAttr("speed", 1, is_real),
+    pAttr("stream", 0, is_uint),
 )
-audio_builder = smallAttrs(
+audio_builder = pAttrs(
     "audio",
-    smallAttr("start", Required, is_uint),
-    smallAttr("dur", Required, is_uint),
-    smallAttr("src", Required, any_p),
-    smallAttr("offset", 0, is_int),
-    smallAttr("speed", 1, is_real),
-    smallAttr("volume", 1, is_real),
-    smallAttr("stream", 0, is_uint),
+    pAttr("start", Required, is_uint),
+    pAttr("dur", Required, is_uint),
+    pAttr("src", Required, any_p),
+    pAttr("offset", 0, is_int),
+    pAttr("speed", 1, is_real),
+    pAttr("volume", 1, is_real),
+    pAttr("stream", 0, is_uint),
 )
-text_builder = smallAttrs(
+text_builder = pAttrs(
     "text",
-    smallAttr("start", Required, is_uint),
-    smallAttr("dur", Required, is_uint),
-    smallAttr("content", Required, is_str),
-    smallAttr("x", 0.5, is_real),
-    smallAttr("y", 0.5, is_real),
-    smallAttr("font", "Arial", is_str),
-    smallAttr("size", 55, is_uint),
-    smallAttr("align", "left", is_str),
-    smallAttr("opacity", 1, is_threshold),
-    smallAttr("anchor", "ce", is_str),
-    smallAttr("rotate", 0, is_real),
-    smallAttr("fill", "#FFF", is_str),
-    smallAttr("stroke", 0, is_uint),
-    smallAttr("strokecolor", "#000", is_str),
+    pAttr("start", Required, is_uint),
+    pAttr("dur", Required, is_uint),
+    pAttr("content", Required, is_str),
+    pAttr("x", 0.5, is_real),
+    pAttr("y", 0.5, is_real),
+    pAttr("font", "Arial", is_str),
+    pAttr("size", 55, is_uint),
+    pAttr("align", "left", is_str),
+    pAttr("opacity", 1, is_threshold),
+    pAttr("anchor", "ce", is_str),
+    pAttr("rotate", 0, is_real),
+    pAttr("fill", "#FFF", is_str),
+    pAttr("stroke", 0, is_uint),
+    pAttr("strokecolor", "#000", is_str),
 )
 
-img_builder = smallAttrs(
+img_builder = pAttrs(
     "image",
-    smallAttr("start", Required, is_uint),
-    smallAttr("dur", Required, is_uint),
-    smallAttr("src", Required, any_p),
-    smallAttr("x", 0.5, is_real),
-    smallAttr("y", 0.5, is_real),
-    smallAttr("opacity", 1, is_threshold),
-    smallAttr("anchor", "ce", is_str),
-    smallAttr("rotate", 0, is_real),
-    smallAttr("stroke", 0, is_uint),
-    smallAttr("strokecolor", "#000", is_str),
+    pAttr("start", Required, is_uint),
+    pAttr("dur", Required, is_uint),
+    pAttr("src", Required, any_p),
+    pAttr("x", 0.5, is_real),
+    pAttr("y", 0.5, is_real),
+    pAttr("opacity", 1, is_threshold),
+    pAttr("anchor", "ce", is_str),
+    pAttr("rotate", 0, is_real),
+    pAttr("stroke", 0, is_uint),
+    pAttr("strokecolor", "#000", is_str),
 )
 
-rect_builder = smallAttrs(
+rect_builder = pAttrs(
     "rect",
-    smallAttr("start", Required, is_uint),
-    smallAttr("dur", Required, is_uint),
-    smallAttr("x", Required, is_real),
-    smallAttr("y", Required, is_real),
-    smallAttr("width", Required, is_real),
-    smallAttr("height", Required, is_real),
-    smallAttr("opacity", 1, is_threshold),
-    smallAttr("anchor", "ce", is_str),
-    smallAttr("rotate", 0, is_real),
-    smallAttr("fill", "#c4c4c4", is_str),
-    smallAttr("stroke", 0, is_uint),
-    smallAttr("strokecolor", "#000", is_str),
+    pAttr("start", Required, is_uint),
+    pAttr("dur", Required, is_uint),
+    pAttr("x", Required, is_real),
+    pAttr("y", Required, is_real),
+    pAttr("width", Required, is_real),
+    pAttr("height", Required, is_real),
+    pAttr("opacity", 1, is_threshold),
+    pAttr("anchor", "ce", is_str),
+    pAttr("rotate", 0, is_real),
+    pAttr("fill", "#c4c4c4", is_str),
+    pAttr("stroke", 0, is_uint),
+    pAttr("strokecolor", "#000", is_str),
 )
 ellipse_builder = rect_builder
 visual_objects = {

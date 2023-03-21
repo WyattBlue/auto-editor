@@ -13,7 +13,7 @@ from auto_editor.lib.contracts import andc, gte_c, is_int_or_float, lte_c
 from auto_editor.output import Ensure
 from auto_editor.timeline import v3
 from auto_editor.utils.bar import Bar
-from auto_editor.utils.cmdkw import ParserError, parse_with_palet, smallAttr, smallAttrs
+from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 from auto_editor.wavfile import AudioData, read, write
@@ -22,15 +22,15 @@ from auto_editor.wavfile import AudioData, read, write
 # Ubuntu Latest and my static ffmpeg build for Windows are the main blockers
 
 norm_types = {
-    "ebu": smallAttrs(
+    "ebu": pAttrs(
         "ebu",
-        smallAttr("i", -24.0, andc(is_int_or_float, gte_c(-70), lte_c(-5))),
-        smallAttr("lra", 7.0, andc(is_int_or_float, gte_c(1), lte_c(20))),
-        smallAttr("tp", -2.0, andc(is_int_or_float, gte_c(-9), lte_c(99))),
-        smallAttr("gain", 0.0, andc(is_int_or_float, gte_c(-99), lte_c(99))),
+        pAttr("i", -24.0, andc(is_int_or_float, gte_c(-70), lte_c(-5))),
+        pAttr("lra", 7.0, andc(is_int_or_float, gte_c(1), lte_c(20))),
+        pAttr("tp", -2.0, andc(is_int_or_float, gte_c(-9), lte_c(99))),
+        pAttr("gain", 0.0, andc(is_int_or_float, gte_c(-99), lte_c(99))),
     ),
-    "peak": smallAttrs(
-        "peak", smallAttr("t", -8.0, andc(is_int_or_float, gte_c(-99), lte_c(0)))
+    "peak": pAttrs(
+        "peak", pAttr("t", -8.0, andc(is_int_or_float, gte_c(-99), lte_c(0)))
     ),
 }
 
