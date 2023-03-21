@@ -17,7 +17,7 @@ class Required:
     pass
 
 
-class smallAttr:
+class pAttr:
     __slots__ = ("n", "default", "contract")
 
     def __init__(self, n: str, default: Any, contract: Any):
@@ -26,24 +26,24 @@ class smallAttr:
         self.contract = contract
 
 
-class smallAttrs:
+class pAttrs:
     __slots__ = ("name", "attrs")
 
-    def __init__(self, name: str, *attrs: smallAttr):
+    def __init__(self, name: str, *attrs: pAttr):
         self.name = name
         self.attrs = attrs
 
 
-class Attr(NamedTuple):
+class cAttr(NamedTuple):
     n: str
     coerce: Any
     default: Any
 
 
-class Attrs:
+class cAttrs:
     __slots__ = ("name", "attrs")
 
-    def __init__(self, name: str, *attrs: Attr):
+    def __init__(self, name: str, *attrs: cAttr):
         self.name = name
         self.attrs = attrs
 
@@ -103,7 +103,7 @@ class PLexer:
         return None
 
 
-def parse_with_palet(text: str, build: smallAttrs, env: dict) -> dict[str, Any]:
+def parse_with_palet(text: str, build: pAttrs, env: dict) -> dict[str, Any]:
     from auto_editor.interpreter import Lexer, Parser, interpret
     from auto_editor.lib.data_structs import display_str
     from auto_editor.lib.err import MyError
@@ -115,13 +115,6 @@ def parse_with_palet(text: str, build: smallAttrs, env: dict) -> dict[str, Any]:
 
     KEYWORD_SEP = "="
     kwargs: dict[str, Any] = {}
-
-    for attr in build.attrs:
-        kwargs[_norm_name(attr.n)] = attr.default
-
-    allow_positional_args = True
-
-    lexer = PLexer(text)
 
     def go(text: str, c: Any) -> Any:
         try:
@@ -139,6 +132,12 @@ def parse_with_palet(text: str, build: smallAttrs, env: dict) -> dict[str, Any]:
 
         return results[-1]
 
+    for attr in build.attrs:
+        kwargs[_norm_name(attr.n)] = attr.default
+
+    allow_positional_args = True
+
+    lexer = PLexer(text)
     i = 0
     while (arg := lexer.get_next_token()) is not None:
         if not arg:
@@ -189,7 +188,7 @@ def parse_with_palet(text: str, build: smallAttrs, env: dict) -> dict[str, Any]:
 
 def parse_dataclass(
     text: str,  # the string to be parsed
-    build: Attrs,
+    build: cAttrs,
     var_f: Callable[[str, str, Any], Any] = _default_var_f,
     coerce_default: bool = False,
 ) -> dict[str, Any]:

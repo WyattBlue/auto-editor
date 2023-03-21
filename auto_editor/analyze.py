@@ -20,9 +20,13 @@ from auto_editor.lib.contracts import (
 )
 from auto_editor.lib.data_structs import Sym
 from auto_editor.render.subtitle import SubtitleParser
-from auto_editor.utils.cmdkw import ParserError, Required, parse_with_palet
-from auto_editor.utils.cmdkw import smallAttr as Attr
-from auto_editor.utils.cmdkw import smallAttrs as Attrs
+from auto_editor.utils.cmdkw import (
+    ParserError,
+    Required,
+    parse_with_palet,
+    pAttr,
+    pAttrs,
+)
 from auto_editor.utils.func import boolop
 from auto_editor.wavfile import read
 
@@ -38,31 +42,31 @@ if TYPE_CHECKING:
     from auto_editor.utils.log import Log
 
 
-audio_builder = Attrs(
+audio_builder = pAttrs(
     "audio",
-    Attr("threshold", 0.04, is_threshold),
-    Attr("stream", 0, orc(is_uint, Sym("all"), "all")),
-    Attr("mincut", 6, is_uint),
-    Attr("minclip", 3, is_uint),
+    pAttr("threshold", 0.04, is_threshold),
+    pAttr("stream", 0, orc(is_uint, Sym("all"), "all")),
+    pAttr("mincut", 6, is_uint),
+    pAttr("minclip", 3, is_uint),
 )
-motion_builder = Attrs(
+motion_builder = pAttrs(
     "motion",
-    Attr("threshold", 0.02, is_threshold),
-    Attr("stream", 0, is_uint),
-    Attr("blur", 9, is_uint),
-    Attr("width", 400, is_nat),
+    pAttr("threshold", 0.02, is_threshold),
+    pAttr("stream", 0, is_uint),
+    pAttr("blur", 9, is_uint),
+    pAttr("width", 400, is_nat),
 )
-pixeldiff_builder = Attrs(
+pixeldiff_builder = pAttrs(
     "pixeldiff",
-    Attr("threshold", 1, is_uint),
-    Attr("stream", 0, is_uint),
+    pAttr("threshold", 1, is_uint),
+    pAttr("stream", 0, is_uint),
 )
-subtitle_builder = Attrs(
+subtitle_builder = pAttrs(
     "subtitle",
-    Attr("pattern", Required, is_str),
-    Attr("stream", 0, is_uint),
-    Attr("ignore-case", False, is_bool),
-    Attr("max-count", None, orc(is_uint, is_void)),
+    pAttr("pattern", Required, is_str),
+    pAttr("stream", 0, is_uint),
+    pAttr("ignore-case", False, is_bool),
+    pAttr("max-count", None, orc(is_uint, is_void)),
 )
 
 builder_map = {

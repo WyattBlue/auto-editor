@@ -17,7 +17,13 @@ from auto_editor.timeline import (
     Visual,
     v3,
 )
-from auto_editor.utils.cmdkw import Attr, Attrs, ParserError, Required, parse_dataclass
+from auto_editor.utils.cmdkw import (
+    ParserError,
+    Required,
+    cAttr,
+    cAttrs,
+    parse_dataclass,
+)
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     align,
@@ -33,71 +39,71 @@ from auto_editor.utils.types import (
 Make a pre-edited file reference that can be inputted back into auto-editor.
 """
 
-video_builder = Attrs(
+video_builder = cAttrs(
     "video",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("src", src, Required),
-    Attr("offset", natural, 0),
-    Attr("speed", number, 1),
-    Attr("stream", natural, 0),
+    cAttr("start", natural, Required),
+    cAttr("dur", natural, Required),
+    cAttr("src", src, Required),
+    cAttr("offset", natural, 0),
+    cAttr("speed", number, 1),
+    cAttr("stream", natural, 0),
 )
-audio_builder = Attrs(
+audio_builder = cAttrs(
     "audio",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("src", src, Required),
-    Attr("offset", natural, 0),
-    Attr("speed", number, 1),
-    Attr("volume", threshold, 1),
-    Attr("stream", natural, 0),
+    cAttr("start", natural, Required),
+    cAttr("dur", natural, Required),
+    cAttr("src", src, Required),
+    cAttr("offset", natural, 0),
+    cAttr("speed", number, 1),
+    cAttr("volume", threshold, 1),
+    cAttr("stream", natural, 0),
 )
-text_builder = Attrs(
+text_builder = cAttrs(
     "text",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("content", str, Required),
-    Attr("x", int, "50%"),
-    Attr("y", int, "50%"),
-    Attr("font", str, "Arial"),
-    Attr("size", natural, 55),
-    Attr("align", align, "left"),
-    Attr("opacity", threshold, 1),
-    Attr("anchor", anchor, "ce"),
-    Attr("rotate", number, 0),
-    Attr("fill", str, "#FFF"),
-    Attr("stroke", natural, 0),
-    Attr("strokecolor", color, "#000"),
+    cAttr("start", natural, Required),
+    cAttr("dur", natural, Required),
+    cAttr("content", str, Required),
+    cAttr("x", int, "50%"),
+    cAttr("y", int, "50%"),
+    cAttr("font", str, "Arial"),
+    cAttr("size", natural, 55),
+    cAttr("align", align, "left"),
+    cAttr("opacity", threshold, 1),
+    cAttr("anchor", anchor, "ce"),
+    cAttr("rotate", number, 0),
+    cAttr("fill", str, "#FFF"),
+    cAttr("stroke", natural, 0),
+    cAttr("strokecolor", color, "#000"),
 )
 
-img_builder = Attrs(
+img_builder = cAttrs(
     "image",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("src", src, Required),
-    Attr("x", int, "50%"),
-    Attr("y", int, "50%"),
-    Attr("opacity", threshold, 1),
-    Attr("anchor", anchor, "ce"),
-    Attr("rotate", number, 0),
-    Attr("stroke", natural, 0),
-    Attr("strokecolor", color, "#000"),
+    cAttr("start", natural, Required),
+    cAttr("dur", natural, Required),
+    cAttr("src", src, Required),
+    cAttr("x", int, "50%"),
+    cAttr("y", int, "50%"),
+    cAttr("opacity", threshold, 1),
+    cAttr("anchor", anchor, "ce"),
+    cAttr("rotate", number, 0),
+    cAttr("stroke", natural, 0),
+    cAttr("strokecolor", color, "#000"),
 )
 
-rect_builder = Attrs(
+rect_builder = cAttrs(
     "rect",
-    Attr("start", natural, Required),
-    Attr("dur", natural, Required),
-    Attr("x", int, Required),
-    Attr("y", int, Required),
-    Attr("width", int, Required),
-    Attr("height", int, Required),
-    Attr("opacity", threshold, 1),
-    Attr("anchor", anchor, "ce"),
-    Attr("rotate", number, 0),
-    Attr("fill", color, "#c4c4c4"),
-    Attr("stroke", natural, 0),
-    Attr("strokecolor", color, "#000"),
+    cAttr("start", natural, Required),
+    cAttr("dur", natural, Required),
+    cAttr("x", int, Required),
+    cAttr("y", int, Required),
+    cAttr("width", int, Required),
+    cAttr("height", int, Required),
+    cAttr("opacity", threshold, 1),
+    cAttr("anchor", anchor, "ce"),
+    cAttr("rotate", number, 0),
+    cAttr("fill", color, "#c4c4c4"),
+    cAttr("stroke", natural, 0),
+    cAttr("strokecolor", color, "#000"),
 )
 ellipse_builder = rect_builder
 
