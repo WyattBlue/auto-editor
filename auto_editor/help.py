@@ -73,21 +73,21 @@ Export Methods:
  - default    ; Export as a regular media file
 
  - premiere   ; Export as an XML timeline file for Adobe Premiere Pro
-    - name  ; Set the group name
+    - name string? : "Auto-Editor Media Group"
 
  - resolve    ; Export as an XML timeline file for DaVinci Resolve
-    - name  ; Set the group name
+    - name string? : "Auto-Editor Media Group"
 
  - final-cut-pro  ; Export as an XML timeline file for Final Cut Pro
-    - name  ; Set the group name
+    - name string? : "Auto-Editor Media Group"
 
  - shotcut    ; Export as an XML timeline file for Shotcut
 
  - json       ; Export as an auto-editor JSON timeline file
-    - api  ;  Set the timeline version used
+    - api string? : "3.0.0"
 
  - timeline   ; Print the auto-editor timeline to stdout
-    - api
+    - api string? : "3.0.0"
 
  - audio      ; Export as a WAV audio file
 

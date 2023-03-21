@@ -256,9 +256,7 @@ def path_resolve(path: Path, flavor: str) -> str:
     return f"{path.resolve()}"
 
 
-def fcp7_write_xml(
-    _name: str | None, ensure: Ensure, output: str, tl: v3, flavor: str
-) -> None:
+def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) -> None:
     assert tl.v1 is not None
 
     clips = [c for c in tl.v1.chunks if c[2] != 99999]
@@ -268,11 +266,10 @@ def fcp7_write_xml(
     width, height = tl.res
 
     audio_file = len(src.videos) == 0 and len(src.audios) == 1
+    tracks = len(src.audios)
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
     pathurls = [path_resolve(src.path, flavor)]
-
-    tracks = len(src.audios)
 
     if tracks > 1:
         fold = src.path.parent / f"{src.path.stem}_tracks"
@@ -282,11 +279,6 @@ def fcp7_write_xml(
             newtrack = fold / f"{i}.wav"
             move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
             pathurls.append(path_resolve(newtrack, flavor))
-
-    if _name is None:
-        name = f"Auto-Editor {'Audio' if audio_file else 'Video'} Group"
-    else:
-        name = _name
 
     xmeml = ET.Element("xmeml", version="4")
     sequence = ET.SubElement(xmeml, "sequence")

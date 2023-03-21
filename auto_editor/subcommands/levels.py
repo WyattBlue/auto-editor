@@ -9,9 +9,9 @@ import numpy as np
 from auto_editor.analyze import LevelError, Levels, builder_map
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.interpreter import env
-from auto_editor.objs.util import ParserError, parse_with_palet
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
+from auto_editor.utils.cmdkw import ParserError, parse_with_palet
 from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import frame_rate

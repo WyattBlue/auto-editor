@@ -64,7 +64,7 @@ def fraction(_a: float, tb: Fraction) -> str:
     return f"{num}/{dem}s"
 
 
-def fcp_xml(_group_name: str | None, output: str, tl: v3) -> None:
+def fcp_xml(group_name: str, output: str, tl: v3) -> None:
     assert tl.v1 is not None
     src = tl.v1.source
     chunks = tl.v1.chunks
@@ -74,13 +74,6 @@ def fcp_xml(_group_name: str | None, output: str, tl: v3) -> None:
     pathurl = src.path.resolve().as_uri()
     width, height = tl.res
     name = src.path.stem
-
-    if _group_name is None:
-        is_audio = not src.videos and src.audios
-        group_name = f"Auto-Editor {'Audio' if is_audio else 'Video'} Group"
-    else:
-        group_name = _group_name
-
     colorspace = get_colorspace(src)
 
     with open(output, "w", encoding="utf-8") as outfile:

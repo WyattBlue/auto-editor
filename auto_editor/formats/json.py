@@ -7,7 +7,6 @@ from fractions import Fraction
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.objs.util import Attr, Attrs, ParserError, Required, parse_dataclass
 from auto_editor.timeline import (
     TlAudio,
     TlEllipse,
@@ -18,6 +17,7 @@ from auto_editor.timeline import (
     Visual,
     v3,
 )
+from auto_editor.utils.cmdkw import Attr, Attrs, ParserError, Required, parse_dataclass
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     align,

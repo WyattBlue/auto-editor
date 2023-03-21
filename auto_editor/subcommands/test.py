@@ -342,6 +342,9 @@ def main(sys_args: list[str] | None = None):
         out2 = run.main([out], [])
         return out, out2
 
+    def premiere_named_export():
+        run.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
+
     def resolution_and_scale():
         cn = checker.check(run.main(["example.mp4"], ["--scale", "1.5"]))
 
@@ -847,8 +850,9 @@ def main(sys_args: list[str] | None = None):
                 silent_threshold,
                 track_tests,
                 codec_tests,
-                motion,
+                premiere_named_export,
                 export,
+                motion,
                 resolution_and_scale,
             ]
         )
