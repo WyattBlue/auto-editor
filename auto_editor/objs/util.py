@@ -103,28 +103,10 @@ class PLexer:
         return None
 
 
-def parse_with_palet(
-    text: str,  # the string to be parsed
-    build: smallAttrs,
-    env: dict,
-) -> dict[str, Any]:
+def parse_with_palet(text: str, build: smallAttrs, env: dict) -> dict[str, Any]:
     from auto_editor.interpreter import Lexer, Parser, interpret
     from auto_editor.lib.data_structs import display_str
     from auto_editor.lib.err import MyError
-
-    def go(text: str, c: Any) -> Any:
-        try:
-            results = interpret(env, Parser(Lexer(text)))
-        except MyError as e:
-            raise ParserError(e)
-
-        if len(results) == 0:
-            raise ParserError("Results must be of length > 0")
-
-        if c(results[-1]) is not True:
-            raise ParserError(f"Value: {display_str(results[-1])} needs to be {c.name}")
-
-        return results[-1]
 
     # Positional Arguments
     #    --rectangle 0,end,10,20,20,30,#000, ...
@@ -140,6 +122,22 @@ def parse_with_palet(
     allow_positional_args = True
 
     lexer = PLexer(text)
+
+    def go(text: str, c: Any) -> Any:
+        try:
+            results = interpret(env, Parser(Lexer(build.name, text)))
+        except MyError as e:
+            raise ParserError(e)
+
+        if len(results) == 0:
+            raise ParserError("Results must be of length > 0")
+
+        if c(results[-1]) is not True:
+            raise ParserError(
+                f"{build.name}: `{display_str(results[-1])}` needs to be {c.name}"
+            )
+
+        return results[-1]
 
     i = 0
     while (arg := lexer.get_next_token()) is not None:

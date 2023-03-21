@@ -93,7 +93,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 continue
 
             try:
-                lexer = Lexer(text)
+                lexer = Lexer("repl", text)
                 parser = Parser(lexer)
 
                 for result in interpret(env, parser):

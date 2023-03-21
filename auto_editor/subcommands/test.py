@@ -122,7 +122,7 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
     if args.only != []:
         tests = list(filter(lambda t: t.__name__ in args.only, tests))
 
-    total_time = 0
+    total_time = 0.0
 
     for passed, test in enumerate(tests):
         start = perf_counter()
@@ -608,7 +608,7 @@ def main(sys_args: list[str] | None = None):
         def cases(*cases: tuple[str, Any]) -> None:
             for text, expected in cases:
                 try:
-                    parser = Parser(Lexer(text))
+                    parser = Parser(Lexer("repl", text))
                     env["timebase"] = Fraction(30)
                     results = interpret(env, parser)
                 except MyError as e:

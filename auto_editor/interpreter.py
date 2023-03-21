@@ -60,9 +60,10 @@ class Token:
 
 
 class Lexer:
-    __slots__ = ("text", "pos", "char", "lineno", "column")
+    __slots__ = ("filename", "text", "pos", "char", "lineno", "column")
 
-    def __init__(self, text: str):
+    def __init__(self, filename: str, text: str):
+        self.filename = filename
         self.text = text
         self.pos: int = 0
         self.lineno: int = 1
@@ -70,10 +71,10 @@ class Lexer:
         self.char: str | None = self.text[self.pos] if text else None
 
     def error(self, msg: str) -> NoReturn:
-        raise MyError(f"{msg}\n  at {self.lineno}:{self.column}")
+        raise MyError(f"{msg}\n  at {self.filename}:{self.lineno}:{self.column}")
 
     def close_err(self, msg: str) -> NoReturn:
-        raise ClosingError(f"{msg}\n  at {self.lineno}:{self.column}")
+        raise ClosingError(f"{msg}\n  at {self.filename}:{self.lineno}:{self.column}")
 
     def char_is_norm(self) -> bool:
         return self.char is not None and self.char not in '()[]{}"; \t\n\r\x0b\x0c'
@@ -267,9 +268,10 @@ class Lexer:
                 )
 
             def handle_strings() -> bool:
+                nonlocal result
                 if self.char == '"':
                     self.advance()
-                    f'{result}"{self.string()}"'
+                    result = f'{result}"{self.string()}"'
                     return handle_strings()
                 else:
                     return self.char_is_norm()
