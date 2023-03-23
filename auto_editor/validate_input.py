@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-from platform import system
+import sys
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.func import get_stdout
@@ -49,9 +49,9 @@ def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
         ).strip()
     except FileNotFoundError:
         msg = "Could not find program 'yt-dlp' when attempting to download a URL. Install yt-dlp with "
-        if system() == "Windows":
+        if sys.platform == "win32":
             msg += "your favorite package manager (pip, choco, winget)."
-        elif system() == "Darwin":
+        elif sys.platform == "darwin":
             msg += "brew or pip and make sure it's in PATH."
         else:
             msg += "pip or your favorite package manager and make sure it's in PATH."

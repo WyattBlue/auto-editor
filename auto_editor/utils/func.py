@@ -117,6 +117,12 @@ def get_stdout(cmd: list[str]) -> str:
     return stdout.decode("utf-8", "replace")
 
 
+def get_stdout_bytes(cmd: list[str]) -> bytes:
+    from subprocess import PIPE, Popen
+
+    return Popen(cmd, stdout=PIPE, stderr=PIPE).communicate()[0]
+
+
 def aspect_ratio(width: int, height: int) -> tuple[int, int]:
     if height == 0:
         return (0, 0)
@@ -149,7 +155,7 @@ def open_with_system_default(path: str, log: Log) -> None:
     import sys
     from subprocess import run
 
-    if sys.platform == "win64" or sys.platform == "win32":
+    if sys.platform == "win32":
         from os import startfile
 
         try:
@@ -157,13 +163,13 @@ def open_with_system_default(path: str, log: Log) -> None:
         except OSError:
             log.warning("Could not find application to open file.")
     else:
-        try:  # should work on MacOS and some Linux distros
+        try:  # MacOS case
             run(["open", path])
         except Exception:
-            try:  # should work on WSL2
+            try:  # WSL2 case
                 run(["cmd.exe", "/C", "start", path])
             except Exception:
-                try:  # should work on most other Linux distros
+                try:  # Linux case
                     run(["xdg-open", path])
                 except Exception:
                     log.warning("Could not open output file.")

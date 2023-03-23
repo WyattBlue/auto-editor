@@ -7,7 +7,6 @@ import sys
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
-from platform import system
 from re import search
 from subprocess import PIPE, Popen
 from typing import Any
@@ -47,14 +46,13 @@ class FFmpeg:
         self.path = _set_ff_path(ff_location, my_ffmpeg)
         try:
             _version = get_stdout([self.path, "-version"]).split("\n")[0]
-            _version = _version.replace("ffmpeg version", "").strip()
-            self.version = _version.split(" ")[0]
+            self.version = _version.replace("ffmpeg version", "").strip().split(" ")[0]
         except FileNotFoundError:
-            if system() == "Darwin":
+            if sys.platform == "darwin":
                 Log().error(
                     "No ffmpeg found, download via homebrew or install ae-ffmpeg."
                 )
-            if system() == "Windows":
+            if sys.platform == "win32":
                 Log().error(
                     "No ffmpeg found, download ffmpeg with your favorite package "
                     "manager (ex chocolatey), or install ae-ffmpeg."
