@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from shutil import get_terminal_size
 from typing import Any, Callable, Literal, TypeVar, Union
+from io import StringIO
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import CoerceError
@@ -59,15 +60,12 @@ def out(text: str) -> None:
         exist_indent = re.search(indent_regex, line)
         pre_indent = exist_indent.groups()[0] if exist_indent else ""
 
-        wrapped_lines.append(
-            textwrap.fill(line, width=width, subsequent_indent=pre_indent)
-        )
-
-    print("\n".join(wrapped_lines))
+        sys.stdout.write(textwrap.fill(line, width=width, subsequent_indent=pre_indent))
+        sys.stdout.write("\n")
 
 
 def print_program_help(reqs: list[Required], args: list[Options | OptionText]) -> None:
-    text = f"Usage: {' '.join([req.metavar for req in reqs])}\n\nOptions:"
+    sys.stdout.write(f"Usage: {' '.join([req.metavar for req in reqs])}\n\nOptions:")
 
     width = get_terminal_size().columns - 3
     split = int(width * 0.44) + 3
@@ -76,12 +74,12 @@ def print_program_help(reqs: list[Required], args: list[Options | OptionText]) -
     for i, arg in enumerate(args):
         if isinstance(arg, OptionText):
             if i == 0:
-                text += f"\n  {arg.text}"
+                sys.stdout.write(f"\n  {arg.text}")
                 indent = "    "
             else:
-                text += f"\n\n  {arg.text}"
+                sys.stdout.write(f"\n\n  {arg.text}")
         else:
-            text += "\n"
+            sys.stdout.write("\n")
             line = f"{indent}{', '.join(reversed(arg.names))}"
             if arg.metavar is not None:
                 line += f" {arg.metavar}"
@@ -104,9 +102,8 @@ def print_program_help(reqs: list[Required], args: list[Options | OptionText]) -
                     subsequent_indent=split * " ",
                 )
 
-            text += line
-    text += "\n\n"
-    sys.stdout.write(text)
+            sys.stdout.write(line)
+    sys.stdout.write("\n\n")
 
 
 def to_underscore(name: str) -> str:
@@ -120,13 +117,14 @@ def to_key(op: Options | Required) -> str:
 
 
 def print_option_help(program_name: str | None, ns_obj: T, option: Options) -> None:
-    text = f"  {', '.join(option.names)} {'' if option.metavar is None else option.metavar}\n\n"
+    text = StringIO()
+    text.write(f"  {', '.join(option.names)} {'' if option.metavar is None else option.metavar}\n\n")
 
     if option.flag:
-        text += "    type: flag\n"
+        text.write("    type: flag\n")
     else:
         if option.nargs != 1:
-            text += f"    nargs: {option.nargs}\n"
+            text.write(f"    nargs: {option.nargs}\n")
 
         default: str | float | int | tuple | None = None
         try:
@@ -135,19 +133,19 @@ def print_option_help(program_name: str | None, ns_obj: T, option: Options) -> N
             pass
 
         if default is not None and isinstance(default, (int, float, str)):
-            text += f"    default: {default}\n"
+            text.write(f"    default: {default}\n")
 
         if option.choices is not None:
-            text += f"    choices: {', '.join(option.choices)}\n"
+            text.write(f"    choices: {', '.join(option.choices)}\n")
 
     from auto_editor.help import data
 
     if program_name is not None and option.names[0] in data[program_name]:
-        text += indent(data[program_name][option.names[0]], "    ") + "\n"
+        text.write(indent(data[program_name][option.names[0]], "    ") + "\n")
     else:
-        text += f"    {option.help}\n\n"
+        text.write(f"    {option.help}\n\n")
 
-    out(text)
+    out(text.getvalue())
 
 
 def get_option(name: str, options: list[Options]) -> Options | None:
