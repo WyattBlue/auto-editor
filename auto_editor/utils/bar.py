@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import sys
 from math import floor
-from platform import system
 from shutil import get_terminal_size
 from time import localtime, time
 
-from .func import get_stdout
+from .func import get_stdout_bytes
 
 
 class Bar:
@@ -34,12 +33,12 @@ class Bar:
         self.part_width = len(self.chars) - 1
 
         self.ampm = True
-        if system() == "Darwin" and bar_type in ("default", "classic"):
+        if sys.platform == "darwin" and bar_type in ("modern", "classic", "ascii"):
             try:
-                date_format = get_stdout(
-                    ["defaults", "read", "com.apple.menuextra.clock", "DateFormat"]
+                date_format = get_stdout_bytes(
+                    ["defaults", "read", "com.apple.menuextra.clock", "Show24Hour"]
                 )
-                self.ampm = "a" in date_format
+                self.ampm = date_format == b"0\n"
             except FileNotFoundError:
                 pass
 

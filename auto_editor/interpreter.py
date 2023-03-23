@@ -7,6 +7,7 @@ import sys
 from difflib import get_close_matches
 from fractions import Fraction
 from functools import reduce
+from io import StringIO
 from time import sleep
 from typing import TYPE_CHECKING
 
@@ -100,7 +101,7 @@ class Lexer:
         return self.char is None or self.char in " \t\n\r\x0b\x0c"
 
     def string(self) -> str:
-        result = ""
+        result = StringIO()
         while self.char is not None and self.char != '"':
             if self.char == "\\":
                 self.advance()
@@ -109,34 +110,37 @@ class Lexer:
 
                 if self.char in 'nt"\\':
                     if self.char == "n":
-                        result += "\n"
+                        result.write("\n")
                     if self.char == "t":
-                        result += "\t"
+                        result.write("\t")
                     if self.char == '"':
-                        result += '"'
+                        result.write('"')
                     if self.char == "\\":
-                        result += "\\"
+                        result.write("\\")
                     self.advance()
                     continue
 
                 self.error(f"Unknown escape sequence `\\{self.char}` in string")
             else:
-                result += self.char
+                result.write(self.char)
             self.advance()
 
         if self.char is None:
             self.close_err(f'Expected a closing `"`')
 
         self.advance()
-        return result
+        return result.getvalue()
 
     def number(self) -> Token:
-        result = ""
+        buf = StringIO()
         token = NUM
 
         while self.char is not None and self.char in "+-0123456789./":
-            result += self.char
+            buf.write(self.char)
             self.advance()
+
+        result = buf.getvalue()
+        del buf
 
         unit = ""
         if self.char_is_norm():
@@ -179,12 +183,13 @@ class Lexer:
             self.advance()
             return Token(CHAR, Char(char))
 
-        result = ""
+        buf = StringIO()
         while self.char_is_norm():
             assert self.char is not None
-            result += self.char
+            buf.write(self.char)
             self.advance()
 
+        result = buf.getvalue()
         if result in ("t", "true"):
             return Token(BOOL, True)
 
@@ -778,7 +783,7 @@ class Syntax:
     __repr__ = __str__
 
 
-def check_for_syntax(env: Env, node: list) -> Any:
+def check_for_syntax(env: Env, node: list) -> tuple[Sym, Any]:
     name = node[0]
     if len(node) < 2:
         raise MyError(f"{name}: bad syntax")
@@ -802,14 +807,14 @@ def check_for_syntax(env: Env, node: list) -> Any:
     return var, my_iter
 
 
-def syn_lambda(env: Env, node: list) -> Any:
+def syn_lambda(env: Env, node: list) -> UserProc:
     if not isinstance(node[1], list):
         raise MyError(f"{node[0]}: bad syntax")
 
     return UserProc("", node[1], node[2:])  # parms, body
 
 
-def syn_define(env: Env, node: list) -> Any:
+def syn_define(env: Env, node: list) -> None:
     if len(node) < 3:
         raise MyError(f"{node[0]}: too few args")
 
@@ -854,7 +859,7 @@ def syn_define(env: Env, node: list) -> Any:
     return None
 
 
-def syn_definec(env: Env, node: list) -> Any:
+def syn_definec(env: Env, node: list) -> None:
     if len(node) < 3:
         raise MyError(f"{node[0]}: bad syntax")
 
