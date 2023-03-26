@@ -291,18 +291,21 @@ def make_layers(
         # Setup for handling custom speeds
         has_loud = has_loud.astype(np.uint)
 
-        if len(cut_out) > 0:
-            # always cut out even if 'silent_speed' is not 99,999
-            mut_set_range(has_loud, cut_out, get_speed_index(99_999))
+        try:
+            if len(cut_out) > 0:
+                # always cut out even if 'silent_speed' is not 99,999
+                mut_set_range(has_loud, cut_out, get_speed_index(99_999))
 
-        if len(add_in) > 0:
-            # set to 'video_speed' index
-            mut_set_range(has_loud, add_in, 1)
+            if len(add_in) > 0:
+                # set to 'video_speed' index
+                mut_set_range(has_loud, add_in, 1)
 
-        for speed_range in speed_ranges:
-            speed = speed_range[0]
-            _range = list(speed_range[1:])
-            mut_set_range(has_loud, [_range], get_speed_index(speed))
+            for speed_range in speed_ranges:
+                speed = speed_range[0]
+                _range = list(speed_range[1:])
+                mut_set_range(has_loud, [_range], get_speed_index(speed))
+        except CoerceError as e:
+            log.error(e)
 
         chunks = chunkify(has_loud, speed_hash)
 
