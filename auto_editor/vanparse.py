@@ -6,9 +6,9 @@ import sys
 import textwrap
 from collections.abc import Iterator
 from dataclasses import dataclass
+from io import StringIO
 from shutil import get_terminal_size
 from typing import Any, Callable, Literal, TypeVar, Union
-from io import StringIO
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import CoerceError
@@ -54,7 +54,6 @@ def out(text: str) -> None:
     width = get_terminal_size().columns - 3
 
     indent_regex = re.compile(r"^(\s+)")
-    wrapped_lines = []
 
     for line in text.split("\n"):
         exist_indent = re.search(indent_regex, line)
@@ -118,7 +117,9 @@ def to_key(op: Options | Required) -> str:
 
 def print_option_help(program_name: str | None, ns_obj: T, option: Options) -> None:
     text = StringIO()
-    text.write(f"  {', '.join(option.names)} {'' if option.metavar is None else option.metavar}\n\n")
+    text.write(
+        f"  {', '.join(option.names)} {'' if option.metavar is None else option.metavar}\n\n"
+    )
 
     if option.flag:
         text.write("    type: flag\n")

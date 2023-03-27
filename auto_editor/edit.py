@@ -99,12 +99,8 @@ def set_audio_codec(
 ) -> str:
     if codec == "auto":
         codec = "aac" if (src is None or not src.audios) else src.audios[0].codec
-        if ctr.acodecs is not None:
-            if ctr.astrict and codec not in ctr.acodecs:
-                return ctr.acodecs[0]
-
-            if codec in ctr.disallow_a:
-                return ctr.acodecs[0]
+        if ctr.acodecs is not None and codec not in ctr.acodecs:
+            return ctr.acodecs[0]
         return codec
 
     if codec == "copy":
@@ -115,12 +111,7 @@ def set_audio_codec(
         codec = src.audios[0].codec
 
     if codec != "unset":
-        if ctr.astrict:
-            assert ctr.acodecs is not None
-            if codec not in ctr.acodecs:
-                log.error(codec_error.format(codec, out_ext))
-
-        if codec in ctr.disallow_a:
+        if ctr.acodecs is None or codec not in ctr.acodecs:
             log.error(codec_error.format(codec, out_ext))
 
     return codec
