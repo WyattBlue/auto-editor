@@ -17,10 +17,8 @@ class DictContainer(TypedDict, total=False):
     acodecs: list[str] | None
     scodecs: list[str] | None
     vstrict: bool
-    astrict: bool
     sstrict: bool
     disallow_v: list[str]
-    disallow_a: list[str]
     samplerate: list[int] | None
 
 
@@ -38,36 +36,10 @@ class Container:
     acodecs: list[str] | None = None
     scodecs: list[str] | None = None
     vstrict: bool = False
-    astrict: bool = False
     sstrict: bool = False
     disallow_v: list[str] = field(default_factory=list)
-    disallow_a: list[str] = field(default_factory=list)
     samplerate: list[int] | None = None  # Any samplerate is allowed
 
-
-pcm_formats = [
-    "pcm_s16le",  # default format
-    "pcm_alaw",
-    "pcm_f32be",
-    "pcm_f32le",
-    "pcm_f64be",
-    "pcm_f64le",
-    "pcm_mulaw",
-    "pcm_s16be",
-    "pcm_s24be",
-    "pcm_s24le",
-    "pcm_s32be",
-    "pcm_s32le",
-    "pcm_s8",
-    "pcm_u16be",
-    "pcm_u16le",
-    "pcm_u24be",
-    "pcm_u24le",
-    "pcm_u32be",
-    "pcm_u32le",
-    "pcm_u8",
-    "pcm_vidc",
-]
 
 # Define aliases
 h265: DictContainer = {
@@ -85,7 +57,6 @@ aac: DictContainer = {
     "allow_audio": True,
     "max_audios": 1,
     "acodecs": ["aac"],
-    "astrict": True,
 }
 ass: DictContainer = {
     "name": "SubStation Alpha",
@@ -101,9 +72,9 @@ mp4: DictContainer = {
     "allow_subtitle": True,
     "allow_image": True,
     "vcodecs": ["h264", "hevc", "vp9", "av1", "mpeg4", "mpeg2video", "mjpeg"],
-    "acodecs": ["aac", "mp3", "opus", "flac", "vorbis", "mp2"],
-    "disallow_v": ["prores", "apng", "gif", "msmpeg4v3", "flv1", "vp8", "rawvideo"],
-    "disallow_a": pcm_formats,
+    "acodecs": ["aac", "mp3", "opus", "flac", "vorbis", "libvorbis", "ac3", "mp2"],
+    "vstrict": True,
+    # "disallow_v": ["prores", "apng", "gif", "msmpeg4v3", "flv1", "vp8", "dvvideo", "rawvideo"],
 }
 ogg: DictContainer = {
     "allow_video": True,
@@ -112,8 +83,30 @@ ogg: DictContainer = {
     "vcodecs": ["libtheora", "theora"],
     "acodecs": ["libvorbis", "vorbis", "flac", "opus", "speex"],
     "vstrict": True,
-    "astrict": True,
 }
+
+mka_audio = [
+    "libvorbis",
+    "vorbis",
+    "aac",
+    "mp3",
+    "opus",
+    "flac",
+    "ac3",
+    "mp2",
+    "wmav2",
+    "pcm_s16le",
+    "pcm_alaw",
+    "pcm_f32le",
+    "pcm_f64le",
+    "pcm_mulaw",
+    "pcm_s16be",
+    "pcm_s24be",
+    "pcm_s24le",
+    "pcm_s32be",
+    "pcm_s32le",
+    "pcm_u8",
+]
 
 containers: dict[str, DictContainer] = {
     # Aliases section
@@ -148,8 +141,19 @@ containers: dict[str, DictContainer] = {
         "name": "Waveform Audio File Format",
         "allow_audio": True,
         "max_audios": 1,
-        "acodecs": pcm_formats + ["mp3"],
-        "astrict": True,
+        "acodecs": [
+            "pcm_s16le",
+            "mp3",
+            "mp2",
+            "wmav2",
+            "pcm_alaw",
+            "pcm_f32le",
+            "pcm_f64le",
+            "pcm_mulaw",
+            "pcm_s24le",
+            "pcm_s32le",
+            "pcm_u8",
+        ],
     },
     "ast": {
         "name": "AST / Audio Stream",
@@ -162,18 +166,15 @@ containers: dict[str, DictContainer] = {
         "allow_audio": True,
         "max_audios": 1,
         "acodecs": ["mp3"],
-        "astrict": True,
     },
     "opus": {
         "name": "Opus",
         "allow_audio": True,
         "acodecs": ["opus", "flac", "libvorbis", "vorbis", "speex"],
-        "astrict": True,
     },
     "oga": {
         "allow_audio": True,
         "acodecs": ["flac", "libvorbis", "vorbis", "opus", "speex"],
-        "astrict": True,
     },
     "flac": {
         "name": "Free Lossless Audio Codec",
@@ -187,10 +188,9 @@ containers: dict[str, DictContainer] = {
         "allow_audio": True,
         "allow_subtitle": True,
         "vcodecs": ["vp9", "vp8", "av1", "libaom-av1"],
-        "acodecs": ["opus", "vorbis"],
+        "acodecs": ["opus", "vorbis", "libvorbis"],
         "scodecs": ["webvtt"],
         "vstrict": True,
-        "astrict": True,
         "sstrict": True,
     },
     "srt": {
@@ -212,7 +212,23 @@ containers: dict[str, DictContainer] = {
         "allow_video": True,
         "allow_audio": True,
         "vcodecs": ["mpeg4", "h264", "prores", "mjpeg", "mpeg2video", "rawvideo"],
-        "acodecs": ["mp3", "aac", "vorbis", "mp2"],
+        "acodecs": [
+            "mp3",
+            "aac",
+            "flac",
+            "vorbis",
+            "libvorbis",
+            "mp2",
+            "wmav2",
+            "pcm_s16le",
+            "pcm_alaw",
+            "pcm_f32le",
+            "pcm_f64le",
+            "pcm_mulaw",
+            "pcm_s24le",
+            "pcm_s32le",
+            "pcm_u8",
+        ],
         "disallow_v": ["hevc", "apng", "gif"],
     },
     "wmv": {
@@ -220,8 +236,25 @@ containers: dict[str, DictContainer] = {
         "allow_video": True,
         "allow_audio": True,
         "vcodecs": ["msmpeg4v3", "h264", "mpeg4", "mpeg2video", "mjpeg", "rawvideo"],
-        "acodecs": ["wmav2", "aac", "flac"],
-        "disallow_v": ["prores", "hevc", "apng", "gif"],
+        "acodecs": [
+            "wmav2",
+            "aac",
+            "mp3",
+            "flac",
+            "vorbis",
+            "libvorbis",
+            "ac3",
+            "mp2",
+            "pcm_s16le",
+            "pcm_alaw",
+            "pcm_f32le",
+            "pcm_f64le",
+            "pcm_mulaw",
+            "pcm_s24le",
+            "pcm_s32le",
+            "pcm_u8",
+        ],
+        "vstrict": True,
     },
     "mkv": {
         "name": "Matroska",
@@ -242,13 +275,13 @@ containers: dict[str, DictContainer] = {
             "gif",
             "rawvideo",
         ],
-        "acodecs": ["libvorbis", "vorbis", "opus", "flac", "aac", "mp2"],
+        "acodecs": mka_audio,
         "disallow_v": ["apng"],
     },
     "mka": {
         "name": "Matroska Audio",
         "allow_audio": True,
-        "acodecs": ["libvorbis", "vorbis", "opus", "flac", "aac", "mp2"],
+        "acodecs": mka_audio,
     },
     "mov": {
         "name": "QuickTime / MOV",
@@ -265,10 +298,32 @@ containers: dict[str, DictContainer] = {
             "mjpeg",
             "gif",
             "flv1",
+            "dvvideo",
             "rawvideo",
         ],
-        "acodecs": ["aac", "mp3", "mp2", "vorbis"],
-        "disallow_a": ["opus", "flac"],
+        "acodecs": [
+            "aac",
+            "mp3",
+            "vorbis",
+            "libvorbis",
+            "ac3",
+            "mp2",
+            "wmav2",
+            "pcm_s16le",
+            "pcm_alaw",
+            "pcm_f32be",
+            "pcm_f32le",
+            "pcm_f64be",
+            "pcm_f64le",
+            "pcm_mulaw",
+            "pcm_s16be",
+            "pcm_s24be",
+            "pcm_s24le",
+            "pcm_s32be",
+            "pcm_s32le",
+            "pcm_s8",
+            "pcm_u8",
+        ],
         "disallow_v": ["apng", "vp9", "vp8"],
     },
     "swf": {
@@ -278,7 +333,6 @@ containers: dict[str, DictContainer] = {
         "vcodecs": ["flv1", "mjpeg"],
         "acodecs": ["mp3"],
         "vstrict": True,
-        "astrict": True,
         "samplerate": [44100, 22050, 11025],
     },
     "not_in_here": {
