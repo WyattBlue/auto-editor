@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from platform import system
 from subprocess import PIPE
@@ -9,7 +8,9 @@ import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.interpreter import env
+from auto_editor.lang.json import Lexer, Parser
 from auto_editor.lib.contracts import andc, gte_c, is_int_or_float, lte_c
+from auto_editor.lib.err import MyError
 from auto_editor.output import Ensure
 from auto_editor.timeline import v3
 from auto_editor.utils.bar import Bar
@@ -73,8 +74,8 @@ def parse_ebu_bytes(norm: dict, stderr: bytes, log: Log) -> list[str]:
         log.error(f"Invalid loudnorm stats.\n{stderr!r}")
 
     try:
-        parsed = json.loads(b"\n".join(lines[start:end]))
-    except json.decoder.JSONDecodeError:
+        parsed = Parser(Lexer("loudnorm", b"\n".join(lines[start:end]))).expr()
+    except MyError:
         log.error(f"Invalid loudnorm stats.\n{start=},{end=}\n{stderr!r}")
 
     for key in (

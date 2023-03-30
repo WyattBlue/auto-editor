@@ -108,7 +108,9 @@ class Lexer:
                 if self.char is None:
                     break
 
-                if self.char in 'nt"\\':
+                if self.char in 'fnt"\\':
+                    if self.char == "f":
+                        result.write("\f")
                     if self.char == "n":
                         result.write("\n")
                     if self.char == "t":

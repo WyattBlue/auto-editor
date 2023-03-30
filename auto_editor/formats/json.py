@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
 import os
 import sys
 from fractions import Fraction
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.lang.json import Lexer, Parser, dump
+from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
     TlAudio,
     TlEllipse,
@@ -162,7 +163,10 @@ class Version:
 
 def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     with open(path) as f:
-        data = json.load(f)
+        try:
+            data = Parser(Lexer(path, f)).expr()
+        except MyError as e:
+            log.error(e)
 
     check_attrs(data, log, "version")
     version = Version(data["version"], log)
@@ -259,7 +263,7 @@ def make_json_timeline(ver: str, out: str | int, tl: object, log: Log) -> None:
     else:
         outfile = sys.stdout
 
-    json.dump(tl.as_dict(), outfile, indent=2, default=lambda o: o.__dict__)
+    dump(tl.as_dict(), outfile, indent=2)
 
     if isinstance(out, str):
         outfile.close()

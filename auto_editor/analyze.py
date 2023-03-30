@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import re
 from dataclasses import dataclass
@@ -9,6 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from auto_editor import version
+from auto_editor.lang.json import Lexer, Parser, dump
 from auto_editor.lib.contracts import (
     is_bool,
     is_nat,
@@ -191,7 +191,7 @@ class Levels:
 
         try:
             with open(workfile) as file:
-                cache = json.load(file)
+                cache = Parser(Lexer(workfile, file)).expr()
         except Exception:
             return None
 
@@ -215,7 +215,7 @@ class Levels:
 
         try:
             with open(workfile) as file:
-                json_object = json.load(file)
+                json_object = Parser(Lexer(workfile, file)).expr()
         except Exception:
             json_object = {}
 
@@ -232,7 +232,7 @@ class Levels:
             json_object[src_key] = {key: entry}
 
         with open(os.path.join(workdur, "cache.json"), "w") as file:
-            file.write(json.dumps(json_object))
+            dump(json_object, file)
 
         return arr
 

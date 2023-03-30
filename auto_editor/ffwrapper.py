@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os.path
 import subprocess
 import sys
@@ -11,6 +10,8 @@ from re import search
 from subprocess import PIPE, Popen
 from typing import Any
 
+from auto_editor.lang.json import Lexer, Parser
+from auto_editor.lib.err import MyError
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
@@ -242,13 +243,15 @@ class FileInfo:
             return default
 
         try:
-            json_info = json.loads(info)
+            json_info = Parser(Lexer("ffprobe", info)).expr()
+            if not isinstance(json_info, dict):
+                raise MyError("Expected Object")
             if "streams" not in json_info:
-                raise ValueError("Key 'streams' not found")
+                raise MyError("Key 'streams' not found")
             if "format" not in json_info:
-                raise ValueError("Key 'format' not found")
-        except Exception as e:
-            log.error(f"{path}: Could not read ffprobe JSON: {e}")
+                raise MyError("Key 'format' not found")
+        except MyError as e:
+            log.error(f"{path}: Could not read ffprobe JSON\n{e}")
 
         self.bitrate: str | None = None
         if "bit_rate" in json_info["format"]:

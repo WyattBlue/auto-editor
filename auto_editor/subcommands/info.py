@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import json
 import os.path
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.lang.json import dump
 from auto_editor.timeline import v3
 from auto_editor.utils.func import aspect_ratio
 from auto_editor.utils.log import Log
@@ -191,7 +191,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             file_info[file]["container"]["fps_mode"] = fps_mode
 
     if args.json:
-        print(json.dumps(file_info, indent=4))
+        dump(file_info, sys.stdout, indent=4)
         return
 
     def stream_to_text(text: str, label: str, streams: list[dict[str, Any]]) -> str:
