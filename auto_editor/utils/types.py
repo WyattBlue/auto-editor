@@ -121,26 +121,40 @@ def sample_rate(val: str) -> int:
     return natural(num)
 
 
-def time(val: str) -> int | str:
+def bitrate(val: str) -> str:
+    if val == "unset":
+        return val
+    _num, unit = _split_num_str(val)
+    num = int(_num) if _num.is_integer() else _num
+    if unit not in ("", "k", "K", "M"):
+        extra = f". Did you mean `{num}M`?" if unit == "m" else ""
+        raise CoerceError(f"`{val}` is not a valid bitrate format{extra}")
+    return val
+
+
+def time(val: str, tb: Fraction) -> int:
     if ":" in val:
         boxes = val.split(":")
         if len(boxes) == 2:
-            return str(int(boxes[0]) * 60 + float(boxes[1]))
+            return round((int(boxes[0]) * 60 + float(boxes[1])) * tb)
         if len(boxes) == 3:
-            return str(int(boxes[0]) * 3600 + int(boxes[1]) * 60 + float(boxes[2]))
+            return round(
+                (int(boxes[0]) * 3600 + int(boxes[1]) * 60 + float(boxes[2])) * tb
+            )
         raise CoerceError(f"'{val}': Invalid time format")
 
     num, unit = _split_num_str(val)
     if unit in ("s", "sec", "secs", "second", "seconds"):
-        return str(num)
-    if unit in ("m", "min", "mins", "minute", "minutes"):
-        return str(num * 60)
-    if unit in ("h", "hour", "hours"):
-        return str(num * 3600)
+        return round(num * tb)
+    if unit in ("min", "mins", "minute", "minutes"):
+        return round(num * tb * 60)
+    if unit == "hour":
+        return round(num * tb * 3600)
 
-    _unit_check(unit, ("",))
-    if not isinstance(num, int) and not num.is_integer():
-        raise CoerceError(f"'{val}': Time specifier expects: integer?.")
+    if unit != "":
+        raise CoerceError(f"'{val}': Time format got unknown unit: `{unit}`")
+    if not num.is_integer():
+        raise CoerceError(f"'{val}': Time format expects: int?")
     return int(num)
 
 
@@ -151,16 +165,13 @@ def anchor(val: str) -> str:
     return val
 
 
-Margin = tuple[Union[int, str], Union[int, str]]
-
-
-def margin(val: str) -> Margin:
+def margin(val: str) -> tuple[str, str]:
     vals = val.strip().split(",")
     if len(vals) == 1:
         vals.append(vals[0])
     if len(vals) != 2:
         raise CoerceError("--margin has too many arguments.")
-    return time(vals[0]), time(vals[1])
+    return vals[0], vals[1]
 
 
 def time_range(val: str) -> list[str]:
@@ -277,7 +288,7 @@ class Args:
     show_ffmpeg_output: bool = False
     quiet: bool = False
     preview: bool = False
-    margin: Margin = ("0.2", "0.2")
+    margin: tuple[str, str] = ("0.2s", "0.2s")
     silent_speed: float = 99999.0
     video_speed: float = 1.0
     output_file: str | None = None

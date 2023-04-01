@@ -146,20 +146,41 @@ Beware that the temp directory can get quite big.
 """.strip(),
         "--ffmpeg-location": "This takes precedence over `--my-ffmpeg`.",
         "--my-ffmpeg": "This is equivalent to `--ffmpeg-location ffmpeg`.",
+        "--audio-bitrate": """
+`--audio-bitrate` sets the target bitrate for the audio encoder.
+The value accepts a natural number and the units: ``, `k`, `K`, and `M`.
+The special value `unset` may also be used, and means: Don't pass any value to ffmpeg, let it choose a default bitrate.
+""".strip(),
+        "--video-bitrate": """
+`--video-bitrate` sets the target bitrate for the video encoder. It accepts the same format as `--audio-bitrate` and the special `unset` value is allowed.
+""".strip(),
         "--silent-threshold": """
 Silent threshold is a percentage where 0% represents absolute silence and 100% represents the highest volume in the media file.
 Setting the threshold to `0%` will cut only out areas where area is absolutely silence.
 """.strip(),
         "--margin": """
-Default value: 0.2sec,0.2sec
+Default value: 0.2s,0.2s
+
+`--margin` takes either one number of two numbers with a `,` in-between.
+The numbers may be written in the 'time' format. Here is a quick recap:
+
+  frames / timebase : `` (no units)
+  seconds           : `s` `sec` `secs` `second` `seconds`
+  minutes           : `min` `mins` `minute` `minutes`
+  hours             : `hour`
+
+  seconds, minutes  :    MM:SS.SS
+  hours, mins, secs : HH:MM:SS.SS
+
 
 Setting margin examples:
  - `--margin 6`
  - `--margin 4,10`
  - `--margin 0.3s,0.5s`
+ = `==margin 1:12.5` ; 1 minute, 12.5 seconds
 
 Behind the scenes, margin is a function that operates on boolean arrays
-(where usually 1 represents "loud" and 0 represents "silence")
+(where 1 represents "loud" and 0 represents "silence")
 
 Here is a list of examples on how margin mutates boolean arrays
 
@@ -207,8 +228,6 @@ Examples:
 """.strip(),
         "--silent-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
         "--video-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
-        "--min-clip-length": "Type: nonnegative-integer?",
-        "--min-cut-length": "Type: nonnegative-integer?",
     },
     "info": {
         "_": "Retrieve information and properties about media files",

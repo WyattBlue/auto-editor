@@ -9,6 +9,7 @@ from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     Args,
+    bitrate,
     color,
     frame_rate,
     margin,
@@ -230,6 +231,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--video-bitrate",
         "-b:v",
         metavar="BITRATE",
+        type=bitrate,
         help="Set the number of bits per second for video",
     )
     parser.add_argument(
@@ -262,6 +264,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--audio-bitrate",
         "-b:a",
         metavar="BITRATE",
+        type=bitrate,
         help="Set the number of bits per second for audio",
     )
     parser.add_argument(
