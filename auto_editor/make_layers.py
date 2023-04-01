@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
-    from auto_editor.utils.types import Margin
 
     BoolList = NDArray[np.bool_]
 
@@ -222,7 +221,7 @@ def make_layers(
     ensure: Ensure,
     tb: Fraction,
     method: str,
-    margin: Margin,
+    margin: tuple[str, str],
     cut_out: list[list[str]],
     add_in: list[list[str]],
     mark_silent: list[list[str]],
@@ -238,13 +237,11 @@ def make_layers(
     all_clips: list[list[Clip]] = []
     all_chunks: list[Chunks] = []
 
-    def seconds_to_ticks(val: int | str) -> int:
-        if isinstance(val, str):
-            return round(float(val) * tb)
-        return val
-
-    start_margin = seconds_to_ticks(margin[0])
-    end_margin = seconds_to_ticks(margin[1])
+    try:
+        start_margin = time(margin[0], tb)
+        end_margin = time(margin[1], tb)
+    except CoerceError as e:
+        log.error(e)
 
     speed_map = [silent_speed, loud_speed]
     speed_hash = {
@@ -265,9 +262,9 @@ def make_layers(
         if val == "end":
             return len(arr)
         try:
-            num = seconds_to_ticks(time(val))
+            num = time(val, tb)
             return num if num >= 0 else num + len(arr)
-        except TypeError as e:
+        except CoerceError as e:
             log.error(e)
 
     def mut_set_range(arr: NDArray, _ranges: list[list[str]], index: Any) -> None:
