@@ -108,13 +108,21 @@ class Lexer:
                 if self.char is None:
                     break
 
-                if self.char in 'fnt"\\':
-                    if self.char == "f":
-                        result.write("\f")
-                    if self.char == "n":
-                        result.write("\n")
+                if self.char in 'abtnvfr"\\':
+                    if self.char == "a":
+                        result.write("\a")
+                    if self.char == "b":
+                        result.write("\b")
                     if self.char == "t":
                         result.write("\t")
+                    if self.char == "n":
+                        result.write("\n")
+                    if self.char ==  "v":
+                        result.write("\v")
+                    if self.char == "f":
+                        result.write("\f")
+                    if self.char == "r":
+                        result.write("\r")
                     if self.char == '"':
                         result.write('"')
                     if self.char == "\\":
