@@ -10,7 +10,6 @@
 
 (define (syntax name body summary)
     (hash "tag" "syntax" "name" name "body" body "summary" summary)
-    #hash{"tag": "syntax" "name": name "body": body "summary": summary}
 )
 
 (define (value name sig summary)
