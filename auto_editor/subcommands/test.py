@@ -744,6 +744,7 @@ def main(sys_args: list[str] | None = None):
             ("(length (list 1 2 3))", 3),
             ("(length '(1 2 3))", 3),
             ("(length (vector 1 2 4))", 3),
+            ("(length #(1 2 4))", 3),
             ("(length (list))", 0),
             ("(length '())", 0),
             ("(length (bool-array 0 1 0))", 3),
@@ -754,11 +755,12 @@ def main(sys_args: list[str] | None = None):
             ("(ref (range 0 10) 2)", 2),
             ("((range 0 10) 2)", 2),
             ("((vector 0.3 #\\a 17) 2)", 17),
+            ("(#(0.3 #\\a 17) 2)", 17),
             ("(begin)", None),
             ("(void)", None),
             ("(begin (define r 10) (* pi (* r r)))", 314.1592653589793),
-            ("(for/vector ([i (vector 0 1 2)]) i)", [0, 1, 2]),
-            ("(vector -20dB 0dB 20dB)", [0.1, 1, 10]),
+            ("(for/vector ([i #(0 1 2)]) i)", [0, 1, 2]),
+            ("#(-20dB 0dB 20dB)", [0.1, 1, 10]),
             ("(define ca (lambda (r) (* pi (* r r)))) (ca 5)", 78.53981633974483),
             (
                 "(define ca (lambda (r) (void) (* pi (* r r)))) (ca 5)",
@@ -780,6 +782,7 @@ def main(sys_args: list[str] | None = None):
             ('(eval "hello")', "hello"),
             ("(eval '(+ 3 4))", 7),
             ("(eval (list + 3 4))", 7),
+            ("(eval #(+ 3 4))", 7),
             ("(eval (vector + 3 4))", 7),
             ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
             ("(var-exists? 'my-func)", True),
@@ -798,8 +801,9 @@ def main(sys_args: list[str] | None = None):
             ('("hello".upper)', "HELLO"),
             ('("heLlo".lower)', "hello"),
             ('(define s "hello")(s.title)', "Hello"),
-            ("(define v (vector 2 0 3 -4 5 1 4))(v.sort)", [-4, 0, 1, 2, 3, 4, 5]),
-            ("(define v (vector 2 0 3 -4 5 1 4))(v.sort!)v", [-4, 0, 1, 2, 3, 4, 5]),
+            ("(define v #(2 0 3 -4 5 1 4))(v.sort)", [-4, 0, 1, 2, 3, 4, 5]),
+            ("(define v #(2 0 3 -4 5 1 4))(v.sort!)v", [-4, 0, 1, 2, 3, 4, 5]),
+            ('#(#("sym" "symbol?") "bool?")', [["sym", "symbol?"], "bool?"]),
         )
 
     tests = []

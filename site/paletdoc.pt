@@ -1,4 +1,3 @@
-(define vec vector)
 (define (code val) (hash "tag" "code" "val" val))
 
 (define (text children ...) (hash "tag" "text" "children" children))
@@ -11,6 +10,7 @@
 
 (define (syntax name body summary)
     (hash "tag" "syntax" "name" name "body" body "summary" summary)
+    #hash{"tag": "syntax" "name": name "body": body "summary": summary}
 )
 
 (define (value name sig summary)
@@ -18,7 +18,7 @@
 )
 
 (define doc {hash
-    "Assignment" [vec
+    "Assignment" #[
         (syntax "define" "id expr" (text "Set " 'id " to the result of " 'expr "."))
         (syntax "set!" "id expr"
             (text
@@ -39,7 +39,7 @@
             (text "Define a procedure with contracts.")
         )
     ]
-    "Control Flow" [vec
+    "Control Flow" #[
         (syntax
             "if" "test-expr then-expr else-expr"
             (text
@@ -69,7 +69,7 @@
             )
         )
     ]
-    "Loops" [vec
+    "Loops" #[
         (syntax
             "for"
             "([id seq-expr] ...) body"
@@ -87,10 +87,10 @@
             )
         )
     ]
-    "Equality" [vec
+    "Equality" #[
         (proc
             "equal?"
-            (vec (vec "v1" "any") (vec "v2" "any") "bool?")
+            #(#("v1" "any") #("v2" "any") "bool?")
             (text
                 "Returns " #t " if " 'v1 " and " 'v2
                 " are the same type and have the same value, " #f " otherwise."
@@ -98,14 +98,14 @@
         )
         (proc
             "eq?"
-            (vec (vec "v1" "any") (vec "v2" "any") "bool?")
+            #(#("v1" "any") #("v2" "any") "bool?")
             (text
                 "Returns " #t " if " 'v1 " and " 'v2
                 " refer to the same object in memory, " #f " otherwise."
             )
         )
     ]
-    "Booleans" [vec
+    "Booleans" #[
         (pred
             "bool?"
             (text "Returns " #t " if " 'v " is " #t " or " #f ", " #f " otherwise.")
@@ -113,7 +113,7 @@
         (value "true" "bool?" (text "An alias for " #t "."))
         (value "false" "bool?" (text "An alias for " #f "."))
     ]
-    "Number Predicates" [vec
+    "Number Predicates" #[
         (pred
             "number?"
             (text "Returns " #t " if " 'v " is a number, " #f " otherwise.")
@@ -155,32 +155,32 @@
                 #f " otherwise."
             )
         )
-        (proc "zero?" (vec (vec "z" "number?") "bool?") (text "Returns " (code "(= z 0)")))
+        (proc "zero?" #(#("z" "number?") "bool?") (text "Returns " (code "(= z 0)")))
         (proc
             "positive?"
-            (vec (vec "x" "real?") "bool?")
+            #(#("x" "real?") "bool?")
             (text "Returns " (code "(> x 0)"))
         )
         (proc
             "negative?"
-            (vec (vec "x" "real?") "bool?")
+            #(#("x" "real?") "bool?")
             (text "Returns " (code "(< x 0)"))
         )
         (proc
             "even?"
-            (vec (vec "n" "int?") "bool?")
+            #(#("n" "int?") "bool?")
             (text "Returns " (code "(zero? (mod n 2))"))
         )
         (proc
             "odd?"
-            (vec (vec "n" "int?") "bool?")
+            #(#("n" "int?") "bool?")
             (text "Returns " (code "(not (even? n))"))
         )
     ]
-    "Numbers" [vec
+    "Numbers" #[
         (proc
             "+"
-            (vec (vec "z" "number?") "..." "number?")
+            #(#("z" "number?") "..." "number?")
             (text
                 "Return the sum of " 'z "s. Add from left to right. "
                 "If no arguments are provided the result is 0."
@@ -188,7 +188,7 @@
         )
         (proc
             "-"
-            (vec (vec "z" "number?") (vec "w" "number?") "..." "number?")
+            #(#("z" "number?") #("w" "number?") "..." "number?")
             (text
                 "When no " 'w "s are applied return " (code "(- 0 z)")
                 ", otherwise return the subtraction of " 'w "s of " 'z "."
@@ -196,7 +196,7 @@
         )
         (proc
             "*"
-            (vec (vec "z" "number?") "..." "number?")
+            #(#("z" "number?") "..." "number?")
             (text
                 "Return the product of " 'z "s. If no " 'z
                 "s are supplied the result is 1."
@@ -204,7 +204,7 @@
         )
         (proc
             "/"
-            (vec (vec "z" "number?") (vec "w" "number?") "..." "number?")
+            #(#("z" "number?") #("w" "number?") "..." "number?")
             (text
                 "When no " 'w "s are applied return " (code "(/ 1 z)")
                 ". Otherwise return the division of " 'w "s of " 'z "."
@@ -212,27 +212,27 @@
         )
         (proc
             "mod"
-            (vec (vec "n" "int?") (vec "m" "int?") "int?")
+            #(#("n" "int?") #("m" "int?") "int?")
             (text "Return the modulo of " 'n " and " 'm ".")
         )
         (proc
             "modulo"
-            (vec (vec "n" "int?") (vec "m" "int?") "int?")
+            #(#("n" "int?") #("m" "int?") "int?")
             (text "Clone of " (link 'mod) ".")
         )
         (proc
             "add1"
-            (vec (vec "z" "number?") "number?")
+            #(#("z" "number?") "number?")
             (text "Returns " (code "(+ z 1)") ".")
         )
         (proc
             "sub1"
-            (vec (vec "z" "number?") "number?")
+            #(#("z" "number?") "number?")
             (text "Returns " (code "(- z 1)") ".")
         )
         (proc
             "="
-            (vec (vec "z" "number?") (vec "w" "number?") "..." "bool?")
+            #(#("z" "number?") #("w" "number?") "..." "bool?")
             (text
                 "Returns " #t " if all arguments are numerically equal, "
                 #f " otherwise."
@@ -240,12 +240,12 @@
         )
         (proc
             "<"
-            (vec (vec "x" "real?") (vec "y" "real?") "bool?")
+            #(#("x" "real?") #("y" "real?") "bool?")
             (text "Returns " #t " if " 'x " is less than " 'y ", " #f " otherwise.")
         )
         (proc
             "<="
-            (vec (vec "x" "real?") (vec "y" "real?") "bool?")
+            #(#("x" "real?") #("y" "real?") "bool?")
             (text
                 "Returns " #t " if " 'x " is less than or equal to "
                 'y ", " #f " otherwise."
@@ -253,12 +253,12 @@
         )
         (proc
             ">"
-            (vec (vec "x" "real?") (vec "y" "real?") "bool?")
+            #(#("x" "real?") #("y" "real?") "bool?")
             (text "Returns " #t " if " 'x " is greater than " 'y ", " #f " otherwise.")
         )
         (proc
             ">="
-            (vec (vec "x" "real?") (vec "y" "real?") "bool?")
+            #(#("x" "real?") #("y" "real?") "bool?")
             (text
                 "Returns " #t " if " 'x " is greater than or equal to " 'y ", " #f
                 " otherwise."
@@ -266,32 +266,32 @@
         )
         (proc
             "abs"
-            (vec (vec "x" "real?") "real?")
+            #(#("x" "real?") "real?")
             (text "Returns the absolute value of " 'x ".")
         )
         (proc
             "max"
-            (vec (vec "x" "real?") "..." "real?")
+            #(#("x" "real?") "..." "real?")
             (text "Returns largest value of the " 'x "s.")
         )
         (proc
             "min"
-            (vec (vec "x" "real?") "..." "real?")
+            #(#("x" "real?") "..." "real?")
             (text "Returns smallest value of the " 'x "s.")
         )
         (proc
             "real-part"
-            (vec (vec "z" "number?") "real?")
+            #(#("z" "number?") "real?")
             (text "Returns the real part of " 'z ".")
         )
         (proc
             "imag-part"
-            (vec (vec "z" "number?") "real?")
+            #(#("z" "number?") "real?")
             (text "Returns the imaginary part of " 'z ".")
         )
         (proc
             "round"
-            (vec (vec "x" "real?") "int?")
+            #(#("x" "real?") "int?")
             (text
                 "Returns the closest integer to " 'x
                 " resolving ties in favor of even numbers."
@@ -299,68 +299,68 @@
         )
         (proc
             "ceil"
-            (vec (vec "x" "real?") "int?")
+            #(#("x" "real?") "int?")
             (text "Returns the smallest integer bigger than " 'x ".")
         )
         (proc
             "floor"
-            (vec (vec "x" "real?") "int?")
+            #(#("x" "real?") "int?")
             (text "Returns the largest integer less than " 'x ".")
         )
         (proc
             "random"
-            (vec "float?")
+            #("float?")
             (text "Returns a random number between 0.0 inclusive to 1.0 exclusive.")
         )
         (proc
             "randrange"
-            (vec
-                (vec "start" "int?")
-                (vec "stop" "int?")
-                (vec "step" "(and/c int? (not/c 0))" "1")
+            #(
+                #("start" "int?")
+                #("stop" "int?")
+                #("step" "(and/c int? (not/c 0))" "1")
             "int?")
             (text "Returns a random int between " 'start " and " 'stop " inclusive.")
         )
     ]
-    "Exponents" [vec
+    "Exponents" #[
         (proc
             "pow"
-            (vec (vec "z" "real?") (vec "w" "real?") "real?")
+            #(#("z" "real?") #("w" "real?") "real?")
             (text "Returns " 'z " raised to the " 'w " power.")
         )
         (proc
             "sqrt"
-            (vec (vec "z" "number?") "number?")
+            #(#("z" "number?") "number?")
             (text "Returns the square root of " 'z ".")
         )
         (proc
             "exp"
-            (vec (vec "x" "real?") "float?")
+            #(#("x" "real?") "float?")
             (text "Returns Euler's number raised to the " 'z " power.")
         )
         (proc
             "log"
-            (vec (vec "x" "real?") (vec "b" "real?" "(exp 1)") "float?")
+            #(#("x" "real?") #("b" "real?" "(exp 1)") "float?")
             (text
                 "Returns the natural logarithm of " 'x ".\n"
                 "If " 'b " is provided it serves as an alternative base."
             )
         )
     ]
-    "Geometry" [vec
+    "Geometry" #[
         (proc
             "sin"
-            (vec (vec "z" "real?") "float?")
+            #(#("z" "real?") "float?")
             (text "Returns the sine of " 'z " in radians.")
         )
         (proc
             "cos"
-            (vec (vec "z" "real?") "float?")
+            #(#("z" "real?") "float?")
             (text "Returns the cosine of " 'z " in radians.")
         )
         (proc
             "tan"
-            (vec (vec "z" "real?") "float?")
+            #(#("z" "real?") "float?")
             (text "Returns the tangent of " 'z " in radians.")
         )
         (value "pi" "float?"
@@ -370,23 +370,23 @@
             )
         )
     ]
-    "Symbols" [vec
+    "Symbols" #[
         (pred
             "symbol?"
             (text "Returns " #t " if " 'v " is a symbol, " #f " otherwise.")
         )
         (proc
             "symbol->string"
-            (vec (vec "sym" "symbol?") "string?")
+            #(#("sym" "symbol?") "string?")
             (text "Returns a new string whose characters are the same as in " 'sym ".")
         )
         (proc
             "string->symbol"
-            (vec (vec "str" "string?") "symbol?")
+            #(#("str" "string?") "symbol?")
             (text "Returns a symbol whose characters are the same as " 'str ".")
         )
     ]
-    "Strings" [vec
+    "Strings" #[
         (pred
             "string?"
             (text "Returns " #t " if " 'v " is a string, " #f " otherwise.")
@@ -397,95 +397,95 @@
         )
         (proc
             "string"
-            (vec (vec "char" "char?") "..." "string?")
+            #(#("char" "char?") "..." "string?")
             (text "Returns a new string from the given " 'char "s.")
         )
         (proc
             "string-append"
-            (vec (vec "str" "string?") "..." "string?")
+            #(#("str" "string?") "..." "string?")
             (text "Returns a new string concatenated from the given " 'str "s")
         )
         (proc
             "char->int"
-            (vec (vec "char" "char?") "int?")
+            #(#("char" "char?") "int?")
             (text "Returns the corresponding int to the given " 'char ".")
         )
         (proc
             "int->char"
-            (vec (vec "k" "int?") "char?")
+            #(#("k" "int?") "char?")
             (text "Returns the character corresponding to " 'k ".")
         )
         (proc
             "number->string"
-            (vec (vec "z" "number?") "string?")
+            #(#("z" "number?") "string?")
             (text "Returns " 'z " as a string.")
         )
         (proc
             "~a"
-            (vec (vec "v" "datum?") "..." "string?")
+            #(#("v" "datum?") "..." "string?")
             (text
                 "Converts all " 'v "s to a string using display with \"\" as the joiner."
             )
         )
         (proc
             "~s"
-            (vec (vec "v" "datum?") "..." "string?")
+            #(#("v" "datum?") "..." "string?")
             (text
                 "Converts all " 'v "s to a string using display with \" \" as the joiner."
             )
         )
         (proc
             "~v"
-            (vec (vec "v" "datum?") "..." "string?")
+            #(#("v" "datum?") "..." "string?")
             (text
                 "Converts all " 'v " to a string using print with \" \" as the joiner."
             )
         )
     ]
-    "Vectors" [vec
+    "Vectors" #[
         (pred
             "vector?"
             (text "Returns " #t " if " 'v " is a vector, " #f " otherwise.")
         )
         (proc
             "vector"
-            (vec (vec "v" "any") "..." "vector?")
+            #(#("v" "any") "..." "vector?")
             (text
                 "Returns a new vector with the " 'v " args filled with its slots in order."
             )
         )
         (proc
             "make-vector"
-            (vec (vec "size" "uint?") (vec "v" "any" "0") "vector?")
+            #(#("size" "uint?") #("v" "any" "0") "vector?")
             (text
                 "Returns a new vector with " 'size " slots all filled with " 'v "s."
             )
         )
         (proc
             "vector-pop!"
-            (vec (vec "vec" "vector?") "any")
+            #(#("vec" "vector?") "any")
             (text "Remove the last element of " 'vec " and return it.")
         )
         (proc
             "vector-add!"
-            (vec (vec "vec" "vector?") (vec "v" "any") "none")
+            #(#("vec" "vector?") #("v" "any") "none")
             (text "Append " 'v " to the end of " 'vec ".")
         )
         (proc
             "vector-set!"
-            (vec (vec "vec" "vector?") (vec "pos" "int?") (vec "v" "any") "none")
+            #(#("vec" "vector?") #("pos" "int?") #("v" "any") "none")
             (text "Set slot " 'pos " of " 'vec " to " 'v ".")
         )
         (proc
             "vector-append"
-            (vec (vec "vec" "vector?") "..." "vector?")
+            #(#("vec" "vector?") "..." "vector?")
             (text
                 "Returns a new vector with all elements of " 'vec "s appended in order."
             )
         )
         (proc
             "vector-extend!"
-            (vec (vec "vec" "vector?") (vec "vec2" "vector?") "..." "none")
+            #(#("vec" "vector?") #("vec2" "vector?") "..." "none")
             (text
                 "Modify " 'vec " so that all elements of " 'vec2
                 "s are appended to the end of " 'vec " in order."
@@ -493,18 +493,18 @@
         )
         (proc
             "string->vector"
-            (vec (vec "str" "string?") "vector?")
+            #(#("str" "string?") "vector?")
             (text "Returns a new string filled with the characters of " 'str ".")
         )
     ]
-    "Arrays" [vec
+    "Arrays" #[
         (pred
             "array?"
             (text "Returns " #t " if " 'v " is an array, " #f " otherwise.")
         )
         (proc
             "array"
-            (vec (vec "dtype" "symbol?") (vec "v" "any") "..." "array?")
+            #(#("dtype" "symbol?") #("v" "any") "..." "array?")
             (text
                 "Returns a freshly allocated array with " 'dtype
                 " as its datatype and the " 'v " args as its values filled in order."
@@ -512,10 +512,10 @@
         )
         (proc
             "make-array"
-            (vec
-                (vec "dtype" "symbol?")
-                (vec "size" "uint?")
-                (vec "v" "int?" "0")
+            #(
+                #("dtype" "symbol?")
+                #("size" "uint?")
+                #("v" "int?" "0")
             "array?")
             (text
                 "Returns a freshly allocated array with " 'dtype
@@ -524,11 +524,11 @@
         )
         (proc
             "array-splice!"
-            (vec
-                (vec "arr" "array?")
-                (vec "v" "real?")
-                (vec "start" "int?" "0")
-                (vec "stop" "int?" "(length arr)")
+            #(
+                #("arr" "array?")
+                #("v" "real?")
+                #("start" "int?" "0")
+                #("stop" "int?" "(length arr)")
             "array?")
             (text
                 "Modify " 'arr " by setting " 'start " to " 'stop " into the value " 'v "."
@@ -536,7 +536,7 @@
         )
         (proc
             "count-nonzero"
-            (vec (vec "arr" "array?") "uint?")
+            #(#("arr" "array?") "uint?")
             (text "Returns the number of non-zeros in " 'arr ".")
         )
         (pred
@@ -548,16 +548,17 @@
         )
         (proc
             "bool-array"
-            (vec (vec "v" "uint?") "..." "bool-array?")
+            #(#("v" "uint?") "..." "bool-array?")
             (text "Returns a new boolean array with " 'v " as its values.")
         )
         (proc
             "margin"
-            (vec
-                (vec "left" "int?")
-                (vec "right" "int?" "left")
-                (vec "arr" "bool-array?")
-            "bool-array?")
+            #(
+                #("left" "int?")
+                #("right" "int?" "left")
+                #("arr" "bool-array?")
+                "bool-array?"
+            )
             (text
                 "Returns a new " (link 'bool-array?) " with " 'left " and " 'right
                 " margin applied."
@@ -585,10 +586,11 @@
         )
         (proc
             "xor"
-            (vec
-                (vec "expr1" "(or/c bool? bool-array?)")
-                (vec "expr2" "(or/c bool? bool-array?)")
-             "(or/c bool? bool-array?)")
+            #(
+                #("expr1" "(or/c bool? bool-array?)")
+                #("expr2" "(or/c bool? bool-array?)")
+                "(or/c bool? bool-array?)"
+            )
             (text
                 "Returns a new boolean or boolean-array based on the exclusive-or of "
                 'expr1 " and " 'expr2 ". " 'expr2
@@ -597,12 +599,12 @@
         )
         (proc
             "not"
-            (vec (vec "h" "(or/c bool? bool-array?)") "(or/c bool? bool-array?)")
+            #(#("h" "(or/c bool? bool-array?)") "(or/c bool? bool-array?)")
             (text "Returns the inverse of " 'h ".")
         )
         (proc
             "mincut"
-            (vec (vec "arr" "bool-array?") (vec "x" "uint?") "bool-array?")
+            #(#("arr" "bool-array?") #("x" "uint?") "bool-array?")
             (text
                 "Turn all 0s sections that are less than " 'x " in length to 1s. "
                 "0s represent cuts and 1s represent clips."
@@ -610,7 +612,7 @@
         )
         (proc
             "minclip"
-            (vec (vec "arr" "bool-array?") (vec "x" "uint?") "bool-array?")
+            #(#("arr" "bool-array?") #("x" "uint?") "bool-array?")
             (text
                 "Turn all 1s sections that are less than " 'x " in length to 0s "
             )
@@ -619,7 +621,7 @@
             "The symbol 'all. Exists for backwards compatibility for older auto-editor versions"
         ))
     ]
-    "Pairs and Lists" [vec
+    "Pairs and Lists" #[
         (pred
             "pair?"
             (text "Returns " #t " if " 'v " is a pair, " #f " otherwise.")
@@ -630,7 +632,7 @@
         )
         (proc
             "cons"
-            (vec (vec "a" "any") (vec "d" "any") "pair?")
+            #(#("a" "any") #("d" "any") "pair?")
             (text
                 "Returns a newly allocated pair where the first item is set to "
                 'a " and the second item set to " 'd "."
@@ -638,12 +640,12 @@
         )
         (proc
             "car"
-            (vec (vec "p" "pair?") "any?")
+            #(#("p" "pair?") "any?")
             (text "Returns the first element of pair " 'p ".")
         )
         (proc
             "cdr"
-            (vec (vec "p" "pair?") "any?")
+            #(#("p" "pair?") "any?")
             (text "Returns the second element of pair " 'p ".")
         )
         (value "null" "null?" (text "The empty list."))
@@ -657,78 +659,78 @@
         )
         (proc
             "list"
-            (vec (vec "v" "any") "..." "list?")
+            #(#("v" "any") "..." "list?")
             (text "Returns a list with " 'v " in order.")
         )
         (proc
             "list-ref"
-            (vec (vec "lst" "list?") (vec "pos" "uint?") "any")
+            #(#("lst" "list?") #("pos" "uint?") "any")
             (text
                 "Returns the element of " 'lst " at position " 'pos "."
             )
         )
         (proc
             "vector->list"
-            (vec (vec "vec" "vector?") "list?")
+            #(#("vec" "vector?") "list?")
             (text "Returns a new list based on " 'vec ".")
         )
         (proc
             "list->vector"
-            (vec (vec "lst" "list?") "vector?")
+            #(#("lst" "list?") "vector?")
             (text "Returns a new vector based on " 'lst ".")
         )
         (proc
             "string->list"
-            (vec (vec "str" "string?") "list?")
+            #(#("str" "string?") "list?")
             (text "Returns a new list filled with the characters of " 'str ".")
         )
         (proc
             "caar"
-            (vec (vec "v" "any") "any")
+            #(#("v" "any") "any")
             (text "Returns " (code "(car (car v))"))
         )
         (proc
             "cadr"
-            (vec (vec "v" "any") "any")
+            #(#("v" "any") "any")
             (text "Returns " (code "(car (cdr v))"))
         )
         (proc
             "cdar"
-            (vec (vec "v" "any") "any")
+            #(#("v" "any") "any")
             (text "Returns " (code "(cdr (car v))"))
         )
         (proc
             "cddr"
-            (vec (vec "v" "any") "any")
+            #(#("v" "any") "any")
             (text "Returns " (code "(cdr (cdr v))"))
         )
     ]
-    "Ranges" [vec
+    "Ranges" #[
         (pred
             "range?"
             (text "Returns " #t " if " 'v " is a range object, " #f " otherwise.")
         )
         (proc
             "range"
-            (vec
-                (vec "start" "int?")
-                (vec "stop" "int?")
-                (vec "step" "(and/c int? (not/c 0))" "1")
+            #(
+                #("start" "int?")
+                #("stop" "int?")
+                #("step" "(and/c int? (not/c 0))" "1")
              "range?")
             (text "Returns a range object.")
         )
         (proc
             "range->vector"
-            (vec (vec "rng" "range?") "vector?")
+            #(#("rng" "range?") "vector?")
             (text "Returns a new vector based on " 'rng ".")
         )
         (proc
             "range->list"
-            (vec (vec "rng" "range?") "list?")
+            #(#("rng" "range?") "list?")
             (text "Returns a new list based on " 'rng ".")
         )
     ]
-    "Generic Sequences" [vec
+    "Generic Sequences" #[
         (pred
             "iterable?"
             (text
@@ -745,12 +747,12 @@
         )
         (proc
             "length"
-            (vec (vec "seq" "iterable?") "uint?")
+            #(#("seq" "iterable?") "uint?")
             (text "Returns the length of " 'seq ".")
         )
         (proc
             "ref"
-            (vec (vec "seq" "iterable?") (vec "pos" "int?") "any")
+            #(#("seq" "iterable?") #("pos" "int?") "any")
             (text
                 "Returns the element of " 'seq " at position " 'pos
                 " where the first element is at position 0. For sequences other than "
@@ -759,12 +761,13 @@
         )
         (proc
             "slice"
-            (vec
-                (vec "seq" "sequence?")
-                (vec "start" "int?")
-                (vec "stop" "int?" "(length seq)")
-                (vec "step" "int?" "1")
-            "sequence?")
+            #(
+                #("seq" "sequence?")
+                #("start" "int?")
+                #("stop" "int?" "(length seq)")
+                #("step" "int?" "1")
+                "sequence?"
+            )
             (text
                 "Returns the elements of " 'seq " from " 'start " inclusively to "
                 'stop " exclusively. If " 'step " is negative then " 'stop
@@ -773,67 +776,67 @@
         )
         (proc
             "reverse"
-            (vec (vec "seq" "sequence?") "sequence?")
+            #(#("seq" "sequence?") "sequence?")
             (text "Returns " 'seq " in reverse order.")
         )
     ]
-    "Hashmaps" [vec
+    "Hashmaps" #[
         (pred
             "hash?"
             (text "Returns " #t " if " 'v " is a hash table, " #f " otherwise.")
         )
         (proc
             "hash"
-            (vec (vec "key" "any") (vec "val" "any") "..." "hash?")
+            #(#("key" "any") #("val" "any") "..." "hash?")
             (text "Returns a newly constructed hash map from key-value pairs.")
         )
         (proc
             "has-key?"
-            (vec (vec "hash" "hash?") (vec "key" "any") "bool?")
+            #(#("hash" "hash?") #("key" "any") "bool?")
             (text "Returns " #t " if " 'key " is in the hash map, " #f " otherwise.")
         )
     ]
-    "Actions" [vec
+    "Actions" #[
         (proc
             "sleep"
-            (vec (vec "time" "(or/c int? float?)") "void?")
+            #(#("time" "(or/c int? float?)") "void?")
             (text "Adds a delay by " 'time "seconds.")
         )
         (proc
             "error"
-            (vec (vec "msg" "string?") "none")
+            #(#("msg" "string?") "none")
             (text "Raises an exception with " 'msg " as the message.")
         )
         (proc
             "exit"
-            (vec (vec "status" "uint?" "1") "none")
+            #(#("status" "uint?" "1") "none")
             (text "Immediately terminates the program.")
         )
         (proc
             "begin"
-            (vec (vec "datum" "any") "..." "any")
+            #(#("datum" "any") "..." "any")
             (text "Evaluates all arguments and returns the last one.")
         )
     ]
-    "Input / Output" [vec
+    "Input / Output" #[
         (proc
             "display"
-            (vec (vec "datum" "any") "void?")
+            #(#("datum" "any") "void?")
             (text "Display " 'datum " to stdout.")
         )
         (proc
             "displayln"
-            (vec (vec "datum" "any") "void?")
+            #(#("datum" "any") "void?")
             (text "Display " 'datum " to stdout with a newline character.")
         )
         (proc
             "print"
-            (vec (vec "datum" "any") "void?")
+            #(#("datum" "any") "void?")
             (text "Display " 'datum " like REPL does.")
         )
         (proc
             "println"
-            (vec (vec "datum" "any") "void?")
+            #(#("datum" "any") "void?")
             (text "Display " 'datum " like REPL does with a newline character.")
         )
         (syntax
@@ -845,18 +848,18 @@
             )
         )
     ]
-    "Void" [vec
+    "Void" #[
         (pred
             "void?"
             (text "Returns " #t " if " 'v " is " (void) ", " #f " otherwise.")
         )
         (proc
             "void"
-            (vec (vec "v" "any") "..." "void?")
+            #(#("v" "any") "..." "void?")
             (text  "Returns the constant " (void) ". All " 'v " arguments are ignored.")
         )
     ]
-    "Procedures" [vec
+    "Procedures" #[
         (pred
             "procedure?"
             (text "Returns " #t " if " 'v " is a procedure, " #f " otherwise.")
@@ -872,7 +875,7 @@
         (pred "any" (text "Always returns " #t " regardless of the value of " 'v "."))
         (proc
             "map"
-            (vec (vec "proc" "procedure?") (vec "seq" "sequence?") "sequence?")
+            #(#("proc" "procedure?") #("seq" "sequence?") "sequence?")
             (text
                 "Returns a new sequence with the results of " 'proc
                 " applied to each element."
@@ -880,12 +883,12 @@
         )
         (proc
             "apply"
-            (vec (vec "proc" "procedure?") (vec "seq" "sequence?") "any")
+            #(#("proc" "procedure?") #("seq" "sequence?") "any")
             (text "Applies " 'proc " given " 'seq " as its arguments.")
         )
         (proc
             "and/c"
-            (vec (vec "contract" "contract?") "contract?")
+            #(#("contract" "contract?") "contract?")
             (text
                 "Takes any number of contracts and returns a contract predicate that "
                 "accepts any values that satisfies all contracts."
@@ -893,7 +896,7 @@
         )
         (proc
             "or/c"
-            (vec (vec "contract" "contract?") "contract?")
+            #(#("contract" "contract?") "contract?")
             (text
                 "Takes any number of contracts and returns a contract predicate that "
                 "accepts any values that can satisfy one or more contracts."
@@ -901,7 +904,7 @@
         )
         (proc
             "not/c"
-            (vec (vec "contract" "contract?") "contract?")
+            #(#("contract" "contract?") "contract?")
             (text
                 "Takes one contract and returns a contract that accepts one value and "
                 "satisfies the opposite of the given contract."
@@ -909,7 +912,7 @@
         )
         (proc
             ">=/c"
-            (vec (vec "n" "real?") "contract?")
+            #(#("n" "real?") "contract?")
             (text
                 "Returns a new contract that requires the input to be " (link 'real?)
                 " and " (link '>=) " than " 'n "."
@@ -917,21 +920,21 @@
         )
         (proc
             ">/c"
-            (vec (vec "n" "real?") "contract?")
+            #(#("n" "real?") "contract?")
             (text "Like " (link '>=/c) " but for " (link '>) ".")
         )
         (proc
             "<=/c"
-            (vec (vec "n" "real?") "contract?")
+            #(#("n" "real?") "contract?")
             (text "Like " (link '>=/c) " but for " (link '<=) ".")
         )
         (proc
             "</c"
-            (vec (vec "n" "real?") "contract?")
+            #(#("n" "real?") "contract?")
             (text "Like " (link '>=/c) " but for " (link '<) ".")
         )
     ]
-    "Objects" [vec
+    "Objects" #[
         (pred
             "object?"
             (text "Returns " #t " if " 'v " is an object, " #f
@@ -940,12 +943,12 @@
         )
         (proc
             "attrs"
-            (vec (vec "obj" "object?") "vector?")
+            #(#("obj" "object?") "vector?")
             (text "Returns all attributes of " 'obj " as a vector of strings.")
         )
         (syntax "@r" "obj attr" (text "Returns the specified attribute on the object."))
     ]
-    "Reflection" [vec
+    "Reflection" #[
         (syntax
             "eval" "body"
             (text
@@ -961,7 +964,7 @@
         )
         (proc
             "var-exists?"
-            (vec (vec "sym" "symbol?") "bool?")
+            #(#("sym" "symbol?") "bool?")
             (text
                 "Returns " #t " if the variable corresponding to " 'sym
                 " is defined in the current environment, " #f " otherwise."
