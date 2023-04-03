@@ -193,7 +193,7 @@ def display_dtype(dtype: np.dtype) -> str:
     return f"float{dtype.itemsize * 8}"
 
 
-def display_str(val: object) -> str:
+def display_str(val: object, lead: bool = True) -> str:
     if val is None:
         return "#<void>"
     if val is True:
@@ -217,11 +217,12 @@ def display_str(val: object) -> str:
     if isinstance(val, Fraction):
         return f"{val.numerator}/{val.denominator}"
     if isinstance(val, list):
+        lead_hash = "#" if lead else ""
         if not val:
-            return "#()"
-        result = f"#({display_str(val[0])}"
+            return f"{lead_hash}()"
+        result = f"{lead_hash}({display_str(val[0], False)}"
         for item in val[1:]:
-            result += f" {display_str(item)}"
+            result += f" {display_str(item, False)}"
         return result + ")"
     if isinstance(val, np.ndarray):
         kind = val.dtype.kind
@@ -251,7 +252,7 @@ def print_str(val: object) -> str:
         return f'"{str_escape(val)}"'
     if type(val) is Char:
         return f"{val!r}"
-    if type(val) is Sym or type(val) is Cons or isinstance(val, list):
+    if type(val) is Sym or type(val) is Cons:
         return f"'{display_str(val)}"
 
     return display_str(val)

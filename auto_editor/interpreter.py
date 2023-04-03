@@ -44,7 +44,9 @@ SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 ID, QUOTE, NUM, BOOL, STR, CHAR = "ID", "QUOTE", "NUM", "BOOL", "STR", "CHAR"
 METHOD, SEC, DB, PER, DOT = "METHOD", "SEC", "DB", "PER", "DOT"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
+VLIT = "VLIT"
 METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
+brac_pairs = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
 
 
 class Token:
@@ -117,7 +119,7 @@ class Lexer:
                         result.write("\t")
                     if self.char == "n":
                         result.write("\n")
-                    if self.char ==  "v":
+                    if self.char == "v":
                         result.write("\v")
                     if self.char == "f":
                         result.write("\f")
@@ -192,6 +194,13 @@ class Lexer:
             char = self.char
             self.advance()
             return Token(CHAR, Char(char))
+
+        if self.char in "([{":
+            brac_type = self.char
+            self.advance()
+            if self.char is None:
+                self.close_err(f"Expected a character after #{brac_type}")
+            return Token(VLIT, brac_pairs[brac_type])
 
         buf = StringIO()
         while self.char_is_norm():
@@ -354,6 +363,16 @@ class Parser:
             self.eat()
             return token.value
 
+        if token.type == VLIT:
+            lit_arr = []
+            self.eat()
+            while self.current_token.type != token.value:
+                lit_arr.append(self.expr())
+                if self.current_token.type == EOF:
+                    raise ClosingError("Unclosed vector literal")
+            self.eat()
+            return [list, lit_arr]
+
         if token.type == SEC:
             self.eat()
             return [Sym("round"), [Sym("*"), token.value, Sym("timebase")]]
@@ -377,10 +396,9 @@ class Parser:
             self.eat()
             return [Sym("quote"), self.expr()]
 
-        pars = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
-        if token.type in pars:
+        if token.type in brac_pairs:
             self.eat()
-            closing = pars[token.type]
+            closing = brac_pairs[token.type]
             childs = []
             while self.current_token.type != closing:
                 if self.current_token.type == EOF:
@@ -1193,6 +1211,9 @@ def my_eval(env: Env, node: object) -> Any:
     if isinstance(node, list):
         if not node:
             raise MyError("Illegal () expression")
+
+        if node[0] is list:  # Handle vector literal
+            return [my_eval(env, item) for item in node[1]]
 
         oper = my_eval(env, node[0])
         if not callable(oper):
