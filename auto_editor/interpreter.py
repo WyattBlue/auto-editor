@@ -44,7 +44,7 @@ SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 ID, QUOTE, NUM, BOOL, STR, CHAR = "ID", "QUOTE", "NUM", "BOOL", "STR", "CHAR"
 METHOD, SEC, DB, PER, DOT = "METHOD", "SEC", "DB", "PER", "DOT"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
-VLIT = "VLIT"
+VLIT, HASH_LIT = "VLIT", "HLIT"
 METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
 brac_pairs = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
 
@@ -195,7 +195,7 @@ class Lexer:
             self.advance()
             return Token(CHAR, Char(char))
 
-        if self.char in "([{":
+        if self.char is not None and self.char in "([{":
             brac_type = self.char
             self.advance()
             if self.char is None:
@@ -214,6 +214,18 @@ class Lexer:
 
         if result in ("f", "false"):
             return Token(BOOL, False)
+
+        if result == "hash":
+            self.advance()
+            if self.char is None or self.char not in "([{":
+                self.error(f"Expected an opening bracket after #hash")
+
+            brac_type = self.char
+            self.advance()
+            if self.char is None:
+                self.close_err(f"Expected a character after #{brac_type}")
+
+            return Token(HASH_LIT, brac_type)
 
         self.error(f"Unknown hash literal `#{result}`")
 
@@ -1122,6 +1134,22 @@ is_obj = Contract(
 )
 
 
+def str_to_float(v: str) -> float:
+    try:
+        return float(v)
+    except ValueError:
+        raise MyError(f"invalid float: {v}")
+
+
+def str_to_int(v: str, base: int) -> int:
+    if base < 2 or base > 36:
+        raise MyError(f"int: base must be between 2 and 36")
+    try:
+        return int(v, base)
+    except ValueError:
+        raise MyError(f"invalid int: {v} for base {base}")
+
+
 def get_attrs(obj: Any) -> dict[str, Any]:
     if type(obj) is str:
         return {
@@ -1136,6 +1164,8 @@ def get_attrs(obj: Any) -> dict[str, Any]:
             "title": Proc("title", obj.title, (0, 0)),
             "lower": Proc("lower", obj.lower, (0, 0)),
             "upper": Proc("upper", obj.upper, (0, 0)),
+            "float": Proc("float", lambda: str_to_float(obj), (0, 0)),
+            "int": Proc("int", lambda b=10: str_to_int(obj, b), (0, 1), [is_int]),
         }
     if isinstance(obj, list):
 

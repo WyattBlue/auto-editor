@@ -95,7 +95,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             try:
                 lexer = Lexer("repl", text)
                 parser = Parser(lexer)
-                print(parser)
 
                 for result in interpret(env, parser):
                     if result is not None:

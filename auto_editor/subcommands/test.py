@@ -804,6 +804,11 @@ def main(sys_args: list[str] | None = None):
             ("(define v #(2 0 3 -4 5 1 4))(v.sort)", [-4, 0, 1, 2, 3, 4, 5]),
             ("(define v #(2 0 3 -4 5 1 4))(v.sort!)v", [-4, 0, 1, 2, 3, 4, 5]),
             ('#(#("sym" "symbol?") "bool?")', [["sym", "symbol?"], "bool?"]),
+            ('("23".int)', 23),
+            ('("164".int 10)', 164),
+            ('("1111".int 2)', 15),
+            ('("AF".int 16)', 175),
+            ('("3.14".float)', 3.14),
         )
 
     tests = []
