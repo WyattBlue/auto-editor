@@ -4,19 +4,19 @@ labels: bug
 body:
   - type: textarea
     attributes:
+      label: Bug description
+      description: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
       label: What's your platform?
       description: "Which operating system do you use? Run `auto-editor --debug`"
       placeholder: "Paste output of `auto-editor --debug`"
       render: shell
     validations:
       required: true  
-
-  - type: textarea
-    attributes:
-      label: Bug description
-      description: What happened?
-    validations:
-      required: true
 
   - type: textarea
     attributes:
@@ -31,7 +31,6 @@ body:
       label: What properties does your input video have?
       description: This is NOT the place where you paste your command. IF YOU DO NOT FILL THIS OUT CORRECTLY, YOUR ISSUE WILL BE DELETED.
       placeholder: Run `auto-editor info your_video.mp4` AND `ffmpeg -hide_banner -i your_video.mp4`
-      render: shell
 
   - type: textarea
     attributes:
