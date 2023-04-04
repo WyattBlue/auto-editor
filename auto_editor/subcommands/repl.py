@@ -26,6 +26,7 @@ except ImportError:
 @dataclass
 class REPL_Args:
     input: list[str] = field(default_factory=list)
+    debug_parser: bool = False
     timebase: Fraction | None = None
     ffmpeg_location: str | None = None
     my_ffmpeg: bool = False
@@ -35,6 +36,11 @@ class REPL_Args:
 
 def repl_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_required("input", nargs="*")
+    parser.add_argument(
+        "--debug-parser",
+        flag=True,
+        help="Print parser value",
+    )
     parser.add_argument(
         "--timebase",
         "-tb",
@@ -95,6 +101,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             try:
                 lexer = Lexer("repl", text)
                 parser = Parser(lexer)
+                if args.debug_parser:
+                    print(f"parser: {parser}")
 
                 for result in interpret(env, parser):
                     if result is not None:
