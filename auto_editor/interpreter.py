@@ -209,10 +209,10 @@ class Lexer:
             self.advance()
 
         result = buf.getvalue()
-        if result in ("t", "true"):
+        if result in ("t", "T", "true"):
             return Token(BOOL, True)
 
-        if result in ("f", "false"):
+        if result in ("f", "F", "false"):
             return Token(BOOL, False)
 
         if result == "hash":
