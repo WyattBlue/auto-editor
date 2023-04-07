@@ -1,30 +1,39 @@
-{{ comp.header "The `--source` Option" }}
+{{ comp.header "The --source option" }}
 <body>
 {{ comp.nav }}
 <section class="section">
 <div class="container">
-    <h1>The `--source` Option</h1>
+    <h1>The <code>--source</code> Option</h1>
     <p class="author">Author: <b>WyattBlue</b></p>
     <p class="date">Date: <b>October 16, 2022</b></p>
+
     <hr>
     <h3>What Does the <code>--source</code> Option Do?</h3>
+
     <p>Auto-Editor allows you to create timeline objects with your files, however, typing/dragging the file path every time an object is declared is a pain. What <code>--source</code> does is map a path to a short and reusable label. You can use that label to reference the file without using it's path.</p>
-    <h1>Map a path to the label "dog"</h1>
-    <p>--source dog:/Users/wyattblue/Downloads/dog-123.png</p>
+
+    <pre><code><i># Map a path to the label "dog"</i>
+--source dog:/Users/wyattblue/Downloads/dog-123.png
+</pre></code>
+
     <p>Right now, <code>src</code> only accepts source names and not the file path directly. This might change in the future.</p>
     <p>Also, User defined labels cannot:</p>
     <ul>
-        <li>Contain <code>, = . : ; ( ) / \ [ ] { } ' " | # &lt; &gt; & ^ % $ _ @</code> anywhere</li>
-        <li>Contain the space character</li>
-        <li>Start with a with a digit or a dash (<code>0 1 2 3 4 5 6 7 8 9 -</code>)</li>
         <li>Be greater than 55 characters</li>
+        <li>Start with a with a digit or a dash (<code>0 1 2 3 4 5 6 7 8 9 -</code>)</li>
+        <li>Contain <code>, = . : ; ( ) / \ [ ] { }' " | # &lt; &gt; &amp; ^ % $ _ @</code> anywhere</li>
         <li>Contain an invalid UTF-8 character</li>
+        <li>Contain the space character</li>
     </ul>
+
     <p>This is partly because of limitations on file path names, *cough* Windows *cough*, but also to make parsing easy and forwards compatible.</p>
-    <p>The reason *User defined* is there is that paths given to auto-editor without a label are assigned a name, <code>0</code>, <code>1</code>, <code>2</code> and beyond.</p>
-    <h1>How you would use --source in a real situation</h1>
-    <p>auto-editor movie.mp4 movie2.mp4 --source dog:/Users/wyattblue/Downloads/dog-123.png \</p>
-    <p>--add image:0,30,src=dog</p>
+    <p>The reason <i>User defined</i> is there is that paths given to auto-editor without a label are assigned a name, <code>0</code>, <code>1</code>, <code>2</code> and beyond.
+
+    <pre><code><i># How you would use --source in a real situation</i>
+auto-editor movie.mp4 movie2.mp4 --source dog:/Users/wyattblue/Downloads/dog-123.png \
+--add image:0,30,src=dog
+</pre></code>
+
 </div>
 </section>
 </body>
