@@ -14,6 +14,7 @@ type
     tk_list,
     tk_ul,
     tk_block,
+    tk_link,
     tk_eof,
   Token = ref object
     kind: TokenKind
@@ -30,6 +31,7 @@ type
     just_start,
     in_head,
     normal_state,
+    link_state,
   Lexer = ref object
     text: string
     current_char: char
@@ -62,7 +64,7 @@ proc peek(self: Lexer): char =
     return self.text[peak_pos]
 
 proc make_token(kind: TokenKind, value: string): Token =
-  echo kind, " \"", value, "\""
+#  echo kind, " \"", value, "\""
   return Token(kind: kind, value: value)
 
 
@@ -70,11 +72,32 @@ proc get_next_token(self: Lexer): Token =
   var rod = ""
   var levels = 0
   while self.current_char != '\0':
+    if self.state == link_state:
+      rod = ""
+      while self.current_char != ')':
+        rod = rod & self.current_char
+        advance(self)
+      advance(self)
+      self.state = normal_state
+      return make_token(tk_text, rod)  # return link ref
     if self.current_char == '\n':
       advance(self)
       return make_token(tk_newline, "")
 
-    if self.state == normal_state and self.current_char == '`':
+    if self.state == normal_state and self.current_char == '[':  # Handle links
+      advance(self)
+      rod = ""
+      while self.current_char != ']':
+        rod = rod & self.current_char 
+        advance(self)
+      advance(self)
+      if self.current_char != '(':
+        error("link expected ref")
+      advance(self)
+      self.state = link_state
+      return make_token(tk_link, rod)
+
+    if self.state == normal_state and self.current_char == '`':  # Handle code ticks
       while self.current_char == '`':
         levels += 1
         advance(self)
@@ -128,6 +151,8 @@ proc get_next_token(self: Lexer): Token =
     if peek(self) == '\n':
       break_token = true
     elif self.state == normal_state and peek(self) == '`':
+      break_token = true
+    elif self.state == normal_state and peek(self) == '[':
       break_token = true
     elif self.state == in_head and peek(self) == ':':
       break_token = true
@@ -249,7 +274,6 @@ proc convert(text: string, path: string) =
       discard ends.pop()
 
   while obj.kind != tk_eof:
-    echo ends
     if obj.kind in @[tk_h1, tk_h2, tk_h3]:
       ends.add(obj.kind)
       f.write(&"    <{to_tag(ends[^1])}>")
@@ -288,7 +312,10 @@ proc convert(text: string, path: string) =
         obj = get_next_token(lexer)
 
       f.write("</pre></code>\n")
-
+    elif obj.kind == tk_link:
+      var link_text = sanitize(obj.value)
+      obj = get_next_token(lexer)
+      f.write(&"<a href=\"{obj.value}\">{link_text}</a>")
     elif obj.kind == tk_bar:
       f.write("    <hr>\n")
     elif obj.kind == tk_newline:

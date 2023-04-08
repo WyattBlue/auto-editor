@@ -30,6 +30,10 @@ ref = Path("src") / "ref" / version
 ref.mkdir(parents=True, exist_ok=True)
 
 
+# Build blog posts
+subprocess.run(["./blog_gen"])
+
+
 def get_link_name(item: Path) -> str:
     extname = {
         ".dmg": "MacOS",
