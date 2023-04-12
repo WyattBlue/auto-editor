@@ -12,7 +12,7 @@ Auto-Editor allows you to create timeline objects with your files, however, typi
 ```
 
 Right now, `src` only accepts source names and not the file path directly. This might change in the future.
-Also, User defined labels cannot:
+Also, user defined labels cannot:
  * Contain `, = . : ; ( ) / \ [ ] { } ' " | # < > & ^ % $ _ @` anywhere
  * Contain the space character
  * Start with a with a digit or a dash (`0 1 2 3 4 5 6 7 8 9 -`)
@@ -23,7 +23,7 @@ This is partly because of limitations on file path names, *cough* Windows *cough
 The reason *User defined* is there is that paths given to auto-editor without a label are assigned a name, `0`, `1`, `2` and beyond.
 
 ```
-# How you would use --source in a real situation
+# How you would use `--source` in a real situation
 auto-editor movie.mp4 movie2.mp4 --source dog:/Users/wyattblue/Downloads/dog-123.png \
 --add image:0,30,src=dog
 ```
