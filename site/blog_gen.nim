@@ -1,4 +1,5 @@
 import strutils
+import std/os
 import std/strformat
 
 type
@@ -20,19 +21,16 @@ type
     kind: TokenKind
     value: string
 
-proc error(msg: string) =
-  write(stderr, msg)
-  system.quit(1)
-
-# error(&"{line}:{col} Expected {kind}, got {actual_kind} {actual_val}")
 
 type
   State = enum
     just_start,
     in_head,
     normal_state,
+    block_state,
     link_state,
   Lexer = ref object
+    name: string
     text: string
     current_char: char
     state: State
@@ -40,8 +38,12 @@ type
     line: int
     col: int
 
-proc Lexer_init(text: string): Lexer = 
-  return Lexer(text: text, current_char: text[0], state: just_start, pos: 0, line: 1, col: 1)
+proc Lexer_init(name: string, text: string): Lexer =
+  return Lexer(name: name, text: text, current_char: text[0], state: just_start, pos: 0, line: 1, col: 1)
+
+proc error(self: Lexer, msg: string) =
+  write(stderr, &"{self.name}:{self.line}:{self.col} {msg}")
+  system.quit(1)
 
 proc advance(self: Lexer) = 
   self.pos += 1
@@ -63,10 +65,15 @@ proc peek(self: Lexer): char =
   else:
     return self.text[peak_pos]
 
-proc make_token(kind: TokenKind, value: string): Token =
-#  echo kind, " \"", value, "\""
-  return Token(kind: kind, value: value)
+proc long_peek(self: Lexer, pos: int): char =
+  let peak_pos = self.pos + pos
+  if peak_pos > len(self.text) - 1:
+    return '\0'
+  else:
+    return self.text[peak_pos]
 
+proc make_token(kind: TokenKind, value: string): Token =
+  return Token(kind: kind, value: value)
 
 proc get_next_token(self: Lexer): Token = 
   var rod = ""
@@ -75,7 +82,7 @@ proc get_next_token(self: Lexer): Token =
     if self.state == link_state:
       rod = ""
       while self.current_char != ')':
-        rod = rod & self.current_char
+        rod &= self.current_char
         advance(self)
       advance(self)
       self.state = normal_state
@@ -88,11 +95,11 @@ proc get_next_token(self: Lexer): Token =
       advance(self)
       rod = ""
       while self.current_char != ']':
-        rod = rod & self.current_char 
+        rod &= self.current_char
         advance(self)
       advance(self)
       if self.current_char != '(':
-        error("link expected ref")
+        error(self, "link expected ref")
       advance(self)
       self.state = link_state
       return make_token(tk_link, rod)
@@ -105,20 +112,42 @@ proc get_next_token(self: Lexer): Token =
       if levels == 1:
         rod = ""
         while self.current_char != '`':
-          rod = rod & self.current_char
+          rod &= self.current_char
           advance(self)
         advance(self)
 
         if rod.strip() == "":
-          error("Tick can't be blank")
+          error(self, "Tick can't be blank")
 
         return make_token(tk_tick, rod)
       elif levels == 3:
+        self.state = block_state
+        while not (self.current_char in @['\n', '\0']):
+          advance(self)
         return make_token(tk_block, "")
       elif levels != 0:
-        error(&"Wrong number of `s, ({levels})")
+        error(self, &"Wrong number of `s, ({levels})")
 
-    rod = rod & self.current_char
+    if self.state == block_state and self.current_char == '`':
+      levels = 0
+      while long_peek(self, levels) == '`':
+        levels += 1
+        if levels == 5:
+          break
+
+      if levels == 3:
+        advance(self)
+        advance(self)
+        advance(self)
+        self.state = normal_state
+        return make_token(tk_block, "")
+      else:
+        while levels > 0:
+          levels -= 1
+          rod &= '`'
+          advance(self)
+
+    rod &= self.current_char
 
     if self.state == in_head and self.current_char == ':':
       advance(self)  # then go to ` ` 
@@ -128,17 +157,17 @@ proc get_next_token(self: Lexer): Token =
       rod = ""
       while self.current_char != '\n':
         if self.current_char == '\0':
-          error("Got EOF on key-value pair")
+          error(self, "Got EOF on key-value pair")
 
         if self.current_char != '\n':
-          rod = rod & self.current_char
+          rod &= self.current_char
 
         advance(self)
 
       advance(self)
       return make_token(tk_keyval, rod)
 
-    if rod == "---":
+    if self.state in @[just_start, in_head, normal_state] and rod == "---":
       advance(self)
       advance(self)
       if self.state == just_start:
@@ -154,6 +183,8 @@ proc get_next_token(self: Lexer): Token =
       break_token = true
     elif self.state == normal_state and peek(self) == '[':
       break_token = true
+    elif self.state == block_state and peek(self) == '#':
+      break_token = true
     elif self.state == in_head and peek(self) == ':':
       break_token = true
 
@@ -164,31 +195,35 @@ proc get_next_token(self: Lexer): Token =
       else:
         return make_token(tk_text, rod)
 
-    levels = 0
-    
-    if self.col == 1 and self.current_char == ' ' and peek(self) == '*':
+    if self.state == block_state and self.current_char == '#' and self.peek() == ' ':
       advance(self)
-      advance(self)
-      advance(self)
-      return make_token(tk_list, "")
+      return make_token(tk_h1, "")  # Italicize comments
 
-    if self.current_char == '#' and self.col == 1:
-      while self.current_char == '#':
-        levels += 1
+    if self.state == normal_state:
+      if self.col == 1 and self.current_char == ' ' and peek(self) == '*':
         advance(self)
-      
-      if self.current_char != ' ':
-        error("Expected space after header")
-      advance(self)
+        advance(self)
+        advance(self)
+        return make_token(tk_list, "")
 
-      if levels == 3:
-        return make_token(tk_h3, "")
-      elif levels == 2:
-        return make_token(tk_h2, "")
-      elif levels == 1:
-        return make_token(tk_h1, "")
-      elif levels != 0:
-        error("Too many #s")
+      levels = 0
+      if self.current_char == '#' and self.col == 1:
+        while self.current_char == '#':
+          levels += 1
+          advance(self)
+
+        if self.current_char != ' ':
+          error(self, "Expected space after header")
+        advance(self)
+
+        if levels == 3:
+          return make_token(tk_h3, "")
+        elif levels == 2:
+          return make_token(tk_h2, "")
+        elif levels == 1:
+          return make_token(tk_h1, "")
+        elif levels != 0:
+          error(self, "Too many #s")
 
     advance(self)
 
@@ -200,31 +235,31 @@ proc sanitize(v: string): string =
   return v.replace("<", "&lt;").replace(">", "&gt;")
 
 
-proc convert(text: string, path: string) =
-  var lexer = Lexer_init(text)
+proc convert(file: string, path: string) =
+  let text = readFile(file)
+  var lexer = Lexer_init(file, text)
 
   if get_next_token(lexer).kind != tk_bar:
-    error("Expected --- at start")
+    error(lexer, "Expected --- at start")
 
   proc parse_keyval(key: string): string = 
     var token = get_next_token(lexer)
     if token.kind != tk_text:
-      error("head: expected text")
+      error(lexer, "head: expected text")
     if token.value != key:
-      error(&"Expected {key}, got {token.value}")
+      error(lexer, &"Expected {key}, got {token.value}")
     token = get_next_token(lexer)
     if token.kind != tk_keyval:
-      error("head: expected keyval")
+      error(lexer, "head: expected keyval")
     return token.value
       
-
   let
     title = parse_keyval("title")
     author = parse_keyval("author")
     date = parse_keyval("date")
 
   if get_next_token(lexer).kind != tk_bar:
-    error("head: expected end ---")
+    error(lexer, "head: expected end ---")
   var output = &"""{{{{ comp.header "{title}" }}}}
 <body>
 {{{{ comp.nav }}}}
@@ -257,7 +292,7 @@ proc convert(text: string, path: string) =
     elif t == tk_ul:
       result = "ul"
     else:
-      error("to_tag got bad value")
+      error(lexer, "to_tag got bad value")
 
   var obj = get_next_token(lexer)
   var ends: seq[TokenKind] = @[]
@@ -300,14 +335,18 @@ proc convert(text: string, path: string) =
     elif obj.kind == tk_block:
       f.write("    <pre><code>")
       obj = get_next_token(lexer)
-      while obj.kind != tk_block:
+      var has_text = false
+      while obj.kind != tk_eof and obj.kind != tk_block:
         if len(ends) > 0:
-          error("code block must not be indented")
+          error(lexer, "code block must not be indented")
         if obj.kind == tk_h1:
           obj = get_next_token(lexer)
-          f.write(&"<i>{sanitize(obj.value)}</i>\n")
+          f.write(&"<i># {sanitize(obj.value).strip()}</i>")
+          has_text = true
         elif obj.kind == tk_text:
           f.write(sanitize(obj.value))
+          has_text = true
+        elif obj.kind == tk_newline and has_text:
           f.write("\n")
         obj = get_next_token(lexer)
 
@@ -321,7 +360,7 @@ proc convert(text: string, path: string) =
     elif obj.kind == tk_newline:
       write_end()
     else:
-      error(&"unexpected obj.kind: {obj.kind}")
+      error(lexer, &"unexpected obj.kind: {obj.kind}")
 
     obj = get_next_token(lexer)
 
@@ -331,13 +370,5 @@ proc convert(text: string, path: string) =
   f.write("</div>\n</section>\n</body>\n</html>\n")
   f.close()
 
-
-var text: string
-text = readFile("src/blog/source.md")
-convert(text, "src/blog/source.html")
-  
-text = readFile("src/blog/supporting-davinci-resolve-again.md")
-convert(text, "src/blog/supporting-davinci-resolve-again.html")
-
-text = readFile("src/blog/silent-threshold.md")
-convert(text, "src/blog/silent-threshold.html")
+for file in walkFiles("src/blog/*.md"):
+  convert(file, file.changeFileExt("html"))

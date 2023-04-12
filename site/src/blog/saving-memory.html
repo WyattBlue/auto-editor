@@ -1,0 +1,42 @@
+{{ comp.header "The Optimization That Reduced Memory Consumption by 99%" }}
+<body>
+{{ comp.nav }}
+<section class="section">
+<div class="container">
+    <h1>The Optimization That Reduced Memory Consumption by 99%</h1>
+    <p class="author">Author: <b>WyattBlue</b></p>
+    <p class="date">Date: <b>April 11, 2023</b></p>
+    <p>Every time auto-editor processes a media file with audio, auto-editor reads, does analysis, then writes new the audio file. The most common type of files auto-editor process's are <code>mp4</code> containers with an AAC audio track, but many other audio codecs could be used as well. Therefore, Auto-Editor converts them into WAV files.</p>
+    <p>However, the data needs to be in a form that can be viewed or changed by the Python runtime. That's where <a href="https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/wavfile.py">wavfile.py</a> comes in. wavfile.py reads WAV file data and returns a data structure that Python can use. I won't spoil what is used in the final version, but first, let's examine a naive approach.</p>
+    <h2>Python's List</h2>
+    <pre><code><i># A 2-channel stereo audio samples</i>
+samples = [[0, 0, 345, 578, 345 ...], [0, 0, 235, 456, 234 ...]]
+</pre></code>
+    <p>The code above represents samples as a native Python list, however, this is incredibly memory inefficient. A typical audio file is has a sample rate of 44.1kHz. That means that one second of audio needs to store 44,100 numbers. Let's see how well Python stores all this data.</p>
+    <pre><code>&gt;&gt;&gt; sys.getsizeof([0] * 44100) + 44100 * 28
+1587656  <i># 1,587,656 bytes -&gt; 1.5 megabytes</i>
+</pre></code>
+    <p>That's pretty bad.</p>
+    <p>The reason why memory usage is so high is that the lists can't store int objects directly, they store a 4 byte reference to a Python Object, which in this case is a 28 byte sized int. In order to reduce memory, we'll need to pick a more suitable data structure.</p>
+    <h2>Numpy Arrays</h2>
+    <p>Using <a href="https://github.com/numpy/numpy">numpy arrays</a> allows us to pack fixed-size data extremely tightly and efficiently.</p>
+    <pre><code>&gt;&gt;&gt; sys.getsizeof(np.zeros([44100, 1], dtype=np.int32))
+176528  <i># 176,528 bytes -&gt; 176 kilobytes</i>
+</pre></code>
+    <p>The memory used is much more reasonable. By using numpy arrays, we see see a 10x improvement in memory.</p>
+    <p>However, even with numpy arrays, working with large audio files can still consume a lot of memory. For example, a 6-hour stereo audio file can take up around 2GB of memory. Since auto-editor reads and writes big audio files. It's important that auto-editor doesn't have these big files in memory at the same time, but at one point, that was exactly what was happening.</p>
+    <p>In <a href="https://github.com/WyattBlue/auto-editor/commit/9657cfaf99a17eb25f99dc20f96cc3dc7033bb07">commit 9657cfa</a>, I had to give a hint to Python's Garbage Collector using the <code>del</code> keyword because the input audio samples weren't being cleaned up soon enough. This reduced peak memory consumption by half, but I actually figured out an substantial optimization that made this patch irrelevant.</p>
+    <p>I knew before writing even a single piece of audio rendering code that lists were unsuitable to the task, but I what didn't know that applying this optimization would save so much memory, and would make my fix obsolete in the process.</p>
+    <h2>Memory Maps</h2>
+    <p>The optimization was swapping <code>numpy.array</code> to <code>numpy.memmap</code> when reading and writing audio WAV files. memory-maps are a way of reading and writing files as if it were in memory, but can be lazy-loaded from storage. Otherwise, <code>numpy.memmap</code> has basically the same interface as <code>numpy.array</code>.</p>
+    <p>Memory-maps really shines in our use-case because since we've already paying for the storage cost by storing audio data in the WAV format, we've reduced the memory used in this operation to almost zero!</p>
+    <h2>Conclusion</h2>
+    <p>Thinking about your data structures is essential if you care about performance. Sometimes researching more than what is typically used/well known. The best way to catch these issues is to test your program with very large input and profile the memory, storage, and time used.</p>
+    <p>Creating fast, efficient programs is everyone's responsibly.</p>
+    <hr>
+    <h2>Other Paths</h2>
+    <p>Python has a built-in alternative to numpy arrays, which is the <a href="https://docs.python.org/3/library/array.html#module-array">array.array</a> datatype. However, there are many problems. One is that you don't have nice guaranteed, only platform-dependent <code>int</code><code>long</code> and <code>long long</code> values. Another is that numpy has speed optimizations like SIMD and <code>array.array</code> doesn't. <code>array.array</code> is really only a thin layer other a fixed size C array, but C Compilers don't include these arithmetic optimizations like numpy does.</p>
+</div>
+</section>
+</body>
+</html>
