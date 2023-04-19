@@ -5,6 +5,12 @@
     <description>News for Auto-Editor</description>
     <language>en-us</language>
     <item>
+      <title>How to Compile FFmpeg on Windows</title>
+      <link>https://auto-editor.com/blog/how-to-compile-ffmpeg-on-windows</link>
+      <pubDate>Tue, 18 Apr 2023 00:00:00 +0000</pubDate>
+      <description>https://auto-editor.com/blog/how-to-compile-ffmpeg-on-windows</description>
+    </item>
+    <item>
       <title>The Optimization That Reduced Memory Consumption by 99%</title>
       <link>https://auto-editor.com/blog/saving-memory</link>
       <pubDate>Tue, 11 Apr 2023 00:00:00 +0000</pubDate>

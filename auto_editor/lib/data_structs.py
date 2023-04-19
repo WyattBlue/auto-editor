@@ -223,6 +223,16 @@ def display_str(val: object) -> str:
         for item in val[1:]:
             result += f" {display_str(item)}"
         return result + ")"
+    if isinstance(val, dict):
+        result = "#hash("
+        is_first = True
+        for k, v in val.items():
+            if is_first:
+                result += f'[{print_str(k)} {print_str(v)}]'
+                is_first = False
+            else:
+                result += f' [{print_str(k)} {print_str(v)}]'
+        return result + ")"
     if isinstance(val, np.ndarray):
         kind = val.dtype.kind
         result = f"(array '{display_dtype(val.dtype)}"

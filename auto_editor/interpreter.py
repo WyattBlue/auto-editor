@@ -1185,6 +1185,13 @@ def get_attrs(obj: Any) -> dict[str, Any]:
             "sort": Proc("sort", lambda: sorted(obj), (0, 0)),
             "sort!": Proc("sort!", obj.sort, (0, 0)),
         }
+    if isinstance(obj, dict):
+        return {
+            "@name": "hash",
+            "values": Proc("values", lambda: list(obj.values()), (0, 0)),
+            "update": Proc("update", lambda d: obj.update(d), (1, 1), [is_hash]),
+            "copy": Proc("copy", lambda: obj.copy(), (0, 0)),
+        }
     if isinstance(obj, Proc):
         return {
             "@name": "procedure",
@@ -1256,8 +1263,8 @@ def my_eval(env: Env, node: object) -> Any:
             if is_iterable(oper):
                 values = [my_eval(env, c) for c in node[1:]]
                 if values:
-                    if isinstance(values[0], str) or len(values) > 1:
-                        raise MyError(f"{node}: Bad ref")
+                    if len(values) > 1:
+                        raise MyError(f"{print_str(node[0])}: ref expects 1 argument")
                     else:
                         return ref(oper, *values)
 
@@ -1491,6 +1498,7 @@ env: Env = {
     "@r": Syntax(attr),
     # reflection
     "eval": Syntax(syn_eval),
+    "make-env": Proc("make-env", lambda: env.copy(), (0, 0)),
     "var-exists?": Proc("var-exists?", lambda sym: sym.val in env, (1, 1), [is_symbol]),
 }
 

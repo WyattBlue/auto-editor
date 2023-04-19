@@ -274,7 +274,6 @@ proc convert(file: string, path: string) =
   f.write(output)
 
   let blocks: seq[TokenKind] = @[tk_text, tk_h1, tk_h2, tk_h3, tk_list, tk_ul]
-  let headers: seq[TokenKind] = @[tk_h1, tk_h2, tk_h3, tk_list]
 
   proc to_tag(t: TokenKind): string = 
     if t == tk_text:
