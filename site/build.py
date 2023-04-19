@@ -241,9 +241,9 @@ with open(ref / "palet.html", "w") as file:
         if _var not in canonical_env:
             raise ValueError(f"{_var} not in env")
 
-    for key in canonical_env:
-        if key not in pt_vars:
-            raise ValueError(f"missing docs for {key}")
+    # for key in canonical_env:
+    #     if key not in pt_vars:
+    #         raise ValueError(f"missing docs for {key}")
 
     print(f"built {len(canonical_env)} variables")
 

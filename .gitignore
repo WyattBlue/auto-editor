@@ -9,6 +9,8 @@ site/src/app/
 site/src/ref
 site/blog_gen
 site/binaries/
+site/src/blog/*.html
+!site/src/blog/index.html
 
 # Python Generated Files
 __pycache__/
