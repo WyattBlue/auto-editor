@@ -1155,12 +1155,12 @@ def get_attrs(obj: Any) -> dict[str, Any]:
         return {
             "@name": "string",
             "@len": Proc("@len", obj.__len__, (0, 0)),
-            "split": Proc("split", obj.split, (0, 1)),
+            "split": Proc("split", obj.split, (0, 1), [is_str]),
             "strip": Proc("strip", obj.strip, (0, 0)),
             "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
             "startswith": Proc("startswith", obj.startswith, (1, 1), [is_str]),
             "endswith": Proc("endswith", obj.endswith, (1, 1), [is_str]),
-            "replace": Proc("replace", obj.replace, (1, 2), [is_str, is_int]),
+            "replace": Proc("replace", obj.replace, (2, 3), [is_str, is_str, is_int]),
             "title": Proc("title", obj.title, (0, 0)),
             "lower": Proc("lower", obj.lower, (0, 0)),
             "upper": Proc("upper", obj.upper, (0, 0)),
@@ -1467,7 +1467,7 @@ env: Env = {
     # ranges
     "range": Proc("range", range, (1, 3), [is_int, is_int, int_not_zero]),
     # generic iterables
-    "length": Proc("length", len, (1, 1), [is_iterable]),
+    "len": Proc("len", len, (1, 1), [is_iterable]),
     "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_sequence]),
     "ref": Proc("ref", ref, (2, 2), [is_iterable, is_int]),
     "slice": Proc("slice", p_slice, (2, 4), [is_sequence, is_int]),
