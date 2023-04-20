@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from io import StringIO
 from typing import Any, Callable
 
 import numpy as np
@@ -92,15 +93,19 @@ class Cons:
         if type(self.d) not in (Cons, NullType):
             return f"(cons {self.a} {self.d})"
 
-        result = f"({display_str(self.a)}"
+        result = StringIO()
+        result.write(f"({display_str(self.a)}")
         tail = self.d
         while type(tail) is Cons:
             if type(tail.d) not in (Cons, NullType):
-                return f"{result} (cons {tail.a} {tail.d}))"
-            result += f" {display_str(tail.a)}"
+                result.write(f" (cons {tail.a} {tail.d}))")
+                return result.getvalue()
+
+            result.write(f" {display_str(tail.a)}")
             tail = tail.d
 
-        return f"{result})"
+        result.write(")")
+        return result.getvalue()
 
     def __eq__(self, obj: object) -> bool:
         return type(obj) is Cons and self.a == obj.a and self.d == obj.d
@@ -219,30 +224,35 @@ def display_str(val: object) -> str:
     if isinstance(val, list):
         if not val:
             return "#()"
-        result = f"#({display_str(val[0])}"
+        result = StringIO()
+        result.write(f"#({display_str(val[0])}")
         for item in val[1:]:
-            result += f" {display_str(item)}"
-        return result + ")"
+            result.write(f" {display_str(item)}")
+        result.write(")")
+        return result.getvalue()
     if isinstance(val, dict):
-        result = "#hash("
+        result = StringIO()
+        result.write("#hash(")
         is_first = True
         for k, v in val.items():
             if is_first:
-                result += f'[{print_str(k)} {print_str(v)}]'
+                result.write(f"[{print_str(k)} {print_str(v)}]")
                 is_first = False
             else:
-                result += f' [{print_str(k)} {print_str(v)}]'
-        return result + ")"
+                result.write(f" [{print_str(k)} {print_str(v)}]")
+        result.write(")")
+        return result.getvalue()
     if isinstance(val, np.ndarray):
-        kind = val.dtype.kind
-        result = f"(array '{display_dtype(val.dtype)}"
-        if kind == "b":
+        result = StringIO()
+        result.write(f"(array '{display_dtype(val.dtype)}")
+        if val.dtype.kind == "b":
             for item in val:
-                result += " 1" if item else " 0"
+                result.write(" 1" if item else " 0")
         else:
             for item in val:
-                result += f" {item}"
-        return result + ")"
+                result.write(f" {item}")
+        result.write(")")
+        return result.getvalue()
 
     return f"{val!r}"
 
