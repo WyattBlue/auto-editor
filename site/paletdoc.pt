@@ -335,7 +335,7 @@
         (proc
             "exp"
             #(#("x" "real?") "float?")
-            (text "Returns Euler's number raised to the " 'z " power.")
+            (text "Returns Euler's number raised to the " 'x " power.")
         )
         (proc
             "log"
@@ -527,7 +527,7 @@
                 #("arr" "array?")
                 #("v" "real?")
                 #("start" "int?" "0")
-                #("stop" "int?" "(length arr)")
+                #("stop" "int?" "(len arr)")
             "array?")
             (text
                 "Modify " 'arr " by setting " 'start " to " 'stop " into the value " 'v "."
@@ -745,7 +745,7 @@
             )
         )
         (proc
-            "length"
+            "len"
             #(#("seq" "iterable?") "uint?")
             (text "Returns the length of " 'seq ".")
         )
@@ -763,7 +763,7 @@
             #(
                 #("seq" "sequence?")
                 #("start" "int?")
-                #("stop" "int?" "(length seq)")
+                #("stop" "int?" "(len seq)")
                 #("step" "int?" "1")
                 "sequence?"
             )
@@ -967,6 +967,13 @@
             (text
                 "Returns " #t " if the variable corresponding to " 'sym
                 " is defined in the current environment, " #f " otherwise."
+            )
+        )
+        (proc
+            "make-env"
+            #(#("no" "one") "hash?")
+            (text
+                "Returns a copy of the current environment represented as a hash. The keys are always strings."
             )
         )
     ]
