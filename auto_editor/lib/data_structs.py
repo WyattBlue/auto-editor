@@ -209,6 +209,8 @@ def display_str(val: object) -> str:
         return val.val
     if type(val) is str:
         return val
+    if type(val) is bytes:
+        return val.decode()
     if type(val) is Char:
         return f"{val}"
     if type(val) is range:
@@ -257,18 +259,27 @@ def display_str(val: object) -> str:
     return f"{val!r}"
 
 
+str_escape = {
+    "\\": "\\\\",
+    '"': '\\"',
+    "\r": "\\r",
+    "\f": "\\f",
+    "\v": "\\v",
+    "\n": "\\n",
+    "\t": "\\t",
+    "\b": "\\b",
+    "\a": "\\a",
+}
+
 def print_str(val: object) -> str:
     if type(val) is str:
-
-        def str_escape(val: str) -> str:
-            return (
-                val.replace("\\", "\\\\")
-                .replace('"', '\\"')
-                .replace("\n", "\\n")
-                .replace("\t", "\\t")
-            )
-
-        return f'"{str_escape(val)}"'
+        for k, v in str_escape.items():
+            val = val.replace(k, v)
+        return f'"{val}"'
+    if type(val) is bytes:
+        for k, v in str_escape.items():
+            val = val.replace(k.encode(), v.encode())
+        return f'#"{val.decode()}"'
     if type(val) is Char:
         return f"{val!r}"
     if type(val) is Sym or type(val) is Cons:
