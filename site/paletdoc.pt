@@ -441,6 +441,12 @@
             )
         )
     ]
+    "Bytes" #[
+        (pred
+            "bytes?"
+            (text "Returns " #t " if " 'v " is a byte string, " #f " otherwise.")
+        )
+    ]
     "Vectors" #[
         (pred
             "vector?"
@@ -733,14 +739,14 @@
         (pred
             "iterable?"
             (text
-                "Returns " #t " if " 'v " is a vector array string hash pair or range, "
+                "Returns " #t " if " 'v " is a vector array string bytes hash pair or range, "
                 #f " otherwise."
             )
         )
         (pred
             "sequence?"
             (text
-                "Returns " #t " if " 'v " is a vector array string pair or range, "
+                "Returns " #t " if " 'v " is a vector array string bytes pair or range, "
                 #f " otherwise."
             )
         )

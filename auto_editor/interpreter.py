@@ -7,7 +7,7 @@ import sys
 from difflib import get_close_matches
 from fractions import Fraction
 from functools import reduce
-from io import StringIO
+from io import StringIO, BytesIO
 from time import sleep
 from typing import TYPE_CHECKING
 
@@ -41,13 +41,23 @@ class ClosingError(MyError):
 ###############################################################################
 
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
-ID, QUOTE, NUM, BOOL, STR, CHAR = "ID", "QUOTE", "NUM", "BOOL", "STR", "CHAR"
-METHOD, SEC, DB, PER, DOT = "METHOD", "SEC", "DB", "PER", "DOT"
+VAL, QUOTE, SEC, DB, PER, DOT = "VAL", "QUOTE", "SEC", "DB", "PER", "DOT"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
 VLIT, HASH_LIT = "VLIT", "HLIT"
 METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
 brac_pairs = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
 
+str_escape = {
+    "a":"\a",
+    "b":"\b",
+    "t":"\t",
+    "n":"\n",
+    "v":"\v",
+    "f":"\f",
+    "r":"\r",
+    '"':'"',
+    "\\":"\\",
+}
 
 class Token:
     __slots__ = ("type", "value")
@@ -102,6 +112,31 @@ class Lexer:
     def is_whitespace(self) -> bool:
         return self.char is None or self.char in " \t\n\r\x0b\x0c"
 
+    def bytes(self) -> bytes:
+        result = BytesIO()
+        while self.char is not None and self.char != '"':
+            if ord(self.char) > 126:
+                self.error("bytes can only contain ASCII literal characters")
+
+            if self.char == "\\":
+                self.advance()
+                if self.char is None:
+                    break
+
+                if self.char not in str_escape:
+                    self.error(f"Unknown escape sequence `\\{self.char}` in bytes")
+
+                result.write(str_escape[self.char].encode())
+            else:
+                result.write(self.char.encode())
+            self.advance()
+
+        if self.char is None:
+            self.close_err(f'Expected a closing `"`')
+
+        self.advance()
+        return result.getvalue()
+
     def string(self) -> str:
         result = StringIO()
         while self.char is not None and self.char != '"':
@@ -110,29 +145,10 @@ class Lexer:
                 if self.char is None:
                     break
 
-                if self.char in 'abtnvfr"\\':
-                    if self.char == "a":
-                        result.write("\a")
-                    if self.char == "b":
-                        result.write("\b")
-                    if self.char == "t":
-                        result.write("\t")
-                    if self.char == "n":
-                        result.write("\n")
-                    if self.char == "v":
-                        result.write("\v")
-                    if self.char == "f":
-                        result.write("\f")
-                    if self.char == "r":
-                        result.write("\r")
-                    if self.char == '"':
-                        result.write('"')
-                    if self.char == "\\":
-                        result.write("\\")
-                    self.advance()
-                    continue
+                if self.char not in str_escape:
+                    self.error(f"Unknown escape sequence `\\{self.char}` in string")
 
-                self.error(f"Unknown escape sequence `\\{self.char}` in string")
+                result.write(str_escape[self.char])
             else:
                 result.write(self.char)
             self.advance()
@@ -145,7 +161,7 @@ class Lexer:
 
     def number(self) -> Token:
         buf = StringIO()
-        token = NUM
+        token = VAL
 
         while self.char is not None and self.char in "+-0123456789./":
             buf.write(self.char)
@@ -168,11 +184,11 @@ class Lexer:
             elif unit == "%":
                 token = PER
             elif unit != "i":
-                return Token(ID, Sym(result + unit))
+                return Token(VAL, Sym(result + unit))
 
         try:
             if unit == "i":
-                return Token(NUM, complex(result + "j"))
+                return Token(VAL, complex(result + "j"))
             elif "/" in result:
                 val = Fraction(result)
                 if val.denominator == 1:
@@ -183,7 +199,7 @@ class Lexer:
             else:
                 return Token(token, int(result))
         except ValueError:
-            return Token(ID, Sym(result + unit))
+            return Token(VAL, Sym(result + unit))
 
     def hash_literal(self) -> Token:
         if self.char == "\\":
@@ -193,7 +209,11 @@ class Lexer:
 
             char = self.char
             self.advance()
-            return Token(CHAR, Char(char))
+            return Token(VAL, Char(char))
+
+        if self.char == '"':
+            self.advance()
+            return Token(VAL, self.bytes())
 
         if self.char is not None and self.char in "([{":
             brac_type = self.char
@@ -210,10 +230,10 @@ class Lexer:
 
         result = buf.getvalue()
         if result in ("t", "T", "true"):
-            return Token(BOOL, True)
+            return Token(VAL, True)
 
         if result in ("f", "F", "false"):
-            return Token(BOOL, False)
+            return Token(VAL, False)
 
         if result == "hash":
             self.advance()
@@ -247,7 +267,7 @@ class Lexer:
                 if self.char == ".":  # handle `object.method` syntax
                     self.advance()
                     return Token(DOT, (my_str, self.get_next_token()))
-                return Token(STR, my_str)
+                return Token(VAL, my_str)
 
             if self.char == "'":
                 self.advance()
@@ -323,11 +343,11 @@ class Lexer:
                 self.advance()
 
             if is_method:
-                return Token(METHOD, Method(result))
+                return Token(VAL, Method(result))
 
             for method in METHODS:
                 if result == method[:-1]:
-                    return Token(METHOD, Method(result))
+                    return Token(VAL, Method(result))
 
             if self.char == ".":  # handle `object.method` syntax
                 self.advance()
@@ -336,7 +356,7 @@ class Lexer:
             if has_illegal:
                 self.error(f"Symbol has illegal character(s): {result}")
 
-            return Token(ID, Sym(result))
+            return Token(VAL, Sym(result))
 
         return Token(EOF, "EOF")
 
@@ -371,7 +391,7 @@ class Parser:
     def expr(self) -> Any:
         token = self.current_token
 
-        if token.type in (CHAR, NUM, STR, BOOL, ID, METHOD):
+        if token.type == VAL:
             self.eat()
             return token.value
 
@@ -476,13 +496,13 @@ is_cont = Contract("contract?", is_contract)
 is_iterable = Contract(
     "iterable?",
     lambda v: v is Null
-    or type(v) in (str, range, Cons)
+    or type(v) in (str, bytes, range, Cons)
     or isinstance(v, (list, dict, np.ndarray)),
 )
 is_sequence = Contract(
     "sequence?",
     lambda v: v is Null
-    or type(v) in (str, range, Cons)
+    or type(v) in (str, bytes, range, Cons)
     or isinstance(v, (list, np.ndarray)),
 )
 is_boolarr = Contract(
@@ -1166,6 +1186,22 @@ def get_attrs(obj: Any) -> dict[str, Any]:
             "upper": Proc("upper", obj.upper, (0, 0)),
             "float": Proc("float", lambda: str_to_float(obj), (0, 0)),
             "int": Proc("int", lambda b=10: str_to_int(obj, b), (0, 1), [is_int]),
+            "encode": Proc("encode", obj.encode, (0, 0)),
+        }
+    if type(obj) is bytes:
+        return {
+            "@name": "bytes",
+            "@len": Proc("@len", obj.__len__, (0, 0)),
+            "split": Proc("split", obj.split, (0, 1), [is_bytes]),
+            "strip": Proc("strip", obj.strip, (0, 0)),
+            "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
+            "startswith": Proc("startswith", obj.startswith, (1, 1), [is_bytes]),
+            "endswith": Proc("endswith", obj.endswith, (1, 1), [is_bytes]),
+            "replace": Proc("replace", obj.replace, (2, 3), [is_bytes, is_bytes, is_int]),
+            "title": Proc("title", obj.title, (0, 0)),
+            "lower": Proc("lower", obj.lower, (0, 0)),
+            "upper": Proc("upper", obj.upper, (0, 0)),
+            "decode": Proc("decode", obj.decode, (0, 0)),
         }
     if isinstance(obj, list):
 
@@ -1339,6 +1375,7 @@ env: Env = {
     "void?": is_void,
     "symbol?": (is_symbol := Contract("symbol?", lambda v: type(v) is Sym)),
     "string?": is_str,
+    "bytes?": is_bytes,
     "char?": (is_char := Contract("char?", lambda v: type(v) is Char)),
     "vector?": (is_vector := Contract("vector?", lambda v: isinstance(v, list))),
     "array?": (is_array := Contract("array?", lambda v: isinstance(v, np.ndarray))),
