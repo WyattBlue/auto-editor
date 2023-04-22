@@ -271,6 +271,7 @@ str_escape = {
     "\a": "\\a",
 }
 
+
 def print_str(val: object) -> str:
     if type(val) is str:
         for k, v in str_escape.items():

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import cmath
 import math
+import os
 import random
 import sys
 from difflib import get_close_matches
 from fractions import Fraction
 from functools import reduce
-from io import StringIO, BytesIO
+from io import BytesIO, StringIO
 from time import sleep
 from typing import TYPE_CHECKING
 
@@ -48,16 +49,17 @@ METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
 brac_pairs = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
 
 str_escape = {
-    "a":"\a",
-    "b":"\b",
-    "t":"\t",
-    "n":"\n",
-    "v":"\v",
-    "f":"\f",
-    "r":"\r",
-    '"':'"',
-    "\\":"\\",
+    "a": "\a",
+    "b": "\b",
+    "t": "\t",
+    "n": "\n",
+    "v": "\v",
+    "f": "\f",
+    "r": "\r",
+    '"': '"',
+    "\\": "\\",
 }
+
 
 class Token:
     __slots__ = ("type", "value")
@@ -213,7 +215,11 @@ class Lexer:
 
         if self.char == '"':
             self.advance()
-            return Token(VAL, self.bytes())
+            my_bytes = self.bytes()
+            if self.char == ".":  # handle `object.method` syntax
+                self.advance()
+                return Token(DOT, (my_bytes, self.get_next_token()))
+            return Token(VAL, my_bytes)
 
         if self.char is not None and self.char in "([{":
             brac_type = self.char
@@ -1154,20 +1160,30 @@ is_obj = Contract(
 )
 
 
-def str_to_float(v: str) -> float:
+def str_to_float(v: str | bytes) -> float:
     try:
         return float(v)
     except ValueError:
-        raise MyError(f"invalid float: {v}")
+        raise MyError(f"invalid float: {print_str(v)}")
 
 
-def str_to_int(v: str, base: int) -> int:
+def str_to_int(v: str | bytes, base: int) -> int:
     if base < 2 or base > 36:
         raise MyError(f"int: base must be between 2 and 36")
     try:
         return int(v, base)
     except ValueError:
-        raise MyError(f"invalid int: {v} for base {base}")
+        raise MyError(f"invalid int: {print_str(v)} for base {base}")
+
+
+def change_ext(path: str, c: str) -> str:
+    base, ext = os.path.splitext(path)
+    return base if c == "" else f"{base}.{c}"
+
+
+def b_change_ext(path: bytes, c: bytes) -> bytes:
+    base, ext = os.path.splitext(path)
+    return base if c == b"" else base + b"." + c
 
 
 def get_attrs(obj: Any) -> dict[str, Any]:
@@ -1186,6 +1202,10 @@ def get_attrs(obj: Any) -> dict[str, Any]:
             "upper": Proc("upper", obj.upper, (0, 0)),
             "float": Proc("float", lambda: str_to_float(obj), (0, 0)),
             "int": Proc("int", lambda b=10: str_to_int(obj, b), (0, 1), [is_int]),
+            "exists": Proc("exists", lambda: os.path.exists(obj), (0, 0)),
+            "change-ext": Proc(
+                "change-ext", lambda c: change_ext(obj, c), (1, 1), [is_str]
+            ),
             "encode": Proc("encode", obj.encode, (0, 0)),
         }
     if type(obj) is bytes:
@@ -1197,10 +1217,18 @@ def get_attrs(obj: Any) -> dict[str, Any]:
             "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
             "startswith": Proc("startswith", obj.startswith, (1, 1), [is_bytes]),
             "endswith": Proc("endswith", obj.endswith, (1, 1), [is_bytes]),
-            "replace": Proc("replace", obj.replace, (2, 3), [is_bytes, is_bytes, is_int]),
+            "replace": Proc(
+                "replace", obj.replace, (2, 3), [is_bytes, is_bytes, is_int]
+            ),
             "title": Proc("title", obj.title, (0, 0)),
             "lower": Proc("lower", obj.lower, (0, 0)),
             "upper": Proc("upper", obj.upper, (0, 0)),
+            "float": Proc("float", lambda: str_to_float(obj), (0, 0)),
+            "int": Proc("int", lambda b=10: str_to_int(obj, b), (0, 1), [is_int]),
+            "exists": Proc("exists", lambda: os.path.exists(obj), (0, 0)),
+            "change-ext": Proc(
+                "change-ext", lambda c: b_change_ext(obj, c), (1, 1), [is_bytes]
+            ),
             "decode": Proc("decode", obj.decode, (0, 0)),
         }
     if isinstance(obj, list):
