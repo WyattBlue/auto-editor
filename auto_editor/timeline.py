@@ -229,6 +229,36 @@ class v3:
     a: ASpace
     v1: v1 | None  # v1 compatible?
 
+    def __str__(self) -> str:
+        result = "sources\n"
+        for k, v in self.sources.items():
+            result += f" [{k} -> {v.path}]\n"
+        result += f"""
+global
+ timebase {self.tb}
+ samplerate {self.sr}
+ res {self.res[0]}x{self.res[1]}
+"""
+        result += "\nvideo\n"
+        for i, layer in enumerate(self.v):
+            result += f" v{i} "
+            for obj in layer:
+                if isinstance(obj, TlVideo):
+                    result += (
+                        f"[#:start {obj.start} #:dur {obj.dur} #:off {obj.offset}] "
+                    )
+                else:
+                    result += f"[#:start {obj.start} #:dur {obj.dur}] "
+            result += "\n"
+
+        result += "\naudio\n"
+        for i, alayer in enumerate(self.a):
+            result += f" a{i} "
+            for abj in alayer:
+                result += f"[#:start {abj.start} #:dur {abj.dur} #:off {abj.offset}] "
+            result += "\n"
+        return result
+
     @property
     def end(self) -> int:
         end = 0
@@ -246,22 +276,30 @@ class v3:
 
         return end
 
-    def out_len(self) -> float:
-        out_len: float = 0
-        for vclips in self.v:
-            dur: float = 0
-            for v_obj in vclips:
-                if isinstance(v_obj, TlVideo):
-                    dur += v_obj.dur / v_obj.speed
+    def audio_duration(self) -> float:
+        total_dur = 0.0
+        for clips in self.a:
+            dur = 0.0
+            for clip in clips:
+                dur += clip.dur / clip.speed
+            total_dur = max(total_dur, dur)
+        return total_dur
+
+    def video_duration(self) -> float:
+        total_dur = 0.0
+        for clips in self.v:
+            dur = 0.0
+            for clip in clips:
+                if isinstance(clip, TlVideo):
+                    dur += clip.dur / clip.speed
                 else:
-                    dur += v_obj.dur
-            out_len = max(out_len, dur)
-        for aclips in self.a:
-            dur = 0
-            for aclip in aclips:
-                dur += aclip.dur / aclip.speed
-            out_len = max(out_len, dur)
-        return out_len
+                    dur += clip.dur
+            total_dur = max(total_dur, dur)
+        return total_dur
+
+    def out_len(self) -> float:
+        # Calculates the duration of the timeline
+        return max(self.video_duration(), self.audio_duration())
 
     def as_dict(self) -> dict:
         sources = {key: f"{src.path.resolve()}" for key, src in self.sources.items()}

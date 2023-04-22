@@ -77,10 +77,12 @@ def make_av(
 
     for clips, inp in zip(all_clips, inputs):
         src = sources[inp]
-        if src.videos:
-            vtl.append(
-                [TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0) for c in clips]
-            )
+
+        for c in clips:
+            if src.videos:
+                if len(vtl) == 0:
+                    vtl.append([])
+                vtl[0].append(TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0))
 
         for c in clips:
             for a in range(len(src.audios)):
