@@ -84,7 +84,7 @@ class MediaJson(TypedDict, total=False):
     subtitle: list[SubtitleJson]
     container: ContainerJson
     type: Literal["media", "timeline", "unknown"]
-    version: Literal["v1", "v2", "v3"]
+    version: Literal["v1", "v3"]
     clips: int
 
 
