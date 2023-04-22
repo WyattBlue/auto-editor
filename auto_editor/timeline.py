@@ -6,7 +6,7 @@ from typing import Union
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import *
-from auto_editor.utils.chunks import Chunks, v2Chunks
+from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
 from auto_editor.utils.types import Align
 
@@ -28,35 +28,6 @@ class v1:
             "source": self.source.path.resolve(),
             "chunks": self.chunks,
         }
-
-
-@dataclass
-class v2:
-    """
-    v2 timeline constructor
-
-    Like v1 but allows for (nameless) multiple inputs and a custom timebase
-    """
-
-    sources: list[FileInfo]
-    tb: Fraction
-    sr: int
-    res: tuple[int, int]
-    chunks: v2Chunks
-
-    def as_dict(self) -> dict:
-        return {
-            "version": "2.0",
-            "timebase": f"{self.tb.numerator}/{self.tb.denominator}",
-            "samplerate": self.sr,
-            "sources": [s.path.resolve() for s in self.sources],
-            "chunks": self.chunks,
-        }
-
-
-"""
-timeline v3 classes
-"""
 
 
 class Tl:
