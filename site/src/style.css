@@ -23,7 +23,7 @@ body {
   padding: 0 2em;
   margin: 0;
 }
-@media (max-width: 40em) {
+@media (max-width: 60em) {
   body {padding: 0 1rem}
 }
 
@@ -66,11 +66,6 @@ hr {
 img {
   max-width: 100%;
   height: auto;
-}
-
-.navbar-start > .navbar-item {
-  font-size: 20px;
-  font-weight: bold;
 }
 
 .navbar-link, a.navbar-item {
@@ -180,22 +175,23 @@ h3, .medium {font-size: 1.7rem}
 h4, .smedium {font-size: 1.5rem}
 p, li, th, pre, blockquote, .small {font-size: 1.28rem}
 .tiny {font-size: 1rem}
-
-@media (max-width: 60em){
-  .huge {font-size: 4.5rem}
-  .huge-lite {font-size: 3.4rem}
-  h1, .bigger {font-size: 2.3rem}
-  h2, .big {font-size: 1.9rem}
-  h3, .medium {font-size: 1.6rem}
-  h4, .smedium {font-size: 1.3rem}
-  p, li, th, pre, blockquote, .small {font-size: 1.2rem}
-}
+pre {line-height: 1.25}
+.navbar-start > .navbar-item {font-size: 1.3em}
 
 @media (max-width: 55em){
   .huge {font-size: 4rem}
-  .h1, .bigger {font-size: 2rem}
-  .h2, .big {font-size: 1.7rem}
-  .h3, .medium {font-size: 1.5rem}
+  .huge-lite {font-size: 3rem}
+  h1, .bigger {font-size: 2rem}
+  h2, .big {font-size: 1.8rem}
+  h3, .medium {font-size: 1.5rem}
+  h4, .smedium {font-size: 1.3rem}
+  p, li, th, pre, blockquote, .small {font-size: 1.1rem}
+  pre {padding: 1rem 1.25rem}
+  pre {line-height: 1}
+}
+
+@media (max-width: 45em){
+  .navbar-start > .navbar-item {font-size: 1em}
 }
 
 #icon {
@@ -210,7 +206,10 @@ h1 {
   word-break: break-word;
 }
 h1, h2 {text-align: center}
-h1, h2, th, .bold {font-weight: bold}
+h1, th, .bold {font-weight: bold}
+h2 {font-weight: 600}
+h3 {font-weight: 500}
+.navbar-start > .navbar-item {font-weight: bold}
 .underline {text-decoration: underline}
 
 .author, .date {line-height: 1}

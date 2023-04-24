@@ -277,6 +277,7 @@ if ref.exists():
             '<section class="section">\n'
             '<div class="container">\n'
             '<h2 class="left">Reference</h2>\n'
+            '<p>See also: <a href="../docs">docs</a></p>\n'
             '<hr>\n'
         )
         for child in sorted(ref.iterdir(), reverse=True):
@@ -309,7 +310,6 @@ if ref.exists():
                         "</div>\n</section>\n</body>\n</html>\n\n"
                     )
 
-        file.write('<br><p>See also: <a href="../docs">docs</a></p>\n')
         file.write("</div>\n</section>\n</body>\n</html>\n\n")
 
 
