@@ -23,7 +23,7 @@ body {
   padding: 0 2em;
   margin: 0;
 }
-@media (max-width: 60em) {
+@media (max-width: 55em) {
   body {padding: 0 1rem}
 }
 

@@ -11,6 +11,8 @@ site/blog_gen
 site/binaries/
 site/src/blog/*.html
 !site/src/blog/index.html
+site/src/docs/subcommands/*.html
+!site/src/docs/subcommands/index.html
 
 # Python Generated Files
 __pycache__/

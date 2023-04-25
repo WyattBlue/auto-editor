@@ -3,6 +3,10 @@ import std/os
 import std/strformat
 
 type
+  PragmaKind = enum
+    blog_type,
+    explainer_type,
+
   TokenKind = enum
     tk_bar,
     tk_keyval,
@@ -235,7 +239,7 @@ proc sanitize(v: string): string =
   return v.replace("<", "&lt;").replace(">", "&gt;")
 
 
-proc convert(file: string, path: string) =
+proc convert(pragma: PragmaKind, file: string, path: string) =
   let text = readFile(file)
   var lexer = Lexer_init(file, text)
 
@@ -253,14 +257,20 @@ proc convert(file: string, path: string) =
       error(lexer, "head: expected keyval")
     return token.value
       
-  let
-    title = parse_keyval("title")
+  let title = parse_keyval("title")
+
+  var author = ""
+  var date = ""
+  if pragma == blog_type:
     author = parse_keyval("author")
     date = parse_keyval("date")
 
   if get_next_token(lexer).kind != tk_bar:
     error(lexer, "head: expected end ---")
-  var output = &"""{{{{ comp.header "{title}" }}}}
+
+  var output = ""
+  if pragma == blog_type:
+    output = &"""{{{{ comp.header "{title}" }}}}
 <body>
 {{{{ comp.nav }}}}
 <section class="section">
@@ -268,6 +278,14 @@ proc convert(file: string, path: string) =
     <h1>{title}</h1>
     <p class="author">Author: <b>{author}</b></p>
     <p class="date">Date: <b>{date}</b></p>
+"""
+  else:
+    output = &"""{{{{ comp.header "{title}" }}}}
+<body>
+{{{{ comp.nav }}}}
+<section class="section">
+<div class="container">
+    <h2 class="left">{title}</h2>
 """
 
   let f = open(path, fmWrite)
@@ -370,4 +388,7 @@ proc convert(file: string, path: string) =
   f.close()
 
 for file in walkFiles("src/blog/*.md"):
-  convert(file, file.changeFileExt("html"))
+  convert(blog_type, file, file.changeFileExt("html"))
+
+for file in walkFiles("src/docs/subcommands/*.md"):
+  convert(explainer_type, file, file.changeFileExt("html"))
