@@ -184,16 +184,9 @@ def render_av(
             for layer in tl.v:
                 for lobj in layer:
                     if isinstance(lobj, TlVideo):
-                        if index >= lobj.start and index < lobj.start + ceil(
-                            lobj.dur / lobj.speed
-                        ):
-                            obj_list.append(
-                                VideoFrame(
-                                    lobj.offset
-                                    + round((index - lobj.start) * lobj.speed),
-                                    lobj.src,
-                                )
-                            )
+                        if index >= lobj.start and index < (lobj.start + lobj.dur):
+                            _i = lobj.offset + round((index - lobj.start) * lobj.speed)
+                            obj_list.append(VideoFrame(_i, lobj.src))
                     elif index >= lobj.start and index < lobj.start + lobj.dur:
                         obj_list.append(lobj)
 

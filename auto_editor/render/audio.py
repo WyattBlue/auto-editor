@@ -199,13 +199,7 @@ def make_new_audio(
                 samples[f"{clip.src}-{clip.stream}"] = read(audio_path)[1]
 
             if arr is None:
-                leng = max(
-                    round(
-                        (layer[-1].start + (layer[-1].dur / layer[-1].speed)) * sr / tb
-                    ),
-                    sr // tb,
-                )
-
+                leng = max(round((layer[-1].start + layer[-1].dur) * sr / tb), sr // tb)
                 dtype = np.int32
                 for _samp_arr in samples.values():
                     dtype = _samp_arr.dtype
@@ -222,7 +216,7 @@ def make_new_audio(
             samp_list = samples[f"{clip.src}-{clip.stream}"]
 
             samp_start = clip.offset * sr // tb
-            samp_end = (clip.offset + clip.dur) * sr // tb
+            samp_end = round((clip.offset + clip.dur * clip.speed) * sr / tb)
             if samp_end > len(samp_list):
                 samp_end = len(samp_list)
 
