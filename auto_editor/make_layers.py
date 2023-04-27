@@ -45,21 +45,17 @@ class Clip(NamedTuple):
     src: str
 
 
-def clipify(chunks: Chunks, src: str, start: Fraction = Fraction(0)) -> list[Clip]:
+def clipify(chunks: Chunks, src: str, start: int = 0) -> list[Clip]:
     clips: list[Clip] = []
     i = 0
     for chunk in chunks:
         if chunk[2] != 99999:
-            if i == 0:
-                dur = chunk[1] - chunk[0]
-                offset = chunk[0]
-            else:
-                dur = chunk[1] - chunk[0]
-                offset = chunk[0] + 1
+            dur = round((chunk[1] - chunk[0]) / chunk[2])
+            offset = chunk[0]
 
             if not (clips and clips[-1].start == round(start)):
-                clips.append(Clip(round(start), dur, offset, chunk[2], src))
-            start += Fraction(dur, Fraction(chunk[2]))
+                clips.append(Clip(start, dur, offset, chunk[2], src))
+            start += dur
             i += 1
 
     return clips
@@ -235,7 +231,7 @@ def make_layers(
     temp: str,
     log: Log,
 ) -> tuple[Chunks, VSpace, ASpace]:
-    start = Fraction(0)
+    start = 0
     all_clips: list[list[Clip]] = []
     all_chunks: list[Chunks] = []
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Union
+from typing import Any, Union
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import *
@@ -234,43 +234,29 @@ global
     def end(self) -> int:
         end = 0
         for vclips in self.v:
-            if len(vclips) > 0:
+            if vclips:
                 v = vclips[-1]
-                if isinstance(v, TlVideo):
-                    end = max(end, max(1, round(v.start + (v.dur / v.speed))))
-                else:
-                    end = max(end, v.start + v.dur)
+                end = max(end, v.start + v.dur)
+
         for aclips in self.a:
-            if len(aclips) > 0:
+            if aclips:
                 a = aclips[-1]
-                end = max(end, max(1, round(a.start + (a.dur / a.speed))))
+                end = max(end, a.start + a.dur)
 
         return end
 
-    def audio_duration(self) -> float:
-        total_dur = 0.0
-        for clips in self.a:
-            dur = 0.0
+    def _duration(self, layer: Any) -> int:
+        total_dur = 0
+        for clips in layer:
+            dur = 0
             for clip in clips:
-                dur += clip.dur / clip.speed
+                dur += clip.dur
             total_dur = max(total_dur, dur)
         return total_dur
 
-    def video_duration(self) -> float:
-        total_dur = 0.0
-        for clips in self.v:
-            dur = 0.0
-            for clip in clips:
-                if isinstance(clip, TlVideo):
-                    dur += clip.dur / clip.speed
-                else:
-                    dur += clip.dur
-            total_dur = max(total_dur, dur)
-        return total_dur
-
-    def out_len(self) -> float:
+    def out_len(self) -> int:
         # Calculates the duration of the timeline
-        return max(self.video_duration(), self.audio_duration())
+        return max(self._duration(self.v), self._duration(self.a))
 
     def as_dict(self) -> dict:
         sources = {key: f"{src.path.resolve()}" for key, src in self.sources.items()}

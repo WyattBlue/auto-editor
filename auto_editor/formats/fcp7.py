@@ -259,24 +259,23 @@ def path_resolve(path: Path, flavor: str) -> str:
 def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) -> None:
     duration = int(tl.out_len())
     width, height = tl.res
-
-    assert "0" in tl.sources
-    src = tl.sources["0"]
-
-    audio_file = len(src.videos) == 0 and len(src.audios) == 1
-    tracks = len(src.audios)
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
-    pathurls = [path_resolve(src.path, flavor)]
+    flat_source: dict[str, FileInfo] = {}
+    flat_url: dict[tuple[str, int], str] = {}
 
-    if tracks > 1:
-        fold = src.path.parent / f"{src.path.stem}_tracks"
-        safe_mkdir(fold)
+    for key, src in tl.sources.items():
+        flat_source[key] = src
+        flat_url[(key, 0)] = path_resolve(src.path, flavor)
 
-        for i in range(1, tracks):
-            newtrack = fold / f"{i}.wav"
-            move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
-            pathurls.append(path_resolve(newtrack, flavor))
+        if len(src.audios) > 1:
+            fold = src.path.parent / f"{src.path.stem}_tracks"
+            safe_mkdir(fold)
+
+            for i in range(1, len(src.audios)):
+                newtrack = fold / f"{i}.wav"
+                move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
+                flat_url[(key, i)] = path_resolve(newtrack, flavor)
 
     xmeml = ET.Element("xmeml", version="4")
     sequence = ET.SubElement(xmeml, "sequence")
@@ -304,25 +303,28 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
 
         for j, clip in enumerate(tl.v[0]):
             assert isinstance(clip, TlVideo)
+            src = tl.sources[clip.src]
 
-            _start = clip.start
-            _end = clip.start + int(clip.dur / clip.speed)
-            _in = int(clip.offset / clip.speed)
-            _out = int((clip.offset + clip.dur) / clip.speed)
+            _start = f"{clip.start}"
+            _end = f"{clip.start + clip.dur}"
+            _in = f"{int(clip.offset / clip.speed)}"
+            _out = f"{int(clip.offset / clip.speed) + clip.dur}"
 
             clipitem = ET.SubElement(track, "clipitem", id=f"clipitem-{j+1}")
             ET.SubElement(clipitem, "masterclipid").text = "masterclip-2"
             ET.SubElement(clipitem, "name").text = src.path.stem
-            ET.SubElement(clipitem, "start").text = str(_start)
-            ET.SubElement(clipitem, "end").text = str(_end)
-            ET.SubElement(clipitem, "in").text = str(_in)
-            ET.SubElement(clipitem, "out").text = str(_out)
+            ET.SubElement(clipitem, "start").text = _start
+            ET.SubElement(clipitem, "end").text = _end
+            ET.SubElement(clipitem, "in").text = _in
+            ET.SubElement(clipitem, "out").text = _out
 
             filedef = ET.SubElement(clipitem, "file", id="file-1")
 
             if j == 0:
                 ET.SubElement(filedef, "name").text = src.path.stem
-                ET.SubElement(filedef, "pathurl").text = pathurls[0]
+                ET.SubElement(filedef, "pathurl").text = flat_url[
+                    (clip.src, clip.stream)
+                ]
 
                 rate = ET.SubElement(filedef, "rate")
                 ET.SubElement(rate, "timebase").text = str(timebase)
@@ -351,7 +353,7 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
             if clip.speed != 1:
                 clipitem.append(speedup(clip.speed * 100))
 
-            for i in range(tracks + 1):
+            for i in range(len(src.audios) + 1):
                 link = ET.SubElement(clipitem, "link")
                 ET.SubElement(
                     link, "linkclipref"
@@ -376,12 +378,14 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
         )
 
         for j, aclip in enumerate(aclips):
-            _start = aclip.start
-            _end = aclip.start + int(aclip.dur / aclip.speed)
-            _in = int(aclip.offset / aclip.speed)
-            _out = int((aclip.offset + aclip.dur) / aclip.speed)
+            src = tl.sources[aclip.src]
 
-            if audio_file:
+            _start = f"{aclip.start}"
+            _end = f"{aclip.start + aclip.dur}"
+            _in = f"{aclip.offset / aclip.speed}"
+            _out = f"{(aclip.offset / aclip.speed) + aclip.dur}"
+
+            if not src.videos:
                 clip_item_num = j + 1
                 master_id = "1"
             else:
@@ -396,16 +400,17 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
             )
             ET.SubElement(clipitem, "masterclipid").text = f"masterclip-{master_id}"
             ET.SubElement(clipitem, "name").text = src.path.stem
-            ET.SubElement(clipitem, "start").text = str(_start)
-            ET.SubElement(clipitem, "end").text = str(_end)
-            ET.SubElement(clipitem, "in").text = str(_in)
-            ET.SubElement(clipitem, "out").text = str(_out)
+            ET.SubElement(clipitem, "start").text = _start
+            ET.SubElement(clipitem, "end").text = _end
+            ET.SubElement(clipitem, "in").text = _in
+            ET.SubElement(clipitem, "out").text = _out
 
             filedef = ET.SubElement(clipitem, "file", id=f"file-{t+1}")
-            if j == 0 and (audio_file or t > 0):
+            if j == 0 and (not src.videos or t > 0):
                 ET.SubElement(filedef, "name").text = src.path.stem
-                ET.SubElement(filedef, "pathurl").text = pathurls[t]
-
+                ET.SubElement(filedef, "pathurl").text = flat_url[
+                    (aclip.src, aclip.stream)
+                ]
                 rate = ET.SubElement(filedef, "rate")
                 ET.SubElement(rate, "timebase").text = str(timebase)
                 ET.SubElement(rate, "ntsc").text = ntsc
@@ -426,7 +431,7 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
             if aclip.speed != 1:
                 clipitem.append(speedup(aclip.speed * 100))
 
-            if not audio_file:
+            if src.videos:
                 ET.SubElement(clipitem, "outputchannelindex").text = "1"
 
         audio.append(track)
