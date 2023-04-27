@@ -166,6 +166,16 @@ def main(sys_args: list[str] | None = None):
 
     ### Tests ###
 
+    all_files = (
+        "aac.m4a",
+        "alac.m4a",
+        "wav/pcm-f32le.wav",
+        "wav/pcm-s32le.wav",
+        "multi-track.mov",
+        "subtitle.mp4",
+        "testsrc.mkv",
+    )
+
     ## API Tests ##
 
     def help_tests():
@@ -242,7 +252,7 @@ def main(sys_args: list[str] | None = None):
 
     # PR #260
     def high_speed_test():
-        return run.main(inputs=["example.mp4"], cmd=["--video-speed", "99998"])
+        return run.check(["example.mp4", "--video-speed", "99998"], "empty")
 
     # Issue #184
     def units():
@@ -440,27 +450,23 @@ def main(sys_args: list[str] | None = None):
             ["example.mp4", "--add", 'text:0,30,"text",0,0,"notafont"'], "not found"
         )
 
+    def premiere():
+        results = set()
+        for test_name in all_files:
+            test_file = f"resources/{test_name}"
+            p_xml = run.main([test_file], ["-exp"])
+            results.add(p_xml)
+            results.add(run.main([p_xml], []))
+
+        return tuple(results)
+
     def export():
         results = set()
-        all_files = (
-            "aac.m4a",
-            "alac.m4a",
-            "wav/pcm-f32le.wav",
-            "wav/pcm-s32le.wav",
-            "multi-track.mov",
-            "subtitle.mp4",
-            "testsrc.mkv",
-        )
 
         for test_name in all_files:
             test_file = f"resources/{test_name}"
             results.add(run.main([test_file], []))
             run.main([test_file], ["--edit", "none"])
-
-            p_xml = run.main([test_file], ["-exp"])
-            results.add(p_xml)
-            results.add(run.main([p_xml], []))
-
             results.add(run.main([test_file], ["-exf"]))
             results.add(run.main([test_file], ["-exs"]))
             results.add(run.main([test_file], ["--export_as_clip_sequence"]))
@@ -824,6 +830,7 @@ def main(sys_args: list[str] | None = None):
     if args.category in ("cli", "all"):
         tests.extend(
             [
+                premiere,
                 SAR,
                 yuv442p,
                 check_font_error,
