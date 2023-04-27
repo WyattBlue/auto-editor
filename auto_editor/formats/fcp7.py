@@ -382,8 +382,8 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
 
             _start = f"{aclip.start}"
             _end = f"{aclip.start + aclip.dur}"
-            _in = f"{aclip.offset / aclip.speed}"
-            _out = f"{(aclip.offset / aclip.speed) + aclip.dur}"
+            _in = f"{int(aclip.offset / aclip.speed)}"
+            _out = f"{int(aclip.offset / aclip.speed) + aclip.dur}"
 
             if not src.videos:
                 clip_item_num = j + 1

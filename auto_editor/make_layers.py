@@ -51,6 +51,9 @@ def clipify(chunks: Chunks, src: str, start: int = 0) -> list[Clip]:
     for chunk in chunks:
         if chunk[2] != 99999:
             dur = round((chunk[1] - chunk[0]) / chunk[2])
+            if dur == 0:
+                continue
+
             offset = chunk[0]
 
             if not (clips and clips[-1].start == round(start)):
