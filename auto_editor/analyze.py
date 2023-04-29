@@ -248,7 +248,7 @@ class Levels:
         )
 
         if len(samples) == 0:
-            raise LevelError(f"audio: audio stream '{s}' has length of 0.")
+            raise LevelError(f"audio: stream '{s}' has no samples.")
 
         def get_max_volume(s: np.ndarray) -> float:
             return max(float(np.max(s)), -float(np.min(s)))
@@ -261,15 +261,15 @@ class Levels:
 
         if samp_per_ticks < 1:
             self.log.error(
-                f"audio: audio stream '{s}'\n  Samplerate ({sr}) must be greater than "
+                f"audio: stream '{s}'\n  Samplerate ({sr}) must be greater than "
                 f"or equal to timebase ({self.tb})\n"
                 "  Try `-fps 30` and/or `--sample-rate 48000`"
             )
 
         audio_ticks = int(samp_count / samp_per_ticks)
-        self.log.debug(f"analyze: Audio Length: {audio_ticks}")
-        self.log.debug(f"... no rounding: {float(samp_count / samp_per_ticks)}")
-
+        self.log.debug(
+            f"analyze: audio length: {audio_ticks} ({float(samp_count / samp_per_ticks)})"
+        )
         self.bar.start(audio_ticks, "Analyzing audio volume")
 
         threshold_list = np.zeros((audio_ticks), dtype=np.float_)
