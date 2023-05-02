@@ -107,9 +107,8 @@ def _read_data_chunk(
             f"Unknown wave file format: {format_tag:#06x}. Supported formats: PCM, IEEE_FLOAT"
         )
 
-    start = fid.tell()
-    data = np.memmap(fid, dtype=dtype, mode="c", offset=start, shape=(n_samples,))
-    fid.seek(start + size)
+    data = np.memmap(fid, dtype=dtype, mode="c", offset=fid.tell(), shape=(n_samples,))
+    fid.seek(size, 1)
 
     _handle_pad_byte(fid, size)
 
@@ -125,6 +124,8 @@ def _read_data_chunk(
 def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
     if data := fid.read(4):
         size = struct.unpack(f"{en}I", data)[0]
+        if size == 0:
+            raise ValueError("Unknown chunk")
         fid.seek(size, 1)
         _handle_pad_byte(fid, size)
 
