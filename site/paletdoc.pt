@@ -57,32 +57,11 @@
             )
         )
         (syntax
-            "cond" "([test-clause then-body]... [else then-body)"
-            (text
-                "Evaluate each " 'cond-clause " if the clause is evaluated to "
-                #t " then evaluate and return " 'then-body
-                ". If the clause is " #f " continue to the next clause. "
-                "If there are no clauses left return " (void)
-                ". If the last " 'test-clause " is " 'else
-                " then its evaluated " 'then-body "."
-            )
-        )
-    ]
-    "Loops" #[
-        (syntax
             "for"
             "([id seq-expr] ...) body"
             (text
                 "Loop over " 'seq-expr " by setting the variable " 'id
                 " to the nth item of " 'seq-expr " and evaluating " 'body "."
-            )
-        )
-        (syntax
-            "for/vector"
-            "([id seq-expr] ...) body"
-            (text
-                "Like " (link 'for)
-                " but returns a vector with the last evaluated elements of " 'body "."
             )
         )
     ]
@@ -306,20 +285,6 @@
             #(#("x" "real?") "int?")
             (text "Returns the largest integer less than " 'x ".")
         )
-        (proc
-            "random"
-            #("float?")
-            (text "Returns a random number between 0.0 inclusive to 1.0 exclusive.")
-        )
-        (proc
-            "randrange"
-            #(
-                #("start" "int?")
-                #("stop" "int?")
-                #("step" "(and/c int? (not/c 0))" "1")
-            "int?")
-            (text "Returns a random int between " 'start " and " 'stop " inclusive.")
-        )
     ]
     "Exponents" #[
         (proc
@@ -361,12 +326,6 @@
             "tan"
             #(#("z" "real?") "float?")
             (text "Returns the tangent of " 'z " in radians.")
-        )
-        (value "pi" "float?"
-            (text
-                "A floating point approximation of 𝜋: "
-                "the circumference of a circle divided by its diameter."
-            )
         )
     ]
     "Symbols" #[
@@ -439,12 +398,6 @@
             (text
                 "Converts all " 'v " to a string using print with \" \" as the joiner."
             )
-        )
-    ]
-    "Bytes" #[
-        (pred
-            "bytes?"
-            (text "Returns " #t " if " 'v " is a byte string, " #f " otherwise.")
         )
     ]
     "Vectors" #[
@@ -539,11 +492,6 @@
                 "Modify " 'arr " by setting " 'start " to " 'stop " into the value " 'v "."
             )
         )
-        (proc
-            "count-nonzero"
-            #(#("arr" "array?") "uint?")
-            (text "Returns the number of non-zeros in " 'arr ".")
-        )
         (pred
             "bool-array?"
             (text
@@ -626,90 +574,6 @@
             "The symbol 'all. Exists for backwards compatibility for older auto-editor versions"
         ))
     ]
-    "Pairs and Lists" #[
-        (pred
-            "pair?"
-            (text "Returns " #t " if " 'v " is a pair, " #f " otherwise.")
-        )
-        (pred
-            "null?"
-            (text "Returns " #t " if " 'v " is an empty list, " #f " otherwise.")
-        )
-        (proc
-            "cons"
-            #(#("a" "any") #("d" "any") "pair?")
-            (text
-                "Returns a newly allocated pair where the first item is set to "
-                'a " and the second item set to " 'd "."
-            )
-        )
-        (proc
-            "car"
-            #(#("p" "pair?") "any?")
-            (text "Returns the first element of pair " 'p ".")
-        )
-        (proc
-            "cdr"
-            #(#("p" "pair?") "any?")
-            (text "Returns the second element of pair " 'p ".")
-        )
-        (value "null" "null?" (text "The empty list."))
-        (pred
-            "list?"
-            (text
-                "Returns " #t " if " 'v
-                 " is an empty list or a pair whose second element is a list, "
-                 #f " otherwise."
-            )
-        )
-        (proc
-            "list"
-            #(#("v" "any") "..." "list?")
-            (text "Returns a list with " 'v " in order.")
-        )
-        (proc
-            "list-ref"
-            #(#("lst" "list?") #("pos" "uint?") "any")
-            (text
-                "Returns the element of " 'lst " at position " 'pos "."
-            )
-        )
-        (proc
-            "vector->list"
-            #(#("vec" "vector?") "list?")
-            (text "Returns a new list based on " 'vec ".")
-        )
-        (proc
-            "list->vector"
-            #(#("lst" "list?") "vector?")
-            (text "Returns a new vector based on " 'lst ".")
-        )
-        (proc
-            "string->list"
-            #(#("str" "string?") "list?")
-            (text "Returns a new list filled with the characters of " 'str ".")
-        )
-        (proc
-            "caar"
-            #(#("v" "any") "any")
-            (text "Returns " (code "(car (car v))"))
-        )
-        (proc
-            "cadr"
-            #(#("v" "any") "any")
-            (text "Returns " (code "(car (cdr v))"))
-        )
-        (proc
-            "cdar"
-            #(#("v" "any") "any")
-            (text "Returns " (code "(cdr (car v))"))
-        )
-        (proc
-            "cddr"
-            #(#("v" "any") "any")
-            (text "Returns " (code "(cdr (cdr v))"))
-        )
-    ]
     "Ranges" #[
         (pred
             "range?"
@@ -728,11 +592,6 @@
             "range->vector"
             #(#("rng" "range?") "vector?")
             (text "Returns a new vector based on " 'rng ".")
-        )
-        (proc
-            "range->list"
-            #(#("rng" "range?") "list?")
-            (text "Returns a new list based on " 'rng ".")
         )
     ]
     "Generic Sequences" #[
@@ -803,54 +662,9 @@
     ]
     "Actions" #[
         (proc
-            "sleep"
-            #(#("time" "(or/c int? float?)") "void?")
-            (text "Adds a delay by " 'time "seconds.")
-        )
-        (proc
-            "error"
-            #(#("msg" "string?") "none")
-            (text "Raises an exception with " 'msg " as the message.")
-        )
-        (proc
-            "exit"
-            #(#("status" "uint?" "1") "none")
-            (text "Immediately terminates the program.")
-        )
-        (proc
             "begin"
             #(#("datum" "any") "..." "any")
             (text "Evaluates all arguments and returns the last one.")
-        )
-    ]
-    "Input / Output" #[
-        (proc
-            "display"
-            #(#("datum" "any") "void?")
-            (text "Display " 'datum " to stdout.")
-        )
-        (proc
-            "displayln"
-            #(#("datum" "any") "void?")
-            (text "Display " 'datum " to stdout with a newline character.")
-        )
-        (proc
-            "print"
-            #(#("datum" "any") "void?")
-            (text "Display " 'datum " like REPL does.")
-        )
-        (proc
-            "println"
-            #(#("datum" "any") "void?")
-            (text "Display " 'datum " like REPL does with a newline character.")
-        )
-        (syntax
-            "with-open"
-            "(file-binding file-path file-mode) body-expr"
-            (text
-                "In the block the file object to " 'file-binding "\n."
-                (code "(with-open (file \"shopping.txt\" 'a) ((. file write) \"buy milk\"))")
-            )
         )
     ]
     "Void" #[
@@ -955,31 +769,10 @@
     ]
     "Reflection" #[
         (syntax
-            "eval" "body"
-            (text
-                "Evaluate value if value is a vector or list, otherwise return the value."
-            )
-        )
-        (syntax
             "quote" "body"
             (text
                 "Returns " 'body " as its \"literalized\" form, "
                 "a constant value with its binding names copied."
-            )
-        )
-        (proc
-            "var-exists?"
-            #(#("sym" "symbol?") "bool?")
-            (text
-                "Returns " #t " if the variable corresponding to " 'sym
-                " is defined in the current environment, " #f " otherwise."
-            )
-        )
-        (proc
-            "make-env"
-            #(#("no" "one") "hash?")
-            (text
-                "Returns a copy of the current environment represented as a hash. The keys are always strings."
             )
         )
     ]
