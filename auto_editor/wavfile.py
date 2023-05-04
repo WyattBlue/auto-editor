@@ -81,7 +81,6 @@ def _read_data_chunk(
         size = data_size
 
     bytes_per_sample = block_align // channels
-    n_samples = size // bytes_per_sample
 
     if bytes_per_sample in (3, 5, 6, 7):
         raise ValueError(f"Unsupported bytes per sample: {bytes_per_sample}")
@@ -107,17 +106,17 @@ def _read_data_chunk(
             f"Unknown wave file format: {format_tag:#06x}. Supported formats: PCM, IEEE_FLOAT"
         )
 
-    data = np.memmap(fid, dtype=dtype, mode="c", offset=fid.tell(), shape=(n_samples,))
-    fid.seek(size, 1)
+    if size % 2 == 0:
+        n_samples = size // block_align
+    else:
+        n_samples = (size - 1) // block_align
 
+    data = np.memmap(
+        fid, dtype=dtype, mode="c", offset=fid.tell(), shape=(n_samples, channels)
+    )
+    fid.seek(size, 1)
     _handle_pad_byte(fid, size)
 
-    if channels > 1:
-        try:
-            _data = data.reshape(-1, channels)
-        except ValueError:
-            _data = data[:-1].reshape(-1, channels)
-        return _data
     return data
 
 
@@ -271,8 +270,7 @@ def write(fid: io.BufferedWriter, sr: int, arr: AudioData) -> None:
         header_data += b"fact"
         header_data += struct.pack("<II", 4, arr.shape[0])
 
-    # check data size (needs to be immediately before the data chunk)
-    if ((len(header_data) - 8) + (8 + arr.nbytes)) > 0xFFFFFFFF:
+    if len(header_data) + arr.nbytes > 0xFFFFFFFF:
         raise ValueError("Data exceeds wave file size limit")
 
     fid.write(header_data)
