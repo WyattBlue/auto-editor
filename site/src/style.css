@@ -212,8 +212,10 @@ h3 {font-weight: 500}
 .navbar-start > .navbar-item {font-weight: bold}
 .underline {text-decoration: underline}
 
-.author, .date {line-height: 1}
-.author {margin-bottom: 0.5rem}
+.author-date {
+  font-weight: 650;
+  margin-block-end: 0.4em;
+}
 
 /* Light Theme Colors */
 html {background-color: white}
