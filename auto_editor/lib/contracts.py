@@ -3,7 +3,7 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import Any, Callable
 
-from .data_structs import Null, Sym, print_str
+from .data_structs import Sym, print_str
 from .err import MyError
 
 
@@ -61,8 +61,6 @@ def check_contract(c: object, val: object) -> bool:
         return val is True
     if c is False:
         return val is False
-    if c is Null:
-        return val is Null
 
     if type(c) is int:
         return val == c
@@ -80,7 +78,7 @@ def is_contract(c: object) -> bool:
         and (c.arity[1] is None or c.arity[1] > 0)
     ):
         return True
-    if c is True or c is False or c is Null:
+    if c is True or c is False:
         return True
     return type(c) in (int, float, Fraction, complex, str, Sym)
 
@@ -95,7 +93,6 @@ is_real = Contract("real?", lambda v: type(v) in (int, float, Fraction))
 is_float = Contract("float?", lambda v: type(v) is float)
 is_frac = Contract("frac?", lambda v: type(v) is Fraction)
 is_str = Contract("string?", lambda v: type(v) is str)
-is_bytes = Contract("bytes?", lambda v: type(v) is bytes)
 any_p = Contract("any", lambda v: True)
 is_void = Contract("void?", lambda v: v is None)
 is_int_or_float = Contract("(or/c int? float?)", lambda v: type(v) in (int, float))

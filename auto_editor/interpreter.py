@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import cmath
 import math
-import os
 import random
 import sys
 from difflib import get_close_matches
 from fractions import Fraction
 from functools import reduce
-from io import BytesIO, StringIO
-from time import sleep
+from io import StringIO
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -114,31 +112,6 @@ class Lexer:
     def is_whitespace(self) -> bool:
         return self.char is None or self.char in " \t\n\r\x0b\x0c"
 
-    def bytes(self) -> bytes:
-        result = BytesIO()
-        while self.char is not None and self.char != '"':
-            if ord(self.char) > 126:
-                self.error("bytes can only contain ASCII literal characters")
-
-            if self.char == "\\":
-                self.advance()
-                if self.char is None:
-                    break
-
-                if self.char not in str_escape:
-                    self.error(f"Unknown escape sequence `\\{self.char}` in bytes")
-
-                result.write(str_escape[self.char].encode())
-            else:
-                result.write(self.char.encode())
-            self.advance()
-
-        if self.char is None:
-            self.close_err(f'Expected a closing `"`')
-
-        self.advance()
-        return result.getvalue()
-
     def string(self) -> str:
         result = StringIO()
         while self.char is not None and self.char != '"':
@@ -212,14 +185,6 @@ class Lexer:
             char = self.char
             self.advance()
             return Token(VAL, Char(char))
-
-        if self.char == '"':
-            self.advance()
-            my_bytes = self.bytes()
-            if self.char == ".":  # handle `object.method` syntax
-                self.advance()
-                return Token(DOT, (my_bytes, self.get_next_token()))
-            return Token(VAL, my_bytes)
 
         if self.char is not None and self.char in "([{":
             brac_type = self.char
@@ -501,15 +466,11 @@ def check_args(
 is_cont = Contract("contract?", is_contract)
 is_iterable = Contract(
     "iterable?",
-    lambda v: v is Null
-    or type(v) in (str, bytes, range, Cons)
-    or isinstance(v, (list, dict, np.ndarray)),
+    lambda v: type(v) in (str, range) or isinstance(v, (list, dict, np.ndarray)),
 )
 is_sequence = Contract(
     "sequence?",
-    lambda v: v is Null
-    or type(v) in (str, bytes, range, Cons)
-    or isinstance(v, (list, np.ndarray)),
+    lambda v: type(v) in (str, range) or isinstance(v, (list, np.ndarray)),
 )
 is_boolarr = Contract(
     "bool-array?",
@@ -519,10 +480,6 @@ bool_or_barr = Contract(
     "(or/c bool? bool-array?)",
     lambda v: type(v) is bool or is_boolarr(v),
 )
-
-
-def raise_(msg: str) -> None:
-    raise MyError(msg)
 
 
 def is_equal(a: object, b: object) -> bool:
@@ -659,38 +616,6 @@ def margin(a: int, b: Any, c: Any = None) -> BoolList:
     return arr
 
 
-def _list(*values: Any) -> Cons | NullType:
-    result: Cons | NullType = Null
-    for val in reversed(values):
-        result = Cons(val, result)
-    return result
-
-
-# convert nested vectors to nested lists
-def deep_list(vec: list) -> Cons | NullType:
-    result: Cons | NullType = Null
-    for val in reversed(vec):
-        if isinstance(val, list):
-            val = deep_list(val)
-        result = Cons(val, result)
-    return result
-
-
-def list_to_vector(val: Cons | NullType) -> list:
-    result = []
-    while type(val) is Cons:
-        result.append(val.a)
-        val = val.d
-    return result
-
-
-def vec_to_list(values: list) -> Cons | NullType:
-    result: Cons | NullType = Null
-    for val in reversed(values):
-        result = Cons(val, result)
-    return result
-
-
 def vector_set(vec: list, pos: int, v: Any) -> None:
     try:
         vec[pos] = v
@@ -703,12 +628,6 @@ def vector_extend(vec: list, *more_vecs: list) -> None:
         vec.extend(more)
 
 
-def is_list(val: Any) -> bool:
-    while type(val) is Cons:
-        val = val.d
-    return val is Null
-
-
 def randrange(*args: int) -> int:
     try:
         return random.randrange(*args)
@@ -716,7 +635,7 @@ def randrange(*args: int) -> int:
         raise MyError("randrange: got empty range")
 
 
-def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | NullType) -> Any:
+def palet_map(proc: Proc, seq: str | list | range | NDArray) -> Any:
     if type(seq) is str:
         return str(map(proc.proc, seq))
     if isinstance(seq, (list, range)):
@@ -728,16 +647,8 @@ def palet_map(proc: Proc, seq: str | list | range | NDArray | Cons | NullType) -
         check_args(proc.name, [0], (1, 1), None)
         return proc.proc(seq)
 
-    result: Cons | NullType = Null
-    while type(seq) is Cons:
-        result = Cons(proc.proc(seq.a), result)
-        seq = seq.d
-    return result[::-1]
 
-
-def apply(proc: Proc, seq: str | list | range | Cons | NullType) -> Any:
-    if isinstance(seq, (Cons, NullType)):
-        return reduce(proc.proc, list_to_vector(seq))
+def apply(proc: Proc, seq: str | list | range) -> Any:
     return reduce(proc.proc, seq)
 
 
@@ -751,7 +662,7 @@ def ref(seq: Any, ref: int) -> Any:
 
 
 def p_slice(
-    seq: str | list | range | NDArray | Cons | NullType,
+    seq: str | list | range | NDArray,
     start: int = 0,
     end: int | None = None,
     step: int = 1,
@@ -766,13 +677,6 @@ def splice(
     arr: NDArray, v: int, start: int | None = None, end: int | None = None
 ) -> None:
     arr[start:end] = v
-
-
-def stream_to_list(s: range) -> Cons | NullType:
-    result: Cons | NullType = Null
-    for item in reversed(s):
-        result = Cons(item, result)
-    return result
 
 
 def palet_hash(*args: Any) -> dict:
@@ -980,15 +884,10 @@ def syn_for(env: Env, node: list) -> None:
     return None
 
 
-def syn_for_vec(env: Env, node: list) -> list:
-    results = []
-    var, my_iter = check_for_syntax(env, node)
-
-    for item in my_iter:
-        env[var.val] = item
-        results.append([my_eval(env, c) for c in node[2:]][-1])
-
-    return results
+def syn_quote(env: Env, node: list) -> list:
+    if len(node) != 2:
+        raise MyError("quote: bad syntax")
+    return node[1]
 
 
 def syn_if(env: Env, node: list) -> Any:
@@ -1015,42 +914,6 @@ def syn_when(env: Env, node: list) -> Any:
         )
 
     return my_eval(env, node[2]) if test_expr else None
-
-
-def syn_cond(env: Env, node: list) -> Any:
-    for test_expr in node[1:]:
-        if not isinstance(test_expr, list) or not test_expr:
-            raise MyError(f"{node[0]}: bad syntax, clause is not a test-value pair")
-
-        if test_expr[0] == Sym("else"):
-            if len(test_expr) == 1:
-                raise MyError(f"{node[0]}: missing expression in else clause")
-            test_clause = True
-        else:
-            test_clause = my_eval(env, test_expr[0])
-            if type(test_clause) is not bool:
-                raise MyError(
-                    f"{node[0]} test-expr: expected bool?, got {print_str(test_clause)}"
-                )
-
-        if test_clause:
-            if len(test_expr) == 1:
-                return True
-
-            for rest_clause in test_expr[1:-1]:
-                my_eval(env, rest_clause)
-            return my_eval(env, test_expr[-1])
-
-    return None
-
-
-def syn_quote(env: Env, node: list) -> Any:
-    if len(node) != 2:
-        raise MyError("quote: bad syntax")
-
-    if isinstance(node[1], list):
-        return deep_list(node[1])
-    return node[1]
 
 
 def syn_and(env: Env, node: list) -> Any:
@@ -1101,52 +964,6 @@ def syn_or(env: Env, node: list) -> Any:
     raise MyError(f"{node[0]} expects (or/c bool? bool-array?)")
 
 
-def syn_with_open(env: Env, node: list) -> None:
-    if len(node) < 2:
-        raise MyError(f"{node[0]} has too few args")
-    if len(node) > 3:
-        raise MyError(f"{node[0]} has too many args")
-
-    open_as = node[1][0]
-    if type(open_as) is not Sym:
-        raise MyError(f"{node[0]} as: expected identifier, got {print_str(open_as)}")
-
-    file_name = my_eval(env, node[1][1])
-    if type(file_name) is not str:
-        raise MyError(
-            f"{node[0]} file-name: expected string, got {print_str(file_name)}"
-        )
-
-    if len(node[1]) == 3:
-        file_mode = my_eval(env, node[1][2])
-        if type(file_mode) is not Sym or file_mode.val not in ("w", "r", "a"):
-            raise MyError(
-                f"{node[0]} file-mode: expected (or/c 'w 'r 'a), got {print_str(file_mode)}"
-            )
-    else:
-        file_mode = Sym("r")
-
-    with open(file_name, file_mode.val) as file:
-        if file_mode.val == "r":
-            open_file = PaletObject(
-                {
-                    "read": Proc("read", file.read, (0, 0)),
-                    "readlines": Proc("readlines", file.readlines, (0, 0)),
-                }
-            )
-        else:
-            open_file = PaletObject(
-                {"write": Proc("write", file.write, (1, 1), [is_str])}
-            )
-
-        env[open_as.val] = open_file
-        for c in node[2:]:
-            my_eval(env, c)
-
-    del env[open_as.val]
-    return None
-
-
 class PaletObject:
     __slots__ = "attributes"
 
@@ -1158,32 +975,6 @@ is_obj = Contract(
     "object?",
     lambda v: type(v) is str or isinstance(v, (list, Proc, PaletObject)),
 )
-
-
-def str_to_float(v: str | bytes) -> float:
-    try:
-        return float(v)
-    except ValueError:
-        raise MyError(f"invalid float: {print_str(v)}")
-
-
-def str_to_int(v: str | bytes, base: int) -> int:
-    if base < 2 or base > 36:
-        raise MyError(f"int: base must be between 2 and 36")
-    try:
-        return int(v, base)
-    except ValueError:
-        raise MyError(f"invalid int: {print_str(v)} for base {base}")
-
-
-def change_ext(path: str, c: str) -> str:
-    base, ext = os.path.splitext(path)
-    return base if c == "" else f"{base}.{c}"
-
-
-def b_change_ext(path: bytes, c: bytes) -> bytes:
-    base, ext = os.path.splitext(path)
-    return base if c == b"" else base + b"." + c
 
 
 def get_attrs(obj: Any) -> dict[str, Any]:
@@ -1200,75 +991,15 @@ def get_attrs(obj: Any) -> dict[str, Any]:
             "title": Proc("title", obj.title, (0, 0)),
             "lower": Proc("lower", obj.lower, (0, 0)),
             "upper": Proc("upper", obj.upper, (0, 0)),
-            "float": Proc("float", lambda: str_to_float(obj), (0, 0)),
-            "int": Proc("int", lambda b=10: str_to_int(obj, b), (0, 1), [is_int]),
-            "exists": Proc("exists", lambda: os.path.exists(obj), (0, 0)),
-            "change-ext": Proc(
-                "change-ext", lambda c: change_ext(obj, c), (1, 1), [is_str]
-            ),
-            "encode": Proc("encode", obj.encode, (0, 0)),
-        }
-    if type(obj) is bytes:
-        return {
-            "@name": "bytes",
-            "@len": Proc("@len", obj.__len__, (0, 0)),
-            "split": Proc("split", obj.split, (0, 1), [is_bytes]),
-            "strip": Proc("strip", obj.strip, (0, 0)),
-            "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
-            "startswith": Proc("startswith", obj.startswith, (1, 1), [is_bytes]),
-            "endswith": Proc("endswith", obj.endswith, (1, 1), [is_bytes]),
-            "replace": Proc(
-                "replace", obj.replace, (2, 3), [is_bytes, is_bytes, is_int]
-            ),
-            "title": Proc("title", obj.title, (0, 0)),
-            "lower": Proc("lower", obj.lower, (0, 0)),
-            "upper": Proc("upper", obj.upper, (0, 0)),
-            "float": Proc("float", lambda: str_to_float(obj), (0, 0)),
-            "int": Proc("int", lambda b=10: str_to_int(obj, b), (0, 1), [is_int]),
-            "exists": Proc("exists", lambda: os.path.exists(obj), (0, 0)),
-            "change-ext": Proc(
-                "change-ext", lambda c: b_change_ext(obj, c), (1, 1), [is_bytes]
-            ),
-            "decode": Proc("decode", obj.decode, (0, 0)),
         }
     if isinstance(obj, list):
-
-        def _join(s: str) -> str:
-            try:
-                assert isinstance(obj, list)
-                return s.join(obj)
-            except TypeError:
-                raise MyError("join: every item must be a string")
-
         return {
             "@name": "vector",
             "@len": Proc("@len", obj.__len__, (0, 0)),
             "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
             "pop": Proc("pop", obj.pop, (0, 0)),
-            "join": Proc("join", _join, (1, 1), [is_str]),
             "sort": Proc("sort", lambda: sorted(obj), (0, 0)),
             "sort!": Proc("sort!", obj.sort, (0, 0)),
-        }
-    if isinstance(obj, dict):
-        return {
-            "@name": "hash",
-            "values": Proc("values", lambda: list(obj.values()), (0, 0)),
-            "update": Proc("update", lambda d: obj.update(d), (1, 1), [is_hash]),
-            "copy": Proc("copy", lambda: obj.copy(), (0, 0)),
-        }
-    if isinstance(obj, Proc):
-        return {
-            "@name": "procedure",
-            "arity-min": obj.arity[0],
-            "arity-max": obj.arity[1],
-            "name": obj.name,
-        }
-    if isinstance(obj, Contract):
-        return {
-            "@name": "procedure",
-            "arity-min": 1,
-            "arity-max": 1,
-            "name": obj.name,
         }
     if isinstance(obj, PaletObject):
         return obj.attributes
@@ -1347,33 +1078,10 @@ def my_eval(env: Env, node: object) -> Any:
     return node
 
 
-def syn_eval(env: Env, v: list) -> Any:
-    if len(v) != 2:
-        raise MyError(f"eval: Arity mismatch, expected 1, given {len(v) - 1}")
-
-    node = my_eval(env, v[1])
-    if isinstance(node, list):
-        return my_eval(env, node)
-    if isinstance(node, Cons):
-        return my_eval(env, list_to_vector(node))
-
-    return node
-
-
-def my_write(v: Any) -> None:
-    try:
-        sys.stdout.write(v)
-    except UnicodeEncodeError as e:
-        raise MyError(e)
-    return None
-
-
 env: Env = {
     # constants
     "true": True,
     "false": False,
-    "null": Null,
-    "pi": math.pi,
     "all": Sym("all"),
     # syntax
     "lambda": Syntax(syn_lambda),
@@ -1384,11 +1092,8 @@ env: Env = {
     "quote": Syntax(syn_quote),
     "if": Syntax(syn_if),
     "when": Syntax(syn_when),
-    "cond": Syntax(syn_cond),
-    "with-open": Syntax(syn_with_open),
     # loops
     "for": Syntax(syn_for),
-    "for/vector": Syntax(syn_for_vec),
     # contracts
     "number?": is_num,
     "real?": is_real,
@@ -1403,30 +1108,17 @@ env: Env = {
     "void?": is_void,
     "symbol?": (is_symbol := Contract("symbol?", lambda v: type(v) is Sym)),
     "string?": is_str,
-    "bytes?": is_bytes,
     "char?": (is_char := Contract("char?", lambda v: type(v) is Char)),
     "vector?": (is_vector := Contract("vector?", lambda v: isinstance(v, list))),
     "array?": (is_array := Contract("array?", lambda v: isinstance(v, np.ndarray))),
     "bool-array?": is_boolarr,
-    "pair?": (is_pair := Contract("pair?", lambda v: type(v) is Cons)),
-    "null?": Contract("null?", lambda v: v is Null),
-    "list?": Contract("list?", is_list),
     "range?": (is_range := Contract("range?", lambda v: type(v) is range)),
     "iterable?": is_iterable,
     "sequence?": is_sequence,
     "procedure?": is_proc,
     "contract?": is_cont,
     "hash?": (is_hash := Contract("hash?", lambda v: isinstance(v, dict))),
-    # actions
     "begin": Proc("begin", lambda *x: x[-1] if x else None, (0, None)),
-    "display": Proc("display", lambda v: my_write(display_str(v)), (1, 1)),
-    "displayln": Proc("displayln", lambda v: my_write(display_str(v) + "\n"), (1, 1)),
-    "print": Proc("print", lambda v: my_write(print_str(v)), (1, 1)),
-    "println": Proc("println", lambda v: my_write(print_str(v) + "\n"), (1, 1)),
-    "exit": Proc("exit", sys.exit, (0, 1), [is_uint]),
-    "error": Proc("error", raise_, (1, 1), [is_str]),
-    "sleep": Proc("sleep", sleep, (1, 1), [is_int_or_float]),
-    # void
     "void": Proc("void", lambda *v: None, (0, 0)),
     # control / b-arrays
     "not": Proc(
@@ -1482,8 +1174,6 @@ env: Env = {
     "tan": Proc("tan", math.tan, (1, 1), [is_real]),
     "mod": Proc("mod", lambda a, b: a % b, (2, 2), [is_int]),
     "modulo": Proc("modulo", lambda a, b: a % b, (2, 2), [is_int]),
-    "random": Proc("random", random.random, (0, 0)),
-    "randrange": Proc("randrange", randrange, (1, 3), [is_int, is_int, int_not_zero]),
     # symbols
     "symbol->string": Proc("symbol->string", str, (1, 1), [is_symbol]),
     "string->symbol": Proc("string->symbol", Sym, (1, 1), [is_str]),
@@ -1505,23 +1195,12 @@ env: Env = {
     "vector-add!": Proc("vector-add!", list.append, (2, 2), [is_vector, any_p]),
     "vector-set!": Proc("vector-set!", vector_set, (3, 3), [is_vector, is_int, any_p]),
     "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
-    # cons/list
-    "cons": Proc("cons", Cons, (2, 2)),
-    "car": Proc("car", lambda val: val.a, (1, 1), [is_pair]),
-    "cdr": Proc("cdr", lambda val: val.d, (1, 1), [is_pair]),
-    "caar": UserProc("caar", ["v"], [[Sym("car"), [Sym("car"), Sym("v")]]]),
-    "cadr": UserProc("cdar", ["v"], [[Sym("car"), [Sym("cdr"), Sym("v")]]]),
-    "cdar": UserProc("cdar", ["v"], [[Sym("cdr"), [Sym("car"), Sym("v")]]]),
-    "cddr": UserProc("cddr", ["v"], [[Sym("cdr"), [Sym("cdr"), Sym("v")]]]),
-    "list": Proc("list", _list, (0, None)),
-    "list-ref": Proc("list-ref", ref, (2, 2), [is_pair, is_uint]),
     # arrays
     "array": Proc("array", array_proc, (2, None), [is_symbol, is_real]),
     "make-array": Proc("make-array", make_array, (2, 3), [is_symbol, is_uint, is_real]),
     "array-splice!": Proc(
         "array-splice!", splice, (2, 4), [is_array, is_real, is_int, is_int]
     ),
-    "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
     # bool arrays
     "bool-array": Proc(
         "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_uint]
@@ -1547,32 +1226,15 @@ env: Env = {
     "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
     # conversions
     "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
-    "string->list": Proc(
-        "string->list", lambda s: vec_to_list([Char(c) for c in s]), (1, 1), [is_str]
-    ),
     "string->vector": Proc(
         "string->vector", lambda s: [Char(c) for c in s], (1, 1), [is_str]
     ),
-    "list->vector": Proc("list->vector", list_to_vector, (1, 1), [is_pair]),
-    "vector->list": Proc("vector->list", vec_to_list, (1, 1), [is_vector]),
-    "range->list": Proc("range->list", stream_to_list, (1, 1), [is_range]),
     "range->vector": Proc("range->vector", list, (1, 1), [is_range]),
     # objects
     "object?": is_obj,
     "attrs": Proc("attrs", lambda v: list(get_attrs(v).keys()), (1, 1), [is_obj]),
     "@r": Syntax(attr),
-    # reflection
-    "eval": Syntax(syn_eval),
-    "make-env": Proc("make-env", lambda: env.copy(), (0, 0)),
-    "var-exists?": Proc("var-exists?", lambda sym: sym.val in env, (1, 1), [is_symbol]),
 }
-
-
-###############################################################################
-#                                                                             #
-#  INTERPRETER                                                                #
-#                                                                             #
-###############################################################################
 
 
 def interpret(env: Env, parser: Parser) -> list:

@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from fractions import Fraction
 from io import StringIO
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
-
-from .err import MyError
 
 
 class Sym:
@@ -49,142 +47,6 @@ class Char:
         return obj2 + self.val
 
 
-class NullType:
-    __slots__ = ()
-
-    def __new__(cls: type[NullType]) -> NullType:
-        return Null
-
-    def __eq__(self, obj: object) -> bool:
-        return obj is Null
-
-    def __len__(self) -> int:
-        return 0
-
-    def __next__(self) -> StopIteration:
-        raise StopIteration
-
-    def __getitem__(self, ref: int | slice) -> None:
-        raise IndexError
-
-    def __str__(self) -> str:
-        return "'()"
-
-    def __copy__(self) -> NullType:
-        return Null
-
-    def __deepcopy__(self, memo: Any) -> NullType:
-        return Null
-
-    __repr__ = __str__
-
-
-Null = object.__new__(NullType)
-
-
-class Cons:
-    __slots__ = ("a", "d")
-
-    def __init__(self, a: Any, d: Any):
-        self.a = a
-        self.d = d
-
-    def __repr__(self) -> str:
-        if type(self.d) not in (Cons, NullType):
-            return f"(cons {self.a} {self.d})"
-
-        result = StringIO()
-        result.write(f"({display_str(self.a)}")
-        tail = self.d
-        while type(tail) is Cons:
-            if type(tail.d) not in (Cons, NullType):
-                result.write(f" (cons {tail.a} {tail.d}))")
-                return result.getvalue()
-
-            result.write(f" {display_str(tail.a)}")
-            tail = tail.d
-
-        result.write(")")
-        return result.getvalue()
-
-    def __eq__(self, obj: object) -> bool:
-        return type(obj) is Cons and self.a == obj.a and self.d == obj.d
-
-    def __len__(self: Cons | NullType) -> int:
-        count = 0
-        while type(self) is Cons:
-            self = self.d
-            count += 1
-        if self is not Null:
-            raise MyError("length expects: list?")
-        return count
-
-    def __next__(self) -> Any:
-        if type(self.d) is Cons:
-            return self.d
-        raise StopIteration
-
-    def __iter__(self) -> Any:
-        while type(self) is Cons:
-            yield self.a
-            self = self.d
-
-    def __getitem__(self, ref: object) -> Any:
-        if type(ref) is not int and type(ref) is not slice:
-            raise MyError(f"ref: not a valid index: {print_str(ref)}")
-
-        if type(ref) is int:
-            if ref < 0:
-                raise MyError(f"ref: negative index not allowed: {ref}")
-            pos = ref
-            while pos > 0:
-                pos -= 1
-                self = self.d
-                if type(self) is not Cons:
-                    raise MyError(f"ref: index out of range: {ref}")
-
-            return self.a
-
-        assert type(ref) is slice
-
-        lst: Cons | NullType = Null
-        steps: int = -1
-        i: int = 0
-
-        do_reverse = True
-        start, stop, step = ref.start, ref.stop, ref.step
-        if start is None:
-            start = 0
-        if step < 0:
-            do_reverse = False
-            step = -step
-
-            if stop is None:
-                stop = float("inf")
-            else:
-                start, stop = stop + 1, start
-
-        while type(self) is Cons:
-            if i > stop - 1:
-                break
-            if i >= start:
-                steps = (steps + 1) % step
-                if steps == 0:
-                    lst = Cons(self.a, lst)
-
-            self = self.d
-            i += 1
-
-        if not do_reverse:
-            return lst
-
-        result: Cons | NullType = Null
-        while type(lst) is Cons:
-            result = Cons(lst.a, result)
-            lst = lst.d
-        return result
-
-
 def display_dtype(dtype: np.dtype) -> str:
     if dtype.kind == "b":
         return "bool"
@@ -209,8 +71,6 @@ def display_str(val: object) -> str:
         return val.val
     if type(val) is str:
         return val
-    if type(val) is bytes:
-        return val.decode()
     if type(val) is Char:
         return f"{val}"
     if type(val) is range:
@@ -277,13 +137,9 @@ def print_str(val: object) -> str:
         for k, v in str_escape.items():
             val = val.replace(k, v)
         return f'"{val}"'
-    if type(val) is bytes:
-        for k, v in str_escape.items():
-            val = val.replace(k.encode(), v.encode())
-        return f'#"{val.decode()}"'
     if type(val) is Char:
         return f"{val!r}"
-    if type(val) is Sym or type(val) is Cons:
+    if type(val) is Sym:
         return f"'{display_str(val)}"
 
     return display_str(val)
