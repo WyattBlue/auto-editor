@@ -276,8 +276,7 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
 <section class="section">
 <div class="container">
     <h1>{title}</h1>
-    <p class="author">Author: <b>{author}</b></p>
-    <p class="date">Date: <b>{date}</b></p>
+    <p class="author-date">{author}&nbsp;&nbsp;&nbsp;{date}</p>
 """
   else:
     output = &"""{{{{ comp.header "{title}" }}}}
