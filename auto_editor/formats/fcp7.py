@@ -106,6 +106,37 @@ def speedup(speed: float) -> Element:
     return fil
 
 
+SUPPORTED_EFFECTS = ["timeremap"]
+
+
+def read_filters(clipitem: Element, log: Log) -> float:
+    for effect_tag in clipitem:
+        if len(effect_tag) < 3:
+            log.error("effect tag requires: <effectid> <name> and one <parameter>")
+        for i, effects in enumerate(effect_tag):
+            if i == 0 and effects.tag != "name":
+                log.error("<effect>: <name> must be first tag")
+            if i == 1 and effects.tag != "effectid":
+                log.error("<effect>: <effectid> must be second tag")
+                if effects.text not in SUPPORTED_EFFECTS:
+                    log.error(f"`{effects.text}` is not a supported effect.")
+
+            if i > 1:
+                for j, parms in enumerate(effects):
+                    if j == 0:
+                        if parms.tag != "parameterid":
+                            log.error("<parameter>: <parameterid> must be first tag")
+                        if parms.text != "speed":
+                            break
+
+                    if j > 0 and parms.tag == "value":
+                        if parms.text is None:
+                            log.error("<value>: number required")
+                        return float(parms.text) / 100
+
+    return 1.0
+
+
 def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     def xml_bool(val: str) -> bool:
         if val == "TRUE":
@@ -168,6 +199,7 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                 "in": int,
                 "out": int,
                 "file": None,
+                "filter": None,
             },
         },
     }
@@ -183,6 +215,7 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                 "in": int,
                 "out": int,
                 "file": None,
+                "filter": None,
             },
         },
     }
@@ -218,11 +251,16 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                             f"'pathurl' child element not found in {clipitem['file'].tag}"
                         )
 
+                if "filter" in clipitem:
+                    speed = read_filters(clipitem["filter"], log)
+                else:
+                    speed = 1.0
+
                 start = clipitem["start"]
                 dur = clipitem["end"] - start
-                offset = clipitem["in"]
+                offset = int(clipitem["in"] * speed)
 
-                vobjs[t].append(TlVideo(start, dur, file_id, offset, speed=1, stream=0))
+                vobjs[t].append(TlVideo(start, dur, file_id, offset, speed, stream=0))
 
     if "audio" in av:
         tracks = valid.parse(av["audio"], aclip_schema)
@@ -239,12 +277,17 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                         uri_to_path(fileobj["pathurl"]), ffmpeg, log, str(len(sources))
                     )
 
+                if "filter" in clipitem:
+                    speed = read_filters(clipitem["filter"], log)
+                else:
+                    speed = 1.0
+
                 start = clipitem["start"]
                 dur = clipitem["end"] - start
-                offset = clipitem["in"]
+                offset = int(clipitem["in"] * speed)
 
                 aobjs[t].append(
-                    TlAudio(start, dur, file_id, offset, speed=1, volume=1, stream=0)
+                    TlAudio(start, dur, file_id, offset, speed, volume=1, stream=0)
                 )
 
     return v3(sources, tb, sr, res, "#000", vobjs, aobjs, None)

@@ -3,7 +3,6 @@ from __future__ import annotations
 import cmath
 import math
 import random
-import sys
 from difflib import get_close_matches
 from fractions import Fraction
 from functools import reduce
