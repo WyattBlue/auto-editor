@@ -299,16 +299,51 @@ def path_resolve(path: Path, flavor: str) -> str:
     return f"{path.resolve()}"
 
 
+def media_def(
+    filedef: Element, url: str, src: FileInfo, tl: v3, tb: int, ntsc: str
+) -> None:
+    ET.SubElement(filedef, "name").text = src.path.stem
+    ET.SubElement(filedef, "pathurl").text = url
+
+    rate = ET.SubElement(filedef, "rate")
+    ET.SubElement(rate, "timebase").text = f"{tb}"
+    ET.SubElement(rate, "ntsc").text = ntsc
+
+    mediadef = ET.SubElement(filedef, "media")
+
+    if len(src.videos) > 0:
+        videodef = ET.SubElement(mediadef, "video")
+
+        vschar = ET.SubElement(videodef, "samplecharacteristics")
+        rate = ET.SubElement(vschar, "rate")
+        ET.SubElement(rate, "timebase").text = f"{tb}"
+        ET.SubElement(rate, "ntsc").text = ntsc
+        ET.SubElement(vschar, "width").text = f"{tl.res[0]}"
+        ET.SubElement(vschar, "height").text = f"{tl.res[1]}"
+        ET.SubElement(vschar, "anamorphic").text = ANAMORPHIC
+        ET.SubElement(vschar, "pixelaspectratio").text = PIXEL_ASPECT_RATIO
+
+    if len(src.audios) > 0:
+        audiodef = ET.SubElement(mediadef, "audio")
+        aschar = ET.SubElement(audiodef, "samplecharacteristics")
+        ET.SubElement(aschar, "depth").text = DEPTH
+        ET.SubElement(aschar, "samplerate").text = f"{tl.sr}"
+        ET.SubElement(audiodef, "channelcount").text = "2"
+
+
 def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) -> None:
-    duration = int(tl.out_len())
     width, height = tl.res
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
-    flat_source: dict[str, FileInfo] = {}
     flat_url: dict[tuple[str, int], str] = {}
+    src_to_id: dict[tuple[str, int], str] = {}
+
+    flat_source: dict[str, FileInfo] = {}
+    file_defs: set[str] = set()
 
     for key, src in tl.sources.items():
         flat_source[key] = src
+        src_to_id[(key, 0)] = f"file-{len(src_to_id)}"
         flat_url[(key, 0)] = path_resolve(src.path, flavor)
 
         if len(src.audios) > 1:
@@ -319,13 +354,14 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
                 newtrack = fold / f"{i}.wav"
                 move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
                 flat_url[(key, i)] = path_resolve(newtrack, flavor)
+                src_to_id[(key, i)] = f"file-{len(src_to_id)}"
 
     xmeml = ET.Element("xmeml", version="4")
     sequence = ET.SubElement(xmeml, "sequence")
     ET.SubElement(sequence, "name").text = name
-    ET.SubElement(sequence, "duration").text = str(duration)
+    ET.SubElement(sequence, "duration").text = f"{int(tl.out_len())}"
     rate = ET.SubElement(sequence, "rate")
-    ET.SubElement(rate, "timebase").text = str(timebase)
+    ET.SubElement(rate, "timebase").text = f"{timebase}"
     ET.SubElement(rate, "ntsc").text = ntsc
     media = ET.SubElement(sequence, "media")
     video = ET.SubElement(media, "video")
@@ -333,12 +369,12 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
     vschar = ET.SubElement(vformat, "samplecharacteristics")
 
     rate = ET.SubElement(vschar, "rate")
-    ET.SubElement(rate, "timebase").text = str(timebase)
+    ET.SubElement(rate, "timebase").text = f"{timebase}"
     ET.SubElement(rate, "ntsc").text = ntsc
     ET.SubElement(vschar, "fielddominance").text = "none"
     ET.SubElement(vschar, "colordepth").text = COLORDEPTH
-    ET.SubElement(vschar, "width").text = str(width)
-    ET.SubElement(vschar, "height").text = str(height)
+    ET.SubElement(vschar, "width").text = f"{width}"
+    ET.SubElement(vschar, "height").text = f"{height}"
     ET.SubElement(vschar, "pixelaspectratio").text = PIXEL_ASPECT_RATIO
 
     if len(tl.v) > 0 and len(tl.v[0]) > 0:
@@ -361,37 +397,13 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
             ET.SubElement(clipitem, "in").text = _in
             ET.SubElement(clipitem, "out").text = _out
 
-            filedef = ET.SubElement(clipitem, "file", id="file-1")
+            _id = src_to_id[(clip.src, clip.stream)]
+            filedef = ET.SubElement(clipitem, "file", id=_id)
 
-            if j == 0:
-                ET.SubElement(filedef, "name").text = src.path.stem
-                ET.SubElement(filedef, "pathurl").text = flat_url[
-                    (clip.src, clip.stream)
-                ]
-
-                rate = ET.SubElement(filedef, "rate")
-                ET.SubElement(rate, "timebase").text = str(timebase)
-                ET.SubElement(rate, "ntsc").text = ntsc
-                ET.SubElement(filedef, "duration").text = str(duration)
-
-                mediadef = ET.SubElement(filedef, "media")
-                videodef = ET.SubElement(mediadef, "video")
-
-                vschar = ET.SubElement(videodef, "samplecharacteristics")
-                rate = ET.SubElement(vschar, "rate")
-                ET.SubElement(rate, "timebase").text = str(timebase)
-                ET.SubElement(rate, "ntsc").text = ntsc
-                ET.SubElement(filedef, "duration").text = str(duration)
-                ET.SubElement(vschar, "width").text = str(width)
-                ET.SubElement(vschar, "height").text = str(height)
-                ET.SubElement(vschar, "anamorphic").text = ANAMORPHIC
-                ET.SubElement(vschar, "pixelaspectratio").text = PIXEL_ASPECT_RATIO
-
-                audiodef = ET.SubElement(mediadef, "audio")
-                aschar = ET.SubElement(audiodef, "samplecharacteristics")
-                ET.SubElement(aschar, "depth").text = DEPTH
-                ET.SubElement(aschar, "samplerate").text = str(tl.sr)
-                ET.SubElement(audiodef, "channelcount").text = "2"
+            pathurl = flat_url[(clip.src, clip.stream)]
+            if pathurl not in file_defs:
+                media_def(filedef, pathurl, flat_source[clip.src], tl, timebase, ntsc)
+                file_defs.add(pathurl)
 
             if clip.speed != 1:
                 clipitem.append(speedup(clip.speed * 100))
@@ -448,22 +460,13 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
             ET.SubElement(clipitem, "in").text = _in
             ET.SubElement(clipitem, "out").text = _out
 
-            filedef = ET.SubElement(clipitem, "file", id=f"file-{t+1}")
-            if j == 0 and (not src.videos or t > 0):
-                ET.SubElement(filedef, "name").text = src.path.stem
-                ET.SubElement(filedef, "pathurl").text = flat_url[
-                    (aclip.src, aclip.stream)
-                ]
-                rate = ET.SubElement(filedef, "rate")
-                ET.SubElement(rate, "timebase").text = str(timebase)
-                ET.SubElement(rate, "ntsc").text = ntsc
+            _id = src_to_id[(aclip.src, aclip.stream)]
+            filedef = ET.SubElement(clipitem, "file", id=_id)
 
-                media = ET.SubElement(filedef, "media")
-                media_audio = ET.SubElement(media, "audio")
-                maschar = ET.SubElement(media_audio, "samplecharacteristics")
-                ET.SubElement(maschar, "depth").text = DEPTH
-                ET.SubElement(maschar, "samplerate").text = str(tl.sr)
-                ET.SubElement(media_audio, "channelcount").text = "2"
+            pathurl = flat_url[(aclip.src, aclip.stream)]
+            if pathurl not in file_defs:
+                media_def(filedef, pathurl, flat_source[aclip.src], tl, timebase, ntsc)
+                file_defs.add(pathurl)
 
             sourcetrack = ET.SubElement(clipitem, "sourcetrack")
             ET.SubElement(sourcetrack, "mediatype").text = "audio"
