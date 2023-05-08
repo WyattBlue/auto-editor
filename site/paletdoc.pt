@@ -492,6 +492,11 @@
                 "Modify " 'arr " by setting " 'start " to " 'stop " into the value " 'v "."
             )
         )
+        (proc
+            "count-nonzero"
+            #(#("arr" "array?") "uint?")
+            (text "Returns the number of non-zeros in " 'arr ".")
+        )
         (pred
             "bool-array?"
             (text
@@ -665,6 +670,26 @@
             "begin"
             #(#("datum" "any") "..." "any")
             (text "Evaluates all arguments and returns the last one.")
+        )
+        (proc
+            "display"
+            #(#("datum" "any") "void?")
+            (text "Display " 'datum " to stdout.")
+        )
+        (proc
+            "displayln"
+            #(#("datum" "any") "void?")
+            (text "Display " 'datum " to stdout with a newline character.")
+        )
+        (proc
+            "print"
+            #(#("datum" "any") "void?")
+            (text "Display " 'datum " like REPL does.")
+        )
+        (proc
+            "println"
+            #(#("datum" "any") "void?")
+            (text "Display " 'datum " like REPL does with a newline character.")
         )
     ]
     "Void" #[

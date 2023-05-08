@@ -1200,6 +1200,7 @@ env: Env = {
     "array-splice!": Proc(
         "array-splice!", splice, (2, 4), [is_array, is_real, is_int, is_int]
     ),
+    "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
     # bool arrays
     "bool-array": Proc(
         "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), [is_uint]
@@ -1223,6 +1224,11 @@ env: Env = {
     # hashs
     "hash": Proc("hash", palet_hash),
     "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
+    # actions
+    "display": Proc("display", lambda v: print(display_str(v), end=""), (1, 1)),
+    "displayln": Proc("displayln", lambda v: print(display_str(v)), (1, 1)),
+    "print": Proc("print", lambda v: print(print_str(v), end=""), (1, 1)),
+    "println": Proc("println", lambda v: print(print_str(v)), (1, 1)),
     # conversions
     "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
     "string->vector": Proc(
