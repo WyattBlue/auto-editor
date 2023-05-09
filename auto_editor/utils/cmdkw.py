@@ -104,7 +104,7 @@ class PLexer:
 
 
 def parse_with_palet(text: str, build: pAttrs, env: dict) -> dict[str, Any]:
-    from auto_editor.interpreter import Lexer, Parser, interpret
+    from auto_editor.lang.palet import Lexer, Parser, interpret
     from auto_editor.lib.data_structs import display_str
     from auto_editor.lib.err import MyError
 
