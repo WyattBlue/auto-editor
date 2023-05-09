@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from auto_editor.interpreter import Lexer, Parser, env, interpret
+from auto_editor.lang.palet import Lexer, Parser, env, interpret
 from auto_editor.lib.err import MyError
 
 

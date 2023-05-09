@@ -1,3 +1,9 @@
+"""
+Palet is a light-weight scripting languge. It handles `--edit` and the `repl`.
+The syntax is inspired by the Racket Programming language.
+"""
+
+
 from __future__ import annotations
 
 import cmath

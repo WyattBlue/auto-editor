@@ -8,7 +8,7 @@ import numpy as np
 
 from auto_editor.analyze import LevelError, Levels, builder_map
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.interpreter import env
+from auto_editor.lang.palet import env
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet
