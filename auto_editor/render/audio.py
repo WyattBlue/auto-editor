@@ -7,8 +7,8 @@ from subprocess import PIPE
 import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg
-from auto_editor.lang.palet import env
 from auto_editor.lang.json import Lexer, Parser
+from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import andc, gte_c, is_int_or_float, lte_c
 from auto_editor.lib.err import MyError
 from auto_editor.output import Ensure
