@@ -16,7 +16,7 @@ from auto_editor import version
 import auto_editor.vanparse as vanparse
 from auto_editor.__main__ import main_options
 from auto_editor.vanparse import OptionText
-from auto_editor.interpreter import env, interpret, Parser, Lexer, Sym
+from auto_editor.lang.palet import env, interpret, Parser, Lexer, Sym
 
 argp = ArgumentParser()
 argp.add_argument("--production", "-p", action="store_true")
