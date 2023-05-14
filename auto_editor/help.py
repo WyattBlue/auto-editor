@@ -84,10 +84,10 @@ Export Methods:
  - shotcut    ; Export as an XML timeline file for Shotcut
 
  - json       ; Export as an auto-editor JSON timeline file
-    - api string? : "3.0.0"
+    - api string? : "3"
 
  - timeline   ; Print the auto-editor timeline to stdout
-    - api string? : "3.0.0"
+    - api string? : "3"
 
  - audio      ; Export as a WAV audio file
 

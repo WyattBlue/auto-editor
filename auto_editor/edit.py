@@ -151,8 +151,8 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
         "resolve": pAttrs("resolve", name_attr),
         "final-cut-pro": pAttrs("final-cut-pro", name_attr),
         "shotcut": pAttrs("shotcut"),
-        "json": pAttrs("json", pAttr("api", "3.0.0", is_str)),
-        "timeline": pAttrs("json", pAttr("api", "3.0.0", is_str)),
+        "json": pAttrs("json", pAttr("api", "3", is_str)),
+        "timeline": pAttrs("json", pAttr("api", "3", is_str)),
         "audio": pAttrs("audio"),
         "clip-sequence": pAttrs("clip-sequence"),
     }

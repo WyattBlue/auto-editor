@@ -24,7 +24,7 @@ class v1:
 
     def as_dict(self) -> dict:
         return {
-            "version": "1.0",
+            "version": "1",
             "source": self.source.path.resolve(),
             "chunks": self.chunks,
         }
@@ -274,14 +274,12 @@ global
                 a.append(ab)
 
         return {
-            "version": "unstable:3.0",
-            "timeline": {
-                "resolution": self.res,
-                "timebase": f"{self.tb.numerator}/{self.tb.denominator}",
-                "samplerate": self.sr,
-                "sources": sources,
-                "background": self.background,
-                "v": v,
-                "a": a,
-            },
+            "version": "3",
+            "resolution": self.res,
+            "timebase": f"{self.tb.numerator}/{self.tb.denominator}",
+            "samplerate": self.sr,
+            "sources": sources,
+            "background": self.background,
+            "v": v,
+            "a": a,
         }
