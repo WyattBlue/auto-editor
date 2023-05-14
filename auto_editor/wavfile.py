@@ -123,8 +123,6 @@ def _read_data_chunk(
 def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
     if data := fid.read(4):
         size = struct.unpack(f"{en}I", data)[0]
-        if size == 0:
-            raise ValueError("Unknown chunk")
         fid.seek(size, 1)
         _handle_pad_byte(fid, size)
 
