@@ -105,7 +105,7 @@ class PLexer:
 
 def parse_with_palet(text: str, build: pAttrs, env: dict) -> dict[str, Any]:
     from auto_editor.lang.palet import Lexer, Parser, interpret
-    from auto_editor.lib.data_structs import display_str
+    from auto_editor.lib.data_structs import print_str
     from auto_editor.lib.err import MyError
 
     # Positional Arguments
@@ -127,7 +127,7 @@ def parse_with_palet(text: str, build: pAttrs, env: dict) -> dict[str, Any]:
 
         if c(results[-1]) is not True:
             raise ParserError(
-                f"{build.name}: `{display_str(results[-1])}` needs to be {c.name}"
+                f"{build.name}: Expected {c.name}, got {print_str(results[-1])}"
             )
 
         return results[-1]

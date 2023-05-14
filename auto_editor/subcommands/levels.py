@@ -86,7 +86,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     src = sources["0"]
 
     tb = src.get_fps() if args.timebase is None else args.timebase
-    ensure = Ensure(ffmpeg, src.get_samplerate(), temp, log)
+    ensure = Ensure(ffmpeg, src.get_sr(), temp, log)
 
     if ":" in args.edit:
         method, attrs = args.edit.split(":", 1)

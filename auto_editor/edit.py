@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
-from auto_editor.lib.contracts import is_str
+from auto_editor.lib.contracts import is_int, is_str
 from auto_editor.make_layers import make_timeline
 from auto_editor.output import Ensure, mux_quality_media
 from auto_editor.render.audio import make_new_audio
@@ -151,8 +151,8 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
         "resolve": pAttrs("resolve", name_attr),
         "final-cut-pro": pAttrs("final-cut-pro", name_attr),
         "shotcut": pAttrs("shotcut"),
-        "json": pAttrs("json", pAttr("api", "3", is_str)),
-        "timeline": pAttrs("json", pAttr("api", "3", is_str)),
+        "json": pAttrs("json", pAttr("api", 3, is_int)),
+        "timeline": pAttrs("json", pAttr("api", 3, is_int)),
         "audio": pAttrs("audio"),
         "clip-sequence": pAttrs("clip-sequence"),
     }
@@ -222,7 +222,7 @@ def edit_media(
 
     if args.sample_rate is None:
         if tl is None:
-            samplerate = 48000 if src is None else src.get_samplerate()
+            samplerate = 48000 if src is None else src.get_sr()
         else:
             samplerate = tl.sr
     else:

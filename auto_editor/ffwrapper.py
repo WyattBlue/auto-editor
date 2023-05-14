@@ -189,7 +189,7 @@ class FileInfo:
             return self.videos[0].fps
         return Fraction(30)
 
-    def get_samplerate(self) -> int:
+    def get_sr(self) -> int:
         if self.audios:
             return self.audios[0].samplerate
         return 48000
