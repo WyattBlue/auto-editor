@@ -124,6 +124,7 @@ audio_objects = {
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
     if not isinstance(data, dict):
         log.error("Data is in wrong shape!")
+
     for attr in attrs:
         if attr not in data:
             log.error(f"'{attr}' attribute not found!")
@@ -134,127 +135,94 @@ def check_file(path: str, log: Log) -> None:
         log.error(f"Could not locate media file: '{path}'")
 
 
-class Version:
-    __slots__ = ("major", "minor", "micro")
-
-    def __init__(self, val: str, log: Log) -> None:
-        if val.startswith("unstable:"):
-            val = val[9:]
-
-        ver_str = val.split(".")
-        if len(ver_str) > 3:
-            log.error("Version string: Too many separators!")
-        while len(ver_str) < 3:
-            ver_str.append("0")
-
-        try:
-            self.major, self.minor, self.micro = map(int, ver_str)
-        except ValueError:
-            log.error("Version string: Could not convert to int.")
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, tuple) and len(other) == 2:
-            return (self.major, self.minor) == other
-        return (self.major, self.minor, self.micro) == other
-
-    def __str__(self) -> str:
-        return f"{self.major}.{self.minor}.{self.micro}"
-
-
 def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     with open(path) as f:
         try:
-            data = Parser(Lexer(path, f)).expr()
+            tl = Parser(Lexer(path, f)).expr()
         except MyError as e:
             log.error(e)
 
-    check_attrs(data, log, "version")
-    version = Version(data["version"], log)
+    check_attrs(tl, log, "version")
 
-    if version == (3, 0):
-        check_attrs(data, log, "timeline")
-        tl = data["timeline"]
-        check_attrs(
-            tl,
-            log,
-            "sources",
-            "background",
-            "v",
-            "a",
-            "timebase",
-            "resolution",
-            "samplerate",
-        )
+    if tl["version"] != "3":
+        log.error(f"Importing version {tl['version']} timelines is not supported.")
 
-        sources: dict[str, FileInfo] = {}
-        for _id, path in tl["sources"].items():
-            check_file(path, log)
-            sources[_id] = FileInfo(path, ffmpeg, log)
+    check_attrs(
+        tl,
+        log,
+        "sources",
+        "background",
+        "v",
+        "a",
+        "timebase",
+        "resolution",
+        "samplerate",
+    )
 
-        bg = tl["background"]
-        sr = tl["samplerate"]
-        res = (tl["resolution"][0], tl["resolution"][1])
-        tb = Fraction(tl["timebase"])
+    sources: dict[str, FileInfo] = {}
+    for _id, path in tl["sources"].items():
+        check_file(path, log)
+        sources[_id] = FileInfo(path, ffmpeg, log)
 
-        v: Any = []
-        a: Any = []
+    bg = tl["background"]
+    sr = tl["samplerate"]
+    res = (tl["resolution"][0], tl["resolution"][1])
+    tb = Fraction(tl["timebase"])
 
-        def dict_to_args(d: dict) -> str:
-            attrs = []
-            for k, v in d.items():
-                if k != "name":
-                    attrs.append(f"{k}={v}")
-            return ",".join(attrs)
+    v: Any = []
+    a: Any = []
 
-        for vlayers in tl["v"]:
-            if vlayers:
-                v_out: list[Visual] = []
-                for vdict in vlayers:
-                    if "name" not in vdict:
-                        log.error("Invalid video object: name not specified")
-                    if vdict["name"] not in visual_objects:
-                        log.error(f"Unknown video object: {vdict['name']}")
-                    my_vobj, my_build = visual_objects[vdict["name"]]
+    def dict_to_args(d: dict) -> str:
+        attrs = []
+        for k, v in d.items():
+            if k != "name":
+                attrs.append(f"{k}={v}")
+        return ",".join(attrs)
 
-                    text = dict_to_args(vdict)
-                    try:
-                        my_dict = parse_dataclass(text, my_build, coerce_default=True)
-                        v_out.append(my_vobj(**my_dict))
-                    except ParserError as e:
-                        log.error(e)
+    for vlayers in tl["v"]:
+        if vlayers:
+            v_out: list[Visual] = []
+            for vdict in vlayers:
+                if "name" not in vdict:
+                    log.error("Invalid video object: name not specified")
+                if vdict["name"] not in visual_objects:
+                    log.error(f"Unknown video object: {vdict['name']}")
+                my_vobj, my_build = visual_objects[vdict["name"]]
 
-                v.append(v_out)
+                text = dict_to_args(vdict)
+                try:
+                    my_dict = parse_dataclass(text, my_build, coerce_default=True)
+                    v_out.append(my_vobj(**my_dict))
+                except ParserError as e:
+                    log.error(e)
 
-        for alayers in tl["a"]:
-            if alayers:
-                a_out = []
-                for adict in alayers:
-                    if "name" not in adict:
-                        log.error("Invalid audio object: name not specified")
-                    if adict["name"] not in audio_objects:
-                        log.error(f"Unknown audio object: {adict['name']}")
-                    my_aobj, my_build = audio_objects[adict["name"]]
+            v.append(v_out)
 
-                    text = dict_to_args(adict)
-                    try:
-                        my_dict = parse_dataclass(text, my_build, coerce_default=True)
-                        a_out.append(my_aobj(**my_dict))
-                    except ParserError as e:
-                        log.error(e)
+    for alayers in tl["a"]:
+        if alayers:
+            a_out = []
+            for adict in alayers:
+                if "name" not in adict:
+                    log.error("Invalid audio object: name not specified")
+                if adict["name"] not in audio_objects:
+                    log.error(f"Unknown audio object: {adict['name']}")
+                my_aobj, my_build = audio_objects[adict["name"]]
 
-                a.append(a_out)
+                text = dict_to_args(adict)
+                try:
+                    my_dict = parse_dataclass(text, my_build, coerce_default=True)
+                    a_out.append(my_aobj(**my_dict))
+                except ParserError as e:
+                    log.error(e)
 
-        return v3(sources, tb, sr, res, bg, v, a, None)
+            a.append(a_out)
 
-    log.error(f"Importing version {version} timelines is not supported.")
+    return v3(sources, tb, sr, res, bg, v, a, None)
 
 
-def make_json_timeline(ver: str, out: str | int, tl: object, log: Log) -> None:
-    if (version := Version(ver, log)) != (3, 0):
-        log.error(f"Version {version} is not supported!")
-
-    if not isinstance(tl, v3):
-        raise ValueError("Wrong tl object!")
+def make_json_timeline(ver: str, out: str | int, tl: v3, log: Log) -> None:
+    if ver != "3":
+        log.error(f"Version {ver} is not supported!")
 
     if isinstance(out, str):
         if not out.endswith(".json"):
