@@ -25,7 +25,7 @@ class v1:
     def as_dict(self) -> dict:
         return {
             "version": "1",
-            "source": self.source.path.resolve(),
+            "source": f"{self.source.path.resolve()}",
             "chunks": self.chunks,
         }
 

@@ -16,6 +16,7 @@ from auto_editor.timeline import (
     TlText,
     TlVideo,
     Visual,
+    v1,
     v3,
 )
 from auto_editor.utils.cmdkw import (
@@ -135,18 +136,7 @@ def check_file(path: str, log: Log) -> None:
         log.error(f"Could not locate media file: '{path}'")
 
 
-def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
-    with open(path) as f:
-        try:
-            tl = Parser(Lexer(path, f)).expr()
-        except MyError as e:
-            log.error(e)
-
-    check_attrs(tl, log, "version")
-
-    if tl["version"] != "3":
-        log.error(f"Importing version {tl['version']} timelines is not supported.")
-
+def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
     check_attrs(
         tl,
         log,
@@ -220,8 +210,55 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     return v3(sources, tb, sr, res, bg, v, a, None)
 
 
-def make_json_timeline(ver: str, out: str | int, tl: v3, log: Log) -> None:
-    if ver != "3":
+def read_v1(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
+    from auto_editor.make_layers import clipify, make_av
+
+    check_attrs(tl, log, "source", "chunks")
+
+    chunks = tl["chunks"]
+    path = tl["source"]
+
+    check_file(path, log)
+
+    src = FileInfo(path, ffmpeg, log)
+    sources = {"0": src}
+
+    v, a = make_av([clipify(chunks, "0", 0)], sources, [0])
+
+    return v3(
+        sources,
+        src.get_fps(),
+        src.get_sr(),
+        src.get_res(),
+        "#000",
+        v,
+        a,
+        v1(src, chunks),
+    )
+
+
+def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
+    with open(path) as f:
+        try:
+            tl = Parser(Lexer(path, f)).expr()
+        except MyError as e:
+            log.error(e)
+
+    check_attrs(tl, log, "version")
+
+    ver = tl["version"]
+
+    if ver == "3":
+        return read_v3(tl, ffmpeg, log)
+    if ver == "1":
+        return read_v1(tl, ffmpeg, log)
+    if type(ver) is not str:
+        log.error("version needs to be a string")
+    log.error(f"Importing version {ver} timelines is not supported.")
+
+
+def make_json_timeline(ver: int, out: str | int, tl: v3, log: Log) -> None:
+    if ver not in (3, 1):
         log.error(f"Version {ver} is not supported!")
 
     if isinstance(out, str):
@@ -231,7 +268,12 @@ def make_json_timeline(ver: str, out: str | int, tl: v3, log: Log) -> None:
     else:
         outfile = sys.stdout
 
-    dump(tl.as_dict(), outfile, indent=2)
+    if ver == 3:
+        dump(tl.as_dict(), outfile, indent=2)
+    else:
+        if tl.v1 is None:
+            log.error("Timeline can't be converted to v1 format")
+        dump(tl.v1.as_dict(), outfile, indent=2)
 
     if isinstance(out, str):
         outfile.close()
