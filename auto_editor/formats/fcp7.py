@@ -328,7 +328,7 @@ def media_def(
         aschar = ET.SubElement(audiodef, "samplecharacteristics")
         ET.SubElement(aschar, "depth").text = DEPTH
         ET.SubElement(aschar, "samplerate").text = f"{tl.sr}"
-        ET.SubElement(audiodef, "channelcount").text = "2"
+        ET.SubElement(audiodef, "channelcount").text = f"{src.audios[0].channels}"
 
 
 def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) -> None:
