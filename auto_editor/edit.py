@@ -265,7 +265,7 @@ def edit_media(
     if export["export"] in ("premiere", "resolve"):
         from auto_editor.formats.fcp7 import fcp7_write_xml
 
-        fcp7_write_xml(export["name"], ensure, output, tl, export["export"])
+        fcp7_write_xml(export["name"], ffmpeg, output, tl, export["export"], log)
         return
 
     if export["export"] == "final-cut-pro":
