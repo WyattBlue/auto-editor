@@ -4,7 +4,6 @@ import os.path
 import xml.etree.ElementTree as ET
 from fractions import Fraction
 from math import ceil
-from shutil import move
 from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
@@ -16,7 +15,6 @@ from .utils import Validator, safe_mkdir, show
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from auto_editor.output import Ensure
     from auto_editor.utils.log import Log
 
 """
@@ -331,20 +329,21 @@ def media_def(
         ET.SubElement(audiodef, "channelcount").text = f"{src.audios[0].channels}"
 
 
-def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) -> None:
+def fcp7_write_xml(
+    name: str, ffmpeg: FFmpeg, output: str, tl: v3, flavor: str, log: Log
+) -> None:
     width, height = tl.res
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
-    flat_url: dict[tuple[str, int], str] = {}
-    src_to_id: dict[tuple[str, int], str] = {}
-
-    flat_source: dict[str, FileInfo] = {}
-    file_defs: set[str] = set()
+    key_to_url: dict[tuple[str, int], str] = {}
+    key_to_id: dict[tuple[str, int], str] = {}
+    key_to_source: dict[tuple[str, int], FileInfo] = {}
+    file_defs: set[str] = set()  # Contains urls
 
     for key, src in tl.sources.items():
-        flat_source[key] = src
-        src_to_id[(key, 0)] = f"file-{len(src_to_id)}"
-        flat_url[(key, 0)] = path_resolve(src.path, flavor)
+        key_to_source[(key, 0)] = src
+        key_to_id[(key, 0)] = f"file-{len(key_to_id)+1}"
+        key_to_url[(key, 0)] = path_resolve(src.path, flavor)
 
         if len(src.audios) > 1:
             fold = src.path.parent / f"{src.path.stem}_tracks"
@@ -352,9 +351,14 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
 
             for i in range(1, len(src.audios)):
                 newtrack = fold / f"{i}.wav"
-                move(ensure.audio(f"{src.path.resolve()}", "0", i), newtrack)
-                flat_url[(key, i)] = path_resolve(newtrack, flavor)
-                src_to_id[(key, i)] = f"file-{len(src_to_id)}"
+
+                ffmpeg.run(
+                    ["-i", f"{src.path.resolve()}", "-map", f"0:a:{i}", f"{newtrack}"]
+                )
+
+                key_to_source[(key, i)] = FileInfo(f"{newtrack}", ffmpeg, log, key)
+                key_to_url[(key, i)] = path_resolve(newtrack, flavor)
+                key_to_id[(key, i)] = f"file-{len(key_to_id)+1}"
 
     xmeml = ET.Element("xmeml", version="4")
     sequence = ET.SubElement(xmeml, "sequence")
@@ -397,12 +401,13 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
             ET.SubElement(clipitem, "in").text = _in
             ET.SubElement(clipitem, "out").text = _out
 
-            _id = src_to_id[(clip.src, clip.stream)]
+            _id = key_to_id[(clip.src, clip.stream)]
             filedef = ET.SubElement(clipitem, "file", id=_id)
 
-            pathurl = flat_url[(clip.src, clip.stream)]
+            pathurl = key_to_url[(clip.src, clip.stream)]
+            my_src = key_to_source[(clip.src, clip.stream)]
             if pathurl not in file_defs:
-                media_def(filedef, pathurl, flat_source[clip.src], tl, timebase, ntsc)
+                media_def(filedef, pathurl, my_src, tl, timebase, ntsc)
                 file_defs.add(pathurl)
 
             if clip.speed != 1:
@@ -460,12 +465,13 @@ def fcp7_write_xml(name: str, ensure: Ensure, output: str, tl: v3, flavor: str) 
             ET.SubElement(clipitem, "in").text = _in
             ET.SubElement(clipitem, "out").text = _out
 
-            _id = src_to_id[(aclip.src, aclip.stream)]
+            _id = key_to_id[(aclip.src, aclip.stream)]
             filedef = ET.SubElement(clipitem, "file", id=_id)
 
-            pathurl = flat_url[(aclip.src, aclip.stream)]
+            pathurl = key_to_url[(aclip.src, aclip.stream)]
+            my_src = key_to_source[(aclip.src, aclip.stream)]
             if pathurl not in file_defs:
-                media_def(filedef, pathurl, flat_source[aclip.src], tl, timebase, ntsc)
+                media_def(filedef, pathurl, my_src, tl, timebase, ntsc)
                 file_defs.add(pathurl)
 
             sourcetrack = ET.SubElement(clipitem, "sourcetrack")
