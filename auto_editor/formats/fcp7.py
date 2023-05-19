@@ -307,6 +307,9 @@ def media_def(
     ET.SubElement(rate, "timebase").text = f"{tb}"
     ET.SubElement(rate, "ntsc").text = ntsc
 
+    # DaVinci Resolve needs this tag even though it's blank
+    ET.SubElement(filedef, "duration").text = ""
+
     mediadef = ET.SubElement(filedef, "media")
 
     if len(src.videos) > 0:
