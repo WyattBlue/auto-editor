@@ -121,7 +121,7 @@ class Lexer:
             self.advance()
 
         if self.char is None:
-            self.error(f'Expected a closing `"`')
+            self.error('Expected a closing `"`')
 
         self.advance()
         return result.getvalue()

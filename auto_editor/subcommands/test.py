@@ -610,7 +610,7 @@ def main(sys_args: list[str] | None = None):
 
     def audio_norm_ebu():
         return run.main(
-            ["example.mp4"], ["--audio-normalize", f"ebu:i=-5,lra=20,gain=5,tp=-1"]
+            ["example.mp4"], ["--audio-normalize", "ebu:i=-5,lra=20,gain=5,tp=-1"]
         )
 
     def palet():

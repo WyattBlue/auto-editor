@@ -134,7 +134,7 @@ class Lexer:
             self.advance()
 
         if self.char is None:
-            self.close_err(f'Expected a closing `"`')
+            self.close_err('Expected a closing `"`')
 
         self.advance()
         return result.getvalue()
@@ -214,7 +214,7 @@ class Lexer:
         if result == "hash":
             self.advance()
             if self.char is None or self.char not in "([{":
-                self.error(f"Expected an opening bracket after #hash")
+                self.error("Expected an opening bracket after #hash")
 
             brac_type = self.char
             self.advance()
