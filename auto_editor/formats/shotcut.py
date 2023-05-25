@@ -38,7 +38,7 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
     tb = tl.tb
     src = tl.v1.source
 
-    profile = ET.SubElement(
+    ET.SubElement(
         mlt,
         "profile",
         attrib={
