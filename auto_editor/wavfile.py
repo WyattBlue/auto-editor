@@ -15,6 +15,8 @@ AudioData = Union[np.memmap, np.ndarray]
 Endian = Literal[">", "<"]  # Big Endian, Little Endian
 ByteOrd = Literal["big", "little"]
 
+class WavError(Exception):
+    pass
 
 def _read_fmt_chunk(
     fid: io.BufferedReader, bytes_order: ByteOrd
@@ -22,7 +24,7 @@ def _read_fmt_chunk(
     size = int.from_bytes(fid.read(4), bytes_order)
 
     if size < 16:
-        raise ValueError("Binary structure of wave file is not compliant")
+        raise WavError("Binary structure of wave file is not compliant")
 
     format_tag = int.from_bytes(fid.read(2), bytes_order)
     channels = int.from_bytes(fid.read(2), bytes_order)
@@ -47,10 +49,10 @@ def _read_fmt_chunk(
             if raw_guid.endswith(tail):
                 format_tag = int.from_bytes(raw_guid[:4], bytes_order)
         else:
-            raise ValueError("Binary structure of wave file is not compliant")
+            raise WavError("Binary structure of wave file is not compliant")
 
     if format_tag not in {PCM, IEEE_FLOAT}:
-        raise ValueError(
+        raise WavError(
             f"Encountered unknown format tag: {format_tag:#06x}, while reading fmt chunk."
         )
 
@@ -83,7 +85,7 @@ def _read_data_chunk(
     bytes_per_sample = block_align // channels
 
     if bytes_per_sample in (3, 5, 6, 7):
-        raise ValueError(f"Unsupported bytes per sample: {bytes_per_sample}")
+        raise WavError(f"Unsupported bytes per sample: {bytes_per_sample}")
 
     if format_tag == PCM:
         if 1 <= bit_depth <= 8:
@@ -91,18 +93,18 @@ def _read_data_chunk(
         elif bit_depth <= 64:
             dtype = f"{en}i{bytes_per_sample}"
         else:
-            raise ValueError(
+            raise WavError(
                 f"Unsupported bit depth: the WAV file has {bit_depth}-bit integer data."
             )
     elif format_tag == IEEE_FLOAT:
         if bit_depth in (32, 64):
             dtype = f"{en}f{bytes_per_sample}"
         else:
-            raise ValueError(
+            raise WavError(
                 f"Unsupported bit depth: the WAV file has {bit_depth}-bit floating-point data."
             )
     else:
-        raise ValueError(
+        raise WavError(
             f"Unknown wave file format: {format_tag:#06x}. Supported formats: PCM, IEEE_FLOAT"
         )
 
@@ -121,10 +123,15 @@ def _read_data_chunk(
 
 
 def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
-    if data := fid.read(4):
+    data = fid.read(4)
+    if len(data) == 0:
+        pass
+    elif len(data) == 4:
         size = struct.unpack(f"{en}I", data)[0]
         fid.seek(size, 1)
         _handle_pad_byte(fid, size)
+    else:
+        raise WavError("Chunk has bad size information")
 
 
 def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
@@ -133,7 +140,7 @@ def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
 
     heading = fid.read(12)
     if heading != b"\xff\xff\xff\xffWAVEds64":
-        raise ValueError(f"Invalid heading for rf64 chunk: {heading!r}")
+        raise WavError(f"Invalid heading for rf64 chunk: {heading!r}")
 
     chunk_size = fid.read(4)
 
@@ -163,7 +170,7 @@ def _read_riff_chunk(sig: bytes, fid: io.BufferedReader) -> tuple[None, int, End
 
     form = fid.read(4)
     if form != b"WAVE":
-        raise ValueError(f"Not a WAV file. RIFF form type is {form!r}.")
+        raise WavError(f"Not a WAV file. RIFF form type is {form!r}.")
 
     return None, file_size, en
 
@@ -183,7 +190,7 @@ def read(filename: str) -> tuple[int, AudioData]:
         elif file_sig == b"RF64":
             data_size, file_size, en = _read_rf64_chunk(fid)
         else:
-            raise ValueError(f"File format {file_sig!r} not supported.")
+            raise WavError(f"File format {file_sig!r} not supported.")
 
         fmt_chunk_received = False
         data_chunk_received = False
@@ -193,10 +200,10 @@ def read(filename: str) -> tuple[int, AudioData]:
             if not chunk_id:
                 if data_chunk_received:
                     break  # EOF but data successfully read
-                raise ValueError("Unexpected end of file.")
+                raise WavError("Unexpected end of file.")
 
             elif len(chunk_id) < 4 and not (fmt_chunk_received and data_chunk_received):
-                raise ValueError(f"Incomplete chunk ID: {chunk_id!r}")
+                raise WavError(f"Incomplete chunk ID: {chunk_id!r}")
 
             if chunk_id == b"fmt ":
                 fmt_chunk_received = True
@@ -207,7 +214,7 @@ def read(filename: str) -> tuple[int, AudioData]:
             elif chunk_id == b"data":
                 data_chunk_received = True
                 if not fmt_chunk_received:
-                    raise ValueError("No fmt chunk before data")
+                    raise WavError("No fmt chunk before data")
 
                 data = _read_data_chunk(
                     fid,
@@ -263,13 +270,12 @@ def write(fid: io.BufferedWriter, sr: int, arr: AudioData) -> None:
     header_data += struct.pack("<I", len(fmt_chunk_data))
     header_data += fmt_chunk_data
 
-    # fact chunk (non-PCM files)
     if not (dkind == "i" or dkind == "u"):
         header_data += b"fact"
         header_data += struct.pack("<II", 4, arr.shape[0])
 
     if len(header_data) + arr.nbytes > 0xFFFFFFFF:
-        raise ValueError("Data exceeds wave file size limit")
+        raise WavError("Data exceeds wave file size limit")
 
     fid.write(header_data)
 
