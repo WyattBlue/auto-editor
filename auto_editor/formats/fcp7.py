@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os.path
 import xml.etree.ElementTree as ET
 from fractions import Fraction
 from math import ceil
@@ -34,13 +33,11 @@ DEPTH = "16"
 
 
 def uri_to_path(uri: str) -> str:
-    from urllib.parse import urlparse
-    from urllib.request import url2pathname
-
-    parsed = urlparse(uri)
-    s = os.path.sep
-    host = f"{s}{s}{parsed.netloc}{s}"
-    return os.path.normpath(os.path.join(host, url2pathname(parsed.path)))
+    if uri.startswith("file://localhost/"):
+        return uri[16:]
+    if uri.startswith("file://"):
+        return uri[7:]
+    return uri
 
     # /Users/wyattblue/projects/auto-editor/example.mp4
     # file:///Users/wyattblue/projects/auto-editor/example.mp4
