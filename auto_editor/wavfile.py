@@ -124,14 +124,14 @@ def _read_data_chunk(
 
 def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
     data = fid.read(4)
-    if len(data) == 0:
-        pass
-    elif len(data) == 4:
+    if len(data) == 4:
         size = struct.unpack(f"{en}I", data)[0]
         fid.seek(size, 1)
         _handle_pad_byte(fid, size)
+    elif len(data) == 0:
+        pass  # It's okay, we've hit EOF
     else:
-        raise WavError("Chunk has bad size information")
+        raise WavError(f"Unknown chunk size has wrong length, expected 4, got {len(data)}")
 
 
 def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
@@ -237,24 +237,12 @@ def read(filename: str) -> tuple[int, AudioData]:
 def write(fid: io.BufferedWriter, sr: int, arr: AudioData) -> None:
     # Write RIFF WAV Header
     fid.write(b"RIFF\x00\x00\x00\x00WAVE")
-
-    # Write RF64 WAV Header
-    # fid.write(b"RF64\xff\xff\xff\xffWAVEds64")
-
-    # #  - chunk_size
-    # fid.write(b'\x1c\x00\x00\x00')  # Value based on bit-depth + '# of samples'
-
-    # # - bw_size, Declaring Little Endian
-    # fid.write(b'j@|\x00')
-    # fid.write(b'\x00\x00\x00\x00')
-
-    # Write 'fmt' Header
-    dkind = arr.dtype.kind
-
     header_data = b"fmt "
 
+    dkind = arr.dtype.kind
     format_tag = IEEE_FLOAT if dkind == "f" else PCM
     channels = 1 if arr.ndim == 1 else arr.shape[1]
+
     bit_depth = arr.dtype.itemsize * 8
     bit_rate = sr * (bit_depth // 8) * channels
     block_align = channels * (bit_depth // 8)
@@ -263,16 +251,8 @@ def write(fid: io.BufferedWriter, sr: int, arr: AudioData) -> None:
         "<HHIIHH", format_tag, channels, sr, bit_rate, block_align, bit_depth
     )
 
-    if not (dkind == "i" or dkind == "u"):
-        # add cbSize field for non-PCM files
-        fmt_chunk_data += b"\x00\x00"
-
     header_data += struct.pack("<I", len(fmt_chunk_data))
     header_data += fmt_chunk_data
-
-    if not (dkind == "i" or dkind == "u"):
-        header_data += b"fact"
-        header_data += struct.pack("<II", 4, arr.shape[0])
 
     if len(header_data) + arr.nbytes > 0xFFFFFFFF:
         raise WavError("Data exceeds wave file size limit")
