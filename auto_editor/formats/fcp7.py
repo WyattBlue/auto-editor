@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from fractions import Fraction
+from io import StringIO
 from math import ceil
 from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
@@ -33,10 +34,51 @@ DEPTH = "16"
 
 
 def uri_to_path(uri: str) -> str:
+    def de_norm(s: str) -> str:
+        uri_escape = {
+            "3C": "<",
+            "3E": ">",
+            "23": "#",
+            "25": "%",
+            "2B": "+",
+            "7B": "{",
+            "7D": "}",
+            "7C": "|",
+            "5C": "\\",
+            "5E": "^",
+            "7E": "~",
+            "5B": "[",
+            "5D": "]",
+            "60": "`",
+            "3F": "?",
+            "3A": ":",
+            "40": "@",
+            "3D": "=",
+            "2A": "*",
+            "29": ")",
+            "28": "(",
+            "27": "'",
+            "26": "&",
+            "24": "$",
+            "22": '"',
+            "21": "!",
+        }
+        buf = StringIO()
+        for i, char in enumerate(s):
+            if char == "%" and len(s) > i + 3:
+                tag = s[i + 1 : i + 3]
+                if tag in uri_escape:
+                    buf.write(uri_escape[tag])
+                else:
+                    buf.write(char)
+            else:
+                buf.write(char)
+        return buf.getvalue()
+
     if uri.startswith("file://localhost/"):
-        return uri[16:]
+        return de_norm(uri[16:])
     if uri.startswith("file://"):
-        return uri[7:]
+        return de_norm(uri[7:])
     return uri
 
     # /Users/wyattblue/projects/auto-editor/example.mp4
