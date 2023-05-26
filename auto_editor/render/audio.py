@@ -17,7 +17,7 @@ from auto_editor.utils.bar import Bar
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
-from auto_editor.wavfile import AudioData, WavError, read, write
+from auto_editor.wavfile import AudioData, read, write
 
 # only newer versions of ffmpeg support lra to 50.
 # Ubuntu Latest and my static ffmpeg build for Windows are the main blockers
@@ -182,10 +182,10 @@ def make_new_audio(
     if not tl.a or not tl.a[0]:
         log.error("Trying to render empty audio timeline")
 
-    for l, layer in enumerate(tl.a):
+    for i, layer in enumerate(tl.a):
         bar.start(len(layer), "Creating new audio")
 
-        path = Path(temp, f"new{l}.wav")
+        path = Path(temp, f"new{i}.wav")
         output.append(f"{path}")
         arr: AudioData | None = None
 
@@ -255,10 +255,7 @@ def make_new_audio(
                     write(fid, sr, samp_list[samp_start:samp_end])
 
                 ffmpeg.run(["-i", f"{af}", "-af", ",".join(filters), f"{af_out}"])
-                try:
-                    clip_arr = read(f"{af_out}")[1]
-                except WavError as e:
-                    raise e
+                clip_arr = read(f"{af_out}")[1]
 
             # Mix numpy arrays
             start = clip.start * sr // tb

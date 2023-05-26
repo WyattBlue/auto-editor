@@ -754,7 +754,9 @@ class Syntax:
     def __call__(self, env: Env, node: list) -> Any:
         return self.syn(env, node)
 
-    __str__: Callable[[Syntax], str] = lambda self: "#<syntax>"
+    def __str__(self) -> str:
+        return "#<syntax>"
+
     __repr__ = __str__
 
 
