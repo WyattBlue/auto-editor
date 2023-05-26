@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from fractions import Fraction
 from io import StringIO
-from typing import Callable
 
 import numpy as np
 
@@ -14,7 +13,9 @@ class Sym:
         self.val = val
         self.hash = hash(val)
 
-    __str__: Callable[[Sym], str] = lambda self: self.val
+    def __str__(self) -> str:
+        return self.val
+
     __repr__ = __str__
 
     def __hash__(self) -> int:
@@ -34,7 +35,8 @@ class Char:
             assert type(val) is str and len(val) == 1
             self.val = val
 
-    __str__: Callable[[Char], str] = lambda self: self.val
+    def __str__(self) -> str:
+        return self.val
 
     def __repr__(self) -> str:
         names = {" ": "space", "\n": "newline", "\t": "tab"}
