@@ -15,8 +15,10 @@ AudioData = Union[np.memmap, np.ndarray]
 Endian = Literal[">", "<"]  # Big Endian, Little Endian
 ByteOrd = Literal["big", "little"]
 
+
 class WavError(Exception):
     pass
+
 
 def _read_fmt_chunk(
     fid: io.BufferedReader, bytes_order: ByteOrd
@@ -107,7 +109,6 @@ def _read_data_chunk(
         raise WavError(
             f"Unknown wave file format: {format_tag:#06x}. Supported formats: PCM, IEEE_FLOAT"
         )
-
     if size % 2 == 0:
         n_samples = size // block_align
     else:
@@ -124,14 +125,19 @@ def _read_data_chunk(
 
 def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
     data = fid.read(4)
+
     if len(data) == 4:
         size = struct.unpack(f"{en}I", data)[0]
+        if size == 0:
+            raise WavError("Unknown chunk size is 0")
         fid.seek(size, 1)
         _handle_pad_byte(fid, size)
     elif len(data) == 0:
         pass  # It's okay, we've hit EOF
     else:
-        raise WavError(f"Unknown chunk size has wrong length, expected 4, got {len(data)}")
+        raise WavError(
+            f"Unknown chunk size has wrong length, expected 4, got {len(data)}"
+        )
 
 
 def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
@@ -183,55 +189,53 @@ def _handle_pad_byte(fid: io.BufferedReader, size: int) -> None:
 def read(filename: str) -> tuple[int, AudioData]:
     fid = open(filename, "rb")
 
-    try:
-        file_sig = fid.read(4)
-        if file_sig in (b"RIFF", b"RIFX"):
-            data_size, file_size, en = _read_riff_chunk(file_sig, fid)
-        elif file_sig == b"RF64":
-            data_size, file_size, en = _read_rf64_chunk(fid)
+    file_sig = fid.read(4)
+    if file_sig in (b"RIFF", b"RIFX"):
+        data_size, file_size, en = _read_riff_chunk(file_sig, fid)
+    elif file_sig == b"RF64":
+        data_size, file_size, en = _read_rf64_chunk(fid)
+    else:
+        raise WavError(f"File format {file_sig!r} not supported.")
+
+    bytes_order: ByteOrd = "big" if en == ">" else "little"
+    fmt_chunk_received = False
+
+    while fid.tell() < file_size:
+        chunk_id = fid.read(4)
+
+        if not chunk_id:
+            raise WavError("Unexpected end of file.")
+        if len(chunk_id) < 4:
+            raise WavError(f"Incomplete chunk ID: {chunk_id!r}")
+
+        if chunk_id == b"fmt ":
+            fmt_chunk_received = True
+            format_tag, channels, sr, block_align, bit_depth = _read_fmt_chunk(
+                fid, bytes_order
+            )
+        elif chunk_id == b"data":
+            if not fmt_chunk_received:
+                raise WavError("No fmt chunk before data")
+
+            data = _read_data_chunk(
+                fid,
+                format_tag,
+                channels,
+                bit_depth,
+                en,
+                block_align,
+                data_size,
+            )
+
+            fid.seek(0)
+            return sr, data
+
+        elif chunk_id == b"\x00\x00\x00\x00":
+            raise WavError("Invalid chunk ID")
         else:
-            raise WavError(f"File format {file_sig!r} not supported.")
+            _skip_unknown_chunk(fid, en)
 
-        fmt_chunk_received = False
-        data_chunk_received = False
-        while fid.tell() < file_size:
-            chunk_id = fid.read(4)
-
-            if not chunk_id:
-                if data_chunk_received:
-                    break  # EOF but data successfully read
-                raise WavError("Unexpected end of file.")
-
-            elif len(chunk_id) < 4 and not (fmt_chunk_received and data_chunk_received):
-                raise WavError(f"Incomplete chunk ID: {chunk_id!r}")
-
-            if chunk_id == b"fmt ":
-                fmt_chunk_received = True
-                bytes_order: ByteOrd = "big" if en == ">" else "little"
-                format_tag, channels, sr, block_align, bit_depth = _read_fmt_chunk(
-                    fid, bytes_order
-                )
-            elif chunk_id == b"data":
-                data_chunk_received = True
-                if not fmt_chunk_received:
-                    raise WavError("No fmt chunk before data")
-
-                data = _read_data_chunk(
-                    fid,
-                    format_tag,
-                    channels,
-                    bit_depth,
-                    en,
-                    block_align,
-                    data_size,
-                )
-            else:
-                _skip_unknown_chunk(fid, en)
-
-    finally:
-        fid.seek(0)
-
-    return sr, data
+    raise WavError("Found no data")
 
 
 def write(fid: io.BufferedWriter, sr: int, arr: AudioData) -> None:
