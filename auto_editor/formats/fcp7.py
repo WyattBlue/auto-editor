@@ -62,27 +62,35 @@ def uri_to_path(uri: str) -> str:
             "24": "$",
             "22": '"',
             "21": "!",
+            "20": " ",
         }
         buf = StringIO()
-        for i, char in enumerate(s):
-            if char == "%" and len(s) > i + 3:
+        i = 0
+        while i < len(s):
+            if s[i] == "%" and len(s) > i + 3:
                 tag = s[i + 1 : i + 3]
                 if tag in uri_escape:
                     buf.write(uri_escape[tag])
+                    i += 3
                 else:
-                    buf.write(char)
+                    buf.write(s[i])
+                    i += 1
             else:
-                buf.write(char)
+                buf.write(s[i])
+                i += 1
         return buf.getvalue()
 
     if uri.startswith("file://localhost/"):
         return de_norm(uri[16:])
     if uri.startswith("file://"):
+        if uri[9] == ":":  # Handle Windows-style paths
+            return de_norm(uri[8:])
         return de_norm(uri[7:])
     return uri
 
     # /Users/wyattblue/projects/auto-editor/example.mp4
     # file:///Users/wyattblue/projects/auto-editor/example.mp4
+    # file:///C:/Users/WyattBlue/projects/auto-editor/example.mp4
     # file://localhost/Users/wyattblue/projects/auto-editor/example.mp4
 
 
