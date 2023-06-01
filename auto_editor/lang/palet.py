@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from auto_editor.analyze import edit_method, mut_remove_small
+from auto_editor.analyze import edit_method, mut_remove_large, mut_remove_small
 from auto_editor.lib.contracts import *
 from auto_editor.lib.data_structs import *
 from auto_editor.lib.err import MyError
@@ -603,6 +603,18 @@ def minclip(oarr: BoolList, _min: int) -> BoolList:
 def mincut(oarr: BoolList, _min: int) -> BoolList:
     arr = np.copy(oarr)
     mut_remove_small(arr, _min, replace=0, with_=1)
+    return arr
+
+
+def maxclip(oarr: BoolList, _min: int) -> BoolList:
+    arr = np.copy(oarr)
+    mut_remove_large(arr, _min, replace=1, with_=0)
+    return arr
+
+
+def maxcut(oarr: BoolList, _min: int) -> BoolList:
+    arr = np.copy(oarr)
+    mut_remove_large(arr, _min, replace=0, with_=1)
     return arr
 
 
@@ -1216,6 +1228,8 @@ env: Env = {
     "margin": Proc("margin", margin, (2, 3), None),
     "mincut": Proc("mincut", mincut, (2, 2), [is_boolarr, is_uint]),
     "minclip": Proc("minclip", minclip, (2, 2), [is_boolarr, is_uint]),
+    "maxcut": Proc("maxcut", maxcut, (2, 2), [is_boolarr, is_uint]),
+    "maxclip": Proc("maxclip", maxclip, (2, 2), [is_boolarr, is_uint]),
     # ranges
     "range": Proc("range", range, (1, 3), [is_int, is_int, int_not_zero]),
     # generic iterables

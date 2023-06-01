@@ -111,12 +111,30 @@ def mut_remove_small(
             if not active:
                 start_p = j
                 active = True
-            # Special case for end.
-            if j == len(arr) - 1:
-                if j - start_p < lim:
-                    arr[start_p : j + 1] = with_
+
+            if j == len(arr) - 1 and j - start_p < lim:
+                arr[start_p:] = with_
         elif active:
             if j - start_p < lim:
+                arr[start_p:j] = with_
+            active = False
+
+
+def mut_remove_large(
+    arr: NDArray[np.bool_], lim: int, replace: int, with_: int
+) -> None:
+    start_p = 0
+    active = False
+    for j, item in enumerate(arr):
+        if item == replace:
+            if not active:
+                start_p = j
+                active = True
+
+            if j == len(arr) - 1 and j - start_p >= lim:
+                arr[start_p:] = with_
+        elif active:
+            if j - start_p > lim:
                 arr[start_p:j] = with_
             active = False
 

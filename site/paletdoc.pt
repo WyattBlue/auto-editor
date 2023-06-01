@@ -564,16 +564,24 @@
             "mincut"
             #(#("arr" "bool-array?") #("x" "uint?") "bool-array?")
             (text
-                "Turn all 0s sections that are less than " 'x " in length to 1s. "
-                "0s represent cuts and 1s represent clips."
+                "Turn all 0 runs that are less than " 'x " in length to 1s. "
+                "0s represent cuts, 1s represent clips."
             )
         )
         (proc
             "minclip"
             #(#("arr" "bool-array?") #("x" "uint?") "bool-array?")
-            (text
-                "Turn all 1s sections that are less than " 'x " in length to 0s "
-            )
+            (text "Turn all 1 runs that are less than " 'x " in length to 0s")
+        )
+        (proc
+            "maxcut"
+            #(#("arr" "bool-array?") #("x" "uint?") "bool-array?")
+            (text "Turn all 0 runs that are greater than " 'x " in length to 1s")
+        )
+        (proc
+            "maxclip"
+            #(#("arr" "bool-array?") #("x" "uint?") "bool-array?")
+            (text "Turn all 1 runs that are more than " 'x " in length to 0s")
         )
         (value "all" "'all" (text
             "The symbol 'all. Exists for backwards compatibility for older auto-editor versions"
