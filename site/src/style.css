@@ -204,8 +204,8 @@ h1 {
   margin-bottom: 1.5rem;
   line-height: 1.125;
   word-break: break-word;
+  text-align: center;
 }
-h1, h2 {text-align: center}
 h1, th, .bold {font-weight: bold}
 h2 {font-weight: 600}
 h3 {font-weight: 500}
