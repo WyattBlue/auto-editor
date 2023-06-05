@@ -340,7 +340,7 @@ def edit_media(
 
     if export["export"] == "clip-sequence":
         if tl.v1 is None:
-            log.error("Timeline to complex to use clip-sequence export")
+            log.error("Timeline too complex to use clip-sequence export")
 
         sources = {"0": tl.v1.source}
 

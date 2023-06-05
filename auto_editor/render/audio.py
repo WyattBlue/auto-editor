@@ -26,8 +26,8 @@ norm_types = {
     "ebu": pAttrs(
         "ebu",
         pAttr("i", -24.0, andc(is_int_or_float, between_c(-70, 5))),
-        pAttr("lra", 7.0, andc(is_int_or_float, between_c(1, 20))),
-        pAttr("tp", -2.0, andc(is_int_or_float, between_c(-9, 99))),
+        pAttr("lra", 7.0, andc(is_int_or_float, between_c(1, 50))),
+        pAttr("tp", -2.0, andc(is_int_or_float, between_c(-9, 0))),
         pAttr("gain", 0.0, andc(is_int_or_float, between_c(-99, 99))),
     ),
     "peak": pAttrs(
