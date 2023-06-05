@@ -205,17 +205,17 @@ Apply audio normalization after cutting.
 Normalization Methods:
  - ebu  ; EBU R128 (double pass) loudness normalization
    ; Integrated loudness target
-   - i (and/c (or/c int? float?) (>=/c -70) (<=/c -5)) : -24.0
+   - i (and/c (or/c int? float?) (between/c -70 -5)) : -24.0
    ; Loudness range target
-   - lra (and/c (or/c int? float?) (>=/c 1) (<=/c 20)) : 7.0
+   - lra (and/c (or/c int? float?) (between/c 1 20)) : 7.0
    ; Set maximum true peak
-   - tp (and/c (or/c int? float?) (>=/c -9) (<=/c 0)) : -2.0
+   - tp (and/c (or/c int? float?) (between/c 9 0)) : -2.0
    ; Set offset gain. Gain is applied before the true-peak limiter
-   - gain (and/c (or/c int? float?) (>=/c -99) (<=/c 99)) : 0.0
+   - gain (and/c (or/c int? float?) (between/c -99 99)) : 0.0
 
  - peak
   ; Loudness target
-  - t (and/c (or/c int? float?) (>=/c -99) (<=/c 0)) : -8.0
+  - t (and/c (or/c int? float?) (between/c -99 0)) : -8.0
 
 If `#f` is chosen, no audio-normalization will be applied.
 

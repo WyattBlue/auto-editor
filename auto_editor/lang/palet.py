@@ -1168,6 +1168,7 @@ env: Env = {
     ">/c": Proc(">/c", gt_c, (1, 1), [is_real]),
     "<=/c": Proc("<=/c", lte_c, (1, 1), [is_real]),
     "</c": Proc("</c", lt_c, (1, 1), [is_real]),
+    "between/c": Proc("between/c", between_c, (2, 2), [is_real, is_real]),
     # numbers
     "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
     "-": Proc("-", minus, (1, None), [is_num]),
