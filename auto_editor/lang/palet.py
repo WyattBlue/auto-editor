@@ -507,16 +507,30 @@ def minus(*vals: Number) -> Number:
     return reduce(lambda a, b: a - b, vals)
 
 
-def div(*vals: Any) -> Number:
-    if len(vals) == 1:
-        vals = (1, vals[0])
+def num_div(z: Number, *w: Number) -> Number:
+    if len(w) == 0:
+        w = (z,)
+        z = 1
 
-    if not {float, complex}.intersection({type(val) for val in vals}):
-        result = reduce(Fraction, vals)
-        if result.denominator == 1:
-            return result.numerator
-        return result
-    return reduce(lambda a, b: a / b, vals)
+    for num in w:
+        if num == 0:
+            raise MyError("/: division by zero")
+
+        if type(num) is int:
+            num = Fraction(num)
+
+        z /= num
+
+    if type(z) is Fraction and z.denominator == 1:
+        return z.numerator
+    return z
+
+
+def int_div(n: int, *m: int) -> int:
+    if 0 in m:
+        raise MyError("div: division by zero")
+
+    return reduce(lambda a, b: a // b, m, n)
 
 
 def _sqrt(v: Number) -> Number:
@@ -1173,7 +1187,8 @@ env: Env = {
     "+": Proc("+", lambda *v: sum(v), (0, None), [is_num]),
     "-": Proc("-", minus, (1, None), [is_num]),
     "*": Proc("*", mul, (0, None), [is_num]),
-    "/": Proc("/", div, (1, None), [is_num]),
+    "/": Proc("/", num_div, (1, None), [is_num]),
+    "div": Proc("div", int_div, (2, None), [is_int]),
     "add1": Proc("add1", lambda z: z + 1, (1, 1), [is_num]),
     "sub1": Proc("sub1", lambda z: z - 1, (1, 1), [is_num]),
     "sqrt": Proc("sqrt", _sqrt, (1, 1), [is_num]),
