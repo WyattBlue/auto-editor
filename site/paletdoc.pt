@@ -785,6 +785,14 @@
             #(#("n" "real?") "contract?")
             (text "Like " (link '>=/c) " but for " (link '<) ".")
         )
+        (proc
+            "between/c"
+            #(#("n" "real?") #("m" "real?") "contract?")
+            (text
+                "Returns a contract that requires the input a real number between " 'n
+                " and " 'm " or equal to one of them."
+            )
+        )
     ]
     "Objects" #[
         (pred
