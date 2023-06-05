@@ -89,9 +89,9 @@ def display_str(val: object) -> str:
         if not val:
             return "#()"
         result = StringIO()
-        result.write(f"#({display_str(val[0])}")
+        result.write(f"#({print_str(val[0])}")
         for item in val[1:]:
-            result.write(f" {display_str(item)}")
+            result.write(f" {print_str(item)}")
         result.write(")")
         return result.getvalue()
     if isinstance(val, dict):
