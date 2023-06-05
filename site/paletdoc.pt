@@ -184,9 +184,14 @@
             "/"
             #(#("z" "number?") #("w" "number?") "..." "number?")
             (text
-                "When no " 'w "s are applied return " (code "(/ 1 z)")
-                ". Otherwise return the division of " 'w "s of " 'z "."
+                "Returns the division of " 'z " by the " 'w
+                "s. If no " 'w "s are given, returns " (code "(/ 1 z)") "."
             )
+        )
+        (proc
+            "div"
+            #(#("n" "int?") #("m" "int?") "..." "int?")
+            (text "Returns the integer division of " 'n " by the " 'm "s.")
         )
         (proc
             "mod"
