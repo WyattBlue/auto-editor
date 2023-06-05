@@ -1090,11 +1090,12 @@ def my_eval(env: Env, node: object) -> Any:
             """
             if is_iterable(oper):
                 values = [my_eval(env, c) for c in node[1:]]
-                if values:
-                    if len(values) > 1:
-                        raise MyError(f"{print_str(node[0])}: ref expects 1 argument")
-                    else:
-                        return ref(oper, *values)
+                if len(values) > 3:
+                    raise MyError(f"{print_str(node[0])}: slice expects 1 argument")
+                if len(values) in (2, 3):
+                    return p_slice(oper, *values)
+                if len(values) == 1:
+                    return ref(oper, *values)
 
             raise MyError(f"{print_str(oper)}, expected procedure")
 
