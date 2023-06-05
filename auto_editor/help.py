@@ -207,9 +207,9 @@ Normalization Methods:
    ; Integrated loudness target
    - i (and/c (or/c int? float?) (between/c -70 -5)) : -24.0
    ; Loudness range target
-   - lra (and/c (or/c int? float?) (between/c 1 20)) : 7.0
+   - lra (and/c (or/c int? float?) (between/c 1 50)) : 7.0
    ; Set maximum true peak
-   - tp (and/c (or/c int? float?) (between/c 9 0)) : -2.0
+   - tp (and/c (or/c int? float?) (between/c -9 0)) : -2.0
    ; Set offset gain. Gain is applied before the true-peak limiter
    - gain (and/c (or/c int? float?) (between/c -99 99)) : 0.0
 
