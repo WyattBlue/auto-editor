@@ -486,6 +486,10 @@
             )
         )
         (proc
+            "array-copy" #(#("arr" "array?") "array?")
+            (text "Returns a new copy of " 'arr ".")
+        )
+        (proc
             "array-splice!"
             #(
                 #("arr" "array?")
@@ -683,6 +687,11 @@
             "begin"
             #(#("datum" "any") "..." "any")
             (text "Evaluates all arguments and returns the last one.")
+        )
+        (proc
+            "assert"
+            #(#("expr" "any") #("msg" "(or/c string? #f)" "#f") "void?")
+            (text "Raises error if " 'expr " is not " #t ".")
         )
         (proc
             "display"

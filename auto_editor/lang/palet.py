@@ -276,7 +276,7 @@ class Lexer:
                             break
 
                     if not success and self.char is None:
-                        self.close_err("end of file in `#|` comment")
+                        self.close_err("no closing `|#` for `#|` comment")
                     continue
 
                 elif self.char == "!" and self.peek() == "/":
@@ -284,7 +284,7 @@ class Lexer:
                     self.advance()
                     while self.char is not None and self.char != "\n":
                         self.advance()
-                    if self.char is None:
+                    if self.char is None or self.char == "\n":
                         continue
                 else:
                     return self.hash_literal()
@@ -685,7 +685,11 @@ def apply(proc: Proc, seq: str | list | range) -> Any:
 
 def ref(seq: Any, ref: int) -> Any:
     try:
-        return Char(seq[ref]) if type(seq) is str else seq[ref]
+        if type(seq) is str:
+            return Char(seq[ref])
+        if isinstance(seq, np.ndarray) and seq.dtype == np.bool_:
+            return int(seq[ref])
+        return seq[ref]
     except KeyError:
         raise MyError(f"ref: Invalid key: {print_str(ref)}")
     except IndexError:
@@ -717,6 +721,11 @@ def palet_hash(*args: Any) -> dict:
     for key, item in zip(args[0::2], args[1::2]):
         result[key] = item
     return result
+
+
+def palet_assert(expr: object, msg: str | bool = False) -> None:
+    if expr is not True:
+        raise MyError("AssertError" if msg is False else f"AssertError: {msg}")
 
 
 ###############################################################################
@@ -909,10 +918,16 @@ def syn_set(env: Env, node: list) -> None:
 def syn_for(env: Env, node: list) -> None:
     var, my_iter = check_for_syntax(env, node)
 
-    for item in my_iter:
-        env[var.val] = item
-        for c in node[2:]:
-            my_eval(env, c)
+    if isinstance(my_iter, np.ndarray) and my_iter.dtype == np.bool_:
+        for item in my_iter:
+            env[var.val] = int(item)
+            for c in node[2:]:
+                my_eval(env, c)
+    else:
+        for item in my_iter:
+            env[var.val] = item
+            for c in node[2:]:
+                my_eval(env, c)
 
     return None
 
@@ -937,7 +952,7 @@ def syn_if(env: Env, node: list) -> Any:
 
 
 def syn_when(env: Env, node: list) -> Any:
-    if len(node) != 3:
+    if len(node) < 3:
         raise MyError(f"{node[0]}: bad syntax")
     test_expr = my_eval(env, node[1])
 
@@ -946,7 +961,11 @@ def syn_when(env: Env, node: list) -> Any:
             f"{node[0]} test-expr: expected bool?, got {print_str(test_expr)}"
         )
 
-    return my_eval(env, node[2]) if test_expr else None
+    if test_expr:
+        for item in node[2:-1]:
+            my_eval(env, item)
+        return my_eval(env, node[-1])
+    return None
 
 
 def syn_and(env: Env, node: list) -> Any:
@@ -1237,6 +1256,7 @@ env: Env = {
     "array-splice!": Proc(
         "array-splice!", splice, (2, 4), [is_array, is_real, is_int, is_int]
     ),
+    "array-copy": Proc("array-copy", np.copy, (1, 1), [is_array]),
     "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), [is_array]),
     # bool arrays
     "bool-array": Proc(
@@ -1264,6 +1284,7 @@ env: Env = {
     "hash": Proc("hash", palet_hash),
     "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
     # actions
+    "assert": Proc("assert", palet_assert, (1, 2), [any_p, orc(is_str, False)]),
     "display": Proc("display", lambda v: print(display_str(v), end=""), (1, 1)),
     "displayln": Proc("displayln", lambda v: print(display_str(v)), (1, 1)),
     "print": Proc("print", lambda v: print(print_str(v), end=""), (1, 1)),
@@ -1283,6 +1304,6 @@ env: Env = {
 
 def interpret(env: Env, parser: Parser) -> list:
     result = []
-    while parser.current_token.type not in (EOF, RPAREN, RBRAC, RCUR):
+    while parser.current_token.type != EOF:
         result.append(my_eval(env, parser.expr()))
     return result
