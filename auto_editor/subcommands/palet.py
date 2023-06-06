@@ -14,7 +14,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         try:
             interpret(env, Parser(Lexer(sys_args[0], program_text)))
         except (MyError, ZeroDivisionError) as e:
-            print(f"error: {e}", file=sys.stderr)
+            sys.stderr.write(f"error: {e}\n")
+            sys.exit(1)
 
     else:
         from .repl import main
