@@ -1,0 +1,46 @@
+#!/usr/bin/env auto-editor palet
+
+(define (mut-remove-large arr lim replace with)
+   (define start-p 0)
+   (define active #f)
+   (define j 0)
+   (for ([item arr])
+        (if (equal? item replace)
+            (begin
+                (when (not active)
+                    (set! start-p j)
+                    (set! active #t)
+                )
+                (when (and (equal? j (sub1 (len arr))) (>= (- j start-p) lim))
+                    (array-splice! arr with start-p)
+                )
+            )
+            (when active
+                (when (> (- j start-p) lim)
+                    (array-splice! arr with start-p j)
+                )
+                (set! active #f)
+            )
+        )
+        (set! j (add1 j))
+    )
+)
+
+
+(define (maxclip oarr min)
+    (define arr (array-copy oarr))
+    (mut-remove-large arr min 1 0)
+    arr
+)
+(define (maxcut oarr min)
+    (define arr (array-copy oarr))
+    (mut-remove-large arr min 0 1)
+    arr
+)
+
+(define my-arr (bool-array 1 0 1 0 0 1 0 0 0 1 0 0 0 0 1 0 0 0 0 0 1 1 1))
+
+(assert (equal?
+    (maxcut my-arr 3)
+    (bool-array 1 0 1 0 0 1 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1)
+))

@@ -613,7 +613,7 @@ def main(sys_args: list[str] | None = None):
             ["example.mp4"], ["--audio-normalize", "ebu:i=-5,lra=20,gain=5,tp=-1"]
         )
 
-    def palet():
+    def palet_python_bridge():
         def cases(*cases: tuple[str, Any]) -> None:
             for text, expected in cases:
                 try:
@@ -770,10 +770,14 @@ def main(sys_args: list[str] | None = None):
             ('#(#("sym" "symbol?") "bool?")', [["sym", "symbol?"], "bool?"]),
         )
 
+    def palet_scripts():
+        run.raw(["palet", "resources/scripts/maxcut.pt"])
+
+
     tests = []
 
     if args.category in ("palet", "all"):
-        tests.append(palet)
+        tests.extend([palet_python_bridge, palet_scripts])
 
     if args.category in ("sub", "all"):
         tests.extend([info, levels, subdump, desc])
