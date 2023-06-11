@@ -773,7 +773,6 @@ def main(sys_args: list[str] | None = None):
     def palet_scripts():
         run.raw(["palet", "resources/scripts/maxcut.pt"])
 
-
     tests = []
 
     if args.category in ("palet", "all"):
