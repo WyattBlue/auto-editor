@@ -60,7 +60,10 @@ hr {
   align-items: stretch;
 }
 
-.navbar-start {justify-content: flex-start}
+.navbar-start {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
 .navbar-item img {max-height: 1.75rem}
 
 img {
