@@ -2,7 +2,7 @@
 title: desc
 ---
 
-`desc` displays video's description. If there's none, `No description.` will be displayed.
+`desc` displays the video's description. If there is none, `No description.` will be displayed.
 You may call `desc` with `aedesc`
 
 Examples:
