@@ -2,7 +2,7 @@
 title: repl
 ---
 
-`repl` allows you to access auto-editor's shell. See the [palet reference](https://auto-editor.com/ref) for compressive documentation.
+`repl` allows you to access auto-editor's shell. See the [palet reference](https://auto-editor.com/ref) for comprehensive documentation.
 
 ```
 auto-editor repl example.mp4
