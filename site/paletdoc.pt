@@ -735,7 +735,7 @@
             (text
                 "Returns " #t " if " 'v " is a contract, " #f " otherwise. "
                 "A contract is either a " (link 'bool?) ", " (link 'number?)  ", "
-                (link 'string?) ", " (link 'symbol?) ", or a predicate."
+                (link 'string?) ", " (link 'symbol?) " literal, or a predicate."
             )
         )
         (pred "any" (text "Always returns " #t " regardless of the value of " 'v "."))
@@ -828,6 +828,22 @@
             (text
                 "Returns " 'body " as its \"literalized\" form, "
                 "a constant value with its binding names copied."
+            )
+        )
+        (proc
+            "var-exists?"
+            #(#("sym" "symbol?") "bool?")
+            (text "Returns " #t " if the variable corresponding to " 'sym
+            " is defined in the current environment, " #f " otherwise.")
+        )
+        (syntax
+            "delete" "identifier"
+            (text "Deletes identifier from the environment.")
+        )
+        (syntax
+            "rename" "original new"
+            (text
+                "Move the original identifier to the new identifier. Works for both procedures and syntaxes."
             )
         )
     ]
