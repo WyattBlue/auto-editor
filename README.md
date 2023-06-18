@@ -154,5 +154,5 @@ auto-editor --scale --help
 ## Copyright
 Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all directories besides the ones listed below. Auto-Editor was created by [these people.](https://auto-editor.com/blog/thank-you-early-testers)
 
-ae-ffmpeg is under the [LGPLv3 License](https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/ffmpeg/LICENSE.txt). The ffmpeg and ffprobe programs were created by the FFmpeg team.
+ae-ffmpeg is under the [LGPLv3 License](https://github.com/WyattBlue/auto-editor/blob/master/ae-ffmpeg/LICENSE.txt). The ffmpeg and ffprobe programs were created by the FFmpeg team.
 
