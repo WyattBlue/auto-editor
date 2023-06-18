@@ -59,7 +59,7 @@ auto-editor example.mp4 --cut-out start,10
 auto-editor example.mp4 --cut-out -10sec,end
 
 <i># Cut out the first 10 seconds and cut out the range from 15 seconds to 20 seconds.</i>
-auto-editor example.mp4 --cut_out start,10sec 15sec,20sec</code></pre>
+auto-editor example.mp4 --cut-out start,10sec 15sec,20sec</code></pre>
 
 <p>And of course, all the audio cuts still apply.</p>
 <p>If you don't want <strong>any automatic cuts</strong>, use <code>--edit none</code></p>
@@ -74,14 +74,10 @@ auto-editor example.mp4 --edit all --add-in start,5sec</code></pre>
 <pre><code>auto-editor --help</code></pre>
 <p>Use <code>--help</code> with a specific option for more information:</p>
 <pre><code>auto-editor --scale --help
---scale
+  --scale NUM
 
-  type: number
-  default: 1.0
-  ------------
-
-  Scale the input video's resolution by the given factor.</code></pre>
-
+    default: 1.0
+    Scale the output video's resolution by NUM factor</code></pre>
 <h3>Articles</h3>
 <ul>
   <li><a href="/installing.html">How to Install Auto-Editor</a></li>
@@ -100,9 +96,8 @@ auto-editor example.mp4 --edit all --add-in start,5sec</code></pre>
 
 
 <h3>Copyright</h3>
-<p>Auto-Editor is under the <a href="https://github.com/WyattBlue/auto-editor/blob/master/LICENSE">Public Domain</a> and includes all files besides the ones listed below. Auto-Editor was created by <a href="https://github.com/WyattBlue/auto-editor/blob/master/AUTHORS.md">these people</a>.</p>
-
-<p>The binaries under auto_editor/ffmpeg are subject to the <a href="https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/ffmpeg/LICENSE.txt">LGPLv3 License</a>. The FFmpeg and FFprobe programs were created by the FFmpeg team and purposely compiled by WyattBlue for use in auto-editor.</p>
+<p>Auto-Editor is under the <a href="https://github.com/WyattBlue/auto-editor/blob/master/LICENSE">Public Domain</a> and includes all files besides the ones listed below. Auto-Editor was created by <a href="./blog/thank-you-early-testers.html">these people</a>.
+<p>ae-ffmpeg is under the <a href="https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/ae-ffmpeg/LICENSE.txt">LGPLv3 License</a>. The ffmpeg and ffprobe programs were created by the FFmpeg team.</p>
 </div>
 </section>
 </body>

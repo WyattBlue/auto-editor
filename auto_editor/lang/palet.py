@@ -1016,6 +1016,36 @@ def syn_or(env: Env, node: list) -> Any:
     raise MyError(f"{node[0]} expects (or/c bool? bool-array?)")
 
 
+def syn_delete(env: Env, node: list) -> None:
+    if len(node) != 2:
+        raise MyError(f"{node[0]}: Arity mismatch: Expected 1. got {len(node) - 1}")
+
+    first = node[1]
+    if type(first) is not Sym:
+        raise MyError(f"{node[0]}: First argument: Expected identifier")
+
+    del env[first.val]
+
+
+def syn_rename(env: Env, node: list) -> None:
+    if len(node) != 3:
+        raise MyError(f"{node[0]}: Arity mismatch: Expected 2. got {len(node) - 1}")
+
+    first = node[1]
+    if type(first) is not Sym:
+        raise MyError(f"{node[0]}: First argument: Expected identifier")
+
+    sec = node[2]
+    if type(sec) is not Sym:
+        raise MyError(f"{node[0]}: Second argument: Expected identifier")
+
+    if first.val not in env:
+        raise MyError(f"{node[0]}: Original identifier does not exist")
+
+    env[sec.val] = env[first.val]
+    del env[first.val]
+
+
 class PaletObject:
     __slots__ = "attributes"
 
@@ -1299,6 +1329,10 @@ env: Env = {
     "object?": is_obj,
     "attrs": Proc("attrs", lambda v: list(get_attrs(v).keys()), (1, 1), [is_obj]),
     "@r": Syntax(attr),
+    # reflexion
+    "var-exists?": Proc("var-exists?", lambda sym: sym.val in env, (1, 1), [is_symbol]),
+    "rename": Syntax(syn_rename),
+    "delete": Syntax(syn_delete),
 }
 
 
