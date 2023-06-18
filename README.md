@@ -99,11 +99,11 @@ Other editors, like Sony Vegas, can understand the `premiere` format. If your fa
 Use the `--cut-out` option to always remove a section.
 
 ```
-# Cut out the first 10 seconds.
-auto-editor example.mp4 --cut-out start,10sec
+# Cut out the first 30 seconds.
+auto-editor example.mp4 --cut-out start,30sec
 
-# Cut out the first 10 frames.
-auto-editor example.mp4 --cut-out start,10
+# Cut out the first 30 frames.
+auto-editor example.mp4 --cut-out start,30
 
 # Cut out the last 10 seconds.
 auto-editor example.mp4 --cut-out -10sec,end
@@ -112,16 +112,16 @@ auto-editor example.mp4 --cut-out -10sec,end
 auto-editor example.mp4 --cut-out start,10sec 15sec,20sec
 ```
 
-And of course, all the audio cuts still apply.
+And of course, you can use any `--edit` configuration.
 
-If you don't want **any automatic cuts**, use `--edit none`
+If you don't want **any automatic cuts**, you can use `--edit none` or `--edit all/e`
 
 ```
 # Cut out the first 5 seconds, leave the rest untouched.
 auto-editor example.mp4 --edit none --cut-out start,5sec
 
 # Leave in the first 5 seconds, cut everything else out.
-auto-editor example.mp4 --edit all --add-in start,5sec
+auto-editor example.mp4 --edit all/e --add-in start,5sec
 ```
 
 <h2 align="center">More Options</h2>
@@ -136,16 +136,13 @@ Use `--help` with a specific option for more information:
 
 ```
 auto-editor --scale --help
---scale
+  --scale NUM
 
-  type: number
-  default: 1.0
-  ------------
-
-  Scale the input video's resolution by the given factor.
+    default: 1.0
+    Scale the output video's resolution by NUM factor
 ```
 
-<h3 align="center">Auto-Editor is available on all platforms</h3>
+<h3 align="center">Auto-Editor is available on all major platforms</h3>
 <p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/site/src/img/cross-platform.webp" width="500" title="Windows, MacOS, and Linux"></p>
 
 ## Articles
@@ -155,7 +152,7 @@ auto-editor --scale --help
  - [Blog](https://auto-editor.com/blog)
 
 ## Copyright
-Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all directories besides the ones listed below. Auto-Editor was created by [these people.](https://github.com/WyattBlue/auto-editor/blob/master/AUTHORS.md)
+Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all directories besides the ones listed below. Auto-Editor was created by [these people.](https://auto-editor.com/blog/thank-you-early-testers)
 
-ae-ffmpeg is under the [LGPLv3 License](https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/ffmpeg/LICENSE.txt). The FFmpeg and FFprobe programs were created by the FFmpeg team and purposely compiled by WyattBlue for use in auto-editor.
+ae-ffmpeg is under the [LGPLv3 License](https://github.com/WyattBlue/auto-editor/blob/master/auto_editor/ffmpeg/LICENSE.txt). The ffmpeg and ffprobe programs were created by the FFmpeg team.
 
