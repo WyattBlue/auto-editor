@@ -16,7 +16,6 @@ from auto_editor.vanparse import ArgumentParser
 @dataclass
 class InfoArgs:
     json: bool = False
-    include_vfr: bool = False
     ffmpeg_location: str | None = None
     my_ffmpeg: bool = False
     help: bool = False
@@ -26,12 +25,6 @@ class InfoArgs:
 def info_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_required("input", nargs="*")
     parser.add_argument("--json", flag=True, help="Export info in JSON format")
-    parser.add_argument(
-        "--include-vfr",
-        "--has-vfr",
-        flag=True,
-        help="Display the number of Variable Frame Rate (VFR) frames",
-    )
     parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
     parser.add_argument(
         "--my-ffmpeg",
@@ -75,7 +68,6 @@ class SubtitleJson(TypedDict):
 class ContainerJson(TypedDict):
     duration: str
     bitrate: str | None
-    fps_mode: str | None
 
 
 class MediaJson(TypedDict, total=False):
@@ -131,7 +123,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             "container": {
                 "duration": src.duration,
                 "bitrate": src.bitrate,
-                "fps_mode": None,
             },
         }
 
@@ -170,25 +161,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         for track, s_stream in enumerate(src.subtitles):
             sub: SubtitleJson = {"codec": s_stream.codec, "lang": s_stream.lang}
             file_info[file]["subtitle"].append(sub)
-
-        if args.include_vfr:
-            fps_mode = ffmpeg.pipe(
-                [
-                    "-i",
-                    file,
-                    "-hide_banner",
-                    "-vf",
-                    "vfrdet",
-                    "-an",
-                    "-f",
-                    "null",
-                    "-",
-                ]
-            ).strip()
-            if "VFR:" in fps_mode:
-                fps_mode = (fps_mode[fps_mode.index("VFR:") :]).strip()
-
-            file_info[file]["container"]["fps_mode"] = fps_mode
 
     if args.json:
         dump(file_info, sys.stdout, indent=4)
