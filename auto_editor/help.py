@@ -199,6 +199,66 @@ Here is a list of examples on how margin mutates boolean arrays
 (margin -2 2 (bool-array 0 0 1 1 0 0 0))
 > (array 'bool 0 0 0 0 1 1 0)
 """.strip(),
+        "--add": """
+ - video
+   - start        uint?
+   - dur          uint?
+   - src          str?
+   - offset       int?        : 0
+   - speed        real?       : 1
+   - stream       uint?       : 0
+
+ - audio
+   - start        uint?
+   - dur          uint?
+   - src          str?
+   - offset       int?        : 0
+   - speed        real?       : 1
+   - volume       real?       : 1
+   - stream       uint?       : 0
+
+ - text
+   - start        uint?
+   - dur          uint?
+   - content      str?
+   - x            real?       : 0.5
+   - y            real?       : 0.5
+   - font         str?        : "Arial"
+   - size         uint?       : 55
+   - align        str?        : "left"
+   - opacity      threshold?  : 1.0
+   - anchor       str?        : "ce"
+   - rotate       real?       : 0
+   - fill         str?        : "#FFF"
+   - stroke       uint?       : 0
+   - strokecolor  str?        : "#000"
+
+ - image
+   - start        uint?
+   - dur          uint?
+   - src          str?
+   - x            real?       : 0.5
+   - y            real?       : 0.5
+   - opacity      threshold?  : 1.0
+   - anchor       str?        : "ce"
+   - rotate       real?       : 0
+   - stroke       uint?       : 0
+   - strokecolor  str?        : "#000"
+
+ - rectangle && ellipse
+   - start        uint?
+   - dur          uint?
+   - x            real?
+   - y            real?
+   - width        real?
+   - height       real?
+   - opacity      threshold?  : 1.0
+   - anchor       str?        : "ce"
+   - rotate       real?       : 0
+   - fill         str?        : "#FFF"
+   - stroke       uint?       : 0
+   - strokecolor  str?        : "#000"
+""".strip(),
         "--audio-normalize": """
 Apply audio normalization after cutting.
 
@@ -229,18 +289,7 @@ Examples:
         "--silent-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
         "--video-speed": "99999 is the 'cut speed' and values over that or <=0 are considered 'cut speeds' as well",
     },
-    "info": {
-        "_": "Retrieve information and properties about media files",
-        "--include-vfr": """
-A typical output will look like this:
-
-- VFR:0.583394 (3204/2288) min: 41 max: 42 avg: 41
-
-'0.583394' is the ratio of how many VFR frames are there.
-'3204' is the number of VFR frames, '2288' is the number of non-VFR frames.
- Adding '3204' and '2288' will result in how many frames the video has in total.
-""".strip(),
-    },
+    "info": {"_": "Retrieve information and properties about media files"},
     "levels": {"_": "Display loudness over time"},
     "subdump": {
         "_": "Dump text-based subtitles to stdout with formatting stripped out"

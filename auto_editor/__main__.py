@@ -128,7 +128,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--add",
         nargs="*",
         metavar="OBJ:START,DUR,ATTRS?",
-        help="Insert an timeline object to the timeline",
+        help="Insert an audio/video object to the timeline",
     )
     parser.add_argument(
         "--source",
