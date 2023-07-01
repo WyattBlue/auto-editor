@@ -39,7 +39,7 @@ setup(
     zip_safe=True,
     install_requires=[
         "numpy>=1.22.0",
-        "pillow==9.5.0",
+        "pillow==10.0.0",
         "av==10.0.0",
         "ae-ffmpeg==1.1.*",
     ],
