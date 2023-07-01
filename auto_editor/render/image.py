@@ -87,10 +87,15 @@ def render_image(
 
     if isinstance(obj, TlText):
         obj_img = Image.new("RGBA", img.size)
-        _draw = ImageDraw.Draw(obj_img)
-        text_w, text_h = _draw.textsize(
-            obj.content, font=font_cache[(obj.font, obj.size)], stroke_width=obj.stroke
+        draw = ImageDraw.Draw(obj_img)
+        bound_box = draw.textbbox(
+            (0, 0),
+            obj.content,
+            font=font_cache[(obj.font, obj.size)],
+            stroke_width=obj.stroke,
         )
+        text_w = bound_box[2] - bound_box[0]
+        text_h = (bound_box[3] - bound_box[1]) * 2
         obj_img = Image.new("RGBA", (text_w, text_h), (255, 255, 255, 0))
 
     draw = ImageDraw.Draw(obj_img)
