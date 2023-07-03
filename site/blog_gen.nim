@@ -4,46 +4,46 @@ import std/strformat
 
 type
   PragmaKind = enum
-    blog_type,
-    explainer_type,
+    blogType,
+    explainerType,
 
   TokenKind = enum
-    tk_bar,
-    tk_keyval,
-    tk_text,
-    tk_h1,
-    tk_h2,
-    tk_h3,
-    tk_newline,
-    tk_tick,
-    tk_list,
-    tk_ul,
-    tk_block,
-    tk_link,
-    tk_eof,
+    tkBar,
+    keyval,
+    tkText,
+    tkH1,
+    tkH2,
+    tkH3,
+    tkNewline,
+    tkTick,
+    tkList,
+    tkUl,
+    tkBlock,
+    tkLink,
+    tkEOF,
+
   Token = ref object
     kind: TokenKind
     value: string
 
-
-type
   State = enum
-    just_start,
-    in_head,
-    normal_state,
-    block_state,
-    link_state,
+    startState,
+    headState,
+    normalState,
+    blockState,
+    linkState,
+
   Lexer = ref object
     name: string
     text: string
-    current_char: char
+    currentChar: char
     state: State
     pos: int
     line: int
     col: int
 
-proc Lexer_init(name: string, text: string): Lexer =
-  return Lexer(name: name, text: text, current_char: text[0], state: just_start, pos: 0, line: 1, col: 1)
+func initLexer(name: string, text: string): Lexer =
+  return Lexer(name: name, text: text, currentChar: text[0], state: startState, pos: 0, line: 1, col: 1)
 
 proc error(self: Lexer, msg: string) =
   write(stderr, &"{self.name}:{self.line}:{self.col} {msg}")
@@ -52,224 +52,224 @@ proc error(self: Lexer, msg: string) =
 proc advance(self: Lexer) = 
   self.pos += 1
   if self.pos > len(self.text) - 1:
-    self.current_char = '\0'
+    self.currentChar = '\0'
   else:
-    if self.current_char == '\n':
+    if self.currentChar == '\n':
       self.line += 1
       self.col = 1
     else:
       self.col += 1
 
-    self.current_char = self.text[self.pos]
+    self.currentChar = self.text[self.pos]
 
-proc peek(self: Lexer): char = 
-  let peak_pos = self.pos + 1
-  if peak_pos > len(self.text) - 1:
+func peek(self: Lexer): char =
+  let peakPos = self.pos + 1
+  if peakPos > len(self.text) - 1:
     return '\0'
   else:
-    return self.text[peak_pos]
+    return self.text[peakPos]
 
-proc long_peek(self: Lexer, pos: int): char =
-  let peak_pos = self.pos + pos
-  if peak_pos > len(self.text) - 1:
+func longPeek(self: Lexer, pos: int): char =
+  let peakPos = self.pos + pos
+  if peakPos > len(self.text) - 1:
     return '\0'
   else:
-    return self.text[peak_pos]
+    return self.text[peakPos]
 
-proc make_token(kind: TokenKind, value: string): Token =
+func initToken(kind: TokenKind, value: string): Token =
   return Token(kind: kind, value: value)
 
-proc get_next_token(self: Lexer): Token = 
+proc getNextToken(self: Lexer): Token =
   var rod = ""
   var levels = 0
-  while self.current_char != '\0':
-    if self.state == link_state:
+  while self.currentChar != '\0':
+    if self.state == linkState:
       rod = ""
-      while self.current_char != ')':
-        rod &= self.current_char
-        advance(self)
-      advance(self)
-      self.state = normal_state
-      return make_token(tk_text, rod)  # return link ref
-    if self.current_char == '\n':
-      advance(self)
-      return make_token(tk_newline, "")
+      while self.currentChar != ')':
+        rod &= self.currentChar
+        self.advance()
+      self.advance()
+      self.state = normalState
+      return initToken(tkText, rod)  # return link ref
+    if self.currentChar == '\n':
+      self.advance()
+      return initToken(tkNewline, "")
 
-    if self.state == normal_state and self.current_char == '[':  # Handle links
-      advance(self)
+    if self.state == normalState and self.currentChar == '[':  # Handle links
+      self.advance()
       rod = ""
-      while self.current_char != ']':
-        rod &= self.current_char
-        advance(self)
-      advance(self)
-      if self.current_char != '(':
-        error(self, "link expected ref")
-      advance(self)
-      self.state = link_state
-      return make_token(tk_link, rod)
+      while self.currentChar != ']':
+        rod &= self.currentChar
+        self.advance()
+      self.advance()
+      if self.currentChar != '(':
+        self.error("link expected ref")
+      self.advance()
+      self.state = linkState
+      return initToken(tkLink, rod)
 
-    if self.state == normal_state and self.current_char == '`':  # Handle code ticks
-      while self.current_char == '`':
+    if self.state == normalState and self.currentChar == '`':  # Handle code ticks
+      while self.currentChar == '`':
         levels += 1
-        advance(self)
+        self.advance()
 
       if levels == 1:
         rod = ""
-        while self.current_char != '`':
-          rod &= self.current_char
-          advance(self)
-        advance(self)
+        while self.currentChar != '`':
+          rod &= self.currentChar
+          self.advance()
+        self.advance()
 
         if rod.strip() == "":
-          error(self, "Tick can't be blank")
+          self.error("Tick can't be blank")
 
-        return make_token(tk_tick, rod)
+        return initToken(tkTick, rod)
       elif levels == 3:
-        self.state = block_state
-        while not (self.current_char in @['\n', '\0']):
-          advance(self)
-        return make_token(tk_block, "")
+        self.state = blockState
+        while not (self.currentChar in @['\n', '\0']):
+          self.advance()
+        return initToken(tkBlock, "")
       elif levels != 0:
-        error(self, &"Wrong number of `s, ({levels})")
+        self.error(&"Wrong number of `s, ({levels})")
 
-    if self.state == block_state and self.current_char == '`':
+    if self.state == blockState and self.currentChar == '`':
       levels = 0
-      while long_peek(self, levels) == '`':
+      while longPeek(self, levels) == '`':
         levels += 1
         if levels == 5:
           break
 
       if levels == 3:
-        advance(self)
-        advance(self)
-        advance(self)
-        self.state = normal_state
-        return make_token(tk_block, "")
+        self.advance()
+        self.advance()
+        self.advance()
+        self.state = normalState
+        return initToken(tkBlock, "")
       else:
         while levels > 0:
           levels -= 1
           rod &= '`'
-          advance(self)
+          self.advance()
 
-    rod &= self.current_char
+    rod &= self.currentChar
 
-    if self.state == in_head and self.current_char == ':':
-      advance(self)  # then go to ` ` 
-      while self.current_char == ' ':
-        advance(self)
+    if self.state == headState and self.currentChar == ':':
+      self.advance()  # then go to ` `
+      while self.currentChar == ' ':
+        self.advance()
 
       rod = ""
-      while self.current_char != '\n':
-        if self.current_char == '\0':
-          error(self, "Got EOF on key-value pair")
+      while self.currentChar != '\n':
+        if self.currentChar == '\0':
+          self.error("Got EOF on key-value pair")
 
-        if self.current_char != '\n':
-          rod &= self.current_char
+        if self.currentChar != '\n':
+          rod &= self.currentChar
 
-        advance(self)
+        self.advance()
 
-      advance(self)
-      return make_token(tk_keyval, rod)
+      self.advance()
+      return initToken(keyval, rod)
 
-    if self.state in @[just_start, in_head, normal_state] and rod == "---":
-      advance(self)
-      advance(self)
-      if self.state == just_start:
-        self.state = in_head
-      elif self.state == in_head:
-        self.state = normal_state
-      return make_token(tk_bar, "")
+    if self.state in @[startState, headState, normalState] and rod == "---":
+      self.advance()
+      self.advance()
+      if self.state == startState:
+        self.state = headState
+      elif self.state == headState:
+        self.state = normalState
+      return initToken(tkBar, "")
 
-    var break_token = false
-    if peek(self) == '\n':
-      break_token = true
-    elif self.state == normal_state and peek(self) == '`':
-      break_token = true
-    elif self.state == normal_state and peek(self) == '[':
-      break_token = true
-    elif self.state == block_state and peek(self) == '#':
-      break_token = true
-    elif self.state == in_head and peek(self) == ':':
-      break_token = true
+    var breakToken = false
+    if self.peek() == '\n':
+      breakToken = true
+    elif self.state == normalState and self.peek() == '`':
+      breakToken = true
+    elif self.state == normalState and self.peek() == '[':
+      breakToken = true
+    elif self.state == blockState and self.peek() == '#':
+      breakToken = true
+    elif self.state == headState and self.peek() == ':':
+      breakToken = true
 
-    if break_token:
-      advance(self)
+    if breakToken:
+      self.advance()
       if rod.strip() == "":
         continue
       else:
-        return make_token(tk_text, rod)
+        return initToken(tkText, rod)
 
-    if self.state == block_state and self.current_char == '#' and self.peek() == ' ':
-      advance(self)
-      return make_token(tk_h1, "")  # Italicize comments
+    if self.state == blockState and self.currentChar == '#' and self.peek() == ' ':
+      self.advance()
+      return initToken(tkH1, "")  # Italicize comments
 
-    if self.state == normal_state:
-      if self.col == 1 and self.current_char == ' ' and peek(self) == '*':
-        advance(self)
-        advance(self)
-        advance(self)
-        return make_token(tk_list, "")
+    if self.state == normalState:
+      if self.col == 1 and self.currentChar == ' ' and self.peek() == '*':
+        self.advance()
+        self.advance()
+        self.advance()
+        return initToken(tkList, "")
 
       levels = 0
-      if self.current_char == '#' and self.col == 1:
-        while self.current_char == '#':
+      if self.currentChar == '#' and self.col == 1:
+        while self.currentChar == '#':
           levels += 1
-          advance(self)
+          self.advance()
 
-        if self.current_char != ' ':
-          error(self, "Expected space after header")
-        advance(self)
+        if self.currentChar != ' ':
+          self.error("Expected space after header")
+        self.advance()
 
         if levels == 3:
-          return make_token(tk_h3, "")
+          return initToken(tkH3, "")
         elif levels == 2:
-          return make_token(tk_h2, "")
+          return initToken(tkH2, "")
         elif levels == 1:
-          return make_token(tk_h1, "")
+          return initToken(tkH1, "")
         elif levels != 0:
-          error(self, "Too many #s")
+          self.error("Too many #s")
 
-    advance(self)
+    self.advance()
 
-  return make_token(tk_eof, "")
+  return initToken(tkEOF, "")
 
 
-
-proc sanitize(v: string): string =
+func sanitize(v: string): string =
   return v.replace("<", "&lt;").replace(">", "&gt;")
 
 
 proc convert(pragma: PragmaKind, file: string, path: string) =
   let text = readFile(file)
-  var lexer = Lexer_init(file, text)
+  var
+    lexer = initLexer(file, text)
+    author = ""
+    date = ""
 
-  if get_next_token(lexer).kind != tk_bar:
+  if getNextToken(lexer).kind != tkBar:
     error(lexer, "Expected --- at start")
 
   proc parse_keyval(key: string): string = 
-    var token = get_next_token(lexer)
-    if token.kind != tk_text:
+    var token = getNextToken(lexer)
+    if token.kind != tkText:
       error(lexer, "head: expected text")
     if token.value != key:
       error(lexer, &"Expected {key}, got {token.value}")
-    token = get_next_token(lexer)
-    if token.kind != tk_keyval:
+    token = getNextToken(lexer)
+    if token.kind != keyval:
       error(lexer, "head: expected keyval")
     return token.value
       
   let title = parse_keyval("title")
 
-  var author = ""
-  var date = ""
-  if pragma == blog_type:
+  if pragma == blogType:
     author = parse_keyval("author")
     date = parse_keyval("date")
 
-  if get_next_token(lexer).kind != tk_bar:
+  if getNextToken(lexer).kind != tkBar:
     error(lexer, "head: expected end ---")
 
   var output = ""
-  if pragma == blog_type:
+  if pragma == blogType:
     output = &"""{{{{ comp.header "{title}" }}}}
 <body>
 {{{{ comp.nav }}}}
@@ -290,104 +290,104 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
   let f = open(path, fmWrite)
   f.write(output)
 
-  let blocks: seq[TokenKind] = @[tk_text, tk_h1, tk_h2, tk_h3, tk_list, tk_ul]
+  let blocks: seq[TokenKind] = @[tkText, tkH1, tkH2, tkH3, tkList, tkUl]
 
-  proc to_tag(t: TokenKind): string = 
-    if t == tk_text:
+  proc toTag(t: TokenKind): string =
+    if t == tkText:
       result = "p"
-    elif t == tk_h1:
+    elif t == tkH1:
       result = "h1"
-    elif t == tk_h2:
+    elif t == tkH2:
       result = "h2"
-    elif t == tk_h3:
+    elif t == tkH3:
       result = "h3"
-    elif t == tk_tick:
+    elif t == tkTick:
       result = "code"
-    elif t == tk_list:
+    elif t == tkList:
       result = "li"
-    elif t == tk_ul:
+    elif t == tkUl:
       result = "ul"
     else:
-      error(lexer, "to_tag got bad value")
+      error(lexer, "toTag got bad value")
 
-  var obj = get_next_token(lexer)
+  var obj = getNextToken(lexer)
   var ends: seq[TokenKind] = @[]
 
-  proc write_end() = 
+  proc writeEnd() =
     if len(ends) > 0:
       if ends[^1] in blocks:
-        if ends[^1] == tk_ul:
-          f.write(&"    </{to_tag(ends[^1])}>\n")
+        if ends[^1] == tkUl:
+          f.write(&"    </{toTag(ends[^1])}>\n")
         else:
-          f.write(&"</{to_tag(ends[^1])}>\n")
+          f.write(&"</{toTag(ends[^1])}>\n")
       else:
-        f.write(&"</{to_tag(ends[^1])}>")
+        f.write(&"</{toTag(ends[^1])}>")
       discard ends.pop()
 
-  while obj.kind != tk_eof:
-    if obj.kind in @[tk_h1, tk_h2, tk_h3]:
+  while obj.kind != tkEOF:
+    if obj.kind in @[tkH1, tkH2, tkH3]:
       ends.add(obj.kind)
-      f.write(&"    <{to_tag(ends[^1])}>")
-    elif obj.kind == tk_tick:
+      f.write(&"    <{toTag(ends[^1])}>")
+    elif obj.kind == tkTick:
       if len(ends) == 0:
         f.write("    <p>")
-        ends.add(tk_text)
+        ends.add(tkText)
 
       f.write(&"<code>{sanitize(obj.value)}</code>")
-    elif obj.kind == tk_text:
+    elif obj.kind == tkText:
       if len(ends) > 0:
         f.write(sanitize(obj.value))
       else:
         f.write(&"    <p>{sanitize(obj.value)}")
         ends.add(obj.kind)
-    elif obj.kind == tk_list:
+    elif obj.kind == tkList:
       if len(ends) == 0:
         f.write("    <ul>\n")
-        ends.add(tk_ul)
+        ends.add(tkUl)
 
       f.write("        <li>")
-      ends.add(tk_list)
+      ends.add(tkList)
 
-    elif obj.kind == tk_block:
+    elif obj.kind == tkBlock:
       f.write("    <pre><code>")
-      obj = get_next_token(lexer)
+      obj = getNextToken(lexer)
       var has_text = false
-      while obj.kind != tk_eof and obj.kind != tk_block:
+      while obj.kind != tkEOF and obj.kind != tkBlock:
         if len(ends) > 0:
           error(lexer, "code block must not be indented")
-        if obj.kind == tk_h1:
-          obj = get_next_token(lexer)
+        if obj.kind == tkH1:
+          obj = getNextToken(lexer)
           f.write(&"<i># {sanitize(obj.value).strip()}</i>")
           has_text = true
-        elif obj.kind == tk_text:
+        elif obj.kind == tkText:
           f.write(sanitize(obj.value))
           has_text = true
-        elif obj.kind == tk_newline and has_text:
+        elif obj.kind == tkNewline and has_text:
           f.write("\n")
-        obj = get_next_token(lexer)
+        obj = getNextToken(lexer)
 
       f.write("</pre></code>\n")
-    elif obj.kind == tk_link:
+    elif obj.kind == tkLink:
       var link_text = sanitize(obj.value)
-      obj = get_next_token(lexer)
+      obj = getNextToken(lexer)
       f.write(&"<a href=\"{obj.value}\">{link_text}</a>")
-    elif obj.kind == tk_bar:
+    elif obj.kind == tkBar:
       f.write("    <hr>\n")
-    elif obj.kind == tk_newline:
-      write_end()
+    elif obj.kind == tkNewline:
+      writeEnd()
     else:
       error(lexer, &"unexpected obj.kind: {obj.kind}")
 
-    obj = get_next_token(lexer)
+    obj = getNextToken(lexer)
 
   while len(ends) > 0:
-    write_end()
+    writeEnd()
 
   f.write("</div>\n</section>\n</body>\n</html>\n")
   f.close()
 
 for file in walkFiles("src/blog/*.md"):
-  convert(blog_type, file, file.changeFileExt("html"))
+  convert(blogType, file, file.changeFileExt("html"))
 
 for file in walkFiles("src/docs/subcommands/*.md"):
-  convert(explainer_type, file, file.changeFileExt("html"))
+  convert(explainerType, file, file.changeFileExt("html"))
