@@ -5,6 +5,12 @@
     <description>News for Auto-Editor</description>
     <language>en-us</language>
     <item>
+      <title>Nim vs Zig</title>
+      <link>https://auto-editor.com/blog/nim-vs-zig</link>
+      <pubDate>Fri, 13 Jul 2023 18:00:00 EDT</pubDate>
+      <description>https://auto-editor.com/blog/nim-vs-zig</description>
+    </item>
+    <item>
       <title>Why Nim Is My Favorite Compiled Language</title>
       <link>https://auto-editor.com/blog/why-nim-is-my-favorite-compiled-language</link>
       <pubDate>Sat, 3 Jun 2023 00:05:00 EDT</pubDate>
