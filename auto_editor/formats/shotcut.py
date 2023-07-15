@@ -85,18 +85,17 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
             continue
 
         speed = clip[2]
-        _out = to_timecode(clip[1] / speed / tb, "standard")
-        length = to_timecode((clip[1] / speed + 1) / tb, "standard")
+        length = to_timecode(clip[1] / speed / tb, "standard")
 
         if speed == 1:
             resource = f"{src.path}"
             caption = f"{src.path.stem}"
             chain = ET.SubElement(
-                mlt, "chain", attrib={"id": f"chain{chains}", "out": f"{_out}"}
+                mlt, "chain", attrib={"id": f"chain{chains}", "out": length}
             )
         else:
             chain = ET.SubElement(
-                mlt, "producer", attrib={"id": f"producer{producers}", "out": f"{_out}"}
+                mlt, "producer", attrib={"id": f"producer{producers}", "out": length}
             )
 
             resource = f"{speed}:{src.path}"
@@ -127,16 +126,8 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
             continue
 
         speed = clip[2]
-
-        if speed == 1:
-            in_len: float = clip[0] - 1
-        else:
-            in_len = max(clip[0] / speed, 0)
-
-        out_len = max((clip[1] - 2) / speed, 0)
-
-        _in = to_timecode(in_len / tb, "standard")
-        _out = to_timecode(out_len / tb, "standard")
+        _in = to_timecode(clip[0] / speed / tb, "standard")
+        _out = to_timecode(clip[1] / speed / tb, "standard")
 
         tag_name = f"chain{i}"
         if speed != 1:
