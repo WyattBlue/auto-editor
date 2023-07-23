@@ -31,12 +31,9 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
         },
     )
 
-    assert tl.v1 is not None
-
     width, height = tl.res
     num, den = aspect_ratio(width, height)
     tb = tl.tb
-    src = tl.v1.source
 
     ET.SubElement(
         mlt,
@@ -80,14 +77,19 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
     chains = 0
     producers = 0
 
-    for clip in tl.v1.chunks:
-        if clip[2] == 99999:
-            continue
+    if tl.v:
+        clips = tl.v[0]
+    elif tl.a:
+        clips = tl.a[0]
+    else:
+        clips = []
 
-        speed = clip[2]
-        length = to_timecode(clip[1] / speed / tb, "standard")
 
-        if speed == 1:
+    for clip in clips:
+        src = tl.sources[clip.src]
+        length = to_timecode((clip.offset / clip.speed + clip.dur) / tb, "standard")
+
+        if clip.speed == 1:
             resource = f"{src.path}"
             caption = f"{src.path.stem}"
             chain = ET.SubElement(
@@ -97,17 +99,16 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
             chain = ET.SubElement(
                 mlt, "producer", attrib={"id": f"producer{producers}", "out": length}
             )
-
-            resource = f"{speed}:{src.path}"
-            caption = f"{src.path.stem} ({speed}x)"
+            resource = f"{clip.speed}:{src.path}"
+            caption = f"{src.path.stem} ({clip.speed}x)"
 
             producers += 1
 
         ET.SubElement(chain, "property", name="length").text = length
         ET.SubElement(chain, "property", name="resource").text = resource
 
-        if speed != 1:
-            ET.SubElement(chain, "property", name="warp_speed").text = str(speed)
+        if clip.speed != 1:
+            ET.SubElement(chain, "property", name="warp_speed").text = f"{clip.speed}"
             ET.SubElement(chain, "property", name="warp_pitch").text = "1"
             ET.SubElement(chain, "property", name="mlt_service").text = "timewarp"
 
@@ -120,17 +121,12 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
     ET.SubElement(main_playlist, "property", name="shotcut:name").text = "V1"
 
     producers = 0
-    i = 0
-    for clip in tl.v1.chunks:
-        if clip[2] == 99999:
-            continue
-
-        speed = clip[2]
-        _in = to_timecode(clip[0] / speed / tb, "standard")
-        _out = to_timecode(clip[1] / speed / tb, "standard")
+    for i, clip in enumerate(clips):
+        _in = to_timecode(clip.offset / clip.speed / tb, "standard")
+        _out = to_timecode((clip.offset / clip.speed + clip.dur) / tb, "standard")
 
         tag_name = f"chain{i}"
-        if speed != 1:
+        if clip.speed != 1:
             tag_name = f"producer{producers}"
             producers += 1
 
@@ -139,8 +135,6 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
             "entry",
             attrib={"producer": tag_name, "in": _in, "out": _out},
         )
-
-        i += 1
 
     tractor = ET.SubElement(
         mlt,
