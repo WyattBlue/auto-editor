@@ -111,7 +111,7 @@ class SubtitleParser:
         self.contents = new_content
 
     def write(self, file_path: str) -> None:
-        with open(file_path, "w") as file:
+        with open(file_path, "w", encoding="utf-8") as file:
             file.write(self.header)
             for c in self.contents:
                 file.write(
@@ -135,12 +135,12 @@ def make_new_subtitles(tl: v3, ffmpeg: FFmpeg, temp: str, log: Log) -> list[str]
         parser = SubtitleParser(tl.tb)
 
         if sub.codec in parser.supported_codecs:
-            with open(file_path) as file:
+            with open(file_path, encoding="utf-8") as file:
                 parser.parse(file.read(), sub.codec)
         else:
             convert_path = os.path.join(temp, f"{s}s_convert.vtt")
             ffmpeg.run(["-i", file_path, convert_path])
-            with open(convert_path) as file:
+            with open(convert_path, encoding="utf-8") as file:
                 parser.parse(file.read(), "webvtt")
 
         parser.edit(tl.v1.chunks)

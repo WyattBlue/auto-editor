@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from typing import TYPE_CHECKING, Any, cast
 
-from auto_editor.ffwrapper import FFmpeg
 from auto_editor.timeline import v3
 from auto_editor.utils.func import aspect_ratio, to_timecode
-from auto_editor.utils.log import Log
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from auto_editor.ffwrapper import FFmpeg
+    from auto_editor.timeline import TlAudio, TlVideo
+    from auto_editor.utils.log import Log
 
 """
 Shotcut uses the MLT timeline format
@@ -78,12 +84,11 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
     producers = 0
 
     if tl.v:
-        clips = tl.v[0]
+        clips: Sequence[TlVideo | TlAudio] = cast(Any, tl.v[0])
     elif tl.a:
         clips = tl.a[0]
     else:
         clips = []
-
 
     for clip in clips:
         src = tl.sources[clip.src]

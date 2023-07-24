@@ -238,7 +238,7 @@ def read_v1(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
 
 
 def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
-    with open(path) as f:
+    with open(path, encoding="utf-8", errors="ignore") as f:
         try:
             tl = Parser(Lexer(path, f)).expr()
         except MyError as e:
