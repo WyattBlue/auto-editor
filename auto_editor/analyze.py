@@ -208,7 +208,7 @@ class Levels:
         )
 
         try:
-            with open(workfile) as file:
+            with open(workfile, encoding="utf-8") as file:
                 cache = Parser(Lexer(workfile, file)).expr()
         except Exception:
             return None
@@ -232,7 +232,7 @@ class Levels:
         key = obj_tag(tag, self.tb, obj)
 
         try:
-            with open(workfile) as file:
+            with open(workfile, encoding="utf-8") as file:
                 json_object = Parser(Lexer(workfile, file)).expr()
         except Exception:
             json_object = {}
@@ -249,7 +249,7 @@ class Levels:
         else:
             json_object[src_key] = {key: entry}
 
-        with open(os.path.join(workdur, "cache.json"), "w") as file:
+        with open(os.path.join(workdur, "cache.json"), "w", encoding="utf-8") as file:
             dump(json_object, file)
 
         return arr
@@ -330,7 +330,7 @@ class Levels:
         )
         parser = SubtitleParser(self.tb)
 
-        with open(sub_file) as file:
+        with open(sub_file, encoding="utf-8") as file:
             parser.parse(file.read(), "webvtt")
 
         # stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string

@@ -30,12 +30,8 @@ class v1:
         }
 
 
-class Tl:
-    pass
-
-
 @dataclass
-class TlVideo(Tl):
+class TlVideo:
     start: int
     dur: int
     src: str
@@ -46,7 +42,7 @@ class TlVideo(Tl):
 
 
 @dataclass
-class TlAudio(Tl):
+class TlAudio:
     start: int
     dur: int
     src: str
@@ -58,7 +54,7 @@ class TlAudio(Tl):
 
 
 @dataclass
-class _Visual(Tl):
+class _Visual:
     start: int
     dur: int
     x: int | float

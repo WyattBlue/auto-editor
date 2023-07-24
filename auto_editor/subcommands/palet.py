@@ -8,7 +8,7 @@ from auto_editor.lib.err import MyError
 
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
     if sys_args:
-        with open(sys_args[0]) as file:
+        with open(sys_args[0], encoding="utf-8", errors="ignore") as file:
             program_text = file.read()
 
         try:
