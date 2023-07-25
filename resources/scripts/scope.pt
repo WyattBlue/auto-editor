@@ -1,0 +1,21 @@
+#!/usr/bin/env auto-editor palet
+
+; Enforce lexical scoping
+
+(define (f x) (lambda (y) (+ x y)))
+(assert (equal? ((f 10) 12) 22))
+
+; Test that variables do not leak scope
+
+(define (outer a)
+  (define (inner1 b)
+    (define (inner2 c) c)
+    (inner2 b)
+  )
+  (inner1 a)
+)
+
+(outer 13)
+(assert (not (var-exists? 'a)))
+(assert (not (var-exists? 'b)))
+(assert (not (var-exists? 'c)))
