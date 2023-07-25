@@ -738,16 +738,18 @@ def palet_assert(expr: object, msg: str | bool = False) -> None:
 class UserProc(Proc):
     """A user-defined procedure."""
 
-    __slots__ = ("parms", "body", "name", "arity", "contracts")
+    __slots__ = ("env", "parms", "body", "name", "arity", "contracts")
 
     def __init__(
         self,
+        env: Env,
         name: str,
         parms: list,
         body: list,
         contracts: list[Any] | None = None,
         eat_last: bool = False,
     ):
+        self.env = env
         self.parms = [f"{p}" for p in parms]
         self.body = body
         self.name = name
@@ -760,23 +762,17 @@ class UserProc(Proc):
         self.contracts = contracts
 
     def __call__(self, *args: Any) -> Any:
-        saved_env: Env = {}
-        for item in self.parms:
-            if item in env:
-                saved_env[item] = env[item]
-
         if self.arity[1] is None:
             largs = list(args)
             args = tuple([largs[len(self.parms) - 1 :]])
 
-        env.update(zip(self.parms, args))
-        for item in self.body[0:-1]:
-            my_eval(env, item)
-        result = my_eval(env, self.body[-1])
+        inner_env = self.env.copy()
+        inner_env.update(dict(zip(self.parms, args)))
 
-        for item in self.parms:
-            del env[item]
-        env.update(saved_env)
+        for item in self.body[0:-1]:
+            my_eval(inner_env, item)
+        result = my_eval(inner_env, self.body[-1])
+
         return result
 
 
@@ -823,7 +819,7 @@ def syn_lambda(env: Env, node: list) -> UserProc:
     if not isinstance(node[1], list):
         raise MyError(f"{node[0]}: bad syntax")
 
-    return UserProc("", node[1], node[2:])  # parms, body
+    return UserProc(env, "", node[1], node[2:])  # parms, body
 
 
 def syn_define(env: Env, node: list) -> None:
@@ -844,7 +840,7 @@ def syn_define(env: Env, node: list) -> None:
             parameters = node[1][1:]
 
         body = node[2:]
-        env[n] = UserProc(n, parameters, body, eat_last=eat_last)
+        env[n] = UserProc(env, n, parameters, body, eat_last=eat_last)
         return None
     elif type(node[1]) is not Sym:
         raise MyError(f"{node[0]}: must be an identifier")
@@ -862,7 +858,7 @@ def syn_define(env: Env, node: list) -> None:
     ):
         parameters = node[2][1]
         body = node[2][2:]
-        env[n] = UserProc(n, parameters, body)
+        env[n] = UserProc(env, n, parameters, body)
     else:
         for item in node[2:-1]:
             my_eval(env, item)
@@ -898,7 +894,7 @@ def syn_definec(env: Env, node: list) -> None:
 
         contracts.append(con)
 
-    env[n] = UserProc(n, parameters, node[2:], contracts)
+    env[n] = UserProc(env, n, parameters, node[2:], contracts)
     return None
 
 
@@ -1156,12 +1152,13 @@ def my_eval(env: Env, node: object) -> Any:
             check_args(oper.name, values, (1, 1), None)
         else:
             check_args(oper.name, values, oper.arity, oper.contracts)
+
         return oper(*values)
 
     return node
 
-
-env: Env = {
+env: Env = {}
+env.update({
     # constants
     "true": True,
     "false": False,
@@ -1221,13 +1218,19 @@ env: Env = {
     "=": Proc("=", equal_num, (1, None), [is_num]),
     "eq?": Proc("eq?", lambda a, b: a is b, (2, 2)),
     "equal?": Proc("equal?", is_equal, (2, 2)),
-    "zero?": UserProc("zero?", ["z"], [[Sym("="), Sym("z"), 0]], [is_num]),
-    "positive?": UserProc("positive?", ["x"], [[Sym(">"), Sym("x"), 0]], [is_real]),
-    "negative?": UserProc("negative?", ["x"], [[Sym("<"), Sym("x"), 0]], [is_real]),
-    "even?": UserProc(
-        "even?", ["n"], [[Sym("zero?"), [Sym("mod"), Sym("n"), 2]]], [is_int]
+    "zero?": UserProc(env, "zero?", ["z"], [[Sym("="), Sym("z"), 0]], [is_num]),
+    "positive?": UserProc(
+        env, "positive?", ["x"], [[Sym(">"), Sym("x"), 0]], [is_real]
     ),
-    "odd?": UserProc("odd?", ["n"], [[Sym("not"), [Sym("even?"), Sym("n")]]], [is_int]),
+    "negative?": UserProc(
+        env, "negative?", ["x"], [[Sym("<"), Sym("x"), 0]], [is_real]
+    ),
+    "even?": UserProc(
+        env, "even?", ["n"], [[Sym("zero?"), [Sym("mod"), Sym("n"), 2]]], [is_int]
+    ),
+    "odd?": UserProc(
+        env, "odd?", ["n"], [[Sym("not"), [Sym("even?"), Sym("n")]]], [is_int]
+    ),
     ">=/c": Proc(">=/c", gte_c, (1, 1), [is_real]),
     ">/c": Proc(">/c", gt_c, (1, 1), [is_real]),
     "<=/c": Proc("<=/c", lte_c, (1, 1), [is_real]),
@@ -1333,7 +1336,7 @@ env: Env = {
     "var-exists?": Proc("var-exists?", lambda sym: sym.val in env, (1, 1), [is_symbol]),
     "rename": Syntax(syn_rename),
     "delete": Syntax(syn_delete),
-}
+})
 
 
 def interpret(env: Env, parser: Parser) -> list:
