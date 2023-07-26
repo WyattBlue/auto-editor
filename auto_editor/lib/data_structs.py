@@ -8,33 +8,43 @@ import numpy as np
 
 
 class Env:
-    __slots__ = "data"
+    __slots__ = ("data", "outer")
 
-    def __init__(self) -> None:
-        self.data: dict[str, Any] = {}
+    def __init__(self, data: dict[str, Any], outer: Env | None = None) -> None:
+        self.data = data
+        self.outer = outer
 
     def __getitem__(self, key: str) -> Any:
-        return self.data[key]
+        if key in self.data:
+            return self.data[key]
+        if self.outer is not None:
+            return self.outer[key]
 
     def __setitem__(self, key: str, val: Any) -> None:
         self.data[key] = val
 
     def __delitem__(self, key: str) -> None:
-        del self.data[key]
+        if key in self.data:
+            del self.data[key]
+        elif self.outer is not None:
+            del self.outer[key]
 
-    def __contains__(self, item: Any) -> bool:
-        return item in self.data
+    def __contains__(self, key: str) -> bool:
+        if key in self.data:
+            return True
+        if self.outer is not None:
+            return key in self.outer
+        return False
 
     def update(self, my_dict: dict[str, Any]) -> None:
         self.data.update(my_dict)
 
     def get(self, key: str) -> Any:
-        return self.data.get(key)
-
-    def copy(self) -> Env:
-        new_env = Env()
-        new_env.update(self.data.copy())
-        return new_env
+        if key in self.data:
+            return self.data[key]
+        if self.outer is not None:
+            return self.outer.get(key)
+        return None
 
 
 class Sym:
