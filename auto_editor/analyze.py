@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from auto_editor.ffwrapper import FileInfo
+    from auto_editor.lib.data_structs import Env
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
@@ -489,9 +490,7 @@ class Levels:
         return self.cache("pixeldiff", pobj, result)
 
 
-def edit_method(
-    val: str, filesetup: FileSetup, env: dict[str, Any]
-) -> NDArray[np.bool_]:
+def edit_method(val: str, filesetup: FileSetup, env: Env) -> NDArray[np.bool_]:
     assert isinstance(filesetup, FileSetup)
     src = filesetup.src
     tb = filesetup.tb

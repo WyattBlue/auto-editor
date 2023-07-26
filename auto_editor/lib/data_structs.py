@@ -2,8 +2,39 @@ from __future__ import annotations
 
 from fractions import Fraction
 from io import StringIO
+from typing import Any
 
 import numpy as np
+
+
+class Env:
+    __slots__ = "data"
+
+    def __init__(self) -> None:
+        self.data: dict[str, Any] = {}
+
+    def __getitem__(self, key: str) -> Any:
+        return self.data[key]
+
+    def __setitem__(self, key: str, val: Any) -> None:
+        self.data[key] = val
+
+    def __delitem__(self, key: str) -> None:
+        del self.data[key]
+
+    def __contains__(self, item: Any) -> bool:
+        return item in self.data
+
+    def update(self, my_dict: dict[str, Any]) -> None:
+        self.data.update(my_dict)
+
+    def get(self, key: str) -> Any:
+        return self.data.get(key)
+
+    def copy(self) -> Env:
+        new_env = Env()
+        new_env.update(self.data.copy())
+        return new_env
 
 
 class Sym:
