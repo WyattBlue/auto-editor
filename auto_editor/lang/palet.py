@@ -904,7 +904,7 @@ def syn_set(env: Env, node: list) -> None:
 
     name = node[1].val
     if name not in env:
-        raise MyError(f"{node[0]}: cannot set variable {name} before definition")
+        raise MyError(f"{node[0]}: cannot set variable '{name}' before definition")
     env[name] = my_eval(env, node[2])
     return None
 
@@ -1040,24 +1040,55 @@ def syn_rename(env: Env, node: list) -> None:
     del env[first.val]
 
 
-class PaletObject:
-    __slots__ = "attributes"
+def syn_let(env: Env, node: list) -> Any:
+    if len(node) < 2:
+        raise MyError(f"{node[0]}: Arity mismatch: Expected at least 1 term")
 
-    def __init__(self, attrs: dict[str, Any]):
-        self.attributes = attrs
+    if type(node[1]) is Sym:
+        raise MyError(f"{node[0]}: Named-let form is not supported")
+
+    for var_ids in node[1]:
+        if len(var_ids) != 2:
+            raise MyError(f"{node[0]}: Expected two terms: `id` and `val-expr`")
+
+    new_maps: dict[str, Any] = {}
+    for var, val in node[1]:
+        if type(var) is not Sym:
+            raise MyError(f"{node[0]}: Expected symbol for `id` term")
+        new_maps[var.val] = my_eval(env, val)
+
+    inner_env = Env(new_maps, env)
+    for item in node[2:-1]:
+        my_eval(inner_env, item)
+    return my_eval(inner_env, node[-1])
 
 
-is_obj = Contract(
-    "object?",
-    lambda v: type(v) is str or isinstance(v, (list, Proc, PaletObject)),
-)
+def syn_let_star(env: Env, node: list) -> Any:
+    if len(node) < 2:
+        raise MyError(f"{node[0]}: Arity mismatch: Expected at least 1 term")
+
+    for var_ids in node[1]:
+        if len(var_ids) != 2:
+            raise MyError(f"{node[0]}: Expected two terms: `id` and `val-expr`")
+
+    inner_env = Env({}, env)
+
+    for var, val in node[1]:
+        if type(var) is not Sym:
+            raise MyError(f"{node[0]}: Expected symbol for `id` term")
+        inner_env[var.val] = my_eval(inner_env, val)
+
+    for item in node[2:-1]:
+        my_eval(inner_env, item)
+    return my_eval(inner_env, node[-1])
+
+
+is_obj = Contract("object?", lambda v: type(v) is str or isinstance(v, (list, Proc)))
 
 
 def get_attrs(obj: Any) -> dict[str, Any]:
     if type(obj) is str:
         return {
-            "@name": "string",
-            "@len": Proc("@len", obj.__len__, (0, 0)),
             "split": Proc("split", obj.split, (0, 1), [is_str]),
             "strip": Proc("strip", obj.strip, (0, 0)),
             "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
@@ -1070,16 +1101,12 @@ def get_attrs(obj: Any) -> dict[str, Any]:
         }
     if isinstance(obj, list):
         return {
-            "@name": "vector",
-            "@len": Proc("@len", obj.__len__, (0, 0)),
             "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
             "pop": Proc("pop", obj.pop, (0, 0)),
             "sort": Proc("sort", lambda: sorted(obj), (0, 0)),
             "sort!": Proc("sort!", obj.sort, (0, 0)),
         }
-    if isinstance(obj, PaletObject):
-        return obj.attributes
-    raise MyError("")
+    raise MyError("Not an object!")
 
 
 def attr(env: Env, node: list) -> Any:
@@ -1172,6 +1199,8 @@ env.update({
     "quote": Syntax(syn_quote),
     "if": Syntax(syn_if),
     "when": Syntax(syn_when),
+    "let": Syntax(syn_let),
+    "let*": Syntax(syn_let_star),
     # loops
     "for": Syntax(syn_for),
     # contracts

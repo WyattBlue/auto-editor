@@ -18,24 +18,36 @@
 
 (define doc {hash
     "Assignment" #[
-        (syntax "define" "id expr" (text "Set " 'id " to the result of " 'expr "."))
+        (syntax "define" "id expr" (text "Set "'id" to the result of "'expr"."))
         (syntax "set!" "id expr"
             (text
-                "Set " 'id " to the result of " 'expr " if " 'id
-                " is already defined. If " 'id " is not defined, raise an error."
+                "Set "'id" to the result of "'expr" if "'id
+                " is already defined. If "'id" is not defined, raise an error."
             )
         )
         (syntax
             "lambda" "args body"
             (text
-                "Produces a procedure that accepts " 'args " arguments and runs "
-                'body " when called."
+                "Produces a procedure that accepts "'args" arguments and runs "
+                'body" when called."
             )
         )
         (syntax "λ" "args body" (text "Clone of " (link 'lambda) "."))
         (syntax
             "define/c" "(proc-bind [id-binding contract]... )"
             (text "Define a procedure with contracts.")
+        )
+        (syntax "let" "([id val-expr] ...) body)"
+            (text "Evaluates the "'val-expr"s left-to-right, creating a new location for each "'id
+            ", and places the values into the locations. It then evaluates the "'body
+            "s, in which the "'id"s are bound.")
+        )
+        (syntax "let*" "([id val-expr] ...) body)"
+            (text "Like " (link 'let) ", but evaluates the "'val-expr
+                "s one by one, creating a location for each "'id
+                " as soon as the value is available. The "'id"s are bound in the remaining "
+                'val-expr"s as well as in the "'body"."
+            )
         )
     ]
     "Control Flow" #[
