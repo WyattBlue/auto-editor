@@ -121,11 +121,7 @@ def parse_with_palet(
 
     def go(text: str, c: Any) -> Any:
         try:
-            if isinstance(_env, Env):
-                env = _env
-            else:
-                env = Env()
-                env.update(_env)
+            env = _env if isinstance(_env, Env) else Env(_env)
             results = interpret(env, Parser(Lexer(build.name, text)))
         except MyError as e:
             raise ParserError(e)

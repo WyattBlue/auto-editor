@@ -765,8 +765,7 @@ class UserProc(Proc):
             largs = list(args)
             args = tuple([largs[len(self.parms) - 1 :]])
 
-        inner_env = self.env.copy()
-        inner_env.update(dict(zip(self.parms, args)))
+        inner_env = Env(dict(zip(self.parms, args)), self.env)
 
         for item in self.body[0:-1]:
             my_eval(inner_env, item)
@@ -1158,7 +1157,7 @@ def my_eval(env: Env, node: object) -> Any:
 
 
 # fmt: off
-env = Env()
+env = Env({})
 env.update({
     # constants
     "true": True,
