@@ -3,6 +3,7 @@ from __future__ import annotations
 from difflib import get_close_matches
 from typing import TYPE_CHECKING, NamedTuple
 
+from auto_editor.lib.data_structs import Env
 from auto_editor.utils.types import CoerceError
 
 if TYPE_CHECKING:
@@ -103,7 +104,9 @@ class PLexer:
         return None
 
 
-def parse_with_palet(text: str, build: pAttrs, env: dict) -> dict[str, Any]:
+def parse_with_palet(
+    text: str, build: pAttrs, _env: Env | dict[str, Any]
+) -> dict[str, Any]:
     from auto_editor.lang.palet import Lexer, Parser, interpret
     from auto_editor.lib.data_structs import print_str
     from auto_editor.lib.err import MyError
@@ -118,6 +121,11 @@ def parse_with_palet(text: str, build: pAttrs, env: dict) -> dict[str, Any]:
 
     def go(text: str, c: Any) -> Any:
         try:
+            if isinstance(_env, Env):
+                env = _env
+            else:
+                env = Env()
+                env.update(_env)
             results = interpret(env, Parser(Lexer(build.name, text)))
         except MyError as e:
             raise ParserError(e)

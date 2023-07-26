@@ -31,7 +31,6 @@ if TYPE_CHECKING:
     Number = Union[int, float, complex, Fraction]
     Real = Union[int, float, Fraction]
     BoolList = NDArray[np.bool_]
-    Env = dict[str, Any]
 
 
 class ClosingError(MyError):
@@ -1108,7 +1107,7 @@ def my_eval(env: Env, node: object) -> Any:
     if type(node) is Sym:
         val = env.get(node.val)
         if val is None:
-            if mat := get_close_matches(node.val, env):
+            if mat := get_close_matches(node.val, env.data):
                 raise MyError(f"'{node.val}' not found. Did you mean: {mat[0]}")
             raise MyError(f"'{node.val}' not found.")
         return val
@@ -1157,7 +1156,9 @@ def my_eval(env: Env, node: object) -> Any:
 
     return node
 
-env: Env = {}
+
+# fmt: off
+env = Env()
 env.update({
     # constants
     "true": True,
@@ -1337,6 +1338,7 @@ env.update({
     "rename": Syntax(syn_rename),
     "delete": Syntax(syn_delete),
 })
+# fmt: on
 
 
 def interpret(env: Env, parser: Parser) -> list:
