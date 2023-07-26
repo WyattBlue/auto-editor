@@ -19,3 +19,20 @@
 (assert (not (var-exists? 'a)))
 (assert (not (var-exists? 'b)))
 (assert (not (var-exists? 'c)))
+
+; Test `let` and `let*`
+
+(assert (equal? (let ([x 5]) x) 5))
+(assert (not (var-exists? 'x)))
+
+(assert (equal?
+  (let ([x 5])
+    (let ([x 2] [y x]) #(y x))
+  )
+  #(5 2)
+))
+
+(assert (equal?
+  (let* ([x 1] [y (+ x 1)]) #(y x))
+  #(2 1)
+))

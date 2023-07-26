@@ -187,9 +187,9 @@ with open(ref / "palet.html", "w") as file:
     with open("paletdoc.pt", "r") as sourcefile:
         source = sourcefile.read()[:]
 
-    canonical_env = deepcopy(env)
+    canonical_env = deepcopy(env.data)
     result = interpret(env, Parser(Lexer("paletdoc.pt", source)))
-    doc = env["doc"].copy()
+    doc = env.data["doc"].copy()
 
     for category, somethings in doc.items():
         file.write(f'<h2 class="left">{category}</h2>\n')
