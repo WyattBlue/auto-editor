@@ -726,6 +726,10 @@ def palet_assert(expr: object, msg: str | bool = False) -> None:
     if expr is not True:
         raise MyError("AssertError" if msg is False else f"AssertError: {msg}")
 
+def palet_system(cmd: str) -> bool:
+    import subprocess
+    return (result := subprocess.run(cmd, shell=True).returncode) == 0
+
 
 ###############################################################################
 #                                                                             #
@@ -1351,6 +1355,7 @@ env.update({
     "displayln": Proc("displayln", lambda v: print(display_str(v)), (1, 1)),
     "print": Proc("print", lambda v: print(print_str(v), end=""), (1, 1)),
     "println": Proc("println", lambda v: print(print_str(v)), (1, 1)),
+    "system": Proc("system", palet_system, (1, 1)),
     # conversions
     "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
     "string->vector": Proc(
