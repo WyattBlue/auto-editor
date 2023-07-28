@@ -725,6 +725,14 @@
             #(#("datum" "any") "void?")
             (text "Display " 'datum " like REPL does with a newline character.")
         )
+        (proc
+            "system"
+            #(#("cmd" "string?") "bool?")
+            (text
+                "Executes a Unix-like or Windows shell command synchronously. "
+                "Returns "#t" if successful, "#f" otherwise."
+            )
+        )
     ]
     "Void" #[
         (pred
