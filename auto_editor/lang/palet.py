@@ -726,9 +726,14 @@ def palet_assert(expr: object, msg: str | bool = False) -> None:
     if expr is not True:
         raise MyError("AssertError" if msg is False else f"AssertError: {msg}")
 
+
 def palet_system(cmd: str) -> bool:
     import subprocess
-    return (result := subprocess.run(cmd, shell=True).returncode) == 0
+
+    try:
+        return subprocess.run(cmd, shell=True).returncode == 0
+    except Exception:
+        return False
 
 
 ###############################################################################
