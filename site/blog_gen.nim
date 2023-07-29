@@ -4,6 +4,7 @@ import std/strformat
 
 type
   PragmaKind = enum
+    normalType,
     blogType,
     explainerType,
 
@@ -269,8 +270,9 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
     error(lexer, "head: expected end ---")
 
   var output = ""
-  if pragma == blogType:
-    output = &"""{{{{ comp.header "{title}" }}}}
+  case pragma:
+    of blogType:
+      output = &"""{{{{ comp.header "{title}" }}}}
 <body>
 {{{{ comp.nav }}}}
 <section class="section">
@@ -278,14 +280,22 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
     <h1>{title}</h1>
     <p class="author-date">{author}&nbsp;&nbsp;&nbsp;{date}</p>
 """
-  else:
-    output = &"""{{{{ comp.header "{title}" }}}}
+    of normalType:
+      output = &"""{{{{ comp.header "{title}" }}}}
+<body>
+{{{{ comp.nav }}}}
+<section class="section">
+<div class="container">
+"""
+    of explainerType:
+      output = &"""{{{{ comp.header "{title}" }}}}
 <body>
 {{{{ comp.nav }}}}
 <section class="section">
 <div class="container">
     <h2 class="left">{title}</h2>
 """
+
 
   let f = open(path, fmWrite)
   f.write(output)
@@ -388,6 +398,9 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
 
 for file in walkFiles("src/blog/*.md"):
   convert(blogType, file, file.changeFileExt("html"))
+
+for file in walkFiles("src/docs/*.md"):
+  convert(normalType, file, file.changeFileExt("html"))
 
 for file in walkFiles("src/docs/subcommands/*.md"):
   convert(explainerType, file, file.changeFileExt("html"))

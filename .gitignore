@@ -13,6 +13,8 @@ site/src/blog/*.html
 !site/src/blog/index.html
 site/src/docs/subcommands/*.html
 !site/src/docs/subcommands/index.html
+site/src/docs/*.html
+!site/src/docs/index.html
 
 # Python Generated Files
 __pycache__/
