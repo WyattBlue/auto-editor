@@ -69,6 +69,16 @@
             )
         )
         (syntax
+            "cond" "([test-clause then-body]... [else then-body)"
+            (text
+                "Evaluate each " 'cond-clause " if the clause is evaluated to "
+                #t " then evaluate and return " 'then-body
+                ". If the clause is " #f " continue to the next clause. "
+                "If there are no clauses left return " (void)
+                ". If the last "'test-clause" is "'else" then its evaluated "'then-body"."
+            )
+        )
+        (syntax
             "for"
             "([id seq-expr] ...) body"
             (text
@@ -675,13 +685,13 @@
         (proc
             "reverse"
             #(#("seq" "sequence?") "sequence?")
-            (text "Returns " 'seq " in reverse order.")
+            (text "Returns "'seq" in reverse order.")
         )
     ]
     "Hashmaps" #[
         (pred
             "hash?"
-            (text "Returns " #t " if " 'v " is a hash table, " #f " otherwise.")
+            (text "Returns "#t" if "'v" is a hash table, "#f" otherwise.")
         )
         (proc
             "hash"
@@ -691,7 +701,7 @@
         (proc
             "has-key?"
             #(#("hash" "hash?") #("key" "any") "bool?")
-            (text "Returns " #t " if " 'key " is in the hash map, " #f " otherwise.")
+            (text "Returns " #t " if "'key" is in the hash map, "#f" otherwise.")
         )
     ]
     "Actions" #[
@@ -703,17 +713,27 @@
         (proc
             "assert"
             #(#("expr" "any") #("msg" "(or/c string? #f)" "#f") "void?")
-            (text "Raises error if " 'expr " is not " #t ".")
+            (text "Raises error if "'expr" is not "#t".")
+        )
+        (proc
+            "error"
+            #(#("msg" "string?") "none")
+            (text "Raises an exception with "'msg" as the message.")
+        )
+        (proc
+            "sleep"
+            #(#("time" "(or/c int? float?)") "void?")
+            (text "Adds a delay of "'time" seconds.")
         )
         (proc
             "display"
             #(#("datum" "any") "void?")
-            (text "Display " 'datum " to stdout.")
+            (text "Display "'datum" to stdout.")
         )
         (proc
             "displayln"
             #(#("datum" "any") "void?")
-            (text "Display " 'datum " to stdout with a newline character.")
+            (text "Display "'datum" to stdout with a newline character.")
         )
         (proc
             "print"

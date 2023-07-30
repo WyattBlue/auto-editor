@@ -13,6 +13,7 @@ from difflib import get_close_matches
 from fractions import Fraction
 from functools import reduce
 from io import StringIO
+from time import sleep
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -486,6 +487,10 @@ bool_or_barr = Contract(
 )
 
 
+def raise_(msg: str) -> None:
+    raise MyError(msg)
+
+
 def is_equal(a: object, b: object) -> bool:
     if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
         return np.array_equal(a, b)
@@ -724,7 +729,7 @@ def palet_hash(*args: Any) -> dict:
 
 def palet_assert(expr: object, msg: str | bool = False) -> None:
     if expr is not True:
-        raise MyError("AssertError" if msg is False else f"AssertError: {msg}")
+        raise MyError("assert-error" if msg is False else f"assert-error: {msg}")
 
 
 def palet_system(cmd: str) -> bool:
@@ -1049,6 +1054,33 @@ def syn_rename(env: Env, node: list) -> None:
     del env[first.val]
 
 
+def syn_cond(env: Env, node: list) -> Any:
+    for test_expr in node[1:]:
+        if not isinstance(test_expr, list) or not test_expr:
+            raise MyError(f"{node[0]}: bad syntax, clause is not a test-value pair")
+
+        if test_expr[0] == Sym("else"):
+            if len(test_expr) == 1:
+                raise MyError(f"{node[0]}: missing expression in else clause")
+            test_clause = True
+        else:
+            test_clause = my_eval(env, test_expr[0])
+            if type(test_clause) is not bool:
+                raise MyError(
+                    f"{node[0]} test-expr: expected bool?, got {print_str(test_clause)}"
+                )
+
+        if test_clause:
+            if len(test_expr) == 1:
+                return True
+
+            for rest_clause in test_expr[1:-1]:
+                my_eval(env, rest_clause)
+            return my_eval(env, test_expr[-1])
+
+    return None
+
+
 def syn_let(env: Env, node: list) -> Any:
     if len(node) < 2:
         raise MyError(f"{node[0]}: Arity mismatch: Expected at least 1 term")
@@ -1057,7 +1089,7 @@ def syn_let(env: Env, node: list) -> Any:
         raise MyError(f"{node[0]}: Named-let form is not supported")
 
     for var_ids in node[1]:
-        if len(var_ids) != 2:
+        if not isinstance(var_ids, list) or len(var_ids) != 2:
             raise MyError(f"{node[0]}: Expected two terms: `id` and `val-expr`")
 
     new_maps: dict[str, Any] = {}
@@ -1208,6 +1240,7 @@ env.update({
     "quote": Syntax(syn_quote),
     "if": Syntax(syn_if),
     "when": Syntax(syn_when),
+    "cond": Syntax(syn_cond),
     "let": Syntax(syn_let),
     "let*": Syntax(syn_let_star),
     # loops
@@ -1358,6 +1391,8 @@ env.update({
     "assert": Proc("assert", palet_assert, (1, 2), [any_p, orc(is_str, False)]),
     "display": Proc("display", lambda v: print(display_str(v), end=""), (1, 1)),
     "displayln": Proc("displayln", lambda v: print(display_str(v)), (1, 1)),
+    "error": Proc("error", raise_, (1, 1), [is_str]),
+    "sleep": Proc("sleep", sleep, (1, 1), [is_int_or_float]),
     "print": Proc("print", lambda v: print(print_str(v), end=""), (1, 1)),
     "println": Proc("println", lambda v: print(print_str(v)), (1, 1)),
     "system": Proc("system", palet_system, (1, 1)),
