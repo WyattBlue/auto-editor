@@ -2,6 +2,7 @@
 title: palet
 ---
 
+## palet
 `palet` allows you to run palet files. See the [palet reference](https://auto-editor.com/ref) for comprehensive documentation.
 
 ```

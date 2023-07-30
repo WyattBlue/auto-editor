@@ -2,6 +2,7 @@
 title: levels
 ---
 
+## levels
 `levels` displays individual "edit method" stream values before the threshold procedure (if any) is applied. media information relevant to auto-editor. levels mainly exists to be used extensively by other programs so they can use auto-editor's rich media analysis features.
 
 Because typical levels output is so long, it won't be displayed verbatim.

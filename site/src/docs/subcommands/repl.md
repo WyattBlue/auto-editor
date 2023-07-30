@@ -2,6 +2,7 @@
 title: repl
 ---
 
+## repl
 `repl` allows you to access auto-editor's shell. See the [palet reference](https://auto-editor.com/ref) for comprehensive documentation.
 
 ```

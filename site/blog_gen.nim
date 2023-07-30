@@ -6,7 +6,6 @@ type
   PragmaKind = enum
     normalType,
     blogType,
-    explainerType,
 
   TokenKind = enum
     tkBar,
@@ -65,17 +64,11 @@ proc advance(self: Lexer) =
 
 func peek(self: Lexer): char =
   let peakPos = self.pos + 1
-  if peakPos > len(self.text) - 1:
-    return '\0'
-  else:
-    return self.text[peakPos]
+  return (if peakPos > len(self.text) - 1: '\0' else: self.text[peakPos])
 
 func longPeek(self: Lexer, pos: int): char =
   let peakPos = self.pos + pos
-  if peakPos > len(self.text) - 1:
-    return '\0'
-  else:
-    return self.text[peakPos]
+  return (if peakPos > len(self.text) - 1: '\0' else: self.text[peakPos])
 
 func initToken(kind: TokenKind, value: string): Token =
   return Token(kind: kind, value: value)
@@ -269,10 +262,11 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
   if getNextToken(lexer).kind != tkBar:
     error(lexer, "head: expected end ---")
 
-  var output = ""
-  case pragma:
-    of blogType:
-      output = &"""{{{{ comp.header "{title}" }}}}
+  let f = open(path, fmWrite)
+  f.write(
+    case pragma:
+      of blogType:
+        &"""{{{{ comp.header "{title}" }}}}
 <body>
 {{{{ comp.nav }}}}
 <section class="section">
@@ -280,25 +274,14 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
     <h1>{title}</h1>
     <p class="author-date">{author}&nbsp;&nbsp;&nbsp;{date}</p>
 """
-    of normalType:
-      output = &"""{{{{ comp.header "{title}" }}}}
+      of normalType:
+        &"""{{{{ comp.header "{title}" }}}}
 <body>
 {{{{ comp.nav }}}}
 <section class="section">
 <div class="container">
 """
-    of explainerType:
-      output = &"""{{{{ comp.header "{title}" }}}}
-<body>
-{{{{ comp.nav }}}}
-<section class="section">
-<div class="container">
-    <h2 class="left">{title}</h2>
-"""
-
-
-  let f = open(path, fmWrite)
-  f.write(output)
+  )
 
   let blocks: seq[TokenKind] = @[tkText, tkH1, tkH2, tkH3, tkList, tkUl]
 
@@ -378,6 +361,9 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
 
       f.write("</pre></code>\n")
     elif obj.kind == tkLink:
+      if len(ends) == 0:
+        f.write("    <p>")
+        ends.add(tkText)
       var link_text = sanitize(obj.value)
       obj = getNextToken(lexer)
       f.write(&"<a href=\"{obj.value}\">{link_text}</a>")
@@ -403,4 +389,4 @@ for file in walkFiles("src/docs/*.md"):
   convert(normalType, file, file.changeFileExt("html"))
 
 for file in walkFiles("src/docs/subcommands/*.md"):
-  convert(explainerType, file, file.changeFileExt("html"))
+  convert(normalType, file, file.changeFileExt("html"))
