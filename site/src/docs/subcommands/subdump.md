@@ -2,6 +2,7 @@
 title: subdump
 ---
 
+## subdump
 `subdump` is a utility program that displays the textual representation of subtitle streams in media files.
 
 Here's an example:
