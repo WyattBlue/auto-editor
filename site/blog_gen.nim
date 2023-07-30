@@ -382,8 +382,10 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
   f.write("</div>\n</section>\n</body>\n</html>\n")
   f.close()
 
+convert(normalType, "src/blog/index.md", "src/blog/index.html")
 for file in walkFiles("src/blog/*.md"):
-  convert(blogType, file, file.changeFileExt("html"))
+  if file != "src/blog/index.md":
+    convert(blogType, file, file.changeFileExt("html"))
 
 for file in walkFiles("src/docs/*.md"):
   convert(normalType, file, file.changeFileExt("html"))
