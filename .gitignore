@@ -10,9 +10,7 @@ site/src/ref
 site/blog_gen
 site/binaries/
 site/src/blog/*.html
-!site/src/blog/index.html
-site/src/docs/subcommands/*.html
-site/src/docs/*.html
+site/src/docs/**/*.html
 
 # Python Generated Files
 __pycache__/
