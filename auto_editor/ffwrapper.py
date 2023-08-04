@@ -169,7 +169,6 @@ class SubtitleStream:
 class FileInfo:
     __slots__ = (
         "path",
-        "modified",
         "bitrate",
         "duration",
         "description",
@@ -203,12 +202,6 @@ class FileInfo:
         self.description = None
         self.duration = ""
 
-        try:
-            stats = os.stat(path)
-            self.modified = stats.st_mtime
-        except OSError:
-            log.error(f"Could not access: {path}")
-
         _dir = os.path.dirname(ffmpeg.path)
         _ext = os.path.splitext(ffmpeg.path)[1]
         ffprobe = os.path.join(_dir, f"ffprobe{_ext}")
@@ -228,6 +221,8 @@ class FileInfo:
             )
         except FileNotFoundError:
             log.nofile(ffprobe)
+        except Exception as e:
+            log.error(e)
 
         def get_attr(name: str, dic: dict[Any, Any], default: Any = -1) -> str:
             if name in dic:
