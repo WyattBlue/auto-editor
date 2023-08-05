@@ -1175,8 +1175,8 @@ def my_eval(env: Env, node: object) -> Any:
         val = env.get(node.val)
         if val is None:
             if mat := get_close_matches(node.val, env.data):
-                raise MyError(f"'{node.val}' not found. Did you mean: {mat[0]}")
-            raise MyError(f"'{node.val}' not found.")
+                raise MyError(f"variable `{node.val}` not found. Did you mean: {mat[0]}")
+            raise MyError(f'variable `{node.val}` not found. Did you mean: "{node.val}"')
         return val
 
     if isinstance(node, Method):
