@@ -727,6 +727,24 @@ def palet_hash(*args: Any) -> dict:
     return result
 
 
+def hash_ref(h: dict, k: object) -> object:
+    try:
+        return h[k]
+    except Exception:
+        raise MyError("hash-ref: invalid key")
+
+
+def hash_set(h: dict, k: object, v: object) -> None:
+    h[k] = v
+
+
+def hash_remove(h: dict, v: object) -> None:
+    try:
+        del h[v]
+    except Exception:
+        pass
+
+
 def palet_assert(expr: object, msg: str | bool = False) -> None:
     if expr is not True:
         raise MyError("assert-error" if msg is False else f"assert-error: {msg}")
@@ -1175,8 +1193,12 @@ def my_eval(env: Env, node: object) -> Any:
         val = env.get(node.val)
         if val is None:
             if mat := get_close_matches(node.val, env.data):
-                raise MyError(f"variable `{node.val}` not found. Did you mean: {mat[0]}")
-            raise MyError(f'variable `{node.val}` not found. Did you mean: "{node.val}"')
+                raise MyError(
+                    f"variable `{node.val}` not found. Did you mean: {mat[0]}"
+                )
+            raise MyError(
+                f'variable `{node.val}` not found. Did you mean: "{node.val}"'
+            )
         return val
 
     if isinstance(node, Method):
@@ -1376,7 +1398,7 @@ env.update({
     # generic iterables
     "len": Proc("len", len, (1, 1), [is_iterable]),
     "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), [is_sequence]),
-    "ref": Proc("ref", ref, (2, 2), [is_iterable, is_int]),
+    "ref": Proc("ref", ref, (2, 2), [is_sequence, is_int]),
     "slice": Proc("slice", p_slice, (2, 4), [is_sequence, is_int]),
     # procedures
     "map": Proc("map", palet_map, (2, 2), [is_proc, is_sequence]),
@@ -1385,8 +1407,15 @@ env.update({
     "or/c": Proc("or/c", orc, (1, None), [is_cont]),
     "not/c": Proc("not/c", notc, (1, 1), [is_cont]),
     # hashs
-    "hash": Proc("hash", palet_hash),
+    "hash": Proc("hash", palet_hash, (0, None)),
+    "hash-ref": Proc("hash", hash_ref, (2, 2), [is_hash, any_p]),
+    "hash-set!": Proc("hash-set!", hash_set, (3, 3), [is_hash, any_p, any_p]),
     "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), [is_hash, any_p]),
+    "hash-remove!": Proc("hash-remove!", hash_remove, (2, 2), [is_hash, any_p]),
+    "hash-update!": UserProc(env, "hash-update!", ["h", "v", "up"],
+        [[Sym("hash-set!"), Sym("h"), Sym("v"), [Sym("up"), [Sym("hash-ref"), Sym("h"), Sym("v")]]]],
+        [is_hash, any_p, any_p],
+    ),
     # actions
     "assert": Proc("assert", palet_assert, (1, 2), [any_p, orc(is_str, False)]),
     "display": Proc("display", lambda v: print(display_str(v), end=""), (1, 1)),

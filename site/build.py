@@ -230,8 +230,7 @@ with open(ref / "palet.html", "w") as file:
                 file.write(
                     f'<div id="{some["name"]}" class="palet-block">\n'
                     f'<p class="mono">(<b>{san(some["name"])}</b>&nbsp;{build_sig(varsigs)})'
-                    + ("" if rname == "none" else f'&nbsp;→&nbsp;{build_var(rname)}')
-                    + '&nbsp;&nbsp;Procedure</p>\n'
+                    f'&nbsp;→&nbsp;{build_var(rname)}&nbsp;&nbsp;Procedure</p>\n'
                 )
                 file.write(build_var_sig(varsigs))
                 file.write(f"</div>\n<p>{text_to_str(some['summary'])}</p>\n")
