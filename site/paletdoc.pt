@@ -442,50 +442,48 @@
         (proc
             "make-vector"
             #(#("size" "uint?") #("v" "any" "0") "vector?")
-            (text
-                "Returns a new vector with " 'size " slots all filled with " 'v "s."
-            )
+            (text "Returns a new vector with "'size" slots all filled with "'v"s.")
         )
         (proc
             "vector-pop!"
             #(#("vec" "vector?") "any")
-            (text "Remove the last element of " 'vec " and return it.")
+            (text "Remove the last element of "'vec" and return it.")
         )
         (proc
             "vector-add!"
-            #(#("vec" "vector?") #("v" "any") "none")
-            (text "Append " 'v " to the end of " 'vec ".")
+            #(#("vec" "vector?") #("v" "any") "void?")
+            (text "Append "'v" to the end of "'vec".")
         )
         (proc
             "vector-set!"
-            #(#("vec" "vector?") #("pos" "int?") #("v" "any") "none")
-            (text "Set slot " 'pos " of " 'vec " to " 'v ".")
+            #(#("vec" "vector?") #("pos" "int?") #("v" "any") "void?")
+            (text "Set slot "'pos" of "'vec" to "'v".")
         )
         (proc
             "vector-append"
             #(#("vec" "vector?") "..." "vector?")
             (text
-                "Returns a new vector with all elements of " 'vec "s appended in order."
+                "Returns a new vector with all elements of "'vec"s appended in order."
             )
         )
         (proc
             "vector-extend!"
-            #(#("vec" "vector?") #("vec2" "vector?") "..." "none")
+            #(#("vec" "vector?") #("vec2" "vector?") "..." "void?")
             (text
-                "Modify " 'vec " so that all elements of " 'vec2
-                "s are appended to the end of " 'vec " in order."
+                "Modify "'vec" so that all elements of "
+                'vec2"s are appended to the end of "'vec" in order."
             )
         )
         (proc
             "string->vector"
             #(#("str" "string?") "vector?")
-            (text "Returns a new string filled with the characters of " 'str ".")
+            (text "Returns a new string filled with the characters of "'str".")
         )
     ]
     "Arrays" #[
         (pred
             "array?"
-            (text "Returns " #t " if " 'v " is an array, " #f " otherwise.")
+            (text "Returns "#t" if "'v" is an array, "#f" otherwise.")
         )
         (proc
             "array"
@@ -660,7 +658,7 @@
         )
         (proc
             "ref"
-            #(#("seq" "iterable?") #("pos" "int?") "any")
+            #(#("seq" "sequence?") #("pos" "int?") "any")
             (text
                 "Returns the element of " 'seq " at position " 'pos
                 " where the first element is at position 0. For sequences other than "
@@ -699,9 +697,31 @@
             (text "Returns a newly constructed hash map from key-value pairs.")
         )
         (proc
+            "hash-ref"
+            #(#("hash" "hash?") #("key" "any") "any")
+            (text "Returns the value for "'key" in "'hash".")
+        )
+        (proc
+            "hash-set!"
+            #(#("hash" "hash?") #("key" "any") #("v" "any") "void?")
+            (text "Set "'key" to "'v" in "'hash", overwriting any existing mappings.")
+        )
+        (proc
             "has-key?"
             #(#("hash" "hash?") #("key" "any") "bool?")
-            (text "Returns " #t " if "'key" is in the hash map, "#f" otherwise.")
+            (text "Returns "#t" if "'key" is in the hash map, "#f" otherwise.")
+        )
+        (proc
+            "hash-update!"
+            #(#("hash" "hash?") #("key" "any") #("updater" "any") "void?")
+            (text "Updates the value mapped by "'key" in "'hash" by applying "'updater
+            " to the value. The value returned by "'updater
+            " becomes the new mapping for "'key", overwriting the original value in "'hash".")
+        )
+        (proc
+            "hash-remove!"
+            #(#("hash" "hash?") #("key" "any") "void?")
+            (text "Removes any existing mapping for "'key" in "'hash".")
         )
     ]
     "Actions" #[
@@ -717,7 +737,7 @@
         )
         (proc
             "error"
-            #(#("msg" "string?") "none")
+            #(#("msg" "string?") "void?")
             (text "Raises an exception with "'msg" as the message.")
         )
         (proc
