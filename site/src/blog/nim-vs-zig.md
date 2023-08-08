@@ -23,19 +23,19 @@ Nim has a special mode called [NimScript](https://nim-lang.org/docs/nimscript.ht
 Zig does not have such a mode.
 
 ## Read Eval Print Loop
-Nim has an experimental repl (via `nim secret`), unfortunately, it currently does not support most of standard library so it's limited to basic expressions. Even in this form, however, it is still occasionally helpful.
+Nim has an experimental repl (via `nim secret`), unfortunately, it currently does not support most of the standard library so it's limited to basic expressions. Even in this form, however, it is still occasionally helpful.
 
 Zig does not appear to have a repl even though [there has been discussion on this](https://github.com/ziglang/zig/issues/596).
 
 ## Macros
 Nim programmers can write macros by accessing Nim's AST via `std/macros` and there a number of useful default macros that Nim has, such as `std/enumerate`.
 
-Zig takes a hard-line stance against any preprocessor or macro in it's quest to keep the language simple. Zig believes this to be so appealing that they put it on the front page of their website.
+Zig takes a hard-line stance against any preprocessor or macro in its quest to keep the language simple. Zig believes this to be so appealing that they put it on the front page of their website.
 
 ## Verbosity
 To test how verbose each language, I've written a small program in each of them to compare.
 
-Naive FizzBuzz written in Zig:
+Naïve FizzBuzz written in Zig:
 ```
 const std = @import("std"); 
 
@@ -61,7 +61,7 @@ pub fn main() !void {
 }
 ```
 
-Naive FizzBuzz written in Nim: 
+Naïve FizzBuzz written in Nim:
 ```
 for i in 1..100:
     if i mod 15 == 0:
@@ -79,6 +79,6 @@ As you can see, Nim is shorter than Zig. In Zig's defense, it's buffering is mad
 Also, for some reason, Zig doesn't have a for loop construct even though it's trying to appeal to C/JavaScript programmers. I don't why this is the case.
 
 ## Conclusion 
-I prefer Nim, both because it prioritizes what I need, but also because it aligns with my values, such having AST macros, a minimalist OOP system, closures, and having an orthogonal design in general.
+I prefer Nim, both because it prioritizes what I need, but also because it aligns with my values, such as having AST macros, a minimalist OOP system, closures, and having an orthogonal design in general.
 
 Zig seems like a fine choice if you really want C performance but want to avoid the many pain points of actually writing C ([a somewhat crowded space](https://ziglang.org/learn/why_zig_rust_d_cpp/)). However, I don't think Zig's value for simplicity is helpful. It's just going to shift the complexity to user code.
