@@ -16,9 +16,9 @@ My first language I reviewed was C. Both Python and FFmpeg are written in C so i
 C++ solves points 1 and 2, but point 4 is a lot worse because C++ has so many language features and only some of them are well thought out. Also C and C++ has diverged significantly so many positive improvements in C are not in C++.
 
 ## Rust
-This is when I started thinking about Rust, but at the time, I was intimated by both by the dense syntax and the Borrow Checker. I also considered Go since it seemed easier, but the fact that you can't link C libraries in Go without Cgo, (which has it's own limitations that I don't really understand, but I'm told are serious)
+This is when I started thinking about Rust, but at the time, I was intimated by both by the dense syntax and the Borrow Checker. I also considered Go since it seemed easier, but the fact that you can't link C libraries in Go without Cgo, (which has its own limitations that I don't really understand, but I'm told are serious)
 
-Later in time, I tried to rewrite my simple command-line calculator in Rust, but I found it difficult and frustrating. Rust standard libraries for processing input and output for the shell was not working how I expected. One issue was when the user typed when the prompt was displayed, it would display like this: 
+Later in time, I tried to rewrite my simple command-line calculator in Rust, but I found it difficult and frustrating. Rust standard libraries for processing input and output for the shell was not working how I expected. One issue was when the user typed when the prompt was displayed. It would display like this:
 
 ```
 >
@@ -31,7 +31,7 @@ Instead of like this:
 > 2 + 2
 ```
 
-Rust also wouldn't flush stdout when I wanted it to when both C and Python did what I expected the first time. I ultimately abandoned the effort. Then I learned of Nim. 
+Rust also wouldn't flush stdout when I wanted it to, when both C and Python did what I expected the first time. I ultimately abandoned the effort. Then I learned of Nim.
 
 ## Nim
 I finished writing my calculator in Nim faster than in C. In fact, it was almost as fast as if I had written it in Python. I had so much developer velocity in Nim that I expanded my test project's scope and tried my hand at writing a small Scheme dialect. I ultimately got bools, integers, and floats, along with more math functions like `pow` and `modulo`. I did not implement parens or supporting arity besides 2 but that was okay because this was just a trial run and the language had already proved itself.
