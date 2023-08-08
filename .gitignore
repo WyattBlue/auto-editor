@@ -4,14 +4,6 @@
 *example
 *https*
 
-# Website Files
-site/src/app/
-site/src/ref
-site/blog_gen
-site/binaries/
-site/src/blog/*.html
-site/src/docs/**/*.html
-
 # Python Generated Files
 __pycache__/
 *.pyc
@@ -25,3 +17,4 @@ dist/
 
 # OS Files
 .DS_Store
+

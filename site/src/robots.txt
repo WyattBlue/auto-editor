@@ -1,8 +1,0 @@
-User-Agent: TurnitinBot
-Disallow: /
-
-User-Agent: NPBot
-Disallow: /
-
-User-Agent: SlySearch
-Disallow: /
