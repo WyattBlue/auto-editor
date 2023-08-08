@@ -1,4 +1,4 @@
-<p align="center"><img src="https://raw.githubusercontent.com/wyattblue/auto-editor/master/site/src/img/auto-editor-banner.webp" title="Auto-Editor" width="700"></p>
+<p align="center"><img src="https://auto-editor.com/img/auto-editor-banner.webp" title="Auto-Editor" width="700"></p>
 
 **Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing a variety of methods, most notably audio loudness.
 
