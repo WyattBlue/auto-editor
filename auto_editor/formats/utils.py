@@ -26,13 +26,6 @@ def safe_mkdir(path: str | Path) -> None:
         mkdir(path)
 
 
-def indent(base: int, *lines: str) -> str:
-    new_lines = ""
-    for line in lines:
-        new_lines += ("\t" * base) + line + "\n"
-    return new_lines
-
-
 class Validator:
     def __init__(self, log: Log):
         self.log = log

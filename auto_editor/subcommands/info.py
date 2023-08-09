@@ -66,7 +66,7 @@ class SubtitleJson(TypedDict):
 
 
 class ContainerJson(TypedDict):
-    duration: str
+    duration: float
     bitrate: str | None
 
 
