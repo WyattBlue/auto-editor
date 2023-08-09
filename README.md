@@ -6,6 +6,7 @@
 
 [![Actions Status](https://github.com/wyattblue/auto-editor/workflows/build/badge.svg)](https://github.com/wyattblue/auto-editor/actions)
 <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
+<a href="https://discord.com/invite/kMHAWJJ/"><img src="https://img.shields.io/discord/711767814821773372?color=%237289DA&label=chat&logo=discord&logoColor=white"></a>
 
 Before doing the real editing, you first cut out the "dead space" which is typically silence. This is known as a "first pass". Cutting these is a boring task, especially if the video is very long.
 
@@ -143,7 +144,7 @@ auto-editor --scale --help
 ```
 
 <h3 align="center">Auto-Editor is available on all major platforms</h3>
-<p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/site/src/img/cross-platform.webp" width="500" title="Windows, MacOS, and Linux"></p>
+<p align="center"><img src="https://auto-editor.com/img/cross-platform.webp" width="500" title="Windows, MacOS, and Linux"></p>
 
 ## Articles
  - [How to Install Auto-Editor](https://auto-editor.com/installing)
