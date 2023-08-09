@@ -200,7 +200,7 @@ class FileInfo:
         self.audios: list[AudioStream] = []
         self.subtitles: list[SubtitleStream] = []
         self.description = None
-        self.duration = ""
+        self.duration = 0.0
 
         _dir = os.path.dirname(ffmpeg.path)
         _ext = os.path.splitext(ffmpeg.path)[1]
@@ -258,7 +258,10 @@ class FileInfo:
             self.description = json_info["format"]["tags"]["description"]
 
         if "duration" in json_info["format"]:
-            self.duration = json_info["format"]["duration"]
+            try:
+                self.duration = float(json_info["format"]["duration"])
+            except Exception:
+                pass
 
         for stream in json_info["streams"]:
             lang = None
