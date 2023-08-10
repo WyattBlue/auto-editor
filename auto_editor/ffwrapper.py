@@ -8,7 +8,7 @@ from fractions import Fraction
 from pathlib import Path
 from re import search
 from subprocess import PIPE, Popen
-from typing import Any
+from typing import Any, Literal, overload
 
 from auto_editor.lang.json import Lexer, Parser
 from auto_editor.lib.err import MyError
@@ -224,18 +224,22 @@ class FileInfo:
         except Exception as e:
             log.error(e)
 
-        def get_attr(name: str, dic: dict[Any, Any], default: Any = -1) -> str:
+        @overload
+        def get_attr(name: str, dic: dict[str, str], op: Literal[True]) -> str | None:
+            ...
+
+        @overload
+        def get_attr(name: str, dic: dict[str, str]) -> str:
+            ...
+
+        def get_attr(name: str, dic: dict[str, str], op: bool = False) -> str | None:
             if name in dic:
                 if isinstance(dic[name], str):
                     return dic[name]
                 log.error(f"'{name}' must be a string")
-            if default == -1:
+            if not op:
                 log.error(f"'{name}' must be in ffprobe json")
-            if default is not None:
-                log.warning(
-                    f"'{name}' not found. Using value '{default}' as a placeholder."
-                )
-            return default
+            return None
 
         try:
             json_info = Parser(Lexer("ffprobe", info)).expr()
@@ -278,12 +282,12 @@ class FileInfo:
 
             if codec_type == "video":
                 pix_fmt = get_attr("pix_fmt", stream)
-                vduration = get_attr("duration", stream, default=None)
-                color_range = get_attr("color_range", stream, default=None)
-                color_space = get_attr("color_space", stream, default=None)
-                color_primaries = get_attr("color_primaries", stream, default=None)
-                color_transfer = get_attr("color_transfer", stream, default=None)
-                sar = get_attr("sample_aspect_ratio", stream, default=None)
+                vduration = get_attr("duration", stream, True)
+                color_range = get_attr("color_range", stream, True)
+                color_space = get_attr("color_space", stream, True)
+                color_primaries = get_attr("color_primaries", stream, True)
+                color_transfer = get_attr("color_transfer", stream, True)
+                sar = get_attr("sample_aspect_ratio", stream, True)
                 fps_str = get_attr("r_frame_rate", stream)
                 time_base_str = get_attr("time_base", stream)
 
@@ -332,9 +336,9 @@ class FileInfo:
 
                 if "channels" not in stream:
                     log.error("audio stream has no 'channels' data")
-                c = int(stream["channels"])
+                c = stream["channels"]
 
-                adur = get_attr("duration", stream, default=None)
+                adur = get_attr("duration", stream, True)
                 self.audios.append(AudioStream(codec, sr, c, adur, br, lang))
             if codec_type == "subtitle":
                 ext = SUB_EXTS.get(codec, "vtt")
