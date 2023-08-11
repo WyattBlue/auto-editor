@@ -177,7 +177,7 @@ Setting margin examples:
  - `--margin 6`
  - `--margin 4,10`
  - `--margin 0.3s,0.5s`
- = `==margin 1:12.5` ; 1 minute, 12.5 seconds
+ - `--margin 1:12.5` ; 1 minute, 12.5 seconds
 
 Behind the scenes, margin is a function that operates on boolean arrays
 (where 1 represents "loud" and 0 represents "silence")
