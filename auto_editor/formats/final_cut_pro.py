@@ -21,7 +21,7 @@ https://developer.apple.com/documentation/professional_video_applications/fcpxml
 def get_colorspace(src: FileInfo) -> str:
     # See: https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/asset#3686496
 
-    if len(src.videos) == 0:
+    if not src.videos:
         return "1-1-1 (Rec. 709)"
 
     s = src.videos[0]
@@ -41,16 +41,11 @@ def get_colorspace(src: FileInfo) -> str:
 
 
 def fcp_xml(group_name: str, output: str, tl: v3) -> None:
-    # TODOs:
-    #  - Allow fractional timebases
-    #  - Don't hardcode stereo audio layout
-
-    assert int(tl.tb) == tl.tb
 
     def fraction(val: int) -> str:
         if val == 0:
             return "0s"
-        return f"{val}/{tl.tb}s"
+        return f"{val * tl.tb.denominator}/{tl.tb.numerator}s"
 
     for _, _src in tl.sources.items():
         src = _src
@@ -82,7 +77,7 @@ def fcp_xml(group_name: str, output: str, tl: v3) -> None:
         format="r1",
         hasAudio="1" if tl.a and tl.a[0] else "0",
         audioSources="1",
-        audioChannels="2",
+        audioChannels=f"{2 if not src.audios else src.audios[0].channels}",
         duration=fraction(tl_dur),
     )
     SubElement(r2, "media-rep", kind="original-media", src=src.path.resolve().as_uri())
@@ -96,8 +91,8 @@ def fcp_xml(group_name: str, output: str, tl: v3) -> None:
         format="r1",
         tcStart="0s",
         tcFormat="NDF",
-        audioLayout="stereo",
-        audioRate=f"{tl.sr // 1000}k",
+        audioLayout="mono" if src.audios and src.audios[0].channels == 1 else "stereo",
+        audioRate="44.1k" if tl.sr == 44100 else "48k",
     )
     spine = SubElement(sequence, "spine")
 
