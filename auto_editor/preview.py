@@ -26,7 +26,6 @@ def all_cuts(tl: v3, in_len: int) -> list[int]:
     tb = tl.tb
     oe: list[tuple[int, int]] = []
 
-    # TODO: Make offset_end_pairs work on overlapping clips.
     for clip in tl.a[0]:
         oe.append((clip.offset, clip.offset + clip.dur))
 
