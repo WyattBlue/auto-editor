@@ -1099,6 +1099,22 @@ def syn_cond(env: Env, node: list) -> Any:
     return None
 
 
+def syn_case(env: Env, node: list) -> Any:
+    val_expr = my_eval(env, node[1])
+    for case_clause in node[2:]:
+        if not (type(case_clause) == list and len(case_clause) == 2):
+            raise MyError("case: bad syntax")
+        if type(case_clause[0]) == list:
+            for case in case_clause[0]:
+                if is_equal(my_eval(env, case), val_expr):
+                    return my_eval(env, case_clause[1])
+        elif type(case_clause[0]) == Sym and case_clause[0].val == "else":
+            return my_eval(env, case_clause[1])
+        else:
+            raise MyError("case: bad syntax")
+    return None
+
+
 def syn_let(env: Env, node: list) -> Any:
     if len(node) < 2:
         raise MyError(f"{node[0]}: Arity mismatch: Expected at least 1 term")
@@ -1263,6 +1279,7 @@ env.update({
     "if": Syntax(syn_if),
     "when": Syntax(syn_when),
     "cond": Syntax(syn_cond),
+    "case": Syntax(syn_case),
     "let": Syntax(syn_let),
     "let*": Syntax(syn_let_star),
     # loops
