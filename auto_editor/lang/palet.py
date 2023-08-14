@@ -1106,7 +1106,7 @@ def syn_case(env: Env, node: list) -> Any:
             raise MyError("case: bad syntax")
         if type(case_clause[0]) == list:
             for case in case_clause[0]:
-                if is_equal(my_eval(env, case), val_expr):
+                if is_equal(case, val_expr):
                     return my_eval(env, case_clause[1])
         elif type(case_clause[0]) == Sym and case_clause[0].val == "else":
             return my_eval(env, case_clause[1])
