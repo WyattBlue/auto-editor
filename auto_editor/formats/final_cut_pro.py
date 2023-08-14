@@ -41,7 +41,6 @@ def get_colorspace(src: FileInfo) -> str:
 
 
 def fcp_xml(group_name: str, output: str, tl: v3) -> None:
-
     def fraction(val: int) -> str:
         if val == 0:
             return "0s"
