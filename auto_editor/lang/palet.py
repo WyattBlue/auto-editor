@@ -928,17 +928,69 @@ def syn_definec(env: Env, node: list) -> None:
     return None
 
 
+def guard_term(node: list, n: int, u: int) -> None:
+    if n == u:
+        if len(node) != n:
+            raise MyError(
+                f"{node[0]}: Expects exactly {n-1} term{'s' if n > 2 else ''}"
+            )
+        return None
+    if len(node) < n:
+        raise MyError(f"{node[0]}: Expects at least {n-1} term{'s' if n > 2 else ''}")
+    if len(node) > u:
+        raise MyError(f"{node[0]}: Expects at most {u-1} term{'s' if u > 2 else ''}")
+
+
 def syn_set(env: Env, node: list) -> None:
-    if len(node) != 3:
-        raise MyError(f"{node[0]}: bad syntax")
+    guard_term(node, 3, 3)
+
     if type(node[1]) is not Sym:
-        raise MyError(f"{node[0]} expected identifier, got {print_str(node[1])}")
+        raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
 
     name = node[1].val
     if name not in env:
-        raise MyError(f"{node[0]}: cannot set variable '{name}' before definition")
+        raise MyError(f"{node[0]}: Can't set variable `{name}` before definition")
     env[name] = my_eval(env, node[2])
-    return None
+
+
+def syn_incf(env: Env, node: list) -> None:
+    guard_term(node, 2, 3)
+
+    if type(node[1]) is not Sym:
+        raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
+    name = node[1].val
+
+    if env[name] is None:
+        raise MyError(f"{node[0]}: `{name}` is not defined")
+    if not is_num(env[name]):
+        raise MyError(f"{node[0]}: `{name}` is not a number?")
+
+    if len(node) == 3:
+        if not is_num(num := my_eval(env, node[2])):
+            raise MyError(f"{node[0]}: Expected number? got: {print_str(num)}")
+        env[name] += num
+    else:
+        env[name] += 1
+
+
+def syn_decf(env: Env, node: list) -> None:
+    guard_term(node, 2, 3)
+
+    if type(node[1]) is not Sym:
+        raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
+    name = node[1].val
+
+    if env[name] is None:
+        raise MyError(f"{node[0]}: `{name}` is not defined")
+    if not is_num(env[name]):
+        raise MyError(f"{node[0]}: `{name}` is not a number?")
+
+    if len(node) == 3:
+        if not is_num(num := my_eval(env, node[2])):
+            raise MyError(f"{node[0]}: Expected number? got: {print_str(num)}")
+        env[name] -= num
+    else:
+        env[name] -= 1
 
 
 def syn_for(env: Env, node: list) -> None:
@@ -955,18 +1007,14 @@ def syn_for(env: Env, node: list) -> None:
             for c in node[2:]:
                 my_eval(env, c)
 
-    return None
-
 
 def syn_quote(env: Env, node: list) -> list:
-    if len(node) != 2:
-        raise MyError("quote: bad syntax")
+    guard_term(node, 2, 2)
     return node[1]
 
 
 def syn_if(env: Env, node: list) -> Any:
-    if len(node) != 4:
-        raise MyError(f"{node[0]}: bad syntax")
+    guard_term(node, 4, 4)
     test_expr = my_eval(env, node[1])
 
     if type(test_expr) is not bool:
@@ -979,7 +1027,7 @@ def syn_if(env: Env, node: list) -> Any:
 
 def syn_when(env: Env, node: list) -> Any:
     if len(node) < 3:
-        raise MyError(f"{node[0]}: bad syntax")
+        raise MyError(f"{node[0]}: Expected at least 2 terms")
     test_expr = my_eval(env, node[1])
 
     if type(test_expr) is not bool:
@@ -996,7 +1044,7 @@ def syn_when(env: Env, node: list) -> Any:
 
 def syn_and(env: Env, node: list) -> Any:
     if len(node) == 1:
-        raise MyError(f"{node[0]}: Arity mismatch: Expected 1. got 0")
+        raise MyError(f"{node[0]}: Expected at least 1 term")
 
     first = my_eval(env, node[1])
     if first is False:
@@ -1020,7 +1068,7 @@ def syn_and(env: Env, node: list) -> Any:
 
 def syn_or(env: Env, node: list) -> Any:
     if len(node) == 1:
-        raise MyError(f"{node[0]}: Arity mismatch: Expected 1. got 0")
+        raise MyError(f"{node[0]}: Expected at least 1 term")
 
     first = my_eval(env, node[1])
     if first is True:
@@ -1043,27 +1091,23 @@ def syn_or(env: Env, node: list) -> Any:
 
 
 def syn_delete(env: Env, node: list) -> None:
-    if len(node) != 2:
-        raise MyError(f"{node[0]}: Arity mismatch: Expected 1. got {len(node) - 1}")
+    guard_term(node, 2, 2)
+    if type(node[1]) is not Sym:
+        raise MyError(f"{node[0]}: Expected identifier for first term")
 
-    first = node[1]
-    if type(first) is not Sym:
-        raise MyError(f"{node[0]}: First argument: Expected identifier")
-
-    del env[first.val]
+    del env[node[1].val]
 
 
 def syn_rename(env: Env, node: list) -> None:
-    if len(node) != 3:
-        raise MyError(f"{node[0]}: Arity mismatch: Expected 2. got {len(node) - 1}")
+    guard_term(node, 3, 3)
 
     first = node[1]
     if type(first) is not Sym:
-        raise MyError(f"{node[0]}: First argument: Expected identifier")
+        raise MyError(f"{node[0]}: Expected identifier for first term")
 
     sec = node[2]
     if type(sec) is not Sym:
-        raise MyError(f"{node[0]}: Second argument: Expected identifier")
+        raise MyError(f"{node[0]}: Expected identifier for second term")
 
     if first.val not in env:
         raise MyError(f"{node[0]}: Original identifier does not exist")
@@ -1117,7 +1161,7 @@ def syn_case(env: Env, node: list) -> Any:
 
 def syn_let(env: Env, node: list) -> Any:
     if len(node) < 2:
-        raise MyError(f"{node[0]}: Arity mismatch: Expected at least 1 term")
+        raise MyError(f"{node[0]}: Expected at least 1 term")
 
     if type(node[1]) is Sym:
         raise MyError(f"{node[0]}: Named-let form is not supported")
@@ -1140,7 +1184,7 @@ def syn_let(env: Env, node: list) -> Any:
 
 def syn_let_star(env: Env, node: list) -> Any:
     if len(node) < 2:
-        raise MyError(f"{node[0]}: Arity mismatch: Expected at least 1 term")
+        raise MyError(f"{node[0]}: Expected at least 1 term")
 
     for var_ids in node[1]:
         if len(var_ids) != 2:
@@ -1275,6 +1319,8 @@ env.update({
     "define": Syntax(syn_define),
     "define/c": Syntax(syn_definec),
     "set!": Syntax(syn_set),
+    "incf": Syntax(syn_incf),
+    "decf": Syntax(syn_decf),
     "quote": Syntax(syn_quote),
     "if": Syntax(syn_if),
     "when": Syntax(syn_when),
