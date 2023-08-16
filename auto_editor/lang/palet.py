@@ -1237,50 +1237,13 @@ def syn_let_star(env: Env, node: list) -> Any:
     return my_eval(inner_env, node[-1])
 
 
-is_obj = Contract("object?", lambda v: type(v) is str or isinstance(v, (list, Proc)))
-
-
-def get_attrs(obj: Any) -> dict[str, Any]:
-    if type(obj) is str:
-        return {
-            "split": Proc("split", obj.split, (0, 1), [is_str]),
-            "strip": Proc("strip", obj.strip, (0, 0)),
-            "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
-            "startswith": Proc("startswith", obj.startswith, (1, 1), [is_str]),
-            "endswith": Proc("endswith", obj.endswith, (1, 1), [is_str]),
-            "replace": Proc("replace", obj.replace, (2, 3), [is_str, is_str, is_int]),
-            "title": Proc("title", obj.title, (0, 0)),
-            "lower": Proc("lower", obj.lower, (0, 0)),
-            "upper": Proc("upper", obj.upper, (0, 0)),
-        }
-    if isinstance(obj, list):
-        return {
-            "repeat": Proc("repeat", lambda a: obj * a, (1, 1), [is_int]),
-            "pop": Proc("pop", obj.pop, (0, 0)),
-            "sort": Proc("sort", lambda: sorted(obj), (0, 0)),
-            "sort!": Proc("sort!", obj.sort, (0, 0)),
-        }
-    raise MyError("Not an object!")
-
-
 def attr(env: Env, node: list) -> Any:
-    if len(node) != 3:
-        raise MyError("@r: not enough args")
+    guard_term(node, 3, 3)
 
     if not isinstance(node[2], Sym):
         raise MyError("@r: attribute must be an identifier")
-    my_attr = node[2].val
-    my_obj = my_eval(env, node[1])
 
-    try:
-        attrs = get_attrs(my_obj)
-    except MyError:
-        raise MyError(f"@r: expected an object, got {print_str(my_obj)}")
-    if my_attr not in attrs:
-        if mat := get_close_matches(my_attr, attrs):
-            raise MyError(f"@r: No such attribute: '{my_attr}'. Did you mean: {mat[0]}")
-        raise MyError(f"@r: No such attribute: '{my_attr}'")
-    return attrs[my_attr]
+    return my_eval(env, [node[2], node[1]])
 
 
 def my_eval(env: Env, node: object) -> Any:
@@ -1363,6 +1326,7 @@ env.update({
     "case": Syntax(syn_case),
     "let": Syntax(syn_let),
     "let*": Syntax(syn_let_star),
+    "@r": Syntax(attr),
     # loops
     "for": Syntax(syn_for),
     # contracts
@@ -1459,6 +1423,16 @@ env.update({
     # strings
     "string": Proc("string", string_append, (0, None), [is_char]),
     "string-append": Proc("string-append", string_append, (0, None), [is_str]),
+    "split": Proc("split", str.split, (1, 2), [is_str, is_str]),
+    "strip": Proc("strip", str.strip, (1, 1), [is_str]),
+    "str-repeat": Proc("str-repeat", lambda s, a: s * a, (2, 2), [is_str, is_int]),
+    "startswith": Proc("startswith", str.startswith, (2, 2), [is_str, is_str]),
+    "endswith": Proc("endswith", str.endswith, (2, 2), [is_str, is_str]),
+    "replace": Proc("replace", str.replace, (3, 4), [is_str, is_str, is_str, is_int]),
+    "title": Proc("title", str.title, (1, 1), [is_str]),
+    "lower": Proc("lower", str.lower, (1, 1), [is_str]),
+    "upper": Proc("upper", str.upper, (1, 1), [is_str]),
+    # format
     "char->int": Proc("char->int", lambda c: ord(c.val), (1, 1), [is_char]),
     "int->char": Proc("int->char", Char, (1, 1), [is_int]),
     "~a": Proc("~a", lambda *v: "".join([display_str(a) for a in v]), (0, None)),
@@ -1474,6 +1448,8 @@ env.update({
     "vector-add!": Proc("vector-add!", list.append, (2, 2), [is_vector, any_p]),
     "vector-set!": Proc("vector-set!", vector_set, (3, 3), [is_vector, is_int, any_p]),
     "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), [is_vector]),
+    "sort": Proc("sort", sorted, (1, 1), [is_vector]),
+    "sort!": Proc("sort!", list.sort, (1, 1), [is_vector]),
     # arrays
     "array": Proc("array", array_proc, (2, None), [is_symbol, is_real]),
     "make-array": Proc("make-array", make_array, (2, 3), [is_symbol, is_uint, is_real]),
@@ -1529,10 +1505,6 @@ env.update({
         "string->vector", lambda s: [Char(c) for c in s], (1, 1), [is_str]
     ),
     "range->vector": Proc("range->vector", list, (1, 1), [is_range]),
-    # objects
-    "object?": is_obj,
-    "attrs": Proc("attrs", lambda v: list(get_attrs(v).keys()), (1, 1), [is_obj]),
-    "@r": Syntax(attr),
     # reflexion
     "var-exists?": Proc("var-exists?", lambda sym: sym.val in env, (1, 1), [is_symbol]),
     "rename": Syntax(syn_rename),
