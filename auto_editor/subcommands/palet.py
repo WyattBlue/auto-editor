@@ -12,7 +12,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             program_text = file.read()
 
         try:
-            interpret(env, Parser(Lexer(sys_args[0], program_text)))
+            interpret(env, Parser(Lexer(sys_args[0], program_text, True)))
         except (MyError, ZeroDivisionError) as e:
             sys.stderr.write(f"error: {e}\n")
             sys.exit(1)
