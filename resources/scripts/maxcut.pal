@@ -1,6 +1,6 @@
 #!/usr/bin/env auto-editor palet
 
-(define (mut-remove-large arr lim replace with)
+(define (remove-large! arr lim replace with)
    (define start-p 0)
    (define active #f)
    (define j 0)
@@ -22,19 +22,19 @@
                 (set! active #f)
             )
         )
-        (set! j (add1 j))
+        (incf j)
     )
 )
 
 
 (define (maxclip oarr min)
     (define arr (array-copy oarr))
-    (mut-remove-large arr min 1 0)
+    (remove-large! arr min 1 0)
     arr
 )
 (define (maxcut oarr min)
     (define arr (array-copy oarr))
-    (mut-remove-large arr min 0 1)
+    (remove-large! arr min 0 1)
     arr
 )
 
