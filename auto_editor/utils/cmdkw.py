@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from difflib import get_close_matches
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 
 from auto_editor.lib.data_structs import Env
 from auto_editor.utils.types import CoerceError
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any
 
 
 class ParserError(Exception):
@@ -35,16 +35,10 @@ class pAttrs:
         self.attrs = attrs
 
 
-class cAttr(NamedTuple):
-    n: str
-    coerce: Any
-    default: Any
-
-
 class cAttrs:
     __slots__ = ("name", "attrs")
 
-    def __init__(self, name: str, *attrs: cAttr):
+    def __init__(self, name: str, *attrs: tuple[str, Any, Any]):
         self.name = name
         self.attrs = attrs
 
@@ -186,16 +180,7 @@ def parse_with_palet(
     return kwargs
 
 
-def _default_var_f(name: str, val: str, coerce: Any) -> Any:
-    return coerce(val)
-
-
-def parse_dataclass(
-    text: str,  # the string to be parsed
-    build: cAttrs,
-    var_f: Callable[[str, str, Any], Any] = _default_var_f,
-    coerce_default: bool = False,
-) -> dict[str, Any]:
+def parse_dataclass(text: str, build: cAttrs) -> dict[str, Any]:
     # Positional Arguments
     #    --rectangle 0,end,10,20,20,30,#000, ...
     # Keyword Arguments
@@ -204,11 +189,11 @@ def parse_dataclass(
     KEYWORD_SEP = "="
     kwargs: dict[str, Any] = {}
 
+    def var_f(n: str, c: Any, v: Any) -> Any:
+        return c(v)
+
     for attr in build.attrs:
-        if coerce_default and attr.default is not Required:
-            kwargs[_norm_name(attr.n)] = var_f(attr.n, attr.default, attr.coerce)
-        else:
-            kwargs[_norm_name(attr.n)] = attr.default
+        kwargs[attr[0]] = var_f(*attr) if attr[2] is not Required else attr[1]
 
     allow_positional_args = True
 
@@ -228,16 +213,16 @@ def parse_dataclass(
             found = False
 
             for attr in build.attrs:
-                if key == attr.n:
+                if key == attr[0]:
                     try:
-                        kwargs[_norm_name(attr.n)] = var_f(attr.n, val, attr.coerce)
+                        kwargs[attr[0]] = var_f(attr[0], attr[1], val)
                     except CoerceError as e:
                         raise ParserError(e)
                     found = True
                     break
 
             if not found:
-                all_names = {attr.n for attr in build.attrs}
+                all_names = {attr[0] for attr in build.attrs}
                 if matches := get_close_matches(key, all_names):
                     more = f"\n    Did you mean:\n        {', '.join(matches)}"
                 else:
@@ -248,8 +233,8 @@ def parse_dataclass(
                 )
 
         elif allow_positional_args:
-            name = build.attrs[i].n
-            kwargs[_norm_name(name)] = var_f(name, arg, build.attrs[i].coerce)
+            name = build.attrs[i][0]
+            kwargs[name] = var_f(name, build.attrs[i][1], arg)
         else:
             raise ParserError(
                 f"{build.name} positional argument follows keyword argument."

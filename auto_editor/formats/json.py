@@ -19,13 +19,7 @@ from auto_editor.timeline import (
     v1,
     v3,
 )
-from auto_editor.utils.cmdkw import (
-    ParserError,
-    Required,
-    cAttr,
-    cAttrs,
-    parse_dataclass,
-)
+from auto_editor.utils.cmdkw import ParserError, Required, cAttrs, parse_dataclass
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     align,
@@ -43,69 +37,69 @@ Make a pre-edited file reference that can be inputted back into auto-editor.
 
 video_builder = cAttrs(
     "video",
-    cAttr("start", natural, Required),
-    cAttr("dur", natural, Required),
-    cAttr("src", src, Required),
-    cAttr("offset", natural, 0),
-    cAttr("speed", number, 1),
-    cAttr("stream", natural, 0),
+    ("start", natural, Required),
+    ("dur", natural, Required),
+    ("src", src, Required),
+    ("offset", natural, 0),
+    ("speed", number, 1),
+    ("stream", natural, 0),
 )
 audio_builder = cAttrs(
     "audio",
-    cAttr("start", natural, Required),
-    cAttr("dur", natural, Required),
-    cAttr("src", src, Required),
-    cAttr("offset", natural, 0),
-    cAttr("speed", number, 1),
-    cAttr("volume", threshold, 1),
-    cAttr("stream", natural, 0),
+    ("start", natural, Required),
+    ("dur", natural, Required),
+    ("src", src, Required),
+    ("offset", natural, 0),
+    ("speed", number, 1),
+    ("volume", threshold, 1),
+    ("stream", natural, 0),
 )
 text_builder = cAttrs(
     "text",
-    cAttr("start", natural, Required),
-    cAttr("dur", natural, Required),
-    cAttr("content", str, Required),
-    cAttr("x", int, "50%"),
-    cAttr("y", int, "50%"),
-    cAttr("font", str, "Arial"),
-    cAttr("size", natural, 55),
-    cAttr("align", align, "left"),
-    cAttr("opacity", threshold, 1),
-    cAttr("anchor", anchor, "ce"),
-    cAttr("rotate", number, 0),
-    cAttr("fill", str, "#FFF"),
-    cAttr("stroke", natural, 0),
-    cAttr("strokecolor", color, "#000"),
+    ("start", natural, Required),
+    ("dur", natural, Required),
+    ("content", str, Required),
+    ("x", int, "50%"),
+    ("y", int, "50%"),
+    ("font", str, "Arial"),
+    ("size", natural, 55),
+    ("align", align, "left"),
+    ("opacity", threshold, 1),
+    ("anchor", anchor, "ce"),
+    ("rotate", number, 0),
+    ("fill", str, "#FFF"),
+    ("stroke", natural, 0),
+    ("strokecolor", color, "#000"),
 )
 
 img_builder = cAttrs(
     "image",
-    cAttr("start", natural, Required),
-    cAttr("dur", natural, Required),
-    cAttr("src", src, Required),
-    cAttr("x", int, "50%"),
-    cAttr("y", int, "50%"),
-    cAttr("opacity", threshold, 1),
-    cAttr("anchor", anchor, "ce"),
-    cAttr("rotate", number, 0),
-    cAttr("stroke", natural, 0),
-    cAttr("strokecolor", color, "#000"),
+    ("start", natural, Required),
+    ("dur", natural, Required),
+    ("src", src, Required),
+    ("x", int, "50%"),
+    ("y", int, "50%"),
+    ("opacity", threshold, 1),
+    ("anchor", anchor, "ce"),
+    ("rotate", number, 0),
+    ("stroke", natural, 0),
+    ("strokecolor", color, "#000"),
 )
 
 rect_builder = cAttrs(
     "rect",
-    cAttr("start", natural, Required),
-    cAttr("dur", natural, Required),
-    cAttr("x", int, Required),
-    cAttr("y", int, Required),
-    cAttr("width", int, Required),
-    cAttr("height", int, Required),
-    cAttr("opacity", threshold, 1),
-    cAttr("anchor", anchor, "ce"),
-    cAttr("rotate", number, 0),
-    cAttr("fill", color, "#c4c4c4"),
-    cAttr("stroke", natural, 0),
-    cAttr("strokecolor", color, "#000"),
+    ("start", natural, Required),
+    ("dur", natural, Required),
+    ("x", int, Required),
+    ("y", int, Required),
+    ("width", int, Required),
+    ("height", int, Required),
+    ("opacity", threshold, 1),
+    ("anchor", anchor, "ce"),
+    ("rotate", number, 0),
+    ("fill", color, "#c4c4c4"),
+    ("stroke", natural, 0),
+    ("strokecolor", color, "#000"),
 )
 ellipse_builder = rect_builder
 
@@ -181,7 +175,7 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
 
                 text = dict_to_args(vdict)
                 try:
-                    my_dict = parse_dataclass(text, my_build, coerce_default=True)
+                    my_dict = parse_dataclass(text, my_build)
                     v_out.append(my_vobj(**my_dict))
                 except ParserError as e:
                     log.error(e)
@@ -200,7 +194,7 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
 
                 text = dict_to_args(adict)
                 try:
-                    my_dict = parse_dataclass(text, my_build, coerce_default=True)
+                    my_dict = parse_dataclass(text, my_build)
                     a_out.append(my_aobj(**my_dict))
                 except ParserError as e:
                     log.error(e)
