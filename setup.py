@@ -43,7 +43,7 @@ setup(
         "av==10.0.0",
         "ae-ffmpeg==1.1.*",
     ],
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     classifiers=[
         "Topic :: Multimedia :: Sound/Audio",
         "Topic :: Multimedia :: Video",
@@ -56,7 +56,6 @@ setup(
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: Implementation :: CPython",
