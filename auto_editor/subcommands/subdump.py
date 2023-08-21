@@ -10,7 +10,7 @@ from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
 
-@dataclass
+@dataclass(slots=True)
 class SubArgs:
     ffmpeg_location: str | None = None
     my_ffmpeg: bool = False

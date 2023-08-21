@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any, Union
+from typing import Any
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import *
@@ -11,7 +11,7 @@ from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
 from auto_editor.utils.types import Align
 
 
-@dataclass
+@dataclass(slots=True)
 class v1:
     """
     v1 timeline constructor
@@ -177,8 +177,8 @@ audio_objects = {
     "audio": (TlAudio, audio_builder),
 }
 
-Visual = Union[TlText, TlImage, TlRect, TlEllipse]
-VLayer = list[Union[TlVideo, Visual]]
+Visual = TlText | TlImage | TlRect | TlEllipse
+VLayer = list[TlVideo | Visual]
 VSpace = list[VLayer]
 
 ALayer = list[TlAudio]

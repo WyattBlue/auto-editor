@@ -13,7 +13,7 @@ from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
 
-@dataclass
+@dataclass(slots=True)
 class InfoArgs:
     json: bool = False
     ffmpeg_location: str | None = None

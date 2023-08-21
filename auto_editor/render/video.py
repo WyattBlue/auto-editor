@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 av.logging.set_level(av.logging.PANIC)
 
 
-@dataclass
+@dataclass(slots=True)
 class VideoFrame:
     index: int
     src: str

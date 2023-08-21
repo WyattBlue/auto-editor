@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Union
-
 import av
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
@@ -27,7 +25,7 @@ def apply_anchor(x: int, y: int, w: int, h: int, anchor: str) -> tuple[int, int]
     return x, y
 
 
-FontCache = dict[tuple[str, int], Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]]
+FontCache = dict[tuple[str, int], ImageFont.FreeTypeFont | ImageFont.ImageFont]
 ImgCache = dict[str, Image.Image]
 
 

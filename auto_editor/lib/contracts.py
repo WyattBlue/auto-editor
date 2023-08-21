@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from fractions import Fraction
-from typing import Any, Callable
+from typing import Any
 
 from .data_structs import Sym, print_str
 from .err import MyError

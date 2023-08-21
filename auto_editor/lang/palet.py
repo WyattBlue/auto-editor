@@ -25,12 +25,13 @@ from auto_editor.lib.err import MyError
 from auto_editor.utils.func import boolop, mut_margin
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, NoReturn, Union
+    from collections.abc import Callable
+    from typing import Any, NoReturn
 
     from numpy.typing import NDArray
 
-    Number = Union[int, float, complex, Fraction]
-    Real = Union[int, float, Fraction]
+    Number = int | float | complex | Fraction
+    Real = int | float | Fraction
     BoolList = NDArray[np.bool_]
 
 

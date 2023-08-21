@@ -131,7 +131,7 @@ class FFmpeg:
         return output
 
 
-@dataclass
+@dataclass(slots=True)
 class VideoStream:
     width: int
     height: int
@@ -149,7 +149,7 @@ class VideoStream:
     lang: str | None
 
 
-@dataclass
+@dataclass(slots=True)
 class AudioStream:
     codec: str
     samplerate: int
@@ -159,7 +159,7 @@ class AudioStream:
     lang: str | None
 
 
-@dataclass
+@dataclass(slots=True)
 class SubtitleStream:
     codec: str
     ext: str
