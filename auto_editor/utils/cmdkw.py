@@ -49,10 +49,6 @@ class cAttrs:
         self.attrs = attrs
 
 
-def _default_var_f(name: str, val: str, coerce: Any) -> Any:
-    return coerce(val)
-
-
 def _norm_name(s: str) -> str:
     # Python does not allow - in variable names
     return s.replace("-", "_")
@@ -188,6 +184,10 @@ def parse_with_palet(
             raise ParserError(f"'{k}' must be specified.")
 
     return kwargs
+
+
+def _default_var_f(name: str, val: str, coerce: Any) -> Any:
+    return coerce(val)
 
 
 def parse_dataclass(

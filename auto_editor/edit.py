@@ -45,7 +45,7 @@ def set_output(
 
     ext_map = {
         "premiere": ".xml",
-        "resolve": ".xml",
+        "resolve": ".fcpxml",
         "final-cut-pro": ".fcpxml",
         "shotcut": ".mlt",
         "json": ".json",
@@ -271,7 +271,7 @@ def edit_media(
     if export["export"] in ("final-cut-pro", "resolve"):
         from auto_editor.formats.fcp11 import fcp11_write_xml
 
-        fcp11_write_xml(export["name"], output, export["export"], tl)
+        fcp11_write_xml(export["name"], output, export["export"], tl, log)
         return
 
     if export["export"] == "shotcut":

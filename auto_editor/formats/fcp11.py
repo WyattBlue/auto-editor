@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
     from auto_editor.ffwrapper import FileInfo
     from auto_editor.timeline import TlAudio, TlVideo, v3
+    from auto_editor.utils.log import Log
 
 """
 Export a FCPXML 11 file readable with Final Cut Pro 10.6.8 or later.
@@ -40,7 +41,9 @@ def get_colorspace(src: FileInfo) -> str:
     return "1-1-1 (Rec. 709)"
 
 
-def fcp11_write_xml(group_name: str, output: str, flavor: str, tl: v3) -> None:
+def fcp11_write_xml(
+    group_name: str, output: str, flavor: str, tl: v3, log: Log
+) -> None:
     def fraction(val: int) -> str:
         if val == 0:
             return "0s"
@@ -51,8 +54,8 @@ def fcp11_write_xml(group_name: str, output: str, flavor: str, tl: v3) -> None:
         break
 
     proj_name = src.path.stem
-    tl_dur = tl.out_len()
     src_dur = int(src.duration * tl.tb)
+    tl_dur = src_dur if flavor == "resolve" else tl.out_len()
 
     fcpxml = Element("fcpxml", version="1.10" if flavor == "resolve" else "1.11")
     resources = SubElement(fcpxml, "resources")
@@ -102,6 +105,7 @@ def fcp11_write_xml(group_name: str, output: str, flavor: str, tl: v3) -> None:
     else:
         clips = []
 
+    warn = False
     for clip in clips:
         clip_properties = {
             "name": proj_name,
@@ -119,6 +123,7 @@ def fcp11_write_xml(group_name: str, output: str, flavor: str, tl: v3) -> None:
             # See the "Time Maps" section.
             # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
 
+            warn = True
             timemap = SubElement(asset, "timeMap")
             SubElement(timemap, "timept", time="0s", value="0s", interp="smooth2")
             SubElement(
@@ -129,6 +134,12 @@ def fcp11_write_xml(group_name: str, output: str, flavor: str, tl: v3) -> None:
                 interp="smooth2",
             )
 
+    if flavor == "resolve" and warn:
+        log.warning(
+            "DaVinci Resolve may take a very long time when importing timelines with "
+            "speed effects. Consider switching to a good editor, like Premiere Pro, "
+            "Final Cut Pro, or ShotCut (free)"
+        )
     tree = ElementTree(fcpxml)
     indent(tree, space="\t", level=0)
     tree.write(output, xml_declaration=True, encoding="utf-8")
