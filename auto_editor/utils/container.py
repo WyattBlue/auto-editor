@@ -22,7 +22,7 @@ class DictContainer(TypedDict, total=False):
     samplerate: list[int] | None
 
 
-@dataclass
+@dataclass(slots=True)
 class Container:
     name: str | None = None
     allow_video: bool = False

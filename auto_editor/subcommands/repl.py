@@ -23,7 +23,7 @@ except ImportError:
     pass
 
 
-@dataclass
+@dataclass(slots=True)
 class REPL_Args:
     input: list[str] = field(default_factory=list)
     debug_parser: bool = False

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os.path
+from dataclasses import dataclass
 from fractions import Fraction
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
@@ -9,14 +10,12 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 
 
+@dataclass(slots=True)
 class Ensure:
-    __slots__ = ("_ffmpeg", "_sr", "temp", "log")
-
-    def __init__(self, ffmpeg: FFmpeg, sr: int, temp: str, log: Log):
-        self._ffmpeg = ffmpeg
-        self._sr = sr
-        self.temp = temp
-        self.log = log
+    _ffmpeg: FFmpeg
+    _sr: int
+    temp: str
+    log: Log
 
     def audio(self, path: str, label: str, stream: int) -> str:
         out_path = os.path.join(self.temp, f"{label}-{stream}.wav")

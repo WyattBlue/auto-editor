@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import struct
 import sys
-from typing import Literal, Union
+from typing import Literal
 
 import numpy as np
 
@@ -11,7 +11,7 @@ PCM = 0x0001
 IEEE_FLOAT = 0x0003
 EXTENSIBLE = 0xFFFE
 
-AudioData = Union[np.memmap, np.ndarray]
+AudioData = np.memmap | np.ndarray
 Endian = Literal[">", "<"]  # Big Endian, Little Endian
 ByteOrd = Literal["big", "little"]
 

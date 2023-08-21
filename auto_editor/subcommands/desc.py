@@ -8,7 +8,7 @@ from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
 
-@dataclass
+@dataclass(slots=True)
 class DescArgs:
     ffmpeg_location: str | None = None
     help: bool = False

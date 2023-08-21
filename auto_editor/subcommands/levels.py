@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
-@dataclass
+@dataclass(slots=True)
 class LevelArgs:
     input: list[str] = field(default_factory=list)
     edit: str = "audio"

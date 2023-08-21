@@ -8,16 +8,19 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from io import StringIO
 from shutil import get_terminal_size
-from typing import Any, Callable, Literal, TypeVar, Union
+from typing import TYPE_CHECKING
 
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import CoerceError
 
-T = TypeVar("T")
-Nargs = Union[int, Literal["*"]]
+if TYPE_CHECKING:
+    from typing import Any, Callable, Literal, TypeVar
+
+    T = TypeVar("T")
+    Nargs = int | Literal["*"]
 
 
-@dataclass
+@dataclass(slots=True)
 class Required:
     names: tuple[str, ...]
     nargs: Nargs = "*"
@@ -26,7 +29,7 @@ class Required:
     metavar: str = "[file ...] [options]"
 
 
-@dataclass
+@dataclass(slots=True)
 class Options:
     names: tuple[str, ...]
     nargs: Nargs = 1
@@ -37,7 +40,7 @@ class Options:
     help: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class OptionText:
     text: str
 

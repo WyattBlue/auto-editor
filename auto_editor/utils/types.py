@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Literal, Union
+from typing import Literal
 
 
 class CoerceError(Exception):
@@ -196,7 +196,7 @@ def align(val: str) -> Align:
     raise CoerceError("Align must be 'left', 'right', or 'center'")
 
 
-Stream = Union[int, Literal["all"]]
+Stream = int | Literal["all"]
 
 
 def stream(val: str) -> Stream:

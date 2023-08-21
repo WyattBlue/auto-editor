@@ -78,7 +78,7 @@ builder_map = {
 }
 
 
-@dataclass
+@dataclass(slots=True)
 class FileSetup:
     src: FileInfo
     ensure: Ensure

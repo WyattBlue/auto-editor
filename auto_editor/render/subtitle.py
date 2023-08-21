@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from auto_editor.utils.log import Log
 
 
-@dataclass
+@dataclass(slots=True)
 class SerialSub:
     start: int
     end: int

@@ -5,10 +5,11 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from fractions import Fraction
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
@@ -20,7 +21,7 @@ from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
 
-@dataclass
+@dataclass(slots=True)
 class TestArgs:
     only: list[str] = field(default_factory=list)
     help: bool = False
