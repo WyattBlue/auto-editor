@@ -262,16 +262,16 @@ def edit_media(
         make_json_timeline(export["api"], output, tl, log)
         return
 
-    if export["export"] in ("premiere", "resolve"):
+    if export["export"] == "premiere":
         from auto_editor.formats.fcp7 import fcp7_write_xml
 
-        fcp7_write_xml(export["name"], ffmpeg, output, tl, export["export"], log)
+        fcp7_write_xml(export["name"], ffmpeg, output, tl, log)
         return
 
-    if export["export"] == "final-cut-pro":
-        from auto_editor.formats.final_cut_pro import fcp_xml
+    if export["export"] in ("final-cut-pro", "resolve"):
+        from auto_editor.formats.fcp11 import fcp11_write_xml
 
-        fcp_xml(export["name"], output, tl)
+        fcp11_write_xml(export["name"], output, export["export"], tl)
         return
 
     if export["export"] == "shotcut":

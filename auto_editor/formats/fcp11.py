@@ -40,7 +40,7 @@ def get_colorspace(src: FileInfo) -> str:
     return "1-1-1 (Rec. 709)"
 
 
-def fcp_xml(group_name: str, output: str, tl: v3) -> None:
+def fcp11_write_xml(group_name: str, output: str, flavor: str, tl: v3) -> None:
     def fraction(val: int) -> str:
         if val == 0:
             return "0s"
@@ -54,7 +54,7 @@ def fcp_xml(group_name: str, output: str, tl: v3) -> None:
     tl_dur = tl.out_len()
     src_dur = int(src.duration * tl.tb)
 
-    fcpxml = Element("fcpxml", version="1.11")
+    fcpxml = Element("fcpxml", version="1.10" if flavor == "resolve" else "1.11")
     resources = SubElement(fcpxml, "resources")
     SubElement(
         resources,
