@@ -338,12 +338,6 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     return v3(sources, tb, sr, res, "#000", vobjs, aobjs, None)
 
 
-def path_resolve(path: Path, flavor: str) -> str:
-    if flavor == "resolve":
-        return path.resolve().as_uri()
-    return f"{path.resolve()}"
-
-
 def media_def(
     filedef: Element, url: str, src: FileInfo, tl: v3, tb: int, ntsc: str
 ) -> None:
@@ -379,9 +373,7 @@ def media_def(
         ET.SubElement(audiodef, "channelcount").text = f"{src.audios[0].channels}"
 
 
-def fcp7_write_xml(
-    name: str, ffmpeg: FFmpeg, output: str, tl: v3, flavor: str, log: Log
-) -> None:
+def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> None:
     width, height = tl.res
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
@@ -390,10 +382,13 @@ def fcp7_write_xml(
     key_to_source: dict[tuple[str, int], FileInfo] = {}
     file_defs: set[str] = set()  # Contains urls
 
+    def path_resolve(path: Path) -> str:
+        return f"{path.resolve()}"
+
     for key, src in tl.sources.items():
         key_to_source[(key, 0)] = src
         key_to_id[(key, 0)] = f"file-{len(key_to_id)+1}"
-        key_to_url[(key, 0)] = path_resolve(src.path, flavor)
+        key_to_url[(key, 0)] = path_resolve(src.path)
 
         if len(src.audios) > 1:
             fold = src.path.parent / f"{src.path.stem}_tracks"
@@ -407,7 +402,7 @@ def fcp7_write_xml(
                 )
 
                 key_to_source[(key, i)] = FileInfo(f"{newtrack}", ffmpeg, log, key)
-                key_to_url[(key, i)] = path_resolve(newtrack, flavor)
+                key_to_url[(key, i)] = path_resolve(newtrack)
                 key_to_id[(key, i)] = f"file-{len(key_to_id)+1}"
 
     xmeml = ET.Element("xmeml", version="4")
