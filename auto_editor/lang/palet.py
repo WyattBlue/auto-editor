@@ -729,10 +729,8 @@ def ref(seq: Any, ref: int) -> Any:
         if isinstance(seq, np.ndarray) and seq.dtype == np.bool_:
             return int(seq[ref])
         return seq[ref]
-    except KeyError:
+    except (KeyError, IndexError, TypeError):
         raise MyError(f"ref: Invalid key: {print_str(ref)}")
-    except IndexError:
-        raise MyError(f"ref: Invalid index: {print_str(ref)}")
 
 
 def p_slice(
