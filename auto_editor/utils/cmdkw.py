@@ -4,7 +4,6 @@ from difflib import get_close_matches
 from typing import TYPE_CHECKING
 
 from auto_editor.lib.data_structs import Env
-from auto_editor.utils.types import CoerceError
 
 if TYPE_CHECKING:
     from typing import Any
@@ -31,14 +30,6 @@ class pAttrs:
     __slots__ = ("name", "attrs")
 
     def __init__(self, name: str, *attrs: pAttr):
-        self.name = name
-        self.attrs = attrs
-
-
-class cAttrs:
-    __slots__ = ("name", "attrs")
-
-    def __init__(self, name: str, *attrs: tuple[str, Any, Any]):
         self.name = name
         self.attrs = attrs
 
@@ -172,73 +163,6 @@ def parse_with_palet(
                 f"{build.name} positional argument follows keyword argument."
             )
         i += 1
-
-    for k, v in kwargs.items():
-        if v is Required:
-            raise ParserError(f"'{k}' must be specified.")
-
-    return kwargs
-
-
-def parse_dataclass(text: str, build: cAttrs) -> dict[str, Any]:
-    # Positional Arguments
-    #    --rectangle 0,end,10,20,20,30,#000, ...
-    # Keyword Arguments
-    #    --rectangle start=0,dur=end,x1=10, ...
-
-    KEYWORD_SEP = "="
-    kwargs: dict[str, Any] = {}
-
-    def var_f(n: str, c: Any, v: Any) -> Any:
-        return c(v)
-
-    for attr in build.attrs:
-        kwargs[attr[0]] = var_f(*attr) if attr[2] is not Required else attr[1]
-
-    allow_positional_args = True
-
-    for i, arg in enumerate(text.split(",")):
-        if not arg:
-            continue
-
-        if i + 1 > len(build.attrs):
-            raise ParserError(
-                f"{build.name} has too many arguments, starting with '{arg}'."
-            )
-
-        if KEYWORD_SEP in arg:
-            key, val = arg.split(KEYWORD_SEP, 1)
-
-            allow_positional_args = False
-            found = False
-
-            for attr in build.attrs:
-                if key == attr[0]:
-                    try:
-                        kwargs[attr[0]] = var_f(attr[0], attr[1], val)
-                    except CoerceError as e:
-                        raise ParserError(e)
-                    found = True
-                    break
-
-            if not found:
-                all_names = {attr[0] for attr in build.attrs}
-                if matches := get_close_matches(key, all_names):
-                    more = f"\n    Did you mean:\n        {', '.join(matches)}"
-                else:
-                    more = f"\n    keywords available:\n        {', '.join(all_names)}"
-
-                raise ParserError(
-                    f"{build.name} got an unexpected keyword '{key}'\n{more}"
-                )
-
-        elif allow_positional_args:
-            name = build.attrs[i][0]
-            kwargs[name] = var_f(name, build.attrs[i][1], arg)
-        else:
-            raise ParserError(
-                f"{build.name} positional argument follows keyword argument."
-            )
 
     for k, v in kwargs.items():
         if v is Required:
