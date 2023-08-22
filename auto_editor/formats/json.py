@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from difflib import get_close_matches
 from fractions import Fraction
 from typing import Any
 
@@ -13,16 +14,15 @@ from auto_editor.timeline import (
     TlEllipse,
     TlImage,
     TlRect,
-    TlText,
     TlVideo,
     Visual,
     v1,
     v3,
 )
-from auto_editor.utils.cmdkw import ParserError, Required, cAttrs, parse_dataclass
+from auto_editor.utils.cmdkw import ParserError, Required
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
-    align,
+    CoerceError,
     anchor,
     color,
     natural,
@@ -34,6 +34,15 @@ from auto_editor.utils.types import (
 """
 Make a pre-edited file reference that can be inputted back into auto-editor.
 """
+
+
+class cAttrs:
+    __slots__ = ("name", "attrs")
+
+    def __init__(self, name: str, *attrs: tuple[str, Any, Any]):
+        self.name = name
+        self.attrs = attrs
+
 
 video_builder = cAttrs(
     "video",
@@ -54,24 +63,6 @@ audio_builder = cAttrs(
     ("volume", threshold, 1),
     ("stream", natural, 0),
 )
-text_builder = cAttrs(
-    "text",
-    ("start", natural, Required),
-    ("dur", natural, Required),
-    ("content", str, Required),
-    ("x", int, "50%"),
-    ("y", int, "50%"),
-    ("font", str, "Arial"),
-    ("size", natural, 55),
-    ("align", align, "left"),
-    ("opacity", threshold, 1),
-    ("anchor", anchor, "ce"),
-    ("rotate", number, 0),
-    ("fill", str, "#FFF"),
-    ("stroke", natural, 0),
-    ("strokecolor", color, "#000"),
-)
-
 img_builder = cAttrs(
     "image",
     ("start", natural, Required),
@@ -106,7 +97,6 @@ ellipse_builder = rect_builder
 visual_objects = {
     "rectangle": (TlRect, rect_builder),
     "ellipse": (TlEllipse, ellipse_builder),
-    "text": (TlText, text_builder),
     "image": (TlImage, img_builder),
     "video": (TlVideo, video_builder),
 }
@@ -156,13 +146,6 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
     v: Any = []
     a: Any = []
 
-    def dict_to_args(d: dict) -> str:
-        attrs = []
-        for k, v in d.items():
-            if k != "name":
-                attrs.append(f"{k}={v}")
-        return ",".join(attrs)
-
     for vlayers in tl["v"]:
         if vlayers:
             v_out: list[Visual] = []
@@ -173,9 +156,8 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
                     log.error(f"Unknown video object: {vdict['name']}")
                 my_vobj, my_build = visual_objects[vdict["name"]]
 
-                text = dict_to_args(vdict)
                 try:
-                    my_dict = parse_dataclass(text, my_build)
+                    my_dict = parse_obj(vdict, my_build)
                     v_out.append(my_vobj(**my_dict))
                 except ParserError as e:
                     log.error(e)
@@ -192,9 +174,8 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
                     log.error(f"Unknown audio object: {adict['name']}")
                 my_aobj, my_build = audio_objects[adict["name"]]
 
-                text = dict_to_args(adict)
                 try:
-                    my_dict = parse_dataclass(text, my_build)
+                    my_dict = parse_obj(adict, my_build)
                     a_out.append(my_aobj(**my_dict))
                 except ParserError as e:
                     log.error(e)
@@ -249,6 +230,44 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     if type(ver) is not str:
         log.error("version needs to be a string")
     log.error(f"Importing version {ver} timelines is not supported.")
+
+
+def parse_obj(obj: dict[str, Any], build: cAttrs) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+
+    del obj["name"]
+
+    def var_f(n: str, c: Any, v: Any) -> Any:
+        return c(v)
+
+    for attr in build.attrs:
+        kwargs[attr[0]] = var_f(*attr) if attr[2] is not Required else attr[1]
+
+    for key, val in obj.items():
+        found = False
+        for attr in build.attrs:
+            if key == attr[0]:
+                try:
+                    kwargs[key] = var_f(key, attr[1], val)
+                except CoerceError as e:
+                    raise ParserError(e)
+                found = True
+                break
+
+        if not found:
+            all_names = {attr[0] for attr in build.attrs}
+            if matches := get_close_matches(key, all_names):
+                more = f"\n    Did you mean:\n        {', '.join(matches)}"
+            else:
+                more = f"\n    keywords available:\n        {', '.join(all_names)}"
+
+            raise ParserError(f"{build.name} got an unexpected keyword '{key}'\n{more}")
+
+    for k, v in kwargs.items():
+        if v is Required:
+            raise ParserError(f"'{k}' must be specified.")
+
+    return kwargs
 
 
 def make_json_timeline(ver: int, out: str | int, tl: v3, log: Log) -> None:
