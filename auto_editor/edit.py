@@ -271,7 +271,7 @@ def edit_media(
     if export["export"] in ("final-cut-pro", "resolve"):
         from auto_editor.formats.fcp11 import fcp11_write_xml
 
-        fcp11_write_xml(export["name"], output, export["export"], tl, log)
+        fcp11_write_xml(export["name"], ffmpeg, output, export["export"], tl, log)
         return
 
     if export["export"] == "shotcut":

@@ -3,10 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 from xml.etree.ElementTree import Element, ElementTree, SubElement, indent
 
+from auto_editor.ffwrapper import FFmpeg, FileInfo
+
+from .utils import make_tracks_dir
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from fractions import Fraction
 
-    from auto_editor.ffwrapper import FileInfo
     from auto_editor.timeline import TlAudio, TlVideo, v3
     from auto_editor.utils.log import Log
 
@@ -41,8 +45,16 @@ def get_colorspace(src: FileInfo) -> str:
     return "1-1-1 (Rec. 709)"
 
 
+def make_name(src: FileInfo, tb: Fraction) -> str:
+    if src.get_res()[1] == 720 and tb == 30:
+        return "FFVideoFormat720p30"
+    if src.get_res()[1] == 720 and tb == 25:
+        return "FFVideoFormat720p25"
+    return "FFVideoFormatRateUndefined"
+
+
 def fcp11_write_xml(
-    group_name: str, output: str, flavor: str, tl: v3, log: Log
+    group_name: str, ffmpeg: FFmpeg, output: str, flavor: str, tl: v3, log: Log
 ) -> None:
     def fraction(val: int) -> str:
         if val == 0:
@@ -57,32 +69,50 @@ def fcp11_write_xml(
     src_dur = int(src.duration * tl.tb)
     tl_dur = src_dur if flavor == "resolve" else tl.out_len()
 
+    all_srcs: list[FileInfo] = [src]
+    all_refs: list[str] = ["r2"]
+    if flavor == "resolve":
+        if len(src.audios) > 1:
+            fold = make_tracks_dir(src)
+
+            for i in range(1, len(src.audios)):
+                newtrack = fold / f"{i}.wav"
+                ffmpeg.run(
+                    ["-i", f"{src.path.resolve()}", "-map", f"0:a:{i}", f"{newtrack}"]
+                )
+                all_srcs.append(FileInfo(f"{newtrack}", ffmpeg, log))
+                all_refs.append(f"r{(i + 1) * 2}")
+
     fcpxml = Element("fcpxml", version="1.10" if flavor == "resolve" else "1.11")
     resources = SubElement(fcpxml, "resources")
-    SubElement(
-        resources,
-        "format",
-        id="r1",
-        name=f"FFVideoFormat{tl.res[1]}p{int(tl.tb)}",
-        frameDuration=fraction(1),
-        width=f"{tl.res[0]}",
-        height=f"{tl.res[1]}",
-        colorSpace=get_colorspace(src),
-    )
-    r2 = SubElement(
-        resources,
-        "asset",
-        id="r2",
-        name=proj_name,
-        start="0s",
-        hasVideo="1" if tl.v and tl.v[0] else "0",
-        format="r1",
-        hasAudio="1" if tl.a and tl.a[0] else "0",
-        audioSources="1",
-        audioChannels=f"{2 if not src.audios else src.audios[0].channels}",
-        duration=fraction(tl_dur),
-    )
-    SubElement(r2, "media-rep", kind="original-media", src=src.path.resolve().as_uri())
+
+    for i, one_src in enumerate(all_srcs):
+        SubElement(
+            resources,
+            "format",
+            id=f"r{i*2+1}",
+            name=make_name(one_src, tl.tb),
+            frameDuration=fraction(1),
+            width=f"{tl.res[0]}",
+            height=f"{tl.res[1]}",
+            colorSpace=get_colorspace(one_src),
+        )
+        r2 = SubElement(
+            resources,
+            "asset",
+            id=f"r{i*2+2}",
+            name=one_src.path.stem,
+            start="0s",
+            hasVideo="1" if one_src.videos else "0",
+            format=f"r{i*2+1}",
+            hasAudio="1" if one_src.audios else "0",
+            audioSources="1",
+            audioChannels=f"{2 if not one_src.audios else one_src.audios[0].channels}",
+            duration=fraction(tl_dur),
+        )
+        SubElement(
+            r2, "media-rep", kind="original-media", src=one_src.path.resolve().as_uri()
+        )
 
     lib = SubElement(fcpxml, "library")
     evt = SubElement(lib, "event", name=group_name)
@@ -105,11 +135,10 @@ def fcp11_write_xml(
     else:
         clips = []
 
-    warn = False
-    for clip in clips:
+    def make_clip(ref: str, clip: TlVideo | TlAudio, speed_warn: bool) -> bool:
         clip_properties = {
             "name": proj_name,
-            "ref": "r2",
+            "ref": ref,
             "offset": fraction(clip.start),
             "duration": fraction(clip.dur),
             "start": fraction(int(clip.offset // clip.speed)),
@@ -123,7 +152,7 @@ def fcp11_write_xml(
             # See the "Time Maps" section.
             # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
 
-            warn = True
+            speed_warn = True
             timemap = SubElement(asset, "timeMap")
             SubElement(timemap, "timept", time="0s", value="0s", interp="smooth2")
             SubElement(
@@ -133,6 +162,12 @@ def fcp11_write_xml(
                 value=fraction(src_dur),
                 interp="smooth2",
             )
+        return speed_warn
+
+    warn = False
+    for my_ref in all_refs:
+        for clip in clips:
+            warn = make_clip(my_ref, clip, warn)
 
     if flavor == "resolve" and warn:
         log.warning(

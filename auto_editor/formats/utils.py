@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
-from auto_editor.utils.log import Log
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from auto_editor.ffwrapper import FileInfo
+    from auto_editor.utils.log import Log
 
 
 def show(ele: Element, limit: int, depth: int = 0) -> None:
@@ -15,15 +19,19 @@ def show(ele: Element, limit: int, depth: int = 0) -> None:
             show(child, limit, depth + 1)
 
 
-def safe_mkdir(path: str | Path) -> None:
+def make_tracks_dir(src: FileInfo) -> Path:
     from os import mkdir
     from shutil import rmtree
 
+    fold = src.path.parent / f"{src.path.stem}_tracks"
+
     try:
-        mkdir(path)
+        mkdir(fold)
     except OSError:
-        rmtree(path)
-        mkdir(path)
+        rmtree(fold)
+        mkdir(fold)
+
+    return fold
 
 
 class Validator:
