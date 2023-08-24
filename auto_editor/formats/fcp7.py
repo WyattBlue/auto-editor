@@ -10,7 +10,7 @@ from xml.etree.ElementTree import Element
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
 
-from .utils import Validator, safe_mkdir, show
+from .utils import Validator, make_tracks_dir, show
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -391,9 +391,7 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
         key_to_url[(key, 0)] = path_resolve(src.path)
 
         if len(src.audios) > 1:
-            fold = src.path.parent / f"{src.path.stem}_tracks"
-            safe_mkdir(fold)
-
+            fold = make_tracks_dir(src)
             for i in range(1, len(src.audios)):
                 newtrack = fold / f"{i}.wav"
 
