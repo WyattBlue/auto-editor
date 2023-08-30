@@ -48,7 +48,7 @@ class ClosingError(MyError):
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 VAL, QUOTE, SEC, DB, PER, DOT = "VAL", "QUOTE", "SEC", "DB", "PER", "DOT"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
-VLIT, HASH_LIT = "VLIT", "HLIT"
+VLIT = "VLIT"
 METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
 brac_pairs = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
 
@@ -220,18 +220,6 @@ class Lexer:
 
         if result in ("f", "F", "false"):
             return Token(VAL, False)
-
-        if result == "hash":
-            self.advance()
-            if self.char is None or self.char not in "([{":
-                self.error("Expected an opening bracket after #hash")
-
-            brac_type = self.char
-            self.advance()
-            if self.char is None:
-                self.close_err(f"Expected a character after #{brac_type}")
-
-            return Token(HASH_LIT, brac_type)
 
         self.error(f"Unknown hash literal `#{result}`")
 
