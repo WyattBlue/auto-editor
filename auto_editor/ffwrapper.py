@@ -298,11 +298,10 @@ class FileInfo:
                 except ValueError:
                     log.error(f"Could not convert fps '{fps_str}' to Fraction.")
 
-                if fps < 1:
-                    if codec in IMG_CODECS:
-                        fps = Fraction(25)
-                    elif fps == 0:
-                        fps = Fraction(30)
+                if fps < 1 and codec in IMG_CODECS:
+                    fps = Fraction(25)
+                if fps == 0:
+                    fps = Fraction(30)
 
                 try:
                     time_base = Fraction(time_base_str)
