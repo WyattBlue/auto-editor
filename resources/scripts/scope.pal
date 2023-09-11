@@ -1,5 +1,6 @@
 #!/usr/bin/env auto-editor palet
 
+#lang palet
 ; Enforce lexical scoping
 
 (define (f x) (lambda (y) (+ x y)))
