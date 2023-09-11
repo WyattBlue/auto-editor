@@ -180,10 +180,7 @@ class Lexer:
             if unit == "i":
                 return Token(VAL, complex(result + "j"))
             elif "/" in result:
-                val = Fraction(result)
-                if val.denominator == 1:
-                    return Token(token, val.numerator)
-                return Token(token, val)
+                return Token(token, Fraction(result))
             elif "." in result:
                 return Token(token, float(result))
             else:
@@ -934,7 +931,9 @@ def syn_definec(env: Env, node: list) -> None:
     contracts: list[Proc | Contract] = []
     parameters: list[Sym] = []
     for item in node[1][1:]:
-        if len(item) != 2:
+        if item == Sym("->"):
+            break
+        if type(item) is not list or len(item) != 2:
             raise MyError(f"{node[0]}: bad var-binding syntax")
         if type(item[0]) is not Sym:
             raise MyError(f"{node[0]}: binding must be identifier")
@@ -1013,6 +1012,23 @@ def syn_decf(env: Env, node: list) -> None:
         env[name] -= num
     else:
         env[name] -= 1
+
+
+def syn_strappend(env: Env, node: list) -> None:
+    guard_term(node, 3, 3)
+
+    if type(node[1]) is not Sym:
+        raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
+    name = node[1].val
+
+    if env[name] is None:
+        raise MyError(f"{node[0]}: `{name}` is not defined")
+    if not is_str(env[name]):
+        raise MyError(f"{node[0]}: `{name}` is not a string?")
+
+    if not is_str(num := my_eval(env, node[2])):
+        raise MyError(f"{node[0]}: Expected string? got: {print_str(num)}")
+    env[name] += num
 
 
 def syn_for(env: Env, node: list) -> None:
@@ -1224,6 +1240,10 @@ def syn_let_star(env: Env, node: list) -> Any:
     return my_eval(inner_env, node[-1])
 
 
+def syn_class(env: Env, node: list) -> Any:
+    ...
+
+
 def attr(env: Env, node: list) -> Any:
     guard_term(node, 3, 3)
 
@@ -1306,6 +1326,7 @@ env.update({
     "set!": Syntax(syn_set),
     "incf": Syntax(syn_incf),
     "decf": Syntax(syn_decf),
+    "&=": Syntax(syn_strappend),
     "quote": Syntax(syn_quote),
     "if": Syntax(syn_if),
     "when": Syntax(syn_when),
@@ -1313,6 +1334,7 @@ env.update({
     "case": Syntax(syn_case),
     "let": Syntax(syn_let),
     "let*": Syntax(syn_let_star),
+    "class": Syntax(syn_class),
     "@r": Syntax(attr),
     # loops
     "for": Syntax(syn_for),
@@ -1409,7 +1431,7 @@ env.update({
     "string->symbol": Proc("string->symbol", Sym, (1, 1), [is_str]),
     # strings
     "string": Proc("string", string_append, (0, None), [is_char]),
-    "string-append": Proc("string-append", string_append, (0, None), [is_str]),
+    "&": Proc("&", string_append, (0, None), [is_str]),
     "split": Proc("split", str.split, (1, 2), [is_str, is_str]),
     "strip": Proc("strip", str.strip, (1, 1), [is_str]),
     "str-repeat": Proc("str-repeat", lambda s, a: s * a, (2, 2), [is_str, is_int]),

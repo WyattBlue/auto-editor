@@ -683,7 +683,7 @@ def main(sys_args: list[str] | None = None):
             ("(float? 21)", False),
             ("(frac? 4/5)", True),
             ("(frac? 3.4)", False),
-            ('(string-append "Hello" " World")', "Hello World"),
+            ('(& "Hello" " World")', "Hello World"),
             ('(define apple "Red Wood") apple', "Red Wood"),
             ("(= 1 1.0)", True),
             ("(= 1 2)", False),

@@ -123,6 +123,21 @@ def read_tb_ntsc(tb: int, ntsc: bool) -> Fraction:
     return Fraction(tb)
 
 
+"""
+(define/c (read-tb-ntsc [tb int?] [ntsc bool?] -> frac?)
+    (if ntsc
+        (cond
+            ((= tb 24) 24000/1001)
+            ((= tb 30) 30000/1001)
+            ((= tb 60) 60000/1001)
+            (else (* tb 999/1000))
+        )
+        (* tb 1/1)
+    )
+)
+"""
+
+
 def speedup(speed: float) -> Element:
     fil = Element("filter")
     effect = ET.SubElement(fil, "effect")
@@ -149,6 +164,28 @@ def speedup(speed: float) -> Element:
     ET.SubElement(para3, "value").text = "FALSE"
 
     return fil
+
+
+"""
+(define/c (speedup [speed float?] -> element?)
+    (xml (filter (effect
+        (name "Time Remap")
+        (effectid "timeremap")
+        (parameter #:authoringApp "PremierePro"
+            (parameterid "variablespeed") (name "variablespeed")
+            (valuemin "0") (valuemax "1") (value "0")
+        )
+        (parameter #:authoringApp "PremierePro"
+            (parameterid "speed") (name "speed")
+            (valuemin "-100000") (valuemax "100000") (value (number->string speed))
+        )
+        (parameter #:authoringApp "PremierePro"
+            (parameterid "frameblending") (name "frameblending")
+            (value "FALSE")
+        )
+    )))
+)
+"""
 
 
 SUPPORTED_EFFECTS = ["timeremap"]
