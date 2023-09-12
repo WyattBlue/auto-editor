@@ -198,6 +198,16 @@ class Lexer:
             self.advance()
             return Token(VAL, Char(char))
 
+        if self.char == ":":
+            self.advance()
+            buf = StringIO()
+            while self.char_is_norm():
+                assert self.char is not None
+                buf.write(self.char)
+                self.advance()
+
+            return Token(VAL, Keyword(buf.getvalue()))
+
         if self.char is not None and self.char in "([{":
             brac_type = self.char
             self.advance()
@@ -505,6 +515,9 @@ is_boolarr = Contract(
 bool_or_barr = Contract(
     "(or/c bool? bool-array?)",
     lambda v: type(v) is bool or is_boolarr(v),
+)
+is_keyw = Contract(
+    "keyword?", lambda v: type(v) is list and len(v) == 2 and type(v[1]) is Keyword
 )
 
 
@@ -1048,6 +1061,8 @@ def syn_for(env: Env, node: list) -> None:
 
 def syn_quote(env: Env, node: list) -> list:
     guard_term(node, 2, 2)
+    if type(node[1]) is list or type(node[1]) is Keyword:
+        return [list, node[1]]
     return node[1]
 
 
@@ -1447,6 +1462,10 @@ env.update({
     "~a": Proc("~a", lambda *v: "".join([display_str(a) for a in v]), (0, None)),
     "~s": Proc("~s", lambda *v: " ".join([display_str(a) for a in v]), (0, None)),
     "~v": Proc("~v", lambda *v: " ".join([print_str(a) for a in v]), (0, None)),
+    # keyword
+    "keyword?": is_keyw,
+    "keyword->string": Proc("keyword->string", lambda k: k[1].val, (1, 1), [is_keyw]),
+    "string->keyword": Proc("string->keyword", lambda s: [list, Keyword(s)], (1, 1), [is_str]),
     # vectors
     "vector": Proc("vector", lambda *a: list(a), (0, None)),
     "make-vector": Proc(
@@ -1525,5 +1544,7 @@ env.update({
 def interpret(env: Env, parser: Parser) -> list:
     result = []
     while parser.current_token.type != EOF:
-        result.append(my_eval(env, parser.expr()))
+        if type(parsed := my_eval(env, parser.expr())) is Keyword:
+            raise MyError(f"Keyword misused in expression. `{parsed}`")
+        result.append(parsed)
     return result
