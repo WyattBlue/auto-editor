@@ -66,6 +66,21 @@ class Sym:
         return type(obj) is Sym and self.hash == obj.hash
 
 
+class Keyword:
+    __slots__ = "val"
+
+    def __init__(self, val: str):
+        self.val = val
+
+    def __str__(self) -> str:
+        return f"#:{self.val}"
+
+    __repr__ = __str__
+
+    def __eq__(self, obj: object) -> bool:
+        return type(obj) is Keyword and self.val == obj.val
+
+
 class Char:
     __slots__ = "val"
 
@@ -123,10 +138,24 @@ def display_str(val: object) -> str:
         return f"{val.real}{join}{val.imag}i"
     if type(val) is np.bool_:
         return "1" if val else "0"
-
-    if isinstance(val, Fraction):
+    if type(val) is Fraction:
         return f"{val.numerator}/{val.denominator}"
-    if isinstance(val, list):
+
+    if type(val) is list and val and val[0] is list:
+        if type(val[1]) is Keyword:
+            return f"{val[1]}"
+
+        if not val[1]:
+            return "()"
+
+        result = StringIO()
+        result.write(f"({display_str(val[1][0])}")
+        for item in val[1][1:]:
+            result.write(f" {display_str(item)}")
+        result.write(")")
+        return result.getvalue()
+
+    if type(val) is list:
         if not val:
             return "#()"
         result = StringIO()
@@ -182,7 +211,9 @@ def print_str(val: object) -> str:
         return f'"{val}"'
     if type(val) is Char:
         return f"{val!r}"
-    if type(val) is Sym:
+    if type(val) is Keyword:
+        return f"'{val}"
+    if type(val) is Sym or (type(val) is list and val and val[0] is list):
         return f"'{display_str(val)}"
 
     return display_str(val)
