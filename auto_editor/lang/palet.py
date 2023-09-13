@@ -554,13 +554,8 @@ def num_div(z: Number, *w: Number) -> Number:
         if num == 0:
             raise MyError("/: division by zero")
 
-        if type(num) is int:
-            num = Fraction(num)
-
         z /= num
 
-    if type(z) is Fraction and z.denominator == 1:
-        return z.numerator
     return z
 
 
