@@ -46,7 +46,7 @@ class ClosingError(MyError):
 ###############################################################################
 
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
-VAL, QUOTE, SEC, DB, PER, DOT = "VAL", "QUOTE", "SEC", "DB", "PER", "DOT"
+VAL, QUOTE, SEC, DB, DOT = "VAL", "QUOTE", "SEC", "DB", "DOT"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
 VLIT = "VLIT"
 METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
@@ -171,14 +171,14 @@ class Lexer:
                 token = SEC
             elif unit == "dB":
                 token = DB
-            elif unit == "%":
-                token = PER
-            elif unit != "i":
+            elif unit != "i" and unit != "%":
                 return Token(VAL, Sym(result + unit))
 
         try:
             if unit == "i":
                 return Token(VAL, complex(result + "j"))
+            elif unit == "%":
+                return Token(VAL, float(result) / 100)
             elif "/" in result:
                 return Token(token, Fraction(result))
             elif "." in result:
@@ -412,6 +412,7 @@ class Parser:
             self.eat()
             return [list, lit_arr]
 
+        # Handle unhygienic macros in next four cases
         if token.type == SEC:
             self.eat()
             return [Sym("round"), [Sym("*"), token.value, Sym("timebase")]]
@@ -419,10 +420,6 @@ class Parser:
         if token.type == DB:
             self.eat()
             return [Sym("pow"), 10, [Sym("/"), token.value, 20]]
-
-        if token.type == PER:
-            self.eat()
-            return [Sym("/"), token.value, 100.0]
 
         if token.type == DOT:
             self.eat()
