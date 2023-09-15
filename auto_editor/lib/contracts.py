@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from fractions import Fraction
 from typing import Any
 
@@ -8,49 +9,47 @@ from .data_structs import Sym, print_str
 from .err import MyError
 
 
+@dataclass(slots=True)
 class Proc:
-    __slots__ = ("name", "proc", "arity", "contracts")
-
-    def __init__(
-        self,
-        name: str,
-        proc: Callable,
-        arity: tuple[int, int | None] = (1, None),
-        contracts: list[Any] | None = None,
-    ):
-        self.name = name
-        self.proc = proc
-        self.arity = arity
-        self.contracts = contracts
-
-    def __str__(self) -> str:
-        return f"#<procedure:{self.name}>"
-
-    __repr__ = __str__
+    name: str
+    proc: Callable
+    arity: tuple[int, int | None] = (1, None)
+    contracts: list[Any] | None = None
 
     def __call__(self, *args: Any) -> Any:
         return self.proc(*args)
 
+    def __str__(self) -> str:
+        return self.name
 
+    def __repr__(self) -> str:
+        n = "inf" if self.arity[1] is None else f"{self.arity[1]}"
+
+        if self.contracts is None:
+            c = ""
+        else:
+            c = " (" + " ".join([f"{c}" for c in self.contracts]) + ")"
+        return f"#<proc:{self.name} ({self.arity[0]} {n}){c}>"
+
+
+@dataclass(slots=True)
 class Contract:
     # Convenient flat contract class
-    __slots__ = ("name", "c")
-
-    def __init__(self, name: str, c: Callable[[object], bool]):
-        self.name = name
-        self.c = c
-
-    def __str__(self) -> str:
-        return f"<procedure:{self.name}>"
-
-    __repr__ = __str__
+    name: str
+    c: Callable[[object], bool]
 
     def __call__(self, v: object) -> bool:
         return self.c(v)
 
+    def __str__(self) -> str:
+        return self.name
+
+    def __repr__(self) -> str:
+        return f"#<proc:{self.name} (1 1)>"
+
 
 def check_contract(c: object, val: object) -> bool:
-    if isinstance(c, Contract):
+    if type(c) is Contract:
         return c(val)
     if (
         isinstance(c, Proc)
@@ -62,16 +61,13 @@ def check_contract(c: object, val: object) -> bool:
         return val is True
     if c is False:
         return val is False
-
-    if type(c) is int:
-        return val == c
     if type(c) in (int, float, Fraction, complex, str, Sym):
         return val == c
     raise MyError(f"Invalid contract, got: {print_str(c)}")
 
 
 def is_contract(c: object) -> bool:
-    if isinstance(c, Contract):
+    if type(c) is Contract:
         return True
     if (
         isinstance(c, Proc)
@@ -137,5 +133,9 @@ def lt_c(n: int | float | Fraction) -> Proc:
 
 def between_c(n: int | float | Fraction, m: int | float | Fraction) -> Proc:
     if m > n:
-        return Proc(f"(between/c {n} {m})", lambda i: is_real(i) and i <= m and i >= n)
-    return Proc(f"(between/c {n} {m})", lambda i: is_real(i) and i <= n and i >= m)
+        return Proc(
+            f"(between/c {n} {m})", lambda i: is_real(i) and i <= m and i >= n, (1, 1)
+        )
+    return Proc(
+        f"(between/c {n} {m})", lambda i: is_real(i) and i <= n and i >= m, (1, 1)
+    )
