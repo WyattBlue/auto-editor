@@ -45,10 +45,9 @@ class ClosingError(MyError):
 #                                                                             #
 ###############################################################################
 
-SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
-VAL, QUOTE, SEC, DB, DOT = "VAL", "QUOTE", "SEC", "DB", "DOT"
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
-VLIT = "VLIT"
+VAL, QUOTE, SEC, DB, DOT, VLIT = "VAL", "QUOTE", "SEC", "DB", "DOT", "VLIT"
+SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
 METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
 brac_pairs = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
 
@@ -493,7 +492,7 @@ def check_args(
     for i, val in enumerate(values):
         check = cont[-1] if i >= len(cont) else cont[i]
         if not check_contract(check, val):
-            raise MyError(f"{o} expected a {check.name}, got {print_str(val)}")
+            raise MyError(f"{o} expected a {print_str(check)}, got {print_str(val)}")
 
 
 is_cont = Contract("contract?", is_contract)
@@ -793,41 +792,40 @@ def palet_system(cmd: str) -> bool:
 class UserProc(Proc):
     """A user-defined procedure."""
 
-    __slots__ = ("env", "parms", "body", "name", "arity", "contracts")
+    __slots__ = ("env", "name", "parms", "body", "contracts", "arity")
 
     def __init__(
         self,
         env: Env,
         name: str,
-        parms: list,
+        parms: list[str],
         body: list,
         contracts: list[Any] | None = None,
-        eat_last: bool = False,
     ):
         self.env = env
-        self.parms = [f"{p}" for p in parms]
-        self.body = body
         self.name = name
+        self.parms = parms
+        self.body = body
+        self.contracts = contracts
 
-        if eat_last:
+        if parms and parms[-1] == "...":
+            parms.pop()
             self.arity: tuple[int, int | None] = len(parms) - 1, None
         else:
             self.arity = len(parms), len(parms)
 
-        self.contracts = contracts
-
     def __call__(self, *args: Any) -> Any:
         if self.arity[1] is None:
-            largs = list(args)
-            args = tuple([largs[len(self.parms) - 1 :]])
+            args = tuple(
+                list(args[: len(self.parms) - 1]) + [list(args[len(self.parms) - 1 :])]
+            )
 
         inner_env = Env(dict(zip(self.parms, args)), self.env)
 
         for item in self.body[0:-1]:
             my_eval(inner_env, item)
-        result = my_eval(inner_env, self.body[-1])
 
-        return result
+        return my_eval(inner_env, self.body[-1])
 
 
 class Syntax:
@@ -870,62 +868,82 @@ def check_for_syntax(env: Env, node: list) -> tuple[Sym, Any]:
 
 
 def syn_lambda(env: Env, node: list) -> UserProc:
-    if not isinstance(node[1], list):
+    if len(node) < 3:
+        raise MyError(f"{node[0]}: too few terms")
+
+    if type(node[1]) is not list:
         raise MyError(f"{node[0]}: bad syntax")
 
-    return UserProc(env, "", node[1], node[2:])  # parms, body
+    parms: list[str] = []
+    for item in node[1]:
+        if type(item) is not Sym:
+            raise MyError(f"{node[0]}: must be an identifier")
+
+        parms.append(f"{item}")
+
+    return UserProc(env, "", parms, node[2:])
 
 
 def syn_define(env: Env, node: list) -> None:
     if len(node) < 3:
-        raise MyError(f"{node[0]}: too few args")
+        raise MyError(f"{node[0]}: too few terms")
 
-    if isinstance(node[1], list):
-        if not node[1] or type(node[1][0]) is not Sym:
+    if type(node[1]) is list:
+        term = node[1]
+        body = node[2:]
+
+        if not term or type(term[0]) is not Sym:
             raise MyError(f"{node[0]}: proc-binding must be an identifier")
 
-        n = node[1][0].val
+        n = term[0].val
+        parms: list[str] = []
+        for item in term[1:]:
+            if type(item) is not Sym:
+                raise MyError(f"{node[0]}: must be an identifier")
 
-        eat_last = False
-        if node[1][1:] and node[1][-1] == Sym("..."):
-            eat_last = True
-            parameters = node[1][1:-1]
-        else:
-            parameters = node[1][1:]
+            parms.append(f"{item}")
 
-        body = node[2:]
-        env[n] = UserProc(env, n, parameters, body, eat_last=eat_last)
+        env[n] = UserProc(env, n, parms, body)
         return None
+
     elif type(node[1]) is not Sym:
         raise MyError(f"{node[0]}: must be an identifier")
 
+    if len(node) > 3:
+        raise MyError(f"{node[0]}: multiple expressions after identifier")
+
     n = node[1].val
 
-    if len(node) > 3:
-        raise MyError(f"{node[0]}: bad syntax (multiple expressions after identifier)")
-
     if (
-        isinstance(node[2], list)
+        type(node[2]) is list
         and node[2]
         and type(node[2][0]) is Sym
         and node[2][0].val in ("lambda", "λ")
     ):
-        parameters = node[2][1]
+        terms = node[2][1]
         body = node[2][2:]
-        env[n] = UserProc(env, n, parameters, body)
+
+        parms: list[str] = []
+        for item in terms:
+            if type(item) is not Sym:
+                raise MyError(f"{node[0]}: must be an identifier")
+
+            parms.append(f"{item}")
+
+        env[n] = UserProc(env, n, parms, body)
+
     else:
         for item in node[2:-1]:
             my_eval(env, item)
         env[n] = my_eval(env, node[-1])
 
-    return None
 
 
 def syn_definec(env: Env, node: list) -> None:
     if len(node) < 3:
-        raise MyError(f"{node[0]}: bad syntax")
+        raise MyError(f"{node[0]}: too few terms")
 
-    if not isinstance(node[1], list):
+    if type(node[1]) is not list:
         raise MyError(f"{node[0]} only allows procedure declarations")
 
     if not node[1] or type(node[1][0]) is not Sym:
@@ -934,7 +952,7 @@ def syn_definec(env: Env, node: list) -> None:
     n = node[1][0].val
 
     contracts: list[Proc | Contract] = []
-    parameters: list[Sym] = []
+    parms: list[str] = []
     for item in node[1][1:]:
         if item == Sym("->"):
             break
@@ -943,14 +961,14 @@ def syn_definec(env: Env, node: list) -> None:
         if type(item[0]) is not Sym:
             raise MyError(f"{node[0]}: binding must be identifier")
 
-        parameters.append(item[0])
         con = my_eval(env, item[1])
         if not is_cont(con):
             raise MyError(f"{node[0]}: {print_str(con)} is not a valid contract")
 
+        parms.append(f"{item[0]}")
         contracts.append(con)
 
-    env[n] = UserProc(env, n, parameters, node[2:], contracts)
+    env[n] = UserProc(env, n, parms, node[2:], contracts)
     return None
 
 
@@ -1341,7 +1359,7 @@ env.update({
     "case": Syntax(syn_case),
     "let": Syntax(syn_let),
     "let*": Syntax(syn_let_star),
-    "class": Syntax(syn_class),
+    #"class": Syntax(syn_class),
     "@r": Syntax(attr),
     # loops
     "for": Syntax(syn_for),
@@ -1518,7 +1536,7 @@ env.update({
     "sleep": Proc("sleep", sleep, (1, 1), [is_int_or_float]),
     "print": Proc("print", lambda v: print(print_str(v), end=""), (1, 1)),
     "println": Proc("println", lambda v: print(print_str(v)), (1, 1)),
-    "system": Proc("system", palet_system, (1, 1)),
+    "system": Proc("system", palet_system, (1, 1), [is_str]),
     # conversions
     "number->string": Proc("number->string", number_to_string, (1, 1), [is_num]),
     "string->vector": Proc(
