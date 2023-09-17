@@ -492,7 +492,8 @@ def check_args(
     for i, val in enumerate(values):
         check = cont[-1] if i >= len(cont) else cont[i]
         if not check_contract(check, val):
-            raise MyError(f"{o} expected a {print_str(check)}, got {print_str(val)}")
+            exp = f"{check}" if callable(check) else print_str(check)
+            raise MyError(f"{o} expected a {exp}, got {print_str(val)}")
 
 
 is_cont = Contract("contract?", is_contract)
@@ -923,7 +924,7 @@ def syn_define(env: Env, node: list) -> None:
         terms = node[2][1]
         body = node[2][2:]
 
-        parms: list[str] = []
+        parms = []
         for item in terms:
             if type(item) is not Sym:
                 raise MyError(f"{node[0]}: must be an identifier")
@@ -936,7 +937,6 @@ def syn_define(env: Env, node: list) -> None:
         for item in node[2:-1]:
             my_eval(env, item)
         env[n] = my_eval(env, node[-1])
-
 
 
 def syn_definec(env: Env, node: list) -> None:
@@ -1554,7 +1554,8 @@ env.update({
 def interpret(env: Env, parser: Parser) -> list:
     result = []
     while parser.current_token.type != EOF:
-        if type(parsed := my_eval(env, parser.expr())) is Keyword:
-            raise MyError(f"Keyword misused in expression. `{parsed}`")
-        result.append(parsed)
+        result.append(my_eval(env, parser.expr()))
+
+        if type(result[-1]) is Keyword:
+            raise MyError(f"Keyword misused in expression. `{result[-1]}`")
     return result

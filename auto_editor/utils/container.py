@@ -41,25 +41,40 @@ class Container:
     samplerate: list[int] | None = None  # Any samplerate is allowed
 
 
-# Define aliases
+h264_en = [
+    "h264",
+    "libx264",
+    "libx264rgb",
+    "libopenh264",
+    "h264_videotoolbox",
+    "h264_amf",
+    "h264_nvenc",
+    "h264_qsv",
+]
+hevc_en = ["hevc", "libx265", "hevc_videotoolbox", "hevc_amf", "hevc_nvenc", "hevc_qsv"]
+av1_en = ["av1", "libaom-av1", "av1_nvenc", "av1_amf"]
+prores_en = ["prores", "prores_videotoolbox", "prores_aw", "prores_ks"]
+aac_en = ["aac", "aac_at", "libfdk_aac"]
+
+
 h265: DictContainer = {
     "name": "H.265 / High Efficiency Video Coding (HEVC) / MPEG-H Part 2",
     "allow_video": True,
-    "vcodecs": ["hevc", "mpeg4", "h264"],
+    "vcodecs": hevc_en + ["mpeg4"] + h264_en,
 }
 h264: DictContainer = {
     "name": "H.264 / Advanced Video Coding (AVC) / MPEG-4 Part 10",
     "allow_video": True,
-    "vcodecs": ["h264", "mpeg4", "hevc"],
+    "vcodecs": h264_en + ["mpeg4"] + hevc_en,
 }
 aac: DictContainer = {
     "name": "Advanced Audio Coding",
     "allow_audio": True,
     "max_audios": 1,
-    "acodecs": ["aac"],
+    "acodecs": aac_en,
 }
 ass: DictContainer = {
-    "name": "SubStation Alpha",
+    "name": "Advanced SubStation Alpha",
     "allow_subtitle": True,
     "scodecs": ["ass", "ssa"],
     "max_subtitles": 1,
@@ -71,10 +86,9 @@ mp4: DictContainer = {
     "allow_audio": True,
     "allow_subtitle": True,
     "allow_image": True,
-    "vcodecs": ["h264", "hevc", "vp9", "av1", "mpeg4", "mpeg2video", "mjpeg"],
-    "acodecs": ["aac", "mp3", "opus", "flac", "vorbis", "libvorbis", "ac3", "mp2"],
+    "vcodecs": h264_en + hevc_en + av1_en + ["vp9", "mpeg4", "mpeg2video", "mjpeg"],
+    "acodecs": aac_en + ["mp3", "opus", "flac", "vorbis", "libvorbis", "ac3", "mp2"],
     "vstrict": True,
-    # "disallow_v": ["prores", "apng", "gif", "msmpeg4v3", "flv1", "vp8", "dvvideo", "rawvideo"],
 }
 ogg: DictContainer = {
     "allow_video": True,
@@ -85,28 +99,29 @@ ogg: DictContainer = {
     "vstrict": True,
 }
 
-mka_audio = [
-    "libvorbis",
-    "vorbis",
-    "aac",
-    "mp3",
-    "opus",
-    "flac",
-    "ac3",
-    "mp2",
-    "wmav2",
-    "pcm_s16le",
-    "pcm_alaw",
-    "pcm_f32le",
-    "pcm_f64le",
-    "pcm_mulaw",
-    "pcm_s16be",
-    "pcm_s24be",
-    "pcm_s24le",
-    "pcm_s32be",
-    "pcm_s32le",
-    "pcm_u8",
-]
+mka_audio = (
+    ["libvorbis", "vorbis"]
+    + aac_en
+    + [
+        "mp3",
+        "opus",
+        "flac",
+        "ac3",
+        "mp2",
+        "wmav2",
+        "pcm_s16le",
+        "pcm_alaw",
+        "pcm_f32le",
+        "pcm_f64le",
+        "pcm_mulaw",
+        "pcm_s16be",
+        "pcm_s24be",
+        "pcm_s24le",
+        "pcm_s32be",
+        "pcm_s32le",
+        "pcm_u8",
+    ]
+)
 
 containers: dict[str, DictContainer] = {
     # Aliases section
@@ -187,7 +202,7 @@ containers: dict[str, DictContainer] = {
         "allow_video": True,
         "allow_audio": True,
         "allow_subtitle": True,
-        "vcodecs": ["vp9", "vp8", "av1", "libaom-av1"],
+        "vcodecs": ["vp9", "vp8"] + av1_en,
         "acodecs": ["opus", "vorbis", "libvorbis"],
         "scodecs": ["webvtt"],
         "vstrict": True,
@@ -211,10 +226,10 @@ containers: dict[str, DictContainer] = {
         "name": "Audio Video Interleave",
         "allow_video": True,
         "allow_audio": True,
-        "vcodecs": ["mpeg4", "h264", "prores", "mjpeg", "mpeg2video", "rawvideo"],
-        "acodecs": [
-            "mp3",
-            "aac",
+        "vcodecs": ["mpeg4"] + h264_en + ["prores", "mjpeg", "mpeg2video", "rawvideo"],
+        "acodecs": ["mp3"]
+        + aac_en
+        + [
             "flac",
             "vorbis",
             "libvorbis",
@@ -229,16 +244,18 @@ containers: dict[str, DictContainer] = {
             "pcm_s32le",
             "pcm_u8",
         ],
-        "disallow_v": ["hevc", "apng", "gif"],
+        "disallow_v": hevc_en + ["apng", "gif"],
     },
     "wmv": {
         "name": "Windows Media Video",
         "allow_video": True,
         "allow_audio": True,
-        "vcodecs": ["msmpeg4v3", "h264", "mpeg4", "mpeg2video", "mjpeg", "rawvideo"],
-        "acodecs": [
-            "wmav2",
-            "aac",
+        "vcodecs": ["msmpeg4v3"]
+        + h264_en
+        + ["mpeg4", "mpeg2video", "mjpeg", "rawvideo"],
+        "acodecs": ["wmav2"]
+        + aac_en
+        + [
             "mp3",
             "flac",
             "vorbis",
@@ -262,12 +279,12 @@ containers: dict[str, DictContainer] = {
         "allow_audio": True,
         "allow_subtitle": True,
         "allow_image": True,
-        "vcodecs": [
-            "h264",
-            "hevc",
+        "vcodecs": h264_en
+        + hevc_en
+        + prores_en
+        + [
             "vp9",
             "vp8",
-            "prores",
             "mpeg4",
             "mpeg2video",
             "msmpeg4v3",
@@ -288,10 +305,10 @@ containers: dict[str, DictContainer] = {
         "allow_video": True,
         "allow_audio": True,
         "allow_subtitle": True,
-        "vcodecs": [
-            "h264",
-            "hevc",
-            "prores",
+        "vcodecs": h264_en
+        + hevc_en
+        + prores_en
+        + [
             "mpeg4",
             "mpeg2video",
             "msmpeg4v3",
@@ -301,8 +318,8 @@ containers: dict[str, DictContainer] = {
             "dvvideo",
             "rawvideo",
         ],
-        "acodecs": [
-            "aac",
+        "acodecs": aac_en
+        + [
             "mp3",
             "vorbis",
             "libvorbis",
