@@ -5,7 +5,6 @@ from typing import TypedDict
 
 
 class DictContainer(TypedDict, total=False):
-    name: str | None
     allow_video: bool
     allow_audio: bool
     allow_subtitle: bool
@@ -24,7 +23,6 @@ class DictContainer(TypedDict, total=False):
 
 @dataclass(slots=True)
 class Container:
-    name: str | None = None
     allow_video: bool = False
     allow_audio: bool = False
     allow_subtitle: bool = False
@@ -58,30 +56,25 @@ aac_en = ["aac", "aac_at", "libfdk_aac"]
 
 
 h265: DictContainer = {
-    "name": "H.265 / High Efficiency Video Coding (HEVC) / MPEG-H Part 2",
     "allow_video": True,
     "vcodecs": hevc_en + ["mpeg4"] + h264_en,
 }
 h264: DictContainer = {
-    "name": "H.264 / Advanced Video Coding (AVC) / MPEG-4 Part 10",
     "allow_video": True,
     "vcodecs": h264_en + ["mpeg4"] + hevc_en,
 }
 aac: DictContainer = {
-    "name": "Advanced Audio Coding",
     "allow_audio": True,
     "max_audios": 1,
     "acodecs": aac_en,
 }
 ass: DictContainer = {
-    "name": "Advanced SubStation Alpha",
     "allow_subtitle": True,
     "scodecs": ["ass", "ssa"],
     "max_subtitles": 1,
     "sstrict": True,
 }
 mp4: DictContainer = {
-    "name": "MP4 / MPEG-4 Part 14",
     "allow_video": True,
     "allow_audio": True,
     "allow_subtitle": True,
@@ -139,21 +132,18 @@ containers: dict[str, DictContainer] = {
     "ogg": ogg,
     "ogv": ogg,
     "apng": {
-        "name": "Animated Portable Network Graphics",
         "allow_video": True,
         "max_videos": 1,
         "vcodecs": ["apng"],
         "vstrict": True,
     },
     "gif": {
-        "name": "Graphics Interchange Format",
         "allow_video": True,
         "max_videos": 1,
         "vcodecs": ["gif"],
         "vstrict": True,
     },
     "wav": {
-        "name": "Waveform Audio File Format",
         "allow_audio": True,
         "max_audios": 1,
         "acodecs": [
@@ -171,19 +161,16 @@ containers: dict[str, DictContainer] = {
         ],
     },
     "ast": {
-        "name": "AST / Audio Stream",
         "allow_audio": True,
         "max_audios": 1,
         "acodecs": ["pcm_s16be_planar"],
     },
     "mp3": {
-        "name": "MP3 / MPEG-2 Audio Layer 3",
         "allow_audio": True,
         "max_audios": 1,
         "acodecs": ["mp3"],
     },
     "opus": {
-        "name": "Opus",
         "allow_audio": True,
         "acodecs": ["opus", "flac", "libvorbis", "vorbis", "speex"],
     },
@@ -192,13 +179,11 @@ containers: dict[str, DictContainer] = {
         "acodecs": ["flac", "libvorbis", "vorbis", "opus", "speex"],
     },
     "flac": {
-        "name": "Free Lossless Audio Codec",
         "allow_audio": True,
         "max_audios": 1,
         "acodecs": ["flac"],
     },
     "webm": {
-        "name": "WebM",
         "allow_video": True,
         "allow_audio": True,
         "allow_subtitle": True,
@@ -209,21 +194,18 @@ containers: dict[str, DictContainer] = {
         "sstrict": True,
     },
     "srt": {
-        "name": "SubRip Text / Subtitle Resource Tracks",
         "allow_subtitle": True,
         "scodecs": ["srt"],
         "max_subtitles": 1,
         "sstrict": True,
     },
     "vtt": {
-        "name": "Web Video Text Track",
         "allow_subtitle": True,
         "scodecs": ["webvtt"],
         "max_subtitles": 1,
         "sstrict": True,
     },
     "avi": {
-        "name": "Audio Video Interleave",
         "allow_video": True,
         "allow_audio": True,
         "vcodecs": ["mpeg4"] + h264_en + ["prores", "mjpeg", "mpeg2video", "rawvideo"],
@@ -247,7 +229,6 @@ containers: dict[str, DictContainer] = {
         "disallow_v": hevc_en + ["apng", "gif"],
     },
     "wmv": {
-        "name": "Windows Media Video",
         "allow_video": True,
         "allow_audio": True,
         "vcodecs": ["msmpeg4v3"]
@@ -274,7 +255,6 @@ containers: dict[str, DictContainer] = {
         "vstrict": True,
     },
     "mkv": {
-        "name": "Matroska",
         "allow_video": True,
         "allow_audio": True,
         "allow_subtitle": True,
@@ -296,12 +276,10 @@ containers: dict[str, DictContainer] = {
         "disallow_v": ["apng"],
     },
     "mka": {
-        "name": "Matroska Audio",
         "allow_audio": True,
         "acodecs": mka_audio,
     },
     "mov": {
-        "name": "QuickTime / MOV",
         "allow_video": True,
         "allow_audio": True,
         "allow_subtitle": True,
@@ -344,7 +322,6 @@ containers: dict[str, DictContainer] = {
         "disallow_v": ["apng", "vp9", "vp8"],
     },
     "swf": {
-        "name": "ShockWave Flash / Small Web Format",
         "allow_video": True,
         "allow_audio": True,
         "vcodecs": ["flv1", "mjpeg"],
@@ -352,15 +329,10 @@ containers: dict[str, DictContainer] = {
         "vstrict": True,
         "samplerate": [44100, 22050, 11025],
     },
-    "not_in_here": {
-        "allow_video": True,
-        "allow_audio": True,
-        "allow_subtitle": True,
-    },
 }
 
 
 def container_constructor(key: str) -> Container:
     if key in containers:
         return Container(**containers[key])
-    return Container(**containers["not_in_here"])
+    return Container(allow_video=True, allow_audio=True, allow_subtitle=True)
