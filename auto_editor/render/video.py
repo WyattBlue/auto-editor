@@ -117,13 +117,10 @@ def render_av(
 
     apply_video_later = True
 
-    if args.video_codec in encoders:
-        apply_video_later = encoders[args.video_codec]["pix_fmt"].isdisjoint(
-            allowed_pix_fmt
-        )
-
     if args.scale != 1:
         apply_video_later = False
+    elif args.video_codec in encoders:
+        apply_video_later = set(encoders[args.video_codec]).isdisjoint(allowed_pix_fmt)
 
     log.debug(f"apply video quality settings now: {not apply_video_later}")
 
