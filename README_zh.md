@@ -1,4 +1,4 @@
-<p align="center"><img src="https://raw.githubusercontent.com/wyattblue/auto-editor/master/site/src/img/auto-editor-banner.webp" title="Auto-Editor" width="700"></p>
+<p align="center"><img src="https://auto-editor.com/img/auto-editor-banner.webp" title="Auto-Editor" width="700"></p>
 
 **Auto-Editor**是一款命令行应用程序，通过各种方法（最常用的是音频响度）自动**编辑视频和音频**。
 
@@ -143,7 +143,7 @@ auto-editor --scale --help
 ```
 
 <h3 align="center">Auto-Editor可在所有主要平台上使用</h3>
-<p align="center"><img src="https://raw.githubusercontent.com/WyattBlue/auto-editor/master/site/src/img/cross-platform.webp" width="500" title="Windows、MacOS和Linux"></p>
+<p align="center"><img src="https://auto-editor.com/img/cross-platform.webp" width="500" title="Windows、MacOS和Linux"></p>
 
 ## 文章
  - [如何安装Auto-Editor](https://auto-editor.com/installing)
