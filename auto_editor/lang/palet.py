@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import cmath
 import math
-import random
 from dataclasses import dataclass
 from difflib import get_close_matches
 from fractions import Fraction
@@ -679,13 +678,6 @@ def vector_set(vec: list, pos: int, v: Any) -> None:
 def vector_extend(vec: list, *more_vecs: list) -> None:
     for more in more_vecs:
         vec.extend(more)
-
-
-def randrange(*args: int) -> int:
-    try:
-        return random.randrange(*args)
-    except ValueError:
-        raise MyError("randrange: got empty range")
 
 
 def palet_map(proc: Proc, seq: str | list | range | NDArray) -> Any:
