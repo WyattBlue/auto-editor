@@ -682,19 +682,19 @@ def vector_extend(vec: list, *more_vecs: list) -> None:
 
 def palet_map(proc: Proc, seq: str | list | range | NDArray) -> Any:
     if type(seq) is str:
-        return str(map(proc.proc, seq))
+        return str(map(proc, seq))
     if isinstance(seq, (list, range)):
-        return list(map(proc.proc, seq))
+        return list(map(proc, seq))
 
     if isinstance(seq, np.ndarray):
         if proc.arity[0] != 0:
             raise MyError("map: procedure must take at least one arg")
         check_args(proc.name, [0], (1, 1), None)
-        return proc.proc(seq)
+        return proc(seq)
 
 
 def apply(proc: Proc, seq: str | list | range) -> Any:
-    return reduce(proc.proc, seq)
+    return reduce(proc, seq)
 
 
 def ref(seq: Any, ref: int) -> Any:
