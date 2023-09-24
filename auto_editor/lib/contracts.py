@@ -10,36 +10,16 @@ from .err import MyError
 
 
 @dataclass(slots=True)
-class Proc:
-    name: str
-    proc: Callable
-    arity: tuple[int, int | None] = (1, None)
-    contracts: list[Any] | None = None
-
-    def __call__(self, *args: Any) -> Any:
-        return self.proc(*args)
-
-    def __str__(self) -> str:
-        return self.name
-
-    def __repr__(self) -> str:
-        n = "inf" if self.arity[1] is None else f"{self.arity[1]}"
-
-        if self.contracts is None:
-            c = ""
-        else:
-            c = " (" + " ".join([f"{c}" for c in self.contracts]) + ")"
-        return f"#<proc:{self.name} ({self.arity[0]} {n}){c}>"
-
-
-@dataclass(slots=True)
 class Contract:
     # Convenient flat contract class
     name: str
     c: Callable[[object], bool]
 
-    def __call__(self, v: object) -> bool:
-        return self.c(v)
+    def __call__(self, *v: object) -> bool:
+        if len(v) != 1:
+            o = self.name
+            raise MyError(f"`{o}` has an arity mismatch. Expected 1, got {len(v)}")
+        return self.c(v[0])
 
     def __str__(self) -> str:
         return self.name
@@ -64,6 +44,59 @@ def check_contract(c: object, val: object) -> bool:
     if type(c) in (int, float, Fraction, complex, str, Sym):
         return val == c
     raise MyError(f"Invalid contract, got: {print_str(c)}")
+
+
+def check_args(
+    o: str,
+    values: list | tuple,
+    arity: tuple[int, int | None],
+    cont: list[Contract] | None,
+) -> None:
+    lower, upper = arity
+    amount = len(values)
+
+    assert not (upper is not None and lower > upper)
+    base = f"`{o}` has an arity mismatch. Expected "
+
+    if lower == upper and len(values) != lower:
+        raise MyError(f"{base}{lower}, got {amount}")
+    if upper is None and amount < lower:
+        raise MyError(f"{base}at least {lower}, got {amount}")
+    if upper is not None and (amount > upper or amount < lower):
+        raise MyError(f"{base}between {lower} and {upper}, got {amount}")
+
+    if cont is None:
+        return
+
+    for i, val in enumerate(values):
+        check = cont[-1] if i >= len(cont) else cont[i]
+        if not check_contract(check, val):
+            exp = f"{check}" if callable(check) else print_str(check)
+            raise MyError(f"`{o}` expected a {exp}, got {print_str(val)}")
+
+
+@dataclass(slots=True)
+class Proc:
+    name: str
+    proc: Callable
+    arity: tuple[int, int | None] = (1, None)
+    contracts: list[Any] | None = None
+
+    def __call__(self, *args: Any) -> Any:
+        check_args(self.name, args, self.arity, self.contracts)
+        return self.proc(*args)
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __repr__(self) -> str:
+        n = "inf" if self.arity[1] is None else f"{self.arity[1]}"
+
+        if self.contracts is None:
+            c = ""
+        else:
+            c = " (" + " ".join([f"{c}" for c in self.contracts]) + ")"
+        return f"#<proc:{self.name} ({self.arity[0]} {n}){c}>"
 
 
 def is_contract(c: object) -> bool:

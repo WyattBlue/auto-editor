@@ -458,43 +458,15 @@ class Parser:
 ###############################################################################
 
 
-def check_args(
-    o: str,
-    values: list | tuple,
-    arity: tuple[int, int | None],
-    cont: list[Contract] | None,
-) -> None:
-    lower, upper = arity
-    amount = len(values)
-
-    assert not (upper is not None and lower > upper)
-    base = f"`{o}` has an arity mismatch. Expected "
-
-    if lower == upper and len(values) != lower:
-        raise MyError(f"{base}{lower}, got {amount}")
-    if upper is None and amount < lower:
-        raise MyError(f"{base}at least {lower}, got {amount}")
-    if upper is not None and (amount > upper or amount < lower):
-        raise MyError(f"{base}between {lower} and {upper}, got {amount}")
-
-    if cont is None:
-        return
-
-    for i, val in enumerate(values):
-        check = cont[-1] if i >= len(cont) else cont[i]
-        if not check_contract(check, val):
-            exp = f"{check}" if callable(check) else print_str(check)
-            raise MyError(f"`{o}` expected a {exp}, got {print_str(val)}")
-
-
 is_cont = Contract("contract?", is_contract)
 is_iterable = Contract(
     "iterable?",
-    lambda v: type(v) in (str, range) or isinstance(v, (list, dict, np.ndarray)),
+    lambda v: type(v) in (str, range, Quoted)
+    or isinstance(v, (list, dict, np.ndarray)),
 )
 is_sequence = Contract(
     "sequence?",
-    lambda v: type(v) in (str, range) or isinstance(v, (list, np.ndarray)),
+    lambda v: type(v) in (str, range, Quoted) or isinstance(v, (list, np.ndarray)),
 )
 is_boolarr = Contract(
     "bool-array?",
@@ -504,9 +476,7 @@ bool_or_barr = Contract(
     "(or/c bool? bool-array?)",
     lambda v: type(v) is bool or is_boolarr(v),
 )
-is_keyw = Contract(
-    "keyword?", lambda v: type(v) is list and len(v) == 2 and type(v[1]) is Keyword
-)
+is_keyw = Contract("keyword?", lambda v: type(v) is QuotedKeyword)
 
 
 def raise_(msg: str) -> None:
@@ -680,21 +650,14 @@ def vector_extend(vec: list, *more_vecs: list) -> None:
         vec.extend(more)
 
 
-def palet_map(proc: Proc, seq: str | list | range | NDArray) -> Any:
+def palet_map(proc: Proc, seq: Any) -> Any:
     if type(seq) is str:
         return str(map(proc, seq))
+    if type(seq) is Quoted:
+        return Quoted(list(map(proc, seq.val)))
     if isinstance(seq, (list, range)):
         return list(map(proc, seq))
-
-    if isinstance(seq, np.ndarray):
-        if proc.arity[0] != 0:
-            raise MyError("map: procedure must take at least one arg")
-        check_args(proc.name, [0], (1, 1), None)
-        return proc(seq)
-
-
-def apply(proc: Proc, seq: str | list | range) -> Any:
-    return reduce(proc, seq)
+    return proc(seq)
 
 
 def ref(seq: Any, ref: int) -> Any:
@@ -1126,10 +1089,12 @@ def syn_for(env: Env, node: list) -> None:
                 my_eval(env, c)
 
 
-def syn_quote(env: Env, node: list) -> list:
+def syn_quote(env: Env, node: list) -> Any:
     guard_term(node, 2, 2)
-    if type(node[1]) is list or type(node[1]) is Keyword:
-        return [list, node[1]]
+    if type(node[1]) is Keyword:
+        return QuotedKeyword(node[1])
+    if type(node[1]) is list:
+        return Quoted(node[1])
     return node[1]
 
 
@@ -1382,13 +1347,7 @@ def my_eval(env: Env, node: object) -> Any:
         if type(oper) is Syntax:
             return oper(env, node)
 
-        values = [my_eval(env, c) for c in node[1:]]
-        if type(oper) is Contract:
-            check_args(oper.name, values, (1, 1), None)
-        else:
-            check_args(oper.name, values, oper.arity, oper.contracts)
-
-        return oper(*values)
+        return oper(*(my_eval(env, c) for c in node[1:]))
 
     return node
 
@@ -1526,8 +1485,8 @@ env.update({
     "~v": Proc("~v", lambda *v: " ".join([print_str(a) for a in v]), (0, None)),
     # keyword
     "keyword?": is_keyw,
-    "keyword->string": Proc("keyword->string", lambda k: k[1].val, (1, 1), [is_keyw]),
-    "string->keyword": Proc("string->keyword", lambda s: [list, Keyword(s)], (1, 1), [is_str]),
+    "keyword->string": Proc("keyword->string", lambda v: v.val.val, (1, 1), [is_keyw]),
+    "string->keyword": Proc("string->keyword", QuotedKeyword, (1, 1), [is_str]),
     # vectors
     "vector": Proc("vector", lambda *a: list(a), (0, None)),
     "make-vector": Proc(
@@ -1566,7 +1525,7 @@ env.update({
     "slice": Proc("slice", p_slice, (2, 4), [is_sequence, is_int]),
     # procedures
     "map": Proc("map", palet_map, (2, 2), [is_proc, is_sequence]),
-    "apply": Proc("apply", apply, (2, 2), [is_proc, is_sequence]),
+    "apply": Proc("apply", lambda p, s: p(*s), (2, 2), [is_proc, is_sequence]),
     "and/c": Proc("and/c", andc, (1, None), [is_cont]),
     "or/c": Proc("or/c", orc, (1, None), [is_cont]),
     "not/c": Proc("not/c", notc, (1, 1), [is_cont]),

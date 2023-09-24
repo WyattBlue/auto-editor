@@ -81,6 +81,43 @@ class Keyword:
         return type(obj) is Keyword and self.val == obj.val
 
 
+class QuotedKeyword:
+    __slots__ = "val"
+
+    def __init__(self, val: Keyword | str):
+        self.val = val if isinstance(val, Keyword) else Keyword(val)
+
+    def __str__(self) -> str:
+        return f"{self.val}"
+
+    __repr__ = __str__
+
+    def __eq__(self, obj: object) -> bool:
+        return type(obj) is QuotedKeyword and self.val == obj.val
+
+
+class Quoted:
+    __slots__ = "val"
+
+    def __init__(self, val: list):
+        self.val = val
+
+    def __len__(self) -> int:
+        return len(self.val)
+
+    def __getitem__(self, index: int) -> object:
+        return self.val[index]
+
+    def __iter__(self) -> list:
+        return self.val
+
+    def __contains__(self, item: object) -> bool:
+        return item in self.val
+
+    def __eq__(self, obj: object) -> bool:
+        return type(obj) is Quoted and self.val == obj.val
+
+
 class Char:
     __slots__ = "val"
 
@@ -141,16 +178,12 @@ def display_str(val: object) -> str:
     if type(val) is Fraction:
         return f"{val.numerator}/{val.denominator}"
 
-    if type(val) is list and val and val[0] is list:
-        if type(val[1]) is Keyword:
-            return f"{val[1]}"
-
-        if not val[1]:
+    if type(val) is Quoted:
+        if not val:
             return "()"
-
         result = StringIO()
-        result.write(f"({display_str(val[1][0])}")
-        for item in val[1][1:]:
+        result.write(f"({display_str(val[0])}")
+        for item in val[1:]:
             result.write(f" {display_str(item)}")
         result.write(")")
         return result.getvalue()
@@ -213,7 +246,7 @@ def print_str(val: object) -> str:
         return f"{val!r}"
     if type(val) is Keyword:
         return f"'{val}"
-    if type(val) is Sym or (type(val) is list and val and val[0] is list):
+    if type(val) in (Sym, Quoted, QuotedKeyword):
         return f"'{display_str(val)}"
 
     return display_str(val)
