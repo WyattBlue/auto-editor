@@ -55,3 +55,7 @@
   (let* ([x 1] [y (+ x 1)]) #(y x))
   #(2 1)
 ))
+
+(assert (= (apply add1 #(4)) 5))
+(assert (= (apply sub1 #(4)) 3))
+(assert (equal? (map add1 '(3 4 5)) '(4 5 6)))
