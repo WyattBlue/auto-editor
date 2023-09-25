@@ -57,5 +57,8 @@
 ))
 
 (assert (= (apply add1 #(4)) 5))
+(assert (= (apply add1 '(4)) 5))
 (assert (= (apply sub1 #(4)) 3))
 (assert (equal? (map add1 '(3 4 5)) '(4 5 6)))
+
+(assert (equal? ('(3 4 5 6) 0 4 2) '(3 5)))

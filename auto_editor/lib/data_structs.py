@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from fractions import Fraction
 from io import StringIO
 from typing import Any
@@ -105,11 +106,14 @@ class Quoted:
     def __len__(self) -> int:
         return len(self.val)
 
-    def __getitem__(self, index: int) -> object:
-        return self.val[index]
+    def __getitem__(self, key: int | slice) -> Any:
+        if isinstance(key, slice):
+            return Quoted(self.val[key])
 
-    def __iter__(self) -> list:
-        return self.val
+        return self.val[key]
+
+    def __iter__(self) -> Iterator:
+        return self.val.__iter__()
 
     def __contains__(self, item: object) -> bool:
         return item in self.val

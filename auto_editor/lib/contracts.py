@@ -164,7 +164,7 @@ def lt_c(n: int | float | Fraction) -> Proc:
     return Proc(f"(</c {n})", lambda i: i < n, (1, 1), [is_real])
 
 
-def between_c(n: int | float | Fraction, m: int | float | Fraction) -> Proc:
+def between_c(n: Any, m: Any) -> Proc:
     if m > n:
         return Proc(
             f"(between/c {n} {m})", lambda i: is_real(i) and i <= m and i >= n, (1, 1)
