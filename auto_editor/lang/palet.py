@@ -1294,7 +1294,7 @@ def syn_class(env: Env, node: list) -> Any:
 def attr(env: Env, node: list) -> Any:
     guard_term(node, 3, 3)
 
-    if not isinstance(node[2], Sym):
+    if type(node[2]) is not Sym:
         raise MyError("@r: attribute must be an identifier")
 
     return my_eval(env, [node[2], node[1]])
@@ -1318,10 +1318,9 @@ def my_eval(env: Env, node: object) -> Any:
             raise MyError("Can't use edit methods if there's no input files")
         return edit_method(node.val, env["@filesetup"], env)
 
-    if isinstance(node, list):
+    if type(node) is list:
         if not node:
             raise MyError("Illegal () expression")
-
         if node[0] is list:  # Handle vector literal
             return [my_eval(env, item) for item in node[1]]
 
@@ -1394,7 +1393,7 @@ env.update({
     "symbol?": (is_symbol := Contract("symbol?", lambda v: type(v) is Sym)),
     "string?": is_str,
     "char?": (is_char := Contract("char?", lambda v: type(v) is Char)),
-    "vector?": (is_vector := Contract("vector?", lambda v: isinstance(v, list))),
+    "vector?": (is_vector := Contract("vector?", lambda v: type(v) is list)),
     "array?": (is_array := Contract("array?", lambda v: isinstance(v, np.ndarray))),
     "bool-array?": is_boolarr,
     "range?": (is_range := Contract("range?", lambda v: type(v) is range)),
