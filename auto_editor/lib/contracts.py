@@ -50,7 +50,7 @@ def check_args(
     o: str,
     values: list | tuple,
     arity: tuple[int, int | None],
-    cont: list[Contract] | None,
+    cont: tuple[Any, ...],
 ) -> None:
     lower, upper = arity
     amount = len(values)
@@ -65,7 +65,7 @@ def check_args(
     if upper is not None and (amount > upper or amount < lower):
         raise MyError(f"{base}between {lower} and {upper}, got {amount}")
 
-    if cont is None:
+    if not cont:
         return
 
     for i, val in enumerate(values):
@@ -75,12 +75,16 @@ def check_args(
             raise MyError(f"`{o}` expected a {exp}, got {print_str(val)}")
 
 
-@dataclass(slots=True)
 class Proc:
-    name: str
-    proc: Callable
-    arity: tuple[int, int | None] = (1, None)
-    contracts: list[Any] | None = None
+    __slots__ = ("name", "proc", "arity", "contracts")
+
+    def __init__(
+        self, n: str, p: Callable, a: tuple[int, int | None] = (1, None), *c: Any
+    ):
+        self.name = n
+        self.proc = p
+        self.arity = a
+        self.contracts: tuple[Any, ...] = c
 
     def __call__(self, *args: Any) -> Any:
         check_args(self.name, args, self.arity, self.contracts)
@@ -134,13 +138,13 @@ is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
 
 def andc(*cs: object) -> Proc:
     return Proc(
-        "flat-and/c", lambda v: all([check_contract(c, v) for c in cs]), (1, 1), [any_p]
+        "flat-and/c", lambda v: all([check_contract(c, v) for c in cs]), (1, 1), any_p
     )
 
 
 def orc(*cs: object) -> Proc:
     return Proc(
-        "flat-or/c", lambda v: any([check_contract(c, v) for c in cs]), (1, 1), [any_p]
+        "flat-or/c", lambda v: any([check_contract(c, v) for c in cs]), (1, 1), any_p
     )
 
 
