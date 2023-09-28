@@ -27,7 +27,7 @@ from auto_editor.utils.func import boolop, mut_margin
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any, NoReturn
+    from typing import Any, Literal, NoReturn
 
     from numpy.typing import NDArray
 
@@ -477,6 +477,31 @@ bool_or_barr = Contract(
     lambda v: type(v) is bool or is_boolarr(v),
 )
 is_keyw = Contract("keyword?", lambda v: type(v) is QuotedKeyword)
+
+
+@dataclass(slots=True)
+class OutputPort:
+    name: str
+    port: Any
+    write: Any
+    closed: bool
+
+    def close(self) -> None:
+        if not self.closed:
+            self.port.close()
+
+    def __str__(self) -> str:
+        return f"#<output-port:{self.name}>"
+
+    __repr__ = __str__
+
+
+def initOutPort(name: str) -> OutputPort | Literal[False]:
+    try:
+        port = open(name, "w", encoding="utf-8")
+    except Exception:
+        return False
+    return OutputPort(name, port, port.write, False)
 
 
 def raise_(msg: str) -> None:
@@ -1382,8 +1407,8 @@ env.update({
     "number?": is_num,
     "real?": is_real,
     "int?": is_int,
-    "uint?": is_uint,
     "nat?": is_nat,
+    "nat1?": is_nat1,
     "float?": is_float,
     "frac?": is_frac,
     "threshold?": is_threshold,
@@ -1485,7 +1510,7 @@ env.update({
     # vectors
     "vector": Proc("vector", lambda *a: list(a), (0, None)),
     "make-vector": Proc(
-        "make-vector", lambda size, a=0: [a] * size, (1, 2), is_uint, any_p
+        "make-vector", lambda size, a=0: [a] * size, (1, 2), is_nat, any_p
     ),
     "vector-append": Proc("vector-append", vector_append, (0, None), is_vector),
     "vector-pop!": Proc("vector-pop!", list.pop, (1, 1), is_vector),
@@ -1496,7 +1521,7 @@ env.update({
     "sort!": Proc("sort!", list.sort, (1, 1), is_vector),
     # arrays
     "array": Proc("array", array_proc, (2, None), is_symbol, is_real),
-    "make-array": Proc("make-array", make_array, (2, 3), is_symbol, is_uint, is_real),
+    "make-array": Proc("make-array", make_array, (2, 3), is_symbol, is_nat, is_real),
     "array-splice!": Proc(
         "array-splice!", splice, (2, 4), is_array, is_real, is_int, is_int
     ),
@@ -1504,13 +1529,13 @@ env.update({
     "count-nonzero": Proc("count-nonzero", np.count_nonzero, (1, 1), is_array),
     # bool arrays
     "bool-array": Proc(
-        "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), is_uint
+        "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), is_nat
     ),
     "margin": Proc("margin", margin, (2, 3)),
-    "mincut": Proc("mincut", mincut, (2, 2), is_boolarr, is_uint),
-    "minclip": Proc("minclip", minclip, (2, 2), is_boolarr, is_uint),
-    "maxcut": Proc("maxcut", maxcut, (2, 2), is_boolarr, is_uint),
-    "maxclip": Proc("maxclip", maxclip, (2, 2), is_boolarr, is_uint),
+    "mincut": Proc("mincut", mincut, (2, 2), is_boolarr, is_nat),
+    "minclip": Proc("minclip", minclip, (2, 2), is_boolarr, is_nat),
+    "maxcut": Proc("maxcut", maxcut, (2, 2), is_boolarr, is_nat),
+    "maxclip": Proc("maxclip", maxclip, (2, 2), is_boolarr, is_nat),
     # ranges
     "range": Proc("range", range, (1, 3), is_int, is_int, int_not_zero),
     # generic iterables
@@ -1533,14 +1558,24 @@ env.update({
     "hash-update!": UserProc(env, "hash-update!", ["h", "v", "up"], (is_hash, any_p),
         [[Sym("hash-set!"), Sym("h"), Sym("v"), [Sym("up"), [Sym("hash-ref"), Sym("h"), Sym("v")]]]],
     ),
+    # i/o
+    "open-output-file": Proc("open-output-file", initOutPort, (1, 1), is_str),
+    "output-port?": (op := Contract("output-port?", lambda v: type(v) is OutputPort)),
+    "close-port": Proc("close-port", OutputPort.close, (1, 1), op),
+    "closed?": Proc("closed?", lambda o: o.closed, (1, 1), op),
+    # printing
+    "display": Proc("display",
+        lambda v, f=None: print(display_str(v), end="", file=f), (1, 2), any_p, op),
+    "displayln": Proc("displayln",
+        lambda v, f=None: print(display_str(v), file=f), (1, 2), any_p, op),
+    "print": Proc("print",
+        lambda v, f=None: print(print_str(v), end="", file=f), (1, 2), any_p, op),
+    "println": Proc("println",
+        lambda v, f=None: print(print_str(v), file=f), (1, 2), any_p, op),
     # actions
     "assert": Proc("assert", palet_assert, (1, 2), any_p, orc(is_str, False)),
-    "display": Proc("display", lambda v: print(display_str(v), end=""), (1, 1)),
-    "displayln": Proc("displayln", lambda v: print(display_str(v)), (1, 1)),
     "error": Proc("error", raise_, (1, 1), is_str),
     "sleep": Proc("sleep", sleep, (1, 1), is_int_or_float),
-    "print": Proc("print", lambda v: print(print_str(v), end=""), (1, 1)),
-    "println": Proc("println", lambda v: print(print_str(v)), (1, 1)),
     "system": Proc("system", palet_system, (1, 1), is_str),
     # conversions
     "number->string": Proc("number->string", number_to_string, (1, 1), is_num),

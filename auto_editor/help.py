@@ -31,28 +31,28 @@ editing.
 Editing Methods:
  - audio  ; Audio silence/loudness detection
     - threshold threshold? : 4%
-    - stream (or/c uint? 'all "all") : 0
-    - mincut uint? : 6
-    - minclip uint? : 3
+    - stream (or/c nat? 'all "all") : 0
+    - mincut nat? : 6
+    - minclip nat? : 3
 
  - motion  ; Motion detection specialized for noisy real-life videos
     - threshold threshold? : 2%
-    - stream uint? : 0
-    - blur uint? : 9
-    - width nat? : 400
+    - stream nat? : 0
+    - blur nat? : 9
+    - width nat1? : 400
 
  - none  ;  Do not modify the media in anyway; mark all sections as "loud" (1).
  - all/e  ; Cut out everything out; mark all sections as "silent" (0).
 
  - pixeldiff  ; Detect when a certain amount of pixels have changed between frames.
-    - threshold uint? : 1
-    - stream uint? : 0
+    - threshold nat? : 1
+    - stream nat? : 0
 
  - subtitle  ; Detect when subtitle matches pattern as a RegEx string.
     - pattern string?
-    - stream uint? : 0
+    - stream nat? : 0
     - ignore-case bool? : #f
-    - max-count (or/c uint? void?) : (void)
+    - max-count (or/c nat? void?) : (void)
 
 Command-line Examples:
   --edit audio

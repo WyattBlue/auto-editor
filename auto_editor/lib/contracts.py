@@ -119,8 +119,8 @@ def is_contract(c: object) -> bool:
 
 is_bool = Contract("bool?", lambda v: type(v) is bool)
 is_int = Contract("int?", lambda v: type(v) is int)
-is_uint = Contract("uint?", lambda v: type(v) is int and v > -1)
-is_nat = Contract("nat?", lambda v: type(v) is int and v > 0)
+is_nat = Contract("nat?", lambda v: type(v) is int and v > -1)
+is_nat1 = Contract("nat1?", lambda v: type(v) is int and v > 0)
 int_not_zero = Contract("(or/c (not/c 0) int?)", lambda v: v != 0 and is_int(v))
 is_num = Contract("number?", lambda v: type(v) in (int, float, Fraction, complex))
 is_real = Contract("real?", lambda v: type(v) in (int, float, Fraction))

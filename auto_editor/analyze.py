@@ -12,9 +12,9 @@ from auto_editor.lang.json import Lexer, Parser, dump
 from auto_editor.lib.contracts import (
     is_bool,
     is_nat,
+    is_nat1,
     is_str,
     is_threshold,
-    is_uint,
     is_void,
     orc,
 )
@@ -46,28 +46,28 @@ if TYPE_CHECKING:
 audio_builder = pAttrs(
     "audio",
     pAttr("threshold", 0.04, is_threshold),
-    pAttr("stream", 0, orc(is_uint, Sym("all"), "all")),
-    pAttr("mincut", 6, is_uint),
-    pAttr("minclip", 3, is_uint),
+    pAttr("stream", 0, orc(is_nat, Sym("all"), "all")),
+    pAttr("mincut", 6, is_nat),
+    pAttr("minclip", 3, is_nat),
 )
 motion_builder = pAttrs(
     "motion",
     pAttr("threshold", 0.02, is_threshold),
-    pAttr("stream", 0, is_uint),
-    pAttr("blur", 9, is_uint),
-    pAttr("width", 400, is_nat),
+    pAttr("stream", 0, is_nat),
+    pAttr("blur", 9, is_nat),
+    pAttr("width", 400, is_nat1),
 )
 pixeldiff_builder = pAttrs(
     "pixeldiff",
-    pAttr("threshold", 1, is_uint),
-    pAttr("stream", 0, is_uint),
+    pAttr("threshold", 1, is_nat),
+    pAttr("stream", 0, is_nat),
 )
 subtitle_builder = pAttrs(
     "subtitle",
     pAttr("pattern", Required, is_str),
-    pAttr("stream", 0, is_uint),
+    pAttr("stream", 0, is_nat),
     pAttr("ignore-case", False, is_bool),
-    pAttr("max-count", None, orc(is_uint, is_void)),
+    pAttr("max-count", None, orc(is_nat, is_void)),
 )
 
 builder_map = {
