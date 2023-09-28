@@ -100,59 +100,59 @@ class TlEllipse(_Visual):
 
 video_builder = pAttrs(
     "video",
-    pAttr("start", Required, is_uint),
-    pAttr("dur", Required, is_uint),
+    pAttr("start", Required, is_nat),
+    pAttr("dur", Required, is_nat),
     pAttr("src", Required, is_str),
     pAttr("offset", 0, is_int),
     pAttr("speed", 1, is_real),
-    pAttr("stream", 0, is_uint),
+    pAttr("stream", 0, is_nat),
 )
 audio_builder = pAttrs(
     "audio",
-    pAttr("start", Required, is_uint),
-    pAttr("dur", Required, is_uint),
+    pAttr("start", Required, is_nat),
+    pAttr("dur", Required, is_nat),
     pAttr("src", Required, is_str),
     pAttr("offset", 0, is_int),
     pAttr("speed", 1, is_real),
     pAttr("volume", 1, is_real),
-    pAttr("stream", 0, is_uint),
+    pAttr("stream", 0, is_nat),
 )
 text_builder = pAttrs(
     "text",
-    pAttr("start", Required, is_uint),
-    pAttr("dur", Required, is_uint),
+    pAttr("start", Required, is_nat),
+    pAttr("dur", Required, is_nat),
     pAttr("content", Required, is_str),
     pAttr("x", 0.5, is_real),
     pAttr("y", 0.5, is_real),
     pAttr("font", "Arial", is_str),
-    pAttr("size", 55, is_uint),
+    pAttr("size", 55, is_nat),
     pAttr("align", "left", is_str),
     pAttr("opacity", 1, is_threshold),
     pAttr("anchor", "ce", is_str),
     pAttr("rotate", 0, is_real),
     pAttr("fill", "#FFF", is_str),
-    pAttr("stroke", 0, is_uint),
+    pAttr("stroke", 0, is_nat),
     pAttr("strokecolor", "#000", is_str),
 )
 
 img_builder = pAttrs(
     "image",
-    pAttr("start", Required, is_uint),
-    pAttr("dur", Required, is_uint),
+    pAttr("start", Required, is_nat),
+    pAttr("dur", Required, is_nat),
     pAttr("src", Required, is_str),
     pAttr("x", 0.5, is_real),
     pAttr("y", 0.5, is_real),
     pAttr("opacity", 1, is_threshold),
     pAttr("anchor", "ce", is_str),
     pAttr("rotate", 0, is_real),
-    pAttr("stroke", 0, is_uint),
+    pAttr("stroke", 0, is_nat),
     pAttr("strokecolor", "#000", is_str),
 )
 
 rect_builder = pAttrs(
     "rect",
-    pAttr("start", Required, is_uint),
-    pAttr("dur", Required, is_uint),
+    pAttr("start", Required, is_nat),
+    pAttr("dur", Required, is_nat),
     pAttr("x", Required, is_real),
     pAttr("y", Required, is_real),
     pAttr("width", Required, is_real),
@@ -161,7 +161,7 @@ rect_builder = pAttrs(
     pAttr("anchor", "ce", is_str),
     pAttr("rotate", 0, is_real),
     pAttr("fill", "#c4c4c4", is_str),
-    pAttr("stroke", 0, is_uint),
+    pAttr("stroke", 0, is_nat),
     pAttr("strokecolor", "#000", is_str),
 )
 ellipse_builder = rect_builder
