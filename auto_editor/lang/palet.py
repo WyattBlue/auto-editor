@@ -788,6 +788,8 @@ class UserProc(Proc):
             self.arity = len(parms), len(parms)
 
     def __call__(self, *args: Any) -> Any:
+        check_args(self.name, args, self.arity, self.contracts)
+
         if self.arity[1] is None:
             args = tuple(
                 list(args[: len(self.parms) - 1]) + [list(args[len(self.parms) - 1 :])]
@@ -1407,10 +1409,11 @@ env.update({
     "number?": is_num,
     "real?": is_real,
     "int?": is_int,
-    "nat?": is_nat,
-    "nat1?": is_nat1,
     "float?": is_float,
     "frac?": is_frac,
+    "complex?": Contract("complex?", lambda v: type(v) is complex),
+    "nat?": is_nat,
+    "nat1?": is_nat1,
     "threshold?": is_threshold,
     "any": any_p,
     "bool?": is_bool,
