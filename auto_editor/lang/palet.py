@@ -588,6 +588,13 @@ def number_to_string(val: Number) -> str:
     return f"{val}"
 
 
+def palet_join(v: Any, s: str) -> str:
+    try:
+        return s.join(v)
+    except Exception:
+        raise MyError("join: expected string?")
+
+
 dtype_map = {
     Sym("bool"): np.bool_,
     Sym("int8"): np.int8,
@@ -1500,6 +1507,7 @@ env.update({
     "title": Proc("title", str.title, (1, 1), is_str),
     "lower": Proc("lower", str.lower, (1, 1), is_str),
     "upper": Proc("upper", str.upper, (1, 1), is_str),
+    "join": Proc("join", palet_join, (2, 2), is_vector, is_str),
     # format
     "char->int": Proc("char->int", lambda c: ord(c.val), (1, 1), is_char),
     "int->char": Proc("int->char", Char, (1, 1), is_int),
