@@ -1523,11 +1523,11 @@ env.update({
     "make-vector": Proc(
         "make-vector", lambda size, a=0: [a] * size, (1, 2), is_nat, any_p
     ),
-    "vector-append": Proc("vector-append", vector_append, (0, None), is_vector),
-    "vector-pop!": Proc("vector-pop!", list.pop, (1, 1), is_vector),
-    "vector-add!": Proc("vector-add!", list.append, (2, 2), is_vector, any_p),
-    "vector-set!": Proc("vector-set!", vector_set, (3, 3), is_vector, is_int, any_p),
-    "vector-extend!": Proc("vector-extend!", vector_extend, (2, None), is_vector),
+    "add!": Proc("add!", list.append, (2, 2), is_vector, any_p),
+    "pop!": Proc("pop!", list.pop, (1, 1), is_vector),
+    "vec-set!": Proc("vec-set!", vector_set, (3, 3), is_vector, is_int, any_p),
+    "vec-append": Proc("vec-append", vector_append, (0, None), is_vector),
+    "vec-extend!": Proc("vec-extend!", vector_extend, (2, None), is_vector),
     "sort": Proc("sort", sorted, (1, 1), is_vector),
     "sort!": Proc("sort!", list.sort, (1, 1), is_vector),
     # arrays
