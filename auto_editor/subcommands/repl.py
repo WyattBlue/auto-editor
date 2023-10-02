@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 import auto_editor
-from auto_editor.analyze import FileSetup
+from auto_editor.analyze import FileSetup, Levels
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.lang.palet import ClosingError, Lexer, Parser, env, interpret
 from auto_editor.lib.data_structs import print_str
@@ -77,9 +77,10 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         src = sources["0"]
         tb = src.get_fps() if args.timebase is None else args.timebase
         ensure = Ensure(ffmpeg, src.get_sr(), temp, log)
-        filesetup = FileSetup(src, ensure, strict, tb, Bar("none"), temp, log)
+        bar = Bar("none")
         env["timebase"] = tb
-        env["@filesetup"] = filesetup
+        env["@levels"] = Levels(ensure, src, tb, bar, temp, log)
+        env["@filesetup"] = FileSetup(src, ensure, strict, tb, bar, temp, log)
 
     print(f"Auto-Editor {auto_editor.version} ({auto_editor.__version__})")
     text = None

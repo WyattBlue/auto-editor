@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 
-from auto_editor.analyze import FileSetup
+from auto_editor.analyze import FileSetup, Levels
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
@@ -90,31 +90,40 @@ def make_av(
     return vtl, atl
 
 
-def run_interpreter(
-    text: str,
-    filesetup: FileSetup,
-    log: Log,
+def run_interpreter_for_edit_option(
+    text: str, filesetup: FileSetup
 ) -> NDArray[np.bool_]:
+    ensure = filesetup.ensure
+    src = filesetup.src
+    tb = filesetup.tb
+    bar = filesetup.bar
+    temp = filesetup.temp
+    log = filesetup.log
+
     try:
         parser = Parser(Lexer("`--edit`", text))
         if log.is_debug:
             log.debug(f"edit: {parser}")
 
         env["timebase"] = filesetup.tb
+        env["@levels"] = Levels(ensure, src, tb, bar, temp, log)
         env["@filesetup"] = filesetup
 
         results = interpret(env, parser)
-    except (MyError, ZeroDivisionError) as e:
+
+        if len(results) == 0:
+            raise MyError("Expression in --edit must return a bool-array, got nothing")
+
+        result = results[-1]
+        if callable(result):
+            result = result()
+
+        if not is_boolarr(result):
+            raise MyError(
+                f"Expression in --edit must return a bool-array, got {print_str(result)}"
+            )
+    except MyError as e:
         log.error(e)
-
-    if len(results) == 0:
-        log.error("Expression in --edit must return a bool-array, got nothing")
-
-    result = results[-1]
-    if not is_boolarr(result):
-        log.error(
-            f"Expression in --edit must return a bool-array, got {print_str(result)}"
-        )
 
     assert isinstance(result, np.ndarray)
     return result
@@ -276,7 +285,7 @@ def make_layers(
 
     for i in map(str, inputs):
         filesetup = FileSetup(sources[i], ensure, len(inputs) < 2, tb, bar, temp, log)
-        has_loud = run_interpreter(method, filesetup, log)
+        has_loud = run_interpreter_for_edit_option(method, filesetup)
 
         if len(mark_loud) > 0:
             mut_set_range(has_loud, mark_loud, loud_speed)
