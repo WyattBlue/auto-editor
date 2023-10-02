@@ -149,16 +149,14 @@ def obj_tag(tag: str, tb: Fraction, obj: dict[str, Any]) -> str:
     return key
 
 
+@dataclass
 class Levels:
-    def __init__(
-        self, ensure: Ensure, src: FileInfo, tb: Fraction, bar: Bar, temp: str, log: Log
-    ):
-        self.ensure = ensure
-        self.src = src
-        self.tb = tb
-        self.bar = bar
-        self.temp = temp
-        self.log = log
+    ensure: Ensure
+    src: FileInfo
+    tb: Fraction
+    bar: Bar
+    temp: str
+    log: Log
 
     @property
     def media_length(self) -> int:
@@ -167,9 +165,7 @@ class Levels:
                 return len(arr)
 
             sr, samples = read(
-                self.ensure.audio(
-                    f"{self.src.path.resolve()}", self.src.label, stream=0
-                )
+                self.ensure.audio(f"{self.src.path.resolve()}", self.src.label, 0)
             )
             samp_count = len(samples)
             del samples

@@ -49,7 +49,7 @@ class ClosingError(MyError):
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
 VAL, QUOTE, SEC, DB, DOT, VLIT = "VAL", "QUOTE", "SEC", "DB", "DOT", "VLIT"
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
-METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:", "none:", "all/e:")
+METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:")
 brac_pairs = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
 
 str_escape = {
@@ -1334,6 +1334,20 @@ def attr(env: Env, node: list) -> Any:
     return my_eval(env, [node[2], node[1]])
 
 
+def edit_none() -> np.ndarray:
+    if "@levels" not in env:
+        raise MyError("Can't use `none` if there's no input media")
+
+    return env["@levels"].none()
+
+
+def edit_all() -> np.ndarray:
+    if "@levels" not in env:
+        raise MyError("Can't use `all/e` if there's no input media")
+
+    return env["@levels"].all()
+
+
 def my_eval(env: Env, node: object) -> Any:
     if type(node) is Sym:
         val = env.get(node.val)
@@ -1392,6 +1406,9 @@ env.update({
     "true": True,
     "false": False,
     "all": Sym("all"),
+    # edit procedures
+    "none": Proc("none", edit_none, (0, 0)),
+    "all/e": Proc("all/e", edit_all, (0, 0)),
     # syntax
     "lambda": Syntax(syn_lambda),
     "λ": Syntax(syn_lambda),
