@@ -40,7 +40,7 @@ setup(
     install_requires=[
         "numpy>=1.22.0",
         "pillow==10.0.1",
-        "av==10.0.0",
+        "pyav==11.0.1",
         "ae-ffmpeg==1.1.*",
     ],
     python_requires=">=3.10",
@@ -58,6 +58,7 @@ setup(
         "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
     ],
