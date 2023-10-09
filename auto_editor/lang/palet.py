@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     Number = int | float | complex | Fraction
     Real = int | float | Fraction
     BoolList = NDArray[np.bool_]
+    Node = tuple
 
 
 class ClosingError(MyError):
@@ -394,34 +395,34 @@ class Parser:
             return token.value
 
         if token.type == VLIT:
-            lit_arr = []
             self.eat()
+            literal_vec = []
             while self.current_token.type != token.value:
-                lit_arr.append(self.expr())
+                literal_vec.append(self.expr())
                 if self.current_token.type == EOF:
                     raise ClosingError("Unclosed vector literal")
             self.eat()
-            return [list, lit_arr]
+            return literal_vec
 
         # Handle unhygienic macros in next four cases
         if token.type == SEC:
             self.eat()
-            return [Sym("round"), [Sym("*"), token.value, Sym("timebase")]]
+            return (Sym("round"), (Sym("*"), token.value, Sym("timebase")))
 
         if token.type == DB:
             self.eat()
-            return [Sym("pow"), 10, [Sym("/"), token.value, 20]]
+            return (Sym("pow"), 10, (Sym("/"), token.value, 20))
 
         if token.type == DOT:
             self.eat()
             if type(token.value[1].value) is not Sym:
                 raise MyError(". macro: attribute call needs to be an identifier")
 
-            return [Sym("@r"), token.value[0], token.value[1].value]
+            return (Sym("@r"), token.value[0], token.value[1].value)
 
         if token.type == QUOTE:
             self.eat()
-            return [Sym("quote"), self.expr()]
+            return (Sym("quote"), self.expr())
 
         if token.type in brac_pairs:
             self.eat()
@@ -433,13 +434,13 @@ class Parser:
                 childs.append(self.expr())
 
             self.eat()
-            return childs
+            return tuple(childs)
 
         self.eat()
         childs = []
         while self.current_token.type not in (RPAREN, RBRAC, RCUR, EOF):
             childs.append(self.expr())
-        return childs
+        return tuple(childs)
 
     def __str__(self) -> str:
         result = str(self.expr())
@@ -686,7 +687,7 @@ def palet_map(proc: Proc, seq: Any) -> Any:
     if type(seq) is str:
         return str(map(proc, seq))
     if type(seq) is Quoted:
-        return Quoted(list(map(proc, seq.val)))
+        return Quoted(tuple(map(proc, seq.val)))
     if isinstance(seq, (list, range)):
         return list(map(proc, seq))
     return proc(seq)
@@ -780,7 +781,7 @@ class UserProc(Proc):
         name: str,
         parms: list[str],
         contracts: tuple[Any, ...],
-        body: list,
+        body: Node,
     ):
         self.env = env
         self.name = name
@@ -816,7 +817,7 @@ class KeywordProc:
     name: str
     parms: list[str]
     kw_parms: list[str]
-    body: list
+    body: Node
     arity: tuple[int, None]
     contracts: list[Any] | None = None
 
@@ -870,10 +871,10 @@ class KeywordProc:
 class Syntax:
     __slots__ = "syn"
 
-    def __init__(self, syn: Callable[[Env, list], Any]):
+    def __init__(self, syn: Callable[[Env, Node], Any]):
         self.syn = syn
 
-    def __call__(self, env: Env, node: list) -> Any:
+    def __call__(self, env: Env, node: Node) -> Any:
         return self.syn(env, node)
 
     def __str__(self) -> str:
@@ -882,7 +883,7 @@ class Syntax:
     __repr__ = __str__
 
 
-def check_for_syntax(env: Env, node: list) -> tuple[Sym, Any]:
+def check_for_syntax(env: Env, node: Node) -> tuple[Sym, Any]:
     name = node[0]
     if len(node) < 2:
         raise MyError(f"{name}: bad syntax")
@@ -890,8 +891,8 @@ def check_for_syntax(env: Env, node: list) -> tuple[Sym, Any]:
     if len(node) == 2:
         raise MyError(f"{name}: missing body")
 
-    assert isinstance(node[1], list)
-    assert isinstance(node[1][0], list)
+    assert isinstance(node[1], tuple)
+    assert isinstance(node[1][0], tuple)
 
     var = node[1][0][0]
     if type(var) is not Sym:
@@ -906,11 +907,11 @@ def check_for_syntax(env: Env, node: list) -> tuple[Sym, Any]:
     return var, my_iter
 
 
-def syn_lambda(env: Env, node: list) -> UserProc:
+def syn_lambda(env: Env, node: Node) -> UserProc:
     if len(node) < 3:
         raise MyError(f"{node[0]}: too few terms")
 
-    if type(node[1]) is not list:
+    if type(node[1]) is not tuple:
         raise MyError(f"{node[0]}: bad syntax")
 
     parms: list[str] = []
@@ -923,11 +924,11 @@ def syn_lambda(env: Env, node: list) -> UserProc:
     return UserProc(env, "", parms, (), node[2:])
 
 
-def syn_define(env: Env, node: list) -> None:
+def syn_define(env: Env, node: Node) -> None:
     if len(node) < 3:
         raise MyError(f"{node[0]}: too few terms")
 
-    if type(node[1]) is list:
+    if type(node[1]) is tuple:
         term = node[1]
         body = node[2:]
 
@@ -970,7 +971,7 @@ def syn_define(env: Env, node: list) -> None:
     n = node[1].val
 
     if (
-        type(node[2]) is list
+        type(node[2]) is tuple
         and node[2]
         and type(node[2][0]) is Sym
         and node[2][0].val in ("lambda", "λ")
@@ -993,11 +994,11 @@ def syn_define(env: Env, node: list) -> None:
         env[n] = my_eval(env, node[-1])
 
 
-def syn_definec(env: Env, node: list) -> None:
+def syn_definec(env: Env, node: Node) -> None:
     if len(node) < 3:
         raise MyError(f"{node[0]}: too few terms")
 
-    if type(node[1]) is not list:
+    if type(node[1]) is not tuple:
         raise MyError(f"{node[0]} only allows procedure declarations")
 
     if not node[1] or type(node[1][0]) is not Sym:
@@ -1010,7 +1011,7 @@ def syn_definec(env: Env, node: list) -> None:
     for item in node[1][1:]:
         if item == Sym("->"):
             break
-        if type(item) is not list or len(item) != 2:
+        if type(item) is not tuple or len(item) != 2:
             raise MyError(f"{node[0]}: bad var-binding syntax")
         if type(item[0]) is not Sym:
             raise MyError(f"{node[0]}: binding must be identifier")
@@ -1026,7 +1027,7 @@ def syn_definec(env: Env, node: list) -> None:
     return None
 
 
-def guard_term(node: list, n: int, u: int) -> None:
+def guard_term(node: Node, n: int, u: int) -> None:
     if n == u:
         if len(node) != n:
             raise MyError(
@@ -1039,7 +1040,7 @@ def guard_term(node: list, n: int, u: int) -> None:
         raise MyError(f"{node[0]}: Expects at most {u-1} term{'s' if u > 2 else ''}")
 
 
-def syn_set(env: Env, node: list) -> None:
+def syn_set(env: Env, node: Node) -> None:
     guard_term(node, 3, 3)
 
     if type(node[1]) is not Sym:
@@ -1051,7 +1052,7 @@ def syn_set(env: Env, node: list) -> None:
     env[name] = my_eval(env, node[2])
 
 
-def syn_incf(env: Env, node: list) -> None:
+def syn_incf(env: Env, node: Node) -> None:
     guard_term(node, 2, 3)
 
     if type(node[1]) is not Sym:
@@ -1071,7 +1072,7 @@ def syn_incf(env: Env, node: list) -> None:
         env[name] += 1
 
 
-def syn_decf(env: Env, node: list) -> None:
+def syn_decf(env: Env, node: Node) -> None:
     guard_term(node, 2, 3)
 
     if type(node[1]) is not Sym:
@@ -1091,7 +1092,7 @@ def syn_decf(env: Env, node: list) -> None:
         env[name] -= 1
 
 
-def syn_strappend(env: Env, node: list) -> None:
+def syn_strappend(env: Env, node: Node) -> None:
     guard_term(node, 3, 3)
 
     if type(node[1]) is not Sym:
@@ -1108,7 +1109,7 @@ def syn_strappend(env: Env, node: list) -> None:
     env[name] += num
 
 
-def syn_for(env: Env, node: list) -> None:
+def syn_for(env: Env, node: Node) -> None:
     var, my_iter = check_for_syntax(env, node)
 
     if isinstance(my_iter, np.ndarray) and my_iter.dtype == np.bool_:
@@ -1123,16 +1124,16 @@ def syn_for(env: Env, node: list) -> None:
                 my_eval(env, c)
 
 
-def syn_quote(env: Env, node: list) -> Any:
+def syn_quote(env: Env, node: Node) -> Any:
     guard_term(node, 2, 2)
     if type(node[1]) is Keyword:
         return QuotedKeyword(node[1])
-    if type(node[1]) is list:
+    if type(node[1]) is tuple:
         return Quoted(node[1])
     return node[1]
 
 
-def syn_if(env: Env, node: list) -> Any:
+def syn_if(env: Env, node: Node) -> Any:
     guard_term(node, 4, 4)
     test_expr = my_eval(env, node[1])
 
@@ -1144,7 +1145,7 @@ def syn_if(env: Env, node: list) -> Any:
     return my_eval(env, node[2] if test_expr else node[3])
 
 
-def syn_when(env: Env, node: list) -> Any:
+def syn_when(env: Env, node: Node) -> Any:
     if len(node) < 3:
         raise MyError(f"{node[0]}: Expected at least 2 terms")
     test_expr = my_eval(env, node[1])
@@ -1161,7 +1162,7 @@ def syn_when(env: Env, node: list) -> Any:
     return None
 
 
-def syn_and(env: Env, node: list) -> Any:
+def syn_and(env: Env, node: Node) -> Any:
     if len(node) == 1:
         raise MyError(f"{node[0]}: Expected at least 1 term")
 
@@ -1185,7 +1186,7 @@ def syn_and(env: Env, node: list) -> Any:
     raise MyError(f"{node[0]} expects (or/c bool? bool-array?)")
 
 
-def syn_or(env: Env, node: list) -> Any:
+def syn_or(env: Env, node: Node) -> Any:
     if len(node) == 1:
         raise MyError(f"{node[0]}: Expected at least 1 term")
 
@@ -1209,7 +1210,7 @@ def syn_or(env: Env, node: list) -> Any:
     raise MyError(f"{node[0]} expects (or/c bool? bool-array?)")
 
 
-def syn_delete(env: Env, node: list) -> None:
+def syn_delete(env: Env, node: Node) -> None:
     guard_term(node, 2, 2)
     if type(node[1]) is not Sym:
         raise MyError(f"{node[0]}: Expected identifier for first term")
@@ -1217,7 +1218,7 @@ def syn_delete(env: Env, node: list) -> None:
     del env[node[1].val]
 
 
-def syn_rename(env: Env, node: list) -> None:
+def syn_rename(env: Env, node: Node) -> None:
     guard_term(node, 3, 3)
 
     first = node[1]
@@ -1235,9 +1236,9 @@ def syn_rename(env: Env, node: list) -> None:
     del env[first.val]
 
 
-def syn_cond(env: Env, node: list) -> Any:
+def syn_cond(env: Env, node: Node) -> Any:
     for test_expr in node[1:]:
-        if not isinstance(test_expr, list) or not test_expr:
+        if type(test_expr) is not tuple or not test_expr:
             raise MyError(f"{node[0]}: bad syntax, clause is not a test-value pair")
 
         if test_expr[0] == Sym("else"):
@@ -1262,23 +1263,23 @@ def syn_cond(env: Env, node: list) -> Any:
     return None
 
 
-def syn_case(env: Env, node: list) -> Any:
+def syn_case(env: Env, node: Node) -> Any:
     val_expr = my_eval(env, node[1])
     for case_clause in node[2:]:
-        if not (type(case_clause) == list and len(case_clause) == 2):
+        if type(case_clause) is not tuple or len(case_clause) != 2:
             raise MyError("case: bad syntax")
-        if type(case_clause[0]) == list:
+        if type(case_clause[0]) is tuple:
             for case in case_clause[0]:
                 if is_equal(case, val_expr):
                     return my_eval(env, case_clause[1])
-        elif type(case_clause[0]) == Sym and case_clause[0].val == "else":
+        elif type(case_clause[0]) is Sym and case_clause[0].val == "else":
             return my_eval(env, case_clause[1])
         else:
             raise MyError("case: bad syntax")
     return None
 
 
-def syn_let(env: Env, node: list) -> Any:
+def syn_let(env: Env, node: Node) -> Any:
     if len(node) < 2:
         raise MyError(f"{node[0]}: Expected at least 1 term")
 
@@ -1286,7 +1287,7 @@ def syn_let(env: Env, node: list) -> Any:
         raise MyError(f"{node[0]}: Named-let form is not supported")
 
     for var_ids in node[1]:
-        if not isinstance(var_ids, list) or len(var_ids) != 2:
+        if type(var_ids) is not tuple or len(var_ids) != 2:
             raise MyError(f"{node[0]}: Expected two terms: `id` and `val-expr`")
 
     new_maps: dict[str, Any] = {}
@@ -1301,7 +1302,7 @@ def syn_let(env: Env, node: list) -> Any:
     return my_eval(inner_env, node[-1])
 
 
-def syn_let_star(env: Env, node: list) -> Any:
+def syn_let_star(env: Env, node: Node) -> Any:
     if len(node) < 2:
         raise MyError(f"{node[0]}: Expected at least 1 term")
 
@@ -1321,17 +1322,17 @@ def syn_let_star(env: Env, node: list) -> Any:
     return my_eval(inner_env, node[-1])
 
 
-def syn_class(env: Env, node: list) -> Any:
+def syn_class(env: Env, node: Node) -> Any:
     ...
 
 
-def attr(env: Env, node: list) -> Any:
+def attr(env: Env, node: Node) -> Any:
     guard_term(node, 3, 3)
 
     if type(node[2]) is not Sym:
         raise MyError("@r: attribute must be an identifier")
 
-    return my_eval(env, [node[2], node[1]])
+    return my_eval(env, (node[2], node[1]))
 
 
 def edit_none() -> np.ndarray:
@@ -1367,10 +1368,11 @@ def my_eval(env: Env, node: object) -> Any:
         return edit_method(node.val, env["@filesetup"], env)
 
     if type(node) is list:
+        return [my_eval(env, item) for item in node]
+
+    if type(node) is tuple:
         if not node:
             raise MyError("Illegal () expression")
-        if node[0] is list:  # Handle vector literal
-            return [my_eval(env, item) for item in node[1]]
 
         oper = my_eval(env, node[0])
         if not callable(oper):
@@ -1381,13 +1383,13 @@ def my_eval(env: Env, node: object) -> Any:
             we could write (a x y) instead, which is even shorter than the Perl form.
             """
             if is_iterable(oper):
-                values = [my_eval(env, c) for c in node[1:]]
-                if len(values) > 3:
+                length = len(node[1:])
+                if length > 3:
                     raise MyError(f"{print_str(node[0])}: slice expects 1 argument")
-                if len(values) in (2, 3):
-                    return p_slice(oper, *values)
-                if len(values) == 1:
-                    return ref(oper, *values)
+                if length in (2, 3):
+                    return p_slice(oper, *(my_eval(env, c) for c in node[1:]))
+                if length == 1:
+                    return ref(oper, my_eval(env, node[1]))
 
             raise MyError(f"{print_str(oper)}, expected procedure")
 
@@ -1445,6 +1447,7 @@ env.update({
     "symbol?": (is_symbol := Contract("symbol?", lambda v: type(v) is Sym)),
     "string?": is_str,
     "char?": (is_char := Contract("char?", lambda v: type(v) is Char)),
+    "list?": (is_list := Contract("list?", lambda v: type(v) is Quoted)),
     "vector?": (is_vector := Contract("vector?", lambda v: type(v) is list)),
     "array?": (is_array := Contract("array?", lambda v: isinstance(v, np.ndarray))),
     "bool-array?": is_boolarr,
@@ -1469,15 +1472,13 @@ env.update({
     "=": Proc("=", equal_num, (1, None), is_num),
     "eq?": Proc("eq?", lambda a, b: a is b, (2, 2)),
     "equal?": Proc("equal?", is_equal, (2, 2)),
-    "zero?": UserProc(env, "zero?", ["z"], (is_num,), [[Sym("="), Sym("z"), 0]]),
-    "positive?": UserProc(env, "positive?", ["x"], (is_real,), [[Sym(">"), Sym("x"), 0]]),
-    "negative?": UserProc(env, "negative?", ["x"], (is_real,), [[Sym("<"), Sym("x"), 0]]),
+    "zero?": UserProc(env, "zero?", ["z"], (is_num,), ((Sym("="), Sym("z"), 0),)),
+    "positive?": UserProc(env, "positive?", ["x"], (is_real,), ((Sym(">"), Sym("x"), 0),)),
+    "negative?": UserProc(env, "negative?", ["x"], (is_real,), ((Sym("<"), Sym("x"), 0),)),
     "even?": UserProc(
-        env, "even?", ["n"], (is_int,), [[Sym("zero?"), [Sym("mod"), Sym("n"), 2]]]
-    ),
+        env, "even?", ["n"], (is_int,), ((Sym("zero?"), (Sym("mod"), Sym("n"), 2)),)),
     "odd?": UserProc(
-        env, "odd?", ["n"], (is_int,), [[Sym("not"), [Sym("even?"), Sym("n")]]]
-    ),
+        env, "odd?", ["n"], (is_int,), ((Sym("not"), (Sym("even?"), Sym("n"))),)),
     ">=/c": Proc(">=/c", gte_c, (1, 1), is_real),
     ">/c": Proc(">/c", gt_c, (1, 1), is_real),
     "<=/c": Proc("<=/c", lte_c, (1, 1), is_real),
@@ -1584,7 +1585,9 @@ env.update({
     "has-key?": Proc("has-key?", lambda h, k: k in h, (2, 2), is_hash, any_p),
     "hash-remove!": Proc("hash-remove!", hash_remove, (2, 2), is_hash, any_p),
     "hash-update!": UserProc(env, "hash-update!", ["h", "v", "up"], (is_hash, any_p),
-        [[Sym("hash-set!"), Sym("h"), Sym("v"), [Sym("up"), [Sym("hash-ref"), Sym("h"), Sym("v")]]]],
+        (
+            (Sym("hash-set!"), Sym("h"), Sym("v"), (Sym("up"), (Sym("h"), Sym("v"))),),
+        ),
     ),
     # i/o
     "open-output-file": Proc("open-output-file", initOutPort, (1, 1), is_str),

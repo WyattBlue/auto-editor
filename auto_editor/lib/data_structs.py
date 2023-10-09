@@ -100,7 +100,7 @@ class QuotedKeyword:
 class Quoted:
     __slots__ = "val"
 
-    def __init__(self, val: list):
+    def __init__(self, val: tuple):
         self.val = val
 
     def __len__(self) -> int:
