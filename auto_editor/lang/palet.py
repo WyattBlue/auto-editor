@@ -1536,6 +1536,8 @@ env.update({
     "keyword?": is_keyw,
     "keyword->string": Proc("keyword->string", lambda v: v.val.val, (1, 1), is_keyw),
     "string->keyword": Proc("string->keyword", QuotedKeyword, (1, 1), is_str),
+    # lists
+    "list": Proc("list", lambda *a: Quoted(a), (0, None)),
     # vectors
     "vector": Proc("vector", lambda *a: list(a), (0, None)),
     "make-vector": Proc(
@@ -1618,6 +1620,11 @@ env.update({
     "var-exists?": Proc("var-exists?", lambda sym: sym.val in env, (1, 1), is_symbol),
     "rename": Syntax(syn_rename),
     "delete": Syntax(syn_delete),
+    "eval": Proc("eval",
+        lambda tl: my_eval(env, tl.val) if type(tl) is Quoted
+            else (my_eval(env, tl) if type(tl) is Sym else tl),
+        (1, 1)
+    ),
 })
 # fmt: on
 
