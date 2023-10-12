@@ -107,7 +107,7 @@ class Quoted:
         return len(self.val)
 
     def __getitem__(self, key: int | slice) -> Any:
-        if isinstance(key, slice):
+        if isinstance(key, slice) or type(self.val[key]) is tuple:
             return Quoted(self.val[key])
 
         return self.val[key]
@@ -182,7 +182,7 @@ def display_str(val: object) -> str:
     if type(val) is Fraction:
         return f"{val.numerator}/{val.denominator}"
 
-    if type(val) is Quoted:
+    if type(val) is Quoted or type(val) is tuple:
         if not val:
             return "()"
         result = StringIO()
