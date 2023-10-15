@@ -8,6 +8,9 @@ from typing import Any
 import numpy as np
 
 
+class NotFound:
+    pass
+
 class Env:
     __slots__ = ("data", "outer")
 
@@ -45,7 +48,7 @@ class Env:
             return self.data[key]
         if self.outer is not None:
             return self.outer.get(key)
-        return None
+        return NotFound()
 
 
 class Sym:
