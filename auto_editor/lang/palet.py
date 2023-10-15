@@ -462,8 +462,8 @@ class Parser:
 is_cont = Contract("contract?", is_contract)
 is_iterable = Contract(
     "iterable?",
-    lambda v: type(v) in (str, range, Quoted)
-    or isinstance(v, (list, dict, np.ndarray)),
+    lambda v: type(v) in (str, range, list, tuple, dict, Quoted)
+    or isinstance(v, np.ndarray),
 )
 is_sequence = Contract(
     "sequence?",
@@ -1124,6 +1124,28 @@ def syn_for(env: Env, node: Node) -> None:
                 my_eval(env, c)
 
 
+def syn_for_items(env: Env, node: Node) -> None:
+    if len(node) < 2:
+        raise MyError(f"{node[0]}: bad syntax")
+
+    if type(node[1]) is not tuple or len(node[1]) != 3:
+        raise MyError(f"{node[0]}: Invalid id body")
+
+    key, val, dic = node[1]
+    if type(key) is not Sym or type(val) is not Sym:
+        raise MyError(f"{node[0]}: key and val must be identifiers")
+
+    dic = my_eval(env, dic)
+    if type(dic) is not dict:
+        raise MyError(f"{node[0]}: dict must be a hash?")
+
+    for k, v in dic.items():
+        env[key.val] = k
+        env[val.val] = v
+        for c in node[2:]:
+            my_eval(env, c)
+
+
 def syn_quote(env: Env, node: Node) -> Any:
     guard_term(node, 2, 2)
     if type(node[1]) is Keyword:
@@ -1352,14 +1374,12 @@ def edit_all() -> np.ndarray:
 def my_eval(env: Env, node: object) -> Any:
     if type(node) is Sym:
         val = env.get(node.val)
-        if val is None:
+        if type(val) is NotFound:
             if mat := get_close_matches(node.val, env.data):
                 raise MyError(
                     f"variable `{node.val}` not found. Did you mean: {mat[0]}"
                 )
-            raise MyError(
-                f'variable `{node.val}` not found. Did you mean: "{node.val}"'
-            )
+            raise MyError(f'variable `{node.val}` not found. Did you mean a string literal.')
         return val
 
     if isinstance(node, Method):
@@ -1431,6 +1451,7 @@ env.update({
     "@r": Syntax(attr),
     # loops
     "for": Syntax(syn_for),
+    "for-items": Syntax(syn_for_items),
     # contracts
     "number?": is_num,
     "real?": is_real,
@@ -1447,7 +1468,7 @@ env.update({
     "symbol?": (is_symbol := Contract("symbol?", lambda v: type(v) is Sym)),
     "string?": is_str,
     "char?": (is_char := Contract("char?", lambda v: type(v) is Char)),
-    "list?": (is_list := Contract("list?", lambda v: type(v) is Quoted)),
+    "list?": (is_list := Contract("list?", lambda v: type(v) is Quoted or type(v) is tuple)),
     "vector?": (is_vector := Contract("vector?", lambda v: type(v) is list)),
     "array?": (is_array := Contract("array?", lambda v: isinstance(v, np.ndarray))),
     "bool-array?": is_boolarr,
@@ -1631,9 +1652,13 @@ env.update({
 
 def interpret(env: Env, parser: Parser) -> list:
     result = []
-    while parser.current_token.type != EOF:
-        result.append(my_eval(env, parser.expr()))
 
-        if type(result[-1]) is Keyword:
-            raise MyError(f"Keyword misused in expression. `{result[-1]}`")
+    try:
+        while parser.current_token.type != EOF:
+            result.append(my_eval(env, parser.expr()))
+
+            if type(result[-1]) is Keyword:
+                raise MyError(f"Keyword misused in expression. `{result[-1]}`")
+    except RecursionError:
+        raise MyError("maximum recursion depth exceeded")
     return result
