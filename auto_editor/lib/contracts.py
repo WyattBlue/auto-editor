@@ -137,35 +137,33 @@ is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
 
 
 def andc(*cs: object) -> Proc:
-    return Proc(
-        "flat-and/c", lambda v: all([check_contract(c, v) for c in cs]), (1, 1), any_p
-    )
+    name = "(and/c " + " ".join((f"{c}" for c in cs)) + ")"
+    return Proc(name, lambda v: all((check_contract(c, v) for c in cs)), (1, 1), any_p)
 
 
 def orc(*cs: object) -> Proc:
-    return Proc(
-        "flat-or/c", lambda v: any([check_contract(c, v) for c in cs]), (1, 1), any_p
-    )
+    name = "(or/c " + " ".join((f"{c}" for c in cs)) + ")"
+    return Proc(name, lambda v: any((check_contract(c, v) for c in cs)), (1, 1), any_p)
 
 
 def notc(c: object) -> Proc:
-    return Proc("flat-not/c", lambda v: not check_contract(c, v), (1, 1), [any_p])
+    return Proc("flat-not/c", lambda v: not check_contract(c, v), (1, 1), any_p)
 
 
 def gte_c(n: int | float | Fraction) -> Proc:
-    return Proc(f"(>=/c {n})", lambda i: i >= n, (1, 1), [is_real])
+    return Proc(f"(>=/c {n})", lambda i: i >= n, (1, 1), is_real)
 
 
 def gt_c(n: int | float | Fraction) -> Proc:
-    return Proc(f"(>/c {n})", lambda i: i > n, (1, 1), [is_real])
+    return Proc(f"(>/c {n})", lambda i: i > n, (1, 1), is_real)
 
 
 def lte_c(n: int | float | Fraction) -> Proc:
-    return Proc(f"(<=/c {n})", lambda i: i <= n, (1, 1), [is_real])
+    return Proc(f"(<=/c {n})", lambda i: i <= n, (1, 1), is_real)
 
 
 def lt_c(n: int | float | Fraction) -> Proc:
-    return Proc(f"(</c {n})", lambda i: i < n, (1, 1), [is_real])
+    return Proc(f"(</c {n})", lambda i: i < n, (1, 1), is_real)
 
 
 def between_c(n: Any, m: Any) -> Proc:

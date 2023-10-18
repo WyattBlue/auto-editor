@@ -1043,53 +1043,104 @@ def guard_term(node: Node, n: int, u: int) -> None:
 def syn_set(env: Env, node: Node) -> None:
     guard_term(node, 3, 3)
 
-    if type(node[1]) is not Sym:
-        raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
+    if type(node[1]) is Sym:
+        name = node[1].val
+        if name not in env:
+            raise MyError(f"{node[0]}: Can't set variable `{name}` before definition")
+        env[name] = my_eval(env, node[2])
+        return None
 
-    name = node[1].val
-    if name not in env:
-        raise MyError(f"{node[0]}: Can't set variable `{name}` before definition")
-    env[name] = my_eval(env, node[2])
+    if type(node[1]) is tuple and len(node[1]) == 3 and node[1][0] == Sym("@r"):
+        base = my_eval(env, node[1][1])
+        name = node[1][2].val
+        for i, item in enumerate(base.attrs[0::2]):
+            if name == item:
+                result = my_eval(env, node[2])
+                check_args(item, (result,), (1, 1), (base.attrs[i * 2 + 1],))
+                base.values[i] = result
+                return None
+
+        raise MyError(f"{node[0]}: {base.name} has no attribute `{name}`")
+
+    raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
 
 
 def syn_incf(env: Env, node: Node) -> None:
     guard_term(node, 2, 3)
 
-    if type(node[1]) is not Sym:
-        raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
-    name = node[1].val
-
-    if env[name] is None:
-        raise MyError(f"{node[0]}: `{name}` is not defined")
-    if not is_num(env[name]):
-        raise MyError(f"{node[0]}: `{name}` is not a number?")
-
+    incre_by = 1
     if len(node) == 3:
-        if not is_num(num := my_eval(env, node[2])):
-            raise MyError(f"{node[0]}: Expected number? got: {print_str(num)}")
-        env[name] += num
-    else:
-        env[name] += 1
+        incre_by = my_eval(env, node[2])
+        if not is_num(incre_by):
+            raise MyError(f"{node[0]}: Expected number? got: {print_str(incre_by)}")
+
+    if type(node[1]) is Sym:
+        name = node[1].val
+
+        if type(env[name]) is NotFound:
+            raise MyError(f"{node[0]}: `{name}` is not defined")
+        if not is_num(env[name]):
+            raise MyError(f"{node[0]}: `{name}` is not a number?")
+        env[name] += incre_by
+        return None
+
+    if type(node[1]) is tuple and len(node[1]) == 3 and node[1][0] == Sym("@r"):
+        base = my_eval(env, node[1][1])
+        if type(node[1][2]) is not Sym:
+            raise MyError(f"{node[0]}: class attribute must be an identifier")
+        name = node[1][2].val
+        for i, item in enumerate(base.attrs[0::2]):
+            if name == item:
+                if not is_num(base.values[i]):
+                    raise MyError(f"{node[0]}: `{name}` is not a number?")
+
+                check_args(
+                    name, (base.values[i] + incre_by,), (1, 1), (base.attrs[i * 2 + 1],)
+                )
+                base.values[i] += incre_by
+                return None
+        raise MyError(f"{node[0]}: {base.name} has no attribute `{name}`")
+
+    raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
 
 
 def syn_decf(env: Env, node: Node) -> None:
     guard_term(node, 2, 3)
 
-    if type(node[1]) is not Sym:
-        raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
-    name = node[1].val
-
-    if env[name] is None:
-        raise MyError(f"{node[0]}: `{name}` is not defined")
-    if not is_num(env[name]):
-        raise MyError(f"{node[0]}: `{name}` is not a number?")
-
+    incre_by = 1
     if len(node) == 3:
-        if not is_num(num := my_eval(env, node[2])):
-            raise MyError(f"{node[0]}: Expected number? got: {print_str(num)}")
-        env[name] -= num
-    else:
-        env[name] -= 1
+        incre_by = my_eval(env, node[2])
+        if not is_num(incre_by):
+            raise MyError(f"{node[0]}: Expected number? got: {print_str(incre_by)}")
+
+    if type(node[1]) is Sym:
+        name = node[1].val
+
+        if type(env[name]) is NotFound:
+            raise MyError(f"{node[0]}: `{name}` is not defined")
+        if not is_num(env[name]):
+            raise MyError(f"{node[0]}: `{name}` is not a number?")
+        env[name] -= incre_by
+        return None
+
+    if type(node[1]) is tuple and len(node[1]) == 3 and node[1][0] == Sym("@r"):
+        base = my_eval(env, node[1][1])
+        if type(node[1][2]) is not Sym:
+            raise MyError(f"{node[0]}: class attribute must be an identifier")
+        name = node[1][2].val
+        for i, item in enumerate(base.attrs[0::2]):
+            if name == item:
+                if not is_num(base.values[i]):
+                    raise MyError(f"{node[0]}: `{name}` is not a number?")
+
+                check_args(
+                    name, (base.values[i] - incre_by,), (1, 1), (base.attrs[i * 2 + 1],)
+                )
+                base.values[i] -= incre_by
+                return None
+        raise MyError(f"{node[0]}: {base.name} has no attribute `{name}`")
+
+    raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
 
 
 def syn_strappend(env: Env, node: Node) -> None:
@@ -1099,7 +1150,7 @@ def syn_strappend(env: Env, node: Node) -> None:
         raise MyError(f"{node[0]}: Expected identifier, got {print_str(node[1])}")
     name = node[1].val
 
-    if env[name] is None:
+    if type(env[name]) is NotFound:
         raise MyError(f"{node[0]}: `{name}` is not defined")
     if not is_str(env[name]):
         raise MyError(f"{node[0]}: `{name}` is not a string?")
@@ -1344,8 +1395,40 @@ def syn_let_star(env: Env, node: Node) -> Any:
     return my_eval(inner_env, node[-1])
 
 
-def syn_class(env: Env, node: Node) -> Any:
-    ...
+def syn_class(env: Env, node: Node) -> None:
+    if len(node) < 2:
+        raise MyError(f"{node[0]}: Expects at least 1 term")
+
+    if type(node[1]) is not Sym:
+        raise MyError("class name must be an identifier")
+
+    attr_len = len(node) - 2
+    attrs: Any = [None] * (attr_len * 2)
+    contracts = [None] * attr_len
+
+    for i, item in enumerate(node[2:]):
+        if type(item) is not tuple or len(item) != 2:
+            raise MyError(f"{node[0]}: Invalid syntax")
+
+        contracts[i] = my_eval(env, item[1])
+        attrs[i * 2] = item[0].val
+        attrs[i * 2 + 1] = contracts[i]
+
+    name = node[1].val
+    pred = name + "?"
+    attrs = tuple(attrs)
+
+    env[name] = Proc(
+        name,
+        lambda *args: PaletClass(name, attrs, list(args)),
+        (attr_len, attr_len),
+        *contracts,
+    )
+    env[pred] = Proc(
+        pred,
+        lambda v: type(v) is PaletClass and v.name == name and v.attrs == attrs,
+        (1, 1),
+    )
 
 
 def attr(env: Env, node: Node) -> Any:
@@ -1353,6 +1436,15 @@ def attr(env: Env, node: Node) -> Any:
 
     if type(node[2]) is not Sym:
         raise MyError("@r: attribute must be an identifier")
+
+    base = my_eval(env, node[1])
+    if type(base) is PaletClass:
+        if type(name := node[2]) is not Sym:
+            raise MyError("@r: class attribute must be an identifier")
+
+        for i, item in enumerate(base.attrs[0::2]):
+            if name.val == item:
+                return base.values[i]
 
     return my_eval(env, (node[2], node[1]))
 
@@ -1379,7 +1471,9 @@ def my_eval(env: Env, node: object) -> Any:
                 raise MyError(
                     f"variable `{node.val}` not found. Did you mean: {mat[0]}"
                 )
-            raise MyError(f'variable `{node.val}` not found. Did you mean a string literal.')
+            raise MyError(
+                f"variable `{node.val}` not found. Did you mean a string literal."
+            )
         return val
 
     if isinstance(node, Method):
@@ -1447,7 +1541,7 @@ env.update({
     "case": Syntax(syn_case),
     "let": Syntax(syn_let),
     "let*": Syntax(syn_let_star),
-    #"class": Syntax(syn_class),
+    "class": Syntax(syn_class),
     "@r": Syntax(attr),
     # loops
     "for": Syntax(syn_for),
@@ -1527,7 +1621,7 @@ env.update({
     "min": Proc("min", lambda *v: min(v), (1, None), is_real),
     "sin": Proc("sin", math.sin, (1, 1), is_real),
     "cos": Proc("cos", math.cos, (1, 1), is_real),
-    "log": Proc("log", math.log, (1, 2), is_real),
+    "log": Proc("log", math.log, (1, 2), andc(is_real, gt_c(0))),
     "tan": Proc("tan", math.tan, (1, 1), is_real),
     "mod": Proc("mod", lambda a, b: a % b, (2, 2), is_int),
     "modulo": Proc("modulo", lambda a, b: a % b, (2, 2), is_int),
