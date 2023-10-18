@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 from fractions import Fraction
 from io import StringIO
 from typing import Any
@@ -10,6 +11,7 @@ import numpy as np
 
 class NotFound:
     pass
+
 
 class Env:
     __slots__ = ("data", "outer")
@@ -257,3 +259,20 @@ def print_str(val: object) -> str:
         return f"'{display_str(val)}"
 
     return display_str(val)
+
+
+@dataclass(slots=True)
+class PaletClass:
+    name: str
+    attrs: tuple
+    values: list
+
+    def __str__(self) -> str:
+        result = StringIO()
+        result.write(f"({self.name}")
+        for i, val in enumerate(self.values):
+            result.write(f" #:{self.attrs[i * 2]} {print_str(val)}")
+        result.write(")")
+        return result.getvalue()
+
+    __repr__ = __str__

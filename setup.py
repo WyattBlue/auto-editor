@@ -40,7 +40,7 @@ setup(
     install_requires=[
         "numpy>=1.22.0",
         "pillow==10.0.1",
-        "pyav==11.0.1",
+        "pyav==11.1.0",
         "ae-ffmpeg==1.1.*",
     ],
     python_requires=">=3.10",
