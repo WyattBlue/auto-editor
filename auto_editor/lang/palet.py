@@ -13,6 +13,7 @@ from difflib import get_close_matches
 from fractions import Fraction
 from functools import reduce
 from io import StringIO
+from operator import add, ge, gt, is_, le, lt, mod, mul
 from time import sleep
 from typing import TYPE_CHECKING
 
@@ -489,6 +490,7 @@ class OutputPort:
 
     def close(self) -> None:
         if not self.closed:
+            self.closed = True
             self.port.close()
 
     def __str__(self) -> str:
@@ -517,10 +519,6 @@ def is_equal(a: object, b: object) -> bool:
 
 def equal_num(*values: object) -> bool:
     return all(values[0] == val for val in values[1:])
-
-
-def mul(*vals: Any) -> Number:
-    return reduce(lambda a, b: a * b, vals, 1)
 
 
 def minus(*vals: Number) -> Number:
@@ -565,14 +563,6 @@ def _xor(*vals: Any) -> bool | BoolList:
         return reduce(lambda a, b: boolop(a, b, logical_xor), vals)
     check_args("xor", vals, (2, None), (is_bool,))
     return reduce(lambda a, b: a ^ b, vals)
-
-
-def string_append(*vals: str | Char) -> str:
-    return reduce(lambda a, b: a + b, vals, "")
-
-
-def vector_append(*vals: list) -> list:
-    return reduce(lambda a, b: a + b, vals, [])
 
 
 def string_ref(s: str, ref: int) -> Char:
@@ -681,6 +671,13 @@ def vector_set(vec: list, pos: int, v: Any) -> None:
 def vector_extend(vec: list, *more_vecs: list) -> None:
     for more in more_vecs:
         vec.extend(more)
+
+
+def list_append(*v: Quoted) -> Quoted:
+    result = Quoted(tuple())
+    for item in v:
+        result.val = result.val + item.val
+    return result
 
 
 def palet_map(proc: Proc, seq: Any) -> Any:
@@ -1086,6 +1083,8 @@ def syn_incf(env: Env, node: Node) -> None:
 
     if type(node[1]) is tuple and len(node[1]) == 3 and node[1][0] == Sym("@r"):
         base = my_eval(env, node[1][1])
+        if type(base) is not PaletClass:
+            raise MyError(f"{node[0]}: must be a class instance")
         if type(node[1][2]) is not Sym:
             raise MyError(f"{node[0]}: class attribute must be an identifier")
         name = node[1][2].val
@@ -1125,6 +1124,8 @@ def syn_decf(env: Env, node: Node) -> None:
 
     if type(node[1]) is tuple and len(node[1]) == 3 and node[1][0] == Sym("@r"):
         base = my_eval(env, node[1][1])
+        if type(base) is not PaletClass:
+            raise MyError(f"{node[0]}: must be a class instance")
         if type(node[1][2]) is not Sym:
             raise MyError(f"{node[0]}: class attribute must be an identifier")
         name = node[1][2].val
@@ -1580,12 +1581,12 @@ env.update({
     "or": Syntax(syn_or),
     "xor": Proc("xor", _xor, (2, None), bool_or_barr),
     # booleans
-    ">": Proc(">", lambda a, b: a > b, (2, 2), is_real),
-    ">=": Proc(">=", lambda a, b: a >= b, (2, 2), is_real),
-    "<": Proc("<", lambda a, b: a < b, (2, 2), is_real),
-    "<=": Proc("<=", lambda a, b: a <= b, (2, 2), is_real),
+    ">": Proc(">", gt, (2, 2), is_real),
+    ">=": Proc(">=", ge, (2, 2), is_real),
+    "<": Proc("<", lt, (2, 2), is_real),
+    "<=": Proc("<=", le, (2, 2), is_real),
     "=": Proc("=", equal_num, (1, None), is_num),
-    "eq?": Proc("eq?", lambda a, b: a is b, (2, 2)),
+    "eq?": Proc("eq?", is_, (2, 2)),
     "equal?": Proc("equal?", is_equal, (2, 2)),
     "zero?": UserProc(env, "zero?", ["z"], (is_num,), ((Sym("="), Sym("z"), 0),)),
     "positive?": UserProc(env, "positive?", ["x"], (is_real,), ((Sym(">"), Sym("x"), 0),)),
@@ -1602,7 +1603,7 @@ env.update({
     # numbers
     "+": Proc("+", lambda *v: sum(v), (0, None), is_num),
     "-": Proc("-", minus, (1, None), is_num),
-    "*": Proc("*", mul, (0, None), is_num),
+    "*": Proc("*", lambda *v: reduce(mul, v, 1), (0, None), is_num),
     "/": Proc("/", num_div, (1, None), is_num),
     "div": Proc("div", int_div, (2, None), is_int),
     "add1": Proc("add1", lambda z: z + 1, (1, 1), is_num),
@@ -1623,17 +1624,17 @@ env.update({
     "cos": Proc("cos", math.cos, (1, 1), is_real),
     "log": Proc("log", math.log, (1, 2), andc(is_real, gt_c(0))),
     "tan": Proc("tan", math.tan, (1, 1), is_real),
-    "mod": Proc("mod", lambda a, b: a % b, (2, 2), is_int),
-    "modulo": Proc("modulo", lambda a, b: a % b, (2, 2), is_int),
+    "mod": Proc("mod", mod, (2, 2), is_int),
+    "modulo": Proc("modulo", mod, (2, 2), is_int),
     # symbols
     "symbol->string": Proc("symbol->string", str, (1, 1), is_symbol),
     "string->symbol": Proc("string->symbol", Sym, (1, 1), is_str),
     # strings
-    "string": Proc("string", string_append, (0, None), is_char),
-    "&": Proc("&", string_append, (0, None), is_str),
+    "string": Proc("string", lambda *v: reduce(add, v, ""), (0, None), is_char),
+    "&": Proc("&", lambda *v: reduce(add, v, ""), (0, None), is_str),
     "split": Proc("split", str.split, (1, 2), is_str, is_str),
     "strip": Proc("strip", str.strip, (1, 1), is_str),
-    "str-repeat": Proc("str-repeat", lambda s, a: s * a, (2, 2), is_str, is_int),
+    "str-repeat": Proc("str-repeat", mul, (2, 2), is_str, is_int),
     "startswith": Proc("startswith", str.startswith, (2, 2), is_str),
     "endswith": Proc("endswith", str.endswith, (2, 2), is_str),
     "replace": Proc("replace", str.replace, (3, 4), is_str, is_str, is_str, is_int),
@@ -1653,6 +1654,7 @@ env.update({
     "string->keyword": Proc("string->keyword", QuotedKeyword, (1, 1), is_str),
     # lists
     "list": Proc("list", lambda *a: Quoted(a), (0, None)),
+    "append": Proc("append", list_append, (0, None), is_list),
     # vectors
     "vector": Proc("vector", lambda *a: list(a), (0, None)),
     "make-vector": Proc(
@@ -1661,7 +1663,7 @@ env.update({
     "add!": Proc("add!", list.append, (2, 2), is_vector, any_p),
     "pop!": Proc("pop!", list.pop, (1, 1), is_vector),
     "vec-set!": Proc("vec-set!", vector_set, (3, 3), is_vector, is_int, any_p),
-    "vec-append": Proc("vec-append", vector_append, (0, None), is_vector),
+    "vec-append": Proc("vec-append", lambda *v: reduce(add, v, []), (0, None), is_vector),
     "vec-extend!": Proc("vec-extend!", vector_extend, (2, None), is_vector),
     "sort": Proc("sort", sorted, (1, 1), is_vector),
     "sort!": Proc("sort!", list.sort, (1, 1), is_vector),
