@@ -9,16 +9,7 @@ from typing import Any
 from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.lang.json import Lexer, Parser, dump
 from auto_editor.lib.err import MyError
-from auto_editor.timeline import (
-    TlAudio,
-    TlEllipse,
-    TlImage,
-    TlRect,
-    TlVideo,
-    Visual,
-    v1,
-    v3,
-)
+from auto_editor.timeline import TlAudio, TlImage, TlRect, TlVideo, VSpace, v1, v3
 from auto_editor.utils.cmdkw import ParserError, Required
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -73,8 +64,6 @@ img_builder = cAttrs(
     ("opacity", threshold, 1),
     ("anchor", anchor, "ce"),
     ("rotate", number, 0),
-    ("stroke", natural, 0),
-    ("strokecolor", color, "#000"),
 )
 
 rect_builder = cAttrs(
@@ -85,18 +74,12 @@ rect_builder = cAttrs(
     ("y", int, Required),
     ("width", int, Required),
     ("height", int, Required),
-    ("opacity", threshold, 1),
     ("anchor", anchor, "ce"),
-    ("rotate", number, 0),
     ("fill", color, "#c4c4c4"),
-    ("stroke", natural, 0),
-    ("strokecolor", color, "#000"),
 )
-ellipse_builder = rect_builder
 
 visual_objects = {
     "rectangle": (TlRect, rect_builder),
-    "ellipse": (TlEllipse, ellipse_builder),
     "image": (TlImage, img_builder),
     "video": (TlVideo, video_builder),
 }
@@ -148,7 +131,7 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
 
     for vlayers in tl["v"]:
         if vlayers:
-            v_out: list[Visual] = []
+            v_out: VSpace = []
             for vdict in vlayers:
                 if "name" not in vdict:
                     log.error("Invalid video object: name not specified")

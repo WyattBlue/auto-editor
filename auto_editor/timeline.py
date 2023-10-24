@@ -8,7 +8,6 @@ from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import *
 from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
-from auto_editor.utils.types import Align
 
 
 @dataclass(slots=True)
@@ -54,48 +53,28 @@ class TlAudio:
 
 
 @dataclass
-class _Visual:
+class TlImage:
     start: int
     dur: int
-    x: int | float
-    y: int | float
+    src: str
+    x: int
+    y: int
     anchor: str
     opacity: float
-    rotate: float
-    stroke: int
-    strokecolor: str
-
-
-@dataclass
-class TlText(_Visual):
-    content: str
-    font: str
-    size: int
-    align: Align
-    fill: str
-    name: str = "text"
-
-
-@dataclass
-class TlImage(_Visual):
-    src: str
     name: str = "image"
 
 
 @dataclass
-class TlRect(_Visual):
+class TlRect:
+    start: int
+    dur: int
+    x: int
+    y: int
     width: int
     height: int
+    anchor: str
     fill: str
     name: str = "rectangle"
-
-
-@dataclass
-class TlEllipse(_Visual):
-    width: int
-    height: int
-    fill: str
-    name: str = "ellipse"
 
 
 video_builder = pAttrs(
@@ -117,58 +96,30 @@ audio_builder = pAttrs(
     pAttr("volume", 1, is_real),
     pAttr("stream", 0, is_nat),
 )
-text_builder = pAttrs(
-    "text",
-    pAttr("start", Required, is_nat),
-    pAttr("dur", Required, is_nat),
-    pAttr("content", Required, is_str),
-    pAttr("x", 0.5, is_real),
-    pAttr("y", 0.5, is_real),
-    pAttr("font", "Arial", is_str),
-    pAttr("size", 55, is_nat),
-    pAttr("align", "left", is_str),
-    pAttr("opacity", 1, is_threshold),
-    pAttr("anchor", "ce", is_str),
-    pAttr("rotate", 0, is_real),
-    pAttr("fill", "#FFF", is_str),
-    pAttr("stroke", 0, is_nat),
-    pAttr("strokecolor", "#000", is_str),
-)
-
 img_builder = pAttrs(
     "image",
     pAttr("start", Required, is_nat),
     pAttr("dur", Required, is_nat),
     pAttr("src", Required, is_str),
-    pAttr("x", 0.5, is_real),
-    pAttr("y", 0.5, is_real),
+    pAttr("x", Required, is_int),
+    pAttr("y", Required, is_int),
     pAttr("opacity", 1, is_threshold),
     pAttr("anchor", "ce", is_str),
-    pAttr("rotate", 0, is_real),
-    pAttr("stroke", 0, is_nat),
-    pAttr("strokecolor", "#000", is_str),
 )
 
 rect_builder = pAttrs(
     "rect",
     pAttr("start", Required, is_nat),
     pAttr("dur", Required, is_nat),
-    pAttr("x", Required, is_real),
-    pAttr("y", Required, is_real),
-    pAttr("width", Required, is_real),
-    pAttr("height", Required, is_real),
-    pAttr("opacity", 1, is_threshold),
+    pAttr("x", Required, is_int),
+    pAttr("y", Required, is_int),
+    pAttr("width", Required, is_int),
+    pAttr("height", Required, is_int),
     pAttr("anchor", "ce", is_str),
-    pAttr("rotate", 0, is_real),
     pAttr("fill", "#c4c4c4", is_str),
-    pAttr("stroke", 0, is_nat),
-    pAttr("strokecolor", "#000", is_str),
 )
-ellipse_builder = rect_builder
 visual_objects = {
     "rectangle": (TlRect, rect_builder),
-    "ellipse": (TlEllipse, ellipse_builder),
-    "text": (TlText, text_builder),
     "image": (TlImage, img_builder),
     "video": (TlVideo, video_builder),
 }
@@ -177,8 +128,7 @@ audio_objects = {
     "audio": (TlAudio, audio_builder),
 }
 
-Visual = TlText | TlImage | TlRect | TlEllipse
-VLayer = list[TlVideo | Visual]
+VLayer = list[TlVideo | TlImage | TlRect]
 VSpace = list[VLayer]
 
 ALayer = list[TlAudio]

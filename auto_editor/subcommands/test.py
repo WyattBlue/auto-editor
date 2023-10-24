@@ -406,50 +406,10 @@ def main(sys_args: list[str] | None = None):
                 "--mark_as_loud",
                 "start,end",
                 "--add",
-                'rectangle:0,30,0,200,100,300,fill="#43FA56",stroke=10',
+                'rectangle:0,30,0,200,100,300,fill="#43FA56"',
             ],
         )
-
-        # Every element should be visible, order should be preserved.
-        run.main(
-            ["example.mp4"],
-            [
-                "--add",
-                'ellipse:0,30,50%,50%,300,300,fill="red"',
-                'rectangle:0,30,500,440,400,200,fill="skyblue"',
-                'ellipse:0,30,50%,50%,100,100,fill="darkgreen"',
-                "--edit",
-                "none",
-                "--cut-out",
-                "30,end",
-            ],
-        )
-
-        # Both ellipses should be visible
-        out2 = run.main(
-            ["example.mp4"],
-            [
-                "--add",
-                'ellipse:0,60,50%,50%,300,300,fill="darkgreen"',
-                'ellipse:0,30,50%,50%,200,200,fill="green"',
-                "--edit",
-                "none",
-                "--cut-out",
-                "60,end",
-            ],
-        )
-
-        return out, out2
-
-    def render_text():
-        return run.main(
-            ["example.mp4"], ["--add", 'text:0,30,"This, is my text",font="default"']
-        )
-
-    def check_font_error():
-        run.check(
-            ["example.mp4", "--add", 'text:0,30,"text",0,0,"notafont"'], "not found"
-        )
+        return out
 
     def premiere():
         results = set()
@@ -788,7 +748,6 @@ def main(sys_args: list[str] | None = None):
                 premiere,
                 SAR,
                 yuv442p,
-                check_font_error,
                 edit_negative_tests,
                 edit_positive_tests,
                 audio_norm_f,
@@ -802,7 +761,6 @@ def main(sys_args: list[str] | None = None):
                 concat_multiple_tracks,
                 render_video_objs,
                 various_errors,
-                render_text,
                 add_audio,
                 frame_rate,
                 help_tests,
