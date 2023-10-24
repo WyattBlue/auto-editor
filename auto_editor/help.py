@@ -222,7 +222,7 @@ Here is a list of examples on how margin mutates boolean arrays
    - opacity      threshold?  : 1.0
    - anchor       str?        : "ce"
 
- - rectangle
+ - rect
    - start, dur   nat?
    - x, y         int?
    - width        int?

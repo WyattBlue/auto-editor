@@ -384,7 +384,7 @@ def main(sys_args: list[str] | None = None):
     def obj_makes_video():
         out = run.main(
             ["resources/new-commentary.mp3"],
-            ["--add", 'rectangle:0,30,0,0,300,300,fill="blue"'],
+            ["--add", 'rect:0,30,0,0,300,300,fill="blue"'],
             "out.mp4",
         )
         cn = checker.check(out)
@@ -397,7 +397,7 @@ def main(sys_args: list[str] | None = None):
         return out
 
     def various_errors():
-        run.check(["example.mp4", "--add", "rectangle:0,60", "--cut-out", "60,end"])
+        run.check(["example.mp4", "--add", "rect:0,60", "--cut-out", "60,end"])
 
     def render_video_objs():
         out = run.main(
@@ -406,7 +406,7 @@ def main(sys_args: list[str] | None = None):
                 "--mark_as_loud",
                 "start,end",
                 "--add",
-                'rectangle:0,30,0,200,100,300,fill="#43FA56"',
+                'rect:0,30,0,200,100,300,fill="#43FA56"',
             ],
         )
         return out

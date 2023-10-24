@@ -79,7 +79,7 @@ rect_builder = cAttrs(
 )
 
 visual_objects = {
-    "rectangle": (TlRect, rect_builder),
+    "rect": (TlRect, rect_builder),
     "image": (TlImage, img_builder),
     "video": (TlVideo, video_builder),
 }
