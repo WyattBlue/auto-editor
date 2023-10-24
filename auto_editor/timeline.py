@@ -119,7 +119,7 @@ rect_builder = pAttrs(
     pAttr("fill", "#c4c4c4", is_str),
 )
 visual_objects = {
-    "rectangle": (TlRect, rect_builder),
+    "rect": (TlRect, rect_builder),
     "image": (TlImage, img_builder),
     "video": (TlVideo, video_builder),
 }
