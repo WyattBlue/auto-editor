@@ -201,63 +201,34 @@ Here is a list of examples on how margin mutates boolean arrays
 """.strip(),
         "--add": """
  - video
-   - start        uint?
-   - dur          uint?
+   - start, dur   nat?
    - src          str?
-   - offset       int?        : 0
-   - speed        real?       : 1
-   - stream       uint?       : 0
+   - offset       int?     : 0
+   - speed        real?    : 1
+   - stream       uint?    : 0
 
  - audio
-   - start        uint?
-   - dur          uint?
+   - start, dur   nat?
    - src          str?
-   - offset       int?        : 0
-   - speed        real?       : 1
-   - volume       real?       : 1
-   - stream       uint?       : 0
-
- - text
-   - start        uint?
-   - dur          uint?
-   - content      str?
-   - x            real?       : 0.5
-   - y            real?       : 0.5
-   - font         str?        : "Arial"
-   - size         uint?       : 55
-   - align        str?        : "left"
-   - opacity      threshold?  : 1.0
-   - anchor       str?        : "ce"
-   - rotate       real?       : 0
-   - fill         str?        : "#FFF"
-   - stroke       uint?       : 0
-   - strokecolor  str?        : "#000"
+   - offset       int?     : 0
+   - speed        real?    : 1
+   - volume       real?    : 1
+   - stream       uint?    : 0
 
  - image
-   - start        uint?
-   - dur          uint?
+   - start, dur   nat?
    - src          str?
-   - x            real?       : 0.5
-   - y            real?       : 0.5
+   - x, y         int?
    - opacity      threshold?  : 1.0
    - anchor       str?        : "ce"
-   - rotate       real?       : 0
-   - stroke       uint?       : 0
-   - strokecolor  str?        : "#000"
 
- - rectangle && ellipse
-   - start        uint?
-   - dur          uint?
-   - x            real?
-   - y            real?
-   - width        real?
-   - height       real?
-   - opacity      threshold?  : 1.0
-   - anchor       str?        : "ce"
-   - rotate       real?       : 0
-   - fill         str?        : "#FFF"
-   - stroke       uint?       : 0
-   - strokecolor  str?        : "#000"
+ - rectangle
+   - start, dur   nat?
+   - x, y         int?
+   - width        int?
+   - height       int?
+   - anchor       str?     : "ce"
+   - fill         str?     : "#FFF"
 """.strip(),
         "--audio-normalize": """
 Apply audio normalization after cutting.

@@ -12,10 +12,11 @@ from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
+    ALayer,
     ASpace,
     TlAudio,
     TlVideo,
-    Visual,
+    VLayer,
     VSpace,
     audio_objects,
     v1,
@@ -193,8 +194,8 @@ def make_timeline(
     tl = v3(sources, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
 
     w, h = res
-    pool: list[Visual] = []
-    apool: list[TlAudio] = []
+    pool: VLayer = []
+    apool: ALayer = []
 
     env["start"] = 0
     env["end"] = tl.end

@@ -10,8 +10,8 @@ import av
 from PIL import Image, ImageOps
 
 from auto_editor.output import video_quality
-from auto_editor.render.image import make_caches, render_image
-from auto_editor.timeline import TlVideo, Visual
+from auto_editor.render.image import make_cache, render_image
+from auto_editor.timeline import TlVideo
 from auto_editor.utils.encoder import encoders
 
 if TYPE_CHECKING:
@@ -74,7 +74,7 @@ def render_av(
     else:
         src = None
 
-    font_cache, img_cache = make_caches(tl.v, tl.sources, log)
+    img_cache = make_cache(tl.v, tl.sources, log)
 
     cns: dict[str, Any] = {}
     decoders: dict[str, Any] = {}
@@ -177,7 +177,7 @@ def render_av(
     try:
         for index in range(tl.end):
             # Add objects to obj_list
-            obj_list: list[VideoFrame | Visual] = []
+            obj_list: list[Any] = []
             for layer in tl.v:
                 for lobj in layer:
                     if isinstance(lobj, TlVideo):
@@ -241,7 +241,7 @@ def render_av(
                         frame = frame.from_image(img).reformat(format=target_pix_fmt)
 
                 else:
-                    frame = render_image(frame, obj, font_cache, img_cache)
+                    frame = render_image(frame, obj, img_cache)
 
             if frame.format.name != target_pix_fmt:
                 frame = frame.reformat(format=target_pix_fmt)
