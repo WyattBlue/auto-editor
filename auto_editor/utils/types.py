@@ -183,19 +183,6 @@ def speed_range(val: str) -> tuple[float, str, str]:
     return number(a[0]), a[1], a[2]
 
 
-Align = Literal["left", "center", "right"]
-
-
-def align(val: str) -> Align:
-    if val == "left":
-        return "left"
-    if val == "center":
-        return "center"
-    if val == "right":
-        return "right"
-    raise CoerceError("Align must be 'left', 'right', or 'center'")
-
-
 Stream = int | Literal["all"]
 
 
@@ -237,14 +224,6 @@ def resolution(val: str | None) -> tuple[int, int] | None:
         raise CoerceError(f"'{val}': Resolution takes two numbers")
 
     return natural(vals[0]), natural(vals[1])
-
-
-def pos(val: tuple[float | str, int]) -> int:
-    num, unit = _split_num_str(val[0])
-    if unit == "%":
-        return round((num / 100) * val[1])
-    _unit_check(unit, ("",))
-    return round(num)
 
 
 @dataclass
