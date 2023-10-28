@@ -131,7 +131,8 @@ any_p = Contract("any", lambda v: True)
 is_void = Contract("void?", lambda v: v is None)
 is_int_or_float = Contract("(or/c int? float?)", lambda v: type(v) in (int, float))
 is_threshold = Contract(
-    "threshold?", lambda v: type(v) in (int, float) and v >= 0 and v <= 1  # type: ignore
+    "threshold?",
+    lambda v: type(v) in (int, float) and v >= 0 and v <= 1,  # type: ignore
 )
 is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
 

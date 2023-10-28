@@ -1506,7 +1506,9 @@ def my_eval(env: Env, node: object) -> Any:
                 if length == 1:
                     return ref(oper, my_eval(env, node[1]))
 
-            raise MyError(f"Tried to run: {print_str(oper)} with args: {print_str(node[1:])}")
+            raise MyError(
+                f"Tried to run: {print_str(oper)} with args: {print_str(node[1:])}"
+            )
 
         if type(oper) is Syntax:
             return oper(env, node)
