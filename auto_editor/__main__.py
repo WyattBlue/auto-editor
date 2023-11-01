@@ -3,8 +3,6 @@
 import sys
 
 import auto_editor
-from auto_editor.edit import edit_media
-from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -315,6 +313,9 @@ def main() -> None:
     if args.version:
         print(f"{auto_editor.version} ({auto_editor.__version__})")
         sys.exit()
+
+    from auto_editor.edit import edit_media
+    from auto_editor.ffwrapper import FFmpeg
 
     log = Log(args.debug, args.quiet)
     ffmpeg = FFmpeg(
