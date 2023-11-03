@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from auto_editor.analyze import LevelError, Levels, builder_map
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, initFileInfo
 from auto_editor.lang.palet import env
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
@@ -80,7 +80,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
     sources = {}
     for i, path in enumerate(args.input):
-        sources[str(i)] = FileInfo(path, ffmpeg, log, str(i))
+        sources[str(i)] = initFileInfo(path, ffmpeg, log, str(i))
 
     assert "0" in sources
     src = sources["0"]

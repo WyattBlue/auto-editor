@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret
 from auto_editor.lib.data_structs import Char
 from auto_editor.lib.err import MyError
@@ -51,7 +51,7 @@ class Checker:
         self.log = log
 
     def check(self, path: str) -> FileInfo:
-        return FileInfo(path, self.ffmpeg, self.log)
+        return initFileInfo(path, self.ffmpeg, self.log)
 
 
 class Runner:

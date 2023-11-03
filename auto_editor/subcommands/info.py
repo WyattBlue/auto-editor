@@ -5,7 +5,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, initFileInfo
 from auto_editor.lang.json import dump
 from auto_editor.timeline import v3
 from auto_editor.utils.func import aspect_ratio
@@ -109,7 +109,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             file_info[file] = {"type": "timeline"}
             continue
 
-        src = FileInfo(file, ffmpeg, log)
+        src = initFileInfo(file, ffmpeg, log)
 
         if len(src.videos) + len(src.audios) + len(src.subtitles) == 0:
             file_info[file] = {"type": "unknown"}

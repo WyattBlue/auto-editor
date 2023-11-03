@@ -6,7 +6,7 @@ from fractions import Fraction
 
 import auto_editor
 from auto_editor.analyze import FileSetup, Levels
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, initFileInfo
 from auto_editor.lang.palet import ClosingError, Lexer, Parser, env, interpret
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
@@ -72,7 +72,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         strict = len(args.input) < 2
         sources = {}
         for i, path in enumerate(args.input):
-            sources[str(i)] = FileInfo(path, ffmpeg, log, str(i))
+            sources[str(i)] = initFileInfo(path, ffmpeg, log, str(i))
 
         src = sources["0"]
         tb = src.get_fps() if args.timebase is None else args.timebase

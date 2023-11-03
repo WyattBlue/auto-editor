@@ -6,7 +6,7 @@ from difflib import get_close_matches
 from fractions import Fraction
 from typing import Any
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
 from auto_editor.lang.json import Lexer, Parser, dump
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import TlAudio, TlImage, TlRect, TlVideo, VSpace, v1, v3
@@ -119,7 +119,7 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
     sources: dict[str, FileInfo] = {}
     for _id, path in tl["sources"].items():
         check_file(path, log)
-        sources[_id] = FileInfo(path, ffmpeg, log)
+        sources[_id] = initFileInfo(path, ffmpeg, log)
 
     bg = tl["background"]
     sr = tl["samplerate"]
@@ -178,7 +178,7 @@ def read_v1(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
 
     check_file(path, log)
 
-    src = FileInfo(path, ffmpeg, log)
+    src = initFileInfo(path, ffmpeg, log)
     sources = {"0": src}
 
     v, a = make_av([clipify(chunks, "0", 0)], sources, [0])
