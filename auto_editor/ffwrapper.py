@@ -15,9 +15,6 @@ from auto_editor.lib.err import MyError
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
-IMG_CODECS = ("png", "mjpeg", "webp")
-SUB_EXTS = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
-
 
 class FFmpeg:
     __slots__ = ("debug", "show_cmd", "path", "version")
@@ -166,17 +163,16 @@ class SubtitleStream:
     lang: str | None
 
 
+@dataclass(slots=True)
 class FileInfo:
-    __slots__ = (
-        "path",
-        "bitrate",
-        "duration",
-        "description",
-        "videos",
-        "audios",
-        "subtitles",
-        "label",
-    )
+    path: Path
+    bitrate: str | None
+    duration: float
+    description: str | None
+    videos: tuple[VideoStream, ...]
+    audios: tuple[AudioStream, ...]
+    subtitles: tuple[SubtitleStream, ...]
+    label: str
 
     def get_res(self) -> tuple[int, int]:
         if self.videos:
@@ -193,152 +189,156 @@ class FileInfo:
             return self.audios[0].samplerate
         return 48000
 
-    def __init__(self, path: str, ffmpeg: FFmpeg, log: Log, label: str = ""):
-        self.label = label
-        self.path = Path(path)
-        self.videos: list[VideoStream] = []
-        self.audios: list[AudioStream] = []
-        self.subtitles: list[SubtitleStream] = []
-        self.description = None
-        self.duration = 0.0
 
-        _dir = os.path.dirname(ffmpeg.path)
-        _ext = os.path.splitext(ffmpeg.path)[1]
-        ffprobe = os.path.join(_dir, f"ffprobe{_ext}")
+def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log, label: str = "") -> FileInfo:
+    videos: list[VideoStream] = []
+    audios: list[AudioStream] = []
+    subtitles: list[SubtitleStream] = []
+    description = None
+    duration = 0.0
 
+    _dir = os.path.dirname(ffmpeg.path)
+    _ext = os.path.splitext(ffmpeg.path)[1]
+    ffprobe = os.path.join(_dir, f"ffprobe{_ext}")
+
+    try:
+        info = get_stdout(
+            [
+                ffprobe,
+                "-v",
+                "-8",
+                "-print_format",
+                "json",
+                "-show_streams",
+                "-show_format",
+                path,
+            ]
+        )
+    except FileNotFoundError:
+        log.nofile(ffprobe)
+    except Exception as e:
+        log.error(e)
+
+    @overload
+    def get_attr(name: str, dic: dict[str, str], op: Literal[True]) -> str | None:
+        ...
+
+    @overload
+    def get_attr(name: str, dic: dict[str, str]) -> str:
+        ...
+
+    def get_attr(name: str, dic: dict[str, str], op: bool = False) -> str | None:
+        if name in dic:
+            if isinstance(dic[name], str):
+                return dic[name]
+            log.error(f"'{name}' must be a string")
+        if not op:
+            log.error(f"'{name}' must be in ffprobe json")
+        return None
+
+    try:
+        json_info = Parser(Lexer("ffprobe", info)).expr()
+        if not isinstance(json_info, dict):
+            raise MyError("Expected Object")
+        if "streams" not in json_info:
+            raise MyError("Key 'streams' not found")
+        if "format" not in json_info:
+            raise MyError("Key 'format' not found")
+    except MyError as e:
+        log.error(f"{path}: Could not read ffprobe JSON\n{e}")
+
+    bitrate: str | None = None
+    if "bit_rate" in json_info["format"]:
+        bitrate = json_info["format"]["bit_rate"]
+    if "tags" in json_info["format"] and "description" in json_info["format"]["tags"]:
+        description = json_info["format"]["tags"]["description"]
+
+    if "duration" in json_info["format"]:
         try:
-            info = get_stdout(
-                [
-                    ffprobe,
-                    "-v",
-                    "-8",
-                    "-print_format",
-                    "json",
-                    "-show_streams",
-                    "-show_format",
-                    path,
-                ]
-            )
-        except FileNotFoundError:
-            log.nofile(ffprobe)
-        except Exception as e:
-            log.error(e)
+            duration = float(json_info["format"]["duration"])
+        except Exception:
+            pass
 
-        @overload
-        def get_attr(name: str, dic: dict[str, str], op: Literal[True]) -> str | None:
-            ...
+    img_codecs = ("png", "mjpeg", "webp")
 
-        @overload
-        def get_attr(name: str, dic: dict[str, str]) -> str:
-            ...
+    for stream in json_info["streams"]:
+        lang = None
+        br = None
+        if "tags" in stream and "language" in stream["tags"]:
+            lang = stream["tags"]["language"]
+        if "bit_rate" in stream:
+            br = stream["bit_rate"]
 
-        def get_attr(name: str, dic: dict[str, str], op: bool = False) -> str | None:
-            if name in dic:
-                if isinstance(dic[name], str):
-                    return dic[name]
-                log.error(f"'{name}' must be a string")
-            if not op:
-                log.error(f"'{name}' must be in ffprobe json")
-            return None
+        codec_type = get_attr("codec_type", stream)
 
-        try:
-            json_info = Parser(Lexer("ffprobe", info)).expr()
-            if not isinstance(json_info, dict):
-                raise MyError("Expected Object")
-            if "streams" not in json_info:
-                raise MyError("Key 'streams' not found")
-            if "format" not in json_info:
-                raise MyError("Key 'format' not found")
-        except MyError as e:
-            log.error(f"{path}: Could not read ffprobe JSON\n{e}")
+        if codec_type in ("video", "audio", "subtitle"):
+            codec = get_attr("codec_name", stream)
 
-        self.bitrate: str | None = None
-        if "bit_rate" in json_info["format"]:
-            self.bitrate = json_info["format"]["bit_rate"]
-        if (
-            "tags" in json_info["format"]
-            and "description" in json_info["format"]["tags"]
-        ):
-            self.description = json_info["format"]["tags"]["description"]
+        if codec_type == "video":
+            pix_fmt = get_attr("pix_fmt", stream)
+            vduration = get_attr("duration", stream, True)
+            color_range = get_attr("color_range", stream, True)
+            color_space = get_attr("color_space", stream, True)
+            color_primaries = get_attr("color_primaries", stream, True)
+            color_transfer = get_attr("color_transfer", stream, True)
+            sar = get_attr("sample_aspect_ratio", stream, True)
+            fps_str = get_attr("r_frame_rate", stream)
+            time_base_str = get_attr("time_base", stream)
 
-        if "duration" in json_info["format"]:
             try:
-                self.duration = float(json_info["format"]["duration"])
-            except Exception:
-                pass
+                fps = Fraction(fps_str)
+            except ZeroDivisionError:
+                fps = Fraction(0)
+            except ValueError:
+                log.error(f"Could not convert fps '{fps_str}' to Fraction.")
 
-        for stream in json_info["streams"]:
-            lang = None
-            br = None
-            if "tags" in stream and "language" in stream["tags"]:
-                lang = stream["tags"]["language"]
-            if "bit_rate" in stream:
-                br = stream["bit_rate"]
+            if fps < 1 and codec in img_codecs:
+                fps = Fraction(25)
+            if fps == 0:
+                fps = Fraction(30)
 
-            codec_type = get_attr("codec_type", stream)
-
-            if codec_type in ("video", "audio", "subtitle"):
-                codec = get_attr("codec_name", stream)
-
-            if codec_type == "video":
-                pix_fmt = get_attr("pix_fmt", stream)
-                vduration = get_attr("duration", stream, True)
-                color_range = get_attr("color_range", stream, True)
-                color_space = get_attr("color_space", stream, True)
-                color_primaries = get_attr("color_primaries", stream, True)
-                color_transfer = get_attr("color_transfer", stream, True)
-                sar = get_attr("sample_aspect_ratio", stream, True)
-                fps_str = get_attr("r_frame_rate", stream)
-                time_base_str = get_attr("time_base", stream)
-
-                try:
-                    fps = Fraction(fps_str)
-                except ZeroDivisionError:
-                    fps = Fraction(0)
-                except ValueError:
-                    log.error(f"Could not convert fps '{fps_str}' to Fraction.")
-
-                if fps < 1 and codec in IMG_CODECS:
-                    fps = Fraction(25)
-                if fps == 0:
-                    fps = Fraction(30)
-
-                try:
-                    time_base = Fraction(time_base_str)
-                except (ValueError, ZeroDivisionError):
-                    if codec not in IMG_CODECS:
-                        log.error(
-                            f"Could not convert time_base '{time_base_str}' to Fraction."
-                        )
-                    time_base = Fraction(0)
-
-                self.videos.append(
-                    VideoStream(
-                        stream["width"],
-                        stream["height"],
-                        codec,
-                        fps,
-                        vduration,
-                        sar,
-                        time_base,
-                        pix_fmt,
-                        color_range,
-                        color_space,
-                        color_primaries,
-                        color_transfer,
-                        br,
-                        lang,
+            try:
+                time_base = Fraction(time_base_str)
+            except (ValueError, ZeroDivisionError):
+                if codec not in img_codecs:
+                    log.error(
+                        f"Could not convert time_base '{time_base_str}' to Fraction."
                     )
+                time_base = Fraction(0)
+
+            videos.append(
+                VideoStream(
+                    stream["width"],
+                    stream["height"],
+                    codec,
+                    fps,
+                    vduration,
+                    sar,
+                    time_base,
+                    pix_fmt,
+                    color_range,
+                    color_space,
+                    color_primaries,
+                    color_transfer,
+                    br,
+                    lang,
                 )
-            if codec_type == "audio":
-                sr = int(stream["sample_rate"])
+            )
+        if codec_type == "audio":
+            sr = int(stream["sample_rate"])
 
-                if "channels" not in stream:
-                    log.error("audio stream has no 'channels' data")
-                c = stream["channels"]
+            if "channels" not in stream:
+                log.error("audio stream has no 'channels' data")
+            c = stream["channels"]
 
-                adur = get_attr("duration", stream, True)
-                self.audios.append(AudioStream(codec, sr, c, adur, br, lang))
-            if codec_type == "subtitle":
-                ext = SUB_EXTS.get(codec, "vtt")
-                self.subtitles.append(SubtitleStream(codec, ext, lang))
+            adur = get_attr("duration", stream, True)
+            audios.append(AudioStream(codec, sr, c, adur, br, lang))
+        if codec_type == "subtitle":
+            sub_exts = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
+            ext = sub_exts.get(codec, "vtt")
+            subtitles.append(SubtitleStream(codec, ext, lang))
+
+    v = tuple(videos)
+    a = tuple(audios)
+    s = tuple(subtitles)
+    return FileInfo(Path(path), bitrate, duration, description, v, a, s, label)

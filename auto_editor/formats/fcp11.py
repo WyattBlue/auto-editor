@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 from xml.etree.ElementTree import Element, ElementTree, SubElement, indent
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
 
 from .utils import make_tracks_dir
 
@@ -80,7 +80,7 @@ def fcp11_write_xml(
                 ffmpeg.run(
                     ["-i", f"{src.path.resolve()}", "-map", f"0:a:{i}", f"{newtrack}"]
                 )
-                all_srcs.append(FileInfo(f"{newtrack}", ffmpeg, log))
+                all_srcs.append(initFileInfo(f"{newtrack}", ffmpeg, log))
                 all_refs.append(f"r{(i + 1) * 2}")
 
     fcpxml = Element("fcpxml", version="1.10" if flavor == "resolve" else "1.11")

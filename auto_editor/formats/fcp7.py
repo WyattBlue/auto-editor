@@ -7,7 +7,7 @@ from math import ceil
 from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
 from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
 
 from .utils import Validator, make_tracks_dir, show
@@ -321,7 +321,7 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                     fileobj = valid.parse(clipitem["file"], {"pathurl": str})
 
                     if "pathurl" in fileobj:
-                        sources[file_id] = FileInfo(
+                        sources[file_id] = initFileInfo(
                             uri_to_path(fileobj["pathurl"]),
                             ffmpeg,
                             log,
@@ -355,7 +355,7 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                 file_id = clipitem["file"].attrib["id"]
                 if file_id not in sources:
                     fileobj = valid.parse(clipitem["file"], {"pathurl": str})
-                    sources[file_id] = FileInfo(
+                    sources[file_id] = initFileInfo(
                         uri_to_path(fileobj["pathurl"]), ffmpeg, log, str(len(sources))
                     )
 
@@ -436,7 +436,7 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
                     ["-i", f"{src.path.resolve()}", "-map", f"0:a:{i}", f"{newtrack}"]
                 )
 
-                key_to_source[(key, i)] = FileInfo(f"{newtrack}", ffmpeg, log, key)
+                key_to_source[(key, i)] = initFileInfo(f"{newtrack}", ffmpeg, log, key)
                 key_to_url[(key, i)] = path_resolve(newtrack)
                 key_to_id[(key, i)] = f"file-{len(key_to_id)+1}"
 

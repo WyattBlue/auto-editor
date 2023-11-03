@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
 from auto_editor.lib.contracts import is_int, is_str
 from auto_editor.make_layers import make_timeline
 from auto_editor.output import Ensure, mux_quality_media
@@ -129,7 +129,7 @@ def make_sources(
         if path in used_paths:
             inputs.append(used_paths[path])
         else:
-            sources[str(i)] = FileInfo(path, ffmpeg, log, str(i))
+            sources[str(i)] = initFileInfo(path, ffmpeg, log, str(i))
             inputs.append(i)
             used_paths[path] = i
             i += 1

@@ -5,7 +5,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, initFileInfo
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -38,7 +38,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     log = Log(temp=temp)
 
     for i, input_file in enumerate(args.input):
-        src = FileInfo(input_file, ffmpeg, log)
+        src = initFileInfo(input_file, ffmpeg, log)
 
         cmd = ["-i", input_file]
         for s, sub in enumerate(src.subtitles):

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import numpy as np
 
 from auto_editor.analyze import FileSetup, Levels
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
@@ -188,7 +188,7 @@ def make_timeline(
         if not os.path.isfile(path):
             log.error(f"Path '{path}' is not a file")
 
-        sources[label] = FileInfo(path, ffmpeg, log, label)
+        sources[label] = initFileInfo(path, ffmpeg, log, label)
 
     v1_compatiable = None if inp is None else v1(inp, chunks)
     tl = v3(sources, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
