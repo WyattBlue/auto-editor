@@ -562,7 +562,7 @@ def main(sys_args: list[str] | None = None):
     #  Issue 280
     def SAR():
         out = run.main(["resources/SAR-2by3.mp4"], [])
-        assert checker.check(out).videos[0].sar == "2:3"
+        assert checker.check(out).videos[0].sar == Fraction(2, 3)
 
         return out
 
