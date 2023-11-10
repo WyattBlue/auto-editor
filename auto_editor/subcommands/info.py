@@ -39,15 +39,15 @@ class VideoJson(TypedDict):
     fps: str
     resolution: list[int]
     aspect_ratio: list[int]
-    pixel_aspect_ratio: str | None
-    duration: str | None
+    pixel_aspect_ratio: str
+    duration: float
     pix_fmt: str
     color_range: str | None
     color_space: str | None
     color_primaries: str | None
     color_transfer: str | None
     timebase: str
-    bitrate: str | None
+    bitrate: int
     lang: str | None
 
 
@@ -55,8 +55,8 @@ class AudioJson(TypedDict):
     codec: str
     samplerate: int
     channels: int
-    duration: str | None
-    bitrate: str | None
+    duration: float
+    bitrate: int
     lang: str | None
 
 
@@ -67,7 +67,7 @@ class SubtitleJson(TypedDict):
 
 class ContainerJson(TypedDict):
     duration: float
-    bitrate: str | None
+    bitrate: int
 
 
 class MediaJson(TypedDict, total=False):
@@ -134,7 +134,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 "fps": str(v.fps),
                 "resolution": [w, h],
                 "aspect_ratio": list(aspect_ratio(w, h)),
-                "pixel_aspect_ratio": v.sar,
+                "pixel_aspect_ratio": str(v.sar).replace("/", ":"),
                 "duration": v.duration,
                 "pix_fmt": v.pix_fmt,
                 "color_range": v.color_range,

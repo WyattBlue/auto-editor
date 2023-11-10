@@ -152,9 +152,8 @@ def render_av(
         cmd += video_quality(args, ctr)
 
     # Setting SAR requires re-encoding so we do it here.
-    if src is not None and src.videos:
-        if (sar := src.videos[0].sar) is not None:
-            cmd.extend(["-vf", f"setsar={sar.replace(':', '/')}"])
+    if src is not None and src.videos and (sar := src.videos[0].sar) is not None:
+        cmd.extend(["-vf", f"setsar={sar}"])
 
     cmd.append(spedup)
 

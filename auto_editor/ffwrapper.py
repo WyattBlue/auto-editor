@@ -8,10 +8,8 @@ from fractions import Fraction
 from pathlib import Path
 from re import search
 from subprocess import PIPE, Popen
-from typing import Any, Literal, overload
+from typing import Any
 
-from auto_editor.lang.json import Lexer, Parser
-from auto_editor.lib.err import MyError
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
@@ -87,7 +85,7 @@ class FFmpeg:
             process.stdin.close()
         output = stderr.decode("utf-8", "replace")
 
-        error_list = [
+        error_list = (
             r"Unknown encoder '.*'",
             r"-q:v qscale not available for encoder\. Use -b:v bitrate instead\.",
             r"Specified sample rate .* is not supported",
@@ -98,7 +96,7 @@ class FFmpeg:
             r"Incompatible pixel format '.*' for codec '[A-Za-z0-9_]*'",
             r"Unrecognized option '.*'",
             r"Permission denied",
-        ]
+        )
 
         if self.debug:
             print(f"stderr: {output}")
@@ -134,15 +132,15 @@ class VideoStream:
     height: int
     codec: str
     fps: Fraction
-    duration: str | None
-    sar: str | None
+    duration: float
+    sar: Fraction
     time_base: Fraction
     pix_fmt: str
     color_range: str | None
     color_space: str | None
     color_primaries: str | None
     color_transfer: str | None
-    bitrate: str | None
+    bitrate: int
     lang: str | None
 
 
@@ -151,8 +149,8 @@ class AudioStream:
     codec: str
     samplerate: int
     channels: int
-    duration: str | None
-    bitrate: str | None
+    duration: float
+    bitrate: int
     lang: str | None
 
 
@@ -166,7 +164,7 @@ class SubtitleStream:
 @dataclass(slots=True)
 class FileInfo:
     path: Path
-    bitrate: str | None
+    bitrate: int
     duration: float
     description: str | None
     videos: tuple[VideoStream, ...]
@@ -191,154 +189,107 @@ class FileInfo:
 
 
 def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log, label: str = "") -> FileInfo:
-    videos: list[VideoStream] = []
-    audios: list[AudioStream] = []
-    subtitles: list[SubtitleStream] = []
-    description = None
-    duration = 0.0
+    import av
+
+    av.logging.set_level(av.logging.PANIC)
+
+    try:
+        cont = av.open(path, "r")
+    except av.error.InvalidDataError:
+        log.error(f"Invalid data when processing: {path}")
+
+    videos: tuple[VideoStream, ...] = ()
+    audios: tuple[AudioStream, ...] = ()
+    subtitles: tuple[SubtitleStream, ...] = ()
 
     _dir = os.path.dirname(ffmpeg.path)
     _ext = os.path.splitext(ffmpeg.path)[1]
     ffprobe = os.path.join(_dir, f"ffprobe{_ext}")
 
-    try:
-        info = get_stdout(
-            [
-                ffprobe,
-                "-v",
-                "-8",
-                "-print_format",
-                "json",
-                "-show_streams",
-                "-show_format",
-                path,
-            ]
-        )
-    except FileNotFoundError:
-        log.nofile(ffprobe)
-    except Exception as e:
-        log.error(e)
+    for i, v in enumerate(cont.streams.video):
+        vdur = 0.0
+        if hasattr(v, "duration") and v.duration is not None:
+            vdur = float(v.duration * v.time_base)
 
-    @overload
-    def get_attr(name: str, dic: dict[str, str], op: Literal[True]) -> str | None:
-        ...
+        fps = v.average_rate
+        if (fps is None or fps < 1) and v.name in ("png", "mjpeg", "webp"):
+            fps = Fraction(25)
+        if fps is None or fps == 0:
+            fps = Fraction(30)
 
-    @overload
-    def get_attr(name: str, dic: dict[str, str]) -> str:
-        ...
-
-    def get_attr(name: str, dic: dict[str, str], op: bool = False) -> str | None:
-        if name in dic:
-            if isinstance(dic[name], str):
-                return dic[name]
-            log.error(f"'{name}' must be a string")
-        if not op:
-            log.error(f"'{name}' must be in ffprobe json")
-        return None
-
-    try:
-        json_info = Parser(Lexer("ffprobe", info)).expr()
-        if not isinstance(json_info, dict):
-            raise MyError("Expected Object")
-        if "streams" not in json_info:
-            raise MyError("Key 'streams' not found")
-        if "format" not in json_info:
-            raise MyError("Key 'format' not found")
-    except MyError as e:
-        log.error(f"{path}: Could not read ffprobe JSON\n{e}")
-
-    bitrate: str | None = None
-    if "bit_rate" in json_info["format"]:
-        bitrate = json_info["format"]["bit_rate"]
-    if "tags" in json_info["format"] and "description" in json_info["format"]["tags"]:
-        description = json_info["format"]["tags"]["description"]
-
-    if "duration" in json_info["format"]:
+        _sar = c_range = c_space = c_primary = c_transfer = None
         try:
-            duration = float(json_info["format"]["duration"])
-        except Exception:
-            pass
-
-    img_codecs = ("png", "mjpeg", "webp")
-
-    for stream in json_info["streams"]:
-        lang = None
-        br = None
-        if "tags" in stream and "language" in stream["tags"]:
-            lang = stream["tags"]["language"]
-        if "bit_rate" in stream:
-            br = stream["bit_rate"]
-
-        codec_type = get_attr("codec_type", stream)
-
-        if codec_type in ("video", "audio", "subtitle"):
-            codec = get_attr("codec_name", stream)
-
-        if codec_type == "video":
-            pix_fmt = get_attr("pix_fmt", stream)
-            vduration = get_attr("duration", stream, True)
-            color_range = get_attr("color_range", stream, True)
-            color_space = get_attr("color_space", stream, True)
-            color_primaries = get_attr("color_primaries", stream, True)
-            color_transfer = get_attr("color_transfer", stream, True)
-            sar = get_attr("sample_aspect_ratio", stream, True)
-            fps_str = get_attr("r_frame_rate", stream)
-            time_base_str = get_attr("time_base", stream)
-
-            try:
-                fps = Fraction(fps_str)
-            except ZeroDivisionError:
-                fps = Fraction(0)
-            except ValueError:
-                log.error(f"Could not convert fps '{fps_str}' to Fraction.")
-
-            if fps < 1 and codec in img_codecs:
-                fps = Fraction(25)
-            if fps == 0:
-                fps = Fraction(30)
-
-            try:
-                time_base = Fraction(time_base_str)
-            except (ValueError, ZeroDivisionError):
-                if codec not in img_codecs:
-                    log.error(
-                        f"Could not convert time_base '{time_base_str}' to Fraction."
-                    )
-                time_base = Fraction(0)
-
-            videos.append(
-                VideoStream(
-                    stream["width"],
-                    stream["height"],
-                    codec,
-                    fps,
-                    vduration,
-                    sar,
-                    time_base,
-                    pix_fmt,
-                    color_range,
-                    color_space,
-                    color_primaries,
-                    color_transfer,
-                    br,
-                    lang,
-                )
+            _raw = get_stdout(
+                [
+                    ffprobe,
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    f"v:{i}",
+                    "-show_entries",
+                    "stream=sample_aspect_ratio:stream=color_range:stream=color_space:stream=color_primaries:stream=color_transfer",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    path,
+                ]
             )
-        if codec_type == "audio":
-            sr = int(stream["sample_rate"])
+            _sar, c_range, c_space, c_primary, c_transfer = _raw.strip().split("\n")
+        except Exception as e:
+            raise e
 
-            if "channels" not in stream:
-                log.error("audio stream has no 'channels' data")
-            c = stream["channels"]
+        if v.sample_aspect_ratio is None:
+            try:
+                sar = Fraction(_sar.replace(":", "/"))
+            except Exception:
+                sar = Fraction(1)
+        else:
+            sar = v.sample_aspect_ratio
 
-            adur = get_attr("duration", stream, True)
-            audios.append(AudioStream(codec, sr, c, adur, br, lang))
-        if codec_type == "subtitle":
-            sub_exts = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
-            ext = sub_exts.get(codec, "vtt")
-            subtitles.append(SubtitleStream(codec, ext, lang))
+        videos += (
+            VideoStream(
+                v.width,
+                v.height,
+                v.name,
+                fps,
+                vdur,
+                sar,
+                v.time_base,
+                v.codec_context.pix_fmt,
+                c_range,
+                c_space,
+                c_primary,
+                c_transfer,
+                0 if v.bit_rate is None else v.bit_rate,
+                v.language,
+            ),
+        )
 
-    v = tuple(videos)
-    a = tuple(audios)
-    s = tuple(subtitles)
-    return FileInfo(Path(path), bitrate, duration, description, v, a, s, label)
+    for a in cont.streams.audio:
+        adur = 0.0
+        if hasattr(a, "duration") and a.duration is not None:
+            adur = float(a.duration * a.time_base)
+
+        audios += (
+            AudioStream(
+                a.codec_context.name,
+                a.sample_rate,
+                a.channels,
+                adur,
+                0 if a.bit_rate is None else a.bit_rate,
+                a.language,
+            ),
+        )
+
+    for s in cont.streams.subtitles:
+        codec = s.codec_context.name
+        sub_exts = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
+        ext = sub_exts.get(codec, "vtt")
+        subtitles += (SubtitleStream(codec, ext, s.language),)
+
+    desc = cont.metadata.get("description", None)
+    bitrate = 0 if cont.bit_rate is None else cont.bit_rate
+    dur = cont.duration / 1_000_000
+
+    cont.close()
+
+    return FileInfo(Path(path), bitrate, dur, desc, videos, audios, subtitles, label)
