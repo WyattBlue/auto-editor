@@ -163,6 +163,9 @@ def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
     data_size = int.from_bytes(data_size_low + data_size_high, "little")
 
     int_chunk_size = int.from_bytes(chunk_size, bytes_order)
+    if type(int_chunk_size) is not int or int_chunk_size > 40:
+        raise WavError("Invalid chunk size in RF64 chunk")
+
     fid.read(40 - int_chunk_size)
 
     return data_size, file_size, en
@@ -238,43 +241,61 @@ def read(filename: str) -> tuple[int, AudioData]:
     raise WavError("Found no data")
 
 
-def write(fid: io.BufferedWriter, sr: int, arr: AudioData) -> None:
-    # Write RIFF WAV Header
-    fid.write(b"RIFF\x00\x00\x00\x00WAVE")
-    header_data = b"fmt "
+def write(fid: io.BufferedWriter, sr: int, arr: np.ndarray) -> None:
+    channels = 1 if arr.ndim == 1 else arr.shape[1]
+    bit_depth = arr.dtype.itemsize * 8
+    block_align = channels * (bit_depth // 8)
+    data_size = arr.nbytes
+    total_size = 44 + data_size  # Basic WAV header size + data size
+
+    if is_rf64 := total_size > 0xFFFFFFFF:
+        fid.write(b"RF64\xFF\xFF\xFF\xFFWAVE")
+        ds64_size = 28
+        ds64_chunk_data = (0).to_bytes(ds64_size, "little")  # placeholder values
+        fid.write(b"ds64" + struct.pack("<I", ds64_size) + ds64_chunk_data)
+    else:
+        fid.write(b"RIFF" + struct.pack("<I", total_size - 8) + b"WAVE")
 
     dkind = arr.dtype.kind
     format_tag = IEEE_FLOAT if dkind == "f" else PCM
-    channels = 1 if arr.ndim == 1 else arr.shape[1]
-
-    bit_depth = arr.dtype.itemsize * 8
-    bit_rate = sr * (bit_depth // 8) * channels
-    block_align = channels * (bit_depth // 8)
 
     fmt_chunk_data = struct.pack(
-        "<HHIIHH", format_tag, channels, sr, bit_rate, block_align, bit_depth
+        "<HHIIHH", format_tag, channels, sr, 0, block_align, bit_depth
     )
+    fid.write(b"fmt " + struct.pack("<I", len(fmt_chunk_data)) + fmt_chunk_data)
 
-    header_data += struct.pack("<I", len(fmt_chunk_data))
-    header_data += fmt_chunk_data
-
-    if len(header_data) + arr.nbytes > 0xFFFFFFFF:
-        raise WavError("Data exceeds wave file size limit")
-
-    fid.write(header_data)
-
-    # Write Data Chunk
+    # Data chunk
     fid.write(b"data")
-    fid.write(struct.pack("<I", arr.nbytes))
+    fid.write(struct.pack("<I", 0xFFFFFFFF if is_rf64 else data_size))
+
     if arr.dtype.byteorder == ">" or (
         arr.dtype.byteorder == "=" and sys.byteorder == "big"
     ):
         arr = arr.byteswap()
-
-    # Write the actual data
     fid.write(arr.ravel().view("b").data)
 
-    # Write size info
-    size = fid.tell()
-    fid.seek(4)
-    fid.write(struct.pack("<I", size - 8))
+    if is_rf64:
+        end_position = fid.tell()
+        fid.seek(16)  # Position at the start of 'ds64' chunk size
+
+        file_size = end_position - 20
+        fid.write(struct.pack("<I", ds64_size))
+        fid.write(file_size.to_bytes(8, "little") + data_size.to_bytes(8, "little"))
+
+        fid.seek(end_position)
+
+
+def main() -> None:
+    data = np.random.rand(48000, 2)
+    with open("test.wav", "wb") as file:
+        write(file, 48_000, data)
+
+    read_sr, read_data = read("test.wav")
+
+    assert read_sr == 48_000
+    assert np.array_equal(data, read_data)
+    print("success")
+
+
+if __name__ == "__main__":
+    main()
