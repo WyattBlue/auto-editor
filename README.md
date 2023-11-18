@@ -27,28 +27,18 @@ See [Installing](https://auto-editor.com/installing) for additional information.
 
 Change the **pace** of the edited video by using `--margin`.
 
-`--margin` adds in some "silent" sections to make the editing feel nicer. Setting `--margin` to `0.2sec` will add up to 0.2 seconds in front of and 0.2 seconds behind the original clip.
+`--margin` adds in some "silent" sections to make the editing feel nicer.
 
 ```
+# Add 0.2 seconds of padding before and after to make the edit nicer.
+# `0.2s` is the default value for `--margin`
 auto-editor example.mp4 --margin 0.2sec
+
+# Add 0.3 seconds of padding before, 1.5 seconds after
+auto-editor example.mp4 --margin 0.3s,1.5sec
 ```
 
-<h3>Working With Multiple Audio Tracks</h3>
-By default, only the first audio track will used for editing (track 0). You can change this with these commands.
-
-Use all audio tracks for editing:
-```
-auto-editor multi-track.mov --edit audio:stream=all
-```
-
-Use only the second, fourth, and sixth audio track:
-```
-# track numbers start at 0
-auto-editor so-many-tracks.mp4 --edit "(or audio:stream=1 audio:stream=3 audio:stream=5)"
-```
-
-<h3>Methods for Making Automatic Cuts</h3>
-
+### Methods for Making Automatic Cuts
 The `--edit` option is how auto-editor makes automated cuts.
 
 For example, edit out motionlessness in a video by setting `--edit motion`.
@@ -70,9 +60,34 @@ Different editing methods can be used together.
 auto-editor example.mp4 --edit "(or audio:3% motion:6%)"
 ```
 
+You can also use `dB` unit, a volume unit familiar to video-editors (case sensitive):
+```
+auto-editor example.mp4 --edit audio:threshold=-19dB
+auto-editor example.mp4 --edit audio:-7dB
+auto-editor example.mp4 --edit motion:-19dB
 
-<h3>See What Auto-Editor Cuts Out</h3>
+# The `dB` unit is a just a macro that expands into an S-expression:
+# '-19dB
+# > '(pow 10 (/ -19 20))
+# (eval '(pow 10 (/ -19 20)))
+# > 0.11220184543019636
+```
 
+### Working With Multiple Audio Tracks
+By default, only the first audio track will used for editing (track 0). You can change this with these commands.
+
+Use all audio tracks for editing:
+```
+auto-editor multi-track.mov --edit audio:stream=all
+```
+
+Use only the second, fourth, and sixth audio track:
+```
+# track numbers start at 0
+auto-editor so-many-tracks.mp4 --edit "(or audio:stream=1 audio:stream=3 audio:stream=5)"
+```
+
+### See What Auto-Editor Cuts Out
 To export what auto-editor normally cuts out. Set `--video-speed` to `99999` and `--silent-speed` to `1`. This is the reverse of the usual default values.  
 
 ```
