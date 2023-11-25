@@ -9,7 +9,16 @@ from typing import Any
 from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
 from auto_editor.lang.json import Lexer, Parser, dump
 from auto_editor.lib.err import MyError
-from auto_editor.timeline import TlAudio, TlImage, TlRect, TlVideo, VSpace, v1, v3
+from auto_editor.timeline import (
+    ASpace,
+    TlAudio,
+    TlImage,
+    TlRect,
+    TlVideo,
+    VSpace,
+    v1,
+    v3,
+)
 from auto_editor.utils.cmdkw import ParserError, Required
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -18,7 +27,6 @@ from auto_editor.utils.types import (
     color,
     natural,
     number,
-    src,
     threshold,
 )
 
@@ -33,60 +41,6 @@ class cAttrs:
     def __init__(self, name: str, *attrs: tuple[str, Any, Any]):
         self.name = name
         self.attrs = attrs
-
-
-video_builder = cAttrs(
-    "video",
-    ("start", natural, Required),
-    ("dur", natural, Required),
-    ("src", src, Required),
-    ("offset", natural, 0),
-    ("speed", number, 1),
-    ("stream", natural, 0),
-)
-audio_builder = cAttrs(
-    "audio",
-    ("start", natural, Required),
-    ("dur", natural, Required),
-    ("src", src, Required),
-    ("offset", natural, 0),
-    ("speed", number, 1),
-    ("volume", threshold, 1),
-    ("stream", natural, 0),
-)
-img_builder = cAttrs(
-    "image",
-    ("start", natural, Required),
-    ("dur", natural, Required),
-    ("src", src, Required),
-    ("x", int, "50%"),
-    ("y", int, "50%"),
-    ("opacity", threshold, 1),
-    ("anchor", anchor, "ce"),
-    ("rotate", number, 0),
-)
-
-rect_builder = cAttrs(
-    "rect",
-    ("start", natural, Required),
-    ("dur", natural, Required),
-    ("x", int, Required),
-    ("y", int, Required),
-    ("width", int, Required),
-    ("height", int, Required),
-    ("anchor", anchor, "ce"),
-    ("fill", color, "#c4c4c4"),
-)
-
-visual_objects = {
-    "rect": (TlRect, rect_builder),
-    "image": (TlImage, img_builder),
-    "video": (TlVideo, video_builder),
-}
-
-audio_objects = {
-    "audio": (TlAudio, audio_builder),
-}
 
 
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
@@ -107,7 +61,6 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
     check_attrs(
         tl,
         log,
-        "sources",
         "background",
         "v",
         "a",
@@ -116,10 +69,63 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
         "samplerate",
     )
 
-    sources: dict[str, FileInfo] = {}
-    for _id, path in tl["sources"].items():
-        check_file(path, log)
-        sources[_id] = initFileInfo(path, ffmpeg, log)
+    srcs: dict[str, FileInfo] = {}
+
+    def make_src(v: str) -> FileInfo:
+        if v in srcs:
+            return srcs[v]
+        temp = initFileInfo(v, ffmpeg, log)
+        srcs[v] = temp
+        return temp
+
+    video_builder = cAttrs(
+        "video",
+        ("start", natural, Required),
+        ("dur", natural, Required),
+        ("src", make_src, Required),
+        ("offset", natural, 0),
+        ("speed", number, 1),
+        ("stream", natural, 0),
+    )
+    audio_builder = cAttrs(
+        "audio",
+        ("start", natural, Required),
+        ("dur", natural, Required),
+        ("src", make_src, Required),
+        ("offset", natural, 0),
+        ("speed", number, 1),
+        ("volume", threshold, 1),
+        ("stream", natural, 0),
+    )
+    img_builder = cAttrs(
+        "image",
+        ("start", natural, Required),
+        ("dur", natural, Required),
+        ("src", make_src, Required),
+        ("x", int, "50%"),
+        ("y", int, "50%"),
+        ("opacity", threshold, 1),
+        ("anchor", anchor, "ce"),
+        ("rotate", number, 0),
+    )
+
+    rect_builder = cAttrs(
+        "rect",
+        ("start", natural, Required),
+        ("dur", natural, Required),
+        ("x", int, Required),
+        ("y", int, Required),
+        ("width", int, Required),
+        ("height", int, Required),
+        ("anchor", anchor, "ce"),
+        ("fill", color, "#c4c4c4"),
+    )
+
+    visual_objects = {
+        "rect": (TlRect, rect_builder),
+        "image": (TlImage, img_builder),
+        "video": (TlVideo, video_builder),
+    }
 
     bg = tl["background"]
     sr = tl["samplerate"]
@@ -140,8 +146,7 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
                 my_vobj, my_build = visual_objects[vdict["name"]]
 
                 try:
-                    my_dict = parse_obj(vdict, my_build)
-                    v_out.append(my_vobj(**my_dict))
+                    v_out.append(my_vobj(**parse_obj(vdict, my_build)))
                 except ParserError as e:
                     log.error(e)
 
@@ -153,23 +158,26 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
             for adict in alayers:
                 if "name" not in adict:
                     log.error("Invalid audio object: name not specified")
-                if adict["name"] not in audio_objects:
+                if adict["name"] != "audio":
                     log.error(f"Unknown audio object: {adict['name']}")
-                my_aobj, my_build = audio_objects[adict["name"]]
 
                 try:
-                    my_dict = parse_obj(adict, my_build)
-                    a_out.append(my_aobj(**my_dict))
+                    a_out.append(TlAudio(**parse_obj(adict, audio_builder)))
                 except ParserError as e:
                     log.error(e)
 
             a.append(a_out)
 
-    return v3(sources, tb, sr, res, bg, v, a, None)
+    try:
+        src = srcs[next(iter(srcs))]
+    except StopIteration:
+        src = None
+
+    return v3(src, tb, sr, res, bg, v, a, v1=None)
 
 
 def read_v1(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
-    from auto_editor.make_layers import clipify, make_av
+    from auto_editor.make_layers import clipify
 
     check_attrs(tl, log, "source", "chunks")
 
@@ -179,18 +187,27 @@ def read_v1(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
     check_file(path, log)
 
     src = initFileInfo(path, ffmpeg, log)
-    sources = {"0": src}
 
-    v, a = make_av([clipify(chunks, "0", 0)], sources, [0])
+    vtl: VSpace = []
+    atl: ASpace = [[] for _ in range(len(src.audios))]
+
+    for c in clipify(chunks, src):
+        if src.videos:
+            if len(vtl) == 0:
+                vtl.append([])
+            vtl[0].append(TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0))
+
+        for a in range(len(src.audios)):
+            atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
 
     return v3(
-        sources,
+        src,
         src.get_fps(),
         src.get_sr(),
         src.get_res(),
         "#000",
-        v,
-        a,
+        vtl,
+        atl,
         v1(src, chunks),
     )
 

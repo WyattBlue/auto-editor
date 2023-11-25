@@ -13,7 +13,7 @@ from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
 from .utils import Validator, make_tracks_dir, show
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    pass
 
     from auto_editor.utils.log import Log
 
@@ -188,7 +188,7 @@ def speedup(speed: float) -> Element:
 """
 
 
-SUPPORTED_EFFECTS = ["timeremap"]
+SUPPORTED_EFFECTS = ("timeremap",)
 
 
 def read_filters(clipitem: Element, log: Log) -> float:
@@ -325,7 +325,6 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                             uri_to_path(fileobj["pathurl"]),
                             ffmpeg,
                             log,
-                            str(len(sources)),
                         )
                     else:
                         show(clipitem["file"], 3)
@@ -342,7 +341,9 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                 dur = clipitem["end"] - start
                 offset = int(clipitem["in"] * speed)
 
-                vobjs[t].append(TlVideo(start, dur, file_id, offset, speed, stream=0))
+                vobjs[t].append(
+                    TlVideo(start, dur, sources[file_id], offset, speed, stream=0)
+                )
 
     if "audio" in av:
         tracks = valid.parse(av["audio"], aclip_schema)
@@ -356,7 +357,7 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                 if file_id not in sources:
                     fileobj = valid.parse(clipitem["file"], {"pathurl": str})
                     sources[file_id] = initFileInfo(
-                        uri_to_path(fileobj["pathurl"]), ffmpeg, log, str(len(sources))
+                        uri_to_path(fileobj["pathurl"]), ffmpeg, log
                     )
 
                 if "filter" in clipitem:
@@ -369,10 +370,18 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                 offset = int(clipitem["in"] * speed)
 
                 aobjs[t].append(
-                    TlAudio(start, dur, file_id, offset, speed, volume=1, stream=0)
+                    TlAudio(
+                        start, dur, sources[file_id], offset, speed, volume=1, stream=0
+                    )
                 )
 
-    return v3(sources, tb, sr, res, "#000", vobjs, aobjs, None)
+    primary_src = sources[next(iter(sources))]
+    assert type(primary_src) is FileInfo
+    print(sources)
+    print(vobjs)
+    print(aobjs)
+    print("=================")
+    return v3(primary_src, tb, sr, res, "#000", vobjs, aobjs, v1=None)
 
 
 def media_def(
@@ -414,31 +423,30 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
     width, height = tl.res
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
-    key_to_url: dict[tuple[str, int], str] = {}
-    key_to_id: dict[tuple[str, int], str] = {}
-    key_to_source: dict[tuple[str, int], FileInfo] = {}
+    src_to_url: dict[tuple[FileInfo, int], str] = {}
+    src_to_id: dict[tuple[FileInfo, int], str] = {}
+    src_to_src: dict[tuple[FileInfo, int], FileInfo] = {}
+
     file_defs: set[str] = set()  # Contains urls
 
-    def path_resolve(path: Path) -> str:
-        return f"{path.resolve()}"
+    for src in set(tl.sources):
+        path_resolve = f"{src.path.resolve()}"
+        the_id = f"file-{len(src_to_id)+1}"
 
-    for key, src in tl.sources.items():
-        key_to_source[(key, 0)] = src
-        key_to_id[(key, 0)] = f"file-{len(key_to_id)+1}"
-        key_to_url[(key, 0)] = path_resolve(src.path)
+        src_to_url[(src, 0)] = path_resolve
+        src_to_id[(src, 0)] = the_id
 
         if len(src.audios) > 1:
             fold = make_tracks_dir(src)
             for i in range(1, len(src.audios)):
                 newtrack = fold / f"{i}.wav"
 
-                ffmpeg.run(
-                    ["-i", f"{src.path.resolve()}", "-map", f"0:a:{i}", f"{newtrack}"]
-                )
+                ffmpeg.run(["-i", path_resolve, "-map", f"0:a:{i}", f"{newtrack}"])
 
-                key_to_source[(key, i)] = initFileInfo(f"{newtrack}", ffmpeg, log, key)
-                key_to_url[(key, i)] = path_resolve(newtrack)
-                key_to_id[(key, i)] = f"file-{len(key_to_id)+1}"
+                new_src = initFileInfo(f"{newtrack}", ffmpeg, log)
+                src_to_url[(src, i)] = f"{newtrack.resolve()}"
+                src_to_id[(src, i)] = f"file-{len(src_to_id)+1}"
+                src_to_src[(src, i)] = new_src
 
     xmeml = ET.Element("xmeml", version="4")
     sequence = ET.SubElement(xmeml, "sequence")
@@ -466,7 +474,6 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
 
         for j, clip in enumerate(tl.v[0]):
             assert isinstance(clip, TlVideo)
-            src = tl.sources[clip.src]
 
             _start = f"{clip.start}"
             _end = f"{clip.start + clip.dur}"
@@ -481,13 +488,12 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
             ET.SubElement(clipitem, "in").text = _in
             ET.SubElement(clipitem, "out").text = _out
 
-            _id = key_to_id[(clip.src, clip.stream)]
+            _id = src_to_id[(clip.src, 0)]
             filedef = ET.SubElement(clipitem, "file", id=_id)
 
-            pathurl = key_to_url[(clip.src, clip.stream)]
-            my_src = key_to_source[(clip.src, clip.stream)]
+            pathurl = src_to_url[(clip.src, 0)]
             if pathurl not in file_defs:
-                media_def(filedef, pathurl, my_src, tl, timebase, ntsc)
+                media_def(filedef, pathurl, clip.src, tl, timebase, ntsc)
                 file_defs.add(pathurl)
 
             if clip.speed != 1:
@@ -518,7 +524,7 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
         )
 
         for j, aclip in enumerate(aclips):
-            src = tl.sources[aclip.src]
+            src = aclip.src
 
             _start = f"{aclip.start}"
             _end = f"{aclip.start + aclip.dur}"
@@ -545,11 +551,15 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
             ET.SubElement(clipitem, "in").text = _in
             ET.SubElement(clipitem, "out").text = _out
 
-            _id = key_to_id[(aclip.src, aclip.stream)]
-            filedef = ET.SubElement(clipitem, "file", id=_id)
+            _id = src_to_id[(aclip.src, aclip.stream)]
+            pathurl = src_to_url[(aclip.src, aclip.stream)]
 
-            pathurl = key_to_url[(aclip.src, aclip.stream)]
-            my_src = key_to_source[(aclip.src, aclip.stream)]
+            if aclip.stream > 0:
+                my_src = src_to_src[(aclip.src, aclip.stream)]
+            else:
+                my_src = aclip.src
+
+            filedef = ET.SubElement(clipitem, "file", id=_id)
             if pathurl not in file_defs:
                 media_def(filedef, pathurl, my_src, tl, timebase, ntsc)
                 file_defs.add(pathurl)

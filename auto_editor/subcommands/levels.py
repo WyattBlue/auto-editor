@@ -78,12 +78,11 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     temp = setup_tempdir(None, Log())
     log = Log(quiet=True, temp=temp)
 
-    sources = {}
-    for i, path in enumerate(args.input):
-        sources[str(i)] = initFileInfo(path, ffmpeg, log, str(i))
+    sources = [initFileInfo(path, ffmpeg, log) for path in args.input]
+    if len(sources) < 1:
+        log.error("levels needs at least one input file")
 
-    assert "0" in sources
-    src = sources["0"]
+    src = sources[0]
 
     tb = src.get_fps() if args.timebase is None else args.timebase
     ensure = Ensure(ffmpeg, src.get_sr(), temp, log)
@@ -93,12 +92,9 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     else:
         method, attrs = args.edit, ""
 
-    start_printed = False
-
-    for src in sources.values():
-        if not start_printed:
-            print("")
-            print("@start")
+    for src in sources:
+        print("")
+        print("@start")
 
         levels = Levels(ensure, src, tb, bar, temp, log)
 

@@ -149,7 +149,7 @@ def obj_tag(tag: str, tb: Fraction, obj: dict[str, Any]) -> str:
     return key
 
 
-@dataclass
+@dataclass(slots=True)
 class Levels:
     ensure: Ensure
     src: FileInfo
@@ -164,9 +164,7 @@ class Levels:
             if (arr := self.read_cache("audio", {"stream": 0})) is not None:
                 return len(arr)
 
-            sr, samples = read(
-                self.ensure.audio(f"{self.src.path.resolve()}", self.src.label, 0)
-            )
+            sr, samples = read(self.ensure.audio(self.src, 0))
             samp_count = len(samples)
             del samples
 
@@ -258,9 +256,7 @@ class Levels:
         if (arr := self.read_cache("audio", {"stream": s})) is not None:
             return arr
 
-        sr, samples = read(
-            self.ensure.audio(f"{self.src.path.resolve()}", self.src.label, s)
-        )
+        sr, samples = read(self.ensure.audio(self.src, s))
 
         if len(samples) == 0:
             raise LevelError(f"audio: stream '{s}' has no samples.")
@@ -322,9 +318,7 @@ class Levels:
         except re.error as e:
             self.log.error(e)
 
-        sub_file = self.ensure.subtitle(
-            f"{self.src.path.resolve()}", self.src.label, stream=stream
-        )
+        sub_file = self.ensure.subtitle(self.src, stream)
         parser = SubtitleParser(self.tb)
 
         with open(sub_file, encoding="utf-8") as file:
@@ -371,7 +365,11 @@ class Levels:
         stream = container.streams.video[s]
         stream.thread_type = "AUTO"
 
-        if stream.duration is None:
+        if (
+            stream.duration is None
+            or stream.time_base is None
+            or stream.average_rate is None
+        ):
             inaccurate_dur = 1
         else:
             inaccurate_dur = int(
@@ -445,7 +443,11 @@ class Levels:
         stream = container.streams.video[s]
         stream.thread_type = "AUTO"
 
-        if stream.duration is None:
+        if (
+            stream.duration is None
+            or stream.time_base is None
+            or stream.average_rate is None
+        ):
             inaccurate_dur = 1
         else:
             inaccurate_dur = int(

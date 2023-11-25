@@ -5,7 +5,6 @@ from PIL import Image, ImageChops, ImageDraw
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import TlImage, TlRect, VSpace
-from auto_editor.utils.log import Log
 
 av.logging.set_level(av.logging.PANIC)
 
@@ -25,17 +24,15 @@ def apply_anchor(x: int, y: int, w: int, h: int, anchor: str) -> tuple[int, int]
     return x, y
 
 
-ImgCache = dict[str, Image.Image]
+ImgCache = dict[FileInfo, Image.Image]
 
 
-def make_cache(vtl: VSpace, sources: dict[str, FileInfo], log: Log) -> ImgCache:
+def make_cache(vtl: VSpace) -> ImgCache:
     img_cache: ImgCache = {}
     for layer in vtl:
         for obj in layer:
             if isinstance(obj, TlImage) and obj.src not in img_cache:
-                img_cache[obj.src] = Image.open(f"{sources[obj.src].path}").convert(
-                    "RGBA"
-                )
+                img_cache[obj.src] = Image.open(obj.src.path).convert("RGBA")
 
     return img_cache
 
