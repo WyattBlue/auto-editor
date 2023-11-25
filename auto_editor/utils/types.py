@@ -229,7 +229,6 @@ def resolution(val: str | None) -> tuple[int, int] | None:
 @dataclass
 class Args:
     add: list[str] = field(default_factory=list)
-    source: list[str] = field(default_factory=list)
     yt_dlp_location: str = "yt-dlp"
     download_format: str | None = None
     output_format: str | None = None

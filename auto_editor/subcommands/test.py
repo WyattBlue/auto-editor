@@ -232,24 +232,25 @@ def main(sys_args: list[str] | None = None):
         return out
 
     def add_audio():
-        run.main(
-            ["example.mp4"],
-            [
-                "--source",
-                "snd:resources/wav/pcm-f32le.wav",
-                "--add",
-                'audio:0.3sec,end,"snd",volume=0.3',
-            ],
-        )
-        return run.main(
-            ["example.mp4"],
-            [
-                "--source",
-                "snd:resources/wav/pcm-f32le.wav",
-                "--add",
-                'audio:2,40,"snd",3sec',
-            ],
-        )
+        pass
+        # run.main(
+        #     ["example.mp4"],
+        #     [
+        #         "--source",
+        #         "snd:resources/wav/pcm-f32le.wav",
+        #         "--add",
+        #         'audio:0.3sec,end,"snd",volume=0.3',
+        #     ],
+        # )
+        # return run.main(
+        #     ["example.mp4"],
+        #     [
+        #         "--source",
+        #         "snd:resources/wav/pcm-f32le.wav",
+        #         "--add",
+        #         'audio:2,40,"snd",3sec',
+        #     ],
+        # )
 
     # PR #260
     def high_speed_test():
