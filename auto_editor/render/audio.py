@@ -192,6 +192,9 @@ def make_new_audio(
 
         for c, clip in enumerate(layer):
             if f"{clip.src}-{clip.stream}" not in samples:
+                if clip.src not in tl.sources:
+                    log.error(f"Unknown source: {clip.src}")
+
                 audio_path = ensure.audio(
                     f"{tl.sources[clip.src].path.resolve()}",
                     clip.src,
