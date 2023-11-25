@@ -84,16 +84,6 @@ def speed(val: str) -> float:
     return _s
 
 
-def src(val: str) -> int | str:
-    try:
-        if int(val) > 0:
-            return int(val)
-    except ValueError:
-        pass
-
-    return val
-
-
 def threshold(val: str | float) -> float:
     num = number(val)
     if num > 1 or num < 0:

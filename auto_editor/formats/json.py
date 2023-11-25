@@ -18,7 +18,6 @@ from auto_editor.utils.types import (
     color,
     natural,
     number,
-    src,
     threshold,
 )
 
@@ -35,11 +34,21 @@ class cAttrs:
         self.attrs = attrs
 
 
+def make_src(val: str) -> int | str:
+    try:
+        if int(val) > 0:
+            return int(val)
+    except ValueError:
+        pass
+
+    return val
+
+
 video_builder = cAttrs(
     "video",
     ("start", natural, Required),
     ("dur", natural, Required),
-    ("src", src, Required),
+    ("src", make_src, Required),
     ("offset", natural, 0),
     ("speed", number, 1),
     ("stream", natural, 0),
@@ -48,7 +57,7 @@ audio_builder = cAttrs(
     "audio",
     ("start", natural, Required),
     ("dur", natural, Required),
-    ("src", src, Required),
+    ("src", make_src, Required),
     ("offset", natural, 0),
     ("speed", number, 1),
     ("volume", threshold, 1),
@@ -58,7 +67,7 @@ img_builder = cAttrs(
     "image",
     ("start", natural, Required),
     ("dur", natural, Required),
-    ("src", src, Required),
+    ("src", make_src, Required),
     ("x", int, "50%"),
     ("y", int, "50%"),
     ("opacity", threshold, 1),
