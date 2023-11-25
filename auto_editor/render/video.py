@@ -30,7 +30,7 @@ av.logging.set_level(av.logging.PANIC)
 @dataclass(slots=True)
 class VideoFrame:
     index: int
-    src: str
+    src: FileInfo
 
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
@@ -66,32 +66,29 @@ def render_av(
     temp: str,
     log: Log,
 ) -> tuple[str, bool]:
-    if not tl.sources:
-        if "0" in tl.sources:
-            src: FileInfo | None = tl.sources["0"]
-        else:
-            src = next(iter(tl.sources.items()))[1]
-    else:
-        src = None
+    src = tl.src
+    img_cache = make_cache(tl.v)
 
-    img_cache = make_cache(tl.v, tl.sources, log)
-
-    cns: dict[str, Any] = {}
-    decoders: dict[str, Any] = {}
-    seek_cost: dict[str, int] = {}
-    tous: dict[str, int] = {}
+    cns: dict[FileInfo, av.container.InputContainer] = {}
+    decoders: dict[FileInfo, Any] = {}
+    seek_cost: dict[FileInfo, int] = {}
+    tous: dict[FileInfo, int] = {}
 
     target_pix_fmt = "yuv420p"  # Reasonable default
 
-    for key, src in tl.sources.items():
-        cns[key] = av.open(f"{src.path}")
+    first_src: FileInfo | None = None
+    for src in tl.sources:
+        if first_src is None:
+            first_src = src
+        cns[src] = av.open(f"{src.path}")
 
-        if len(cns[key].streams.video) == 0:
-            decoders[key] = None
-            tous[key] = 0
-            seek_cost[key] = 0
+    for src, cn in cns.items():
+        if len(cn.streams.video) == 0:
+            decoders[src] = None
+            tous[src] = 0
+            seek_cost[src] = 0
         else:
-            stream = cns[key].streams.video[0]
+            stream = cn.streams.video[0]
             stream.thread_type = "AUTO"
 
             if args.no_seek or stream.average_rate is None:
@@ -102,11 +99,11 @@ def render_av(
                 sc_val = int(stream.average_rate * 5)
                 tou = int(stream.time_base.denominator / stream.average_rate)
 
-            seek_cost[key] = sc_val
-            tous[key] = tou
-            decoders[key] = cns[key].decode(stream)
+            seek_cost[src] = sc_val
+            tous[src] = tou
+            decoders[src] = cn.decode(stream)
 
-            if key == "0":
+            if src == first_src:
                 target_pix_fmt = stream.pix_fmt
 
     log.debug(f"Tous: {tous}")

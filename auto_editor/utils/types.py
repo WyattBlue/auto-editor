@@ -84,16 +84,6 @@ def speed(val: str) -> float:
     return _s
 
 
-def src(val: str) -> int | str:
-    try:
-        if int(val) > 0:
-            return int(val)
-    except ValueError:
-        pass
-
-    return val
-
-
 def threshold(val: str | float) -> float:
     num = number(val)
     if num > 1 or num < 0:
@@ -229,7 +219,6 @@ def resolution(val: str | None) -> tuple[int, int] | None:
 @dataclass
 class Args:
     add: list[str] = field(default_factory=list)
-    source: list[str] = field(default_factory=list)
     yt_dlp_location: str = "yt-dlp"
     download_format: str | None = None
     output_format: str | None = None
