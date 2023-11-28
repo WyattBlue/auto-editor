@@ -288,7 +288,7 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log, label: str = "") -> FileIn
 
     desc = cont.metadata.get("description", None)
     bitrate = 0 if cont.bit_rate is None else cont.bit_rate
-    dur = cont.duration / 1_000_000
+    dur = 0 if cont.duration is None else cont.duration / 1_000_000
 
     cont.close()
 
