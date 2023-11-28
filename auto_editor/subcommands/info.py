@@ -41,7 +41,7 @@ class VideoJson(TypedDict):
     aspect_ratio: list[int]
     pixel_aspect_ratio: str
     duration: float
-    pix_fmt: str
+    pix_fmt: str | None
     color_range: str | None
     color_space: str | None
     color_primaries: str | None
