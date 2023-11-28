@@ -126,7 +126,7 @@ class FFmpeg:
         return output
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class VideoStream:
     width: int
     height: int
@@ -135,7 +135,7 @@ class VideoStream:
     duration: float
     sar: Fraction
     time_base: Fraction
-    pix_fmt: str
+    pix_fmt: str | None
     color_range: str | None
     color_space: str | None
     color_primaries: str | None
@@ -144,7 +144,7 @@ class VideoStream:
     lang: str | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class AudioStream:
     codec: str
     samplerate: int
@@ -154,14 +154,14 @@ class AudioStream:
     lang: str | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class SubtitleStream:
     codec: str
     ext: str
     lang: str | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FileInfo:
     path: Path
     bitrate: int
@@ -208,7 +208,7 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log, label: str = "") -> FileIn
 
     for i, v in enumerate(cont.streams.video):
         vdur = 0.0
-        if hasattr(v, "duration") and v.duration is not None:
+        if v.duration is not None and v.time_base is not None:
             vdur = float(v.duration * v.time_base)
 
         fps = v.average_rate
