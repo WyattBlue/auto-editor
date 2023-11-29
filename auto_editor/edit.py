@@ -216,7 +216,7 @@ def edit_media(
         if os.path.isdir(output):
             log.error("Output path already has an existing directory!")
 
-        if os.path.isfile(output) and src is not None and src.path != output:
+        if os.path.isfile(output) and src is not None and src.path != output:  # type: ignore
             log.debug(f"Removing already existing file: {output}")
             os.remove(output)
 

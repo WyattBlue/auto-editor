@@ -134,7 +134,7 @@ class VideoStream:
     fps: Fraction
     duration: float
     sar: Fraction
-    time_base: Fraction
+    time_base: Fraction | None
     pix_fmt: str | None
     color_range: str | None
     color_space: str | None
@@ -266,13 +266,13 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log, label: str = "") -> FileIn
 
     for a in cont.streams.audio:
         adur = 0.0
-        if hasattr(a, "duration") and a.duration is not None:
+        if a.duration is not None and a.time_base is not None:
             adur = float(a.duration * a.time_base)
 
         audios += (
             AudioStream(
                 a.codec_context.name,
-                a.sample_rate,
+                0 if a.sample_rate is None else a.sample_rate,
                 a.channels,
                 adur,
                 0 if a.bit_rate is None else a.bit_rate,

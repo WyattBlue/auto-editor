@@ -188,7 +188,11 @@ class Levels:
                 self.log.error("Could not get media duration")
 
             video = cn.streams.video[0]
-            dur = int(video.duration * video.time_base * self.tb)
+
+            if video.duration is None or video.time_base is None:
+                dur = 0
+            else:
+                dur = int(video.duration * video.time_base * self.tb)
             self.log.debug(f"Video duration: {dur}")
 
         return dur
@@ -371,7 +375,11 @@ class Levels:
         stream = container.streams.video[s]
         stream.thread_type = "AUTO"
 
-        if stream.duration is None:
+        if (
+            stream.duration is None
+            or stream.time_base is None
+            or stream.average_rate is None
+        ):
             inaccurate_dur = 1
         else:
             inaccurate_dur = int(
@@ -445,7 +453,11 @@ class Levels:
         stream = container.streams.video[s]
         stream.thread_type = "AUTO"
 
-        if stream.duration is None:
+        if (
+            stream.duration is None
+            or stream.time_base is None
+            or stream.average_rate is None
+        ):
             inaccurate_dur = 1
         else:
             inaccurate_dur = int(
