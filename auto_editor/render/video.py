@@ -80,7 +80,9 @@ def render_av(
     for src in tl.sources:
         if first_src is None:
             first_src = src
-        cns[src] = av.open(f"{src.path}")
+
+        if src not in cns:
+            cns[src] = av.open(f"{src.path}")
 
     for src, cn in cns.items():
         if len(cn.streams.video) == 0:
