@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any
+from typing import Any, Iterator
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import *
@@ -33,7 +33,7 @@ class v1:
 class TlVideo:
     start: int
     dur: int
-    src: str
+    src: FileInfo
     offset: int
     speed: float
     stream: int
@@ -44,19 +44,22 @@ class TlVideo:
 class TlAudio:
     start: int
     dur: int
-    src: str
+    src: FileInfo
     offset: int
     speed: float
     volume: float
     stream: int
     name: str = "audio"
 
+    def __repr__(self) -> str:
+        return f"<audio start={self.start}, dur={self.dur} src={self.src.path}>"
+
 
 @dataclass
 class TlImage:
     start: int
     dur: int
-    src: str
+    src: FileInfo
     x: int
     y: int
     anchor: str
@@ -137,26 +140,24 @@ ASpace = list[ALayer]
 
 @dataclass
 class v3:
-    sources: dict[str, FileInfo]
+    src: FileInfo | None  # Used as a template for timeline settings
     tb: Fraction
     sr: int
     res: tuple[int, int]
     background: str
     v: VSpace
     a: ASpace
-    v1: v1 | None  # v1 compatible?
+    v1: v1 | None  # Is it v1 compatible (linear and only one source)?
 
     def __str__(self) -> str:
-        result = "sources\n"
-        for k, v in self.sources.items():
-            result += f" [{k} -> {v.path}]\n"
-        result += f"""
+        result = f"""
 global
  timebase {self.tb}
  samplerate {self.sr}
  res {self.res[0]}x{self.res[1]}
-"""
-        result += "\nvideo\n"
+
+video\n"""
+
         for i, layer in enumerate(self.v):
             result += f" v{i} "
             for obj in layer:
@@ -191,6 +192,16 @@ global
 
         return end
 
+    @property
+    def sources(self) -> Iterator[FileInfo]:
+        for vclips in self.v:
+            for v in vclips:
+                if isinstance(v, TlVideo):
+                    yield v.src
+        for aclips in self.a:
+            for a in aclips:
+                yield a.src
+
     def _duration(self, layer: Any) -> int:
         total_dur = 0
         for clips in layer:
@@ -205,8 +216,6 @@ global
         return max(self._duration(self.v), self._duration(self.a))
 
     def as_dict(self) -> dict:
-        sources = {key: f"{src.path.resolve()}" for key, src in self.sources.items()}
-
         v = []
         for i, vlayer in enumerate(self.v):
             vb = [vobj.__dict__ for vobj in vlayer]
@@ -224,7 +233,6 @@ global
             "resolution": self.res,
             "timebase": f"{self.tb.numerator}/{self.tb.denominator}",
             "samplerate": self.sr,
-            "sources": sources,
             "background": self.background,
             "v": v,
             "a": a,

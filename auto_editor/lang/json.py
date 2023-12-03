@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import StringIO, TextIOWrapper
 from typing import TYPE_CHECKING
 
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.err import MyError
 
 if TYPE_CHECKING:
@@ -264,6 +265,8 @@ def dump(
         file.write("null")
     elif isinstance(data, str):
         file.write(f'"{normalize_string(data)}"')
+    elif isinstance(data, FileInfo):
+        file.write(f'"{normalize_string(f"{data.path}")}"')
     elif isinstance(data, (int, float)):
         file.write(f"{data}")
     elif isinstance(data, (list, tuple)):

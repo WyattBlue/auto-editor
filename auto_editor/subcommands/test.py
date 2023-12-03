@@ -25,11 +25,13 @@ from auto_editor.vanparse import ArgumentParser
 class TestArgs:
     only: list[str] = field(default_factory=list)
     help: bool = False
+    no_fail_fast: bool = False
     category: str = "cli"
 
 
 def test_options(parser):
     parser.add_argument("--only", "-n", nargs="*")
+    parser.add_argument("--no-fail-fast", flag=True)
     parser.add_required(
         "category",
         nargs=1,
@@ -125,7 +127,10 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
 
     total_time = 0.0
 
-    for passed, test in enumerate(tests):
+    passed = 0
+    total = len(tests)
+    for index, test in enumerate(tests, start=1):
+        name = test.__name__
         start = perf_counter()
 
         try:
@@ -137,11 +142,16 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
             clean_all()
             sys.exit(1)
         except Exception as e:
-            print(f"Test '{test.__name__}' ({passed}/{len(tests)}) failed.\n")
-            clean_all()
-            raise e
-
-        print(f"{test.__name__:<25} {round(dur, 2)} secs")
+            print(f"{name:<24} ({index}/{total})  {round(dur, 2):<4} secs  [FAILED]")
+            if args.no_fail_fast:
+                print(f"\n{e}")
+            else:
+                print("")
+                clean_all()
+                raise e
+        else:
+            passed += 1
+            print(f"{name:<24} ({index}/{total})  {round(dur, 2):<4} secs  [PASSED]")
 
         if outputs is not None:
             if isinstance(outputs, str):
@@ -153,7 +163,8 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
                 except FileNotFoundError:
                     pass
 
-    print(f"\nCompleted\n{passed+1}/{len(tests)}\n{round(total_time, 2)} secs")
+    print(f"\nCompleted\n{passed}/{total}\n{round(total_time, 2)} secs")
+    clean_all()
 
 
 def main(sys_args: list[str] | None = None):

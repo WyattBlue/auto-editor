@@ -43,10 +43,10 @@ class Clip(NamedTuple):
     dur: int
     offset: int
     speed: float
-    src: str
+    src: FileInfo
 
 
-def clipify(chunks: Chunks, src: str, start: int = 0) -> list[Clip]:
+def clipify(chunks: Chunks, src: FileInfo, start: int = 0) -> list[Clip]:
     clips: list[Clip] = []
     i = 0
     for chunk in chunks:
@@ -65,19 +65,12 @@ def clipify(chunks: Chunks, src: str, start: int = 0) -> list[Clip]:
     return clips
 
 
-def make_av(
-    all_clips: list[list[Clip]], sources: dict[str, FileInfo], _inputs: list[int]
-) -> tuple[VSpace, ASpace]:
-    if len(_inputs) > 1000:
-        raise ValueError("Number of file inputs can't be greater than 1000")
-
-    inputs = [str(i) for i in _inputs]
+def make_av(src: FileInfo, all_clips: list[list[Clip]]) -> tuple[VSpace, ASpace]:
+    assert type(src) is FileInfo
     vtl: VSpace = []
-    atl: ASpace = [[] for _ in range(max(len(sources[i].audios) for i in inputs))]
+    atl: ASpace = [[] for _ in range(len(src.audios))]
 
-    for clips, inp in zip(all_clips, inputs):
-        src = sources[inp]
-
+    for clips in all_clips:
         for c in clips:
             if src.videos:
                 if len(vtl) == 0:
@@ -131,8 +124,7 @@ def run_interpreter_for_edit_option(
 
 
 def make_timeline(
-    sources: dict[str, FileInfo],
-    inputs: list[int],
+    sources: list[FileInfo],
     ffmpeg: FFmpeg,
     ensure: Ensure,
     args: Args,
@@ -141,7 +133,7 @@ def make_timeline(
     temp: str,
     log: Log,
 ) -> v3:
-    inp = None if not inputs else sources[str(inputs[0])]
+    inp = None if not sources else sources[0]
 
     if inp is None:
         tb, res = Fraction(30), (1920, 1080)
@@ -151,7 +143,6 @@ def make_timeline(
 
     chunks, vclips, aclips = make_layers(
         sources,
-        inputs,
         ensure,
         tb,
         args.edit_based_on,
@@ -169,7 +160,7 @@ def make_timeline(
     )
 
     v1_compatiable = None if inp is None else v1(inp, chunks)
-    tl = v3(sources, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
+    tl = v3(inp, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
 
     w, h = res
     pool: VLayer = []
@@ -205,8 +196,7 @@ def make_timeline(
 
 
 def make_layers(
-    sources: dict[str, FileInfo],
-    inputs: list[int],
+    sources: list[FileInfo],
     ensure: Ensure,
     tb: Fraction,
     method: str,
@@ -262,8 +252,8 @@ def make_layers(
             pair = [parse_time(val, arr) for val in _range]
             arr[pair[0] : pair[1]] = index
 
-    for i in map(str, inputs):
-        filesetup = FileSetup(sources[i], ensure, len(inputs) < 2, tb, bar, temp, log)
+    for src in sources:
+        filesetup = FileSetup(src, ensure, len(sources) < 2, tb, bar, temp, log)
         has_loud = run_interpreter_for_edit_option(method, filesetup)
 
         if len(mark_loud) > 0:
@@ -296,9 +286,25 @@ def make_layers(
         chunks = chunkify(has_loud, speed_hash)
 
         all_chunks.append(chunks)
-        all_clips.append(clipify(chunks, i, start))
+        all_clips.append(clipify(chunks, src, start))
         start += round(chunks_len(chunks))
 
-    vclips, aclips = make_av(all_clips, sources, inputs)
+    vtl: VSpace = []
+    atl: ASpace = []
 
-    return merge_chunks(all_chunks), vclips, aclips
+    for clips in all_clips:
+        for c in clips:
+            if c.src.videos:
+                if len(vtl) == 0:
+                    vtl.append([])
+                vtl[0].append(TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0))
+
+        for c in clips:
+            for a in range(len(c.src.audios)):
+                if a >= len(atl):
+                    atl.append([])
+                atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
+
+    print(atl)
+
+    return merge_chunks(all_chunks), vtl, atl

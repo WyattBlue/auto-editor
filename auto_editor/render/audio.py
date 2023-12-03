@@ -6,7 +6,7 @@ from subprocess import PIPE
 
 import numpy as np
 
-from auto_editor.ffwrapper import FFmpeg
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.lang.json import Lexer, Parser
 from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import andc, between_c, is_int_or_float
@@ -18,9 +18,6 @@ from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 from auto_editor.wavfile import AudioData, read, write
-
-# only newer versions of ffmpeg support lra to 50.
-# Ubuntu Latest and my static ffmpeg build for Windows are the main blockers
 
 norm_types = {
     "ebu": pAttrs(
@@ -174,7 +171,7 @@ def make_new_audio(
     sr = tl.sr
     tb = tl.tb
     output = []
-    samples = {}
+    samples: dict[tuple[FileInfo, int], AudioData] = {}
 
     norm = parse_norm(args.audio_normalize, log)
 
@@ -191,16 +188,9 @@ def make_new_audio(
         arr: AudioData | None = None
 
         for c, clip in enumerate(layer):
-            if f"{clip.src}-{clip.stream}" not in samples:
-                if clip.src not in tl.sources:
-                    log.error(f"Unknown source: {clip.src}")
-
-                audio_path = ensure.audio(
-                    f"{tl.sources[clip.src].path.resolve()}",
-                    clip.src,
-                    clip.stream,
-                )
-                samples[f"{clip.src}-{clip.stream}"] = read(audio_path)[1]
+            if (clip.src, clip.stream) not in samples:
+                audio_path = ensure.audio(clip.src, clip.stream)
+                samples[(clip.src, clip.stream)] = read(audio_path)[1]
 
             if arr is None:
                 leng = max(round((layer[-1].start + layer[-1].dur) * sr / tb), sr // tb)
@@ -217,8 +207,7 @@ def make_new_audio(
                 )
                 del leng
 
-            samp_list = samples[f"{clip.src}-{clip.stream}"]
-
+            samp_list = samples[(clip.src, clip.stream)]
             samp_start = clip.offset * sr // tb
             samp_end = round((clip.offset + clip.dur * clip.speed) * sr / tb)
             if samp_end > len(samp_list):
