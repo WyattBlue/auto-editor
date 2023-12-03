@@ -469,6 +469,7 @@ class Levels:
         for frame in container.decode(stream):
             prev_image = image
 
+            assert frame.time is not None
             index = int(frame.time * self.tb)
             self.bar.tick(index)
 

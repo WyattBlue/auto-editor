@@ -13,8 +13,6 @@ from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
 from .utils import Validator, make_tracks_dir, show
 
 if TYPE_CHECKING:
-    pass
-
     from auto_editor.utils.log import Log
 
 """

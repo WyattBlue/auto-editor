@@ -305,6 +305,4 @@ def make_layers(
                     atl.append([])
                 atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
 
-    print(atl)
-
     return merge_chunks(all_chunks), vtl, atl
