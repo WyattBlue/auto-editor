@@ -170,7 +170,6 @@ class FileInfo:
     videos: tuple[VideoStream, ...]
     audios: tuple[AudioStream, ...]
     subtitles: tuple[SubtitleStream, ...]
-    label: str
 
     def get_res(self) -> tuple[int, int]:
         if self.videos:
@@ -188,7 +187,7 @@ class FileInfo:
         return 48000
 
 
-def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log, label: str = "") -> FileInfo:
+def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
     import av
 
     av.logging.set_level(av.logging.PANIC)
@@ -245,6 +244,9 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log, label: str = "") -> FileIn
         else:
             sar = v.sample_aspect_ratio
 
+        assert type(v.codec_context.pix_fmt) is str
+        assert type(v.time_base) is Fraction
+
         videos += (
             VideoStream(
                 v.width,
@@ -292,4 +294,4 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log, label: str = "") -> FileIn
 
     cont.close()
 
-    return FileInfo(Path(path), bitrate, dur, desc, videos, audios, subtitles, label)
+    return FileInfo(Path(path), bitrate, dur, desc, videos, audios, subtitles)

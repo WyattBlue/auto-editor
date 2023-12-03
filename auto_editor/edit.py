@@ -117,25 +117,6 @@ def set_audio_codec(
     return codec
 
 
-def make_sources(
-    paths: list[str], ffmpeg: FFmpeg, log: Log
-) -> tuple[dict[str, FileInfo], list[int]]:
-    used_paths: dict[str, int] = {}
-    sources: dict[str, FileInfo] = {}
-    inputs: list[int] = []
-
-    i = 0
-    for path in paths:
-        if path in used_paths:
-            inputs.append(used_paths[path])
-        else:
-            sources[str(i)] = initFileInfo(path, ffmpeg, log, str(i))
-            inputs.append(i)
-            used_paths[path] = i
-            i += 1
-    return sources, inputs
-
-
 def parse_export(export: str, log: Log) -> dict[str, Any]:
     exploded = export.split(":", maxsplit=1)
     if len(exploded) == 1:
@@ -181,25 +162,27 @@ def edit_media(
             from auto_editor.formats.fcp7 import fcp7_read_xml
 
             tl = fcp7_read_xml(paths[0], ffmpeg, log)
-            src: FileInfo | None = next(iter(tl.sources.items()))[1]
-            sources = tl.sources
+            assert tl.src is not None
+            sources: list[FileInfo] = [tl.src]
+            src: FileInfo | None = tl.src
 
         elif path_ext == ".mlt":
             from auto_editor.formats.shotcut import shotcut_read_mlt
 
             tl = shotcut_read_mlt(paths[0], ffmpeg, log)
-            src = next(iter(tl.sources.items()))[1]
-            sources = tl.sources
+            assert tl.src is not None
+            sources = [tl.src]
+            src = tl.src
 
         elif path_ext == ".json":
             from auto_editor.formats.json import read_json
 
             tl = read_json(paths[0], ffmpeg, log)
-            sources = tl.sources
-            src = sources["0"]
+            sources = [] if tl.src is None else [tl.src]
+            src = tl.src
         else:
-            sources, inputs = make_sources(paths, ffmpeg, log)
-            src = None if not inputs else sources[str(inputs[0])]
+            sources = [initFileInfo(path, ffmpeg, log) for path in paths]
+            src = None if not sources else sources[0]
 
     del paths
 
@@ -240,9 +223,7 @@ def edit_media(
                 cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
             ffmpeg.run(cmd)
 
-        tl = make_timeline(
-            sources, inputs, ffmpeg, ensure, args, samplerate, bar, temp, log
-        )
+        tl = make_timeline(sources, ffmpeg, ensure, args, samplerate, bar, temp, log)
 
     if export["export"] == "timeline":
         from auto_editor.formats.json import make_json_timeline
@@ -342,8 +323,6 @@ def edit_media(
         if tl.v1 is None:
             log.error("Timeline too complex to use clip-sequence export")
 
-        sources = {"0": tl.v1.source}
-
         from auto_editor.make_layers import clipify, make_av
         from auto_editor.utils.func import append_filename
 
@@ -360,9 +339,11 @@ def edit_media(
 
             padded_chunks = pad_chunk(chunk, total_frames)
 
-            vspace, aspace = make_av([clipify(padded_chunks, "0")], sources, [0])
+            vspace, aspace = make_av(
+                tl.v1.source, [clipify(padded_chunks, tl.v1.source)]
+            )
             my_timeline = v3(
-                sources,
+                tl.v1.source,
                 tl.tb,
                 tl.sr,
                 tl.res,

@@ -53,8 +53,18 @@ def preview(ensure: Ensure, tl: v3, temp: str, log: Log) -> None:
     tb = tl.tb
 
     # Calculate input videos length
+    all_sources = set()
+    for vlayer in tl.v:
+        for vclip in vlayer:
+            if hasattr(vclip, "src"):
+                all_sources.add(vclip.src)
+    for alayer in tl.a:
+        for aclip in alayer:
+            if hasattr(aclip, "src"):
+                all_sources.add(aclip.src)
+
     in_len = 0
-    for src in tl.sources.values():
+    for src in all_sources:
         in_len += Levels(ensure, src, tb, Bar("none"), temp, log).media_length
 
     out_len = tl.out_len()

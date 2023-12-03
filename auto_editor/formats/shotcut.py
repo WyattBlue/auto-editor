@@ -91,7 +91,7 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
         clips = []
 
     for clip in clips:
-        src = tl.sources[clip.src]
+        src = clip.src
         length = to_timecode((clip.offset / clip.speed + clip.dur) / tb, "standard")
 
         if clip.speed == 1:

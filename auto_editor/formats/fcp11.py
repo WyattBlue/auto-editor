@@ -61,9 +61,8 @@ def fcp11_write_xml(
             return "0s"
         return f"{val * tl.tb.denominator}/{tl.tb.numerator}s"
 
-    for _, _src in tl.sources.items():
-        src = _src
-        break
+    src = tl.src
+    assert src is not None
 
     proj_name = src.path.stem
     src_dur = int(src.duration * tl.tb)

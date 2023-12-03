@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os.path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
@@ -16,27 +16,43 @@ class Ensure:
     _sr: int
     temp: str
     log: Log
+    labels: list[tuple[FileInfo, int]] = field(default_factory=list)
+    sub_labels: list[tuple[FileInfo, int]] = field(default_factory=list)
 
-    def audio(self, path: str, label: str, stream: int) -> str:
-        out_path = os.path.join(self.temp, f"{label}-{stream}.wav")
+    def audio(self, src: FileInfo, stream: int) -> str:
+        try:
+            label = self.labels.index((src, stream))
+            first_time = False
+        except ValueError:
+            self.labels.append((src, stream))
+            label = len(self.labels) - 1
+            first_time = True
 
-        if not os.path.isfile(out_path):
+        out_path = os.path.join(self.temp, f"{label:x}.wav")
+
+        if first_time:
             self.log.conwrite("Extracting audio")
 
-            cmd = ["-i", path, "-map", f"0:a:{stream}"]
+            cmd = ["-i", f"{src.path}", "-map", f"0:a:{stream}"]
             cmd += ["-ac", "2", "-ar", f"{self._sr}", "-rf64", "always", out_path]
             self._ffmpeg.run(cmd)
 
         return out_path
 
-    def subtitle(self, path: str, label: str, stream: int) -> str:
-        out_path = os.path.join(self.temp, f"{label}-{stream}.vtt")
+    def subtitle(self, src: FileInfo, stream: int) -> str:
+        try:
+            label = self.sub_labels.index((src, stream))
+            first_time = False
+        except ValueError:
+            self.sub_labels.append((src, stream))
+            label = len(self.sub_labels) - 1
+            first_time = True
 
-        if not os.path.isfile(out_path):
+        out_path = os.path.join(self.temp, f"{label:x}.vtt")
+
+        if first_time:
             self.log.conwrite("Extracting subtitle")
-
-            cmd = ["-i", path, "-map", f"0:s:{stream}", out_path]
-            self._ffmpeg.run(cmd)
+            self._ffmpeg.run(["-i", f"{src.path}", "-map", f"0:s:{stream}", out_path])
 
         return out_path
 
