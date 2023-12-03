@@ -51,6 +51,9 @@ class TlAudio:
     stream: int
     name: str = "audio"
 
+    def __repr__(self) -> str:
+        return f"<audio start={self.start}, dur={self.dur} src={self.src.path}>"
+
 
 @dataclass
 class TlImage:
