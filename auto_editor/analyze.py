@@ -186,7 +186,11 @@ class Levels:
                 self.log.error("Could not get media duration")
 
             video = cn.streams.video[0]
-            dur = int(video.duration * video.time_base * self.tb)
+
+            if video.duration is None or video.time_base is None:
+                dur = 0
+            else:
+                dur = int(video.duration * video.time_base * self.tb)
             self.log.debug(f"Video duration: {dur}")
 
         return dur

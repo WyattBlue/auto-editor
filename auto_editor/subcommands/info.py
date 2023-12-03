@@ -41,7 +41,7 @@ class VideoJson(TypedDict):
     aspect_ratio: list[int]
     pixel_aspect_ratio: str
     duration: float
-    pix_fmt: str
+    pix_fmt: str | None
     color_range: str | None
     color_space: str | None
     color_primaries: str | None
@@ -166,6 +166,9 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         dump(file_info, sys.stdout, indent=4)
         return
 
+    def is_null(key: str, val: object) -> bool:
+        return val is None or (key in ("bitrate", "duration") and val == 0.0)
+
     def stream_to_text(text: str, label: str, streams: list[dict[str, Any]]) -> str:
         if len(streams) > 0:
             text += f" - {label}:\n"
@@ -173,11 +176,12 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         for s, stream in enumerate(streams):
             text += f"   - track {s}:\n"
             for key, value in stream.items():
-                if value is not None:
+                if not is_null(key, value):
                     key = key.replace("_", " ")
                     if isinstance(value, list):
                         sep = "x" if key == "resolution" else ":"
-                        value = sep.join([str(x) for x in value])
+
+                        value = sep.join(f"{x}" for x in value)
 
                     text += f"     - {key}: {value}\n"
         return text
