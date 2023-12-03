@@ -134,8 +134,8 @@ class VideoStream:
     fps: Fraction
     duration: float
     sar: Fraction
-    time_base: Fraction
-    pix_fmt: str
+    time_base: Fraction | None
+    pix_fmt: str | None
     color_range: str | None
     color_space: str | None
     color_primaries: str | None
@@ -207,7 +207,7 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
 
     for i, v in enumerate(cont.streams.video):
         vdur = 0.0
-        if hasattr(v, "duration") and v.duration is not None:
+        if v.duration is not None and v.time_base is not None:
             vdur = float(v.duration * v.time_base)
 
         fps = v.average_rate
@@ -268,7 +268,7 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
 
     for a in cont.streams.audio:
         adur = 0.0
-        if hasattr(a, "duration") and a.duration is not None:
+        if a.duration is not None and a.time_base is not None:
             adur = float(a.duration * a.time_base)
 
         audios += (
@@ -290,7 +290,7 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
 
     desc = cont.metadata.get("description", None)
     bitrate = 0 if cont.bit_rate is None else cont.bit_rate
-    dur = cont.duration / 1_000_000
+    dur = 0 if cont.duration is None else cont.duration / 1_000_000
 
     cont.close()
 
