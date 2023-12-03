@@ -289,6 +289,22 @@ def make_layers(
         all_clips.append(clipify(chunks, src, start))
         start += round(chunks_len(chunks))
 
-    vclips, aclips = make_av(sources[0], all_clips)
+    vtl: VSpace = []
+    atl: ASpace = []
 
-    return merge_chunks(all_chunks), vclips, aclips
+    for clips in all_clips:
+        for c in clips:
+            if c.src.videos:
+                if len(vtl) == 0:
+                    vtl.append([])
+                vtl[0].append(TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0))
+
+        for c in clips:
+            for a in range(len(c.src.audios)):
+                if a >= len(atl):
+                    atl.append([])
+                atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
+
+    print(atl)
+
+    return merge_chunks(all_chunks), vtl, atl
