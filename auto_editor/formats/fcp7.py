@@ -375,10 +375,7 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
 
     primary_src = sources[next(iter(sources))]
     assert type(primary_src) is FileInfo
-    print(sources)
-    print(vobjs)
-    print(aobjs)
-    print("=================")
+
     return v3(primary_src, tb, sr, res, "#000", vobjs, aobjs, v1=None)
 
 
