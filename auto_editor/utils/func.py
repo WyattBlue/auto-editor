@@ -111,9 +111,9 @@ def merge(start_list: np.ndarray, end_list: np.ndarray) -> BoolList:
 
 
 def get_stdout(cmd: list[str]) -> str:
-    from subprocess import PIPE, Popen
+    from subprocess import DEVNULL, PIPE, Popen
 
-    stdout, _ = Popen(cmd, stdout=PIPE, stderr=PIPE).communicate()
+    stdout, _ = Popen(cmd, stdin=DEVNULL, stdout=PIPE, stderr=PIPE).communicate()
     return stdout.decode("utf-8", "replace")
 
 
