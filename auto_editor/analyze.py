@@ -479,6 +479,7 @@ class Levels:
                     axis=0,
                 )
 
+            assert isinstance(frame, av.VideoFrame)
             image = frame.to_image()
 
             if prev_image is not None:

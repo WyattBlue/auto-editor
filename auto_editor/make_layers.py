@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import os
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 
 from auto_editor.analyze import FileSetup, Levels
-from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
+from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError

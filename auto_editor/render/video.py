@@ -93,7 +93,7 @@ def render_av(
             stream = cn.streams.video[0]
             stream.thread_type = "AUTO"
 
-            if args.no_seek or stream.average_rate is None:
+            if args.no_seek or stream.average_rate is None or stream.time_base is None:
                 sc_val = 4294967295  # 2 ** 32 - 1
                 tou = 0
             else:
@@ -105,7 +105,7 @@ def render_av(
             tous[src] = tou
             decoders[src] = cn.decode(stream)
 
-            if src == first_src:
+            if src == first_src and stream.pix_fmt is not None:
                 target_pix_fmt = stream.pix_fmt
 
     log.debug(f"Tous: {tous}")

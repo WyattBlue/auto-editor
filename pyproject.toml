@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=48.0.0", "wheel"]
+
+[project]
+name = "auto-editor"
+description = "Auto-Editor: Effort free video editing!"
+readme = "README.md"
+license = { text = "Unlicense" }
+authors = [{ name = "WyattBlue", email = "wyattblue@auto-editor.com" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.22.0",
+    "pillow==10.1.0",
+    "pyav==11.4.1",
+    "ae-ffmpeg==1.1.*",
+]
+keywords = [
+    "video", "audio", "media", "editor", "editing",
+    "processing", "nonlinear", "automatic", "silence-detect",
+    "silence-removal", "silence-speedup", "motion-detection",
+]
+dynamic = ["version"]
+
+[tool.setuptools.packages]
+find = {}
+
+[tool.setuptools.dynamic]
+version = {attr = "auto_editor.__version__"}
+
+[project.urls]
+"Bug Tracker" = "https://github.com/WyattBlue/auto-editor/issues"
+"Source Code" = "https://github.com/WyattBlue/auto-editor"
+homepage = "https://auto-editor.com"
+
+[project.scripts]
+"auto-editor" = "auto_editor.__main__:main"
+aedesc = "auto_editor.subcommands.desc:main"
+aeinfo = "auto_editor.subcommands.info:main"
+aesubdump = "auto_editor.subcommands.subdump:main"
+aelevels = "auto_editor.subcommands.levels:main"
