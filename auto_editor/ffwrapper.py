@@ -244,9 +244,6 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
         else:
             sar = v.sample_aspect_ratio
 
-        assert type(v.codec_context.pix_fmt) is str
-        assert type(v.time_base) is Fraction
-
         videos += (
             VideoStream(
                 v.width,
