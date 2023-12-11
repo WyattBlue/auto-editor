@@ -242,27 +242,6 @@ def main(sys_args: list[str] | None = None):
 
         return out
 
-    def add_audio():
-        pass
-        # run.main(
-        #     ["example.mp4"],
-        #     [
-        #         "--source",
-        #         "snd:resources/wav/pcm-f32le.wav",
-        #         "--add",
-        #         'audio:0.3sec,end,"snd",volume=0.3',
-        #     ],
-        # )
-        # return run.main(
-        #     ["example.mp4"],
-        #     [
-        #         "--source",
-        #         "snd:resources/wav/pcm-f32le.wav",
-        #         "--add",
-        #         'audio:2,40,"snd",3sec',
-        #     ],
-        # )
-
     # PR #260
     def high_speed_test():
         return run.check(["example.mp4", "--video-speed", "99998"], "empty")
@@ -391,36 +370,6 @@ def main(sys_args: list[str] | None = None):
         assert cn.videos[0].height == 380
         assert cn.audios[0].samplerate == 48000
 
-        return out
-
-    def obj_makes_video():
-        out = run.main(
-            ["resources/new-commentary.mp3"],
-            ["--add", 'rect:0,30,0,0,300,300,fill="blue"'],
-            "out.mp4",
-        )
-        cn = checker.check(out)
-        assert len(cn.videos) == 1
-        assert len(cn.audios) == 1
-        assert cn.videos[0].width == 1920
-        assert cn.videos[0].height == 1080
-        assert cn.videos[0].fps == 30
-
-        return out
-
-    def various_errors():
-        run.check(["example.mp4", "--add", "rect:0,60", "--cut-out", "60,end"])
-
-    def render_video_objs():
-        out = run.main(
-            ["resources/testsrc.mp4"],
-            [
-                "--mark_as_loud",
-                "start,end",
-                "--add",
-                'rect:0,30,0,200,100,300,fill="#43FA56"',
-            ],
-        )
         return out
 
     def premiere():
@@ -767,13 +716,9 @@ def main(sys_args: list[str] | None = None):
                 json_tests,
                 high_speed_test,
                 video_speed,
-                obj_makes_video,
                 multi_track_edit,
                 concat_mux_tracks,
                 concat_multiple_tracks,
-                render_video_objs,
-                various_errors,
-                add_audio,
                 frame_rate,
                 help_tests,
                 version_test,

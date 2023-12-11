@@ -10,20 +10,8 @@ from auto_editor.ffwrapper import FFmpeg, FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
-from auto_editor.timeline import (
-    ALayer,
-    ASpace,
-    TlAudio,
-    TlVideo,
-    VLayer,
-    VSpace,
-    audio_objects,
-    v1,
-    v3,
-    visual_objects,
-)
+from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v1, v3
 from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
-from auto_editor.utils.cmdkw import ParserError, parse_with_palet
 from auto_editor.utils.func import mut_margin
 from auto_editor.utils.types import Args, CoerceError, time
 
@@ -159,39 +147,7 @@ def make_timeline(
     )
 
     v1_compatiable = None if inp is None else v1(inp, chunks)
-    tl = v3(inp, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
-
-    w, h = res
-    pool: VLayer = []
-    apool: ALayer = []
-
-    env["start"] = 0
-    env["end"] = tl.end
-
-    for obj_attrs_str in args.add:
-        exploded = obj_attrs_str.split(":", 1)
-        obj_s = exploded[0]
-        attrs = "" if len(exploded) == 1 else exploded[1]
-
-        try:
-            if obj_s in visual_objects:
-                dic_obj = parse_with_palet(attrs, visual_objects[obj_s][1], env)
-                pool.append(visual_objects[obj_s][0](**dic_obj))
-            elif obj_s in audio_objects:
-                dic_obj = parse_with_palet(attrs, audio_objects[obj_s][1], env)
-                apool.append(audio_objects[obj_s][0](**dic_obj))
-            else:
-                log.error(f"Unknown timeline object: '{obj_s}'")
-        except (ParserError, CoerceError) as e:
-            log.error(e)
-
-    for vobj in pool:
-        tl.v.append([vobj])
-
-    for aobj in apool:
-        tl.a.append([aobj])
-
-    return tl
+    return v3(inp, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
 
 
 def make_layers(
