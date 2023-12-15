@@ -118,9 +118,9 @@ def get_stdout(cmd: list[str]) -> str:
 
 
 def get_stdout_bytes(cmd: list[str]) -> bytes:
-    from subprocess import PIPE, Popen
+    from subprocess import DEVNULL, PIPE, Popen
 
-    return Popen(cmd, stdout=PIPE, stderr=PIPE).communicate()[0]
+    return Popen(cmd, stdin=DEVNULL, stdout=PIPE, stderr=PIPE).communicate()[0]
 
 
 def aspect_ratio(width: int, height: int) -> tuple[int, int]:
