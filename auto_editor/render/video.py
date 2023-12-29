@@ -37,6 +37,8 @@ class VideoFrame:
 allowed_pix_fmt = {
     "yuv420p",
     "yuvj420p",
+    "yuv444p",
+    "yuvj444p",
     "rgb48be",
     "rgb48le",
     "rgb64be",
