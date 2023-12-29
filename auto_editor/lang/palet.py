@@ -468,7 +468,7 @@ is_iterable = Contract(
 )
 is_sequence = Contract(
     "sequence?",
-    lambda v: type(v) in (str, range, Quoted) or isinstance(v, (list, np.ndarray)),
+    lambda v: type(v) in (str, range, Quoted) or isinstance(v, list | np.ndarray),
 )
 is_boolarr = Contract(
     "bool-array?",
@@ -685,7 +685,7 @@ def palet_map(proc: Proc, seq: Any) -> Any:
         return str(map(proc, seq))
     if type(seq) is Quoted:
         return Quoted(tuple(map(proc, seq.val)))
-    if isinstance(seq, (list, range)):
+    if isinstance(seq, list | range):
         return list(map(proc, seq))
     return proc(seq)
 

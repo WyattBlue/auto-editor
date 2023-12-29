@@ -14,7 +14,8 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import CoerceError
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Literal, TypeVar
+    from collections.abc import Callable
+    from typing import Any, Literal, TypeVar
 
     T = TypeVar("T")
     Nargs = int | Literal["*"]
@@ -136,7 +137,7 @@ def print_option_help(program_name: str | None, ns_obj: T, option: Options) -> N
         except AttributeError:
             pass
 
-        if default is not None and isinstance(default, (int, float, str)):
+        if default is not None and isinstance(default, int | float | str):
             text.write(f"    default: {default}\n")
 
         if option.choices is not None:

@@ -134,7 +134,7 @@ is_threshold = Contract(
     "threshold?",
     lambda v: type(v) in (int, float) and v >= 0 and v <= 1,  # type: ignore
 )
-is_proc = Contract("procedure?", lambda v: isinstance(v, (Proc, Contract)))
+is_proc = Contract("procedure?", lambda v: isinstance(v, Proc | Contract))
 
 
 def andc(*cs: object) -> Proc:

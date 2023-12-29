@@ -39,5 +39,30 @@ aeinfo = "auto_editor.subcommands.info:main"
 aesubdump = "auto_editor.subcommands.subdump:main"
 aelevels = "auto_editor.subcommands.levels:main"
 
-[tool.isort]
-profile = "black"
+[tool.mypy]
+warn_unused_ignores = true
+warn_redundant_casts = true
+extra_checks = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+strict_optional = true
+strict_equality = true
+python_version = "3.10"
+
+[tool.ruff]
+select = [
+    "UP", # pyupgrade
+    "E",  # pycodestyle
+    "F",  # Pyflakes
+    "W",  # pycodestyle
+    "I",  # isort
+    "C401",  # flake8-comprehensions: unnecessary-generator-set
+    "C402",  # flake8-comprehensions: unnecessary-generator-dict
+    "C403",  # flake8-comprehensions: unnecessary-list-comprehension-set
+    "C404",  # flake8-comprehensions: unnecessary-list-comprehension-dict
+    "C405",  # flake8-comprehensions: unnecessary-literal-set
+]
+target-version = "py310"
+
+[tool.ruff.lint]
+ignore = ["E501", "E712", "E721", "F403", "F405"]

@@ -267,9 +267,9 @@ def dump(
         file.write(f'"{normalize_string(data)}"')
     elif isinstance(data, FileInfo):
         file.write(f'"{normalize_string(f"{data.path}")}"')
-    elif isinstance(data, (int, float)):
+    elif isinstance(data, int | float):
         file.write(f"{data}")
-    elif isinstance(data, (list, tuple)):
+    elif isinstance(data, list | tuple):
         file.write("[")
         if indent is not None:
             level += indent
