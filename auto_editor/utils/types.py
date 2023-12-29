@@ -20,7 +20,7 @@ def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
 
 
 def _split_num_str(val: str | float) -> tuple[float, str]:
-    if isinstance(val, (float, int)):
+    if isinstance(val, float | int):
         return val, ""
 
     index = 0
