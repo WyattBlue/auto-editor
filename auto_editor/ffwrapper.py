@@ -185,8 +185,6 @@ class FileInfo:
             return self.audios[0].samplerate
         return 48000
 
-    def __repr__(self): return f"@{self.path}@"
-
 
 def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
     import av
