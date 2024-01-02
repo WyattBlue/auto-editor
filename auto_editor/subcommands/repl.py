@@ -105,6 +105,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 for result in interpret(env, parser):
                     if result is not None:
                         sys.stdout.write(f"{print_str(result)}\n")
+                        env["_"] = result
+
             except ClosingError:
                 continue  # Allow user to continue adding text
             except (MyError, ZeroDivisionError) as e:
