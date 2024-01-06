@@ -197,7 +197,9 @@ def make_timeline(
     except CoerceError as e:
         log.error(e)
 
-    def echunk(arr, src_index) -> list[tuple[FileInfo, int, int, float]]:
+    def echunk(
+        arr: NDArray, src_index: NDArray[np.int32]
+    ) -> list[tuple[FileInfo, int, int, float]]:
         arr_length = len(has_loud)
 
         chunks = []
@@ -205,16 +207,16 @@ def make_timeline(
         doi = 0
         for j in range(1, arr_length):
             if (arr[j] != arr[j - 1]) or (src_index[j] != src_index[j - 1]):
+                src = sources[src_index[j - 1]]
+                chunks.append((src, start, j - doi, speed_map[arr[j - 1]]))
+                start = j - doi
+
                 if src_index[j] != src_index[j - 1]:
                     start = 0
                     doi = j
-                src = sources[src_index[j - 1]]
-                chunks.append((src, start, j, speed_map[arr[j - 1]]))
-                start = j - doi
 
         src = sources[src_index[j]]
         chunks.append((src, start, arr_length, speed_map[arr[j]]))
-        print(chunks)
         return chunks
 
     clips: list[Clip] = []
