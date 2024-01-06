@@ -248,7 +248,6 @@ def main(sys_args: list[str] | None = None):
 
     # Issue #184
     def units():
-        run.main(["example.mp4"], ["--mark_as_loud", "20s,22sec", "25secs,26.5seconds"])
         run.main(["example.mp4"], ["--edit", "all/e", "--set-speed", "125%,-30,end"])
         return run.main(["example.mp4"], ["--edit", "audio:threshold=4%"])
 
@@ -412,7 +411,7 @@ def main(sys_args: list[str] | None = None):
         return out
 
     def concat():
-        out = run.main(["example.mp4"], ["--mark_as_silent", "0,171"], "hmm.mp4")
+        out = run.main(["example.mp4"], ["--cut-out", "0,171"], "hmm.mp4")
         out2 = run.main(["example.mp4", "hmm.mp4"], ["--debug"])
         return out, out2
 

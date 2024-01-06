@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
@@ -11,7 +11,6 @@ from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v1, v3
-from auto_editor.utils.chunks import Chunks, chunkify, chunks_len, merge_chunks
 from auto_editor.utils.func import mut_margin
 from auto_editor.utils.types import Args, CoerceError, time
 
@@ -20,6 +19,7 @@ if TYPE_CHECKING:
 
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
+    from auto_editor.utils.chunks import Chunks
     from auto_editor.utils.log import Log
 
     BoolList = NDArray[np.bool_]
@@ -128,59 +128,33 @@ def make_timeline(
         tb = inp.get_fps() if args.frame_rate is None else args.frame_rate
         res = inp.get_res() if args.resolution is None else args.resolution
 
-    chunks, vclips, aclips = make_layers(
-        sources,
-        ensure,
-        tb,
-        args.edit_based_on,
-        args.margin,
-        args.cut_out,
-        args.add_in,
-        args.mark_as_silent,
-        args.mark_as_loud,
-        args.set_speed_for_range,
-        args.silent_speed,
-        args.video_speed,
-        bar,
-        temp,
-        log,
-    )
-
-    v1_compatiable = None if inp is None else v1(inp, chunks)
-    return v3(inp, tb, sr, res, args.background, vclips, aclips, v1_compatiable)
-
-
-def make_layers(
-    sources: list[FileInfo],
-    ensure: Ensure,
-    tb: Fraction,
-    method: str,
-    margin: tuple[str, str],
-    cut_out: list[list[str]],
-    add_in: list[list[str]],
-    mark_silent: list[list[str]],
-    mark_loud: list[list[str]],
-    speed_ranges: list[tuple[float, str, str]],
-    silent_speed: float,
-    loud_speed: float,
-    bar: Bar,
-    temp: str,
-    log: Log,
-) -> tuple[Chunks, VSpace, ASpace]:
-    start = 0
-    all_clips: list[list[Clip]] = []
-    all_chunks: list[Chunks] = []
-
     try:
-        start_margin = time(margin[0], tb)
-        end_margin = time(margin[1], tb)
+        start_margin = time(args.margin[0], tb)
+        end_margin = time(args.margin[1], tb)
     except CoerceError as e:
         log.error(e)
 
-    speed_map = [silent_speed, loud_speed]
+    method = args.edit_based_on
+
+    has_loud = np.array([], dtype=np.bool_)
+    src_index = np.array([], dtype=np.int32)
+    concat = np.concatenate
+
+    for i, src in enumerate(sources):
+        filesetup = FileSetup(src, ensure, len(sources) < 2, tb, bar, temp, log)
+
+        edit_result = run_interpreter_for_edit_option(method, filesetup)
+        mut_margin(edit_result, start_margin, end_margin)
+
+        has_loud = concat((has_loud, edit_result))
+        src_index = concat((src_index, np.full(len(edit_result), i, dtype=np.int32)))
+
+    # Setup for handling custom speeds
+    speed_index = has_loud.astype(np.uint)
+    speed_map = [args.silent_speed, args.video_speed]
     speed_hash = {
-        0: silent_speed,
-        1: loud_speed,
+        0: args.silent_speed,
+        1: args.video_speed,
     }
 
     def get_speed_index(speed: float) -> int:
@@ -201,63 +175,98 @@ def make_layers(
         except CoerceError as e:
             log.error(e)
 
-    def mut_set_range(arr: NDArray, _ranges: list[list[str]], index: Any) -> None:
+    def mut_set_range(arr: NDArray, _ranges: list[list[str]], index: float) -> None:
         for _range in _ranges:
             assert len(_range) == 2
             pair = [parse_time(val, arr) for val in _range]
             arr[pair[0] : pair[1]] = index
 
-    for src in sources:
-        filesetup = FileSetup(src, ensure, len(sources) < 2, tb, bar, temp, log)
-        has_loud = run_interpreter_for_edit_option(method, filesetup)
+    try:
+        if len(args.cut_out) > 0:
+            # always cut out even if 'silent_speed' is not 99,999
+            mut_set_range(speed_index, args.cut_out, get_speed_index(99_999))
 
-        if len(mark_loud) > 0:
-            mut_set_range(has_loud, mark_loud, loud_speed)
+        if len(args.add_in) > 0:
+            # set to 'video_speed' index
+            mut_set_range(speed_index, args.add_in, 1.0)
 
-        if len(mark_silent) > 0:
-            mut_set_range(has_loud, mark_silent, silent_speed)
+        for speed_range in args.set_speed_for_range:
+            speed = speed_range[0]
+            _range = list(speed_range[1:])
+            mut_set_range(speed_index, [_range], get_speed_index(speed))
+    except CoerceError as e:
+        log.error(e)
 
-        mut_margin(has_loud, start_margin, end_margin)
+    def echunk(
+        arr: NDArray, src_index: NDArray[np.int32]
+    ) -> list[tuple[FileInfo, int, int, float]]:
+        arr_length = len(has_loud)
 
-        # Setup for handling custom speeds
-        has_loud = has_loud.astype(np.uint)
+        chunks = []
+        start = 0
+        doi = 0
+        for j in range(1, arr_length):
+            if (arr[j] != arr[j - 1]) or (src_index[j] != src_index[j - 1]):
+                src = sources[src_index[j - 1]]
+                chunks.append((src, start, j - doi, speed_map[arr[j - 1]]))
+                start = j - doi
 
-        try:
-            if len(cut_out) > 0:
-                # always cut out even if 'silent_speed' is not 99,999
-                mut_set_range(has_loud, cut_out, get_speed_index(99_999))
+                if src_index[j] != src_index[j - 1]:
+                    start = 0
+                    doi = j
 
-            if len(add_in) > 0:
-                # set to 'video_speed' index
-                mut_set_range(has_loud, add_in, 1)
+        src = sources[src_index[j]]
+        chunks.append((src, start, arr_length, speed_map[arr[j]]))
+        return chunks
 
-            for speed_range in speed_ranges:
-                speed = speed_range[0]
-                _range = list(speed_range[1:])
-                mut_set_range(has_loud, [_range], get_speed_index(speed))
-        except CoerceError as e:
-            log.error(e)
+    clips: list[Clip] = []
+    i = 0
+    start = 0
+    for chunk in echunk(speed_index, src_index):
+        if chunk[3] != 99999:
+            dur = round((chunk[2] - chunk[1]) / chunk[3])
+            if dur == 0:
+                continue
 
-        chunks = chunkify(has_loud, speed_hash)
+            offset = chunk[1]
 
-        all_chunks.append(chunks)
-        all_clips.append(clipify(chunks, src, start))
-        start += round(chunks_len(chunks))
+            if not (clips and clips[-1].start == round(start)):
+                clips.append(Clip(start, dur, offset, chunk[3], chunk[0]))
+            start += dur
+            i += 1
 
     vtl: VSpace = []
     atl: ASpace = []
+    for c in clips:
+        if c.src.videos:
+            if len(vtl) == 0:
+                vtl.append([])
+            vtl[0].append(TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0))
 
-    for clips in all_clips:
-        for c in clips:
-            if c.src.videos:
-                if len(vtl) == 0:
-                    vtl.append([])
-                vtl[0].append(TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0))
+    for c in clips:
+        for a in range(len(c.src.audios)):
+            if a >= len(atl):
+                atl.append([])
+            atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
 
-        for c in clips:
-            for a in range(len(c.src.audios)):
-                if a >= len(atl):
-                    atl.append([])
-                atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
+    # Turn long silent/loud array to formatted chunk list.
+    # Example: [1, 1, 1, 2, 2], {1: 1.0, 2: 1.5} => [(0, 3, 1.0), (3, 5, 1.5)]
+    def chunkify(arr: NDArray, smap: dict[int, float]) -> Chunks:
+        arr_length = len(arr)
 
-    return merge_chunks(all_chunks), vtl, atl
+        chunks = []
+        start = 0
+        for j in range(1, arr_length):
+            if arr[j] != arr[j - 1]:
+                chunks.append((start, j, smap[arr[j - 1]]))
+                start = j
+        chunks.append((start, arr_length, smap[arr[j]]))
+        return chunks
+
+    if len(sources) == 1 and inp is not None:
+        chunks = chunkify(speed_index, speed_hash)
+        v1_compatiable = v1(inp, chunks)
+    else:
+        v1_compatiable = None
+
+    return v3(inp, tb, sr, res, args.background, vtl, atl, v1_compatiable)
