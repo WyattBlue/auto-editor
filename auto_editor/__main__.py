@@ -69,20 +69,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="The range of media that will be added in, opposite of --cut-out",
     )
     parser.add_argument(
-        "--mark-as-loud",
-        type=time_range,
-        nargs="*",
-        metavar="[START,STOP ...]",
-        help='The range that will be marked as "loud"',
-    )
-    parser.add_argument(
-        "--mark-as-silent",
-        type=time_range,
-        nargs="*",
-        metavar="[START,STOP ...]",
-        help='The range that will be marked as "silent"',
-    )
-    parser.add_argument(
         "--set-speed-for-range",
         "--set-speed",
         type=speed_range,

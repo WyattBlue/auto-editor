@@ -232,8 +232,6 @@ class Args:
     no_seek: bool = False
     cut_out: list[list[str]] = field(default_factory=list)
     add_in: list[list[str]] = field(default_factory=list)
-    mark_as_loud: list[list[str]] = field(default_factory=list)
-    mark_as_silent: list[list[str]] = field(default_factory=list)
     set_speed_for_range: list[tuple[float, str, str]] = field(default_factory=list)
     frame_rate: Fraction | None = None
     sample_rate: int | None = None

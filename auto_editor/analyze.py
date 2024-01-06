@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from fractions import Fraction
     from typing import Any
 
+    from av.filter import FilterContext
     from numpy.typing import NDArray
 
     from auto_editor.ffwrapper import FileInfo
@@ -93,7 +94,7 @@ class LevelError(Exception):
     pass
 
 
-def link_nodes(*nodes: Any) -> None:
+def link_nodes(*nodes: FilterContext) -> None:
     for c, n in zip(nodes, nodes[1:]):
         c.link_to(n)
 
@@ -403,6 +404,7 @@ class Levels:
 
             prev_image = image
 
+            assert isinstance(frame.time, float)
             index = int(frame.time * self.tb)
             self.bar.tick(index)
 
