@@ -7,15 +7,14 @@ from subprocess import DEVNULL, PIPE
 from typing import TYPE_CHECKING
 
 import av
-from PIL import Image, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageOps
 
 from auto_editor.output import video_quality
-from auto_editor.render.image import make_cache, render_image
-from auto_editor.timeline import TlVideo
+from auto_editor.timeline import TlImage, TlRect, TlVideo
 from auto_editor.utils.encoder import encoders
 
 if TYPE_CHECKING:
-    from typing import Any
+    from collections.abc import Iterator
 
     from auto_editor.ffwrapper import FFmpeg, FileInfo
     from auto_editor.timeline import v3
@@ -23,6 +22,9 @@ if TYPE_CHECKING:
     from auto_editor.utils.container import Container
     from auto_editor.utils.log import Log
     from auto_editor.utils.types import Args
+
+    ImgCache = dict[FileInfo, Image.Image]
+
 
 av.logging.set_level(av.logging.PANIC)
 
@@ -59,6 +61,51 @@ allowed_pix_fmt = {
 }
 
 
+def apply_anchor(x: int, y: int, w: int, h: int, anchor: str) -> tuple[int, int]:
+    if anchor == "ce":
+        x = (x * 2 - w) // 2
+        y = (y * 2 - h) // 2
+    if anchor == "tr":
+        x -= w
+    if anchor == "bl":
+        y -= h
+    if anchor == "br":
+        x -= w
+        y -= h
+    # Pillow uses 'tl' by default
+    return x, y
+
+
+def render_image(
+    frame: av.VideoFrame, obj: TlRect | TlImage, img_cache: ImgCache
+) -> av.VideoFrame:
+    img = frame.to_image().convert("RGBA")
+
+    x = obj.x
+    y = obj.y
+
+    if isinstance(obj, TlRect):
+        w = obj.width
+        h = obj.height
+        newimg = Image.new("RGBA", (w, h), (255, 255, 255, 0))
+        draw = ImageDraw.Draw(newimg)
+        draw.rectangle((0, 0, w, h), fill=obj.fill)
+    if isinstance(obj, TlImage):
+        newimg = img_cache[obj.src]
+        draw = ImageDraw.Draw(newimg)
+        newimg = ImageChops.multiply(
+            newimg,
+            Image.new("RGBA", newimg.size, (255, 255, 255, int(obj.opacity * 255))),
+        )
+
+    img.paste(
+        newimg,
+        apply_anchor(x, y, newimg.size[0], newimg.size[1], obj.anchor),
+        newimg,
+    )
+    return frame.from_image(img)
+
+
 def render_av(
     ffmpeg: FFmpeg,
     tl: v3,
@@ -68,11 +115,15 @@ def render_av(
     temp: str,
     log: Log,
 ) -> tuple[str, bool]:
-    src = tl.src
-    img_cache = make_cache(tl.v)
+    img_cache: ImgCache = {}
+    for layer in tl.v:
+        for pobj in layer:
+            if isinstance(pobj, TlImage) and pobj.src not in img_cache:
+                img_cache[pobj.src] = Image.open(pobj.src.path).convert("RGBA")
 
+    src = tl.src
     cns: dict[FileInfo, av.container.InputContainer] = {}
-    decoders: dict[FileInfo, Any] = {}
+    decoders: dict[FileInfo, Iterator[av.video.frame.VideoFrame] | None] = {}
     seek_cost: dict[FileInfo, int] = {}
     tous: dict[FileInfo, int] = {}
 
@@ -173,11 +224,9 @@ def render_av(
     null_frame = av.VideoFrame.from_image(null_img).reformat(format=target_pix_fmt)
 
     frame_index = -1
-    frame = null_frame
     try:
         for index in range(tl.end):
-            # Add objects to obj_list
-            obj_list: list[Any] = []
+            obj_list: list[VideoFrame | TlRect | TlImage] = []
             for layer in tl.v:
                 for lobj in layer:
                     if isinstance(lobj, TlVideo):
@@ -187,7 +236,7 @@ def render_av(
                     elif index >= lobj.start and index < lobj.start + lobj.dur:
                         obj_list.append(lobj)
 
-            # Render obj_list
+            frame = null_frame
             for obj in obj_list:
                 if isinstance(obj, VideoFrame):
                     my_stream = cns[obj.src].streams.video[0]
@@ -195,8 +244,9 @@ def render_av(
                         log.debug(f"Seek: {frame_index} -> 0")
                         cns[obj.src].seek(0)
                         try:
-                            assert decoders[obj.src] is not None
-                            frame = next(decoders[obj.src])
+                            it = decoders[obj.src]
+                            assert it is not None
+                            frame = next(it)
                             frame_index = round(frame.time * tl.tb)
                         except StopIteration:
                             pass
@@ -216,7 +266,9 @@ def render_av(
                             )
 
                         try:
-                            frame = next(decoders[obj.src])
+                            it = decoders[obj.src]
+                            assert it is not None
+                            frame = next(it)
                             frame_index = round(frame.time * tl.tb)
                         except StopIteration:
                             log.debug(f"No source frame at {index=}. Using null frame")
@@ -248,9 +300,6 @@ def render_av(
                 bar.tick(index)
             elif index % 3 == 0:
                 bar.tick(index)
-
-            # if frame == null_frame:
-            #     raise ValueError("no null frame allowed")
 
             process2.stdin.write(frame.to_ndarray().tobytes())
 
