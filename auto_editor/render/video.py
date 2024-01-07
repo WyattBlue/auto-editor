@@ -7,11 +7,13 @@ from subprocess import DEVNULL, PIPE
 from typing import TYPE_CHECKING
 
 import av
+import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageOps
 
 from auto_editor.output import video_quality
 from auto_editor.timeline import TlImage, TlRect, TlVideo
 from auto_editor.utils.encoder import encoders
+from auto_editor.utils.types import color
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -106,6 +108,16 @@ def render_image(
     return frame.from_image(img)
 
 
+def make_solid(width: int, height: int, pix_fmt: str, raw_color: str) -> av.VideoFrame:
+    hex_color = color(raw_color)  # Handle values like 'red'
+    hex_color = hex_color.lstrip("#").upper()
+    rgb_color = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+
+    rgb_array = np.full((height, width, 3), rgb_color, dtype=np.uint8)
+    rgb_frame = av.VideoFrame.from_ndarray(rgb_array, format="rgb24")
+    return rgb_frame.reformat(format=pix_fmt)
+
+
 def render_av(
     ffmpeg: FFmpeg,
     tl: v3,
@@ -122,8 +134,8 @@ def render_av(
                 img_cache[pobj.src] = Image.open(pobj.src.path).convert("RGBA")
 
     src = tl.src
-    cns: dict[FileInfo, av.container.InputContainer] = {}
-    decoders: dict[FileInfo, Iterator[av.video.frame.VideoFrame] | None] = {}
+    cns: dict[FileInfo, av.InputContainer] = {}
+    decoders: dict[FileInfo, Iterator[av.VideoFrame] | None] = {}
     seek_cost: dict[FileInfo, int] = {}
     tous: dict[FileInfo, int] = {}
 
@@ -220,9 +232,7 @@ def render_av(
 
     bar.start(tl.end, "Creating new video")
 
-    null_img = Image.new("RGB", (width, height), args.background)
-    null_frame = av.VideoFrame.from_image(null_img).reformat(format=target_pix_fmt)
-
+    null_frame = make_solid(width, height, target_pix_fmt, args.background)
     frame_index = -1
     try:
         for index in range(tl.end):
