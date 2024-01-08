@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
-from math import ceil
 from subprocess import DEVNULL, PIPE
 from typing import TYPE_CHECKING
 
 import av
 import numpy as np
-from PIL import Image, ImageChops, ImageDraw, ImageOps
+from PIL import Image, ImageChops, ImageDraw
 
 from auto_editor.output import video_quality
 from auto_editor.timeline import TlImage, TlRect, TlVideo
@@ -17,6 +16,8 @@ from auto_editor.utils.types import color
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from av.filter import FilterContext
 
     from auto_editor.ffwrapper import FFmpeg, FileInfo
     from auto_editor.timeline import v3
@@ -35,6 +36,11 @@ av.logging.set_level(av.logging.PANIC)
 class VideoFrame:
     index: int
     src: FileInfo
+
+
+def link_nodes(*nodes: FilterContext) -> None:
+    for c, n in zip(nodes, nodes[1:]):
+        c.link_to(n)
 
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
@@ -108,9 +114,8 @@ def render_image(
     return frame.from_image(img)
 
 
-def make_solid(width: int, height: int, pix_fmt: str, raw_color: str) -> av.VideoFrame:
-    hex_color = color(raw_color)  # Handle values like 'red'
-    hex_color = hex_color.lstrip("#").upper()
+def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
+    hex_color = bg.lstrip("#").upper()
     rgb_color = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
     rgb_array = np.full((height, width, 3), rgb_color, dtype=np.uint8)
@@ -231,7 +236,8 @@ def render_av(
 
     bar.start(tl.end, "Creating new video")
 
-    null_frame = make_solid(width, height, target_pix_fmt, args.background)
+    bg = color(args.background)
+    null_frame = make_solid(width, height, target_pix_fmt, bg)
     frame_index = -1
     try:
         for index in range(tl.end):
@@ -290,13 +296,18 @@ def render_av(
                             log.debug(f"Keyframe {frame_index} {frame.pts}")
 
                     if frame.width != width or frame.height != height:
-                        img = frame.to_image().convert("RGB")
-                        if img.width > width or img.height > height:
-                            factor = ceil(max(width / img.width, height / img.height))
-                            img = ImageOps.scale(img, factor)
-                        img = ImageOps.pad(img, (width, height), color=args.background)
-                        frame = frame.from_image(img).reformat(format=target_pix_fmt)
-
+                        graph = av.filter.Graph()
+                        link_nodes(
+                            graph.add_buffer(template=my_stream),
+                            graph.add(
+                                "scale",
+                                f"{width}:{height}:force_original_aspect_ratio=decrease:eval=frame",
+                            ),
+                            graph.add("pad", f"{width}:{height}:-1:-1:color={bg}"),
+                            graph.add("buffersink"),
+                        )
+                        graph.push(frame)
+                        frame = graph.pull()
                 else:
                     frame = render_image(frame, obj, img_cache)
 
