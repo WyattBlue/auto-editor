@@ -135,7 +135,7 @@ def render_av(
 
     src = tl.src
     cns: dict[FileInfo, av.InputContainer] = {}
-    decoders: dict[FileInfo, Iterator[av.VideoFrame] | None] = {}
+    decoders: dict[FileInfo, Iterator[av.VideoFrame]] = {}
     seek_cost: dict[FileInfo, int] = {}
     tous: dict[FileInfo, int] = {}
 
@@ -151,7 +151,6 @@ def render_av(
 
     for src, cn in cns.items():
         if len(cn.streams.video) == 0:
-            decoders[src] = None
             tous[src] = 0
             seek_cost[src] = 0
         else:
@@ -254,9 +253,7 @@ def render_av(
                         log.debug(f"Seek: {frame_index} -> 0")
                         cns[obj.src].seek(0)
                         try:
-                            it = decoders[obj.src]
-                            assert it is not None
-                            frame = next(it)
+                            frame = next(decoders[obj.src])
                             frame_index = round(frame.time * tl.tb)
                         except StopIteration:
                             pass
@@ -276,9 +273,7 @@ def render_av(
                             )
 
                         try:
-                            it = decoders[obj.src]
-                            assert it is not None
-                            frame = next(it)
+                            frame = next(decoders[obj.src])
                             frame_index = round(frame.time * tl.tb)
                         except StopIteration:
                             log.debug(f"No source frame at {index=}. Using null frame")
