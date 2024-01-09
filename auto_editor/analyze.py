@@ -254,7 +254,7 @@ class Levels:
 
         return arr
 
-    def audio(self, s: int) -> NDArray[np.float_]:
+    def audio(self, s: int) -> NDArray[np.float64]:
         if s > len(self.src.audios) - 1:
             raise LevelError(f"audio: audio stream '{s}' does not exist.")
 
@@ -288,7 +288,7 @@ class Levels:
         )
         self.bar.start(audio_ticks, "Analyzing audio volume")
 
-        threshold_list = np.zeros((audio_ticks), dtype=np.float_)
+        threshold_list = np.zeros((audio_ticks), dtype=np.float64)
 
         if max_volume == 0:  # Prevent dividing by zero
             return threshold_list
@@ -351,7 +351,7 @@ class Levels:
 
         return result
 
-    def motion(self, s: int, blur: int, width: int) -> NDArray[np.float_]:
+    def motion(self, s: int, blur: int, width: int) -> NDArray[np.float64]:
         import av
         from PIL import ImageChops, ImageFilter
 
@@ -396,7 +396,7 @@ class Levels:
         )
         graph.configure()
 
-        threshold_list = np.zeros((1024), dtype=np.float_)
+        threshold_list = np.zeros((1024), dtype=np.float64)
 
         for unframe in container.decode(stream):
             graph.push(unframe)
@@ -410,7 +410,7 @@ class Levels:
 
             if index > len(threshold_list) - 1:
                 threshold_list = np.concatenate(
-                    (threshold_list, np.zeros((len(threshold_list)), dtype=np.float_)),
+                    (threshold_list, np.zeros((len(threshold_list)), dtype=np.float64)),
                     axis=0,
                 )
 
