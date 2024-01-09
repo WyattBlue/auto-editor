@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import av
 import numpy as np
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageChops
 
 from auto_editor.output import video_quality
 from auto_editor.timeline import TlImage, TlRect, TlVideo
@@ -80,38 +80,8 @@ def apply_anchor(x: int, y: int, w: int, h: int, anchor: str) -> tuple[int, int]
     if anchor == "br":
         x -= w
         y -= h
-    # Pillow uses 'tl' by default
+    # Use 'tl' by default
     return x, y
-
-
-def render_image(
-    frame: av.VideoFrame, obj: TlRect | TlImage, img_cache: ImgCache
-) -> av.VideoFrame:
-    img = frame.to_image().convert("RGBA")
-
-    x = obj.x
-    y = obj.y
-
-    if isinstance(obj, TlRect):
-        w = obj.width
-        h = obj.height
-        newimg = Image.new("RGBA", (w, h), (255, 255, 255, 0))
-        draw = ImageDraw.Draw(newimg)
-        draw.rectangle((0, 0, w, h), fill=obj.fill)
-    if isinstance(obj, TlImage):
-        newimg = img_cache[obj.src]
-        draw = ImageDraw.Draw(newimg)
-        newimg = ImageChops.multiply(
-            newimg,
-            Image.new("RGBA", newimg.size, (255, 255, 255, int(obj.opacity * 255))),
-        )
-
-    img.paste(
-        newimg,
-        apply_anchor(x, y, newimg.size[0], newimg.size[1], obj.anchor),
-        newimg,
-    )
-    return frame.from_image(img)
 
 
 def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
@@ -230,7 +200,6 @@ def render_av(
 
     # First few frames can have an abnormal keyframe count, so never seek there.
     seek = 10
-
     seek_frame = None
     frames_saved = 0
 
@@ -308,8 +277,34 @@ def render_av(
                         )
                         graph.push(frame)
                         frame = graph.pull()
-                else:
-                    frame = render_image(frame, obj, img_cache)
+                elif isinstance(obj, TlRect):
+                    graph = av.filter.Graph()
+                    x, y = apply_anchor(obj.x, obj.y, obj.width, obj.height, obj.anchor)
+                    link_nodes(
+                        graph.add_buffer(template=my_stream),
+                        graph.add(
+                            "drawbox",
+                            f"x={x}:y={y}:w={obj.width}:h={obj.height}:color={obj.fill}:t=fill",
+                        ),
+                        graph.add("buffersink"),
+                    )
+                    graph.push(frame)
+                    frame = graph.pull()
+                elif isinstance(obj, TlImage):
+                    newimg = img_cache[obj.src]
+                    newimg = ImageChops.multiply(
+                        newimg,
+                        Image.new(
+                            "RGBA", newimg.size, (255, 255, 255, int(obj.opacity * 255))
+                        ),
+                    )
+                    img = frame.to_image().convert("RGBA")
+                    img.paste(
+                        newimg,
+                        apply_anchor(x, y, newimg.size[0], newimg.size[1], obj.anchor),
+                        newimg,
+                    )
+                    frame = frame.from_image(img)
 
             if frame.format.name != target_pix_fmt:
                 frame = frame.reformat(format=target_pix_fmt)
