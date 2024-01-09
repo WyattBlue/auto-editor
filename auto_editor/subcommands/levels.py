@@ -57,7 +57,7 @@ def levels_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 def print_arr(arr: NDArray) -> None:
-    if arr.dtype == np.float_:
+    if arr.dtype == np.float64:
         for a in arr:
             sys.stdout.write(f"{a:.20f}\n")
     elif arr.dtype == np.bool_:
