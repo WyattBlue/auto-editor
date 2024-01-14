@@ -150,10 +150,12 @@ def parse_with_palet(
                 if matches := get_close_matches(key, all_names):
                     more = f"\n    Did you mean:\n        {', '.join(matches)}"
                 else:
-                    more = f"\n    keywords available:\n        {', '.join(all_names)}"
+                    more = (
+                        f"\n    attributes available:\n        {', '.join(all_names)}"
+                    )
 
                 raise ParserError(
-                    f"{build.name} got an unexpected keyword '{key}'\n{more}"
+                    f"{build.name} got an unexpected attribute '{key}'\n{more}"
                 )
 
         elif allow_positional_args:

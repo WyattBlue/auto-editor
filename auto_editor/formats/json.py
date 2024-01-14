@@ -102,11 +102,10 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
         ("start", natural, Required),
         ("dur", natural, Required),
         ("src", make_src, Required),
-        ("x", int, "50%"),
-        ("y", int, "50%"),
+        ("x", int, Required),
+        ("y", int, Required),
         ("opacity", threshold, 1),
         ("anchor", anchor, "ce"),
-        ("rotate", number, 0),
     )
 
     rect_builder = cAttrs(
@@ -259,7 +258,7 @@ def parse_obj(obj: dict[str, Any], build: cAttrs) -> dict[str, Any]:
             if matches := get_close_matches(key, all_names):
                 more = f"\n    Did you mean:\n        {', '.join(matches)}"
             else:
-                more = f"\n    keywords available:\n        {', '.join(all_names)}"
+                more = f"\n    attributes available:\n        {', '.join(all_names)}"
 
             raise ParserError(f"{build.name} got an unexpected keyword '{key}'\n{more}")
 

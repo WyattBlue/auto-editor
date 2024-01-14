@@ -199,37 +199,6 @@ Here is a list of examples on how margin mutates boolean arrays
 (margin -2 2 (bool-array 0 0 1 1 0 0 0))
 > (array 'bool 0 0 0 0 1 1 0)
 """.strip(),
-        "--add": """
- - video
-   - start, dur   nat?
-   - src          str?
-   - offset       int?     : 0
-   - speed        real?    : 1
-   - stream       uint?    : 0
-
- - audio
-   - start, dur   nat?
-   - src          str?
-   - offset       int?     : 0
-   - speed        real?    : 1
-   - volume       real?    : 1
-   - stream       uint?    : 0
-
- - image
-   - start, dur   nat?
-   - src          str?
-   - x, y         int?
-   - opacity      threshold?  : 1.0
-   - anchor       str?        : "ce"
-
- - rect
-   - start, dur   nat?
-   - x, y         int?
-   - width        int?
-   - height       int?
-   - anchor       str?     : "ce"
-   - fill         str?     : "#FFF"
-""".strip(),
         "--audio-normalize": """
 Apply audio normalization after cutting.
 
