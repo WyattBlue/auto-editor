@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 import av
 import numpy as np
-from PIL import Image, ImageChops
 
 from auto_editor.output import video_quality
 from auto_editor.timeline import TlImage, TlRect, TlVideo
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
     from auto_editor.utils.log import Log
     from auto_editor.utils.types import Args
 
-    ImgCache = dict[FileInfo, Image.Image]
+    ImgCache = dict[FileInfo, np.ndarray]
 
 
 av.logging.set_level(av.logging.PANIC)
@@ -93,6 +92,19 @@ def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
     return rgb_frame.reformat(format=pix_fmt)
 
 
+def make_image_cache(tl: v3) -> ImgCache:
+    img_cache = {}
+    for clip in tl.v:
+        for obj in clip:
+            if isinstance(obj, TlImage) and obj.src not in img_cache:
+                with av.open(obj.src.path) as cn:
+                    for frame in cn.decode(cn.streams.video[0]):
+                        img_cache[obj.src] = frame.to_ndarray(format="rgb24")
+                        break
+
+    return img_cache
+
+
 def render_av(
     ffmpeg: FFmpeg,
     tl: v3,
@@ -102,12 +114,6 @@ def render_av(
     temp: str,
     log: Log,
 ) -> tuple[str, bool]:
-    img_cache: ImgCache = {}
-    for layer in tl.v:
-        for pobj in layer:
-            if isinstance(pobj, TlImage) and pobj.src not in img_cache:
-                img_cache[pobj.src] = Image.open(pobj.src.path).convert("RGBA")
-
     src = tl.src
     cns: dict[FileInfo, av.InputContainer] = {}
     decoders: dict[FileInfo, Iterator[av.VideoFrame]] = {}
@@ -115,6 +121,7 @@ def render_av(
     tous: dict[FileInfo, int] = {}
 
     target_pix_fmt = "yuv420p"  # Reasonable default
+    img_cache = make_image_cache(tl)
 
     first_src: FileInfo | None = None
     for src in tl.sources:
@@ -125,10 +132,7 @@ def render_av(
             cns[src] = av.open(f"{src.path}")
 
     for src, cn in cns.items():
-        if len(cn.streams.video) == 0:
-            tous[src] = 0
-            seek_cost[src] = 0
-        else:
+        if len(cn.streams.video) > 0:
             stream = cn.streams.video[0]
             stream.thread_type = "AUTO"
 
@@ -291,20 +295,22 @@ def render_av(
                     graph.push(frame)
                     frame = graph.pull()
                 elif isinstance(obj, TlImage):
-                    newimg = img_cache[obj.src]
-                    newimg = ImageChops.multiply(
-                        newimg,
-                        Image.new(
-                            "RGBA", newimg.size, (255, 255, 255, int(obj.opacity * 255))
-                        ),
-                    )
-                    img = frame.to_image().convert("RGBA")
-                    img.paste(
-                        newimg,
-                        apply_anchor(x, y, newimg.size[0], newimg.size[1], obj.anchor),
-                        newimg,
-                    )
-                    frame = frame.from_image(img)
+                    img = img_cache[obj.src]
+                    x_pos, y_pos = obj.x, obj.y
+
+                    y_end = min(y_pos + img.shape[0], frame.height)
+                    x_end = min(x_pos + img.shape[1], frame.width)
+
+                    array = frame.to_ndarray(format="rgb24")
+                    roi = array[y_pos:y_end, x_pos:x_end]
+
+                    img = img[: y_end - y_pos, : x_end - x_pos]
+                    roi = (1 - obj.opacity) * roi + obj.opacity * img
+
+                    array[y_pos:y_end, x_pos:x_end] = roi
+                    array = np.clip(array, 0, 255).astype(np.uint8)
+
+                    frame = av.VideoFrame.from_ndarray(array, format="rgb24")
 
             if frame.format.name != target_pix_fmt:
                 frame = frame.reformat(format=target_pix_fmt)
