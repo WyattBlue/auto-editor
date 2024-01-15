@@ -104,6 +104,7 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
         ("src", make_src, Required),
         ("x", int, Required),
         ("y", int, Required),
+        ("width", natural, Required),
         ("opacity", threshold, 1),
         ("anchor", anchor, "ce"),
     )
@@ -132,7 +133,7 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
     tb = Fraction(tl["timebase"])
 
     v: Any = []
-    a: Any = []
+    a: list[list[TlAudio]] = []
 
     for vlayers in tl["v"]:
         if vlayers:

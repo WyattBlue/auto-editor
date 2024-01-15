@@ -52,9 +52,6 @@ class TlAudio:
     stream: int
     name: str = "audio"
 
-    def __repr__(self) -> str:
-        return f"<audio start={self.start}, dur={self.dur} src={self.src.path}>"
-
 
 @dataclass
 class TlImage:
@@ -63,8 +60,9 @@ class TlImage:
     src: FileInfo
     x: int
     y: int
-    anchor: str
+    width: int
     opacity: float
+    anchor: str
     name: str = "image"
 
 
@@ -107,10 +105,10 @@ img_builder = pAttrs(
     pAttr("src", Required, is_str),
     pAttr("x", Required, is_int),
     pAttr("y", Required, is_int),
+    pAttr("width", 0, is_nat),
     pAttr("opacity", 1, is_threshold),
     pAttr("anchor", "ce", is_str),
 )
-
 rect_builder = pAttrs(
     "rect",
     pAttr("start", Required, is_nat),
@@ -126,10 +124,6 @@ visual_objects = {
     "rect": (TlRect, rect_builder),
     "image": (TlImage, img_builder),
     "video": (TlVideo, video_builder),
-}
-
-audio_objects = {
-    "audio": (TlAudio, audio_builder),
 }
 
 VLayer = list[TlVideo | TlImage | TlRect]
