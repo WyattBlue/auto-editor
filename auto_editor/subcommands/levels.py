@@ -114,8 +114,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 print_arr(levels.audio(obj["stream"]))
             elif method == "motion":
                 print_arr(levels.motion(obj["stream"], obj["blur"], obj["width"]))
-            elif method == "pixeldiff":
-                print_arr(levels.pixeldiff(obj["stream"]))
             elif method == "subtitle":
                 print_arr(
                     levels.subtitle(

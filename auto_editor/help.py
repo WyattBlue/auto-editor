@@ -41,18 +41,15 @@ Editing Methods:
     - blur nat? : 9
     - width nat1? : 400
 
- - none  ;  Do not modify the media in anyway; mark all sections as "loud" (1).
- - all/e  ; Cut out everything out; mark all sections as "silent" (0).
-
- - pixeldiff  ; Detect when a certain amount of pixels have changed between frames.
-    - threshold nat? : 1
-    - stream nat? : 0
-
  - subtitle  ; Detect when subtitle matches pattern as a RegEx string.
     - pattern string?
     - stream nat? : 0
     - ignore-case bool? : #f
     - max-count (or/c nat? void?) : (void)
+
+ - none   ; Do not modify the media in anyway; mark all sections as "loud" (1).
+ - all/e  ; Cut out everything out; mark all sections as "silent" (0).
+
 
 Command-line Examples:
   --edit audio
