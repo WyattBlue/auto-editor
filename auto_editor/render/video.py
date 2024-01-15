@@ -25,8 +25,6 @@ if TYPE_CHECKING:
     from auto_editor.utils.log import Log
     from auto_editor.utils.types import Args
 
-    ImgCache = dict[FileInfo, np.ndarray]
-
 
 av.logging.set_level(av.logging.PANIC)
 
@@ -92,14 +90,26 @@ def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
     return rgb_frame.reformat(format=pix_fmt)
 
 
-def make_image_cache(tl: v3) -> ImgCache:
+def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
     img_cache = {}
     for clip in tl.v:
         for obj in clip:
             if isinstance(obj, TlImage) and obj.src not in img_cache:
                 with av.open(obj.src.path) as cn:
-                    for frame in cn.decode(cn.streams.video[0]):
-                        img_cache[obj.src] = frame.to_ndarray(format="rgb24")
+                    my_stream = cn.streams.video[0]
+                    for frame in cn.decode(my_stream):
+                        if obj.width != 0:
+                            graph = av.filter.Graph()
+                            link_nodes(
+                                graph.add_buffer(template=my_stream),
+                                graph.add("scale", f"{obj.width}:-1"),
+                                graph.add("buffersink"),
+                            )
+                            graph.push(frame)
+                            frame = graph.pull()
+                        img_cache[(obj.src, obj.width)] = frame.to_ndarray(
+                            format="rgb24"
+                        )
                         break
 
     return img_cache
@@ -295,19 +305,38 @@ def render_av(
                     graph.push(frame)
                     frame = graph.pull()
                 elif isinstance(obj, TlImage):
-                    img = img_cache[obj.src]
-                    x_pos, y_pos = obj.x, obj.y
-
-                    y_end = min(y_pos + img.shape[0], frame.height)
-                    x_end = min(x_pos + img.shape[1], frame.width)
-
+                    img = img_cache[(obj.src, obj.width)]
                     array = frame.to_ndarray(format="rgb24")
-                    roi = array[y_pos:y_end, x_pos:x_end]
 
-                    img = img[: y_end - y_pos, : x_end - x_pos]
-                    roi = (1 - obj.opacity) * roi + obj.opacity * img
+                    overlay_h, overlay_w, _ = img.shape
+                    x_pos, y_pos = apply_anchor(
+                        obj.x, obj.y, overlay_w, overlay_h, obj.anchor
+                    )
 
-                    array[y_pos:y_end, x_pos:x_end] = roi
+                    x_start = max(x_pos, 0)
+                    y_start = max(y_pos, 0)
+                    x_end = min(x_pos + overlay_w, frame.width)
+                    y_end = min(y_pos + overlay_h, frame.height)
+
+                    # Clip the overlay image to fit into the frame
+                    overlay_x_start = max(-x_pos, 0)
+                    overlay_y_start = max(-y_pos, 0)
+                    overlay_x_end = overlay_w - max(
+                        (x_pos + overlay_w) - frame.width, 0
+                    )
+                    overlay_y_end = overlay_h - max(
+                        (y_pos + overlay_h) - frame.height, 0
+                    )
+                    clipped_overlay = img[
+                        overlay_y_start:overlay_y_end, overlay_x_start:overlay_x_end
+                    ]
+
+                    # Create a region of interest (ROI) on the video frame
+                    roi = array[y_start:y_end, x_start:x_end]
+
+                    # Blend the overlay image with the ROI based on the opacity
+                    roi = (1 - obj.opacity) * roi + obj.opacity * clipped_overlay
+                    array[y_start:y_end, x_start:x_end] = roi
                     array = np.clip(array, 0, 255).astype(np.uint8)
 
                     frame = av.VideoFrame.from_ndarray(array, format="rgb24")
