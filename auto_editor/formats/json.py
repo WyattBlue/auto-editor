@@ -12,35 +12,20 @@ from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
     ASpace,
     TlAudio,
-    TlImage,
-    TlRect,
     TlVideo,
     VSpace,
+    audio_builder,
     v1,
     v3,
+    visual_objects,
 )
-from auto_editor.utils.cmdkw import ParserError, Required
+from auto_editor.utils.cmdkw import ParserError, Required, pAttrs
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import (
-    CoerceError,
-    anchor,
-    color,
-    natural,
-    number,
-    threshold,
-)
+from auto_editor.utils.types import CoerceError
 
 """
 Make a pre-edited file reference that can be inputted back into auto-editor.
 """
-
-
-class cAttrs:
-    __slots__ = ("name", "attrs")
-
-    def __init__(self, name: str, *attrs: tuple[str, Any, Any]):
-        self.name = name
-        self.attrs = attrs
 
 
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
@@ -78,54 +63,51 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
         srcs[v] = temp
         return temp
 
-    video_builder = cAttrs(
-        "video",
-        ("start", natural, Required),
-        ("dur", natural, Required),
-        ("src", make_src, Required),
-        ("offset", natural, 0),
-        ("speed", number, 1),
-        ("stream", natural, 0),
-    )
-    audio_builder = cAttrs(
-        "audio",
-        ("start", natural, Required),
-        ("dur", natural, Required),
-        ("src", make_src, Required),
-        ("offset", natural, 0),
-        ("speed", number, 1),
-        ("volume", threshold, 1),
-        ("stream", natural, 0),
-    )
-    img_builder = cAttrs(
-        "image",
-        ("start", natural, Required),
-        ("dur", natural, Required),
-        ("src", make_src, Required),
-        ("x", int, Required),
-        ("y", int, Required),
-        ("width", natural, Required),
-        ("opacity", threshold, 1),
-        ("anchor", anchor, "ce"),
-    )
+    def parse_obj(obj: dict[str, Any], build: pAttrs) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {}
+        del obj["name"]
 
-    rect_builder = cAttrs(
-        "rect",
-        ("start", natural, Required),
-        ("dur", natural, Required),
-        ("x", int, Required),
-        ("y", int, Required),
-        ("width", int, Required),
-        ("height", int, Required),
-        ("anchor", anchor, "ce"),
-        ("fill", color, "#c4c4c4"),
-    )
+        for attr in build.attrs:
+            assert attr.coerce is not None
+            if attr.default is Required:
+                kwargs[attr.n] = Required
+            else:
+                assert attr.coerce != "source"
+                kwargs[attr.n] = attr.coerce(attr.default)
 
-    visual_objects = {
-        "rect": (TlRect, rect_builder),
-        "image": (TlImage, img_builder),
-        "video": (TlVideo, video_builder),
-    }
+        for key, val in obj.items():
+            found = False
+            for attr in build.attrs:
+                if key == attr.n:
+                    try:
+                        if attr.coerce == "source":
+                            kwargs[key] = make_src(val)
+                        else:
+                            assert attr.coerce is not None
+                            kwargs[key] = attr.coerce(val)
+                    except CoerceError as e:
+                        raise ParserError(e)
+                    found = True
+                    break
+
+            if not found:
+                all_names = {attr.n for attr in build.attrs}
+                if matches := get_close_matches(key, all_names):
+                    more = f"\n    Did you mean:\n        {', '.join(matches)}"
+                else:
+                    more = (
+                        f"\n    attributes available:\n        {', '.join(all_names)}"
+                    )
+
+                raise ParserError(
+                    f"{build.name} got an unexpected keyword '{key}'\n{more}"
+                )
+
+        for k, v in kwargs.items():
+            if v is Required:
+                raise ParserError(f"'{k}' must be specified.")
+
+        return kwargs
 
     bg = tl["background"]
     sr = tl["samplerate"]
@@ -230,44 +212,6 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     if type(ver) is not str:
         log.error("version needs to be a string")
     log.error(f"Importing version {ver} timelines is not supported.")
-
-
-def parse_obj(obj: dict[str, Any], build: cAttrs) -> dict[str, Any]:
-    kwargs: dict[str, Any] = {}
-
-    del obj["name"]
-
-    def var_f(n: str, c: Any, v: Any) -> Any:
-        return c(v)
-
-    for attr in build.attrs:
-        kwargs[attr[0]] = var_f(*attr) if attr[2] is not Required else attr[1]
-
-    for key, val in obj.items():
-        found = False
-        for attr in build.attrs:
-            if key == attr[0]:
-                try:
-                    kwargs[key] = var_f(key, attr[1], val)
-                except CoerceError as e:
-                    raise ParserError(e)
-                found = True
-                break
-
-        if not found:
-            all_names = {attr[0] for attr in build.attrs}
-            if matches := get_close_matches(key, all_names):
-                more = f"\n    Did you mean:\n        {', '.join(matches)}"
-            else:
-                more = f"\n    attributes available:\n        {', '.join(all_names)}"
-
-            raise ParserError(f"{build.name} got an unexpected keyword '{key}'\n{more}")
-
-    for k, v in kwargs.items():
-        if v is Required:
-            raise ParserError(f"'{k}' must be specified.")
-
-    return kwargs
 
 
 def make_json_timeline(ver: int, out: str | int, tl: v3, log: Log) -> None:

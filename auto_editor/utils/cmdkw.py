@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from difflib import get_close_matches
 from typing import TYPE_CHECKING
 
 from auto_editor.lib.data_structs import Env
 
 if TYPE_CHECKING:
-    from typing import Any
+    from collections.abc import Callable
+    from typing import Any, Literal
 
 
 class ParserError(Exception):
@@ -17,13 +19,12 @@ class Required:
     pass
 
 
+@dataclass(slots=True)
 class pAttr:
-    __slots__ = ("n", "default", "contract")
-
-    def __init__(self, n: str, default: Any, contract: Any):
-        self.n = n
-        self.default = default
-        self.contract = contract
+    n: str
+    default: Any
+    contract: Any
+    coerce: Callable[[Any], Any] | Literal["source"] | None = None
 
 
 class pAttrs:
