@@ -51,7 +51,7 @@ class ClosingError(MyError):
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
 VAL, QUOTE, SEC, DB, DOT, VLIT = "VAL", "QUOTE", "SEC", "DB", "DOT", "VLIT"
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
-METHODS = ("audio:", "motion:", "pixeldiff:", "subtitle:")
+METHODS = ("audio:", "motion:", "subtitle:")
 brac_pairs = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
 
 str_escape = {

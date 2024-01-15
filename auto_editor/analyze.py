@@ -58,11 +58,6 @@ motion_builder = pAttrs(
     pAttr("blur", 9, is_nat),
     pAttr("width", 400, is_nat1),
 )
-pixeldiff_builder = pAttrs(
-    "pixeldiff",
-    pAttr("threshold", 1, is_nat),
-    pAttr("stream", 0, is_nat),
-)
 subtitle_builder = pAttrs(
     "subtitle",
     pAttr("pattern", Required, is_str),
@@ -74,7 +69,6 @@ subtitle_builder = pAttrs(
 builder_map = {
     "audio": audio_builder,
     "motion": motion_builder,
-    "pixeldiff": pixeldiff_builder,
     "subtitle": subtitle_builder,
 }
 
@@ -353,7 +347,6 @@ class Levels:
 
     def motion(self, s: int, blur: int, width: int) -> NDArray[np.float64]:
         import av
-        from PIL import ImageChops, ImageFilter
 
         av.logging.set_level(av.logging.PANIC)
 
@@ -370,21 +363,11 @@ class Levels:
         stream = container.streams.video[s]
         stream.thread_type = "AUTO"
 
-        if (
-            stream.duration is None
-            or stream.time_base is None
-            or stream.average_rate is None
-        ):
-            inaccurate_dur = 1
-        else:
-            inaccurate_dur = int(
-                stream.duration * stream.time_base * stream.average_rate
-            )
-
+        inaccurate_dur = 1 if stream.duration is None else stream.duration
         self.bar.start(inaccurate_dur, "Analyzing motion")
 
-        prev_image = None
-        image = None
+        prev_frame = None
+        current_frame = None
         total_pixels = self.src.videos[0].width * self.src.videos[0].height
         index = 0
 
@@ -392,6 +375,8 @@ class Levels:
         link_nodes(
             graph.add_buffer(template=stream),
             graph.add("scale", f"{width}:-1"),
+            graph.add("format", "gray"),
+            graph.add("gblur", f"sigma={blur}"),
             graph.add("buffersink"),
         )
         graph.configure()
@@ -402,11 +387,13 @@ class Levels:
             graph.push(unframe)
             frame = graph.pull()
 
-            prev_image = image
-
-            assert isinstance(frame.time, float)
+            # Showing progress ...
+            assert frame.time is not None
             index = int(frame.time * self.tb)
-            self.bar.tick(index)
+            if frame.pts is not None:
+                self.bar.tick(frame.pts)
+
+            current_frame = frame.to_ndarray()
 
             if index > len(threshold_list) - 1:
                 threshold_list = np.concatenate(
@@ -414,86 +401,17 @@ class Levels:
                     axis=0,
                 )
 
-            image = frame.to_image().convert("L")
+            if prev_frame is not None:
+                # Use `int16` to avoid underflow with `uint8` datatype
+                diff = np.abs(
+                    prev_frame.astype(np.int16) - current_frame.astype(np.int16)
+                )
+                threshold_list[index] = np.count_nonzero(diff) / total_pixels
 
-            if blur > 0:
-                image = image.filter(ImageFilter.GaussianBlur(radius=blur))
-
-            if prev_image is not None:
-                count = np.count_nonzero(ImageChops.difference(prev_image, image))
-
-                threshold_list[index] = count / total_pixels
+            prev_frame = current_frame
 
         self.bar.end()
-        result = threshold_list[:index]
-        del threshold_list
-
-        return self.cache("motion", mobj, result)
-
-    def pixeldiff(self, s: int) -> NDArray[np.uint64]:
-        import av
-        from PIL import ImageChops
-
-        av.logging.set_level(av.logging.PANIC)
-
-        pobj = {"stream": s}
-
-        if s >= len(self.src.videos):
-            raise LevelError(f"pixeldiff: video stream '{s}' does not exist.")
-
-        if (arr := self.read_cache("pixeldiff", pobj)) is not None:
-            return arr
-
-        container = av.open(f"{self.src.path}", "r")
-
-        stream = container.streams.video[s]
-        stream.thread_type = "AUTO"
-
-        if (
-            stream.duration is None
-            or stream.time_base is None
-            or stream.average_rate is None
-        ):
-            inaccurate_dur = 1
-        else:
-            inaccurate_dur = int(
-                stream.duration * stream.time_base * stream.average_rate
-            )
-
-        self.bar.start(inaccurate_dur, "Analyzing pixel diffs")
-
-        prev_image = None
-        image = None
-        index = 0
-
-        threshold_list = np.zeros((1024), dtype=np.uint64)
-
-        for frame in container.decode(stream):
-            prev_image = image
-
-            assert frame.time is not None
-            index = int(frame.time * self.tb)
-            self.bar.tick(index)
-
-            if index > len(threshold_list) - 1:
-                threshold_list = np.concatenate(
-                    (threshold_list, np.zeros((len(threshold_list)), dtype=np.uint64)),
-                    axis=0,
-                )
-
-            assert isinstance(frame, av.VideoFrame)
-            image = frame.to_image()
-
-            if prev_image is not None:
-                threshold_list[index] = np.count_nonzero(
-                    ImageChops.difference(prev_image, image)
-                )
-
-        self.bar.end()
-        result = threshold_list[:index]
-        del threshold_list
-
-        return self.cache("pixeldiff", pobj, result)
+        return self.cache("motion", mobj, threshold_list[:index])
 
 
 def edit_method(val: str, filesetup: FileSetup, env: Env) -> NDArray[np.bool_]:
@@ -558,8 +476,6 @@ def edit_method(val: str, filesetup: FileSetup, env: Env) -> NDArray[np.bool_]:
                 levels.motion(obj["stream"], obj["blur"], obj["width"]),
                 obj["threshold"],
             )
-        if method == "pixeldiff":
-            return to_threshold(levels.pixeldiff(obj["stream"]), obj["threshold"])
 
         if method == "subtitle":
             return levels.subtitle(
