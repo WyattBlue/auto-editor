@@ -9,6 +9,13 @@ from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import *
 from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
+from auto_editor.utils.types import (
+    anchor,
+    color,
+    natural,
+    number,
+    threshold,
+)
 
 
 @dataclass(slots=True)
@@ -30,7 +37,7 @@ class v1:
         }
 
 
-@dataclass
+@dataclass(slots=True)
 class TlVideo:
     start: int
     dur: int
@@ -38,10 +45,20 @@ class TlVideo:
     offset: int
     speed: float
     stream: int
-    name: str = "video"
+
+    def as_dict(self) -> dict:
+        return {
+            "name": "video",
+            "src": self.src,
+            "start": self.start,
+            "dur": self.dur,
+            "offset": self.offset,
+            "speed": self.speed,
+            "stream": self.stream,
+        }
 
 
-@dataclass
+@dataclass(slots=True)
 class TlAudio:
     start: int
     dur: int
@@ -50,10 +67,21 @@ class TlAudio:
     speed: float
     volume: float
     stream: int
-    name: str = "audio"
+
+    def as_dict(self) -> dict:
+        return {
+            "name": "audio",
+            "src": self.src,
+            "start": self.start,
+            "dur": self.dur,
+            "offset": self.offset,
+            "speed": self.speed,
+            "volume": self.volume,
+            "stream": self.stream,
+        }
 
 
-@dataclass
+@dataclass(slots=True)
 class TlImage:
     start: int
     dur: int
@@ -63,10 +91,22 @@ class TlImage:
     width: int
     opacity: float
     anchor: str
-    name: str = "image"
+
+    def as_dict(self) -> dict:
+        return {
+            "name": "image",
+            "src": self.src,
+            "start": self.start,
+            "dur": self.dur,
+            "x": self.x,
+            "y": self.y,
+            "width": self.width,
+            "opacity": self.opacity,
+            "anchor": self.anchor,
+        }
 
 
-@dataclass
+@dataclass(slots=True)
 class TlRect:
     start: int
     dur: int
@@ -76,49 +116,61 @@ class TlRect:
     height: int
     anchor: str
     fill: str
-    name: str = "rectangle"
+
+    def as_dict(self) -> dict:
+        return {
+            "name": "rect",
+            "start": self.start,
+            "dur": self.dur,
+            "x": self.x,
+            "y": self.y,
+            "width": self.width,
+            "height": self.height,
+            "anchor": self.anchor,
+            "fill": self.fill,
+        }
 
 
 video_builder = pAttrs(
     "video",
-    pAttr("start", Required, is_nat),
-    pAttr("dur", Required, is_nat),
-    pAttr("src", Required, is_str),
-    pAttr("offset", 0, is_int),
-    pAttr("speed", 1, is_real),
-    pAttr("stream", 0, is_nat),
+    pAttr("start", Required, is_nat, natural),
+    pAttr("dur", Required, is_nat, natural),
+    pAttr("src", Required, is_str, "source"),
+    pAttr("offset", 0, is_int, natural),
+    pAttr("speed", 1, is_real, number),
+    pAttr("stream", 0, is_nat, natural),
 )
 audio_builder = pAttrs(
     "audio",
-    pAttr("start", Required, is_nat),
-    pAttr("dur", Required, is_nat),
-    pAttr("src", Required, is_str),
-    pAttr("offset", 0, is_int),
-    pAttr("speed", 1, is_real),
-    pAttr("volume", 1, is_real),
-    pAttr("stream", 0, is_nat),
+    pAttr("start", Required, is_nat, natural),
+    pAttr("dur", Required, is_nat, natural),
+    pAttr("src", Required, is_str, "source"),
+    pAttr("offset", 0, is_int, natural),
+    pAttr("speed", 1, is_real, number),
+    pAttr("volume", 1, is_threshold, threshold),
+    pAttr("stream", 0, is_nat, natural),
 )
 img_builder = pAttrs(
     "image",
-    pAttr("start", Required, is_nat),
-    pAttr("dur", Required, is_nat),
-    pAttr("src", Required, is_str),
-    pAttr("x", Required, is_int),
-    pAttr("y", Required, is_int),
-    pAttr("width", 0, is_nat),
-    pAttr("opacity", 1, is_threshold),
-    pAttr("anchor", "ce", is_str),
+    pAttr("start", Required, is_nat, natural),
+    pAttr("dur", Required, is_nat, natural),
+    pAttr("src", Required, is_str, "source"),
+    pAttr("x", Required, is_int, int),
+    pAttr("y", Required, is_int, int),
+    pAttr("width", 0, is_nat, natural),
+    pAttr("opacity", 1, is_threshold, threshold),
+    pAttr("anchor", "ce", is_str, anchor),
 )
 rect_builder = pAttrs(
     "rect",
-    pAttr("start", Required, is_nat),
-    pAttr("dur", Required, is_nat),
-    pAttr("x", Required, is_int),
-    pAttr("y", Required, is_int),
-    pAttr("width", Required, is_int),
-    pAttr("height", Required, is_int),
-    pAttr("anchor", "ce", is_str),
-    pAttr("fill", "#c4c4c4", is_str),
+    pAttr("start", Required, is_nat, natural),
+    pAttr("dur", Required, is_nat, natural),
+    pAttr("x", Required, is_int, int),
+    pAttr("y", Required, is_int, int),
+    pAttr("width", Required, is_int, int),
+    pAttr("height", Required, is_int, int),
+    pAttr("anchor", "ce", is_str, anchor),
+    pAttr("fill", "#c4c4c4", is_str, color),
 )
 visual_objects = {
     "rect": (TlRect, rect_builder),
@@ -213,13 +265,13 @@ video\n"""
     def as_dict(self) -> dict:
         v = []
         for i, vlayer in enumerate(self.v):
-            vb = [vobj.__dict__ for vobj in vlayer]
+            vb = [vobj.as_dict() for vobj in vlayer]
             if vb:
                 v.append(vb)
 
         a = []
         for i, alayer in enumerate(self.a):
-            ab = [aobj.__dict__ for aobj in alayer]
+            ab = [aobj.as_dict() for aobj in alayer]
             if ab:
                 a.append(ab)
 
