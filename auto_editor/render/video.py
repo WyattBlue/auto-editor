@@ -3,6 +3,7 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass
 from subprocess import DEVNULL, PIPE
+from sys import platform
 from typing import TYPE_CHECKING
 
 import av
@@ -111,7 +112,6 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
                             format="rgb24"
                         )
                         break
-
     return img_cache
 
 
@@ -197,6 +197,10 @@ def render_av(
         "-pix_fmt",
         target_pix_fmt,
     ]
+
+    if platform == "darwin":
+        # Fix videotoolbox issue with legacy macs
+        cmd += ["-allow_sw", "1"]
 
     if apply_video_later:
         cmd += ["-c:v", "mpeg4", "-qscale:v", "1"]
