@@ -6,8 +6,7 @@ The syntax is inspired by the Racket Programming language.
 
 from __future__ import annotations
 
-import cmath
-import math
+from cmath import sqrt as complex_sqrt
 from dataclasses import dataclass
 from difflib import get_close_matches
 from fractions import Fraction
@@ -549,7 +548,7 @@ def int_div(n: int, *m: int) -> int:
 
 
 def _sqrt(v: Number) -> Number:
-    r = cmath.sqrt(v)
+    r = complex_sqrt(v)
     if r.imag == 0:
         if int(r.real) == r.real:
             return int(r.real)
@@ -1396,6 +1395,25 @@ def syn_let_star(env: Env, node: Node) -> Any:
     return my_eval(inner_env, node[-1])
 
 
+def syn_import(env: Env, node: Node) -> None:
+    guard_term(node, 2, 2)
+
+    if type(node[1]) is not Sym:
+        raise MyError("class name must be an identifier")
+
+    module = node[1].val
+    error = MyError(f"No module named `{module}`")
+
+    if module != "math":
+        raise error
+    try:
+        obj = __import__("auto_editor.lang.libmath", fromlist=["lang"])
+    except ImportError:
+        raise error
+
+    env.update(obj.all())
+
+
 def syn_class(env: Env, node: Node) -> None:
     if len(node) < 2:
         raise MyError(f"{node[0]}: Expects at least 1 term")
@@ -1544,6 +1562,7 @@ env.update({
     "case": Syntax(syn_case),
     "let": Syntax(syn_let),
     "let*": Syntax(syn_let_star),
+    "import": Syntax(syn_import),
     "class": Syntax(syn_class),
     "@r": Syntax(attr),
     # loops
@@ -1615,17 +1634,10 @@ env.update({
     "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), is_num),
     # reals
     "pow": Proc("pow", pow, (2, 2), is_real),
-    "exp": Proc("exp", math.exp, (1, 1), is_real),
     "abs": Proc("abs", abs, (1, 1), is_real),
-    "ceil": Proc("ceil", math.ceil, (1, 1), is_real),
-    "floor": Proc("floor", math.floor, (1, 1), is_real),
     "round": Proc("round", round, (1, 1), is_real),
     "max": Proc("max", lambda *v: max(v), (1, None), is_real),
     "min": Proc("min", lambda *v: min(v), (1, None), is_real),
-    "sin": Proc("sin", math.sin, (1, 1), is_real),
-    "cos": Proc("cos", math.cos, (1, 1), is_real),
-    "log": Proc("log", math.log, (1, 2), andc(is_real, gt_c(0))),
-    "tan": Proc("tan", math.tan, (1, 1), is_real),
     "mod": Proc("mod", mod, (2, 2), is_int),
     "modulo": Proc("modulo", mod, (2, 2), is_int),
     # symbols

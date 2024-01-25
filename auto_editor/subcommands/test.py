@@ -577,12 +577,6 @@ def main(sys_args: list[str] | None = None):
             ("(pow 4 0.5)", 2.0),
             ("(abs 1.0)", 1.0),
             ("(abs -1)", 1),
-            ("(round 3.5)", 4),
-            ("(round 2.5)", 2),
-            ("(ceil 2.1)", 3),
-            ("(ceil 2.9)", 3),
-            ("(floor 2.1)", 2),
-            ("(floor 2.9)", 2),
             ("(bool? #t)", True),
             ("(bool? #f)", True),
             ("(bool? 0)", False),
@@ -693,6 +687,7 @@ def main(sys_args: list[str] | None = None):
         run.raw(["palet", "resources/scripts/maxcut.pal"])
         run.raw(["palet", "resources/scripts/scope.pal"])
         run.raw(["palet", "resources/scripts/case.pal"])
+        run.raw(["palet", "resources/scripts/testmath.pal"])
 
     tests = []
 

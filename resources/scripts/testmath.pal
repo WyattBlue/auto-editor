@@ -1,0 +1,28 @@
+#!/usr/bin/env auto-editor palet
+#lang palet
+
+(import math)
+
+(assert (equal? (round 3.5) 4))
+(assert (equal? (round 2.5) 2))
+(assert (equal? (ceil 2.1) 3))
+(assert (equal? (ceil 2.9) 3))
+(assert (equal? (floor 2.1) 2))
+(assert (equal? (floor 2.9) 2))
+
+(assert (equal? (sin 0) 0.0))
+(assert (equal? (sin 0/1) 0.0))
+(assert (equal? (sin (/ pi 2)) 1.0))
+
+(assert (equal? (cos 0) 1.0))
+(assert (equal? (cos (* pi 2)) 1.0))
+(assert (equal? (cos pi) -1.0))
+(assert (equal? (cos tau) 1.0))
+
+(assert (equal? (asin 0) 0.0))
+(assert (equal? (asin 0/1) 0.0))
+(assert (equal? (acos 1) 0.0))
+(assert (equal? (acos -1) pi))
+
+(assert (equal? (log 1) 0.0))
+(assert (equal? (log e) 1.0))
