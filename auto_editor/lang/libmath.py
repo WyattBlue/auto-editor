@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from auto_editor.lib.contracts import Proc, andc, gt_c, is_real, between_c
+from auto_editor.lib.contracts import Proc, andc, between_c, gt_c, is_real
 
 
 def all() -> dict[str, object]:
