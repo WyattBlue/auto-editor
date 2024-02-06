@@ -143,9 +143,6 @@ def fcp11_write_xml(
             "start": fraction(int(clip.offset // clip.speed)),
             "tcFormat": "NDF",
         }
-        if clip.start == 0:
-            del clip_properties["start"]
-
         asset = SubElement(spine, "asset-clip", clip_properties)
         if clip.speed != 1:
             # See the "Time Maps" section.
@@ -171,7 +168,7 @@ def fcp11_write_xml(
     if flavor == "resolve" and warn:
         log.warning(
             "DaVinci Resolve may take a very long time when importing timelines with "
-            "speed effects. Consider switching to a good editor, like Premiere Pro, "
+            "speed effects. Consider switching to Premiere Pro, "
             "Final Cut Pro, or ShotCut (free)"
         )
     tree = ElementTree(fcpxml)
