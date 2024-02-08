@@ -215,7 +215,7 @@ def edit_media(
 
     if tl is None:
         # Extract subtitles in their native format.
-        if src is not None and len(src.subtitles) > 0:
+        if src is not None and len(src.subtitles) > 0 and not args.sn:
             cmd = ["-i", f"{src.path}", "-hide_banner"]
             for s, sub in enumerate(src.subtitles):
                 cmd.extend(["-map", f"0:s:{s}"])
@@ -283,7 +283,7 @@ def edit_media(
         sub_output = []
         apply_later = False
 
-        if ctr.allow_subtitle:
+        if ctr.allow_subtitle and not args.sn:
             sub_output = make_new_subtitles(tl, ffmpeg, temp, log)
 
         if ctr.allow_audio:

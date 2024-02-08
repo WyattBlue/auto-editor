@@ -229,6 +229,7 @@ class Args:
     video_quality_scale: str = "unset"
     scale: float = 1.0
     extras: str | None = None
+    sn: bool = False
     no_seek: bool = False
     cut_out: list[list[str]] = field(default_factory=list)
     add_in: list[list[str]] = field(default_factory=list)
