@@ -235,8 +235,8 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
                 ]
             )
             _sar, c_range, c_space, c_primary, c_transfer = _raw.strip().split("\n")
-        except Exception as e:
-            raise e
+        except Exception:
+            log.debug("Unexpected ffprobe shape")
 
         if v.sample_aspect_ratio is None:
             try:
