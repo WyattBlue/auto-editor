@@ -25,8 +25,6 @@ Also, Premiere itself will happily output subtlety incorrect XML files that don'
 come back the way they started.
 """
 
-PIXEL_ASPECT_RATIO = "square"
-ANAMORPHIC = "FALSE"
 DEPTH = "16"
 
 
@@ -120,21 +118,6 @@ def read_tb_ntsc(tb: int, ntsc: bool) -> Fraction:
     return Fraction(tb)
 
 
-"""
-(define/c (read-tb-ntsc [tb int?] [ntsc bool?] -> frac?)
-    (if ntsc
-        (cond
-            ((= tb 24) 24000/1001)
-            ((= tb 30) 30000/1001)
-            ((= tb 60) 60000/1001)
-            (else (* tb 999/1000))
-        )
-        (* tb 1/1)
-    )
-)
-"""
-
-
 def speedup(speed: float) -> Element:
     fil = Element("filter")
     effect = ET.SubElement(fil, "effect")
@@ -161,28 +144,6 @@ def speedup(speed: float) -> Element:
     ET.SubElement(para3, "value").text = "FALSE"
 
     return fil
-
-
-"""
-(define/c (speedup [speed float?] -> element?)
-    (xml (filter (effect
-        (name "Time Remap")
-        (effectid "timeremap")
-        (parameter #:authoringApp "PremierePro"
-            (parameterid "variablespeed") (name "variablespeed")
-            (valuemin "0") (valuemax "1") (value "0")
-        )
-        (parameter #:authoringApp "PremierePro"
-            (parameterid "speed") (name "speed")
-            (valuemin "-100000") (valuemax "100000") (value (number->string speed))
-        )
-        (parameter #:authoringApp "PremierePro"
-            (parameterid "frameblending") (name "frameblending")
-            (value "FALSE")
-        )
-    )))
-)
-"""
 
 
 SUPPORTED_EFFECTS = ("timeremap",)
@@ -402,8 +363,8 @@ def media_def(
         ET.SubElement(rate, "ntsc").text = ntsc
         ET.SubElement(vschar, "width").text = f"{tl.res[0]}"
         ET.SubElement(vschar, "height").text = f"{tl.res[1]}"
-        ET.SubElement(vschar, "anamorphic").text = ANAMORPHIC
-        ET.SubElement(vschar, "pixelaspectratio").text = PIXEL_ASPECT_RATIO
+        ET.SubElement(vschar, "anamorphic").text = "FALSE"
+        ET.SubElement(vschar, "pixelaspectratio").text = "square"
 
     for aud in src.audios:
         audiodef = ET.SubElement(mediadef, "audio")
@@ -444,7 +405,7 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
     ET.SubElement(rate, "ntsc").text = ntsc
     ET.SubElement(vschar, "width").text = f"{width}"
     ET.SubElement(vschar, "height").text = f"{height}"
-    ET.SubElement(vschar, "pixelaspectratio").text = PIXEL_ASPECT_RATIO
+    ET.SubElement(vschar, "pixelaspectratio").text = "square"
 
     if len(tl.v) > 0 and len(tl.v[0]) > 0:
         track = ET.SubElement(video, "track")
@@ -475,7 +436,7 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
             if clip.speed != 1:
                 clipitem.append(speedup(clip.speed * 100))
 
-            for i in range(len(src.audios) * 2 + 1):
+            for i in range(len(src.audios) * 2 + 1):  # `2` because stereo.
                 link = ET.SubElement(clipitem, "link")
                 ET.SubElement(
                     link, "linkclipref"
@@ -494,66 +455,61 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
     ET.SubElement(aschar, "depth").text = DEPTH
     ET.SubElement(aschar, "samplerate").text = str(tl.sr)
 
-    def st(a):
-        result = []
-        for layer in a:
-            result.append(layer)
-            result.append(layer)
-
-        return result
-
-    for t, aclips in enumerate(st(tl.a)):
-        track = ET.Element(
-            "track",
-            currentExplodedTrackIndex=f"{(t % 2)}",
-            totalExplodedTrackCount="2",
-            premiereTrackType="Stereo",
-        )
-
-        if src.videos:
-            ET.SubElement(track, "outputchannelindex").text = f"{(t % 2) + 1}"
-
-        for j, aclip in enumerate(aclips):
-            src = aclip.src
-
-            _start = f"{aclip.start}"
-            _end = f"{aclip.start + aclip.dur}"
-            _in = f"{int(aclip.offset / aclip.speed)}"
-            _out = f"{int(aclip.offset / aclip.speed) + aclip.dur}"
-
-            if not src.videos:
-                clip_item_num = j + 1
-            else:
-                clip_item_num = len(aclips) + 1 + j + (t * len(aclips))
-
-            clipitem = ET.SubElement(
-                track,
-                "clipitem",
-                id=f"clipitem-{clip_item_num}",
-                premiereChannelType="stereo",
+    t = 0
+    for aclips in tl.a:
+        for channelcount in range(0, 2):  # Because "stereo" is hardcoded.
+            t += 1
+            track = ET.Element(
+                "track",
+                currentExplodedTrackIndex=f"{channelcount}",
+                totalExplodedTrackCount="2",  # Because "stereo" is hardcoded.
+                premiereTrackType="Stereo",
             )
-            ET.SubElement(clipitem, "name").text = src.path.stem
-            ET.SubElement(clipitem, "start").text = _start
-            ET.SubElement(clipitem, "end").text = _end
-            ET.SubElement(clipitem, "in").text = _in
-            ET.SubElement(clipitem, "out").text = _out
 
-            pathurl = src_to_url[aclip.src]
-            filedef = ET.SubElement(clipitem, "file", id=src_to_id[aclip.src])
-            if pathurl not in file_defs:
-                media_def(filedef, pathurl, aclip.src, tl, timebase, ntsc)
-                file_defs.add(pathurl)
+            if src.videos:
+                ET.SubElement(track, "outputchannelindex").text = f"{channelcount + 1}"
 
-            sourcetrack = ET.SubElement(clipitem, "sourcetrack")
-            ET.SubElement(sourcetrack, "mediatype").text = "audio"
-            ET.SubElement(sourcetrack, "trackindex").text = f"{t + 1}"  # ??
-            labels = ET.SubElement(clipitem, "labels")
-            ET.SubElement(labels, "label2").text = "Iris"
+            for j, aclip in enumerate(aclips):
+                src = aclip.src
 
-            if aclip.speed != 1:
-                clipitem.append(speedup(aclip.speed * 100))
+                _start = f"{aclip.start}"
+                _end = f"{aclip.start + aclip.dur}"
+                _in = f"{int(aclip.offset / aclip.speed)}"
+                _out = f"{int(aclip.offset / aclip.speed) + aclip.dur}"
 
-        audio.append(track)
+                if not src.videos:
+                    clip_item_num = j + 1
+                else:
+                    clip_item_num = len(aclips) + 1 + j + (t * len(aclips))
+
+                clipitem = ET.SubElement(
+                    track,
+                    "clipitem",
+                    id=f"clipitem-{clip_item_num}",
+                    premiereChannelType="stereo",
+                )
+                ET.SubElement(clipitem, "name").text = src.path.stem
+                ET.SubElement(clipitem, "start").text = _start
+                ET.SubElement(clipitem, "end").text = _end
+                ET.SubElement(clipitem, "in").text = _in
+                ET.SubElement(clipitem, "out").text = _out
+
+                pathurl = src_to_url[aclip.src]
+                filedef = ET.SubElement(clipitem, "file", id=src_to_id[aclip.src])
+                if pathurl not in file_defs:
+                    media_def(filedef, pathurl, aclip.src, tl, timebase, ntsc)
+                    file_defs.add(pathurl)
+
+                sourcetrack = ET.SubElement(clipitem, "sourcetrack")
+                ET.SubElement(sourcetrack, "mediatype").text = "audio"
+                ET.SubElement(sourcetrack, "trackindex").text = f"{t + 1}"
+                labels = ET.SubElement(clipitem, "labels")
+                ET.SubElement(labels, "label2").text = "Iris"
+
+                if aclip.speed != 1:
+                    clipitem.append(speedup(aclip.speed * 100))
+
+            audio.append(track)
 
     tree = ET.ElementTree(xmeml)
     ET.indent(tree, space="\t", level=0)
