@@ -10,7 +10,7 @@ from xml.etree.ElementTree import Element
 from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
 from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
 
-from .utils import Validator, make_tracks_dir, show
+from .utils import Validator, show
 
 if TYPE_CHECKING:
     from auto_editor.utils.log import Log
@@ -26,7 +26,6 @@ come back the way they started.
 """
 
 PIXEL_ASPECT_RATIO = "square"
-COLORDEPTH = "24"
 ANAMORPHIC = "FALSE"
 DEPTH = "16"
 
@@ -406,44 +405,29 @@ def media_def(
         ET.SubElement(vschar, "anamorphic").text = ANAMORPHIC
         ET.SubElement(vschar, "pixelaspectratio").text = PIXEL_ASPECT_RATIO
 
-    if len(src.audios) > 0:
+    for aud in src.audios:
         audiodef = ET.SubElement(mediadef, "audio")
         aschar = ET.SubElement(audiodef, "samplecharacteristics")
         ET.SubElement(aschar, "depth").text = DEPTH
         ET.SubElement(aschar, "samplerate").text = f"{tl.sr}"
-        ET.SubElement(audiodef, "channelcount").text = f"{src.audios[0].channels}"
+        ET.SubElement(audiodef, "channelcount").text = f"{aud.channels}"
 
 
-def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> None:
+def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
     width, height = tl.res
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
-    src_to_url: dict[tuple[FileInfo, int], str] = {}
-    src_to_id: dict[tuple[FileInfo, int], str] = {}
-    src_to_src: dict[tuple[FileInfo, int], FileInfo] = {}
+    src_to_url: dict[FileInfo, str] = {}
+    src_to_id: dict[FileInfo, str] = {}
 
     file_defs: set[str] = set()  # Contains urls
 
     for src in set(tl.sources):
-        path_resolve = f"{src.path.resolve()}"
         the_id = f"file-{len(src_to_id)+1}"
+        src_to_url[src] = f"{src.path.resolve()}"
+        src_to_id[src] = the_id
 
-        src_to_url[(src, 0)] = path_resolve
-        src_to_id[(src, 0)] = the_id
-
-        if len(src.audios) > 1:
-            fold = make_tracks_dir(src)
-            for i in range(1, len(src.audios)):
-                newtrack = fold / f"{i}.wav"
-
-                ffmpeg.run(["-i", path_resolve, "-map", f"0:a:{i}", f"{newtrack}"])
-
-                new_src = initFileInfo(f"{newtrack}", ffmpeg, log)
-                src_to_url[(src, i)] = f"{newtrack.resolve()}"
-                src_to_id[(src, i)] = f"file-{len(src_to_id)+1}"
-                src_to_src[(src, i)] = new_src
-
-    xmeml = ET.Element("xmeml", version="4")
+    xmeml = ET.Element("xmeml", version="5")
     sequence = ET.SubElement(xmeml, "sequence")
     ET.SubElement(sequence, "name").text = name
     ET.SubElement(sequence, "duration").text = f"{int(tl.out_len())}"
@@ -458,8 +442,6 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
     rate = ET.SubElement(vschar, "rate")
     ET.SubElement(rate, "timebase").text = f"{timebase}"
     ET.SubElement(rate, "ntsc").text = ntsc
-    ET.SubElement(vschar, "fielddominance").text = "none"
-    ET.SubElement(vschar, "colordepth").text = COLORDEPTH
     ET.SubElement(vschar, "width").text = f"{width}"
     ET.SubElement(vschar, "height").text = f"{height}"
     ET.SubElement(vschar, "pixelaspectratio").text = PIXEL_ASPECT_RATIO
@@ -476,17 +458,16 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
             _out = f"{int(clip.offset / clip.speed) + clip.dur}"
 
             clipitem = ET.SubElement(track, "clipitem", id=f"clipitem-{j+1}")
-            ET.SubElement(clipitem, "masterclipid").text = "masterclip-2"
             ET.SubElement(clipitem, "name").text = src.path.stem
             ET.SubElement(clipitem, "start").text = _start
             ET.SubElement(clipitem, "end").text = _end
             ET.SubElement(clipitem, "in").text = _in
             ET.SubElement(clipitem, "out").text = _out
 
-            _id = src_to_id[(clip.src, 0)]
+            _id = src_to_id[clip.src]
             filedef = ET.SubElement(clipitem, "file", id=_id)
 
-            pathurl = src_to_url[(clip.src, 0)]
+            pathurl = src_to_url[clip.src]
             if pathurl not in file_defs:
                 media_def(filedef, pathurl, clip.src, tl, timebase, ntsc)
                 file_defs.add(pathurl)
@@ -494,7 +475,7 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
             if clip.speed != 1:
                 clipitem.append(speedup(clip.speed * 100))
 
-            for i in range(len(src.audios) + 1):
+            for i in range(len(src.audios) * 2 + 1):
                 link = ET.SubElement(clipitem, "link")
                 ET.SubElement(
                     link, "linkclipref"
@@ -513,10 +494,24 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
     ET.SubElement(aschar, "depth").text = DEPTH
     ET.SubElement(aschar, "samplerate").text = str(tl.sr)
 
-    for t, aclips in enumerate(tl.a):
+    def st(a):
+        result = []
+        for layer in a:
+            result.append(layer)
+            result.append(layer)
+
+        return result
+
+    for t, aclips in enumerate(st(tl.a)):
         track = ET.Element(
-            "track", currentExplodedTrackIndex="0", premiereTrackType="Stereo"
+            "track",
+            currentExplodedTrackIndex=f"{(t % 2)}",
+            totalExplodedTrackCount="2",
+            premiereTrackType="Stereo",
         )
+
+        if src.videos:
+            ET.SubElement(track, "outputchannelindex").text = f"{(t % 2) + 1}"
 
         for j, aclip in enumerate(aclips):
             src = aclip.src
@@ -528,10 +523,8 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
 
             if not src.videos:
                 clip_item_num = j + 1
-                master_id = "1"
             else:
                 clip_item_num = len(aclips) + 1 + j + (t * len(aclips))
-                master_id = "2"
 
             clipitem = ET.SubElement(
                 track,
@@ -539,37 +532,26 @@ def fcp7_write_xml(name: str, ffmpeg: FFmpeg, output: str, tl: v3, log: Log) -> 
                 id=f"clipitem-{clip_item_num}",
                 premiereChannelType="stereo",
             )
-            ET.SubElement(clipitem, "masterclipid").text = f"masterclip-{master_id}"
             ET.SubElement(clipitem, "name").text = src.path.stem
             ET.SubElement(clipitem, "start").text = _start
             ET.SubElement(clipitem, "end").text = _end
             ET.SubElement(clipitem, "in").text = _in
             ET.SubElement(clipitem, "out").text = _out
 
-            _id = src_to_id[(aclip.src, aclip.stream)]
-            pathurl = src_to_url[(aclip.src, aclip.stream)]
-
-            if aclip.stream > 0:
-                my_src = src_to_src[(aclip.src, aclip.stream)]
-            else:
-                my_src = aclip.src
-
-            filedef = ET.SubElement(clipitem, "file", id=_id)
+            pathurl = src_to_url[aclip.src]
+            filedef = ET.SubElement(clipitem, "file", id=src_to_id[aclip.src])
             if pathurl not in file_defs:
-                media_def(filedef, pathurl, my_src, tl, timebase, ntsc)
+                media_def(filedef, pathurl, aclip.src, tl, timebase, ntsc)
                 file_defs.add(pathurl)
 
             sourcetrack = ET.SubElement(clipitem, "sourcetrack")
             ET.SubElement(sourcetrack, "mediatype").text = "audio"
-            ET.SubElement(sourcetrack, "trackindex").text = "1"
+            ET.SubElement(sourcetrack, "trackindex").text = f"{t + 1}"  # ??
             labels = ET.SubElement(clipitem, "labels")
             ET.SubElement(labels, "label2").text = "Iris"
 
             if aclip.speed != 1:
                 clipitem.append(speedup(aclip.speed * 100))
-
-            if src.videos:
-                ET.SubElement(clipitem, "outputchannelindex").text = "1"
 
         audio.append(track)
 
