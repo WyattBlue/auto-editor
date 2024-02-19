@@ -193,7 +193,7 @@ def mux_quality_media(
         cmd.extend(args.extras.split(" "))
     cmd.extend(["-strict", "-2"])  # Allow experimental codecs.
 
-    if not args.sn:
+    if s_tracks > 0:
         cmd.extend(["-map", "0:t?"])  # Add input attachments to output.
 
     # This was causing a crash for 'example.mp4 multi-track.mov'
