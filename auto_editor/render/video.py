@@ -168,15 +168,26 @@ def render_av(
     log.debug(f"Target pix_fmt: {target_pix_fmt}")
 
     apply_video_later = True
-
-    if args.scale != 1:
-        apply_video_later = False
-    elif args.video_codec in encoders:
+    if args.video_codec in encoders:
         apply_video_later = set(encoders[args.video_codec]).isdisjoint(allowed_pix_fmt)
 
     log.debug(f"apply video quality settings now: {not apply_video_later}")
 
-    width, height = tl.res
+    if args.scale == 1.0:
+        target_width, target_height = tl.res
+        scale_graph = None
+    else:
+        target_width = max(round(tl.res[0] * args.scale), 2)
+        target_height = max(round(tl.res[1] * args.scale), 2)
+        scale_graph = av.filter.Graph()
+        link_nodes(
+            scale_graph.add(
+                "buffer", video_size="1x1", time_base="1/1", pix_fmt=target_pix_fmt
+            ),
+            scale_graph.add("scale", f"{target_width}:{target_height}"),
+            scale_graph.add("buffersink"),
+        )
+
     spedup = os.path.join(temp, "spedup0.mp4")
 
     cmd = [
@@ -189,7 +200,7 @@ def render_av(
         "-pix_fmt",
         target_pix_fmt,
         "-s",
-        f"{width}*{height}",
+        f"{target_width}*{target_height}",
         "-framerate",
         f"{tl.tb}",
         "-i",
@@ -224,7 +235,7 @@ def render_av(
     bar.start(tl.end, "Creating new video")
 
     bg = color(args.background)
-    null_frame = make_solid(width, height, target_pix_fmt, bg)
+    null_frame = make_solid(target_width, target_height, target_pix_fmt, bg)
     frame_index = -1
     try:
         for index in range(tl.end):
@@ -282,7 +293,8 @@ def render_av(
                         if frame.key_frame:
                             log.debug(f"Keyframe {frame_index} {frame.pts}")
 
-                    if frame.width != width or frame.height != height:
+                    if (frame.width, frame.height) != tl.res:
+                        width, height = tl.res
                         graph = av.filter.Graph()
                         link_nodes(
                             graph.add_buffer(template=my_stream),
@@ -345,6 +357,10 @@ def render_av(
 
                     frame = av.VideoFrame.from_ndarray(array, format="rgb24")
 
+            if scale_graph is not None and frame.width != target_width:
+                scale_graph.push(frame)
+                frame = scale_graph.pull()
+
             if frame.format.name != target_pix_fmt:
                 frame = frame.reformat(format=target_pix_fmt)
                 bar.tick(index)
@@ -362,20 +378,5 @@ def render_av(
         log.error("FFmpeg Error!")
 
     log.debug(f"Total frames saved seeking: {frames_saved}")
-
-    if args.scale != 1:
-        sped_input = os.path.join(temp, "spedup0.mp4")
-        spedup = os.path.join(temp, "scale0.mp4")
-        scale_filter = f"scale=iw*{args.scale}:ih*{args.scale}"
-
-        cmd = ["-i", sped_input, "-vf", scale_filter, spedup]
-
-        check_errors = ffmpeg.pipe(cmd)
-        if "Error" in check_errors or "failed" in check_errors:
-            if "-allow_sw 1" in check_errors:
-                cmd.insert(-1, "-allow_sw")
-                cmd.insert(-1, "1")
-            # Run again to show errors even if it might not work.
-            ffmpeg.run(cmd)
 
     return spedup, apply_video_later
