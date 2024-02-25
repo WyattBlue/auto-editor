@@ -363,7 +363,6 @@ def media_def(
         ET.SubElement(rate, "ntsc").text = ntsc
         ET.SubElement(vschar, "width").text = f"{tl.res[0]}"
         ET.SubElement(vschar, "height").text = f"{tl.res[1]}"
-        ET.SubElement(vschar, "anamorphic").text = "FALSE"
         ET.SubElement(vschar, "pixelaspectratio").text = "square"
 
     for aud in src.audios:
@@ -389,7 +388,7 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
         src_to_id[src] = the_id
 
     xmeml = ET.Element("xmeml", version="5")
-    sequence = ET.SubElement(xmeml, "sequence")
+    sequence = ET.SubElement(xmeml, "sequence", explodedTracks="true")
     ET.SubElement(sequence, "name").text = name
     ET.SubElement(sequence, "duration").text = f"{int(tl.out_len())}"
     rate = ET.SubElement(sequence, "rate")
@@ -400,12 +399,13 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
     vformat = ET.SubElement(video, "format")
     vschar = ET.SubElement(vformat, "samplecharacteristics")
 
-    rate = ET.SubElement(vschar, "rate")
-    ET.SubElement(rate, "timebase").text = f"{timebase}"
-    ET.SubElement(rate, "ntsc").text = ntsc
     ET.SubElement(vschar, "width").text = f"{width}"
     ET.SubElement(vschar, "height").text = f"{height}"
     ET.SubElement(vschar, "pixelaspectratio").text = "square"
+
+    rate = ET.SubElement(vschar, "rate")
+    ET.SubElement(rate, "timebase").text = f"{timebase}"
+    ET.SubElement(rate, "ntsc").text = ntsc
 
     if len(tl.v) > 0 and len(tl.v[0]) > 0:
         track = ET.SubElement(video, "track")
@@ -420,6 +420,7 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
 
             clipitem = ET.SubElement(track, "clipitem", id=f"clipitem-{j+1}")
             ET.SubElement(clipitem, "name").text = src.path.stem
+            ET.SubElement(clipitem, "enabled").text = "TRUE"
             ET.SubElement(clipitem, "start").text = _start
             ET.SubElement(clipitem, "end").text = _end
             ET.SubElement(clipitem, "in").text = _in
@@ -433,6 +434,7 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
                 media_def(filedef, pathurl, clip.src, tl, timebase, ntsc)
                 file_defs.add(pathurl)
 
+            ET.SubElement(clipitem, "compositemode").text = "normal"
             if clip.speed != 1:
                 clipitem.append(speedup(clip.speed * 100))
 
@@ -444,8 +446,6 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
                 ET.SubElement(link, "mediatype").text = "video" if i == 0 else "audio"
                 ET.SubElement(link, "trackindex").text = str(max(i, 1))
                 ET.SubElement(link, "clipindex").text = str(j + 1)
-                if i > 0:
-                    ET.SubElement(link, "groupindex").text = "1"
 
     # Audio definitions and clips
     audio = ET.SubElement(media, "audio")
@@ -489,6 +489,7 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
                     premiereChannelType="stereo",
                 )
                 ET.SubElement(clipitem, "name").text = src.path.stem
+                ET.SubElement(clipitem, "enabled").text = "TRUE"
                 ET.SubElement(clipitem, "start").text = _start
                 ET.SubElement(clipitem, "end").text = _end
                 ET.SubElement(clipitem, "in").text = _in
@@ -502,7 +503,7 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
 
                 sourcetrack = ET.SubElement(clipitem, "sourcetrack")
                 ET.SubElement(sourcetrack, "mediatype").text = "audio"
-                ET.SubElement(sourcetrack, "trackindex").text = f"{t + 1}"
+                ET.SubElement(sourcetrack, "trackindex").text = f"{t}"
                 labels = ET.SubElement(clipitem, "labels")
                 ET.SubElement(labels, "label2").text = "Iris"
 
@@ -512,5 +513,5 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
             audio.append(track)
 
     tree = ET.ElementTree(xmeml)
-    ET.indent(tree, space="\t", level=0)
+    ET.indent(tree, space="  ", level=0)
     tree.write(output, xml_declaration=True, encoding="utf-8")
