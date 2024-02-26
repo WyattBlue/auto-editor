@@ -21,13 +21,10 @@ from auto_editor.lib.contracts import (
 from auto_editor.lib.data_structs import Sym
 from auto_editor.render.subtitle import SubtitleParser
 from auto_editor.utils.cmdkw import (
-    ParserError,
     Required,
-    parse_with_palet,
     pAttr,
     pAttrs,
 )
-from auto_editor.utils.func import boolop
 from auto_editor.wavfile import read
 
 if TYPE_CHECKING:
@@ -38,7 +35,6 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from auto_editor.ffwrapper import FileInfo
-    from auto_editor.lib.data_structs import Env
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
@@ -412,81 +408,3 @@ class Levels:
 
         self.bar.end()
         return self.cache("motion", mobj, threshold_list[:index])
-
-
-def edit_method(val: str, filesetup: FileSetup, env: Env) -> NDArray[np.bool_]:
-    assert isinstance(filesetup, FileSetup)
-    src = filesetup.src
-    tb = filesetup.tb
-    ensure = filesetup.ensure
-    strict = filesetup.strict
-    bar = filesetup.bar
-    temp = filesetup.temp
-    log = filesetup.log
-
-    if ":" in val:
-        method, attrs = val.split(":", 1)
-    else:
-        method, attrs = val, ""
-
-    levels = Levels(ensure, src, tb, bar, temp, log)
-
-    if method == "none":
-        return levels.none()
-    if method == "all/e":
-        return levels.all()
-
-    try:
-        obj = parse_with_palet(attrs, builder_map[method], env)
-    except ParserError as e:
-        log.error(e)
-
-    try:
-        if method == "audio":
-            s = obj["stream"]
-            if s == "all" or s == Sym("all"):
-                total_list: NDArray[np.bool_] | None = None
-                for s in range(len(src.audios)):
-                    audio_list = to_threshold(levels.audio(s), obj["threshold"])
-                    if total_list is None:
-                        total_list = audio_list
-                    else:
-                        total_list = boolop(total_list, audio_list, np.logical_or)
-
-                if total_list is None:
-                    if strict:
-                        log.error("Input has no audio streams.")
-                    stream_data = levels.all()
-                else:
-                    stream_data = total_list
-            else:
-                assert isinstance(s, int)
-                stream_data = to_threshold(levels.audio(s), obj["threshold"])
-
-            assert isinstance(obj["minclip"], int)
-            assert isinstance(obj["mincut"], int)
-
-            mut_remove_small(stream_data, obj["minclip"], replace=1, with_=0)
-            mut_remove_small(stream_data, obj["mincut"], replace=0, with_=1)
-
-            return stream_data
-
-        if method == "motion":
-            return to_threshold(
-                levels.motion(obj["stream"], obj["blur"], obj["width"]),
-                obj["threshold"],
-            )
-
-        if method == "subtitle":
-            return levels.subtitle(
-                obj["pattern"],
-                obj["stream"],
-                obj["ignore_case"],
-                obj["max_count"],
-            )
-    except LevelError as e:
-        if strict:
-            log.error(e)
-
-        return levels.all()
-    raise ValueError("Unreachable")

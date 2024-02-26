@@ -172,3 +172,44 @@ def parse_with_palet(
             raise ParserError(f"'{k}' must be specified.")
 
     return kwargs
+
+
+def parse_method(
+    name: str, text: str, env: Env
+) -> tuple[str, list[Any], dict[str, Any]]:
+    from auto_editor.lang.palet import Lexer, Parser, interpret
+    from auto_editor.lib.err import MyError
+
+    # Positional Arguments
+    #    audio:0.04,0,6,3
+    # Keyword Arguments
+    #    audio:threshold=0.04,stream=0,mincut=6,minclip=3
+
+    args: list[Any] = []
+    kwargs: dict[str, Any] = {}
+
+    allow_positional_args = True
+    lexer = PLexer(text)
+    while (arg := lexer.get_next_token()) is not None:
+        if not arg:
+            continue
+
+        if "=" in arg:
+            key, val = arg.split("=", 1)
+
+            results = interpret(env, Parser(Lexer(name, val)))
+            if not results:
+                raise MyError("Results must be of length > 0")
+
+            kwargs[key] = results[-1]
+            allow_positional_args = False
+
+        elif allow_positional_args:
+            results = interpret(env, Parser(Lexer(name, arg)))
+            if not results:
+                raise MyError("Results must be of length > 0")
+            args.append(results[-1])
+        else:
+            raise ParserError(f"{name} positional argument follows keyword argument.")
+
+    return name, args, kwargs

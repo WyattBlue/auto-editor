@@ -57,6 +57,7 @@ class Sym:
     __slots__ = ("val", "hash")
 
     def __init__(self, val: str):
+        assert isinstance(val, str)
         self.val = val
         self.hash = hash(val)
 
