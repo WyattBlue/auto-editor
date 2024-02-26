@@ -132,6 +132,7 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
     for index, test in enumerate(tests, start=1):
         name = test.__name__
         start = perf_counter()
+        outputs = None
 
         try:
             outputs = test()
@@ -142,6 +143,8 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
             clean_all()
             sys.exit(1)
         except Exception as e:
+            dur = perf_counter() - start
+            total_time += dur
             print(f"{name:<24} ({index}/{total})  {round(dur, 2):<4} secs  [FAILED]")
             if args.no_fail_fast:
                 print(f"\n{e}")
@@ -684,8 +687,8 @@ def main(sys_args: list[str] | None = None):
         )
 
     def palet_scripts():
-        run.raw(["palet", "resources/scripts/maxcut.pal"])
         run.raw(["palet", "resources/scripts/scope.pal"])
+        run.raw(["palet", "resources/scripts/maxcut.pal"])
         run.raw(["palet", "resources/scripts/case.pal"])
         run.raw(["palet", "resources/scripts/testmath.pal"])
 

@@ -47,7 +47,7 @@ def check_contract(c: object, val: object) -> bool:
 
 
 def check_args(
-    o: str,
+    name: str,
     values: list | tuple,
     arity: tuple[int, int | None],
     cont: tuple[Any, ...],
@@ -56,7 +56,7 @@ def check_args(
     amount = len(values)
 
     assert not (upper is not None and lower > upper)
-    base = f"`{o}` has an arity mismatch. Expected "
+    base = f"`{name}` has an arity mismatch. Expected "
 
     if lower == upper and len(values) != lower:
         raise MyError(f"{base}{lower}, got {amount}")
@@ -72,11 +72,11 @@ def check_args(
         check = cont[-1] if i >= len(cont) else cont[i]
         if not check_contract(check, val):
             exp = f"{check}" if callable(check) else print_str(check)
-            raise MyError(f"`{o}` expected a {exp}, got {print_str(val)}")
+            raise MyError(f"`{name}` expected {exp}, but got {print_str(val)}")
 
 
 class Proc:
-    __slots__ = ("name", "proc", "arity", "contracts")
+    __slots__ = ("name", "proc", "arity", "contracts", "kw_contracts")
 
     def __init__(
         self, n: str, p: Callable, a: tuple[int, int | None] = (1, None), *c: Any
@@ -84,11 +84,52 @@ class Proc:
         self.name = n
         self.proc = p
         self.arity = a
-        self.contracts: tuple[Any, ...] = c
 
-    def __call__(self, *args: Any) -> Any:
-        check_args(self.name, args, self.arity, self.contracts)
-        return self.proc(*args)
+        if c and type(c[-1]) is dict:
+            self.kw_contracts: dict[str, int] | None = c[-1]
+            self.contracts: tuple[Any, ...] = c[:-1]
+        else:
+            self.kw_contracts = None
+            self.contracts = c
+
+    def __call__(self, *args: Any, **kwargs: Any):
+        lower, upper = self.arity
+        amount = len(args)
+        cont = self.contracts
+        kws = self.kw_contracts
+
+        assert not (upper is not None and lower > upper)
+        base = f"`{self.name}` has an arity mismatch. Expected "
+
+        if lower == upper and len(args) != lower:
+            raise MyError(f"{base}{lower}, got {amount}")
+        if upper is None and amount < lower:
+            raise MyError(f"{base}at least {lower}, got {amount}")
+        if upper is not None and (amount > upper or amount < lower):
+            raise MyError(f"{base}between {lower} and {upper}, got {amount}")
+
+        if not cont:
+            return self.proc(*args)
+
+        if kws is not None:
+            for key, val in kwargs.items():
+                check = cont[-1] if kws[key] >= len(cont) else cont[kws[key]]
+                if not check_contract(check, val):
+                    exp = f"{check}" if callable(check) else print_str(check)
+                    raise MyError(
+                        f"`{self.name} #:{key}` expected {exp}, but got {print_str(val)}"
+                    )
+
+        elif len(kwargs) > 0:
+            raise MyError("Keyword arguments are not allowed here")
+
+        for i, val in enumerate(args):
+            check = cont[-1] if i >= len(cont) else cont[i]
+            if not check_contract(check, val):
+                exp = f"{check}" if callable(check) else print_str(check)
+                raise MyError(f"`{self.name}` expected {exp}, but got {print_str(val)}")
+
+        return self.proc(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.name
@@ -137,13 +178,19 @@ is_threshold = Contract(
 is_proc = Contract("procedure?", lambda v: isinstance(v, Proc | Contract))
 
 
+def contract_printer(cs) -> str:
+    return " ".join(
+        c.name if isinstance(c, Proc | Contract) else print_str(c) for c in cs
+    )
+
+
 def andc(*cs: object) -> Proc:
-    name = "(and/c " + " ".join(f"{c}" for c in cs) + ")"
+    name = f"(and/c {contract_printer(cs)})"
     return Proc(name, lambda v: all(check_contract(c, v) for c in cs), (1, 1), any_p)
 
 
 def orc(*cs: object) -> Proc:
-    name = "(or/c " + " ".join(f"{c}" for c in cs) + ")"
+    name = f"(or/c {contract_printer(cs)})"
     return Proc(name, lambda v: any(check_contract(c, v) for c in cs), (1, 1), any_p)
 
 
