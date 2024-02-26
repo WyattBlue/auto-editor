@@ -18,7 +18,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy import logical_and, logical_not, logical_or, logical_xor
 
-from auto_editor.analyze import edit_method, mut_remove_large, mut_remove_small
+from auto_editor.analyze import (
+    LevelError,
+    mut_remove_large,
+    mut_remove_small,
+    to_threshold,
+)
 from auto_editor.lib.contracts import *
 from auto_editor.lib.data_structs import *
 from auto_editor.lib.err import MyError
@@ -47,9 +52,8 @@ class ClosingError(MyError):
 ###############################################################################
 
 LPAREN, RPAREN, LBRAC, RBRAC, LCUR, RCUR, EOF = "(", ")", "[", "]", "{", "}", "EOF"
-VAL, QUOTE, SEC, DB, DOT, VLIT = "VAL", "QUOTE", "SEC", "DB", "DOT", "VLIT"
+VAL, QUOTE, SEC, DB, DOT, VLIT, M = "VAL", "QUOTE", "SEC", "DB", "DOT", "VLIT", "M"
 SEC_UNITS = ("s", "sec", "secs", "second", "seconds")
-METHODS = ("audio:", "motion:", "subtitle:")
 brac_pairs = {LPAREN: RPAREN, LBRAC: RBRAC, LCUR: RCUR}
 
 str_escape = {
@@ -315,7 +319,6 @@ class Lexer:
 
             result = ""
             has_illegal = False
-            is_method = False
 
             def normal() -> bool:
                 return (
@@ -332,22 +335,24 @@ class Lexer:
                 else:
                     return self.char_is_norm()
 
+            is_method = False
             while normal():
-                result += self.char
-                if (result + ":") in METHODS:
+                if self.char == ":":
+                    name = result
+                    result = ""
                     is_method = True
                     normal = handle_strings
+                else:
+                    result += self.char
 
                 if self.char in "'`|\\":
                     has_illegal = True
                 self.advance()
 
             if is_method:
-                return Token(VAL, Method(result))
+                from auto_editor.utils.cmdkw import parse_method
 
-            for method in METHODS:
-                if result == method[:-1]:
-                    return Token(VAL, Method(result))
+                return Token(M, parse_method(name, result, env))
 
             if self.char == ".":  # handle `object.method` syntax
                 self.advance()
@@ -366,16 +371,6 @@ class Lexer:
 #  PARSER                                                                     #
 #                                                                             #
 ###############################################################################
-
-
-@dataclass(slots=True)
-class Method:
-    val: str
-
-    def __str__(self) -> str:
-        return f"#<method:{self.val}>"
-
-    __repr__ = __str__
 
 
 class Parser:
@@ -411,6 +406,16 @@ class Parser:
         if token.type == DB:
             self.eat()
             return (Sym("pow"), 10, (Sym("/"), token.value, 20))
+
+        if token.type == M:
+            self.eat()
+            name, args, kwargs = token.value
+            _result = [Sym(name)] + args
+            for key, val in kwargs.items():
+                _result.append(Keyword(key))
+                _result.append(val)
+
+            return tuple(_result)
 
         if token.type == DOT:
             self.eat()
@@ -505,7 +510,7 @@ def initOutPort(name: str) -> OutputPort | Literal[False]:
     return OutputPort(name, port, port.write, False)
 
 
-def raise_(msg: str) -> None:
+def raise_(msg: str) -> NoReturn:
     raise MyError(msg)
 
 
@@ -807,7 +812,7 @@ class UserProc(Proc):
 
 
 @dataclass(slots=True)
-class KeywordProc:
+class KeywordUserProc:
     env: Env
     name: str
     parms: list[str]
@@ -816,38 +821,21 @@ class KeywordProc:
     arity: tuple[int, None]
     contracts: list[Any] | None = None
 
-    def __call__(self, *args: Any) -> Any:
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         env = {}
+        all_parms = self.parms + self.kw_parms
+        for i, arg in enumerate(args):
+            if i >= len(all_parms):
+                raise MyError("Too many arguments")
+            env[all_parms[i]] = arg
 
-        for i, parm in enumerate(self.parms):
-            if type(args[i]) is Keyword:
-                raise MyError(f"Invalid keyword `{args[i]}`")
-            env[parm] = args[i]
-
-        remain_args = args[len(self.parms) :]
-
-        allow_pos = True
-        pos_index = 0
-        key = ""
-        for arg in remain_args:
-            if type(arg) is Keyword:
-                if key:
-                    raise MyError("Expected value for keyword but got another keyword")
-                key = arg.val
-                allow_pos = False
-            elif key:
-                env[key] = arg
-                key = ""
+        for key, val in kwargs.items():
+            if key in env:
+                raise MyError(
+                    f"Keyword: {key} already fulfilled by positional argument."
+                )
             else:
-                if not allow_pos:
-                    raise MyError("Positional argument not allowed here")
-                if pos_index >= len(self.kw_parms):
-                    base = f"`{self.name}` has an arity mismatch. Expected"
-                    upper = len(self.parms) + len(self.kw_parms)
-                    raise MyError(f"{base} at most {upper}")
-
-                env[self.kw_parms[pos_index]] = arg
-                pos_index += 1
+                env[key] = val
 
         inner_env = Env(env, self.env)
 
@@ -952,7 +940,7 @@ def syn_define(env: Env, node: Node) -> None:
                     raise MyError(f"{node[0]}: must be an identifier")
 
         if kw_only:
-            env[n] = KeywordProc(env, n, parms, kparms, body, (len(parms), None))
+            env[n] = KeywordUserProc(env, n, parms, kparms, body, (len(parms), None))
         else:
             env[n] = UserProc(env, n, parms, (), body)
         return None
@@ -1481,6 +1469,78 @@ def edit_all() -> np.ndarray:
     return env["@levels"].all()
 
 
+def edit_audio(
+    threshold: float = 0.04, stream: object = "all", mincut: int = 6, minclip: int = 3
+) -> np.ndarray:
+    if "@levels" not in env or "@filesetup" not in env:
+        raise MyError("Can't use `audio` if there's no input media")
+
+    levels = env["@levels"]
+    src = env["@filesetup"].src
+    strict = env["@filesetup"].strict
+
+    stream_data: NDArray[np.bool_] | None = None
+    if stream == "all" or stream == Sym("all"):
+        stream_range = range(0, len(src.audios))
+    else:
+        assert isinstance(stream, int)
+        stream_range = range(stream, stream + 1)
+
+    try:
+        for s in stream_range:
+            audio_list = to_threshold(levels.audio(s), threshold)
+            if stream_data is None:
+                stream_data = audio_list
+            else:
+                stream_data = boolop(stream_data, audio_list, np.logical_or)
+    except LevelError as e:
+        raise_(e) if strict else levels.all()
+
+    if stream_data is not None:
+        mut_remove_small(stream_data, minclip, replace=1, with_=0)
+        mut_remove_small(stream_data, mincut, replace=0, with_=1)
+
+        return stream_data
+
+    stream = 0 if stream == "all" or stream == Sym("all") else stream
+    return raise_(f"audio stream '{stream}' does not exist") if strict else levels.all()
+
+
+def edit_motion(
+    threshold: float = 0.02,
+    stream: int = 0,
+    blur: int = 9,
+    width: int = 400,
+) -> np.ndarray:
+    if "@levels" not in env:
+        raise MyError("Can't use `motion` if there's no input media")
+
+    levels = env["@levels"]
+    strict = env["@filesetup"].strict
+    try:
+        return to_threshold(levels.motion(stream, blur, width), threshold)
+    except LevelError as e:
+        return raise_(e) if strict else levels.all()
+
+
+def edit_subtitle(pattern, stream=0, **kwargs):
+    if "@levels" not in env:
+        raise MyError("Can't use `subtitle` if there's no input media")
+
+    levels = env["@levels"]
+    strict = env["@filesetup"].strict
+    if "ignore-case" not in kwargs:
+        kwargs["ignore-case"] = False
+    if "max-count" not in kwargs:
+        kwargs["max-count"] = None
+    ignore_case = kwargs["ignore-case"]
+    max_count = kwargs["max-count"]
+    try:
+        return levels.subtitle(pattern, stream, ignore_case, max_count)
+    except LevelError as e:
+        return raise_(e) if strict else levels.all()
+
+
 def my_eval(env: Env, node: object) -> Any:
     if type(node) is Sym:
         val = env.get(node.val)
@@ -1493,11 +1553,6 @@ def my_eval(env: Env, node: object) -> Any:
                 f"variable `{node.val}` not found. Did you mean a string literal."
             )
         return val
-
-    if isinstance(node, Method):
-        if "@filesetup" not in env:
-            raise MyError("Can't use edit methods if there's no input files")
-        return edit_method(node.val, env["@filesetup"], env)
 
     if type(node) is list:
         return [my_eval(env, item) for item in node]
@@ -1530,7 +1585,21 @@ def my_eval(env: Env, node: object) -> Any:
         if type(oper) is Syntax:
             return oper(env, node)
 
-        return oper(*(my_eval(env, c) for c in node[1:]))
+        i = 1
+        args: list[Any] = []
+        kwargs: dict[str, Any] = {}
+        while i < len(node):
+            result = my_eval(env, node[i])
+            if type(result) is Keyword:
+                i += 1
+                if i >= len(node):
+                    raise MyError("Keyword need argument")
+                kwargs[result.val] = my_eval(env, node[i])
+            else:
+                args.append(result)
+            i += 1
+
+        return oper(*args, **kwargs)
 
     return node
 
@@ -1545,6 +1614,18 @@ env.update({
     # edit procedures
     "none": Proc("none", edit_none, (0, 0)),
     "all/e": Proc("all/e", edit_all, (0, 0)),
+    "audio": Proc("audio", edit_audio, (0, 4),
+        is_threshold, orc(is_nat, Sym("all"), "all"), is_nat,
+        {"threshold": 0, "stream": 1, "minclip": 2, "mincut": 2}
+    ),
+    "motion": Proc("motion", edit_motion, (0, 4),
+        is_threshold, is_nat, is_nat1,
+        {"threshold": 0, "stream": 1, "blur": 1, "width": 2}
+    ),
+    "subtitle": Proc("subtitle", edit_subtitle, (1, 4),
+        is_str, is_nat, is_bool, orc(is_nat, is_void),
+        {"pattern": 0, "stream": 1, "ignore-case": 2, "max-count": 3}
+    ),
     # syntax
     "lambda": Syntax(syn_lambda),
     "λ": Syntax(syn_lambda),
