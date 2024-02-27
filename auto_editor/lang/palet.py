@@ -1470,7 +1470,7 @@ def edit_all() -> np.ndarray:
 
 
 def edit_audio(
-    threshold: float = 0.04, stream: object = "all", mincut: int = 6, minclip: int = 3
+    threshold: float = 0.04, stream: object = Sym("all"), mincut: int = 6, minclip: int = 3
 ) -> np.ndarray:
     if "@levels" not in env or "@filesetup" not in env:
         raise MyError("Can't use `audio` if there's no input media")
@@ -1480,7 +1480,7 @@ def edit_audio(
     strict = env["@filesetup"].strict
 
     stream_data: NDArray[np.bool_] | None = None
-    if stream == "all" or stream == Sym("all"):
+    if stream == Sym("all"):
         stream_range = range(0, len(src.audios))
     else:
         assert isinstance(stream, int)
@@ -1502,7 +1502,7 @@ def edit_audio(
 
         return stream_data
 
-    stream = 0 if stream == "all" or stream == Sym("all") else stream
+    stream = 0 if stream == Sym("all") else stream
     return raise_(f"audio stream '{stream}' does not exist") if strict else levels.all()
 
 
@@ -1615,7 +1615,7 @@ env.update({
     "none": Proc("none", edit_none, (0, 0)),
     "all/e": Proc("all/e", edit_all, (0, 0)),
     "audio": Proc("audio", edit_audio, (0, 4),
-        is_threshold, orc(is_nat, Sym("all"), "all"), is_nat,
+        is_threshold, orc(is_nat, Sym("all")), is_nat,
         {"threshold": 0, "stream": 1, "minclip": 2, "mincut": 2}
     ),
     "motion": Proc("motion", edit_motion, (0, 4),

@@ -25,15 +25,18 @@ will set the speed from 400 ticks to 800 ticks to 2.5x
 If timebase is 30, 400 ticks to 800 means 13.33 to 26.66 seconds
 """.strip(),
         "--edit-based-on": """
-Evalutes a palet expression that returns a bool-array?. The array is then used for
+Evaluates a palet expression that returns a bool-array?. The array is then used for
 editing.
 
 Editing Methods:
  - audio  ; Audio silence/loudness detection
     - threshold threshold? : 4%
-    - stream (or/c nat? 'all "all") : 0
+    - stream (or/c nat? 'all) : 'all
     - mincut nat? : 6
     - minclip nat? : 3
+
+ ; mincut is more significant, there it has a larger default value.
+ ; minclip gets applied first, then mincut
 
  - motion  ; Motion detection specialized for noisy real-life videos
     - threshold threshold? : 2%
@@ -150,10 +153,6 @@ The special value `unset` may also be used, and means: Don't pass any value to f
 """.strip(),
         "--video-bitrate": """
 `--video-bitrate` sets the target bitrate for the video encoder. It accepts the same format as `--audio-bitrate` and the special `unset` value is allowed.
-""".strip(),
-        "--silent-threshold": """
-Silent threshold is a percentage where 0% represents absolute silence and 100% represents the highest volume in the media file.
-Setting the threshold to `0%` will cut only out areas where area is absolutely silence.
 """.strip(),
         "--margin": """
 Default value: 0.2s,0.2s
