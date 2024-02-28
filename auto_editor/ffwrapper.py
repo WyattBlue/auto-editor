@@ -239,10 +239,13 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
             log.debug("Unexpected ffprobe shape")
 
         if v.sample_aspect_ratio is None:
-            try:
-                sar = Fraction(_sar.replace(":", "/"))
-            except Exception:
+            if _sar is None:
                 sar = Fraction(1)
+            else:
+                try:
+                    sar = Fraction(_sar.replace(":", "/"))
+                except Exception:
+                    sar = Fraction(1)
         else:
             sar = v.sample_aspect_ratio
 
