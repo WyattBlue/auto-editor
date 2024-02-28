@@ -510,7 +510,7 @@ def initOutPort(name: str) -> OutputPort | Literal[False]:
     return OutputPort(name, port, port.write, False)
 
 
-def raise_(msg: str) -> NoReturn:
+def raise_(msg: str | Exception) -> NoReturn:
     raise MyError(msg)
 
 
@@ -1470,7 +1470,10 @@ def edit_all() -> np.ndarray:
 
 
 def edit_audio(
-    threshold: float = 0.04, stream: object = Sym("all"), mincut: int = 6, minclip: int = 3
+    threshold: float = 0.04,
+    stream: object = Sym("all"),
+    mincut: int = 6,
+    minclip: int = 3,
 ) -> np.ndarray:
     if "@levels" not in env or "@filesetup" not in env:
         raise MyError("Can't use `audio` if there's no input media")
