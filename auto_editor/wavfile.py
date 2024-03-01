@@ -45,9 +45,9 @@ def _read_fmt_chunk(
             raw_guid = extensible_chunk_data[6:22]
 
             if bytes_order == "big":
-                tail = b"\x00\x00\x00\x10\x80\x00\x00\xAA\x00\x38\x9B\x71"
+                tail = b"\x00\x00\x00\x10\x80\x00\x00\xaa\x00\x38\x9b\x71"
             else:
-                tail = b"\x00\x00\x10\x00\x80\x00\x00\xAA\x00\x38\x9B\x71"
+                tail = b"\x00\x00\x10\x00\x80\x00\x00\xaa\x00\x38\x9b\x71"
             if raw_guid.endswith(tail):
                 format_tag = int.from_bytes(raw_guid[:4], bytes_order)
         else:
@@ -249,7 +249,7 @@ def write(fid: io.BufferedWriter, sr: int, arr: np.ndarray) -> None:
     total_size = 44 + data_size  # Basic WAV header size + data size
 
     if is_rf64 := total_size > 0xFFFFFFFF:
-        fid.write(b"RF64\xFF\xFF\xFF\xFFWAVE")
+        fid.write(b"RF64\xff\xff\xff\xffWAVE")
         ds64_size = 28
         ds64_chunk_data = (0).to_bytes(ds64_size, "little")  # placeholder values
         fid.write(b"ds64" + struct.pack("<I", ds64_size) + ds64_chunk_data)
