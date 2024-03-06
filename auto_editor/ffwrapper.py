@@ -135,10 +135,10 @@ class VideoStream:
     sar: Fraction
     time_base: Fraction | None
     pix_fmt: str | None
-    color_range: str | None
-    color_space: str | None
-    color_primaries: str | None
-    color_transfer: str | None
+    color_range: int
+    color_space: int
+    color_primaries: int
+    color_transfer: int
     bitrate: int
     lang: str | None
 
@@ -259,10 +259,10 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
                 sar,
                 v.time_base,
                 v.codec_context.pix_fmt,
-                c_range,
-                c_space,
-                c_primary,
-                c_transfer,
+                v.color_range,
+                v.colorspace,
+                v.color_primaries,
+                v.color_trc,
                 0 if v.bit_rate is None else v.bit_rate,
                 v.language,
             ),
