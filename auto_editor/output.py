@@ -182,12 +182,19 @@ def mux_quality_media(
         cmd += _ffset("-c:a", args.audio_codec) + _ffset("-b:a", args.audio_bitrate)
 
     if same_container and v_tracks > 0:
-        cmd += (
-            _ffset("-color_range", src.videos[0].color_range)
-            + _ffset("-colorspace", src.videos[0].color_space)
-            + _ffset("-color_primaries", src.videos[0].color_primaries)
-            + _ffset("-color_trc", src.videos[0].color_transfer)
-        )
+        color_range = src.videos[0].color_range
+        colorspace = src.videos[0].color_space
+        color_prim = src.videos[0].color_primaries
+        color_trc = src.videos[0].color_transfer
+
+        if color_range == 1 or color_range == 2:
+            cmd.extend(["-color_range", f"{color_range}"])
+        if colorspace in (0, 1) or (colorspace >= 3 and colorspace < 16):
+            cmd.extend(["-colorspace", f"{colorspace}"])
+        if color_prim in (0, 1) or (color_prim >= 4 and color_prim < 17):
+            cmd.extend(["-color_primaries", f"{color_prim}"])
+        if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
+            cmd.extend(["-color_trc", f"{color_trc}"])
 
     if args.extras is not None:
         cmd.extend(args.extras.split(" "))

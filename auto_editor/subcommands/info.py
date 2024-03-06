@@ -42,10 +42,10 @@ class VideoJson(TypedDict):
     pixel_aspect_ratio: str
     duration: float
     pix_fmt: str | None
-    color_range: str | None
-    color_space: str | None
-    color_primaries: str | None
-    color_transfer: str | None
+    color_range: int
+    color_space: int
+    color_primaries: int
+    color_transfer: int
     timebase: str
     bitrate: int
     lang: str | None
@@ -177,13 +177,27 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             text += f"   - track {s}:\n"
             for key, value in stream.items():
                 if not is_null(key, value):
-                    key = key.replace("_", " ")
                     if isinstance(value, list):
                         sep = "x" if key == "resolution" else ":"
-
                         value = sep.join(f"{x}" for x in value)
 
-                    text += f"     - {key}: {value}\n"
+                    if key in (
+                        "color_range",
+                        "color_space",
+                        "color_transfer",
+                        "color_primaries",
+                    ):
+                        if key == "color_range":
+                            if value == 1:
+                                text += "     - color range: 1 (tv)\n"
+                            elif value == 2:
+                                text += "     - color range: 2 (pc)\n"
+                        elif value == 1:
+                            text += f"     - {key.replace('_', ' ')}: 1 (bt709)\n"
+                        elif value != 2:
+                            text += f"     - {key.replace('_', ' ')}: {value}\n"
+                    else:
+                        text += f"     - {key.replace('_', ' ')}: {value}\n"
         return text
 
     text = ""

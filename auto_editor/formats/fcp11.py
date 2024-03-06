@@ -32,13 +32,13 @@ def get_colorspace(src: FileInfo) -> str:
     s = src.videos[0]
     if s.pix_fmt == "rgb24":
         return "sRGB IEC61966-2.1"
-    if s.color_space == "smpte170m":
-        return "6-1-6 (Rec. 601 NTSC)"
-    if s.color_space == "bt470bg":
+    if s.color_space == 5:  # "bt470bg"
         return "5-1-6 (Rec. 601 PAL)"
-    if s.color_primaries == "bt2020":
+    if s.color_space == 6:  # "smpte170m"
+        return "6-1-6 (Rec. 601 NTSC)"
+    if s.color_primaries == 9:  # "bt2020"
         # See: https://video.stackexchange.com/questions/22059/how-to-identify-hdr-video
-        if s.color_transfer in ("arib-std-b67", "smpte2084"):
+        if s.color_transfer in (16, 18):  # "smpte2084" "arib-std-b67"
             return "9-18-9 (Rec. 2020 HLG)"
         return "9-1-9 (Rec. 2020)"
 
