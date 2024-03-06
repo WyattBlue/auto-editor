@@ -189,7 +189,7 @@ class FileInfo:
         return f"@{self.path.name}"
 
 
-def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
+def initFileInfo(path: str, log: Log) -> FileInfo:
     import av
 
     av.logging.set_level(av.logging.PANIC)
@@ -203,14 +203,11 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
     audios: tuple[AudioStream, ...] = ()
     subtitles: tuple[SubtitleStream, ...] = ()
 
-    _dir = os.path.dirname(ffmpeg.path)
-    _ext = os.path.splitext(ffmpeg.path)[1]
-    ffprobe = os.path.join(_dir, f"ffprobe{_ext}")
-
-    for i, v in enumerate(cont.streams.video):
-        vdur = 0.0
+    for v in cont.streams.video:
         if v.duration is not None and v.time_base is not None:
             vdur = float(v.duration * v.time_base)
+        else:
+            vdur = 0.0
 
         fps = v.average_rate
         if (fps is None or fps < 1) and v.name in ("png", "mjpeg", "webp"):
@@ -218,37 +215,8 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
         if fps is None or fps == 0:
             fps = Fraction(30)
 
-        _sar = c_range = c_space = c_primary = c_transfer = None
-        try:
-            _raw = get_stdout(
-                [
-                    ffprobe,
-                    "-v",
-                    "error",
-                    "-select_streams",
-                    f"v:{i}",
-                    "-show_entries",
-                    "stream=sample_aspect_ratio:stream=color_range:stream=color_space:stream=color_primaries:stream=color_transfer",
-                    "-of",
-                    "default=noprint_wrappers=1:nokey=1",
-                    path,
-                ]
-            )
-            _sar, c_range, c_space, c_primary, c_transfer = _raw.strip().split("\n")
-        except Exception:
-            log.debug("Unexpected ffprobe shape")
-
-        if v.sample_aspect_ratio is None:
-            if _sar is None:
-                sar = Fraction(1)
-            else:
-                try:
-                    sar = Fraction(_sar.replace(":", "/"))
-                except Exception:
-                    sar = Fraction(1)
-        else:
-            sar = v.sample_aspect_ratio
-
+        sar = Fraction(1) if v.sample_aspect_ratio is None else v.sample_aspect_ratio
+        cc = v.codec_context
         videos += (
             VideoStream(
                 v.width,
@@ -258,11 +226,11 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
                 vdur,
                 sar,
                 v.time_base,
-                v.codec_context.pix_fmt,
-                v.color_range,
-                v.colorspace,
-                v.color_primaries,
-                v.color_trc,
+                cc.pix_fmt,
+                cc.color_range,
+                cc.colorspace,
+                cc.color_primaries,
+                cc.color_trc,
                 0 if v.bit_rate is None else v.bit_rate,
                 v.language,
             ),
@@ -273,13 +241,14 @@ def initFileInfo(path: str, ffmpeg: FFmpeg, log: Log) -> FileInfo:
         if a.duration is not None and a.time_base is not None:
             adur = float(a.duration * a.time_base)
 
+        a_cc = a.codec_context
         audios += (
             AudioStream(
-                a.codec_context.name,
-                0 if a.sample_rate is None else a.sample_rate,
-                a.channels,
+                a_cc.name,
+                0 if a_cc.sample_rate is None else a_cc.sample_rate,
+                a_cc.channels,
                 adur,
-                0 if a.bit_rate is None else a.bit_rate,
+                0 if a_cc.bit_rate is None else a_cc.bit_rate,
                 a.language,
             ),
         )

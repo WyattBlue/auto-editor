@@ -109,7 +109,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             file_info[file] = {"type": "timeline"}
             continue
 
-        src = initFileInfo(file, ffmpeg, log)
+        src = initFileInfo(file, log)
 
         if len(src.videos) + len(src.audios) + len(src.subtitles) == 0:
             file_info[file] = {"type": "unknown"}

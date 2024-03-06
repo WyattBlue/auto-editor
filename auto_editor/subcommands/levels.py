@@ -78,7 +78,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     temp = setup_tempdir(None, Log())
     log = Log(quiet=True, temp=temp)
 
-    sources = [initFileInfo(path, ffmpeg, log) for path in args.input]
+    sources = [initFileInfo(path, log) for path in args.input]
     if len(sources) < 1:
         log.error("levels needs at least one input file")
 

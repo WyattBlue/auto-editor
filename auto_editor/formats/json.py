@@ -59,7 +59,7 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
     def make_src(v: str) -> FileInfo:
         if v in srcs:
             return srcs[v]
-        temp = initFileInfo(v, ffmpeg, log)
+        temp = initFileInfo(v, log)
         srcs[v] = temp
         return temp
 
@@ -168,7 +168,7 @@ def read_v1(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
 
     check_file(path, log)
 
-    src = initFileInfo(path, ffmpeg, log)
+    src = initFileInfo(path, log)
 
     vtl: VSpace = []
     atl: ASpace = [[] for _ in range(len(src.audios))]

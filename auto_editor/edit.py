@@ -181,7 +181,7 @@ def edit_media(
             sources = [] if tl.src is None else [tl.src]
             src = tl.src
         else:
-            sources = [initFileInfo(path, ffmpeg, log) for path in paths]
+            sources = [initFileInfo(path, log) for path in paths]
             src = None if not sources else sources[0]
 
     del paths

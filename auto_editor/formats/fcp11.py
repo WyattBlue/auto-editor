@@ -79,7 +79,7 @@ def fcp11_write_xml(
                 ffmpeg.run(
                     ["-i", f"{src.path.resolve()}", "-map", f"0:a:{i}", f"{newtrack}"]
                 )
-                all_srcs.append(initFileInfo(f"{newtrack}", ffmpeg, log))
+                all_srcs.append(initFileInfo(f"{newtrack}", log))
                 all_refs.append(f"r{(i + 1) * 2}")
 
     fcpxml = Element("fcpxml", version="1.10" if flavor == "resolve" else "1.11")
