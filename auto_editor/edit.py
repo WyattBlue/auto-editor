@@ -177,7 +177,7 @@ def edit_media(
         elif path_ext == ".json":
             from auto_editor.formats.json import read_json
 
-            tl = read_json(paths[0], ffmpeg, log)
+            tl = read_json(paths[0], log)
             sources = [] if tl.src is None else [tl.src]
             src = tl.src
         else:
