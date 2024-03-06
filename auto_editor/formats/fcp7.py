@@ -281,7 +281,6 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                     if "pathurl" in fileobj:
                         sources[file_id] = initFileInfo(
                             uri_to_path(fileobj["pathurl"]),
-                            ffmpeg,
                             log,
                         )
                     else:
@@ -315,7 +314,7 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
                 if file_id not in sources:
                     fileobj = valid.parse(clipitem["file"], {"pathurl": str})
                     sources[file_id] = initFileInfo(
-                        uri_to_path(fileobj["pathurl"]), ffmpeg, log
+                        uri_to_path(fileobj["pathurl"]), log
                     )
 
                 if "filter" in clipitem:
