@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
+from auto_editor.ffwrapper import FileInfo, initFileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret
 from auto_editor.lib.data_structs import Char
 from auto_editor.lib.err import MyError

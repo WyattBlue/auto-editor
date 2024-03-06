@@ -5,7 +5,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict
 
-from auto_editor.ffwrapper import FFmpeg, initFileInfo
+from auto_editor.ffwrapper import initFileInfo
 from auto_editor.lang.json import dump
 from auto_editor.timeline import v3
 from auto_editor.utils.func import aspect_ratio
@@ -16,8 +16,6 @@ from auto_editor.vanparse import ArgumentParser
 @dataclass(slots=True)
 class InfoArgs:
     json: bool = False
-    ffmpeg_location: str | None = None
-    my_ffmpeg: bool = False
     help: bool = False
     input: list[str] = field(default_factory=list)
 
@@ -25,12 +23,6 @@ class InfoArgs:
 def info_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_required("input", nargs="*")
     parser.add_argument("--json", flag=True, help="Export info in JSON format")
-    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
-    parser.add_argument(
-        "--my-ffmpeg",
-        flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged",
-    )
     return parser
 
 
@@ -83,7 +75,6 @@ class MediaJson(TypedDict, total=False):
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
     args = info_options(ArgumentParser("info")).parse_args(InfoArgs, sys_args)
 
-    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg)
     log = Log(quiet=not args.json)
 
     file_info: dict[str, MediaJson] = {}
@@ -96,7 +87,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         if ext == ".json":
             from auto_editor.formats.json import read_json
 
-            tl = read_json(file, ffmpeg, log)
+            tl = read_json(file, log)
             file_info[file] = {"type": "timeline"}
             file_info[file]["version"] = "v3" if isinstance(tl, v3) else "v1"
 

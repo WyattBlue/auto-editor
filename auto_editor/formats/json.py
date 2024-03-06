@@ -6,7 +6,7 @@ from difflib import get_close_matches
 from fractions import Fraction
 from typing import Any
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
+from auto_editor.ffwrapper import FileInfo, initFileInfo
 from auto_editor.lang.json import Lexer, Parser, dump
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
@@ -42,7 +42,7 @@ def check_file(path: str, log: Log) -> None:
         log.error(f"Could not locate media file: '{path}'")
 
 
-def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
+def read_v3(tl: Any, log: Log) -> v3:
     check_attrs(
         tl,
         log,
@@ -158,7 +158,7 @@ def read_v3(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
     return v3(src, tb, sr, res, bg, v, a, v1=None)
 
 
-def read_v1(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
+def read_v1(tl: Any, log: Log) -> v3:
     from auto_editor.make_layers import clipify
 
     check_attrs(tl, log, "source", "chunks")
@@ -194,7 +194,7 @@ def read_v1(tl: Any, ffmpeg: FFmpeg, log: Log) -> v3:
     )
 
 
-def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
+def read_json(path: str, log: Log) -> v3:
     with open(path, encoding="utf-8", errors="ignore") as f:
         try:
             tl = Parser(Lexer(path, f)).expr()
@@ -206,9 +206,9 @@ def read_json(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     ver = tl["version"]
 
     if ver == "3":
-        return read_v3(tl, ffmpeg, log)
+        return read_v3(tl, log)
     if ver == "1":
-        return read_v1(tl, ffmpeg, log)
+        return read_v1(tl, log)
     if type(ver) is not str:
         log.error("version needs to be a string")
     log.error(f"Importing version {ver} timelines is not supported.")
