@@ -97,7 +97,6 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
         for obj in clip:
             if isinstance(obj, TlImage) and obj.src not in img_cache:
                 with av.open(obj.src.path) as cn:
-                    assert isinstance(cn, av.InputContainer)
                     my_stream = cn.streams.video[0]
                     for frame in cn.decode(my_stream):
                         if obj.width != 0:
