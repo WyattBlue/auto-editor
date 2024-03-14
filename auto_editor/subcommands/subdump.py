@@ -1,57 +1,25 @@
-from __future__ import annotations
-
-import os
 import sys
-import tempfile
 from dataclasses import dataclass, field
 
-from auto_editor.ffwrapper import FFmpeg, initFileInfo
 from auto_editor.utils.log import Log
-from auto_editor.vanparse import ArgumentParser
 
-
-@dataclass(slots=True)
-class SubArgs:
-    ffmpeg_location: str | None = None
-    my_ffmpeg: bool = False
-    help: bool = False
-    input: list[str] = field(default_factory=list)
-
-
-def subdump_options(parser: ArgumentParser) -> ArgumentParser:
-    parser.add_required("input", nargs="*")
-    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
-    parser.add_argument(
-        "--my-ffmpeg",
-        flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged",
-    )
-    return parser
+import av
 
 
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
-    args = subdump_options(ArgumentParser("subdump")).parse_args(SubArgs, sys_args)
+    for i, input_file in enumerate(sys_args):
+        with av.open(input_file) as container:
+            for s in range(len(container.streams.subtitles)):
+                print(f"file: {input_file} ({s})")
+                for packet in container.demux(subtitles=s):
+                    for item in packet.decode():
+                        if type(item) is av.subtitles.subtitle.SubtitleSet and item:
+                            if item[0].type == b"ass":
+                                print(item[0].ass.decode("utf-8"))
+                            else:
+                                print(item[0].text)
+        print("------")
 
-    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, debug=False)
-
-    temp = tempfile.mkdtemp()
-    log = Log(temp=temp)
-
-    for i, input_file in enumerate(args.input):
-        src = initFileInfo(input_file, log)
-
-        cmd = ["-i", input_file]
-        for s, sub in enumerate(src.subtitles):
-            cmd.extend(["-map", f"0:s:{s}", os.path.join(temp, f"{i}s{s}.{sub.ext}")])
-        ffmpeg.run(cmd)
-
-        for s, sub in enumerate(src.subtitles):
-            print(f"file: {input_file} ({s}:{sub.lang}:{sub.ext})")
-            with open(os.path.join(temp, f"{i}s{s}.{sub.ext}")) as file:
-                print(file.read())
-            print("------")
-
-    log.cleanup()
 
 
 if __name__ == "__main__":
