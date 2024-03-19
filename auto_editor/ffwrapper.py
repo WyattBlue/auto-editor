@@ -217,6 +217,10 @@ def initFileInfo(path: str, log: Log) -> FileInfo:
 
         sar = Fraction(1) if v.sample_aspect_ratio is None else v.sample_aspect_ratio
         cc = v.codec_context
+
+        if v.name is None:
+            log.error(f"Can't detect codec for video stream {v}")
+
         videos += (
             VideoStream(
                 v.width,
