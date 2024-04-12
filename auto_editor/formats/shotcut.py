@@ -92,7 +92,7 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
 
     for clip in clips:
         src = clip.src
-        length = to_timecode((clip.offset / clip.speed + clip.dur) / tb, "standard")
+        length = to_timecode((clip.offset + clip.dur) / tb, "standard")
 
         if clip.speed == 1:
             resource = f"{src.path}"
@@ -127,8 +127,8 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
 
     producers = 0
     for i, clip in enumerate(clips):
-        _in = to_timecode(clip.offset / clip.speed / tb, "standard")
-        _out = to_timecode((clip.offset / clip.speed + clip.dur) / tb, "standard")
+        _in = to_timecode(clip.offset / tb, "standard")
+        _out = to_timecode((clip.offset + clip.dur) / tb, "standard")
 
         tag_name = f"chain{i}"
         if clip.speed != 1:

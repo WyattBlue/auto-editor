@@ -32,7 +32,8 @@ def all_cuts(tl: v3, in_len: int) -> list[int]:
     oe: list[tuple[int, int]] = []
 
     for clip in tl.a[0]:
-        oe.append((clip.offset, clip.offset + clip.dur))
+        old_offset = clip.offset * clip.speed
+        oe.append((round(old_offset * clip.speed), round(old_offset + clip.dur)))
 
     cut_lens = []
     i = 0
