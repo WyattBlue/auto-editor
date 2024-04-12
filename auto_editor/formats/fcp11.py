@@ -140,7 +140,7 @@ def fcp11_write_xml(
             "ref": ref,
             "offset": fraction(clip.start),
             "duration": fraction(clip.dur),
-            "start": fraction(int(clip.offset // clip.speed)),
+            "start": fraction(clip.offset),
             "tcFormat": "NDF",
         }
         asset = SubElement(spine, "asset-clip", clip_properties)
