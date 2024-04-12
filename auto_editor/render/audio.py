@@ -208,8 +208,8 @@ def make_new_audio(
                 del leng
 
             samp_list = samples[(clip.src, clip.stream)]
-            samp_start = clip.offset * sr // tb
-            samp_end = round((clip.offset + clip.dur * clip.speed) * sr / tb)
+            samp_start = round(clip.offset * clip.speed * sr / tb)
+            samp_end = round((clip.offset + clip.dur) * clip.speed * sr / tb)
             if samp_end > len(samp_list):
                 samp_end = len(samp_list)
 

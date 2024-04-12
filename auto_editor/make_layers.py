@@ -42,7 +42,7 @@ def clipify(chunks: Chunks, src: FileInfo, start: int = 0) -> list[Clip]:
             if dur == 0:
                 continue
 
-            offset = chunk[0]
+            offset = int(chunk[0] / chunk[2])
 
             if not (clips and clips[-1].start == round(start)):
                 clips.append(Clip(start, dur, offset, chunk[2], src))
@@ -228,7 +228,7 @@ def make_timeline(
             if dur == 0:
                 continue
 
-            offset = chunk[1]
+            offset = int(chunk[1] / chunk[3])
 
             if not (clips and clips[-1].start == round(start)):
                 clips.append(Clip(start, dur, offset, chunk[3], chunk[0]))
