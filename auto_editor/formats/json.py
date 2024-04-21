@@ -173,6 +173,27 @@ def read_v1(tl: Any, log: Log) -> v3:
     vtl: VSpace = []
     atl: ASpace = [[] for _ in range(len(src.audios))]
 
+    # Verify chunks
+    last_end: int | None = None
+    if type(chunks) is not list:
+        log.error("chunks key must be an array")
+
+    for i, chunk in enumerate(chunks):
+        if type(chunk) is not list or len(chunk) != 3:
+            log.error(f"Invalid chunk at chunk {i}")
+        if type(chunk[0]) is not int or chunk[0] < 0:
+            log.error(f"Invalid start at chunk {i}")
+        if type(chunk[1]) is not int or chunk[1] <= chunk[0]:
+            log.error(f"Invalid end at chunk {i}")
+        if type(chunk[2]) is not float or chunk[2] < 0.0 or chunk[2] > 99999.0:
+            log.error(f"Invalid speed at chunk {i}")
+
+        if i == 0 and chunk[0] != 0:
+            log.error("First chunk must start with 0")
+        if i != 0 and chunk[0] != last_end:
+            log.error(f"Invalid start at chunk {i}")
+        last_end = chunk[1]
+
     for c in clipify(chunks, src):
         if src.videos:
             if len(vtl) == 0:
