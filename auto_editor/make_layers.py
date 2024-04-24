@@ -125,7 +125,14 @@ def make_timeline(
     if inp is None:
         tb, res = Fraction(30), (1920, 1080)
     else:
-        tb = inp.get_fps() if args.frame_rate is None else args.frame_rate
+        tb = round(inp.get_fps() if args.frame_rate is None else args.frame_rate, 2)
+        ntsc = Fraction(30_000, 1001)
+        film_ntsc = Fraction(24_000, 1001)
+        if tb == round(ntsc, 2):
+            tb = ntsc
+        elif tb == round(film_ntsc, 2):
+            tb = film_ntsc
+
         res = inp.get_res() if args.resolution is None else args.resolution
 
     try:
