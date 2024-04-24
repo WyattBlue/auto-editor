@@ -43,10 +43,10 @@ The `--edit` option is how auto-editor makes automated cuts.
 For example, edit out motionlessness in a video by setting `--edit motion`.
 
 ```
-# cut out sections where percentage of motion is less than 2.
-auto-editor example.mp4 --edit motion:threshold=2%
+# cut out sections where the total motion is less than 2%.
+auto-editor example.mp4 --edit motion:threshold=0.02
 
-# --edit is set to "audio:threshold=4%" by default.
+# `--edit audio:threshold=0.04,stream=all` is used by defaut.
 auto-editor example.mp4
 
 # Different tracks can be set with different attribute.
@@ -56,34 +56,14 @@ auto-editor multi-track.mov --edit "(or audio:stream=0 audio:threshold=10%,strea
 Different editing methods can be used together.
 ```
 # 'threshold' is always the first argument for edit-method objects
-auto-editor example.mp4 --edit "(or audio:3% motion:6%)"
+auto-editor example.mp4 --edit "(or audio:0.03 motion:0.06)"
 ```
 
 You can also use `dB` unit, a volume unit familiar to video-editors (case sensitive):
 ```
-auto-editor example.mp4 --edit audio:threshold=-19dB
+auto-editor example.mp4 --edit audio:-19dB
 auto-editor example.mp4 --edit audio:-7dB
 auto-editor example.mp4 --edit motion:-19dB
-
-# The `dB` unit is a just a macro that expands into an S-expression:
-# '-19dB
-# > '(pow 10 (/ -19 20))
-# (eval '(pow 10 (/ -19 20)))
-# > 0.11220184543019636
-```
-
-### Working With Multiple Audio Tracks
-By default, only the first audio track will used for editing (track 0). You can change this with these commands.
-
-Use all audio tracks for editing:
-```
-auto-editor multi-track.mov --edit audio:stream=all
-```
-
-Use only the second, fourth, and sixth audio track:
-```
-# track numbers start at 0
-auto-editor so-many-tracks.mp4 --edit "(or audio:stream=1 audio:stream=3 audio:stream=5)"
 ```
 
 ### See What Auto-Editor Cuts Out
@@ -102,12 +82,10 @@ auto-editor example.mp4 --export premiere
 ```
 
 Auto-Editor can also export to:
-
 - DaVinci Resolve with `--export resolve`
 - Final Cut Pro with `--export final-cut-pro`
 - ShotCut with `--export shotcut`
-
-Other editors, like Sony Vegas, can understand the `premiere` format. If your favorite editor doesn't, you can use ` --export clip-sequence` which creates many video clips that can be imported and manipulated like normal.
+- Individual media clips with `--export clip-sequence`
 
 ### Naming Timelines
 By default, auto-editor will name the timeline to "Auto-Editor Media Group" if the export supports naming.
@@ -171,14 +149,11 @@ List all available options:
 auto-editor --help
 ```
 
-Use `--help` with a specific option for more information:
+Use `--help` with a specific option to learn more about it:
 
 ```
-auto-editor --scale --help
-  --scale NUM
-
-    default: 1.0
-    Scale the output video's resolution by NUM factor
+auto-editor -c:v --help
+auto-editor --margin --help
 ```
 
 <h3 align="center">Auto-Editor is available on all major platforms</h3>
