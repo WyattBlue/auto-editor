@@ -53,7 +53,7 @@ hevc_en = ["hevc", "libx265", "hevc_videotoolbox", "hevc_amf", "hevc_nvenc", "he
 av1_en = ["av1", "libaom-av1", "av1_nvenc", "av1_amf"]
 prores_en = ["prores", "prores_videotoolbox", "prores_aw", "prores_ks"]
 aac_en = ["aac", "aac_at", "libfdk_aac"]
-
+opus_en = ["opus", "libopus"]
 
 h265: DictContainer = {
     "allow_video": True,
@@ -80,7 +80,7 @@ mp4: DictContainer = {
     "allow_subtitle": True,
     "allow_image": True,
     "vcodecs": h264_en + hevc_en + av1_en + ["vp9", "mpeg4", "mpeg2video", "mjpeg"],
-    "acodecs": aac_en + ["mp3", "opus", "flac", "vorbis", "libvorbis", "ac3", "mp2"],
+    "acodecs": aac_en + opus_en + ["mp3", "flac", "vorbis", "libvorbis", "ac3", "mp2"],
     "vstrict": True,
 }
 ogg: DictContainer = {
@@ -88,16 +88,16 @@ ogg: DictContainer = {
     "allow_audio": True,
     "allow_subtitle": True,
     "vcodecs": ["libtheora", "theora"],
-    "acodecs": ["libvorbis", "vorbis", "flac", "opus", "speex"],
+    "acodecs": opus_en + ["libvorbis", "vorbis", "flac", "speex"],
     "vstrict": True,
 }
 
 mka_audio = (
     ["libvorbis", "vorbis"]
     + aac_en
+    + opus_en
     + [
         "mp3",
-        "opus",
         "flac",
         "ac3",
         "mp2",
@@ -172,11 +172,11 @@ containers: dict[str, DictContainer] = {
     },
     "opus": {
         "allow_audio": True,
-        "acodecs": ["opus", "flac", "libvorbis", "vorbis", "speex"],
+        "acodecs": opus_en + ["flac", "libvorbis", "vorbis", "speex"],
     },
     "oga": {
         "allow_audio": True,
-        "acodecs": ["flac", "libvorbis", "vorbis", "opus", "speex"],
+        "acodecs": opus_en + ["flac", "libvorbis", "vorbis", "speex"],
     },
     "flac": {
         "allow_audio": True,
@@ -188,7 +188,7 @@ containers: dict[str, DictContainer] = {
         "allow_audio": True,
         "allow_subtitle": True,
         "vcodecs": ["vp9", "vp8"] + av1_en,
-        "acodecs": ["opus", "vorbis", "libvorbis"],
+        "acodecs": opus_en + ["vorbis", "libvorbis"],
         "scodecs": ["webvtt"],
         "vstrict": True,
         "sstrict": True,
