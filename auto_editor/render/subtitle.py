@@ -3,6 +3,7 @@ import av
 from auto_editor.timeline import v3
 from auto_editor.utils.log import Log
 
+import numpy as np
 
 def find_chunk(target: int, chunks: list[tuple[int, int, float]]) -> int:
     low = 0
@@ -22,6 +23,15 @@ def find_chunk(target: int, chunks: list[tuple[int, int, float]]) -> int:
     raise ValueError("")
 
 
+def chunk_unroll(chunks: list[tuple[int, int, float]]) -> np.ndarray:
+    result = np.zeros((chunks[-1][1]), dtype=np.float64)
+
+    for chunk in chunks:
+        result[chunk[0]:chunk[1]] = chunk[2]
+
+    return result
+
+# TODO: This
 def make_new_subtitles(tl: v3, old_out: str, out_path: str, log: Log) -> None:
     if tl.v1 is None:
         return None
@@ -35,7 +45,7 @@ def make_new_subtitles(tl: v3, old_out: str, out_path: str, log: Log) -> None:
 
     out_streams = {}
     for stream in processed.streams:
-        if stream.type in ("video", "audio", "data", "attachment"):
+        if stream.type in ("video", "audio", "data", "attachment", ""):
             out_streams[stream.index] = output.add_stream(template=stream)
 
     for stream in input_cont.streams:
@@ -43,12 +53,11 @@ def make_new_subtitles(tl: v3, old_out: str, out_path: str, log: Log) -> None:
             out_streams[stream.index] = output.add_stream(template=stream)
 
     for packet in processed.demux():
-        if packet.stream.index in out_streams:
-            packet.stream = out_streams[packet.stream.index]
-            output.mux_one(packet)
+        packet.stream = out_streams[packet.stream.index]
+        output.mux(packet)
 
-    chunks = tl.v1.chunks
-    new_start = 0
+    scroll = chunk_unroll(tl.v1.chunks)
+    lock = 0
     for packet in input_cont.demux():
         if packet.dts is None:
             continue
@@ -56,32 +65,29 @@ def make_new_subtitles(tl: v3, old_out: str, out_path: str, log: Log) -> None:
         if packet.stream.type == "subtitle":
             if packet.pts is None or packet.duration is None:
                 continue
+
             if not packet.decode():
                 continue  # Skip empty packets
 
             start = round(packet.pts * packet.time_base * tl.tb)
             end = round((packet.pts + packet.duration) * packet.time_base * tl.tb)
 
-            index = find_chunk(start, chunks)
-
             new_duration = 0.0
-            for chunk in chunks[index:]:
-                if chunk[1] >= end:
-                    break
-                if chunk[2] == 0.0 or chunk[2] >= 99999.0:
-                    pass
-                else:
-                    new_duration += (chunk[1] - chunk[0]) / chunk[2]
+            for i in range(start, end):
+                if i < len(scroll) and scroll[i] != 99999.0:
+                    new_duration += 1 * scroll[i]
 
-            new_start += packet.pts
-            packet.pts = new_start
-            packet.dts = packet.pts
+            new_duration = int(new_duration)
+            if new_duration > 0.0:
+                packet.pts = lock
+                packet.dts = lock
 
-            if new_duration > 0:
-                packet.duration = round(new_duration / tl.tb / packet.time_base)
+                lock += 1000
+
+                packet.duration = int(new_duration / (packet.time_base * tl.tb))
                 packet.stream = out_streams[packet.stream.index]
                 output.mux_one(packet)
 
-    input_cont.close()
-    processed.close()
     output.close()
+    processed.close()
+    input_cont.close()
