@@ -292,13 +292,14 @@ def edit_media(
 
         log.conwrite("Writing output file")
 
-        making_subs = ctr.allow_subtitle and not args.sn
+        number_subs = 0 if tl.v1 is None else len(tl.v1.source.subtitles)
+        making_subs = number_subs > 0 and ctr.allow_subtitle and not args.sn
         old_out = os.path.join(temp, f"oldout.{out_ext}")
         mux_quality_media(
             ffmpeg,
             visual_output,
             audio_output,
-            0 if tl.v1 is None else len(tl.v1.source.subtitles),
+            number_subs,
             apply_later,
             ctr,
             old_out if making_subs else output,
