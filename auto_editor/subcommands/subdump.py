@@ -1,7 +1,6 @@
 import sys
 
 import av
-from av.subtitles.subtitle import SubtitleSet
 
 
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
@@ -10,12 +9,12 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             for s in range(len(container.streams.subtitles)):
                 print(f"file: {input_file} ({s}:{container.streams.subtitles[s].name})")
                 for packet in container.demux(subtitles=s):
-                    for item in packet.decode():
-                        if type(item) is SubtitleSet and item:
-                            if item[0].type == b"ass":
-                                print(item[0].ass.decode("utf-8"))
-                            elif item[0].type == b"text":
-                                print(item[0].text)
+                    for sub in packet.decode():
+                        for val in sub.rects:
+                            if isinstance(val, av.subtitles.subtitle.AssSubtitle):
+                                print(val.ass.decode("utf-8", "ignore"))
+                            elif isinstance(val, av.subtitles.subtitle.TextSubtitle):
+                                print(val.text.decode("utf-8", "ignore"))
         print("------")
 
 

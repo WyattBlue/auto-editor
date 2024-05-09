@@ -76,7 +76,7 @@ def mux_quality_media(
     ffmpeg: FFmpeg,
     visual_output: list[tuple[bool, str]],
     audio_output: list[str],
-    sub_output: list[str],
+    subtitle_streams: int,
     apply_v: bool,
     ctr: Container,
     output_path: str,
@@ -88,7 +88,6 @@ def mux_quality_media(
 ) -> None:
     v_tracks = len(visual_output)
     a_tracks = len(audio_output)
-    s_tracks = 0 if args.sn else len(sub_output)
 
     cmd = ["-hide_banner", "-y", "-i", f"{src.path}"]
 
@@ -126,10 +125,7 @@ def mux_quality_media(
                 new_a_file = audio_output[0]
             cmd.extend(["-i", new_a_file])
 
-    for subfile in sub_output:
-        cmd.extend(["-i", subfile])
-
-    for i in range(v_tracks + s_tracks + a_tracks):
+    for i in range(v_tracks + a_tracks):
         cmd.extend(["-map", f"{i+1}:0"])
 
     cmd.extend(["-map_metadata", "0"])
@@ -163,20 +159,6 @@ def mux_quality_media(
             break
         if astream.lang is not None:
             cmd.extend([f"-metadata:s:a:{i}", f"language={astream.lang}"])
-    for i, sstream in enumerate(src.subtitles):
-        if i > s_tracks:
-            break
-        if sstream.lang is not None:
-            cmd.extend([f"-metadata:s:s:{i}", f"language={sstream.lang}"])
-
-    if s_tracks > 0:
-        scodec = src.subtitles[0].codec
-        if same_container:
-            cmd.extend(["-c:s", scodec])
-        elif ctr.scodecs is not None:
-            if scodec not in ctr.scodecs:
-                scodec = ctr.scodecs[0]
-            cmd.extend(["-c:s", scodec])
 
     if a_tracks > 0:
         cmd += _ffset("-c:a", args.audio_codec) + _ffset("-b:a", args.audio_bitrate)
@@ -199,9 +181,6 @@ def mux_quality_media(
     if args.extras is not None:
         cmd.extend(args.extras.split(" "))
     cmd.extend(["-strict", "-2"])  # Allow experimental codecs.
-
-    if s_tracks > 0:
-        cmd.extend(["-map", "0:t?"])  # Add input attachments to output.
 
     # This was causing a crash for 'example.mp4 multi-track.mov'
     # cmd.extend(["-map", "0:d?"])

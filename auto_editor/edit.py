@@ -214,15 +214,6 @@ def edit_media(
     ensure = Ensure(ffmpeg, samplerate, temp, log)
 
     if tl is None:
-        # Extract subtitles in their native format.
-        if src is not None and len(src.subtitles) > 0 and not args.sn:
-            cmd = ["-i", f"{src.path}", "-hide_banner"]
-            for s, sub in enumerate(src.subtitles):
-                cmd.extend(["-map", f"0:s:{s}"])
-            for s, sub in enumerate(src.subtitles):
-                cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
-            ffmpeg.run(cmd)
-
         tl = make_timeline(sources, ffmpeg, ensure, args, samplerate, bar, temp, log)
 
     if export["export"] == "timeline":
@@ -280,11 +271,7 @@ def edit_media(
 
         visual_output = []
         audio_output = []
-        sub_output = []
         apply_later = False
-
-        if ctr.allow_subtitle and not args.sn:
-            sub_output = make_new_subtitles(tl, ffmpeg, temp, log)
 
         if ctr.allow_audio:
             audio_output = make_new_audio(tl, ensure, args, ffmpeg, bar, temp, log)
@@ -304,20 +291,25 @@ def edit_media(
                     visual_output.append((False, out_path))
 
         log.conwrite("Writing output file")
+
+        making_subs = ctr.allow_subtitle and not args.sn
+        old_out = os.path.join(temp, f"oldout.{out_ext}")
         mux_quality_media(
             ffmpeg,
             visual_output,
             audio_output,
-            sub_output,
+            0 if tl.v1 is None else len(tl.v1.source.subtitles),
             apply_later,
             ctr,
-            output,
+            old_out if making_subs else output,
             tl.tb,
             args,
             src,
             temp,
             log,
         )
+        if making_subs:
+            make_new_subtitles(tl, old_out, output, log)
 
     if export["export"] == "clip-sequence":
         if tl.v1 is None:

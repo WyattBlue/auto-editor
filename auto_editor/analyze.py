@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
+from numpy import concatenate as npconcat
+from numpy import zeros as npzeros
 
 from auto_editor import version
 from auto_editor.lang.json import Lexer, Parser, dump
@@ -19,7 +21,6 @@ from auto_editor.lib.contracts import (
     orc,
 )
 from auto_editor.lib.data_structs import Sym
-from auto_editor.render.subtitle import SubtitleParser
 from auto_editor.utils.cmdkw import (
     Required,
     pAttr,
@@ -190,7 +191,7 @@ class Levels:
         return np.ones(self.media_length, dtype=np.bool_)
 
     def all(self) -> NDArray[np.bool_]:
-        return np.zeros(self.media_length, dtype=np.bool_)
+        return npzeros(self.media_length, dtype=np.bool_)
 
     def read_cache(self, tag: str, obj: dict[str, Any]) -> None | np.ndarray:
         workfile = os.path.join(
@@ -278,7 +279,7 @@ class Levels:
         )
         self.bar.start(audio_ticks, "Analyzing audio volume")
 
-        threshold_list = np.zeros((audio_ticks), dtype=np.float64)
+        threshold_list = npzeros((audio_ticks), dtype=np.float64)
 
         if max_volume == 0:  # Prevent dividing by zero
             return threshold_list
@@ -313,31 +314,51 @@ class Levels:
         except re.error as e:
             self.log.error(e)
 
-        sub_file = self.ensure.subtitle(self.src, stream)
-        parser = SubtitleParser(self.tb)
+        import av
 
-        with open(sub_file, encoding="utf-8") as file:
-            parser.parse(file.read(), "webvtt")
-
-        # stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string
-        def cleanhtml(raw_html: str) -> str:
-            cleanr = re.compile("<.*?>")
-            return re.sub(cleanr, "", raw_html)
-
-        if not parser.contents:
-            self.log.error("subtitle has no valid entries")
-
-        result = np.zeros((parser.contents[-1].end), dtype=np.bool_)
-
+        result = npzeros((30), dtype=np.bool_)
         count = 0
-        for content in parser.contents:
-            if max_count is not None and count >= max_count:
-                break
+        subtitle_length = 0
 
-            line = cleanhtml(content.after.strip())
-            if line and re.search(pattern, line):
-                result[content.start : content.end] = 1
-                count += 1
+        with av.open(self.src.path, "r") as container:
+            for packet in container.demux(subtitles=stream):
+                if packet is None or packet.pts is None:
+                    continue
+
+                line = ""
+                if sub := packet.decode():
+                    for val in sub[0].rects:
+                        if isinstance(val, av.subtitles.subtitle.AssSubtitle):
+                            line += val.ass.decode("utf-8", "ignore")
+                        if isinstance(val, av.subtitles.subtitle.TextSubtitle):
+                            line += val.text.decode("utf-8", "ignore")
+
+                if packet.duration is not None and packet.time_base is not None:
+                    end = round(
+                        (packet.pts + packet.duration) * packet.time_base * self.tb
+                    )
+                    subtitle_length = max(subtitle_length, end)
+
+                if line and re.search(pattern, line):
+                    if packet.duration is None or packet.time_base is None:
+                        self.log.warning("Subtitle has unknown duration")
+                        continue
+
+                    count += 1
+                    start = round(packet.pts * packet.time_base * self.tb)
+
+                    if len(result) < end:
+                        new_length = max(end, len(result) * 2)
+                        result = npconcat(
+                            [result, npzeros(new_length, dtype=np.bool_)], axis=0
+                        )
+
+                    result[start:end] = 1
+
+                    if max_count is not None and count >= max_count:
+                        break
+
+        result = result[:subtitle_length]
 
         return result
 
@@ -377,7 +398,7 @@ class Levels:
         )
         graph.configure()
 
-        threshold_list = np.zeros((1024), dtype=np.float64)
+        threshold_list = npzeros((1024), dtype=np.float64)
 
         for unframe in container.decode(stream):
             graph.push(unframe)
@@ -392,8 +413,8 @@ class Levels:
             current_frame = frame.to_ndarray()
 
             if index > len(threshold_list) - 1:
-                threshold_list = np.concatenate(
-                    (threshold_list, np.zeros((len(threshold_list)), dtype=np.float64)),
+                threshold_list = npconcat(
+                    (threshold_list, npzeros((len(threshold_list)), dtype=np.float64)),
                     axis=0,
                 )
 
