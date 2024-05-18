@@ -178,7 +178,6 @@ def read_v1(tl: Any, log: Log) -> v3:
     if type(chunks) is not list:
         log.error("chunks key must be an array")
 
-    do_bonk_chunk = False
     for i, chunk in enumerate(chunks):
         if type(chunk) is not list or len(chunk) != 3:
             log.error(f"Invalid chunk at chunk {i}")

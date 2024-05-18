@@ -11,6 +11,7 @@ from auto_editor.timeline import v3
 from auto_editor.utils.func import aspect_ratio
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
+from auto_editor.make_layers import make_sane_timebase
 
 
 @dataclass(slots=True)
@@ -108,6 +109,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
         file_info[file] = {
             "type": "media",
+            "recommendedTimebase": "30/1",
             "video": [],
             "audio": [],
             "subtitle": [],
@@ -116,6 +118,10 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 "bitrate": src.bitrate,
             },
         }
+
+        if src.videos:
+            recTb = make_sane_timebase(src.videos[0].fps)
+            file_info[file]["recommendedTimebase"] = f"{recTb.numerator}/{recTb.denominator}"
 
         for track, v in enumerate(src.videos):
             w, h = v.width, v.height
