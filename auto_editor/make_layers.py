@@ -110,6 +110,17 @@ def run_interpreter_for_edit_option(
     return result
 
 
+def make_sane_timebase(fps: Fraction) -> Fraction:
+    tb = round(fps, 2)
+    ntsc = Fraction(30_000, 1001)
+    film_ntsc = Fraction(24_000, 1001)
+    if tb == round(ntsc, 2):
+        return ntsc
+    if tb == round(film_ntsc, 2):
+        return film_ntsc
+    return tb
+
+
 def make_timeline(
     sources: list[FileInfo],
     ffmpeg: FFmpeg,
@@ -125,16 +136,10 @@ def make_timeline(
     if inp is None:
         tb, res = Fraction(30), (1920, 1080)
     else:
-        tb = round(inp.get_fps() if args.frame_rate is None else args.frame_rate, 2)
-        ntsc = Fraction(30_000, 1001)
-        film_ntsc = Fraction(24_000, 1001)
-        if tb == round(ntsc, 2):
-            tb = ntsc
-        elif tb == round(film_ntsc, 2):
-            tb = film_ntsc
-
+        tb = make_sane_timebase(
+            inp.get_fps() if args.frame_rate is None else args.frame_rate
+        )
         res = inp.get_res() if args.resolution is None else args.resolution
-
     try:
         start_margin = time(args.margin[0], tb)
         end_margin = time(args.margin[1], tb)
