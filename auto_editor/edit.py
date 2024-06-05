@@ -223,7 +223,7 @@ def edit_media(
                 cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
             ffmpeg.run(cmd)
 
-        tl = make_timeline(sources, ffmpeg, ensure, args, samplerate, bar, temp, log)
+        tl = make_timeline(sources, ensure, args, samplerate, bar, temp, log)
 
     if export["export"] == "timeline":
         from auto_editor.formats.json import make_json_timeline
