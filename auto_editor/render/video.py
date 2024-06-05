@@ -27,9 +27,6 @@ if TYPE_CHECKING:
     from auto_editor.utils.types import Args
 
 
-av.logging.set_level(av.logging.PANIC)
-
-
 @dataclass(slots=True)
 class VideoFrame:
     index: int

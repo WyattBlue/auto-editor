@@ -170,8 +170,6 @@ class Levels:
         # If there's no audio, get length in video metadata.
         import av
 
-        av.logging.set_level(av.logging.PANIC)
-
         with av.open(f"{self.src.path}") as cn:
             if len(cn.streams.video) < 1:
                 self.log.error("Could not get media duration")
@@ -227,11 +225,7 @@ class Levels:
         except Exception:
             json_object = {}
 
-        entry = {
-            "type": str(arr.dtype),
-            "arr": arr.tolist(),
-        }
-
+        entry = {"type": str(arr.dtype), "arr": arr.tolist()}
         src_key = f"{self.src.path}"
 
         if src_key in json_object:
@@ -344,13 +338,10 @@ class Levels:
     def motion(self, s: int, blur: int, width: int) -> NDArray[np.float64]:
         import av
 
-        av.logging.set_level(av.logging.PANIC)
-
-        mobj = {"stream": s, "width": width, "blur": blur}
-
         if s >= len(self.src.videos):
             raise LevelError(f"motion: video stream '{s}' does not exist.")
 
+        mobj = {"stream": s, "width": width, "blur": blur}
         if (arr := self.read_cache("motion", mobj)) is not None:
             return arr
 
