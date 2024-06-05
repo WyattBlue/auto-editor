@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, NamedTuple
 import numpy as np
 
 from auto_editor.analyze import FileSetup, Levels
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
@@ -121,9 +121,18 @@ def make_sane_timebase(fps: Fraction) -> Fraction:
     return tb
 
 
+def parse_time(val: str, arr: NDArray, tb: Fraction) -> int:  # raises: `CoerceError`
+    if val == "start":
+        return 0
+    if val == "end":
+        return len(arr)
+
+    num = time(val, tb)
+    return num if num >= 0 else num + len(arr)
+
+
 def make_timeline(
     sources: list[FileInfo],
-    ffmpeg: FFmpeg,
     ensure: Ensure,
     args: Args,
     sr: int,
@@ -140,6 +149,7 @@ def make_timeline(
             inp.get_fps() if args.frame_rate is None else args.frame_rate
         )
         res = inp.get_res() if args.resolution is None else args.resolution
+
     try:
         start_margin = time(args.margin[0], tb)
         end_margin = time(args.margin[1], tb)
@@ -176,36 +186,21 @@ def make_timeline(
         speed_hash[len(speed_map) - 1] = speed
         return len(speed_map) - 1
 
-    def parse_time(val: str, arr: NDArray) -> int:
-        if val == "start":
-            return 0
-        if val == "end":
-            return len(arr)
-        try:
-            num = time(val, tb)
-            return num if num >= 0 else num + len(arr)
-        except CoerceError as e:
-            log.error(e)
-
-    def mut_set_range(arr: NDArray, _ranges: list[list[str]], index: float) -> None:
-        for _range in _ranges:
-            assert len(_range) == 2
-            pair = [parse_time(val, arr) for val in _range]
-            arr[pair[0] : pair[1]] = index
-
     try:
-        if len(args.cut_out) > 0:
+        for _range in args.cut_out:
             # always cut out even if 'silent_speed' is not 99,999
-            mut_set_range(speed_index, args.cut_out, get_speed_index(99_999))
+            pair = [parse_time(val, speed_index, tb) for val in _range]
+            speed_index[pair[0] : pair[1]] = get_speed_index(99_999)
 
-        if len(args.add_in) > 0:
+        for _range in args.add_in:
             # set to 'video_speed' index
-            mut_set_range(speed_index, args.add_in, 1.0)
+            pair = [parse_time(val, speed_index, tb) for val in _range]
+            speed_index[pair[0] : pair[1]] = 1
 
         for speed_range in args.set_speed_for_range:
-            speed = speed_range[0]
-            _range = list(speed_range[1:])
-            mut_set_range(speed_index, [_range], get_speed_index(speed))
+            start_in = parse_time(speed_range[1], speed_index, tb)
+            end_in = parse_time(speed_range[2], speed_index, tb)
+            speed_index[start_in:end_in] = get_speed_index(speed_range[0])
     except CoerceError as e:
         log.error(e)
 

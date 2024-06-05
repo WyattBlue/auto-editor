@@ -164,8 +164,9 @@ def margin(val: str) -> tuple[str, str]:
     return vals[0], vals[1]
 
 
-def time_range(val: str) -> list[str]:
-    return _comma_coerce("time_range", val, 2)
+def time_range(val: str) -> tuple[str, str]:
+    a = _comma_coerce("time_range", val, 2)
+    return a[0], a[1]
 
 
 def speed_range(val: str) -> tuple[float, str, str]:
@@ -231,8 +232,8 @@ class Args:
     extras: str | None = None
     sn: bool = False
     no_seek: bool = False
-    cut_out: list[list[str]] = field(default_factory=list)
-    add_in: list[list[str]] = field(default_factory=list)
+    cut_out: list[tuple[str, str]] = field(default_factory=list)
+    add_in: list[tuple[str, str]] = field(default_factory=list)
     set_speed_for_range: list[tuple[float, str, str]] = field(default_factory=list)
     frame_rate: Fraction | None = None
     sample_rate: int | None = None
