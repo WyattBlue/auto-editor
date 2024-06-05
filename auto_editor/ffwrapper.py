@@ -192,8 +192,6 @@ class FileInfo:
 def initFileInfo(path: str, log: Log) -> FileInfo:
     import av
 
-    av.logging.set_level(av.logging.PANIC)
-
     try:
         cont = av.open(path, "r")
     except av.error.InvalidDataError:
