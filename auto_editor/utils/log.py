@@ -24,7 +24,7 @@ class Timer:
 
 
 class Log:
-    __slots__ = ("is_debug", "quiet", "temp")
+    __slots__ = ("is_debug", "quiet", "temp", "machine")
 
     def __init__(
         self, show_debug: bool = False, quiet: bool = False, temp: str | None = None
@@ -32,6 +32,7 @@ class Log:
         self.is_debug = show_debug
         self.quiet = quiet
         self.temp = temp
+        self.machine = False
 
     def debug(self, message: object) -> None:
         if self.is_debug:
@@ -55,7 +56,9 @@ class Log:
                 self.debug(f"Failed to delete temp dir:\n{e}")
 
     def conwrite(self, message: str) -> None:
-        if not self.quiet:
+        if self.machine:
+            print(message, flush=True)
+        elif not self.quiet:
             buffer = " " * (get_terminal_size().columns - len(message) - 3)
             sys.stdout.write(f"  {message}{buffer}\r")
 
