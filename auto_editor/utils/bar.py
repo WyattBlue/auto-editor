@@ -67,9 +67,9 @@ class Bar:
 
         if self.machine:
             index = min(index, self.total)
-            raw = int(self.begin_time + rate)
+            secs_til_eta = round(self.begin_time + rate - time(), 2)
             print(
-                f"{self.title}~{index}~{self.total}~{self.begin_time}~{raw}",
+                f"{self.title}~{index}~{self.total}~{secs_til_eta}",
                 end="\r",
                 flush=True,
             )
