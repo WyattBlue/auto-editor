@@ -323,7 +323,8 @@ def main() -> None:
         log.error("You need to give auto-editor an input file.")
 
     temp = setup_tempdir(args.temp_dir, Log())
-    log = Log(args.debug, args.quiet, temp=temp)
+    log = Log(args.debug, args.quiet, temp)
+    log.machine = args.progress == "machine"
     log.debug(f"Temp Directory: {temp}")
 
     paths = valid_input(args.input, ffmpeg, args, log)
