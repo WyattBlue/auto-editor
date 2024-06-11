@@ -4,7 +4,7 @@ import sys
 
 import auto_editor
 from auto_editor.utils.func import setup_tempdir
-from auto_editor.utils.log import Log
+from auto_editor.utils.log import Log, Timer
 from auto_editor.utils.types import (
     Args,
     bitrate,
@@ -312,8 +312,7 @@ def main() -> None:
     if args.debug and args.input == []:
         import platform as plat
 
-        is64bit = "64-bit" if sys.maxsize > 2**32 else "32-bit"
-        print(f"Python Version: {plat.python_version()} {is64bit}")
+        print(f"Python Version: {plat.python_version()}")
         print(f"Platform: {plat.system()} {plat.release()} {plat.machine().lower()}")
         print(f"FFmpeg Version: {ffmpeg.version}\nFFmpeg Path: {ffmpeg.path}")
         print(f"Auto-Editor Version: {auto_editor.version}")
@@ -328,9 +327,10 @@ def main() -> None:
     log.debug(f"Temp Directory: {temp}")
 
     paths = valid_input(args.input, ffmpeg, args, log)
+    timer = Timer(args.quiet or log.machine)
 
     try:
-        edit_media(paths, ffmpeg, args, temp, log)
+        edit_media(paths, ffmpeg, args, temp, timer, log)
     except KeyboardInterrupt:
         log.error("Keyboard Interrupt")
     log.cleanup()

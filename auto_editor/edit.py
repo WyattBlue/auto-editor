@@ -150,9 +150,8 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
 
 
 def edit_media(
-    paths: list[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
+    paths: list[str], ffmpeg: FFmpeg, args: Args, temp: str, timer: Timer, log: Log
 ) -> None:
-    timer = Timer(args.quiet)
     bar = Bar(args.progress)
     tl = None
 
