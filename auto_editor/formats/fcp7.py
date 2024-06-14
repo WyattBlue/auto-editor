@@ -188,7 +188,7 @@ def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
     try:
         tree = ET.parse(path)
     except FileNotFoundError:
-        log.nofile(path)
+        log.error(f"Could not find '{path}'")
 
     root = tree.getroot()
 

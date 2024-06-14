@@ -81,6 +81,6 @@ def valid_input(inputs: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> list
         else:
             if os.path.isdir(my_input):
                 log.error("Input must be a file or a URL, not a directory.")
-            log.nofile(my_input)
+            log.error(f"Could not find '{my_input}'")
 
     return new_inputs
