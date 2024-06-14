@@ -2,37 +2,26 @@ from __future__ import annotations
 
 import sys
 from datetime import timedelta
-from pathlib import Path
 from shutil import get_terminal_size, rmtree
 from time import perf_counter, sleep
 from typing import NoReturn
 
 
-class Timer:
-    __slots__ = ("start_time", "quiet")
-
-    def __init__(self, quiet: bool = False):
-        self.start_time = perf_counter()
-        self.quiet = quiet
-
-    def stop(self) -> None:
-        if not self.quiet:
-            second_len = round(perf_counter() - self.start_time, 2)
-            minute_len = timedelta(seconds=round(second_len))
-
-            sys.stdout.write(f"Finished. took {second_len} seconds ({minute_len})\n")
-
-
 class Log:
-    __slots__ = ("is_debug", "quiet", "temp", "machine")
+    __slots__ = ("is_debug", "quiet", "temp", "machine", "start_time")
 
     def __init__(
-        self, show_debug: bool = False, quiet: bool = False, temp: str | None = None
+        self,
+        is_debug: bool = False,
+        quiet: bool = False,
+        temp: str | None = None,
+        machine: bool = False,
     ):
-        self.is_debug = show_debug
+        self.is_debug = is_debug
         self.quiet = quiet
         self.temp = temp
-        self.machine = False
+        self.machine = machine
+        self.start_time = 0 if self.quiet or self.machine else perf_counter()
 
     def debug(self, message: object) -> None:
         if self.is_debug:
@@ -62,6 +51,23 @@ class Log:
             buffer = " " * (get_terminal_size().columns - len(message) - 3)
             sys.stdout.write(f"  {message}{buffer}\r")
 
+    def print(self, message: str) -> None:
+        if not self.quiet:
+            self.conwrite("")
+            sys.stdout.write(f"{message}\n")
+
+    def warning(self, message: str) -> None:
+        if not self.quiet:
+            self.conwrite("")
+            sys.stderr.write(f"Warning! {message}\n")
+
+    def stop_timer(self) -> None:
+        if not self.quiet and not self.machine:
+            second_len = round(perf_counter() - self.start_time, 2)
+            minute_len = timedelta(seconds=round(second_len))
+
+            sys.stdout.write(f"Finished. took {second_len} seconds ({minute_len})\n")
+
     def error(self, message: str | Exception) -> NoReturn:
         if self.is_debug and isinstance(message, Exception):
             self.cleanup()
@@ -81,16 +87,3 @@ class Log:
                 import os
 
                 os._exit(1)
-
-    def nofile(self, path: str | Path) -> NoReturn:
-        self.error(f"Could not find '{path}'")
-
-    def warning(self, message: str) -> None:
-        if not self.quiet:
-            self.conwrite("")
-            sys.stderr.write(f"Warning! {message}\n")
-
-    def print(self, message: str) -> None:
-        if not self.quiet:
-            self.conwrite("")
-            sys.stdout.write(f"{message}\n")

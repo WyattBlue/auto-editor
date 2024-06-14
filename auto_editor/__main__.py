@@ -3,8 +3,10 @@
 import sys
 
 import auto_editor
+from auto_editor.edit import edit_media
+from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.func import setup_tempdir
-from auto_editor.utils.log import Log, Timer
+from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     Args,
     bitrate,
@@ -277,7 +279,7 @@ def main() -> None:
             f"auto_editor.subcommands.{sys.argv[1]}", fromlist=["subcommands"]
         )
         obj.main(sys.argv[2:])
-        sys.exit()
+        return
 
     args = main_options(ArgumentParser("Auto-Editor")).parse_args(
         Args,
@@ -296,41 +298,37 @@ def main() -> None:
 
     if args.version:
         print(f"{auto_editor.version} ({auto_editor.__version__})")
-        sys.exit()
+        return
 
-    from auto_editor.edit import edit_media
-    from auto_editor.ffwrapper import FFmpeg
+    if args.debug and not args.input:
+        import platform as plat
+
+        import av
+
+        print(f"Python Version: {plat.python_version()}")
+        print(f"Platform: {plat.system()} {plat.release()} {plat.machine().lower()}")
+        print(f"PyAV Version: {av.__version__}")
+        print(f"Auto-Editor Version: {auto_editor.version}")
+        return
 
     log = Log(args.debug, args.quiet)
+    if not args.input:
+        log.error("You need to give auto-editor an input file.")
+
+    temp = setup_tempdir(args.temp_dir, log)
+    log = Log(args.debug, args.quiet, temp, args.progress == "machine")
+    log.debug(f"Temp Directory: {temp}")
+
     ffmpeg = FFmpeg(
         args.ffmpeg_location,
         args.my_ffmpeg,
         args.show_ffmpeg_commands,
         args.show_ffmpeg_output,
     )
-
-    if args.debug and args.input == []:
-        import platform as plat
-
-        print(f"Python Version: {plat.python_version()}")
-        print(f"Platform: {plat.system()} {plat.release()} {plat.machine().lower()}")
-        print(f"FFmpeg Version: {ffmpeg.version}\nFFmpeg Path: {ffmpeg.path}")
-        print(f"Auto-Editor Version: {auto_editor.version}")
-        sys.exit()
-
-    if args.input == []:
-        log.error("You need to give auto-editor an input file.")
-
-    temp = setup_tempdir(args.temp_dir, Log())
-    log = Log(args.debug, args.quiet, temp)
-    log.machine = args.progress == "machine"
-    log.debug(f"Temp Directory: {temp}")
-
     paths = valid_input(args.input, ffmpeg, args, log)
-    timer = Timer(args.quiet or log.machine)
 
     try:
-        edit_media(paths, ffmpeg, args, temp, timer, log)
+        edit_media(paths, ffmpeg, args, temp, log)
     except KeyboardInterrupt:
         log.error("Keyboard Interrupt")
     log.cleanup()

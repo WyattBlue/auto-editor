@@ -83,7 +83,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
     for file in args.input:
         if not os.path.isfile(file):
-            log.nofile(file)
+            log.error(f"Could not find '{file}'")
 
         ext = os.path.splitext(file)[1]
         if ext == ".json":
