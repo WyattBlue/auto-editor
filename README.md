@@ -88,16 +88,14 @@ Auto-Editor can also export to:
 - Individual media clips with `--export clip-sequence`
 
 ### Naming Timelines
-By default, auto-editor will name the timeline to "Auto-Editor Media Group" if the export supports naming.
+Some editors support naming timelines. By default, auto-editor will use the name "Auto-Editor Media Group". For `premiere` `resolve` and `final-cut-pro` export options, you can change the name with the following syntax.
 
 ```
+# for POSIX shells
 auto-editor example.mp4 --export 'premiere:name="Your name here"'
 
-auto-editor example.mp4 --export 'resolve:name="Your name here"'
-
-auto-editor example.mp4 --export 'final-cut-pro:name="Your name here"'
-
-# No other export options support naming
+# for Powershell
+auto-editor example.mp4 --export 'premiere:name=""Your name here""'
 ```
 
 ### Split by Clip
