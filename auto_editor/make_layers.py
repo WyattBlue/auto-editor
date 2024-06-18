@@ -112,8 +112,13 @@ def run_interpreter_for_edit_option(
 
 def make_sane_timebase(fps: Fraction) -> Fraction:
     tb = round(fps, 2)
+
+    ntsc_60 = Fraction(60_000, 1001)
     ntsc = Fraction(30_000, 1001)
     film_ntsc = Fraction(24_000, 1001)
+
+    if tb == round(ntsc_60, 2):
+        return ntsc_60
     if tb == round(ntsc, 2):
         return ntsc
     if tb == round(film_ntsc, 2):
