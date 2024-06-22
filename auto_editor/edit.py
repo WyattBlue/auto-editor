@@ -212,15 +212,6 @@ def edit_media(
     ensure = Ensure(ffmpeg, samplerate, temp, log)
 
     if tl is None:
-        # Extract subtitles in their native format.
-        if src is not None and len(src.subtitles) > 0 and not args.sn:
-            cmd = ["-i", f"{src.path}", "-hide_banner"]
-            for s, sub in enumerate(src.subtitles):
-                cmd.extend(["-map", f"0:s:{s}"])
-            for s, sub in enumerate(src.subtitles):
-                cmd.extend([os.path.join(temp, f"{s}s.{sub.ext}")])
-            ffmpeg.run(cmd)
-
         tl = make_timeline(sources, ensure, args, samplerate, bar, temp, log)
 
     if export["export"] == "timeline":
@@ -282,7 +273,7 @@ def edit_media(
         apply_later = False
 
         if ctr.allow_subtitle and not args.sn:
-            sub_output = make_new_subtitles(tl, ffmpeg, temp, log)
+            sub_output = make_new_subtitles(tl, ffmpeg, ensure, temp, log)
 
         if ctr.allow_audio:
             audio_output = make_new_audio(tl, ensure, args, ffmpeg, bar, temp, log)
