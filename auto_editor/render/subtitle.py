@@ -135,16 +135,11 @@ def make_new_subtitles(
         new_path = os.path.join(temp, f"new{s}s.{sub.ext}")
         parser = SubtitleParser(tl.tb)
 
-        if sub.codec in parser.supported_codecs:
-            file_path = ensure.subtitle(tl.v1.source, s)
-            with open(file_path, encoding="utf-8") as file:
-                parser.parse(file.read(), sub.codec)
-        else:
-            file_path = os.path.join(temp, f"{s}s.{sub.ext}")
-            convert_path = os.path.join(temp, f"{s}s_convert.vtt")
-            ffmpeg.run(["-i", file_path, convert_path])
-            with open(convert_path, encoding="utf-8") as file:
-                parser.parse(file.read(), "webvtt")
+        ext = sub.ext if sub.codec in parser.supported_codecs else "vtt"
+        file_path = ensure.subtitle(tl.v1.source, s, ext)
+
+        with open(file_path, encoding="utf-8") as file:
+            parser.parse(file.read(), sub.codec)
 
         parser.edit(tl.v1.chunks)
         parser.write(new_path)
