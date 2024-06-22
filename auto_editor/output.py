@@ -32,6 +32,7 @@ class Ensure:
 
         if first_time:
             self.log.conwrite("Extracting audio")
+            self.log.debug(f"Making external audio for stream: {stream}")
 
             cmd = ["-i", f"{src.path}", "-map", f"0:a:{stream}"]
             cmd += ["-ac", "2", "-ar", f"{self._sr}", "-rf64", "always", out_path]
@@ -52,6 +53,7 @@ class Ensure:
 
         if first_time:
             self.log.conwrite("Extracting subtitle")
+            self.log.debug(f"Making external subtitle: {out_path}")
             self._ffmpeg.run(["-i", f"{src.path}", "-map", f"0:s:{stream}", out_path])
 
         return out_path
