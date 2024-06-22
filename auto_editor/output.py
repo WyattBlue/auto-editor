@@ -16,23 +16,23 @@ class Ensure:
     _sr: int
     temp: str
     log: Log
-    labels: list[tuple[FileInfo, int]] = field(default_factory=list)
-    sub_labels: list[tuple[FileInfo, int]] = field(default_factory=list)
+    _audios: list[tuple[FileInfo, int]] = field(default_factory=list)
+    _subtitles: list[tuple[FileInfo, int]] = field(default_factory=list)
 
     def audio(self, src: FileInfo, stream: int) -> str:
         try:
-            label = self.labels.index((src, stream))
+            label = self._audios.index((src, stream))
             first_time = False
         except ValueError:
-            self.labels.append((src, stream))
-            label = len(self.labels) - 1
+            self._audios.append((src, stream))
+            label = len(self._audios) - 1
             first_time = True
 
         out_path = os.path.join(self.temp, f"{label:x}.wav")
 
         if first_time:
+            self.log.debug(f"Making external audio: {out_path}")
             self.log.conwrite("Extracting audio")
-            self.log.debug(f"Making external audio for stream: {stream}")
 
             cmd = ["-i", f"{src.path}", "-map", f"0:a:{stream}"]
             cmd += ["-ac", "2", "-ar", f"{self._sr}", "-rf64", "always", out_path]
@@ -42,18 +42,18 @@ class Ensure:
 
     def subtitle(self, src: FileInfo, stream: int) -> str:
         try:
-            label = self.sub_labels.index((src, stream))
+            self._subtitles.index((src, stream))
             first_time = False
         except ValueError:
-            self.sub_labels.append((src, stream))
-            label = len(self.sub_labels) - 1
+            self._subtitles.append((src, stream))
             first_time = True
 
-        out_path = os.path.join(self.temp, f"{label:x}.vtt")
+        sub = src.subtitles[stream]
+        out_path = os.path.join(self.temp, f"{stream}s.{sub.ext}")
 
         if first_time:
-            self.log.conwrite("Extracting subtitle")
             self.log.debug(f"Making external subtitle: {out_path}")
+            self.log.conwrite("Extracting subtitle")
             self._ffmpeg.run(["-i", f"{src.path}", "-map", f"0:s:{stream}", out_path])
 
         return out_path
