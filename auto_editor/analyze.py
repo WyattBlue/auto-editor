@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -19,12 +20,12 @@ from auto_editor.lib.contracts import (
     orc,
 )
 from auto_editor.lib.data_structs import Sym
-from auto_editor.render.subtitle import SubtitleParser
 from auto_editor.utils.cmdkw import (
     Required,
     pAttr,
     pAttrs,
 )
+from auto_editor.utils.subtitle_tools import convert_ass_to_text
 from auto_editor.wavfile import read
 
 if TYPE_CHECKING:
@@ -307,31 +308,65 @@ class Levels:
         except re.error as e:
             self.log.error(e)
 
-        sub_file = self.ensure.subtitle(self.src, stream)
-        parser = SubtitleParser(self.tb)
+        import av
+        from av.subtitles.subtitle import AssSubtitle, TextSubtitle
 
-        with open(sub_file, encoding="utf-8") as file:
-            parser.parse(file.read(), "webvtt")
+        try:
+            container = av.open(self.src.path, "r")
+            subtitle_stream = container.streams.subtitles[stream]
+            assert isinstance(subtitle_stream.time_base, Fraction)
+        except Exception as e:
+            self.log.error(e)
 
-        # stackoverflow.com/questions/9662346/python-code-to-remove-html-tags-from-a-string
-        def cleanhtml(raw_html: str) -> str:
-            cleanr = re.compile("<.*?>")
-            return re.sub(cleanr, "", raw_html)
+        # Get the length of the subtitle stream.
+        sub_length = 0
+        for packet in container.demux(subtitle_stream):
+            if packet.pts is None or packet.duration is None:
+                continue
+            for subset in packet.decode():
+                # See definition of `AVSubtitle`
+                # in: https://ffmpeg.org/doxygen/trunk/avcodec_8h_source.html
+                start = float(packet.pts * subtitle_stream.time_base)
+                dur = float(packet.duration * subtitle_stream.time_base)
 
-        if not parser.contents:
-            self.log.error("subtitle has no valid entries")
+                end = round((start + dur) * self.tb)
+                sub_length = max(sub_length, end)
 
-        result = np.zeros((parser.contents[-1].end), dtype=np.bool_)
+        result = np.zeros((sub_length), dtype=np.bool_)
+        del sub_length
 
         count = 0
-        for content in parser.contents:
-            if max_count is not None and count >= max_count:
+        early_exit = False
+        container.seek(0)
+        for packet in container.demux(subtitle_stream):
+            if packet.pts is None or packet.duration is None:
+                continue
+            if early_exit:
                 break
+            for subset in packet.decode():
+                if max_count is not None and count >= max_count:
+                    early_exit = True
+                    break
 
-            line = cleanhtml(content.after.strip())
-            if line and re.search(pattern, line):
-                result[content.start : content.end] = 1
-                count += 1
+                start = float(packet.pts * subtitle_stream.time_base)
+                dur = float(packet.duration * subtitle_stream.time_base)
+
+                san_start = round(start * self.tb)
+                san_end = round((start + dur) * self.tb)
+
+                for sub in subset:
+                    if isinstance(sub, AssSubtitle):
+                        line = convert_ass_to_text(sub.ass.decode(errors="ignore"))
+                    elif isinstance(sub, TextSubtitle):
+                        line = sub.text.decode(errors="ignore")
+                    else:
+                        continue
+
+                    if line and re.search(pattern, line):
+                        result[san_start:san_end] = 1
+                        count += 1
+
+        container.close()
 
         return result
 
