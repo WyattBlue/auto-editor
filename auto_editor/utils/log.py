@@ -8,7 +8,7 @@ from typing import NoReturn
 
 
 class Log:
-    __slots__ = ("is_debug", "quiet", "temp", "machine", "start_time")
+    __slots__ = ("is_debug", "quiet", "temp", "machine", "start_time", "no_color")
 
     def __init__(
         self,
@@ -16,11 +16,13 @@ class Log:
         quiet: bool = False,
         temp: str | None = None,
         machine: bool = False,
+        no_color: bool = True,
     ):
         self.is_debug = is_debug
         self.quiet = quiet
         self.temp = temp
         self.machine = machine
+        self.no_color = no_color
         self.start_time = 0 if self.quiet or self.machine else perf_counter()
 
     def debug(self, message: object) -> None:
@@ -74,7 +76,11 @@ class Log:
             raise message
 
         self.conwrite("")
-        sys.stderr.write(f"Error! {message}\n")
+        if self.no_color:
+            sys.stderr.write(f"Error! {message}\n")
+        else:
+            sys.stderr.write(f"\033[31;40mError! {message}\033[0m\n")
+
         self.cleanup()
         from platform import system
 

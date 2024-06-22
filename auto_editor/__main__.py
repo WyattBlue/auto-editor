@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+from os import environ
 
 import auto_editor
 from auto_editor.edit import edit_media
@@ -281,9 +282,14 @@ def main() -> None:
         obj.main(sys.argv[2:])
         return
 
+    ff_color = "AV_LOG_FORCE_NOCOLOR"
+    no_color = bool(environ.get("NO_COLOR")) or bool(environ.get(ff_color))
+    log = Log(no_color=no_color)
+
     args = main_options(ArgumentParser("Auto-Editor")).parse_args(
         Args,
         sys.argv[1:],
+        log,
         macros=[
             ({"--frame-margin"}, ["--margin"]),
             ({"--export-to-premiere", "-exp"}, ["--export", "premiere"]),
@@ -311,12 +317,11 @@ def main() -> None:
         print(f"Auto-Editor Version: {auto_editor.version}")
         return
 
-    log = Log(args.debug, args.quiet)
     if not args.input:
         log.error("You need to give auto-editor an input file.")
 
     temp = setup_tempdir(args.temp_dir, log)
-    log = Log(args.debug, args.quiet, temp, args.progress == "machine")
+    log = Log(args.debug, args.quiet, temp, args.progress == "machine", no_color)
     log.debug(f"Temp Directory: {temp}")
 
     ffmpeg = FFmpeg(
