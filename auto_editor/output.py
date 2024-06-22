@@ -17,7 +17,7 @@ class Ensure:
     temp: str
     log: Log
     _audios: list[tuple[FileInfo, int]] = field(default_factory=list)
-    _subtitles: list[tuple[FileInfo, int]] = field(default_factory=list)
+    _subtitles: list[tuple[FileInfo, int, str]] = field(default_factory=list)
 
     def audio(self, src: FileInfo, stream: int) -> str:
         try:
@@ -40,16 +40,15 @@ class Ensure:
 
         return out_path
 
-    def subtitle(self, src: FileInfo, stream: int) -> str:
+    def subtitle(self, src: FileInfo, stream: int, ext: str) -> str:
         try:
-            self._subtitles.index((src, stream))
+            self._subtitles.index((src, stream, ext))
             first_time = False
         except ValueError:
-            self._subtitles.append((src, stream))
+            self._subtitles.append((src, stream, ext))
             first_time = True
 
-        sub = src.subtitles[stream]
-        out_path = os.path.join(self.temp, f"{stream}s.{sub.ext}")
+        out_path = os.path.join(self.temp, f"{stream}s.{ext}")
 
         if first_time:
             self.log.debug(f"Making external subtitle: {out_path}")
