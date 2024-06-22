@@ -273,7 +273,7 @@ def edit_media(
         apply_later = False
 
         if ctr.allow_subtitle and not args.sn:
-            sub_output = make_new_subtitles(tl, ffmpeg, ensure, temp, log)
+            sub_output = make_new_subtitles(tl, ensure, temp)
 
         if ctr.allow_audio:
             audio_output = make_new_audio(tl, ensure, args, ffmpeg, bar, temp, log)

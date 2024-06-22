@@ -10,11 +10,9 @@ from auto_editor.utils.func import to_timecode
 if TYPE_CHECKING:
     from fractions import Fraction
 
-    from auto_editor.ffwrapper import FFmpeg
     from auto_editor.output import Ensure
     from auto_editor.timeline import v3
     from auto_editor.utils.chunks import Chunks
-    from auto_editor.utils.log import Log
 
 
 @dataclass(slots=True)
@@ -123,9 +121,7 @@ class SubtitleParser:
             file.write(self.footer)
 
 
-def make_new_subtitles(
-    tl: v3, ffmpeg: FFmpeg, ensure: Ensure, temp: str, log: Log
-) -> list[str]:
+def make_new_subtitles(tl: v3, ensure: Ensure, temp: str) -> list[str]:
     if tl.v1 is None:
         return []
 
