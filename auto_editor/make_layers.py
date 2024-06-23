@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from math import ceil
 from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
@@ -231,21 +232,35 @@ def make_timeline(
         chunks.append((src, start, arr_length, speed_map[arr[j]]))
         return chunks
 
+    # Assert timeline is monotonic because non-monotonic timelines are incorrect
+    # here and causes back-seeking (performance issue) in video rendering.
+
+    # We don't properly check monotonicity for multiple sources, so skip those.
+
+    check_monotonic = len(sources) == 1
+    last_i = 0
+
     clips: list[Clip] = []
-    i = 0
     start = 0
+
     for chunk in echunk(speed_index, src_index):
         if chunk[3] != 99999:
-            dur = round((chunk[2] - chunk[1]) / chunk[3])
+            dur = int((chunk[2] - chunk[1]) / chunk[3])
             if dur == 0:
                 continue
 
-            offset = int(chunk[1] / chunk[3])
+            offset = ceil(chunk[1] / chunk[3])
 
-            if not (clips and clips[-1].start == round(start)):
-                clips.append(Clip(start, dur, offset, chunk[3], chunk[0]))
+            if check_monotonic:
+                max_end = start + dur - 1
+                this_i = round((offset + max_end - start) * chunk[3])
+                if this_i < last_i:
+                    raise ValueError("not monotonic", sources, this_i, last_i)
+                last_i = this_i
+
+            clips.append(Clip(start, dur, offset, chunk[3], chunk[0]))
+
             start += dur
-            i += 1
 
     vtl: VSpace = []
     atl: ASpace = []
@@ -281,4 +296,22 @@ def make_timeline(
     else:
         v1_compatiable = None
 
-    return v3(inp, tb, sr, res, args.background, vtl, atl, v1_compatiable)
+    tl = v3(inp, tb, sr, res, args.background, vtl, atl, v1_compatiable)
+
+    # Additional monotonic check, o(n^2) time complexity so disable by default.
+
+    # if len(sources) != 1:
+    #     return tl
+
+    # last_i = 0
+    # for index in range(tl.end):
+    #     for layer in tl.v:
+    #         for lobj in layer:
+    #             if index >= lobj.start and index < (lobj.start + lobj.dur):
+    #                 _i = round((lobj.offset + index - lobj.start) * lobj.speed)
+    #                 if (_i < last_i):
+    #                     print(_i, last_i)
+    #                     raise ValueError("not monotonic")
+    #                 last_i = _i
+
+    return tl
