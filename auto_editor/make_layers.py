@@ -38,7 +38,7 @@ def clipify(chunks: Chunks, src: FileInfo, start: int = 0) -> list[Clip]:
     clips: list[Clip] = []
     i = 0
     for chunk in chunks:
-        if chunk[2] != 99999:
+        if chunk[2] > 0 and chunk[2] < 99999.0:
             dur = round((chunk[1] - chunk[0]) / chunk[2])
             if dur == 0:
                 continue
