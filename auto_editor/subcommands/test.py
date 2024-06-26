@@ -340,10 +340,16 @@ def main(sys_args: list[str] | None = None):
     def track_tests():
         return run.main(["resources/multi-track.mov"], ["--keep_tracks_seperate"])
 
-    def json_tests():
+    def export_json_tests():
         out = run.main(["example.mp4"], ["--export_as_json"])
         out2 = run.main([out], [])
         return out, out2
+
+    def import_v1_tests():
+        with open("v1.json", "w") as file:
+            file.write("""{"version": "1", "source": "example.mp4", "chunks": [ [0, 26, 1.0], [26, 34, 0] ]}""")
+
+        return run.main(["v1.json"], [])
 
     def premiere_named_export():
         run.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
@@ -711,7 +717,8 @@ def main(sys_args: list[str] | None = None):
                 edit_positive_tests,
                 audio_norm_f,
                 audio_norm_ebu,
-                json_tests,
+                export_json_tests,
+                import_v1_tests,
                 high_speed_test,
                 video_speed,
                 multi_track_edit,
