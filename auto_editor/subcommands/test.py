@@ -347,7 +347,9 @@ def main(sys_args: list[str] | None = None):
 
     def import_v1_tests():
         with open("v1.json", "w") as file:
-            file.write("""{"version": "1", "source": "example.mp4", "chunks": [ [0, 26, 1.0], [26, 34, 0] ]}""")
+            file.write(
+                """{"version": "1", "source": "example.mp4", "chunks": [ [0, 26, 1.0], [26, 34, 0] ]}"""
+            )
 
         return run.main(["v1.json"], [])
 
