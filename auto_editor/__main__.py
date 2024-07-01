@@ -311,10 +311,10 @@ def main() -> None:
 
         import av
 
-        print(f"Python Version: {plat.python_version()}")
-        print(f"Platform: {plat.system()} {plat.release()} {plat.machine().lower()}")
-        print(f"PyAV Version: {av.__version__}")
-        print(f"Auto-Editor Version: {auto_editor.version}")
+        print(f"OS: {plat.system()} {plat.release()} {plat.machine().lower()}")
+        print(f"Python: {plat.python_version()}")
+        print(f"PyAV: {av.__version__}")
+        print(f"Auto-Editor: {auto_editor.version}")
         return
 
     if not args.input:
