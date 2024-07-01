@@ -9,7 +9,6 @@ from auto_editor.utils.func import aspect_ratio, to_timecode
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from auto_editor.ffwrapper import FFmpeg
     from auto_editor.timeline import TlAudio, TlVideo
     from auto_editor.utils.log import Log
 
@@ -22,7 +21,7 @@ https://mltframework.org/docs/mltxml/
 """
 
 
-def shotcut_read_mlt(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
+def shotcut_read_mlt(path: str, log: Log) -> v3:
     raise NotImplementedError
 
 

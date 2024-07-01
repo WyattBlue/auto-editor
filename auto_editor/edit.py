@@ -160,7 +160,7 @@ def edit_media(
         if path_ext == ".xml":
             from auto_editor.formats.fcp7 import fcp7_read_xml
 
-            tl = fcp7_read_xml(paths[0], ffmpeg, log)
+            tl = fcp7_read_xml(paths[0], log)
             assert tl.src is not None
             sources: list[FileInfo] = [tl.src]
             src: FileInfo | None = tl.src
@@ -168,7 +168,7 @@ def edit_media(
         elif path_ext == ".mlt":
             from auto_editor.formats.shotcut import shotcut_read_mlt
 
-            tl = shotcut_read_mlt(paths[0], ffmpeg, log)
+            tl = shotcut_read_mlt(paths[0], log)
             assert tl.src is not None
             sources = [tl.src]
             src = tl.src

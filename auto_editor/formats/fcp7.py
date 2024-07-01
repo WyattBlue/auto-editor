@@ -7,7 +7,7 @@ from math import ceil
 from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
+from auto_editor.ffwrapper import FileInfo, initFileInfo
 from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
 
 from .utils import Validator, show
@@ -177,7 +177,7 @@ def read_filters(clipitem: Element, log: Log) -> float:
     return 1.0
 
 
-def fcp7_read_xml(path: str, ffmpeg: FFmpeg, log: Log) -> v3:
+def fcp7_read_xml(path: str, log: Log) -> v3:
     def xml_bool(val: str) -> bool:
         if val == "TRUE":
             return True
