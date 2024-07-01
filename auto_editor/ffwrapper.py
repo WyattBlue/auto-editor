@@ -11,6 +11,8 @@ from shutil import which
 from subprocess import PIPE, Popen
 from typing import Any
 
+import av
+
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 
@@ -190,10 +192,12 @@ class FileInfo:
 
 
 def initFileInfo(path: str, log: Log) -> FileInfo:
-    import av
-
     try:
         cont = av.open(path, "r")
+    except av.error.FileNotFoundError:
+        log.error(f"Could not find '{path}'")
+    except av.error.IsADirectoryError:
+        log.error(f"Expected a media file, but got a directory: {path}")
     except av.error.InvalidDataError:
         log.error(f"Invalid data when processing: {path}")
 
