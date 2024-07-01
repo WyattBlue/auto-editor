@@ -67,20 +67,17 @@ def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
 
 
 def valid_input(inputs: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> list[str]:
-    new_inputs = []
+    result = []
 
     for my_input in inputs:
-        if os.path.isfile(my_input):
+        if my_input.startswith("http://") or my_input.startswith("https://"):
+            result.append(download_video(my_input, args, ffmpeg, log))
+        else:
             _, ext = os.path.splitext(my_input)
             if ext == "":
-                log.error("File must have an extension.")
-            new_inputs.append(my_input)
+                if os.path.isdir(my_input):
+                    log.error("Input must be a file or a URL, not a directory.")
+                log.error("Input file must have an extension.")
+            result.append(my_input)
 
-        elif my_input.startswith("http://") or my_input.startswith("https://"):
-            new_inputs.append(download_video(my_input, args, ffmpeg, log))
-        else:
-            if os.path.isdir(my_input):
-                log.error("Input must be a file or a URL, not a directory.")
-            log.error(f"Could not find '{my_input}'")
-
-    return new_inputs
+    return result
