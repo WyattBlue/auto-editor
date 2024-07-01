@@ -4,15 +4,22 @@ import os.path
 from dataclasses import dataclass, field
 from fractions import Fraction
 
+import av
+from av.audio.resampler import AudioResampler
+
 from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.utils.bar import Bar
 from auto_editor.utils.container import Container
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
+
+av.logging.set_level(av.logging.VERBOSE)
 
 
 @dataclass(slots=True)
 class Ensure:
     _ffmpeg: FFmpeg
+    _bar: Bar
     _sr: int
     temp: str
     log: Log
@@ -31,12 +38,42 @@ class Ensure:
         out_path = os.path.join(self.temp, f"{label:x}.wav")
 
         if first_time:
+            sample_rate = self._sr
+            bar = self._bar
             self.log.debug(f"Making external audio: {out_path}")
-            self.log.conwrite("Extracting audio")
 
-            cmd = ["-i", f"{src.path}", "-map", f"0:a:{stream}"]
-            cmd += ["-ac", "2", "-ar", f"{self._sr}", "-rf64", "always", out_path]
-            self._ffmpeg.run(cmd)
+            in_container = av.open(src.path, "r")
+            out_container = av.open(
+                out_path, "w", format="wav", options={"rf64": "always"}
+            )
+            astream = in_container.streams.audio[stream]
+
+            if astream.duration is None or astream.time_base is None:
+                dur = 0
+            else:
+                dur = int(astream.duration * astream.time_base)
+
+            bar.start(dur, "Extracting audio")
+
+            # PyAV always uses "stereo" layout, which is what we want.
+            output_astream = out_container.add_stream("pcm_s16le", rate=sample_rate)
+            assert isinstance(output_astream, av.audio.stream.AudioStream)
+
+            resampler = AudioResampler(format="s16", layout="stereo", rate=sample_rate)  # type: ignore
+            for i, frame in enumerate(in_container.decode(astream)):
+                if i % 1500 == 0:
+                    bar.tick(0 if frame.time is None else frame.time)
+
+                for new_frame in resampler.resample(frame):
+                    for packet in output_astream.encode(new_frame):
+                        out_container.mux_one(packet)
+
+            for packet in output_astream.encode():
+                out_container.mux_one(packet)
+
+            out_container.close()
+            in_container.close()
+            bar.end()
 
         return out_path
 

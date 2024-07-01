@@ -209,7 +209,7 @@ def edit_media(
     else:
         samplerate = args.sample_rate
 
-    ensure = Ensure(ffmpeg, samplerate, temp, log)
+    ensure = Ensure(ffmpeg, bar, samplerate, temp, log)
 
     if tl is None:
         tl = make_timeline(sources, ensure, args, samplerate, bar, temp, log)
