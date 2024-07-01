@@ -103,8 +103,8 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
                                 graph.add("scale", f"{obj.width}:-1"),
                                 graph.add("buffersink"),
                             )
-                            graph.push(frame)
-                            frame = graph.pull()
+                            graph.vpush(frame)
+                            frame = graph.vpull()
                         img_cache[(obj.src, obj.width)] = frame.to_ndarray(
                             format="rgb24"
                         )
@@ -122,7 +122,7 @@ def render_av(
     log: Log,
 ) -> tuple[str, bool]:
     src = tl.src
-    cns: dict[FileInfo, av.InputContainer] = {}
+    cns: dict[FileInfo, av.container.InputContainer] = {}
     decoders: dict[FileInfo, Iterator[av.VideoFrame]] = {}
     seek_cost: dict[FileInfo, int] = {}
     tous: dict[FileInfo, int] = {}
@@ -302,8 +302,8 @@ def render_av(
                             graph.add("pad", f"{width}:{height}:-1:-1:color={bg}"),
                             graph.add("buffersink"),
                         )
-                        graph.push(frame)
-                        frame = graph.pull()
+                        graph.vpush(frame)
+                        frame = graph.vpull()
                 elif isinstance(obj, TlRect):
                     graph = av.filter.Graph()
                     x, y = apply_anchor(obj.x, obj.y, obj.width, obj.height, obj.anchor)
@@ -315,8 +315,8 @@ def render_av(
                         ),
                         graph.add("buffersink"),
                     )
-                    graph.push(frame)
-                    frame = graph.pull()
+                    graph.vpush(frame)
+                    frame = graph.vpull()
                 elif isinstance(obj, TlImage):
                     img = img_cache[(obj.src, obj.width)]
                     array = frame.to_ndarray(format="rgb24")
@@ -355,8 +355,8 @@ def render_av(
                     frame = av.VideoFrame.from_ndarray(array, format="rgb24")
 
             if scale_graph is not None and frame.width != target_width:
-                scale_graph.push(frame)
-                frame = scale_graph.pull()
+                scale_graph.vpush(frame)
+                frame = scale_graph.vpull()
 
             if frame.format.name != target_pix_fmt:
                 frame = frame.reformat(format=target_pix_fmt)
