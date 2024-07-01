@@ -119,7 +119,7 @@ def to_key(op: Options | Required) -> str:
     return op.names[0][:2].replace("-", "") + op.names[0][2:].replace("-", "_")
 
 
-def print_option_help(program_name: str | None, ns_obj: T, option: Options) -> None:
+def print_option_help(name: str | None, ns_obj: object, option: Options) -> None:
     text = StringIO()
     text.write(
         f"  {', '.join(option.names)} {'' if option.metavar is None else option.metavar}\n\n"
@@ -145,8 +145,8 @@ def print_option_help(program_name: str | None, ns_obj: T, option: Options) -> N
 
     from auto_editor.help import data
 
-    if program_name is not None and option.names[0] in data[program_name]:
-        text.write(indent(data[program_name][option.names[0]], "    ") + "\n")
+    if name is not None and option.names[0] in data[name]:
+        text.write(indent(data[name][option.names[0]], "    ") + "\n")
     else:
         text.write(f"    {option.help}\n\n")
 
