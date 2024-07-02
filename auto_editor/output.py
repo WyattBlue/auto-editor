@@ -49,7 +49,7 @@ class Ensure:
             astream = in_container.streams.audio[stream]
 
             if astream.duration is None or astream.time_base is None:
-                dur = 0
+                dur = 1
             else:
                 dur = int(astream.duration * astream.time_base)
 
