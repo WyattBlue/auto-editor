@@ -13,8 +13,6 @@ from auto_editor.utils.container import Container
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 
-av.logging.set_level(av.logging.VERBOSE)
-
 
 @dataclass(slots=True)
 class Ensure:
