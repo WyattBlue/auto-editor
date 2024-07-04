@@ -22,36 +22,3 @@ jobs:
       run: |
         python -m build
         twine upload dist/*
-  make:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: macos-14
-            arch: arm64
-          - os: macos-12
-            arch: x86_64
-          - os: ubuntu-latest
-            arch: i686
-          - os: ubuntu-latest
-            arch: x86_64
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.12"
-    - name: Build Directory
-      run: |
-        pip install -U numpy pyav pyinstaller
-        pyinstaller auto_editor/__main__.py --strip --optimize 2 \
-          --exclude-module yaml --exclude-module numpy.random --exclude-module numpy.fft \
-          --hidden-import auto_editor.subcommands.desc \
-          --hidden-import auto_editor.subcommands.info --hidden-import auto_editor.subcommands.levels \
-          --hidden-import auto_editor.subcommands.palet --hidden-import auto_editor.subcommands.repl \
-          --hidden-import auto_editor.subcommands.subdump --hidden-import auto_editor.subcommands.test
-    - name: Upload Directory
-      uses: actions/upload-artifact@v4
-      with:
-        name: dist-${{ matrix.os }}-${{ matrix.arch }}
-        path: dist/
