@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import Any
 
+from numpy import float64
+
 from .data_structs import Sym, print_str
 from .err import MyError
 
@@ -41,7 +43,7 @@ def check_contract(c: object, val: object) -> bool:
         return val is True
     if c is False:
         return val is False
-    if type(c) in (int, float, Fraction, complex, str, Sym):
+    if type(c) in (int, float, float64, Fraction, complex, str, Sym):
         return val == c
     raise MyError(f"Invalid contract, got: {print_str(c)}")
 
@@ -163,17 +165,21 @@ is_int = Contract("int?", lambda v: type(v) is int)
 is_nat = Contract("nat?", lambda v: type(v) is int and v > -1)
 is_nat1 = Contract("nat1?", lambda v: type(v) is int and v > 0)
 int_not_zero = Contract("(or/c (not/c 0) int?)", lambda v: v != 0 and is_int(v))
-is_num = Contract("number?", lambda v: type(v) in (int, float, Fraction, complex))
-is_real = Contract("real?", lambda v: type(v) in (int, float, Fraction))
-is_float = Contract("float?", lambda v: type(v) is float)
+is_num = Contract(
+    "number?", lambda v: type(v) in (int, float, float64, Fraction, complex)
+)
+is_real = Contract("real?", lambda v: type(v) in (int, float, float64, Fraction))
+is_float = Contract("float?", lambda v: type(v) in (float, float64))
 is_frac = Contract("frac?", lambda v: type(v) is Fraction)
 is_str = Contract("string?", lambda v: type(v) is str)
 any_p = Contract("any", lambda v: True)
 is_void = Contract("void?", lambda v: v is None)
-is_int_or_float = Contract("(or/c int? float?)", lambda v: type(v) in (int, float))
+is_int_or_float = Contract(
+    "(or/c int? float?)", lambda v: type(v) in (int, float, float64)
+)
 is_threshold = Contract(
     "threshold?",
-    lambda v: type(v) in (int, float) and v >= 0 and v <= 1,  # type: ignore
+    lambda v: type(v) in (int, float, float64) and v >= 0 and v <= 1,  # type: ignore
 )
 is_proc = Contract("procedure?", lambda v: isinstance(v, Proc | Contract))
 
