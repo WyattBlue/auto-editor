@@ -296,22 +296,4 @@ def make_timeline(
     else:
         v1_compatiable = None
 
-    tl = v3(inp, tb, sr, res, args.background, vtl, atl, v1_compatiable)
-
-    # Additional monotonic check, o(n^2) time complexity so disable by default.
-
-    # if len(sources) != 1:
-    #     return tl
-
-    # last_i = 0
-    # for index in range(tl.end):
-    #     for layer in tl.v:
-    #         for lobj in layer:
-    #             if index >= lobj.start and index < (lobj.start + lobj.dur):
-    #                 _i = round((lobj.offset + index - lobj.start) * lobj.speed)
-    #                 if (_i < last_i):
-    #                     print(_i, last_i)
-    #                     raise ValueError("not monotonic")
-    #                 last_i = _i
-
-    return tl
+    return v3(inp, tb, sr, res, args.background, vtl, atl, v1_compatiable)
