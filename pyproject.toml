@@ -9,7 +9,7 @@ license = { text = "Unlicense" }
 authors = [{ name = "WyattBlue", email = "wyattblue@auto-editor.com" }]
 requires-python = ">=3.10"
 dependencies = [
-    "numpy>=1.22.0",
+    "numpy>=1.23.0",
     "pyav==12.2.*",
     "ae-ffmpeg==1.2.*",
 ]
