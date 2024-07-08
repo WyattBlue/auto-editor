@@ -90,10 +90,6 @@ def link_nodes(*nodes: FilterContext) -> None:
         c.link_to(n)
 
 
-def to_threshold(arr: np.ndarray, t: int | float) -> NDArray[np.bool_]:
-    return np.fromiter((x >= t for x in arr), dtype=np.bool_)
-
-
 def mut_remove_small(
     arr: NDArray[np.bool_], lim: int, replace: int, with_: int
 ) -> None:

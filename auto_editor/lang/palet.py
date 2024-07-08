@@ -18,12 +18,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy import logical_and, logical_not, logical_or, logical_xor
 
-from auto_editor.analyze import (
-    LevelError,
-    mut_remove_large,
-    mut_remove_small,
-    to_threshold,
-)
+from auto_editor.analyze import LevelError, mut_remove_large, mut_remove_small
 from auto_editor.lib.contracts import *
 from auto_editor.lib.data_structs import *
 from auto_editor.lib.err import MyError
@@ -690,6 +685,9 @@ def palet_map(proc: Proc, seq: Any) -> Any:
         return Quoted(tuple(map(proc, seq.val)))
     if isinstance(seq, list | range):
         return list(map(proc, seq))
+    elif isinstance(seq, np.ndarray):
+        vectorized_proc = np.vectorize(proc)
+        return vectorized_proc(seq)
     return proc(seq)
 
 
@@ -1469,6 +1467,16 @@ def edit_all() -> np.ndarray:
     return env["@levels"].all()
 
 
+def audio_levels(stream: int) -> np.ndarray:
+    if "@levels" not in env:
+        raise MyError("Can't use `audio` if there's no input media")
+
+    try:
+        return env["@levels"].audio(stream)
+    except LevelError as e:
+        raise MyError(e)
+
+
 def edit_audio(
     threshold: float = 0.04,
     stream: object = Sym("all"),
@@ -1491,7 +1499,7 @@ def edit_audio(
 
     try:
         for s in stream_range:
-            audio_list = to_threshold(levels.audio(s), threshold)
+            audio_list = levels.audio(s) >= threshold
             if stream_data is None:
                 stream_data = audio_list
             else:
@@ -1521,7 +1529,7 @@ def edit_motion(
     levels = env["@levels"]
     strict = env["@filesetup"].strict
     try:
-        return to_threshold(levels.motion(stream, blur, width), threshold)
+        return levels.motion(stream, blur, width) >= threshold
     except LevelError as e:
         return raise_(e) if strict else levels.all()
 
@@ -1582,7 +1590,7 @@ def my_eval(env: Env, node: object) -> Any:
                     return ref(oper, my_eval(env, node[1]))
 
             raise MyError(
-                f"Tried to run: {print_str(oper)} with args: {print_str(node[1:])}"
+                f"{print_str(oper)} is not a function. Tried to run with args: {print_str(node[1:])}"
             )
 
         if type(oper) is Syntax:
@@ -1617,6 +1625,7 @@ env.update({
     # edit procedures
     "none": Proc("none", edit_none, (0, 0)),
     "all/e": Proc("all/e", edit_all, (0, 0)),
+    "audio-levels": Proc("audio-levels", audio_levels, (1, 1), is_nat),
     "audio": Proc("audio", edit_audio, (0, 4),
         is_threshold, orc(is_nat, Sym("all")), is_nat,
         {"threshold": 0, "stream": 1, "minclip": 2, "mincut": 2}

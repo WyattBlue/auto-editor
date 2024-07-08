@@ -46,3 +46,9 @@
     (maxcut my-arr 3)
     (bool-array 1 0 1 0 0 1 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1)
 ))
+
+
+(define (b x) (>= x 0.5))
+(define arr (array 'float64 0.1 0.2 0.3 0.6 0.7))
+
+(assert (bool-array? (map b arr)))
