@@ -1477,6 +1477,16 @@ def audio_levels(stream: int) -> np.ndarray:
         raise MyError(e)
 
 
+def motion_levels(stream: int, blur: int = 9, width: int = 400) -> np.ndarray:
+    if "@levels" not in env:
+        raise MyError("Can't use `motion` if there's no input media")
+
+    try:
+        return env["@levels"].motion(stream, blur, width)
+    except LevelError as e:
+        raise MyError(e)
+
+
 def edit_audio(
     threshold: float = 0.04,
     stream: object = Sym("all"),
@@ -1630,6 +1640,7 @@ env.update({
         is_threshold, orc(is_nat, Sym("all")), is_nat,
         {"threshold": 0, "stream": 1, "minclip": 2, "mincut": 2}
     ),
+    "motion-levels": Proc("motion-levels", motion_levels, (1, 3), is_nat, is_nat1, {"blur": 1, "width": 2}),
     "motion": Proc("motion", edit_motion, (0, 4),
         is_threshold, is_nat, is_nat1,
         {"threshold": 0, "stream": 1, "blur": 1, "width": 2}
