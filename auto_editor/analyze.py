@@ -191,17 +191,17 @@ class Levels:
 
         return arr
 
-    def audio(self, s: int) -> NDArray[np.float64]:
-        if s > len(self.src.audios) - 1:
-            raise LevelError(f"audio: audio stream '{s}' does not exist.")
+    def audio(self, stream: int) -> NDArray[np.float64]:
+        if stream > len(self.src.audios) - 1:
+            raise LevelError(f"audio: audio stream '{stream}' does not exist.")
 
-        if (arr := self.read_cache("audio", {"stream": s})) is not None:
+        if (arr := self.read_cache("audio", {"stream": stream})) is not None:
             return arr
 
-        sr, samples = read(self.ensure.audio(self.src, s))
+        sr, samples = read(self.ensure.audio(self.src, stream))
 
         if len(samples) == 0:
-            raise LevelError(f"audio: stream '{s}' has no samples.")
+            raise LevelError(f"audio: stream '{stream}' has no samples.")
 
         def get_max_volume(s: np.ndarray) -> float:
             return max(float(np.max(s)), -float(np.min(s)))
@@ -214,7 +214,7 @@ class Levels:
 
         if samp_per_ticks < 1:
             self.log.error(
-                f"audio: stream '{s}'\n  Samplerate ({sr}) must be greater than "
+                f"audio: stream '{stream}'\n  Samplerate ({sr}) must be greater than "
                 f"or equal to timebase ({self.tb})\n"
                 "  Try `-fps 30` and/or `--sample-rate 48000`"
             )
@@ -241,11 +241,11 @@ class Levels:
             threshold_list[i] = get_max_volume(samples[start:end]) / max_volume
 
         self.bar.end()
-        return self.cache("audio", {"stream": s}, threshold_list)
+        return self.cache("audio", {"stream": stream}, threshold_list)
 
     def subtitle(
         self,
-        patterns: str,
+        pattern: str,
         stream: int,
         ignore_case: bool,
         max_count: int | None,
@@ -255,8 +255,7 @@ class Levels:
 
         try:
             flags = re.IGNORECASE if ignore_case else 0
-            pattern = re.compile(patterns, flags)
-            del patterns  # make sure we don't accidentally use it
+            re_pattern = re.compile(pattern, flags)
         except re.error as e:
             self.log.error(e)
 
@@ -314,7 +313,7 @@ class Levels:
                     else:
                         continue
 
-                    if line and re.search(pattern, line):
+                    if line and re.search(re_pattern, line):
                         result[san_start:san_end] = 1
                         count += 1
 
@@ -322,22 +321,22 @@ class Levels:
 
         return result
 
-    def motion(self, s: int, blur: int, width: int) -> NDArray[np.float64]:
+    def motion(self, stream: int, blur: int, width: int) -> NDArray[np.float64]:
         import av
 
-        if s >= len(self.src.videos):
-            raise LevelError(f"motion: video stream '{s}' does not exist.")
+        if stream >= len(self.src.videos):
+            raise LevelError(f"motion: video stream '{stream}' does not exist.")
 
-        mobj = {"stream": s, "width": width, "blur": blur}
+        mobj = {"stream": stream, "width": width, "blur": blur}
         if (arr := self.read_cache("motion", mobj)) is not None:
             return arr
 
         container = av.open(f"{self.src.path}", "r")
 
-        stream = container.streams.video[s]
-        stream.thread_type = "AUTO"
+        video = container.streams.video[stream]
+        video.thread_type = "AUTO"
 
-        inaccurate_dur = 1 if stream.duration is None else stream.duration
+        inaccurate_dur = 1 if video.duration is None else video.duration
         self.bar.start(inaccurate_dur, "Analyzing motion")
 
         prev_frame = None
@@ -347,7 +346,7 @@ class Levels:
 
         graph = av.filter.Graph()
         link_nodes(
-            graph.add_buffer(template=stream),
+            graph.add_buffer(template=video),
             graph.add("scale", f"{width}:-1"),
             graph.add("format", "gray"),
             graph.add("gblur", f"sigma={blur}"),
@@ -357,7 +356,7 @@ class Levels:
 
         threshold_list = np.zeros((1024), dtype=np.float64)
 
-        for unframe in container.decode(stream):
+        for unframe in container.decode(video):
             graph.push(unframe)
             frame = graph.pull()
 
