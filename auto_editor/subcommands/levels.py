@@ -9,16 +9,7 @@ import numpy as np
 from auto_editor.analyze import LevelError, Levels
 from auto_editor.ffwrapper import FFmpeg, initFileInfo
 from auto_editor.lang.palet import env
-from auto_editor.lib.contracts import (
-    is_bool,
-    is_nat,
-    is_nat1,
-    is_str,
-    is_threshold,
-    is_void,
-    orc,
-)
-from auto_editor.lib.data_structs import Sym
+from auto_editor.lib.contracts import is_bool, is_nat, is_nat1, is_str, is_void, orc
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.cmdkw import (
@@ -108,16 +99,9 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     else:
         method, attrs = args.edit, ""
 
-    audio_builder = pAttrs(
-        "audio",
-        pAttr("threshold", 0.04, is_threshold),
-        pAttr("stream", 0, orc(is_nat, Sym("all"), "all")),
-        pAttr("mincut", 6, is_nat),
-        pAttr("minclip", 3, is_nat),
-    )
+    audio_builder = pAttrs("audio", pAttr("stream", 0, is_nat))
     motion_builder = pAttrs(
         "motion",
-        pAttr("threshold", 0.02, is_threshold),
         pAttr("stream", 0, is_nat),
         pAttr("blur", 9, is_nat),
         pAttr("width", 400, is_nat1),
@@ -149,9 +133,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 obj = parse_with_palet(attrs, builder, env)
             except ParserError as e:
                 log.error(e)
-
-            if "threshold" in obj:
-                del obj["threshold"]
 
         try:
             if method == "audio":
