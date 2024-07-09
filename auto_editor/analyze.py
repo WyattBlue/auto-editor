@@ -10,21 +10,6 @@ import numpy as np
 
 from auto_editor import version
 from auto_editor.lang.json import Lexer, Parser, dump
-from auto_editor.lib.contracts import (
-    is_bool,
-    is_nat,
-    is_nat1,
-    is_str,
-    is_threshold,
-    is_void,
-    orc,
-)
-from auto_editor.lib.data_structs import Sym
-from auto_editor.utils.cmdkw import (
-    Required,
-    pAttr,
-    pAttrs,
-)
 from auto_editor.utils.subtitle_tools import convert_ass_to_text
 from auto_editor.wavfile import read
 
@@ -39,35 +24,6 @@ if TYPE_CHECKING:
     from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.log import Log
-
-
-audio_builder = pAttrs(
-    "audio",
-    pAttr("threshold", 0.04, is_threshold),
-    pAttr("stream", 0, orc(is_nat, Sym("all"), "all")),
-    pAttr("mincut", 6, is_nat),
-    pAttr("minclip", 3, is_nat),
-)
-motion_builder = pAttrs(
-    "motion",
-    pAttr("threshold", 0.02, is_threshold),
-    pAttr("stream", 0, is_nat),
-    pAttr("blur", 9, is_nat),
-    pAttr("width", 400, is_nat1),
-)
-subtitle_builder = pAttrs(
-    "subtitle",
-    pAttr("pattern", Required, is_str),
-    pAttr("stream", 0, is_nat),
-    pAttr("ignore-case", False, is_bool),
-    pAttr("max-count", None, orc(is_nat, is_void)),
-)
-
-builder_map = {
-    "audio": audio_builder,
-    "motion": motion_builder,
-    "subtitle": subtitle_builder,
-}
 
 
 @dataclass(slots=True)

@@ -6,12 +6,28 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from auto_editor.analyze import LevelError, Levels, builder_map
+from auto_editor.analyze import LevelError, Levels
 from auto_editor.ffwrapper import FFmpeg, initFileInfo
 from auto_editor.lang.palet import env
+from auto_editor.lib.contracts import (
+    is_bool,
+    is_nat,
+    is_nat1,
+    is_str,
+    is_threshold,
+    is_void,
+    orc,
+)
+from auto_editor.lib.data_structs import Sym
 from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
-from auto_editor.utils.cmdkw import ParserError, parse_with_palet
+from auto_editor.utils.cmdkw import (
+    ParserError,
+    Required,
+    parse_with_palet,
+    pAttr,
+    pAttrs,
+)
 from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import frame_rate
@@ -91,6 +107,34 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         method, attrs = args.edit.split(":", 1)
     else:
         method, attrs = args.edit, ""
+
+    audio_builder = pAttrs(
+        "audio",
+        pAttr("threshold", 0.04, is_threshold),
+        pAttr("stream", 0, orc(is_nat, Sym("all"), "all")),
+        pAttr("mincut", 6, is_nat),
+        pAttr("minclip", 3, is_nat),
+    )
+    motion_builder = pAttrs(
+        "motion",
+        pAttr("threshold", 0.02, is_threshold),
+        pAttr("stream", 0, is_nat),
+        pAttr("blur", 9, is_nat),
+        pAttr("width", 400, is_nat1),
+    )
+    subtitle_builder = pAttrs(
+        "subtitle",
+        pAttr("pattern", Required, is_str),
+        pAttr("stream", 0, is_nat),
+        pAttr("ignore-case", False, is_bool),
+        pAttr("max-count", None, orc(is_nat, is_void)),
+    )
+
+    builder_map = {
+        "audio": audio_builder,
+        "motion": motion_builder,
+        "subtitle": subtitle_builder,
+    }
 
     for src in sources:
         print("")
