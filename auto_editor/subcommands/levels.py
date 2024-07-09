@@ -64,6 +64,8 @@ def levels_options(parser: ArgumentParser) -> ArgumentParser:
 
 
 def print_arr(arr: NDArray) -> None:
+    print("")
+    print("@start")
     if arr.dtype == np.float64:
         for a in arr:
             sys.stdout.write(f"{a:.20f}\n")
@@ -73,6 +75,8 @@ def print_arr(arr: NDArray) -> None:
     else:
         for a in arr:
             sys.stdout.write(f"{a}\n")
+    sys.stdout.flush()
+    print("")
 
 
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
@@ -121,33 +125,20 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     }
 
     for src in sources:
-        print("")
-        print("@start")
-
-        levels = Levels(ensure, src, tb, bar, temp, log)
-
         if method in builder_map:
-            builder = builder_map[method]
-
             try:
-                obj = parse_with_palet(attrs, builder, env)
+                obj = parse_with_palet(attrs, builder_map[method], env)
             except ParserError as e:
                 log.error(e)
 
+        levels = Levels(ensure, src, tb, bar, temp, log)
         try:
             if method == "audio":
-                print_arr(levels.audio(obj["stream"]))
+                print_arr(levels.audio(**obj))
             elif method == "motion":
-                print_arr(levels.motion(obj["stream"], obj["blur"], obj["width"]))
+                print_arr(levels.motion(**obj))
             elif method == "subtitle":
-                print_arr(
-                    levels.subtitle(
-                        obj["pattern"],
-                        obj["stream"],
-                        obj["ignore_case"],
-                        obj["max_count"],
-                    )
-                )
+                print_arr(levels.subtitle(**obj))
             elif method == "none":
                 print_arr(levels.none())
             elif method == "all/e":
@@ -157,8 +148,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         except LevelError as e:
             log.error(e)
 
-    sys.stdout.flush()
-    print("")
     log.cleanup()
 
 
