@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from auto_editor import version
-from auto_editor.lang.json import Lexer, Parser, dump
 from auto_editor.utils.subtitle_tools import convert_ass_to_text
 from auto_editor.wavfile import read
 
@@ -145,49 +144,29 @@ class Levels:
 
     def read_cache(self, tag: str, obj: dict[str, Any]) -> None | np.ndarray:
         workfile = os.path.join(
-            os.path.dirname(self.temp), f"ae-{version}", "cache.json"
+            os.path.dirname(self.temp), f"ae-{version}", "cache.npz"
         )
 
         try:
-            with open(workfile, encoding="utf-8") as file:
-                cache = Parser(Lexer(workfile, file)).expr()
-        except Exception:
+            npzfile = np.load(workfile, allow_pickle=False)
+        except Exception as e:
+            self.log.debug(e)
             return None
 
-        if f"{self.src.path.resolve()}" not in cache:
+        key = f"{self.src.path}:{obj_tag(tag, self.tb, obj)}"
+        if key not in npzfile.files:
             return None
 
-        key = obj_tag(tag, self.tb, obj)
-
-        if key not in (root := cache[f"{self.src.path.resolve()}"]):
-            return None
-
-        return np.asarray(root[key]["arr"], dtype=root[key]["type"])
+        self.log.debug("Using cache")
+        return npzfile[key]
 
     def cache(self, tag: str, obj: dict[str, Any], arr: np.ndarray) -> np.ndarray:
         workdur = os.path.join(os.path.dirname(self.temp), f"ae-{version}")
-        workfile = os.path.join(workdur, "cache.json")
         if not os.path.exists(workdur):
             os.mkdir(workdur)
 
-        key = obj_tag(tag, self.tb, obj)
-
-        try:
-            with open(workfile, encoding="utf-8") as file:
-                json_object = Parser(Lexer(workfile, file)).expr()
-        except Exception:
-            json_object = {}
-
-        entry = {"type": str(arr.dtype), "arr": arr.tolist()}
-        src_key = f"{self.src.path}"
-
-        if src_key in json_object:
-            json_object[src_key][key] = entry
-        else:
-            json_object[src_key] = {key: entry}
-
-        with open(os.path.join(workdur, "cache.json"), "w", encoding="utf-8") as file:
-            dump(json_object, file)
+        tag = obj_tag(tag, self.tb, obj)
+        np.savez(os.path.join(workdur, "cache.npz"), **{f"{self.src.path}:{tag}": arr})
 
         return arr
 
