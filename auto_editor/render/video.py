@@ -205,7 +205,7 @@ def render_av(
     if apply_video_later:
         cmd += ["-c:v", "mpeg4", "-qscale:v", "1"]
     else:
-        cmd += video_quality(args, ctr)
+        cmd += video_quality(args)
 
     # Setting SAR requires re-encoding so we do it here.
     if src is not None and src.videos and (sar := src.videos[0].sar) is not None:
