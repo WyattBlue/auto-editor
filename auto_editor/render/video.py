@@ -17,8 +17,6 @@ from auto_editor.utils.types import color
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from av.filter import FilterContext
-
     from auto_editor.ffwrapper import FFmpeg, FileInfo
     from auto_editor.timeline import v3
     from auto_editor.utils.bar import Bar
@@ -31,11 +29,6 @@ if TYPE_CHECKING:
 class VideoFrame:
     index: int
     src: FileInfo
-
-
-def link_nodes(*nodes: FilterContext) -> None:
-    for c, n in zip(nodes, nodes[1:]):
-        c.link_to(n)
 
 
 # From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
@@ -98,12 +91,11 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
                     for frame in cn.decode(my_stream):
                         if obj.width != 0:
                             graph = av.filter.Graph()
-                            link_nodes(
+                            graph.link_nodes(
                                 graph.add_buffer(template=my_stream),
                                 graph.add("scale", f"{obj.width}:-1"),
                                 graph.add("buffersink"),
-                            )
-                            graph.vpush(frame)
+                            ).vpush(frame)
                             frame = graph.vpull()
                         img_cache[(obj.src, obj.width)] = frame.to_ndarray(
                             format="rgb24"
@@ -177,7 +169,7 @@ def render_av(
         target_width = max(round(tl.res[0] * args.scale), 2)
         target_height = max(round(tl.res[1] * args.scale), 2)
         scale_graph = av.filter.Graph()
-        link_nodes(
+        scale_graph.link_nodes(
             scale_graph.add(
                 "buffer", video_size="1x1", time_base="1/1", pix_fmt=target_pix_fmt
             ),
@@ -293,7 +285,7 @@ def render_av(
                     if (frame.width, frame.height) != tl.res:
                         width, height = tl.res
                         graph = av.filter.Graph()
-                        link_nodes(
+                        graph.link_nodes(
                             graph.add_buffer(template=my_stream),
                             graph.add(
                                 "scale",
@@ -301,21 +293,19 @@ def render_av(
                             ),
                             graph.add("pad", f"{width}:{height}:-1:-1:color={bg}"),
                             graph.add("buffersink"),
-                        )
-                        graph.vpush(frame)
+                        ).vpush(frame)
                         frame = graph.vpull()
                 elif isinstance(obj, TlRect):
                     graph = av.filter.Graph()
                     x, y = apply_anchor(obj.x, obj.y, obj.width, obj.height, obj.anchor)
-                    link_nodes(
+                    graph.link_nodes(
                         graph.add_buffer(template=my_stream),
                         graph.add(
                             "drawbox",
                             f"x={x}:y={y}:w={obj.width}:h={obj.height}:color={obj.fill}:t=fill",
                         ),
                         graph.add("buffersink"),
-                    )
-                    graph.vpush(frame)
+                    ).vpush(frame)
                     frame = graph.vpull()
                 elif isinstance(obj, TlImage):
                     img = img_cache[(obj.src, obj.width)]

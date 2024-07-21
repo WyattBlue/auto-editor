@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from fractions import Fraction
     from typing import Any
 
-    from av.filter import FilterContext
     from numpy.typing import NDArray
 
     from auto_editor.ffwrapper import FileInfo
@@ -38,11 +37,6 @@ class FileSetup:
 
 class LevelError(Exception):
     pass
-
-
-def link_nodes(*nodes: FilterContext) -> None:
-    for c, n in zip(nodes, nodes[1:]):
-        c.link_to(n)
 
 
 def mut_remove_small(
@@ -239,7 +233,7 @@ class Levels:
             self.log.error(e)
 
         import av
-        from av.subtitles.subtitle import AssSubtitle, TextSubtitle
+        from av.subtitles.subtitle import AssSubtitle
 
         try:
             container = av.open(self.src.path, "r")
@@ -287,8 +281,6 @@ class Levels:
                 for sub in subset:
                     if isinstance(sub, AssSubtitle):
                         line = convert_ass_to_text(sub.ass.decode(errors="ignore"))
-                    elif isinstance(sub, TextSubtitle):
-                        line = sub.text.decode(errors="ignore")
                     else:
                         continue
 
@@ -324,14 +316,13 @@ class Levels:
         index = 0
 
         graph = av.filter.Graph()
-        link_nodes(
+        graph.link_nodes(
             graph.add_buffer(template=video),
             graph.add("scale", f"{width}:-1"),
             graph.add("format", "gray"),
             graph.add("gblur", f"sigma={blur}"),
             graph.add("buffersink"),
-        )
-        graph.configure()
+        ).configure()
 
         threshold_list = np.zeros((1024), dtype=np.float64)
 

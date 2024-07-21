@@ -57,7 +57,7 @@ class Ensure:
             output_astream = out_container.add_stream("pcm_s16le", rate=sample_rate)
             assert isinstance(output_astream, av.audio.stream.AudioStream)
 
-            resampler = AudioResampler(format="s16", layout="stereo", rate=sample_rate)  # type: ignore
+            resampler = AudioResampler(format="s16", layout="stereo", rate=sample_rate)
             for i, frame in enumerate(in_container.decode(astream)):
                 if i % 1500 == 0:
                     bar.tick(0 if frame.time is None else frame.time)
