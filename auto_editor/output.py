@@ -211,7 +211,7 @@ def mux_quality_media(
             cmd.extend(["-c:s", scodec])
         elif ctr.scodecs is not None:
             if scodec not in ctr.scodecs:
-                scodec = ctr.scodecs[0]
+                scodec = ctr.default_sub
             cmd.extend(["-c:s", scodec])
 
     if a_tracks > 0:

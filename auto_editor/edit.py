@@ -68,12 +68,8 @@ def set_video_codec(
 ) -> str:
     if codec == "auto":
         codec = "h264" if (src is None or not src.videos) else src.videos[0].codec
-        if ctr.vcodecs is not None:
-            if ctr.vstrict and codec not in ctr.vcodecs:
-                return ctr.vcodecs[0]
-
-            if codec in ctr.disallow_v:
-                return ctr.vcodecs[0]
+        if codec not in ctr.vcodecs and ctr.default_vid != "none":
+            return ctr.default_vid
         return codec
 
     if codec == "copy":
@@ -83,12 +79,7 @@ def set_video_codec(
             log.error("Input file does not have a video stream to copy codec from.")
         codec = src.videos[0].codec
 
-    if ctr.vstrict:
-        assert ctr.vcodecs is not None
-        if codec not in ctr.vcodecs:
-            log.error(codec_error.format(codec, out_ext))
-
-    if codec in ctr.disallow_v:
+    if ctr.vcodecs is not None and codec not in ctr.vcodecs:
         log.error(codec_error.format(codec, out_ext))
 
     return codec
@@ -99,8 +90,8 @@ def set_audio_codec(
 ) -> str:
     if codec == "auto":
         codec = "aac" if (src is None or not src.audios) else src.audios[0].codec
-        if ctr.acodecs is not None and codec not in ctr.acodecs:
-            return ctr.acodecs[0]
+        if codec not in ctr.acodecs and ctr.default_aud != "none":
+            return ctr.default_aud
         return codec
 
     if codec == "copy":
@@ -272,13 +263,13 @@ def edit_media(
         sub_output = []
         apply_later = False
 
-        if ctr.allow_subtitle and not args.sn:
+        if ctr.default_sub != "none" and not args.sn:
             sub_output = make_new_subtitles(tl, ensure, temp)
 
-        if ctr.allow_audio:
+        if ctr.default_aud != "none":
             audio_output = make_new_audio(tl, ensure, args, ffmpeg, bar, temp, log)
 
-        if ctr.allow_video:
+        if ctr.default_vid != "none":
             if tl.v:
                 out_path, apply_later = render_av(ffmpeg, tl, args, bar, ctr, temp, log)
                 visual_output.append((True, out_path))
