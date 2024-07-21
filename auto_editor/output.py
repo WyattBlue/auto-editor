@@ -99,7 +99,7 @@ def _ffset(option: str, value: str | None) -> list[str]:
     return [option] + [value]
 
 
-def video_quality(args: Args, ctr: Container) -> list[str]:
+def video_quality(args: Args) -> list[str]:
     return (
         _ffset("-b:v", args.video_bitrate)
         + ["-c:v", args.video_codec]
@@ -174,7 +174,7 @@ def mux_quality_media(
     for is_video, path in visual_output:
         if is_video:
             if apply_v:
-                cmd += video_quality(args, ctr)
+                cmd += video_quality(args)
             else:
                 # Real video is only allowed on track 0
                 cmd += ["-c:v:0", "copy"]
