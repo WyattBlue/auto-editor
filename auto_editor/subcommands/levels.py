@@ -25,6 +25,7 @@ from auto_editor.utils.types import frame_rate
 from auto_editor.vanparse import ArgumentParser
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from fractions import Fraction
 
     from numpy.typing import NDArray
@@ -77,6 +78,68 @@ def print_arr(arr: NDArray) -> None:
             sys.stdout.write(f"{a}\n")
     sys.stdout.flush()
     print("")
+
+
+def print_arr_gen(arr: Iterator[int | float | bool]) -> None:
+    print("")
+    print("@start")
+    for a in arr:
+        if isinstance(a, float):
+            print(f"{a:.20f}")
+        if isinstance(a, bool):
+            print("1" if a else "0")
+        if isinstance(a, int):
+            print(a)
+    print("")
+
+
+def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[float]:
+    import av
+
+    container = av.open(f"{src.path}", "r")
+
+    video = container.streams.video[stream]
+    video.thread_type = "AUTO"
+
+    prev_frame = None
+    current_frame = None
+    total_pixels = src.videos[0].width * src.videos[0].height
+    index = 0
+    prev_index = 0
+
+    graph = av.filter.Graph()
+    graph.link_nodes(
+        graph.add_buffer(template=video),
+        graph.add("scale", f"{width}:-1"),
+        graph.add("format", "gray"),
+        graph.add("gblur", f"sigma={blur}"),
+        graph.add("buffersink"),
+    ).configure()
+
+    for unframe in container.decode(video):
+        if unframe.pts is None:
+            continue
+
+        graph.push(unframe)
+        frame = graph.pull()
+        assert frame.time is not None
+        index = round(frame.time * tb)
+
+        current_frame = frame.to_ndarray()
+        if prev_frame is None:
+            value = 0.0
+        else:
+            # Use `int16` to avoid underflow with `uint8` datatype
+            diff = np.abs(prev_frame.astype(np.int16) - current_frame.astype(np.int16))
+            value = np.count_nonzero(diff) / total_pixels
+
+        for _ in range(index - prev_index):
+            yield value
+
+        prev_frame = current_frame
+        prev_index = index
+
+    container.close()
 
 
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
@@ -136,7 +199,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             if method == "audio":
                 print_arr(levels.audio(**obj))
             elif method == "motion":
-                print_arr(levels.motion(**obj))
+                print_arr_gen(iter_motion(src, tb, **obj))
             elif method == "subtitle":
                 print_arr(levels.subtitle(**obj))
             elif method == "none":
