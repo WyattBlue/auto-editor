@@ -354,4 +354,5 @@ class Levels:
             prev_frame = current_frame
 
         self.bar.end()
+        container.close()
         return self.cache("motion", mobj, threshold_list[:index])
