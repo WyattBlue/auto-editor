@@ -103,8 +103,17 @@ def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[float]:
 
         exact_size = (1 / tb) * sample_rate
         accumulated_error = 0
+        start_pts = None
 
         for frame in container.decode(audio=stream):
+            if frame.pts is None:
+                continue
+
+            # Fifo is strict and expects the first frame's pts to be 0.
+            if start_pts is None:
+                start_pts = frame.pts
+
+            frame.pts = frame.pts - start_pts
             fifo.write(frame)
 
             while fifo.samples >= math.ceil(exact_size):
