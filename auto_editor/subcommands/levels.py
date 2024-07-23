@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import math
 import sys
 from dataclasses import dataclass, field
+from fractions import Fraction
 from typing import TYPE_CHECKING
 
+import av
 import numpy as np
+from av.audio.fifo import AudioFifo
 
 from auto_editor.analyze import LevelError, Levels
 from auto_editor.ffwrapper import FFmpeg, initFileInfo
@@ -80,23 +84,45 @@ def print_arr(arr: NDArray) -> None:
     print("")
 
 
-def print_arr_gen(arr: Iterator[int | float | bool]) -> None:
+def print_arr_gen(arr: Iterator[int | float]) -> None:
     print("")
     print("@start")
     for a in arr:
         if isinstance(a, float):
             print(f"{a:.20f}")
-        if isinstance(a, bool):
-            print("1" if a else "0")
-        if isinstance(a, int):
+        else:
             print(a)
     print("")
 
 
-def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[float]:
-    import av
+def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[float]:
+    fifo = AudioFifo()
+    try:
+        container = av.open(src.path, "r")
+        sample_rate = container.streams.audio[stream].rate
 
-    container = av.open(f"{src.path}", "r")
+        exact_size = (1 / tb) * sample_rate
+        accumulated_error = 0
+
+        for frame in container.decode(audio=stream):
+            fifo.write(frame)
+
+            while fifo.samples >= math.ceil(exact_size):
+                size_with_error = exact_size + accumulated_error
+                current_size = round(size_with_error)
+                accumulated_error = size_with_error - current_size
+
+                audio_chunk = fifo.read(current_size)
+                assert audio_chunk is not None
+                arr = audio_chunk.to_ndarray().flatten()
+                yield float(np.max(np.abs(arr)))
+
+    finally:
+        container.close()
+
+
+def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[float]:
+    container = av.open(src.path, "r")
 
     video = container.streams.video[stream]
     video.thread_type = "AUTO"
@@ -197,7 +223,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         levels = Levels(ensure, src, tb, bar, temp, log)
         try:
             if method == "audio":
-                print_arr(levels.audio(**obj))
+                # print_arr(levels.audio(**obj))
+                print_arr_gen(iter_audio(src, tb, **obj))
             elif method == "motion":
                 print_arr_gen(iter_motion(src, tb, **obj))
             elif method == "subtitle":
