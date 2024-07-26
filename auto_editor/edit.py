@@ -92,6 +92,8 @@ def set_audio_codec(
         codec = "aac" if (src is None or not src.audios) else src.audios[0].codec
         if codec not in ctr.acodecs and ctr.default_aud != "none":
             return ctr.default_aud
+        if codec == "mp3float":
+            return "mp3"
         return codec
 
     if codec == "copy":
