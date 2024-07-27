@@ -103,7 +103,6 @@ def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[float]:
 
         exact_size = (1 / tb) * sample_rate
         accumulated_error = 0
-        start_pts = None
 
         for frame in container.decode(audio=stream):
             frame.pts = None  # Skip check
