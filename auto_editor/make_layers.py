@@ -18,7 +18,6 @@ from auto_editor.utils.types import Args, CoerceError, time
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from auto_editor.output import Ensure
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.chunks import Chunks
     from auto_editor.utils.log import Log
@@ -75,7 +74,6 @@ def make_av(src: FileInfo, all_clips: list[list[Clip]]) -> tuple[VSpace, ASpace]
 def run_interpreter_for_edit_option(
     text: str, filesetup: FileSetup
 ) -> NDArray[np.bool_]:
-    ensure = filesetup.ensure
     src = filesetup.src
     tb = filesetup.tb
     bar = filesetup.bar
@@ -87,8 +85,8 @@ def run_interpreter_for_edit_option(
         if log.is_debug:
             log.debug(f"edit: {parser}")
 
-        env["timebase"] = filesetup.tb
-        env["@levels"] = Levels(ensure, src, tb, bar, temp, log)
+        env["timebase"] = tb
+        env["@levels"] = Levels(src, tb, bar, temp, log)
         env["@filesetup"] = filesetup
 
         results = interpret(env, parser)
@@ -139,7 +137,6 @@ def parse_time(val: str, arr: NDArray, tb: Fraction) -> int:  # raises: `CoerceE
 
 def make_timeline(
     sources: list[FileInfo],
-    ensure: Ensure,
     args: Args,
     sr: int,
     bar: Bar,
@@ -169,7 +166,7 @@ def make_timeline(
     concat = np.concatenate
 
     for i, src in enumerate(sources):
-        filesetup = FileSetup(src, ensure, len(sources) < 2, tb, bar, temp, log)
+        filesetup = FileSetup(src, len(sources) < 2, tb, bar, temp, log)
 
         edit_result = run_interpreter_for_edit_option(method, filesetup)
         mut_margin(edit_result, start_margin, end_margin)

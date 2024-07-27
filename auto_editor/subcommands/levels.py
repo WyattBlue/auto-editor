@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-import math
 import sys
 from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import TYPE_CHECKING
 
-import av
 import numpy as np
-from av.audio.fifo import AudioFifo
 
-from auto_editor.analyze import LevelError, Levels, iter_motion
-from auto_editor.ffwrapper import FFmpeg, initFileInfo
+from auto_editor.analyze import LevelError, Levels, iter_audio, iter_motion
+from auto_editor.ffwrapper import initFileInfo
 from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import is_bool, is_nat, is_nat1, is_str, is_void, orc
-from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.cmdkw import (
     ParserError,
@@ -40,8 +36,6 @@ class LevelArgs:
     input: list[str] = field(default_factory=list)
     edit: str = "audio"
     timebase: Fraction | None = None
-    ffmpeg_location: str | None = None
-    my_ffmpeg: bool = False
     help: bool = False
 
 
@@ -58,12 +52,6 @@ def levels_options(parser: ArgumentParser) -> ArgumentParser:
         metavar="NUM",
         type=frame_rate,
         help="Set custom timebase",
-    )
-    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
-    parser.add_argument(
-        "--my-ffmpeg",
-        flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged",
     )
     return parser
 
@@ -95,46 +83,9 @@ def print_arr_gen(arr: Iterator[int | float]) -> None:
     print("")
 
 
-def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[float]:
-    fifo = AudioFifo()
-    try:
-        container = av.open(src.path, "r")
-        audio_stream = container.streams.audio[stream]
-        sample_rate = audio_stream.rate
-
-        exact_size = (1 / tb) * sample_rate
-        accumulated_error = 0
-
-        # Resample so that audio data is between [-1, 1]
-        resampler = av.AudioResampler(
-            av.AudioFormat("flt"), audio_stream.layout, sample_rate
-        )
-
-        for frame in container.decode(audio=stream):
-            frame.pts = None  # Skip time checks
-
-            for reframe in resampler.resample(frame):
-                fifo.write(reframe)
-
-            while fifo.samples >= math.ceil(exact_size):
-                size_with_error = exact_size + accumulated_error
-                current_size = round(size_with_error)
-                accumulated_error = size_with_error - current_size
-
-                audio_chunk = fifo.read(current_size)
-                assert audio_chunk is not None
-                arr = audio_chunk.to_ndarray().flatten()
-                yield float(np.max(np.abs(arr)))
-
-    finally:
-        container.close()
-
-
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
     parser = levels_options(ArgumentParser("levels"))
     args = parser.parse_args(LevelArgs, sys_args)
-
-    ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg)
 
     bar = Bar("none")
     temp = setup_tempdir(None, Log())
@@ -147,7 +98,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     src = sources[0]
 
     tb = src.get_fps() if args.timebase is None else args.timebase
-    ensure = Ensure(ffmpeg, bar, src.get_sr(), temp, log)
 
     if ":" in args.edit:
         method, attrs = args.edit.split(":", 1)
@@ -182,7 +132,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             except ParserError as e:
                 log.error(e)
 
-        levels = Levels(ensure, src, tb, bar, temp, log)
+        levels = Levels(src, tb, bar, temp, log)
         try:
             if method == "audio":
                 print_arr_gen(iter_audio(src, tb, **obj))

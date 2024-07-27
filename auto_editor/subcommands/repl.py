@@ -6,11 +6,10 @@ from fractions import Fraction
 
 import auto_editor
 from auto_editor.analyze import FileSetup, Levels
-from auto_editor.ffwrapper import FFmpeg, initFileInfo
+from auto_editor.ffwrapper import initFileInfo
 from auto_editor.lang.palet import ClosingError, Lexer, Parser, env, interpret
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
-from auto_editor.output import Ensure
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
@@ -48,12 +47,6 @@ def repl_options(parser: ArgumentParser) -> ArgumentParser:
         type=frame_rate,
         help="Set custom timebase",
     )
-    parser.add_argument("--ffmpeg-location", help="Point to your custom ffmpeg file")
-    parser.add_argument(
-        "--my-ffmpeg",
-        flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged",
-    )
     parser.add_argument(
         "--temp-dir",
         metavar="PATH",
@@ -68,16 +61,14 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     if args.input:
         temp = setup_tempdir(args.temp_dir, Log())
         log = Log(quiet=True, temp=temp)
-        ffmpeg = FFmpeg(args.ffmpeg_location, args.my_ffmpeg, False)
         strict = len(args.input) < 2
         sources = [initFileInfo(path, log) for path in args.input]
         src = sources[0]
         tb = src.get_fps() if args.timebase is None else args.timebase
         bar = Bar("modern")
-        ensure = Ensure(ffmpeg, bar, src.get_sr(), temp, log)
         env["timebase"] = tb
-        env["@levels"] = Levels(ensure, src, tb, bar, temp, log)
-        env["@filesetup"] = FileSetup(src, ensure, strict, tb, bar, temp, log)
+        env["@levels"] = Levels(src, tb, bar, temp, log)
+        env["@filesetup"] = FileSetup(src, strict, tb, bar, temp, log)
 
     print(f"Auto-Editor {auto_editor.version} ({auto_editor.__version__})")
     text = None

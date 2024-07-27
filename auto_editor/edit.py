@@ -202,10 +202,8 @@ def edit_media(
     else:
         samplerate = args.sample_rate
 
-    ensure = Ensure(ffmpeg, bar, samplerate, temp, log)
-
     if tl is None:
-        tl = make_timeline(sources, ensure, args, samplerate, bar, temp, log)
+        tl = make_timeline(sources, args, samplerate, bar, temp, log)
 
     if export["export"] == "timeline":
         from auto_editor.formats.json import make_json_timeline
@@ -216,7 +214,7 @@ def edit_media(
     if args.preview:
         from auto_editor.preview import preview
 
-        preview(ensure, tl, temp, log)
+        preview(tl, temp, log)
         return
 
     if export["export"] == "json":
@@ -264,6 +262,8 @@ def edit_media(
         audio_output = []
         sub_output = []
         apply_later = False
+
+        ensure = Ensure(ffmpeg, bar, samplerate, temp, log)
 
         if ctr.default_sub != "none" and not args.sn:
             sub_output = make_new_subtitles(tl, ensure, temp)
