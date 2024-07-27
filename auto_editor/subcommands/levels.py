@@ -99,14 +99,22 @@ def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[float]:
     fifo = AudioFifo()
     try:
         container = av.open(src.path, "r")
-        sample_rate = container.streams.audio[stream].rate
+        audio_stream = container.streams.audio[stream]
+        sample_rate = audio_stream.rate
 
         exact_size = (1 / tb) * sample_rate
         accumulated_error = 0
 
+        # Resample so that audio data is between [-1, 1]
+        resampler = av.AudioResampler(
+            av.AudioFormat("flt"), audio_stream.layout, sample_rate
+        )
+
         for frame in container.decode(audio=stream):
-            frame.pts = None  # Skip check
-            fifo.write(frame)
+            frame.pts = None  # Skip time checks
+
+            for reframe in resampler.resample(frame):
+                fifo.write(reframe)
 
             while fifo.samples >= math.ceil(exact_size):
                 size_with_error = exact_size + accumulated_error
