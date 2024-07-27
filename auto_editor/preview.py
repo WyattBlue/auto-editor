@@ -6,7 +6,6 @@ from statistics import fmean, median
 from typing import TextIO
 
 from auto_editor.analyze import Levels
-from auto_editor.output import Ensure
 from auto_editor.timeline import v3
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.func import to_timecode
@@ -49,7 +48,7 @@ def all_cuts(tl: v3, in_len: int) -> list[int]:
     return cut_lens
 
 
-def preview(ensure: Ensure, tl: v3, temp: str, log: Log) -> None:
+def preview(tl: v3, temp: str, log: Log) -> None:
     log.conwrite("")
     tb = tl.tb
 
@@ -66,7 +65,7 @@ def preview(ensure: Ensure, tl: v3, temp: str, log: Log) -> None:
 
     in_len = 0
     for src in all_sources:
-        in_len += Levels(ensure, src, tb, Bar("none"), temp, log).media_length
+        in_len += Levels(src, tb, Bar("none"), temp, log).media_length
 
     out_len = tl.out_len()
 

@@ -49,7 +49,7 @@ class SubtitleParser:
         self.codec = codec
         self.contents = []
 
-        if codec == "ass":
+        if codec == "ass" or codec == "ssa":
             time_code = re.compile(r"(.*)(\d+:\d+:[\d.]+)(.*)(\d+:\d+:[\d.]+)(.*)")
         elif codec == "webvtt":
             time_code = re.compile(r"()(\d+:[\d.]+)( --> )(\d+:[\d.]+)(\n.*)")
