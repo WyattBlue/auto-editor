@@ -10,7 +10,7 @@ import av
 import numpy as np
 from av.audio.fifo import AudioFifo
 
-from auto_editor.analyze import LevelError, Levels
+from auto_editor.analyze import LevelError, Levels, iter_motion
 from auto_editor.ffwrapper import FFmpeg, initFileInfo
 from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import is_bool, is_nat, is_nat1, is_str, is_void, orc
@@ -130,53 +130,6 @@ def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[float]:
         container.close()
 
 
-def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[float]:
-    container = av.open(src.path, "r")
-
-    video = container.streams.video[stream]
-    video.thread_type = "AUTO"
-
-    prev_frame = None
-    current_frame = None
-    total_pixels = src.videos[0].width * src.videos[0].height
-    index = 0
-    prev_index = 0
-
-    graph = av.filter.Graph()
-    graph.link_nodes(
-        graph.add_buffer(template=video),
-        graph.add("scale", f"{width}:-1"),
-        graph.add("format", "gray"),
-        graph.add("gblur", f"sigma={blur}"),
-        graph.add("buffersink"),
-    ).configure()
-
-    for unframe in container.decode(video):
-        if unframe.pts is None:
-            continue
-
-        graph.push(unframe)
-        frame = graph.pull()
-        assert frame.time is not None
-        index = round(frame.time * tb)
-
-        current_frame = frame.to_ndarray()
-        if prev_frame is None:
-            value = 0.0
-        else:
-            # Use `int16` to avoid underflow with `uint8` datatype
-            diff = np.abs(prev_frame.astype(np.int16) - current_frame.astype(np.int16))
-            value = np.count_nonzero(diff) / total_pixels
-
-        for _ in range(index - prev_index):
-            yield value
-
-        prev_frame = current_frame
-        prev_index = index
-
-    container.close()
-
-
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
     parser = levels_options(ArgumentParser("levels"))
     args = parser.parse_args(LevelArgs, sys_args)
@@ -232,7 +185,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         levels = Levels(ensure, src, tb, bar, temp, log)
         try:
             if method == "audio":
-                # print_arr(levels.audio(**obj))
                 print_arr_gen(iter_audio(src, tb, **obj))
             elif method == "motion":
                 print_arr_gen(iter_motion(src, tb, **obj))
