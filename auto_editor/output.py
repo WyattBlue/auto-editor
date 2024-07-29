@@ -227,7 +227,7 @@ def mux_quality_media(
             cmd.extend(["-color_range", f"{color_range}"])
         if colorspace in (0, 1) or (colorspace >= 3 and colorspace < 16):
             cmd.extend(["-colorspace", f"{colorspace}"])
-        if color_prim in (0, 1) or (color_prim >= 4 and color_prim < 17):
+        if color_prim == 1 or (color_prim >= 4 and color_prim < 17):
             cmd.extend(["-color_primaries", f"{color_prim}"])
         if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
             cmd.extend(["-color_trc", f"{color_trc}"])
