@@ -628,11 +628,11 @@ def main(sys_args: list[str] | None = None):
             ("(string #\\a #\\b)", "ab"),
             ("(string #\\a #\\b #\\c)", "abc"),
             (
-                "(margin 0 (bool-array 0 0 0 1 0 0 0))",
+                "(margin (bool-array 0 0 0 1 0 0 0) 0)",
                 np.array([0, 0, 0, 1, 0, 0, 0], dtype=np.bool_),
             ),
             (
-                "(margin -2 2 (bool-array 0 0 1 1 0 0 0))",
+                "(margin (bool-array 0 0 1 1 0 0 0) -2 2)",
                 np.array([0, 0, 0, 0, 1, 1, 0], dtype=np.bool_),
             ),
             ("(equal? 3 3)", True),

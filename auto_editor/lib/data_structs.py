@@ -185,6 +185,8 @@ def display_str(val: object) -> str:
         return f"{val.real}{join}{val.imag}i"
     if type(val) is np.bool_:
         return "1" if val else "0"
+    if type(val) is np.float64 or type(val) is np.float32:
+        return f"{float(val)}"
     if type(val) is Fraction:
         return f"{val.numerator}/{val.denominator}"
 

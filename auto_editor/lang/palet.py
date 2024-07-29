@@ -620,42 +620,36 @@ def make_array(dtype: Sym, size: int, v: int = 0) -> np.ndarray:
         raise MyError(f"number too large to be converted to {dtype}")
 
 
-def minclip(oarr: BoolList, _min: int) -> BoolList:
+def minclip(oarr: BoolList, _min: int, /) -> BoolList:
     arr = np.copy(oarr)
     mut_remove_small(arr, _min, replace=1, with_=0)
     return arr
 
 
-def mincut(oarr: BoolList, _min: int) -> BoolList:
+def mincut(oarr: BoolList, _min: int, /) -> BoolList:
     arr = np.copy(oarr)
     mut_remove_small(arr, _min, replace=0, with_=1)
     return arr
 
 
-def maxclip(oarr: BoolList, _min: int) -> BoolList:
+def maxclip(oarr: BoolList, _min: int, /) -> BoolList:
     arr = np.copy(oarr)
     mut_remove_large(arr, _min, replace=1, with_=0)
     return arr
 
 
-def maxcut(oarr: BoolList, _min: int) -> BoolList:
+def maxcut(oarr: BoolList, _min: int, /) -> BoolList:
     arr = np.copy(oarr)
     mut_remove_large(arr, _min, replace=0, with_=1)
     return arr
 
 
-def margin(a: int, b: Any, c: Any = None) -> BoolList:
-    if c is None:
-        check_args("margin", [a, b], (2, 2), (is_int, is_boolarr))
-        oarr = b
-        start, end = a, a
-    else:
-        check_args("margin", [a, b, c], (3, 3), (is_int, is_int, is_boolarr))
-        oarr = c
-        start, end = a, b
-
+def margin(oarr: BoolList, start: int, end: int | None = None, /) -> BoolList:
     arr = np.copy(oarr)
-    mut_margin(arr, start, end)
+    if end is None:
+        mut_margin(arr, start, start)
+    else:
+        mut_margin(arr, start, end)
     return arr
 
 
@@ -1741,6 +1735,8 @@ env.update({
     "round": Proc("round", round, (1, 1), is_real),
     "max": Proc("max", lambda *v: max(v), (1, None), is_real),
     "min": Proc("min", lambda *v: min(v), (1, None), is_real),
+    "max-seq": Proc("max-seq", max, (1, 1), is_sequence),
+    "min-seq": Proc("min-seq", min, (1, 1), is_sequence),
     "mod": Proc("mod", mod, (2, 2), is_int),
     "modulo": Proc("modulo", mod, (2, 2), is_int),
     # symbols
@@ -1796,7 +1792,7 @@ env.update({
     "bool-array": Proc(
         "bool-array", lambda *a: np.array(a, dtype=np.bool_), (1, None), is_nat
     ),
-    "margin": Proc("margin", margin, (2, 3)),
+    "margin": Proc("margin", margin, (2, 3), is_boolarr, is_int),
     "mincut": Proc("mincut", mincut, (2, 2), is_boolarr, is_nat),
     "minclip": Proc("minclip", minclip, (2, 2), is_boolarr, is_nat),
     "maxcut": Proc("maxcut", maxcut, (2, 2), is_boolarr, is_nat),
