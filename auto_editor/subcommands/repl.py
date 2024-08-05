@@ -70,7 +70,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         env["@levels"] = Levels(src, tb, bar, temp, log)
         env["@filesetup"] = FileSetup(src, strict, tb, bar, temp, log)
 
-    print(f"Auto-Editor {auto_editor.version} ({auto_editor.__version__})")
+    print(f"Auto-Editor {auto_editor.__version__}")
     text = None
 
     try:

@@ -303,7 +303,7 @@ def main() -> None:
     )
 
     if args.version:
-        print(f"{auto_editor.version} ({auto_editor.__version__})")
+        print(auto_editor.__version__)
         return
 
     if args.debug and not args.input:
@@ -314,7 +314,7 @@ def main() -> None:
         print(f"OS: {plat.system()} {plat.release()} {plat.machine().lower()}")
         print(f"Python: {plat.python_version()}")
         print(f"PyAV: {av.__version__}")
-        print(f"Auto-Editor: {auto_editor.version}")
+        print(f"Auto-Editor: {auto_editor.__version__}")
         return
 
     if not args.input:

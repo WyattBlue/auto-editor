@@ -12,7 +12,7 @@ import numpy as np
 from av.audio.fifo import AudioFifo
 from av.subtitles.subtitle import AssSubtitle
 
-from auto_editor import version
+from auto_editor import __version__
 from auto_editor.utils.subtitle_tools import convert_ass_to_text
 
 if TYPE_CHECKING:
@@ -211,7 +211,7 @@ class Levels:
 
     def read_cache(self, tag: str, obj: dict[str, Any]) -> None | np.ndarray:
         workfile = os.path.join(
-            os.path.dirname(self.temp), f"ae-{version}", "cache.npz"
+            os.path.dirname(self.temp), f"ae-{__version__}", "cache.npz"
         )
 
         try:
@@ -228,7 +228,7 @@ class Levels:
         return npzfile[key]
 
     def cache(self, tag: str, obj: dict[str, Any], arr: np.ndarray) -> np.ndarray:
-        workdur = os.path.join(os.path.dirname(self.temp), f"ae-{version}")
+        workdur = os.path.join(os.path.dirname(self.temp), f"ae-{__version__}")
         if not os.path.exists(workdur):
             os.mkdir(workdur)
 

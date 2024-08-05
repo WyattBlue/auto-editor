@@ -1,2 +1,1 @@
-__version__ = "24.31.1"
-version = "24w31a"
+__version__ = "25.0.0rc1"
