@@ -88,7 +88,7 @@ def obj_tag(tag: str, tb: Fraction, obj: dict[str, Any]) -> str:
     return key
 
 
-def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[float]:
+def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[np.float32]:
     fifo = AudioFifo()
     try:
         container = av.open(src.path, "r")
@@ -117,13 +117,13 @@ def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[float]:
                 audio_chunk = fifo.read(current_size)
                 assert audio_chunk is not None
                 arr = audio_chunk.to_ndarray().flatten()
-                yield float(np.max(np.abs(arr)))
+                yield np.max(np.abs(arr))
 
     finally:
         container.close()
 
 
-def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[float]:
+def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[np.float32]:
     container = av.open(src.path, "r")
 
     video = container.streams.video[stream]
@@ -155,11 +155,11 @@ def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[float]:
 
         current_frame = frame.to_ndarray()
         if prev_frame is None:
-            value = 0.0
+            value = np.float32(0.0)
         else:
             # Use `int16` to avoid underflow with `uint8` datatype
             diff = np.abs(prev_frame.astype(np.int16) - current_frame.astype(np.int16))
-            value = np.count_nonzero(diff) / total_pixels
+            value = np.float32(np.count_nonzero(diff) / total_pixels)
 
         for _ in range(index - prev_index):
             yield value
@@ -237,7 +237,7 @@ class Levels:
 
         return arr
 
-    def audio(self, stream: int) -> NDArray[np.float64]:
+    def audio(self, stream: int) -> NDArray[np.float32]:
         if stream >= len(self.src.audios):
             raise LevelError(f"audio: audio stream '{stream}' does not exist.")
 
@@ -256,12 +256,12 @@ class Levels:
         bar = self.bar
         bar.start(inaccurate_dur, "Analyzing audio volume")
 
-        result = np.zeros((inaccurate_dur), dtype=np.float64)
+        result = np.zeros((inaccurate_dur), dtype=np.float32)
         index = 0
         for value in iter_audio(self.src, self.tb, stream):
             if index > len(result) - 1:
                 result = np.concatenate(
-                    (result, np.zeros((len(result)), dtype=np.float64))
+                    (result, np.zeros((len(result)), dtype=np.float32))
                 )
             result[index] = value
             bar.tick(index)
@@ -270,7 +270,7 @@ class Levels:
         bar.end()
         return self.cache("audio", {"stream": stream}, result[:index])
 
-    def motion(self, stream: int, blur: int, width: int) -> NDArray[np.float64]:
+    def motion(self, stream: int, blur: int, width: int) -> NDArray[np.float32]:
         if stream >= len(self.src.videos):
             raise LevelError(f"motion: video stream '{stream}' does not exist.")
 
@@ -289,12 +289,12 @@ class Levels:
         bar = self.bar
         bar.start(inaccurate_dur, "Analyzing motion")
 
-        result = np.zeros((inaccurate_dur), dtype=np.float64)
+        result = np.zeros((inaccurate_dur), dtype=np.float32)
         index = 0
         for value in iter_motion(self.src, self.tb, stream, blur, width):
             if index > len(result) - 1:
                 result = np.concatenate(
-                    (result, np.zeros((len(result)), dtype=np.float64))
+                    (result, np.zeros((len(result)), dtype=np.float32))
                 )
             result[index] = value
             bar.tick(index)

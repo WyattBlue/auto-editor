@@ -72,14 +72,11 @@ def print_arr(arr: NDArray) -> None:
     print("")
 
 
-def print_arr_gen(arr: Iterator[int | float]) -> None:
+def print_arr_gen(arr: Iterator[float | np.float32]) -> None:
     print("")
     print("@start")
     for a in arr:
-        if isinstance(a, float):
-            print(f"{a:.20f}")
-        else:
-            print(a)
+        print(f"{a:.20f}")
     print("")
 
 
