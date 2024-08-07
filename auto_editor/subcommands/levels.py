@@ -19,7 +19,6 @@ from auto_editor.utils.cmdkw import (
     pAttr,
     pAttrs,
 )
-from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import frame_rate
 from auto_editor.vanparse import ArgumentParser
@@ -85,8 +84,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     args = parser.parse_args(LevelArgs, sys_args)
 
     bar = Bar("none")
-    temp = setup_tempdir(None, Log())
-    log = Log(quiet=True, temp=temp)
+    log = Log(quiet=True)
 
     sources = [initFileInfo(path, log) for path in args.input]
     if len(sources) < 1:
@@ -129,7 +127,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             except ParserError as e:
                 log.error(e)
 
-        levels = Levels(src, tb, bar, False, temp, log)
+        levels = Levels(src, tb, bar, False, log)
         try:
             if method == "audio":
                 print_arr_gen(iter_audio(src, tb, **obj))

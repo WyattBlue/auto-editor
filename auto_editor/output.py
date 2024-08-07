@@ -19,7 +19,6 @@ class Ensure:
     _ffmpeg: FFmpeg
     _bar: Bar
     _sr: int
-    temp: str
     log: Log
     _audios: list[tuple[FileInfo, int]] = field(default_factory=list)
     _subtitles: list[tuple[FileInfo, int, str]] = field(default_factory=list)
@@ -33,7 +32,7 @@ class Ensure:
             label = len(self._audios) - 1
             first_time = True
 
-        out_path = os.path.join(self.temp, f"{label:x}.wav")
+        out_path = os.path.join(self.log.temp, f"{label:x}.wav")
 
         if first_time:
             sample_rate = self._sr
@@ -83,7 +82,7 @@ class Ensure:
             self._subtitles.append((src, stream, ext))
             first_time = True
 
-        out_path = os.path.join(self.temp, f"{stream}s.{ext}")
+        out_path = os.path.join(self.log.temp, f"{stream}s.{ext}")
 
         if first_time:
             self.log.debug(f"Making external subtitle: {out_path}")
@@ -119,7 +118,6 @@ def mux_quality_media(
     tb: Fraction,
     args: Args,
     src: FileInfo,
-    temp: str,
     log: Log,
 ) -> None:
     v_tracks = len(visual_output)
@@ -142,7 +140,7 @@ def mux_quality_media(
                 cmd.extend(["-i", path])
         else:
             # Merge all the audio a_tracks into one.
-            new_a_file = os.path.join(temp, "new_audio.wav")
+            new_a_file = os.path.join(log.temp, "new_audio.wav")
             if a_tracks > 1:
                 new_cmd = []
                 for path in audio_output:

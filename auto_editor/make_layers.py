@@ -102,7 +102,6 @@ def make_timeline(
     args: Args,
     sr: int,
     bar: Bar,
-    temp: str,
     log: Log,
 ) -> v3:
     inp = None if not sources else sources[0]
@@ -126,7 +125,7 @@ def make_timeline(
     concat = np.concatenate
 
     for i, src in enumerate(sources):
-        filesetup = FileSetup(src, len(sources) < 2, tb, bar, temp, log)
+        filesetup = FileSetup(src, len(sources) < 2, tb, bar, log)
 
         try:
             parser = Parser(Lexer("`--edit`", args.edit_based_on))
@@ -134,7 +133,7 @@ def make_timeline(
                 log.debug(f"edit: {parser}")
 
             env["timebase"] = tb
-            env["@levels"] = Levels(src, tb, bar, args.no_cache, temp, log)
+            env["@levels"] = Levels(src, tb, bar, args.no_cache, log)
             env["@filesetup"] = filesetup
 
             results = interpret(env, parser)

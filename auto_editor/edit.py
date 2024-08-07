@@ -142,9 +142,7 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
     log.error(f"'{name}': Export must be [{', '.join([s for s in parsing.keys()])}]")
 
 
-def edit_media(
-    paths: list[str], ffmpeg: FFmpeg, args: Args, temp: str, log: Log
-) -> None:
+def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
     bar = Bar(args.progress)
     tl = None
 
@@ -203,7 +201,7 @@ def edit_media(
         samplerate = args.sample_rate
 
     if tl is None:
-        tl = make_timeline(sources, args, samplerate, bar, temp, log)
+        tl = make_timeline(sources, args, samplerate, bar, log)
 
     if export["export"] == "timeline":
         from auto_editor.formats.json import make_json_timeline
@@ -214,7 +212,7 @@ def edit_media(
     if args.preview:
         from auto_editor.preview import preview
 
-        preview(tl, temp, log)
+        preview(tl, log)
         return
 
     if export["export"] == "json":
@@ -263,22 +261,22 @@ def edit_media(
         sub_output = []
         apply_later = False
 
-        ensure = Ensure(ffmpeg, bar, samplerate, temp, log)
+        ensure = Ensure(ffmpeg, bar, samplerate, log)
 
         if ctr.default_sub != "none" and not args.sn:
-            sub_output = make_new_subtitles(tl, ensure, temp)
+            sub_output = make_new_subtitles(tl, ensure, log.temp)
 
         if ctr.default_aud != "none":
-            audio_output = make_new_audio(tl, ensure, args, ffmpeg, bar, temp, log)
+            audio_output = make_new_audio(tl, ensure, args, ffmpeg, bar, log)
 
         if ctr.default_vid != "none":
             if tl.v:
-                out_path, apply_later = render_av(ffmpeg, tl, args, bar, ctr, temp, log)
+                out_path, apply_later = render_av(ffmpeg, tl, args, bar, ctr, log)
                 visual_output.append((True, out_path))
 
             for v, vid in enumerate(src.videos, start=1):
                 if ctr.allow_image and vid.codec in ("png", "mjpeg", "webp"):
-                    out_path = os.path.join(temp, f"{v}.{vid.codec}")
+                    out_path = os.path.join(log.temp, f"{v}.{vid.codec}")
                     # fmt: off
                     ffmpeg.run(["-i", f"{src.path}", "-map", "0:v", "-map", "-0:V",
                         "-c", "copy", out_path])
@@ -297,7 +295,6 @@ def edit_media(
             tl.tb,
             args,
             src,
-            temp,
             log,
         )
 

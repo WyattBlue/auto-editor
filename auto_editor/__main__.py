@@ -6,7 +6,6 @@ from os import environ
 import auto_editor
 from auto_editor.edit import edit_media
 from auto_editor.ffwrapper import FFmpeg
-from auto_editor.utils.func import setup_tempdir
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     Args,
@@ -315,9 +314,8 @@ def main() -> None:
     if not args.input:
         log.error("You need to give auto-editor an input file.")
 
-    temp = setup_tempdir(args.temp_dir, log)
-    log = Log(args.debug, args.quiet, temp, args.progress == "machine", no_color)
-    log.debug(f"Temp Directory: {temp}")
+    is_machine = args.progress == "machine"
+    log = Log(args.debug, args.quiet, args.temp_dir, is_machine, no_color)
 
     ffmpeg = FFmpeg(
         args.ffmpeg_location,
@@ -328,7 +326,7 @@ def main() -> None:
     paths = valid_input(args.input, ffmpeg, args, log)
 
     try:
-        edit_media(paths, ffmpeg, args, temp, log)
+        edit_media(paths, ffmpeg, args, log)
     except KeyboardInterrupt:
         log.error("Keyboard Interrupt")
     log.cleanup()

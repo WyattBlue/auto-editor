@@ -25,26 +25,6 @@ def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:
     return call(a, b)
 
 
-def setup_tempdir(temp: str | None, log: Log) -> str:
-    if temp is None:
-        import tempfile
-
-        return tempfile.mkdtemp()
-
-    import os.path
-    from os import listdir, mkdir
-
-    if os.path.isfile(temp):
-        log.error("Temp directory cannot be an already existing file.")
-    if os.path.isdir(temp):
-        if len(listdir(temp)) != 0:
-            log.error("Temp directory should be empty!")
-    else:
-        mkdir(temp)
-
-    return temp
-
-
 def to_timecode(secs: float | Fraction, fmt: str) -> str:
     sign = ""
     if secs < 0:

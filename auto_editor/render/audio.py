@@ -166,7 +166,7 @@ def apply_audio_normalization(
 
 
 def make_new_audio(
-    tl: v3, ensure: Ensure, args: Args, ffmpeg: FFmpeg, bar: Bar, temp: str, log: Log
+    tl: v3, ensure: Ensure, args: Args, ffmpeg: FFmpeg, bar: Bar, log: Log
 ) -> list[str]:
     sr = tl.sr
     tb = tl.tb
@@ -176,6 +176,7 @@ def make_new_audio(
     norm = parse_norm(args.audio_normalize, log)
 
     af_tick = 0
+    temp = log.temp
 
     if not tl.a or not tl.a[0]:
         log.error("Trying to render empty audio timeline")

@@ -48,7 +48,7 @@ def all_cuts(tl: v3, in_len: int) -> list[int]:
     return cut_lens
 
 
-def preview(tl: v3, temp: str, log: Log) -> None:
+def preview(tl: v3, log: Log) -> None:
     log.conwrite("")
     tb = tl.tb
 
@@ -65,7 +65,7 @@ def preview(tl: v3, temp: str, log: Log) -> None:
 
     in_len = 0
     for src in all_sources:
-        in_len += Levels(src, tb, Bar("none"), False, temp, log).media_length
+        in_len += Levels(src, tb, Bar("none"), False, log).media_length
 
     out_len = tl.out_len()
 
