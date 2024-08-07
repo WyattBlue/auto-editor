@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from fractions import Fraction
 from math import ceil
+from tempfile import gettempdir
 from typing import TYPE_CHECKING
 
 import av
@@ -33,7 +34,6 @@ class FileSetup:
     strict: bool
     tb: Fraction
     bar: Bar
-    temp: str
     log: Log
 
 
@@ -176,7 +176,6 @@ class Levels:
     tb: Fraction
     bar: Bar
     no_cache: bool
-    temp: str
     log: Log
 
     @property
@@ -214,9 +213,7 @@ class Levels:
         if self.no_cache:
             return None
 
-        workfile = os.path.join(
-            os.path.dirname(self.temp), f"ae-{__version__}", "cache.npz"
-        )
+        workfile = os.path.join(gettempdir(), f"ae-{__version__}", "cache.npz")
 
         try:
             npzfile = np.load(workfile, allow_pickle=False)
@@ -235,7 +232,7 @@ class Levels:
         if self.no_cache:
             return arr
 
-        workdur = os.path.join(os.path.dirname(self.temp), f"ae-{__version__}")
+        workdur = os.path.join(gettempdir(), f"ae-{__version__}")
         if not os.path.exists(workdur):
             os.mkdir(workdur)
 

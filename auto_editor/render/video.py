@@ -105,13 +105,7 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
 
 
 def render_av(
-    ffmpeg: FFmpeg,
-    tl: v3,
-    args: Args,
-    bar: Bar,
-    ctr: Container,
-    temp: str,
-    log: Log,
+    ffmpeg: FFmpeg, tl: v3, args: Args, bar: Bar, ctr: Container, log: Log
 ) -> tuple[str, bool]:
     src = tl.src
     cns: dict[FileInfo, av.container.InputContainer] = {}
@@ -121,6 +115,7 @@ def render_av(
 
     target_pix_fmt = "yuv420p"  # Reasonable default
     img_cache = make_image_cache(tl)
+    temp = log.temp
 
     first_src: FileInfo | None = None
     for src in tl.sources:
