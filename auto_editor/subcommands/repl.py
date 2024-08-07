@@ -67,7 +67,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         tb = src.get_fps() if args.timebase is None else args.timebase
         bar = Bar("modern")
         env["timebase"] = tb
-        env["@levels"] = Levels(src, tb, bar, temp, log)
+        env["@levels"] = Levels(src, tb, bar, False, temp, log)
         env["@filesetup"] = FileSetup(src, strict, tb, bar, temp, log)
 
     print(f"Auto-Editor {auto_editor.__version__}")

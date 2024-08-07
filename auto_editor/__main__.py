@@ -140,10 +140,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_text("Utility Options:")
     parser.add_argument(
-        "--export",
-        "-ex",
-        metavar="EXPORT:ATTRS?",
-        help="Choose the export mode",
+        "--export", "-ex", metavar="EXPORT:ATTRS?", help="Choose the export mode"
     )
     parser.add_argument(
         "--output-file",
@@ -153,15 +150,10 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Set the name/path of the new output file.",
     )
     parser.add_argument(
-        "--player",
-        "-p",
-        metavar="CMD",
-        help="Set player to open output media files",
+        "--player", "-p", metavar="CMD", help="Set player to open output media files"
     )
     parser.add_argument(
-        "--no-open",
-        flag=True,
-        help="Do not open the output file after editing is done",
+        "--no-open", flag=True, help="Do not open the output file after editing is done"
     )
     parser.add_argument(
         "--temp-dir",
@@ -255,7 +247,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--audio-normalize",
         metavar="NORM-TYPE",
-        help="Apply audio rendering to all audio tracks. Applied right before rendering the output file.",
+        help="Apply audio rendering to all audio tracks. Applied right before rendering the output file",
     )
     parser.add_text("Miscellaneous:")
     parser.add_argument(
@@ -267,6 +259,9 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--extras",
         metavar="CMD",
         help="Add extra options for ffmpeg. Must be in quotes",
+    )
+    parser.add_argument(
+        "--no-cache", flag=True, help="Don't look for or write a cache file"
     )
     parser.add_argument("--version", "-V", flag=True, help="Display version and halt")
     return parser
