@@ -175,6 +175,7 @@ class Levels:
     src: FileInfo
     tb: Fraction
     bar: Bar
+    no_cache: bool
     temp: str
     log: Log
 
@@ -210,6 +211,9 @@ class Levels:
         return np.zeros(self.media_length, dtype=np.bool_)
 
     def read_cache(self, tag: str, obj: dict[str, Any]) -> None | np.ndarray:
+        if self.no_cache:
+            return None
+
         workfile = os.path.join(
             os.path.dirname(self.temp), f"ae-{__version__}", "cache.npz"
         )
@@ -227,7 +231,10 @@ class Levels:
         self.log.debug("Using cache")
         return npzfile[key]
 
-    def cache(self, tag: str, obj: dict[str, Any], arr: np.ndarray) -> np.ndarray:
+    def cache(self, arr: np.ndarray, tag: str, obj: dict[str, Any]) -> np.ndarray:
+        if self.no_cache:
+            return arr
+
         workdur = os.path.join(os.path.dirname(self.temp), f"ae-{__version__}")
         if not os.path.exists(workdur):
             os.mkdir(workdur)
@@ -268,7 +275,7 @@ class Levels:
             index += 1
 
         bar.end()
-        return self.cache("audio", {"stream": stream}, result[:index])
+        return self.cache(result[:index], "audio", {"stream": stream})
 
     def motion(self, stream: int, blur: int, width: int) -> NDArray[np.float32]:
         if stream >= len(self.src.videos):
@@ -301,7 +308,7 @@ class Levels:
             index += 1
 
         bar.end()
-        return self.cache("motion", mobj, result[:index])
+        return self.cache(result[:index], "motion", mobj)
 
     def subtitle(
         self,

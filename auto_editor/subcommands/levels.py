@@ -129,7 +129,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             except ParserError as e:
                 log.error(e)
 
-        levels = Levels(src, tb, bar, temp, log)
+        levels = Levels(src, tb, bar, False, temp, log)
         try:
             if method == "audio":
                 print_arr_gen(iter_audio(src, tb, **obj))

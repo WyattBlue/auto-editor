@@ -71,44 +71,6 @@ def make_av(src: FileInfo, all_clips: list[list[Clip]]) -> tuple[VSpace, ASpace]
     return vtl, atl
 
 
-def run_interpreter_for_edit_option(
-    text: str, filesetup: FileSetup
-) -> NDArray[np.bool_]:
-    src = filesetup.src
-    tb = filesetup.tb
-    bar = filesetup.bar
-    temp = filesetup.temp
-    log = filesetup.log
-
-    try:
-        parser = Parser(Lexer("`--edit`", text))
-        if log.is_debug:
-            log.debug(f"edit: {parser}")
-
-        env["timebase"] = tb
-        env["@levels"] = Levels(src, tb, bar, temp, log)
-        env["@filesetup"] = filesetup
-
-        results = interpret(env, parser)
-
-        if len(results) == 0:
-            raise MyError("Expression in --edit must return a bool-array, got nothing")
-
-        result = results[-1]
-        if callable(result):
-            result = result()
-
-        if not is_boolarr(result):
-            raise MyError(
-                f"Expression in --edit must return a bool-array, got {print_str(result)}"
-            )
-    except MyError as e:
-        log.error(e)
-
-    assert isinstance(result, np.ndarray)
-    return result
-
-
 def make_sane_timebase(fps: Fraction) -> Fraction:
     tb = round(fps, 2)
 
@@ -159,8 +121,6 @@ def make_timeline(
     except CoerceError as e:
         log.error(e)
 
-    method = args.edit_based_on
-
     has_loud = np.array([], dtype=np.bool_)
     src_index = np.array([], dtype=np.int32)
     concat = np.concatenate
@@ -168,11 +128,36 @@ def make_timeline(
     for i, src in enumerate(sources):
         filesetup = FileSetup(src, len(sources) < 2, tb, bar, temp, log)
 
-        edit_result = run_interpreter_for_edit_option(method, filesetup)
-        mut_margin(edit_result, start_margin, end_margin)
+        try:
+            parser = Parser(Lexer("`--edit`", args.edit_based_on))
+            if log.is_debug:
+                log.debug(f"edit: {parser}")
 
-        has_loud = concat((has_loud, edit_result))
-        src_index = concat((src_index, np.full(len(edit_result), i, dtype=np.int32)))
+            env["timebase"] = tb
+            env["@levels"] = Levels(src, tb, bar, args.no_cache, temp, log)
+            env["@filesetup"] = filesetup
+
+            results = interpret(env, parser)
+
+            if len(results) == 0:
+                log.error("Expression in --edit must return a bool-array, got nothing")
+
+            result = results[-1]
+            if callable(result):
+                result = result()
+        except MyError as e:
+            log.error(e)
+
+        if not is_boolarr(result):
+            log.error(
+                f"Expression in --edit must return a bool-array, got {print_str(result)}"
+            )
+        assert isinstance(result, np.ndarray)
+
+        mut_margin(result, start_margin, end_margin)
+
+        has_loud = concat((has_loud, result))
+        src_index = concat((src_index, np.full(len(result), i, dtype=np.int32)))
 
     # Setup for handling custom speeds
     speed_index = has_loud.astype(np.uint)

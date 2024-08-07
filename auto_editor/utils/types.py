@@ -217,7 +217,7 @@ def resolution(val: str | None) -> tuple[int, int] | None:
     return natural(vals[0]), natural(vals[1])
 
 
-@dataclass
+@dataclass(slots=True)
 class Args:
     yt_dlp_location: str = "yt-dlp"
     download_format: str | None = None
@@ -255,6 +255,7 @@ class Args:
     show_ffmpeg_output: bool = False
     quiet: bool = False
     preview: bool = False
+    no_cache: bool = False
     margin: tuple[str, str] = ("0.2s", "0.2s")
     silent_speed: float = 99999.0
     video_speed: float = 1.0
