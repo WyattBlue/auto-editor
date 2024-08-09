@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from fractions import Fraction
+from typing import TYPE_CHECKING
 
 import numpy as np
-from numpy.typing import NDArray
 
-from auto_editor.utils.log import Log
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from fractions import Fraction
 
-BoolList = NDArray[np.bool_]
-BoolOperand = Callable[[BoolList, BoolList], BoolList]
+    from numpy.typing import NDArray
+
+    from auto_editor.utils.log import Log
+
+    BoolList = NDArray[np.bool_]
+    BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
 
 def boolop(a: BoolList, b: BoolList, call: BoolOperand) -> BoolList:

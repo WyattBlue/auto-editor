@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any
+from typing import TYPE_CHECKING
 
 from numpy import float64
 
 from .data_structs import Sym, print_str
 from .err import MyError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any
 
 
 @dataclass(slots=True)
