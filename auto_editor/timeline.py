@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
 from dataclasses import dataclass
-from fractions import Fraction
-from typing import Any
+from typing import TYPE_CHECKING
 
-from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import *
-from auto_editor.utils.chunks import Chunks
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
-from auto_editor.utils.types import (
-    anchor,
-    color,
-    natural,
-    number,
-    threshold,
-)
+from auto_editor.utils.types import anchor, color, natural, number, threshold
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from fractions import Fraction
+    from typing import Any
+
+    from auto_editor.ffwrapper import FileInfo
+    from auto_editor.utils.chunks import Chunks
 
 
 @dataclass(slots=True)

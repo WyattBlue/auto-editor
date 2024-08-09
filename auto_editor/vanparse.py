@@ -4,7 +4,6 @@ import difflib
 import re
 import sys
 import textwrap
-from collections.abc import Iterator
 from dataclasses import dataclass
 from io import StringIO
 from shutil import get_terminal_size
@@ -14,7 +13,7 @@ from auto_editor.utils.log import Log
 from auto_editor.utils.types import CoerceError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
     from typing import Any, Literal, TypeVar
 
     T = TypeVar("T")
