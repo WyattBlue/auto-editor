@@ -1487,12 +1487,12 @@ def edit_audio(
     mincut: int = 6,
     minclip: int = 3,
 ) -> np.ndarray:
-    if "@levels" not in env or "@filesetup" not in env:
+    if "@levels" not in env:
         raise MyError("Can't use `audio` if there's no input media")
 
     levels = env["@levels"]
-    src = env["@filesetup"].src
-    strict = env["@filesetup"].strict
+    src = levels.src
+    strict = levels.strict
 
     stream_data: NDArray[np.bool_] | None = None
     if stream == Sym("all"):
@@ -1531,11 +1531,10 @@ def edit_motion(
         raise MyError("Can't use `motion` if there's no input media")
 
     levels = env["@levels"]
-    strict = env["@filesetup"].strict
     try:
         return levels.motion(stream, blur, width) >= threshold
     except LevelError as e:
-        return raise_(e) if strict else levels.all()
+        return raise_(e) if levels.strict else levels.all()
 
 
 def edit_subtitle(pattern, stream=0, **kwargs):
@@ -1543,7 +1542,6 @@ def edit_subtitle(pattern, stream=0, **kwargs):
         raise MyError("Can't use `subtitle` if there's no input media")
 
     levels = env["@levels"]
-    strict = env["@filesetup"].strict
     if "ignore-case" not in kwargs:
         kwargs["ignore-case"] = False
     if "max-count" not in kwargs:
@@ -1553,7 +1551,7 @@ def edit_subtitle(pattern, stream=0, **kwargs):
     try:
         return levels.subtitle(pattern, stream, ignore_case, max_count)
     except LevelError as e:
-        return raise_(e) if strict else levels.all()
+        return raise_(e) if levels.strict else levels.all()
 
 
 def my_eval(env: Env, node: object) -> Any:

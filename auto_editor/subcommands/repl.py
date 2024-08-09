@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 import auto_editor
-from auto_editor.analyze import FileSetup, Levels
+from auto_editor.analyze import Levels
 from auto_editor.ffwrapper import initFileInfo
 from auto_editor.lang.palet import ClosingError, Lexer, Parser, env, interpret
 from auto_editor.lib.data_structs import print_str
@@ -65,8 +65,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         tb = src.get_fps() if args.timebase is None else args.timebase
         bar = Bar("modern")
         env["timebase"] = tb
-        env["@levels"] = Levels(src, tb, bar, False, log)
-        env["@filesetup"] = FileSetup(src, strict, tb, bar, log)
+        env["@levels"] = Levels(src, tb, bar, False, log, strict)
 
     print(f"Auto-Editor {auto_editor.__version__}")
     text = None

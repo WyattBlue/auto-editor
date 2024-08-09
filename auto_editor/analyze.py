@@ -28,15 +28,6 @@ if TYPE_CHECKING:
     from auto_editor.utils.log import Log
 
 
-@dataclass(slots=True)
-class FileSetup:
-    src: FileInfo
-    strict: bool
-    tb: Fraction
-    bar: Bar
-    log: Log
-
-
 class LevelError(Exception):
     pass
 
@@ -177,6 +168,7 @@ class Levels:
     bar: Bar
     no_cache: bool
     log: Log
+    strict: bool
 
     @property
     def media_length(self) -> int:

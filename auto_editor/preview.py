@@ -65,7 +65,7 @@ def preview(tl: v3, log: Log) -> None:
 
     in_len = 0
     for src in all_sources:
-        in_len += Levels(src, tb, Bar("none"), False, log).media_length
+        in_len += Levels(src, tb, Bar("none"), False, log, False).media_length
 
     out_len = tl.out_len()
 
