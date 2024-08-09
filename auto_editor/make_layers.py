@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
-from auto_editor.analyze import FileSetup, Levels
+from auto_editor.analyze import Levels
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
@@ -125,16 +125,13 @@ def make_timeline(
     concat = np.concatenate
 
     for i, src in enumerate(sources):
-        filesetup = FileSetup(src, len(sources) < 2, tb, bar, log)
-
         try:
             parser = Parser(Lexer("`--edit`", args.edit_based_on))
             if log.is_debug:
                 log.debug(f"edit: {parser}")
 
             env["timebase"] = tb
-            env["@levels"] = Levels(src, tb, bar, args.no_cache, log)
-            env["@filesetup"] = filesetup
+            env["@levels"] = Levels(src, tb, bar, args.no_cache, log, len(sources) < 2)
 
             results = interpret(env, parser)
 
