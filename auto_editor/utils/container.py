@@ -83,6 +83,8 @@ def container_constructor(ext: str) -> Container:
             vcodecs.add(codec)
             if codec == "h264":
                 vcodecs.add("libx264")
+            if codec == "av1":
+                vcodecs.add("libsvtav1")
         if kind == "audio":
             acodecs.add(codec)
         if kind == "subtitle":
