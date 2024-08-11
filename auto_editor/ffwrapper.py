@@ -232,7 +232,7 @@ def initFileInfo(path: str, log: Log) -> FileInfo:
                 vdur,
                 sar,
                 v.time_base,
-                cc.pix_fmt,
+                getattr(v.format, "name", None),
                 cc.color_range,
                 cc.colorspace,
                 cc.color_primaries,
