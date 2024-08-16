@@ -305,9 +305,11 @@ def main() -> None:
 
         import av
 
+        license = av._core.library_meta["libavcodec"]["license"]
+
         print(f"OS: {plat.system()} {plat.release()} {plat.machine().lower()}")
         print(f"Python: {plat.python_version()}")
-        print(f"PyAV: {av.__version__}")
+        print(f"PyAV: {av.__version__} ({license})")
         print(f"Auto-Editor: {auto_editor.__version__}")
         return
 
