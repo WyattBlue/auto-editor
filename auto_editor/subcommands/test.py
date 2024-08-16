@@ -355,6 +355,13 @@ def main(sys_args: list[str] | None = None):
     def premiere_named_export():
         run.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
 
+    def export_subtitles():
+        cn = fileinfo(run.main(["resources/subtitle.mp4"], []))
+
+        assert len(cn.videos) == 1
+        assert len(cn.audios) == 1
+        assert len(cn.subtitles) == 1
+
     def resolution_and_scale():
         cn = fileinfo(run.main(["example.mp4"], ["--scale", "1.5"]))
 
@@ -743,6 +750,7 @@ def main(sys_args: list[str] | None = None):
                 track_tests,
                 codec_tests,
                 premiere_named_export,
+                export_subtitles,
                 export,
                 motion,
                 resolution_and_scale,

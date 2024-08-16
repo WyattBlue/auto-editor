@@ -262,7 +262,6 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
         apply_later = False
 
         ensure = Ensure(ffmpeg, bar, samplerate, log)
-
         if ctr.default_sub != "none" and not args.sn:
             sub_output = make_new_subtitles(tl, ensure, log.temp)
 

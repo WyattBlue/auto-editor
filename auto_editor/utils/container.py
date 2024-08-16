@@ -72,6 +72,8 @@ def container_constructor(ext: str) -> Container:
             vdefault = container.default_video_codec
         adefault = container.default_audio_codec
         sdefault = container.default_subtitle_codec
+        if sdefault == "none" and ext == "mp4":
+            sdefault = "srt"
 
     vcodecs = set()
     acodecs = set()
