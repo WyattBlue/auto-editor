@@ -309,7 +309,7 @@ def main(sys_args: list[str] | None = None):
         """Input file must have an extension. Throw error if none is given."""
 
         shutil.copy("example.mp4", "example")
-        run.check(["example", "--no-open"], "must have an extension.")
+        run.check(["example", "--no-open"], "must have an extension")
 
         return "example"
 

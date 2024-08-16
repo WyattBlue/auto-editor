@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import os
 import re
 import subprocess
 import sys
+from os.path import exists, isdir, isfile, lexists, splitext
 
 from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.func import get_stdout
@@ -27,7 +27,7 @@ def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
         download_format = "bestvideo[ext=mp4]+bestaudio[ext=m4a]"
 
     if args.output_format is None:
-        output_format = re.sub(r"\W+", "-", os.path.splitext(my_input)[0]) + ".%(ext)s"
+        output_format = re.sub(r"\W+", "-", splitext(my_input)[0]) + ".%(ext)s"
     else:
         output_format = args.output_format
 
@@ -57,10 +57,10 @@ def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
             msg += "pip or your favorite package manager and make sure it's in PATH."
         log.error(msg)
 
-    if not os.path.isfile(location):
+    if not isfile(location):
         subprocess.run([yt_dlp_path] + cmd)
 
-    if not os.path.isfile(location):
+    if not isfile(location):
         log.error(f"Download file wasn't created: {location}")
 
     return location
@@ -73,11 +73,16 @@ def valid_input(inputs: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> list
         if my_input.startswith("http://") or my_input.startswith("https://"):
             result.append(download_video(my_input, args, ffmpeg, log))
         else:
-            _, ext = os.path.splitext(my_input)
+            _, ext = splitext(my_input)
             if ext == "":
-                if os.path.isdir(my_input):
+                if isdir(my_input):
                     log.error("Input must be a file or a URL, not a directory.")
-                log.error("Input file must have an extension.")
+                if exists(my_input):
+                    log.error(f"Input file must have an extension: {my_input}")
+                if lexists(my_input):
+                    log.error(f"Input file is a broken symbolic link: {my_input}")
+                if my_input.startswith("-"):
+                    log.error(f"Option/Input file doesn't exist: {my_input}")
             result.append(my_input)
 
     return result

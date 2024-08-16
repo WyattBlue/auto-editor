@@ -195,7 +195,7 @@ def initFileInfo(path: str, log: Log) -> FileInfo:
     try:
         cont = av.open(path, "r")
     except av.error.FileNotFoundError:
-        log.error(f"Could not find '{path}'")
+        log.error(f"Input file doesn't exist: {path}")
     except av.error.IsADirectoryError:
         log.error(f"Expected a media file, but got a directory: {path}")
     except av.error.InvalidDataError:
