@@ -47,7 +47,7 @@ class VideoJson(TypedDict):
 class AudioJson(TypedDict):
     codec: str
     samplerate: int
-    channels: int
+    layout: str
     duration: float
     bitrate: int
     lang: str | None
@@ -150,8 +150,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         for track, a in enumerate(src.audios):
             aud: AudioJson = {
                 "codec": a.codec,
+                "layout": a.layout,
                 "samplerate": a.samplerate,
-                "channels": a.channels,
                 "duration": a.duration,
                 "bitrate": a.bitrate,
                 "lang": a.lang,

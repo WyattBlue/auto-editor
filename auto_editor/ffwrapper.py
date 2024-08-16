@@ -149,6 +149,7 @@ class VideoStream:
 class AudioStream:
     codec: str
     samplerate: int
+    layout: str
     channels: int
     duration: float
     bitrate: int
@@ -252,6 +253,7 @@ def initFileInfo(path: str, log: Log) -> FileInfo:
             AudioStream(
                 a_cc.name,
                 0 if a_cc.sample_rate is None else a_cc.sample_rate,
+                a.layout.name,
                 a_cc.channels,
                 adur,
                 0 if a_cc.bit_rate is None else a_cc.bit_rate,
