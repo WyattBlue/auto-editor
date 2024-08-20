@@ -12,6 +12,7 @@ from fractions import Fraction
 from functools import reduce
 from io import StringIO
 from operator import add, ge, gt, is_, le, lt, mod, mul
+from subprocess import run
 from time import sleep
 from typing import TYPE_CHECKING
 
@@ -747,12 +748,24 @@ def palet_assert(expr: object, msg: str | bool = False) -> None:
 
 
 def palet_system(cmd: str) -> bool:
-    import subprocess
-
     try:
-        return subprocess.run(cmd, shell=True).returncode == 0
+        return run(cmd, shell=True).returncode == 0
     except Exception:
         return False
+
+
+def palet_system_star(*cmd: str) -> bool:
+    try:
+        return run(cmd).returncode == 0
+    except Exception:
+        return False
+
+
+def change_file_ext(a, ext) -> str:
+    import os.path
+
+    base_name = os.path.splitext(a)[0]
+    return f"{base_name}.{ext}" if ext else base_name
 
 
 ###############################################################################
@@ -1624,7 +1637,7 @@ env.update({
     "true": True,
     "false": False,
     "all": Sym("all"),
-    # edit procedures
+    # builtin edit procedures
     "none": Proc("none", edit_none, (0, 0)),
     "all/e": Proc("all/e", edit_all, (0, 0)),
     "audio-levels": Proc("audio-levels", audio_levels, (1, 1), is_nat),
@@ -1753,6 +1766,7 @@ env.update({
     "lower": Proc("lower", str.lower, (1, 1), is_str),
     "upper": Proc("upper", str.upper, (1, 1), is_str),
     "join": Proc("join", palet_join, (2, 2), is_vector, is_str),
+    "change-file-ext": Proc("change-file-ext", change_file_ext, (2, 2), is_str),
     # format
     "char->int": Proc("char->int", lambda c: ord(c.val), (1, 1), is_char),
     "int->char": Proc("int->char", Char, (1, 1), is_int),
@@ -1838,6 +1852,7 @@ env.update({
     "error": Proc("error", raise_, (1, 1), is_str),
     "sleep": Proc("sleep", sleep, (1, 1), is_int_or_float),
     "system": Proc("system", palet_system, (1, 1), is_str),
+    "system*": Proc("system*", palet_system_star, (1, None), is_str),
     # conversions
     "number->string": Proc("number->string", number_to_string, (1, 1), is_num),
     "string->vector": Proc(

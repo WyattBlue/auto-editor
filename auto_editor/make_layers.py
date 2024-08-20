@@ -124,6 +124,12 @@ def make_timeline(
     src_index = np.array([], dtype=np.int32)
     concat = np.concatenate
 
+    if args.config:
+        # Edit `env` with user-defined code.
+        with open("config.pal") as file:
+            parser = Parser(Lexer("config.pal", file.read()))
+            interpret(env, parser)
+
     for i, src in enumerate(sources):
         try:
             parser = Parser(Lexer("`--edit`", args.edit_based_on))
@@ -131,6 +137,7 @@ def make_timeline(
                 log.debug(f"edit: {parser}")
 
             env["timebase"] = tb
+            env["src"] = f"{src.path}"
             env["@levels"] = Levels(src, tb, bar, args.no_cache, log, len(sources) < 2)
 
             results = interpret(env, parser)
