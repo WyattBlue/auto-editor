@@ -7,14 +7,14 @@
  - rsync and ssh (for deployment)
 
 ```
-# Install
-bun install
+# Compile Nim, get resources
+make compile
 
 # Run local
-bun run dev
+make
 
 # Publish
-./go.sh
+make upload
 ```
 
 ## Server Requirements

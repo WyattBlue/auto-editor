@@ -1,6 +1,5 @@
 {
-  "name": "express-ae",
-  "version": "1.0.0",
+  "name": "auto-editor.com",
   "main": "server.js",
   "type": "module",
   "scripts": {

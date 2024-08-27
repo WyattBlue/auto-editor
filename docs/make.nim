@@ -1,6 +1,78 @@
 import strutils
 import std/os
 import std/strformat
+import sequtils
+
+func shouldProcessFile(path: string): bool =
+  if path.endsWith(".DS_Store"):
+    return false
+
+  let ext = path.splitFile().ext.toLowerAscii()
+  return ext notin [".webp", ".png", ".jpeg", ".jpg", ".svg"]
+
+proc parseTemplate(content: string, compName: string, compContent: string): string =
+  var newContent = content
+  var startIdx = 0
+  while true:
+    let openIdx = newContent.find("{{ " & compName, startIdx)
+    if openIdx == -1:
+      break
+    let closeIdx = newContent.find(" }}", openIdx)
+    if closeIdx == -1 and openIdx != -1:
+      stderr.writeLine("error! Unclosed template for " & compName)
+      quit(1)
+    if closeIdx == -1:
+      break
+
+    let fullMatch = newContent[openIdx .. closeIdx + 2]
+    let argsStr = newContent[openIdx + compName.len + 3 .. closeIdx - 1].strip()
+    let args = argsStr.split('"').filterIt(it.strip() != "")
+
+    var replacedContent = compContent
+    for i, arg in args:
+      replacedContent = replacedContent.replace("{{ $" & $(i+1) & " }}", arg)
+
+    newContent = newContent.replace(fullMatch, replacedContent)
+    startIdx = openIdx + replacedContent.len
+
+  return newContent
+
+proc processFile(path: string) =
+  if not shouldProcessFile(path):
+    return
+
+  var content = readFile(path)
+
+  for kind, comp in walkDir("components"):
+    let compName = comp.extractFilename().changeFileExt("")
+    if kind == pcFile and not compName.startsWith("."):
+      let compContent = readFile(comp).strip()
+      content = parseTemplate(content, compName, compContent)
+  
+  var outputPath = path
+  if path.endsWith("index.html"):
+    outputPath = path
+  elif path.endsWith(".html"):
+    outputPath = path.splitFile().dir / path.splitFile().name
+
+  writeFile(outputPath, content)
+  
+  if outputPath != path:
+    removeFile(path)
+    echo "Processed and renamed: ", path, " -> ", outputPath
+  else:
+    echo "Processed: ", path
+
+proc processDirectory(dir: string) =
+  for kind, path in walkDir(dir):
+    if kind == pcFile:
+      processFile(path)
+    elif kind == pcDir:
+      processDirectory(path)
+
+################################
+#  Markdown -> HTML converter  #
+################################
 
 type
   PragmaKind = enum
@@ -51,7 +123,7 @@ proc error(self: Lexer, msg: string) =
   write(stderr, &"{self.name}:{self.line}:{self.col} {msg}")
   system.quit(1)
 
-proc advance(self: Lexer) = 
+proc advance(self: Lexer) =
   self.pos += 1
   if self.pos > len(self.text) - 1:
     self.currentChar = '\0'
@@ -468,7 +540,7 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
   if getNextToken(lexer).kind != tkBar:
     error(lexer, "Expected --- at start")
 
-  proc parse_keyval(key: string): string = 
+  proc parse_keyval(key: string): string =
     var token = getNextToken(lexer)
     if token.kind != tkText:
       lexer.error("head: expected text")
@@ -481,7 +553,7 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
       lexer.error("head: expected keyval")
 
     return token.value
-      
+
   let title = parse_keyval("title")
 
   if pragma == blogType:
@@ -651,16 +723,22 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
   f.write("</div>\n</section>\n</body>\n</html>\n")
   f.close()
 
-convert(normalType, "src/blog/index.md", "src/blog/index.html")
-convert(normalType, "src/ref/index.md", "src/ref/index.html")
-for file in walkFiles("src/blog/*.md"):
-  if file != "src/blog/index.md":
+  removeFile file
+
+
+proc main() =
+  convert(normalType, "public/blog/index.md", "public/blog/index.html")
+  convert(normalType, "public/ref/index.md", "public/ref/index.html")
+  for file in walkFiles("public/blog/*.md"):
     convert(blogType, file, file.changeFileExt("html"))
 
-for file in walkFiles("src/docs/*.md"):
-  convert(normalType, file, file.changeFileExt("html"))
+  for file in walkFiles("public/docs/*.md"):
+    convert(normalType, file, file.changeFileExt("html"))
 
-for file in walkFiles("src/docs/subcommands/*.md"):
-  convert(normalType, file, file.changeFileExt("html"))
+  for file in walkFiles("public/docs/subcommands/*.md"):
+    convert(normalType, file, file.changeFileExt("html"))
 
-echo "done building"
+  processDirectory("public")
+  echo "done building"
+
+main()

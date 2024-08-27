@@ -1,9 +1,8 @@
 src/ref
-src/blog/*.html
-src/docs/**/*.html
+src/img
 public
 
-mdGen
+make
 binaries/
 
 .DS_Store

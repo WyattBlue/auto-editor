@@ -2,8 +2,6 @@ import express from "express";
 import { exec } from "node:child_process";
 import * as path from "path";
 
-exec("./build.py");
-
 const app = express();
 
 app.get("/app/*", (req, res) => {
