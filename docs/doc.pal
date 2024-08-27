@@ -1,0 +1,916 @@
+(define (text children ...) (hash "tag" "text" "children" children))
+
+(class code [val string?])
+(class codeblock [val string?])
+(class link [val symbol?])
+
+(class proc [name string?] [sig any] [summary hash?])
+(class syntax [name string?] [body string?] [summary hash?])
+(class value [name string?] [sig any] [summary hash?])
+
+(define/c (pred [name string?] [summary hash?] -> proc?)
+    (proc name '((v any) bool?) summary)
+)
+
+
+; -----------
+; Doc builder
+
+(define/c (san [v (or/c symbol? string?)] -> string?)
+    (when v.symbol?
+        (set! v v.symbol->string)
+    )
+    (replace (replace (replace v "&" "&amp;") "<" "&lt;") ">" "&gt;")
+)
+
+(define/c (text->string [text hash?] -> string?)
+    (define s "")
+    (for ([c (text "children")]) (cond
+        [(equal? c #t) (&= s "<span class=\"palet-val\">#t</span>")]
+        [(equal? c #f) (&= s "<span class=\"palet-val\">#f</span>")]
+        [(void? c) (&= s "<span class=\"palet-val\">#&lt;void&gt;</span>")]
+        [(symbol? c) (&= s (& "<span class=\"palet-var\">" (san c) "</span>"))]
+        [(string? c) (&= s (replace (san c) "\n" "<br/>"))]
+        [(link? c) (&= s (& "<a href=\"#" (symbol->string c.val) "\">" (san c.val) "</a>"))]
+        [(code? c) (&= s (& "<code>" (san c.val) "</code>"))]
+        [(codeblock? c) (&= s (& "<pre><code>" (san c.val) "</code></pre>"))]
+        [else (error "Unknown text value in text->string")]
+    ))
+    s
+)
+
+(define/c (build-sig [mylist list?] -> string?)
+    (define results #())
+    (for ([v mylist])
+        (add! results (cond
+            [(equal? v '...) "..."]
+            [(equal? v.len 3) (& "<span class=\"palet-var\">[" (san (v 0)) "]</span>")]
+            [else (& "<span class=\"palet-var\">" (san (v 0)) "</span>")]
+        ))
+    )
+    (join results "&nbsp;")
+)
+
+
+(define/c (build-var [c any] -> string?)
+    (cond
+        [(equal? c #t) "<span class=\"palet-val\">#t</span>"]
+        [(equal? c #f) "<span class=\"palet-val\">#f</span>"]
+        [(void? c) "<span class=\"palet-val\">#&lt;void&gt;</span>"]
+        [(and c.list? (= c.len 1) (equal? (c 0) 'void)) "<span class=\"palet-val\">#&lt;void&gt;</span>"]
+        [(and c.symbol? c.var-exists?) (& "<a href=\"#" c.symbol->string "\">" (san c) "</a>")]
+        [(or c.string? c.symbol?) (san c)]
+        [(list? c) (begin
+            (define results #())
+            (for ([inner c])
+                (add! results (build-var inner))
+            )
+            (& "(" (join results " ") ")")
+        )]
+        [else (~v c)]
+    )
+)
+
+(define/c (build-var-sig [sigs list?])
+    (define result "")
+    (for ([s sigs])
+        (when (and s.symbol? (not (equal? s '...)))
+            (error "string besides ... was found")
+        )
+        (when (not (equal? s '...))
+            (define name (s 0))
+            (define sig (s 1))
+            (&= result (& "<p class=\"mono\">&nbsp;<span class=\"palet-var\">" name.san
+                "</span>&nbsp;:&nbsp;" sig.build-var
+                    (if (> s.len 2) (& "&nbsp;=&nbsp;" (build-var (s 2))) "") "</p>\n"
+            ))
+        )
+    )
+    result
+)
+
+(define/c (doc-builder [file output-port?] [doc hash?] -> void?)
+    (define special-forms 0)
+    (define palet-procs 0)
+    (define palet-vars #[])
+
+    (for-items [category somethings doc]
+        (displayln (& "<h2 class=\"left\">" category "</h2>") file)
+
+        (for ([some somethings])
+            (if (and some.hash? (equal? (some "tag") "text"))
+                (displayln (& "<p>" some.text->string "</p>") file)
+                (add! palet-vars (if some.hash? (some "name") some.name))
+            )
+            (when some.value?
+                (displayln (&
+                    "<div class=\"palet-block\">\n<p class=\"mono\">" (san some.name)
+                     "\n&nbsp;:&nbsp;<a href=\"#" some.sig "\">" some.sig
+                     "</a>&nbsp;&nbsp;Value</p>\n</div>\n<p>" (text->string some.summary) "</p>"
+                ) file)
+            )
+            (when some.syntax?
+                special-forms.incf
+                (displayln (&
+                    "<div id=\"" (san some.name) "\" class=\"palet-block\">\n<p class=\"mono\">(<b>"
+                    some.name "</b>&nbsp;" some.body ")&nbsp;&nbsp;Syntax</p>\n</div>\n<p>"
+                    (text->string some.summary) "</p>"
+                ) file)
+            )
+            (when some.proc?
+                palet-procs.incf
+                (define rname (some.sig -1))  ; result name
+                (define varsigs (some.sig 0 -1))
+                (displayln (&
+                    "<div id=\"" (san some.name)
+                    "\" class=\"palet-block\">\n<p class=\"mono\">(<b>" (san some.name) "</b>&nbsp;"
+                    (build-sig varsigs) ")&nbsp;→&nbsp;"  (build-var rname) "&nbsp;&nbsp;Procedure</p>\n"
+                    (build-var-sig varsigs) "</div>\n<p>" (text->string some.summary) "</p>"
+                ) file)
+            )
+        )
+    )
+    (display "</div>\n</section>\n</body>\n</html>\n\n" file)
+    file.close-port
+    (displayln (~s "built" palet-procs "variables\nbuilt" special-forms "special forms"))
+)
+
+
+; -----
+
+(define edit-docs {hash
+    "Edit Methods" #[
+        (proc "audio" '((threshold threshold? 0.04) (stream (or/c nat? "'all") "'all") (mincut int? 6) (minclip int? 3) bool-array?)
+            (text "Auto-Editor's default. Provides a high level abstraction over "(link 'audio-levels)".")
+        )
+        (proc "motion" '((threshold threshold? 0.02) (stream nat? 0) (blur nat? 9) (width nat1? 400) bool-array?)
+            (text "Motion analysis. Provides a high level abstraction over "(link 'motion-levels)".")
+        )
+        (proc "subtitle" '((pattern string?) (stream nat? 0) (ignore-case bool? #f) (max-count (or/c nat? void?) (void)) bool-array?)
+            (text "When "'pattern", a RegEx Expression, matches a subtitle line, consider that time the line occupies as loud.")
+        )
+    ]
+    "Level Procedures" #[
+        (proc "audio-levels" '((stream nat?) array?)
+            (text "Analysis audio volume based on samples. Using a 2-pass method where all the values are adjusted based on the highest sample value. Returns an array of float64s.")
+        )
+        (proc "motion-levels" '((stream nat?) (blur nat? 9) (width nat1? 400) array?)
+            (text "Scale the video to "'width" pixels, convert to grayscale, apply a Gaussian blur of "'blur" amount, then compare the difference with the previous frame. Returns an array of float64s.")
+        )
+    ]
+})
+
+(define core-docs {hash
+    "Assignment" #[
+        (syntax "define" "id expr" (text "Set "'id" to the result of "'expr"."))
+        (syntax "set!" "id expr"
+            (text
+                "Set "'id" to the result of "'expr" if "'id
+                " is already defined. If "'id" is not defined, raise an error."
+            )
+        )
+        (syntax
+            "lambda" "args body"
+            (text
+                "Produces a procedure that accepts "'args" arguments and runs "
+                'body" when called."
+            )
+        )
+        (syntax "λ" "args body" (text "Clone of " (link 'lambda) "."))
+        (syntax
+            "define/c" "(proc-bind [id-binding contract]... )"
+            (text "Define a procedure with contracts.")
+        )
+        (syntax "let" "([id val-expr] ...) body)"
+            (text "Evaluates the "'val-expr"s left-to-right, creating a new location for each "
+            'id", and places the values into the locations. It then evaluates the "'body
+            "s, in which the "'id"s are bound.")
+        )
+        (syntax "let*" "([id val-expr] ...) body)"
+            (text "Like " (link 'let) ", but evaluates the "'val-expr
+                "s one by one, creating a location for each "'id
+                " as soon as the value is available. The "'id"s are bound in the remaining "
+                'val-expr"s as well as in the "'body"."
+            )
+        )
+    ]
+    "Control Flow" #[
+        (syntax "if" "test-expr then-expr else-expr"
+            (text
+                "Evaluates "'test-expr". If "#t" then evaluate "'then-expr" else evaluate "
+                'else-expr". An error will be raised if evaluated "'test-expr" is not a "
+                (link 'bool?)"."
+            )
+        )
+        (syntax "when" "test-expr body"
+            (text
+                "Evaluates "'test-expr". If "#t" then evaluate "'body
+                " else do nothing. An error will be raised if evaluated "'test-expr
+                " is not a "(link 'bool?)"."
+            )
+        )
+        (syntax "cond" "[test-clause then-body]... [else then-body]"
+            (text
+                "Evaluate each "'cond-clause" if the clause is evaluated to "#t
+                " then evaluate and return "'then-body". If the clause is "#f
+                " continue to the next clause. If there are no clauses left return "
+                (void)". If the last "'test-clause" is "'else" then its evaluated "
+                'then-body"."
+            )
+        )
+        (syntax "case" "val-expr case-clause ..."
+            (text
+                "Evaluates "'val-expr" and uses the result to choose a "'case-clause
+                ". The selected clause is the first datum whose "'quote" form is "
+                (link 'equal?)" to the result of "'val-expr". If no "'case-clause
+                " is choosen, then "(void)" is returned, unless there is an else"
+                " clause, in that case return its body.\n\n"
+                "A "'case-clause " that starts with else must be the last "'case-clause"."
+            )
+        )
+        (syntax "for" "([id seq-expr] ...) body"
+            (text
+                "Loop over "'seq-expr" by setting the variable "'id" to the nth item of "
+                'seq-expr" and evaluating "'body"."
+            )
+        )
+    ]
+    "Equality" #[
+        (proc "equal?" '((v1 any) (v2 any) bool?)
+            (text
+                "Returns "#t" if "'v1" and "'v2" are the same type and have the same value, "
+                #f" otherwise."
+            )
+        )
+        (proc "eq?" '((v1 any) (v2 any) bool?)
+            (text
+                "Returns "#t" if "'v1" and "'v2" refer to the same object in memory, "
+                #f" otherwise."
+            )
+        )
+    ]
+    "Booleans" #[
+        (pred "bool?" (text "Returns "#t" if "'v" is "#t" or "#f", "#f" otherwise."))
+        (value "true" "bool?" (text "An alias for "#t"."))
+        (value "false" "bool?" (text "An alias for "#f"."))
+    ]
+    "Number Predicates" #[
+        (pred "number?" (text "Returns "#t" if "'v" is a number, "#f" otherwise."))
+        (pred "real?" (text "Returns "#t" if "'v" is a real number, "#f" otherwise."))
+        (pred "int?" (text "Returns "#t" if "'v" is an integer, "#f" otherwise."))
+        (pred "float?" (text "Returns "#t" if "'v" is a float, "#f" otherwise."))
+        (pred "frac?"
+            (text "Returns "#t" if "'v" is a fraction (a rational number), "#f" otherwise.")
+        )
+        (pred "complex?" (text "Returns "#t" if "'v" is an complex number, "#f" otherwise."))
+        (pred "nat?"
+            (text "Returns "#t" if "'v" is an integer and "'v" is >= 0, "#f" otherwise.")
+        )
+        (pred "nat1?"
+            (text "Returns "#t" if "'v" is an integer and "'v" is >= 1, "#f" otherwise.")
+        )
+        (pred "threshold?"
+            (text "Returns "#t" if "'v" is a float and "'v" is >= 0 and <= 1, "#f" otherwise.")
+        )
+        (proc "zero?" '((z number?) bool?) (text "Returns " (code "(= z 0)")))
+        (proc "positive?" '((x real?) bool?) (text "Returns " (code "(> x 0)")))
+        (proc "negative?" '((x real?) bool?) (text "Returns " (code "(< x 0)")))
+        (proc "even?" '((n int?) bool?) (text "Returns " (code "(zero? (mod n 2))")))
+        (proc "odd?" '((n int?) bool?) (text "Returns " (code "(not (even? n))")))
+    ]
+    "Numbers" #[
+        (proc "+" '((z number?) ... number?)
+            (text
+                "Return the sum of "'z"s. Add from left to right. "
+                "If no arguments are provided the result is 0."
+            )
+        )
+        (proc "-" '((z number?) (w number?) ... number?)
+            (text
+                "When no "'w"s are applied return "(code "(- 0 z)")
+                ", otherwise return the subtraction of "'w"s of "'z"."
+            )
+        )
+        (proc "*" '((z number?) ... number?)
+            (text "Return the product of "'z"s. If no "'z"s are supplied the result is 1.")
+        )
+        (proc "/" '((z number?) (w number?) ... number?)
+            (text
+                "Returns the division of "'z" by the "'w"s. If no "'w"s are given, returns "
+                (code "(/ 1 z)")"."
+            )
+        )
+        (proc "div" '((n int?) (m int?) ... int?)
+            (text "Returns the integer division of "'n" by the "'m"s.")
+        )
+        (proc "mod" '((n int?) (m int?) int?) (text "Return the modulo of "'n" and "'m"."))
+        (proc "modulo" '((n int?) (m int?) int?) (text "Clone of "(link 'mod)"."))
+        (proc "add1" '((z number?) number?) (text "Returns "(code "(+ z 1)")"."))
+        (proc "sub1" '((z number?) number?) (text "Returns "(code "(- z 1)")"."))
+        (syntax "incf" "id [delta 1]"
+            (text
+                "Mutate "'id" by adding the evaluated result of "'delta". If "'delta
+                " is not specified, then add 1 to "'id"."
+            )
+        )
+        (syntax "decf" "id [delta 1]"
+            (text
+                "Mutate "'id" by subtracting the evaluated result of "'delta". If "
+                'delta" is not specified, then subtract 1 from "'id"."
+            )
+        )
+        (proc "=" '((z number?) (w number?) ... bool?)
+            (text "Returns "#t" if all arguments are numerically equal, "#f" otherwise.")
+        )
+        (proc "<" '((x real?) (y real?) bool?)
+            (text "Returns "#t" if "'x" is less than "'y", "#f" otherwise.")
+        )
+        (proc "<=" '((x real?) (y real?) bool?)
+            (text "Returns "#t" if "'x" is less than or equal to "'y", "#f" otherwise.")
+        )
+        (proc ">" '((x real?) (y real?) bool?)
+            (text "Returns "#t" if "'x" is greater than "'y", "#f" otherwise.")
+        )
+        (proc ">=" '((x real?) (y real?) bool?)
+            (text "Returns "#t" if "'x" is greater than or equal to "'y", "#f" otherwise.")
+        )
+        (proc "abs" '((x real?) real?) (text "Returns the absolute value of "'x"."))
+        (proc "max" '((x real?) ... real?) (text "Returns largest value of the "'x"s."))
+        (proc "min" '((x real?) ... real?) (text "Returns smallest value of the "'x"s."))
+        (proc "real-part" '((z number?) real?) (text "Returns the real part of "'z"."))
+        (proc "imag-part" '((z number?) real?) (text "Returns the imaginary part of "'z"."))
+        (proc "round" '((x real?) int?)
+            (text
+                "Returns the closest integer to "'x" resolving ties in favor of even numbers."
+            )
+        )
+        (proc "pow" '((z real?) (w real?) real?)
+            (text "Returns "'z" raised to the "'w" power.")
+        )
+        (proc "sqrt" '((z number?) number?)
+            (text "Returns the square root of "'z".")
+        )
+    ]
+    "Math Module" #[
+        (text "Imported with " (code "(import math)") ".")
+        (proc "ceil" '((x real?) int?) (text "Returns the smallest integer bigger than "'x"."))
+        (proc "floor" '((x real?) int?) (text "Returns the largest integer less than "'x"."))
+        (proc "exp" '((x real?) float?)
+            (text "Returns Euler's number raised to the "'x" power.")
+        )
+        (proc "log" '([x (and/c real? (>/c 0))] [b real? (exp 1)] float?)
+            (text
+                "Returns the natural logarithm of "'x".\n"
+                "If "'b" is provided it serves as an alternative base."
+            )
+        )
+        (value "e" "2.718281828459045" (text "Euler's number."))
+        (proc "sin" '((z real?) float?) (text "Returns the sine of "'z" in radians."))
+        (proc "cos" '((z real?) float?) (text "Returns the cosine of "'z" in radians."))
+        (proc "tan" '((z real?) float?) (text "Returns the tangent of "'z" in radians."))
+        (proc "asin" '((z (between/c -1 1)) float?) (text "Returns the arc sine of "'z"."))
+        (proc "acos" '((z (between/c -1 1)) float?) (text "Returns the arc cosine of "'z"."))
+        (proc "atan" '((z real?) float?) (text "Returns the arc tangent of "'z"."))
+        (value "pi" "3.141592653589793" (text "The ratio of a circle's circumference to its diameter."))
+        (value "tau" "6.283185307179586" (text "The ratio of a circle's circumference to its radius."))
+    ]
+    "Symbols" #[
+        (pred "symbol?" (text "Returns "#t" if "'v" is a symbol, "#f" otherwise."))
+        (proc
+            "symbol->string" '((sym symbol?) string?)
+            (text "Returns a new string whose characters are the same as in "'sym".")
+        )
+        (proc
+            "string->symbol" '((str string?) symbol?)
+            (text "Returns a symbol whose characters are the same as "'str".")
+        )
+    ]
+    "Strings" #[
+        (pred "string?" (text "Returns "#t" if "'v" is a string, "#f" otherwise."))
+        (pred "char?" (text "Returns "#t" if "'v" is a char, "#f" otherwise."))
+        (proc "string" '((char char?) ... string?)
+            (text "Returns a new string from the given "'char"s.")
+        )
+        (proc "&" '((str string?) ... string?)
+            (text "Returns a new string concatenated from the given "'str"s")
+        )
+        (syntax "&=" "id delta"
+            (text "Mutate "'id" by concatenating the evaluated result of "'delta".")
+        )
+        (proc "upper" '((str string?) string?)
+            (text
+                "Returns a string whose characters are the upcase conversion of the "
+                "characters in "'str" in the C locale."
+            )
+        )
+        (proc "lower" '((str string?) string?)
+            (text "Like "(link 'upper)", but for downcase conversion.")
+        )
+        (proc "title" '((str string?) string?)
+            (text "Like "(link 'upper)", but for titlecase conversion.")
+        )
+        (proc "startswith" '((str string?) (w string?) bool?)
+            (text "Returns "#t" if "'str" starts with "'w", "#f" otherwise.")
+        )
+        (proc "endswith" '((str string?) (w string?) bool?)
+            (text "Returns "#t" if "'str" ends with "'w", "#f" otherwise.")
+        )
+        (proc "strip" '((str string?) string?)
+            (text "Returns "'str" with its leading and tailing whitespace stripped out.")
+        )
+        (proc "replace" '((str string?) (w string?) (z string?) string?)
+            (text "Returns "'str" will all "'w"s replaced with "'z"s.")
+        )
+        (proc "replace" '((str string?) (w string?) (z string?) (count int?) string?)
+            (text "Returns "'str" will all "'w"s replaced with "'z"s up until "'count".")
+        )
+        (proc "split" '((str string?) (by string? "\" \"") vector?)
+            (text "Returns a vector of strings split from "'str" by '"'by".")
+        )
+        (proc "str-repeat" '((str string?) (n int?) string?)
+            (text "Returns "'str" concatenated "'n" times.")
+        )
+        (proc "join" '((strs vector?) (sep string?) string?)
+            (text "Returns a new string with "'strs" joined between with "'sep".")
+        )
+        (proc "change-file-ext" '((a string?) (ext string?) string?)
+            (text "Returns a new string with the file extension replaced with "'ext".")
+        )
+    ]
+    "Format" #[
+        (proc "char->int" '((char char?) int?)
+            (text "Returns the corresponding int to the given "'char".")
+        )
+        (proc "int->char" '((k int?) char?)
+            (text "Returns the character corresponding to "'k".")
+        )
+        (proc "number->string" '((z number?) string?) (text "Returns "'z" as a string."))
+        (proc "~a" '((v any) ... string?)
+            (text "Converts all "'v"s to a string using display with \"\" as the joiner.")
+        )
+        (proc "~s" '((v any) ... string?)
+            (text "Converts all "'v"s to a string using display with \" \" as the joiner.")
+        )
+        (proc "~v" '((v any) ... string?)
+            (text "Converts all "'v" to a string using print with \" \" as the joiner.")
+        )
+    ]
+    "Keywords" #[
+        (pred "keyword?" (text "Returns "#t" if "'v" is a keyword, "#f" otherwise."))
+        (proc "keyword->string" '((keyword keyword?) vector?)
+            (text "Returns the string from the given "'keyword", not including the leading hash colon.")
+        )
+        (proc "string->keyword" '((str string?) keyword?)
+            (text "Returns the keyword from the given "'str".")
+        )
+    ]
+    "Lists" #[
+        (pred "list?"
+            (text "Return "#t" if "'v" is a list (an immutable collection of elements), "#f" otherwise.")
+        )
+        (proc "list" '((v any) ... list?)
+            (text "Returns a new list with the "'v"s as the elements.")
+        )
+    ]
+    "Vectors" #[
+        (pred "vector?"
+            (text "Returns "#t" if "'v" is a vector (a mutable, resizable collection of elements), "#f" otherwise.")
+        )
+        (proc "vector" '((v any) ... vector?)
+            (text "Returns a new vector with the "'v" args filled with its slots in order.")
+        )
+        (proc "make-vector" '((size nat?) (v any 0) vector?)
+            (text "Returns a new vector with "'size" slots all filled with "'v"s.")
+        )
+        (proc "add!" '((vec vector?) (v any) void?)
+            (text "Append "'v" to the end of "'vec".")
+        )
+        (proc "pop!" '((vec vector?) any)
+            (text "Remove the last element of "'vec" and return it.")
+        )
+        (proc "vec-set!" '((vec vector?) (pos int?) (v any) void?)
+            (text "Set slot "'pos" of "'vec" to "'v".")
+        )
+        (proc "vec-append" '((vec vector?) ... vector?)
+            (text "Returns a new vector with all elements of "'vec"s appended in order.")
+        )
+        (proc "vec-extend!" '((vec vector?) (vec2 vector?) ... void?)
+            (text
+                "Modify "'vec" so that all elements of "'vec2"s are appended to the"
+                " end of "'vec" in order."
+            )
+        )
+        (proc "sort" '((vec vector?) vector?) (text "Returns a newly sorted vector."))
+        (proc "sort!" '((vec vector?) void?) (text "Modifies "'vec" by sorting in place."))
+        (proc "string->vector" '((str string?) vector?)
+            (text "Returns a new vector with characters contained in "'str".")
+        )
+    ]
+    "Arrays" #[
+        (pred "array?" (text "Returns "#t" if "'v" is an array, "#f" otherwise."))
+        (proc "array" '((dtype symbol?) (v any) ... array?)
+            (text
+                "Returns a freshly allocated array with "'dtype
+                " as its datatype and the "'v" args as its values filled in order."
+            )
+        )
+        (proc "make-array" '((dtype symbol?) (size nat?) (v int? 0) array?)
+            (text
+                "Returns a freshly allocated array with "'dtype
+                " as its datatype and the value "'v" filled."
+            )
+        )
+        (proc "array-copy" '((arr array?) array?) (text "Returns a new copy of "'arr"."))
+        (proc "array-splice!"
+            '((arr array?) (v real?) (start int? 0) (stop int? (len arr)) array?)
+            (text "Modify "'arr" by setting "'start" to "'stop" into the value "'v".")
+        )
+        (proc "count-nonzero" '((arr array?) nat?)
+            (text "Returns the number of non-zeros in "'arr".")
+        )
+        (pred "bool-array?"
+            (text "Returns "#t" if "'v" is an array with 'bool as its datatype, "#f" otherwise."
+            )
+        )
+        (proc "bool-array" '((v nat?) ... bool-array?)
+            (text "Returns a new boolean array with "'v" as its values.")
+        )
+        (proc "margin"
+            '((arr bool-array?) (left int?) (right int? left) bool-array?)
+            (text
+                "Returns a new "(link 'bool-array?)" with "'left" and "'right" margin applied."
+            )
+        )
+        (syntax "and" "first-expr rest-expr ..."
+            (text
+                "Evaluate " 'first-expr " if the result is a " (link 'bool-array?)
+                " evaluate all " 'rest-expr "s and return the logical-and of all arrays."
+                " If the result is " #f " evaluate " 'rest-expr
+                " one at a time. Return immediately if any arg is " #f
+                ", return " #t " if all values are " #t "."
+            )
+        )
+        (syntax "or" "first-expr rest-expr ..."
+            (text
+                "Evaluate "'first-expr" if the result is a "(link 'bool-array?)
+                " evaluate all "'rest-expr"s and return the logical-and of all arrays."
+                " If the result is "#t" evaluate "'rest-expr
+                " one at a time. Return immediately if any arg is "#t
+                ", return "#f" if all values are "#f"."
+            )
+        )
+        (proc "xor"
+            '(
+                (expr1 (or/c bool? bool-array?))
+                (expr2 (or/c bool? bool-array?))
+                (or/c bool? bool-array?)
+            )
+            (text
+                "Returns a new boolean or boolean-array based on the exclusive-or of "
+                'expr1" and "'expr2". "'expr2" must be the same type as "'expr1"."
+            )
+        )
+        (proc "not" '(("h" (or/c bool? bool-array?)) (or/c bool? bool-array?))
+            (text "Returns the inverse of "'h".")
+        )
+        (proc "mincut" '((arr bool-array?) (x nat?) bool-array?)
+            (text
+                "Turn all 0 runs that are less than "'x" in length to 1s. "
+                "0s represent cuts, 1s represent clips."
+            )
+        )
+        (proc "minclip" '((arr bool-array?) (x nat?) bool-array?)
+            (text "Turn all 1 runs that are less than "'x" in length to 0s")
+        )
+        (proc "maxcut" '((arr bool-array?) (x nat?) bool-array?)
+            (text "Turn all 0 runs that are greater than "'x" in length to 1s")
+        )
+        (proc "maxclip" '((arr bool-array?) (x nat?) bool-array?)
+            (text "Turn all 1 runs that are more than "'x" in length to 0s")
+        )
+        (value "all" "'all"
+            (text
+                "The symbol 'all. "
+                "Exists for backwards compatibility for older auto-editor versions."
+            )
+        )
+    ]
+    "Ranges" #[
+        (pred "range?" (text "Returns "#t" if "'v" is a range object, "#f" otherwise."))
+        (proc "range" '((start int?) (stop int?) (step (and/c int? (not/c 0)) 1) range?)
+            (text "Returns a range object.")
+        )
+        (proc "range->vector" '((rng range?) vector?)
+            (text "Returns a new vector based on "'rng".")
+        )
+    ]
+    "Generic Sequences" #[
+        (pred "iterable?"
+            (text
+                "Returns "#t" if "'v" is a vector array string hash or range, "#f" otherwise."
+            )
+        )
+        (pred "sequence?"
+            (text "Returns "#t" if "'v" is a vector array string or range, "#f" otherwise.")
+        )
+        (proc "len" '((seq iterable?) nat?) (text "Returns the length of "'seq"."))
+        (proc "ref" '((seq sequence?) (pos int?) any)
+            (text
+                "Returns the element of "'seq" at position "'pos
+                " where the first element is at position 0. Negative positions are allowed."
+            )
+        )
+        (proc "reverse" '((seq sequence?) sequence?)
+            (text "Returns "'seq" in reverse order.")
+        )
+        (proc "slice"
+            '((seq sequence?) (start int?) (stop int? (len seq)) (step int? 1) sequence?)
+            (text
+                "Returns the elements of "'seq" from "'start" inclusively to "'stop
+                " exclusively. If "'step" is negative then "'stop " is inclusive and "
+                'start" is exclusive."
+            )
+        )
+        (proc "max-seq" '((v sequence?) any) (text "Returns the largest value of "'v"."))
+        (proc "min-seq" '((v sequence?) any) (text "Returns the smallest value of "'v"."))
+    ]
+    "Hashmaps" #[
+        (pred "hash?" (text "Returns "#t" if "'v" is a hash table, "#f" otherwise."))
+        (proc "hash" '((key any) (val any) ... hash?)
+            (text "Returns a newly constructed hash map from key-value pairs.")
+        )
+        (proc "hash-ref" '((hash hash?) (key any) any)
+            (text "Returns the value for "'key" in "'hash".")
+        )
+        (proc "hash-set!" '((hash hash?) (key any) (v any) void?)
+            (text "Set "'key" to "'v" in "'hash", overwriting any existing mappings.")
+        )
+        (proc "has-key?" '((hash hash?) (key any) bool?)
+            (text "Returns "#t" if "'key" is in the hash map, "#f" otherwise.")
+        )
+        (proc "hash-update!" '((hash hash?) (key any) (updater any) void?)
+            (text "Updates the value mapped by "'key" in "'hash" by applying "'updater
+            " to the value. The value returned by "'updater
+            " becomes the new mapping for "'key", overwriting the original value in "'hash".")
+        )
+        (proc "hash-remove!" '((hash hash?) (key any) void?)
+            (text "Removes any existing mapping for "'key" in "'hash".")
+        )
+    ]
+    "I/O" #[
+        (pred "output-port?" (text "Returns "#t" if "'v" is an output port, "#f" otherwise."))
+        (proc "open-output-file" '((path string?) output-port?)
+            (text "Opens the file specified by "'path" for output.")
+        )
+        (proc "close-port" '((out output-port?) void?)
+            (text
+                "Flushes, then closes the port "'out". The port is now incapable of delivering"
+                " or accepting data. This has no effect if the port has already been closed."
+            )
+        )
+        (proc "closed?" '((v output-port?) bool?)
+            (text "Returns "#t" if "'v" is a closed port, "#f" otherwise.")
+        )
+    ]
+    "Printing" #[
+        (proc "print" '((datum any) (out output-port? "#<stdout>") void?)
+            (text "Display "'datum" like REPL does.")
+        )
+        (proc "println" '((datum any) (out output-port? "#<stdout>") void?)
+            (text "Display "'datum" like print but with a newline character.")
+        )
+        (proc "display" '((datum any) (out output-port? "#<stdout>") void?)
+            (text "Display "'datum" to stdout.")
+        )
+        (proc "displayln" '((datum any) (out output-port? "#<stdout>") void?)
+            (text "Display "'datum" to stdout with a newline character.")
+        )
+    ]
+    "Actions" #[
+        (proc "begin" '(("datum" "any") ... "any")
+            (text "Evaluates all arguments and returns the last one.")
+        )
+        (proc "assert" '((expr any) (msg (or/c string? #f) #f) void?)
+            (text "Raises error if "'expr" is not "#t".")
+        )
+        (proc "error" '((msg string?) void?)
+            (text "Raises an exception with "'msg" as the message.")
+        )
+        (proc "sleep" '((time (or/c int? float?)) void?)
+            (text "Adds a delay of "'time" seconds.")
+        )
+        (proc "system" '((cmd string?) bool?)
+            (text
+                "Executes a Unix-like or Windows shell command synchronously. "
+                "Returns "#t" if successful, "#f" otherwise."
+            )
+        )
+        (proc "system*" '((command string?) (arg string?) ... bool?)
+            (text
+                "Executes a Unix-like or Windows shell command synchronously. "
+                "Returns "#t" if successful, "#f" otherwise."
+            )
+        )
+    ]
+    "Void" #[
+        (pred "void?" (text "Returns "#t" if "'v" is "(void)", "#f" otherwise."))
+        (proc "void" '((v any) ... void?)
+            (text  "Returns the constant "(void)". All "'v" arguments are ignored.")
+        )
+    ]
+    "Procedures" #[
+        (pred "procedure?" (text "Returns "#t" if "'v" is a procedure, "#f" otherwise."))
+        (pred "contract?"
+            (text
+                "Returns "#t" if "'v" is a contract, "#f" otherwise. "
+                "A contract is either a " (link 'bool?) ", " (link 'number?)  ", "
+                (link 'string?) ", " (link 'symbol?) " literal, or a predicate."
+            )
+        )
+        (pred "any" (text "Always returns "#t" regardless of the value of "'v"."))
+        (proc "map" '((proc procedure?) (seq sequence?) sequence?)
+            (text "Returns a new sequence with the results of "'proc" applied to each element.")
+        )
+        (proc "apply" '((proc procedure?) (seq sequence?) any)
+            (text "Applies "'proc" given "'seq" as its arguments.")
+        )
+        (proc "and/c" '((contract contract?) contract?)
+            (text
+                "Takes any number of contracts and returns a contract predicate that "
+                "accept values that satisfies all contracts."
+            )
+        )
+        (proc "or/c" '((contract contract?) contract?)
+            (text
+                "Takes any number of contracts and returns a contract predicate that "
+                "accept values that can satisfy one or more contracts."
+            )
+        )
+        (proc "not/c" '((contract contract?) contract?)
+            (text
+                "Takes one contract and returns a contract that accepts a value that "
+                "satisfies the opposite of the given contract."
+            )
+        )
+        (proc ">=/c" '((n real?) contract?)
+            (text
+                "Returns a new contract that requires the input to be "(link 'real?)
+                " and "(link '>=)" than "'n"."
+            )
+        )
+        (proc ">/c" '((n real?) contract?)
+            (text "Like "(link '>=/c)" but for "(link '>)".")
+        )
+        (proc "<=/c" '((n real?) contract?)
+            (text "Like "(link '>=/c)" but for "(link '<=)".")
+        )
+        (proc "</c" '((n real?) contract?)
+            (text "Like "(link '>=/c)" but for "(link '<)".")
+        )
+        (proc "between/c" '((n real?) (m real?) contract?)
+            (text
+                "Returns a contract that requires the input a real number between "'n
+                " and "'m" or equal to one of them."
+            )
+        )
+    ]
+    "Reflection" #[
+        (syntax "quote" "body"
+            (text
+                "Returns "'body" as its \"literalized\" form, "
+                "a constant value with its binding names copied."
+            )
+        )
+        (proc "var-exists?" '((sym symbol?) bool?)
+            (text
+                "Returns "#t" if the variable corresponding to "'sym
+                " is defined in the current environment, "#f" otherwise."
+            )
+        )
+        (syntax "delete" "identifier" (text "Deletes identifier from the environment."))
+        (syntax "rename" "original new"
+            (text
+                "Move the original identifier to the new identifier. "
+                "Works for both procedures and syntaxes."
+            )
+        )
+    ]
+    "Objects" #[
+        (syntax "class" "name [id contract?]..." (text
+            "Creates a object initiator and a predicate to identify that object. Example:\n"
+            (codeblock "(class person [name string?] [age nat?])
+(define alyssa (person \"Alyssa P.\" 23))
+alyssa.name  ; returns \"Alyssa P.\"
+alyssa.age   ; returns 23
+(person? alyssa)  ; returns #t")
+            "Class objects are mutable"
+            (codeblock "(incf alyssa.age)  ; Increase age by 1"))
+        )
+        (syntax "@r" "obj attr"
+            (text
+                  "Returns the specified attribute on the object. "
+                  "Users are not expected to directly use this special form. "
+                  "Instead, use the `.` syntax."
+                  (codeblock "(define a 10)\na.incf ; turns into (@r a incf)")
+            )
+        )
+    ]
+})
+
+(define file (open-output-file "src/ref/palet.html"))
+(when (equal? file #f)
+    (error "palet.html port failed to open.")
+)
+(displayln "{{ header \"Palet Scripting Reference\" }}
+<style>
+.palet-block {
+ padding-left: 7px;
+ padding-bottom: 7px;
+ padding-top: 7px;
+ margin-top: 30px;
+ margin-bottom: 6px;
+}
+.palet-block > p {margin-top: 0; margin-bottom: 0}
+.palet-var {
+    position: relative;
+    left: -1px;
+    font-size: 85%;
+    font-style: italic;
+    font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+.palet-val {
+    color: #0B65B8;
+    font-size: 85%;
+    font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+
+.palet-block { background-color: #F9F5F5; border-top: 3px solid #EAEAEA}
+@media (prefers-color-scheme: dark) {
+  .palet-block {background-color: #323232; border-top: 3px solid #4A4A4A}
+  .palet-val {color: #A3DEFF}
+}
+</style>
+<body>
+{{ nav }}
+<section class=\"section\">
+<div class=\"container\">
+<h1>Palet Scripting Reference</h1>
+<p>This reference manual describes all the builtin syntax, procedures, and values in the language that are defined by default. <a href=\"/ref/edit\">--edit docs</a></p>"
+file )
+(doc-builder file core-docs)
+
+
+(define file2 (open-output-file "src/ref/edit.html"))
+(when (equal? file2 #f)
+    (error "edit.html port failed to open.")
+)
+
+(displayln "{{ header \"Edit Reference\" }}
+<style>
+.palet-block {
+ padding-left: 7px;
+ padding-bottom: 7px;
+ padding-top: 7px;
+ margin-top: 30px;
+ margin-bottom: 6px;
+}
+.palet-block > p {margin-top: 0; margin-bottom: 0}
+.palet-var {
+    position: relative;
+    left: -1px;
+    font-size: 85%;
+    font-style: italic;
+    font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+.palet-val {
+    color: #0B65B8;
+    font-size: 85%;
+    font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+
+.palet-block { background-color: #F9F5F5; border-top: 3px solid #EAEAEA}
+@media (prefers-color-scheme: dark) {
+  .palet-block {background-color: #323232; border-top: 3px solid #4A4A4A}
+  .palet-val {color: #A3DEFF}
+}
+</style>
+<body>
+{{ nav }}
+<section class=\"section\">
+<div class=\"container\">
+<h1>Edit Reference</h1>
+<p>When you run:<p>
+<pre><code>auto-editor example.mp4 --edit audio:0.05,stream=0</code></pre>
+<p>You're actually running a palet expression!<br>To be precise, you're writing the syntax-sugary equivalent of:</p>
+<pre><code>auto-editor example.mp4 --edit \"(audio 0.05 #:stream 0)\"</code></pre>
+<p>Isn't that neat.<br>You can use any syntax or procedure <a href=\"/ref/palet\">defined in the core language</a>.</p>
+<pre><code>auto-editor example.mp4 --edit '(print \"Hello World!\")(audio 0.05 #:stream 0)'</code></pre>
+<p>And that command will indeed, print \"Hello World!\".<br>As long as that expression returns a boolean array, you can do anything.</p>
+<p>All the edit methods are listed below:</p>" file2)
+
+;<p>Of course, you probably know that you can use procedures like <code>motion</code> and <code>subtitle</code> too. However, this example doesn't have much motion and has no subtitle streams.</p>
+;<pre><code>auto-editor example.mp4 --edit '(map (lambda (x) (and (< x 0.01) (>= x 0.9) audio-levels:0)</code></pre>
+
+(doc-builder file2 edit-docs)
+
+

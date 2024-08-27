@@ -1,0 +1,41 @@
+{{ header "Auto-Editor - Install" }}
+<body>
+{{ nav }}
+<section class="section">
+<div class="container">
+<h1>Installing Auto-Editor</h1>
+<p>Download and Install <a href="https://python.org">Python 3</a>.</p>
+<blockquote><p>If you are installing on Windows, make sure "Add Python 3.12 to PATH" is checked.</p></blockquote>
+<p>Once that's done, you should have pip on your PATH. That means when you run <code>pip3</code> on your console, you should get a list of commands and not <code>command not found</code>. If you don't have pip on your PATH, try reinstalling Python.</p>
+<p>Then run:</p>
+<pre><code>pip install --upgrade pip</code></pre>
+<p>to upgrade pip to the latest version. Then use pip to install auto-editor:</p>
+<pre><code>pip install auto-editor</code></pre>
+<blockquote><p>Linux users: you will need to have ffmpeg installed and on your PATH</p></blockquote>
+<p>Now run this command and it should list all the options you can use.</p>
+<pre><code>auto-editor --help</code></pre>
+<p>If that works then congratulations, you have successfully installed auto-editor. You can use now use this with any other type of video or audio that you have.</p>
+<pre><code>auto-editor C:path\to\your\video.mp4</code></pre>
+<p>About every 3 weeks, a new version of auto-editor will be available. It's recommended that you stay up to date so you always get the latest improvements and bug fixes. Upgrade by running:</p>
+<pre><code>pip install auto-editor --upgrade</code></pre>
+<p>If you would like to uninstall auto-editor, run:</p>
+<pre><code>pip uninstall auto-editor</code></pre>
+<h2>Extras</h2>
+<h3>Installing a Specific Version</h3>
+<pre><code><i># Install version 23w21a</i>
+pip install auto-editor==23.21.1</code></pre>
+<h3>Installing and Running the Latest Commit</h3>
+<pre><code>pip install git+https://github.com/WyattBlue/auto-editor.git</code></pre>
+<p>Then run with <code>auto-editor</code> like normal.</p>
+<h2>Optional Dependencies</h2>
+<p>If yt-dlp is installed, auto-editor can download and use URLs as inputs.
+<pre><code>auto-editor "https://www.youtube.com/watch?v=kcs82HnguGc"</code></pre>
+<h3>Dealing with "Not recognized as a command" error</h3>
+<p>Instead of using:</p>
+<pre><code>auto-editor [options]</code></pre>
+<p>Try:</p>
+<pre><code>py -m auto_editor [options]</code></pre>
+</div>
+</section>
+</body>
+</html>

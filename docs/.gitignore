@@ -1,0 +1,11 @@
+src/ref
+src/blog/*.html
+src/docs/**/*.html
+public
+
+mdGen
+binaries/
+
+.DS_Store
+node_modules/
+bun.lockb

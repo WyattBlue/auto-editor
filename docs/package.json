@@ -1,0 +1,15 @@
+{
+  "name": "express-ae",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch server.js"
+  },
+  "dependencies": {
+    "express": "latest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

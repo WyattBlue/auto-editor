@@ -1,0 +1,288 @@
+:root {
+  --electric-blue-200: #DAF0FF;
+  --electric-blue-400: #B6E0FF;
+  --electric-blue-600: #91D1FF;
+  --electric-blue-800: #6CC1FF;
+  --electric-blue-1000: #48B2FF;
+
+  --charcoal-100: #F7F9FC;
+  --charcoal-200: #DDDFE2;
+  --charcoal-400: #AAACAF;
+  --charcoal-500: #86939B;
+  --charcoal-600: #787A7D;
+  --charcoal-800: #45474A;
+  --charcoal-900: #1B2326;
+  --charcoal-1000: #131417;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body, button, input {
+  font-family: BlinkMacSystemFont, -apple-system, sans-serif, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Helvetica, Arial;
+}
+
+html, p, h1, h2, h3, h4, h5, html, blockquote {
+  margin: 0;
+  padding: 0;
+}
+
+li, ol {margin: 0}
+ul {margin-top: 0}
+
+body {
+  font-size: 1em;
+  font-weight: 400;
+  line-height: 1.5;
+  padding: 0 2em;
+  margin: 0;
+}
+@media (max-width: 55em) {
+  body {padding: 0 1rem}
+}
+
+hr {
+  margin: 24px 0;
+  padding: 0;
+  height: .28rem;
+  border: 0;
+  overflow: hidden;
+  box-sizing: content-box;
+}
+
+.container {
+  max-width: 1000px;
+  flex-grow: 1;
+  margin: 0 auto;
+  position: relative;
+  width: auto;
+}
+
+.navbar>.container {
+  padding-top: 13px;
+  display: flex;
+}
+
+.navbar-brand {
+  margin-left: -.75rem;
+  display: flex;
+  min-height: 3.25rem;
+}
+
+.hero, .navbar, .navbar-menu, .navbar-start {
+  display: flex;
+  align-items: stretch;
+}
+
+.navbar-start {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.navbar-item img {max-height: 1.75rem}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+.navbar-link, a.navbar-item {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: .5rem .75rem;
+  position: relative;
+  text-decoration: none;
+}
+
+a {
+  outline: none;
+  text-decoration: none;
+  padding: 2px 1px 0;
+}
+a:hover {border-bottom: 1px solid}
+a.navbar-item:hover {border-bottom: 0}
+
+a.no-underline {
+  border-bottom: 0;
+}
+
+code {
+  font-size: 80%;
+  border-radius: 5px;
+  padding: 2px;
+}
+
+code, pre {
+  -moz-osx-font-smoothing: auto;
+  -webkit-font-smoothing: auto;
+  font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+
+.mono {
+  font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  font-size: 110%;
+}
+
+pre {
+  padding: 1.25rem 1.5rem;
+  white-space: pre;
+  word-wrap: normal;
+  overflow-x: auto;
+}
+
+pre code {
+  background-color: transparent;
+  color: currentColor;
+  padding: 0;
+}
+
+blockquote {
+  padding: 0 10px;
+  margin: 0 0 20px;
+}
+
+th {padding: 10px}
+
+g-emoji {
+  font-family: Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol;
+  font-style: normal;
+  line-height: 1;
+  vertical-align: -.075em;
+}
+
+.center {
+  text-align: center;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+.right {text-align: right}
+.left {text-align: left}
+
+.hero {
+  margin-bottom: 3rem;
+  margin-top: 1.6rem;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+p, .paragraph {max-width: 88ch;}
+p {
+  display: block;
+  margin-block-start: 0.4em;
+  margin-block-end: 1em;
+  margin-inline-start: 0px;
+  margin-inline-end: 0px;
+}
+
+.section {padding: 1rem 0}
+
+.subtitle {margin-top: -1.5rem}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.huge {font-size: 5rem}
+.huge-lite {font-size: 4rem}
+h1, .bigger {font-size: 2.5rem}
+h2, .big {font-size: 2.1rem}
+h3, .medium {font-size: 1.7rem}
+h4, .smedium {font-size: 1.5rem}
+p, li, th, pre, blockquote, .small {font-size: 1.28rem}
+.tiny {font-size: 1rem}
+pre {line-height: 1.25}
+.navbar-start > .navbar-item {font-size: 1.3em}
+
+@media (max-width: 55em){
+  .huge {font-size: 4rem}
+  .huge-lite {font-size: 3rem}
+  h1, .bigger {font-size: 2rem}
+  h2, .big {font-size: 1.8rem}
+  h3, .medium {font-size: 1.5rem}
+  h4, .smedium {font-size: 1.3rem}
+  p, li, th, pre, blockquote, .small {font-size: 1.1rem}
+  pre {padding: 1rem 1.25rem}
+  pre {line-height: 1}
+}
+
+@media (max-width: 45em){
+  .navbar-start > .navbar-item {font-size: 1em}
+}
+
+#icon {
+  width: 35%;
+  margin-top: -3%;
+  margin-bottom: -3%;
+}
+
+h1 {
+  margin-bottom: 1.5rem;
+  line-height: 1.125;
+  word-break: break-word;
+  text-align: center;
+}
+h1, th, .bold {font-weight: bold}
+h2 {font-weight: 600}
+h3 {font-weight: 500}
+.navbar-start > .navbar-item {font-weight: bold}
+.underline {text-decoration: underline}
+
+.author-date {
+  font-weight: 650;
+  margin-block-end: 0.4em;
+}
+
+/* Light Theme Colors */
+html {background-color: white}
+.hero {background-color: #EAEAEA}
+hr {background-color: #EAEAEA}
+h1, h2, h3, h4, p, code, pre, th {color: #323232}
+blockquote {border-left: 5px solid #EAEAEA}
+blockquote > p {color: #696969}
+pre {background-color: #F9F5F5}
+code {background-color: #EAEAEA}
+th {border: 1px solid #323232}
+a {color: #0573D9}
+a:hover {color: #63C0F4}
+a.navbar-item:hover {background-color: #F9F7F7}
+.navbar-start > .navbar-item {color: #323232}
+li {color: black; text-decoration: black;}
+
+/* highlighting */
+.keyword {color: #ad46ad; font-style: italic;}
+.keyword-import {color: #ad46ad;}
+.terminator {color: #B28372;}
+.function-name {color: #549ACF; }
+.type-primitive {color: #4594e2; font-style: italic;}
+
+/* Dark Theme Colors */
+@media (prefers-color-scheme: dark) {
+  html {background-color: #262626}
+  .hero {background-color: #4A4A4A}
+  hr {background-color: #4A4A4A}
+  h1, h2, h3, h4, p, code, pre, th {color: #F9F7F7}
+  blockquote {border-left: 5px solid #4A4A4A}
+  blockquote > p {color: #DBDBDB}
+  pre {background-color: #323232}
+  code {background-color: #4A4A4A}
+  th {border: 1px solid #F9F7F7}
+  a {color: #63C0F4}
+  a:hover {color: #A3DEFF}
+  a.navbar-item:hover {background-color: #323232}
+  .navbar-start > .navbar-item {color: #F9F7F7}
+  li {color: #F9F7F7; text-decoration: #F9F7F7;}
+
+   /* highlighting */
+  .keyword {color: #c78bc8; font-style: italic;}
+  .keyword-import {color: #c78bc8;}
+  .terminator {color: #A6ACB9;}
+  .type-primitive {color: #6eaadf; font-style: italic;}
+  .string {color: #99c794;}
+  .comment {color: #a6acb9;}
+  .operator {color: #e07457;}
+}
