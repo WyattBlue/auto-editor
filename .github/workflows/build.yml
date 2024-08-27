@@ -14,25 +14,47 @@ on:
     branches:
       - master
 jobs:
-  build1:
-    strategy:
-      matrix:
-        python-version: ['3.10']
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Lint
+        run: |
+          pip install .
+          pip install -U ruff mypy
+          ruff format --check auto_editor
+          mypy auto_editor
+      - name: Nim
+        uses: iffy/install-nim@v5
+        with:
+          version: binary:stable
+      - name: Docs
+        run: |
+          make -C docs compile
+          make -C docs html
+
+  main:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install FFmpeg
-      run: |
-        sudo apt update
-        sudo apt install ffmpeg
-    - name: Install Auto-Editor
-      run: pip install -e .
-    - name: Test
-      run: |
-        auto-editor --debug
-        auto-editor test all
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install FFmpeg
+        run: |
+          sudo apt update
+          sudo apt install ffmpeg
+      - name: Install Auto-Editor
+        run: pip install -e .
+      - name: Test
+        run: |
+          auto-editor --debug
+          auto-editor test all
