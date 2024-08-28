@@ -124,6 +124,13 @@ def make_timeline(
     src_index = np.array([], dtype=np.int32)
     concat = np.concatenate
 
+    try:
+        stdenv = __import__("auto_editor.lang.stdenv", fromlist=["lang"])
+        env.update(stdenv.make_standard_env())
+    except ImportError:
+        func = log.error if args.config else log.debug
+        func("Failed to import standard env")
+
     if args.config:
         # Edit `env` with user-defined code.
         with open("config.pal") as file:

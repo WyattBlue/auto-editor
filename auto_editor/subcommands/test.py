@@ -13,6 +13,7 @@ import numpy as np
 
 from auto_editor.ffwrapper import FileInfo, initFileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret
+from auto_editor.lang.stdenv import make_standard_env
 from auto_editor.lib.data_structs import Char
 from auto_editor.lib.err import MyError
 from auto_editor.utils.log import Log
@@ -551,6 +552,8 @@ def main(sys_args: list[str] | None = None):
         )
 
     def palet_python_bridge():
+        env.update(make_standard_env())
+
         def cases(*cases: tuple[str, Any]) -> None:
             for text, expected in cases:
                 try:

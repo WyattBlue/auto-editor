@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import auto_editor.vanparse as vanparse
 from auto_editor.__main__ import main_options
 from auto_editor.lang.palet import Lexer, Parser, env, interpret
+from auto_editor.lang.stdenv import make_standard_env
 from auto_editor.vanparse import OptionText
 
 
@@ -40,6 +41,7 @@ def main():
 
         file.write("</div>\n</section>\n</body>\n</html>\n\n")
 
+    env.update(make_standard_env())
     with open("doc.pal") as sourcefile:
         try:
             interpret(env, Parser(Lexer("doc.pal", sourcefile.read())))

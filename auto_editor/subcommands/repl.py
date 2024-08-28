@@ -8,6 +8,7 @@ import auto_editor
 from auto_editor.analyze import Levels
 from auto_editor.ffwrapper import initFileInfo
 from auto_editor.lang.palet import ClosingError, Lexer, Parser, env, interpret
+from auto_editor.lang.stdenv import make_standard_env
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
 from auto_editor.utils.bar import Bar
@@ -67,6 +68,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         env["timebase"] = tb
         env["@levels"] = Levels(src, tb, bar, False, log, strict)
 
+    env.update(make_standard_env())
     print(f"Auto-Editor {auto_editor.__version__}")
     text = None
 
@@ -85,8 +87,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 continue
 
             try:
-                lexer = Lexer("repl", text)
-                parser = Parser(lexer)
+                parser = Parser(Lexer("repl", text))
                 if args.debug_parser:
                     print(f"parser: {parser}")
 
