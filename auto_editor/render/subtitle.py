@@ -83,7 +83,9 @@ class SubtitleParser:
     def edit(self, chunks: Chunks) -> None:
         for cut in reversed(chunks):
             the_speed = cut[2]
-            speed_factor = 1 if the_speed == 99999 else 1 - (1 / the_speed)
+            speed_factor = (
+                1 if (the_speed == 0 or the_speed >= 99999) else 1 - (1 / the_speed)
+            )
 
             new_content = []
             for content in self.contents:
