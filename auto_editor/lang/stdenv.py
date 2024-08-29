@@ -666,14 +666,10 @@ def make_standard_env() -> dict[str, Any]:
             raise MyError("class name must be an identifier")
 
         module = node[1].val
-        error = MyError(f"No module named `{module}`")
-
-        if module != "math":
-            raise error
         try:
-            obj = __import__("auto_editor.lang.libmath", fromlist=["lang"])
+            obj = __import__(f"auto_editor.lang.lib{module}", fromlist=["lang"])
         except ImportError:
-            raise error
+            raise MyError(f"No module named `{module}`")
 
         env.update(obj.all())
 
@@ -863,6 +859,11 @@ def make_standard_env() -> dict[str, Any]:
             vectorized_proc = np.vectorize(proc)
             return vectorized_proc(seq)
         return proc(seq)
+
+    def palet_member(v: object, seq: Any) -> bool:
+        if type(v) is Char and type(seq) is str:
+            return v.val in seq
+        return v in seq
 
     def splice(
         arr: NDArray, v: int, start: int | None = None, end: int | None = None
@@ -1079,6 +1080,7 @@ def make_standard_env() -> dict[str, Any]:
         "range": Proc("range", range, (1, 3), is_int, is_int, int_not_zero),
         # generic iterables
         "len": Proc("len", len, (1, 1), is_iterable),
+        "member": Proc("member", palet_member, (2, 2), any_p, is_sequence),
         "reverse": Proc("reverse", lambda v: v[::-1], (1, 1), is_sequence),
         "ref": Proc("ref", ref, (2, 2), is_sequence, is_int),
         "slice": Proc("slice", p_slice, (2, 4), is_sequence, is_int),

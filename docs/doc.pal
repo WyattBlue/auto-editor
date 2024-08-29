@@ -1,3 +1,6 @@
+(import introspection)
+(define standard-env (get-current-env))
+
 (define (text children ...) (hash "tag" "text" "children" children))
 
 (class code [val string?])
@@ -89,7 +92,7 @@
     result
 )
 
-(define/c (doc-builder [file output-port?] [doc hash?] -> void?)
+(define/c (doc-builder [file output-port?] [doc hash?] [check-env (or/c hash? #f)] -> void?)
     (define special-forms 0)
     (define palet-procs 0)
     (define palet-vars #[])
@@ -132,6 +135,17 @@
     )
     (display "</div>\n</section>\n</body>\n</html>\n\n" file)
     file.close-port
+
+    (when check-env.hash?
+        (for-items [key item check-env]
+            (when (not (member key #("none" "all/e" "audio" "audio-levels" "motion" "motion-levels" "subtitle" "get-current-env" "proc-name")))
+                (when (not (member key palet-vars))
+                    (error (& "`" key "` not in docs."))
+                )
+            )
+        )
+    )
+
     (displayln (~s "built" palet-procs "variables\nbuilt" special-forms "special forms"))
 )
 
@@ -233,6 +247,9 @@
                 "Loop over "'seq-expr" by setting the variable "'id" to the nth item of "
                 'seq-expr" and evaluating "'body"."
             )
+        )
+        (syntax "for-items" "[key value hash-id] body"
+            (text "Loop over key-value pairs of "'hash-id", which should be a hash?.")
         )
     ]
     "Equality" #[
@@ -350,6 +367,9 @@
         (proc "sqrt" '((z number?) number?)
             (text "Returns the square root of "'z".")
         )
+    ]
+    "Modules" #[
+        (syntax "import" "module" (text "Imports a module"))
     ]
     "Math Module" #[
         (text "Imported with " (code "(import math)") ".")
@@ -470,6 +490,9 @@
         )
         (proc "list" '((v any) ... list?)
             (text "Returns a new list with the "'v"s as the elements.")
+        )
+        (proc "append" '((v list?) ... list?)
+            (text "Returns a new list with all the arguments appended in order.")
         )
     ]
     "Vectors" #[
@@ -613,7 +636,10 @@
         (pred "sequence?"
             (text "Returns "#t" if "'v" is a vector array string or range, "#f" otherwise.")
         )
-        (proc "len" '((seq iterable?) nat?) (text "Returns the length of "'seq"."))
+        (proc "len" '((iter iterable?) nat?) (text "Returns the length of "'iter"."))
+        (proc "member" '((x any) (seq sequence?) bool?)
+            (text "Returns "#t" if "'x" is in "'seq", "#f" otherwise.")
+        )
         (proc "ref" '((seq sequence?) (pos int?) any)
             (text
                 "Returns the element of "'seq" at position "'pos
@@ -787,12 +813,15 @@
                 " is defined in the current environment, "#f" otherwise."
             )
         )
-        (syntax "delete" "identifier" (text "Deletes identifier from the environment."))
         (syntax "rename" "original new"
             (text
                 "Move the original identifier to the new identifier. "
                 "Works for both procedures and syntaxes."
             )
+        )
+        (syntax "delete" "identifier" (text "Deletes identifier from the environment."))
+        (proc "eval" '((arg any) any)
+            (text "Allows running arbitrary, dynamically generated code. Effective the opposite of "(link 'quote)".")
         )
     ]
     "Objects" #[
@@ -857,7 +886,7 @@ alyssa.age   ; returns 23
 <h1>Palet Scripting Reference</h1>
 <p>This reference manual describes all the builtin syntax, procedures, and values in the language that are defined by default. <a href=\"/ref/edit\">--edit docs</a></p>"
 file )
-(doc-builder file core-docs)
+(doc-builder file core-docs standard-env)
 
 
 (define file2 (open-output-file "src/ref/edit.html"))
@@ -911,6 +940,6 @@ file )
 ;<p>Of course, you probably know that you can use procedures like <code>motion</code> and <code>subtitle</code> too. However, this example doesn't have much motion and has no subtitle streams.</p>
 ;<pre><code>auto-editor example.mp4 --edit '(map (lambda (x) (and (< x 0.01) (>= x 0.9) audio-levels:0)</code></pre>
 
-(doc-builder file2 edit-docs)
+(doc-builder file2 edit-docs #f)
 
 
