@@ -348,6 +348,13 @@ def media_def(
     ET.SubElement(filedef, "name").text = src.path.stem
     ET.SubElement(filedef, "pathurl").text = url
 
+    timecode = ET.SubElement(filedef, "timecode")
+    ET.SubElement(timecode, "string").text = "00:00:00:00"
+    ET.SubElement(timecode, "displayformat").text = "NDF"
+    rate = ET.SubElement(timecode, "rate")
+    ET.SubElement(rate, "timebase").text = f"{tb}"
+    ET.SubElement(rate, "ntsc").text = ntsc
+
     rate = ET.SubElement(filedef, "rate")
     ET.SubElement(rate, "timebase").text = f"{tb}"
     ET.SubElement(rate, "ntsc").text = ntsc
@@ -376,82 +383,48 @@ def media_def(
         ET.SubElement(audiodef, "channelcount").text = f"{aud.channels}"
 
 
-def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3, log: Log) -> None:
-    width, height = tl.res
-    timebase, ntsc = set_tb_ntsc(tl.tb)
+def resolve_write_audio(audio: Element, make_filedef, tl: v3) -> None:
+    track = ET.SubElement(audio, "track")
+    for aclips in tl.a:
+        for j, aclip in enumerate(aclips):
+            src = aclip.src
 
-    src_to_url: dict[FileInfo, str] = {}
-    src_to_id: dict[FileInfo, str] = {}
+            _start = f"{aclip.start}"
+            _end = f"{aclip.start + aclip.dur}"
+            _in = f"{aclip.offset}"
+            _out = f"{aclip.offset + aclip.dur}"
 
-    file_defs: set[str] = set()  # Contains urls
+            if not src.videos:
+                clip_item_num = j + 1
+            else:
+                clip_item_num = len(aclips) + 1 + j
 
-    for src in set(tl.sources):
-        the_id = f"file-{len(src_to_id)+1}"
-        src_to_url[src] = f"{src.path.resolve()}"
-        src_to_id[src] = the_id
-
-    xmeml = ET.Element("xmeml", version="5")
-    sequence = ET.SubElement(xmeml, "sequence", explodedTracks="true")
-    ET.SubElement(sequence, "name").text = name
-    ET.SubElement(sequence, "duration").text = f"{int(tl.out_len())}"
-    rate = ET.SubElement(sequence, "rate")
-    ET.SubElement(rate, "timebase").text = f"{timebase}"
-    ET.SubElement(rate, "ntsc").text = ntsc
-    media = ET.SubElement(sequence, "media")
-    video = ET.SubElement(media, "video")
-    vformat = ET.SubElement(video, "format")
-    vschar = ET.SubElement(vformat, "samplecharacteristics")
-
-    ET.SubElement(vschar, "width").text = f"{width}"
-    ET.SubElement(vschar, "height").text = f"{height}"
-    ET.SubElement(vschar, "pixelaspectratio").text = "square"
-
-    rate = ET.SubElement(vschar, "rate")
-    ET.SubElement(rate, "timebase").text = f"{timebase}"
-    ET.SubElement(rate, "ntsc").text = ntsc
-
-    if len(tl.v) > 0 and len(tl.v[0]) > 0:
-        track = ET.SubElement(video, "track")
-
-        for j, clip in enumerate(tl.v[0]):
-            assert isinstance(clip, TlVideo)
-
-            _start = f"{clip.start}"
-            _end = f"{clip.start + clip.dur}"
-            _in = f"{clip.offset}"
-            _out = f"{clip.offset + clip.dur}"
-
-            clipitem = ET.SubElement(track, "clipitem", id=f"clipitem-{j+1}")
+            clipitem = ET.SubElement(track, "clipitem", id=f"clipitem-{clip_item_num}")
             ET.SubElement(clipitem, "name").text = src.path.stem
-            ET.SubElement(clipitem, "enabled").text = "TRUE"
             ET.SubElement(clipitem, "start").text = _start
             ET.SubElement(clipitem, "end").text = _end
+            ET.SubElement(clipitem, "enabled").text = "TRUE"
             ET.SubElement(clipitem, "in").text = _in
             ET.SubElement(clipitem, "out").text = _out
 
-            _id = src_to_id[clip.src]
-            filedef = ET.SubElement(clipitem, "file", id=_id)
+            make_filedef(clipitem, aclip.src)
 
-            pathurl = src_to_url[clip.src]
-            if pathurl not in file_defs:
-                media_def(filedef, pathurl, clip.src, tl, timebase, ntsc)
-                file_defs.add(pathurl)
+            sourcetrack = ET.SubElement(clipitem, "sourcetrack")
+            ET.SubElement(sourcetrack, "mediatype").text = "audio"
+            ET.SubElement(sourcetrack, "trackindex").text = "1"
 
-            ET.SubElement(clipitem, "compositemode").text = "normal"
-            if clip.speed != 1:
-                clipitem.append(speedup(clip.speed * 100))
-
-            for i in range(1 + len(src.audios) * 2):  # `2` because stereo.
+            if src.videos:
                 link = ET.SubElement(clipitem, "link")
-                ET.SubElement(
-                    link, "linkclipref"
-                ).text = f"clipitem-{(i*(len(tl.v[0])))+j+1}"
-                ET.SubElement(link, "mediatype").text = "video" if i == 0 else "audio"
-                ET.SubElement(link, "trackindex").text = f"{max(i, 1)}"
-                ET.SubElement(link, "clipindex").text = f"{j + 1}"
+                ET.SubElement(link, "linkclipref").text = f"clipitem-{j + 1}"
+                ET.SubElement(link, "mediatype").text = "video"
+                link = ET.SubElement(clipitem, "link")
+                ET.SubElement(link, "linkclipref").text = f"clipitem-{clip_item_num}"
 
-    # Audio definitions and clips
-    audio = ET.SubElement(media, "audio")
+            if aclip.speed != 1:
+                clipitem.append(speedup(aclip.speed * 100))
+
+
+def premiere_write_audio(audio: Element, make_filedef, src: FileInfo, tl: v3) -> None:
     ET.SubElement(audio, "numOutputChannels").text = "2"
     aformat = ET.SubElement(audio, "format")
     aschar = ET.SubElement(aformat, "samplecharacteristics")
@@ -498,11 +471,7 @@ def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3, log: Log) -> N
                 ET.SubElement(clipitem, "in").text = _in
                 ET.SubElement(clipitem, "out").text = _out
 
-                pathurl = src_to_url[aclip.src]
-                filedef = ET.SubElement(clipitem, "file", id=src_to_id[aclip.src])
-                if pathurl not in file_defs:
-                    media_def(filedef, pathurl, aclip.src, tl, timebase, ntsc)
-                    file_defs.add(pathurl)
+                make_filedef(clipitem, aclip.src)
 
                 sourcetrack = ET.SubElement(clipitem, "sourcetrack")
                 ET.SubElement(sourcetrack, "mediatype").text = "audio"
@@ -514,6 +483,103 @@ def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3, log: Log) -> N
                     clipitem.append(speedup(aclip.speed * 100))
 
             audio.append(track)
+
+
+def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3, log: Log) -> None:
+    width, height = tl.res
+    timebase, ntsc = set_tb_ntsc(tl.tb)
+
+    src_to_url: dict[FileInfo, str] = {}
+    src_to_id: dict[FileInfo, str] = {}
+
+    file_defs: set[str] = set()  # Contains urls
+
+    for src in set(tl.sources):
+        the_id = f"file-{len(src_to_id)+1}"
+        src_to_url[src] = f"{src.path.resolve()}"
+        src_to_id[src] = the_id
+
+    def make_filedef(clipitem: Element, src: FileInfo) -> None:
+        pathurl = src_to_url[src]
+        filedef = ET.SubElement(clipitem, "file", id=src_to_id[src])
+        if pathurl not in file_defs:
+            media_def(filedef, pathurl, src, tl, timebase, ntsc)
+            file_defs.add(pathurl)
+
+    xmeml = ET.Element("xmeml", version="5")
+    if resolve:
+        sequence = ET.SubElement(xmeml, "sequence")
+    else:
+        sequence = ET.SubElement(xmeml, "sequence", explodedTracks="true")
+
+    ET.SubElement(sequence, "name").text = name
+    ET.SubElement(sequence, "duration").text = f"{int(tl.out_len())}"
+    rate = ET.SubElement(sequence, "rate")
+    ET.SubElement(rate, "timebase").text = f"{timebase}"
+    ET.SubElement(rate, "ntsc").text = ntsc
+    media = ET.SubElement(sequence, "media")
+    video = ET.SubElement(media, "video")
+    vformat = ET.SubElement(video, "format")
+    vschar = ET.SubElement(vformat, "samplecharacteristics")
+
+    ET.SubElement(vschar, "width").text = f"{width}"
+    ET.SubElement(vschar, "height").text = f"{height}"
+    ET.SubElement(vschar, "pixelaspectratio").text = "square"
+
+    rate = ET.SubElement(vschar, "rate")
+    ET.SubElement(rate, "timebase").text = f"{timebase}"
+    ET.SubElement(rate, "ntsc").text = ntsc
+
+    if len(tl.v) > 0 and len(tl.v[0]) > 0:
+        track = ET.SubElement(video, "track")
+
+        for j, clip in enumerate(tl.v[0]):
+            assert isinstance(clip, TlVideo)
+
+            _start = f"{clip.start}"
+            _end = f"{clip.start + clip.dur}"
+            _in = f"{clip.offset}"
+            _out = f"{clip.offset + clip.dur}"
+
+            this_clipid = f"clipitem-{j+1}"
+            clipitem = ET.SubElement(track, "clipitem", id=this_clipid)
+            ET.SubElement(clipitem, "name").text = src.path.stem
+            ET.SubElement(clipitem, "enabled").text = "TRUE"
+            ET.SubElement(clipitem, "start").text = _start
+            ET.SubElement(clipitem, "end").text = _end
+            ET.SubElement(clipitem, "in").text = _in
+            ET.SubElement(clipitem, "out").text = _out
+
+            make_filedef(clipitem, clip.src)
+
+            ET.SubElement(clipitem, "compositemode").text = "normal"
+            if clip.speed != 1:
+                clipitem.append(speedup(clip.speed * 100))
+
+            if resolve:
+                link = ET.SubElement(clipitem, "link")
+                ET.SubElement(link, "linkclipref").text = this_clipid
+                link = ET.SubElement(clipitem, "link")
+                ET.SubElement(
+                    link, "linkclipref"
+                ).text = f"clipitem-{(len(tl.v[0]))+j+1}"
+                continue
+
+            for i in range(1 + len(src.audios) * 2):  # `2` because stereo.
+                link = ET.SubElement(clipitem, "link")
+                ET.SubElement(
+                    link, "linkclipref"
+                ).text = f"clipitem-{(i*(len(tl.v[0])))+j+1}"
+                ET.SubElement(link, "mediatype").text = "video" if i == 0 else "audio"
+                ET.SubElement(link, "trackindex").text = f"{max(i, 1)}"
+                ET.SubElement(link, "clipindex").text = f"{j + 1}"
+
+    # Audio definitions and clips
+    audio = ET.SubElement(media, "audio")
+    if resolve:
+        resolve_write_audio(audio, make_filedef, tl)
+    else:
+        premiere_write_audio(audio, make_filedef, src, tl)
 
     tree = ET.ElementTree(xmeml)
     ET.indent(tree, space="  ", level=0)
