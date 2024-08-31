@@ -384,8 +384,8 @@ def media_def(
 
 
 def resolve_write_audio(audio: Element, make_filedef, tl: v3) -> None:
-    track = ET.SubElement(audio, "track")
-    for aclips in tl.a:
+    for t, aclips in enumerate(tl.a):
+        track = ET.SubElement(audio, "track")
         for j, aclip in enumerate(aclips):
             src = aclip.src
 
@@ -411,7 +411,7 @@ def resolve_write_audio(audio: Element, make_filedef, tl: v3) -> None:
 
             sourcetrack = ET.SubElement(clipitem, "sourcetrack")
             ET.SubElement(sourcetrack, "mediatype").text = "audio"
-            ET.SubElement(sourcetrack, "trackindex").text = "1"
+            ET.SubElement(sourcetrack, "trackindex").text = f"{t + 1}"
 
             if src.videos:
                 link = ET.SubElement(clipitem, "link")
