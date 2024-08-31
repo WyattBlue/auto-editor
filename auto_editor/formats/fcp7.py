@@ -151,8 +151,10 @@ SUPPORTED_EFFECTS = ("timeremap",)
 
 def read_filters(clipitem: Element, log: Log) -> float:
     for effect_tag in clipitem:
+        if effect_tag.tag in ("enabled", "start", "end"):
+            continue
         if len(effect_tag) < 3:
-            log.error("effect tag requires: <effectid> <name> and one <parameter>")
+            log.error("<effect> requires: <effectid> <name> and one <parameter>")
         for i, effects in enumerate(effect_tag):
             if i == 0 and effects.tag != "name":
                 log.error("<effect>: <name> must be first tag")
@@ -266,9 +268,10 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
     if "video" in av:
         tracks = valid.parse(av["video"], vclip_schema)
 
-        width = tracks["format"]["samplecharacteristics"]["width"]
-        height = tracks["format"]["samplecharacteristics"]["height"]
-        res = width, height
+        if "format" in tracks:
+            width = tracks["format"]["samplecharacteristics"]["width"]
+            height = tracks["format"]["samplecharacteristics"]["height"]
+            res = width, height
 
         for t, track in enumerate(tracks["track"]):
             if len(track["clipitem"]) > 0:
@@ -304,7 +307,8 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
 
     if "audio" in av:
         tracks = valid.parse(av["audio"], aclip_schema)
-        sr = tracks["format"]["samplecharacteristics"]["samplerate"]
+        if "format" in tracks:
+            sr = tracks["format"]["samplecharacteristics"]["samplerate"]
 
         for t, track in enumerate(tracks["track"]):
             if len(track["clipitem"]) > 0:
