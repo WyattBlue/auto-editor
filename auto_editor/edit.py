@@ -15,6 +15,7 @@ from auto_editor.utils.bar import Bar
 from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.container import Container, container_constructor
+from auto_editor.utils.func import open_with_system_default
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 
@@ -45,8 +46,9 @@ def set_output(
 
     ext_map = {
         "premiere": ".xml",
-        "resolve": ".fcpxml",
+        "resolve-fcp7": ".xml",
         "final-cut-pro": ".fcpxml",
+        "resolve": ".fcpxml",
         "shotcut": ".mlt",
         "json": ".json",
         "audio": ".wav",
@@ -122,8 +124,9 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
     parsing: dict[str, pAttrs] = {
         "default": pAttrs("default"),
         "premiere": pAttrs("premiere", name_attr),
-        "resolve": pAttrs("resolve", name_attr),
+        "resolve-fcp7": pAttrs("resolve-fcp7", name_attr),
         "final-cut-pro": pAttrs("final-cut-pro", name_attr),
+        "resolve": pAttrs("resolve", name_attr),
         "shotcut": pAttrs("shotcut"),
         "json": pAttrs("json", pAttr("api", 3, is_int)),
         "timeline": pAttrs("json", pAttr("api", 3, is_int)),
@@ -176,10 +179,11 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
 
     del paths
 
-    output, export = set_output(args.output_file, args.export, src, log)
-    assert "export" in export
+    output, export_ops = set_output(args.output_file, args.export, src, log)
+    assert "export" in export_ops
+    export = export_ops["export"]
 
-    if export["export"] == "timeline":
+    if export == "timeline":
         log.quiet = True
 
     if not args.preview:
@@ -203,10 +207,10 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
     if tl is None:
         tl = make_timeline(sources, args, samplerate, bar, log)
 
-    if export["export"] == "timeline":
+    if export == "timeline":
         from auto_editor.formats.json import make_json_timeline
 
-        make_json_timeline(export["api"], 0, tl, log)
+        make_json_timeline(export_ops["api"], 0, tl, log)
         return
 
     if args.preview:
@@ -215,25 +219,27 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
         preview(tl, log)
         return
 
-    if export["export"] == "json":
+    if export == "json":
         from auto_editor.formats.json import make_json_timeline
 
-        make_json_timeline(export["api"], output, tl, log)
+        make_json_timeline(export_ops["api"], output, tl, log)
         return
 
-    if export["export"] == "premiere":
+    if export in ("premiere", "resolve-fcp7"):
         from auto_editor.formats.fcp7 import fcp7_write_xml
 
-        fcp7_write_xml(export["name"], output, tl, log)
+        is_resolve = export.startswith("resolve")
+        fcp7_write_xml(export_ops["name"], output, is_resolve, tl, log)
         return
 
-    if export["export"] in ("final-cut-pro", "resolve"):
+    if export in ("final-cut-pro", "resolve"):
         from auto_editor.formats.fcp11 import fcp11_write_xml
 
-        fcp11_write_xml(export["name"], ffmpeg, output, export["export"], tl, log)
+        is_resolve = export.startswith("resolve")
+        fcp11_write_xml(export_ops["name"], ffmpeg, output, is_resolve, tl, log)
         return
 
-    if export["export"] == "shotcut":
+    if export == "shotcut":
         from auto_editor.formats.shotcut import shotcut_write_mlt
 
         shotcut_write_mlt(output, tl)
@@ -297,7 +303,7 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
             log,
         )
 
-    if export["export"] == "clip-sequence":
+    if export == "clip-sequence":
         if tl.v1 is None:
             log.error("Timeline too complex to use clip-sequence export")
 
@@ -338,10 +344,8 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
 
     log.stop_timer()
 
-    if not args.no_open and export["export"] in ("default", "audio", "clip-sequence"):
+    if not args.no_open and export in ("default", "audio", "clip-sequence"):
         if args.player is None:
-            from auto_editor.utils.func import open_with_system_default
-
             open_with_system_default(output, log)
         else:
             import subprocess

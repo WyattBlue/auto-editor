@@ -372,7 +372,7 @@ def media_def(
         ET.SubElement(audiodef, "channelcount").text = f"{aud.channels}"
 
 
-def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
+def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3, log: Log) -> None:
     width, height = tl.res
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
@@ -437,14 +437,14 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
             if clip.speed != 1:
                 clipitem.append(speedup(clip.speed * 100))
 
-            for i in range(len(src.audios) * 2 + 1):  # `2` because stereo.
+            for i in range(1 + len(src.audios) * 2):  # `2` because stereo.
                 link = ET.SubElement(clipitem, "link")
                 ET.SubElement(
                     link, "linkclipref"
                 ).text = f"clipitem-{(i*(len(tl.v[0])))+j+1}"
                 ET.SubElement(link, "mediatype").text = "video" if i == 0 else "audio"
-                ET.SubElement(link, "trackindex").text = str(max(i, 1))
-                ET.SubElement(link, "clipindex").text = str(j + 1)
+                ET.SubElement(link, "trackindex").text = f"{max(i, 1)}"
+                ET.SubElement(link, "clipindex").text = f"{j + 1}"
 
     # Audio definitions and clips
     audio = ET.SubElement(media, "audio")
@@ -452,7 +452,7 @@ def fcp7_write_xml(name: str, output: str, tl: v3, log: Log) -> None:
     aformat = ET.SubElement(audio, "format")
     aschar = ET.SubElement(aformat, "samplecharacteristics")
     ET.SubElement(aschar, "depth").text = DEPTH
-    ET.SubElement(aschar, "samplerate").text = str(tl.sr)
+    ET.SubElement(aschar, "samplerate").text = f"{tl.sr}"
 
     t = 0
     for aclips in tl.a:

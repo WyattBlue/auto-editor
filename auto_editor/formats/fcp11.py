@@ -54,7 +54,7 @@ def make_name(src: FileInfo, tb: Fraction) -> str:
 
 
 def fcp11_write_xml(
-    group_name: str, ffmpeg: FFmpeg, output: str, flavor: str, tl: v3, log: Log
+    group_name: str, ffmpeg: FFmpeg, output: str, resolve: bool, tl: v3, log: Log
 ) -> None:
     def fraction(val: int) -> str:
         if val == 0:
@@ -66,23 +66,22 @@ def fcp11_write_xml(
 
     proj_name = src.path.stem
     src_dur = int(src.duration * tl.tb)
-    tl_dur = src_dur if flavor == "resolve" else tl.out_len()
+    tl_dur = src_dur if resolve else tl.out_len()
 
     all_srcs: list[FileInfo] = [src]
     all_refs: list[str] = ["r2"]
-    if flavor == "resolve":
-        if len(src.audios) > 1:
-            fold = make_tracks_dir(src)
+    if resolve and len(src.audios) > 1:
+        fold = make_tracks_dir(src)
 
-            for i in range(1, len(src.audios)):
-                newtrack = fold / f"{i}.wav"
-                ffmpeg.run(
-                    ["-i", f"{src.path.resolve()}", "-map", f"0:a:{i}", f"{newtrack}"]
-                )
-                all_srcs.append(initFileInfo(f"{newtrack}", log))
-                all_refs.append(f"r{(i + 1) * 2}")
+        for i in range(1, len(src.audios)):
+            newtrack = fold / f"{i}.wav"
+            ffmpeg.run(
+                ["-i", f"{src.path.resolve()}", "-map", f"0:a:{i}", f"{newtrack}"]
+            )
+            all_srcs.append(initFileInfo(f"{newtrack}", log))
+            all_refs.append(f"r{(i + 1) * 2}")
 
-    fcpxml = Element("fcpxml", version="1.10" if flavor == "resolve" else "1.11")
+    fcpxml = Element("fcpxml", version="1.10" if resolve else "1.11")
     resources = SubElement(fcpxml, "resources")
 
     for i, one_src in enumerate(all_srcs):
@@ -163,9 +162,9 @@ def fcp11_write_xml(
     warn = False
     for my_ref in all_refs:
         for clip in clips:
-            warn = make_clip(my_ref, clip, warn)
+            warn = make_clip(my_ref, clip, warn) or warn
 
-    if flavor == "resolve" and warn:
+    if resolve and warn:
         log.warning(
             "DaVinci Resolve may take a very long time when importing timelines with "
             "speed effects. Consider switching to Premiere Pro, "
