@@ -133,7 +133,7 @@ def fcp11_write_xml(
     else:
         clips = []
 
-    def make_clip(ref: str, clip: TlVideo | TlAudio, speed_warn: bool) -> bool:
+    def make_clip(ref: str, clip: TlVideo | TlAudio) -> None:
         clip_properties = {
             "name": proj_name,
             "ref": ref,
@@ -147,7 +147,6 @@ def fcp11_write_xml(
             # See the "Time Maps" section.
             # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
 
-            speed_warn = True
             timemap = SubElement(asset, "timeMap")
             SubElement(timemap, "timept", time="0s", value="0s", interp="smooth2")
             SubElement(
@@ -157,19 +156,11 @@ def fcp11_write_xml(
                 value=fraction(src_dur),
                 interp="smooth2",
             )
-        return speed_warn
 
-    warn = False
     for my_ref in all_refs:
         for clip in clips:
-            warn = make_clip(my_ref, clip, warn) or warn
+            make_clip(my_ref, clip)
 
-    if resolve and warn:
-        log.warning(
-            "DaVinci Resolve may take a very long time when importing timelines with "
-            "speed effects. Consider switching to Premiere Pro, "
-            "Final Cut Pro, or ShotCut (free)"
-        )
     tree = ElementTree(fcpxml)
     indent(tree, space="\t", level=0)
     tree.write(output, xml_declaration=True, encoding="utf-8")
