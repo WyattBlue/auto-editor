@@ -10,7 +10,7 @@ authors = [{ name = "WyattBlue", email = "wyattblue@auto-editor.com" }]
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.23.0",
-    "pyav==12.3.*",
+    "pyav==13.0.*",
     "ae-ffmpeg==1.2.*",
 ]
 keywords = [
