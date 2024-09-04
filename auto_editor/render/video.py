@@ -57,21 +57,6 @@ allowed_pix_fmt = {
 }
 
 
-def apply_anchor(x: int, y: int, w: int, h: int, anchor: str) -> tuple[int, int]:
-    if anchor == "ce":
-        x = (x * 2 - w) // 2
-        y = (y * 2 - h) // 2
-    if anchor == "tr":
-        x -= w
-    if anchor == "bl":
-        y -= h
-    if anchor == "br":
-        x -= w
-        y -= h
-    # Use 'tl' by default
-    return x, y
-
-
 def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
     hex_color = bg.lstrip("#").upper()
     rgb_color = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
@@ -292,7 +277,7 @@ def render_av(
                         frame = graph.vpull()
                 elif isinstance(obj, TlRect):
                     graph = av.filter.Graph()
-                    x, y = apply_anchor(obj.x, obj.y, obj.width, obj.height, obj.anchor)
+                    x, y = obj.x, obj.y
                     graph.link_nodes(
                         graph.add_buffer(template=my_stream),
                         graph.add(
@@ -307,9 +292,7 @@ def render_av(
                     array = frame.to_ndarray(format="rgb24")
 
                     overlay_h, overlay_w, _ = img.shape
-                    x_pos, y_pos = apply_anchor(
-                        obj.x, obj.y, overlay_w, overlay_h, obj.anchor
-                    )
+                    x_pos, y_pos = obj.x, obj.y
 
                     x_start = max(x_pos, 0)
                     y_start = max(y_pos, 0)
