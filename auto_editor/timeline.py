@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from auto_editor.lib.contracts import *
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
-from auto_editor.utils.types import anchor, color, natural, number, threshold
+from auto_editor.utils.types import color, natural, number, threshold
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -88,7 +88,6 @@ class TlImage:
     y: int
     width: int
     opacity: float
-    anchor: str
 
     def as_dict(self) -> dict:
         return {
@@ -100,7 +99,6 @@ class TlImage:
             "y": self.y,
             "width": self.width,
             "opacity": self.opacity,
-            "anchor": self.anchor,
         }
 
 
@@ -112,7 +110,6 @@ class TlRect:
     y: int
     width: int
     height: int
-    anchor: str
     fill: str
 
     def as_dict(self) -> dict:
@@ -124,7 +121,6 @@ class TlRect:
             "y": self.y,
             "width": self.width,
             "height": self.height,
-            "anchor": self.anchor,
             "fill": self.fill,
         }
 
@@ -157,7 +153,6 @@ img_builder = pAttrs(
     pAttr("y", Required, is_int, int),
     pAttr("width", 0, is_nat, natural),
     pAttr("opacity", 1, is_threshold, threshold),
-    pAttr("anchor", "ce", is_str, anchor),
 )
 rect_builder = pAttrs(
     "rect",
@@ -167,7 +162,6 @@ rect_builder = pAttrs(
     pAttr("y", Required, is_int, int),
     pAttr("width", Required, is_int, int),
     pAttr("height", Required, is_int, int),
-    pAttr("anchor", "ce", is_str, anchor),
     pAttr("fill", "#c4c4c4", is_str, color),
 )
 visual_objects = {

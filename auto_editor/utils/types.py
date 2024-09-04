@@ -148,13 +148,6 @@ def time(val: str, tb: Fraction) -> int:
     return int(num)
 
 
-def anchor(val: str) -> str:
-    allowed = ("tl", "tr", "bl", "br", "ce")
-    if val not in allowed:
-        raise CoerceError(f"Anchor must be: {' '.join(allowed)}")
-    return val
-
-
 def margin(val: str) -> tuple[str, str]:
     vals = val.strip().split(",")
     if len(vals) == 1:
