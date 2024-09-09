@@ -118,6 +118,10 @@ class Proc:
 
         if kws is not None:
             for key, val in kwargs.items():
+                if key not in kws:
+                    raise MyError(
+                        f"{self.name} got an unexpected keyword argument: {key}"
+                    )
                 check = cont[-1] if kws[key] >= len(cont) else cont[kws[key]]
                 if not check_contract(check, val):
                     exp = f"{check}" if callable(check) else print_str(check)
