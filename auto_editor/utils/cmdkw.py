@@ -177,8 +177,7 @@ def parse_with_palet(
 def parse_method(
     name: str, text: str, env: Env
 ) -> tuple[str, list[Any], dict[str, Any]]:
-    from auto_editor.lang.palet import Lexer, Parser, interpret
-    from auto_editor.lib.err import MyError
+    from auto_editor.lang.palet import Lexer, Parser
 
     # Positional Arguments
     #    audio:0.04,0,6,3
@@ -197,18 +196,13 @@ def parse_method(
         if "=" in arg:
             key, val = arg.split("=", 1)
 
-            results = interpret(env, Parser(Lexer(name, val)))
-            if not results:
-                raise MyError("Results must be of length > 0")
-
-            kwargs[key] = results[-1]
+            result = Parser(Lexer(name, val)).expr()
+            kwargs[key] = result
             allow_positional_args = False
 
         elif allow_positional_args:
-            results = interpret(env, Parser(Lexer(name, arg)))
-            if not results:
-                raise MyError("Results must be of length > 0")
-            args.append(results[-1])
+            result = Parser(Lexer(name, arg)).expr()
+            args.append(result)
         else:
             raise ParserError(f"{name} positional argument follows keyword argument.")
 
