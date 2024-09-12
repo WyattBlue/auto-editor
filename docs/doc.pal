@@ -683,6 +683,11 @@
             (text "Removes any existing mapping for "'key" in "'hash".")
         )
     ]
+    "File System" #[
+        (proc "file-exists?" '((str path) bool?)
+            (text "Returns "#t" if a file (not a directory) "'path" exists, "#f" otherwise.")
+        )
+    ]
     "I/O" #[
         (pred "output-port?" (text "Returns "#t" if "'v" is an output port, "#f" otherwise."))
         (proc "open-output-file" '((path string?) output-port?)
@@ -696,6 +701,20 @@
         )
         (proc "closed?" '((v output-port?) bool?)
             (text "Returns "#t" if "'v" is a closed port, "#f" otherwise.")
+        )
+    ]
+    "Subprocess" #[
+        (proc "system" '((cmd string?) bool?)
+            (text
+                "Executes a Unix-like or Windows shell command synchronously. "
+                "Returns "#t" if successful, "#f" otherwise."
+            )
+        )
+        (proc "system*" '((command string?) (arg string?) ... bool?)
+            (text
+                "Executes a Unix-like or Windows shell command synchronously. "
+                "Returns "#t" if successful, "#f" otherwise."
+            )
         )
     ]
     "Printing" #[
@@ -724,18 +743,6 @@
         )
         (proc "sleep" '((time (or/c int? float?)) void?)
             (text "Adds a delay of "'time" seconds.")
-        )
-        (proc "system" '((cmd string?) bool?)
-            (text
-                "Executes a Unix-like or Windows shell command synchronously. "
-                "Returns "#t" if successful, "#f" otherwise."
-            )
-        )
-        (proc "system*" '((command string?) (arg string?) ... bool?)
-            (text
-                "Executes a Unix-like or Windows shell command synchronously. "
-                "Returns "#t" if successful, "#f" otherwise."
-            )
         )
     ]
     "Void" #[
