@@ -837,6 +837,12 @@ def make_standard_env() -> dict[str, Any]:
             return f"{val.real}{join}{val.imag}i"
         return f"{val}"
 
+    def string_to_number(val) -> float:
+        try:
+            return float(val)
+        except Exception:
+            raise MyError(f"failed to convert {val} to number")
+
     def palet_join(v: Any, s: str) -> str:
         try:
             return s.join(v)
@@ -1161,6 +1167,7 @@ def make_standard_env() -> dict[str, Any]:
         "sleep": Proc("sleep", sleep, (1, 1), is_int_or_float),
         # conversions
         "number->string": Proc("number->string", number_to_string, (1, 1), is_num),
+        "string->number": Proc("string->number", string_to_number, (1, 1), is_str),
         "string->vector": Proc(
             "string->vector", lambda s: [Char(c) for c in s], (1, 1), is_str
         ),
