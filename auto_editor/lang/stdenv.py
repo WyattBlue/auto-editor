@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 
 def make_standard_env() -> dict[str, Any]:
+    import os.path
     from cmath import sqrt as complex_sqrt
     from functools import reduce
     from operator import add, ge, gt, is_, le, lt, mod, mul
@@ -1102,6 +1103,7 @@ def make_standard_env() -> dict[str, Any]:
             ),
         ),
         # i/o
+        "file-exists?": Proc("file-exists", os.path.isfile, (1, 1), is_str),
         "open-output-file": Proc("open-output-file", initOutPort, (1, 1), is_str),
         "output-port?": (op := Contract("output-port?", lambda v: type(v) is OutputPort)),
         "close-port": Proc("close-port", OutputPort.close, (1, 1), op),
