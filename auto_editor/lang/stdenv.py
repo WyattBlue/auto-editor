@@ -461,6 +461,11 @@ def make_standard_env() -> dict[str, Any]:
             raise MyError(f"{node[0]}: Expected string? got: {print_str(num)}")
         env[name] += num
 
+    def syn_while(env: Env, node: Node) -> None:
+        while my_eval(env, node[1]) == True:
+            for c in node[2:]:
+                my_eval(env, c)
+
     def syn_for(env: Env, node: Node) -> None:
         var, my_iter = check_for_syntax(env, node)
 
@@ -967,6 +972,7 @@ def make_standard_env() -> dict[str, Any]:
         # loops
         "for": Syntax(syn_for),
         "for-items": Syntax(syn_for_items),
+        "while": Syntax(syn_while),
         # contracts
         "number?": is_num,
         "real?": is_real,
@@ -1129,7 +1135,9 @@ def make_standard_env() -> dict[str, Any]:
         "file-exists?": Proc("file-exists", os.path.isfile, (1, 1), is_str),
         "open-input-file": Proc("open-input-file", initInPort, (1, 1), is_str),
         "input-port?": (ip := Contract("input-port?", lambda v: type(v) is InputPort)),
-        "read-line": Proc("read-line", lambda f: f.port.readline(), (1, 1), ip),
+        "read-line": Proc("read-line",
+            lambda f: (r := f.port.readline(), None if r == "" else r.rstrip())[-1],
+            (1, 1), ip),
         "open-output-file": Proc("open-output-file", initOutPort, (1, 1), is_str),
         "output-port?": (op := Contract("output-port?", lambda v: type(v) is OutputPort)),
         "port?": (port := Contract("port?", orc(ip, op))),
