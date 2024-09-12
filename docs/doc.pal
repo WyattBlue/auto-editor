@@ -251,6 +251,9 @@
         (syntax "for-items" "[key value hash-id] body"
             (text "Loop over key-value pairs of "'hash-id", which should be a hash?.")
         )
+        (syntax "while" "condition body"
+            (text "Loop over body while "'condition" evalutes to "#t".")
+        )
     ]
     "Equality" #[
         (proc "equal?" '((v1 any) (v2 any) bool?)
@@ -689,18 +692,26 @@
         )
     ]
     "I/O" #[
+        (pred "input-port?" (text "Returns "#t" if "'v" is an input port, "#f" otherwise."))
+        (proc "open-input-file" '((path string?) input-port?)
+            (text "Opens the file specified by "'path" for input.")
+        )
         (pred "output-port?" (text "Returns "#t" if "'v" is an output port, "#f" otherwise."))
         (proc "open-output-file" '((path string?) output-port?)
             (text "Opens the file specified by "'path" for output.")
         )
-        (proc "close-port" '((out output-port?) void?)
+        (pred "port?" (text "Returns "#t" if "'v" is an input or output port, "#f" otherwise."))
+        (proc "close-port" '((port port?) void?)
             (text
-                "Flushes, then closes the port "'out". The port is now incapable of delivering"
+                "Flushes, then closes the port "'port". The port is now incapable of delivering"
                 " or accepting data. This has no effect if the port has already been closed."
             )
         )
-        (proc "closed?" '((v output-port?) bool?)
-            (text "Returns "#t" if "'v" is a closed port, "#f" otherwise.")
+        (proc "closed?" '((v port?) bool?)
+            (text "Returns "#t" if "'port" is a closed port, "#f" otherwise.")
+        )
+        (proc "read-line" '((v input-port?) (or/c string? void?))
+            (text "Returns the next line in "'v", returns void when at the end of the file.")
         )
     ]
     "Subprocess" #[
