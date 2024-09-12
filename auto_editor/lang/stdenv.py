@@ -222,14 +222,20 @@ def make_standard_env() -> dict[str, Any]:
         parms: list[str] = []
         for item in node[1]:
             if type(item) is not Sym:
-                raise MyError(f"{node[0]}: must be an identifier")
+                raise MyError(f"{node[0]}: must be an identifier, got: {item} {type(item)}")
 
             parms.append(f"{item}")
 
         return UserProc(env, "", parms, (), node[2:])
 
     def syn_define(env: Env, node: Node) -> None:
+        if len(node) < 2:
+            raise MyError(f"{node[0]}: too few terms")
         if len(node) < 3:
+            if type(node[1]) is Sym:
+                raise MyError(f"{node[0]}: what should `{node[1]}` be defined as?")
+            elif type(node[1]) is tuple and len(node[1]) > 0:
+                raise MyError(f"{node[0]}: function `{node[1][0]}` needs a body.")
             raise MyError(f"{node[0]}: too few terms")
 
         if type(node[1]) is tuple:

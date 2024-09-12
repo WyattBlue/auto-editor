@@ -1,0 +1,10 @@
+
+(define (func2 b)
+    c 
+    b
+)
+(define (func1 a)
+   (func2 a) 
+)
+
+(func1 "hot")

@@ -54,12 +54,14 @@ class Env:
 
 
 class Sym:
-    __slots__ = ("val", "hash")
+    __slots__ = ("val", "hash", "lineno", "column")
 
-    def __init__(self, val: str):
+    def __init__(self, val: str, lineno: int = -1, column: int = -1):
         assert isinstance(val, str)
         self.val = val
         self.hash = hash(val)
+        self.lineno = lineno
+        self.column = column
 
     def __str__(self) -> str:
         return self.val
