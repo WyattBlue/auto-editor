@@ -468,6 +468,7 @@
             (text "Returns the character corresponding to "'k".")
         )
         (proc "number->string" '((z number?) string?) (text "Returns "'z" as a string."))
+        (proc "string->number" '((x string?) float?) (text "Returns "'x" as a float."))
         (proc "~a" '((v any) ... string?)
             (text "Converts all "'v"s to a string using display with \"\" as the joiner.")
         )
