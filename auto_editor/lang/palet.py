@@ -60,6 +60,8 @@ str_escape = {
 class Token:
     type: str
     value: Any
+    lineno: int
+    column: int
 
 
 class Lexer:
@@ -156,21 +158,31 @@ class Lexer:
             elif unit == "dB":
                 token = DB
             elif unit != "i" and unit != "%":
-                return Token(VAL, Sym(result + unit))
+                return Token(
+                    VAL,
+                    Sym(result + unit, self.lineno, self.column),
+                    self.lineno,
+                    self.column,
+                )
 
         try:
             if unit == "i":
-                return Token(VAL, complex(result + "j"))
+                return Token(VAL, complex(result + "j"), self.lineno, self.column)
             elif unit == "%":
-                return Token(VAL, float(result) / 100)
+                return Token(VAL, float(result) / 100, self.lineno, self.column)
             elif "/" in result:
-                return Token(token, Fraction(result))
+                return Token(token, Fraction(result), self.lineno, self.column)
             elif "." in result:
-                return Token(token, float(result))
+                return Token(token, float(result), self.lineno, self.column)
             else:
-                return Token(token, int(result))
+                return Token(token, int(result), self.lineno, self.column)
         except ValueError:
-            return Token(VAL, Sym(result + unit))
+            return Token(
+                VAL,
+                Sym(result + unit, self.lineno, self.column),
+                self.lineno,
+                self.column,
+            )
 
     def hash_literal(self) -> Token:
         if self.char == "\\":
@@ -180,7 +192,7 @@ class Lexer:
 
             char = self.char
             self.advance()
-            return Token(VAL, Char(char))
+            return Token(VAL, Char(char), self.lineno, self.column)
 
         if self.char == ":":
             self.advance()
@@ -190,14 +202,14 @@ class Lexer:
                 buf.write(self.char)
                 self.advance()
 
-            return Token(VAL, Keyword(buf.getvalue()))
+            return Token(VAL, Keyword(buf.getvalue()), self.lineno, self.column)
 
         if self.char is not None and self.char in "([{":
             brac_type = self.char
             self.advance()
             if self.char is None:
                 self.close_err(f"Expected a character after #{brac_type}")
-            return Token(VLIT, brac_pairs[brac_type])
+            return Token(VLIT, brac_pairs[brac_type], self.lineno, self.column)
 
         buf = StringIO()
         while self.char_is_norm():
@@ -207,10 +219,10 @@ class Lexer:
 
         result = buf.getvalue()
         if result in ("t", "T", "true"):
-            return Token(VAL, True)
+            return Token(VAL, True, self.lineno, self.column)
 
         if result in ("f", "F", "false"):
-            return Token(VAL, False)
+            return Token(VAL, False, self.lineno, self.column)
 
         self.error(f"Unknown hash literal `#{result}`")
 
@@ -231,17 +243,19 @@ class Lexer:
                 my_str = self.string()
                 if self.char == ".":  # handle `object.method` syntax
                     self.advance()
-                    return Token(DOT, (my_str, self.get_next_token()))
-                return Token(VAL, my_str)
+                    return Token(
+                        DOT, (my_str, self.get_next_token()), self.lineno, self.column
+                    )
+                return Token(VAL, my_str, self.lineno, self.column)
 
             if self.char == "'":
                 self.advance()
-                return Token(QUOTE, "'")
+                return Token(QUOTE, "'", self.lineno, self.column)
 
             if self.char in "(){}[]":
                 _par = self.char
                 self.advance()
-                return Token(_par, _par)
+                return Token(_par, _par, self.lineno, self.column)
 
             if self.char in "+-":
                 _peek = self.peek()
@@ -339,18 +353,27 @@ class Lexer:
             if is_method:
                 from auto_editor.utils.cmdkw import parse_method
 
-                return Token(M, parse_method(name, result, env))
+                return Token(
+                    M, parse_method(name, result, env), self.lineno, self.column
+                )
 
             if self.char == ".":  # handle `object.method` syntax
                 self.advance()
-                return Token(DOT, (Sym(result), self.get_next_token()))
+                return Token(
+                    DOT,
+                    (Sym(result, self.lineno, self.column), self.get_next_token()),
+                    self.lineno,
+                    self.column,
+                )
 
             if has_illegal:
                 self.error(f"Symbol has illegal character(s): {result}")
 
-            return Token(VAL, Sym(result))
+            return Token(
+                VAL, Sym(result, self.lineno, self.column), self.lineno, self.column
+            )
 
-        return Token(EOF, "EOF")
+        return Token(EOF, "EOF", self.lineno, self.column)
 
 
 ###############################################################################
@@ -370,6 +393,7 @@ class Parser:
 
     def expr(self) -> Any:
         token = self.current_token
+        lineno, column = token.lineno, token.column
 
         if token.type == VAL:
             self.eat()
@@ -397,7 +421,7 @@ class Parser:
         if token.type == M:
             self.eat()
             name, args, kwargs = token.value
-            _result = [Sym(name)] + args
+            _result = [Sym(name, lineno, column)] + args
             for key, val in kwargs.items():
                 _result.append(Keyword(key))
                 _result.append(val)
@@ -413,7 +437,7 @@ class Parser:
 
         if token.type == QUOTE:
             self.eat()
-            return (Sym("quote"), self.expr())
+            return (Sym("quote", lineno, column), self.expr())
 
         if token.type in brac_pairs:
             self.eat()
@@ -610,16 +634,37 @@ def edit_subtitle(pattern, stream=0, **kwargs):
         return raise_(e) if levels.strict else levels.all()
 
 
+class StackTraceManager:
+    def __init__(self) -> None:
+        self.stack: list[Sym] = []
+
+    def push(self, sym: Sym) -> None:
+        self.stack.append(sym)
+
+    def pop(self) -> None:
+        self.stack.pop()
+
+    def get_stacktrace(self) -> str:
+        return "\n".join(
+            f"  at {sym.val} ({sym.lineno}:{sym.column})"
+            for sym in reversed(self.stack)
+        )
+
+
+stack_trace_manager = StackTraceManager()
+
+
 def my_eval(env: Env, node: object) -> Any:
     if type(node) is Sym:
         val = env.get(node.val)
         if type(val) is NotFound:
+            stacktrace = stack_trace_manager.get_stacktrace()
             if mat := get_close_matches(node.val, env.data):
                 raise MyError(
-                    f"variable `{node.val}` not found. Did you mean: {mat[0]}"
+                    f"variable `{node.val}` not found. Did you mean: {mat[0]}\n{stacktrace}"
                 )
             raise MyError(
-                f"variable `{node.val}` not found. Did you mean a string literal."
+                f"variable `{node.val}` not found. Did you mean a string literal.\n{stacktrace}"
             )
         return val
 
@@ -631,6 +676,9 @@ def my_eval(env: Env, node: object) -> Any:
             raise MyError("Illegal () expression")
 
         oper = my_eval(env, node[0])
+        if isinstance(node[0], Sym):
+            stack_trace_manager.push(node[0])
+
         if not callable(oper):
             """
             ...No one wants to write (aref a x y) when they could write a[x,y].
