@@ -137,6 +137,22 @@ def make_standard_env() -> dict[str, Any]:
     }
 
     @dataclass(slots=True)
+    class InputPort:
+        name: str
+        port: Any
+        closed: bool
+
+        def close(self) -> None:
+            if not self.closed:
+                self.closed = True
+                self.port.close()
+
+        def __str__(self) -> str:
+            return f"#<input-port:{self.name}>"
+
+        __repr__ = __str__
+
+    @dataclass(slots=True)
     class OutputPort:
         name: str
         port: Any
@@ -152,6 +168,13 @@ def make_standard_env() -> dict[str, Any]:
             return f"#<output-port:{self.name}>"
 
         __repr__ = __str__
+
+    def initInPort(name: str) -> InputPort | Literal[False]:
+        try:
+            port = open(name, encoding="utf-8")
+        except Exception:
+            return False
+        return InputPort(name, port, False)
 
     def initOutPort(name: str) -> OutputPort | Literal[False]:
         try:
@@ -1104,10 +1127,17 @@ def make_standard_env() -> dict[str, Any]:
         ),
         # i/o
         "file-exists?": Proc("file-exists", os.path.isfile, (1, 1), is_str),
+        "open-input-file": Proc("open-input-file", initInPort, (1, 1), is_str),
+        "input-port?": (ip := Contract("input-port?", lambda v: type(v) is InputPort)),
+        "read-line": Proc("read-line", lambda f: f.port.readline(), (1, 1), ip),
         "open-output-file": Proc("open-output-file", initOutPort, (1, 1), is_str),
         "output-port?": (op := Contract("output-port?", lambda v: type(v) is OutputPort)),
-        "close-port": Proc("close-port", OutputPort.close, (1, 1), op),
-        "closed?": Proc("closed?", lambda o: o.closed, (1, 1), op),
+        "port?": (port := Contract("port?", orc(ip, op))),
+        "close-port": Proc("close-port", lambda p: p.close, (1, 1), port),
+        "closed?": Proc("closed?", lambda o: o.closed, (1, 1), port),
+        # subprocess
+        "system": Proc("system", palet_system, (1, 1), is_str),
+        "system*": Proc("system*", palet_system_star, (1, None), is_str),
         # printing
         "display": Proc("display",
             lambda v, f=None: print(display_str(v), end="", file=f), (1, 2), any_p, op),
@@ -1121,8 +1151,6 @@ def make_standard_env() -> dict[str, Any]:
         "assert": Proc("assert", palet_assert, (1, 2), any_p, orc(is_str, False)),
         "error": Proc("error", raise_, (1, 1), is_str),
         "sleep": Proc("sleep", sleep, (1, 1), is_int_or_float),
-        "system": Proc("system", palet_system, (1, 1), is_str),
-        "system*": Proc("system*", palet_system_star, (1, None), is_str),
         # conversions
         "number->string": Proc("number->string", number_to_string, (1, 1), is_num),
         "string->vector": Proc(
