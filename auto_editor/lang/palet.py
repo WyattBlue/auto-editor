@@ -642,7 +642,8 @@ class StackTraceManager:
         self.stack.append(sym)
 
     def pop(self) -> None:
-        self.stack.pop()
+        if self.stack:
+            self.stack.pop()
 
     def get_stacktrace(self) -> str:
         return "\n".join(
@@ -655,10 +656,13 @@ stack_trace_manager = StackTraceManager()
 
 
 def my_eval(env: Env, node: object) -> Any:
+    def make_trace(sym: Sym) -> str:
+        return f"  at {sym.val} ({sym.lineno}:{sym.column})"
+
     if type(node) is Sym:
         val = env.get(node.val)
         if type(val) is NotFound:
-            stacktrace = stack_trace_manager.get_stacktrace()
+            stacktrace = make_trace(node)
             if mat := get_close_matches(node.val, env.data):
                 raise MyError(
                     f"variable `{node.val}` not found. Did you mean: {mat[0]}\n{stacktrace}"
@@ -679,44 +683,53 @@ def my_eval(env: Env, node: object) -> Any:
         if isinstance(node[0], Sym):
             stack_trace_manager.push(node[0])
 
-        if not callable(oper):
-            """
-            ...No one wants to write (aref a x y) when they could write a[x,y].
-            In this particular case there is a way to finesse our way out of the
-            problem. If we treat data structures as if they were functions on indexes,
-            we could write (a x y) instead, which is even shorter than the Perl form.
-            """
-            if is_iterable(oper):
-                length = len(node[1:])
-                if length > 3:
-                    raise MyError(f"{print_str(node[0])}: slice expects 1 argument")
-                if length in (2, 3):
-                    return p_slice(oper, *(my_eval(env, c) for c in node[1:]))
-                if length == 1:
-                    return ref(oper, my_eval(env, node[1]))
+        try:
+            if not callable(oper):
+                """
+                ...No one wants to write (aref a x y) when they could write a[x,y].
+                In this particular case there is a way to finesse our way out of the
+                problem. If we treat data structures as if they were functions on indexes,
+                we could write (a x y) instead, which is even shorter than the Perl form.
+                """
+                if is_iterable(oper):
+                    length = len(node[1:])
+                    if length > 3:
+                        raise MyError(f"{print_str(node[0])}: slice expects 1 argument")
+                    if length in (2, 3):
+                        return p_slice(oper, *(my_eval(env, c) for c in node[1:]))
+                    if length == 1:
+                        return ref(oper, my_eval(env, node[1]))
 
-            raise MyError(
-                f"{print_str(oper)} is not a function. Tried to run with args: {print_str(node[1:])}"
-            )
+                raise MyError(
+                    f"{print_str(oper)} is not a function. Tried to run with args: {print_str(node[1:])}"
+                )
 
-        if type(oper) is Syntax:
-            return oper(env, node)
+            if type(oper) is Syntax:
+                return oper(env, node)
 
-        i = 1
-        args: list[Any] = []
-        kwargs: dict[str, Any] = {}
-        while i < len(node):
-            result = my_eval(env, node[i])
-            if type(result) is Keyword:
+            i = 1
+            args: list[Any] = []
+            kwargs: dict[str, Any] = {}
+            while i < len(node):
+                result = my_eval(env, node[i])
+                if type(result) is Keyword:
+                    i += 1
+                    if i >= len(node):
+                        raise MyError("Keyword need argument")
+                    kwargs[result.val] = my_eval(env, node[i])
+                else:
+                    args.append(result)
                 i += 1
-                if i >= len(node):
-                    raise MyError("Keyword need argument")
-                kwargs[result.val] = my_eval(env, node[i])
-            else:
-                args.append(result)
-            i += 1
 
-        return oper(*args, **kwargs)
+            return oper(*args, **kwargs)
+        except MyError as e:
+            error_msg = str(e)
+            if not error_msg.endswith(make_trace(node[0])):
+                error_msg += f"\n{make_trace(node[0])}"
+            raise MyError(error_msg)
+        finally:
+            if isinstance(node[0], Sym):
+                stack_trace_manager.pop()
 
     return node
 
