@@ -7,9 +7,9 @@ description = "Auto-Editor: Effort free video editing!"
 readme = "README.md"
 license = { text = "Unlicense" }
 authors = [{ name = "WyattBlue", email = "wyattblue@auto-editor.com" }]
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 dependencies = [
-    "numpy>=1.23.0",
+    "numpy>=1.23.0,<3.0",
     "pyav==13.0.*",
     "ae-ffmpeg==1.2.*",
 ]
