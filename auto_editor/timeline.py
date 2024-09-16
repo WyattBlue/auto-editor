@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from auto_editor.ffwrapper import initFileInfo
+from auto_editor.ffwrapper import initFileInfo, mux
 from auto_editor.lib.contracts import *
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
 from auto_editor.utils.types import color, natural, number, threshold
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pathlib import Path
     from typing import Any
 
-    from auto_editor.ffwrapper import FFmpeg, FileInfo
+    from auto_editor.ffwrapper import FileInfo
     from auto_editor.utils.chunks import Chunks
     from auto_editor.utils.log import Log
 
@@ -303,7 +303,7 @@ def make_tracks_dir(path: Path) -> Path:
     return tracks_dir
 
 
-def set_stream_to_0(tl: v3, ffmpeg: FFmpeg, log: Log) -> None:
+def set_stream_to_0(tl: v3, log: Log) -> None:
     src = tl.src
     assert src is not None
     fold = make_tracks_dir(src.path)
@@ -312,7 +312,7 @@ def set_stream_to_0(tl: v3, ffmpeg: FFmpeg, log: Log) -> None:
     def make_track(i: int, path: Path) -> FileInfo:
         newtrack = fold / f"{path.stem}_{i}.wav"
         if newtrack not in cache:
-            ffmpeg.run(["-i", f"{path}", "-map", f"0:a:{i}", f"{newtrack}"])
+            mux(path, output=newtrack, stream=i)
             cache[newtrack] = initFileInfo(f"{newtrack}", log)
         return cache[newtrack]
 

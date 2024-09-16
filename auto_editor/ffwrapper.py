@@ -127,6 +127,31 @@ class FFmpeg:
         return output
 
 
+def mux(input: Path, output: Path, stream: int, codec: str | None = None) -> None:
+    input_container = av.open(input, "r")
+    output_container = av.open(output, "w")
+
+    input_audio_stream = input_container.streams.audio[stream]
+
+    if codec is None:
+        codec = "pcm_s16le"
+
+    output_audio_stream = output_container.add_stream(codec)
+    assert isinstance(output_audio_stream, av.audio.AudioStream)
+
+    for frame in input_container.decode(input_audio_stream):
+        packet = output_audio_stream.encode(frame)
+        if packet:
+            output_container.mux(packet)
+
+    packet = output_audio_stream.encode(None)
+    if packet:
+        output_container.mux(packet)
+
+    output_container.close()
+    input_container.close()
+
+
 @dataclass(slots=True, frozen=True)
 class VideoStream:
     width: int
