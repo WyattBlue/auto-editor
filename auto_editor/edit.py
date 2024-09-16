@@ -240,7 +240,7 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
         if is_resolve:
             from auto_editor.timeline import set_stream_to_0
 
-            set_stream_to_0(tl, ffmpeg, log)
+            set_stream_to_0(tl, log)
 
         fcp11_write_xml(export_ops["name"], output, is_resolve, tl, log)
         return
