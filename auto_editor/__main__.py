@@ -255,6 +255,11 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Disable the inclusion of subtitle streams in the output file",
     )
     parser.add_argument(
+        "-dn",
+        flag=True,
+        help="Disable the inclusion of data streams in the output file",
+    )
+    parser.add_argument(
         "--extras",
         metavar="CMD",
         help="Add extra options for ffmpeg. Must be in quotes",
