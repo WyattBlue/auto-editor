@@ -237,8 +237,8 @@ def mux_quality_media(
     if s_tracks > 0:
         cmd.extend(["-map", "0:t?"])  # Add input attachments to output.
 
-    # This was causing a crash for 'example.mp4 multi-track.mov'
-    # cmd.extend(["-map", "0:d?"])
+    if not args.dn:
+        cmd.extend(["-map", "0:d?"])
 
     cmd.append(output_path)
     ffmpeg.run_check_errors(cmd, log, path=output_path)

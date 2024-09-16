@@ -224,6 +224,7 @@ class Args:
     scale: float = 1.0
     extras: str | None = None
     sn: bool = False
+    dn: bool = False
     no_seek: bool = False
     cut_out: list[tuple[str, str]] = field(default_factory=list)
     add_in: list[tuple[str, str]] = field(default_factory=list)
