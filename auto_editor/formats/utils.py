@@ -4,9 +4,6 @@ from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
-    from auto_editor.ffwrapper import FileInfo
     from auto_editor.utils.log import Log
 
 
@@ -17,21 +14,6 @@ def show(ele: Element, limit: int, depth: int = 0) -> None:
     for child in ele:
         if isinstance(child, Element) and depth < limit:
             show(child, limit, depth + 1)
-
-
-def make_tracks_dir(src: FileInfo) -> Path:
-    from os import mkdir
-    from shutil import rmtree
-
-    fold = src.path.parent / f"{src.path.stem}_tracks"
-
-    try:
-        mkdir(fold)
-    except OSError:
-        rmtree(fold)
-        mkdir(fold)
-
-    return fold
 
 
 class Validator:

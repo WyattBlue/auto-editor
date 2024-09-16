@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from auto_editor.ffwrapper import initFileInfo
 from auto_editor.lib.contracts import *
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
 from auto_editor.utils.types import color, natural, number, threshold
@@ -10,10 +11,12 @@ from auto_editor.utils.types import color, natural, number, threshold
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from fractions import Fraction
+    from pathlib import Path
     from typing import Any
 
-    from auto_editor.ffwrapper import FileInfo
+    from auto_editor.ffwrapper import FFmpeg, FileInfo
     from auto_editor.utils.chunks import Chunks
+    from auto_editor.utils.log import Log
 
 
 @dataclass(slots=True)
@@ -241,6 +244,13 @@ video\n"""
             for a in aclips:
                 yield a.src
 
+    def unique_sources(self) -> Iterator[FileInfo]:
+        seen = set()
+        for source in self.sources:
+            if source.path not in seen:
+                seen.add(source.path)
+                yield source
+
     def _duration(self, layer: Any) -> int:
         total_dur = 0
         for clips in layer:
@@ -276,3 +286,38 @@ video\n"""
             "v": v,
             "a": a,
         }
+
+
+def make_tracks_dir(path: Path) -> Path:
+    from os import mkdir
+    from shutil import rmtree
+
+    tracks_dir = path.parent / f"{path.stem}_tracks"
+
+    try:
+        mkdir(tracks_dir)
+    except OSError:
+        rmtree(tracks_dir)
+        mkdir(tracks_dir)
+
+    return tracks_dir
+
+
+def set_stream_to_0(tl: v3, ffmpeg: FFmpeg, log: Log) -> None:
+    src = tl.src
+    assert src is not None
+    fold = make_tracks_dir(src.path)
+    cache: dict[Path, FileInfo] = {}
+
+    def make_track(i: int, path: Path) -> FileInfo:
+        newtrack = fold / f"{path.stem}_{i}.wav"
+        if newtrack not in cache:
+            ffmpeg.run(["-i", f"{path}", "-map", f"0:a:{i}", f"{newtrack}"])
+            cache[newtrack] = initFileInfo(f"{newtrack}", log)
+        return cache[newtrack]
+
+    for alayer in tl.a:
+        for aobj in alayer:
+            if aobj.stream > 0:
+                aobj.src = make_track(aobj.stream, aobj.src.path)
+                aobj.stream = 0

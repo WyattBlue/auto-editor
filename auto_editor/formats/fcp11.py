@@ -3,16 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 from xml.etree.ElementTree import Element, ElementTree, SubElement, indent
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
-
-from .utils import make_tracks_dir
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from fractions import Fraction
 
+    from auto_editor.ffwrapper import FileInfo
     from auto_editor.timeline import TlAudio, TlVideo, v3
     from auto_editor.utils.log import Log
+
 
 """
 Export a FCPXML 11 file readable with Final Cut Pro 10.6.8 or later.
@@ -54,7 +52,7 @@ def make_name(src: FileInfo, tb: Fraction) -> str:
 
 
 def fcp11_write_xml(
-    group_name: str, ffmpeg: FFmpeg, output: str, resolve: bool, tl: v3, log: Log
+    group_name: str, output: str, resolve: bool, tl: v3, log: Log
 ) -> None:
     def fraction(val: int) -> str:
         if val == 0:
@@ -68,23 +66,10 @@ def fcp11_write_xml(
     src_dur = int(src.duration * tl.tb)
     tl_dur = src_dur if resolve else tl.out_len()
 
-    all_srcs: list[FileInfo] = [src]
-    all_refs: list[str] = ["r2"]
-    if resolve and len(src.audios) > 1:
-        fold = make_tracks_dir(src)
-
-        for i in range(1, len(src.audios)):
-            newtrack = fold / f"{i}.wav"
-            ffmpeg.run(
-                ["-i", f"{src.path.resolve()}", "-map", f"0:a:{i}", f"{newtrack}"]
-            )
-            all_srcs.append(initFileInfo(f"{newtrack}", log))
-            all_refs.append(f"r{(i + 1) * 2}")
-
     fcpxml = Element("fcpxml", version="1.10" if resolve else "1.11")
     resources = SubElement(fcpxml, "resources")
 
-    for i, one_src in enumerate(all_srcs):
+    for i, one_src in enumerate(tl.unique_sources()):
         SubElement(
             resources,
             "format",
@@ -126,13 +111,6 @@ def fcp11_write_xml(
     )
     spine = SubElement(sequence, "spine")
 
-    if tl.v and tl.v[0]:
-        clips: Sequence[TlVideo | TlAudio] = cast(Any, tl.v[0])
-    elif tl.a and tl.a[0]:
-        clips = tl.a[0]
-    else:
-        clips = []
-
     def make_clip(ref: str, clip: TlVideo | TlAudio) -> None:
         clip_properties = {
             "name": proj_name,
@@ -157,7 +135,19 @@ def fcp11_write_xml(
                 interp="smooth2",
             )
 
-    for my_ref in all_refs:
+    if tl.v and tl.v[0]:
+        clips: Sequence[TlVideo | TlAudio] = cast(Any, tl.v[0])
+    elif tl.a and tl.a[0]:
+        clips = tl.a[0]
+    else:
+        clips = []
+
+    all_refs: list[str] = ["r2"]
+    if resolve:
+        for i in range(1, len(tl.a)):
+            all_refs.append(f"r{(i + 1) * 2}")
+
+    for my_ref in reversed(all_refs):
         for clip in clips:
             make_clip(my_ref, clip)
 
