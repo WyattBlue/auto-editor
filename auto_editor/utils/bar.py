@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from math import floor
 from shutil import get_terminal_size
 from time import localtime, time
@@ -8,39 +9,50 @@ from time import localtime, time
 from .func import get_stdout_bytes
 
 
+def initBar(bar_type: str) -> Bar:
+    icon = "⏳"
+    chars: tuple[str, ...] = (" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█")
+    brackets = ("|", "|")
+    machine = hide = False
+
+    if bar_type == "classic":
+        icon = "⏳"
+        chars = ("░", "█")
+        brackets = ("[", "]")
+    if bar_type == "ascii":
+        icon = "& "
+        chars = ("-", "#")
+        brackets = ("[", "]")
+    if bar_type == "machine":
+        machine = True
+    if bar_type == "none":
+        hide = True
+
+    part_width = len(chars) - 1
+
+    ampm = True
+    if sys.platform == "darwin" and bar_type in ("modern", "classic", "ascii"):
+        try:
+            date_format = get_stdout_bytes(
+                ["defaults", "read", "com.apple.menuextra.clock", "Show24Hour"]
+            )
+            ampm = date_format == b"0\n"
+        except FileNotFoundError:
+            pass
+
+    return Bar(icon, chars, brackets, machine, hide, part_width, ampm, [])
+
+
+@dataclass(slots=True)
 class Bar:
-    def __init__(self, bar_type: str) -> None:
-        self.machine = False
-        self.hide = False
-
-        self.icon = "⏳"
-        self.chars: tuple[str, ...] = (" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█")
-        self.brackets = ("|", "|")
-
-        if bar_type == "classic":
-            self.icon = "⏳"
-            self.chars = ("░", "█")
-            self.brackets = ("[", "]")
-        if bar_type == "ascii":
-            self.icon = "& "
-            self.chars = ("-", "#")
-            self.brackets = ("[", "]")
-        if bar_type == "machine":
-            self.machine = True
-        if bar_type == "none":
-            self.hide = True
-
-        self.part_width = len(self.chars) - 1
-
-        self.ampm = True
-        if sys.platform == "darwin" and bar_type in ("modern", "classic", "ascii"):
-            try:
-                date_format = get_stdout_bytes(
-                    ["defaults", "read", "com.apple.menuextra.clock", "Show24Hour"]
-                )
-                self.ampm = date_format == b"0\n"
-            except FileNotFoundError:
-                pass
+    icon: str
+    chars: tuple[str, ...]
+    brackets: tuple[str, str]
+    machine: bool
+    hide: bool
+    part_width: int
+    ampm: bool
+    stack: list[tuple[str, int, float, float]]
 
     @staticmethod
     def pretty_time(my_time: float, ampm: bool) -> str:
@@ -62,28 +74,25 @@ class Bar:
         if self.hide:
             return
 
-        progress = 0.0 if self.total == 0 else min(1, max(0, index / self.total))
-        rate = 0.0 if progress == 0 else (time() - self.begin_time) / progress
+        title, len_title, total, begin = self.stack[-1]
+        progress = 0.0 if total == 0 else min(1, max(0, index / total))
+        rate = 0.0 if progress == 0 else (time() - begin) / progress
 
         if self.machine:
-            index = min(index, self.total)
-            secs_til_eta = round(self.begin_time + rate - time(), 2)
-            print(
-                f"{self.title}~{index}~{self.total}~{secs_til_eta}",
-                end="\r",
-                flush=True,
-            )
+            index = min(index, total)
+            secs_til_eta = round(begin + rate - time(), 2)
+            print(f"{title}~{index}~{total}~{secs_til_eta}", end="\r", flush=True)
             return
 
-        new_time = self.pretty_time(self.begin_time + rate, self.ampm)
+        new_time = self.pretty_time(begin + rate, self.ampm)
 
         percent = round(progress * 100, 1)
         p_pad = " " * (4 - len(str(percent)))
         columns = get_terminal_size().columns
-        bar_len = max(1, columns - (self.len_title + 32))
+        bar_len = max(1, columns - (len_title + 32))
         bar_str = self._bar_str(progress, bar_len)
 
-        bar = f"  {self.icon}{self.title} {bar_str} {p_pad}{percent}%  ETA {new_time}"
+        bar = f"  {self.icon}{title} {bar_str} {p_pad}{percent}%  ETA {new_time}"
 
         if len(bar) > columns - 2:
             bar = bar[: columns - 2]
@@ -93,10 +102,7 @@ class Bar:
         sys.stdout.write(bar + "\r")
 
     def start(self, total: float, title: str = "Please wait") -> None:
-        self.title = title
-        self.len_title = len(title)
-        self.total = total
-        self.begin_time = time()
+        self.stack.append((title, len(title), total, time()))
 
         try:
             self.tick(0)
@@ -124,6 +130,7 @@ class Bar:
         )
         return line
 
-    @staticmethod
-    def end() -> None:
+    def end(self) -> None:
         sys.stdout.write(" " * (get_terminal_size().columns - 2) + "\r")
+        if self.stack:
+            self.stack.pop()

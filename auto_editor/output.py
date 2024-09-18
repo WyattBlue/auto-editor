@@ -46,9 +46,9 @@ class Ensure:
             astream = in_container.streams.audio[stream]
 
             if astream.duration is None or astream.time_base is None:
-                dur = 1
+                dur = 1.0
             else:
-                dur = int(astream.duration * astream.time_base)
+                dur = float(astream.duration * astream.time_base)
 
             bar.start(dur, "Extracting audio")
 
@@ -58,8 +58,8 @@ class Ensure:
 
             resampler = AudioResampler(format="s16", layout="stereo", rate=sample_rate)
             for i, frame in enumerate(in_container.decode(astream)):
-                if i % 1500 == 0:
-                    bar.tick(0 if frame.time is None else frame.time)
+                if i % 1500 == 0 and frame.time is not None:
+                    bar.tick(frame.time)
 
                 for new_frame in resampler.resample(frame):
                     for packet in output_astream.encode(new_frame):

@@ -7,7 +7,7 @@ from typing import TextIO
 
 from auto_editor.analyze import Levels
 from auto_editor.timeline import v3
-from auto_editor.utils.bar import Bar
+from auto_editor.utils.bar import initBar
 from auto_editor.utils.func import to_timecode
 from auto_editor.utils.log import Log
 
@@ -65,7 +65,7 @@ def preview(tl: v3, log: Log) -> None:
 
     in_len = 0
     for src in all_sources:
-        in_len += Levels(src, tb, Bar("none"), False, log, False).media_length
+        in_len += Levels(src, tb, initBar("none"), False, log, False).media_length
 
     out_len = tl.out_len()
 

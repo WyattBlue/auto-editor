@@ -11,7 +11,7 @@ from auto_editor.render.audio import make_new_audio
 from auto_editor.render.subtitle import make_new_subtitles
 from auto_editor.render.video import render_av
 from auto_editor.timeline import v1, v3
-from auto_editor.utils.bar import Bar
+from auto_editor.utils.bar import initBar
 from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.container import Container, container_constructor
@@ -146,7 +146,7 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
 
 
 def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
-    bar = Bar(args.progress)
+    bar = initBar(args.progress)
     tl = None
 
     if paths:

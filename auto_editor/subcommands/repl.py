@@ -11,7 +11,7 @@ from auto_editor.lang.palet import ClosingError, Lexer, Parser, env, interpret
 from auto_editor.lang.stdenv import make_standard_env
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
-from auto_editor.utils.bar import Bar
+from auto_editor.utils.bar import initBar
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import frame_rate
 from auto_editor.vanparse import ArgumentParser
@@ -64,9 +64,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         sources = [initFileInfo(path, log) for path in args.input]
         src = sources[0]
         tb = src.get_fps() if args.timebase is None else args.timebase
-        bar = Bar("modern")
         env["timebase"] = tb
-        env["@levels"] = Levels(src, tb, bar, False, log, strict)
+        env["@levels"] = Levels(src, tb, initBar("modern"), False, log, strict)
 
     env.update(make_standard_env())
     print(f"Auto-Editor {auto_editor.__version__}")
