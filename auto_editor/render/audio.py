@@ -19,7 +19,7 @@ from auto_editor.utils.bar import Bar
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
-from auto_editor.wavfile import AudioData, read, read_fid, write
+from auto_editor.wavfile import AudioData, read, write
 
 norm_types = {
     "ebu": pAttrs(
@@ -226,7 +226,7 @@ def process_audio_clip(
     output_file.close()
 
     output_bytes.seek(0)
-    return read_fid(output_bytes)[1]
+    return read(output_bytes)[1]
 
 
 def make_new_audio(
@@ -254,7 +254,8 @@ def make_new_audio(
         for c, clip in enumerate(layer):
             if (clip.src, clip.stream) not in samples:
                 audio_path = ensure.audio(clip.src, clip.stream)
-                samples[(clip.src, clip.stream)] = read(audio_path)[1]
+                with open(audio_path, "rb") as file:
+                    samples[(clip.src, clip.stream)] = read(file)[1]
 
             if arr is None:
                 leng = max(round((layer[-1].start + layer[-1].dur) * sr / tb), sr // tb)

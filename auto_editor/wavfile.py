@@ -199,12 +199,7 @@ def _handle_pad_byte(fid: Reader, size: int) -> None:
         fid.seek(1, 1)
 
 
-def read(filename: str) -> tuple[int, AudioData]:
-    fid = open(filename, "rb")
-    return read_fid(fid)
-
-
-def read_fid(fid: Reader) -> tuple[int, AudioData]:
+def read(fid: Reader) -> tuple[int, AudioData]:
     file_sig = fid.read(4)
     if file_sig in (b"RIFF", b"RIFX"):
         data_size, file_size, en = _read_riff_chunk(file_sig, fid)
@@ -303,7 +298,8 @@ def main() -> None:
     with open("test.wav", "wb") as file:
         write(file, 48_000, data)
 
-    read_sr, read_data = read("test.wav")
+    with open("test.wav", "rb") as file:
+        read_sr, read_data = read(file)
 
     assert read_sr == 48_000
     assert np.array_equal(data, read_data)
