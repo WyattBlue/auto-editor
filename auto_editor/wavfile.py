@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import struct
 import sys
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -15,13 +15,17 @@ AudioData = np.memmap | np.ndarray
 Endian = Literal[">", "<"]  # Big Endian, Little Endian
 ByteOrd = Literal["big", "little"]
 
+if TYPE_CHECKING:
+    Reader = io.BufferedReader | io.BytesIO
+    Writer = io.BufferedWriter | io.BytesIO
+
 
 class WavError(Exception):
     pass
 
 
 def _read_fmt_chunk(
-    fid: io.BufferedReader, bytes_order: ByteOrd
+    fid: Reader, bytes_order: ByteOrd
 ) -> tuple[int, int, int, int, int]:
     size = int.from_bytes(fid.read(4), bytes_order)
 
@@ -69,7 +73,7 @@ def _read_fmt_chunk(
 
 
 def _read_data_chunk(
-    fid: io.BufferedReader,
+    fid: Reader,
     format_tag: int,
     channels: int,
     bit_depth: int,
@@ -114,16 +118,22 @@ def _read_data_chunk(
     else:
         n_samples = (size - 1) // block_align
 
-    data = np.memmap(
-        fid, dtype=dtype, mode="c", offset=fid.tell(), shape=(n_samples, channels)
-    )
-    fid.seek(size, 1)
+    if isinstance(fid, io.BufferedReader):
+        data: AudioData = np.memmap(
+            fid, dtype=dtype, mode="c", offset=fid.tell(), shape=(n_samples, channels)
+        )
+        fid.seek(size, 1)
+    else:
+        bytes_per_sample = np.dtype(dtype).itemsize
+        buffer = fid.read(n_samples * channels * bytes_per_sample)
+        data = np.frombuffer(buffer, dtype=dtype).reshape((n_samples, channels))
+
     _handle_pad_byte(fid, size)
 
     return data
 
 
-def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
+def _skip_unknown_chunk(fid: Reader, en: Endian) -> None:
     data = fid.read(4)
 
     if len(data) == 4:
@@ -140,7 +150,7 @@ def _skip_unknown_chunk(fid: io.BufferedReader, en: Endian) -> None:
         )
 
 
-def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
+def _read_rf64_chunk(fid: Reader) -> tuple[int, int, Endian]:
     # https://tech.ebu.ch/docs/tech/tech3306v1_0.pdf
     # https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.2088-1-201910-I!!PDF-E.pdf
 
@@ -171,7 +181,7 @@ def _read_rf64_chunk(fid: io.BufferedReader) -> tuple[int, int, Endian]:
     return data_size, file_size, en
 
 
-def _read_riff_chunk(sig: bytes, fid: io.BufferedReader) -> tuple[None, int, Endian]:
+def _read_riff_chunk(sig: bytes, fid: Reader) -> tuple[None, int, Endian]:
     en: Endian = "<" if sig == b"RIFF" else ">"
     bytes_order: ByteOrd = "big" if en == ">" else "little"
 
@@ -184,14 +194,17 @@ def _read_riff_chunk(sig: bytes, fid: io.BufferedReader) -> tuple[None, int, End
     return None, file_size, en
 
 
-def _handle_pad_byte(fid: io.BufferedReader, size: int) -> None:
+def _handle_pad_byte(fid: Reader, size: int) -> None:
     if size % 2 == 1:
         fid.seek(1, 1)
 
 
 def read(filename: str) -> tuple[int, AudioData]:
     fid = open(filename, "rb")
+    return read_fid(fid)
 
+
+def read_fid(fid: Reader) -> tuple[int, AudioData]:
     file_sig = fid.read(4)
     if file_sig in (b"RIFF", b"RIFX"):
         data_size, file_size, en = _read_riff_chunk(file_sig, fid)
@@ -241,7 +254,7 @@ def read(filename: str) -> tuple[int, AudioData]:
     raise WavError("Found no data")
 
 
-def write(fid: io.BufferedWriter, sr: int, arr: np.ndarray) -> None:
+def write(fid: Writer, sr: int, arr: np.ndarray) -> None:
     channels = 1 if arr.ndim == 1 else arr.shape[1]
     bit_depth = arr.dtype.itemsize * 8
     block_align = channels * (bit_depth // 8)

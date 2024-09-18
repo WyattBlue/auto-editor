@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from platform import system
 from subprocess import PIPE
 
+import av
 import numpy as np
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo
@@ -12,12 +14,12 @@ from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import andc, between_c, is_int_or_float
 from auto_editor.lib.err import MyError
 from auto_editor.output import Ensure
-from auto_editor.timeline import v3
+from auto_editor.timeline import TlAudio, v3
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
-from auto_editor.wavfile import AudioData, read, write
+from auto_editor.wavfile import AudioData, read, read_fid, write
 
 norm_types = {
     "ebu": pAttrs(
@@ -165,6 +167,68 @@ def apply_audio_normalization(
     ffmpeg.run(["-i", f"{pre_master}"] + cmd + [f"{path}"])
 
 
+def process_audio_clip(
+    clip: TlAudio, samp_list: AudioData, samp_start: int, samp_end: int, sr: int
+) -> AudioData:
+    input_buffer = io.BytesIO()
+    write(input_buffer, sr, samp_list[samp_start:samp_end])
+    input_buffer.seek(0)
+
+    input_file = av.open(input_buffer, "r")
+    input_stream = input_file.streams.audio[0]
+
+    output_bytes = io.BytesIO()
+    output_file = av.open(output_bytes, mode="w", format="wav")
+    output_stream = output_file.add_stream("pcm_s16le", rate=sr)
+    assert isinstance(output_stream, av.audio.AudioStream)
+
+    graph = av.filter.Graph()
+    args = [graph.add_abuffer(template=input_stream)]
+
+    if clip.speed != 1:
+        if clip.speed > 10_000:
+            for _ in range(3):
+                args.append(graph.add("atempo", f"{clip.speed ** (1/3)}"))
+        elif clip.speed > 100:
+            for _ in range(2):
+                args.append(graph.add("atempo", f"{clip.speed ** 0.5}"))
+        elif clip.speed >= 0.5:
+            args.append(graph.add("atempo", f"{clip.speed}"))
+        else:
+            start = 0.5
+            while start * 0.5 > clip.speed:
+                start *= 0.5
+                args.append(graph.add("atempo", "0.5"))
+            args.append(graph.add("atempo", f"{clip.speed / start}"))
+
+    if clip.volume != 1:
+        args.append(graph.add("volume", f"{clip.volume}"))
+
+    args.append(graph.add("abuffersink"))
+    graph.link_nodes(*args).configure()
+
+    for frame in input_file.decode(input_stream):
+        graph.push(frame)
+        while True:
+            try:
+                aframe = graph.pull()
+                assert isinstance(aframe, av.audio.AudioFrame)
+                for packet in output_stream.encode(aframe):
+                    output_file.mux(packet)
+            except (av.BlockingIOError, av.EOFError):
+                break
+
+    # Flush the stream
+    for packet in output_stream.encode(None):
+        output_file.mux(packet)
+
+    input_file.close()
+    output_file.close()
+
+    output_bytes.seek(0)
+    return read_fid(output_bytes)[1]
+
+
 def make_new_audio(
     tl: v3, ensure: Ensure, args: Args, ffmpeg: FFmpeg, bar: Bar, log: Log
 ) -> list[str]:
@@ -175,7 +239,6 @@ def make_new_audio(
 
     norm = parse_norm(args.audio_normalize, log)
 
-    af_tick = 0
     temp = log.temp
 
     if not tl.a or not tl.a[0]:
@@ -214,42 +277,10 @@ def make_new_audio(
             if samp_end > len(samp_list):
                 samp_end = len(samp_list)
 
-            filters: list[str] = []
-
-            if clip.speed != 1:
-                if clip.speed > 10_000:
-                    filters.extend([f"atempo={clip.speed}^.33333"] * 3)
-                elif clip.speed > 100:
-                    filters.extend(
-                        [f"atempo=sqrt({clip.speed})", f"atempo=sqrt({clip.speed})"]
-                    )
-                elif clip.speed >= 0.5:
-                    filters.append(f"atempo={clip.speed}")
-                else:
-                    start = 0.5
-                    while start * 0.5 > clip.speed:
-                        start *= 0.5
-                        filters.append("atempo=0.5")
-                    filters.append(f"atempo={clip.speed / start}")
-
-            if clip.volume != 1:
-                filters.append(f"volume={clip.volume}")
-
-            if not filters:
-                clip_arr = samp_list[samp_start:samp_end]
+            if clip.speed != 1 or clip.volume != 1:
+                clip_arr = process_audio_clip(clip, samp_list, samp_start, samp_end, sr)
             else:
-                af = Path(temp, f"af{af_tick}.wav")
-                af_out = Path(temp, f"af{af_tick}_out.wav")
-
-                # Windows can't replace a file that's already in use, so we have to
-                # cycle through file names.
-                af_tick = (af_tick + 1) % 3
-
-                with open(af, "wb") as fid:
-                    write(fid, sr, samp_list[samp_start:samp_end])
-
-                ffmpeg.run(["-i", f"{af}", "-af", ",".join(filters), f"{af_out}"])
-                clip_arr = read(f"{af_out}")[1]
+                clip_arr = samp_list[samp_start:samp_end]
 
             # Mix numpy arrays
             start = clip.start * sr // tb
