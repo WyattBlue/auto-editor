@@ -294,7 +294,7 @@ def initFileInfo(path: str, log: Log) -> FileInfo:
 
     desc = cont.metadata.get("description", None)
     bitrate = 0 if cont.bit_rate is None else cont.bit_rate
-    dur = 0 if cont.duration is None else cont.duration / 1_000_000
+    dur = 0 if cont.duration is None else cont.duration / av.time_base
 
     cont.close()
 

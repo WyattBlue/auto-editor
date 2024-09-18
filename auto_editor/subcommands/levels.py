@@ -11,7 +11,7 @@ from auto_editor.analyze import LevelError, Levels, iter_audio, iter_motion
 from auto_editor.ffwrapper import initFileInfo
 from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import is_bool, is_nat, is_nat1, is_str, is_void, orc
-from auto_editor.utils.bar import Bar
+from auto_editor.utils.bar import initBar
 from auto_editor.utils.cmdkw import (
     ParserError,
     Required,
@@ -83,7 +83,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     parser = levels_options(ArgumentParser("levels"))
     args = parser.parse_args(LevelArgs, sys_args)
 
-    bar = Bar("none")
+    bar = initBar("none")
     log = Log(quiet=True)
 
     sources = [initFileInfo(path, log) for path in args.input]
