@@ -405,7 +405,8 @@ def main(sys_args: list[str] | None = None):
             test_file = f"resources/{test_name}"
             results.add(run.main([test_file], []))
             run.main([test_file], ["--edit", "none"])
-            results.add(run.main([test_file], ["-exf"]))
+            results.add(run.main([test_file], ["--export", "final-cut-pro:version=10"]))
+            results.add(run.main([test_file], ["--export", "final-cut-pro:version=11"]))
             results.add(run.main([test_file], ["-exs"]))
             results.add(run.main([test_file], ["--export_as_clip_sequence"]))
             run.main([test_file], ["--stats"])

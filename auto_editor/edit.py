@@ -125,7 +125,9 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
         "default": pAttrs("default"),
         "premiere": pAttrs("premiere", name_attr),
         "resolve-fcp7": pAttrs("resolve-fcp7", name_attr),
-        "final-cut-pro": pAttrs("final-cut-pro", name_attr),
+        "final-cut-pro": pAttrs(
+            "final-cut-pro", name_attr, pAttr("version", 11, is_int)
+        ),
         "resolve": pAttrs("resolve", name_attr),
         "shotcut": pAttrs("shotcut"),
         "json": pAttrs("json", pAttr("api", 3, is_int)),
@@ -232,17 +234,19 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
         fcp7_write_xml(export_ops["name"], output, is_resolve, tl, log)
         return
 
-    if export in ("final-cut-pro", "resolve"):
+    if export == "final-cut-pro":
         from auto_editor.formats.fcp11 import fcp11_write_xml
 
-        is_resolve = export.startswith("resolve")
+        ver = export_ops["version"]
+        fcp11_write_xml(export_ops["name"], ver, output, False, tl, log)
+        return
 
-        if is_resolve:
-            from auto_editor.timeline import set_stream_to_0
+    if export == "resolve":
+        from auto_editor.formats.fcp11 import fcp11_write_xml
+        from auto_editor.timeline import set_stream_to_0
 
-            set_stream_to_0(tl, log)
-
-        fcp11_write_xml(export_ops["name"], output, is_resolve, tl, log)
+        set_stream_to_0(tl, log)
+        fcp11_write_xml(export_ops["name"], 10, output, True, tl, log)
         return
 
     if export == "shotcut":
