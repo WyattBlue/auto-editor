@@ -52,7 +52,7 @@ def make_name(src: FileInfo, tb: Fraction) -> str:
 
 
 def fcp11_write_xml(
-    group_name: str, output: str, resolve: bool, tl: v3, log: Log
+    group_name: str, version: int, output: str, resolve: bool, tl: v3, log: Log
 ) -> None:
     def fraction(val: int) -> str:
         if val == 0:
@@ -66,7 +66,14 @@ def fcp11_write_xml(
     src_dur = int(src.duration * tl.tb)
     tl_dur = src_dur if resolve else tl.out_len()
 
-    fcpxml = Element("fcpxml", version="1.10" if resolve else "1.11")
+    if version == 11:
+        ver_str = "1.11"
+    elif version == 10:
+        ver_str = "1.10"
+    else:
+        log.error(f"Unknown final cut pro version: {version}")
+
+    fcpxml = Element("fcpxml", version=ver_str)
     resources = SubElement(fcpxml, "resources")
 
     for i, one_src in enumerate(tl.unique_sources()):
