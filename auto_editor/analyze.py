@@ -19,6 +19,7 @@ from auto_editor.utils.subtitle_tools import convert_ass_to_text
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from fractions import Fraction
+    from pathlib import Path
     from typing import Any
 
     from numpy.typing import NDArray
@@ -68,15 +69,6 @@ def mut_remove_large(
             if j - start_p > lim:
                 arr[start_p:j] = with_
             active = False
-
-
-def obj_tag(tag: str, tb: Fraction, obj: dict[str, Any]) -> str:
-    key = f"{tag}:{tb}:"
-    for k, v in obj.items():
-        key += f"{k}={v},"
-
-    key = key[:-1]  # remove unnecessary char
-    return key
 
 
 def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[np.float32]:
@@ -161,6 +153,12 @@ def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[np.floa
     container.close()
 
 
+def obj_tag(path: Path, kind: str, tb: Fraction, obj: dict[str, Any]) -> str:
+    mod_time = int(path.stat().st_mtime)
+    key = f"{path.name}:{mod_time:x}:{kind}:{tb}:"
+    return key + ",".join(f"{v}" for v in obj.values())
+
+
 @dataclass(slots=True)
 class Levels:
     src: FileInfo
@@ -201,7 +199,7 @@ class Levels:
     def all(self) -> NDArray[np.bool_]:
         return np.zeros(self.media_length, dtype=np.bool_)
 
-    def read_cache(self, tag: str, obj: dict[str, Any]) -> None | np.ndarray:
+    def read_cache(self, kind: str, obj: dict[str, Any]) -> None | np.ndarray:
         if self.no_cache:
             return None
 
@@ -213,14 +211,14 @@ class Levels:
             self.log.debug(e)
             return None
 
-        key = f"{self.src.path}:{obj_tag(tag, self.tb, obj)}"
+        key = obj_tag(self.src.path, kind, self.tb, obj)
         if key not in npzfile.files:
             return None
 
         self.log.debug("Using cache")
         return npzfile[key]
 
-    def cache(self, arr: np.ndarray, tag: str, obj: dict[str, Any]) -> np.ndarray:
+    def cache(self, arr: np.ndarray, kind: str, obj: dict[str, Any]) -> np.ndarray:
         if self.no_cache:
             return arr
 
@@ -228,8 +226,8 @@ class Levels:
         if not os.path.exists(workdur):
             os.mkdir(workdur)
 
-        tag = obj_tag(tag, self.tb, obj)
-        np.savez(os.path.join(workdur, "cache.npz"), **{f"{self.src.path}:{tag}": arr})
+        key = obj_tag(self.src.path, kind, self.tb, obj)
+        np.savez(os.path.join(workdur, "cache.npz"), **{key: arr})
 
         return arr
 
