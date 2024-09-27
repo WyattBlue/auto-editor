@@ -328,7 +328,7 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
         total_frames = tl.v1.chunks[-1][1] - 1
         clip_num = 0
         for chunk in tl.v1.chunks:
-            if chunk[2] == 99999:
+            if chunk[2] == 0 or chunk[2] >= 99999:
                 continue
 
             padded_chunks = pad_chunk(chunk, total_frames)
