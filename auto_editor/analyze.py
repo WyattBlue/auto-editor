@@ -114,7 +114,7 @@ def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[np.floa
 
     prev_frame = None
     current_frame = None
-    total_pixels = src.videos[0].width * src.videos[0].height
+    total_pixels = None
     index = 0
     prev_index = -1
 
@@ -132,9 +132,12 @@ def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[np.floa
             continue
 
         graph.push(unframe)
-        frame = graph.pull()
+        frame = graph.vpull()
         assert frame.time is not None
         index = round(frame.time * tb)
+
+        if total_pixels is None:
+            total_pixels = frame.width * frame.height
 
         current_frame = frame.to_ndarray()
         if prev_frame is None:
