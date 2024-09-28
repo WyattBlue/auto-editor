@@ -17,10 +17,9 @@ from auto_editor import __version__
 from auto_editor.utils.subtitle_tools import convert_ass_to_text
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Sequence
     from fractions import Fraction
     from pathlib import Path
-    from typing import Any
 
     from numpy.typing import NDArray
 
@@ -156,10 +155,10 @@ def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[np.floa
     container.close()
 
 
-def obj_tag(path: Path, kind: str, tb: Fraction, obj: dict[str, Any]) -> str:
+def obj_tag(path: Path, kind: str, tb: Fraction, obj: Sequence[object]) -> str:
     mod_time = int(path.stat().st_mtime)
     key = f"{path.name}:{mod_time:x}:{kind}:{tb}:"
-    return key + ",".join(f"{v}" for v in obj.values())
+    return key + ",".join(f"{v}" for v in obj)
 
 
 @dataclass(slots=True)
@@ -174,7 +173,7 @@ class Levels:
     @property
     def media_length(self) -> int:
         if self.src.audios:
-            if (arr := self.read_cache("audio", {"stream": 0})) is not None:
+            if (arr := self.read_cache("audio", (0,))) is not None:
                 return len(arr)
 
             result = sum(1 for _ in iter_audio(self.src, self.tb, 0))
@@ -202,7 +201,7 @@ class Levels:
     def all(self) -> NDArray[np.bool_]:
         return np.zeros(self.media_length, dtype=np.bool_)
 
-    def read_cache(self, kind: str, obj: dict[str, Any]) -> None | np.ndarray:
+    def read_cache(self, kind: str, obj: Sequence[object]) -> None | np.ndarray:
         if self.no_cache:
             return None
 
@@ -221,7 +220,7 @@ class Levels:
         self.log.debug("Using cache")
         return npzfile[key]
 
-    def cache(self, arr: np.ndarray, kind: str, obj: dict[str, Any]) -> np.ndarray:
+    def cache(self, arr: np.ndarray, kind: str, obj: Sequence[object]) -> np.ndarray:
         if self.no_cache:
             return arr
 
@@ -238,7 +237,7 @@ class Levels:
         if stream >= len(self.src.audios):
             raise LevelError(f"audio: audio stream '{stream}' does not exist.")
 
-        if (arr := self.read_cache("audio", {"stream": stream})) is not None:
+        if (arr := self.read_cache("audio", (stream,))) is not None:
             return arr
 
         with av.open(self.src.path, "r") as container:
@@ -265,13 +264,13 @@ class Levels:
             index += 1
 
         bar.end()
-        return self.cache(result[:index], "audio", {"stream": stream})
+        return self.cache(result[:index], "audio", (stream,))
 
     def motion(self, stream: int, blur: int, width: int) -> NDArray[np.float32]:
         if stream >= len(self.src.videos):
             raise LevelError(f"motion: video stream '{stream}' does not exist.")
 
-        mobj = {"stream": stream, "width": width, "blur": blur}
+        mobj = (stream, width, blur)
         if (arr := self.read_cache("motion", mobj)) is not None:
             return arr
 
