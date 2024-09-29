@@ -10,8 +10,6 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from auto_editor.utils.log import Log
-
     BoolList = NDArray[np.bool_]
     BoolOperand = Callable[[BoolList, BoolList], BoolList]
 
@@ -135,7 +133,7 @@ def human_readable_time(time_in_secs: float) -> str:
     return f"{time_in_secs} {units}"
 
 
-def open_with_system_default(path: str, log: Log) -> None:
+def open_with_system_default(path: str) -> str | None:
     import sys
     from subprocess import run
 
@@ -145,7 +143,7 @@ def open_with_system_default(path: str, log: Log) -> None:
         try:
             startfile(path)
         except OSError:
-            log.warning("Could not find application to open file.")
+            return f"Could not find application to open file: {path}"
     else:
         try:  # MacOS case
             run(["open", path])
@@ -156,7 +154,8 @@ def open_with_system_default(path: str, log: Log) -> None:
                 try:  # Linux case
                     run(["xdg-open", path])
                 except Exception:
-                    log.warning("Could not open output file.")
+                    return f"Could not open output file: {path}"
+    return None
 
 
 def append_filename(path: str, val: str) -> str:

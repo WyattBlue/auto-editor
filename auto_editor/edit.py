@@ -354,9 +354,10 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
 
     log.stop_timer()
 
-    if not args.no_open and export in ("default", "audio", "clip-sequence"):
+    if not args.no_open and export in ("default", "audio"):
         if args.player is None:
-            open_with_system_default(output, log)
+            if (ret := open_with_system_default(output)) is not None:
+                log.warning(ret)
         else:
             import subprocess
             from shlex import split
