@@ -8,7 +8,7 @@ from subprocess import run
 
 import auto_editor
 from auto_editor.edit import edit_media
-from auto_editor.ffwrapper import FFmpeg
+from auto_editor.ffwrapper import FFmpeg, initFFmpeg
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -373,7 +373,8 @@ def main() -> None:
     is_machine = args.progress == "machine"
     log = Log(args.debug, args.quiet, args.temp_dir, is_machine, no_color)
 
-    ffmpeg = FFmpeg(
+    ffmpeg = initFFmpeg(
+        log,
         args.ffmpeg_location,
         args.my_ffmpeg,
         args.show_ffmpeg_commands,

@@ -241,4 +241,4 @@ def mux_quality_media(
         cmd.extend(["-map", "0:d?"])
 
     cmd.append(output_path)
-    ffmpeg.run_check_errors(cmd, log, path=output_path)
+    ffmpeg.run_check_errors(cmd, path=output_path)
