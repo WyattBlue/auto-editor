@@ -339,7 +339,7 @@ def render_av(
         process2.wait()
     except (OSError, BrokenPipeError):
         bar.end()
-        ffmpeg.run_check_errors(cmd, log, True)
+        ffmpeg.run_check_errors(cmd, True)
         log.error("FFmpeg Error!")
 
     log.debug(f"Total frames saved seeking: {frames_saved}")
