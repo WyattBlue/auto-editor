@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 
+import re
 import sys
 from os import environ
+from os.path import exists, isdir, isfile, lexists, splitext
+from subprocess import run
 
 import auto_editor
 from auto_editor.edit import edit_media
 from auto_editor.ffwrapper import FFmpeg
+from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     Args,
@@ -20,7 +24,6 @@ from auto_editor.utils.types import (
     speed_range,
     time_range,
 )
-from auto_editor.validate_input import valid_input
 from auto_editor.vanparse import ArgumentParser
 
 
@@ -274,6 +277,50 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
+def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
+    log.conwrite("Downloading video...")
+
+    def get_domain(url: str) -> str:
+        t = __import__("urllib").parse.urlparse(url).netloc
+        return ".".join(t.split(".")[-2:])
+
+    download_format = args.download_format
+    if download_format is None and get_domain(my_input) == "youtube.com":
+        download_format = "bestvideo[ext=mp4]+bestaudio[ext=m4a]"
+
+    if args.output_format is None:
+        output_format = re.sub(r"\W+", "-", splitext(my_input)[0]) + ".%(ext)s"
+    else:
+        output_format = args.output_format
+
+    yt_dlp_path = args.yt_dlp_location
+
+    cmd = ["--ffmpeg-location", ffmpeg.path]
+
+    if download_format is not None:
+        cmd.extend(["-f", download_format])
+
+    cmd.extend(["-o", output_format, my_input])
+
+    if args.yt_dlp_extras is not None:
+        cmd.extend(args.yt_dlp_extras.split(" "))
+
+    try:
+        location = get_stdout(
+            [yt_dlp_path, "--get-filename", "--no-warnings"] + cmd
+        ).strip()
+    except FileNotFoundError:
+        log.error("Program `yt-dlp` must be installed and on PATH.")
+
+    if not isfile(location):
+        run([yt_dlp_path] + cmd)
+
+    if not isfile(location):
+        log.error(f"Download file wasn't created: {location}")
+
+    return location
+
+
 def main() -> None:
     subcommands = ("test", "info", "levels", "subdump", "desc", "repl", "palet")
 
@@ -284,8 +331,7 @@ def main() -> None:
         obj.main(sys.argv[2:])
         return
 
-    ff_color = "AV_LOG_FORCE_NOCOLOR"
-    no_color = bool(environ.get("NO_COLOR")) or bool(environ.get(ff_color))
+    no_color = bool(environ.get("NO_COLOR") or environ.get("AV_LOG_FORCE_NOCOLOR"))
     log = Log(no_color=no_color)
 
     args = main_options(ArgumentParser("Auto-Editor")).parse_args(
@@ -333,7 +379,21 @@ def main() -> None:
         args.show_ffmpeg_commands,
         args.show_ffmpeg_output,
     )
-    paths = valid_input(args.input, ffmpeg, args, log)
+    paths = []
+    for my_input in args.input:
+        if my_input.startswith("http://") or my_input.startswith("https://"):
+            paths.append(download_video(my_input, args, ffmpeg, log))
+        else:
+            if not splitext(my_input)[1]:
+                if isdir(my_input):
+                    log.error("Input must be a file or a URL, not a directory.")
+                if exists(my_input):
+                    log.error(f"Input file must have an extension: {my_input}")
+                if lexists(my_input):
+                    log.error(f"Input file is a broken symbolic link: {my_input}")
+                if my_input.startswith("-"):
+                    log.error(f"Option/Input file doesn't exist: {my_input}")
+            paths.append(my_input)
 
     try:
         edit_media(paths, ffmpeg, args, log)
