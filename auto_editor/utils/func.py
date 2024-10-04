@@ -133,31 +133,6 @@ def human_readable_time(time_in_secs: float) -> str:
     return f"{time_in_secs} {units}"
 
 
-def open_with_system_default(path: str) -> str | None:
-    import sys
-    from subprocess import run
-
-    if sys.platform == "win32":
-        from os import startfile
-
-        try:
-            startfile(path)
-        except OSError:
-            return f"Could not find application to open file: {path}"
-    else:
-        try:  # MacOS case
-            run(["open", path])
-        except Exception:
-            try:  # WSL2 case
-                run(["cmd.exe", "/C", "start", path])
-            except Exception:
-                try:  # Linux case
-                    run(["xdg-open", path])
-                except Exception:
-                    return f"Could not open output file: {path}"
-    return None
-
-
 def append_filename(path: str, val: str) -> str:
     from os.path import splitext
 
