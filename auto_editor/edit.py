@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import sys
+from subprocess import run
 from typing import Any
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
@@ -15,7 +17,6 @@ from auto_editor.utils.bar import initBar
 from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.container import Container, container_constructor
-from auto_editor.utils.func import open_with_system_default
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 
@@ -356,10 +357,21 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
 
     if not args.no_open and export in ("default", "audio"):
         if args.player is None:
-            if (ret := open_with_system_default(output)) is not None:
-                log.warning(ret)
+            if sys.platform == "win32":
+                try:
+                    os.startfile(output)
+                except OSError:
+                    log.warning(f"Could not find application to open file: {output}")
+            else:
+                try:  # MacOS case
+                    run(["open", output])
+                except Exception:
+                    try:  # WSL2 case
+                        run(["cmd.exe", "/C", "start", output])
+                    except Exception:
+                        try:  # Linux case
+                            run(["xdg-open", output])
+                        except Exception:
+                            log.warning(f"Could not open output file: {output}")
         else:
-            import subprocess
-            from shlex import split
-
-            subprocess.run(split(args.player) + [output])
+            run(__import__("shlex").split(args.player) + [output])
