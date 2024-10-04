@@ -14,7 +14,6 @@ from av.audio.fifo import AudioFifo
 from av.subtitles.subtitle import AssSubtitle
 
 from auto_editor import __version__
-from auto_editor.utils.subtitle_tools import convert_ass_to_text
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -359,11 +358,10 @@ class Levels:
                 san_end = round((start + dur) * self.tb)
 
                 for sub in subset:
-                    if isinstance(sub, AssSubtitle):
-                        line = convert_ass_to_text(sub.ass.decode(errors="ignore"))
-                    else:
+                    if not isinstance(sub, AssSubtitle):
                         continue
 
+                    line = sub.dialogue.decode(errors="ignore")
                     if line and re.search(re_pattern, line):
                         result[san_start:san_end] = 1
                         count += 1
