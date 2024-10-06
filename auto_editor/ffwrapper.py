@@ -95,17 +95,12 @@ class FFmpeg:
         return Popen([self.path] + cmd, stdin=stdin, stdout=stdout, stderr=stderr)
 
 
-def mux(input: Path, output: Path, stream: int, codec: str | None = None) -> None:
+def mux(input: Path, output: Path, stream: int) -> None:
     input_container = av.open(input, "r")
     output_container = av.open(output, "w")
 
     input_audio_stream = input_container.streams.audio[stream]
-
-    if codec is None:
-        codec = "pcm_s16le"
-
-    output_audio_stream = output_container.add_stream(codec)
-    assert isinstance(output_audio_stream, av.audio.AudioStream)
+    output_audio_stream = output_container.add_stream("pcm_s16le")
 
     for frame in input_container.decode(input_audio_stream):
         packet = output_audio_stream.encode(frame)
