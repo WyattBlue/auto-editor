@@ -180,7 +180,6 @@ def process_audio_clip(
     output_bytes = io.BytesIO()
     output_file = av.open(output_bytes, mode="w", format="wav")
     output_stream = output_file.add_stream("pcm_s16le", rate=sr)
-    assert isinstance(output_stream, av.audio.AudioStream)
 
     graph = av.filter.Graph()
     args = [graph.add_abuffer(template=input_stream)]
@@ -212,7 +211,7 @@ def process_audio_clip(
         while True:
             try:
                 aframe = graph.pull()
-                assert isinstance(aframe, av.audio.AudioFrame)
+                assert isinstance(aframe, av.AudioFrame)
                 for packet in output_stream.encode(aframe):
                     output_file.mux(packet)
             except (av.BlockingIOError, av.EOFError):
