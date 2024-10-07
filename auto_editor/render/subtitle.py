@@ -112,13 +112,15 @@ class SubtitleParser:
         self.contents = new_content
 
     def write(self, file_path: str) -> None:
+        codec = self.codec
         with open(file_path, "w", encoding="utf-8") as file:
             file.write(self.header)
             for c in self.contents:
                 file.write(
-                    f"{c.before}{to_timecode(c.start / self.tb, self.codec)}"
-                    f"{c.middle}{to_timecode(c.end / self.tb, self.codec)}"
-                    f"{c.after}"
+                    f"{c.before}{to_timecode(c.start / self.tb, codec)}"
+                    + f"{c.middle}{to_timecode(c.end / self.tb, codec)}"
+                    + c.after
+                    + ("\n" if codec == "webvtt" else "")
                 )
             file.write(self.footer)
 
