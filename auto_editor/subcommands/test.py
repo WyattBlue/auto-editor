@@ -186,7 +186,7 @@ def main(sys_args: list[str] | None = None):
         "wav/pcm-f32le.wav",
         "wav/pcm-s32le.wav",
         "multi-track.mov",
-        "subtitle.mp4",
+        "mov_text.mp4",
         "testsrc.mkv",
     )
 
@@ -222,7 +222,8 @@ def main(sys_args: list[str] | None = None):
         run.raw(["levels", "resources/new-commentary.mp3"])
 
     def subdump():
-        run.raw(["subdump", "resources/subtitle.mp4"])
+        run.raw(["subdump", "resources/mov_text.mp4"])
+        run.raw(["subdump", "resources/webvtt.mkv"])
 
     def desc():
         run.raw(["desc", "example.mp4"])
@@ -357,7 +358,13 @@ def main(sys_args: list[str] | None = None):
         run.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
 
     def export_subtitles():
-        cn = fileinfo(run.main(["resources/subtitle.mp4"], []))
+        cn = fileinfo(run.main(["resources/mov_text.mp4"], []))
+
+        assert len(cn.videos) == 1
+        assert len(cn.audios) == 1
+        assert len(cn.subtitles) == 1
+
+        cn = fileinfo(run.main(["resources/webvtt.mkv"], []))
 
         assert len(cn.videos) == 1
         assert len(cn.audios) == 1
