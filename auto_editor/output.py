@@ -16,12 +16,10 @@ from auto_editor.utils.types import Args
 
 @dataclass(slots=True)
 class Ensure:
-    _ffmpeg: FFmpeg
     _bar: Bar
     _sr: int
     log: Log
     _audios: list[tuple[FileInfo, int]] = field(default_factory=list)
-    _subtitles: list[tuple[FileInfo, int, str]] = field(default_factory=list)
 
     def audio(self, src: FileInfo, stream: int) -> str:
         try:
@@ -71,23 +69,6 @@ class Ensure:
             out_container.close()
             in_container.close()
             bar.end()
-
-        return out_path
-
-    def subtitle(self, src: FileInfo, stream: int, ext: str) -> str:
-        try:
-            self._subtitles.index((src, stream, ext))
-            first_time = False
-        except ValueError:
-            self._subtitles.append((src, stream, ext))
-            first_time = True
-
-        out_path = os.path.join(self.log.temp, f"{stream}s.{ext}")
-
-        if first_time:
-            self.log.debug(f"Making external subtitle: {out_path}")
-            self.log.conwrite("Extracting subtitle")
-            self._ffmpeg.run(["-i", f"{src.path}", "-map", f"0:s:{stream}", out_path])
 
         return out_path
 

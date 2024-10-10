@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+import io
 import os
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+import av
 
 from auto_editor.utils.func import to_timecode
 
 if TYPE_CHECKING:
     from fractions import Fraction
 
-    from auto_editor.output import Ensure
     from auto_editor.timeline import v3
     from auto_editor.utils.chunks import Chunks
+    from auto_editor.utils.log import Log
+
+    Input = av.container.InputContainer
 
 
 @dataclass(slots=True)
@@ -26,7 +31,6 @@ class SerialSub:
 
 class SubtitleParser:
     def __init__(self, tb: Fraction) -> None:
-        self.supported_codecs = ("ass", "webvtt", "mov_text")
         self.tb = tb
         self.contents: list[SerialSub] = []
         self.header = ""
@@ -125,24 +129,77 @@ class SubtitleParser:
             file.write(self.footer)
 
 
-def make_new_subtitles(tl: v3, ensure: Ensure, temp: str) -> list[str]:
+def make_srt(input_: Input, stream: int) -> str:
+    output_bytes = io.StringIO()
+    input_stream = input_.streams.subtitles[stream]
+    assert input_stream.time_base is not None
+    s = 1
+    for packet in input_.demux(input_stream):
+        if packet.dts is None or packet.pts is None or packet.duration is None:
+            continue
+
+        start = packet.pts * input_stream.time_base
+        end = start + packet.duration * input_stream.time_base
+
+        for subset in packet.decode():
+            start_time = to_timecode(start, "srt")
+            end_time = to_timecode(end, "srt")
+
+            sub = subset[0]
+            assert len(subset) == 1
+            assert isinstance(sub, av.subtitles.subtitle.AssSubtitle)
+
+            output_bytes.write(f"{s}\n{start_time} --> {end_time}\n")
+            output_bytes.write(sub.dialogue.decode("utf-8", errors="ignore") + "\n\n")
+            s += 1
+
+    output_bytes.seek(0)
+    return output_bytes.getvalue()
+
+
+def _ensure(input_: Input, format: str, stream: int, log: Log) -> str:
+    output_bytes = io.BytesIO()
+    output = av.open(output_bytes, "w", format=format)
+
+    in_stream = input_.streams.subtitles[stream]
+    out_stream = output.add_stream(template=in_stream)
+
+    for packet in input_.demux(in_stream):
+        if packet.dts is None:
+            continue
+        packet.stream = out_stream
+        output.mux(packet)
+
+    output.close()
+    output_bytes.seek(0)
+    return output_bytes.getvalue().decode("utf-8", errors="ignore")
+
+
+def make_new_subtitles(tl: v3, log: Log) -> list[str]:
     if tl.v1 is None:
         return []
 
+    input_ = av.open(tl.v1.source.path)
     new_paths = []
 
     for s, sub in enumerate(tl.v1.source.subtitles):
-        new_path = os.path.join(temp, f"new{s}s.{sub.ext}")
         parser = SubtitleParser(tl.tb)
 
-        ext = sub.ext if sub.codec in parser.supported_codecs else "vtt"
-        file_path = ensure.subtitle(tl.v1.source, s, ext)
+        if sub.codec in ("webvtt", "ass", "ssa", "mov_text"):
+            format = sub.codec
+        else:
+            log.error(f"Unknown subtitle codec: {sub.codec}")
 
-        with open(file_path, encoding="utf-8") as file:
-            parser.parse(file.read(), sub.codec)
-
+        if sub.codec == "mov_text":
+            ret = make_srt(input_, s)
+        else:
+            ret = _ensure(input_, format, s, log)
+        parser.parse(ret, sub.codec)
         parser.edit(tl.v1.chunks)
+
+        new_path = os.path.join(log.temp, f"new{s}s.{sub.ext}")
         parser.write(new_path)
         new_paths.append(new_path)
 
+    input_.close()
     return new_paths
