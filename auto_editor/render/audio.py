@@ -225,6 +225,11 @@ def process_audio_clip(
     output_file.close()
 
     output_bytes.seek(0)
+    has_filesig = output_bytes.read(4)
+    output_bytes.seek(0)
+    if not has_filesig:  # Can rarely happen when clip is extremely small
+        return np.empty((0, 2), dtype=np.int16)
+
     return read(output_bytes)[1]
 
 
