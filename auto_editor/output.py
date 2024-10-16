@@ -3,6 +3,8 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass, field
 from fractions import Fraction
+from re import search
+from subprocess import PIPE
 
 import av
 from av.audio.resampler import AudioResampler
@@ -222,4 +224,23 @@ def mux_quality_media(
         cmd.extend(["-map", "0:d?"])
 
     cmd.append(output_path)
-    ffmpeg.run_check_errors(cmd, path=output_path)
+
+    process = ffmpeg.Popen(cmd, stdout=PIPE, stderr=PIPE)
+    stderr = process.communicate()[1].decode("utf-8", "replace")
+    error_list = (
+        r"Unknown encoder '.*'",
+        r"-q:v qscale not available for encoder\. Use -b:v bitrate instead\.",
+        r"Specified sample rate .* is not supported",
+        r'Unable to parse option value ".*"',
+        r"Error setting option .* to value .*\.",
+        r"DLL .* failed to open",
+        r"Incompatible pixel format '.*' for codec '[A-Za-z0-9_]*'",
+        r"Unrecognized option '.*'",
+        r"Permission denied",
+    )
+    for item in error_list:
+        if check := search(item, stderr):
+            log.error(check.group())
+
+    if not os.path.isfile(output_path):
+        log.error(f"The file {output_path} was not created.")
