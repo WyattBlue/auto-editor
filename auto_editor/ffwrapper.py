@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import os.path
 import sys
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
-from re import search
 from shutil import which
 from subprocess import PIPE, Popen, run
 from typing import Any
@@ -51,41 +49,6 @@ class FFmpeg:
         if self.show_cmd:
             sys.stderr.write(f"{' '.join(cmd)}\n\n")
         run(cmd)
-
-    def run_check_errors(
-        self, cmd: list[str], show_out: bool = False, path: str | None = None
-    ) -> None:
-        process = self.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        _, stderr = process.communicate()
-
-        if process.stdin is not None:
-            process.stdin.close()
-        output = stderr.decode("utf-8", "replace")
-
-        error_list = (
-            r"Unknown encoder '.*'",
-            r"-q:v qscale not available for encoder\. Use -b:v bitrate instead\.",
-            r"Specified sample rate .* is not supported",
-            r'Unable to parse option value ".*"',
-            r"Error setting option .* to value .*\.",
-            r"Undefined constant or missing '.*' in '.*'",
-            r"DLL .* failed to open",
-            r"Incompatible pixel format '.*' for codec '[A-Za-z0-9_]*'",
-            r"Unrecognized option '.*'",
-            r"Permission denied",
-        )
-
-        if self.debug:
-            print(f"stderr: {output}")
-
-        for item in error_list:
-            if check := search(item, output):
-                self.log.error(check.group())
-
-        if path is not None and not os.path.isfile(path):
-            self.log.error(f"The file {path} was not created.")
-        if show_out and not self.debug:
-            print(f"stderr: {output}")
 
     def Popen(
         self, cmd: list[str], stdin: Any = None, stdout: Any = PIPE, stderr: Any = None

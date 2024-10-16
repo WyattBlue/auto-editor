@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
-from subprocess import DEVNULL, PIPE
-from sys import platform
 from typing import TYPE_CHECKING
 
 import av
 import numpy as np
 
-from auto_editor.output import video_quality
 from auto_editor.timeline import TlImage, TlRect, TlVideo
 from auto_editor.utils.encoder import encoders
 from auto_editor.utils.types import color
@@ -99,6 +96,7 @@ def render_av(
     tous: dict[FileInfo, int] = {}
 
     target_pix_fmt = "yuv420p"  # Reasonable default
+    target_fps = tl.tb  # Always constant
     img_cache = make_image_cache(tl)
     temp = log.temp
 
@@ -133,14 +131,28 @@ def render_av(
     log.debug(f"Tous: {tous}")
     log.debug(f"Clips: {tl.v}")
 
-    target_pix_fmt = target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
-    log.debug(f"Target pix_fmt: {target_pix_fmt}")
-
     apply_video_later = True
     if args.video_codec in encoders:
         apply_video_later = set(encoders[args.video_codec]).isdisjoint(allowed_pix_fmt)
 
     log.debug(f"apply video quality settings now: {not apply_video_later}")
+
+    spedup = os.path.join(temp, "spedup0.mkv")
+    output = av.open(spedup, "w")
+    if apply_video_later:
+        output_stream = output.add_stream("mpeg4", rate=target_fps)
+        target_pix_fmt = "yuv420p"
+    else:
+        _temp = output.add_stream(
+            args.video_codec, rate=target_fps, options={"mov_flags": "faststart"}
+        )
+        if not isinstance(_temp, av.VideoStream):
+            log.error(f"Not a known video codec: {args.video_codec}")
+        output_stream = _temp
+        target_pix_fmt = (
+            target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
+        )
+        # TODO: apply `-b:v`, `qscale:v`
 
     if args.scale == 1.0:
         target_width, target_height = tl.res
@@ -157,44 +169,14 @@ def render_av(
             scale_graph.add("buffersink"),
         )
 
-    spedup = os.path.join(temp, "spedup0.mp4")
+    output_stream.width = target_width
+    output_stream.height = target_height
+    output_stream.pix_fmt = target_pix_fmt
 
-    cmd = [
-        "-hide_banner",
-        "-y",
-        "-f",
-        "rawvideo",
-        "-c:v",
-        "rawvideo",
-        "-pix_fmt",
-        target_pix_fmt,
-        "-s",
-        f"{target_width}*{target_height}",
-        "-framerate",
-        f"{tl.tb}",
-        "-i",
-        "-",
-        "-pix_fmt",
-        target_pix_fmt,
-    ]
-
-    if platform == "darwin":
-        # Fix videotoolbox issue with legacy macs
-        cmd += ["-allow_sw", "1"]
-
-    if apply_video_later:
-        cmd += ["-c:v", "mpeg4", "-qscale:v", "1"]
-    else:
-        cmd += video_quality(args)
-
-    # Setting SAR requires re-encoding so we do it here.
     if src is not None and src.videos and (sar := src.videos[0].sar) is not None:
-        cmd.extend(["-vf", f"setsar={sar}"])
+        output_stream.sample_aspect_ratio = sar
 
-    cmd.append(spedup)
-
-    process2 = ffmpeg.Popen(cmd, stdin=PIPE, stdout=DEVNULL, stderr=DEVNULL)
-    assert process2.stdin is not None
+    from_ndarray = av.VideoFrame.from_ndarray
 
     # First few frames can have an abnormal keyframe count, so never seek there.
     seek = 10
@@ -206,142 +188,130 @@ def render_av(
     bg = color(args.background)
     null_frame = make_solid(target_width, target_height, target_pix_fmt, bg)
     frame_index = -1
-    try:
-        for index in range(tl.end):
-            obj_list: list[VideoFrame | TlRect | TlImage] = []
-            for layer in tl.v:
-                for lobj in layer:
-                    if isinstance(lobj, TlVideo):
-                        if index >= lobj.start and index < (lobj.start + lobj.dur):
-                            _i = round((lobj.offset + index - lobj.start) * lobj.speed)
-                            obj_list.append(VideoFrame(_i, lobj.src))
-                    elif index >= lobj.start and index < lobj.start + lobj.dur:
-                        obj_list.append(lobj)
 
-            frame = null_frame
-            for obj in obj_list:
-                if isinstance(obj, VideoFrame):
-                    my_stream = cns[obj.src].streams.video[0]
-                    if frame_index > obj.index:
-                        log.debug(f"Seek: {frame_index} -> 0")
-                        cns[obj.src].seek(0)
-                        try:
-                            frame = next(decoders[obj.src])
-                            frame_index = round(frame.time * tl.tb)
-                        except StopIteration:
-                            pass
+    for index in range(tl.end):
+        obj_list: list[VideoFrame | TlRect | TlImage] = []
+        for layer in tl.v:
+            for lobj in layer:
+                if isinstance(lobj, TlVideo):
+                    if index >= lobj.start and index < (lobj.start + lobj.dur):
+                        _i = round((lobj.offset + index - lobj.start) * lobj.speed)
+                        obj_list.append(VideoFrame(_i, lobj.src))
+                elif index >= lobj.start and index < lobj.start + lobj.dur:
+                    obj_list.append(lobj)
 
-                    while frame_index < obj.index:
-                        # Check if skipping ahead is worth it.
-                        if (
-                            obj.index - frame_index > seek_cost[obj.src]
-                            and frame_index > seek
-                        ):
-                            seek = frame_index + (seek_cost[obj.src] // 2)
-                            seek_frame = frame_index
-                            log.debug(f"Seek: {frame_index} -> {obj.index}")
-                            cns[obj.src].seek(
-                                obj.index * tous[obj.src],
-                                stream=my_stream,
-                            )
+        frame = null_frame
+        for obj in obj_list:
+            if isinstance(obj, VideoFrame):
+                my_stream = cns[obj.src].streams.video[0]
+                if frame_index > obj.index:
+                    log.debug(f"Seek: {frame_index} -> 0")
+                    cns[obj.src].seek(0)
+                    try:
+                        frame = next(decoders[obj.src])
+                        frame_index = round(frame.time * tl.tb)
+                    except StopIteration:
+                        pass
 
-                        try:
-                            frame = next(decoders[obj.src])
-                            frame_index = round(frame.time * tl.tb)
-                        except StopIteration:
-                            log.debug(f"No source frame at {index=}. Using null frame")
-                            frame = null_frame
-                            break
+                while frame_index < obj.index:
+                    # Check if skipping ahead is worth it.
+                    if (
+                        obj.index - frame_index > seek_cost[obj.src]
+                        and frame_index > seek
+                    ):
+                        seek = frame_index + (seek_cost[obj.src] // 2)
+                        seek_frame = frame_index
+                        log.debug(f"Seek: {frame_index} -> {obj.index}")
+                        cns[obj.src].seek(obj.index * tous[obj.src], stream=my_stream)
 
-                        if seek_frame is not None:
-                            log.debug(
-                                f"Skipped {frame_index - seek_frame} frame indexes"
-                            )
-                            frames_saved += frame_index - seek_frame
-                            seek_frame = None
-                        if frame.key_frame:
-                            log.debug(f"Keyframe {frame_index} {frame.pts}")
+                    try:
+                        frame = next(decoders[obj.src])
+                        frame_index = round(frame.time * tl.tb)
+                    except StopIteration:
+                        log.debug(f"No source frame at {index=}. Using null frame")
+                        frame = null_frame
+                        break
 
-                    if (frame.width, frame.height) != tl.res:
-                        width, height = tl.res
-                        graph = av.filter.Graph()
-                        graph.link_nodes(
-                            graph.add_buffer(template=my_stream),
-                            graph.add(
-                                "scale",
-                                f"{width}:{height}:force_original_aspect_ratio=decrease:eval=frame",
-                            ),
-                            graph.add("pad", f"{width}:{height}:-1:-1:color={bg}"),
-                            graph.add("buffersink"),
-                        ).vpush(frame)
-                        frame = graph.vpull()
-                elif isinstance(obj, TlRect):
+                    if seek_frame is not None:
+                        log.debug(f"Skipped {frame_index - seek_frame} frame indexes")
+                        frames_saved += frame_index - seek_frame
+                        seek_frame = None
+                    if frame.key_frame:
+                        log.debug(f"Keyframe {frame_index} {frame.pts}")
+
+                if (frame.width, frame.height) != tl.res:
+                    width, height = tl.res
                     graph = av.filter.Graph()
-                    x, y = obj.x, obj.y
                     graph.link_nodes(
                         graph.add_buffer(template=my_stream),
                         graph.add(
-                            "drawbox",
-                            f"x={x}:y={y}:w={obj.width}:h={obj.height}:color={obj.fill}:t=fill",
+                            "scale",
+                            f"{width}:{height}:force_original_aspect_ratio=decrease:eval=frame",
                         ),
+                        graph.add("pad", f"{width}:{height}:-1:-1:color={bg}"),
                         graph.add("buffersink"),
                     ).vpush(frame)
                     frame = graph.vpull()
-                elif isinstance(obj, TlImage):
-                    img = img_cache[(obj.src, obj.width)]
-                    array = frame.to_ndarray(format="rgb24")
+            elif isinstance(obj, TlRect):
+                graph = av.filter.Graph()
+                x, y = obj.x, obj.y
+                graph.link_nodes(
+                    graph.add_buffer(template=my_stream),
+                    graph.add(
+                        "drawbox",
+                        f"x={x}:y={y}:w={obj.width}:h={obj.height}:color={obj.fill}:t=fill",
+                    ),
+                    graph.add("buffersink"),
+                ).vpush(frame)
+                frame = graph.vpull()
+            elif isinstance(obj, TlImage):
+                img = img_cache[(obj.src, obj.width)]
+                array = frame.to_ndarray(format="rgb24")
 
-                    overlay_h, overlay_w, _ = img.shape
-                    x_pos, y_pos = obj.x, obj.y
+                overlay_h, overlay_w, _ = img.shape
+                x_pos, y_pos = obj.x, obj.y
 
-                    x_start = max(x_pos, 0)
-                    y_start = max(y_pos, 0)
-                    x_end = min(x_pos + overlay_w, frame.width)
-                    y_end = min(y_pos + overlay_h, frame.height)
+                x_start = max(x_pos, 0)
+                y_start = max(y_pos, 0)
+                x_end = min(x_pos + overlay_w, frame.width)
+                y_end = min(y_pos + overlay_h, frame.height)
 
-                    # Clip the overlay image to fit into the frame
-                    overlay_x_start = max(-x_pos, 0)
-                    overlay_y_start = max(-y_pos, 0)
-                    overlay_x_end = overlay_w - max(
-                        (x_pos + overlay_w) - frame.width, 0
-                    )
-                    overlay_y_end = overlay_h - max(
-                        (y_pos + overlay_h) - frame.height, 0
-                    )
-                    clipped_overlay = img[
-                        overlay_y_start:overlay_y_end, overlay_x_start:overlay_x_end
-                    ]
+                # Clip the overlay image to fit into the frame
+                overlay_x_start = max(-x_pos, 0)
+                overlay_y_start = max(-y_pos, 0)
+                overlay_x_end = overlay_w - max((x_pos + overlay_w) - frame.width, 0)
+                overlay_y_end = overlay_h - max((y_pos + overlay_h) - frame.height, 0)
+                clipped_overlay = img[
+                    overlay_y_start:overlay_y_end, overlay_x_start:overlay_x_end
+                ]
 
-                    # Create a region of interest (ROI) on the video frame
-                    roi = array[y_start:y_end, x_start:x_end]
+                # Create a region of interest (ROI) on the video frame
+                roi = array[y_start:y_end, x_start:x_end]
 
-                    # Blend the overlay image with the ROI based on the opacity
-                    roi = (1 - obj.opacity) * roi + obj.opacity * clipped_overlay
-                    array[y_start:y_end, x_start:x_end] = roi
-                    array = np.clip(array, 0, 255).astype(np.uint8)
+                # Blend the overlay image with the ROI based on the opacity
+                roi = (1 - obj.opacity) * roi + obj.opacity * clipped_overlay
+                array[y_start:y_end, x_start:x_end] = roi
+                array = np.clip(array, 0, 255).astype(np.uint8)
 
-                    frame = av.VideoFrame.from_ndarray(array, format="rgb24")
+                frame = from_ndarray(array, format="rgb24")
 
-            if scale_graph is not None and frame.width != target_width:
-                scale_graph.vpush(frame)
-                frame = scale_graph.vpull()
+        if scale_graph is not None and frame.width != target_width:
+            scale_graph.vpush(frame)
+            frame = scale_graph.vpull()
 
-            if frame.format.name != target_pix_fmt:
-                frame = frame.reformat(format=target_pix_fmt)
-                bar.tick(index)
-            elif index % 3 == 0:
-                bar.tick(index)
+        if frame.format.name != target_pix_fmt:
+            frame = frame.reformat(format=target_pix_fmt)
+            bar.tick(index)
+        elif index % 3 == 0:
+            bar.tick(index)
 
-            process2.stdin.write(frame.to_ndarray().tobytes())
+        new_frame = from_ndarray(frame.to_ndarray(), format=frame.format.name)
+        output.mux(output_stream.encode(new_frame))
 
-        bar.end()
-        process2.stdin.close()
-        process2.wait()
-    except (OSError, BrokenPipeError):
-        bar.end()
-        ffmpeg.run_check_errors(cmd, True)
-        log.error("FFmpeg Error!")
+    bar.end()
 
+    output.mux(output_stream.encode(None))
+    output.close()
     log.debug(f"Total frames saved seeking: {frames_saved}")
 
     return spedup, apply_video_later
