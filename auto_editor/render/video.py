@@ -8,16 +8,14 @@ import av
 import numpy as np
 
 from auto_editor.timeline import TlImage, TlRect, TlVideo
-from auto_editor.utils.encoder import encoders
-from auto_editor.utils.types import color
+from auto_editor.utils.types import _split_num_str, color
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from auto_editor.ffwrapper import FFmpeg, FileInfo
+    from auto_editor.ffwrapper import FileInfo
     from auto_editor.timeline import v3
     from auto_editor.utils.bar import Bar
-    from auto_editor.utils.container import Container
     from auto_editor.utils.log import Log
     from auto_editor.utils.types import Args
 
@@ -86,9 +84,22 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
     return img_cache
 
 
-def render_av(
-    ffmpeg: FFmpeg, tl: v3, args: Args, bar: Bar, ctr: Container, log: Log
-) -> tuple[str, bool]:
+def parse_bitrate(input_: str, log: Log) -> int:
+    val, unit = _split_num_str(input_)
+
+    if unit.lower() == "k":
+        return int(val * 1000)
+    if unit == "M":
+        return int(val * 1_000_000)
+    if unit == "G":
+        return int(val * 1_000_000_000)
+    if unit == "":
+        return int(val)
+
+    log.error(f"Unknown bitrate: {input_}")
+
+
+def render_av(tl: v3, args: Args, bar: Bar, log: Log) -> str:
     src = tl.src
     cns: dict[FileInfo, av.container.InputContainer] = {}
     decoders: dict[FileInfo, Iterator[av.VideoFrame]] = {}
@@ -131,28 +142,39 @@ def render_av(
     log.debug(f"Tous: {tous}")
     log.debug(f"Clips: {tl.v}")
 
-    apply_video_later = True
-    if args.video_codec in encoders:
-        apply_video_later = set(encoders[args.video_codec]).isdisjoint(allowed_pix_fmt)
-
-    log.debug(f"apply video quality settings now: {not apply_video_later}")
-
-    spedup = os.path.join(temp, "spedup0.mkv")
-    output = av.open(spedup, "w")
-    if apply_video_later:
-        output_stream = output.add_stream("mpeg4", rate=target_fps)
-        target_pix_fmt = "yuv420p"
-    else:
-        _temp = output.add_stream(
-            args.video_codec, rate=target_fps, options={"mov_flags": "faststart"}
-        )
-        if not isinstance(_temp, av.VideoStream):
-            log.error(f"Not a known video codec: {args.video_codec}")
-        output_stream = _temp
+    _ext = "mkv"
+    if args.video_codec == "gif":
+        _ext = "gif"
+        _c = av.Codec("gif", "w")
+        if _c.video_formats is not None and target_pix_fmt in (
+            f.name for f in _c.video_formats
+        ):
+            target_pix_fmt = target_pix_fmt
+        else:
+            target_pix_fmt = "rgb8"
+        del _c
+    elif args.video_codec == "dvvideo":
+        _ext = "mov"
         target_pix_fmt = (
             target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
         )
-        # TODO: apply `-b:v`, `qscale:v`
+    else:
+        _ext = "mkv"
+        target_pix_fmt = (
+            target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
+        )
+
+    spedup = os.path.join(temp, f"spedup0.{_ext}")
+    del _ext
+    output = av.open(spedup, "w")
+
+    options = {"mov_flags": "faststart"}
+    output_stream = output.add_stream(
+        args.video_codec, rate=target_fps, options=options
+    )
+
+    if not isinstance(output_stream, av.VideoStream):
+        log.error(f"Not a known video codec: {args.video_codec}")
 
     if args.scale == 1.0:
         target_width, target_height = tl.res
@@ -172,6 +194,12 @@ def render_av(
     output_stream.width = target_width
     output_stream.height = target_height
     output_stream.pix_fmt = target_pix_fmt
+    output_stream.framerate = target_fps
+    if args.video_bitrate is not None and args.video_bitrate != "unset":
+        output_stream.bit_rate = parse_bitrate(args.video_bitrate, log)
+        log.debug(f"video bitrate: {output_stream.bit_rate}")
+    else:
+        log.debug(f"[auto] video bitrate: {output_stream.bit_rate}")
 
     if src is not None and src.videos and (sar := src.videos[0].sar) is not None:
         output_stream.sample_aspect_ratio = sar
@@ -200,7 +228,11 @@ def render_av(
                 elif index >= lobj.start and index < lobj.start + lobj.dur:
                     obj_list.append(lobj)
 
-        frame = null_frame
+        if tl.v1 is not None:
+            # When there can be valid gaps in the timeline.
+            frame = null_frame
+        # else, use the last frame
+
         for obj in obj_list:
             if isinstance(obj, VideoFrame):
                 my_stream = cns[obj.src].streams.video[0]
@@ -306,7 +338,15 @@ def render_av(
             bar.tick(index)
 
         new_frame = from_ndarray(frame.to_ndarray(), format=frame.format.name)
-        output.mux(output_stream.encode(new_frame))
+        try:
+            output.mux(output_stream.encode(new_frame))
+        except av.error.ExternalError:
+            log.error(
+                f"Generic error for encoder: {output_stream.name}\n"
+                "Perhaps video quality settings are too low?"
+            )
+        except av.FFmpegError as e:
+            log.error(e)
 
     bar.end()
 
@@ -314,4 +354,4 @@ def render_av(
     output.close()
     log.debug(f"Total frames saved seeking: {frames_saved}")
 
-    return spedup, apply_video_later
+    return spedup
