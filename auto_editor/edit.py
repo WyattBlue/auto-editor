@@ -276,7 +276,6 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
         visual_output = []
         audio_output = []
         sub_output = []
-        apply_later = False
 
         if ctr.default_sub != "none" and not args.sn:
             sub_output = make_new_subtitles(tl, log)
@@ -287,7 +286,7 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
 
         if ctr.default_vid != "none":
             if tl.v:
-                out_path, apply_later = render_av(ffmpeg, tl, args, bar, ctr, log)
+                out_path = render_av(tl, args, bar, log)
                 visual_output.append((True, out_path))
 
             for v, vid in enumerate(src.videos, start=1):
@@ -305,7 +304,6 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
             visual_output,
             audio_output,
             sub_output,
-            apply_later,
             ctr,
             output,
             tl.tb,

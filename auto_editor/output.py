@@ -81,21 +81,11 @@ def _ffset(option: str, value: str | None) -> list[str]:
     return [option] + [value]
 
 
-def video_quality(args: Args) -> list[str]:
-    return (
-        _ffset("-b:v", args.video_bitrate)
-        + ["-c:v", args.video_codec]
-        + _ffset("-qscale:v", args.video_quality_scale)
-        + ["-movflags", "faststart"]
-    )
-
-
 def mux_quality_media(
     ffmpeg: FFmpeg,
     visual_output: list[tuple[bool, str]],
     audio_output: list[str],
     sub_output: list[str],
-    apply_v: bool,
     ctr: Container,
     output_path: str,
     tb: Fraction,
@@ -154,15 +144,7 @@ def mux_quality_media(
     track = 0
     for is_video, path in visual_output:
         if is_video:
-            if apply_v:
-                cmd += video_quality(args)
-            else:
-                # Real video is only allowed on track 0
-                cmd += ["-c:v:0", "copy"]
-
-            if float(tb).is_integer():
-                cmd += ["-video_track_timescale", f"{tb}"]
-
+            cmd += [f"-c:v:{track}", "copy"]
         elif ctr.allow_image:
             ext = os.path.splitext(path)[1][1:]
             cmd += [f"-c:v:{track}", ext, f"-disposition:v:{track}", "attached_pic"]
@@ -213,8 +195,6 @@ def mux_quality_media(
         if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
             cmd.extend(["-color_trc", f"{color_trc}"])
 
-    if args.extras is not None:
-        cmd.extend(args.extras.split(" "))
     cmd.extend(["-strict", "-2"])  # Allow experimental codecs.
 
     if s_tracks > 0:

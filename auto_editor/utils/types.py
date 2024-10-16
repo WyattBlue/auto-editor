@@ -220,9 +220,7 @@ class Args:
     audio_codec: str = "auto"
     video_bitrate: str = "10M"
     audio_bitrate: str = "unset"
-    video_quality_scale: str = "unset"
     scale: float = 1.0
-    extras: str | None = None
     sn: bool = False
     dn: bool = False
     no_seek: bool = False

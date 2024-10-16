@@ -205,15 +205,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--video-bitrate",
         "-b:v",
         metavar="BITRATE",
-        type=bitrate,
         help="Set the number of bits per second for video",
-    )
-    parser.add_argument(
-        "--video-quality-scale",
-        "-qscale:v",
-        "-q:v",
-        metavar="SCALE",
-        help="Set a value to the ffmpeg option -qscale:v",
     )
     parser.add_argument(
         "--scale",
