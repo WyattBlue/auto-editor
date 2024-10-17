@@ -35,8 +35,6 @@ norm_types = {
     ),
 }
 
-file_null = "NUL" if system() in ("Windows", "cli") else "/dev/null"
-
 
 def parse_norm(norm: str, log: Log) -> dict | None:
     if norm == "#f":
@@ -108,25 +106,6 @@ def parse_ebu_bytes(norm: dict, stderr: bytes, log: Log) -> list[str]:
     ]
 
 
-def parse_peak_bytes(t: float, stderr: bytes, log: Log) -> list[str]:
-    peak_level = None
-    for line in stderr.splitlines():
-        if line.startswith(b"[Parsed_astats_0") and b"Peak level dB:" in line:
-            try:
-                peak_level = float(line.split(b":")[1])
-            except Exception:
-                log.error(f"Invalid `astats` stats.\n{stderr!r}")
-            break
-
-    if peak_level is None:
-        log.error(f"Invalid `astats` stats.\n{stderr!r}")
-
-    adjustment = t - peak_level
-    log.debug(f"current peak level: {peak_level}")
-    log.print(f"peak adjustment: {adjustment}")
-    return ["-af", f"volume={adjustment}"]
-
-
 def apply_audio_normalization(
     ffmpeg: FFmpeg, norm: dict, pre_master: Path, path: Path, log: Log
 ) -> None:
@@ -135,13 +114,9 @@ def apply_audio_normalization(
             f"loudnorm=i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:"
             f"offset={norm['gain']}:print_format=json"
         )
-    else:
-        first_pass = "astats=measure_overall=Peak_level:measure_perchannel=0"
-
-    log.debug(f"audio norm first pass: {first_pass}")
-
-    stderr = ffmpeg.Popen(
-        [
+        log.debug(f"audio norm first pass: {first_pass}")
+        file_null = "NUL" if system() in ("Windows", "cli") else "/dev/null"
+        cmd = [
             "-hide_banner",
             "-i",
             f"{pre_master}",
@@ -152,17 +127,32 @@ def apply_audio_normalization(
             "-f",
             "null",
             file_null,
-        ],
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=PIPE,
-    ).communicate()[1]
-
-    if norm["tag"] == "ebu":
+        ]
+        process = ffmpeg.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        stderr = process.communicate()[1]
         cmd = parse_ebu_bytes(norm, stderr, log)
     else:
         assert "t" in norm
-        cmd = parse_peak_bytes(norm["t"], stderr, log)
+
+        def get_peak_level(frame: av.AudioFrame) -> float:
+            # Calculate peak level in dB
+            # Should be equivalent to: -af astats=measure_overall=Peak_level:measure_perchannel=0
+            max_amplitude = np.abs(frame.to_ndarray()).max()
+            if max_amplitude > 0.0:
+                return -20.0 * np.log10(max_amplitude)
+            return -99.0
+
+        with av.open(pre_master) as container:
+            max_peak_level = -99.0
+            assert len(container.streams.video) == 0
+            for frame in container.decode(audio=0):
+                peak_level = get_peak_level(frame)
+                max_peak_level = max(max_peak_level, peak_level)
+
+        adjustment = norm["t"] - max_peak_level
+        log.debug(f"current peak level: {max_peak_level}")
+        log.print(f"peak adjustment: {adjustment}")
+        cmd = ["-af", f"volume={adjustment}"]
 
     ffmpeg.run(["-i", f"{pre_master}"] + cmd + [f"{path}"])
 
