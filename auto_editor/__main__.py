@@ -273,7 +273,7 @@ def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
     log.conwrite("Downloading video...")
 
     def get_domain(url: str) -> str:
-        t = __import__("urllib").parse.urlparse(url).netloc
+        t = __import__("urllib.parse", fromlist=["parse"]).urlparse(url).netloc
         return ".".join(t.split(".")[-2:])
 
     download_format = args.download_format
