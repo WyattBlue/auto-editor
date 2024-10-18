@@ -56,7 +56,7 @@ def parse_norm(norm: str, log: Log) -> dict | None:
         log.error(e)
 
 
-def parse_ebu_bytes(norm: dict, stderr: bytes, log: Log) -> list[str]:
+def parse_ebu_bytes(norm: dict, stderr: bytes, log: Log) -> tuple[str, str]:
     start = end = 0
     lines = stderr.splitlines()
 
@@ -76,13 +76,7 @@ def parse_ebu_bytes(norm: dict, stderr: bytes, log: Log) -> list[str]:
     except MyError:
         log.error(f"Invalid loudnorm stats.\n{start=},{end=}\n{stderr!r}")
 
-    for key in (
-        "input_i",
-        "input_tp",
-        "input_lra",
-        "input_thresh",
-        "target_offset",
-    ):
+    for key in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset"):
         val = float(parsed[key])
         if val == float("-inf"):
             parsed[key] = -99
@@ -98,12 +92,12 @@ def parse_ebu_bytes(norm: dict, stderr: bytes, log: Log) -> list[str]:
     m_thresh = parsed["input_thresh"]
     target_offset = parsed["target_offset"]
 
-    return [
-        "-af",
-        f"loudnorm=i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:offset={target_offset}"
+    filter = (
+        f"i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:offset={target_offset}"
         f":measured_i={m_i}:measured_lra={m_lra}:measured_tp={m_tp}"
-        f":measured_thresh={m_thresh}:linear=true:print_format=json",
-    ]
+        f":measured_thresh={m_thresh}:linear=true:print_format=json"
+    )
+    return "loudnorm", filter
 
 
 def apply_audio_normalization(
@@ -130,7 +124,7 @@ def apply_audio_normalization(
         ]
         process = ffmpeg.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         stderr = process.communicate()[1]
-        cmd = parse_ebu_bytes(norm, stderr, log)
+        name, filter_args = parse_ebu_bytes(norm, stderr, log)
     else:
         assert "t" in norm
 
@@ -151,10 +145,33 @@ def apply_audio_normalization(
 
         adjustment = norm["t"] - max_peak_level
         log.debug(f"current peak level: {max_peak_level}")
-        log.print(f"peak adjustment: {adjustment}")
-        cmd = ["-af", f"volume={adjustment}"]
+        log.print(f"peak adjustment: {adjustment:.3f}dB")
+        name, filter_args = "volume", f"{adjustment}"
 
-    ffmpeg.run(["-i", f"{pre_master}"] + cmd + [f"{path}"])
+    with av.open(pre_master) as container:
+        input_stream = container.streams.audio[0]
+
+        output_file = av.open(path, mode="w")
+        output_stream = output_file.add_stream("pcm_s16le", rate=input_stream.rate)
+
+        graph = av.filter.Graph()
+        graph.link_nodes(
+            graph.add_abuffer(template=input_stream),
+            graph.add(name, filter_args),
+            graph.add("abuffersink"),
+        ).configure()
+        for frame in container.decode(input_stream):
+            graph.push(frame)
+            while True:
+                try:
+                    aframe = graph.pull()
+                    assert isinstance(aframe, av.AudioFrame)
+                    output_file.mux(output_stream.encode(aframe))
+                except (av.BlockingIOError, av.EOFError):
+                    break
+
+        output_file.mux(output_stream.encode(None))
+        output_file.close()
 
 
 def process_audio_clip(
@@ -202,14 +219,12 @@ def process_audio_clip(
             try:
                 aframe = graph.pull()
                 assert isinstance(aframe, av.AudioFrame)
-                for packet in output_stream.encode(aframe):
-                    output_file.mux(packet)
+                output_file.mux(output_stream.encode(aframe))
             except (av.BlockingIOError, av.EOFError):
                 break
 
     # Flush the stream
-    for packet in output_stream.encode(None):
-        output_file.mux(packet)
+    output_file.mux(output_stream.encode(None))
 
     input_file.close()
     output_file.close()
