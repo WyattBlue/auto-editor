@@ -97,7 +97,7 @@ def mux_quality_media(
     a_tracks = len(audio_output)
     s_tracks = 0 if args.sn else len(sub_output)
 
-    cmd = ["-hide_banner", "-y", "-i", f"{src.path}"]
+    cmd = ["-hide_banner", "-y"]
 
     same_container = src.path.suffix == os.path.splitext(output_path)[1]
 
@@ -107,37 +107,14 @@ def mux_quality_media(
         else:
             v_tracks -= 1
 
-    if a_tracks > 0:
-        if args.keep_tracks_separate and ctr.max_audios is None:
-            for path in audio_output:
-                cmd.extend(["-i", path])
-        else:
-            # Merge all the audio a_tracks into one.
-            new_a_file = os.path.join(log.temp, "new_audio.wav")
-            if a_tracks > 1:
-                new_cmd = []
-                for path in audio_output:
-                    new_cmd.extend(["-i", path])
-                new_cmd.extend(
-                    [
-                        "-filter_complex",
-                        f"amix=inputs={a_tracks}:duration=longest",
-                        "-ac",
-                        "2",
-                        new_a_file,
-                    ]
-                )
-                ffmpeg.run(new_cmd)
-                a_tracks = 1
-            else:
-                new_a_file = audio_output[0]
-            cmd.extend(["-i", new_a_file])
+    for audfile in audio_output:
+        cmd.extend(["-i", audfile])
 
     for subfile in sub_output:
         cmd.extend(["-i", subfile])
 
     for i in range(v_tracks + s_tracks + a_tracks):
-        cmd.extend(["-map", f"{i+1}:0"])
+        cmd.extend(["-map", f"{i}:0"])
 
     cmd.extend(["-map_metadata", "0"])
 

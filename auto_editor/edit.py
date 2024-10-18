@@ -283,6 +283,27 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
         if ctr.default_aud != "none":
             ensure = Ensure(bar, samplerate, log)
             audio_output = make_new_audio(tl, ensure, args, ffmpeg, bar, log)
+            atracks = len(audio_output)
+            if (
+                not (args.keep_tracks_separate and ctr.max_audios is None)
+                and atracks > 1
+            ):
+                # Merge all the audio a_tracks into one.
+                new_a_file = os.path.join(log.temp, "new_audio.wav")
+                new_cmd = []
+                for path in audio_output:
+                    new_cmd.extend(["-i", path])
+                new_cmd.extend(
+                    [
+                        "-filter_complex",
+                        f"amix=inputs={atracks}:duration=longest",
+                        "-ac",
+                        "2",
+                        new_a_file,
+                    ]
+                )
+                ffmpeg.run(new_cmd)
+                audio_output = [new_a_file]
 
         if ctr.default_vid != "none":
             if tl.v:

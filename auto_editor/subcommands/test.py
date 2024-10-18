@@ -339,7 +339,10 @@ def main(sys_args: list[str] | None = None):
         )
 
     def track_tests():
-        return run.main(["resources/multi-track.mov"], ["--keep_tracks_seperate"])
+        out = run.main(["resources/multi-track.mov"], ["--keep_tracks_seperate"])
+        assert len(fileinfo(out).audios) == 2
+
+        return out
 
     def export_json_tests():
         out = run.main(["example.mp4"], ["--export_as_json"])
