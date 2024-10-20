@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from fractions import Fraction
+from os import environ
 
 import auto_editor
 from auto_editor.analyze import Levels
@@ -71,11 +72,19 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     print(f"Auto-Editor {auto_editor.__version__}")
     text = None
 
+    no_color = bool(environ.get("NO_COLOR") or environ.get("AV_LOG_FORCE_NOCOLOR"))
+    if no_color:
+        bold_pink = bold_red = reset = ""
+    else:
+        bold_pink = "\033[1;95m"
+        bold_red = "\033[1;31m"
+        reset = "\033[0m"
+
     try:
         while True:
             try:
                 if text is None:
-                    text = input("> ")
+                    text = input(f"{bold_pink}>{reset} ")
                 else:
                     text += "\n" + input("   ")
             except KeyboardInterrupt as e:
@@ -97,8 +106,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
             except ClosingError:
                 continue  # Allow user to continue adding text
-            except (MyError, ZeroDivisionError) as e:
-                print(f"error: {e}")
+            except MyError as e:
+                print(f"{bold_red}error{reset}: {e}")
 
             text = None
 
