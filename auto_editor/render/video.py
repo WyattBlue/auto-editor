@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-import os.path
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import av
 import numpy as np
 
+from auto_editor.output import parse_bitrate
 from auto_editor.timeline import TlImage, TlRect, TlVideo
-from auto_editor.utils.types import _split_num_str, color
+from auto_editor.utils.types import color
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from typing import Any
 
     from auto_editor.ffwrapper import FileInfo
     from auto_editor.timeline import v3
@@ -84,22 +85,11 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
     return img_cache
 
 
-def parse_bitrate(input_: str, log: Log) -> int:
-    val, unit = _split_num_str(input_)
+def render_av(
+    output: av.container.OutputContainer, tl: v3, args: Args, bar: Bar, log: Log
+) -> Any:
+    from_ndarray = av.VideoFrame.from_ndarray
 
-    if unit.lower() == "k":
-        return int(val * 1000)
-    if unit == "M":
-        return int(val * 1_000_000)
-    if unit == "G":
-        return int(val * 1_000_000_000)
-    if unit == "":
-        return int(val)
-
-    log.error(f"Unknown bitrate: {input_}")
-
-
-def render_av(tl: v3, args: Args, bar: Bar, log: Log) -> str:
     src = tl.src
     cns: dict[FileInfo, av.container.InputContainer] = {}
     decoders: dict[FileInfo, Iterator[av.VideoFrame]] = {}
@@ -109,7 +99,6 @@ def render_av(tl: v3, args: Args, bar: Bar, log: Log) -> str:
     target_pix_fmt = "yuv420p"  # Reasonable default
     target_fps = tl.tb  # Always constant
     img_cache = make_image_cache(tl)
-    temp = log.temp
 
     first_src: FileInfo | None = None
     for src in tl.sources:
@@ -142,9 +131,7 @@ def render_av(tl: v3, args: Args, bar: Bar, log: Log) -> str:
     log.debug(f"Tous: {tous}")
     log.debug(f"Clips: {tl.v}")
 
-    _ext = "mkv"
     if args.video_codec == "gif":
-        _ext = "gif"
         _c = av.Codec("gif", "w")
         if _c.video_formats is not None and target_pix_fmt in (
             f.name for f in _c.video_formats
@@ -153,28 +140,18 @@ def render_av(tl: v3, args: Args, bar: Bar, log: Log) -> str:
         else:
             target_pix_fmt = "rgb8"
         del _c
-    elif args.video_codec == "dvvideo":
-        _ext = "mov"
-        target_pix_fmt = (
-            target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
-        )
     else:
-        _ext = "mkv"
         target_pix_fmt = (
             target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
         )
 
-    spedup = os.path.join(temp, f"spedup0.{_ext}")
-    del _ext
-    output = av.open(spedup, "w")
-
-    options = {"mov_flags": "faststart"}
-    output_stream = output.add_stream(
-        args.video_codec, rate=target_fps, options=options
-    )
-
+    ops = {"mov_flags": "faststart"}
+    output_stream = output.add_stream(args.video_codec, rate=target_fps, options=ops)
+    yield output_stream
     if not isinstance(output_stream, av.VideoStream):
         log.error(f"Not a known video codec: {args.video_codec}")
+    if src.videos and src.videos[0].lang is not None:
+        output_stream.metadata["language"] = src.videos[0].lang
 
     if args.scale == 1.0:
         target_width, target_height = tl.res
@@ -195,7 +172,22 @@ def render_av(tl: v3, args: Args, bar: Bar, log: Log) -> str:
     output_stream.height = target_height
     output_stream.pix_fmt = target_pix_fmt
     output_stream.framerate = target_fps
-    if args.video_bitrate is not None and args.video_bitrate != "unset":
+
+    color_range = src.videos[0].color_range
+    colorspace = src.videos[0].color_space
+    color_prim = src.videos[0].color_primaries
+    color_trc = src.videos[0].color_transfer
+
+    if color_range == 1 or color_range == 2:
+        output_stream.color_range = color_range
+    if colorspace in (0, 1) or (colorspace >= 3 and colorspace < 16):
+        output_stream.colorspace = colorspace
+    if color_prim == 1 or (color_prim >= 4 and color_prim < 17):
+        output_stream.color_primaries = color_prim
+    if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
+        output_stream.color_trc = color_trc
+
+    if args.video_bitrate != "auto":
         output_stream.bit_rate = parse_bitrate(args.video_bitrate, log)
         log.debug(f"video bitrate: {output_stream.bit_rate}")
     else:
@@ -203,8 +195,6 @@ def render_av(tl: v3, args: Args, bar: Bar, log: Log) -> str:
 
     if src is not None and src.videos and (sar := src.videos[0].sar) is not None:
         output_stream.sample_aspect_ratio = sar
-
-    from_ndarray = av.VideoFrame.from_ndarray
 
     # First few frames can have an abnormal keyframe count, so never seek there.
     seek = 10
@@ -337,21 +327,7 @@ def render_av(tl: v3, args: Args, bar: Bar, log: Log) -> str:
         elif index % 3 == 0:
             bar.tick(index)
 
-        new_frame = from_ndarray(frame.to_ndarray(), format=frame.format.name)
-        try:
-            output.mux(output_stream.encode(new_frame))
-        except av.error.ExternalError:
-            log.error(
-                f"Generic error for encoder: {output_stream.name}\n"
-                "Perhaps video quality settings are too low?"
-            )
-        except av.FFmpegError as e:
-            log.error(e)
+        yield from_ndarray(frame.to_ndarray(), format=frame.format.name)
 
     bar.end()
-
-    output.mux(output_stream.encode(None))
-    output.close()
     log.debug(f"Total frames saved seeking: {frames_saved}")
-
-    return spedup

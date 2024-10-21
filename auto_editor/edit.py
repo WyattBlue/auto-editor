@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import os
 import sys
+from fractions import Fraction
 from subprocess import run
 from typing import Any
+
+import av
+from av import AudioResampler
 
 from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
 from auto_editor.lib.contracts import is_int, is_str
 from auto_editor.make_layers import make_timeline
-from auto_editor.output import Ensure, mux_quality_media
+from auto_editor.output import Ensure, parse_bitrate
 from auto_editor.render.audio import make_new_audio
 from auto_editor.render.subtitle import make_new_subtitles
 from auto_editor.render.video import render_av
@@ -92,11 +96,19 @@ def set_audio_codec(
     codec: str, src: FileInfo | None, out_ext: str, ctr: Container, log: Log
 ) -> str:
     if codec == "auto":
-        codec = "aac" if (src is None or not src.audios) else src.audios[0].codec
+        if src is None or not src.audios:
+            codec = "aac"
+        else:
+            codec = src.audios[0].codec
+            ctx = av.Codec(codec)
+            if ctx.audio_formats is None:
+                codec = "aac"
         if codec not in ctr.acodecs and ctr.default_aud != "none":
-            return ctr.default_aud
+            codec = ctr.default_aud
         if codec == "mp3float":
-            return "mp3"
+            codec = "mp3"
+        if codec is None:
+            codec = "aac"
         return codec
 
     if codec == "copy":
@@ -106,9 +118,8 @@ def set_audio_codec(
             log.error("Input file does not have an audio stream to copy codec from.")
         codec = src.audios[0].codec
 
-    if codec != "unset":
-        if ctr.acodecs is None or codec not in ctr.acodecs:
-            log.error(codec_error.format(codec, out_ext))
+    if ctr.acodecs is None or codec not in ctr.acodecs:
+        log.error(codec_error.format(codec, out_ext))
 
     return codec
 
@@ -270,68 +281,150 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
     if args.keep_tracks_separate and ctr.max_audios == 1:
         log.warning(f"'{out_ext}' container doesn't support multiple audio tracks.")
 
-    def make_media(tl: v3, output: str) -> None:
+    def make_media(tl: v3, output_path: str) -> None:
         assert src is not None
 
-        visual_output = []
-        audio_output = []
-        sub_output = []
+        output = av.open(output_path, "w")
 
         if ctr.default_sub != "none" and not args.sn:
-            sub_output = make_new_subtitles(tl, log)
+            sub_paths = make_new_subtitles(tl, log)
+        else:
+            sub_paths = []
 
         if ctr.default_aud != "none":
             ensure = Ensure(bar, samplerate, log)
-            audio_output = make_new_audio(tl, ensure, args, ffmpeg, bar, log)
-            atracks = len(audio_output)
+            audio_paths = make_new_audio(tl, ensure, args, ffmpeg, bar, log)
             if (
                 not (args.keep_tracks_separate and ctr.max_audios is None)
-                and atracks > 1
+                and len(audio_paths) > 1
             ):
                 # Merge all the audio a_tracks into one.
                 new_a_file = os.path.join(log.temp, "new_audio.wav")
                 new_cmd = []
-                for path in audio_output:
+                for path in audio_paths:
                     new_cmd.extend(["-i", path])
                 new_cmd.extend(
                     [
                         "-filter_complex",
-                        f"amix=inputs={atracks}:duration=longest",
+                        f"amix=inputs={len(audio_paths)}:duration=longest",
                         "-ac",
                         "2",
                         new_a_file,
                     ]
                 )
                 ffmpeg.run(new_cmd)
-                audio_output = [new_a_file]
+                audio_paths = [new_a_file]
+        else:
+            audio_paths = []
 
-        if ctr.default_vid != "none":
-            if tl.v:
-                out_path = render_av(tl, args, bar, log)
-                visual_output.append((True, out_path))
+        # Setup audio
+        if audio_paths:
+            try:
+                audio_encoder = av.Codec(args.audio_codec)
+            except av.FFmpegError as e:
+                log.error(e)
+            if audio_encoder.audio_formats is None:
+                log.error(f"{args.audio_codec}: No known audio formats avail.")
+            audio_format = audio_encoder.audio_formats[0]
+            resampler = AudioResampler(format=audio_format, layout="stereo", rate=tl.sr)
 
-            for v, vid in enumerate(src.videos, start=1):
-                if ctr.allow_image and vid.codec in ("png", "mjpeg", "webp"):
-                    out_path = os.path.join(log.temp, f"{v}.{vid.codec}")
-                    # fmt: off
-                    ffmpeg.run(["-i", f"{src.path}", "-map", "0:v", "-map", "-0:V",
-                        "-c", "copy", out_path])
-                    # fmt: on
-                    visual_output.append((False, out_path))
+        audio_streams: list[av.AudioStream] = []
+        audio_inputs = []
+        audio_gen_frames = []
+        for i, audio_path in enumerate(audio_paths):
+            audio_stream = output.add_stream(
+                args.audio_codec,
+                format=audio_format,
+                rate=tl.sr,
+                time_base=Fraction(1, tl.sr),
+            )
+            if not isinstance(audio_stream, av.AudioStream):
+                log.error(f"Not a known audio codec: {args.audio_codec}")
 
-        log.conwrite("Writing output file")
-        mux_quality_media(
-            ffmpeg,
-            visual_output,
-            audio_output,
-            sub_output,
-            ctr,
-            output,
-            tl.tb,
-            args,
-            src,
-            log,
-        )
+            if args.audio_bitrate != "auto":
+                audio_stream.bit_rate = parse_bitrate(args.audio_bitrate, log)
+                log.debug(f"audio bitrate: {audio_stream.bit_rate}")
+            else:
+                log.debug(f"[auto] audio bitrate: {audio_stream.bit_rate}")
+            if i < len(src.audios) and src.audios[i].lang is not None:
+                audio_stream.metadata["language"] = src.audios[i].lang  # type: ignore
+
+            audio_streams.append(audio_stream)
+            audio_input = av.open(audio_path)
+            audio_inputs.append(audio_input)
+            audio_gen_frames.append(audio_input.decode(audio=0))
+
+        # Setup subtitles
+        subtitle_streams = []
+        subtitle_inputs = []
+        sub_gen_frames = []
+
+        for i, sub_path in enumerate(sub_paths):
+            subtitle_input = av.open(sub_path)
+            subtitle_inputs.append(subtitle_input)
+            subtitle_stream = output.add_stream(
+                template=subtitle_input.streams.subtitles[0]
+            )
+            if i < len(src.subtitles) and src.subtitles[i].lang is not None:
+                subtitle_stream.metadata["language"] = src.subtitles[i].lang  # type: ignore
+
+            subtitle_streams.append(subtitle_stream)
+            sub_gen_frames.append(subtitle_input.demux(subtitles=0))
+
+        # Setup video
+        if ctr.default_vid != "none" and tl.v:
+            vframes = render_av(output, tl, args, bar, log)
+            output_stream = next(vframes)
+        else:
+            output_stream, vframes = None, iter([])
+
+        # Process frames
+        while True:
+            audio_frames = [next(frames, None) for frames in audio_gen_frames]
+            video_frame = next(vframes, None)
+            subtitle_frames = [next(packet, None) for packet in sub_gen_frames]
+
+            if (
+                all(frame is None for frame in audio_frames)
+                and video_frame is None
+                and all(packet is None for packet in subtitle_frames)
+            ):
+                break
+
+            for audio_stream, audio_frame in zip(audio_streams, audio_frames):
+                if audio_frame:
+                    for reframe in resampler.resample(audio_frame):
+                        output.mux(audio_stream.encode(reframe))
+
+            for subtitle_stream, packet in zip(subtitle_streams, subtitle_frames):
+                if not packet or packet.dts is None:
+                    continue
+                packet.stream = subtitle_stream
+                output.mux(packet)
+
+            if video_frame:
+                try:
+                    output.mux(output_stream.encode(video_frame))
+                except av.error.ExternalError:
+                    log.error(
+                        f"Generic error for encoder: {output_stream.name}\n"
+                        "Perhaps video quality settings are too low?"
+                    )
+                except av.FFmpegError as e:
+                    log.error(e)
+
+        # Flush streams
+        if output_stream is not None:
+            output.mux(output_stream.encode(None))
+        for audio_stream in audio_streams:
+            output.mux(audio_stream.encode(None))
+
+        # Close resources
+        for audio_input in audio_inputs:
+            audio_input.close()
+        for subtitle_input in subtitle_inputs:
+            subtitle_input.close()
+        output.close()
 
     if export == "clip-sequence":
         if tl.v1 is None:

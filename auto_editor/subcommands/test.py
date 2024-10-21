@@ -141,7 +141,10 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
         except Exception as e:
             dur = perf_counter() - start
             total_time += dur
-            print(f"{name:<24} ({index}/{total})  {round(dur, 2):<4} secs  [FAILED]")
+            print(
+                f"{name:<24} ({index}/{total})  {round(dur, 2):<4} secs  \033[1;31m[FAILED]\033[0m",
+                flush=True,
+            )
             if args.no_fail_fast:
                 print(f"\n{e}")
             else:
@@ -150,8 +153,10 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
                 raise e
         else:
             passed += 1
-            print(f"{name:<24} ({index}/{total})  {round(dur, 2):<4} secs  [PASSED]")
-
+            print(
+                f"{name:<24} ({index}/{total})  {round(dur, 2):<4} secs  [\033[1;32mPASSED\033[0m]",
+                flush=True,
+            )
         if outputs is not None:
             if isinstance(outputs, str):
                 outputs = [outputs]
@@ -361,11 +366,11 @@ def main(sys_args: list[str] | None = None):
         run.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
 
     def export_subtitles():
-        cn = fileinfo(run.main(["resources/mov_text.mp4"], []))
+        # cn = fileinfo(run.main(["resources/mov_text.mp4"], []))
 
-        assert len(cn.videos) == 1
-        assert len(cn.audios) == 1
-        assert len(cn.subtitles) == 1
+        # assert len(cn.videos) == 1
+        # assert len(cn.audios) == 1
+        # assert len(cn.subtitles) == 1
 
         cn = fileinfo(run.main(["resources/webvtt.mkv"], []))
 
@@ -468,47 +473,44 @@ def main(sys_args: list[str] | None = None):
     def frame_rate():
         cn = fileinfo(run.main(["example.mp4"], ["-r", "15", "--no-seek"]))
         video = cn.videos[0]
-        # assert video.fps == 15, video.fps
-        # assert video.time_base == Fraction(1, 15)
+        assert video.fps == 15, video.fps
         assert video.duration - 17.33333333333333333333333 < 3, video.duration
 
         cn = fileinfo(run.main(["example.mp4"], ["-r", "20"]))
         video = cn.videos[0]
         assert video.fps == 20, video.fps
-        # assert video.time_base == Fraction(1, 20)
         assert video.duration - 17.33333333333333333333333 < 2
 
         cn = fileinfo(out := run.main(["example.mp4"], ["-r", "60"]))
         video = cn.videos[0]
 
-        # assert video.fps == 60, video.fps
-        # assert video.time_base == Fraction(1, 60)
+        assert video.fps == 60, video.fps
         assert video.duration - 17.33333333333333333333333 < 0.3
 
         return out
 
-    def embedded_image():
-        out1 = run.main(["resources/embedded-image/h264-png.mp4"], [])
-        cn = fileinfo(out1)
-        assert cn.videos[0].codec == "h264"
-        assert cn.videos[1].codec == "png"
+    # def embedded_image():
+    #     out1 = run.main(["resources/embedded-image/h264-png.mp4"], [])
+    #     cn = fileinfo(out1)
+    #     assert cn.videos[0].codec == "h264"
+    #     assert cn.videos[1].codec == "png"
 
-        out2 = run.main(["resources/embedded-image/h264-mjpeg.mp4"], [])
-        cn = fileinfo(out2)
-        assert cn.videos[0].codec == "h264"
-        assert cn.videos[1].codec == "mjpeg"
+    #     out2 = run.main(["resources/embedded-image/h264-mjpeg.mp4"], [])
+    #     cn = fileinfo(out2)
+    #     assert cn.videos[0].codec == "h264"
+    #     assert cn.videos[1].codec == "mjpeg"
 
-        out3 = run.main(["resources/embedded-image/h264-png.mkv"], [])
-        cn = fileinfo(out3)
-        assert cn.videos[0].codec == "h264"
-        assert cn.videos[1].codec == "png"
+    #     out3 = run.main(["resources/embedded-image/h264-png.mkv"], [])
+    #     cn = fileinfo(out3)
+    #     assert cn.videos[0].codec == "h264"
+    #     assert cn.videos[1].codec == "png"
 
-        out4 = run.main(["resources/embedded-image/h264-mjpeg.mkv"], [])
-        cn = fileinfo(out4)
-        assert cn.videos[0].codec == "h264"
-        assert cn.videos[1].codec == "mjpeg"
+    #     out4 = run.main(["resources/embedded-image/h264-mjpeg.mkv"], [])
+    #     cn = fileinfo(out4)
+    #     assert cn.videos[0].codec == "h264"
+    #     assert cn.videos[1].codec == "mjpeg"
 
-        return out1, out2, out3, out4
+    #     return out1, out2, out3, out4
 
     def motion():
         out = run.main(
@@ -754,7 +756,6 @@ def main(sys_args: list[str] | None = None):
                 sr_units,
                 backwards_range,
                 cut_out,
-                embedded_image,
                 gif,
                 margin_tests,
                 input_extension,

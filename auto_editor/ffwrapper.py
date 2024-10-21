@@ -66,13 +66,9 @@ def mux(input: Path, output: Path, stream: int) -> None:
     output_audio_stream = output_container.add_stream("pcm_s16le")
 
     for frame in input_container.decode(input_audio_stream):
-        packet = output_audio_stream.encode(frame)
-        if packet:
-            output_container.mux(packet)
+        output_container.mux(output_audio_stream.encode(frame))
 
-    packet = output_audio_stream.encode(None)
-    if packet:
-        output_container.mux(packet)
+    output_container.mux(output_audio_stream.encode(None))
 
     output_container.close()
     input_container.close()

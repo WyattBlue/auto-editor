@@ -20,7 +20,7 @@ Examples:
 auto-editor my-huge-h264-video.mp4 -b:v 10M  # Maximum quality, big file size
 auto-editor my-h264-video.mp4 -b:v unset  # Let ffmpeg chose, efficient and good looking quality
 auto-editor i-want-this-tiny.mp4 -b:v 125k  # Set bitrate to 125 kilobytes, quality may vary
-auto-editor my-mpeg4-video.mp4 -c:v h264 -b:v unset
+auto-editor my-mpeg4-video.mp4 -c:v h264 -b:v auto
 ```
 
 ## Knowing What Encoder You're Using

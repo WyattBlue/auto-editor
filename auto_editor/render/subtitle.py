@@ -183,9 +183,11 @@ def make_new_subtitles(tl: v3, log: Log) -> list[str]:
     new_paths = []
 
     for s, sub in enumerate(tl.v1.source.subtitles):
-        parser = SubtitleParser(tl.tb)
+        if sub.codec == "mov_text":
+            continue
 
-        if sub.codec in ("webvtt", "ass", "ssa", "mov_text"):
+        parser = SubtitleParser(tl.tb)
+        if sub.codec in ("webvtt", "ass", "ssa"):
             format = sub.codec
         else:
             log.error(f"Unknown subtitle codec: {sub.codec}")

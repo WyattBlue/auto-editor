@@ -148,11 +148,12 @@ Beware that the temp directory can get quite big.
         "--my-ffmpeg": "This is equivalent to `--ffmpeg-location ffmpeg`.",
         "--audio-bitrate": """
 `--audio-bitrate` sets the target bitrate for the audio encoder.
-The value accepts a natural number and the units: ``, `k`, `K`, and `M`.
-The special value `unset` may also be used, and means: Don't pass any value to ffmpeg, let it choose a default bitrate.
+By default, the value is `auto` (let the encoder decide).
+It can be set to a natural number with units: ``, `k`, `K`, `M`, or `G`.
+
 """.strip(),
         "--video-bitrate": """
-`--video-bitrate` sets the target bitrate for the video encoder. It accepts the same format as `--audio-bitrate` and the special `unset` value is allowed.
+`--video-bitrate` sets the target bitrate for the video encoder. `auto` is set as the default. It accepts the same format as `--audio-bitrate`
 """.strip(),
         "--margin": """
 Default value: 0.2s,0.2s

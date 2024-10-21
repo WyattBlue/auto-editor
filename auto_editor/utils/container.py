@@ -80,6 +80,8 @@ def container_constructor(ext: str) -> Container:
     scodecs = set()
 
     for codec in codecs:
+        if ext == "wav" and codec == "aac":
+            continue
         kind = codec_type(codec)
         if kind == "video":
             vcodecs.add(codec)
