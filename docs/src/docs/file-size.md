@@ -18,7 +18,7 @@ auto-editor my-video.mp4 -b:v 230k
 Examples:
 ```
 auto-editor my-huge-h264-video.mp4 -b:v 10M  # Maximum quality, big file size
-auto-editor my-h264-video.mp4 -b:v unset  # Let ffmpeg chose, efficient and good looking quality
+auto-editor my-h264-video.mp4 -b:v auto  # Let ffmpeg chose, efficient and good looking quality
 auto-editor i-want-this-tiny.mp4 -b:v 125k  # Set bitrate to 125 kilobytes, quality may vary
 auto-editor my-mpeg4-video.mp4 -c:v h264 -b:v auto
 ```
@@ -32,11 +32,6 @@ Use Constant Rate Factor (CRF) unless you already know exactly what you want the
 
 If you do use video bitrate, don't set it to a high number like `10M`, it will do what you say, not what you want. libx264 with faithfully target that absurd number even if the quality gain is teeny-tiny.
 
-Recommended options:
-```
-auto-editor my-video.mp4 --my-ffmpeg -c:v libx264 -b:v unset --extras "-preset slow -crf 22"
-```
-
 [FFmpeg's wiki page explains the options you can use in more detail.](https://trac.ffmpeg.org/wiki/Encode/H.264)
 
 
@@ -47,5 +42,5 @@ Due to copyright and patent law affecting software makers, auto-editor does not 
 
 Example:
 ```
-auto-editor my-video.mp4 --my-ffmpeg -c:v hevc -b:v unset
+auto-editor my-video.mp4 --my-ffmpeg -c:v hevc -b:v auto
 ```
