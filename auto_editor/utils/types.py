@@ -111,17 +111,6 @@ def sample_rate(val: str) -> int:
     return natural(num)
 
 
-def bitrate(val: str) -> str:
-    if val == "unset":
-        return val
-    _num, unit = _split_num_str(val)
-    num = int(_num) if _num.is_integer() else _num
-    if unit not in ("", "k", "K", "M"):
-        extra = f". Did you mean `{num}M`?" if unit == "m" else ""
-        raise CoerceError(f"`{val}` is not a valid bitrate format{extra}")
-    return val
-
-
 def time(val: str, tb: Fraction) -> int:
     if ":" in val:
         boxes = val.split(":")
@@ -218,8 +207,8 @@ class Args:
     yt_dlp_extras: str | None = None
     video_codec: str = "auto"
     audio_codec: str = "auto"
-    video_bitrate: str = "10M"
-    audio_bitrate: str = "unset"
+    video_bitrate: str = "auto"
+    audio_bitrate: str = "auto"
     scale: float = 1.0
     sn: bool = False
     dn: bool = False
