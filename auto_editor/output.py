@@ -13,7 +13,10 @@ from auto_editor.utils.types import _split_num_str
 
 
 def parse_bitrate(input_: str, log: Log) -> int:
-    val, unit = _split_num_str(input_)
+    try:
+        val, unit = _split_num_str(input_)
+    except Exception as e:
+        log.error(e)
 
     if unit.lower() == "k":
         return int(val * 1000)
