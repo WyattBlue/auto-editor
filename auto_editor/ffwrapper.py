@@ -28,12 +28,11 @@ def initFFmpeg(log: Log, ff_location: str | None, my_ffmpeg: bool) -> FFmpeg:
     if path is None:
         log.error("Did not find ffmpeg on PATH.")
 
-    return FFmpeg(log, path)
+    return FFmpeg(path)
 
 
 @dataclass(slots=True)
 class FFmpeg:
-    log: Log
     path: str
 
     def run(self, cmd: list[str]) -> None:

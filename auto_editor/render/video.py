@@ -8,7 +8,6 @@ import numpy as np
 
 from auto_editor.output import parse_bitrate
 from auto_editor.timeline import TlImage, TlRect, TlVideo
-from auto_editor.utils.types import color
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -203,7 +202,7 @@ def render_av(
 
     bar.start(tl.end, "Creating new video")
 
-    bg = color(args.background)
+    bg = args.background
     null_frame = make_solid(target_width, target_height, target_pix_fmt, bg)
     frame_index = -1
 
