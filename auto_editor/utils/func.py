@@ -81,17 +81,6 @@ def mut_margin(arr: BoolList, start_m: int, end_m: int) -> None:
             arr[max(i + end_m, 0) : i] = False
 
 
-def merge(start_list: np.ndarray, end_list: np.ndarray) -> BoolList:
-    result = np.zeros((len(start_list)), dtype=np.bool_)
-
-    for i, item in enumerate(start_list):
-        if item == True:
-            where = np.where(end_list[i:])[0]
-            if len(where) > 0:
-                result[i : where[0]] = True
-    return result
-
-
 def get_stdout(cmd: list[str]) -> str:
     from subprocess import DEVNULL, PIPE, Popen
 
