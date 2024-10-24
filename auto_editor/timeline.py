@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from auto_editor.ffwrapper import initFileInfo, mux
 from auto_editor.lib.contracts import *
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
-from auto_editor.utils.types import color, natural, number, threshold
+from auto_editor.utils.types import natural, number, parse_color, threshold
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -165,7 +165,7 @@ rect_builder = pAttrs(
     pAttr("y", Required, is_int, int),
     pAttr("width", Required, is_int, int),
     pAttr("height", Required, is_int, int),
-    pAttr("fill", "#c4c4c4", is_str, color),
+    pAttr("fill", "#c4c4c4", is_str, parse_color),
 )
 visual_objects = {
     "rect": (TlRect, rect_builder),

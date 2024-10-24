@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Literal
 
 
 class CoerceError(Exception):
@@ -156,16 +155,7 @@ def speed_range(val: str) -> tuple[float, str, str]:
     return number(a[0]), a[1], a[2]
 
 
-Stream = int | Literal["all"]
-
-
-def stream(val: str) -> Stream:
-    if val == "all" or val == "'all":
-        return "all"
-    return natural(val)
-
-
-def color(val: str) -> str:
+def parse_color(val: str) -> str:
     """
     Convert a color str into an RGB tuple
 
@@ -219,7 +209,7 @@ class Args:
     frame_rate: Fraction | None = None
     sample_rate: int | None = None
     resolution: tuple[int, int] | None = None
-    background: str = "#000"
+    background: str = "#000000"
     edit_based_on: str = "audio"
     keep_tracks_separate: bool = False
     audio_normalize: str = "#f"

@@ -13,10 +13,10 @@ from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
     Args,
-    color,
     frame_rate,
     margin,
     number,
+    parse_color,
     resolution,
     sample_rate,
     speed,
@@ -108,7 +108,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--background",
         "-b",
-        type=color,
+        type=parse_color,
         metavar="COLOR",
         help="Set the background as a solid RGB color",
     )
