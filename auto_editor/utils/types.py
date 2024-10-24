@@ -233,8 +233,6 @@ class Args:
     version: bool = False
     debug: bool = False
     config: bool = False
-    show_ffmpeg_commands: bool = False
-    show_ffmpeg_output: bool = False
     quiet: bool = False
     preview: bool = False
     no_cache: bool = False

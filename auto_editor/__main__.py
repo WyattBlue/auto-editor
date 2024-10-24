@@ -179,12 +179,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Set what type of progress bar to use",
     )
     parser.add_argument("--debug", flag=True, help="Show debugging messages and values")
-    parser.add_argument(
-        "--show-ffmpeg-commands", flag=True, help="Show ffmpeg commands"
-    )
-    parser.add_argument(
-        "--show-ffmpeg-output", flag=True, help="Show ffmpeg stdout and stderr"
-    )
     parser.add_argument("--quiet", "-q", flag=True, help="Display less output")
     parser.add_argument(
         "--preview",
@@ -363,13 +357,7 @@ def main() -> None:
     is_machine = args.progress == "machine"
     log = Log(args.debug, args.quiet, args.temp_dir, is_machine, no_color)
 
-    ffmpeg = initFFmpeg(
-        log,
-        args.ffmpeg_location,
-        args.my_ffmpeg,
-        args.show_ffmpeg_commands,
-        args.show_ffmpeg_output,
-    )
+    ffmpeg = initFFmpeg(log, args.ffmpeg_location, args.my_ffmpeg)
     paths = []
     for my_input in args.input:
         if my_input.startswith("http://") or my_input.startswith("https://"):
