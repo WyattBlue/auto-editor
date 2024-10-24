@@ -1,21 +1,17 @@
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 from shutil import which
 from subprocess import PIPE, Popen, run
-from typing import Any
 
 import av
 
 from auto_editor.utils.log import Log
 
 
-def initFFmpeg(
-    log: Log, ff_location: str | None, my_ffmpeg: bool, show_cmd: bool, debug: bool
-) -> FFmpeg:
+def initFFmpeg(log: Log, ff_location: str | None, my_ffmpeg: bool) -> FFmpeg:
     if ff_location is not None:
         program = ff_location
     elif my_ffmpeg:
@@ -32,30 +28,21 @@ def initFFmpeg(
     if path is None:
         log.error("Did not find ffmpeg on PATH.")
 
-    return FFmpeg(log, path, show_cmd, debug)
+    return FFmpeg(log, path)
 
 
 @dataclass(slots=True)
 class FFmpeg:
     log: Log
     path: str
-    show_cmd: bool
-    debug: bool
 
     def run(self, cmd: list[str]) -> None:
         cmd = [self.path, "-hide_banner", "-y"] + cmd
-        if not self.debug:
-            cmd.extend(["-nostats", "-loglevel", "error"])
-        if self.show_cmd:
-            sys.stderr.write(f"{' '.join(cmd)}\n\n")
+        cmd.extend(["-nostats", "-loglevel", "error"])
         run(cmd)
 
-    def Popen(
-        self, cmd: list[str], stdin: Any = None, stdout: Any = PIPE, stderr: Any = None
-    ) -> Popen:
-        if self.show_cmd:
-            sys.stderr.write(f"{self.path} {' '.join(cmd)}\n\n")
-        return Popen([self.path] + cmd, stdin=stdin, stdout=stdout, stderr=stderr)
+    def Popen(self, cmd: list[str]) -> Popen:
+        return Popen([self.path] + cmd, stdout=PIPE, stderr=PIPE)
 
 
 def mux(input: Path, output: Path, stream: int) -> None:

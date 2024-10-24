@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 from pathlib import Path
 from platform import system
-from subprocess import PIPE
 
 import av
 import numpy as np
@@ -122,8 +121,7 @@ def apply_audio_normalization(
             "null",
             file_null,
         ]
-        process = ffmpeg.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        stderr = process.communicate()[1]
+        stderr = ffmpeg.Popen(cmd).communicate()[1]
         name, filter_args = parse_ebu_bytes(norm, stderr, log)
     else:
         assert "t" in norm
