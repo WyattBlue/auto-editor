@@ -105,25 +105,3 @@ def aspect_ratio(width: int, height: int) -> tuple[int, int]:
 
     c = gcd(width, height)
     return width // c, height // c
-
-
-def human_readable_time(time_in_secs: float) -> str:
-    units = "seconds"
-    if time_in_secs >= 3600:
-        time_in_secs = round(time_in_secs / 3600, 1)
-        if time_in_secs % 1 == 0:
-            time_in_secs = round(time_in_secs)
-        units = "hours"
-    if time_in_secs >= 60:
-        time_in_secs = round(time_in_secs / 60, 1)
-        if time_in_secs >= 10 or time_in_secs % 1 == 0:
-            time_in_secs = round(time_in_secs)
-        units = "minutes"
-    return f"{time_in_secs} {units}"
-
-
-def append_filename(path: str, val: str) -> str:
-    from os.path import splitext
-
-    root, ext = splitext(path)
-    return root + val + ext

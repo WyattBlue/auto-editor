@@ -157,7 +157,7 @@ def make_srt(input_: Input, stream: int) -> str:
     return output_bytes.getvalue()
 
 
-def _ensure(input_: Input, format: str, stream: int, log: Log) -> str:
+def _ensure(input_: Input, format: str, stream: int) -> str:
     output_bytes = io.BytesIO()
     output = av.open(output_bytes, "w", format=format)
 
@@ -195,7 +195,7 @@ def make_new_subtitles(tl: v3, log: Log) -> list[str]:
         if sub.codec == "mov_text":
             ret = make_srt(input_, s)
         else:
-            ret = _ensure(input_, format, s, log)
+            ret = _ensure(input_, format, s)
         parser.parse(ret, sub.codec)
         parser.edit(tl.v1.chunks)
 

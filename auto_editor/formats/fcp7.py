@@ -485,7 +485,7 @@ def premiere_write_audio(audio: Element, make_filedef, src: FileInfo, tl: v3) ->
             audio.append(track)
 
 
-def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3, log: Log) -> None:
+def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3) -> None:
     width, height = tl.res
     timebase, ntsc = set_tb_ntsc(tl.tb)
 
