@@ -35,11 +35,6 @@ class pAttrs:
         self.attrs = attrs
 
 
-def _norm_name(s: str) -> str:
-    # Python does not allow - in variable names
-    return s.replace("-", "_")
-
-
 class PLexer:
     __slots__ = ("text", "pos", "char")
 
@@ -100,6 +95,10 @@ def parse_with_palet(
 
     KEYWORD_SEP = "="
     kwargs: dict[str, Any] = {}
+
+    def _norm_name(s: str) -> str:
+        # Python does not allow - in variable names
+        return s.replace("-", "_")
 
     def go(text: str, c: Any) -> Any:
         try:
@@ -174,9 +173,7 @@ def parse_with_palet(
     return kwargs
 
 
-def parse_method(
-    name: str, text: str, env: Env
-) -> tuple[str, list[Any], dict[str, Any]]:
+def parse_method(name: str, text: str) -> tuple[str, list[Any], dict[str, Any]]:
     from auto_editor.lang.palet import Lexer, Parser
 
     # Positional Arguments

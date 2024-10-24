@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     Number = int | float | complex | Fraction
-    Real = int | float | Fraction
     BoolList = NDArray[np.bool_]
     Node = tuple
 
@@ -830,12 +829,6 @@ def make_standard_env() -> dict[str, Any]:
             return reduce(lambda a, b: boolop(a, b, logical_xor), vals)
         check_args("xor", vals, (2, None), (is_bool,))
         return reduce(lambda a, b: a ^ b, vals)
-
-    def string_ref(s: str, ref: int) -> Char:
-        try:
-            return Char(s[ref])
-        except IndexError:
-            raise MyError(f"string index {ref} is out of range")
 
     def number_to_string(val: Number) -> str:
         if isinstance(val, complex):

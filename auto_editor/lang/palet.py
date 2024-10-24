@@ -353,9 +353,7 @@ class Lexer:
             if is_method:
                 from auto_editor.utils.cmdkw import parse_method
 
-                return Token(
-                    M, parse_method(name, result, env), self.lineno, self.column
-                )
+                return Token(M, parse_method(name, result), self.lineno, self.column)
 
             if self.char == ".":  # handle `object.method` syntax
                 self.advance()
