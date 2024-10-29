@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 from shutil import which
-from subprocess import PIPE, Popen, run
+from subprocess import PIPE, Popen
 
 import av
 
@@ -34,11 +34,6 @@ def initFFmpeg(log: Log, ff_location: str | None, my_ffmpeg: bool) -> FFmpeg:
 @dataclass(slots=True)
 class FFmpeg:
     path: str
-
-    def run(self, cmd: list[str]) -> None:
-        cmd = [self.path, "-hide_banner", "-y"] + cmd
-        cmd.extend(["-nostats", "-loglevel", "error"])
-        run(cmd)
 
     def Popen(self, cmd: list[str]) -> Popen:
         return Popen([self.path] + cmd, stdout=PIPE, stderr=PIPE)

@@ -633,6 +633,8 @@ def edit_subtitle(pattern, stream=0, **kwargs):
 
 
 class StackTraceManager:
+    __slots__ = ("stack",)
+
     def __init__(self) -> None:
         self.stack: list[Sym] = []
 
@@ -642,12 +644,6 @@ class StackTraceManager:
     def pop(self) -> None:
         if self.stack:
             self.stack.pop()
-
-    def get_stacktrace(self) -> str:
-        return "\n".join(
-            f"  at {sym.val} ({sym.lineno}:{sym.column})"
-            for sym in reversed(self.stack)
-        )
 
 
 stack_trace_manager = StackTraceManager()
