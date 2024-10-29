@@ -16,6 +16,7 @@ from auto_editor.output import Ensure
 from auto_editor.timeline import TlAudio, v3
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
+from auto_editor.utils.container import Container
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import Args
 from auto_editor.wavfile import AudioData, read, write
@@ -236,12 +237,90 @@ def process_audio_clip(
     return read(output_bytes)[1]
 
 
+def mix_audio_files(sr: int, audio_paths: list[str], output_path: str) -> None:
+    mixed_audio = None
+    max_length = 0
+
+    # First pass: determine the maximum length
+    for path in audio_paths:
+        container = av.open(path)
+        stream = container.streams.audio[0]
+
+        # Calculate duration in samples
+        assert stream.duration is not None
+        assert stream.time_base is not None
+        duration_samples = int(stream.duration * sr / stream.time_base.denominator)
+        max_length = max(max_length, duration_samples)
+        container.close()
+
+    # Second pass: read and mix audio
+    for path in audio_paths:
+        container = av.open(path)
+        stream = container.streams.audio[0]
+
+        resampler = av.audio.resampler.AudioResampler(
+            format="s16", layout="mono", rate=sr
+        )
+
+        audio_array: list[np.ndarray] = []
+        for frame in container.decode(audio=0):
+            frame.pts = None
+            resampled = resampler.resample(frame)[0]
+            audio_array.extend(resampled.to_ndarray().flatten())
+
+        # Pad or truncate to max_length
+        current_audio = np.array(audio_array[:max_length])
+        if len(current_audio) < max_length:
+            current_audio = np.pad(
+                current_audio, (0, max_length - len(current_audio)), "constant"
+            )
+
+        if mixed_audio is None:
+            mixed_audio = current_audio.astype(np.float32)
+        else:
+            mixed_audio += current_audio.astype(np.float32)
+
+        container.close()
+
+    if mixed_audio is None:
+        raise ValueError("mixed_audio is None")
+
+    # Normalize the mixed audio
+    max_val = np.max(np.abs(mixed_audio))
+    if max_val > 0:
+        mixed_audio = mixed_audio * (32767 / max_val)
+    mixed_audio = mixed_audio.astype(np.int16)  # type: ignore
+
+    output_container = av.open(output_path, mode="w")
+    output_stream = output_container.add_stream("pcm_s16le", rate=sr)
+
+    chunk_size = sr  # Process 1 second at a time
+    for i in range(0, len(mixed_audio), chunk_size):
+        # Shape becomes (1, samples) for mono
+        chunk = np.array([mixed_audio[i : i + chunk_size]])
+
+        frame = av.AudioFrame.from_ndarray(chunk, format="s16", layout="mono")
+        frame.rate = sr
+        frame.pts = i  # Set presentation timestamp
+
+        output_container.mux(output_stream.encode(frame))
+
+    output_container.mux(output_stream.encode(None))
+    output_container.close()
+
+
 def make_new_audio(
-    tl: v3, ensure: Ensure, args: Args, ffmpeg: FFmpeg, bar: Bar, log: Log
+    tl: v3,
+    ctr: Container,
+    ensure: Ensure,
+    args: Args,
+    ffmpeg: FFmpeg,
+    bar: Bar,
+    log: Log,
 ) -> list[str]:
     sr = tl.sr
     tb = tl.tb
-    output = []
+    output: list[str] = []
     samples: dict[tuple[FileInfo, int], AudioData] = {}
 
     norm = parse_norm(args.audio_normalize, log)
@@ -319,4 +398,9 @@ def make_new_audio(
         Path(temp, "asdf.map").unlink(missing_ok=True)
     except PermissionError:
         pass
+
+    if not (args.keep_tracks_separate and ctr.max_audios is None) and len(output) > 1:
+        new_a_file = f"{Path(temp, 'new_audio.wav')}"
+        mix_audio_files(sr, output, new_a_file)
+        return [new_a_file]
     return output
