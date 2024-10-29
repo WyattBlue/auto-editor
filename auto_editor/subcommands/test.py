@@ -360,7 +360,7 @@ def main(sys_args: list[str] | None = None):
                 """{"version": "1", "source": "example.mp4", "chunks": [ [0, 26, 1.0], [26, 34, 0] ]}"""
             )
 
-        return run.main(["v1.json"], [])
+        return "v1.json", run.main(["v1.json"], [])
 
     def premiere_named_export():
         run.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
