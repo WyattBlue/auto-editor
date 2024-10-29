@@ -55,12 +55,9 @@ def codec_type(x: str) -> str:
         return "subtitle"
 
     try:
-        return Codec(x, "r").type
+        return Codec(x, "w").type
     except Exception:
-        try:
-            return Codec(x, "w").type
-        except Exception:
-            return ""
+        return ""
 
 
 def container_constructor(ext: str) -> Container:
