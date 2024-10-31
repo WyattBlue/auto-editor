@@ -11,31 +11,29 @@ import av
 from auto_editor.utils.log import Log
 
 
-def initFFmpeg(log: Log, ff_location: str | None, my_ffmpeg: bool) -> FFmpeg:
-    if ff_location is not None:
-        program = ff_location
-    elif my_ffmpeg:
-        program = "ffmpeg"
-    else:
-        try:
-            import ae_ffmpeg
-
-            program = ae_ffmpeg.get_path()
-        except ImportError:
-            program = "ffmpeg"
-
-    path: str | None = which(program)
-    if path is None:
-        log.error("Did not find ffmpeg on PATH.")
-
-    return FFmpeg(path)
+def _get_ffmpeg(reason: str, ffloc: str | None, log: Log) -> str:
+    program = "ffmpeg" if ffloc is None else ffloc
+    if (path := which(program)) is None:
+        log.error(f"{reason} needs ffmpeg cli but couldn't find ffmpeg on PATH.")
+    return path
 
 
 @dataclass(slots=True)
 class FFmpeg:
-    path: str
+    ffmpeg_location: str | None
+    path: str | None = None
 
-    def Popen(self, cmd: list[str]) -> Popen:
+    def get_path(self, reason: str, log: Log) -> str:
+        if self.path is not None:
+            return self.path
+
+        self.path = _get_ffmpeg(reason, self.ffmpeg_location, log)
+        return self.path
+
+    def Popen(self, reason: str, cmd: list[str], log: Log) -> Popen:
+        if self.path is None:
+            self.path = _get_ffmpeg(reason, self.ffmpeg_location, log)
+
         return Popen([self.path] + cmd, stdout=PIPE, stderr=PIPE)
 
 

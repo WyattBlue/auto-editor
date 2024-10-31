@@ -122,7 +122,7 @@ def apply_audio_normalization(
             "null",
             file_null,
         ]
-        stderr = ffmpeg.Popen(cmd).communicate()[1]
+        stderr = ffmpeg.Popen("EBU", cmd, log).communicate()[1]
         name, filter_args = parse_ebu_bytes(norm, stderr, log)
     else:
         assert "t" in norm
