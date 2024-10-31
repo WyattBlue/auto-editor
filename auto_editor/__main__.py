@@ -8,7 +8,7 @@ from subprocess import run
 
 import auto_editor
 from auto_editor.edit import edit_media
-from auto_editor.ffwrapper import FFmpeg, initFFmpeg
+from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -166,11 +166,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         metavar="PATH",
         help="Set a custom path to the ffmpeg location",
     )
-    parser.add_argument(
-        "--my-ffmpeg",
-        flag=True,
-        help="Use the ffmpeg on your PATH instead of the one packaged",
-    )
     parser.add_text("Display Options:")
     parser.add_argument(
         "--progress",
@@ -279,7 +274,7 @@ def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
 
     yt_dlp_path = args.yt_dlp_location
 
-    cmd = ["--ffmpeg-location", ffmpeg.path]
+    cmd = ["--ffmpeg-location", ffmpeg.get_path("yt-dlp", log)]
 
     if download_format is not None:
         cmd.extend(["-f", download_format])
@@ -357,7 +352,7 @@ def main() -> None:
     is_machine = args.progress == "machine"
     log = Log(args.debug, args.quiet, args.temp_dir, is_machine, no_color)
 
-    ffmpeg = initFFmpeg(log, args.ffmpeg_location, args.my_ffmpeg)
+    ffmpeg = FFmpeg(args.ffmpeg_location)
     paths = []
     for my_input in args.input:
         if my_input.startswith("http://") or my_input.startswith("https://"):
