@@ -343,8 +343,8 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
         for i, sub_path in enumerate(sub_paths):
             subtitle_input = av.open(sub_path)
             subtitle_inputs.append(subtitle_input)
-            subtitle_stream = output.add_stream(
-                template=subtitle_input.streams.subtitles[0]
+            subtitle_stream = output.add_stream_from_template(
+                subtitle_input.streams.subtitles[0]
             )
             if i < len(src.subtitles) and src.subtitles[i].lang is not None:
                 subtitle_stream.metadata["language"] = src.subtitles[i].lang  # type: ignore

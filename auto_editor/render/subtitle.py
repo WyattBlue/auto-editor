@@ -162,7 +162,7 @@ def _ensure(input_: Input, format: str, stream: int) -> str:
     output = av.open(output_bytes, "w", format=format)
 
     in_stream = input_.streams.subtitles[stream]
-    out_stream = output.add_stream(template=in_stream)
+    out_stream = output.add_stream_from_template(in_stream)
 
     for packet in input_.demux(in_stream):
         if packet.dts is None:
