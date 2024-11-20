@@ -242,11 +242,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Disable the inclusion of data streams in the output file",
     )
     parser.add_argument(
-        "--extras",
-        metavar="CMD",
-        help="Add extra options for ffmpeg. Must be in quotes",
-    )
-    parser.add_argument(
         "--config", flag=True, help="When set, look for `config.pal` and run it"
     )
     parser.add_argument(
