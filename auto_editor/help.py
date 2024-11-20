@@ -144,8 +144,6 @@ If not set, tempdir will be set with Python's tempfile module
 The directory doesn't have to exist beforehand, however, the root path must be valid.
 Beware that the temp directory can get quite big.
 """.strip(),
-        "--ffmpeg-location": "This takes precedence over `--my-ffmpeg`.",
-        "--my-ffmpeg": "This is equivalent to `--ffmpeg-location ffmpeg`.",
         "--audio-bitrate": """
 `--audio-bitrate` sets the target bitrate for the audio encoder.
 By default, the value is `auto` (let the encoder decide).
