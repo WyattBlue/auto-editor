@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
-from shutil import which
-from subprocess import PIPE, Popen
 
 import av
 

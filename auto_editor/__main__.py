@@ -8,7 +8,6 @@ from subprocess import run
 
 import auto_editor
 from auto_editor.edit import edit_media
-from auto_editor.ffwrapper import FFmpeg
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
@@ -262,6 +261,7 @@ def download_video(my_input: str, args: Args, log: Log) -> str:
     else:
         output_format = args.output_format
 
+    cmd = []
     if download_format is not None:
         cmd.extend(["-f", download_format])
 
