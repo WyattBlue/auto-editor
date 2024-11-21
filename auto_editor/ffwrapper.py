@@ -11,32 +11,6 @@ import av
 from auto_editor.utils.log import Log
 
 
-def _get_ffmpeg(reason: str, ffloc: str | None, log: Log) -> str:
-    program = "ffmpeg" if ffloc is None else ffloc
-    if (path := which(program)) is None:
-        log.error(f"{reason} needs ffmpeg cli but couldn't find ffmpeg on PATH.")
-    return path
-
-
-@dataclass(slots=True)
-class FFmpeg:
-    ffmpeg_location: str | None
-    path: str | None = None
-
-    def get_path(self, reason: str, log: Log) -> str:
-        if self.path is not None:
-            return self.path
-
-        self.path = _get_ffmpeg(reason, self.ffmpeg_location, log)
-        return self.path
-
-    def Popen(self, reason: str, cmd: list[str], log: Log) -> Popen:
-        if self.path is None:
-            self.path = _get_ffmpeg(reason, self.ffmpeg_location, log)
-
-        return Popen([self.path] + cmd, stdout=PIPE, stderr=PIPE)
-
-
 def mux(input: Path, output: Path, stream: int) -> None:
     input_container = av.open(input, "r")
     output_container = av.open(output, "w")

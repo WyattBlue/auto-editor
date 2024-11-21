@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from platform import system
 
 import av
 import numpy as np
+from av.filter.loudnorm import stats
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.lang.json import Lexer, Parser
 from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import andc, between_c, is_int_or_float
@@ -56,25 +56,11 @@ def parse_norm(norm: str, log: Log) -> dict | None:
         log.error(e)
 
 
-def parse_ebu_bytes(norm: dict, stderr: bytes, log: Log) -> tuple[str, str]:
-    start = end = 0
-    lines = stderr.splitlines()
-
-    for index, line in enumerate(lines):
-        if line.startswith(b"[Parsed_loudnorm"):
-            start = index + 1
-            continue
-        if start != 0 and line.startswith(b"}"):
-            end = index + 1
-            break
-
-    if start == 0 or end == 0:
-        log.error(f"Invalid loudnorm stats.\n{stderr!r}")
-
+def parse_ebu_bytes(norm: dict, stat: bytes, log: Log) -> tuple[str, str]:
     try:
-        parsed = Parser(Lexer("loudnorm", b"\n".join(lines[start:end]))).expr()
+        parsed = Parser(Lexer("loudnorm", stat)).expr()
     except MyError:
-        log.error(f"Invalid loudnorm stats.\n{start=},{end=}\n{stderr!r}")
+        log.error(f"Invalid loudnorm stats.\n{stat!r}")
 
     for key in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset"):
         val = float(parsed[key])
@@ -101,29 +87,17 @@ def parse_ebu_bytes(norm: dict, stderr: bytes, log: Log) -> tuple[str, str]:
 
 
 def apply_audio_normalization(
-    ffmpeg: FFmpeg, norm: dict, pre_master: Path, path: Path, log: Log
+    norm: dict, pre_master: Path, path: Path, log: Log
 ) -> None:
     if norm["tag"] == "ebu":
         first_pass = (
-            f"loudnorm=i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:"
-            f"offset={norm['gain']}:print_format=json"
+            f"i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:" f"offset={norm['gain']}"
         )
         log.debug(f"audio norm first pass: {first_pass}")
-        file_null = "NUL" if system() in ("Windows", "cli") else "/dev/null"
-        cmd = [
-            "-hide_banner",
-            "-i",
-            f"{pre_master}",
-            "-af",
-            first_pass,
-            "-vn",
-            "-sn",
-            "-f",
-            "null",
-            file_null,
-        ]
-        stderr = ffmpeg.Popen("EBU", cmd, log).communicate()[1]
-        name, filter_args = parse_ebu_bytes(norm, stderr, log)
+        with av.open(f"{pre_master}") as container:
+            stats_ = stats(first_pass, container.streams.audio[0])
+        av.logging.set_level(None)
+        name, filter_args = parse_ebu_bytes(norm, stats_, log)
     else:
         assert "t" in norm
 
@@ -310,13 +284,7 @@ def mix_audio_files(sr: int, audio_paths: list[str], output_path: str) -> None:
 
 
 def make_new_audio(
-    tl: v3,
-    ctr: Container,
-    ensure: Ensure,
-    args: Args,
-    ffmpeg: FFmpeg,
-    bar: Bar,
-    log: Log,
+    tl: v3, ctr: Container, ensure: Ensure, args: Args, bar: Bar, log: Log
 ) -> list[str]:
     sr = tl.sr
     tb = tl.tb
@@ -390,7 +358,7 @@ def make_new_audio(
                 with open(pre_master, "wb") as fid:
                     write(fid, sr, arr)
 
-                apply_audio_normalization(ffmpeg, norm, pre_master, path, log)
+                apply_audio_normalization(norm, pre_master, path, log)
 
         bar.end()
 

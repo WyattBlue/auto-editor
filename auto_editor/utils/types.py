@@ -217,7 +217,6 @@ class Args:
     player: str | None = None
     no_open: bool = False
     temp_dir: str | None = None
-    ffmpeg_location: str | None = None
     progress: str = "modern"
     version: bool = False
     debug: bool = False
