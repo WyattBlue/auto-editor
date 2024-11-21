@@ -161,11 +161,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         metavar="PATH",
         help="Set where the temporary directory is located",
     )
-    parser.add_argument(
-        "--ffmpeg-location",
-        metavar="PATH",
-        help="Set a custom path to the ffmpeg location",
-    )
     parser.add_text("Display Options:")
     parser.add_argument(
         "--progress",
@@ -251,7 +246,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
+def download_video(my_input: str, args: Args, log: Log) -> str:
     log.conwrite("Downloading video...")
 
     def get_domain(url: str) -> str:
@@ -267,18 +262,14 @@ def download_video(my_input: str, args: Args, ffmpeg: FFmpeg, log: Log) -> str:
     else:
         output_format = args.output_format
 
-    yt_dlp_path = args.yt_dlp_location
-
-    cmd = ["--ffmpeg-location", ffmpeg.get_path("yt-dlp", log)]
-
     if download_format is not None:
         cmd.extend(["-f", download_format])
 
     cmd.extend(["-o", output_format, my_input])
-
     if args.yt_dlp_extras is not None:
         cmd.extend(args.yt_dlp_extras.split(" "))
 
+    yt_dlp_path = args.yt_dlp_location
     try:
         location = get_stdout(
             [yt_dlp_path, "--get-filename", "--no-warnings"] + cmd
@@ -347,11 +338,10 @@ def main() -> None:
     is_machine = args.progress == "machine"
     log = Log(args.debug, args.quiet, args.temp_dir, is_machine, no_color)
 
-    ffmpeg = FFmpeg(args.ffmpeg_location)
     paths = []
     for my_input in args.input:
         if my_input.startswith("http://") or my_input.startswith("https://"):
-            paths.append(download_video(my_input, args, ffmpeg, log))
+            paths.append(download_video(my_input, args, log))
         else:
             if not splitext(my_input)[1]:
                 if isdir(my_input):
@@ -365,7 +355,7 @@ def main() -> None:
             paths.append(my_input)
 
     try:
-        edit_media(paths, ffmpeg, args, log)
+        edit_media(paths, args, log)
     except KeyboardInterrupt:
         log.error("Keyboard Interrupt")
     log.cleanup()

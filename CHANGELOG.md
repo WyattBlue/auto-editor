@@ -1,3 +1,15 @@
+# 26.1.0
+
+## Features
+ - Use PyAV 14.
+
+## Fixes
+ - Remove `--ffmpeg-location` arg.
+ - Remove help text for recently removed args.
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.0.1...26.1.0
+
+
 # 26.0.1
 
 ## Fixes
@@ -7,7 +19,7 @@
  - Remove the `ae-ffmpeg` package dependency.
  - Remove unused args, functions.
 
- **Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.0.0...26.0.1
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.0.0...26.0.1
 
 
 # 26.0.0

@@ -9,8 +9,8 @@ license = { text = "Unlicense" }
 authors = [{ name = "WyattBlue", email = "wyattblue@auto-editor.com" }]
 requires-python = ">=3.10,<3.14"
 dependencies = [
-    "numpy>=1.23.0,<3.0",
-    "pyav==13.1.*",
+    "numpy>=1.24,<3.0",
+    "pyav==14.0.0rc4",
 ]
 keywords = [
     "video", "audio", "media", "editor", "editing",

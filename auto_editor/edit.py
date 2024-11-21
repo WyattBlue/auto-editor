@@ -10,7 +10,7 @@ from typing import Any
 import av
 from av import AudioResampler
 
-from auto_editor.ffwrapper import FFmpeg, FileInfo, initFileInfo
+from auto_editor.ffwrapper import FileInfo, initFileInfo
 from auto_editor.lib.contracts import is_int, is_str
 from auto_editor.make_layers import clipify, make_av, make_timeline
 from auto_editor.output import Ensure, parse_bitrate
@@ -160,7 +160,7 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
     log.error(f"'{name}': Export must be [{', '.join([s for s in parsing.keys()])}]")
 
 
-def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
+def edit_media(paths: list[str], args: Args, log: Log) -> None:
     bar = initBar(args.progress)
     tl = None
 
@@ -294,7 +294,7 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
 
         if ctr.default_aud != "none":
             ensure = Ensure(bar, samplerate, log)
-            audio_paths = make_new_audio(tl, ctr, ensure, args, ffmpeg, bar, log)
+            audio_paths = make_new_audio(tl, ctr, ensure, args, bar, log)
         else:
             audio_paths = []
 
@@ -343,8 +343,8 @@ def edit_media(paths: list[str], ffmpeg: FFmpeg, args: Args, log: Log) -> None:
         for i, sub_path in enumerate(sub_paths):
             subtitle_input = av.open(sub_path)
             subtitle_inputs.append(subtitle_input)
-            subtitle_stream = output.add_stream(
-                template=subtitle_input.streams.subtitles[0]
+            subtitle_stream = output.add_stream_from_template(
+                subtitle_input.streams.subtitles[0]
             )
             if i < len(src.subtitles) and src.subtitles[i].lang is not None:
                 subtitle_stream.metadata["language"] = src.subtitles[i].lang  # type: ignore
