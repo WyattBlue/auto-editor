@@ -33,13 +33,12 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "-m",
         type=margin,
         metavar="LENGTH",
-        help='Set sections near "loud" as "loud" too if section is less than LENGTH away.',
+        help='Set sections near "loud" as "loud" too if section is less than LENGTH away',
     )
     parser.add_argument(
-        "--edit-based-on",
         "--edit",
         metavar="METHOD",
-        help="Decide which method to use when making edits",
+        help="Set an expression which determines how to make auto edits",
     )
     parser.add_argument(
         "--silent-speed",
@@ -147,7 +146,7 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--output",
         "-o",
         metavar="FILE",
-        help="Set the name/path of the new output file.",
+        help="Set the name/path of the new output file",
     )
     parser.add_argument(
         "--player", "-p", metavar="CMD", help="Set player to open output media files"
@@ -312,6 +311,7 @@ def main() -> None:
             ({"--export-as-json"}, ["--export", "json"]),
             ({"--export-as-clip-sequence", "-excs"}, ["--export", "clip-sequence"]),
             ({"--keep-tracks-seperate"}, ["--keep-tracks-separate"]),
+            ({"--edit-based-on"}, ["--edit"]),
         ],
     )
 

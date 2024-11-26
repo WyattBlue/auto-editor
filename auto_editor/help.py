@@ -24,9 +24,22 @@ example:
 will set the speed from 400 ticks to 800 ticks to 2.5x
 If timebase is 30, 400 ticks to 800 means 13.33 to 26.66 seconds
 """.strip(),
-        "--edit-based-on": """
+        "--edit": """
 Evaluates a palet expression that returns a bool-array?. The array is then used for
 editing.
+
+Examples:
+  --edit audio
+  --edit audio:0.03           ;  Change the threshold. Can be a value between 0-1.
+  --edit audio:3%             ;  You can also use the `%` macro.
+  --edit audio:0.03,stream=0  ;  Only consider the first stream for editing.
+  --edit audio:stream=1,threshold=0.05  ; Here's how you use keyword arguments.
+  --edit (or audio:0.04,stream=0 audio:0.08,stream=1)  ; Consider both streams for editing (merge with logical or), but with different thresholds.
+  --edit motion
+  --edit motion:0.02,blur=3
+  --edit (or audio:0.04 motion:0.02,blur=3)
+  --edit none
+  --edit all/e
 
 Editing Methods:
  - audio  ; Audio silence/loudness detection
@@ -52,19 +65,6 @@ Editing Methods:
 
  - none   ; Do not modify the media in anyway; mark all sections as "loud" (1).
  - all/e  ; Cut out everything out; mark all sections as "silent" (0).
-
-
-Command-line Examples:
-  --edit audio
-  --edit audio:threshold=4%
-  --edit audio:threshold=0.03
-  --edit audio:stream=1
-  --edit (or audio:4%,stream=0 audio:8%,stream=1) ; `threshold` is first
-  --edit motion
-  --edit motion:threshold=2%,blur=3
-  --edit (or audio:4% motion:2%,blur=3)
-  --edit none
-  --edit all/e
 """.strip(),
         "--export": """
 This option controls how timelines are exported.
