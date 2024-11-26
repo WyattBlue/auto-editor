@@ -210,7 +210,7 @@ class Args:
     sample_rate: int | None = None
     resolution: tuple[int, int] | None = None
     background: str = "#000000"
-    edit_based_on: str = "audio"
+    edit: str = "audio"
     keep_tracks_separate: bool = False
     audio_normalize: str = "#f"
     export: str | None = None

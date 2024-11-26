@@ -139,7 +139,7 @@ def make_timeline(
 
     for i, src in enumerate(sources):
         try:
-            parser = Parser(Lexer("`--edit`", args.edit_based_on))
+            parser = Parser(Lexer("`--edit`", args.edit))
             if log.is_debug:
                 log.debug(f"edit: {parser}")
 
