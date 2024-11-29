@@ -163,6 +163,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             file_info[file]["subtitle"].append(sub)
 
     if args.json:
+        if sys.platform == "win32":
+            sys.stdout.reconfigure(encoding="utf-8")
         dump(file_info, sys.stdout, indent=4)
         return
 
