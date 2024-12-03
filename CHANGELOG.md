@@ -6,6 +6,7 @@
 ## Fixes
  - Remove `--ffmpeg-location` arg.
  - Remove help text for recently removed args.
+ - Fix unicode error on Windows for the info command.
 
 **Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.0.1...26.1.0
 

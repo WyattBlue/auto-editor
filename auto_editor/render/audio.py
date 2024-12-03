@@ -96,7 +96,7 @@ def apply_audio_normalization(
         log.debug(f"audio norm first pass: {first_pass}")
         with av.open(f"{pre_master}") as container:
             stats_ = stats(first_pass, container.streams.audio[0])
-        av.logging.set_level(None)
+
         name, filter_args = parse_ebu_bytes(norm, stats_, log)
     else:
         assert "t" in norm
