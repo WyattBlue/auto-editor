@@ -27,6 +27,9 @@ if TYPE_CHECKING:
     from auto_editor.utils.log import Log
 
 
+__all__ = ("LevelError", "Levels", "iter_audio", "iter_motion")
+
+
 class LevelError(Exception):
     pass
 
@@ -69,45 +72,39 @@ def mut_remove_large(
             active = False
 
 
-def iter_audio(src, tb: Fraction, stream: int = 0) -> Iterator[np.float32]:
+def iter_audio(audio_stream: av.AudioStream, tb: Fraction) -> Iterator[np.float32]:
     fifo = AudioFifo()
-    try:
-        container = av.open(src.path, "r")
-        audio_stream = container.streams.audio[stream]
-        sample_rate = audio_stream.rate
+    sr = audio_stream.rate
 
-        exact_size = (1 / tb) * sample_rate
-        accumulated_error = 0
+    exact_size = (1 / tb) * sr
+    accumulated_error = Fraction(0)
 
-        # Resample so that audio data is between [-1, 1]
-        resampler = av.AudioResampler(
-            av.AudioFormat("flt"), audio_stream.layout, sample_rate
-        )
+    # Resample so that audio data is between [-1, 1]
+    resampler = av.AudioResampler(av.AudioFormat("flt"), audio_stream.layout, sr)
 
-        for frame in container.decode(audio=stream):
-            frame.pts = None  # Skip time checks
+    container = audio_stream.container
+    assert isinstance(container, av.container.InputContainer)
 
-            for reframe in resampler.resample(frame):
-                fifo.write(reframe)
+    for frame in container.decode(audio_stream):
+        frame.pts = None  # Skip time checks
 
-            while fifo.samples >= ceil(exact_size):
-                size_with_error = exact_size + accumulated_error
-                current_size = round(size_with_error)
-                accumulated_error = size_with_error - current_size
+        for reframe in resampler.resample(frame):
+            fifo.write(reframe)
 
-                audio_chunk = fifo.read(current_size)
-                assert audio_chunk is not None
-                arr = audio_chunk.to_ndarray().flatten()
-                yield np.max(np.abs(arr))
+        while fifo.samples >= ceil(exact_size):
+            size_with_error = exact_size + accumulated_error
+            current_size = round(size_with_error)
+            accumulated_error = size_with_error - current_size
 
-    finally:
-        container.close()
+            audio_chunk = fifo.read(current_size)
+            assert audio_chunk is not None
+            arr = audio_chunk.to_ndarray().flatten()
+            yield np.max(np.abs(arr))
 
 
-def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[np.float32]:
-    container = av.open(src.path, "r")
-
-    video = container.streams.video[stream]
+def iter_motion(
+    video: av.VideoStream, tb: Fraction, blur: int, width: int
+) -> Iterator[np.float32]:
     video.thread_type = "AUTO"
 
     prev_frame = None
@@ -124,6 +121,9 @@ def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[np.floa
         graph.add("gblur", f"sigma={blur}"),
         graph.add("buffersink"),
     ).configure()
+
+    container = video.container
+    assert isinstance(container, av.container.InputContainer)
 
     for unframe in container.decode(video):
         if unframe.pts is None:
@@ -151,8 +151,6 @@ def iter_motion(src, tb, stream: int, blur: int, width: int) -> Iterator[np.floa
         prev_frame = current_frame
         prev_index = index
 
-    container.close()
-
 
 def obj_tag(path: Path, kind: str, tb: Fraction, obj: Sequence[object]) -> str:
     mod_time = int(path.stat().st_mtime)
@@ -175,7 +173,11 @@ class Levels:
             if (arr := self.read_cache("audio", (0,))) is not None:
                 return len(arr)
 
-            result = sum(1 for _ in iter_audio(self.src, self.tb, 0))
+            with av.open(self.src.path, "r") as container:
+                audio_stream = container.streams.audio[0]
+                self.log.experimental(audio_stream.codec)
+                result = sum(1 for _ in iter_audio(audio_stream, self.tb))
+
             self.log.debug(f"Audio Length: {result}")
             return result
 
@@ -239,21 +241,26 @@ class Levels:
         if (arr := self.read_cache("audio", (stream,))) is not None:
             return arr
 
-        with av.open(self.src.path, "r") as container:
-            audio = container.streams.audio[stream]
-            if audio.duration is not None and audio.time_base is not None:
-                inaccurate_dur = int(audio.duration * audio.time_base * self.tb)
-            elif container.duration is not None:
-                inaccurate_dur = int(container.duration / av.time_base * self.tb)
-            else:
-                inaccurate_dur = 1024
+        container = av.open(self.src.path, "r")
+        audio = container.streams.audio[stream]
+
+        if audio.codec.experimental:
+            self.log.error(f"`{audio.codec.name}` is an experimental codec")
+
+        if audio.duration is not None and audio.time_base is not None:
+            inaccurate_dur = int(audio.duration * audio.time_base * self.tb)
+        elif container.duration is not None:
+            inaccurate_dur = int(container.duration / av.time_base * self.tb)
+        else:
+            inaccurate_dur = 1024
 
         bar = self.bar
         bar.start(inaccurate_dur, "Analyzing audio volume")
 
         result = np.zeros((inaccurate_dur), dtype=np.float32)
         index = 0
-        for value in iter_audio(self.src, self.tb, stream):
+
+        for value in iter_audio(audio, self.tb):
             if index > len(result) - 1:
                 result = np.concatenate(
                     (result, np.zeros((len(result)), dtype=np.float32))
@@ -263,6 +270,7 @@ class Levels:
             index += 1
 
         bar.end()
+        assert len(result) > 0
         return self.cache(result[:index], "audio", (stream,))
 
     def motion(self, stream: int, blur: int, width: int) -> NDArray[np.float32]:
@@ -273,20 +281,25 @@ class Levels:
         if (arr := self.read_cache("motion", mobj)) is not None:
             return arr
 
-        with av.open(self.src.path, "r") as container:
-            video = container.streams.video[stream]
-            inaccurate_dur = (
-                1024
-                if video.duration is None or video.time_base is None
-                else int(video.duration * video.time_base * self.tb)
-            )
+        container = av.open(self.src.path, "r")
+        video = container.streams.video[stream]
+
+        if video.codec.experimental:
+            self.log.experimental(video.codec)
+
+        inaccurate_dur = (
+            1024
+            if video.duration is None or video.time_base is None
+            else int(video.duration * video.time_base * self.tb)
+        )
 
         bar = self.bar
         bar.start(inaccurate_dur, "Analyzing motion")
 
         result = np.zeros((inaccurate_dur), dtype=np.float32)
         index = 0
-        for value in iter_motion(self.src, self.tb, stream, blur, width):
+
+        for value in iter_motion(video, self.tb, blur, width):
             if index > len(result) - 1:
                 result = np.concatenate(
                     (result, np.zeros((len(result)), dtype=np.float32))

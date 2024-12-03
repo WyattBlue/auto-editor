@@ -169,6 +169,8 @@ def make_timeline(
         has_loud = concat((has_loud, result))
         src_index = concat((src_index, np.full(len(result), i, dtype=np.int32)))
 
+    assert len(has_loud) > 0
+
     # Setup for handling custom speeds
     speed_index = has_loud.astype(np.uint)
     speed_map = [args.silent_speed, args.video_speed]
