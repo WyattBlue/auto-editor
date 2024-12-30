@@ -286,7 +286,16 @@ def download_video(my_input: str, args: Args, log: Log) -> str:
 
 
 def main() -> None:
-    subcommands = ("test", "info", "levels", "subdump", "desc", "repl", "palet")
+    subcommands = (
+        "test",
+        "info",
+        "levels",
+        "subdump",
+        "desc",
+        "repl",
+        "palet",
+        "cache",
+    )
 
     if len(sys.argv) > 1 and sys.argv[1] in subcommands:
         obj = __import__(
