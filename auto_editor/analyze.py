@@ -4,6 +4,7 @@ import os
 import re
 from dataclasses import dataclass
 from fractions import Fraction
+from hashlib import sha1
 from math import ceil
 from tempfile import gettempdir
 from typing import TYPE_CHECKING
@@ -154,8 +155,10 @@ def iter_motion(
 
 def obj_tag(path: Path, kind: str, tb: Fraction, obj: Sequence[object]) -> str:
     mod_time = int(path.stat().st_mtime)
-    key = f"{path.name}:{mod_time:x}:{kind}:{tb}:"
-    return key + ",".join(f"{v}" for v in obj)
+    key = f"{path}:{mod_time:x}:{tb.numerator}:{tb.denominator}:"
+    part1 = sha1(key.encode()).hexdigest()[:16]
+
+    return f"{part1}{kind}," + ",".join(f"{v}" for v in obj)
 
 
 @dataclass(slots=True)
@@ -206,31 +209,31 @@ class Levels:
         if self.no_cache:
             return None
 
-        workfile = os.path.join(gettempdir(), f"ae-{__version__}", "cache.npz")
+        key = obj_tag(self.src.path, kind, self.tb, obj)
+        cache_file = os.path.join(gettempdir(), f"ae-{__version__}", f"{key}.npz")
 
         try:
-            npzfile = np.load(workfile, allow_pickle=False)
+            with np.load(cache_file, allow_pickle=False) as npzfile:
+                return npzfile["data"]
         except Exception as e:
             self.log.debug(e)
             return None
-
-        key = obj_tag(self.src.path, kind, self.tb, obj)
-        if key not in npzfile.files:
-            return None
-
-        self.log.debug("Using cache")
-        return npzfile[key]
 
     def cache(self, arr: np.ndarray, kind: str, obj: Sequence[object]) -> np.ndarray:
         if self.no_cache:
             return arr
 
-        workdur = os.path.join(gettempdir(), f"ae-{__version__}")
-        if not os.path.exists(workdur):
-            os.mkdir(workdur)
+        workdir = os.path.join(gettempdir(), f"ae-{__version__}")
+        if not os.path.exists(workdir):
+            os.mkdir(workdir)
 
         key = obj_tag(self.src.path, kind, self.tb, obj)
-        np.savez(os.path.join(workdur, "cache.npz"), **{key: arr})
+        cache_file = os.path.join(workdir, f"{key}.npz")
+
+        try:
+            np.savez(cache_file, data=arr)
+        except Exception as e:
+            self.log.warning(f"Cache write failed: {e}")
 
         return arr
 
@@ -257,14 +260,15 @@ class Levels:
         bar = self.bar
         bar.start(inaccurate_dur, "Analyzing audio volume")
 
-        result = np.zeros((inaccurate_dur), dtype=np.float32)
+        result: NDArray[np.float32] = np.zeros(inaccurate_dur, dtype=np.float32)
         index = 0
 
         for value in iter_audio(audio, self.tb):
             if index > len(result) - 1:
                 result = np.concatenate(
-                    (result, np.zeros((len(result)), dtype=np.float32))
+                    (result, np.zeros(len(result), dtype=np.float32))
                 )
+
             result[index] = value
             bar.tick(index)
             index += 1
@@ -296,13 +300,13 @@ class Levels:
         bar = self.bar
         bar.start(inaccurate_dur, "Analyzing motion")
 
-        result = np.zeros((inaccurate_dur), dtype=np.float32)
+        result: NDArray[np.float32] = np.zeros(inaccurate_dur, dtype=np.float32)
         index = 0
 
         for value in iter_motion(video, self.tb, blur, width):
             if index > len(result) - 1:
                 result = np.concatenate(
-                    (result, np.zeros((len(result)), dtype=np.float32))
+                    (result, np.zeros(len(result), dtype=np.float32))
                 )
             result[index] = value
             bar.tick(index)
