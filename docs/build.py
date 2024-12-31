@@ -2,6 +2,7 @@
 
 import os
 import sys
+from html import escape
 
 # Put 'auto_editor' in Python path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -19,7 +20,7 @@ def main():
 
     with open("src/ref/options.html", "w") as file:
         file.write(
-            '{{ header-desc "Options" "These are the options and flags that auto-editor uses." }}\n'
+            '{{ headerdesc "Options" "These are the options and flags that auto-editor uses." }}\n'
             "<body>\n"
             "{{ nav }}\n"
             '<section class="section">\n'
@@ -27,12 +28,18 @@ def main():
         )
         for op in parser.args:
             if isinstance(op, OptionText):
-                file.write(f"<h2>{op.text}</h2>\n")
+                file.write(f"<h2>{escape(op.text)}</h2>\n")
             else:
-                file.write(f"<h3><code>{op.names[0]}</code></h3>\n")
+                if op.metavar is None:
+                    file.write(f"<h3><code>{op.names[0]}</code></h3>\n")
+                else:
+                    file.write(
+                        f"<h3><code>{op.names[0]} {escape(op.metavar)}</code></h3>\n"
+                    )
+
                 if len(op.names) > 1:
                     file.write(
-                        "<h4><code>"
+                        "<h4>Aliases: <code>"
                         + "</code> <code>".join(op.names[1:])
                         + "</code></h4>\n"
                     )
