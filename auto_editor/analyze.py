@@ -235,6 +235,22 @@ class Levels:
         except Exception as e:
             self.log.warning(f"Cache write failed: {e}")
 
+        cache_entries = []
+        with os.scandir(workdir) as entries:
+            for entry in entries:
+                if entry.name.endswith(".npz"):
+                    cache_entries.append((entry.path, entry.stat().st_mtime))
+
+        if len(cache_entries) > 10:
+            # Sort by modification time, oldest first
+            cache_entries.sort(key=lambda x: x[1])
+            # Remove oldest files until we're back to 10
+            for filepath, _ in cache_entries[:-10]:
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
+
         return arr
 
     def audio(self, stream: int) -> NDArray[np.float32]:
