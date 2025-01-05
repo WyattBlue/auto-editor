@@ -1,3 +1,11 @@
+# 26.1.1
+
+## Fixes
+ - Allow storing multiple cache entries.
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.1.0...26.1.1
+
+
 # 26.1.0
 
 ## Features
