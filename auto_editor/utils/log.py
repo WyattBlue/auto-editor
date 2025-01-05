@@ -5,9 +5,10 @@ from datetime import timedelta
 from shutil import get_terminal_size, rmtree
 from tempfile import mkdtemp
 from time import perf_counter, sleep
-from typing import NoReturn
+from typing import TYPE_CHECKING, NoReturn
 
-import av
+if TYPE_CHECKING:
+    import av
 
 
 class Log:
