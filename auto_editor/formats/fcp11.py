@@ -80,7 +80,7 @@ def fcp11_write_xml(
         SubElement(
             resources,
             "format",
-            id=f"r{i*2+1}",
+            id=f"r{i * 2 + 1}",
             name=make_name(one_src, tl.tb),
             frameDuration=fraction(1),
             width=f"{tl.res[0]}",
@@ -90,11 +90,11 @@ def fcp11_write_xml(
         r2 = SubElement(
             resources,
             "asset",
-            id=f"r{i*2+2}",
+            id=f"r{i * 2 + 2}",
             name=one_src.path.stem,
             start="0s",
             hasVideo="1" if one_src.videos else "0",
-            format=f"r{i*2+1}",
+            format=f"r{i * 2 + 1}",
             hasAudio="1" if one_src.audios else "0",
             audioSources="1",
             audioChannels=f"{2 if not one_src.audios else one_src.audios[0].channels}",
