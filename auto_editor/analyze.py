@@ -155,7 +155,7 @@ def iter_motion(
 
 def obj_tag(path: Path, kind: str, tb: Fraction, obj: Sequence[object]) -> str:
     mod_time = int(path.stat().st_mtime)
-    key = f"{path}:{mod_time:x}:{tb}:" + ",".join(f"{v}" for v in obj)
+    key = f"{path.name}:{mod_time:x}:{tb}:" + ",".join(f"{v}" for v in obj)
     part1 = sha1(key.encode()).hexdigest()[:16]
 
     return f"{part1}{kind}"
