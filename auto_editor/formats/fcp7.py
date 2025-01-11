@@ -495,7 +495,7 @@ def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3) -> None:
     file_defs: set[str] = set()  # Contains urls
 
     for src in set(tl.sources):
-        the_id = f"file-{len(src_to_id)+1}"
+        the_id = f"file-{len(src_to_id) + 1}"
         src_to_url[src] = f"{src.path.resolve()}"
         src_to_id[src] = the_id
 
@@ -541,7 +541,7 @@ def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3) -> None:
             _in = f"{clip.offset}"
             _out = f"{clip.offset + clip.dur}"
 
-            this_clipid = f"clipitem-{j+1}"
+            this_clipid = f"clipitem-{j + 1}"
             clipitem = ET.SubElement(track, "clipitem", id=this_clipid)
             ET.SubElement(clipitem, "name").text = src.path.stem
             ET.SubElement(clipitem, "enabled").text = "TRUE"
@@ -562,14 +562,14 @@ def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3) -> None:
                 link = ET.SubElement(clipitem, "link")
                 ET.SubElement(
                     link, "linkclipref"
-                ).text = f"clipitem-{(len(tl.v[0]))+j+1}"
+                ).text = f"clipitem-{(len(tl.v[0])) + j + 1}"
                 continue
 
             for i in range(1 + len(src.audios) * 2):  # `2` because stereo.
                 link = ET.SubElement(clipitem, "link")
                 ET.SubElement(
                     link, "linkclipref"
-                ).text = f"clipitem-{(i*(len(tl.v[0])))+j+1}"
+                ).text = f"clipitem-{(i * (len(tl.v[0]))) + j + 1}"
                 ET.SubElement(link, "mediatype").text = "video" if i == 0 else "audio"
                 ET.SubElement(link, "trackindex").text = f"{max(i, 1)}"
                 ET.SubElement(link, "clipindex").text = f"{j + 1}"
