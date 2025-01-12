@@ -32,10 +32,10 @@ homepage = "https://auto-editor.com"
 
 [project.scripts]
 "auto-editor" = "auto_editor.__main__:main"
-aedesc = "auto_editor.subcommands.desc:main"
-aeinfo = "auto_editor.subcommands.info:main"
-aesubdump = "auto_editor.subcommands.subdump:main"
-aelevels = "auto_editor.subcommands.levels:main"
+aedesc = "auto_editor.cmds.desc:main"
+aeinfo = "auto_editor.cmds.info:main"
+aesubdump = "auto_editor.cmds.subdump:main"
+aelevels = "auto_editor.cmds.levels:main"
 
 [tool.mypy]
 warn_unused_ignores = true

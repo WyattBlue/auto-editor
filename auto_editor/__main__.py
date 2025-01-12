@@ -286,21 +286,10 @@ def download_video(my_input: str, args: Args, log: Log) -> str:
 
 
 def main() -> None:
-    subcommands = (
-        "test",
-        "info",
-        "levels",
-        "subdump",
-        "desc",
-        "repl",
-        "palet",
-        "cache",
-    )
+    commands = ("test", "info", "levels", "subdump", "desc", "repl", "palet", "cache")
 
-    if len(sys.argv) > 1 and sys.argv[1] in subcommands:
-        obj = __import__(
-            f"auto_editor.subcommands.{sys.argv[1]}", fromlist=["subcommands"]
-        )
+    if len(sys.argv) > 1 and sys.argv[1] in commands:
+        obj = __import__(f"auto_editor.cmds.{sys.argv[1]}", fromlist=["cmds"])
         obj.main(sys.argv[2:])
         return
 
