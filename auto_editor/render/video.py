@@ -54,7 +54,7 @@ allowed_pix_fmt = {
 
 def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
     hex_color = bg.lstrip("#").upper()
-    rgb_color = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+    rgb_color = tuple(int(hex_color[i : i + 2], 16) for i in {0, 2, 4})
 
     rgb_array = np.full((height, width, 3), rgb_color, dtype=np.uint8)
     rgb_frame = av.VideoFrame.from_ndarray(rgb_array, format="rgb24")
@@ -177,9 +177,9 @@ def render_av(
     color_prim = src.videos[0].color_primaries
     color_trc = src.videos[0].color_transfer
 
-    if color_range == 1 or color_range == 2:
+    if color_range in {1, 2}:
         output_stream.color_range = color_range
-    if colorspace in (0, 1) or (colorspace >= 3 and colorspace < 16):
+    if colorspace in {0, 1} or (colorspace >= 3 and colorspace < 16):
         output_stream.colorspace = colorspace
     if color_prim == 1 or (color_prim >= 4 and color_prim < 17):
         output_stream.color_primaries = color_prim
@@ -310,7 +310,7 @@ def render_av(
                 roi = array[y_start:y_end, x_start:x_end]
 
                 # Blend the overlay image with the ROI based on the opacity
-                roi = (1 - obj.opacity) * roi + obj.opacity * clipped_overlay
+                roi = (1 - obj.opacity) * roi + obj.opacity * clipped_overlay  # type: ignore
                 array[y_start:y_end, x_start:x_end] = roi
                 array = np.clip(array, 0, 255).astype(np.uint8)
 

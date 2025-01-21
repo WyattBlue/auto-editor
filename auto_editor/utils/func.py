@@ -41,7 +41,7 @@ def to_timecode(secs: float | Fraction, fmt: str) -> str:
         if h == 0:
             return f"{sign}{m:02d}:{s:06.3f}"
         return f"{sign}{h:02d}:{m:02d}:{s:06.3f}"
-    if fmt == "srt" or fmt == "mov_text":
+    if fmt in {"srt", "mov_text"}:
         return f"{sign}{h:02d}:{m:02d}:" + f"{s:06.3f}".replace(".", ",", 1)
     if fmt == "standard":
         return f"{sign}{h:02d}:{m:02d}:{s:06.3f}"

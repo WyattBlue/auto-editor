@@ -47,11 +47,11 @@ containers: dict[str, DictContainer] = {
 
 
 def codec_type(x: str) -> str:
-    if x in ("vp9", "vp8", "h264", "hevc", "av1", "gif", "apng"):
+    if x in {"vp9", "vp8", "h264", "hevc", "av1", "gif", "apng"}:
         return "video"
-    if x in ("aac", "flac", "mp3"):
+    if x in {"aac", "flac", "mp3"}:
         return "audio"
-    if x in ("ass", "ssa", "srt"):
+    if x in {"ass", "ssa", "srt"}:
         return "subtitle"
 
     try:
@@ -93,7 +93,7 @@ def container_constructor(ext: str) -> Container:
         if kind == "subtitle":
             scodecs.add(codec)
 
-    allow_image = ext in ("mp4", "mkv")
+    allow_image = ext in {"mp4", "mkv"}
     kwargs = containers[ext] if ext in containers else {}
 
     return Container(

@@ -36,7 +36,7 @@ def get_colorspace(src: FileInfo) -> str:
         return "6-1-6 (Rec. 601 NTSC)"
     if s.color_primaries == 9:  # "bt2020"
         # See: https://video.stackexchange.com/questions/22059/how-to-identify-hdr-video
-        if s.color_transfer in (16, 18):  # "smpte2084" "arib-std-b67"
+        if s.color_transfer in {16, 18}:  # "smpte2084" "arib-std-b67"
             return "9-18-9 (Rec. 2020 HLG)"
         return "9-1-9 (Rec. 2020)"
 

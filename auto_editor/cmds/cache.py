@@ -12,7 +12,7 @@ from auto_editor import __version__
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
     cache_dir = os.path.join(gettempdir(), f"ae-{__version__}")
 
-    if sys_args and sys_args[0] in ("clean", "clear"):
+    if sys_args and sys_args[0] in {"clean", "clear"}:
         rmtree(cache_dir, ignore_errors=True)
         return
 
@@ -26,7 +26,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         return
 
     def format_bytes(size: float) -> str:
-        for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        for unit in {"B", "KiB", "MiB", "GiB", "TiB"}:
             if size < 1024:
                 return f"{size:.2f} {unit}"
             size /= 1024

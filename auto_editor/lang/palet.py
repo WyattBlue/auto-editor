@@ -218,10 +218,10 @@ class Lexer:
             self.advance()
 
         result = buf.getvalue()
-        if result in ("t", "T", "true"):
+        if result in {"t", "T", "true"}:
             return Token(VAL, True, self.lineno, self.column)
 
-        if result in ("f", "F", "false"):
+        if result in {"f", "F", "false"}:
             return Token(VAL, False, self.lineno, self.column)
 
         self.error(f"Unknown hash literal `#{result}`")
@@ -451,7 +451,7 @@ class Parser:
 
         self.eat()
         childs = []
-        while self.current_token.type not in (RPAREN, RBRAC, RCUR, EOF):
+        while self.current_token.type not in {RPAREN, RBRAC, RCUR, EOF}:
             childs.append(self.expr())
         return tuple(childs)
 
@@ -512,7 +512,7 @@ def p_slice(
 
 is_iterable = Contract(
     "iterable?",
-    lambda v: type(v) in (str, range, list, tuple, dict, Quoted)
+    lambda v: type(v) in {str, range, list, tuple, dict, Quoted}
     or isinstance(v, np.ndarray),
 )
 is_boolarr = Contract(
@@ -689,7 +689,7 @@ def my_eval(env: Env, node: object) -> Any:
                     length = len(node[1:])
                     if length > 3:
                         raise MyError(f"{print_str(node[0])}: slice expects 1 argument")
-                    if length in (2, 3):
+                    if length in {2, 3}:
                         return p_slice(oper, *(my_eval(env, c) for c in node[1:]))
                     if length == 1:
                         return ref(oper, my_eval(env, node[1]))

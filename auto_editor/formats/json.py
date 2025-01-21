@@ -239,7 +239,7 @@ def read_json(path: str, log: Log) -> v3:
 
 
 def make_json_timeline(ver: int, out: str | int, tl: v3, log: Log) -> None:
-    if ver not in (3, 1):
+    if ver not in {3, 1}:
         log.error(f"Version {ver} is not supported!")
 
     if isinstance(out, str):

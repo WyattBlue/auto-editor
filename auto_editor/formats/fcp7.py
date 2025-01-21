@@ -99,7 +99,7 @@ def set_tb_ntsc(tb: Fraction) -> tuple[int, str]:
         return 60, "TRUE"
 
     ctb = ceil(tb)
-    if ctb not in (24, 30, 60) and ctb * Fraction(999, 1000) == tb:
+    if ctb not in {24, 30, 60} and ctb * Fraction(999, 1000) == tb:
         return ctb, "TRUE"
 
     return int(tb), "FALSE"
@@ -151,7 +151,7 @@ SUPPORTED_EFFECTS = ("timeremap",)
 
 def read_filters(clipitem: Element, log: Log) -> float:
     for effect_tag in clipitem:
-        if effect_tag.tag in ("enabled", "start", "end"):
+        if effect_tag.tag in {"enabled", "start", "end"}:
             continue
         if len(effect_tag) < 3:
             log.error("<effect> requires: <effectid> <name> and one <parameter>")

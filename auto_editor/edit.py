@@ -240,7 +240,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         make_json_timeline(export_ops["api"], output, tl, log)
         return
 
-    if export in ("premiere", "resolve-fcp7"):
+    if export in {"premiere", "resolve-fcp7"}:
         from auto_editor.formats.fcp7 import fcp7_write_xml
 
         is_resolve = export.startswith("resolve")
@@ -449,7 +449,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
     log.stop_timer()
 
-    if not args.no_open and export in ("default", "audio"):
+    if not args.no_open and export in {"default", "audio"}:
         if args.player is None:
             if sys.platform == "win32":
                 try:

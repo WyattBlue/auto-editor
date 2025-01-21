@@ -90,7 +90,7 @@ def _read_data_chunk(
 
     bytes_per_sample = block_align // channels
 
-    if bytes_per_sample in (3, 5, 6, 7):
+    if bytes_per_sample in {3, 5, 6, 7}:
         raise WavError(f"Unsupported bytes per sample: {bytes_per_sample}")
 
     if format_tag == PCM:
@@ -103,7 +103,7 @@ def _read_data_chunk(
                 f"Unsupported bit depth: the WAV file has {bit_depth}-bit integer data."
             )
     elif format_tag == IEEE_FLOAT:
-        if bit_depth in (32, 64):
+        if bit_depth in {32, 64}:
             dtype = f"{en}f{bytes_per_sample}"
         else:
             raise WavError(
@@ -201,7 +201,7 @@ def _handle_pad_byte(fid: Reader, size: int) -> None:
 
 def read(fid: Reader) -> tuple[int, AudioData]:
     file_sig = fid.read(4)
-    if file_sig in (b"RIFF", b"RIFX"):
+    if file_sig in {b"RIFF", b"RIFX"}:
         data_size, file_size, en = _read_riff_chunk(file_sig, fid)
     elif file_sig == b"RF64":
         data_size, file_size, en = _read_rf64_chunk(fid)

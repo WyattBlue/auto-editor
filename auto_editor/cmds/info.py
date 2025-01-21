@@ -98,7 +98,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
             continue
 
-        if ext in (".xml", ".fcpxml", ".mlt"):
+        if ext in {".xml", ".fcpxml", ".mlt"}:
             file_info[file] = {"type": "timeline"}
             continue
 
@@ -169,7 +169,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         return
 
     def is_null(key: str, val: object) -> bool:
-        return val is None or (key in ("bitrate", "duration") and val == 0.0)
+        return val is None or (key in {"bitrate", "duration"} and val == 0.0)
 
     def stream_to_text(text: str, label: str, streams: list[dict[str, Any]]) -> str:
         if len(streams) > 0:
@@ -183,12 +183,12 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                         sep = "x" if key == "resolution" else ":"
                         value = sep.join(f"{x}" for x in value)
 
-                    if key in (
+                    if key in {
                         "color_range",
                         "color_space",
                         "color_transfer",
                         "color_primaries",
-                    ):
+                    }:
                         if key == "color_range":
                             if value == 1:
                                 text += "     - color range: 1 (tv)\n"

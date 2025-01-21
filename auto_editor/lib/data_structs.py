@@ -191,7 +191,6 @@ def display_str(val: object) -> str:
         return f"{float(val)}"
     if type(val) is Fraction:
         return f"{val.numerator}/{val.denominator}"
-
     if type(val) is Quoted or type(val) is tuple:
         if not val:
             return "()"
@@ -201,7 +200,6 @@ def display_str(val: object) -> str:
             result.write(f" {display_str(item)}")
         result.write(")")
         return result.getvalue()
-
     if type(val) is list:
         if not val:
             return "#()"

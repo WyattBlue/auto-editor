@@ -723,13 +723,13 @@ def main(sys_args: list[str] | None = None):
 
     tests = []
 
-    if args.category in ("palet", "all"):
+    if args.category in {"palet", "all"}:
         tests.extend([palet_python_bridge, palet_scripts])
 
-    if args.category in ("sub", "all"):
+    if args.category in {"sub", "all"}:
         tests.extend([info, levels, subdump, desc])
 
-    if args.category in ("cli", "all"):
+    if args.category in {"cli", "all"}:
         tests.extend(
             [
                 premiere,
