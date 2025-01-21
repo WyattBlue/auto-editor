@@ -31,7 +31,7 @@ def initBar(bar_type: str) -> Bar:
     part_width = len(chars) - 1
 
     ampm = True
-    if sys.platform == "darwin" and bar_type in ("modern", "classic", "ascii"):
+    if sys.platform == "darwin" and bar_type in {"modern", "classic", "ascii"}:
         try:
             date_format = get_stdout_bytes(
                 ["defaults", "read", "com.apple.menuextra.clock", "Show24Hour"]

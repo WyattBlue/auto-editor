@@ -53,7 +53,7 @@ class SubtitleParser:
         self.codec = codec
         self.contents = []
 
-        if codec == "ass" or codec == "ssa":
+        if codec in {"ass", "ssa"}:
             time_code = re.compile(r"(.*)(\d+:\d+:[\d.]+)(.*)(\d+:\d+:[\d.]+)(.*)")
         elif codec == "webvtt":
             time_code = re.compile(r"()(\d+:[\d.]+)( --> )(\d+:[\d.]+)(\n.*)")
@@ -189,7 +189,7 @@ def make_new_subtitles(tl: v3, log: Log) -> list[str]:
         parser = SubtitleParser(tl.tb)
         if sub.codec == "ssa":
             format = "ass"
-        elif sub.codec in ("webvtt", "ass"):
+        elif sub.codec in {"webvtt", "ass"}:
             format = sub.codec
         else:
             log.error(f"Unknown subtitle codec: {sub.codec}")

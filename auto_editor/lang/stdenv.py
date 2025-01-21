@@ -283,7 +283,7 @@ def make_standard_env() -> dict[str, Any]:
             type(node[2]) is tuple
             and node[2]
             and type(node[2][0]) is Sym
-            and node[2][0].val in ("lambda", "λ")
+            and node[2][0].val in {"lambda", "λ"}
         ):
             terms = node[2][1]
             body = node[2][2:]

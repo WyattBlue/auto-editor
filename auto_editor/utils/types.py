@@ -104,7 +104,7 @@ def frame_rate(val: str) -> Fraction:
 
 def sample_rate(val: str) -> int:
     num, unit = _split_num_str(val)
-    if unit in ("kHz", "KHz"):
+    if unit in {"kHz", "KHz"}:
         return natural(num * 1000)
     _unit_check(unit, ("", "Hz"))
     return natural(num)
@@ -122,9 +122,9 @@ def time(val: str, tb: Fraction) -> int:
         raise CoerceError(f"'{val}': Invalid time format")
 
     num, unit = _split_num_str(val)
-    if unit in ("s", "sec", "secs", "second", "seconds"):
+    if unit in {"s", "sec", "secs", "second", "seconds"}:
         return round(num * tb)
-    if unit in ("min", "mins", "minute", "minutes"):
+    if unit in {"min", "mins", "minute", "minutes"}:
         return round(num * tb * 60)
     if unit == "hour":
         return round(num * tb * 3600)

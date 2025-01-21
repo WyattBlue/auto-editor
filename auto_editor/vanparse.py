@@ -289,7 +289,7 @@ class ArgumentParser:
                 key = to_key(option)
 
                 next_arg = None if i == len(sys_args) - 1 else sys_args[i + 1]
-                if next_arg in ("-h", "--help"):
+                if next_arg in {"-h", "--help"}:
                     print_option_help(program_name, ns_obj, option)
                     sys.exit()
 

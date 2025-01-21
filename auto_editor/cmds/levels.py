@@ -59,7 +59,7 @@ def levels_options(parser: ArgumentParser) -> ArgumentParser:
 def print_arr(arr: NDArray) -> None:
     print("")
     print("@start")
-    if arr.dtype in (np.float64, np.float32, np.float16):
+    if arr.dtype in {np.float64, np.float32, np.float16}:
         for a in arr:
             sys.stdout.write(f"{a:.20f}\n")
     elif arr.dtype == np.bool_:

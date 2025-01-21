@@ -204,7 +204,7 @@ class Parser:
     def expr(self) -> Any:
         self.current_token
 
-        if self.current_token.type in (STR, VAL):
+        if self.current_token.type in {STR, VAL}:
             val = self.current_token.value
             self.eat()
             return val
@@ -215,7 +215,7 @@ class Parser:
             my_dic = {}
             while self.current_token.type != RCUR:
                 if self.current_token.type != STR:
-                    if self.current_token.type in (LBRAC, VAL):
+                    if self.current_token.type in {LBRAC, VAL}:
                         self.lexer.error("JSON Objects only allow strings as keys")
                     self.lexer.error("Expected closing `}`")
                 key = self.current_token.value

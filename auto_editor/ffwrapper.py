@@ -111,7 +111,7 @@ def initFileInfo(path: str, log: Log) -> FileInfo:
             vdur = 0.0
 
         fps = v.average_rate
-        if (fps is None or fps < 1) and v.name in ("png", "mjpeg", "webp"):
+        if (fps is None or fps < 1) and v.name in {"png", "mjpeg", "webp"}:
             fps = Fraction(25)
         if fps is None or fps == 0:
             fps = Fraction(30)

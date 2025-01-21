@@ -62,7 +62,7 @@ def parse_ebu_bytes(norm: dict, stat: bytes, log: Log) -> tuple[str, str]:
     except MyError:
         log.error(f"Invalid loudnorm stats.\n{stat!r}")
 
-    for key in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset"):
+    for key in {"input_i", "input_tp", "input_lra", "input_thresh", "target_offset"}:
         val = float(parsed[key])
         if val == float("-inf"):
             parsed[key] = -99
