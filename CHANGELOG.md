@@ -1,3 +1,9 @@
+# 26.1.2
+
+## Fixes
+ - Use file name, not full path for cache
+
+
 # 26.1.1
 
 ## Fixes

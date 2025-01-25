@@ -512,7 +512,7 @@ def p_slice(
 
 is_iterable = Contract(
     "iterable?",
-    lambda v: type(v) in {str, range, list, tuple, dict, Quoted}
+    lambda v: type(v) in (str, range, list, tuple, dict, Quoted)
     or isinstance(v, np.ndarray),
 )
 is_boolarr = Contract(
