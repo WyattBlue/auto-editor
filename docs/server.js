@@ -16,10 +16,6 @@ app.get("/options", (req, res) => {
   res.sendFile(path.join(__dirname, "public/ref/options"), options);
 });
 
-app.get("/gpu", (req, res) => {
-  res.redirect("/docs/gpu")
-});
-
 app.use(express.static("public", {
   index: ["index.html"],
   extensions: ["html"],
