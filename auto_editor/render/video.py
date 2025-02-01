@@ -130,22 +130,34 @@ def render_av(
     log.debug(f"Tous: {tous}")
     log.debug(f"Clips: {tl.v}")
 
+    codec = av.Codec(args.video_codec, "w")
+
     if args.video_codec == "gif":
-        _c = av.Codec("gif", "w")
-        if _c.video_formats is not None and target_pix_fmt in (
-            f.name for f in _c.video_formats
+        if codec.video_formats is not None and target_pix_fmt in (
+            f.name for f in codec.video_formats
         ):
             target_pix_fmt = target_pix_fmt
         else:
             target_pix_fmt = "rgb8"
-        del _c
     else:
         target_pix_fmt = (
             target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
         )
 
+    del codec
     ops = {"mov_flags": "faststart"}
     output_stream = output.add_stream(args.video_codec, rate=target_fps, options=ops)
+
+    if args.vprofile is not None:
+        if args.vprofile.title() not in output_stream.codec_context.profiles:
+            a = [f'"{x.lower()}"' for x in output_stream.codec_context.profiles]
+            b = " ".join(a)
+            log.error(
+                f"`{args.vprofile}` is not a valid profile.\nprofiles supported: {b}"
+            )
+
+        output_stream.codec_context.profile = args.vprofile.title()
+
     yield output_stream
     if not isinstance(output_stream, av.VideoStream):
         log.error(f"Not a known video codec: {args.video_codec}")
