@@ -189,6 +189,12 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Set the number of bits per second for video",
     )
     parser.add_argument(
+        "-vprofile",
+        "-profile:v",
+        metavar="PROFILE",
+        help="Set the video profile. For h264: high, main, or baseline",
+    )
+    parser.add_argument(
         "--scale",
         type=number,
         metavar="NUM",

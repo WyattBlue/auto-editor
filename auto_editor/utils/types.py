@@ -198,6 +198,7 @@ class Args:
     video_codec: str = "auto"
     audio_codec: str = "auto"
     video_bitrate: str = "auto"
+    vprofile: str | None = None
     audio_bitrate: str = "auto"
     scale: float = 1.0
     sn: bool = False
