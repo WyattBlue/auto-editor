@@ -1,7 +1,22 @@
+# 26.2.0 (Unreleased)
+
+## Features
+ - Allow all hardware encoders PyAV knows about (h264_videotoolbox, hevc_nvenc, etc.).
+ - New option `-vprofile`. Allows setting the video profile.
+
+## Misc.
+ - Deprecate the `copy` codec (auto-editor always re-encoders no matter what).
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.1.2...26.2.0
+
+
 # 26.1.2
 
 ## Fixes
  - Use file name, not full path for cache
+
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.1.1...26.1.2
 
 
 # 26.1.1

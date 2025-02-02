@@ -104,6 +104,10 @@ class Log:
         if codec.experimental:
             self.error(f"`{codec.name}` is an experimental codec")
 
+    @staticmethod
+    def deprecated(message: str) -> None:
+        sys.stderr.write(f"\033[1m\033[33m{message}\033[0m\n")
+
     def error(self, message: str | Exception) -> NoReturn:
         if self.is_debug and isinstance(message, Exception):
             self.cleanup()

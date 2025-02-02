@@ -148,15 +148,15 @@ def render_av(
     ops = {"mov_flags": "faststart"}
     output_stream = output.add_stream(args.video_codec, rate=target_fps, options=ops)
 
+    cc = output_stream.codec_context
     if args.vprofile is not None:
-        if args.vprofile.title() not in output_stream.codec_context.profiles:
-            a = [f'"{x.lower()}"' for x in output_stream.codec_context.profiles]
-            b = " ".join(a)
+        if args.vprofile.title() not in cc.profiles:
+            b = " ".join([f'"{x.lower()}"' for x in cc.profiles])
             log.error(
                 f"`{args.vprofile}` is not a valid profile.\nprofiles supported: {b}"
             )
 
-        output_stream.codec_context.profile = args.vprofile.title()
+        cc.profile = args.vprofile.title()
 
     yield output_stream
     if not isinstance(output_stream, av.VideoStream):

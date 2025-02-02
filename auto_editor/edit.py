@@ -8,7 +8,7 @@ from subprocess import run
 from typing import Any
 
 import av
-from av import AudioResampler
+from av import AudioResampler, Codec
 
 from auto_editor.ffwrapper import FileInfo, initFileInfo
 from auto_editor.lib.contracts import is_int, is_str
@@ -81,6 +81,7 @@ def set_video_codec(
         return codec
 
     if codec == "copy":
+        log.deprecated("The `copy` codec is deprecated. auto-editor always re-encodes")
         if src is None:
             log.error("No input to copy its codec from.")
         if not src.videos:
@@ -88,7 +89,13 @@ def set_video_codec(
         codec = src.videos[0].codec
 
     if ctr.vcodecs is not None and codec not in ctr.vcodecs:
-        log.error(codec_error.format(codec, out_ext))
+        try:
+            cobj = Codec(codec, "w")
+        except av.codec.codec.UnknownCodecError:
+            log.error(f"Unknown encoder: {codec}")
+        # Normalize encoder names
+        if cobj.id not in (Codec(x, "w").id for x in ctr.vcodecs):
+            log.error(codec_error.format(codec, out_ext))
 
     return codec
 
@@ -101,18 +108,16 @@ def set_audio_codec(
             codec = "aac"
         else:
             codec = src.audios[0].codec
-            ctx = av.Codec(codec)
-            if ctx.audio_formats is None:
+            if av.Codec(codec, "w").audio_formats is None:
                 codec = "aac"
         if codec not in ctr.acodecs and ctr.default_aud != "none":
             codec = ctr.default_aud
-        if codec == "mp3float":
-            codec = "mp3"
         if codec is None:
             codec = "aac"
         return codec
 
     if codec == "copy":
+        log.deprecated("The `copy` codec is deprecated. auto-editor always re-encodes")
         if src is None:
             log.error("No input to copy its codec from.")
         if not src.audios:
@@ -120,7 +125,13 @@ def set_audio_codec(
         codec = src.audios[0].codec
 
     if ctr.acodecs is None or codec not in ctr.acodecs:
-        log.error(codec_error.format(codec, out_ext))
+        try:
+            cobj = Codec(codec, "w")
+        except av.codec.codec.UnknownCodecError:
+            log.error(f"Unknown encoder: {codec}")
+        # Normalize encoder names
+        if cobj.id not in (Codec(x, "w").id for x in ctr.acodecs):
+            log.error(codec_error.format(codec, out_ext))
 
     return codec
 
@@ -301,7 +312,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         # Setup audio
         if audio_paths:
             try:
-                audio_encoder = av.Codec(args.audio_codec)
+                audio_encoder = av.Codec(args.audio_codec, "w")
             except av.FFmpegError as e:
                 log.error(e)
             if audio_encoder.audio_formats is None:

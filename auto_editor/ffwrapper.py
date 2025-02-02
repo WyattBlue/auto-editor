@@ -147,9 +147,10 @@ def initFileInfo(path: str, log: Log) -> FileInfo:
             adur = float(a.duration * a.time_base)
 
         a_cc = a.codec_context
+        name = a_cc.name if a_cc.name != "mp3float" else "mp3"
         audios += (
             AudioStream(
-                a_cc.name,
+                name,
                 0 if a_cc.sample_rate is None else a_cc.sample_rate,
                 a.layout.name,
                 a_cc.channels,
