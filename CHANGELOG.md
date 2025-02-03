@@ -1,7 +1,7 @@
-# 26.2.0 (Unreleased)
+# 26.2.0
 
 ## Features
- - Allow all hardware encoders PyAV knows about (h264_videotoolbox, hevc_nvenc, etc.).
+ - Allow all hardware encoders PyAV knows about (h264\_videotoolbox, hevc\_nvenc, etc.).
  - New option `-vprofile`. Allows setting the video profile.
 
 ## Misc.
