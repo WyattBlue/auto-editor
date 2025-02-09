@@ -139,6 +139,9 @@ def render_av(
             target_pix_fmt = target_pix_fmt
         else:
             target_pix_fmt = "rgb8"
+
+    elif args.video_codec == "prores":
+        target_pix_fmt = "yuv422p10le"
     else:
         target_pix_fmt = (
             target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
@@ -333,7 +336,10 @@ def render_av(
             frame = scale_graph.vpull()
 
         if frame.format.name != target_pix_fmt:
-            frame = frame.reformat(format=target_pix_fmt)
+            if target_pix_fmt == "yuv422p10le":  # workaround for prores
+                frame = frame.reformat(format="yuv444p16le")
+            else:
+                frame = frame.reformat(format=target_pix_fmt)
             bar.tick(index)
         elif index % 3 == 0:
             bar.tick(index)
