@@ -28,6 +28,7 @@ class VideoFrame:
 
 allowed_pix_fmt = av.video.frame.supported_np_pix_fmts
 
+
 def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
     hex_color = bg.lstrip("#").upper()
     rgb_color = tuple(int(hex_color[i : i + 2], 16) for i in {0, 2, 4})
