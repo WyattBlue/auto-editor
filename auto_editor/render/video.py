@@ -26,31 +26,7 @@ class VideoFrame:
     src: FileInfo
 
 
-# From: github.com/PyAV-Org/PyAV/blob/main/av/video/frame.pyx
-allowed_pix_fmt = {
-    "yuv420p",
-    "yuvj420p",
-    "yuv444p",
-    "yuvj444p",
-    "rgb48be",
-    "rgb48le",
-    "rgb64be",
-    "rgb64le",
-    "rgb24",
-    "bgr24",
-    "argb",
-    "rgba",
-    "abgr",
-    "bgra",
-    "gray",
-    "gray8",
-    "gray16be",
-    "gray16le",
-    "rgb8",
-    "bgr8",
-    "pal8",
-}
-
+allowed_pix_fmt = av.video.frame.supported_np_pix_fmts
 
 def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
     hex_color = bg.lstrip("#").upper()
@@ -132,15 +108,14 @@ def render_av(
 
     codec = av.Codec(args.video_codec, "w")
 
-    if args.video_codec == "gif":
+    if codec.id == 97:  # gif
         if codec.video_formats is not None and target_pix_fmt in (
             f.name for f in codec.video_formats
         ):
             target_pix_fmt = target_pix_fmt
         else:
             target_pix_fmt = "rgb8"
-
-    elif args.video_codec == "prores":
+    elif codec.id == 147:  # prores
         target_pix_fmt = "yuv422p10le"
     else:
         target_pix_fmt = (
@@ -336,10 +311,7 @@ def render_av(
             frame = scale_graph.vpull()
 
         if frame.format.name != target_pix_fmt:
-            if target_pix_fmt == "yuv422p10le":  # workaround for prores
-                frame = frame.reformat(format="yuv444p16le")
-            else:
-                frame = frame.reformat(format=target_pix_fmt)
+            frame = frame.reformat(format=target_pix_fmt)
             bar.tick(index)
         elif index % 3 == 0:
             bar.tick(index)
