@@ -549,6 +549,15 @@ def main(sys_args: list[str] | None = None):
     def yuv442p():
         return run.main(["resources/test_yuv422p.mp4"], [])
 
+    def prores():
+        run.main(["resources/testsrc.mp4", "-c:v", "prores", "-o", "out.mkv"], [])
+        assert fileinfo("out.mkv").videos[0].pix_fmt == "yuv422p10le"
+
+        run.main(["out.mkv", "-c:v", "prores", "-o", "out2.mkv"], [])
+        assert fileinfo("out2.mkv").videos[0].pix_fmt == "yuv422p10le"
+
+        return "out.mkv", "out2.mkv"
+
     #  Issue 280
     def SAR():
         out = run.main(["resources/SAR-2by3.mp4"], [])
@@ -735,6 +744,7 @@ def main(sys_args: list[str] | None = None):
                 premiere,
                 SAR,
                 yuv442p,
+                prores,
                 edit_negative_tests,
                 edit_positive_tests,
                 audio_norm_f,
