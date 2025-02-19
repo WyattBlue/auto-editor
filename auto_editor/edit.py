@@ -136,6 +136,24 @@ def set_audio_codec(
     return codec
 
 
+def normalize_encoder(codec: str) -> tuple[str, bool]:
+    is_hardware = False
+    if "_" in codec:
+        is_hardware = codec.split("_")[-1] in {"videotoolbox", "cuvid", "nvec"}
+
+    id = av.Codec(codec, "w").id
+    name = {
+        27: "h264",
+        97: "gif",
+        173: "hevc",
+        167: "vp9",
+        139: "vp8",
+        86018: "aac",
+    }.get(id, codec)
+
+    return name, is_hardware
+
+
 def parse_export(export: str, log: Log) -> dict[str, Any]:
     exploded = export.split(":", maxsplit=1)
     if len(exploded) == 1:
@@ -365,17 +383,46 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
         # Setup video
         if ctr.default_vid != "none" and tl.v:
-            vframes = render_av(output, tl, args, bar, log)
+            vframes = render_av(output, tl, args, log)
             output_stream = next(vframes)
         else:
             output_stream, vframes = None, iter([])
 
+        no_color = log.no_color or log.machine
+        encoder_titles = []
+        if output_stream is not None:
+            name, h = normalize_encoder(output_stream.name)
+            if no_color:
+                encoder_titles.append(name)
+            else:
+                is_bold = ";1" if h else ""
+                encoder_titles.append(f"\033[95{is_bold}m{name}")
+        if audio_streams:
+            name, h = normalize_encoder(audio_streams[0].name)  # type: ignore
+            if no_color:
+                encoder_titles.append(name)
+            else:
+                is_bold = ";1" if h else ""
+                encoder_titles.append(f"\033[96{is_bold}m{name}")
+        if subtitle_streams:
+            name = subtitle_streams[0].name  # type: ignore
+            if no_color:
+                encoder_titles.append(name)
+            else:
+                encoder_titles.append(f"\033[32m{name}")
+
+        title = f"({os.path.splitext(output_path)[1][1:]}) "
+        if no_color:
+            title += "+".join(encoder_titles)
+        else:
+            title += "\033[0m+".join(encoder_titles) + "\033[0m"
+        bar.start(tl.end, title)
+
         # Process frames
         while True:
             audio_frames = [next(frames, None) for frames in audio_gen_frames]
-            video_frame = next(vframes, None)
+            index, video_frame = next(vframes, (0, None))
             subtitle_frames = [next(packet, None) for packet in sub_gen_frames]
-
             if (
                 all(frame is None for frame in audio_frames)
                 and video_frame is None
@@ -405,11 +452,15 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                 except av.FFmpegError as e:
                     log.error(e)
 
+            bar.tick(index)
+
         # Flush streams
         if output_stream is not None:
             output.mux(output_stream.encode(None))
         for audio_stream in audio_streams:
             output.mux(audio_stream.encode(None))
+
+        bar.end()
 
         # Close resources
         for audio_input in audio_inputs:
