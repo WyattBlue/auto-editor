@@ -89,7 +89,7 @@ class Bar:
         percent = round(progress * 100, 1)
         p_pad = " " * (4 - len(str(percent)))
         columns = get_terminal_size().columns
-        bar_len = max(1, columns - (len_title + 32))
+        bar_len = max(1, columns - len_title - 32)
         bar_str = self._bar_str(progress, bar_len)
 
         bar = f"  {self.icon}{title} {bar_str} {p_pad}{percent}%  ETA {new_time}"
