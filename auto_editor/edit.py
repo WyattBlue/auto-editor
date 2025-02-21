@@ -136,24 +136,6 @@ def set_audio_codec(
     return codec
 
 
-def normalize_encoder(codec: str) -> tuple[str, bool]:
-    is_hardware = False
-    if "_" in codec:
-        is_hardware = codec.split("_")[-1] in {"videotoolbox", "cuvid", "nvec"}
-
-    id = av.Codec(codec, "w").id
-    name = {
-        27: "h264",
-        97: "gif",
-        173: "hevc",
-        167: "vp9",
-        139: "vp8",
-        86018: "aac",
-    }.get(id, codec)
-
-    return name, is_hardware
-
-
 def parse_export(export: str, log: Log) -> dict[str, Any]:
     exploded = export.split(":", maxsplit=1)
     if len(exploded) == 1:
@@ -391,25 +373,14 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         no_color = log.no_color or log.machine
         encoder_titles = []
         if output_stream is not None:
-            name, h = normalize_encoder(output_stream.name)
-            if no_color:
-                encoder_titles.append(name)
-            else:
-                is_bold = ";1" if h else ""
-                encoder_titles.append(f"\033[95{is_bold}m{name}")
+            name = output_stream.codec.canonical_name
+            encoder_titles.append(name if no_color else f"\033[95m{name}")
         if audio_streams:
-            name, h = normalize_encoder(audio_streams[0].name)  # type: ignore
-            if no_color:
-                encoder_titles.append(name)
-            else:
-                is_bold = ";1" if h else ""
-                encoder_titles.append(f"\033[96{is_bold}m{name}")
+            name = audio_streams[0].name
+            encoder_titles.append(name if no_color else f"\033[96m{name}")
         if subtitle_streams:
-            name = subtitle_streams[0].name  # type: ignore
-            if no_color:
-                encoder_titles.append(name)
-            else:
-                encoder_titles.append(f"\033[32m{name}")
+            name = subtitle_streams[0].name
+            encoder_titles.append(name if no_color else f"\033[32m{name}")
 
         title = f"({os.path.splitext(output_path)[1][1:]}) "
         if no_color:

@@ -108,14 +108,14 @@ def render_av(
 
     codec = av.Codec(args.video_codec, "w")
 
-    if codec.id == 97:  # gif
+    if codec.canonical_name == "gif":
         if codec.video_formats is not None and target_pix_fmt in (
             f.name for f in codec.video_formats
         ):
             target_pix_fmt = target_pix_fmt
         else:
             target_pix_fmt = "rgb8"
-    elif codec.id == 147:  # prores
+    elif codec.canonical_name == "prores":
         target_pix_fmt = "yuv422p10le"
     else:
         target_pix_fmt = (
