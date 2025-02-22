@@ -89,20 +89,26 @@ class Bar:
         percent = round(progress * 100, 1)
         p_pad = " " * (4 - len(str(percent)))
         columns = get_terminal_size().columns
-        bar_len = max(1, columns - len_title - 32)
+        bar_len = max(1, columns - len_title - 35)
         bar_str = self._bar_str(progress, bar_len)
 
-        bar = f"  {self.icon}{title} {bar_str} {p_pad}{percent}%  ETA {new_time}"
-
-        if len(bar) > columns - 2:
-            bar = bar[: columns - 2]
-        else:
-            bar += " " * (columns - len(bar) - 4)
-
-        sys.stdout.write(bar + "\r")
+        bar = f"  {self.icon}{title} {bar_str} {p_pad}{percent}%  ETA {new_time}    \r"
+        sys.stdout.write(bar)
 
     def start(self, total: float, title: str = "Please wait") -> None:
-        self.stack.append((title, len(title), total, time()))
+        len_title = 0
+        in_escape = False
+
+        for char in title:
+            if not in_escape:
+                if char == "\033":
+                    in_escape = True
+                else:
+                    len_title += 1
+            elif char == "m":
+                in_escape = False
+
+        self.stack.append((title, len_title, total, time()))
 
         try:
             self.tick(0)
