@@ -1,3 +1,12 @@
+# 26.3.0
+
+## Features
+ - Show codecs used in the progress bar
+ - Support the prores encoder
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.2.0...26.3.0
+
+
 # 26.2.0
 
 ## Features
