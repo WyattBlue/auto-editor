@@ -136,7 +136,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 else:
                     container = av.open(src.path, "r")
                     audio_stream = container.streams.audio[obj["stream"]]
-                    log.experimental(audio_stream.codec)
 
                     values = []
 
@@ -158,7 +157,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 else:
                     container = av.open(src.path, "r")
                     video_stream = container.streams.video[obj["stream"]]
-                    log.experimental(video_stream.codec)
 
                     values = []
 
