@@ -376,7 +376,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             name = output_stream.codec.canonical_name
             encoder_titles.append(name if no_color else f"\033[95m{name}")
         if audio_streams:
-            name = audio_streams[0].name
+            name = audio_streams[0].name.canonical_name  # type: ignore
             encoder_titles.append(name if no_color else f"\033[96m{name}")
         if subtitle_streams:
             name = subtitle_streams[0].name
