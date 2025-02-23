@@ -309,6 +309,13 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         else:
             audio_paths = []
 
+        # Setup video
+        if ctr.default_vid != "none" and tl.v:
+            vframes = render_av(output, tl, args, log)
+            output_stream = next(vframes)
+        else:
+            output_stream, vframes = None, iter([])
+
         # Setup audio
         if audio_paths:
             try:
@@ -363,13 +370,6 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             subtitle_streams.append(subtitle_stream)
             sub_gen_frames.append(subtitle_input.demux(subtitles=0))
 
-        # Setup video
-        if ctr.default_vid != "none" and tl.v:
-            vframes = render_av(output, tl, args, log)
-            output_stream = next(vframes)
-        else:
-            output_stream, vframes = None, iter([])
-
         no_color = log.no_color or log.machine
         encoder_titles = []
         if output_stream is not None:
@@ -401,17 +401,6 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             ):
                 break
 
-            for audio_stream, audio_frame in zip(audio_streams, audio_frames):
-                if audio_frame:
-                    for reframe in resampler.resample(audio_frame):
-                        output.mux(audio_stream.encode(reframe))
-
-            for subtitle_stream, packet in zip(subtitle_streams, subtitle_frames):
-                if not packet or packet.dts is None:
-                    continue
-                packet.stream = subtitle_stream
-                output.mux(packet)
-
             if video_frame:
                 try:
                     output.mux(output_stream.encode(video_frame))
@@ -422,6 +411,17 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                     )
                 except av.FFmpegError as e:
                     log.error(e)
+
+            for audio_stream, audio_frame in zip(audio_streams, audio_frames):
+                if audio_frame:
+                    for reframe in resampler.resample(audio_frame):
+                        output.mux(audio_stream.encode(reframe))
+
+            for subtitle_stream, packet in zip(subtitle_streams, subtitle_frames):
+                if not packet or packet.dts is None:
+                    continue
+                packet.stream = subtitle_stream
+                output.mux(packet)
 
             bar.tick(index)
 

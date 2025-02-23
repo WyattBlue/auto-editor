@@ -9,6 +9,7 @@ from fractions import Fraction
 from time import perf_counter
 from typing import TYPE_CHECKING
 
+import av
 import numpy as np
 
 from auto_editor.ffwrapper import FileInfo, initFileInfo
@@ -235,6 +236,11 @@ def main(sys_args: list[str] | None = None):
 
     def example():
         out = run.main(inputs=["example.mp4"], cmd=[])
+
+        with av.open(out) as container:
+            assert container.streams[0].type == "video"
+            assert container.streams[1].type == "audio"
+
         cn = fileinfo(out)
         video = cn.videos[0]
 
