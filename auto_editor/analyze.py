@@ -178,7 +178,6 @@ class Levels:
 
             with av.open(self.src.path, "r") as container:
                 audio_stream = container.streams.audio[0]
-                self.log.experimental(audio_stream.codec)
                 result = sum(1 for _ in iter_audio(audio_stream, self.tb))
 
             self.log.debug(f"Audio Length: {result}")
@@ -263,9 +262,6 @@ class Levels:
         container = av.open(self.src.path, "r")
         audio = container.streams.audio[stream]
 
-        if audio.codec.experimental:
-            self.log.error(f"`{audio.codec.name}` is an experimental codec")
-
         if audio.duration is not None and audio.time_base is not None:
             inaccurate_dur = int(audio.duration * audio.time_base * self.tb)
         elif container.duration is not None:
@@ -303,9 +299,6 @@ class Levels:
 
         container = av.open(self.src.path, "r")
         video = container.streams.video[stream]
-
-        if video.codec.experimental:
-            self.log.experimental(video.codec)
 
         inaccurate_dur = (
             1024

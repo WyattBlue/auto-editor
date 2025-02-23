@@ -1,14 +1,9 @@
-from __future__ import annotations
-
 import sys
 from datetime import timedelta
 from shutil import get_terminal_size, rmtree
 from tempfile import mkdtemp
 from time import perf_counter, sleep
-from typing import TYPE_CHECKING, NoReturn
-
-if TYPE_CHECKING:
-    import av
+from typing import NoReturn
 
 
 class Log:
@@ -99,10 +94,6 @@ class Log:
             minute_len = timedelta(seconds=round(second_len))
 
             sys.stdout.write(f"Finished. took {second_len} seconds ({minute_len})\n")
-
-    def experimental(self, codec: av.Codec) -> None:
-        if codec.experimental:
-            self.error(f"`{codec.name}` is an experimental codec")
 
     @staticmethod
     def deprecated(message: str) -> None:
