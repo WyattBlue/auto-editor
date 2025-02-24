@@ -1,8 +1,18 @@
+# 26.3.1
+## Fixes
+ - Mux frames in the correct order, this fixes problems with media player's seeking in large files.
+ - Lay out the video stream first.
+ - Fix bug with progress bar being too small (escape characters were being counted in the length).
+ - Fix problem with experimental encoders/decoders (by removing them).
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.3.0...26.3.1
+
+
 # 26.3.0
 
 ## Features
- - Show codecs used in the progress bar
- - Support the prores encoder
+ - Show codecs used in the progress bar.
+ - Support the prores encoder.
 
 **Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.2.0...26.3.0
 
