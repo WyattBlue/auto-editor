@@ -5,7 +5,7 @@ from fractions import Fraction
 from statistics import fmean, median
 from typing import TextIO
 
-from auto_editor.analyze import Levels
+from auto_editor.analyze import initLevels
 from auto_editor.timeline import v3
 from auto_editor.utils.bar import initBar
 from auto_editor.utils.func import to_timecode
@@ -64,8 +64,9 @@ def preview(tl: v3, log: Log) -> None:
                 all_sources.add(aclip.src)
 
     in_len = 0
+    bar = initBar("none")
     for src in all_sources:
-        in_len += Levels(src, tb, initBar("none"), False, log, False).media_length
+        in_len += initLevels(src, tb, bar, False, log).media_length
 
     out_len = tl.out_len()
 

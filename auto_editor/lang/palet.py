@@ -9,11 +9,11 @@ from dataclasses import dataclass
 from difflib import get_close_matches
 from fractions import Fraction
 from io import StringIO
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
-from auto_editor.analyze import LevelError, mut_remove_small
+from auto_editor.analyze import LevelError, Levels, mut_remove_small
 from auto_editor.lib.contracts import *
 from auto_editor.lib.data_structs import *
 from auto_editor.lib.err import MyError
@@ -568,13 +568,12 @@ def edit_audio(
     if "@levels" not in env:
         raise MyError("Can't use `audio` if there's no input media")
 
-    levels = env["@levels"]
-    src = levels.src
+    levels = cast(Levels, env["@levels"])
     strict = levels.strict
 
     stream_data: NDArray[np.bool_] | None = None
     if stream == Sym("all"):
-        stream_range = range(0, len(src.audios))
+        stream_range = range(0, len(levels.container.streams.audio))
     else:
         assert isinstance(stream, int)
         stream_range = range(stream, stream + 1)

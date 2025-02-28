@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
-from auto_editor.analyze import Levels
+from auto_editor.analyze import initLevels
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolarr
 from auto_editor.lib.data_structs import print_str
@@ -145,7 +145,9 @@ def make_timeline(
 
             env["timebase"] = tb
             env["src"] = f"{src.path}"
-            env["@levels"] = Levels(src, tb, bar, args.no_cache, log, len(sources) < 2)
+            env["@levels"] = initLevels(
+                src, tb, bar, args.no_cache, log, len(sources) < 2
+            )
 
             results = interpret(env, parser)
 
