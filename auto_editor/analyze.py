@@ -19,7 +19,6 @@ from auto_editor import __version__
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
     from fractions import Fraction
-    from pathlib import Path
 
     from numpy.typing import NDArray
 
@@ -28,7 +27,7 @@ if TYPE_CHECKING:
     from auto_editor.utils.log import Log
 
 
-__all__ = ("LevelError", "Levels", "iter_audio", "iter_motion")
+__all__ = ("LevelError", "initLevels", "iter_audio", "iter_motion")
 
 
 class LevelError(Exception):
@@ -153,50 +152,48 @@ def iter_motion(
         prev_index = index
 
 
-def obj_tag(path: Path, kind: str, tb: Fraction, obj: Sequence[object]) -> str:
-    mod_time = int(path.stat().st_mtime)
-    key = f"{path.name}:{mod_time:x}:{tb}:" + ",".join(f"{v}" for v in obj)
-    part1 = sha1(key.encode()).hexdigest()[:16]
-
-    return f"{part1}{kind}"
-
-
 @dataclass(slots=True)
 class Levels:
-    src: FileInfo
+    container: av.container.InputContainer
+    name: str
+    mod_time: int
     tb: Fraction
     bar: Bar
     no_cache: bool
     log: Log
-    strict: bool
+    strict: bool  # This is for `edit_audio()` for Palet functions.
 
     @property
     def media_length(self) -> int:
-        if self.src.audios:
+        container = self.container
+        if container.streams.audio:
             if (arr := self.read_cache("audio", (0,))) is not None:
                 return len(arr)
 
-            with av.open(self.src.path, "r") as container:
-                audio_stream = container.streams.audio[0]
-                result = sum(1 for _ in iter_audio(audio_stream, self.tb))
-
+            audio_stream = container.streams.audio[0]
+            result = sum(1 for _ in iter_audio(audio_stream, self.tb))
+            container.seek(0)
             self.log.debug(f"Audio Length: {result}")
             return result
 
         # If there's no audio, get length in video metadata.
-        with av.open(self.src.path) as container:
-            if len(container.streams.video) == 0:
-                self.log.error("Could not get media duration")
+        if not container.streams.video:
+            self.log.error("Could not get media duration")
 
-            video = container.streams.video[0]
-
-            if video.duration is None or video.time_base is None:
-                dur = 0
-            else:
-                dur = int(video.duration * video.time_base * self.tb)
-            self.log.debug(f"Video duration: {dur}")
+        video = container.streams.video[0]
+        if video.duration is None or video.time_base is None:
+            dur = 0
+        else:
+            dur = int(video.duration * video.time_base * self.tb)
+        self.log.debug(f"Video duration: {dur}")
+        container.seek(0)
 
         return dur
+
+    def obj_tag(self, kind: str, obj: Sequence[object]) -> str:
+        mod_time = self.mod_time
+        key = f"{self.name}:{mod_time:x}:{self.tb}:" + ",".join(f"{v}" for v in obj)
+        return f"{sha1(key.encode()).hexdigest()[:16]}{kind}"
 
     def none(self) -> NDArray[np.bool_]:
         return np.ones(self.media_length, dtype=np.bool_)
@@ -208,7 +205,7 @@ class Levels:
         if self.no_cache:
             return None
 
-        key = obj_tag(self.src.path, kind, self.tb, obj)
+        key = self.obj_tag(kind, obj)
         cache_file = os.path.join(gettempdir(), f"ae-{__version__}", f"{key}.npz")
 
         try:
@@ -226,8 +223,7 @@ class Levels:
         if not os.path.exists(workdir):
             os.mkdir(workdir)
 
-        key = obj_tag(self.src.path, kind, self.tb, obj)
-        cache_file = os.path.join(workdir, f"{key}.npz")
+        cache_file = os.path.join(workdir, f"{self.obj_tag(kind, obj)}.npz")
 
         try:
             np.savez(cache_file, data=arr)
@@ -253,13 +249,13 @@ class Levels:
         return arr
 
     def audio(self, stream: int) -> NDArray[np.float32]:
-        if stream >= len(self.src.audios):
+        container = self.container
+        if stream >= len(container.streams.audio):
             raise LevelError(f"audio: audio stream '{stream}' does not exist.")
 
         if (arr := self.read_cache("audio", (stream,))) is not None:
             return arr
 
-        container = av.open(self.src.path, "r")
         audio = container.streams.audio[stream]
 
         if audio.duration is not None and audio.time_base is not None:
@@ -286,32 +282,30 @@ class Levels:
             index += 1
 
         bar.end()
+        container.seek(0)
         assert len(result) > 0
         return self.cache(result[:index], "audio", (stream,))
 
     def motion(self, stream: int, blur: int, width: int) -> NDArray[np.float32]:
-        if stream >= len(self.src.videos):
+        container = self.container
+        if stream >= len(container.streams.video):
             raise LevelError(f"motion: video stream '{stream}' does not exist.")
 
         mobj = (stream, width, blur)
         if (arr := self.read_cache("motion", mobj)) is not None:
             return arr
 
-        container = av.open(self.src.path, "r")
         video = container.streams.video[stream]
-
         inaccurate_dur = (
             1024
             if video.duration is None or video.time_base is None
             else int(video.duration * video.time_base * self.tb)
         )
-
         bar = self.bar
         bar.start(inaccurate_dur, "Analyzing motion")
 
         result: NDArray[np.float32] = np.zeros(inaccurate_dur, dtype=np.float32)
         index = 0
-
         for value in iter_motion(video, self.tb, blur, width):
             if index > len(result) - 1:
                 result = np.concatenate(
@@ -322,6 +316,7 @@ class Levels:
             index += 1
 
         bar.end()
+        container.seek(0)
         return self.cache(result[:index], "motion", mobj)
 
     def subtitle(
@@ -331,7 +326,8 @@ class Levels:
         ignore_case: bool,
         max_count: int | None,
     ) -> NDArray[np.bool_]:
-        if stream >= len(self.src.subtitles):
+        container = self.container
+        if stream >= len(container.streams.subtitles):
             raise LevelError(f"subtitle: subtitle stream '{stream}' does not exist.")
 
         try:
@@ -339,9 +335,7 @@ class Levels:
             re_pattern = re.compile(pattern, flags)
         except re.error as e:
             self.log.error(e)
-
         try:
-            container = av.open(self.src.path, "r")
             subtitle_stream = container.streams.subtitles[stream]
             assert isinstance(subtitle_stream.time_base, Fraction)
         except Exception as e:
@@ -392,6 +386,22 @@ class Levels:
                         result[san_start:san_end] = 1
                         count += 1
 
-        container.close()
-
+        container.seek(0)
         return result
+
+
+def initLevels(
+    src: FileInfo,
+    tb: Fraction,
+    bar: Bar,
+    no_cache: bool,
+    log: Log,
+    strict: bool = False,
+) -> Levels:
+    try:
+        container = av.open(src.path)
+    except av.FFmpegError as e:
+        log.error(e)
+
+    mod_time = int(src.path.stat().st_mtime)
+    return Levels(container, src.path.name, mod_time, tb, bar, no_cache, log, strict)

@@ -6,7 +6,7 @@ from fractions import Fraction
 from os import environ
 
 import auto_editor
-from auto_editor.analyze import Levels
+from auto_editor.analyze import initLevels
 from auto_editor.ffwrapper import initFileInfo
 from auto_editor.lang.palet import ClosingError, Lexer, Parser, env, interpret
 from auto_editor.lang.stdenv import make_standard_env
@@ -66,7 +66,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         src = sources[0]
         tb = src.get_fps() if args.timebase is None else args.timebase
         env["timebase"] = tb
-        env["@levels"] = Levels(src, tb, initBar("modern"), False, log, strict)
+        env["@levels"] = initLevels(src, tb, initBar("modern"), False, log, strict)
 
     env.update(make_standard_env())
     print(f"Auto-Editor {auto_editor.__version__}")

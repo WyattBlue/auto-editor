@@ -128,7 +128,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             except ParserError as e:
                 log.error(e)
 
-        levels = Levels(src, tb, bar, False, log, strict=True)
+        levels = initLevels(src, tb, bar, False, log)
         try:
             if method == "audio":
                 if (arr := levels.read_cache("audio", (obj["stream"],))) is not None:
