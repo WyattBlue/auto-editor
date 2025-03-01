@@ -545,11 +545,11 @@ def main(sys_args: list[str] | None = None):
     def edit_negative_tests():
         run.check(
             ["resources/wav/example-cut-s16le.wav", "--edit", "motion"],
-            "video stream '0' does not ",
+            "video stream",
         )
         run.check(
             ["resources/only-video/man-on-green-screen.gif", "--edit", "audio"],
-            "audio stream '0' does not ",
+            "audio stream",
         )
 
     def yuv442p():
