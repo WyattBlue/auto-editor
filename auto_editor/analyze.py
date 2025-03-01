@@ -161,7 +161,6 @@ class Levels:
     bar: Bar
     no_cache: bool
     log: Log
-    strict: bool  # This is for `edit_audio()` for Palet functions.
 
     @property
     def media_length(self) -> int:
@@ -391,12 +390,7 @@ class Levels:
 
 
 def initLevels(
-    src: FileInfo,
-    tb: Fraction,
-    bar: Bar,
-    no_cache: bool,
-    log: Log,
-    strict: bool = False,
+    src: FileInfo, tb: Fraction, bar: Bar, no_cache: bool, log: Log
 ) -> Levels:
     try:
         container = av.open(src.path)
@@ -404,4 +398,4 @@ def initLevels(
         log.error(e)
 
     mod_time = int(src.path.stat().st_mtime)
-    return Levels(container, src.path.name, mod_time, tb, bar, no_cache, log, strict)
+    return Levels(container, src.path.name, mod_time, tb, bar, no_cache, log)

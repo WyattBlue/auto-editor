@@ -61,12 +61,11 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
     if args.input:
         log = Log(quiet=True, temp_dir=args.temp_dir)
-        strict = len(args.input) < 2
         sources = [initFileInfo(path, log) for path in args.input]
         src = sources[0]
         tb = src.get_fps() if args.timebase is None else args.timebase
         env["timebase"] = tb
-        env["@levels"] = initLevels(src, tb, initBar("modern"), False, log, strict)
+        env["@levels"] = initLevels(src, tb, initBar("modern"), False, log)
 
     env.update(make_standard_env())
     print(f"Auto-Editor {auto_editor.__version__}")
