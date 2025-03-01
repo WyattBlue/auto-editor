@@ -488,6 +488,8 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                         f"Generic error for encoder: {item.stream.name}\n"
                         f"at {item.index} time_base\nPerhaps video quality settings are too low?"
                     )
+                except av.FileNotFoundError:
+                    log.error(f"File not found: {output_path}")
                 except av.FFmpegError as e:
                     log.error(e)
 
