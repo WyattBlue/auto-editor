@@ -444,6 +444,9 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
             if should_get_audio:
                 audio_frames = [next(frames, None) for frames in audio_gen_frames]
+                if audio_frames and audio_frames[-1]:
+                    assert audio_frames[-1].time is not None
+                    index = round(audio_frames[-1].time * tl.tb)
             else:
                 audio_frames = [None]
             if should_get_sub:

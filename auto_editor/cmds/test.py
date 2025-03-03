@@ -119,13 +119,6 @@ def run_tests(runner: Runner, tests: list[Callable], args: TestArgs) -> None:
     )
 
 
-log = Log()
-
-
-def fileinfo(path: str) -> FileInfo:
-    return initFileInfo(path, log)
-
-
 all_files = (
     "aac.m4a",
     "alac.m4a",
@@ -135,6 +128,11 @@ all_files = (
     "mov_text.mp4",
     "testsrc.mkv",
 )
+log = Log()
+
+
+def fileinfo(path: str) -> FileInfo:
+    return initFileInfo(path, log)
 
 
 class Runner:
@@ -142,26 +140,22 @@ class Runner:
         self.program = [sys.executable, "-m", "auto_editor"]
         self.temp_dir = mkdtemp()
 
-    def main(
-        self, inputs: list[str], cmd: list[str], output: str | None = None
-    ) -> str | None:
+    def main(self, inputs: list[str], cmd: list[str], output: str | None = None) -> str:
+        assert inputs
         cmd = self.program + inputs + cmd + ["--no-open", "--progress", "none"]
         temp_dir = self.temp_dir
         if not os.path.exists(temp_dir):
             raise ValueError("Where's the temp dir")
-
-        if output is not None:
+        if output is None:
+            new_root = sha256("".join(cmd).encode()).hexdigest()[:16]
+            output = os.path.join(temp_dir, new_root)
+        else:
             root, ext = os.path.splitext(output)
             if inputs and ext == "":
                 output = root + os.path.splitext(inputs[0])[1]
             output = os.path.join(temp_dir, output)
-            cmd += ["--output", output]
 
-        if output is None and inputs:
-            new_root = sha256("".join(cmd).encode()).hexdigest()[:16]
-            cmd += ["--output", os.path.join(temp_dir, new_root)]
-
-        returncode, stdout, stderr = pipe_to_console(cmd)
+        returncode, stdout, stderr = pipe_to_console(cmd + ["--output", output])
         if returncode > 0:
             raise Exception(f"Test returned: {returncode}\n{stdout}\n{stderr}\n")
 
@@ -306,7 +300,16 @@ class Runner:
         self.check([path, "--no-open"], "must have an extension")
 
     def test_silent_threshold(self):
-        self.main(["resources/new-commentary.mp3"], ["--edit", "audio:threshold=0.1"])
+        with av.open("resources/new-commentary.mp3") as container:
+            assert container.duration / av.time_base == 6.732
+
+        out = self.main(
+            ["resources/new-commentary.mp3"], ["--edit", "audio:threshold=0.1"]
+        )
+        out += ".mp3"
+
+        with av.open(out) as container:
+            assert container.duration / av.time_base == 6.552
 
     def test_track(self):
         out = self.main(["resources/multi-track.mov"], ["--keep_tracks_seperate"], "te")
