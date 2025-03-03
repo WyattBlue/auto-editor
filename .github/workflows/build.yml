@@ -30,9 +30,10 @@ jobs:
           ruff format --check auto_editor
           mypy auto_editor
       - name: Nim
-        uses: iffy/install-nim@v5
+        uses: jiro4989/setup-nim-action@v2
         with:
-          version: binary:stable
+          nim-version: "stable"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Docs
         run: |
           make -C docs compile
