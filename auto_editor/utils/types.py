@@ -201,6 +201,8 @@ class Args:
     vprofile: str | None = None
     audio_bitrate: str = "auto"
     scale: float = 1.0
+    fragmented: bool = False
+    no_fragmented: bool = False
     sn: bool = False
     dn: bool = False
     no_seek: bool = False

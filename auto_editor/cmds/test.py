@@ -1,16 +1,15 @@
-from __future__ import annotations
-
 import concurrent.futures
+import hashlib
 import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from fractions import Fraction
 from hashlib import sha256
 from tempfile import mkdtemp
 from time import perf_counter
-from typing import TYPE_CHECKING
 
 import av
 import numpy as np
@@ -22,12 +21,6 @@ from auto_editor.lib.data_structs import Char
 from auto_editor.lib.err import MyError
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-    from typing import Any
-
-    from auto_editor.vanparse import ArgumentParser
 
 
 @dataclass(slots=True)
@@ -56,69 +49,6 @@ def pipe_to_console(cmd: list[str]) -> tuple[int, str, str]:
     return process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
 
 
-def run_tests(runner: Runner, tests: list[Callable], args: TestArgs) -> None:
-    if args.only != []:
-        tests = list(filter(lambda t: t.__name__ in args.only, tests))
-
-    total_time = 0.0
-    real_time = perf_counter()
-    passed = 0
-    total = len(tests)
-
-    def timed_test(test_func):
-        start_time = perf_counter()
-        try:
-            test_func()
-            success = True
-        except Exception as e:
-            success = False
-            exception = e
-        end_time = perf_counter()
-        duration = end_time - start_time
-
-        if success:
-            return (True, duration, None)
-        else:
-            return (False, duration, exception)
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_to_data = {}
-        for test in tests:
-            future = executor.submit(timed_test, test)
-            future_to_data[future] = test
-
-        index = 0
-        for future in concurrent.futures.as_completed(future_to_data):
-            test = future_to_data[future]
-            name = test.__name__
-            success, dur, exception = future.result()
-            total_time += dur
-            index += 1
-
-            if success:
-                passed += 1
-                print(
-                    f"{name:<26} ({index}/{total})  {round(dur, 2):<4} secs  [\033[1;32mPASSED\033[0m]",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"{name:<26} ({index}/{total})  {round(dur, 2):<4} secs  \033[1;31m[FAILED]\033[0m",
-                    flush=True,
-                )
-                if args.no_fail_fast:
-                    print(f"\n{exception}")
-                else:
-                    print("")
-                    raise exception
-
-    real_time = round(perf_counter() - real_time, 2)
-    total_time = round(total_time, 2)
-    print(
-        f"\nCompleted  {passed}/{total}\nreal time: {real_time} secs   total: {total_time} secs"
-    )
-
-
 all_files = (
     "aac.m4a",
     "alac.m4a",
@@ -133,6 +63,14 @@ log = Log()
 
 def fileinfo(path: str) -> FileInfo:
     return initFileInfo(path, log)
+
+
+def calculate_sha256(filename: str) -> str:
+    sha256_hash = hashlib.sha256()
+    with open(filename, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
 
 
 class Runner:
@@ -215,25 +153,44 @@ class Runner:
     def desc(self):
         self.raw(["desc", "example.mp4"])
 
-    def test_example(self):
-        out = self.main(inputs=["example.mp4"], cmd=[], output="example_ALTERED.mp4")
-
+    def test_example(self) -> None:
+        out = self.main(["example.mp4"], [], output="example_ALTERED.mp4")
         with av.open(out) as container:
-            assert container.streams[0].type == "video"
-            assert container.streams[1].type == "audio"
+            video = container.streams[0]
+            audio = container.streams[1]
 
-        cn = fileinfo(out)
-        video = cn.videos[0]
+            assert isinstance(video, av.VideoStream)
+            assert isinstance(audio, av.AudioStream)
+            assert video.base_rate == 30
+            assert video.average_rate is not None
+            assert video.average_rate == 30, video.average_rate
+            assert (video.width, video.height) == (1280, 720)
+            assert video.codec.name == "h264"
+            assert video.language == "eng"
+            assert audio.codec.name == "aac"
+            assert audio.sample_rate == 48000
+            assert audio.language == "eng"
 
-        assert video.fps == 30
-        # assert video.time_base == Fraction(1, 30)
-        assert video.width == 1280
-        assert video.height == 720
-        assert video.codec == "h264"
-        assert video.lang == "eng"
-        assert cn.audios[0].codec == "aac"
-        assert cn.audios[0].samplerate == 48000
-        assert cn.audios[0].lang == "eng"
+        out1_sha = calculate_sha256(out)
+
+        out = self.main(["example.mp4"], ["--fragmented"], output="example_ALTERED.mp4")
+        with av.open(out) as container:
+            video = container.streams[0]
+            audio = container.streams[1]
+
+            assert isinstance(video, av.VideoStream)
+            assert isinstance(audio, av.AudioStream)
+            assert video.base_rate == 30
+            assert video.average_rate is not None
+            assert round(video.average_rate) == 30, video.average_rate
+            assert (video.width, video.height) == (1280, 720)
+            assert video.codec.name == "h264"
+            assert video.language == "eng"
+            assert audio.codec.name == "aac"
+            assert audio.sample_rate == 48000
+            assert audio.language == "eng"
+
+        assert calculate_sha256(out) != out1_sha, "Fragmented output should be diff."
 
     # PR #260
     def test_high_speed(self):
@@ -519,7 +476,7 @@ class Runner:
     def palet_python_bridge(self):
         env.update(make_standard_env())
 
-        def cases(*cases: tuple[str, Any]) -> None:
+        def cases(*cases: tuple[str, object]) -> None:
             for text, expected in cases:
                 try:
                     parser = Parser(Lexer("repl", text))
@@ -672,6 +629,69 @@ class Runner:
         self.raw(["palet", "resources/scripts/maxcut.pal"])
         self.raw(["palet", "resources/scripts/case.pal"])
         self.raw(["palet", "resources/scripts/testmath.pal"])
+
+
+def run_tests(runner: Runner, tests: list[Callable], args: TestArgs) -> None:
+    if args.only != []:
+        tests = list(filter(lambda t: t.__name__ in args.only, tests))
+
+    total_time = 0.0
+    real_time = perf_counter()
+    passed = 0
+    total = len(tests)
+
+    def timed_test(test_func):
+        start_time = perf_counter()
+        try:
+            test_func()
+            success = True
+        except Exception as e:
+            success = False
+            exception = e
+        end_time = perf_counter()
+        duration = end_time - start_time
+
+        if success:
+            return (True, duration, None)
+        else:
+            return (False, duration, exception)
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_data = {}
+        for test in tests:
+            future = executor.submit(timed_test, test)
+            future_to_data[future] = test
+
+        index = 0
+        for future in concurrent.futures.as_completed(future_to_data):
+            test = future_to_data[future]
+            name = test.__name__
+            success, dur, exception = future.result()
+            total_time += dur
+            index += 1
+
+            if success:
+                passed += 1
+                print(
+                    f"{name:<26} ({index}/{total})  {round(dur, 2):<4} secs  [\033[1;32mPASSED\033[0m]",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"{name:<26} ({index}/{total})  {round(dur, 2):<4} secs  \033[1;31m[FAILED]\033[0m",
+                    flush=True,
+                )
+                if args.no_fail_fast:
+                    print(f"\n{exception}")
+                else:
+                    print("")
+                    raise exception
+
+    real_time = round(perf_counter() - real_time, 2)
+    total_time = round(total_time, 2)
+    print(
+        f"\nCompleted  {passed}/{total}\nreal time: {real_time} secs   total: {total_time} secs"
+    )
 
 
 def main(sys_args: list[str] | None = None) -> None:
