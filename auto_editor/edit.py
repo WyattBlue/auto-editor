@@ -297,7 +297,15 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     def make_media(tl: v3, output_path: str) -> None:
         assert src is not None
 
-        output = av.open(output_path, "w")
+        if args.fragmented and not args.no_fragmented:
+            log.debug("Enabling fragmented mp4/mov")
+            options = {
+                "movflags": "+default_base_moof+faststart+frag_keyframe+separate_moof",
+                "frag_duration": "0.2",
+            }
+        else:
+            options = {"movflags": "faststart"}
+        output = av.open(output_path, "w", options=options)
 
         if ctr.default_sub != "none" and not args.sn:
             sub_paths = make_new_subtitles(tl, log)
@@ -444,7 +452,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
             if should_get_audio:
                 audio_frames = [next(frames, None) for frames in audio_gen_frames]
-                if audio_frames and audio_frames[-1]:
+                if output_stream is None and audio_frames and audio_frames[-1]:
                     assert audio_frames[-1].time is not None
                     index = round(audio_frames[-1].time * tl.tb)
             else:
@@ -481,8 +489,11 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             while frame_queue and frame_queue[0].index <= index:
                 item = heappop(frame_queue)
                 frame_type = item.frame_type
+                bar_index = None
                 try:
                     if frame_type in {"video", "audio"}:
+                        if item.frame.time is not None:
+                            bar_index = round(item.frame.time * tl.tb)
                         output.mux(item.stream.encode(item.frame))
                     elif frame_type == "subtitle":
                         output.mux(item.frame)
@@ -496,7 +507,8 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                 except av.FFmpegError as e:
                     log.error(e)
 
-            bar.tick(index)
+                if bar_index:
+                    bar.tick(bar_index)
 
         # Flush streams
         if output_stream is not None:

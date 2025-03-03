@@ -175,6 +175,27 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         flag=True,
         help="Show stats on how the input will be cut and halt",
     )
+    parser.add_text("Container Settings:")
+    parser.add_argument(
+        "-sn",
+        flag=True,
+        help="Disable the inclusion of subtitle streams in the output file",
+    )
+    parser.add_argument(
+        "-dn",
+        flag=True,
+        help="Disable the inclusion of data streams in the output file",
+    )
+    parser.add_argument(
+        "--fragmented",
+        flag=True,
+        help="Use fragmented mp4/mov to allow playback before video is complete\nSee: https://ffmpeg.org/ffmpeg-formats.html#Fragmentation",
+    )
+    parser.add_argument(
+        "--no-fragmented",
+        flag=True,
+        help="Do not use fragmented mp4/mov for better compatibility (default)",
+    )
     parser.add_text("Video Rendering:")
     parser.add_argument(
         "--video-codec",
@@ -231,16 +252,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Apply audio rendering to all audio tracks. Applied right before rendering the output file",
     )
     parser.add_text("Miscellaneous:")
-    parser.add_argument(
-        "-sn",
-        flag=True,
-        help="Disable the inclusion of subtitle streams in the output file",
-    )
-    parser.add_argument(
-        "-dn",
-        flag=True,
-        help="Disable the inclusion of data streams in the output file",
-    )
     parser.add_argument(
         "--config", flag=True, help="When set, look for `config.pal` and run it"
     )
