@@ -1,4 +1,13 @@
+# 26.3.2
+
+## Fixes
+  - Fix regression in 26.3.0 that caused audio-only exports to have no data.
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.3.1...26.3.2s
+
+
 # 26.3.1
+
 ## Fixes
  - Mux frames in the correct order, this fixes problems with media player's seeking in large files.
  - Lay out the video stream first.

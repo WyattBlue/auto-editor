@@ -219,9 +219,7 @@ class Levels:
             return arr
 
         workdir = os.path.join(gettempdir(), f"ae-{__version__}")
-        if not os.path.exists(workdir):
-            os.mkdir(workdir)
-
+        os.makedirs(workdir, exist_ok=True)
         cache_file = os.path.join(workdir, f"{self.obj_tag(kind, obj)}.npz")
 
         try:

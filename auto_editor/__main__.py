@@ -3,6 +3,7 @@
 import platform as plat
 import re
 import sys
+from io import StringIO
 from os import environ
 from os.path import exists, isdir, isfile, lexists, splitext
 from subprocess import run
@@ -320,23 +321,26 @@ def main() -> None:
     )
 
     if args.version:
-        print(auto_editor.__version__)
-        return
+        return print(auto_editor.__version__)
 
     if args.debug and not args.input:
-        print(f"OS: {plat.system()} {plat.release()} {plat.machine().lower()}")
-        print(f"Python: {plat.python_version()}")
-
+        buf = StringIO()
+        buf.write(f"OS: {plat.system()} {plat.release()} {plat.machine().lower()}\n")
+        buf.write(f"Python: {plat.python_version()}\nPyAV: ")
         try:
             import av
-
-            license = av._core.library_meta["libavcodec"]["license"]
-            print(f"PyAV: {av.__version__} ({license})")
         except (ModuleNotFoundError, ImportError):
-            print("PyAV: error")
+            buf.write("not found")
+        else:
+            try:
+                buf.write(f"{av.__version__} ")
+                license = av._core.library_meta["libavcodec"]["license"]
+                buf.write(f"({license})")
+            except AttributeError:
+                buf.write("error")
 
-        print(f"Auto-Editor: {auto_editor.__version__}")
-        return
+        buf.write(f"\nAuto-Editor: {auto_editor.__version__}")
+        return print(buf.getvalue())
 
     if not args.input:
         log.error("You need to give auto-editor an input file.")
