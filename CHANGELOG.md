@@ -2,6 +2,7 @@
 
 ## Fixes
   - Fix regression in 26.3.0 that caused audio-only exports to have no data.
+  - Support outputing fragmented mp4/mov files with `--fragmented`
 
 **Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.3.1...26.3.2s
 
