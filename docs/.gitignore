@@ -1,12 +1,8 @@
 src/ref/edit.html
 src/ref/options.html
 src/ref/palet.html
-src/img
 public
-
 make
 binaries/
-
-.DS_Store
 node_modules/
 bun.lockb
