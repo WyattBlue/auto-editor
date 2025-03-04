@@ -305,7 +305,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             }
         else:
             options = {"movflags": "faststart"}
-        output = av.open(output_path, "w", options=options)
+        output = av.open(output_path, "w", container_options=options)
 
         if ctr.default_sub != "none" and not args.sn:
             sub_paths = make_new_subtitles(tl, log)
