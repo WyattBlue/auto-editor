@@ -13,10 +13,10 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing import Any
 
+    from auto_editor.__main__ import Args
     from auto_editor.ffwrapper import FileInfo
     from auto_editor.timeline import v3
     from auto_editor.utils.log import Log
-    from auto_editor.utils.types import Args
 
 
 @dataclass(slots=True)

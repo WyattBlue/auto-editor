@@ -6,7 +6,7 @@ from fractions import Fraction
 from heapq import heappop, heappush
 from os.path import splitext
 from subprocess import run
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import av
 from av import AudioResampler, Codec
@@ -24,7 +24,9 @@ from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.container import Container, container_constructor
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import Args
+
+if TYPE_CHECKING:
+    from auto_editor.__main__ import Args
 
 
 def set_output(
@@ -206,7 +208,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
     del paths
 
-    output, export_ops = set_output(args.output_file, args.export, src, log)
+    output, export_ops = set_output(args.output, args.export, src, log)
     assert "export" in export_ops
     export = export_ops["export"]
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from fractions import Fraction
 
 
@@ -9,16 +8,7 @@ class CoerceError(Exception):
     pass
 
 
-def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
-    vals = val.strip().split(",")
-    if num_args > len(vals):
-        raise CoerceError(f"Too few arguments for {name}.")
-    if len(vals) > num_args:
-        raise CoerceError(f"Too many arguments for {name}.")
-    return vals
-
-
-def _split_num_str(val: str | float) -> tuple[float, str]:
+def split_num_str(val: str | float) -> tuple[float, str]:
     if isinstance(val, float | int):
         return val, ""
 
@@ -35,14 +25,9 @@ def _split_num_str(val: str | float) -> tuple[float, str]:
     return float(num), unit
 
 
-def _unit_check(unit: str, allowed_units: tuple[str, ...]) -> None:
-    if unit not in allowed_units:
-        raise CoerceError(f"Unknown unit: '{unit}'")
-
-
 # Numbers: 0, 1, 2, 3, ...
 def natural(val: str | float) -> int:
-    num, unit = _split_num_str(val)
+    num, unit = split_num_str(val)
     if unit != "":
         raise CoerceError(f"'{val}': Natural does not allow units.")
     if not isinstance(num, int) and not num.is_integer():
@@ -69,25 +54,12 @@ def number(val: str | float) -> float:
             raise CoerceError(f"'{val}': Denominator must not be zero.")
         return vs[0] / vs[1]
 
-    num, unit = _split_num_str(val)
+    num, unit = split_num_str(val)
     if unit == "%":
         return num / 100
-    _unit_check(unit, ("",))
-    return num
-
-
-def speed(val: str) -> float:
-    _s = number(val)
-    if _s <= 0 or _s > 99999:
-        return 99999.0
-    return _s
-
-
-def threshold(val: str | float) -> float:
-    num = number(val)
-    if num > 1 or num < 0:
-        raise CoerceError(f"'{val}': Threshold must be between 0 and 1 (0%-100%)")
-    return num
+    if unit == "":
+        return num
+    raise CoerceError(f"Unknown unit: '{unit}'")
 
 
 def frame_rate(val: str) -> Fraction:
@@ -102,14 +74,6 @@ def frame_rate(val: str) -> Fraction:
     return Fraction(val)
 
 
-def sample_rate(val: str) -> int:
-    num, unit = _split_num_str(val)
-    if unit in {"kHz", "KHz"}:
-        return natural(num * 1000)
-    _unit_check(unit, ("", "Hz"))
-    return natural(num)
-
-
 def time(val: str, tb: Fraction) -> int:
     if ":" in val:
         boxes = val.split(":")
@@ -121,7 +85,7 @@ def time(val: str, tb: Fraction) -> int:
             )
         raise CoerceError(f"'{val}': Invalid time format")
 
-    num, unit = _split_num_str(val)
+    num, unit = split_num_str(val)
     if unit in {"s", "sec", "secs", "second", "seconds"}:
         return round(num * tb)
     if unit in {"min", "mins", "minute", "minutes"}:
@@ -134,25 +98,6 @@ def time(val: str, tb: Fraction) -> int:
     if not num.is_integer():
         raise CoerceError(f"'{val}': Time format expects: int?")
     return int(num)
-
-
-def margin(val: str) -> tuple[str, str]:
-    vals = val.strip().split(",")
-    if len(vals) == 1:
-        vals.append(vals[0])
-    if len(vals) != 2:
-        raise CoerceError("--margin has too many arguments.")
-    return vals[0], vals[1]
-
-
-def time_range(val: str) -> tuple[str, str]:
-    a = _comma_coerce("time_range", val, 2)
-    return a[0], a[1]
-
-
-def speed_range(val: str) -> tuple[float, str, str]:
-    a = _comma_coerce("speed_range", val, 3)
-    return number(a[0]), a[1], a[2]
 
 
 def parse_color(val: str) -> str:
@@ -177,62 +122,6 @@ def parse_color(val: str) -> str:
         return color
 
     raise ValueError(f"Invalid Color: '{color}'")
-
-
-def resolution(val: str | None) -> tuple[int, int] | None:
-    if val is None:
-        return None
-    vals = val.strip().split(",")
-    if len(vals) != 2:
-        raise CoerceError(f"'{val}': Resolution takes two numbers")
-
-    return natural(vals[0]), natural(vals[1])
-
-
-@dataclass(slots=True)
-class Args:
-    yt_dlp_location: str = "yt-dlp"
-    download_format: str | None = None
-    output_format: str | None = None
-    yt_dlp_extras: str | None = None
-    video_codec: str = "auto"
-    audio_codec: str = "auto"
-    video_bitrate: str = "auto"
-    vprofile: str | None = None
-    audio_bitrate: str = "auto"
-    scale: float = 1.0
-    fragmented: bool = False
-    no_fragmented: bool = False
-    sn: bool = False
-    dn: bool = False
-    no_seek: bool = False
-    cut_out: list[tuple[str, str]] = field(default_factory=list)
-    add_in: list[tuple[str, str]] = field(default_factory=list)
-    set_speed_for_range: list[tuple[float, str, str]] = field(default_factory=list)
-    frame_rate: Fraction | None = None
-    sample_rate: int | None = None
-    resolution: tuple[int, int] | None = None
-    background: str = "#000000"
-    edit: str = "audio"
-    keep_tracks_separate: bool = False
-    audio_normalize: str = "#f"
-    export: str | None = None
-    player: str | None = None
-    no_open: bool = False
-    temp_dir: str | None = None
-    progress: str = "modern"
-    version: bool = False
-    debug: bool = False
-    config: bool = False
-    quiet: bool = False
-    preview: bool = False
-    no_cache: bool = False
-    margin: tuple[str, str] = ("0.2s", "0.2s")
-    silent_speed: float = 99999.0
-    video_speed: float = 1.0
-    output_file: str | None = None
-    help: bool = False
-    input: list[str] = field(default_factory=list)
 
 
 colormap = {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import av
 import numpy as np
@@ -18,8 +19,10 @@ from auto_editor.utils.bar import Bar
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.container import Container
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import Args
 from auto_editor.wavfile import AudioData, read, write
+
+if TYPE_CHECKING:
+    from auto_editor.__main__ import Args
 
 norm_types = {
     "ebu": pAttrs(
