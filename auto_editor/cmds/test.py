@@ -153,12 +153,37 @@ class Runner:
     def desc(self):
         self.raw(["desc", "example.mp4"])
 
+    def test_movflags(self) -> None:
+        file = "resources/testsrc.mp4"
+        out = self.main([file], ["--faststart"]) + ".mp4"
+        fast = calculate_sha256(out)
+        with av.open(out) as container:
+            assert isinstance(container.streams[0], av.VideoStream)
+            assert isinstance(container.streams[1], av.AudioStream)
+
+        out = self.main([file], ["--no-faststart"]) + ".mp4"
+        nofast = calculate_sha256(out)
+        with av.open(out) as container:
+            assert isinstance(container.streams[0], av.VideoStream)
+            assert isinstance(container.streams[1], av.AudioStream)
+
+        out = self.main([file], ["--fragmented"]) + ".mp4"
+        frag = calculate_sha256(out)
+        with av.open(out) as container:
+            assert isinstance(container.streams[0], av.VideoStream)
+            assert isinstance(container.streams[1], av.AudioStream)
+
+        assert fast != nofast, "+faststart is not being applied"
+        assert frag not in (fast, nofast), "fragmented output should diff."
+
     def test_example(self) -> None:
         out = self.main(["example.mp4"], [], output="example_ALTERED.mp4")
         with av.open(out) as container:
+            assert container.duration is not None
+            assert container.duration > 17300000 and container.duration < 2 << 24
+
             video = container.streams[0]
             audio = container.streams[1]
-
             assert isinstance(video, av.VideoStream)
             assert isinstance(audio, av.AudioStream)
             assert video.base_rate == 30
@@ -170,27 +195,6 @@ class Runner:
             assert audio.codec.name == "aac"
             assert audio.sample_rate == 48000
             assert audio.language == "eng"
-
-        out1_sha = calculate_sha256(out)
-
-        out = self.main(["example.mp4"], ["--fragmented"], output="example_ALTERED.mp4")
-        with av.open(out) as container:
-            video = container.streams[0]
-            audio = container.streams[1]
-
-            assert isinstance(video, av.VideoStream)
-            assert isinstance(audio, av.AudioStream)
-            assert video.base_rate == 30
-            assert video.average_rate is not None
-            assert round(video.average_rate) == 30, video.average_rate
-            assert (video.width, video.height) == (1280, 720)
-            assert video.codec.name == "h264"
-            assert video.language == "eng"
-            assert audio.codec.name == "aac"
-            assert audio.sample_rate == 48000
-            assert audio.language == "eng"
-
-        assert calculate_sha256(out) != out1_sha, "Fragmented output should be diff."
 
     # PR #260
     def test_high_speed(self):

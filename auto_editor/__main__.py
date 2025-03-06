@@ -61,6 +61,8 @@ class Args:
     # Container Settings
     sn: bool = False
     dn: bool = False
+    faststart: bool = False
+    no_faststart: bool = False
     fragmented: bool = False
     no_fragmented: bool = False
 
@@ -273,6 +275,16 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "-dn",
         flag=True,
         help="Disable the inclusion of data streams in the output file",
+    )
+    parser.add_argument(
+        "--faststart",
+        flag=True,
+        help="Enable movflags +faststart, recommended for web (default)",
+    )
+    parser.add_argument(
+        "--no-faststart",
+        flag=True,
+        help="Disable movflags +faststart, will be faster for large files",
     )
     parser.add_argument(
         "--fragmented",
