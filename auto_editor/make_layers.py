@@ -13,11 +13,12 @@ from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v1, v3
 from auto_editor.utils.func import mut_margin
-from auto_editor.utils.types import Args, CoerceError, time
+from auto_editor.utils.types import CoerceError, time
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+    from auto_editor.__main__ import Args
     from auto_editor.utils.bar import Bar
     from auto_editor.utils.chunks import Chunks
     from auto_editor.utils.log import Log

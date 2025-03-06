@@ -3,6 +3,8 @@
 import platform as plat
 import re
 import sys
+from dataclasses import dataclass, field
+from fractions import Fraction
 from io import StringIO
 from os import environ
 from os.path import exists, isdir, isfile, lexists, splitext
@@ -12,21 +14,125 @@ import auto_editor
 from auto_editor.utils.func import get_stdout
 from auto_editor.utils.log import Log
 from auto_editor.utils.types import (
-    Args,
+    CoerceError,
     frame_rate,
-    margin,
+    natural,
     number,
     parse_color,
-    resolution,
-    sample_rate,
-    speed,
-    speed_range,
-    time_range,
+    split_num_str,
 )
 from auto_editor.vanparse import ArgumentParser
 
 
+@dataclass(slots=True)
+class Args:
+    input: list[str] = field(default_factory=list)
+    help: bool = False
+
+    # Editing Options
+    margin: tuple[str, str] = ("0.2s", "0.2s")
+    edit: str = "audio"
+    export: str | None = None
+    output: str | None = None
+    silent_speed: float = 99999.0
+    video_speed: float = 1.0
+    cut_out: list[tuple[str, str]] = field(default_factory=list)
+    add_in: list[tuple[str, str]] = field(default_factory=list)
+    set_speed_for_range: list[tuple[float, str, str]] = field(default_factory=list)
+
+    # Timeline Options
+    frame_rate: Fraction | None = None
+    sample_rate: int | None = None
+    resolution: tuple[int, int] | None = None
+    background: str = "#000000"
+
+    # URL download Options
+    yt_dlp_location: str = "yt-dlp"
+    download_format: str | None = None
+    output_format: str | None = None
+    yt_dlp_extras: str | None = None
+
+    # Display Options
+    progress: str = "modern"
+    debug: bool = False
+    quiet: bool = False
+    preview: bool = False
+
+    # Container Settings
+    sn: bool = False
+    dn: bool = False
+    fragmented: bool = False
+    no_fragmented: bool = False
+
+    # Video Rendering
+    video_codec: str = "auto"
+    video_bitrate: str = "auto"
+    vprofile: str | None = None
+    scale: float = 1.0
+    no_seek: bool = False
+
+    # Audio Rendering
+    audio_codec: str = "auto"
+    audio_bitrate: str = "auto"
+    keep_tracks_separate: bool = False
+    audio_normalize: str = "#f"
+
+    # Misc.
+    config: bool = False
+    no_cache: bool = False
+    no_open: bool = False
+    temp_dir: str | None = None
+    player: str | None = None
+    version: bool = False
+
+
 def main_options(parser: ArgumentParser) -> ArgumentParser:
+    def margin(val: str) -> tuple[str, str]:
+        vals = val.strip().split(",")
+        if len(vals) == 1:
+            vals.append(vals[0])
+        if len(vals) != 2:
+            raise CoerceError("--margin has too many arguments.")
+        return vals[0], vals[1]
+
+    def speed(val: str) -> float:
+        _s = number(val)
+        if _s <= 0 or _s > 99999:
+            return 99999.0
+        return _s
+
+    def resolution(val: str | None) -> tuple[int, int] | None:
+        if val is None:
+            return None
+        vals = val.strip().split(",")
+        if len(vals) != 2:
+            raise CoerceError(f"'{val}': Resolution takes two numbers")
+        return natural(vals[0]), natural(vals[1])
+
+    def sample_rate(val: str) -> int:
+        num, unit = split_num_str(val)
+        if unit in {"kHz", "KHz"}:
+            return natural(num * 1000)
+        if unit not in {"", "Hz"}:
+            raise CoerceError(f"Unknown unit: '{unit}'")
+        return natural(num)
+
+    def _comma_coerce(name: str, val: str, num_args: int) -> list[str]:
+        vals = val.strip().split(",")
+        if num_args > len(vals):
+            raise CoerceError(f"Too few arguments for {name}.")
+        if len(vals) > num_args:
+            raise CoerceError(f"Too many arguments for {name}.")
+        return vals
+
+    def time_range(val: str) -> tuple[str, str]:
+        a = _comma_coerce("time_range", val, 2)
+        return a[0], a[1]
+
+    def speed_range(val: str) -> tuple[float, str, str]:
+        a = _comma_coerce("speed_range", val, 3)
+        return number(a[0]), a[1], a[2]
+
     parser.add_required("input", nargs="*", metavar="[file | url ...] [options]")
     parser.add_text("Editing Options:")
     parser.add_argument(
@@ -40,6 +146,16 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--edit",
         metavar="METHOD",
         help="Set an expression which determines how to make auto edits",
+    )
+    parser.add_argument(
+        "--export", "-ex", metavar="EXPORT:ATTRS?", help="Choose the export mode"
+    )
+    parser.add_argument(
+        "--output",
+        "--output-file",
+        "-o",
+        metavar="FILE",
+        help="Set the name/path of the new output file",
     )
     parser.add_argument(
         "--silent-speed",
@@ -111,12 +227,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         metavar="COLOR",
         help="Set the background as a solid RGB color",
     )
-    parser.add_argument(
-        "--add",
-        nargs="*",
-        metavar="OBJ:START,DUR,ATTRS?",
-        help="Insert an audio/video object to the timeline",
-    )
     parser.add_text("URL Download Options:")
     parser.add_argument(
         "--yt-dlp-location",
@@ -137,28 +247,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--yt-dlp-extras",
         metavar="CMD",
         help="Add extra options for yt-dlp. Must be in quotes",
-    )
-    parser.add_text("Utility Options:")
-    parser.add_argument(
-        "--export", "-ex", metavar="EXPORT:ATTRS?", help="Choose the export mode"
-    )
-    parser.add_argument(
-        "--output-file",
-        "--output",
-        "-o",
-        metavar="FILE",
-        help="Set the name/path of the new output file",
-    )
-    parser.add_argument(
-        "--player", "-p", metavar="CMD", help="Set player to open output media files"
-    )
-    parser.add_argument(
-        "--no-open", flag=True, help="Do not open the output file after editing is done"
-    )
-    parser.add_argument(
-        "--temp-dir",
-        metavar="PATH",
-        help="Set where the temporary directory is located",
     )
     parser.add_text("Display Options:")
     parser.add_argument(
@@ -257,6 +345,17 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_argument(
         "--no-cache", flag=True, help="Don't look for or write a cache file"
+    )
+    parser.add_argument(
+        "--no-open", flag=True, help="Do not open the output file after editing is done"
+    )
+    parser.add_argument(
+        "--temp-dir",
+        metavar="PATH",
+        help="Set where the temporary directory is located",
+    )
+    parser.add_argument(
+        "--player", "-p", metavar="CMD", help="Set player to open output media files"
     )
     parser.add_argument("--version", "-V", flag=True, help="Display version and halt")
     return parser

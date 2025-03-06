@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from auto_editor.ffwrapper import initFileInfo, mux
 from auto_editor.lib.contracts import *
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
-from auto_editor.utils.types import natural, number, parse_color, threshold
+from auto_editor.utils.types import CoerceError, natural, number, parse_color
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -126,6 +126,13 @@ class TlRect:
             "height": self.height,
             "fill": self.fill,
         }
+
+
+def threshold(val: str | float) -> float:
+    num = number(val)
+    if num > 1 or num < 0:
+        raise CoerceError(f"'{val}': Threshold must be between 0 and 1 (0%-100%)")
+    return num
 
 
 video_builder = pAttrs(

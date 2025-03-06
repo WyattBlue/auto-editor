@@ -9,12 +9,12 @@ from av.audio.resampler import AudioResampler
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.bar import Bar
 from auto_editor.utils.log import Log
-from auto_editor.utils.types import _split_num_str
+from auto_editor.utils.types import split_num_str
 
 
 def parse_bitrate(input_: str, log: Log) -> int:
     try:
-        val, unit = _split_num_str(input_)
+        val, unit = split_num_str(input_)
     except Exception as e:
         log.error(e)
 
