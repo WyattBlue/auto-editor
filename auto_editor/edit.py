@@ -299,14 +299,18 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     def make_media(tl: v3, output_path: str) -> None:
         assert src is not None
 
+        options = {}
+        mov_flags = []
         if args.fragmented and not args.no_fragmented:
-            log.debug("Enabling fragmented mp4/mov")
-            options = {
-                "movflags": "+default_base_moof+faststart+frag_keyframe+separate_moof",
-                "frag_duration": "0.2",
-            }
-        else:
-            options = {"movflags": "faststart"}
+            mov_flags.extend(["default_base_moof", "frag_keyframe", "separate_moof"])
+            options["frag_duration"] = "0.2"
+            if args.faststart:
+                log.warning("Fragmented is enabled, will not apply faststart.")
+        elif not args.no_faststart:
+            mov_flags.append("faststart")
+        if mov_flags:
+            options["movflags"] = "+".join(mov_flags)
+
         output = av.open(output_path, "w", container_options=options)
 
         if ctr.default_sub != "none" and not args.sn:

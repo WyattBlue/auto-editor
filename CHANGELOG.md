@@ -1,8 +1,17 @@
+# 26.3.3
+
+## Fixes
+ - Suppress warnings if movflags do not apply.
+ - Add `--faststart` and `--no-faststart` to enable/disable ffmpeg's `-movflags +faststart`.
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.3.2...26.3.3
+
+
 # 26.3.2
 
 ## Fixes
   - Fix regression in 26.3.0 that caused audio-only exports to have no data.
-  - Support outputting fragmented mp4/mov files with `--fragmented`
+  - Support outputting fragmented mp4/mov files with `--fragmented`.
 
 **Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.3.1...26.3.2
 
