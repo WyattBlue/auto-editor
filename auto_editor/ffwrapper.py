@@ -126,7 +126,7 @@ def initFileInfo(path: str, log: Log) -> FileInfo:
             VideoStream(
                 v.width,
                 v.height,
-                v.name,
+                v.codec.canonical_name,
                 fps,
                 vdur,
                 sar,
