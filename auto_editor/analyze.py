@@ -343,15 +343,9 @@ class Levels:
         for packet in container.demux(subtitle_stream):
             if packet.pts is None or packet.duration is None:
                 continue
-            for subset in packet.decode():
-                # See definition of `AVSubtitle`
-                # in: https://ffmpeg.org/doxygen/trunk/avcodec_8h_source.html
-                start = float(packet.pts * subtitle_stream.time_base)
-                dur = float(packet.duration * subtitle_stream.time_base)
+            sub_length = max(sub_length, packet.pts + packet.duration)
 
-                end = round((start + dur) * self.tb)
-                sub_length = max(sub_length, end)
-
+        sub_length = round(sub_length * subtitle_stream.time_base * self.tb)
         result = np.zeros((sub_length), dtype=np.bool_)
         del sub_length
 
@@ -363,25 +357,25 @@ class Levels:
                 continue
             if early_exit:
                 break
-            for subset in packet.decode():
-                if max_count is not None and count >= max_count:
-                    early_exit = True
-                    break
 
-                start = float(packet.pts * subtitle_stream.time_base)
-                dur = float(packet.duration * subtitle_stream.time_base)
+            if max_count is not None and count >= max_count:
+                early_exit = True
+                break
 
-                san_start = round(start * self.tb)
-                san_end = round((start + dur) * self.tb)
+            start = float(packet.pts * subtitle_stream.time_base)
+            dur = float(packet.duration * subtitle_stream.time_base)
 
-                for sub in subset:
-                    if not isinstance(sub, AssSubtitle):
-                        continue
+            san_start = round(start * self.tb)
+            san_end = round((start + dur) * self.tb)
 
-                    line = sub.dialogue.decode(errors="ignore")
-                    if line and re.search(re_pattern, line):
-                        result[san_start:san_end] = 1
-                        count += 1
+            for sub in packet.decode():
+                if not isinstance(sub, AssSubtitle):
+                    continue
+
+                line = sub.dialogue.decode(errors="ignore")
+                if line and re.search(re_pattern, line):
+                    result[san_start:san_end] = 1
+                    count += 1
 
         container.seek(0)
         return result
