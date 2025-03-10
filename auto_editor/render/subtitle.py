@@ -138,18 +138,14 @@ def make_srt(input_: Input, stream: int) -> str:
         if packet.dts is None or packet.pts is None or packet.duration is None:
             continue
 
-        start = packet.pts * input_stream.time_base
-        end = start + packet.duration * input_stream.time_base
+        start_num = packet.pts * input_stream.time_base
+        start = to_timecode(start_num, "srt")
+        end = to_timecode(start_num + packet.duration * input_stream.time_base, "srt")
 
-        for subset in packet.decode():
-            start_time = to_timecode(start, "srt")
-            end_time = to_timecode(end, "srt")
-
-            sub = subset[0]
-            assert len(subset) == 1
+        for sub in packet.decode():
             assert isinstance(sub, av.subtitles.subtitle.AssSubtitle)
 
-            output_bytes.write(f"{s}\n{start_time} --> {end_time}\n")
+            output_bytes.write(f"{s}\n{start} --> {end}\n")
             output_bytes.write(sub.dialogue.decode("utf-8", errors="ignore") + "\n\n")
             s += 1
 
