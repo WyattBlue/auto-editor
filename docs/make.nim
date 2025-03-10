@@ -403,128 +403,6 @@ func paintTS(v: string): string =
     i += 1
 
 
-func paintPython(v: string): string =
-  # paint Python code one line at a time.
-  let myInput = sanitize(v)
-  var i = 0
-  var old_i = -1
-
-  while i < len(myInput):
-    while true:
-      if myInput[i] == '"':
-        i += 1
-        var bar = ""
-        while myInput[i] != '"':
-          bar &= myInput[i]
-          i += 1
-
-        i += 1
-        result &= "<span class=\"string\">\"" & bar & "\"</span>"
-
-      for bar in @["&lt;", "&gt;", "dataclass"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= bar
-          i += len(bar)
-
-      for bar in @["def", "class"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"keyword\">" & bar & "</span>"
-          i += len(bar)
-
-      for bar in @["if", "from", "import"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"keyword-import\">" & bar & "</span>"
-          i += len(bar)
-
-      for bar in @[":", ",", "->"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"terminator\">" & bar & "</span>"
-          i += len(bar)
-
-      for bar in @["bool", "int", "float", "str", "list", "tuple", "Literal"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"type-primitive\">" & bar & "</span>"
-          i += len(bar)
-
-      for bar in @["and", "or"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"operator\">" & bar & "</span>"
-          i += len(bar)
-
-      if old_i == i:
-        break
-
-      old_i = i
-
-    result &= myInput[i]
-    i += 1
-
-
-func paintPalet(v: string): string =
-  let myInput = v
-  var i = 0
-  var old_i = -1
-
-  while i < len(myInput):
-    while true:
-      if myInput[i] == ';':
-        i += 1
-        var bar = ""
-        while i < len(myInput):
-          bar &= myInput[i]
-          i += 1
-
-        result &= "<span class=\"comment\">;" & bar.sanitize & "</span>"
-
-      if myInput[i] == '"':
-        i += 1
-        var bar = ""
-        while myInput[i] != '"':
-          bar &= myInput[i]
-          i += 1
-
-        i += 1
-        result &= "<span class=\"string\">\"" & bar.sanitize & "\"</span>"
-
-      for bar in @["define/c", "define", "let"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"keyword\">" & bar & "</span>"
-          i += len(bar)
-
-      for bar in @["when", "if"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"keyword-import\">" & bar & "</span>"
-          i += len(bar)
-
-      for bar in @["map", "lambda"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"function-name\">" & bar & "</span>"
-          i += len(bar)
-
-      for bar in @[".", "->"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"terminator\">" & bar.sanitize & "</span>"
-          i += len(bar)
-
-      for bar in @["bool?", "int?", "float?", "nat?", "str?", "list?", "threshold?"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"type-primitive\">" & bar.sanitize & "</span>"
-          i += len(bar)
-
-      for bar in @["and", "or", "equal?", ">=", "<=", "=", ">", "<", "/"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"operator\">" & bar.sanitize & "</span>"
-          i += len(bar)
-
-      if old_i == i:
-        break
-
-      old_i = i
-
-    result &= myInput[i]
-    i += 1
-
-
 proc convert(file: string, path: string) =
   let text = readFile(file)
   var
@@ -672,10 +550,6 @@ proc convert(file: string, path: string) =
             f.write(paintTS(obj.value))
           elif lexer.langName == "json":
             f.write(paintJson(obj.value))
-          elif lexer.langName == "python":
-            f.write(paintPython(obj.value))
-          elif lexer.langName == "palet":
-            f.write(paintPalet(obj.value))
           else:
             f.write(sanitize(obj.value))
           has_text = true
