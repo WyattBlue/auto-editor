@@ -1,9 +1,22 @@
 ---
-title: Time Range Syntax
+title: Range Syntax
 ---
 
-# Time Range Syntax
-The `--add-in`, `--cut-out`, `--mark-as-loud`, `--mark-as-silent` options use time range syntax.
+# Range Syntax
+## How Do I Cut the Beginning or End Segment in My Video?
+
+Range syntax is useful for making manual edits in addition to automatic edits. Here's how you cut out the first and last 30 seconds:
+```
+auto-editor video.mp4 --cut-out start,30sec -30sec,end
+```
+
+You can also guarantee those sections would be included, regardless of loudness with:
+```
+auto-editor video.mp4 --add-in start,30sec -30sec,end
+```
+
+## How Range Syntax Works
+The `--add-in`, `--cut-out`, `--mark-as-loud`, `--mark-as-silent` options all use time range syntax.
 
 It describes two numbers, the start and end point, separated by a singe comma `,`. The start number is inclusive, while the end number is exclusive.
 

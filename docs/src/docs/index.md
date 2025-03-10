@@ -7,7 +7,7 @@ See also: [reference](../ref)
 
 ---
 [How To Shrink File Size](./file-size)
-[Time Range Syntax](./range_syntax)
+[Range Syntax](./range-syntax)
 [Subcommands](./subcommands)
 [Using Auto-Editor on Windows](./windows)
 [Supported Media](./supported_media)
