@@ -8,7 +8,7 @@ func shouldProcessFile(path: string): bool =
     return false
 
   let ext = path.splitFile().ext.toLowerAscii()
-  return ext notin [".webp", ".png", ".jpeg", ".jpg", ".svg"]
+  return ext notin [".avif", ".webp", ".png", ".jpeg", ".jpg", ".svg"]
 
 proc parseTemplate(content: string, compName: string, compContent: string): string =
   var newContent = content
@@ -75,10 +75,6 @@ proc processDirectory(dir: string) =
 ################################
 
 type
-  PragmaKind = enum
-    normalType,
-    blogType,
-
   TokenKind = enum
     tkBar,
     keyval,
@@ -529,12 +525,10 @@ func paintPalet(v: string): string =
     i += 1
 
 
-proc convert(pragma: PragmaKind, file: string, path: string) =
+proc convert(file: string, path: string) =
   let text = readFile(file)
   var
     lexer = initLexer(file, text)
-    author = ""
-    date = ""
     desc = ""
 
   if getNextToken(lexer).kind != tkBar:
@@ -555,11 +549,6 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
     return token.value
 
   let title = parse_keyval("title")
-
-  if pragma == blogType:
-    author = parse_keyval("author")
-    date = parse_keyval("date")
-    desc = parse_keyval("desc")
 
   if getNextToken(lexer).kind != tkBar:
     lexer.error("head: expected end ---")
@@ -607,12 +596,6 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
 {{{{ nav }}}}
 <section class="section">
 <div class="container">
-""")
-
-  if pragma == blogType:
-    f.write(&"""
-    <h1>{title}</h1>
-    <p class="author-date">{author}&nbsp;&nbsp;&nbsp;{date}</p>
 """)
 
   let blocks: seq[TokenKind] = @[tkText, tkH1, tkH2, tkH3, tkList, tkUl]
@@ -727,16 +710,11 @@ proc convert(pragma: PragmaKind, file: string, path: string) =
 
 
 proc main() =
-  convert(normalType, "public/blog/index.md", "public/blog/index.html")
-  convert(normalType, "public/ref/index.md", "public/ref/index.html")
-  for file in walkFiles("public/blog/*.md"):
-    convert(blogType, file, file.changeFileExt("html"))
-
+  convert("public/ref/index.md", "public/ref/index.html")
   for file in walkFiles("public/docs/*.md"):
-    convert(normalType, file, file.changeFileExt("html"))
-
+    convert(file, file.changeFileExt("html"))
   for file in walkFiles("public/docs/subcommands/*.md"):
-    convert(normalType, file, file.changeFileExt("html"))
+    convert(file, file.changeFileExt("html"))
 
   processDirectory("public")
   echo "done building"
