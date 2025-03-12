@@ -448,7 +448,7 @@ def main() -> None:
     if args.debug and not args.input:
         buf = StringIO()
         buf.write(f"OS: {plat.system()} {plat.release()} {plat.machine().lower()}\n")
-        buf.write(f"Python: {plat.python_version()}\nPyAV: ")
+        buf.write(f"Python: {plat.python_version()}\nAV: ")
         try:
             import av
         except (ModuleNotFoundError, ImportError):
