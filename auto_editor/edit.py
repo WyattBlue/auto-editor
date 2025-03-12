@@ -83,14 +83,6 @@ def set_video_codec(
             return ctr.default_vid
         return codec
 
-    if codec == "copy":
-        log.deprecated("The `copy` codec is deprecated. auto-editor always re-encodes")
-        if src is None:
-            log.error("No input to copy its codec from.")
-        if not src.videos:
-            log.error("Input file does not have a video stream to copy codec from.")
-        codec = src.videos[0].codec
-
     if ctr.vcodecs is not None and codec not in ctr.vcodecs:
         try:
             cobj = Codec(codec, "w")
@@ -118,14 +110,6 @@ def set_audio_codec(
         if codec is None:
             codec = "aac"
         return codec
-
-    if codec == "copy":
-        log.deprecated("The `copy` codec is deprecated. auto-editor always re-encodes")
-        if src is None:
-            log.error("No input to copy its codec from.")
-        if not src.audios:
-            log.error("Input file does not have an audio stream to copy codec from.")
-        codec = src.audios[0].codec
 
     if ctr.acodecs is None or codec not in ctr.acodecs:
         try:
