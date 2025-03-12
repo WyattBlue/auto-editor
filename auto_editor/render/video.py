@@ -25,9 +25,6 @@ class VideoFrame:
     src: FileInfo
 
 
-allowed_pix_fmt = av.video.frame.supported_np_pix_fmts
-
-
 def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
     hex_color = bg.lstrip("#").upper()
     rgb_color = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
@@ -71,7 +68,7 @@ def render_av(
     seek_cost: dict[FileInfo, int] = {}
     tous: dict[FileInfo, int] = {}
 
-    target_pix_fmt = "yuv420p"  # Reasonable default
+    pix_fmt = "yuv420p"  # Reasonable default
     target_fps = tl.tb  # Always constant
     img_cache = make_image_cache(tl)
 
@@ -101,30 +98,30 @@ def render_av(
             decoders[src] = cn.decode(stream)
 
             if src == first_src and stream.pix_fmt is not None:
-                target_pix_fmt = stream.pix_fmt
+                pix_fmt = stream.pix_fmt
 
     log.debug(f"Tous: {tous}")
     log.debug(f"Clips: {tl.v}")
 
     codec = av.Codec(args.video_codec, "w")
 
-    if codec.canonical_name == "gif":
-        if codec.video_formats is not None and target_pix_fmt in (
-            f.name for f in codec.video_formats
-        ):
-            target_pix_fmt = target_pix_fmt
+    need_valid_fmt = True
+    if codec.video_formats is not None:
+        for video_format in codec.video_formats:
+            if pix_fmt == video_format.name:
+                need_valid_fmt = False
+                break
+
+    if need_valid_fmt:
+        if codec.canonical_name == "gif":
+            pix_fmt = "rgb8"
+        elif codec.canonical_name == "prores":
+            pix_fmt = "yuv422p10le"
         else:
-            target_pix_fmt = "rgb8"
-    elif codec.canonical_name == "prores":
-        target_pix_fmt = "yuv422p10le"
-    else:
-        target_pix_fmt = (
-            target_pix_fmt if target_pix_fmt in allowed_pix_fmt else "yuv420p"
-        )
+            pix_fmt = "yuv420p"
 
     del codec
-    ops = {"mov_flags": "faststart"}
-    output_stream = output.add_stream(args.video_codec, rate=target_fps, options=ops)
+    output_stream = output.add_stream(args.video_codec, rate=target_fps)
 
     cc = output_stream.codec_context
     if args.vprofile is not None:
@@ -151,7 +148,7 @@ def render_av(
         scale_graph = av.filter.Graph()
         scale_graph.link_nodes(
             scale_graph.add(
-                "buffer", video_size="1x1", time_base="1/1", pix_fmt=target_pix_fmt
+                "buffer", video_size="1x1", time_base="1/1", pix_fmt=pix_fmt
             ),
             scale_graph.add("scale", f"{target_width}:{target_height}"),
             scale_graph.add("buffersink"),
@@ -159,7 +156,7 @@ def render_av(
 
     output_stream.width = target_width
     output_stream.height = target_height
-    output_stream.pix_fmt = target_pix_fmt
+    output_stream.pix_fmt = pix_fmt
     output_stream.framerate = target_fps
 
     color_range = src.videos[0].color_range
@@ -191,7 +188,7 @@ def render_av(
     frames_saved = 0
 
     bg = args.background
-    null_frame = make_solid(target_width, target_height, target_pix_fmt, bg)
+    null_frame = make_solid(target_width, target_height, pix_fmt, bg)
     frame_index = -1
 
     for index in range(tl.end):
@@ -308,7 +305,7 @@ def render_av(
             scale_graph.vpush(frame)
             frame = scale_graph.vpull()
 
-        frame = frame.reformat(format=target_pix_fmt)
+        frame = frame.reformat(format=pix_fmt)
         frame.pts = None  # type: ignore
         frame.time_base = 0  # type: ignore
         yield (index, frame)
