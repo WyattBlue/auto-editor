@@ -308,9 +308,9 @@ def render_av(
             scale_graph.vpush(frame)
             frame = scale_graph.vpull()
 
-        if frame.format.name != target_pix_fmt:
-            frame = frame.reformat(format=target_pix_fmt)
-
-        yield (index, from_ndarray(frame.to_ndarray(), format=frame.format.name))
+        frame = frame.reformat(format=target_pix_fmt)
+        frame.pts = None  # type: ignore
+        frame.time_base = 0  # type: ignore
+        yield (index, frame)
 
     log.debug(f"Total frames saved seeking: {frames_saved}")
