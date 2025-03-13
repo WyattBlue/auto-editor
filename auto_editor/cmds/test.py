@@ -73,6 +73,10 @@ def calculate_sha256(filename: str) -> str:
     return sha256_hash.hexdigest()
 
 
+class SkipTest(Exception):
+    pass
+
+
 class Runner:
     def __init__(self) -> None:
         self.program = [sys.executable, "-m", "auto_editor"]
@@ -464,6 +468,16 @@ class Runner:
         out2 = self.main([out], ["-c:v", "prores"], "prores2.mkv")
         assert fileinfo(out2).videos[0].pix_fmt == "yuv422p10le"
 
+    def test_hevc(self):
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            raise SkipTest()
+
+        out = self.main(["resources/testsrc.mp4"], ["-c:v", "hevc"], "out.mkv")
+        assert fileinfo(out).videos[0].pix_fmt == "yuv420p"
+
+        out2 = self.main(["resources/testsrc-hevc.mp4"], []) + ".mp4"
+        assert fileinfo(out2).videos[0].pix_fmt == "yuv420p"
+
     #  Issue 280
     def test_SAR(self):
         out = self.main(["resources/SAR-2by3.mp4"], [], "2by3_out.mp4")
@@ -646,16 +660,21 @@ def run_tests(runner: Runner, tests: list[Callable], args: TestArgs) -> None:
 
     def timed_test(test_func):
         start_time = perf_counter()
+        skipped = False
         try:
             test_func()
             success = True
+        except SkipTest:
+            skipped = True
         except Exception as e:
             success = False
             exception = e
         end_time = perf_counter()
         duration = end_time - start_time
 
-        if success:
+        if skipped:
+            return (SkipTest, duration, None)
+        elif success:
             return (True, duration, None)
         else:
             return (False, duration, exception)
@@ -674,17 +693,15 @@ def run_tests(runner: Runner, tests: list[Callable], args: TestArgs) -> None:
             total_time += dur
             index += 1
 
-            if success:
+            msg = f"{name:<26} ({index}/{total})  {round(dur, 2):<5} secs  "
+            if success == SkipTest:
                 passed += 1
-                print(
-                    f"{name:<26} ({index}/{total})  {round(dur, 2):<4} secs  [\033[1;32mPASSED\033[0m]",
-                    flush=True,
-                )
+                print(f"{msg}[\033[38;2;125;125;125;mSKIPPED\033[0m]", flush=True)
+            elif success:
+                passed += 1
+                print(f"{msg}[\033[1;32mPASSED\033[0m]", flush=True)
             else:
-                print(
-                    f"{name:<26} ({index}/{total})  {round(dur, 2):<4} secs  \033[1;31m[FAILED]\033[0m",
-                    flush=True,
-                )
+                print(f"{msg}\033[1;31m[FAILED]\033[0m", flush=True)
                 if args.no_fail_fast:
                     print(f"\n{exception}")
                 else:
