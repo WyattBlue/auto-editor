@@ -1,3 +1,14 @@
+# 27.0.0
+
+## Major
+ - Deprecate `--keep-tracks-separate`, it's behavior is now the default. Use `--mix-audio-streams` for the old behavior.
+ - Remove deprecated "copy" codec (auto-editor never does remuxing).
+ - Require NumPy >= 2.
+ - Use BasswoodAV (`basswood-av`) instead of PyAV (`pyav`).
+
+## Features
+ - Make video rendering 11% faster, rendering should be 19% faster overall.
+
 # 26.3.3
 
 ## Fixes
