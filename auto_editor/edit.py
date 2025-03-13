@@ -162,6 +162,10 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     bar = initBar(args.progress)
     tl = None
 
+    if args.keep_tracks_separate:
+        log.deprecated("--keep-tracks-separate is deprecated.")
+        args.keep_tracks_separate = False
+
     if paths:
         path_ext = splitext(paths[0])[1].lower()
         if path_ext == ".xml":
@@ -273,9 +277,6 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     args.video_codec = set_video_codec(args.video_codec, src, out_ext, ctr, log)
     args.audio_codec = set_audio_codec(args.audio_codec, src, out_ext, ctr, log)
 
-    if args.keep_tracks_separate and ctr.max_audios == 1:
-        log.warning(f"'{out_ext}' container doesn't support multiple audio tracks.")
-
     def make_media(tl: v3, output_path: str) -> None:
         assert src is not None
 
@@ -293,17 +294,6 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
         output = av.open(output_path, "w", container_options=options)
 
-        if ctr.default_sub != "none" and not args.sn:
-            sub_paths = make_new_subtitles(tl, log)
-        else:
-            sub_paths = []
-
-        if ctr.default_aud != "none":
-            ensure = Ensure(bar, samplerate, log)
-            audio_paths = make_new_audio(tl, ctr, ensure, args, bar, log)
-        else:
-            audio_paths = []
-
         # Setup video
         if ctr.default_vid != "none" and tl.v:
             vframes = render_av(output, tl, args, log)
@@ -313,6 +303,16 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             output_stream, vframes = None, iter([])
 
         # Setup audio
+        if ctr.default_aud != "none":
+            ensure = Ensure(bar, samplerate, log)
+            audio_paths = make_new_audio(tl, ctr, ensure, args, bar, log)
+        else:
+            audio_paths = []
+
+        if len(audio_paths) > 1 and ctr.max_audios == 1:
+            log.warning("Dropping extra audio streams (container only allows one)")
+            audio_paths = audio_paths[0:1]
+
         if audio_paths:
             try:
                 audio_encoder = av.Codec(args.audio_codec, "w")
@@ -350,6 +350,11 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             audio_gen_frames.append(audio_input.decode(audio=0))
 
         # Setup subtitles
+        if ctr.default_sub != "none" and not args.sn:
+            sub_paths = make_new_subtitles(tl, log)
+        else:
+            sub_paths = []
+
         subtitle_streams = []
         subtitle_inputs = []
         sub_gen_frames = []
