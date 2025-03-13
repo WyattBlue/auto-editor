@@ -76,6 +76,7 @@ class Args:
     # Audio Rendering
     audio_codec: str = "auto"
     audio_bitrate: str = "auto"
+    mix_audio_streams: bool = False
     keep_tracks_separate: bool = False
     audio_normalize: str = "#f"
 
@@ -342,9 +343,12 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         help="Set the number of bits per second for audio",
     )
     parser.add_argument(
+        "--mix-audio-streams", flag=True, help="Mix all audio streams together into one"
+    )
+    parser.add_argument(
         "--keep-tracks-separate",
         flag=True,
-        help="Don't mix all audio tracks into one when exporting",
+        help="Don't mix all audio streams into one when exporting (default)",
     )
     parser.add_argument(
         "--audio-normalize",

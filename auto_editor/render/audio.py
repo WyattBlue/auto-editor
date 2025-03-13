@@ -372,7 +372,7 @@ def make_new_audio(
     except PermissionError:
         pass
 
-    if not (args.keep_tracks_separate and ctr.max_audios is None) and len(output) > 1:
+    if args.mix_audio_streams and len(output) > 1:
         new_a_file = f"{Path(temp, 'new_audio.wav')}"
         mix_audio_files(sr, output, new_a_file)
         return [new_a_file]

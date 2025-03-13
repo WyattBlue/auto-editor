@@ -277,7 +277,7 @@ class Runner:
             assert container.duration / av.time_base == 6.552
 
     def test_track(self):
-        out = self.main(["resources/multi-track.mov"], ["--keep_tracks_seperate"], "te")
+        out = self.main(["resources/multi-track.mov"], []) + ".mov"
         assert len(fileinfo(out).audios) == 2
 
     def test_export_json(self):
@@ -361,30 +361,24 @@ class Runner:
             ["--edit", "audio:stream=1"],
             "multi-track_ALTERED.mov",
         )
-        assert len(fileinfo(out).audios) == 1
+        assert len(fileinfo(out).audios) == 2
 
     def test_concat(self):
         out = self.main(["example.mp4"], ["--cut-out", "0,171"], "hmm.mp4")
         self.main(["example.mp4", out], ["--debug"])
 
     def test_concat_mux_tracks(self):
-        out = self.main(
-            ["example.mp4", "resources/multi-track.mov"], [], "concat_mux.mov"
-        )
+        inputs = ["example.mp4", "resources/multi-track.mov"]
+        out = self.main(inputs, ["--mix-audio-streams"], "concat_mux.mov")
         assert len(fileinfo(out).audios) == 1
 
     def test_concat_multi_tracks(self):
         out = self.main(
-            ["resources/multi-track.mov", "resources/multi-track.mov"],
-            ["--keep-tracks-separate"],
-            "out.mov",
+            ["resources/multi-track.mov", "resources/multi-track.mov"], [], "out.mov"
         )
         assert len(fileinfo(out).audios) == 2
-        out = self.main(
-            ["example.mp4", "resources/multi-track.mov"],
-            ["--keep-tracks-separate"],
-            "out.mov",
-        )
+        inputs = ["example.mp4", "resources/multi-track.mov"]
+        out = self.main(inputs, [], "out.mov")
         assert len(fileinfo(out).audios) == 2
 
     def test_frame_rate(self):
