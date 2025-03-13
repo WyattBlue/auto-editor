@@ -9,7 +9,7 @@ import numpy as np
 from av.filter.loudnorm import stats
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.lang.json import Lexer, Parser
+from auto_editor.json import load
 from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import andc, between_c, is_int_or_float
 from auto_editor.lib.err import MyError
@@ -61,12 +61,14 @@ def parse_norm(norm: str, log: Log) -> dict | None:
 
 def parse_ebu_bytes(norm: dict, stat: bytes, log: Log) -> tuple[str, str]:
     try:
-        parsed = Parser(Lexer("loudnorm", stat)).expr()
+        parsed = load("loudnorm", stat)
     except MyError:
         log.error(f"Invalid loudnorm stats.\n{stat!r}")
 
     for key in {"input_i", "input_tp", "input_lra", "input_thresh", "target_offset"}:
-        val = float(parsed[key])
+        val_ = parsed[key]
+        assert isinstance(val_, int | float | str | bytes)
+        val = float(val_)
         if val == float("-inf"):
             parsed[key] = -99
         elif val == float("inf"):

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict
 
 from auto_editor.ffwrapper import initFileInfo
-from auto_editor.lang.json import dump
+from auto_editor.json import dump
 from auto_editor.make_layers import make_sane_timebase
 from auto_editor.timeline import v3
 from auto_editor.utils.func import aspect_ratio
