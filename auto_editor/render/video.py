@@ -11,7 +11,6 @@ from auto_editor.timeline import TlImage, TlRect, TlVideo
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Any
 
     from auto_editor.__main__ import Args
     from auto_editor.ffwrapper import FileInfo
@@ -59,7 +58,7 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
 
 def render_av(
     output: av.container.OutputContainer, tl: v3, args: Args, log: Log
-) -> Any:
+) -> Iterator[tuple[int, av.VideoFrame]]:
     from_ndarray = av.VideoFrame.from_ndarray
 
     src = tl.src
@@ -133,7 +132,7 @@ def render_av(
 
         cc.profile = args.vprofile.title()
 
-    yield output_stream
+    yield output_stream  # type: ignore
     if not isinstance(output_stream, av.VideoStream):
         log.error(f"Not a known video codec: {args.video_codec}")
     if src.videos and src.videos[0].lang is not None:
