@@ -7,7 +7,7 @@ from fractions import Fraction
 from typing import Any
 
 from auto_editor.ffwrapper import FileInfo, initFileInfo
-from auto_editor.lang.json import Lexer, Parser, dump
+from auto_editor.json import dump, load
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
     ASpace,
@@ -221,7 +221,7 @@ def read_v1(tl: Any, log: Log) -> v3:
 def read_json(path: str, log: Log) -> v3:
     with open(path, encoding="utf-8", errors="ignore") as f:
         try:
-            tl = Parser(Lexer(path, f)).expr()
+            tl = load(path, f)
         except MyError as e:
             log.error(e)
 

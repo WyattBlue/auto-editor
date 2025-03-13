@@ -11,29 +11,10 @@ if TYPE_CHECKING:
 
     from _typeshed import SupportsWrite
 
-
-class Token:
-    __slots__ = ("type", "value")
-
-    def __init__(self, type: int, value: object):
-        self.type = type
-        self.value = value
-
-    def __str__(self) -> str:
-        return f"{self.type=} {self.value=}"
-
-    __repr__ = __str__
+    Token = tuple[int, object]
 
 
 EOF, LCUR, RCUR, LBRAC, RBRAC, COL, COMMA, STR, VAL = range(9)
-table = {
-    "{": LCUR,
-    "}": RCUR,
-    "[": LBRAC,
-    "]": RBRAC,
-    ":": COL,
-    ",": COMMA,
-}
 str_escape = {
     "\\": "\\",
     "/": "/",
@@ -87,6 +68,12 @@ class Lexer:
         else:
             self.char = self.text[self.pos]
             self.column += 1
+
+    def rewind(self) -> None:
+        self.pos = 0
+        self.lineno = 1
+        self.column = 1
+        self.char = self.text[self.pos] if self.text else None
 
     def peek(self) -> str | None:
         peek_pos = self.pos + 1
@@ -142,7 +129,7 @@ class Lexer:
         result = buf.getvalue()
 
         try:
-            return Token(VAL, float(result) if has_dot else int(result))
+            return (VAL, float(result) if has_dot else int(result))
         except ValueError:
             self.error(f"`{result}` is not a valid JSON Number")
 
@@ -158,7 +145,7 @@ class Lexer:
 
             if self.char == '"':
                 self.advance()
-                return Token(STR, self.string())
+                return (STR, self.string())
 
             if self.char == "-":
                 _peek = self.peek()
@@ -168,10 +155,11 @@ class Lexer:
             if self.char in "0123456789.":
                 return self.number()
 
+            table = {"{": LCUR, "}": RCUR, "[": LBRAC, "]": RBRAC, ":": COL, ",": COMMA}
             if self.char in table:
                 key = table[self.char]
                 self.advance()
-                return Token(key, None)
+                return (key, None)
 
             keyword = ""
             for i in range(5):  # Longest valid keyword length
@@ -181,14 +169,14 @@ class Lexer:
                 self.advance()
 
             if keyword == "true":
-                return Token(VAL, True)
+                return (VAL, True)
             if keyword == "false":
-                return Token(VAL, False)
+                return (VAL, False)
             if keyword == "null":
-                return Token(VAL, None)
+                return (VAL, None)
 
             self.error(f"Invalid keyword: `{keyword}`")
-        return Token(EOF, None)
+        return (EOF, None)
 
 
 class Parser:
@@ -204,54 +192,62 @@ class Parser:
     def expr(self) -> Any:
         self.current_token
 
-        if self.current_token.type in {STR, VAL}:
-            val = self.current_token.value
+        if self.current_token[0] in {STR, VAL}:
+            val = self.current_token[1]
             self.eat()
             return val
 
-        if self.current_token.type == LCUR:
+        if self.current_token[0] == LCUR:
             self.eat()
 
             my_dic = {}
-            while self.current_token.type != RCUR:
-                if self.current_token.type != STR:
-                    if self.current_token.type in {LBRAC, VAL}:
+            while self.current_token[0] != RCUR:
+                if self.current_token[0] != STR:
+                    if self.current_token[0] in {LBRAC, VAL}:
                         self.lexer.error("JSON Objects only allow strings as keys")
                     self.lexer.error("Expected closing `}`")
-                key = self.current_token.value
+                key = self.current_token[1]
                 if key in my_dic:
                     self.lexer.error(f"Object has repeated key `{key}`")
                 self.eat()
-                if self.current_token.type != COL:
+                if self.current_token[0] != COL:
                     self.lexer.error("Expected `:`")
                 self.eat()
 
                 my_dic[key] = self.expr()
-                if self.current_token.type != RCUR:
-                    if self.current_token.type != COMMA:
+                if self.current_token[0] != RCUR:
+                    if self.current_token[0] != COMMA:
                         self.lexer.error("Expected `,` between Object entries")
                     self.eat()
-                    if self.current_token.type == RCUR:
+                    if self.current_token[0] == RCUR:
                         self.lexer.error("Trailing `,` in Object")
 
             self.eat()
             return my_dic
 
-        if self.current_token.type == LBRAC:
+        if self.current_token[0] == LBRAC:
             self.eat()
             my_arr = []
-            while self.current_token.type != RBRAC:
+            while self.current_token[0] != RBRAC:
                 my_arr.append(self.expr())
-                if self.current_token.type != RBRAC:
-                    if self.current_token.type != COMMA:
+                if self.current_token[0] != RBRAC:
+                    if self.current_token[0] != COMMA:
                         self.lexer.error("Expected `,` between array entries")
                     self.eat()
-                    if self.current_token.type == RBRAC:
+                    if self.current_token[0] == RBRAC:
                         self.lexer.error("Trailing `,` in array")
             self.eat()
             return my_arr
 
         raise MyError(f"Unknown token: {self.current_token}")
+
+
+def load(path: str, f: str | bytes | TextIOWrapper) -> dict[str, object]:
+    lexer = Lexer(path, f)
+    if lexer.get_next_token()[0] != LCUR:
+        raise MyError("Expected JSON Object")
+    lexer.rewind()
+    return Parser(lexer).expr()
 
 
 def dump(
