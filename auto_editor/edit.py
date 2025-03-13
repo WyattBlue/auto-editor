@@ -307,7 +307,8 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         # Setup video
         if ctr.default_vid != "none" and tl.v:
             vframes = render_av(output, tl, args, log)
-            output_stream = next(vframes)
+            output_stream: av.VideoStream | None
+            output_stream = next(vframes)  # type: ignore
         else:
             output_stream, vframes = None, iter([])
 
