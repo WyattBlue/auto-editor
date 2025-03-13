@@ -646,8 +646,8 @@ stack_trace_manager = StackTraceManager()
 
 
 def my_eval(env: Env, node: object) -> Any:
-    def make_trace(sym: Sym) -> str:
-        return f"  at {sym.val} ({sym.lineno}:{sym.column})"
+    def make_trace(sym: object) -> str:
+        return f"  at {sym.val} ({sym.lineno}:{sym.column})" if type(sym) is Sym else ""
 
     if type(node) is Sym:
         val = env.get(node.val)
