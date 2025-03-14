@@ -1,10 +1,10 @@
-import json
 import sys
 from dataclasses import dataclass, field
 
 import av
 from av.subtitles.subtitle import AssSubtitle
 
+from auto_editor.json import dump
 from auto_editor.vanparse import ArgumentParser
 
 
@@ -57,7 +57,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 data[f"{input_file}:{s}"] = entry_data
             container.close()
 
-        json.dump(data, sys.stdout, indent=4)
+        dump(data, sys.stdout, indent=4)
         return
 
     for i, input_file in enumerate(args.input):
