@@ -19,13 +19,22 @@ def main():
     parser = main_options(parser)
 
     with open("src/ref/options.html", "w") as file:
-        file.write(
-            '{{ headerdesc "Options" "These are the options and flags that auto-editor uses." }}\n'
-            "<body>\n"
-            "{{ nav }}\n"
-            '<section class="section">\n'
-            '<div class="container">\n'
-        )
+        file.write("""\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{{ init_head }}
+{{ headerdesc "Options" "These are the options and flags that auto-editor uses." }}
+{{ head_icon }}
+<style>
+{{ core_style }}
+</style>
+<body>
+{{ nav }}
+<section class="section">
+<div class="container">
+""")
+
         for op in parser.args:
             if isinstance(op, OptionText):
                 file.write(f"<h2>{escape(op.text)}</h2>\n")

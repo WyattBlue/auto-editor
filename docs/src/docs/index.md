@@ -9,8 +9,7 @@ See also: [reference](../ref)
 [How To Shrink File Size](./file-size)
 [Range Syntax](./range-syntax)
 [Subcommands](./subcommands)
-[Using Auto-Editor on Windows](./windows)
-[Supported Media](./supported_media)
+[Supported Media](./supported-media)
 
 ### Timeline Documentation
 [The v1 format](./v1)

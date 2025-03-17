@@ -9,9 +9,6 @@ app.get("/app/*", (req, res) => {
   res.redirect(301, `https://app.auto-editor.com${newPath}`);
 });
 
-app.get("/blog/", (req, res) => {
-  res.redirect(301, `https://basswood-io.com/blog`);
-});
 app.get("/blog/*", (req, res) => {
   console.log(req.path);
   res.redirect(301, `https://basswood-io.com${req.path}`);
@@ -35,7 +32,10 @@ app.use(express.static("public", {
 }));
 
 app.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, "404.html"));
+  let options = {
+    headers: {"Content-Type": "text/html"}
+  };
+  res.status(404).sendFile(path.join(__dirname, "public/404"), options);
 });
 
 app.listen(1337, (req, res) => console.log("running on http://localhost:1337"));
