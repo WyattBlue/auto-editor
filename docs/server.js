@@ -9,16 +9,12 @@ app.get("/app/*", (req, res) => {
   res.redirect(301, `https://app.auto-editor.com${newPath}`);
 });
 
-app.get("/blog/*", (req, res) => {
-  console.log(req.path);
+app.get("/blog*", (req, res) => {
   res.redirect(301, `https://basswood-io.com${req.path}`);
 });
 
 app.get("/options", (req, res) => {
-  let options = {
-    headers: {"Content-Type": "text/html"}
-  };
-  res.sendFile(path.join(__dirname, "public/ref/options"), options);
+  res.redirect(301, "https://basswood-io.com/ref/options");
 });
 
 app.use(express.static("public", {

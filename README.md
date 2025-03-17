@@ -159,9 +159,9 @@ auto-editor --margin --help
 
 ## Articles
  - [How to Install Auto-Editor](https://auto-editor.com/installing)
- - [All the Options (And What They Do)](https://auto-editor.com/options)
+ - [All the Options (And What They Do)](https://auto-editor.com/ref/options)
  - [Docs](https://auto-editor.com/docs)
- - [Blog](https://auto-editor.com/blog)
+ - [Blog](https://basswood-io.com/blog/)
 
 ## Copyright
 Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all directories besides the ones listed below. Auto-Editor was created by [these people.](https://auto-editor.com/blog/thank-you-early-testers)
