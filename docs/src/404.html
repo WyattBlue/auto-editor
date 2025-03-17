@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {{ init_head }}
+  <title>404</title>
+  {{ head_icon }}
+  <style>
+{{ core_style }}
+{{ cls_center }}
+.hero {
+  margin-bottom: 3rem;
+  margin-top: 1.6rem;
+  flex-direction: column;
+  justify-content: space-between;
+  background-color: #EAEAEA;
+}
+@media (prefers-color-scheme: dark) {
+  .hero {background-color: #4A4A4A}
+}
+  </style>
+</head>
+<body>
+{{ nav }}
+  <section class="section">
+    <div class="container">
+    <h1 class="hero huge">404. That's an error</h1>
+    <p class="medium center">The page you were looking for doesn't exist. Back to <a href="/">main page</a>.</p>
+    </div>
+  </section>
+</body>
+</html>

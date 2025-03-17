@@ -463,12 +463,10 @@ proc convert(file: string, path: string) =
     f.write("\n  <meta name=\"robots\" content=\"noindex\">")
 
   f.write(&"""
-
-  <link rel="stylesheet" href="/style.css?v=1.12.0">
-  <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
-  <link rel="manifest" href="/favicon/site.webmanifest">
+{{{{ head_icon }}}}
+<style>
+{{{{ core_style }}}}
+</style>
 </head>
 <body>
 {{{{ nav }}}}

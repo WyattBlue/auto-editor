@@ -879,6 +879,7 @@ alyssa.age   ; returns 23
 )
 (displayln "{{ header \"Palet Scripting Reference\" }}
 <style>
+{{ core_style }}
 .palet-block {
  padding-left: 7px;
  padding-bottom: 7px;
@@ -923,6 +924,7 @@ file )
 
 (displayln "{{ header \"Edit Reference\" }}
 <style>
+{{ core_style }}
 .palet-block {
  padding-left: 7px;
  padding-bottom: 7px;

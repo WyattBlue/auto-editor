@@ -1,9 +1,32 @@
-{{ index_header "Auto-Editor" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto-Editor</title>
+  <meta property="og:title" content="Auto-Editor">
+  <meta name="twitter:title" content="Auto-Editor">
+  <meta name="description" property="og:description" content="Automatically edit video and audio by analyzing where sections are silent or still and cut them out.">
+  <meta name="twitter:description" content="Automatically edit video and audio by analyzing where sections are silent or still and cut them out.">
+  <link rel="canonical" href="https://auto-editor.com">
+  <meta property="og:url" content="https://auto-editor.com">
+  <meta name="author" content="WyattBlue">
+  <meta name="Classification" content="video,video-processing,audio,audio-processing,automatic,video-editing,audio-editing">
+  <meta property="og:image" content="/img/1200x630_fb.jpg">
+  {{ head_icon }}
+  <style>
+  {{ core_style }}
+  {{ cls_center }}
+  #icon {
+    aspect-ratio: auto 647 / 238;
+  }
+  </style>
+</head>
 <body>
 {{ nav }}
 <section class="section">
 <div class="container">
-<img class="center" src="/img/auto-editor-banner.svg" width="700" alt="Auto-Editor">
+<img id="icon" class="center" src="/img/auto-editor-banner.svg" width="700" alt="Auto-Editor">
 <br>
 <p><strong>Auto-Editor</strong> is an application for automatically <strong>editing video and audio</strong> by analyzing a variety of methods, most notably audio loudness.</p>
 
