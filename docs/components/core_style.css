@@ -182,6 +182,12 @@ pre {line-height: 1.25}
   .navbar-start > .navbar-item {font-size: 1em}
 }
 
+table {
+  border-collapse: collapse;
+}
+th, td { padding: 10px }
+
+
 h1 {
   margin-bottom: 1.5rem;
   line-height: 1.125;
@@ -197,12 +203,12 @@ h3 {font-weight: 500}
 /* Light Theme Colors */
 html {background-color: white}
 hr {background-color: #EAEAEA}
-h1, h2, h3, h4, p, code, pre, th {color: #323232}
+h1, h2, h3, h4, p, code, pre, thead, tbody {color: #323232}
 blockquote {border-left: 5px solid #EAEAEA}
 blockquote > p {color: #696969}
 pre {background-color: #F9F5F5}
 code {background-color: #EAEAEA}
-th {border: 1px solid #323232}
+th, td {border: 1px solid #323232}
 a {color: #0573D9}
 a:hover {color: #63C0F4}
 a.navbar-item:hover {background-color: #F9F7F7}
@@ -210,22 +216,22 @@ a.navbar-item:hover {background-color: #F9F7F7}
 li {color: black; text-decoration: black;}
 
 /* highlighting */
-.keyword {color: #ad46ad; font-style: italic;}
+.kw {color: #ad46ad; font-style: italic;}
 .keyword-import {color: #ad46ad;}
 .terminator {color: #B28372;}
 .function-name {color: #549ACF; }
-.type-primitive {color: #4594e2; font-style: italic;}
+.dv {color: #4594e2; font-style: italic;}
 
 /* Dark Theme Colors */
 @media (prefers-color-scheme: dark) {
   html {background-color: #262626}
   hr {background-color: #4A4A4A}
-  h1, h2, h3, h4, p, code, pre, th {color: #F9F7F7}
+  h1, h2, h3, h4, p, code, pre, thead, tbody {color: #F9F7F7}
   blockquote {border-left: 5px solid #4A4A4A}
   blockquote > p {color: #DBDBDB}
   pre {background-color: #323232}
   code {background-color: #4A4A4A}
-  th {border: 1px solid #F9F7F7}
+  th, td {border: 1px solid #F9F7F7}
   a {color: #63C0F4}
   a:hover {color: #A3DEFF}
   a.navbar-item:hover {background-color: #323232}
@@ -233,11 +239,11 @@ li {color: black; text-decoration: black;}
   li {color: #F9F7F7; text-decoration: #F9F7F7;}
 
    /* highlighting */
-  .keyword {color: #c78bc8; font-style: italic;}
+  .kw {color: #c78bc8; font-style: italic;}
   .keyword-import {color: #c78bc8;}
   .terminator {color: #A6ACB9;}
-  .type-primitive {color: #6eaadf; font-style: italic;}
-  .string {color: #99c794;}
-  .comment {color: #a6acb9;}
-  .operator {color: #e07457;}
+  .dv {color: #6eaadf; font-style: italic;}
+  .st, .dt {color: #99c794;}
+  .co {color: #a6acb9;}
+  .op {color: #e07457;}
 }
