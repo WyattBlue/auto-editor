@@ -462,15 +462,20 @@ class Runner:
         out2 = self.main([out], ["-c:v", "prores"], "prores2.mkv")
         assert fileinfo(out2).videos[0].pix_fmt == "yuv422p10le"
 
-    def test_hevc(self):
+    def test_decode_hevc(self):
+        out = self.main(["resources/testsrc-hevc.mp4"], ["-c:v", "h264"]) + ".mp4"
+        output = fileinfo(out)
+        assert output.videos[0].codec == "h264"
+        assert output.videos[0].pix_fmt == "yuv420p"
+
+    def test_encode_hevc(self):
         if os.environ.get("GITHUB_ACTIONS") == "true":
             raise SkipTest()
 
         out = self.main(["resources/testsrc.mp4"], ["-c:v", "hevc"], "out.mkv")
-        assert fileinfo(out).videos[0].pix_fmt == "yuv420p"
-
-        out2 = self.main(["resources/testsrc-hevc.mp4"], []) + ".mp4"
-        assert fileinfo(out2).videos[0].pix_fmt == "yuv420p"
+        output = fileinfo(out)
+        assert output.videos[0].codec == "hevc"
+        assert output.videos[0].pix_fmt == "yuv420p"
 
     #  Issue 280
     def test_SAR(self):
