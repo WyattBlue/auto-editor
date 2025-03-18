@@ -1,7 +1,26 @@
 import strutils
 import std/os
 import std/strformat
+import std/osproc
 import sequtils
+
+var reload = ""
+if paramCount() > 0 and paramStr(1) == "--dev":
+  reload = """<script>var bfr = '';
+setInterval(function () {
+    fetch(window.location).then((response) => {
+        return response.text();
+    }).then(r => {
+        if (bfr != '' && bfr != r) {
+            setTimeout(function() {
+                window.location.reload();
+            }, 1000);
+        }
+        else {
+            bfr = r;
+        }
+    });
+}, 1000);</script>"""
 
 func shouldProcessFile(path: string): bool =
   if path.endsWith(".DS_Store"):
@@ -48,7 +67,7 @@ proc processFile(path: string) =
     if kind == pcFile and not compName.startsWith("."):
       let compContent = readFile(comp).strip()
       content = parseTemplate(content, compName, compContent)
-  
+
   var outputPath = path
   if path.endsWith("index.html"):
     outputPath = path
@@ -56,7 +75,7 @@ proc processFile(path: string) =
     outputPath = path.splitFile().dir / path.splitFile().name
 
   writeFile(outputPath, content)
-  
+
   if outputPath != path:
     removeFile(path)
     echo "Processed and renamed: ", path, " -> ", outputPath
@@ -70,11 +89,11 @@ proc processDirectory(dir: string) =
     elif kind == pcDir:
       processDirectory(path)
 
-################################
-#  Markdown -> HTML converter  #
-################################
-
 type
+  PragmaKind = enum
+    normalType,
+    blogType,
+
   TokenKind = enum
     tkBar,
     keyval,
@@ -279,6 +298,11 @@ proc getNextToken(self: Lexer): Token =
         self.advance()
         return initToken(tkList, "")
 
+      if self.col == 1 and self.currentChar == ' ' and self.peek() == '-':
+        self.advance()
+        self.advance()
+        return initToken(tkUl, "")
+
       levels = 0
       if self.currentChar == '#' and self.col == 1:
         while self.currentChar == '#':
@@ -303,110 +327,12 @@ proc getNextToken(self: Lexer): Token =
   return initToken(tkEOF, "")
 
 
-func sanitize(v: string): string =
-  return v.replace("<", "&lt;").replace(">", "&gt;")
-
-func paintJson(v: string): string =
-  # paint TypeScript code one line at a time.
-  let myInput = sanitize(v)
-  var i = 0
-  var old_i = -1
-
-  while i < len(myInput):
-    while true:
-      if myInput[i ..< i + 2] == "//":
-        i += 2
-        var bar = ""
-        while i < len(myInput):
-          bar &= myInput[i]
-          i += 1
-
-        result &= "<span class=\"comment\">//" & bar & "</span>"
-
-      if myInput[i] == '"':
-        i += 1
-        var bar = ""
-        while myInput[i] != '"':
-          bar &= myInput[i]
-          i += 1
-
-        i += 1
-        result &= "<span class=\"string\">\"" & bar & "\"</span>"
-
-      for bar in @[",", ":"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"terminator\">" & bar & "</span>"
-          i += len(bar)
-
-      if old_i == i:
-        break
-
-      old_i = i
-
-    result &= myInput[i]
-    i += 1
-
-
-func paintTS(v: string): string =
-  # paint TypeScript code one line at a time.
-  let myInput = sanitize(v)
-  var i = 0
-  var old_i = -1
-
-  while i < len(myInput):
-    while true:
-      if myInput[i ..< i + 2] == "//":
-        i += 2
-        var bar = ""
-        while i < len(myInput):
-          bar &= myInput[i]
-          i += 1
-
-        result &= "<span class=\"comment\">//" & bar & "</span>"
-
-      if myInput[i] == '"':
-        i += 1
-        var bar = ""
-        while myInput[i] != '"':
-          bar &= myInput[i]
-          i += 1
-
-        i += 1
-        result &= "<span class=\"string\">\"" & bar & "\"</span>"
-
-      for bar in @["&lt;", "&gt;"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= bar
-          i += len(bar)
-
-      for bar in @["interface"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"keyword\">" & bar & "</span>"
-          i += len(bar)
-
-      for bar in @[":", ",", ";"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"terminator\">" & bar & "</span>"
-          i += len(bar)
-
-      for bar in @["string", "number", "Array", "Chunk"]:
-        if myInput[i .. ^1].startsWith(bar):
-          result &= "<span class=\"type-primitive\">" & bar & "</span>"
-          i += len(bar)
-
-      if old_i == i:
-        break
-
-      old_i = i
-
-    result &= myInput[i]
-    i += 1
-
-
-proc convert(file: string, path: string) =
+proc convert(pragma: PragmaKind, file: string, path: string) =
   let text = readFile(file)
   var
     lexer = initLexer(file, text)
+    author = ""
+    date = ""
     desc = ""
 
   if getNextToken(lexer).kind != tkBar:
@@ -428,6 +354,11 @@ proc convert(file: string, path: string) =
 
   let title = parse_keyval("title")
 
+  if pragma == blogType:
+    author = parse_keyval("author")
+    date = parse_keyval("date")
+    desc = parse_keyval("desc")
+
   if getNextToken(lexer).kind != tkBar:
     lexer.error("head: expected end ---")
 
@@ -437,8 +368,7 @@ proc convert(file: string, path: string) =
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {{{{ init_head }}}}
   <title>{title}</title>""")
 
   if desc != "no-index":
@@ -474,107 +404,17 @@ proc convert(file: string, path: string) =
 <div class="container">
 """)
 
-  let blocks: seq[TokenKind] = @[tkText, tkH1, tkH2, tkH3, tkList, tkUl]
+  if pragma == blogType:
+    f.write(&"""
+    <h1>{title}</h1>
+    <p class="author-date">{author}&nbsp;&nbsp;&nbsp;{date}</p>
+""")
 
-  proc toTag(t: TokenKind): string =
-    if t == tkText:
-      result = "p"
-    elif t == tkH1:
-      result = "h1"
-    elif t == tkH2:
-      result = "h2"
-    elif t == tkH3:
-      result = "h3"
-    elif t == tkTick:
-      result = "code"
-    elif t == tkList:
-      result = "li"
-    elif t == tkUl:
-      result = "ul"
-    else:
-      error(lexer, "toTag got bad value")
+  let forPandoc = text[lexer.pos..^1]
+  f.write(execCmdEx("pandoc --from markdown --to html5", input = forPandoc).output)
 
-  var obj = getNextToken(lexer)
-  var ends: seq[TokenKind] = @[]
-
-  proc writeEnd() =
-    if len(ends) > 0:
-      if ends[^1] in blocks:
-        if ends[^1] == tkUl:
-          f.write(&"    </{toTag(ends[^1])}>\n")
-        else:
-          f.write(&"</{toTag(ends[^1])}>\n")
-      else:
-        f.write(&"</{toTag(ends[^1])}>")
-      discard ends.pop()
-
-  while obj.kind != tkEOF:
-    if obj.kind in @[tkH1, tkH2, tkH3]:
-      ends.add(obj.kind)
-      f.write(&"    <{toTag(ends[^1])}>")
-    elif obj.kind == tkTick:
-      if len(ends) == 0:
-        f.write("    <p>")
-        ends.add(tkText)
-
-      f.write(&"<code>{sanitize(obj.value)}</code>")
-    elif obj.kind == tkText:
-      if len(ends) > 0:
-        f.write(sanitize(obj.value))
-      else:
-        f.write(&"    <p>{sanitize(obj.value)}")
-        ends.add(obj.kind)
-    elif obj.kind == tkList:
-      if len(ends) == 0:
-        f.write("    <ul>\n")
-        ends.add(tkUl)
-
-      f.write("        <li>")
-      ends.add(tkList)
-
-    elif obj.kind == tkBlock:
-      f.write("    <pre><code>")
-      obj = getNextToken(lexer)
-      var has_text = false
-      while obj.kind != tkEOF and obj.kind != tkBlock:
-        if len(ends) > 0:
-          error(lexer, "code block must not be indented")
-        if obj.kind == tkH1:
-          obj = getNextToken(lexer)
-          f.write(&"<i># {sanitize(obj.value).strip()}</i>")
-          has_text = true
-        elif obj.kind == tkText:
-          if lexer.langName == "ts":
-            f.write(paintTS(obj.value))
-          elif lexer.langName == "json":
-            f.write(paintJson(obj.value))
-          else:
-            f.write(sanitize(obj.value))
-          has_text = true
-        elif obj.kind == tkNewline and has_text:
-          f.write("\n")
-        obj = getNextToken(lexer)
-
-      f.write("</pre></code>\n")
-    elif obj.kind == tkLink:
-      if len(ends) == 0:
-        f.write("    <p>")
-        ends.add(tkText)
-      var link_text = sanitize(obj.value)
-      obj = getNextToken(lexer)
-      f.write(&"<a href=\"{obj.value}\">{link_text}</a>")
-    elif obj.kind == tkBar:
-      f.write("    <hr>\n")
-    elif obj.kind == tkNewline:
-      writeEnd()
-    else:
-      error(lexer, &"unexpected obj.kind: {obj.kind}")
-
-    obj = getNextToken(lexer)
-
-  while len(ends) > 0:
-    writeEnd()
-
+  if pragma == blogType:
+    f.write("<hr><a href=\"./\">Blog Index</a>\n")
   f.write("</div>\n</section>\n</body>\n</html>\n")
   f.close()
 
@@ -582,11 +422,11 @@ proc convert(file: string, path: string) =
 
 
 proc main() =
-  convert("public/ref/index.md", "public/ref/index.html")
+  convert(normalType, "public/ref/index.md", "public/ref/index.html")
   for file in walkFiles("public/docs/*.md"):
-    convert(file, file.changeFileExt("html"))
+    convert(normalType, file, file.changeFileExt("html"))
   for file in walkFiles("public/docs/subcommands/*.md"):
-    convert(file, file.changeFileExt("html"))
+    convert(normalType, file, file.changeFileExt("html"))
 
   processDirectory("public")
   echo "done building"

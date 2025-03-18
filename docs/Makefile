@@ -2,6 +2,8 @@
 
 default: local
 
+SRC_FILES := $(shell find src -type f)
+
 compile:
 	nim c -d:danger make
 ifeq ($(shell uname),Darwin)
@@ -10,11 +12,17 @@ else
 	strip make && du -sh make
 endif
 
-html:
+html: $(SRC_FILES)
 	rm -rf public
 	cp -R src public
 	python3 build.py
 	./make
+
+htmldev: $(SRC_FILES)
+	rm -rf public
+	cp -R src public
+	python3 build.py
+	./make --dev
 
 local: html
 	bun run dev
