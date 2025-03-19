@@ -4,9 +4,9 @@ import io
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import av
+import bv
 import numpy as np
-from av.filter.loudnorm import stats
+from bv.filter.loudnorm import stats
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.json import load
@@ -99,14 +99,14 @@ def apply_audio_normalization(
             f"i={norm['i']}:lra={norm['lra']}:tp={norm['tp']}:offset={norm['gain']}"
         )
         log.debug(f"audio norm first pass: {first_pass}")
-        with av.open(f"{pre_master}") as container:
+        with bv.open(f"{pre_master}") as container:
             stats_ = stats(first_pass, container.streams.audio[0])
 
         name, filter_args = parse_ebu_bytes(norm, stats_, log)
     else:
         assert "t" in norm
 
-        def get_peak_level(frame: av.AudioFrame) -> float:
+        def get_peak_level(frame: bv.AudioFrame) -> float:
             # Calculate peak level in dB
             # Should be equivalent to: -af astats=measure_overall=Peak_level:measure_perchannel=0
             max_amplitude = np.abs(frame.to_ndarray()).max()
@@ -114,7 +114,7 @@ def apply_audio_normalization(
                 return -20.0 * np.log10(max_amplitude)
             return -99.0
 
-        with av.open(pre_master) as container:
+        with bv.open(pre_master) as container:
             max_peak_level = -99.0
             assert len(container.streams.video) == 0
             for frame in container.decode(audio=0):
@@ -126,13 +126,13 @@ def apply_audio_normalization(
         log.print(f"peak adjustment: {adjustment:.3f}dB")
         name, filter_args = "volume", f"{adjustment}"
 
-    with av.open(pre_master) as container:
+    with bv.open(pre_master) as container:
         input_stream = container.streams.audio[0]
 
-        output_file = av.open(path, mode="w")
+        output_file = bv.open(path, mode="w")
         output_stream = output_file.add_stream("pcm_s16le", rate=input_stream.rate)
 
-        graph = av.filter.Graph()
+        graph = bv.filter.Graph()
         graph.link_nodes(
             graph.add_abuffer(template=input_stream),
             graph.add(name, filter_args),
@@ -143,9 +143,9 @@ def apply_audio_normalization(
             while True:
                 try:
                     aframe = graph.pull()
-                    assert isinstance(aframe, av.AudioFrame)
+                    assert isinstance(aframe, bv.AudioFrame)
                     output_file.mux(output_stream.encode(aframe))
-                except (av.BlockingIOError, av.EOFError):
+                except (bv.BlockingIOError, bv.EOFError):
                     break
 
         output_file.mux(output_stream.encode(None))
@@ -159,14 +159,14 @@ def process_audio_clip(
     write(input_buffer, sr, samp_list[samp_start:samp_end])
     input_buffer.seek(0)
 
-    input_file = av.open(input_buffer, "r")
+    input_file = bv.open(input_buffer, "r")
     input_stream = input_file.streams.audio[0]
 
     output_bytes = io.BytesIO()
-    output_file = av.open(output_bytes, mode="w", format="wav")
+    output_file = bv.open(output_bytes, mode="w", format="wav")
     output_stream = output_file.add_stream("pcm_s16le", rate=sr)
 
-    graph = av.filter.Graph()
+    graph = bv.filter.Graph()
     args = [graph.add_abuffer(template=input_stream)]
 
     if clip.speed != 1:
@@ -196,9 +196,9 @@ def process_audio_clip(
         while True:
             try:
                 aframe = graph.pull()
-                assert isinstance(aframe, av.AudioFrame)
+                assert isinstance(aframe, bv.AudioFrame)
                 output_file.mux(output_stream.encode(aframe))
-            except (av.BlockingIOError, av.EOFError):
+            except (bv.BlockingIOError, bv.EOFError):
                 break
 
     # Flush the stream
@@ -222,7 +222,7 @@ def mix_audio_files(sr: int, audio_paths: list[str], output_path: str) -> None:
 
     # First pass: determine the maximum length
     for path in audio_paths:
-        container = av.open(path)
+        container = bv.open(path)
         stream = container.streams.audio[0]
 
         # Calculate duration in samples
@@ -234,10 +234,10 @@ def mix_audio_files(sr: int, audio_paths: list[str], output_path: str) -> None:
 
     # Second pass: read and mix audio
     for path in audio_paths:
-        container = av.open(path)
+        container = bv.open(path)
         stream = container.streams.audio[0]
 
-        resampler = av.audio.resampler.AudioResampler(
+        resampler = bv.audio.resampler.AudioResampler(
             format="s16", layout="mono", rate=sr
         )
 
@@ -270,7 +270,7 @@ def mix_audio_files(sr: int, audio_paths: list[str], output_path: str) -> None:
         mixed_audio = mixed_audio * (32767 / max_val)
     mixed_audio = mixed_audio.astype(np.int16)  # type: ignore
 
-    output_container = av.open(output_path, mode="w")
+    output_container = bv.open(output_path, mode="w")
     output_stream = output_container.add_stream("pcm_s16le", rate=sr)
 
     chunk_size = sr  # Process 1 second at a time
@@ -278,7 +278,7 @@ def mix_audio_files(sr: int, audio_paths: list[str], output_path: str) -> None:
         # Shape becomes (1, samples) for mono
         chunk = np.array([mixed_audio[i : i + chunk_size]])
 
-        frame = av.AudioFrame.from_ndarray(chunk, format="s16", layout="mono")
+        frame = bv.AudioFrame.from_ndarray(chunk, format="s16", layout="mono")
         frame.rate = sr
         frame.pts = i  # Set presentation timestamp
 

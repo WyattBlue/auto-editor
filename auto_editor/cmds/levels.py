@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import TYPE_CHECKING
 
-import av
+import bv
 import numpy as np
 
 from auto_editor.analyze import *
@@ -134,7 +134,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 if (arr := levels.read_cache("audio", (obj["stream"],))) is not None:
                     print_arr(arr)
                 else:
-                    container = av.open(src.path, "r")
+                    container = bv.open(src.path, "r")
                     audio_stream = container.streams.audio[obj["stream"]]
 
                     values = []
@@ -155,7 +155,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 if (arr := levels.read_cache("motion", mobj)) is not None:
                     print_arr(arr)
                 else:
-                    container = av.open(src.path, "r")
+                    container = bv.open(src.path, "r")
                     video_stream = container.streams.video[obj["stream"]]
 
                     values = []

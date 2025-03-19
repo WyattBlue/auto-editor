@@ -8,8 +8,8 @@ from os.path import splitext
 from subprocess import run
 from typing import TYPE_CHECKING, Any
 
-import av
-from av import AudioResampler, Codec
+import bv
+from bv import AudioResampler, Codec
 
 from auto_editor.ffwrapper import FileInfo, initFileInfo
 from auto_editor.lib.contracts import is_int, is_str
@@ -86,7 +86,7 @@ def set_video_codec(
     if ctr.vcodecs is not None and codec not in ctr.vcodecs:
         try:
             cobj = Codec(codec, "w")
-        except av.codec.codec.UnknownCodecError:
+        except bv.codec.codec.UnknownCodecError:
             log.error(f"Unknown encoder: {codec}")
         # Normalize encoder names
         if cobj.id not in (Codec(x, "w").id for x in ctr.vcodecs):
@@ -103,7 +103,7 @@ def set_audio_codec(
             codec = "aac"
         else:
             codec = src.audios[0].codec
-            if av.Codec(codec, "w").audio_formats is None:
+            if bv.Codec(codec, "w").audio_formats is None:
                 codec = "aac"
         if codec not in ctr.acodecs and ctr.default_aud != "none":
             codec = ctr.default_aud
@@ -114,7 +114,7 @@ def set_audio_codec(
     if ctr.acodecs is None or codec not in ctr.acodecs:
         try:
             cobj = Codec(codec, "w")
-        except av.codec.codec.UnknownCodecError:
+        except bv.codec.codec.UnknownCodecError:
             log.error(f"Unknown encoder: {codec}")
         # Normalize encoder names
         if cobj.id not in (Codec(x, "w").id for x in ctr.acodecs):
@@ -292,12 +292,12 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         if mov_flags:
             options["movflags"] = "+".join(mov_flags)
 
-        output = av.open(output_path, "w", container_options=options)
+        output = bv.open(output_path, "w", container_options=options)
 
         # Setup video
         if ctr.default_vid != "none" and tl.v:
             vframes = render_av(output, tl, args, log)
-            output_stream: av.VideoStream | None
+            output_stream: bv.VideoStream | None
             output_stream = next(vframes)  # type: ignore
         else:
             output_stream, vframes = None, iter([])
@@ -315,15 +315,15 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
         if audio_paths:
             try:
-                audio_encoder = av.Codec(args.audio_codec, "w")
-            except av.FFmpegError as e:
+                audio_encoder = bv.Codec(args.audio_codec, "w")
+            except bv.FFmpegError as e:
                 log.error(e)
             if audio_encoder.audio_formats is None:
                 log.error(f"{args.audio_codec}: No known audio formats avail.")
             audio_format = audio_encoder.audio_formats[0]
             resampler = AudioResampler(format=audio_format, layout="stereo", rate=tl.sr)
 
-        audio_streams: list[av.AudioStream] = []
+        audio_streams: list[bv.AudioStream] = []
         audio_inputs = []
         audio_gen_frames = []
         for i, audio_path in enumerate(audio_paths):
@@ -333,7 +333,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                 rate=tl.sr,
                 time_base=Fraction(1, tl.sr),
             )
-            if not isinstance(audio_stream, av.AudioStream):
+            if not isinstance(audio_stream, bv.AudioStream):
                 log.error(f"Not a known audio codec: {args.audio_codec}")
 
             if args.audio_bitrate != "auto":
@@ -345,7 +345,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                 audio_stream.metadata["language"] = src.audios[i].lang  # type: ignore
 
             audio_streams.append(audio_stream)
-            audio_input = av.open(audio_path)
+            audio_input = bv.open(audio_path)
             audio_inputs.append(audio_input)
             audio_gen_frames.append(audio_input.decode(audio=0))
 
@@ -360,7 +360,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         sub_gen_frames = []
 
         for i, sub_path in enumerate(sub_paths):
-            subtitle_input = av.open(sub_path)
+            subtitle_input = bv.open(sub_path)
             subtitle_inputs.append(subtitle_input)
             subtitle_stream = output.add_stream_from_template(
                 subtitle_input.streams.subtitles[0]
@@ -489,14 +489,14 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                         output.mux(item.stream.encode(item.frame))
                     elif frame_type == "subtitle":
                         output.mux(item.frame)
-                except av.error.ExternalError:
+                except bv.error.ExternalError:
                     log.error(
                         f"Generic error for encoder: {item.stream.name}\n"
                         f"at {item.index} time_base\nPerhaps video quality settings are too low?"
                     )
-                except av.FileNotFoundError:
+                except bv.FileNotFoundError:
                     log.error(f"File not found: {output_path}")
-                except av.FFmpegError as e:
+                except bv.FFmpegError as e:
                     log.error(e)
 
                 if bar_index:

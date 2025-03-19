@@ -3,8 +3,8 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass, field
 
-import av
-from av.audio.resampler import AudioResampler
+import bv
+from bv.audio.resampler import AudioResampler
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.bar import Bar
@@ -53,8 +53,8 @@ class Ensure:
             bar = self._bar
             self.log.debug(f"Making external audio: {out_path}")
 
-            in_container = av.open(src.path, "r")
-            out_container = av.open(
+            in_container = bv.open(src.path, "r")
+            out_container = bv.open(
                 out_path, "w", format="wav", options={"rf64": "always"}
             )
             astream = in_container.streams.audio[stream]
