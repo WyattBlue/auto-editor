@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TypedDict
 
-import av
-from av.codec import Codec
+import bv
+from bv.codec import Codec
 
 
 class DictContainer(TypedDict, total=False):
@@ -61,7 +61,7 @@ def codec_type(x: str) -> str:
 
 
 def container_constructor(ext: str) -> Container:
-    with av.open(f".{ext}", "w") as container:
+    with bv.open(f".{ext}", "w") as container:
         codecs = container.supported_codecs
         if ext == "webm":
             vdefault = "vp9"

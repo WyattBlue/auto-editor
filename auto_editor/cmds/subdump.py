@@ -1,8 +1,8 @@
 import sys
 from dataclasses import dataclass, field
 
-import av
-from av.subtitles.subtitle import AssSubtitle
+import bv
+from bv.subtitles.subtitle import AssSubtitle
 
 from auto_editor.json import dump
 from auto_editor.vanparse import ArgumentParser
@@ -26,7 +26,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     if args.json:
         data = {}
         for input_file in args.input:
-            container = av.open(input_file)
+            container = bv.open(input_file)
             for s in range(len(container.streams.subtitles)):
                 entry_data = []
 
@@ -61,7 +61,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         return
 
     for i, input_file in enumerate(args.input):
-        with av.open(input_file) as container:
+        with bv.open(input_file) as container:
             for s in range(len(container.streams.subtitles)):
                 print(f"file: {input_file} ({s}:{container.streams.subtitles[s].name})")
                 for sub2 in container.decode(subtitles=s):
