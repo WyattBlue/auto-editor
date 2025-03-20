@@ -13,6 +13,7 @@ from .palet import Syntax, env, is_boolarr, is_iterable, my_eval, p_slice, raise
 if TYPE_CHECKING:
     from typing import Any, Literal
 
+    import numpy as np
     from numpy.typing import NDArray
 
     Number = int | float | complex | Fraction

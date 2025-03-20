@@ -302,4 +302,7 @@ def make_timeline(
     else:
         v1_compatiable = None
 
+    if len(vtl) == 0 and len(atl) == 0:
+        log.error("Timeline is empty, nothing to do.")
+
     return v3(inp, tb, sr, res, args.background, vtl, atl, v1_compatiable)

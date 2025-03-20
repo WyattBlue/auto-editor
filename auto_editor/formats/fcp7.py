@@ -424,13 +424,14 @@ def resolve_write_audio(audio: Element, make_filedef, tl: v3) -> None:
                 clipitem.append(speedup(aclip.speed * 100))
 
 
-def premiere_write_audio(audio: Element, make_filedef, src: FileInfo, tl: v3) -> None:
+def premiere_write_audio(audio: Element, make_filedef, tl: v3) -> None:
     ET.SubElement(audio, "numOutputChannels").text = "2"
     aformat = ET.SubElement(audio, "format")
     aschar = ET.SubElement(aformat, "samplecharacteristics")
     ET.SubElement(aschar, "depth").text = DEPTH
     ET.SubElement(aschar, "samplerate").text = f"{tl.sr}"
-
+    src = tl.src
+    assert src is not None
     t = 0
     for aclips in tl.a:
         for channelcount in range(0, 2):  # Because "stereo" is hardcoded.
@@ -579,7 +580,7 @@ def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3) -> None:
     if resolve:
         resolve_write_audio(audio, make_filedef, tl)
     else:
-        premiere_write_audio(audio, make_filedef, src, tl)
+        premiere_write_audio(audio, make_filedef, tl)
 
     tree = ET.ElementTree(xmeml)
     ET.indent(tree, space="  ", level=0)

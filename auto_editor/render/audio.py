@@ -300,7 +300,7 @@ def make_new_audio(
 
     temp = log.temp
 
-    if not tl.a or not tl.a[0]:
+    if not tl.a[0]:
         log.error("Trying to render empty audio timeline")
 
     for i, layer in enumerate(tl.a):
