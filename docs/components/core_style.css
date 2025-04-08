@@ -146,9 +146,10 @@ g-emoji {
   vertical-align: -.075em;
 }
 
-p, .paragraph {max-width: 88ch;}
 p {
   display: block;
+  text-wrap: pretty;
+  max-width: 88ch;
   margin-block-start: 0.4em;
   margin-block-end: 1em;
   margin-inline-start: 0px;

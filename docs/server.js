@@ -4,12 +4,13 @@ import * as path from "path";
 
 const app = express();
 
-app.get("/app/*", (req, res) => {
+app.get("/app/{*splat}", (req, res) => {
   const newPath = req.path.replace("/app/", "/");
   res.redirect(301, `https://app.auto-editor.com${newPath}`);
 });
 
-app.get("/blog*", (req, res) => {
+app.get("/blog", (req, res) => { res.redirect(301, `https://basswood-io.com/blog`) });
+app.get("/blog/{*splat}", (req, res) => {
   res.redirect(301, `https://basswood-io.com${req.path}`);
 });
 
