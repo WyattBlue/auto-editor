@@ -305,7 +305,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         # Setup audio
         if ctr.default_aud != "none":
             ensure = Ensure(bar, samplerate, log)
-            audio_paths = make_new_audio(tl, ctr, ensure, args, bar, log)
+            audio_paths = make_new_audio(tl, ctr, ensure, args, log)
         else:
             audio_paths = []
 
