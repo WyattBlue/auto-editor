@@ -4,6 +4,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from auto_editor.utils.log import Log
+from auto_editor.utils.types import split_num_str
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from fractions import Fraction
@@ -105,3 +108,21 @@ def aspect_ratio(width: int, height: int) -> tuple[int, int]:
 
     c = gcd(width, height)
     return width // c, height // c
+
+
+def parse_bitrate(input_: str, log: Log) -> int:
+    try:
+        val, unit = split_num_str(input_)
+    except Exception as e:
+        log.error(e)
+
+    if unit.lower() == "k":
+        return int(val * 1000)
+    if unit == "M":
+        return int(val * 1_000_000)
+    if unit == "G":
+        return int(val * 1_000_000_000)
+    if unit == "":
+        return int(val)
+
+    log.error(f"Unknown bitrate: {input_}")

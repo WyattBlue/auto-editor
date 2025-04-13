@@ -14,7 +14,6 @@ from bv import AudioResampler, Codec
 from auto_editor.ffwrapper import FileInfo, initFileInfo
 from auto_editor.lib.contracts import is_int, is_str
 from auto_editor.make_layers import clipify, make_av, make_timeline
-from auto_editor.output import Ensure, parse_bitrate
 from auto_editor.render.audio import make_new_audio
 from auto_editor.render.subtitle import make_new_subtitles
 from auto_editor.render.video import render_av
@@ -23,6 +22,7 @@ from auto_editor.utils.bar import initBar
 from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.container import Container, container_constructor
+from auto_editor.utils.func import parse_bitrate
 from auto_editor.utils.log import Log
 
 if TYPE_CHECKING:
@@ -304,8 +304,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
         # Setup audio
         if ctr.default_aud != "none":
-            ensure = Ensure(bar, samplerate, log)
-            audio_paths = make_new_audio(tl, ctr, ensure, args, log)
+            audio_paths = make_new_audio(tl, ctr, args, log)
         else:
             audio_paths = []
 

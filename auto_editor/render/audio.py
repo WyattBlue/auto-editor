@@ -16,7 +16,6 @@ from auto_editor.json import load
 from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import andc, between_c, is_int_or_float
 from auto_editor.lib.err import MyError
-from auto_editor.output import Ensure
 from auto_editor.timeline import TlAudio, v3
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.container import Container
@@ -27,7 +26,7 @@ if TYPE_CHECKING:
 
     Reader = io.BufferedReader | io.BytesIO
     Writer = io.BufferedWriter | io.BytesIO
-    AudioData = np.memmap | np.ndarray
+    AudioData = np.ndarray
 
 
 norm_types = {
@@ -214,6 +213,8 @@ def apply_audio_normalization(
 def process_audio_clip(
     clip: TlAudio, samp_list: AudioData, samp_start: int, samp_end: int, sr: int
 ) -> np.ndarray:
+    samp_list = samp_list.T.copy(order="C")
+
     input_buffer = io.BytesIO()
     wavfile_write(input_buffer, sr, samp_list[samp_start:samp_end])
     input_buffer.seek(0)
@@ -363,9 +364,7 @@ def ndarray_to_file(audio_data: np.ndarray, rate: int, out: str | Path) -> None:
         output.mux(stream.encode(None))
 
 
-def make_new_audio(
-    tl: v3, ctr: Container, ensure: Ensure, args: Args, log: Log
-) -> list[str]:
+def make_new_audio(tl: v3, ctr: Container, args: Args, log: Log) -> list[str]:
     sr = tl.sr
     tb = tl.tb
     output: list[str] = []
@@ -388,53 +387,51 @@ def make_new_audio(
                 log.conwrite("Writing audio to memory")
                 samples[(clip.src, clip.stream)] = file_to_ndarray(
                     clip.src, clip.stream, sr
-                ).T.copy(order="C")
+                )
 
             log.conwrite("Creating audio")
             if arr is None:
-                leng = max(round((layer[-1].start + layer[-1].dur) * sr / tb), sr // tb)
                 dtype = np.int32
                 for _samp_arr in samples.values():
                     dtype = _samp_arr.dtype
                     break
 
+                leng = max(round((layer[-1].start + layer[-1].dur) * sr / tb), sr // tb)
                 arr = np.memmap(
                     Path(temp, "asdf.map"),
                     mode="w+",
                     dtype=dtype,
-                    shape=(leng, 2),
+                    shape=(2, leng),
                 )
                 del leng
 
             samp_list = samples[(clip.src, clip.stream)]
+
             samp_start = round(clip.offset * clip.speed * sr / tb)
             samp_end = round((clip.offset + clip.dur) * clip.speed * sr / tb)
-            if samp_end > len(samp_list):
-                samp_end = len(samp_list)
+            if samp_end > samp_list.shape[1]:
+                samp_end = samp_list.shape[1]
 
             if clip.speed != 1 or clip.volume != 1:
-                clip_arr = process_audio_clip(
-                    clip, samp_list, samp_start, samp_end, sr
-                ).T.copy(order="C")
+                clip_arr = process_audio_clip(clip, samp_list, samp_start, samp_end, sr)
             else:
-                clip_arr = samp_list[samp_start:samp_end]
+                clip_arr = samp_list[:, samp_start:samp_end]
 
             # Mix numpy arrays
             start = clip.start * sr // tb
-            clip_samples = clip_arr.shape[0]
-
-            if start + clip_samples > len(arr):
-                # Clip 'clip_arr' if bigger than expected.
-                arr[start:] += clip_arr[: len(arr) - start]
+            clip_samples = clip_arr.shape[1]
+            if start + clip_samples > arr.shape[1]:
+                # Shorten `clip_arr` if bigger than expected.
+                arr[:, start:] += clip_arr[:, : arr.shape[1] - start]
             else:
-                arr[start : start + clip_samples] += clip_arr
+                arr[:, start : start + clip_samples] += clip_arr
 
         if arr is not None:
             if norm is None:
-                ndarray_to_file(arr.T.copy(order="C"), sr, path)
+                ndarray_to_file(arr, sr, path)
             else:
                 pre_master = Path(temp, "premaster.wav")
-                ndarray_to_file(arr.T.copy(order="C"), sr, pre_master)
+                ndarray_to_file(arr, sr, pre_master)
                 apply_audio_normalization(norm, pre_master, path, log)
 
     try:
