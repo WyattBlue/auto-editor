@@ -308,21 +308,24 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             log.error(e)
         if audio_encoder.audio_formats is None:
             log.error(f"{args.audio_codec}: No known audio formats avail.")
-        audio_format = audio_encoder.audio_formats[0]
-        resampler = AudioResampler(format=audio_format, layout="stereo", rate=tl.sr)
+        fmt = audio_encoder.audio_formats[0]
+        resampler = AudioResampler(format=fmt, layout="stereo", rate=tl.sr)
 
         audio_streams: list[bv.AudioStream] = []
 
-        if ctr.default_aud != "none":
-            audio_streams, audio_gen_frames = make_new_audio(
-                output, audio_format, tl, ctr, args, log
-            )
+        if ctr.default_aud == "none":
+            while len(tl.a) > 0:
+                tl.a.pop()
+        elif len(tl.a) > 1 and ctr.max_audios == 1:
+            log.warning("Dropping extra audio streams (container only allows one)")
+
+            while len(tl.a) > 1:
+                tl.a.pop()
+
+        if len(tl.a) > 0:
+            audio_streams, audio_gen_frames = make_new_audio(output, fmt, tl, args, log)
         else:
             audio_streams, audio_gen_frames = [], [iter([])]
-
-        # if len(audio_paths) > 1 and ctr.max_audios == 1:
-        #     log.warning("Dropping extra audio streams (container only allows one)")
-        #     audio_paths = audio_paths[0:1]
 
         # Setup subtitles
         if ctr.default_sub != "none" and not args.sn:

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import io
-import struct
-import sys
 from fractions import Fraction
+from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,7 +17,6 @@ from auto_editor.lib.contracts import andc, between_c, is_int_or_float
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import TlAudio, v3
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
-from auto_editor.utils.container import Container
 from auto_editor.utils.func import parse_bitrate
 from auto_editor.utils.log import Log
 
@@ -29,8 +26,6 @@ if TYPE_CHECKING:
 
     from auto_editor.__main__ import Args
 
-    Reader = io.BufferedReader | io.BytesIO
-    Writer = io.BufferedWriter | io.BytesIO
     AudioData = np.ndarray
 
 
@@ -101,59 +96,6 @@ def parse_ebu_bytes(norm: dict, stat: bytes, log: Log) -> tuple[str, str]:
     return "loudnorm", filter
 
 
-def wavfile_write(fid: Writer, sr: int, arr: np.ndarray) -> None:
-    # arr.shape is (samples, channels).
-
-    def _handle_pad_byte(fid: Reader, size: int) -> None:
-        if size % 2 == 1:
-            fid.seek(1, 1)
-
-    PCM = 0x0001
-    IEEE_FLOAT = 0x0003
-
-    channels = 1 if arr.ndim == 1 else arr.shape[1]
-    bit_depth = arr.dtype.itemsize * 8
-    block_align = channels * (bit_depth // 8)
-    data_size = arr.nbytes
-    total_size = 44 + data_size  # Basic WAV header size + data size
-
-    if is_rf64 := total_size > 0xFFFFFFFF:
-        fid.write(b"RF64\xff\xff\xff\xffWAVE")
-        ds64_size = 28
-        ds64_chunk_data = (0).to_bytes(ds64_size, "little")  # placeholder values
-        fid.write(b"ds64" + struct.pack("<I", ds64_size) + ds64_chunk_data)
-    else:
-        fid.write(b"RIFF" + struct.pack("<I", total_size - 8) + b"WAVE")
-
-    dkind = arr.dtype.kind
-    format_tag = IEEE_FLOAT if dkind == "f" else PCM
-
-    fmt_chunk_data = struct.pack(
-        "<HHIIHH", format_tag, channels, sr, 0, block_align, bit_depth
-    )
-    fid.write(b"fmt " + struct.pack("<I", len(fmt_chunk_data)) + fmt_chunk_data)
-
-    # Data chunk
-    fid.write(b"data")
-    fid.write(struct.pack("<I", 0xFFFFFFFF if is_rf64 else data_size))
-
-    if arr.dtype.byteorder == ">" or (
-        arr.dtype.byteorder == "=" and sys.byteorder == "big"
-    ):
-        arr = arr.byteswap()
-    fid.write(arr.ravel().view("b").data)
-
-    if is_rf64:
-        end_position = fid.tell()
-        fid.seek(16)  # Position at the start of 'ds64' chunk size
-
-        file_size = end_position - 20
-        fid.write(struct.pack("<I", ds64_size))
-        fid.write(file_size.to_bytes(8, "little") + data_size.to_bytes(8, "little"))
-
-        fid.seek(end_position)
-
-
 def apply_audio_normalization(
     norm: dict, pre_master: Path, path: Path, log: Log
 ) -> None:
@@ -218,17 +160,30 @@ def apply_audio_normalization(
 def process_audio_clip(
     clip: TlAudio, samp_list: AudioData, samp_start: int, samp_end: int, sr: int
 ) -> np.ndarray:
-    samp_list = samp_list.T.copy(order="C")
+    to_s16 = bv.AudioResampler(format="s16", layout="stereo", rate=sr)
+    input_buffer = BytesIO()
 
-    input_buffer = io.BytesIO()
-    wavfile_write(input_buffer, sr, samp_list[samp_start:samp_end])
+    with bv.open(input_buffer, "w", format="wav") as container:
+        output_stream = container.add_stream(
+            "pcm_s16le", sample_rate=sr, format="s16", layout="stereo"
+        )
+
+        frame = AudioFrame.from_ndarray(
+            samp_list[:, samp_start:samp_end], format="s16p", layout="stereo"
+        )
+        frame.rate = sr
+
+        for reframe in to_s16.resample(frame):
+            container.mux(output_stream.encode(reframe))
+        container.mux(output_stream.encode(None))
+
     input_buffer.seek(0)
 
     input_file = bv.open(input_buffer, "r")
     input_stream = input_file.streams.audio[0]
 
     graph = bv.filter.Graph()
-    args = [graph.add_abuffer(sample_rate=sr, format="s16", layout="stereo")]
+    args = [graph.add_abuffer(template=input_stream)]
 
     if clip.speed != 1:
         if clip.speed > 10_000:
@@ -390,7 +345,6 @@ def make_new_audio(
     output: bv.container.OutputContainer,
     audio_format: bv.AudioFormat,
     tl: v3,
-    ctr: Container,
     args: Args,
     log: Log,
 ) -> tuple[list[bv.AudioStream], list[Iterator[AudioFrame]]]:
@@ -405,8 +359,9 @@ def make_new_audio(
     for i, audio_path in enumerate(audio_paths):
         audio_stream = output.add_stream(
             args.audio_codec,
-            format=audio_format,
             rate=tl.sr,
+            format=audio_format,
+            layout="stereo",
             time_base=Fraction(1, tl.sr),
         )
         if not isinstance(audio_stream, bv.AudioStream):
@@ -484,7 +439,10 @@ def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[A
 
         if arr is not None:
             if norm is None:
-                use_iter = True
+                if args.mix_audio_streams:
+                    ndarray_to_file(arr, sr, path)
+                else:
+                    use_iter = True
             else:
                 pre_master = Path(temp, "premaster.wav")
                 ndarray_to_file(arr, sr, pre_master)
