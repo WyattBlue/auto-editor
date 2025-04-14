@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import struct
 import sys
+from fractions import Fraction
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,9 +20,13 @@ from auto_editor.lib.err import MyError
 from auto_editor.timeline import TlAudio, v3
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.container import Container
+from auto_editor.utils.func import parse_bitrate
 from auto_editor.utils.log import Log
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from typing import Any
+
     from auto_editor.__main__ import Args
 
     Reader = io.BufferedReader | io.BytesIO
@@ -364,14 +369,76 @@ def ndarray_to_file(audio_data: np.ndarray, rate: int, out: str | Path) -> None:
         output.mux(stream.encode(None))
 
 
-def make_new_audio(tl: v3, ctr: Container, args: Args, log: Log) -> list[str]:
+def ndarray_to_iter(
+    audio_data: np.ndarray, fmt: bv.AudioFormat, rate: int
+) -> Iterator[AudioFrame]:
+    chunk_size = rate // 4  # Process 0.25 seconds at a time
+
+    resampler = bv.AudioResampler(rate=rate, format=fmt, layout="stereo")
+    for i in range(0, audio_data.shape[1], chunk_size):
+        chunk = audio_data[:, i : i + chunk_size]
+
+        frame = AudioFrame.from_ndarray(chunk, format="s16p", layout="stereo")
+        frame.rate = rate
+        # frame.time_base = Fraction(1, rate)
+        frame.pts = i
+
+        yield from resampler.resample(frame)
+
+
+def make_new_audio(
+    output: bv.container.OutputContainer,
+    audio_format: bv.AudioFormat,
+    tl: v3,
+    ctr: Container,
+    args: Args,
+    log: Log,
+) -> tuple[list[bv.AudioStream], list[Iterator[AudioFrame]]]:
+    audio_inputs = []
+    audio_gen_frames = []
+    audio_streams: list[bv.AudioStream] = []
+    audio_paths = _make_new_audio(tl, audio_format, args, log)
+
+    src = tl.src
+    assert src is not None
+
+    for i, audio_path in enumerate(audio_paths):
+        audio_stream = output.add_stream(
+            args.audio_codec,
+            format=audio_format,
+            rate=tl.sr,
+            time_base=Fraction(1, tl.sr),
+        )
+        if not isinstance(audio_stream, bv.AudioStream):
+            log.error(f"Not a known audio codec: {args.audio_codec}")
+
+        if args.audio_bitrate != "auto":
+            audio_stream.bit_rate = parse_bitrate(args.audio_bitrate, log)
+            log.debug(f"audio bitrate: {audio_stream.bit_rate}")
+        else:
+            log.debug(f"[auto] audio bitrate: {audio_stream.bit_rate}")
+        if i < len(src.audios) and src.audios[i].lang is not None:
+            audio_stream.metadata["language"] = src.audios[i].lang  # type: ignore
+
+        audio_streams.append(audio_stream)
+
+        if isinstance(audio_path, str):
+            audio_input = bv.open(audio_path)
+            audio_inputs.append(audio_input)
+            audio_gen_frames.append(audio_input.decode(audio=0))
+        else:
+            audio_gen_frames.append(audio_path)
+
+    return audio_streams, audio_gen_frames
+
+
+def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[Any]:
     sr = tl.sr
     tb = tl.tb
-    output: list[str] = []
+    output: list[Any] = []
     samples: dict[tuple[FileInfo, int], AudioData] = {}
 
     norm = parse_norm(args.audio_normalize, log)
-
     temp = log.temp
 
     if not tl.a[0]:
@@ -379,8 +446,8 @@ def make_new_audio(tl: v3, ctr: Container, args: Args, log: Log) -> list[str]:
 
     for i, layer in enumerate(tl.a):
         path = Path(temp, f"new{i}.wav")
-        output.append(f"{path}")
         arr: AudioData | None = None
+        use_iter = False
 
         for c, clip in enumerate(layer):
             if (clip.src, clip.stream) not in samples:
@@ -391,19 +458,8 @@ def make_new_audio(tl: v3, ctr: Container, args: Args, log: Log) -> list[str]:
 
             log.conwrite("Creating audio")
             if arr is None:
-                dtype = np.int32
-                for _samp_arr in samples.values():
-                    dtype = _samp_arr.dtype
-                    break
-
                 leng = max(round((layer[-1].start + layer[-1].dur) * sr / tb), sr // tb)
-                arr = np.memmap(
-                    Path(temp, "asdf.map"),
-                    mode="w+",
-                    dtype=dtype,
-                    shape=(2, leng),
-                )
-                del leng
+                arr = np.zeros(shape=(2, leng), dtype=np.int16)
 
             samp_list = samples[(clip.src, clip.stream)]
 
@@ -428,19 +484,20 @@ def make_new_audio(tl: v3, ctr: Container, args: Args, log: Log) -> list[str]:
 
         if arr is not None:
             if norm is None:
-                ndarray_to_file(arr, sr, path)
+                use_iter = True
             else:
                 pre_master = Path(temp, "premaster.wav")
                 ndarray_to_file(arr, sr, pre_master)
                 apply_audio_normalization(norm, pre_master, path, log)
 
-    try:
-        Path(temp, "asdf.map").unlink(missing_ok=True)
-    except PermissionError:
-        pass
+        if use_iter and arr is not None:
+            output.append(ndarray_to_iter(arr, fmt, sr))
+        else:
+            output.append(f"{path}")
 
     if args.mix_audio_streams and len(output) > 1:
         new_a_file = f"{Path(temp, 'new_audio.wav')}"
         mix_audio_files(sr, output, new_a_file)
         return [new_a_file]
+
     return output

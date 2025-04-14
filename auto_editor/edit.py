@@ -22,7 +22,6 @@ from auto_editor.utils.bar import initBar
 from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.container import Container, container_constructor
-from auto_editor.utils.func import parse_bitrate
 from auto_editor.utils.log import Log
 
 if TYPE_CHECKING:
@@ -303,50 +302,27 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             output_stream, vframes = None, iter([])
 
         # Setup audio
-        if ctr.default_aud != "none":
-            audio_paths = make_new_audio(tl, ctr, args, log)
-        else:
-            audio_paths = []
-
-        if len(audio_paths) > 1 and ctr.max_audios == 1:
-            log.warning("Dropping extra audio streams (container only allows one)")
-            audio_paths = audio_paths[0:1]
-
-        if audio_paths:
-            try:
-                audio_encoder = bv.Codec(args.audio_codec, "w")
-            except bv.FFmpegError as e:
-                log.error(e)
-            if audio_encoder.audio_formats is None:
-                log.error(f"{args.audio_codec}: No known audio formats avail.")
-            audio_format = audio_encoder.audio_formats[0]
-            resampler = AudioResampler(format=audio_format, layout="stereo", rate=tl.sr)
+        try:
+            audio_encoder = bv.Codec(args.audio_codec, "w")
+        except bv.FFmpegError as e:
+            log.error(e)
+        if audio_encoder.audio_formats is None:
+            log.error(f"{args.audio_codec}: No known audio formats avail.")
+        audio_format = audio_encoder.audio_formats[0]
+        resampler = AudioResampler(format=audio_format, layout="stereo", rate=tl.sr)
 
         audio_streams: list[bv.AudioStream] = []
-        audio_inputs = []
-        audio_gen_frames = []
-        for i, audio_path in enumerate(audio_paths):
-            audio_stream = output.add_stream(
-                args.audio_codec,
-                format=audio_format,
-                rate=tl.sr,
-                time_base=Fraction(1, tl.sr),
+
+        if ctr.default_aud != "none":
+            audio_streams, audio_gen_frames = make_new_audio(
+                output, audio_format, tl, ctr, args, log
             )
-            if not isinstance(audio_stream, bv.AudioStream):
-                log.error(f"Not a known audio codec: {args.audio_codec}")
+        else:
+            audio_streams, audio_gen_frames = [], [iter([])]
 
-            if args.audio_bitrate != "auto":
-                audio_stream.bit_rate = parse_bitrate(args.audio_bitrate, log)
-                log.debug(f"audio bitrate: {audio_stream.bit_rate}")
-            else:
-                log.debug(f"[auto] audio bitrate: {audio_stream.bit_rate}")
-            if i < len(src.audios) and src.audios[i].lang is not None:
-                audio_stream.metadata["language"] = src.audios[i].lang  # type: ignore
-
-            audio_streams.append(audio_stream)
-            audio_input = bv.open(audio_path)
-            audio_inputs.append(audio_input)
-            audio_gen_frames.append(audio_input.decode(audio=0))
+        # if len(audio_paths) > 1 and ctr.max_audios == 1:
+        #     log.warning("Dropping extra audio streams (container only allows one)")
+        #     audio_paths = audio_paths[0:1]
 
         # Setup subtitles
         if ctr.default_sub != "none" and not args.sn:
@@ -510,8 +486,6 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         bar.end()
 
         # Close resources
-        for audio_input in audio_inputs:
-            audio_input.close()
         for subtitle_input in subtitle_inputs:
             subtitle_input.close()
         output.close()
