@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 import bv
 import numpy as np
 
-from auto_editor.output import parse_bitrate
 from auto_editor.timeline import TlImage, TlRect, TlVideo
+from auto_editor.utils.func import parse_bitrate
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
