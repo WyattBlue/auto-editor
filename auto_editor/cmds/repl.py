@@ -48,11 +48,6 @@ def repl_options(parser: ArgumentParser) -> ArgumentParser:
         type=frame_rate,
         help="Set custom timebase",
     )
-    parser.add_argument(
-        "--temp-dir",
-        metavar="PATH",
-        help="Set where the temporary directory is located",
-    )
     return parser
 
 
@@ -60,7 +55,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     args = repl_options(ArgumentParser(None)).parse_args(REPL_Args, sys_args)
 
     if args.input:
-        log = Log(quiet=True, temp_dir=args.temp_dir)
+        log = Log(quiet=True)
         sources = [initFileInfo(path, log) for path in args.input]
         src = sources[0]
         tb = src.get_fps() if args.timebase is None else args.timebase
