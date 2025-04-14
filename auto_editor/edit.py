@@ -9,7 +9,6 @@ from subprocess import run
 from typing import TYPE_CHECKING, Any
 
 import bv
-from bv import AudioResampler, Codec
 
 from auto_editor.ffwrapper import FileInfo, initFileInfo
 from auto_editor.lib.contracts import is_int, is_str
@@ -84,11 +83,11 @@ def set_video_codec(
 
     if ctr.vcodecs is not None and codec not in ctr.vcodecs:
         try:
-            cobj = Codec(codec, "w")
+            cobj = bv.Codec(codec, "w")
         except bv.codec.codec.UnknownCodecError:
             log.error(f"Unknown encoder: {codec}")
         # Normalize encoder names
-        if cobj.id not in (Codec(x, "w").id for x in ctr.vcodecs):
+        if cobj.id not in (bv.Codec(x, "w").id for x in ctr.vcodecs):
             log.error(codec_error.format(codec, out_ext))
 
     return codec
@@ -112,11 +111,11 @@ def set_audio_codec(
 
     if ctr.acodecs is None or codec not in ctr.acodecs:
         try:
-            cobj = Codec(codec, "w")
+            cobj = bv.Codec(codec, "w")
         except bv.codec.codec.UnknownCodecError:
             log.error(f"Unknown encoder: {codec}")
         # Normalize encoder names
-        if cobj.id not in (Codec(x, "w").id for x in ctr.acodecs):
+        if cobj.id not in (bv.Codec(x, "w").id for x in ctr.acodecs):
             log.error(codec_error.format(codec, out_ext))
 
     return codec
@@ -309,7 +308,6 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         if audio_encoder.audio_formats is None:
             log.error(f"{args.audio_codec}: No known audio formats avail.")
         fmt = audio_encoder.audio_formats[0]
-        resampler = AudioResampler(format=fmt, layout="stereo", rate=tl.sr)
 
         audio_streams: list[bv.AudioStream] = []
 
@@ -441,13 +439,11 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                 break
 
             if should_get_audio:
-                for audio_stream, audio_frame in zip(audio_streams, audio_frames):
-                    for reframe in resampler.resample(audio_frame):
-                        assert reframe.pts is not None
-                        heappush(
-                            frame_queue,
-                            Priority(reframe.pts, reframe, audio_stream),
-                        )
+                for audio_stream, aframe in zip(audio_streams, audio_frames):
+                    if aframe is None:
+                        continue
+                    assert aframe.pts is not None
+                    heappush(frame_queue, Priority(aframe.pts, aframe, audio_stream))
             if should_get_sub:
                 for subtitle_stream, packet in zip(subtitle_streams, subtitle_frames):
                     if packet and packet.pts is not None:
