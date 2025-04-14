@@ -394,13 +394,11 @@ def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[A
     samples: dict[tuple[FileInfo, int], AudioData] = {}
 
     norm = parse_norm(args.audio_normalize, log)
-    temp = log.temp
 
     if not tl.a[0]:
         log.error("Trying to render empty audio timeline")
 
     for i, layer in enumerate(tl.a):
-        path = Path(temp, f"new{i}.wav")
         arr: AudioData | None = None
         use_iter = False
 
@@ -440,21 +438,24 @@ def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[A
         if arr is not None:
             if norm is None:
                 if args.mix_audio_streams:
+                    path = Path(log.temp, f"new{i}.wav")
                     ndarray_to_file(arr, sr, path)
+                    output.append(f"{path}")
                 else:
                     use_iter = True
             else:
-                pre_master = Path(temp, "premaster.wav")
+                path = Path(log.temp, f"new{i}.wav")
+                pre_master = Path(log.temp, "premaster.wav")
+
                 ndarray_to_file(arr, sr, pre_master)
                 apply_audio_normalization(norm, pre_master, path, log)
+                output.append(f"{path}")
 
         if use_iter and arr is not None:
             output.append(ndarray_to_iter(arr, fmt, sr))
-        else:
-            output.append(f"{path}")
 
     if args.mix_audio_streams and len(output) > 1:
-        new_a_file = f"{Path(temp, 'new_audio.wav')}"
+        new_a_file = f"{Path(log.temp, 'new_audio.wav')}"
         mix_audio_files(sr, output, new_a_file)
         return [new_a_file]
 
