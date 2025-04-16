@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=48.0.0"]
+requires = ["setuptools>=77"]
 
 [project]
 name = "auto-editor"
