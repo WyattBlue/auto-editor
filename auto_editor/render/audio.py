@@ -26,8 +26,6 @@ if TYPE_CHECKING:
 
     from auto_editor.__main__ import Args
 
-    AudioData = np.ndarray
-
 
 norm_types = {
     "ebu": pAttrs(
@@ -157,9 +155,7 @@ def apply_audio_normalization(
         output_file.close()
 
 
-def process_audio_clip(
-    clip: TlAudio, samp_list: AudioData, samp_start: int, samp_end: int, sr: int
-) -> np.ndarray:
+def process_audio_clip(clip: TlAudio, data: np.ndarray, sr: int) -> np.ndarray:
     to_s16 = bv.AudioResampler(format="s16", layout="stereo", rate=sr)
     input_buffer = BytesIO()
 
@@ -168,9 +164,7 @@ def process_audio_clip(
             "pcm_s16le", sample_rate=sr, format="s16", layout="stereo"
         )
 
-        frame = AudioFrame.from_ndarray(
-            samp_list[:, samp_start:samp_end], format="s16p", layout="stereo"
-        )
+        frame = AudioFrame.from_ndarray(data, format="s16p", layout="stereo")
         frame.rate = sr
 
         for reframe in to_s16.resample(frame):
@@ -387,11 +381,66 @@ def make_new_audio(
     return audio_streams, audio_gen_frames
 
 
+class Getter:
+    __slots__ = ("container", "stream", "rate")
+
+    def __init__(self, path: Path, stream: int, rate: int):
+        self.container = bv.open(path)
+        self.stream = self.container.streams.audio[0]
+        self.rate = rate
+
+    def get(self, start: int, end: int) -> np.ndarray:
+        # start/end is in samples
+
+        container = self.container
+        stream = self.stream
+        resampler = bv.AudioResampler(format="s16p", layout="stereo", rate=self.rate)
+
+        time_base = stream.time_base
+        assert time_base is not None
+        start_pts = int(start / self.rate / time_base)
+
+        # Seek to the approximate position
+        container.seek(start_pts, stream=stream)
+
+        all_frames = []
+        total_samples = 0
+        target_samples = end - start
+
+        # Decode frames until we have enough samples
+        for frame in container.decode(stream):
+            for resampled_frame in resampler.resample(frame):
+                frame_array = resampled_frame.to_ndarray()
+                all_frames.append(frame_array)
+                total_samples += frame_array.shape[1]
+
+                if total_samples >= target_samples:
+                    break
+
+            if total_samples >= target_samples:
+                break
+
+        result = np.concatenate(all_frames, axis=1)
+
+        # Trim to exact size
+        if result.shape[1] > target_samples:
+            result = result[:, :target_samples]
+        elif result.shape[1] < target_samples:
+            # Pad with zeros if we don't have enough samples
+            padding = np.zeros(
+                (result.shape[0], target_samples - result.shape[1]), dtype=result.dtype
+            )
+            result = np.concatenate([result, padding], axis=1)
+
+        assert result.shape[1] == end - start
+        return result  # Return NumPy array with shape (channels, samples)
+
+
 def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[Any]:
     sr = tl.sr
     tb = tl.tb
     output: list[Any] = []
-    samples: dict[tuple[FileInfo, int], AudioData] = {}
+    samples: dict[tuple[FileInfo, int], Getter] = {}
 
     norm = parse_norm(args.audio_normalize, log)
 
@@ -399,32 +448,32 @@ def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[A
         log.error("Trying to render empty audio timeline")
 
     for i, layer in enumerate(tl.a):
-        arr: AudioData | None = None
+        arr: np.ndarray | None = None
         use_iter = False
 
         for c, clip in enumerate(layer):
             if (clip.src, clip.stream) not in samples:
-                log.conwrite("Writing audio to memory")
-                samples[(clip.src, clip.stream)] = file_to_ndarray(
-                    clip.src, clip.stream, sr
+                samples[(clip.src, clip.stream)] = Getter(
+                    clip.src.path, clip.stream, sr
                 )
 
             log.conwrite("Creating audio")
             if arr is None:
                 leng = max(round((layer[-1].start + layer[-1].dur) * sr / tb), sr // tb)
-                arr = np.zeros(shape=(2, leng), dtype=np.int16)
-
-            samp_list = samples[(clip.src, clip.stream)]
+                map_path = Path(log.temp, f"{i}.map")
+                arr = np.memmap(map_path, mode="w+", dtype=np.int16, shape=(2, leng))
 
             samp_start = round(clip.offset * clip.speed * sr / tb)
             samp_end = round((clip.offset + clip.dur) * clip.speed * sr / tb)
-            if samp_end > samp_list.shape[1]:
-                samp_end = samp_list.shape[1]
+
+            getter = samples[(clip.src, clip.stream)]
 
             if clip.speed != 1 or clip.volume != 1:
-                clip_arr = process_audio_clip(clip, samp_list, samp_start, samp_end, sr)
+                clip_arr = process_audio_clip(
+                    clip, getter.get(samp_start, samp_end), sr
+                )
             else:
-                clip_arr = samp_list[:, samp_start:samp_end]
+                clip_arr = getter.get(samp_start, samp_end)
 
             # Mix numpy arrays
             start = clip.start * sr // tb
