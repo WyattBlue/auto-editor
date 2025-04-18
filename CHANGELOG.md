@@ -1,3 +1,14 @@
+# 27.1.0
+
+## Features
+ - Stream the input source's audio samples, instead of memory mapping an entire wav file.
+
+## Fixes
+ - Print an error message instead of raising an exception if `--export premiere` is used with an empty timeline.
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/27.0.0...27.1.0
+
+
 # 27.0.0
 
 ## Major
@@ -8,6 +19,9 @@
 
 ## Features
  - Make video rendering 11% faster, rendering should be 19% faster overall.
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/26.3.3...27.0.0
+
 
 # 26.3.3
 
