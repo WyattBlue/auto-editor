@@ -257,7 +257,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     out_ext = splitext(output)[1].replace(".", "")
 
     # Check if export options make sense.
-    ctr = container_constructor(out_ext.lower())
+    ctr = container_constructor(out_ext.lower(), log)
 
     if ctr.samplerate is not None and args.sample_rate not in ctr.samplerate:
         log.error(f"'{out_ext}' container only supports samplerates: {ctr.samplerate}")

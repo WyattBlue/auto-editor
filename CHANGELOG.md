@@ -2,6 +2,7 @@
 
 ## Features
  - Stream the input source's audio samples, instead of memory mapping an entire wav file.
+ - Add `--audio-layout`, which allows changing the number of channels (`mono`, `stereo`, etc.).
 
 ## Fixes
  - Print an error message instead of raising an exception if `--export premiere` is used with an empty timeline.

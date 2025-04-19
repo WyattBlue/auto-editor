@@ -206,10 +206,26 @@ class Template:
     subtitles: list[SubtitleTemplate]
 
     @classmethod
-    def init(self, src: FileInfo) -> Template:
+    def init(
+        self,
+        src: FileInfo,
+        sr: int | None = None,
+        layout: str | None = None,
+        res: tuple[int, int] | None = None,
+    ) -> Template:
         alist = [AudioTemplate(x.lang) for x in src.audios]
         slist = [SubtitleTemplate(x.lang) for x in src.subtitles]
-        return Template(src.get_sr(), "stereo", src.get_res(), alist, slist)
+
+        if sr is None:
+            sr = src.get_sr()
+
+        if layout is None:
+            layout = "stereo" if not src.audios else src.audios[0].layout
+
+        if res is None:
+            res = src.get_res()
+
+        return Template(sr, layout, res, alist, slist)
 
 
 @dataclass

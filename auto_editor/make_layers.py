@@ -307,10 +307,9 @@ def make_timeline(
         log.error("Timeline is empty, nothing to do.")
 
     if inp is None:
-        template = Template(sr, "stereo", res, [], [])
+        layout = "stereo" if args.audio_layout is None else args.audio_layout
+        template = Template(sr, layout, res, [], [])
     else:
-        template = Template.init(inp)
-        template.sr = sr
-        template.res = res
+        template = Template.init(inp, sr, args.audio_layout, res)
 
     return v3(tb, args.background, template, vtl, atl, v1_compatiable)

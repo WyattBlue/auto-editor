@@ -336,11 +336,7 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
                     )
                 )
 
-    primary_src = sources[next(iter(sources))]
-
-    T = Template.init(primary_src)
-    T.res = res
-    T.sr = sr
+    T = Template.init(sources[next(iter(sources))], sr, res=res)
     return v3(tb, "#000", T, vobjs, aobjs, v1=None)
 
 
