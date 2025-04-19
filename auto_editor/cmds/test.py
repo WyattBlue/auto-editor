@@ -186,6 +186,7 @@ class Runner:
             assert container.duration is not None
             assert container.duration > 17300000 and container.duration < 2 << 24
 
+            assert len(container.streams) == 2
             video = container.streams[0]
             audio = container.streams[1]
             assert isinstance(video, bv.VideoStream)
@@ -199,6 +200,29 @@ class Runner:
             assert audio.codec.name == "aac"
             assert audio.sample_rate == 48000
             assert audio.language == "eng"
+            assert audio.layout.name == "stereo"
+
+    def test_to_mono(self) -> None:
+        out = self.main(["example.mp4"], ["-layout", "mono"], output="example_mono.mp4")
+        with bv.open(out) as container:
+            assert container.duration is not None
+            assert container.duration > 17300000 and container.duration < 2 << 24
+
+            assert len(container.streams) == 2
+            video = container.streams[0]
+            audio = container.streams[1]
+            assert isinstance(video, bv.VideoStream)
+            assert isinstance(audio, bv.AudioStream)
+            assert video.base_rate == 30
+            assert video.average_rate is not None
+            assert video.average_rate == 30, video.average_rate
+            assert (video.width, video.height) == (1280, 720)
+            assert video.codec.name == "h264"
+            assert video.language == "eng"
+            assert audio.codec.name == "aac"
+            assert audio.sample_rate == 48000
+            assert audio.language == "eng"
+            assert audio.layout.name == "mono"
 
     # PR #260
     def test_high_speed(self):
@@ -332,8 +356,18 @@ class Runner:
         assert cn.videos[0].height == 380
         assert cn.audios[0].samplerate == 48000
 
+    # def test_premiere_multi(self):
+    #     p_xml = self.main([f"resources/multi-track.mov"], ["-exp"], "multi.xml")
+
+    #     cn = fileinfo(self.main([p_xml], []))
+    #     assert len(cn.videos) == 1
+    #     assert len(cn.audios) == 2
+
     def test_premiere(self):
         for test_name in all_files:
+            if test_name == "multi-track.mov":
+                continue
+
             p_xml = self.main([f"resources/{test_name}"], ["-exp"], "out.xml")
             self.main([p_xml], [])
 

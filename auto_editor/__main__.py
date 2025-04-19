@@ -75,6 +75,7 @@ class Args:
 
     # Audio Rendering
     audio_codec: str = "auto"
+    audio_layout: str | None = None
     audio_bitrate: str = "auto"
     mix_audio_streams: bool = False
     keep_tracks_separate: bool = False
@@ -335,6 +336,13 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "-c:a",
         metavar="ENCODER",
         help="Set audio codec for output media",
+    )
+    parser.add_argument(
+        "--audio-layout",
+        "-channel-layout",
+        "-layout",
+        metavar="LAYOUT",
+        help="Set the audio layout for the output media/timeline",
     )
     parser.add_argument(
         "--audio-bitrate",

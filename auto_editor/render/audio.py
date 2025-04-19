@@ -319,17 +319,16 @@ def ndarray_to_file(audio_data: np.ndarray, rate: int, out: str | Path) -> None:
 
 
 def ndarray_to_iter(
-    audio_data: np.ndarray, fmt: bv.AudioFormat, rate: int
+    audio_data: np.ndarray, fmt: bv.AudioFormat, layout: str, rate: int
 ) -> Iterator[AudioFrame]:
     chunk_size = rate // 4  # Process 0.25 seconds at a time
 
-    resampler = bv.AudioResampler(rate=rate, format=fmt, layout="stereo")
+    resampler = bv.AudioResampler(rate=rate, format=fmt, layout=layout)
     for i in range(0, audio_data.shape[1], chunk_size):
         chunk = audio_data[:, i : i + chunk_size]
 
         frame = AudioFrame.from_ndarray(chunk, format="s16p", layout="stereo")
         frame.rate = rate
-        # frame.time_base = Fraction(1, rate)
         frame.pts = i
 
         yield from resampler.resample(frame)
@@ -445,6 +444,12 @@ def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[A
     if not tl.a[0]:
         log.error("Trying to render empty audio timeline")
 
+    layout = tl.T.layout
+    try:
+        bv.AudioLayout(layout)
+    except ValueError:
+        log.error(f"Invalid audio layout: {layout}")
+
     for i, layer in enumerate(tl.a):
         arr: np.ndarray | None = None
         use_iter = False
@@ -499,7 +504,7 @@ def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[A
                 output.append(f"{path}")
 
         if use_iter and arr is not None:
-            output.append(ndarray_to_iter(arr, fmt, sr))
+            output.append(ndarray_to_iter(arr, fmt, layout, sr))
 
     if args.mix_audio_streams and len(output) > 1:
         new_a_file = f"{Path(log.temp, 'new_audio.wav')}"
