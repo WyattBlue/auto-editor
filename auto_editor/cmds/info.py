@@ -5,7 +5,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict
 
-from auto_editor.ffwrapper import initFileInfo
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.json import dump
 from auto_editor.make_layers import make_sane_timebase
 from auto_editor.timeline import v3
@@ -102,7 +102,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             file_info[file] = {"type": "timeline"}
             continue
 
-        src = initFileInfo(file, log)
+        src = FileInfo.init(file, log)
 
         if len(src.videos) + len(src.audios) + len(src.subtitles) == 0:
             file_info[file] = {"type": "unknown"}

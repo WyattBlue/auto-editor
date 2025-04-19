@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import bv
 
-from auto_editor.ffwrapper import FileInfo, initFileInfo
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import is_int, is_str
 from auto_editor.make_layers import clipify, make_av, make_timeline
 from auto_editor.render.audio import make_new_audio
@@ -180,7 +180,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
             tl = read_json(paths[0], log)
         else:
-            sources = [initFileInfo(path, log) for path in paths]
+            sources = [FileInfo.init(path, log) for path in paths]
             src = None if not sources else sources[0]
 
     output, export_ops = set_output(args.output, args.export, src, log)

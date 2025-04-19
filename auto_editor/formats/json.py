@@ -6,7 +6,7 @@ from difflib import get_close_matches
 from fractions import Fraction
 from typing import Any
 
-from auto_editor.ffwrapper import FileInfo, initFileInfo
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.json import dump, load
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
@@ -60,7 +60,7 @@ def read_v3(tl: Any, log: Log) -> v3:
     def make_src(v: str) -> FileInfo:
         if v in srcs:
             return srcs[v]
-        temp = initFileInfo(v, log)
+        temp = FileInfo.init(v, log)
         srcs[v] = temp
         return temp
 
@@ -169,7 +169,7 @@ def read_v1(tl: Any, log: Log) -> v3:
 
     check_file(path, log)
 
-    src = initFileInfo(path, log)
+    src = FileInfo.init(path, log)
 
     vtl: VSpace = []
     atl: ASpace = [[] for _ in range(len(src.audios))]

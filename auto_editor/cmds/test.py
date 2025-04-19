@@ -14,7 +14,7 @@ from time import perf_counter
 import bv
 import numpy as np
 
-from auto_editor.ffwrapper import FileInfo, initFileInfo
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret
 from auto_editor.lang.stdenv import make_standard_env
 from auto_editor.lib.data_structs import Char
@@ -62,7 +62,7 @@ log = Log()
 
 
 def fileinfo(path: str) -> FileInfo:
-    return initFileInfo(path, log)
+    return FileInfo.init(path, log)
 
 
 def calculate_sha256(filename: str) -> str:

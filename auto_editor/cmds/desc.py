@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 
-from auto_editor.ffwrapper import initFileInfo
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -22,7 +22,7 @@ def desc_options(parser: ArgumentParser) -> ArgumentParser:
 def main(sys_args: list[str] = sys.argv[1:]) -> None:
     args = desc_options(ArgumentParser("desc")).parse_args(DescArgs, sys_args)
     for path in args.input:
-        src = initFileInfo(path, Log())
+        src = FileInfo.init(path, Log())
         if src.description is not None:
             sys.stdout.write(f"\n{src.description}\n\n")
         else:

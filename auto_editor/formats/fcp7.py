@@ -7,7 +7,7 @@ from math import ceil
 from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
-from auto_editor.ffwrapper import FileInfo, initFileInfo
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import ASpace, Template, TlAudio, TlVideo, VSpace, v3
 
 from .utils import Validator, show
@@ -282,7 +282,7 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
                     fileobj = valid.parse(clipitem["file"], {"pathurl": str})
 
                     if "pathurl" in fileobj:
-                        sources[file_id] = initFileInfo(
+                        sources[file_id] = FileInfo.init(
                             uri_to_path(fileobj["pathurl"]),
                             log,
                         )
@@ -317,7 +317,7 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
                 file_id = clipitem["file"].attrib["id"]
                 if file_id not in sources:
                     fileobj = valid.parse(clipitem["file"], {"pathurl": str})
-                    sources[file_id] = initFileInfo(
+                    sources[file_id] = FileInfo.init(
                         uri_to_path(fileobj["pathurl"]), log
                     )
 
