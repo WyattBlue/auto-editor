@@ -187,13 +187,42 @@ ALayer = list[TlAudio]
 ASpace = list[ALayer]
 
 
+@dataclass(slots=True)
+class AudioTemplate:
+    lang: str | None
+
+
+@dataclass(slots=True)
+class SubtitleTemplate:
+    lang: str | None
+
+
+@dataclass(slots=True)
+class Template:
+    sr: int
+    layout: str
+    res: tuple[int, int]
+    audios: list[AudioTemplate]
+    subtitles: list[SubtitleTemplate]
+
+    @classmethod
+    def init(self, src: FileInfo) -> Template:
+        alist = [AudioTemplate(x.lang) for x in src.audios]
+        slist = [SubtitleTemplate(x.lang) for x in src.subtitles]
+        return Template(src.get_sr(), "stereo", src.get_res(), alist, slist)
+
+
+def initTemplate(src: FileInfo) -> Template:
+    alist = [AudioTemplate(x.lang) for x in src.audios]
+    slist = [SubtitleTemplate(x.lang) for x in src.subtitles]
+    return Template(src.get_sr(), "stereo", src.get_res(), alist, slist)
+
+
 @dataclass
 class v3:
-    src: FileInfo | None  # Used as a template for timeline settings
     tb: Fraction
-    sr: int
-    res: tuple[int, int]
     background: str
+    template: Template
     v: VSpace
     a: ASpace
     v1: v1 | None  # Is it v1 compatible (linear and only one source)?
@@ -286,13 +315,26 @@ video\n"""
 
         return {
             "version": "3",
-            "resolution": self.res,
             "timebase": f"{self.tb.numerator}/{self.tb.denominator}",
-            "samplerate": self.sr,
             "background": self.background,
+            "resolution": self.T.res,
+            "samplerate": self.T.sr,
+            "layout": self.T.layout,
             "v": v,
             "a": a,
         }
+
+    @property
+    def T(self) -> Template:
+        return self.template
+
+    @property
+    def res(self) -> tuple[int, int]:
+        return self.T.res
+
+    @property
+    def sr(self) -> int:
+        return self.T.sr
 
 
 def make_tracks_dir(path: Path) -> Path:
@@ -310,9 +352,7 @@ def make_tracks_dir(path: Path) -> Path:
     return tracks_dir
 
 
-def set_stream_to_0(tl: v3, log: Log) -> None:
-    src = tl.src
-    assert src is not None
+def set_stream_to_0(src: FileInfo, tl: v3, log: Log) -> None:
     fold = make_tracks_dir(src.path)
     cache: dict[Path, FileInfo] = {}
 

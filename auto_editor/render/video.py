@@ -61,7 +61,6 @@ def render_av(
 ) -> Iterator[tuple[int, bv.VideoFrame]]:
     from_ndarray = bv.VideoFrame.from_ndarray
 
-    src = tl.src
     cns: dict[FileInfo, bv.container.InputContainer] = {}
     decoders: dict[FileInfo, Iterator[bv.VideoFrame]] = {}
     seek_cost: dict[FileInfo, int] = {}

@@ -11,7 +11,7 @@ from auto_editor.ffwrapper import FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolean_array
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
-from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v1, v3
+from auto_editor.timeline import ASpace, Template, TlAudio, TlVideo, VSpace, v1, v3
 from auto_editor.utils.func import mut_margin
 from auto_editor.utils.types import CoerceError, time
 
@@ -99,16 +99,17 @@ def parse_time(val: str, arr: NDArray, tb: Fraction) -> int:  # raises: `CoerceE
 
 
 def make_timeline(
-    sources: list[FileInfo],
-    args: Args,
-    sr: int,
-    bar: Bar,
-    log: Log,
+    sources: list[FileInfo], args: Args, sr: int, bar: Bar, log: Log
 ) -> v3:
     inp = None if not sources else sources[0]
 
     if inp is None:
-        tb, res = Fraction(30), (1920, 1080)
+        tb = (
+            Fraction(30)
+            if args.frame_rate is None
+            else make_sane_timebase(args.frame_rate)
+        )
+        res = (1920, 1080) if args.resolution is None else args.resolution
     else:
         tb = make_sane_timebase(
             inp.get_fps() if args.frame_rate is None else args.frame_rate
@@ -305,4 +306,11 @@ def make_timeline(
     if len(vtl) == 0 and len(atl) == 0:
         log.error("Timeline is empty, nothing to do.")
 
-    return v3(inp, tb, sr, res, args.background, vtl, atl, v1_compatiable)
+    if inp is None:
+        template = Template(sr, "stereo", res, [], [])
+    else:
+        template = Template.init(inp)
+        template.sr = sr
+        template.res = res
+
+    return v3(tb, args.background, template, vtl, atl, v1_compatiable)

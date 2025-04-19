@@ -347,15 +347,12 @@ def make_new_audio(
     audio_streams: list[bv.AudioStream] = []
     audio_paths = _make_new_audio(tl, audio_format, args, log)
 
-    src = tl.src
-    assert src is not None
-
     for i, audio_path in enumerate(audio_paths):
         audio_stream = output.add_stream(
             args.audio_codec,
             rate=tl.sr,
             format=audio_format,
-            layout="stereo",
+            layout=tl.T.layout,
             time_base=Fraction(1, tl.sr),
         )
         if not isinstance(audio_stream, bv.AudioStream):
@@ -366,8 +363,9 @@ def make_new_audio(
             log.debug(f"audio bitrate: {audio_stream.bit_rate}")
         else:
             log.debug(f"[auto] audio bitrate: {audio_stream.bit_rate}")
-        if i < len(src.audios) and src.audios[i].lang is not None:
-            audio_stream.metadata["language"] = src.audios[i].lang  # type: ignore
+
+        if i < len(tl.T.audios) and (lang := tl.T.audios[i].lang) is not None:
+            audio_stream.metadata["language"] = lang
 
         audio_streams.append(audio_stream)
 
