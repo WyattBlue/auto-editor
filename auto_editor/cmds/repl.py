@@ -7,7 +7,7 @@ from os import environ
 
 import auto_editor
 from auto_editor.analyze import initLevels
-from auto_editor.ffwrapper import initFileInfo
+from auto_editor.ffwrapper import FileInfo
 from auto_editor.lang.palet import ClosingError, Lexer, Parser, env, interpret
 from auto_editor.lang.stdenv import make_standard_env
 from auto_editor.lib.data_structs import print_str
@@ -56,7 +56,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
     if args.input:
         log = Log(quiet=True)
-        sources = [initFileInfo(path, log) for path in args.input]
+        sources = [FileInfo.init(path, log) for path in args.input]
         src = sources[0]
         tb = src.get_fps() if args.timebase is None else args.timebase
         env["timebase"] = tb

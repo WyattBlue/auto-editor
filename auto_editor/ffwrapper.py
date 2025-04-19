@@ -86,89 +86,93 @@ class FileInfo:
             return self.audios[0].samplerate
         return 48000
 
+    @classmethod
+    def init(self, path: str, log: Log) -> FileInfo:
+        try:
+            cont = bv.open(path, "r")
+        except bv.error.FileNotFoundError:
+            log.error(f"Input file doesn't exist: {path}")
+        except bv.error.IsADirectoryError:
+            log.error(f"Expected a media file, but got a directory: {path}")
+        except bv.error.InvalidDataError:
+            log.error(f"Invalid data when processing: {path}")
+
+        videos: tuple[VideoStream, ...] = ()
+        audios: tuple[AudioStream, ...] = ()
+        subtitles: tuple[SubtitleStream, ...] = ()
+
+        for v in cont.streams.video:
+            if v.duration is not None and v.time_base is not None:
+                vdur = float(v.duration * v.time_base)
+            else:
+                vdur = 0.0
+
+            fps = v.average_rate
+            if (fps is None or fps < 1) and v.name in {"png", "mjpeg", "webp"}:
+                fps = Fraction(25)
+            if fps is None or fps == 0:
+                fps = Fraction(30)
+
+            if v.sample_aspect_ratio is None:
+                sar = Fraction(1)
+            else:
+                sar = v.sample_aspect_ratio
+
+            cc = v.codec_context
+
+            if v.name is None:
+                log.error(f"Can't detect codec for video stream {v}")
+
+            videos += (
+                VideoStream(
+                    v.width,
+                    v.height,
+                    v.codec.canonical_name,
+                    fps,
+                    vdur,
+                    sar,
+                    v.time_base,
+                    getattr(v.format, "name", None),
+                    cc.color_range,
+                    cc.colorspace,
+                    cc.color_primaries,
+                    cc.color_trc,
+                    0 if v.bit_rate is None else v.bit_rate,
+                    v.language,
+                ),
+            )
+
+        for a in cont.streams.audio:
+            adur = 0.0
+            if a.duration is not None and a.time_base is not None:
+                adur = float(a.duration * a.time_base)
+
+            a_cc = a.codec_context
+            audios += (
+                AudioStream(
+                    a_cc.codec.canonical_name,
+                    0 if a_cc.sample_rate is None else a_cc.sample_rate,
+                    a.layout.name,
+                    a_cc.channels,
+                    adur,
+                    0 if a_cc.bit_rate is None else a_cc.bit_rate,
+                    a.language,
+                ),
+            )
+
+        for s in cont.streams.subtitles:
+            codec = s.codec_context.name
+            sub_exts = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
+            ext = sub_exts.get(codec, "vtt")
+            subtitles += (SubtitleStream(codec, ext, s.language),)
+
+        desc = cont.metadata.get("description", None)
+        bitrate = 0 if cont.bit_rate is None else cont.bit_rate
+        dur = 0 if cont.duration is None else cont.duration / bv.time_base
+
+        cont.close()
+
+        return FileInfo(Path(path), bitrate, dur, desc, videos, audios, subtitles)
+
     def __repr__(self) -> str:
         return f"@{self.path.name}"
-
-
-def initFileInfo(path: str, log: Log) -> FileInfo:
-    try:
-        cont = bv.open(path, "r")
-    except bv.error.FileNotFoundError:
-        log.error(f"Input file doesn't exist: {path}")
-    except bv.error.IsADirectoryError:
-        log.error(f"Expected a media file, but got a directory: {path}")
-    except bv.error.InvalidDataError:
-        log.error(f"Invalid data when processing: {path}")
-
-    videos: tuple[VideoStream, ...] = ()
-    audios: tuple[AudioStream, ...] = ()
-    subtitles: tuple[SubtitleStream, ...] = ()
-
-    for v in cont.streams.video:
-        if v.duration is not None and v.time_base is not None:
-            vdur = float(v.duration * v.time_base)
-        else:
-            vdur = 0.0
-
-        fps = v.average_rate
-        if (fps is None or fps < 1) and v.name in {"png", "mjpeg", "webp"}:
-            fps = Fraction(25)
-        if fps is None or fps == 0:
-            fps = Fraction(30)
-
-        sar = Fraction(1) if v.sample_aspect_ratio is None else v.sample_aspect_ratio
-        cc = v.codec_context
-
-        if v.name is None:
-            log.error(f"Can't detect codec for video stream {v}")
-
-        videos += (
-            VideoStream(
-                v.width,
-                v.height,
-                v.codec.canonical_name,
-                fps,
-                vdur,
-                sar,
-                v.time_base,
-                getattr(v.format, "name", None),
-                cc.color_range,
-                cc.colorspace,
-                cc.color_primaries,
-                cc.color_trc,
-                0 if v.bit_rate is None else v.bit_rate,
-                v.language,
-            ),
-        )
-
-    for a in cont.streams.audio:
-        adur = 0.0
-        if a.duration is not None and a.time_base is not None:
-            adur = float(a.duration * a.time_base)
-
-        a_cc = a.codec_context
-        audios += (
-            AudioStream(
-                a_cc.codec.canonical_name,
-                0 if a_cc.sample_rate is None else a_cc.sample_rate,
-                a.layout.name,
-                a_cc.channels,
-                adur,
-                0 if a_cc.bit_rate is None else a_cc.bit_rate,
-                a.language,
-            ),
-        )
-
-    for s in cont.streams.subtitles:
-        codec = s.codec_context.name
-        sub_exts = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
-        ext = sub_exts.get(codec, "vtt")
-        subtitles += (SubtitleStream(codec, ext, s.language),)
-
-    desc = cont.metadata.get("description", None)
-    bitrate = 0 if cont.bit_rate is None else cont.bit_rate
-    dur = 0 if cont.duration is None else cont.duration / bv.time_base
-
-    cont.close()
-
-    return FileInfo(Path(path), bitrate, dur, desc, videos, audios, subtitles)

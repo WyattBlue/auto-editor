@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from auto_editor.ffwrapper import initFileInfo, mux
+from auto_editor.ffwrapper import FileInfo, mux
 from auto_editor.lib.contracts import *
 from auto_editor.utils.cmdkw import Required, pAttr, pAttrs
 from auto_editor.utils.types import CoerceError, natural, number, parse_color
@@ -212,12 +212,6 @@ class Template:
         return Template(src.get_sr(), "stereo", src.get_res(), alist, slist)
 
 
-def initTemplate(src: FileInfo) -> Template:
-    alist = [AudioTemplate(x.lang) for x in src.audios]
-    slist = [SubtitleTemplate(x.lang) for x in src.subtitles]
-    return Template(src.get_sr(), "stereo", src.get_res(), alist, slist)
-
-
 @dataclass
 class v3:
     tb: Fraction
@@ -360,7 +354,7 @@ def set_stream_to_0(src: FileInfo, tl: v3, log: Log) -> None:
         newtrack = fold / f"{path.stem}_{i}.wav"
         if newtrack not in cache:
             mux(path, output=newtrack, stream=i)
-            cache[newtrack] = initFileInfo(f"{newtrack}", log)
+            cache[newtrack] = FileInfo.init(f"{newtrack}", log)
         return cache[newtrack]
 
     for alayer in tl.a:
