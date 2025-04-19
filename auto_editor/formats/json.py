@@ -11,6 +11,7 @@ from auto_editor.json import dump, load
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
     ASpace,
+    Template,
     TlAudio,
     TlVideo,
     VSpace,
@@ -151,11 +152,11 @@ def read_v3(tl: Any, log: Log) -> v3:
             a.append(a_out)
 
     try:
-        src = srcs[next(iter(srcs))]
+        T = Template.init(srcs[next(iter(srcs))])
     except StopIteration:
-        src = None
+        T = Template(sr, "stereo", res, [], [])
 
-    return v3(src, tb, sr, res, bg, v, a, v1=None)
+    return v3(tb, bg, T, v, a, v1=None)
 
 
 def read_v1(tl: Any, log: Log) -> v3:
@@ -207,11 +208,9 @@ def read_v1(tl: Any, log: Log) -> v3:
             atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
 
     return v3(
-        src,
         src.get_fps(),
-        src.get_sr(),
-        src.get_res(),
         "#000",
+        Template.init(src),
         vtl,
         atl,
         v1(src, chunks),

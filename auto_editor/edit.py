@@ -159,6 +159,7 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
 def edit_media(paths: list[str], args: Args, log: Log) -> None:
     bar = initBar(args.progress)
     tl = None
+    src = None
 
     if args.keep_tracks_separate:
         log.deprecated("--keep-tracks-separate is deprecated.")
@@ -170,29 +171,17 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             from auto_editor.formats.fcp7 import fcp7_read_xml
 
             tl = fcp7_read_xml(paths[0], log)
-            assert tl.src is not None
-            sources: list[FileInfo] = [tl.src]
-            src: FileInfo | None = tl.src
-
         elif path_ext == ".mlt":
             from auto_editor.formats.shotcut import shotcut_read_mlt
 
             tl = shotcut_read_mlt(paths[0], log)
-            assert tl.src is not None
-            sources = [tl.src]
-            src = tl.src
-
         elif path_ext == ".json":
             from auto_editor.formats.json import read_json
 
             tl = read_json(paths[0], log)
-            sources = [] if tl.src is None else [tl.src]
-            src = tl.src
         else:
             sources = [initFileInfo(path, log) for path in paths]
             src = None if not sources else sources[0]
-
-    del paths
 
     output, export_ops = set_output(args.output, args.export, src, log)
     assert "export" in export_ops
@@ -254,7 +243,8 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         from auto_editor.formats.fcp11 import fcp11_write_xml
         from auto_editor.timeline import set_stream_to_0
 
-        set_stream_to_0(tl, log)
+        assert src is not None
+        set_stream_to_0(src, tl, log)
         fcp11_write_xml(export_ops["name"], 10, output, True, tl, log)
         return
 
@@ -276,8 +266,6 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     args.audio_codec = set_audio_codec(args.audio_codec, src, out_ext, ctr, log)
 
     def make_media(tl: v3, output_path: str) -> None:
-        assert src is not None
-
         options = {}
         mov_flags = []
         if args.fragmented and not args.no_fragmented:
@@ -341,8 +329,8 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             subtitle_stream = output.add_stream_from_template(
                 subtitle_input.streams.subtitles[0]
             )
-            if i < len(src.subtitles) and src.subtitles[i].lang is not None:
-                subtitle_stream.metadata["language"] = src.subtitles[i].lang  # type: ignore
+            if i < len(tl.T.subtitles) and (lang := tl.T.subtitles[i].lang) is not None:
+                subtitle_stream.metadata["language"] = lang
 
             subtitle_streams.append(subtitle_stream)
             sub_gen_frames.append(subtitle_input.demux(subtitles=0))
@@ -514,11 +502,9 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                 tl.v1.source, [clipify(padded_chunks, tl.v1.source)]
             )
             my_timeline = v3(
-                tl.v1.source,
                 tl.tb,
-                tl.sr,
-                tl.res,
                 "#000",
+                tl.template,
                 vspace,
                 aspace,
                 v1(tl.v1.source, padded_chunks),

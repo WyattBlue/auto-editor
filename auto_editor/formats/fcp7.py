@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FileInfo, initFileInfo
-from auto_editor.timeline import ASpace, TlAudio, TlVideo, VSpace, v3
+from auto_editor.timeline import ASpace, Template, TlAudio, TlVideo, VSpace, v3
 
 from .utils import Validator, show
 
@@ -337,9 +337,11 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
                 )
 
     primary_src = sources[next(iter(sources))]
-    assert type(primary_src) is FileInfo
 
-    return v3(primary_src, tb, sr, res, "#000", vobjs, aobjs, v1=None)
+    T = Template.init(primary_src)
+    T.res = res
+    T.sr = sr
+    return v3(tb, "#000", T, vobjs, aobjs, v1=None)
 
 
 def media_def(
@@ -430,8 +432,8 @@ def premiere_write_audio(audio: Element, make_filedef, tl: v3) -> None:
     aschar = ET.SubElement(aformat, "samplecharacteristics")
     ET.SubElement(aschar, "depth").text = DEPTH
     ET.SubElement(aschar, "samplerate").text = f"{tl.sr}"
-    src = tl.src
-    assert src is not None
+
+    has_video = tl.v and tl.v[0]
     t = 0
     for aclips in tl.a:
         for channelcount in range(0, 2):  # Because "stereo" is hardcoded.
@@ -443,7 +445,7 @@ def premiere_write_audio(audio: Element, make_filedef, tl: v3) -> None:
                 premiereTrackType="Stereo",
             )
 
-            if src.videos:
+            if has_video:
                 ET.SubElement(track, "outputchannelindex").text = f"{channelcount + 1}"
 
             for j, aclip in enumerate(aclips):
@@ -454,7 +456,7 @@ def premiere_write_audio(audio: Element, make_filedef, tl: v3) -> None:
                 _in = f"{aclip.offset}"
                 _out = f"{aclip.offset + aclip.dur}"
 
-                if not src.videos:
+                if not has_video:
                     clip_item_num = j + 1
                 else:
                     clip_item_num = len(aclips) + 1 + j + (t * len(aclips))

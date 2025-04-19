@@ -59,13 +59,6 @@ def fcp11_write_xml(
             return "0s"
         return f"{val * tl.tb.denominator}/{tl.tb.numerator}s"
 
-    src = tl.src
-    assert src is not None
-
-    proj_name = src.path.stem
-    src_dur = int(src.duration * tl.tb)
-    tl_dur = src_dur if resolve else tl.out_len()
-
     if version == 11:
         ver_str = "1.11"
     elif version == 10:
@@ -76,7 +69,16 @@ def fcp11_write_xml(
     fcpxml = Element("fcpxml", version=ver_str)
     resources = SubElement(fcpxml, "resources")
 
+    src_dur = 0
+    tl_dur = 0 if resolve else tl.out_len()
+
     for i, one_src in enumerate(tl.unique_sources()):
+        if i == 0:
+            proj_name = one_src.path.stem
+            src_dur = int(one_src.duration * tl.tb)
+            if resolve:
+                tl_dur = src_dur
+
         SubElement(
             resources,
             "format",
@@ -113,7 +115,7 @@ def fcp11_write_xml(
         format="r1",
         tcStart="0s",
         tcFormat="NDF",
-        audioLayout="mono" if src.audios and src.audios[0].channels == 1 else "stereo",
+        audioLayout=tl.T.layout,
         audioRate="44.1k" if tl.sr == 44100 else "48k",
     )
     spine = SubElement(sequence, "spine")
