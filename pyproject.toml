@@ -5,7 +5,7 @@ requires = ["setuptools>=77"]
 name = "auto-editor"
 description = "Auto-Editor: Effort free video editing!"
 readme = "README.md"
-license = { text = "Unlicense" }
+license = "Unlicense"
 authors = [{ name = "WyattBlue", email = "wyattblue@auto-editor.com" }]
 requires-python = ">=3.10,<3.14"
 dependencies = [
