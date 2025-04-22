@@ -347,11 +347,9 @@ video\n"""
         return self.T.sr
 
 
-def make_tracks_dir(path: Path) -> Path:
+def make_tracks_dir(tracks_dir: Path, path: Path) -> None:
     from os import mkdir
     from shutil import rmtree
-
-    tracks_dir = path.parent / f"{path.stem}_tracks"
 
     try:
         mkdir(tracks_dir)
@@ -359,14 +357,19 @@ def make_tracks_dir(path: Path) -> Path:
         rmtree(tracks_dir)
         mkdir(tracks_dir)
 
-    return tracks_dir
-
 
 def set_stream_to_0(src: FileInfo, tl: v3, log: Log) -> None:
-    fold = make_tracks_dir(src.path)
+    dir_exists = False
     cache: dict[Path, FileInfo] = {}
 
     def make_track(i: int, path: Path) -> FileInfo:
+        nonlocal dir_exists
+
+        fold = path.parent / f"{path.stem}_tracks"
+        if not dir_exists:
+            make_tracks_dir(fold, path)
+            dir_exists = True
+
         newtrack = fold / f"{path.stem}_{i}.wav"
         if newtrack not in cache:
             mux(path, output=newtrack, stream=i)
