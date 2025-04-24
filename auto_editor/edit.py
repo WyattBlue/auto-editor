@@ -5,6 +5,7 @@ import sys
 from fractions import Fraction
 from heapq import heappop, heappush
 from os.path import splitext
+from pathlib import Path
 from subprocess import run
 from typing import TYPE_CHECKING, Any
 
@@ -28,14 +29,14 @@ if TYPE_CHECKING:
 
 
 def set_output(
-    out: str | None, _export: str | None, src: FileInfo | None, log: Log
+    out: str | None, _export: str | None, path: Path | None, log: Log
 ) -> tuple[str, dict[str, Any]]:
-    if src is None:
+    if path is None:
         root, ext = "out", ".mp4"
     else:
-        root, ext = splitext(src.path if out is None else out)
+        root, ext = splitext(path if out is None else out)
         if ext == "":
-            ext = src.path.suffix
+            ext = path.suffix
 
     if _export is None:
         if ext == ".xml":
@@ -158,8 +159,7 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
 
 def edit_media(paths: list[str], args: Args, log: Log) -> None:
     bar = initBar(args.progress)
-    tl = None
-    src = None
+    tl = src = use_path = None
 
     if args.keep_tracks_separate:
         log.deprecated("--keep-tracks-separate is deprecated.")
@@ -180,10 +180,11 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
             tl = read_json(paths[0], log)
         else:
+            use_path = Path(paths[0])
             sources = [FileInfo.init(path, log) for path in paths]
-            src = None if not sources else sources[0]
+            src = sources[0]
 
-    output, export_ops = set_output(args.output, args.export, src, log)
+    output, export_ops = set_output(args.output, args.export, use_path, log)
     assert "export" in export_ops
     export = export_ops["export"]
 
