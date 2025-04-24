@@ -31,12 +31,16 @@ if TYPE_CHECKING:
 def set_output(
     out: str | None, _export: str | None, path: Path | None, log: Log
 ) -> tuple[str, dict[str, Any]]:
-    if out is None and path is None:
-        root, ext = "out", ".mp4"
+    if out is None:
+        if path is None:
+            log.error("`--output` must be set.")  # When a timeline file is the input.
+        root, ext = splitext(path)
     else:
-        root, ext = splitext(path if out is None else out)
-        if ext == "":
-            ext = path.suffix
+        root, ext = splitext(out)
+
+    if ext == "":
+        # Use `mp4` as the default, because it is most compatible.
+        ext = ".mp4" if path is None else path.suffix
 
     if _export is None:
         if ext == ".xml":
@@ -180,9 +184,9 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
             tl = read_json(paths[0], log)
         else:
-            use_path = Path(paths[0])
             sources = [FileInfo.init(path, log) for path in paths]
             src = sources[0]
+            use_path = src.path
 
     output, export_ops = set_output(args.output, args.export, use_path, log)
     assert "export" in export_ops
