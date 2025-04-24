@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 def set_output(
     out: str | None, _export: str | None, path: Path | None, log: Log
 ) -> tuple[str, dict[str, Any]]:
-    if path is None:
+    if out is None and path is None:
         root, ext = "out", ".mp4"
     else:
         root, ext = splitext(path if out is None else out)
