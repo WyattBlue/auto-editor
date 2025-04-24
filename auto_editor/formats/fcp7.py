@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from fractions import Fraction
-from io import StringIO
 from math import ceil
 from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
@@ -29,59 +28,20 @@ DEPTH = "16"
 
 
 def uri_to_path(uri: str) -> str:
-    def de_norm(s: str) -> str:
-        uri_escape = {
-            "3C": "<",
-            "3E": ">",
-            "23": "#",
-            "25": "%",
-            "2B": "+",
-            "7B": "{",
-            "7D": "}",
-            "7C": "|",
-            "5C": "\\",
-            "5E": "^",
-            "7E": "~",
-            "5B": "[",
-            "5D": "]",
-            "60": "`",
-            "3F": "?",
-            "3A": ":",
-            "40": "@",
-            "3D": "=",
-            "2A": "*",
-            "29": ")",
-            "28": "(",
-            "27": "'",
-            "26": "&",
-            "24": "$",
-            "22": '"',
-            "21": "!",
-            "20": " ",
-        }
-        buf = StringIO()
-        i = 0
-        while i < len(s):
-            if s[i] == "%" and len(s) > i + 3:
-                tag = s[i + 1 : i + 3]
-                if tag in uri_escape:
-                    buf.write(uri_escape[tag])
-                    i += 3
-                else:
-                    buf.write(s[i])
-                    i += 1
-            else:
-                buf.write(s[i])
-                i += 1
-        return buf.getvalue()
+    urllib = __import__("urllib.parse", fromlist=["parse"])
 
     if uri.startswith("file://localhost/"):
-        return de_norm(uri[16:])
-    if uri.startswith("file://"):
-        if uri[9] == ":":  # Handle Windows-style paths
-            return de_norm(uri[8:])
-        return de_norm(uri[7:])
-    return uri
+        uri = uri[16:]
+    elif uri.startswith("file://"):
+        # Windows-style paths
+        if len(uri) > 8 and uri[9] == ":":
+            uri = uri[8:]
+        else:
+            uri = uri[7:]
+    else:
+        return uri
+
+    return urllib.parse.unquote(uri)
 
     # /Users/wyattblue/projects/auto-editor/example.mp4
     # file:///Users/wyattblue/projects/auto-editor/example.mp4

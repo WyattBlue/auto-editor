@@ -15,7 +15,7 @@ app.get("/blog/{*splat}", (req, res) => {
 });
 
 app.get("/options", (req, res) => {
-  res.redirect(301, "https://basswood-io.com/ref/options");
+  res.redirect(301, "https://auto-editor.com/ref/options");
 });
 
 app.use(express.static("public", {
