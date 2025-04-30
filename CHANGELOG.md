@@ -1,3 +1,12 @@
+# 27.1.1
+
+## Fixes
+ - Avoid making empty `*_tracks` directories.
+ - Require `--output` if no suitable name can be auto-selected.
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/27.1.0...27.1.1
+
+
 # 27.1.0
 
 ## Features
