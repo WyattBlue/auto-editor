@@ -97,7 +97,7 @@ class Proc:
             self.kw_contracts = None
             self.contracts = c
 
-    def __call__(self, *args: Any, **kwargs: Any):
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         lower, upper = self.arity
         amount = len(args)
         cont = self.contracts
