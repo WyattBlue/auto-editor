@@ -747,7 +747,7 @@ env.update({
 # fmt: on
 
 
-def interpret(env: Env, parser: Parser) -> list:
+def interpret(env: Env, parser: Parser) -> list[object]:
     result = []
 
     try:

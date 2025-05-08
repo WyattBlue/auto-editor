@@ -290,6 +290,7 @@ class Runner:
 
     def test_silent_threshold(self):
         with bv.open("resources/new-commentary.mp3") as container:
+            assert container.duration is not None
             assert container.duration / bv.time_base == 6.732
 
         out = self.main(
@@ -298,6 +299,7 @@ class Runner:
         out += ".mp3"
 
         with bv.open(out) as container:
+            assert container.duration is not None
             assert container.duration / bv.time_base == 6.552
 
     def test_track(self):
@@ -317,10 +319,10 @@ class Runner:
 
         self.main([path], [])
 
-    def test_premiere_named_export(self):
+    def test_premiere_named_export(self) -> None:
         self.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
 
-    def test_export_subtitles(self):
+    def test_export_subtitles(self) -> None:
         # cn = fileinfo(self.main(["resources/mov_text.mp4"], [], "movtext_out.mp4"))
 
         # assert len(cn.videos) == 1
@@ -332,7 +334,7 @@ class Runner:
         assert len(cn.audios) == 1
         assert len(cn.subtitles) == 1
 
-    def test_scale(self):
+    def test_scale(self) -> None:
         cn = fileinfo(self.main(["example.mp4"], ["--scale", "1.5"], "scale.mp4"))
         assert cn.videos[0].fps == 30
         assert cn.videos[0].width == 1920
@@ -363,7 +365,7 @@ class Runner:
     #     assert len(cn.videos) == 1
     #     assert len(cn.audios) == 2
 
-    def test_premiere(self):
+    def test_premiere(self) -> None:
         for test_name in all_files:
             if test_name == "multi-track.mov":
                 continue
@@ -379,12 +381,12 @@ class Runner:
             self.main([test_file], ["-exs"])
             self.main([test_file], ["--stats"])
 
-    def test_clip_sequence(self):
+    def test_clip_sequence(self) -> None:
         for test_name in all_files:
             test_file = f"resources/{test_name}"
             self.main([test_file], ["--export_as_clip_sequence"])
 
-    def test_codecs(self):
+    def test_codecs(self) -> None:
         self.main(["example.mp4"], ["--video_codec", "h264"])
         self.main(["example.mp4"], ["--audio_codec", "ac3"])
 
@@ -512,15 +514,15 @@ class Runner:
         assert output.videos[0].pix_fmt == "yuv420p"
 
     #  Issue 280
-    def test_SAR(self):
+    def test_SAR(self) -> None:
         out = self.main(["resources/SAR-2by3.mp4"], [], "2by3_out.mp4")
         assert fileinfo(out).videos[0].sar == Fraction(2, 3)
 
-    def test_audio_norm_f(self):
-        return self.main(["example.mp4"], ["--audio-normalize", "#f"])
+    def test_audio_norm_f(self) -> None:
+        self.main(["example.mp4"], ["--audio-normalize", "#f"])
 
-    def test_audio_norm_ebu(self):
-        return self.main(
+    def test_audio_norm_ebu(self) -> None:
+        self.main(
             ["example.mp4"], ["--audio-normalize", "ebu:i=-5,lra=20,gain=5,tp=-1"]
         )
 
@@ -536,11 +538,14 @@ class Runner:
                 except MyError as e:
                     raise ValueError(f"{text}\nMyError: {e}")
 
+                result_val = results[-1]
                 if isinstance(expected, np.ndarray):
-                    if not np.array_equal(expected, results[-1]):
+                    if not isinstance(result_val, np.ndarray):
+                        raise ValueError(f"{text}: Result is not an ndarray")
+                    if not np.array_equal(expected, result_val):
                         raise ValueError(f"{text}: Numpy arrays don't match")
-                elif expected != results[-1]:
-                    raise ValueError(f"{text}: Expected: {expected}, got {results[-1]}")
+                elif expected != result_val:
+                    raise ValueError(f"{text}: Expected: {expected}, got {result_val}")
 
         cases(
             ("345", 345),
@@ -675,7 +680,7 @@ class Runner:
             ('#(#("sym" "symbol?") "bool?")', [["sym", "symbol?"], "bool?"]),
         )
 
-    def palet_scripts(self):
+    def palet_scripts(self) -> None:
         self.raw(["palet", "resources/scripts/scope.pal"])
         self.raw(["palet", "resources/scripts/maxcut.pal"])
         self.raw(["palet", "resources/scripts/case.pal"])
