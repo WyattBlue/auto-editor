@@ -89,17 +89,19 @@ class AutoEditorGUI:
             drag_frame, 
             text="添加文件", 
             command=self.browse_files,
-            font=('Arial', 10),
+            font=('Arial', 10, 'bold'),  # 加粗文字
             bg="#5A9AE2",
             fg="white",
             activebackground="#3A80D2",
             activeforeground="white",
             highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
             highlightcolor="#3A80D2",       # 确保点击时颜色变化
-            borderwidth=1,                  # 确保按钮有边框
+            highlightthickness=2,           # 增加高亮边框厚度
+            bd=0,                           # 减少边框对颜色的影响
+            borderwidth=1,                  # 保持边框可见
             padx=10,
             pady=5,
-            relief=tk.RAISED
+            relief=tk.FLAT                  # 使用扁平风格提高颜色显示一致性
         )
         add_button.pack(pady=5)
         
@@ -108,17 +110,19 @@ class AutoEditorGUI:
             drag_frame, 
             text="添加文件夹", 
             command=self.browse_folder,
-            font=('Arial', 10),
+            font=('Arial', 10, 'bold'),  # 加粗文字
             bg="#5A9AE2",
             fg="white",
             activebackground="#3A80D2",
             activeforeground="white",
             highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
             highlightcolor="#3A80D2",       # 确保点击时颜色变化
-            borderwidth=1,                  # 确保按钮有边框
+            highlightthickness=2,           # 增加高亮边框厚度
+            bd=0,                           # 减少边框对颜色的影响
+            borderwidth=1,                  # 保持边框可见
             padx=10,
             pady=5,
-            relief=tk.RAISED
+            relief=tk.FLAT                  # 使用扁平风格提高颜色显示一致性
         )
         add_folder_button.pack(pady=5)
     
@@ -137,17 +141,19 @@ class AutoEditorGUI:
             toolbar, 
             text="移除选中", 
             command=self.remove_selected,
-            font=('Arial', 10),
+            font=('Arial', 10, 'bold'),  # 加粗文字
             bg="#5A9AE2",
             fg="white",
             activebackground="#3A80D2",
             activeforeground="white",
             highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
             highlightcolor="#3A80D2",       # 确保点击时颜色变化
-            borderwidth=1,                  # 确保按钮有边框
+            highlightthickness=2,           # 增加高亮边框厚度
+            bd=0,                           # 减少边框对颜色的影响
+            borderwidth=1,                  # 保持边框可见
             padx=10,
             pady=5,
-            relief=tk.RAISED
+            relief=tk.FLAT                  # 使用扁平风格提高颜色显示一致性
         )
         remove_button.pack(side=tk.LEFT, padx=5)
         
@@ -155,17 +161,19 @@ class AutoEditorGUI:
             toolbar, 
             text="清空列表", 
             command=self.clear_list,
-            font=('Arial', 10),
+            font=('Arial', 10, 'bold'),  # 加粗文字
             bg="#5A9AE2",
             fg="white",
             activebackground="#3A80D2",
             activeforeground="white",
             highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
             highlightcolor="#3A80D2",       # 确保点击时颜色变化
-            borderwidth=1,                  # 确保按钮有边框
+            highlightthickness=2,           # 增加高亮边框厚度
+            bd=0,                           # 减少边框对颜色的影响
+            borderwidth=1,                  # 保持边框可见
             padx=10,
             pady=5,
-            relief=tk.RAISED
+            relief=tk.FLAT                  # 使用扁平风格提高颜色显示一致性
         )
         clear_button.pack(side=tk.LEFT, padx=5)
         
@@ -310,10 +318,12 @@ class AutoEditorGUI:
             activeforeground="white",
             highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
             highlightcolor="#3A80D2",       # 确保点击时颜色变化
+            highlightthickness=2,           # 增加高亮边框厚度
+            bd=0,                           # 减少边框对颜色的影响
             padx=25,
             pady=10,
-            relief=tk.RAISED,
-            borderwidth=2
+            relief=tk.FLAT,                 # 使用扁平风格提高颜色显示一致性
+            borderwidth=1                   # 确保有边框
         )
         self.process_button.pack(side=tk.RIGHT, padx=10)
         
@@ -323,17 +333,19 @@ class AutoEditorGUI:
             text="停止处理", 
             command=self.stop_processing_command, 
             state=tk.DISABLED,
-            font=('Arial', 12),
+            font=('Arial', 12, 'bold'),
             bg="#E75C4C",
             fg="white",
             activebackground="#C0392B",
             activeforeground="white",
             highlightbackground="#E75C4C",  # 确保macOS上按钮有颜色
             highlightcolor="#C0392B",       # 确保点击时颜色变化
+            highlightthickness=2,           # 增加高亮边框厚度
+            bd=0,                           # 减少边框对颜色的影响
             padx=25,
             pady=10,
-            relief=tk.RAISED,
-            borderwidth=2
+            relief=tk.FLAT,                 # 使用扁平风格提高颜色显示一致性
+            borderwidth=1                   # 确保有边框
         )
         self.stop_button.pack(side=tk.RIGHT, padx=10)
 
