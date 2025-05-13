@@ -45,7 +45,7 @@ class AutoEditorGUI:
         # 创建文件列表区域
         self.create_file_list_area()
         
-        # 创建参数设置区域
+        # 创建参数设置区域1
         self.create_parameter_settings()
         
         # 创建日志区域
