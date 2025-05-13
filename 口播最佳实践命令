@@ -1,0 +1,2 @@
+(auto-editor) klxhans@KLXdeMacBook-Air-6 auto-editor % auto-editor '/Users/klxhans/Downloads/5.3 情感内容/1/5月3日 (1).mp4' --output '/Users/klxhans/Downloads/5.3 情感内容/1/5月3日 (1)-output.mp4' --margin 0.2sec --edit audio:threshold=0.02
+
