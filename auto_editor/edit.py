@@ -211,6 +211,15 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
     if tl is None:
         tl = make_timeline(sources, args, samplerate, bar, log)
+    else:
+        if args.resolution is not None:
+            tl.T.res = args.resolution
+        if args.background is not None:
+            tl.background = args.background
+        if args.frame_rate is not None:
+            log.warning(
+                "Setting timebase/framerate is not supported when importing timelines"
+            )
 
     if export == "timeline":
         from auto_editor.formats.json import make_json_timeline
@@ -522,7 +531,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
     log.stop_timer()
 
-    if not args.no_open and export in {"default", "audio"}:
+    if not args.no_open and export == "default":
         if args.player is None:
             if sys.platform == "win32":
                 try:

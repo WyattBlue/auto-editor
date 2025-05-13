@@ -4,25 +4,26 @@ import os
 import sys
 from difflib import get_close_matches
 from fractions import Fraction
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.json import dump, load
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
-    ASpace,
     Template,
     TlAudio,
     TlVideo,
-    VSpace,
     audio_builder,
     v1,
     v3,
     visual_objects,
 )
 from auto_editor.utils.cmdkw import ParserError, Required, pAttrs
-from auto_editor.utils.log import Log
 from auto_editor.utils.types import CoerceError
+
+if TYPE_CHECKING:
+    from auto_editor.timeline import ASpace, VSpace
+    from auto_editor.utils.log import Log
 
 """
 Make a pre-edited file reference that can be inputted back into auto-editor.
@@ -218,11 +219,13 @@ def read_v1(tl: Any, log: Log) -> v3:
 
 
 def read_json(path: str, log: Log) -> v3:
-    with open(path, encoding="utf-8", errors="ignore") as f:
-        try:
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             tl = load(path, f)
-        except MyError as e:
-            log.error(e)
+    except FileNotFoundError:
+        log.error(f"File not found: {path}")
+    except MyError as e:
+        log.error(e)
 
     check_attrs(tl, log, "version")
 
