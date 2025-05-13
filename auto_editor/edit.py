@@ -45,7 +45,7 @@ def set_output(
     if _export is None:
         match ext:
             case ".xml":
-                export = {"export": "premiere"}
+                export: dict[str, Any] = {"export": "premiere"}
             case ".fcpxml":
                 export = {"export": "final-cut-pro"}
             case ".mlt":
@@ -64,7 +64,6 @@ def set_output(
         "resolve": ".fcpxml",
         "shotcut": ".mlt",
         "json": ".json",
-        "audio": ".wav",
     }
     if export["export"] in ext_map:
         ext = ext_map[export["export"]]
@@ -139,15 +138,14 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
     parsing: dict[str, pAttrs] = {
         "default": pAttrs("default"),
         "premiere": pAttrs("premiere", name_attr),
-        "resolve-fcp7": pAttrs("resolve-fcp7", name_attr),
         "final-cut-pro": pAttrs(
             "final-cut-pro", name_attr, pAttr("version", 11, is_int)
         ),
         "resolve": pAttrs("resolve", name_attr),
+        "resolve-fcp7": pAttrs("resolve-fcp7", name_attr),
         "shotcut": pAttrs("shotcut"),
         "json": pAttrs("json", pAttr("api", 3, is_int)),
         "timeline": pAttrs("json", pAttr("api", 3, is_int)),
-        "audio": pAttrs("audio"),
         "clip-sequence": pAttrs("clip-sequence"),
     }
 
@@ -159,7 +157,8 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
         except ParserError as e:
             log.error(e)
 
-    log.error(f"'{name}': Export must be [{', '.join([s for s in parsing.keys()])}]")
+    valid_choices = " ".join(f'"{s}"' for s in parsing.keys())
+    log.error(f'Invalid export format: "{name}"\nValid choices: {valid_choices}')
 
 
 def edit_media(paths: list[str], args: Args, log: Log) -> None:
