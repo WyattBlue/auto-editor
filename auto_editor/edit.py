@@ -43,16 +43,17 @@ def set_output(
         ext = ".mp4" if path is None else path.suffix
 
     if _export is None:
-        if ext == ".xml":
-            export = {"export": "premiere"}
-        elif ext == ".fcpxml":
-            export = {"export": "final-cut-pro"}
-        elif ext == ".mlt":
-            export = {"export": "shotcut"}
-        elif ext == ".json":
-            export = {"export": "json"}
-        else:
-            export = {"export": "default"}
+        match ext:
+            case ".xml":
+                export = {"export": "premiere"}
+            case ".fcpxml":
+                export = {"export": "final-cut-pro"}
+            case ".mlt":
+                export = {"export": "shotcut"}
+            case ".json":
+                export = {"export": "json", "api": 1}
+            case _:
+                export = {"export": "default"}
     else:
         export = parse_export(_export, log)
 
