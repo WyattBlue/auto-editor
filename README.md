@@ -1,167 +1,97 @@
-<p align="center"><img src="https://auto-editor.com/img/auto-editor-banner.webp" title="Auto-Editor" width="700"></p>
+# Auto-Editor GUI
 
-**Auto-Editor** is a command line application for automatically **editing video and audio** by analyzing a variety of methods, most notably audio loudness.
+这是 [Auto-Editor](https://github.com/WyattBlue/auto-editor) 的图形用户界面版本，旨在为用户提供一个友好、简单的操作界面，使视频编辑过程更加便捷。
+
+![Auto-Editor GUI截图](resources/screenshot.png)
+
+## 主要特性
+
+- **直观的图形界面**：无需记忆命令行参数，所有功能都可通过界面操作完成
+- **批量处理**：支持同时处理多个视频文件
+- **拖放支持**：直接将视频文件拖入应用中进行处理
+- **参数可视化设置**：通过界面轻松调整所有编辑参数
+- **实时日志**：处理过程中实时查看进度和状态
+- **深色主题**：舒适的视觉体验
+
+## 安装说明
+
+### 前提条件
+
+- Python 3.7+
+- 已安装 [auto-editor](https://github.com/WyattBlue/auto-editor)
+
+### 方法一：从源码安装
+
+1. 克隆仓库：
+   ```
+   git clone https://github.com/99hansling/auto-editor-gui.git
+   cd auto-editor-gui
+   ```
+
+2. 安装依赖：
+   ```
+   pip install -r requirements.txt
+   ```
+
+3. 运行应用：
+   ```
+   python auto_editor_gui.py
+   ```
+
+### 方法二：使用预编译版本
+
+1. 在[发布页面](https://github.com/99hansling/auto-editor-gui/releases)下载最新版本
+2. 解压并运行可执行文件
+
+## 使用指南
+
+1. **添加视频**：点击"添加文件"或将视频拖放到界面中
+2. **设置参数**：
+   - 边距(margin)：设置保留的静音部分长度
+   - 音频阈值(threshold)：检测声音的灵敏度
+   - 有声部分速度：正常部分的播放速度
+   - 静音部分速度：静音部分的播放速度
+   - 输出文件后缀：处理后文件的命名方式
+
+3. **开始处理**：点击"开始处理"按钮，应用将自动处理所有添加的视频
+
+## 常见问题
+
+**Q: 为什么我无法使用拖放功能？**  
+A: 确保已安装tkinterdnd2库，可以使用`pip install tkinterdnd2`安装。
+
+**Q: 处理速度受哪些因素影响？**  
+A: 处理速度主要取决于视频长度、分辨率以及您的计算机性能。
+
+## 致谢
+
+本项目基于 [WyattBlue/auto-editor](https://github.com/WyattBlue/auto-editor) 开发，感谢原作者开发的出色工具。GUI界面由@99hansling开发。
+
+## 贡献指南
+
+欢迎提交问题报告和功能建议！如果您想为项目做出贡献，请：
+
+1. Fork本仓库
+2. 创建您的特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交您的更改 (`git commit -m '添加一些很棒的功能'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 开启一个Pull Request
+
+## 许可证
+
+本项目采用Unlicense许可证 - 查看[LICENSE](LICENSE)文件了解更多信息。
 
 ---
 
-[![Actions Status](https://github.com/wyattblue/auto-editor/workflows/build/badge.svg)](https://github.com/wyattblue/auto-editor/actions)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+## 命令行参数参考
 
-Before doing the real editing, you first cut out the "dead space" which is typically silence. This is known as a "first pass". Cutting these is a boring task, especially if the video is very long.
+Auto-Editor GUI支持auto-editor的所有功能，以下是一些常用参数的说明：
 
-```
-auto-editor path/to/your/video.mp4
-```
+### 基本参数
 
-<h2 align="center">Installing</h2>
+- **边距(margin)**：在有声部分前后添加多少秒的静音部分
+- **音频阈值(threshold)**：音频必须超过此音量才被认为是"有声"部分
+- **有声部分速度(video-speed)**：保留部分的播放速度
+- **静音部分速度(silent-speed)**：静音部分的播放速度
 
-```
-pip install auto-editor
-```
-
-See [Installing](https://auto-editor.com/installing) for additional information.
-
-
-<h2 align="center">Cutting</h2>
-
-Change the **pace** of the edited video by using `--margin`.
-
-`--margin` adds in some "silent" sections to make the editing feel nicer.
-
-```
-# Add 0.2 seconds of padding before and after to make the edit nicer.
-# `0.2s` is the default value for `--margin`
-auto-editor example.mp4 --margin 0.2sec
-
-# Add 0.3 seconds of padding before, 1.5 seconds after
-auto-editor example.mp4 --margin 0.3s,1.5sec
-```
-
-### Methods for Making Automatic Cuts
-The `--edit` option is how auto-editor makes automated cuts.
-
-For example, edit out motionlessness in a video by setting `--edit motion`.
-
-```
-# cut out sections where the total motion is less than 2%.
-auto-editor example.mp4 --edit motion:threshold=0.02
-
-# `--edit audio:threshold=0.04,stream=all` is used by defaut.
-auto-editor example.mp4
-
-# Different tracks can be set with different attribute.
-auto-editor multi-track.mov --edit "(or audio:stream=0 audio:threshold=10%,stream=1)"
-```
-
-Different editing methods can be used together.
-```
-# 'threshold' is always the first argument for edit-method objects
-auto-editor example.mp4 --edit "(or audio:0.03 motion:0.06)"
-```
-
-You can also use `dB` unit, a volume unit familiar to video-editors (case sensitive):
-```
-auto-editor example.mp4 --edit audio:-19dB
-auto-editor example.mp4 --edit audio:-7dB
-auto-editor example.mp4 --edit motion:-19dB
-```
-
-### See What Auto-Editor Cuts Out
-To export what auto-editor normally cuts out. Set `--video-speed` to `99999` and `--silent-speed` to `1`. This is the reverse of the usual default values.  
-
-```
-auto-editor example.mp4 --video-speed 99999 --silent-speed 1
-```
-
-<h2 align="center">Exporting to Editors</h2>
-
-Create an XML file that can be imported to Adobe Premiere Pro using this command:
-
-```
-auto-editor example.mp4 --export premiere
-```
-
-Auto-Editor can also export to:
-- DaVinci Resolve with `--export resolve`
-- Final Cut Pro with `--export final-cut-pro`
-- ShotCut with `--export shotcut`
-- Individual media clips with `--export clip-sequence`
-
-### Naming Timelines
-Some editors support naming timelines. By default, auto-editor will use the name "Auto-Editor Media Group". For `premiere` `resolve` and `final-cut-pro` export options, you can change the name with the following syntax.
-
-```
-# for POSIX shells
-auto-editor example.mp4 --export 'premiere:name="Your name here"'
-
-# for Powershell
-auto-editor example.mp4 --export 'premiere:name=""Your name here""'
-```
-
-### Split by Clip
-
-If you want to split the clips, but don't want auto-editor to do any more editing. There's a simple command.
-```
-auto-editor example.mp4 --silent-speed 1 --video-speed 1 --export premiere
-```
-
-<h2 align="center">Manual Editing</h2>
-
-Use the `--cut-out` option to always remove a section.
-
-```
-# Cut out the first 30 seconds.
-auto-editor example.mp4 --cut-out 0,30sec
-
-# Cut out the first 30 frames.
-auto-editor example.mp4 --cut-out 0,30
-
-# Always leave in the first 30 seconds.
-auto-editor example.mp4 --add-in 0,30sec
-
-# Cut out the last 10 seconds.
-auto-editor example.mp4 --cut-out -10sec,end
-
-# You can do multiple at once.
-auto-editor example.mp4 --cut-out 0,10 15sec,20sec
-auto-editor example.mp4 --add-in 30sec,40sec 120,150sec
-```
-
-And of course, you can use any `--edit` configuration.
-
-If you don't want **any automatic cuts**, you can use `--edit none` or `--edit all/e`
-
-```
-# Cut out the first 5 seconds, leave the rest untouched.
-auto-editor example.mp4 --edit none --cut-out 0,5sec
-
-# Leave in the first 5 seconds, cut everything else out.
-auto-editor example.mp4 --edit all/e --add-in 0,5sec
-```
-
-<h2 align="center">More Options</h2>
-
-List all available options:
-
-```
-auto-editor --help
-```
-
-Use `--help` with a specific option to learn more about it:
-
-```
-auto-editor -c:v --help
-auto-editor --margin --help
-```
-
-<h3 align="center">Auto-Editor is available on all major platforms</h3>
-<p align="center"><img src="https://auto-editor.com/img/cross-platform.webp" width="500" title="Windows, MacOS, and Linux"></p>
-
-## Articles
- - [How to Install Auto-Editor](https://auto-editor.com/installing)
- - [All the Options (And What They Do)](https://auto-editor.com/ref/options)
- - [Docs](https://auto-editor.com/docs)
- - [Blog](https://basswood-io.com/blog/)
-
-## Copyright
-Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all directories besides the ones listed below. Auto-Editor was created by [these people.](https://auto-editor.com/blog/thank-you-early-testers)
+有关更多详细信息，请参阅[Auto-Editor文档](https://github.com/WyattBlue/auto-editor/blob/master/README.md)

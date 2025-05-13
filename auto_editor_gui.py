@@ -86,39 +86,39 @@ class AutoEditorGUI:
         
         # 添加文件按钮 - 使用明确的颜色设置
         add_button = tk.Button(
-                drag_frame, 
-                text="添加文件", 
-                command=self.browse_files,
-                font=('Arial', 10, 'bold'),
-                bg="#5A9AE2",
-                fg="white",
-                activebackground="#3A80D2",
-                activeforeground="white",
-                highlightbackground="#5A9AE2",
-                highlightcolor="#3A80D2",
-                padx=10,
-                pady=5,
-                relief=tk.RAISED,
-                bd=1
+            drag_frame, 
+            text="添加文件", 
+            command=self.browse_files,
+            font=('Arial', 10),
+            bg="#5A9AE2",
+            fg="white",
+            activebackground="#3A80D2",
+            activeforeground="white",
+            highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
+            highlightcolor="#3A80D2",       # 确保点击时颜色变化
+            borderwidth=1,                  # 确保按钮有边框
+            padx=10,
+            pady=5,
+            relief=tk.RAISED
         )
         add_button.pack(pady=5)
         
         # 添加文件夹按钮
         add_folder_button = tk.Button(
-                drag_frame, 
-                text="添加文件夹", 
-                command=self.browse_folder,
-                font=('Arial', 10, 'bold'),
-                bg="#5A9AE2",
-                fg="white",
-                activebackground="#3A80D2",
-                activeforeground="white",
-                highlightbackground="#5A9AE2",
-                highlightcolor="#3A80D2",
-                padx=10,
-                pady=5,
-                relief=tk.RAISED,
-                bd=1
+            drag_frame, 
+            text="添加文件夹", 
+            command=self.browse_folder,
+            font=('Arial', 10),
+            bg="#5A9AE2",
+            fg="white",
+            activebackground="#3A80D2",
+            activeforeground="white",
+            highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
+            highlightcolor="#3A80D2",       # 确保点击时颜色变化
+            borderwidth=1,                  # 确保按钮有边框
+            padx=10,
+            pady=5,
+            relief=tk.RAISED
         )
         add_folder_button.pack(pady=5)
     
@@ -134,20 +134,20 @@ class AutoEditorGUI:
         
         # 添加移除选中和清空列表按钮
         remove_button = tk.Button(
-                toolbar, 
-                text="移除选中", 
-                command=self.remove_selected,
-                font=('Arial', 10, 'bold'),
-                bg="#5A9AE2",
-                fg="white",
-                activebackground="#3A80D2",
-                activeforeground="white",
-                highlightbackground="#5A9AE2",
-                highlightcolor="#3A80D2",
-                padx=10,
-                pady=5,
-                relief=tk.RAISED,
-                bd=1
+            toolbar, 
+            text="移除选中", 
+            command=self.remove_selected,
+            font=('Arial', 10),
+            bg="#5A9AE2",
+            fg="white",
+            activebackground="#3A80D2",
+            activeforeground="white",
+            highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
+            highlightcolor="#3A80D2",       # 确保点击时颜色变化
+            borderwidth=1,                  # 确保按钮有边框
+            padx=10,
+            pady=5,
+            relief=tk.RAISED
         )
         remove_button.pack(side=tk.LEFT, padx=5)
         
@@ -155,17 +155,17 @@ class AutoEditorGUI:
             toolbar, 
             text="清空列表", 
             command=self.clear_list,
-            font=('Arial', 10, 'bold'),
+            font=('Arial', 10),
             bg="#5A9AE2",
             fg="white",
             activebackground="#3A80D2",
             activeforeground="white",
-            highlightbackground="#5A9AE2",
-            highlightcolor="#3A80D2",
+            highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
+            highlightcolor="#3A80D2",       # 确保点击时颜色变化
+            borderwidth=1,                  # 确保按钮有边框
             padx=10,
             pady=5,
-            relief=tk.RAISED,
-            bd=1
+            relief=tk.RAISED
         )
         clear_button.pack(side=tk.LEFT, padx=5)
         
@@ -300,40 +300,40 @@ class AutoEditorGUI:
         
         # 处理按钮 - 明显的样式
         self.process_button = tk.Button(
-                button_frame, 
-                text="开始处理", 
-                command=self.start_processing,
-                font=('Arial', 12, 'bold'),
-                bg="#5A9AE2",
-                fg="white",
-                activebackground="#3A80D2",
-                activeforeground="white",
-                highlightbackground="#5A9AE2",
-                highlightcolor="#3A80D2",
-                padx=25,
-                pady=10,
-                relief=tk.RAISED,
-                borderwidth=2
+            button_frame, 
+            text="开始处理", 
+            command=self.start_processing,
+            font=('Arial', 12, 'bold'),
+            bg="#5A9AE2",
+            fg="white",
+            activebackground="#3A80D2",
+            activeforeground="white",
+            highlightbackground="#5A9AE2",  # 确保macOS上按钮有颜色
+            highlightcolor="#3A80D2",       # 确保点击时颜色变化
+            padx=25,
+            pady=10,
+            relief=tk.RAISED,
+            borderwidth=2
         )
         self.process_button.pack(side=tk.RIGHT, padx=10)
         
         # 停止按钮
         self.stop_button = tk.Button(
-                button_frame, 
-                text="停止处理", 
-                command=self.stop_processing_command, 
-                state=tk.DISABLED,
-                font=('Arial', 12, 'bold'),
-                bg="#E75C4C",
-                fg="white",
-                activebackground="#C0392B",
-                activeforeground="white",
-                highlightbackground="#E75C4C",
-                highlightcolor="#C0392B",
-                padx=25,
-                pady=10,
-                relief=tk.RAISED,
-                borderwidth=2
+            button_frame, 
+            text="停止处理", 
+            command=self.stop_processing_command, 
+            state=tk.DISABLED,
+            font=('Arial', 12),
+            bg="#E75C4C",
+            fg="white",
+            activebackground="#C0392B",
+            activeforeground="white",
+            highlightbackground="#E75C4C",  # 确保macOS上按钮有颜色
+            highlightcolor="#C0392B",       # 确保点击时颜色变化
+            padx=25,
+            pady=10,
+            relief=tk.RAISED,
+            borderwidth=2
         )
         self.stop_button.pack(side=tk.RIGHT, padx=10)
 
