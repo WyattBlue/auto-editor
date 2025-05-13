@@ -319,6 +319,15 @@ class Runner:
 
         self.main([path], [])
 
+    def test_res_with_v1(self):
+        v1 = self.main(["example.mp4"], ["--export", "json"], "input.json")
+        out = self.main([v1], ["-res", "720,720"], "output.mp4")
+
+        output = fileinfo(out)
+        assert output.videos[0].width == 720
+        assert output.videos[0].height == 720
+        assert len(output.audios) == 1
+
     def test_premiere_named_export(self) -> None:
         self.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
 

@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from fractions import Fraction
     from pathlib import Path
-    from typing import Any
 
     from auto_editor.ffwrapper import FileInfo
     from auto_editor.utils.chunks import Chunks
@@ -297,7 +296,7 @@ video\n"""
                 seen.add(source.path)
                 yield source
 
-    def _duration(self, layer: Any) -> int:
+    def _duration(self, layer: VSpace | ASpace) -> int:
         total_dur = 0
         for clips in layer:
             dur = 0
