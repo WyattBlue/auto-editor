@@ -165,10 +165,6 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     bar = initBar(args.progress)
     tl = src = use_path = None
 
-    if args.keep_tracks_separate:
-        log.deprecated("--keep-tracks-separate is deprecated.")
-        args.keep_tracks_separate = False
-
     if paths:
         path_ext = splitext(paths[0])[1].lower()
         if path_ext == ".xml":

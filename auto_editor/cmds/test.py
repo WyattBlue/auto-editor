@@ -307,7 +307,7 @@ class Runner:
         assert len(fileinfo(out).audios) == 2
 
     def test_export_json(self):
-        out = self.main(["example.mp4"], ["--export_as_json"], "c77130d763d40e8.json")
+        out = self.main(["example.mp4"], ["--export", "json"], "c77130d763d40e8.json")
         self.main([out], [])
 
     def test_import_v1(self):
@@ -393,11 +393,11 @@ class Runner:
     def test_clip_sequence(self) -> None:
         for test_name in all_files:
             test_file = f"resources/{test_name}"
-            self.main([test_file], ["--export_as_clip_sequence"])
+            self.main([test_file], ["--export", "clip-sequence"])
 
     def test_codecs(self) -> None:
-        self.main(["example.mp4"], ["--video_codec", "h264"])
-        self.main(["example.mp4"], ["--audio_codec", "ac3"])
+        self.main(["example.mp4"], ["--video-codec", "h264"])
+        self.main(["example.mp4"], ["--audio-codec", "ac3"])
 
     # Issue #241
     def test_multi_track_edit(self):

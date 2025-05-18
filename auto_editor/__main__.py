@@ -78,7 +78,6 @@ class Args:
     audio_layout: str | None = None
     audio_bitrate: str = "auto"
     mix_audio_streams: bool = False
-    keep_tracks_separate: bool = False
     audio_normalize: str = "#f"
 
     # Misc.
@@ -354,11 +353,6 @@ def main_options(parser: ArgumentParser) -> ArgumentParser:
         "--mix-audio-streams", flag=True, help="Mix all audio streams together into one"
     )
     parser.add_argument(
-        "--keep-tracks-separate",
-        flag=True,
-        help="Don't mix all audio streams into one when exporting (default)",
-    )
-    parser.add_argument(
         "--audio-normalize",
         metavar="NORM-TYPE",
         help="Apply audio rendering to all audio tracks. Applied right before rendering the output file",
@@ -447,9 +441,7 @@ def main() -> None:
             ({"--export-to-resolve", "-exr"}, ["--export", "resolve"]),
             ({"--export-to-final-cut-pro", "-exf"}, ["--export", "final-cut-pro"]),
             ({"--export-to-shotcut", "-exs"}, ["--export", "shotcut"]),
-            ({"--export-as-json"}, ["--export", "json"]),
             ({"--export-as-clip-sequence", "-excs"}, ["--export", "clip-sequence"]),
-            ({"--keep-tracks-seperate"}, ["--keep-tracks-separate"]),
             ({"--edit-based-on"}, ["--edit"]),
         ],
     )
