@@ -307,7 +307,9 @@ class Runner:
         assert len(fileinfo(out).audios) == 2
 
     def test_export_json(self):
-        out = self.main(["example.mp4"], ["--export", "json"], "c77130d763d40e8.json")
+        out = self.main(["example.mp4"], ["--export", "v1"], "c77130d763d40e8.json")
+        self.main([out], [])
+        out = self.main(["example.mp4"], ["--export", "v1"], "c77130d763d40e8.v1")
         self.main([out], [])
 
     def test_import_v1(self):
@@ -320,7 +322,7 @@ class Runner:
         self.main([path], [])
 
     def test_res_with_v1(self):
-        v1 = self.main(["example.mp4"], ["--export", "json"], "input.json")
+        v1 = self.main(["example.mp4"], ["--export", "v1"], "input.v1")
         out = self.main([v1], ["-res", "720,720"], "output.mp4")
 
         output = fileinfo(out)

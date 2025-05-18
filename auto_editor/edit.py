@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 def set_output(
     out: str | None, _export: str | None, path: Path | None, log: Log
 ) -> tuple[str, dict[str, Any]]:
-    if out is None:
+    if out is None or out == "-":
         if path is None:
             log.error("`--output` must be set.")  # When a timeline file is the input.
         root, ext = splitext(path)
@@ -50,8 +50,10 @@ def set_output(
                 export = {"export": "final-cut-pro"}
             case ".mlt":
                 export = {"export": "shotcut"}
-            case ".json":
+            case ".json" | ".v1":
                 export = {"export": "json", "api": 1}
+            case ".v3":
+                export = {"export": "json", "api": 3}
             case _:
                 export = {"export": "default"}
     else:
@@ -67,6 +69,9 @@ def set_output(
     }
     if export["export"] in ext_map:
         ext = ext_map[export["export"]]
+
+    if out == "-":
+        return "-", export
 
     if out is None:
         return f"{root}_ALTERED{ext}", export
@@ -134,8 +139,7 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
         name, text = exploded
 
     name_attr = pAttr("name", "Auto-Editor Media Group", is_str)
-
-    parsing: dict[str, pAttrs] = {
+    parsing = {
         "default": pAttrs("default"),
         "premiere": pAttrs("premiere", name_attr),
         "final-cut-pro": pAttrs(
@@ -144,16 +148,14 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
         "resolve": pAttrs("resolve", name_attr),
         "resolve-fcp7": pAttrs("resolve-fcp7", name_attr),
         "shotcut": pAttrs("shotcut"),
-        "json": pAttrs("json", pAttr("api", 3, is_int)),
-        "timeline": pAttrs("json", pAttr("api", 3, is_int)),
+        "v1": pAttrs("v1"),
+        "v3": pAttrs("v3"),
         "clip-sequence": pAttrs("clip-sequence"),
     }
 
     if name in parsing:
         try:
-            _tmp = parse_with_palet(text, parsing[name], {})
-            _tmp["export"] = name
-            return _tmp
+            return {"export": name} | parse_with_palet(text, parsing[name], {})
         except ParserError as e:
             log.error(e)
 
@@ -175,7 +177,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
             from auto_editor.formats.shotcut import shotcut_read_mlt
 
             tl = shotcut_read_mlt(paths[0], log)
-        elif path_ext == ".json":
+        elif path_ext in {".v1", ".v3", ".json"}:
             from auto_editor.formats.json import read_json
 
             tl = read_json(paths[0], log)
@@ -188,7 +190,8 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     assert "export" in export_ops
     export = export_ops["export"]
 
-    if export == "timeline":
+    if output == "-":
+        # When printing to stdout, silence all logs.
         log.quiet = True
 
     if not args.preview:
@@ -217,22 +220,16 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                 "Setting timebase/framerate is not supported when importing timelines"
             )
 
-    if export == "timeline":
-        from auto_editor.formats.json import make_json_timeline
-
-        make_json_timeline(export_ops["api"], 0, tl, log)
-        return
-
     if args.preview:
         from auto_editor.preview import preview
 
         preview(tl, log)
         return
 
-    if export == "json":
+    if export in {"v1", "v3"}:
         from auto_editor.formats.json import make_json_timeline
 
-        make_json_timeline(export_ops["api"], output, tl, log)
+        make_json_timeline(export, output, tl, log)
         return
 
     if export in {"premiere", "resolve-fcp7"}:
@@ -264,6 +261,8 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         shotcut_write_mlt(output, tl)
         return
 
+    if output == "-":
+        log.error("Exporting media files to stdout is not supported.")
     out_ext = splitext(output)[1].replace(".", "")
 
     # Check if export options make sense.
