@@ -51,9 +51,9 @@ def set_output(
             case ".mlt":
                 export = {"export": "shotcut"}
             case ".json" | ".v1":
-                export = {"export": "json", "api": 1}
+                export = {"export": "v1"}
             case ".v3":
-                export = {"export": "json", "api": 3}
+                export = {"export": "v3"}
             case _:
                 export = {"export": "default"}
     else:
