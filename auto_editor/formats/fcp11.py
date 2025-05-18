@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any, cast
 from xml.etree.ElementTree import Element, ElementTree, SubElement, indent
 
@@ -162,4 +163,7 @@ def fcp11_write_xml(
 
     tree = ElementTree(fcpxml)
     indent(tree, space="\t", level=0)
-    tree.write(output, xml_declaration=True, encoding="utf-8")
+    if output == "-":
+        print(ET.tostring(fcpxml, encoding="unicode"))
+    else:
+        tree.write(output, xml_declaration=True, encoding="utf-8")

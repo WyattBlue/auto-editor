@@ -542,4 +542,7 @@ def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3) -> None:
 
     tree = ET.ElementTree(xmeml)
     ET.indent(tree, space="  ", level=0)
-    tree.write(output, xml_declaration=True, encoding="utf-8")
+    if output == "-":
+        print(ET.tostring(xmeml, encoding="unicode"))
+    else:
+        tree.write(output, xml_declaration=True, encoding="utf-8")
