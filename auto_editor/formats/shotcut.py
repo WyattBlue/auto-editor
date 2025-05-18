@@ -154,4 +154,7 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
 
     ET.indent(tree, space="\t", level=0)
 
-    tree.write(output, xml_declaration=True, encoding="utf-8")
+    if output == "-":
+        print(ET.tostring(mlt, encoding="unicode"))
+    else:
+        tree.write(output, xml_declaration=True, encoding="utf-8")

@@ -71,22 +71,15 @@ This option controls how timelines are exported.
 
 Export Methods:
  - default    ; Export as a regular media file
-
  - premiere   ; Export as an XML timeline file for Adobe Premiere Pro
     - name : "Auto-Editor Media Group"
-
  - resolve    ; Export as an XML timeline file for DaVinci Resolve
     - name : "Auto-Editor Media Group"
-
  - final-cut-pro  ; Export as an XML timeline file for Final Cut Pro
     - name : "Auto-Editor Media Group"
-
- - shotcut    ; Export as an XML timeline file for Shotcut
-
- - v3         ; Export as an auto-editor v3 timeline file
-
- - v1         ; Export as an auto-editor v1 timeline file
-
+ - shotcut ; Export as an XML timeline file for Shotcut
+ - v3 ; Export as an auto-editor v3 timeline file
+ - v1 ; Export as an auto-editor v1 timeline file
  - clip-sequence  ; Export as multiple numbered media files
 
 """.strip(),
