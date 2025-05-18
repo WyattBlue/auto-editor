@@ -240,25 +240,23 @@ def read_json(path: str, log: Log) -> v3:
     log.error(f"Importing version {ver} timelines is not supported.")
 
 
-def make_json_timeline(ver: int, out: str | int, tl: v3, log: Log) -> None:
-    if ver not in {3, 1}:
-        log.error(f"Version {ver} is not supported!")
+def make_json_timeline(ver: str, out: str, tl: v3, log: Log) -> None:
+    if ver not in {"v1", "v3"}:
+        log.error(f"Unknown timeline version: {ver}")
 
-    if isinstance(out, str):
-        if not out.endswith(".json"):
-            log.error("Output extension must be .json")
-        outfile: Any = open(out, "w")
-    else:
+    if out == "-":
         outfile = sys.stdout
+    else:
+        outfile = open(out, "w")
 
-    if ver == 3:
+    if ver == "v3":
         dump(tl.as_dict(), outfile, indent=2)
     else:
         if tl.v1 is None:
             log.error("Timeline can't be converted to v1 format")
         dump(tl.v1.as_dict(), outfile, indent=2)
 
-    if isinstance(out, str):
-        outfile.close()
-    else:
+    if out == "-":
         print("")  # Flush stdout
+    else:
+        outfile.close()
