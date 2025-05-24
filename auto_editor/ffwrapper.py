@@ -66,7 +66,6 @@ class FileInfo:
     path: Path
     bitrate: int
     duration: float
-    description: str | None
     videos: tuple[VideoStream, ...]
     audios: tuple[AudioStream, ...]
     subtitles: tuple[SubtitleStream, ...]
@@ -166,13 +165,12 @@ class FileInfo:
             ext = sub_exts.get(codec, "vtt")
             subtitles += (SubtitleStream(codec, ext, s.language),)
 
-        desc = cont.metadata.get("description", None)
         bitrate = 0 if cont.bit_rate is None else cont.bit_rate
         dur = 0 if cont.duration is None else cont.duration / bv.time_base
 
         cont.close()
 
-        return FileInfo(Path(path), bitrate, dur, desc, videos, audios, subtitles)
+        return FileInfo(Path(path), bitrate, dur, videos, audios, subtitles)
 
     def __repr__(self) -> str:
         return f"@{self.path.name}"
