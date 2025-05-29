@@ -272,7 +272,7 @@ def mix_audio_files(sr: int, audio_paths: list[str], output_path: str) -> None:
     max_val = np.max(np.abs(mixed_audio))
     if max_val > 0:
         mixed_audio = mixed_audio * (32767 / max_val)
-    mixed_audio = mixed_audio.astype(np.int16)  # type: ignore
+    mixed_audio = mixed_audio.astype(np.int16)
 
     output_container = bv.open(output_path, mode="w")
     output_stream = output_container.add_stream("pcm_s16le", rate=sr)
