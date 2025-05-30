@@ -61,7 +61,7 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
     playlist_bin = ET.SubElement(mlt, "playlist", id="main_bin")
     ET.SubElement(playlist_bin, "property", name="xml_retain").text = "1"
 
-    global_out = to_timecode(tl.out_len() / tb, "standard")
+    global_out = to_timecode(len(tl) / tb, "standard")
 
     producer = ET.SubElement(mlt, "producer", id="bg")
 

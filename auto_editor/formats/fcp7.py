@@ -472,7 +472,7 @@ def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3) -> None:
         sequence = ET.SubElement(xmeml, "sequence", explodedTracks="true")
 
     ET.SubElement(sequence, "name").text = name
-    ET.SubElement(sequence, "duration").text = f"{int(tl.out_len())}"
+    ET.SubElement(sequence, "duration").text = f"{len(tl)}"
     rate = ET.SubElement(sequence, "rate")
     ET.SubElement(rate, "timebase").text = f"{timebase}"
     ET.SubElement(rate, "ntsc").text = ntsc

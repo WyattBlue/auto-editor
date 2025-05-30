@@ -68,8 +68,7 @@ def preview(tl: v3, log: Log) -> None:
     for src in all_sources:
         in_len += initLevels(src, tb, bar, False, log).media_length
 
-    out_len = tl.out_len()
-
+    out_len = len(tl)
     diff = out_len - in_len
 
     fp = sys.stdout
