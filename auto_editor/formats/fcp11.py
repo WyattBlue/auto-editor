@@ -71,7 +71,7 @@ def fcp11_write_xml(
     resources = SubElement(fcpxml, "resources")
 
     src_dur = 0
-    tl_dur = 0 if resolve else tl.out_len()
+    tl_dur = 0 if resolve else len(tl)
 
     for i, one_src in enumerate(tl.unique_sources()):
         if i == 0:

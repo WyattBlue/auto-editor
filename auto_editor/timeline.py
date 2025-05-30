@@ -296,18 +296,14 @@ video\n"""
                 seen.add(source.path)
                 yield source
 
-    def _duration(self, layer: VSpace | ASpace) -> int:
-        total_dur = 0
-        for clips in layer:
-            dur = 0
-            for clip in clips:
-                dur += clip.dur
-            total_dur = max(total_dur, dur)
-        return total_dur
+    def __len__(self) -> int:
+        result = 0
+        for clips in self.v + self.a:
+            if len(clips) > 0:
+                lastClip = clips[-1]
+                result = max(result, lastClip.start + lastClip.dur)
 
-    def out_len(self) -> int:
-        # Calculates the duration of the timeline
-        return max(self._duration(self.v), self._duration(self.a))
+        return result
 
     def as_dict(self) -> dict:
         v = []
