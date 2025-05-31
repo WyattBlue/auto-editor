@@ -17,7 +17,7 @@ from auto_editor.make_layers import clipify, make_av, make_timeline
 from auto_editor.render.audio import make_new_audio
 from auto_editor.render.subtitle import make_new_subtitles
 from auto_editor.render.video import render_av
-from auto_editor.timeline import v1, v3
+from auto_editor.timeline import set_stream_to_0, v1, v3
 from auto_editor.utils.bar import initBar
 from auto_editor.utils.chunks import Chunk, Chunks
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
@@ -170,13 +170,13 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     if paths:
         path_ext = splitext(paths[0])[1].lower()
         if path_ext == ".xml":
-            from auto_editor.formats.fcp7 import fcp7_read_xml
+            from auto_editor.imports.fcp7 import fcp7_read_xml
 
             tl = fcp7_read_xml(paths[0], log)
         elif path_ext == ".mlt":
             log.error("Reading mlt files not implemented")
         elif path_ext in {".v1", ".v3", ".json"}:
-            from auto_editor.formats.json import read_json
+            from auto_editor.imports.json import read_json
 
             tl = read_json(paths[0], log)
         else:
@@ -225,28 +225,27 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         return
 
     if export in {"v1", "v3"}:
-        from auto_editor.formats.json import make_json_timeline
+        from auto_editor.exports.json import make_json_timeline
 
         make_json_timeline(export, output, tl, log)
         return
 
     if export in {"premiere", "resolve-fcp7"}:
-        from auto_editor.formats.fcp7 import fcp7_write_xml
+        from auto_editor.exports.fcp7 import fcp7_write_xml
 
         is_resolve = export.startswith("resolve")
         fcp7_write_xml(export_ops["name"], output, is_resolve, tl)
         return
 
     if export == "final-cut-pro":
-        from auto_editor.formats.fcp11 import fcp11_write_xml
+        from auto_editor.exports.fcp11 import fcp11_write_xml
 
         ver = export_ops["version"]
         fcp11_write_xml(export_ops["name"], ver, output, False, tl, log)
         return
 
     if export == "resolve":
-        from auto_editor.formats.fcp11 import fcp11_write_xml
-        from auto_editor.timeline import set_stream_to_0
+        from auto_editor.exports.fcp11 import fcp11_write_xml
 
         assert src is not None
         set_stream_to_0(src, tl, log)
@@ -254,7 +253,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         return
 
     if export == "shotcut":
-        from auto_editor.formats.shotcut import shotcut_write_mlt
+        from auto_editor.exports.shotcut import shotcut_write_mlt
 
         shotcut_write_mlt(output, tl)
         return
