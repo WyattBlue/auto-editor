@@ -174,9 +174,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
 
             tl = fcp7_read_xml(paths[0], log)
         elif path_ext == ".mlt":
-            from auto_editor.formats.shotcut import shotcut_read_mlt
-
-            tl = shotcut_read_mlt(paths[0], log)
+            log.error("Reading mlt files not implemented")
         elif path_ext in {".v1", ".v3", ".json"}:
             from auto_editor.formats.json import read_json
 
