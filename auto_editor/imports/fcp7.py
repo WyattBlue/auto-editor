@@ -3,6 +3,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from fractions import Fraction
 from typing import TYPE_CHECKING
+from urllib.parse import unquote
 from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FileInfo
@@ -55,25 +56,20 @@ def read_filters(clipitem: Element, log: Log) -> float:
 
 
 def uri_to_path(uri: str) -> str:
-    urllib = __import__("urllib.parse", fromlist=["parse"])
+    # Handle inputs like:
+    # /Users/wyattblue/projects/auto-editor/example.mp4
+    # file:///Users/wyattblue/projects/auto-editor/example.mp4
+    # file:///C:/Users/WyattBlue/projects/auto-editor/example.mp4
+    # file://localhost/Users/wyattblue/projects/auto-editor/example.mp4
 
     if uri.startswith("file://localhost/"):
         uri = uri[16:]
     elif uri.startswith("file://"):
         # Windows-style paths
-        if len(uri) > 8 and uri[9] == ":":
-            uri = uri[8:]
-        else:
-            uri = uri[7:]
+        uri = uri[8:] if len(uri) > 8 and uri[9] == ":" else uri[7:]
     else:
         return uri
-
-    return urllib.parse.unquote(uri)
-
-    # /Users/wyattblue/projects/auto-editor/example.mp4
-    # file:///Users/wyattblue/projects/auto-editor/example.mp4
-    # file:///C:/Users/WyattBlue/projects/auto-editor/example.mp4
-    # file://localhost/Users/wyattblue/projects/auto-editor/example.mp4
+    return unquote(uri)
 
 
 def read_tb_ntsc(tb: int, ntsc: bool) -> Fraction:
