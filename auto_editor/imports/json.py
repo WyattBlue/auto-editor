@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import os
-import sys
 from difflib import get_close_matches
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.json import dump, load
+from auto_editor.json import load
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
     Template,
@@ -24,10 +23,6 @@ from auto_editor.utils.types import CoerceError
 if TYPE_CHECKING:
     from auto_editor.timeline import ASpace, VSpace
     from auto_editor.utils.log import Log
-
-"""
-Make a pre-edited file reference that can be inputted back into auto-editor.
-"""
 
 
 def check_attrs(data: object, log: Log, *attrs: str) -> None:
@@ -238,25 +233,3 @@ def read_json(path: str, log: Log) -> v3:
     if type(ver) is not str:
         log.error("version needs to be a string")
     log.error(f"Importing version {ver} timelines is not supported.")
-
-
-def make_json_timeline(ver: str, out: str, tl: v3, log: Log) -> None:
-    if ver not in {"v1", "v3"}:
-        log.error(f"Unknown timeline version: {ver}")
-
-    if out == "-":
-        outfile = sys.stdout
-    else:
-        outfile = open(out, "w")
-
-    if ver == "v3":
-        dump(tl.as_dict(), outfile, indent=2)
-    else:
-        if tl.v1 is None:
-            log.error("Timeline can't be converted to v1 format")
-        dump(tl.v1.as_dict(), outfile, indent=2)
-
-    if out == "-":
-        print("")  # Flush stdout
-    else:
-        outfile.close()

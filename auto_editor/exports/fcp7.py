@@ -7,9 +7,7 @@ from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.timeline import ASpace, Template, TlAudio, TlVideo, VSpace, v3
-
-from .utils import Validator, show
+from auto_editor.timeline import TlVideo, v3
 
 if TYPE_CHECKING:
     from auto_editor.utils.log import Log
@@ -27,28 +25,6 @@ come back the way they started.
 DEPTH = "16"
 
 
-def uri_to_path(uri: str) -> str:
-    urllib = __import__("urllib.parse", fromlist=["parse"])
-
-    if uri.startswith("file://localhost/"):
-        uri = uri[16:]
-    elif uri.startswith("file://"):
-        # Windows-style paths
-        if len(uri) > 8 and uri[9] == ":":
-            uri = uri[8:]
-        else:
-            uri = uri[7:]
-    else:
-        return uri
-
-    return urllib.parse.unquote(uri)
-
-    # /Users/wyattblue/projects/auto-editor/example.mp4
-    # file:///Users/wyattblue/projects/auto-editor/example.mp4
-    # file:///C:/Users/WyattBlue/projects/auto-editor/example.mp4
-    # file://localhost/Users/wyattblue/projects/auto-editor/example.mp4
-
-
 def set_tb_ntsc(tb: Fraction) -> tuple[int, str]:
     # See chart: https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/FrameRate/FrameRate.html#//apple_ref/doc/uid/TP30001158-TPXREF103
     if tb == Fraction(24000, 1001):
@@ -63,19 +39,6 @@ def set_tb_ntsc(tb: Fraction) -> tuple[int, str]:
         return ctb, "TRUE"
 
     return int(tb), "FALSE"
-
-
-def read_tb_ntsc(tb: int, ntsc: bool) -> Fraction:
-    if ntsc:
-        if tb == 24:
-            return Fraction(24000, 1001)
-        if tb == 30:
-            return Fraction(30000, 1001)
-        if tb == 60:
-            return Fraction(60000, 1001)
-        return tb * Fraction(999, 1000)
-
-    return Fraction(tb)
 
 
 def speedup(speed: float) -> Element:
@@ -137,167 +100,6 @@ def read_filters(clipitem: Element, log: Log) -> float:
                         return float(parms.text) / 100
 
     return 1.0
-
-
-def fcp7_read_xml(path: str, log: Log) -> v3:
-    def xml_bool(val: str) -> bool:
-        if val == "TRUE":
-            return True
-        if val == "FALSE":
-            return False
-        raise TypeError("Value must be 'TRUE' or 'FALSE'")
-
-    try:
-        tree = ET.parse(path)
-    except FileNotFoundError:
-        log.error(f"Could not find '{path}'")
-
-    root = tree.getroot()
-
-    valid = Validator(log)
-
-    valid.check(root, "xmeml")
-    valid.check(root[0], "sequence")
-    result = valid.parse(
-        root[0],
-        {
-            "name": str,
-            "duration": int,
-            "rate": {
-                "timebase": Fraction,
-                "ntsc": xml_bool,
-            },
-            "media": None,
-        },
-    )
-
-    tb = read_tb_ntsc(result["rate"]["timebase"], result["rate"]["ntsc"])
-
-    av = valid.parse(
-        result["media"],
-        {
-            "video": None,
-            "audio": None,
-        },
-    )
-
-    sources: dict[str, FileInfo] = {}
-    vobjs: VSpace = []
-    aobjs: ASpace = []
-
-    vclip_schema = {
-        "format": {
-            "samplecharacteristics": {
-                "width": int,
-                "height": int,
-            },
-        },
-        "track": {
-            "__arr": "",
-            "clipitem": {
-                "__arr": "",
-                "start": int,
-                "end": int,
-                "in": int,
-                "out": int,
-                "file": None,
-                "filter": None,
-            },
-        },
-    }
-
-    aclip_schema = {
-        "format": {"samplecharacteristics": {"samplerate": int}},
-        "track": {
-            "__arr": "",
-            "clipitem": {
-                "__arr": "",
-                "start": int,
-                "end": int,
-                "in": int,
-                "out": int,
-                "file": None,
-                "filter": None,
-            },
-        },
-    }
-
-    sr = 48000
-    res = (1920, 1080)
-
-    if "video" in av:
-        tracks = valid.parse(av["video"], vclip_schema)
-
-        if "format" in tracks:
-            width = tracks["format"]["samplecharacteristics"]["width"]
-            height = tracks["format"]["samplecharacteristics"]["height"]
-            res = width, height
-
-        for t, track in enumerate(tracks["track"]):
-            if len(track["clipitem"]) > 0:
-                vobjs.append([])
-            for i, clipitem in enumerate(track["clipitem"]):
-                file_id = clipitem["file"].attrib["id"]
-                if file_id not in sources:
-                    fileobj = valid.parse(clipitem["file"], {"pathurl": str})
-
-                    if "pathurl" in fileobj:
-                        sources[file_id] = FileInfo.init(
-                            uri_to_path(fileobj["pathurl"]),
-                            log,
-                        )
-                    else:
-                        show(clipitem["file"], 3)
-                        log.error(
-                            f"'pathurl' child element not found in {clipitem['file'].tag}"
-                        )
-
-                if "filter" in clipitem:
-                    speed = read_filters(clipitem["filter"], log)
-                else:
-                    speed = 1.0
-
-                start = clipitem["start"]
-                dur = clipitem["end"] - start
-                offset = clipitem["in"]
-
-                vobjs[t].append(
-                    TlVideo(start, dur, sources[file_id], offset, speed, stream=0)
-                )
-
-    if "audio" in av:
-        tracks = valid.parse(av["audio"], aclip_schema)
-        if "format" in tracks:
-            sr = tracks["format"]["samplecharacteristics"]["samplerate"]
-
-        for t, track in enumerate(tracks["track"]):
-            if len(track["clipitem"]) > 0:
-                aobjs.append([])
-            for i, clipitem in enumerate(track["clipitem"]):
-                file_id = clipitem["file"].attrib["id"]
-                if file_id not in sources:
-                    fileobj = valid.parse(clipitem["file"], {"pathurl": str})
-                    sources[file_id] = FileInfo.init(
-                        uri_to_path(fileobj["pathurl"]), log
-                    )
-
-                if "filter" in clipitem:
-                    speed = read_filters(clipitem["filter"], log)
-                else:
-                    speed = 1.0
-
-                start = clipitem["start"]
-                dur = clipitem["end"] - start
-                offset = clipitem["in"]
-
-                aobjs[t].append(
-                    TlAudio(
-                        start, dur, sources[file_id], offset, speed, volume=1, stream=0
-                    )
-                )
-
-    T = Template.init(sources[next(iter(sources))], sr, res=res)
-    return v3(tb, "#000", T, vobjs, aobjs, v1=None)
 
 
 def media_def(
