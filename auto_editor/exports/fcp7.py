@@ -72,36 +72,6 @@ def speedup(speed: float) -> Element:
 SUPPORTED_EFFECTS = ("timeremap",)
 
 
-def read_filters(clipitem: Element, log: Log) -> float:
-    for effect_tag in clipitem:
-        if effect_tag.tag in {"enabled", "start", "end"}:
-            continue
-        if len(effect_tag) < 3:
-            log.error("<effect> requires: <effectid> <name> and one <parameter>")
-        for i, effects in enumerate(effect_tag):
-            if i == 0 and effects.tag != "name":
-                log.error("<effect>: <name> must be first tag")
-            if i == 1 and effects.tag != "effectid":
-                log.error("<effect>: <effectid> must be second tag")
-                if effects.text not in SUPPORTED_EFFECTS:
-                    log.error(f"`{effects.text}` is not a supported effect.")
-
-            if i > 1:
-                for j, parms in enumerate(effects):
-                    if j == 0:
-                        if parms.tag != "parameterid":
-                            log.error("<parameter>: <parameterid> must be first tag")
-                        if parms.text != "speed":
-                            break
-
-                    if j > 0 and parms.tag == "value":
-                        if parms.text is None:
-                            log.error("<value>: number required")
-                        return float(parms.text) / 100
-
-    return 1.0
-
-
 def media_def(
     filedef: Element, url: str, src: FileInfo, tl: v3, tb: int, ntsc: str
 ) -> None:
