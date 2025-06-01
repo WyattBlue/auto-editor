@@ -1,3 +1,19 @@
+# 28.0.0
+
+## Major
+- Remove deprecated `--keep-tracks-separate`.
+- Remove the "audio" export format. Set the output extension to an audio format instead.
+- Replace JSON timeline export with explicit v1/v3 versions
+
+## Features
+- Set `--output/-o` to `-` to print to stdout. Supported with JSON/XML timeline formats.
+
+## Fixes
+- Use better way to calculate timeline length.
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/27.1.1...28.0.0
+
+
 # 27.1.1
 
 ## Fixes
