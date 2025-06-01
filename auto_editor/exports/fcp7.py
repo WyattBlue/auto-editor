@@ -3,14 +3,10 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from fractions import Fraction
 from math import ceil
-from typing import TYPE_CHECKING
 from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.timeline import TlVideo, v3
-
-if TYPE_CHECKING:
-    from auto_editor.utils.log import Log
 
 """
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format
@@ -67,9 +63,6 @@ def speedup(speed: float) -> Element:
     ET.SubElement(para3, "value").text = "FALSE"
 
     return fil
-
-
-SUPPORTED_EFFECTS = ("timeremap",)
 
 
 def media_def(
