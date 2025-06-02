@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 from xml.etree.ElementTree import Element, ElementTree, SubElement, indent
 
+from auto_editor.timeline import Clip, v3
+
 if TYPE_CHECKING:
-    from collections.abc import Sequence
     from fractions import Fraction
 
     from auto_editor.ffwrapper import FileInfo
-    from auto_editor.timeline import TlAudio, TlVideo, v3
     from auto_editor.utils.log import Log
 
 
@@ -121,7 +121,7 @@ def fcp11_write_xml(
     )
     spine = SubElement(sequence, "spine")
 
-    def make_clip(ref: str, clip: TlVideo | TlAudio) -> None:
+    def make_clip(ref: str, clip: Clip) -> None:
         clip_properties = {
             "name": proj_name,
             "ref": ref,
@@ -146,7 +146,7 @@ def fcp11_write_xml(
             )
 
     if tl.v and tl.v[0]:
-        clips: Sequence[TlVideo | TlAudio] = cast(Any, tl.v[0])
+        clips = cast(list[Clip], tl.v[0])
     elif tl.a and tl.a[0]:
         clips = tl.a[0]
     else:

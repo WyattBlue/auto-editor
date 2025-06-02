@@ -7,7 +7,7 @@ from urllib.parse import unquote
 from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.timeline import ASpace, Template, TlAudio, TlVideo, VSpace, v3
+from auto_editor.timeline import ASpace, Clip, Template, VSpace, v3
 
 if TYPE_CHECKING:
     from auto_editor.utils.log import Log
@@ -239,7 +239,7 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
                 offset = clipitem["in"]
 
                 vobjs[t].append(
-                    TlVideo(start, dur, sources[file_id], offset, speed, stream=0)
+                    Clip(start, dur, sources[file_id], offset, stream=0, speed=speed)
                 )
 
     if "audio" in av:
@@ -268,9 +268,7 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
                 offset = clipitem["in"]
 
                 aobjs[t].append(
-                    TlAudio(
-                        start, dur, sources[file_id], offset, speed, volume=1, stream=0
-                    )
+                    Clip(start, dur, sources[file_id], offset, stream=0, speed=speed)
                 )
 
     T = Template.init(sources[next(iter(sources))], sr, res=res)
