@@ -341,7 +341,7 @@ def make_tracks_dir(tracks_dir: Path, path: Path) -> None:
         mkdir(tracks_dir)
 
 
-def set_stream_to_0(src: FileInfo, tl: v3, log: Log) -> None:
+def set_stream_to_0(tl: v3, log: Log) -> None:
     dir_exists = False
     cache: dict[Path, FileInfo] = {}
 
