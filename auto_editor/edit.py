@@ -247,8 +247,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
     if export == "resolve":
         from auto_editor.exports.fcp11 import fcp11_write_xml
 
-        assert src is not None
-        set_stream_to_0(src, tl, log)
+        set_stream_to_0(tl, log)
         fcp11_write_xml(export_ops["name"], 10, output, True, tl, log)
         return
 
