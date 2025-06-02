@@ -6,7 +6,7 @@ from math import ceil
 from xml.etree.ElementTree import Element
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.timeline import TlVideo, v3
+from auto_editor.timeline import Clip, v3
 
 """
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format
@@ -258,7 +258,7 @@ def fcp7_write_xml(name: str, output: str, resolve: bool, tl: v3) -> None:
         track = ET.SubElement(video, "track")
 
         for j, clip in enumerate(tl.v[0]):
-            assert isinstance(clip, TlVideo)
+            assert isinstance(clip, Clip)
 
             _start = f"{clip.start}"
             _end = f"{clip.start + clip.dur}"

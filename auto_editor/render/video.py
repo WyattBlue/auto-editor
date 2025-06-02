@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import bv
 import numpy as np
 
-from auto_editor.timeline import TlImage, TlRect, TlVideo
+from auto_editor.timeline import Clip, TlImage, TlRect
 from auto_editor.utils.func import parse_bitrate
 
 if TYPE_CHECKING:
@@ -193,7 +193,7 @@ def render_av(
         obj_list: list[VideoFrame | TlRect | TlImage] = []
         for layer in tl.v:
             for lobj in layer:
-                if isinstance(lobj, TlVideo):
+                if isinstance(lobj, Clip):
                     if index >= lobj.start and index < (lobj.start + lobj.dur):
                         _i = round((lobj.offset + index - lobj.start) * lobj.speed)
                         obj_list.append(VideoFrame(_i, lobj.src))

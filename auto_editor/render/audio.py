@@ -15,7 +15,7 @@ from auto_editor.json import load
 from auto_editor.lang.palet import env
 from auto_editor.lib.contracts import andc, between_c, is_int_or_float
 from auto_editor.lib.err import MyError
-from auto_editor.timeline import TlAudio, v3
+from auto_editor.timeline import Clip, v3
 from auto_editor.utils.cmdkw import ParserError, parse_with_palet, pAttr, pAttrs
 from auto_editor.utils.func import parse_bitrate
 from auto_editor.utils.log import Log
@@ -155,7 +155,7 @@ def apply_audio_normalization(
         output_file.close()
 
 
-def process_audio_clip(clip: TlAudio, data: np.ndarray, sr: int) -> np.ndarray:
+def process_audio_clip(clip: Clip, data: np.ndarray, sr: int) -> np.ndarray:
     to_s16 = bv.AudioResampler(format="s16", layout="stereo", rate=sr)
     input_buffer = BytesIO()
 

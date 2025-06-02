@@ -38,13 +38,15 @@ class v1:
 
 
 @dataclass(slots=True)
-class TlVideo:
+class Clip:
     start: int
     dur: int
     src: FileInfo
     offset: int
-    speed: float
     stream: int
+
+    speed: float = 1.0
+    volume: float = 1.0
 
     def as_dict(self) -> dict:
         return {
@@ -54,29 +56,6 @@ class TlVideo:
             "dur": self.dur,
             "offset": self.offset,
             "speed": self.speed,
-            "stream": self.stream,
-        }
-
-
-@dataclass(slots=True)
-class TlAudio:
-    start: int
-    dur: int
-    src: FileInfo
-    offset: int
-    speed: float
-    volume: float
-    stream: int
-
-    def as_dict(self) -> dict:
-        return {
-            "name": "audio",
-            "src": self.src,
-            "start": self.start,
-            "dur": self.dur,
-            "offset": self.offset,
-            "speed": self.speed,
-            "volume": self.volume,
             "stream": self.stream,
         }
 
@@ -176,14 +155,12 @@ rect_builder = pAttrs(
 visual_objects = {
     "rect": (TlRect, rect_builder),
     "image": (TlImage, img_builder),
-    "video": (TlVideo, video_builder),
+    "video": (Clip, video_builder),
 }
 
-VLayer = list[TlVideo | TlImage | TlRect]
+VLayer = list[Clip | TlImage | TlRect]
 VSpace = list[VLayer]
-
-ALayer = list[TlAudio]
-ASpace = list[ALayer]
+ASpace = list[list[Clip]]
 
 
 @dataclass(slots=True)
@@ -248,7 +225,7 @@ video\n"""
         for i, layer in enumerate(self.v):
             result += f" v{i} "
             for obj in layer:
-                if isinstance(obj, TlVideo):
+                if isinstance(obj, Clip):
                     result += (
                         f"[#:start {obj.start} #:dur {obj.dur} #:off {obj.offset}] "
                     )
@@ -283,7 +260,7 @@ video\n"""
     def sources(self) -> Iterator[FileInfo]:
         for vclips in self.v:
             for v in vclips:
-                if isinstance(v, TlVideo):
+                if isinstance(v, Clip):
                     yield v.src
         for aclips in self.a:
             for a in aclips:
@@ -306,15 +283,26 @@ video\n"""
         return result
 
     def as_dict(self) -> dict:
+        def aclip_to_dict(self: Clip) -> dict:
+            return {
+                "name": "audio",
+                "src": self.src,
+                "start": self.start,
+                "dur": self.dur,
+                "offset": self.offset,
+                "speed": self.speed,
+                "volume": self.volume,
+                "stream": self.stream,
+            }
+
         v = []
-        for i, vlayer in enumerate(self.v):
+        a = []
+        for vlayer in self.v:
             vb = [vobj.as_dict() for vobj in vlayer]
             if vb:
                 v.append(vb)
-
-        a = []
-        for i, alayer in enumerate(self.a):
-            ab = [aobj.as_dict() for aobj in alayer]
+        for layer in self.a:
+            ab = [aclip_to_dict(clip) for clip in layer]
             if ab:
                 a.append(ab)
 

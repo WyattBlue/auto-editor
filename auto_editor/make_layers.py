@@ -11,7 +11,7 @@ from auto_editor.ffwrapper import FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret, is_boolean_array
 from auto_editor.lib.data_structs import print_str
 from auto_editor.lib.err import MyError
-from auto_editor.timeline import ASpace, Template, TlAudio, TlVideo, VSpace, v1, v3
+from auto_editor.timeline import ASpace, Clip, Template, VSpace, v1, v3
 from auto_editor.utils.func import mut_margin
 from auto_editor.utils.types import CoerceError, time
 
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     BoolList = NDArray[np.bool_]
 
 
-class Clip(NamedTuple):
+class VirClip(NamedTuple):
     start: int
     dur: int
     offset: int
@@ -34,8 +34,8 @@ class Clip(NamedTuple):
     src: FileInfo
 
 
-def clipify(chunks: Chunks, src: FileInfo, start: int = 0) -> list[Clip]:
-    clips: list[Clip] = []
+def clipify(chunks: Chunks, src: FileInfo, start: int = 0) -> list[VirClip]:
+    clips: list[VirClip] = []
     i = 0
     for chunk in chunks:
         if chunk[2] > 0 and chunk[2] < 99999.0:
@@ -46,14 +46,14 @@ def clipify(chunks: Chunks, src: FileInfo, start: int = 0) -> list[Clip]:
             offset = int(chunk[0] / chunk[2])
 
             if not (clips and clips[-1].start == round(start)):
-                clips.append(Clip(start, dur, offset, chunk[2], src))
+                clips.append(VirClip(start, dur, offset, chunk[2], src))
             start += dur
             i += 1
 
     return clips
 
 
-def make_av(src: FileInfo, all_clips: list[list[Clip]]) -> tuple[VSpace, ASpace]:
+def make_av(src: FileInfo, all_clips: list[list[VirClip]]) -> tuple[VSpace, ASpace]:
     assert type(src) is FileInfo
     vtl: VSpace = []
     atl: ASpace = [[] for _ in range(len(src.audios))]
@@ -63,11 +63,11 @@ def make_av(src: FileInfo, all_clips: list[list[Clip]]) -> tuple[VSpace, ASpace]
             if src.videos:
                 if len(vtl) == 0:
                     vtl.append([])
-                vtl[0].append(TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0))
+                vtl[0].append(Clip(c.start, c.dur, c.src, c.offset, 0, c.speed))
 
         for c in clips:
             for a in range(len(src.audios)):
-                atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
+                atl[a].append(Clip(c.start, c.dur, c.src, c.offset, a, c.speed))
 
     return vtl, atl
 
@@ -247,7 +247,7 @@ def make_timeline(
     check_monotonic = len(sources) == 1
     last_i = 0
 
-    clips: list[Clip] = []
+    clips: list[VirClip] = []
     start = 0
 
     for chunk in echunk(speed_index, src_index):
@@ -265,7 +265,7 @@ def make_timeline(
                     raise ValueError("not monotonic", sources, this_i, last_i)
                 last_i = this_i
 
-            clips.append(Clip(start, dur, offset, chunk[3], chunk[0]))
+            clips.append(VirClip(start, dur, offset, chunk[3], chunk[0]))
 
             start += dur
 
@@ -275,13 +275,13 @@ def make_timeline(
         if c.src.videos:
             if len(vtl) == 0:
                 vtl.append([])
-            vtl[0].append(TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0))
+            vtl[0].append(Clip(c.start, c.dur, c.src, c.offset, 0, c.speed))
 
     for c in clips:
         for a in range(len(c.src.audios)):
             if a >= len(atl):
                 atl.append([])
-            atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
+            atl[a].append(Clip(c.start, c.dur, c.src, c.offset, a, c.speed))
 
     # Turn long silent/loud array to formatted chunk list.
     # Example: [1, 1, 1, 2, 2], {1: 1.0, 2: 1.5} => [(0, 3, 1.0), (3, 5, 1.5)]

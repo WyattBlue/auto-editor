@@ -9,9 +9,8 @@ from auto_editor.ffwrapper import FileInfo
 from auto_editor.json import load
 from auto_editor.lib.err import MyError
 from auto_editor.timeline import (
+    Clip,
     Template,
-    TlAudio,
-    TlVideo,
     audio_builder,
     v1,
     v3,
@@ -112,7 +111,7 @@ def read_v3(tl: Any, log: Log) -> v3:
     tb = Fraction(tl["timebase"])
 
     v: Any = []
-    a: list[list[TlAudio]] = []
+    a: list[list[Clip]] = []
 
     for vlayers in tl["v"]:
         if vlayers:
@@ -141,7 +140,7 @@ def read_v3(tl: Any, log: Log) -> v3:
                     log.error(f"Unknown audio object: {adict['name']}")
 
                 try:
-                    a_out.append(TlAudio(**parse_obj(adict, audio_builder)))
+                    a_out.append(Clip(**parse_obj(adict, audio_builder)))
                 except ParserError as e:
                     log.error(e)
 
@@ -198,10 +197,10 @@ def read_v1(tl: Any, log: Log) -> v3:
         if src.videos:
             if len(vtl) == 0:
                 vtl.append([])
-            vtl[0].append(TlVideo(c.start, c.dur, c.src, c.offset, c.speed, 0))
+            vtl[0].append(Clip(c.start, c.dur, c.src, c.offset, 0, c.speed))
 
         for a in range(len(src.audios)):
-            atl[a].append(TlAudio(c.start, c.dur, c.src, c.offset, c.speed, 1, a))
+            atl[a].append(Clip(c.start, c.dur, c.src, c.offset, a, c.speed))
 
     return v3(
         src.get_fps(),
