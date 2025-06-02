@@ -21,8 +21,6 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     parser.add_argument("--json", flag=True)
     args = parser.parse_args(SubdumpArgs, sys_args)
 
-    do_filter = True
-
     if args.json:
         data = {}
         for input_file in args.input:
@@ -46,7 +44,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                     startf = round(float(start), 3)
                     endf = round(float(end), 3)
 
-                    if do_filter and endf - startf <= 0.02:
+                    if endf - startf <= 0.02:
                         continue
 
                     for sub in packet.decode():
@@ -60,7 +58,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         dump(data, sys.stdout, indent=4)
         return
 
-    for i, input_file in enumerate(args.input):
+    for input_file in args.input:
         with bv.open(input_file) as container:
             for s in range(len(container.streams.subtitles)):
                 print(f"file: {input_file} ({s}:{container.streams.subtitles[s].name})")
