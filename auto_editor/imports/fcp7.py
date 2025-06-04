@@ -213,7 +213,7 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
         for t, track in enumerate(tracks["track"]):
             if len(track["clipitem"]) > 0:
                 vobjs.append([])
-            for i, clipitem in enumerate(track["clipitem"]):
+            for clipitem in track["clipitem"]:
                 file_id = clipitem["file"].attrib["id"]
                 if file_id not in sources:
                     fileobj = parse(clipitem["file"], {"pathurl": str})
@@ -250,7 +250,7 @@ def fcp7_read_xml(path: str, log: Log) -> v3:
         for t, track in enumerate(tracks["track"]):
             if len(track["clipitem"]) > 0:
                 aobjs.append([])
-            for i, clipitem in enumerate(track["clipitem"]):
+            for clipitem in track["clipitem"]:
                 file_id = clipitem["file"].attrib["id"]
                 if file_id not in sources:
                     fileobj = parse(clipitem["file"], {"pathurl": str})

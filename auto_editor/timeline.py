@@ -330,7 +330,7 @@ video\n"""
         return self.T.sr
 
 
-def make_tracks_dir(tracks_dir: Path, path: Path) -> None:
+def make_tracks_dir(tracks_dir: Path) -> None:
     from os import mkdir
     from shutil import rmtree
 
@@ -350,7 +350,7 @@ def set_stream_to_0(tl: v3, log: Log) -> None:
 
         fold = path.parent / f"{path.stem}_tracks"
         if not dir_exists:
-            make_tracks_dir(fold, path)
+            make_tracks_dir(fold)
             dir_exists = True
 
         newtrack = fold / f"{path.stem}_{i}.wav"

@@ -698,7 +698,7 @@ class Runner:
         self.raw(["palet", "resources/scripts/testmath.pal"])
 
 
-def run_tests(runner: Runner, tests: list[Callable], args: TestArgs) -> None:
+def run_tests(tests: list[Callable], args: TestArgs) -> None:
     if args.only != []:
         tests = list(filter(lambda t: t.__name__ in args.only, tests))
 
@@ -797,7 +797,7 @@ def main(sys_args: list[str] | None = None) -> None:
             ]
         )
     try:
-        run_tests(run, tests, args)
+        run_tests(tests, args)
     except KeyboardInterrupt:
         print("Testing Interrupted by User.")
         shutil.rmtree(run.temp_dir)
