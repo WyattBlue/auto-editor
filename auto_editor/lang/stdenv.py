@@ -512,7 +512,7 @@ def make_standard_env() -> dict[str, Any]:
             for c in node[2:]:
                 my_eval(env, c)
 
-    def syn_quote(env: Env, node: Node) -> Any:
+    def syn_quote(_: Env, node: Node) -> Any:
         guard_term(node, 2, 2)
         if type(node[1]) is Keyword:
             return QuotedKeyword(node[1])

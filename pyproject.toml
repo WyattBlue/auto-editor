@@ -57,6 +57,10 @@ select = [
     "F",  # Pyflakes
     "W",  # pycodestyle
     "I",  # isort
+    "F841",
+    "B007",
+    "ARG001",
+    "ARG002",
     "C401",  # flake8-comprehensions: unnecessary-generator-set
     "C402",  # flake8-comprehensions: unnecessary-generator-dict
     "C403",  # flake8-comprehensions: unnecessary-list-comprehension-set

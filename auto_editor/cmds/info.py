@@ -113,7 +113,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                 f"{recTb.numerator}/{recTb.denominator}"
             )
 
-        for track, v in enumerate(src.videos):
+        for v in src.videos:
             w, h = v.width, v.height
 
             vid: VideoJson = {
@@ -134,7 +134,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             }
             file_info[file]["video"].append(vid)
 
-        for track, a in enumerate(src.audios):
+        for a in src.audios:
             aud: AudioJson = {
                 "codec": a.codec,
                 "layout": a.layout,
@@ -145,7 +145,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
             }
             file_info[file]["audio"].append(aud)
 
-        for track, s_stream in enumerate(src.subtitles):
+        for s_stream in src.subtitles:
             sub: SubtitleJson = {"codec": s_stream.codec, "lang": s_stream.lang}
             file_info[file]["subtitle"].append(sub)
 

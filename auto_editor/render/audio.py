@@ -383,7 +383,7 @@ class Getter:
 
     def __init__(self, path: Path, stream: int, rate: int):
         self.container = bv.open(path)
-        self.stream = self.container.streams.audio[0]
+        self.stream = self.container.streams.audio[stream]
         self.rate = rate
 
     def get(self, start: int, end: int) -> np.ndarray:
@@ -454,7 +454,7 @@ def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[A
         arr: np.ndarray | None = None
         use_iter = False
 
-        for c, clip in enumerate(layer):
+        for clip in layer:
             if (clip.src, clip.stream) not in samples:
                 samples[(clip.src, clip.stream)] = Getter(
                     clip.src.path, clip.stream, sr

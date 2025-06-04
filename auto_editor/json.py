@@ -89,7 +89,7 @@ class Lexer:
 
                 if self.char == "u":
                     buf = ""
-                    for i in range(4):
+                    for _ in range(4):
                         self.advance()
                         if self.char is None:
                             self.error("\\u escape sequence needs 4 hexs")
@@ -162,7 +162,7 @@ class Lexer:
                 return (key, None)
 
             keyword = ""
-            for i in range(5):  # Longest valid keyword length
+            for _ in range(5):  # Longest valid keyword length
                 if self.char is None or self.char in " \t\n\r\x0b\x0c[]}{,":
                     break
                 keyword += self.char
