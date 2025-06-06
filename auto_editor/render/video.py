@@ -120,7 +120,7 @@ def render_av(
 
     del codec
     output_stream = output.add_stream(args.video_codec, rate=target_fps)
-    output_stream.options = {"x265-params": "log-level=error"}
+    output_stream.options = {"x265-params": "log-level=error"}  # type: ignore
 
     cc = output_stream.codec_context
     if args.vprofile is not None:
