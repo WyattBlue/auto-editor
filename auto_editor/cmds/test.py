@@ -516,9 +516,6 @@ class Runner:
         assert output.videos[0].pix_fmt == "yuv420p"
 
     def test_encode_hevc(self):
-        if os.environ.get("GITHUB_ACTIONS") == "true":
-            raise SkipTest()
-
         out = self.main(["resources/testsrc.mp4"], ["-c:v", "hevc"], "out.mkv")
         output = fileinfo(out)
         assert output.videos[0].codec == "hevc"
