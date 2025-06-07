@@ -962,6 +962,7 @@ def make_standard_env() -> dict[str, Any]:
         # syntax
         "lambda": Syntax(syn_lambda),
         "λ": Syntax(syn_lambda),
+        "defn": Syntax(syn_define),
         "define": Syntax(syn_define),
         "define/c": Syntax(syn_definec),
         "set!": Syntax(syn_set),
