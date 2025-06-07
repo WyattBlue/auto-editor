@@ -26,7 +26,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         return
 
     def format_bytes(size: float) -> str:
-        for unit in {"B", "KiB", "MiB", "GiB", "TiB"}:
+        for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
             if size < 1024:
                 return f"{size:.2f} {unit}"
             size /= 1024
