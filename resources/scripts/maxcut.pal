@@ -1,7 +1,5 @@
 #!/usr/bin/env auto-editor palet
 
-#lang palet
-
 (define (remove-large! arr lim replace with)
    (define start-p 0)
    (define active #f)

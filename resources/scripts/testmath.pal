@@ -1,6 +1,4 @@
 #!/usr/bin/env auto-editor palet
-#lang palet
-
 (import math)
 
 (assert (equal? (round 3.5) 4))
