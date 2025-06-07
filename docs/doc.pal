@@ -177,6 +177,7 @@
 (define core-docs {hash
     "Assignment" #[
         (syntax "define" "id expr" (text "Set "'id" to the result of "'expr"."))
+        (syntax "defn" "id expr" (text "Alias for "'define"."))
         (syntax "set!" "id expr"
             (text
                 "Set "'id" to the result of "'expr" if "'id
