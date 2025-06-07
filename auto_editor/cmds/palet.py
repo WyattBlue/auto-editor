@@ -14,7 +14,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
 
         env.update(make_standard_env())
         try:
-            interpret(env, Parser(Lexer(sys_args[0], program_text, True)))
+            interpret(env, Parser(Lexer(sys_args[0], program_text)))
         except (MyError, ZeroDivisionError) as e:
             sys.stderr.write(f"error: {e}\n")
             sys.exit(1)

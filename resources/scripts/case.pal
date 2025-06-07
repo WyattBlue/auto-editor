@@ -1,7 +1,5 @@
 #!/usr/bin/env auto-editor palet
 
-#lang palet
-
 (assert (equal? (case (+ 7 5) [(1 2 3) 'small] [(10 11 12) 'big]) 'big))
 (assert (equal? (case (- 7 5) [(1 2 3) 'small] [(10 11 12) 'big]) 'small))
 (assert (case (mod 3 2) [(0) #f] [else #t]))
