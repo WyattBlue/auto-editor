@@ -367,9 +367,6 @@
         (proc "pow" '((z real?) (w real?) real?)
             (text "Returns "'z" raised to the "'w" power.")
         )
-        (proc "sqrt" '((z number?) number?)
-            (text "Returns the square root of "'z".")
-        )
     ]
     "Modules" #[
         (syntax "import" "module" (text "Imports a module"))
