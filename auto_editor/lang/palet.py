@@ -148,7 +148,7 @@ class Lexer:
                 token = SEC
             elif unit == "dB":
                 token = DB
-            elif unit != "i" and unit != "%":
+            elif unit != "%":
                 return Token(
                     VAL,
                     Sym(result + unit, self.lineno, self.column),
@@ -157,9 +157,7 @@ class Lexer:
                 )
 
         try:
-            if unit == "i":
-                return Token(VAL, complex(result + "j"), self.lineno, self.column)
-            elif unit == "%":
+            if unit == "%":
                 return Token(VAL, float(result) / 100, self.lineno, self.column)
             elif "/" in result:
                 return Token(token, Fraction(result), self.lineno, self.column)

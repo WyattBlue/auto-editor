@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
 
-    Number = int | float | complex | Fraction
+    Number = int | float | Fraction
     BoolList = NDArray[np.bool_]
     Node = tuple
 
@@ -835,9 +835,6 @@ def make_standard_env() -> dict[str, Any]:
         return reduce(lambda a, b: a ^ b, vals)
 
     def number_to_string(val: Number) -> str:
-        if isinstance(val, complex):
-            join = "" if val.imag < 0 else "+"
-            return f"{val.real}{join}{val.imag}i"
         return f"{val}"
 
     def string_to_number(val) -> float:
@@ -989,7 +986,6 @@ def make_standard_env() -> dict[str, Any]:
         "int?": is_int,
         "float?": is_float,
         "frac?": is_frac,
-        "complex?": Contract("complex?", lambda v: type(v) is complex),
         "nat?": is_nat,
         "nat1?": is_nat1,
         "threshold?": is_threshold,
@@ -1044,8 +1040,6 @@ def make_standard_env() -> dict[str, Any]:
         "div": Proc("div", int_div, (2, None), is_int),
         "add1": Proc("add1", lambda z: z + 1, (1, 1), is_num),
         "sub1": Proc("sub1", lambda z: z - 1, (1, 1), is_num),
-        "real-part": Proc("real-part", lambda v: v.real, (1, 1), is_num),
-        "imag-part": Proc("imag-part", lambda v: v.imag, (1, 1), is_num),
         # reals
         "pow": Proc("pow", pow, (2, 2), is_real),
         "abs": Proc("abs", abs, (1, 1), is_real),

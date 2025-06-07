@@ -46,7 +46,7 @@ def check_contract(c: object, val: object) -> bool:
         return val is True
     if c is False:
         return val is False
-    if type(c) in (int, float, float64, Fraction, complex, str, Sym):
+    if type(c) in (int, float, float64, Fraction, str, Sym):
         return val == c
     raise MyError(f"Invalid contract, got: {print_str(c)}")
 
@@ -164,7 +164,7 @@ def is_contract(c: object) -> bool:
         return True
     if c is True or c is False:
         return True
-    return type(c) in (int, float, Fraction, complex, str, Sym)
+    return type(c) in (int, float, Fraction, str, Sym)
 
 
 is_bool = Contract("bool?", lambda v: type(v) is bool)
@@ -172,10 +172,8 @@ is_int = Contract("int?", lambda v: type(v) is int)
 is_nat = Contract("nat?", lambda v: type(v) is int and v > -1)
 is_nat1 = Contract("nat1?", lambda v: type(v) is int and v > 0)
 int_not_zero = Contract("(or/c (not/c 0) int?)", lambda v: v != 0 and is_int(v))
-is_num = Contract(
-    "number?", lambda v: type(v) in (int, float, float64, Fraction, complex)
-)
 is_real = Contract("real?", lambda v: type(v) in (int, float, float64, Fraction))
+is_num = is_real
 is_float = Contract("float?", lambda v: type(v) in (float, float64))
 is_frac = Contract("frac?", lambda v: type(v) is Fraction)
 is_str = Contract("string?", lambda v: type(v) is str)
