@@ -155,7 +155,7 @@ def apply_audio_normalization(
         output_file.close()
 
 
-def process_audio_clip(clip: Clip, data: np.ndarray, sr: int) -> np.ndarray:
+def process_audio_clip(clip: Clip, data: np.ndarray, sr: int, log: Log) -> np.ndarray:
     to_s16 = bv.AudioResampler(format="s16", layout="stereo", rate=sr)
     input_buffer = BytesIO()
 
@@ -217,6 +217,9 @@ def process_audio_clip(clip: Clip, data: np.ndarray, sr: int) -> np.ndarray:
             except (bv.BlockingIOError, bv.EOFError):
                 break
 
+    if not all_frames:
+        log.debug(f"No audio frames at {clip=}")
+        return np.zeros_like(data)
     return np.concatenate(all_frames, axis=1)
 
 
@@ -473,7 +476,7 @@ def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[A
 
             if clip.speed != 1 or clip.volume != 1:
                 clip_arr = process_audio_clip(
-                    clip, getter.get(samp_start, samp_end), sr
+                    clip, getter.get(samp_start, samp_end), sr, log
                 )
             else:
                 clip_arr = getter.get(samp_start, samp_end)
