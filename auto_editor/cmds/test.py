@@ -202,6 +202,19 @@ class Runner:
             assert audio.language == "eng"
             assert audio.layout.name == "stereo"
 
+    def test_video_to_mp3(self) -> None:
+        out = self.main(["example.mp4"], [], output="example_ALTERED.mp3")
+        with bv.open(out) as container:
+            assert container.duration is not None
+            assert container.duration > 17300000 and container.duration < 2 << 24
+
+            assert len(container.streams) == 1
+            audio = container.streams[0]
+            assert isinstance(audio, bv.AudioStream)
+            assert audio.codec.name in ("mp3", "mp3float")
+            assert audio.sample_rate == 48000
+            assert audio.layout.name == "stereo"
+
     def test_to_mono(self) -> None:
         out = self.main(["example.mp4"], ["-layout", "mono"], output="example_mono.mp4")
         with bv.open(out) as container:

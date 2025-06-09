@@ -286,7 +286,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         output = bv.open(output_path, "w", container_options=options)
 
         # Setup video
-        if ctr.default_vid != "none" and tl.v:
+        if ctr.default_vid not in ("none", "png") and tl.v:
             vframes = render_av(output, tl, args, log)
             output_stream: bv.VideoStream | None
             output_stream = next(vframes)  # type: ignore
