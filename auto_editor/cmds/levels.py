@@ -36,6 +36,7 @@ class LevelArgs:
     input: list[str] = field(default_factory=list)
     edit: str = "audio"
     timebase: Fraction | None = None
+    no_cache: bool = False
     help: bool = False
 
 
@@ -53,16 +54,14 @@ def levels_options(parser: ArgumentParser) -> ArgumentParser:
         type=frame_rate,
         help="Set custom timebase",
     )
+    parser.add_argument("--no-cache", flag=True)
     return parser
 
 
 def print_arr(arr: NDArray) -> None:
     print("")
     print("@start")
-    if arr.dtype in {np.float64, np.float32, np.float16}:
-        for a in arr:
-            sys.stdout.write(f"{a:.20f}\n")
-    elif arr.dtype == np.bool_:
+    if arr.dtype == np.bool_:
         for a in arr:
             sys.stdout.write(f"{1 if a else 0}\n")
     else:
@@ -76,7 +75,7 @@ def print_arr_gen(arr: Iterator[float | np.float32]) -> None:
     print("")
     print("@start")
     for a in arr:
-        print(f"{a:.20f}")
+        print(f"{a}")
     print("")
 
 
@@ -131,7 +130,11 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
         levels = initLevels(src, tb, bar, False, log)
         try:
             if method == "audio":
-                if (arr := levels.read_cache("audio", (obj["stream"],))) is not None:
+                if (
+                    not args.no_cache
+                    and (arr := levels.read_cache("audio", (obj["stream"],)))
+                    is not None
+                ):
                     print_arr(arr)
                 else:
                     container = bv.open(src.path, "r")
@@ -148,11 +151,15 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                     container.close()
 
                     cache_array = np.array(values, dtype=np.float32)
-                    levels.cache(cache_array, "audio", (obj["stream"],))
+                    if not args.no_cache:
+                        levels.cache(cache_array, "audio", (obj["stream"],))
 
             elif method == "motion":
                 mobj = (obj["stream"], obj["width"], obj["blur"])
-                if (arr := levels.read_cache("motion", mobj)) is not None:
+                if (
+                    not args.no_cache
+                    and (arr := levels.read_cache("motion", mobj)) is not None
+                ):
                     print_arr(arr)
                 else:
                     container = bv.open(src.path, "r")
@@ -171,7 +178,8 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
                     container.close()
 
                     cache_array = np.array(values, dtype=np.float32)
-                    levels.cache(cache_array, "motion", mobj)
+                    if not args.no_cache:
+                        levels.cache(cache_array, "motion", mobj)
 
             elif method == "subtitle":
                 print_arr(levels.subtitle(**obj))
