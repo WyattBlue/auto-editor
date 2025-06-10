@@ -1,3 +1,13 @@
+# 28.0.1
+
+## Fixes
+- Fix #763.
+- Fix cache displaying wrong unit.
+- Fix problem with converting mp4 video/audio file to an mp3 audio file.
+
+**Full Changelog**: https://github.com/WyattBlue/auto-editor/compare/28.0.0...28.0.1
+
+
 # 28.0.0
 
 ## Major
