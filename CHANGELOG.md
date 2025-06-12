@@ -1,3 +1,8 @@
+# 28.0.2
+
+## Fixes
+- preview: print correct number of cuts
+
 # 28.0.1
 
 ## Fixes

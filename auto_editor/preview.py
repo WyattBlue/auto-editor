@@ -28,23 +28,24 @@ def time_frame(
 def all_cuts(tl: v3, in_len: int) -> list[int]:
     # Calculate cuts
     tb = tl.tb
-    oe: list[tuple[int, int]] = []
+    clip_spans: list[tuple[int, int]] = []
 
     for clip in tl.a[0]:
         old_offset = clip.offset * clip.speed
-        oe.append((round(old_offset * clip.speed), round(old_offset + clip.dur)))
+        clip_spans.append((round(old_offset), round(old_offset + clip.dur)))
 
     cut_lens = []
     i = 0
-    while i < len(oe) - 1:
-        if i == 0 and oe[i][0] != 0:
-            cut_lens.append(oe[i][1])
+    while i < len(clip_spans) - 1:
+        if i == 0 and clip_spans[i][0] != 0:
+            cut_lens.append(clip_spans[i][0])
 
-        cut_lens.append(oe[i + 1][0] - oe[i][1])
+        cut_lens.append(clip_spans[i + 1][0] - clip_spans[i][1])
         i += 1
 
-    if len(oe) > 0 and oe[-1][1] < round(in_len * tb):
-        cut_lens.append(in_len - oe[-1][1])
+    if len(clip_spans) > 0 and clip_spans[-1][1] < round(in_len / tb):
+        cut_lens.append(in_len - clip_spans[-1][1])
+
     return cut_lens
 
 
@@ -53,19 +54,9 @@ def preview(tl: v3, log: Log) -> None:
     tb = tl.tb
 
     # Calculate input videos length
-    all_sources = set()
-    for vlayer in tl.v:
-        for vclip in vlayer:
-            if hasattr(vclip, "src"):
-                all_sources.add(vclip.src)
-    for alayer in tl.a:
-        for aclip in alayer:
-            if hasattr(aclip, "src"):
-                all_sources.add(aclip.src)
-
     in_len = 0
     bar = initBar("none")
-    for src in all_sources:
+    for src in tl.unique_sources():
         in_len += initLevels(src, tb, bar, False, log).media_length
 
     out_len = len(tl)
@@ -90,7 +81,7 @@ def preview(tl: v3, log: Log) -> None:
 
     cut_lens = all_cuts(tl, in_len)
     log.debug(cut_lens)
-    fp.write(f"cuts:\n - amount:    {len(clip_lens)}\n")
+    fp.write(f"cuts:\n - amount:    {len(cut_lens)}\n")
     if len(cut_lens) > 0:
         time_frame(fp, "smallest", min(cut_lens), tb)
         time_frame(fp, "largest", max(cut_lens), tb)
