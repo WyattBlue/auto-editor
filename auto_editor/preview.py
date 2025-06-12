@@ -68,7 +68,7 @@ def preview(tl: v3, log: Log) -> None:
     time_frame(fp, "output", out_len, tb, f"{round((out_len / in_len) * 100, 2)}%")
     time_frame(fp, "diff", diff, tb, f"{round((diff / in_len) * 100, 2)}%")
 
-    clip_lens = [clip.dur / clip.speed for clip in tl.a[0]]
+    clip_lens = [clip.dur for clip in tl.a[0]]
     log.debug(clip_lens)
 
     fp.write(f"clips:\n - amount:    {len(clip_lens)}\n")
