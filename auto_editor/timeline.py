@@ -282,41 +282,6 @@ video\n"""
 
         return result
 
-    def as_dict(self) -> dict:
-        def aclip_to_dict(self: Clip) -> dict:
-            return {
-                "name": "audio",
-                "src": self.src,
-                "start": self.start,
-                "dur": self.dur,
-                "offset": self.offset,
-                "speed": self.speed,
-                "volume": self.volume,
-                "stream": self.stream,
-            }
-
-        v = []
-        a = []
-        for vlayer in self.v:
-            vb = [vobj.as_dict() for vobj in vlayer]
-            if vb:
-                v.append(vb)
-        for layer in self.a:
-            ab = [aclip_to_dict(clip) for clip in layer]
-            if ab:
-                a.append(ab)
-
-        return {
-            "version": "3",
-            "timebase": f"{self.tb.numerator}/{self.tb.denominator}",
-            "background": self.background,
-            "resolution": self.T.res,
-            "samplerate": self.T.sr,
-            "layout": self.T.layout,
-            "v": v,
-            "a": a,
-        }
-
     @property
     def T(self) -> Template:
         return self.template
