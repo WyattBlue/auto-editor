@@ -1,5 +1,4 @@
 import xml.etree.ElementTree as ET
-from typing import cast
 
 from auto_editor.timeline import Clip, v3
 from auto_editor.utils.func import aspect_ratio, to_timecode
@@ -71,7 +70,7 @@ def shotcut_write_mlt(output: str, tl: v3) -> None:
     producers = 0
 
     if tl.v:
-        clips = cast(list[Clip], tl.v[0])
+        clips = [clip for clip in tl.v[0] if isinstance(clip, Clip)]
     elif tl.a:
         clips = tl.a[0]
     else:
