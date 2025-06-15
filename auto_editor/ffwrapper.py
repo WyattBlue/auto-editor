@@ -66,6 +66,7 @@ class FileInfo:
     path: Path
     bitrate: int
     duration: float
+    timecode: str  # in SMPTE
     videos: tuple[VideoStream, ...]
     audios: tuple[AudioStream, ...]
     subtitles: tuple[SubtitleStream, ...]
@@ -165,12 +166,22 @@ class FileInfo:
             ext = sub_exts.get(codec, "vtt")
             subtitles += (SubtitleStream(codec, ext, s.language),)
 
+        def get_timecode() -> str:
+            for d in cont.streams.data:
+                if (result := d.metadata.get("timecode")) is not None:
+                    return result
+            for v in cont.streams.video:
+                if (result := v.metadata.get("timecode")) is not None:
+                    return result
+            return "00:00:00:00"
+
+        timecode = get_timecode()
         bitrate = 0 if cont.bit_rate is None else cont.bit_rate
         dur = 0 if cont.duration is None else cont.duration / bv.time_base
 
         cont.close()
 
-        return FileInfo(Path(path), bitrate, dur, videos, audios, subtitles)
+        return FileInfo(Path(path), bitrate, dur, timecode, videos, audios, subtitles)
 
     def __repr__(self) -> str:
         return f"@{self.path.name}"

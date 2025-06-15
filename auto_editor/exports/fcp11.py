@@ -45,6 +45,35 @@ def make_name(src: FileInfo, tb: Fraction) -> str:
     return "FFVideoFormatRateUndefined"
 
 
+def parseSMPTE(val: str, fps: Fraction, log: Log) -> int:
+    if len(val) == 0:
+        return 0
+    try:
+        parts = val.split(":")
+        if len(parts) != 4:
+            raise ValueError(f"Invalid SMPTE format: {val}")
+
+        hours, minutes, seconds, frames = map(int, parts)
+
+        if (
+            hours < 0
+            or minutes < 0
+            or minutes >= 60
+            or seconds < 0
+            or seconds >= 60
+            or frames < 0
+        ):
+            raise ValueError(f"Invalid SMPTE values: {val}")
+
+        if frames >= fps:
+            raise ValueError(f"Frame count {frames} exceeds fps {fps}")
+
+        total_frames = (hours * 3600 + minutes * 60 + seconds) * fps + frames
+        return int(round(total_frames))
+    except (ValueError, ZeroDivisionError) as e:
+        log.error(f"Cannot parse SMPTE timecode '{val}': {e}")
+
+
 def fcp11_write_xml(
     group_name: str, version: int, output: str, resolve: bool, tl: v3, log: Log
 ) -> None:
@@ -83,12 +112,14 @@ def fcp11_write_xml(
             height=f"{tl.res[1]}",
             colorSpace=get_colorspace(one_src),
         )
+
+        startPoint = parseSMPTE(one_src.timecode, tl.tb, log)
         r2 = SubElement(
             resources,
             "asset",
             id=f"r{i * 2 + 2}",
             name=one_src.path.stem,
-            start="0s",
+            start=fraction(startPoint),
             hasVideo="1" if one_src.videos else "0",
             format=f"r{i * 2 + 1}",
             hasAudio="1" if one_src.audios else "0",
@@ -115,12 +146,14 @@ def fcp11_write_xml(
     spine = SubElement(sequence, "spine")
 
     def make_clip(ref: str, clip: Clip) -> None:
+        startPoint = parseSMPTE(clip.src.timecode, tl.tb, log)
+
         clip_properties = {
             "name": proj_name,
             "ref": ref,
-            "offset": fraction(clip.start),
+            "offset": fraction(clip.start + startPoint),
             "duration": fraction(clip.dur),
-            "start": fraction(clip.offset),
+            "start": fraction(clip.offset + startPoint),
             "tcFormat": "NDF",
         }
         asset = SubElement(spine, "asset-clip", clip_properties)
