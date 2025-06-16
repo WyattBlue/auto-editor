@@ -42,10 +42,11 @@ def set_output(
         # Use `mp4` as the default, because it is most compatible.
         ext = ".mp4" if path is None else path.suffix
 
+    export: dict[str, Any]
     if _export is None:
         match ext:
             case ".xml":
-                export: dict[str, Any] = {"export": "premiere"}
+                export = {"export": "premiere"}
             case ".fcpxml":
                 export = {"export": "final-cut-pro"}
             case ".mlt":
@@ -59,16 +60,17 @@ def set_output(
     else:
         export = parse_export(_export, log)
 
-    ext_map = {
-        "premiere": ".xml",
-        "resolve-fcp7": ".xml",
-        "final-cut-pro": ".fcpxml",
-        "resolve": ".fcpxml",
-        "shotcut": ".mlt",
-        "json": ".json",
-    }
-    if export["export"] in ext_map:
-        ext = ext_map[export["export"]]
+    match export["export"]:
+        case "premiere" | "resolve-fcp7":
+            ext = ".xml"
+        case "final-cut-pro" | "resolve":
+            ext = ".fcpxml"
+        case "shotcut":
+            ext = ".mlt"
+        case "v1":
+            ext = ".v1"
+        case "v3":
+            ext = ".v3"
 
     if out == "-":
         return "-", export
