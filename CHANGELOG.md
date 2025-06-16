@@ -1,7 +1,9 @@
 # 28.0.2
 
 ## Fixes
-- preview: print correct number of cuts
+- Fix fcp11 warnings/errors (closes #741).
+- preview: print correct number of cuts.
+- preview: Don't double count speed.
 
 # 28.0.1
 
