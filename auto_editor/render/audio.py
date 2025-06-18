@@ -3,7 +3,7 @@ from __future__ import annotations
 from fractions import Fraction
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import bv
 import numpy as np
@@ -22,7 +22,6 @@ from auto_editor.utils.log import Log
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Any
 
     from auto_editor.__main__ import Args
 
@@ -436,10 +435,12 @@ class Getter:
         return result  # Return NumPy array with shape (channels, samples)
 
 
-def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[Any]:
+def _make_new_audio(
+    tl: v3, fmt: bv.AudioFormat, args: Args, log: Log
+) -> list[str | Iterator[AudioFrame]]:
     sr = tl.sr
     tb = tl.tb
-    output: list[Any] = []
+    output: list[str | Iterator[AudioFrame]] = []
     samples: dict[tuple[FileInfo, int], Getter] = {}
 
     norm = parse_norm(args.audio_normalize, log)
@@ -511,7 +512,9 @@ def _make_new_audio(tl: v3, fmt: bv.AudioFormat, args: Args, log: Log) -> list[A
 
     if args.mix_audio_streams and len(output) > 1:
         new_a_file = f"{Path(log.temp, 'new_audio.wav')}"
-        mix_audio_files(sr, output, new_a_file)
+        # When mix_audio_streams is True, output only contains strings
+        audio_paths = cast(list[str], output)
+        mix_audio_files(sr, audio_paths, new_a_file)
         return [new_a_file]
 
     return output
