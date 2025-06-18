@@ -103,10 +103,11 @@ class Runner:
 
         return output
 
-    def raw(self, cmd: list[str]) -> None:
+    def raw(self, cmd: list[str]) -> str:
         returncode, stdout, stderr = pipe_to_console(self.program + cmd)
         if returncode > 0:
             raise Exception(f"{stdout}\n{stderr}\n")
+        return stdout
 
     def check(self, cmd: list[str], match=None) -> None:
         returncode, stdout, stderr = pipe_to_console(self.program + cmd)
@@ -133,11 +134,13 @@ class Runner:
 
     def test_version(self):
         """Test version flags and debug by itself."""
-        self.raw(["--version"])
-        self.raw(["-V"])
+        v1 = self.raw(["--version"])
+        v2 = self.raw(["-V"])
+        assert "." in v1 and len(v1) > 4
+        assert v1 == v2
 
     def test_parser(self):
-        self.check(["example.mp4", "--video-speed"], "needs argument")
+        self.check(["example.mp4", "--margin"], "needs argument")
 
     def info(self):
         self.raw(["info", "example.mp4"])
