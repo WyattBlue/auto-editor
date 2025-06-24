@@ -299,9 +299,9 @@ def make_timeline(
 
     if len(sources) == 1 and inp is not None:
         chunks = chunkify(speed_index, speed_hash)
-        v1_compatiable = v1(inp, chunks)
+        v1_compatible = v1(inp, chunks)
     else:
-        v1_compatiable = None
+        v1_compatible = None
 
     if len(vtl) == 0 and len(atl) == 0:
         log.error("Timeline is empty, nothing to do.")
@@ -312,4 +312,4 @@ def make_timeline(
     else:
         template = Template.init(inp, sr, args.audio_layout, res)
 
-    return v3(tb, args.background, template, vtl, atl, v1_compatiable)
+    return v3(tb, args.background, template, vtl, atl, v1_compatible)
