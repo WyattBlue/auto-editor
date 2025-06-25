@@ -814,14 +814,6 @@
             )
         )
     ]
-    "AV" #[
-        (proc "encoder" '((value str?) any)
-            (text "Returns av.Codec("'value", mode=\"w\")")
-        )
-        (proc "decoder" '((value str?) any)
-            (text "Returns av.Codec("'value", mode=\"r\")")
-        )
-    ]
     "Reflection" #[
         (syntax "quote" "body"
             (text

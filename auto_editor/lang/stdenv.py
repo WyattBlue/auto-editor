@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import bv
-
 from auto_editor.analyze import mut_remove_large, mut_remove_small
 from auto_editor.lib.contracts import *
 from auto_editor.lib.data_structs import *
@@ -1169,9 +1167,6 @@ def make_standard_env() -> dict[str, Any]:
             "string->vector", lambda s: [Char(c) for c in s], (1, 1), is_str
         ),
         "range->vector": Proc("range->vector", list, (1, 1), is_range),
-        # av
-        "encoder": Proc("encoder", lambda x: bv.Codec(x, "w"), (1, 1), is_str),
-        "decoder": Proc("decoder", lambda x: bv.Codec(x), (1, 1), is_str),
         # reflexion
         "var-exists?": Proc("var-exists?", lambda sym: sym.val in env, (1, 1), is_symbol),
         "rename": Syntax(syn_rename),
