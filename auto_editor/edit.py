@@ -9,7 +9,8 @@ from pathlib import Path
 from subprocess import run
 from typing import TYPE_CHECKING, Any
 
-import bv
+import av
+from av import Codec
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lib.contracts import is_int, is_str
@@ -93,11 +94,11 @@ def set_video_codec(
 
     if ctr.vcodecs is not None and codec not in ctr.vcodecs:
         try:
-            cobj = bv.Codec(codec, "w")
-        except bv.codec.codec.UnknownCodecError:
+            cobj = Codec(codec, "w")
+        except av.codec.codec.UnknownCodecError:
             log.error(f"Unknown encoder: {codec}")
         # Normalize encoder names
-        if cobj.id not in (bv.Codec(x, "w").id for x in ctr.vcodecs):
+        if cobj.id not in (Codec(x, "w").id for x in ctr.vcodecs):
             log.error(codec_error.format(codec, out_ext))
 
     return codec
@@ -111,7 +112,7 @@ def set_audio_codec(
             codec = "aac"
         else:
             codec = src.audios[0].codec
-            if bv.Codec(codec, "w").audio_formats is None:
+            if Codec(codec, "w").audio_formats is None:
                 codec = "aac"
         if codec not in ctr.acodecs and ctr.default_aud != "none":
             codec = ctr.default_aud
@@ -121,11 +122,11 @@ def set_audio_codec(
 
     if ctr.acodecs is None or codec not in ctr.acodecs:
         try:
-            cobj = bv.Codec(codec, "w")
-        except bv.codec.codec.UnknownCodecError:
+            cobj = Codec(codec, "w")
+        except av.codec.codec.UnknownCodecError:
             log.error(f"Unknown encoder: {codec}")
         # Normalize encoder names
-        if cobj.id not in (bv.Codec(x, "w").id for x in ctr.acodecs):
+        if cobj.id not in (Codec(x, "w").id for x in ctr.acodecs):
             log.error(codec_error.format(codec, out_ext))
 
     return codec
@@ -287,26 +288,26 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         if mov_flags:
             options["movflags"] = "+".join(mov_flags)
 
-        output = bv.open(output_path, "w", container_options=options)
+        output = av.open(output_path, "w", container_options=options)
 
         # Setup video
         if ctr.default_vid not in ("none", "png") and tl.v:
             vframes = render_av(output, tl, args, log)
-            output_stream: bv.VideoStream | None
+            output_stream: av.VideoStream | None
             output_stream = next(vframes)  # type: ignore
         else:
             output_stream, vframes = None, iter([])
 
         # Setup audio
         try:
-            audio_encoder = bv.Codec(args.audio_codec, "w")
-        except bv.FFmpegError as e:
+            audio_encoder = Codec(args.audio_codec, "w")
+        except av.FFmpegError as e:
             log.error(e)
         if audio_encoder.audio_formats is None:
             log.error(f"{args.audio_codec}: No known audio formats avail.")
         fmt = audio_encoder.audio_formats[0]
 
-        audio_streams: list[bv.AudioStream] = []
+        audio_streams: list[av.AudioStream] = []
 
         if ctr.default_aud == "none":
             while len(tl.a) > 0:
@@ -333,7 +334,7 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         sub_gen_frames = []
 
         for i, sub_path in enumerate(sub_paths):
-            subtitle_input = bv.open(sub_path)
+            subtitle_input = av.open(sub_path)
             subtitle_inputs.append(subtitle_input)
             subtitle_stream = output.add_stream_from_template(
                 subtitle_input.streams.subtitles[0]
@@ -460,14 +461,14 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
                         output.mux(item.stream.encode(item.frame))
                     elif frame_type == "subtitle":
                         output.mux(item.frame)
-                except bv.error.ExternalError:
+                except av.error.ExternalError:
                     log.error(
                         f"Generic error for encoder: {item.stream.name}\n"
                         f"at {item.index} time_base\nPerhaps video quality settings are too low?"
                     )
-                except bv.FileNotFoundError:
+                except av.FileNotFoundError:
                     log.error(f"File not found: {output_path}")
-                except bv.FFmpegError as e:
+                except av.FFmpegError as e:
                     log.error(e)
 
                 if bar_index:
