@@ -9,10 +9,10 @@ from math import ceil
 from tempfile import gettempdir
 from typing import TYPE_CHECKING
 
-import bv
+import av
 import numpy as np
-from bv.audio.fifo import AudioFifo
-from bv.subtitles.subtitle import AssSubtitle
+from av.audio.fifo import AudioFifo
+from av.subtitles.subtitle import AssSubtitle
 
 from auto_editor import __version__
 
@@ -72,7 +72,7 @@ def mut_remove_large(
             active = False
 
 
-def iter_audio(audio_stream: bv.AudioStream, tb: Fraction) -> Iterator[np.float32]:
+def iter_audio(audio_stream: av.AudioStream, tb: Fraction) -> Iterator[np.float32]:
     fifo = AudioFifo()
     sr = audio_stream.rate
 
@@ -80,10 +80,10 @@ def iter_audio(audio_stream: bv.AudioStream, tb: Fraction) -> Iterator[np.float3
     accumulated_error = Fraction(0)
 
     # Resample so that audio data is between [-1, 1]
-    resampler = bv.AudioResampler(bv.AudioFormat("flt"), audio_stream.layout, sr)
+    resampler = av.AudioResampler(av.AudioFormat("flt"), audio_stream.layout, sr)
 
     container = audio_stream.container
-    assert isinstance(container, bv.container.InputContainer)
+    assert isinstance(container, av.container.InputContainer)
 
     for frame in container.decode(audio_stream):
         frame.pts = None  # Skip time checks
@@ -103,7 +103,7 @@ def iter_audio(audio_stream: bv.AudioStream, tb: Fraction) -> Iterator[np.float3
 
 
 def iter_motion(
-    video: bv.VideoStream, tb: Fraction, blur: int, width: int
+    video: av.VideoStream, tb: Fraction, blur: int, width: int
 ) -> Iterator[np.float32]:
     video.thread_type = "AUTO"
 
@@ -113,7 +113,7 @@ def iter_motion(
     index = 0
     prev_index = -1
 
-    graph = bv.filter.Graph()
+    graph = av.filter.Graph()
     graph.link_nodes(
         graph.add_buffer(template=video),
         graph.add("scale", f"{width}:-1"),
@@ -123,7 +123,7 @@ def iter_motion(
     ).configure()
 
     container = video.container
-    assert isinstance(container, bv.container.InputContainer)
+    assert isinstance(container, av.container.InputContainer)
 
     for unframe in container.decode(video):
         if unframe.pts is None:
@@ -154,7 +154,7 @@ def iter_motion(
 
 @dataclass(slots=True)
 class Levels:
-    container: bv.container.InputContainer
+    container: av.container.InputContainer
     name: str
     mod_time: int
     tb: Fraction
@@ -258,7 +258,7 @@ class Levels:
         if audio.duration is not None and audio.time_base is not None:
             inaccurate_dur = int(audio.duration * audio.time_base * self.tb)
         elif container.duration is not None:
-            inaccurate_dur = int(container.duration / bv.time_base * self.tb)
+            inaccurate_dur = int(container.duration / av.time_base * self.tb)
         else:
             inaccurate_dur = 1024
 
@@ -385,8 +385,8 @@ def initLevels(
     src: FileInfo, tb: Fraction, bar: Bar, no_cache: bool, log: Log
 ) -> Levels:
     try:
-        container = bv.open(src.path)
-    except bv.FFmpegError as e:
+        container = av.open(src.path)
+    except av.FFmpegError as e:
         log.error(e)
 
     mod_time = int(src.path.stat().st_mtime)

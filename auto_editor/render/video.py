@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import bv
+import av
 import numpy as np
 
 from auto_editor.timeline import Clip, TlImage, TlRect
@@ -24,12 +24,12 @@ class VideoFrame:
     src: FileInfo
 
 
-def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> bv.VideoFrame:
+def make_solid(width: int, height: int, pix_fmt: str, bg: str) -> av.VideoFrame:
     hex_color = bg.lstrip("#").upper()
     rgb_color = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
     rgb_array = np.full((height, width, 3), rgb_color, dtype=np.uint8)
-    rgb_frame = bv.VideoFrame.from_ndarray(rgb_array, format="rgb24")
+    rgb_frame = av.VideoFrame.from_ndarray(rgb_array, format="rgb24")
     return rgb_frame.reformat(format=pix_fmt)
 
 
@@ -38,11 +38,11 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
     for clip in tl.v:
         for obj in clip:
             if isinstance(obj, TlImage) and (obj.src, obj.width) not in img_cache:
-                with bv.open(obj.src.path) as cn:
+                with av.open(obj.src.path) as cn:
                     my_stream = cn.streams.video[0]
                     for frame in cn.decode(my_stream):
                         if obj.width != 0:
-                            graph = bv.filter.Graph()
+                            graph = av.filter.Graph()
                             graph.link_nodes(
                                 graph.add_buffer(template=my_stream),
                                 graph.add("scale", f"{obj.width}:-1"),
@@ -57,12 +57,12 @@ def make_image_cache(tl: v3) -> dict[tuple[FileInfo, int], np.ndarray]:
 
 
 def render_av(
-    output: bv.container.OutputContainer, tl: v3, args: Args, log: Log
-) -> Iterator[tuple[int, bv.VideoFrame]]:
-    from_ndarray = bv.VideoFrame.from_ndarray
+    output: av.container.OutputContainer, tl: v3, args: Args, log: Log
+) -> Iterator[tuple[int, av.VideoFrame]]:
+    from_ndarray = av.VideoFrame.from_ndarray
 
-    cns: dict[FileInfo, bv.container.InputContainer] = {}
-    decoders: dict[FileInfo, Iterator[bv.VideoFrame]] = {}
+    cns: dict[FileInfo, av.container.InputContainer] = {}
+    decoders: dict[FileInfo, Iterator[av.VideoFrame]] = {}
     seek_cost: dict[FileInfo, int] = {}
     tous: dict[FileInfo, int] = {}
 
@@ -76,7 +76,7 @@ def render_av(
             first_src = src
 
         if src not in cns:
-            cns[src] = bv.open(f"{src.path}")
+            cns[src] = av.open(f"{src.path}")
 
     for src, cn in cns.items():
         if len(cn.streams.video) > 0:
@@ -101,7 +101,7 @@ def render_av(
     log.debug(f"Tous: {tous}")
     log.debug(f"Clips: {tl.v}")
 
-    codec = bv.Codec(args.video_codec, "w")
+    codec = av.Codec(args.video_codec, "w")
 
     need_valid_fmt = True
     if codec.video_formats is not None:
@@ -120,7 +120,7 @@ def render_av(
 
     del codec
     output_stream = output.add_stream(args.video_codec, rate=target_fps)
-    output_stream.options = {"x265-params": "log-level=error"}  # type: ignore
+    output_stream.options = {"x265-params": "log-level=error"}
 
     cc = output_stream.codec_context
     if args.vprofile is not None:
@@ -133,7 +133,7 @@ def render_av(
         cc.profile = args.vprofile.title()
 
     yield output_stream  # type: ignore
-    if not isinstance(output_stream, bv.VideoStream):
+    if not isinstance(output_stream, av.VideoStream):
         log.error(f"Not a known video codec: {args.video_codec}")
     if src.videos and src.videos[0].lang is not None:
         output_stream.metadata["language"] = src.videos[0].lang
@@ -144,7 +144,7 @@ def render_av(
     else:
         target_width = max(round(tl.res[0] * args.scale), 2)
         target_height = max(round(tl.res[1] * args.scale), 2)
-        scale_graph = bv.filter.Graph()
+        scale_graph = av.filter.Graph()
         scale_graph.link_nodes(
             scale_graph.add(
                 "buffer", video_size="1x1", time_base="1/1", pix_fmt=pix_fmt
@@ -246,7 +246,7 @@ def render_av(
 
                 if (frame.width, frame.height) != tl.res:
                     width, height = tl.res
-                    graph = bv.filter.Graph()
+                    graph = av.filter.Graph()
                     graph.link_nodes(
                         graph.add_buffer(template=my_stream),
                         graph.add(
@@ -258,7 +258,7 @@ def render_av(
                     ).vpush(frame)
                     frame = graph.vpull()
             elif isinstance(obj, TlRect):
-                graph = bv.filter.Graph()
+                graph = av.filter.Graph()
                 x, y = obj.x, obj.y
                 graph.link_nodes(
                     graph.add_buffer(template=my_stream),

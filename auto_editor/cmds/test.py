@@ -11,8 +11,9 @@ from hashlib import sha256
 from tempfile import mkdtemp
 from time import perf_counter
 
-import bv
+import av
 import numpy as np
+from av import AudioStream, VideoStream
 
 from auto_editor.ffwrapper import FileInfo
 from auto_editor.lang.palet import Lexer, Parser, env, interpret
@@ -164,36 +165,36 @@ class Runner:
         file = "resources/testsrc.mp4"
         out = self.main([file], ["--faststart"]) + ".mp4"
         fast = calculate_sha256(out)
-        with bv.open(out) as container:
-            assert isinstance(container.streams[0], bv.VideoStream)
-            assert isinstance(container.streams[1], bv.AudioStream)
+        with av.open(out) as container:
+            assert isinstance(container.streams[0], VideoStream)
+            assert isinstance(container.streams[1], AudioStream)
 
         out = self.main([file], ["--no-faststart"]) + ".mp4"
         nofast = calculate_sha256(out)
-        with bv.open(out) as container:
-            assert isinstance(container.streams[0], bv.VideoStream)
-            assert isinstance(container.streams[1], bv.AudioStream)
+        with av.open(out) as container:
+            assert isinstance(container.streams[0], VideoStream)
+            assert isinstance(container.streams[1], AudioStream)
 
         out = self.main([file], ["--fragmented"]) + ".mp4"
         frag = calculate_sha256(out)
-        with bv.open(out) as container:
-            assert isinstance(container.streams[0], bv.VideoStream)
-            assert isinstance(container.streams[1], bv.AudioStream)
+        with av.open(out) as container:
+            assert isinstance(container.streams[0], VideoStream)
+            assert isinstance(container.streams[1], AudioStream)
 
         assert fast != nofast, "+faststart is not being applied"
         assert frag not in (fast, nofast), "fragmented output should diff."
 
     def test_example(self) -> None:
         out = self.main(["example.mp4"], [], output="example_ALTERED.mp4")
-        with bv.open(out) as container:
+        with av.open(out) as container:
             assert container.duration is not None
             assert container.duration > 17300000 and container.duration < 2 << 24
 
             assert len(container.streams) == 2
             video = container.streams[0]
             audio = container.streams[1]
-            assert isinstance(video, bv.VideoStream)
-            assert isinstance(audio, bv.AudioStream)
+            assert isinstance(video, VideoStream)
+            assert isinstance(audio, AudioStream)
             assert video.base_rate == 30
             assert video.average_rate is not None
             assert video.average_rate == 30, video.average_rate
@@ -207,28 +208,28 @@ class Runner:
 
     def test_video_to_mp3(self) -> None:
         out = self.main(["example.mp4"], [], output="example_ALTERED.mp3")
-        with bv.open(out) as container:
+        with av.open(out) as container:
             assert container.duration is not None
             assert container.duration > 17300000 and container.duration < 2 << 24
 
             assert len(container.streams) == 1
             audio = container.streams[0]
-            assert isinstance(audio, bv.AudioStream)
+            assert isinstance(audio, AudioStream)
             assert audio.codec.name in ("mp3", "mp3float")
             assert audio.sample_rate == 48000
             assert audio.layout.name == "stereo"
 
     def test_to_mono(self) -> None:
         out = self.main(["example.mp4"], ["-layout", "mono"], output="example_mono.mp4")
-        with bv.open(out) as container:
+        with av.open(out) as container:
             assert container.duration is not None
             assert container.duration > 17300000 and container.duration < 2 << 24
 
             assert len(container.streams) == 2
             video = container.streams[0]
             audio = container.streams[1]
-            assert isinstance(video, bv.VideoStream)
-            assert isinstance(audio, bv.AudioStream)
+            assert isinstance(video, VideoStream)
+            assert isinstance(audio, AudioStream)
             assert video.base_rate == 30
             assert video.average_rate is not None
             assert video.average_rate == 30, video.average_rate
@@ -305,18 +306,18 @@ class Runner:
         self.check([path, "--no-open"], "must have an extension")
 
     def test_silent_threshold(self):
-        with bv.open("resources/new-commentary.mp3") as container:
+        with av.open("resources/new-commentary.mp3") as container:
             assert container.duration is not None
-            assert container.duration / bv.time_base == 6.732
+            assert container.duration / av.time_base == 6.732
 
         out = self.main(
             ["resources/new-commentary.mp3"], ["--edit", "audio:threshold=0.1"]
         )
         out += ".mp3"
 
-        with bv.open(out) as container:
+        with av.open(out) as container:
             assert container.duration is not None
-            assert container.duration / bv.time_base == 6.552
+            assert container.duration / av.time_base == 6.552
 
     def test_track(self):
         out = self.main(["resources/multi-track.mov"], []) + ".mov"

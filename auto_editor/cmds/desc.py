@@ -1,7 +1,7 @@
 import sys
 from dataclasses import dataclass, field
 
-import bv
+import av
 
 from auto_editor.vanparse import ArgumentParser
 
@@ -21,7 +21,7 @@ def main(sys_args: list[str] = sys.argv[1:]) -> None:
     args = desc_options(ArgumentParser("desc")).parse_args(DescArgs, sys_args)
     for path in args.input:
         try:
-            container = bv.open(path)
+            container = av.open(path)
             desc = container.metadata.get("description", None)
         except Exception:
             desc = None
