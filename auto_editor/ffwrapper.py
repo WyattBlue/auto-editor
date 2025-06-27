@@ -4,14 +4,14 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
-import bv
+import av
 
 from auto_editor.utils.log import Log
 
 
 def mux(input: Path, output: Path, stream: int) -> None:
-    input_container = bv.open(input, "r")
-    output_container = bv.open(output, "w")
+    input_container = av.open(input, "r")
+    output_container = av.open(output, "w")
 
     input_audio_stream = input_container.streams.audio[stream]
     output_audio_stream = output_container.add_stream("pcm_s16le")
@@ -89,12 +89,12 @@ class FileInfo:
     @classmethod
     def init(self, path: str, log: Log) -> FileInfo:
         try:
-            cont = bv.open(path, "r")
-        except bv.error.FileNotFoundError:
+            cont = av.open(path, "r")
+        except av.error.FileNotFoundError:
             log.error(f"Input file doesn't exist: {path}")
-        except bv.error.IsADirectoryError:
+        except av.error.IsADirectoryError:
             log.error(f"Expected a media file, but got a directory: {path}")
-        except bv.error.InvalidDataError:
+        except av.error.InvalidDataError:
             log.error(f"Invalid data when processing: {path}")
 
         videos: tuple[VideoStream, ...] = ()
@@ -177,7 +177,7 @@ class FileInfo:
 
         timecode = get_timecode()
         bitrate = 0 if cont.bit_rate is None else cont.bit_rate
-        dur = 0 if cont.duration is None else cont.duration / bv.time_base
+        dur = 0 if cont.duration is None else cont.duration / av.time_base
 
         cont.close()
 

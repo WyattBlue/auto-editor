@@ -454,13 +454,13 @@ def main() -> None:
         buf.write(f"OS: {plat.system()} {plat.release()} {plat.machine().lower()}\n")
         buf.write(f"Python: {plat.python_version()}\nAV: ")
         try:
-            import bv
+            import av
         except (ModuleNotFoundError, ImportError):
             buf.write("not found")
         else:
             try:
-                buf.write(f"{bv.__version__} ")
-                license = bv._core.library_meta["libavcodec"]["license"]
+                buf.write(f"{av.__version__} ")
+                license = av._core.library_meta["libavcodec"]["license"]
                 buf.write(f"({license})")
             except AttributeError:
                 buf.write("error")
