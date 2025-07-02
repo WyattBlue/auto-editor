@@ -58,7 +58,7 @@ all_files = (
     "mov_text.mp4",
     "testsrc.mkv",
 )
-log = Log()
+log = Log(is_debug=True)
 
 
 def fileinfo(path: str) -> FileInfo:
