@@ -100,8 +100,10 @@ class Log:
         sys.stderr.write(f"\033[1m\033[33m{message}\033[0m\n")
 
     def error(self, message: str | Exception) -> NoReturn:
-        if self.is_debug and isinstance(message, Exception):
+        if self.is_debug:
             self.cleanup()
+            if isinstance(message, str):
+                raise Exception(message)
             raise message
 
         self.conwrite("")
