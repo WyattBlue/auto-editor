@@ -80,9 +80,6 @@ def set_output(
     return f"{root}{ext}", export
 
 
-codec_error = "'{}' codec is not supported in '{}' container."
-
-
 def set_video_codec(
     codec: str, src: FileInfo | None, out_ext: str, ctr: Container, log: Log
 ) -> str:
