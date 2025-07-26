@@ -99,7 +99,9 @@ def set_video_codec(
             log.error(f"Unknown encoder: {codec}")
         # Normalize encoder names
         if cobj.id not in (Codec(x, "w").id for x in ctr.vcodecs):
-            log.error(codec_error.format(codec, out_ext))
+            log.error(
+                f"'{codec}' video encoder is not supported in the '{out_ext}' container"
+            )
 
     return codec
 
@@ -127,8 +129,9 @@ def set_audio_codec(
             log.error(f"Unknown encoder: {codec}")
         # Normalize encoder names
         if cobj.id not in (Codec(x, "w").id for x in ctr.acodecs):
-            log.error(codec_error.format(codec, out_ext))
-
+            log.error(
+                f"'{codec}' audio encoder is not supported in the '{out_ext}' container"
+            )
     return codec
 
 

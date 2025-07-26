@@ -101,26 +101,21 @@ def render_av(
     log.debug(f"Tous: {tous}")
     log.debug(f"Clips: {tl.v}")
 
-    codec = av.Codec(args.video_codec, "w")
-
-    need_valid_fmt = True
-    if codec.video_formats is not None:
-        for video_format in codec.video_formats:
-            if pix_fmt == video_format.name:
-                need_valid_fmt = False
-                break
-
-    if need_valid_fmt:
-        if codec.canonical_name == "gif":
-            pix_fmt = "rgb8"
-        elif codec.canonical_name == "prores":
-            pix_fmt = "yuv422p10le"
-        else:
-            pix_fmt = "yuv420p"
-
-    del codec
     output_stream = output.add_stream(args.video_codec, rate=target_fps)
     output_stream.options = {"x265-params": "log-level=error"}
+
+    need_valid_fmt = not (
+        output_stream.codec.video_formats
+        and any(pix_fmt == vfmt.name for vfmt in output_stream.codec.video_formats)
+    )
+    if need_valid_fmt:
+        match output_stream.codec.canonical_name:
+            case "gif":
+                pix_fmt = "rgb8"
+            case "prores":
+                pix_fmt = "yuv422p10le"
+            case _:
+                pix_fmt = "yuv420p"
 
     cc = output_stream.codec_context
     if args.vprofile is not None:
