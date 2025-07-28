@@ -78,6 +78,7 @@ Export Methods:
  - final-cut-pro  ; Export as an XML timeline file for Final Cut Pro
     - name : "Auto-Editor Media Group"
  - shotcut ; Export as an XML timeline file for Shotcut
+ - kdenlive ; Export as an XML timeline file for kdenlive
  - v3 ; Export as an auto-editor v3 timeline file
  - v1 ; Export as an auto-editor v1 timeline file
  - clip-sequence  ; Export as multiple numbered media files

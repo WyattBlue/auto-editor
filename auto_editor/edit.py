@@ -51,6 +51,8 @@ def set_output(
                 export = "final-cut-pro"
             case ".mlt":
                 export = "shotcut"
+            case ".kdenlive":
+                export = "kdenlive"
             case ".json" | ".v1":
                 export = "v1"
             case ".v3":
@@ -65,6 +67,8 @@ def set_output(
             ext = ".fcpxml"
         case "shotcut":
             ext = ".mlt"
+        case "kdenlive":
+            ext = ".kdenlive"
         case "v1":
             if ext != ".json":
                 ext = ".v1"
@@ -149,6 +153,7 @@ def parse_export(export: str, log: Log) -> dict[str, Any]:
         "resolve": pAttrs("resolve", name_attr),
         "resolve-fcp7": pAttrs("resolve-fcp7", name_attr),
         "shotcut": pAttrs("shotcut"),
+        "kdenlive": pAttrs("kdenlive"),
         "v1": pAttrs("v1"),
         "v3": pAttrs("v3"),
         "clip-sequence": pAttrs("clip-sequence"),
@@ -260,6 +265,12 @@ def edit_media(paths: list[str], args: Args, log: Log) -> None:
         from auto_editor.exports.shotcut import shotcut_write_mlt
 
         shotcut_write_mlt(output, tl)
+        return
+
+    if export == "kdenlive":
+        from auto_editor.exports.kdenlive import kdenlive_write
+
+        kdenlive_write(output, tl)
         return
 
     if output == "-":
