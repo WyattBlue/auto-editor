@@ -441,6 +441,7 @@ def main() -> None:
             ({"--export-to-resolve", "-exr"}, ["--export", "resolve"]),
             ({"--export-to-final-cut-pro", "-exf"}, ["--export", "final-cut-pro"]),
             ({"--export-to-shotcut", "-exs"}, ["--export", "shotcut"]),
+            ({"--export-to-kdenlive", "-exs"}, ["--export", "kdenlive"]),
             ({"--export-as-clip-sequence", "-excs"}, ["--export", "clip-sequence"]),
             ({"--edit-based-on"}, ["--edit"]),
         ],
