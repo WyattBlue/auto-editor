@@ -247,12 +247,6 @@ def kdenlive_write(output: str, tl: v3) -> None:
             if clip.speed == 1:
                 clip_prod = f"chain{i}"
             else:
-                # FIXME warped clips only work if kdenlive is opened from cmd line tool?
-                # ERROR MESSAGE
-                # can't find clip with id: "" in bin playlist
-                # REGISTRATION  1072 ptr count 3
-                # Reusing timewarp producer!
-                # warp LENGTH 12888
                 clip_prod = f"producer{producers}"
                 producers += 1
 
