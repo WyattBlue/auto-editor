@@ -1,3 +1,9 @@
+# 28.1.0
+
+## Features
+- Add kdenlive export, by @guladam
+- Use PyAV 15.
+
 # 28.0.2
 
 ## Fixes
