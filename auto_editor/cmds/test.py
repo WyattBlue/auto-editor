@@ -28,6 +28,7 @@ from auto_editor.vanparse import ArgumentParser
 class TestArgs:
     only: list[str] = field(default_factory=list)
     help: bool = False
+    program: bool = False
     no_fail_fast: bool = False
     category: str = "cli"
 
@@ -35,6 +36,7 @@ class TestArgs:
 def test_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument("--only", "-n", nargs="*")
     parser.add_argument("--no-fail-fast", flag=True)
+    parser.add_argument("--program", flag=True)
     parser.add_required(
         "category",
         nargs=1,
@@ -79,8 +81,11 @@ class SkipTest(Exception):
 
 
 class Runner:
-    def __init__(self) -> None:
-        self.program = [sys.executable, "-m", "auto_editor"]
+    def __init__(self, is_program: bool) -> None:
+        if is_program:
+            self.program = ["./auto-editor"]
+        else:
+            self.program = [sys.executable, "-m", "auto_editor"]
         self.temp_dir = mkdtemp()
 
     def main(self, inputs: list[str], cmd: list[str], output: str | None = None) -> str:
@@ -776,7 +781,7 @@ def main(sys_args: list[str] | None = None) -> None:
         sys_args = sys.argv[1:]
 
     args = test_options(ArgumentParser("test")).parse_args(TestArgs, sys_args)
-    run = Runner()
+    run = Runner(args.program)
     tests = []
 
     test_methods = {
@@ -785,7 +790,7 @@ def main(sys_args: list[str] | None = None) -> None:
         if callable(getattr(Runner, name)) and name not in ["main", "raw", "check"]
     }
 
-    if args.category in {"palet", "all"}:
+    if not args.program and args.category in {"palet", "all"}:
         tests.extend(
             [test_methods[name] for name in ["palet_python_bridge", "palet_scripts"]]
         )
