@@ -85,6 +85,7 @@ Auto-Editor can also export to:
 - DaVinci Resolve with `--export resolve`
 - Final Cut Pro with `--export final-cut-pro`
 - ShotCut with `--export shotcut`
+- Kdenlive with `--export kdenlive`
 - Individual media clips with `--export clip-sequence`
 
 ### Naming Timelines
