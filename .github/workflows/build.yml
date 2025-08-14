@@ -6,58 +6,104 @@ on:
     paths-ignore:
       - '**.md'
       - '**.txt'
-      - '**.png'
-      - 'auto_editor/__init__.py'
+      - 'src/about.nim'
     branches:
       - master
   pull_request:
     branches:
       - master
+permissions:
+  contents: write
 jobs:
-  style:
+  main:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+            binary_name: auto-editor-linux-x86_64
+          - os: macos-13
+            arch: x86_64
+            binary_name: auto-editor-macos-x86_64
+          - os: macos-latest
+            arch: arm64
+            binary_name: auto-editor-macos-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Nim
+        if: runner.os != 'macOS'
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: "stable"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install packages for macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew update && brew install nim
+          brew unlink gettext libidn2 libpng libtiff libunistring libx11 libxau libxcb libxdmcp little-cms2 unbound
+      - name: Setup
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential pkg-config nasm git
+          elif [ "${{ matrix.os }}" = "macos-13" ]; then
+            brew install nasm
+            echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> $GITHUB_ENV
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
+          fi
+      - name: Build FFmpeg
+        run: nimble makeff
+      - name: Compile
+        run: nimble make
+      - name: Test
+        run: nimble test
+      - name: Rename binary
+        run: |
+          mv auto-editor ${{ matrix.binary_name }}
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ matrix.binary_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Lint
-        run: |
-          pip install .
-          pip install -U ruff mypy
-          ruff format --check auto_editor
-          mypy auto_editor
       - name: Nim
         uses: jiro4989/setup-nim-action@v2
         with:
           nim-version: "stable"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Docs
+      - name: Install mingw-w64
         run: |
-          make -C docs compile
-          make -C docs html
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 mingw-w64-tools mingw-w64-x86-64-dev
+          sudo apt-get install -y build-essential pkg-config nasm git
+      - name: Build FFmpeg
+        run: nimble makeffwin
+      - name: Compile
+        run: nimble windows
+      - name: Rename binary
+        run: |
+          mv auto-editor.exe auto-editor-windows-amd64.exe
 
-  main:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.10"]
-
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      # - name: Upload
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: dist-${{ matrix.arch }}
+      #     path: auto-editor-windows-amd64.exe
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install Auto-Editor
-        run: pip install .
-      - name: Run Debug
-        run: auto-editor --debug
-      - name: Test
-        run: auto-editor test all
+          files: auto-editor-windows-amd64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

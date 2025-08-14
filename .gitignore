@@ -1,19 +1,24 @@
+auto-editor
+build
+ffmpeg_sources
+.vscode
+tests/*
+!tests/*.nim
+!tests/*.py
+
 # Auto-Editor Generated Files
-example_ALTERED.mp4
+*_ALTERED*
 *https*
-config.pal
+*.v3
+
+# OS Files
+.DS_Store
+*.dylib
+*.o
 
 # Python Generated Files
 __pycache__/
 *.pyc
 *.pyo
 *.spec
-
-# Build Files
-build/
-dist/
 *.egg-info/
-
-# OS Files
-.DS_Store
-
