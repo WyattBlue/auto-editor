@@ -12,14 +12,9 @@ from tempfile import mkdtemp
 from time import perf_counter
 
 import av
-import numpy as np
 from av import AudioStream, VideoStream
 
 from auto_editor.ffwrapper import FileInfo
-from auto_editor.lang.palet import Lexer, Parser, env, interpret
-from auto_editor.lang.stdenv import make_standard_env
-from auto_editor.lib.data_structs import Char
-from auto_editor.lib.err import MyError
 from auto_editor.utils.log import Log
 from auto_editor.vanparse import ArgumentParser
 
@@ -29,13 +24,13 @@ class TestArgs:
     only: list[str] = field(default_factory=list)
     help: bool = False
     program: bool = False
-    no_fail_fast: bool = False
+    no_failfast: bool = False
     category: str = "cli"
 
 
 def test_options(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument("--only", "-n", nargs="*")
-    parser.add_argument("--no-fail-fast", flag=True)
+    parser.add_argument("--no-failfast", flag=True)
     parser.add_argument("--program", flag=True)
     parser.add_required(
         "category",
@@ -556,159 +551,6 @@ class Runner:
             ["example.mp4"], ["--audio-normalize", "ebu:i=-5,lra=20,gain=5,tp=-1"]
         )
 
-    def palet_python_bridge(self):
-        env.update(make_standard_env())
-
-        def cases(*cases: tuple[str, object]) -> None:
-            for text, expected in cases:
-                try:
-                    parser = Parser(Lexer("repl", text))
-                    env["timebase"] = Fraction(30)
-                    results = interpret(env, parser)
-                except MyError as e:
-                    raise ValueError(f"{text}\nMyError: {e}")
-
-                result_val = results[-1]
-                if isinstance(expected, np.ndarray):
-                    if not isinstance(result_val, np.ndarray):
-                        raise ValueError(f"{text}: Result is not an ndarray")
-                    if not np.array_equal(expected, result_val):
-                        raise ValueError(f"{text}: Numpy arrays don't match")
-                elif expected != result_val:
-                    raise ValueError(f"{text}: Expected: {expected}, got {result_val}")
-
-        cases(
-            ("345", 345),
-            ("238.5", 238.5),
-            ("-34", -34),
-            ("-98.3", -98.3),
-            ("3sec", 90),
-            ("-3sec", -90),
-            ("0.2sec", 6),
-            ("(+ 4 3)", 7),
-            ("(+ 4 3 2)", 9),
-            ("(+ 10.5 3)", 13.5),
-            ("(- 4 3)", 1),
-            ("(- 3)", -3),
-            ("(- 10.5 3)", 7.5),
-            ("(* 11.5 3)", 34.5),
-            ("(/ 3/4 4)", Fraction(3, 16)),
-            ("(/ 5)", 0.2),
-            ("(/ 6 1)", 6.0),
-            ("30/1", Fraction(30)),
-            ("(pow 2 3)", 8),
-            ("(pow 4 0.5)", 2.0),
-            ("(abs 1.0)", 1.0),
-            ("(abs -1)", 1),
-            ("(bool? #t)", True),
-            ("(bool? #f)", True),
-            ("(bool? 0)", False),
-            ("(bool? 1)", False),
-            ("(bool? false)", True),
-            ("(int? 2)", True),
-            ("(int? 3.0)", False),
-            ("(int? #t)", False),
-            ("(int? #f)", False),
-            ("(int? 4/5)", False),
-            ('(int? "hello")', False),
-            ('(int? "3")', False),
-            ("(float? -23.4)", True),
-            ("(float? 3.0)", True),
-            ("(float? #f)", False),
-            ("(float? 4/5)", False),
-            ("(float? 21)", False),
-            ("(frac? 4/5)", True),
-            ("(frac? 3.4)", False),
-            ('(& "Hello" " World")', "Hello World"),
-            ('(define apple "Red Wood") apple', "Red Wood"),
-            ("(= 1 1.0)", True),
-            ("(= 1 2)", False),
-            ("(= 1)", True),
-            ("(+)", 0),
-            ("(*)", 1),
-            ('(define num 13) ; Set number to 13\n"Hello"', "Hello"),
-            ('(if #t "Hello" apple)', "Hello"),
-            ('(if #f mango "Hi")', "Hi"),
-            ('{if (= [+ 3 4] 7) "yes" "no"}', "yes"),
-            ("((if #t + -) 3 4)", 7),
-            ("((if #f + -) 3 4)", -1),
-            ("(when (positive? 3) 17)", 17),
-            ("(string)", ""),
-            ("(string #\\a)", "a"),
-            ("(string #\\a #\\b)", "ab"),
-            ("(string #\\a #\\b #\\c)", "abc"),
-            (
-                "(margin (bool-array 0 0 0 1 0 0 0) 0)",
-                np.array([0, 0, 0, 1, 0, 0, 0], dtype=np.bool_),
-            ),
-            (
-                "(margin (bool-array 0 0 1 1 0 0 0) -2 2)",
-                np.array([0, 0, 0, 0, 1, 1, 0], dtype=np.bool_),
-            ),
-            ("(equal? 3 3)", True),
-            ("(equal? 3 3.0)", False),
-            ('(equal? 16.3 "Editor")', False),
-            ("(equal? (bool-array 1 1 0) (bool-array 1 1 0))", True),
-            ("(equal? (bool-array 0 1 0) (bool-array 1 1 0))", False),
-            ("(equal? (bool-array 0 1 0) (bool-array 0 1 0 0))", False),
-            ("(equal? #\\a #\\a)", True),
-            ('(equal? "a" #\\a)', False),
-            ("(equal? (vector 1 2 3) (vector 1 2 3))", True),
-            (
-                "(or (bool-array 1 0 0) (bool-array 0 0 0 1))",
-                np.array([1, 0, 0, 1], dtype=np.bool_),
-            ),
-            ("(len (vector 1 2 4))", 3),
-            ("(len #(1 2 4))", 3),
-            ("(len (bool-array 0 1 0))", 3),
-            ("(equal? (reverse #(0 1 2)) #(2 1 0))", True),
-            ("(equal? (reverse (vector 0 1 2)) (vector 2 1 0))", True),
-            ('(ref "Zyx" 1)', Char("y")),
-            ("(ref (vector 0.3 #\\a 2) 2)", 2),
-            ("(ref (range 0 10) 2)", 2),
-            ("((range 0 10) 2)", 2),
-            ("((vector 0.3 #\\a 17) 2)", 17),
-            ("(#(0.3 #\\a 17) 2)", 17),
-            ("(begin)", None),
-            ("(void)", None),
-            ("(begin (define r 10) (* 3.14 (* r r)))", 314.0),
-            ("#(-20dB 0dB 20dB)", [0.1, 1, 10]),
-            ("(define ca (lambda (r) (* 3.14 (* r r)))) (ca 5)", 78.5),
-            (
-                "(define ca (lambda (r) (void) (* 3.14 (* r r)))) (ca 5)",
-                78.5,
-            ),
-            ("(define (my-pow2 a) (* a a)) (my-pow2 30)", 900),
-            ("(define (my-pow2 a) (void) (* a a)) (my-pow2 30)", 900),
-            ("(~a 3 4 'a)", "34a"),
-            ("(~s 3 4 'a)", "3 4 a"),
-            ("(~v 3 4 'a)", "3 4 'a"),
-            ("(define (my-func x) (define (inner) 4) (+ x (inner))) (my-func 16)", 20),
-            ("(define (text child ...) child)", None),
-            ("(text)", []),
-            ("(text 1)", [1]),
-            ("(text 2 1)", [2, 1]),
-            ("(text 3 2 1)", [3, 2, 1]),
-            ("((or/c 0 1) 1)", True),
-            ("((or/c 0 1) 2)", False),
-            ("((or/c 0 1) 1)", True),
-            ('((or/c 0 1 string?) "hello")', True),
-            ("((or/c 0 1 string?) 3)", False),
-            ('"hello".title', "Hello"),
-            ('"hello".upper', "HELLO"),
-            ('"heLlo".lower', "hello"),
-            ('(define s "hello")s.title', "Hello"),
-            ("(define v #(2 0 3 -4 -2 5 1 4)) v.sort", [-4, -2, 0, 1, 2, 3, 4, 5]),
-            ("(define v #(2 0 3 -4 -2 5 1 4)) v.sort! v", [-4, -2, 0, 1, 2, 3, 4, 5]),
-            ('#(#("sym" "symbol?") "bool?")', [["sym", "symbol?"], "bool?"]),
-        )
-
-    def palet_scripts(self) -> None:
-        self.raw(["palet", "resources/scripts/scope.pal"])
-        self.raw(["palet", "resources/scripts/maxcut.pal"])
-        self.raw(["palet", "resources/scripts/case.pal"])
-        self.raw(["palet", "resources/scripts/testmath.pal"])
-
 
 def run_tests(tests: list[Callable], args: TestArgs) -> None:
     if args.only != []:
@@ -763,7 +605,7 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
                 print(f"{msg}[\033[1;32mPASSED\033[0m]", flush=True)
             else:
                 print(f"{msg}\033[1;31m[FAILED]\033[0m", flush=True)
-                if args.no_fail_fast:
+                if args.no_failfast:
                     print(f"\n{exception}")
                 else:
                     print("")
@@ -789,11 +631,6 @@ def main(sys_args: list[str] | None = None) -> None:
         for name in dir(Runner)
         if callable(getattr(Runner, name)) and name not in ["main", "raw", "check"]
     }
-
-    if not args.program and args.category in {"palet", "all"}:
-        tests.extend(
-            [test_methods[name] for name in ["palet_python_bridge", "palet_scripts"]]
-        )
 
     if args.category in {"sub", "all"}:
         tests.extend(
