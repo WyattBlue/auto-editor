@@ -1,0 +1,14 @@
+--- a/source/encoder/CMakeLists.txt
++++ b/source/encoder/CMakeLists.txt
+@@ -22,7 +22,9 @@
+     if(LINKED_12BIT)
+         list(APPEND APIFLAGS "-DLINKED_12BIT=1")
+     endif(LINKED_12BIT)
+-    string(REPLACE ";" " " APIFLAGSTR "${APIFLAGS}")
+-    set_source_files_properties(api.cpp PROPERTIES COMPILE_FLAGS ${APIFLAGSTR})
++    if(APIFLAGS)
++        string(REPLACE ";" " " APIFLAGSTR "${APIFLAGS}")
++        set_source_files_properties(api.cpp PROPERTIES COMPILE_FLAGS ${APIFLAGSTR})
++    endif(APIFLAGS)
+ endif(EXTRA_LIB)
+ 
