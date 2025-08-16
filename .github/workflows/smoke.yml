@@ -1,10 +1,15 @@
-name: build
+name: smoke
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
-permissions:
-  contents: write
+  push:
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - 'src/about.nim'
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 jobs:
   main:
     runs-on: ${{ matrix.os }}
@@ -13,13 +18,8 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: x86_64
-            binary_name: auto-editor-linux-x86_64
-          - os: macos-13
-            arch: x86_64
-            binary_name: auto-editor-macos-x86_64
           - os: macos-latest
             arch: arm64
-            binary_name: auto-editor-macos-arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,9 +39,6 @@ jobs:
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get update
             sudo apt-get install -y build-essential pkg-config nasm git
-          elif [ "${{ matrix.os }}" = "macos-13" ]; then
-            brew install nasm
-            echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           fi
@@ -51,16 +48,6 @@ jobs:
         run: nimble make
       - name: Test
         run: nimble test
-      - name: Rename binary
-        run: |
-          mv auto-editor ${{ matrix.binary_name }}
-      - name: Upload to Release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ matrix.binary_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   windows:
     runs-on: ubuntu-latest
@@ -81,20 +68,3 @@ jobs:
         run: nimble makeffwin
       - name: Compile
         run: nimble windows
-      - name: Rename binary
-        run: |
-          mv auto-editor.exe auto-editor-windows-amd64.exe
-
-      # - name: Upload
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: dist-${{ matrix.arch }}
-      #     path: auto-editor-windows-amd64.exe
-      - name: Upload to Release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: auto-editor-windows-amd64.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
