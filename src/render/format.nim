@@ -25,6 +25,30 @@ proc initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Pri
 
 proc `<`(a, b: Priority): bool = a.index < b.index
 
+
+proc checkAudioEncoder(encoder: ptr AVCodec, rate: cint) =
+  if encoder.sample_fmts == nil:
+    error &"{encoder.name}: No known audio formats avail."
+
+  var allowed: seq[cint]
+
+  if encoder.supported_samplerates != nil:
+    var i: cint = 0
+    let samplerates = cast[ptr UncheckedArray[cint]](encoder.supported_samplerates)
+    while samplerates[i] != 0:
+      allowed.add samplerates[i]
+      inc i
+  else:
+    if encoder.id == 86018: # aac_at
+      allowed = @[48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000]
+    else:
+      debug "audio encoder claims to support every samplerate"
+      return
+
+  if rate notin allowed:
+    let allowedStr = allowed.join(" ")
+    error &"samplerate '{rate}' not allowed for {encoder.name}.\nAllowed: {allowedStr}"
+
 proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: Bar) =
   var options: Table[string, string]
   var movFlags: seq[string] = @[]
@@ -68,9 +92,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate = rate,
           layout = tl.layout, metadata = {"language": "und"}.toTable)
       let encoder = aEncCtx.codec
-      if encoder.sample_fmts == nil:
-        error &"{encoder.name}: No known audio formats avail."
-
+      checkAudioEncoder(encoder, tl.sr)
       aEncCtx.open()
 
       # Update stream parameters after opening encoder for formats like AAC in MKV
@@ -98,9 +120,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate = rate,
             layout = tl.layout, metadata = {"language": tl.a[i].lang}.toTable)
         let encoder = aEncCtx.codec
-        if encoder.sample_fmts == nil:
-          error &"{encoder.name}: No known audio formats avail."
-
+        checkAudioEncoder(encoder, tl.sr)
         aEncCtx.open()
 
         # Update stream parameters after opening encoder for formats like AAC in MKV

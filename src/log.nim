@@ -116,7 +116,6 @@ proc closeTempDir*() =
   if tempDir != "":
     try:
       removeDir(tempDir)
-      debug "Removed Temp Directory."
     except OSError:
       discard
 
