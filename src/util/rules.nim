@@ -3,7 +3,7 @@ import std/strformat
 import ../ffmpeg
 import ../log
 
-proc defaultVideoCodec*(self: ptr AVOutputFormat): string =
+func defaultVideoCodec*(self: ptr AVOutputFormat): string =
   let codecId = self.video_codec
   if codecId != AV_CODEC_ID_NONE:
     let codecName = avcodec_get_name(codecId)
@@ -11,7 +11,7 @@ proc defaultVideoCodec*(self: ptr AVOutputFormat): string =
       return $codecName
   return "none"
 
-proc defaultAudioCodec*(self: ptr AVOutputFormat): string =
+func defaultAudioCodec*(self: ptr AVOutputFormat): string =
   let codecId = self.audio_codec
   if codecId != AV_CODEC_ID_NONE:
     let codecName = avcodec_get_name(codecId)
@@ -19,7 +19,7 @@ proc defaultAudioCodec*(self: ptr AVOutputFormat): string =
       return $codecName
   return "none"
 
-proc defaultSubtitleCodec*(self: ptr AVOutputFormat): string =
+func defaultSubtitleCodec*(self: ptr AVOutputFormat): string =
   let codecId = self.subtitle_codec
   if codecId != AV_CODEC_ID_NONE:
     let codecName = avcodec_get_name(codecId)
