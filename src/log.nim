@@ -14,15 +14,15 @@ type BarType* = enum
 
 type PackedInt* = distinct int64
 
-proc pack*(flag: bool, number: int64): PackedInt =
+func pack*(flag: bool, number: int64): PackedInt =
   let maskedNumber = number and 0x7FFFFFFFFFFFFFFF'i64
   let flagBit = if flag: 0x8000000000000000'i64 else: 0'i64
   PackedInt(flagBit or maskedNumber)
 
-proc getFlag*(packed: PackedInt): bool =
+func getFlag*(packed: PackedInt): bool =
   int64(packed) < 0
 
-proc getNumber*(packed: PackedInt): int64 =
+func getNumber*(packed: PackedInt): int64 =
   let raw = int64(packed) and 0x7FFFFFFFFFFFFFFF'i64
   if (raw and 0x4000000000000000'i64) != 0:
     raw or 0x8000000000000000'i64
@@ -135,7 +135,7 @@ proc error*(msg: string) {.noreturn.} =
 type StringInterner* = object
   strings*: Table[string, ptr string]
 
-proc newStringInterner*(): StringInterner =
+func newStringInterner*(): StringInterner =
   result.strings = initTable[string, ptr string]()
 
 proc intern*(interner: var StringInterner, s: string): ptr string =
