@@ -18,12 +18,12 @@ type Priority = object
   frame: ptr AVFrame
   stream: ptr AVStream
 
-proc initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Priority =
+func initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Priority =
   result.index = index
   result.frame = frame
   result.stream = stream
 
-proc `<`(a, b: Priority): bool = a.index < b.index
+func `<`(a, b: Priority): bool = a.index < b.index
 
 
 proc checkAudioEncoder(encoder: ptr AVCodec, rate: cint) =
