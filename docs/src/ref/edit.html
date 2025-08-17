@@ -6,12 +6,83 @@
 {{ head_icon }}
 <style>
 {{ core_style }}
+.palet-block {
+ padding-left: 7px;
+ padding-bottom: 7px;
+ padding-top: 7px;
+ margin-top: 30px;
+ margin-bottom: 6px;
+}
+.palet-block > p {margin-top: 0; margin-bottom: 0}
+.palet-var {
+    position: relative;
+    left: -1px;
+    font-size: 85%;
+    font-style: italic;
+    font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+.palet-val {
+    color: #0B65B8;
+    font-size: 85%;
+    font-family: SFMono-Regular, ui-monospace, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+.palet-block { background-color: #F9F5F5; border-top: 3px solid #EAEAEA}
+@media (prefers-color-scheme: dark) {
+  .palet-block {background-color: #323232; border-top: 3px solid #4A4A4A}
+  .palet-val {color: #A3DEFF}
+}
 </style>
+</head>
 <body>
 {{ nav }}
 <section class="section">
 <div class="container">
+<h1>Edit Reference</h1>
+<p>When you run:<p>
+<pre><code>auto-editor example.mp4 --edit audio:0.05,stream=0</code></pre>
+<p>You're writing the syntax-sugary equivalent of:</p>
+<pre><code>auto-editor example.mp4 --edit "(audio 0.05 #:stream 0)"</code></pre>
+<p>All the edit methods are listed below:</p>
+<h2>Edit Methods</h2>
+<div id="audio" class="palet-block">
+<p class="mono">(<b>audio</b>&nbsp;<span class="palet-var">[threshold]</span>&nbsp;<span class="palet-var">[stream]</span>&nbsp;<span class="palet-var">[mincut]</span>&nbsp;<span class="palet-var">[minclip]</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
+<p class="mono">&nbsp;<span class="palet-var">threshold</span>:&nbsp;Threshold&nbsp;=&nbsp;0.04</p>
+<p class="mono">&nbsp;<span class="palet-var">stream</span>:&nbsp;(U Natural 'all)&nbsp;=&nbsp;'all</p>
+<p class="mono">&nbsp;<span class="palet-var">mincut</span>:&nbsp;Natural&nbsp;=&nbsp;6</p>
+<p class="mono">&nbsp;<span class="palet-var">minclip</span>:&nbsp;Natural&nbsp;=&nbsp;3</p>
+</div>
+<p>Do a one-pass audio filter based on loudest sample in a timebase section, divided by the max value a sample can be. Then apply minclip, then mincut since this method particular benenfits.</p>
 
+<div id="motion" class="palet-block">
+<p class="mono">(<b>motion</b>&nbsp;<span class="palet-var">[threshold]</span>&nbsp;<span class="palet-var">[stream]</span>&nbsp;<span class="palet-var">[blur]</span>&nbsp;<span class="palet-var">[width]</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
+<p class="mono">&nbsp;<span class="palet-var">threshold</span>:&nbsp;Threshold&nbsp;=&nbsp;0.02</p>
+<p class="mono">&nbsp;<span class="palet-var">stream</span>:&nbsp;Natural&nbsp;=&nbsp;0</p>
+<p class="mono">&nbsp;<span class="palet-var">blur</span>:&nbsp;Natural&nbsp;=&nbsp;9</p>
+<p class="mono">&nbsp;<span class="palet-var">width</span>:&nbsp;Natural&nbsp;=&nbsp;400</p>
+</div>
+<p>Scale the video to <span class="palet-var">width</span> pixels, convert to grayscale, apply a Gaussian blur of <span class="palet-var">blur</span> amount, then compare the difference with the previous frame.</p>
+
+<div id="subtitle" class="palet-block">
+<p class="mono">(<b>subtitle</b>&nbsp;<span class="palet-var">pattern</span>&nbsp;<span class="palet-var">[stream]</span>&nbsp;<span class="palet-var">[ignore-case]</span>&nbsp;<span class="palet-var">[max-count]</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
+<p class="mono">&nbsp;<span class="palet-var">pattern</span>:&nbsp;String</p>
+<p class="mono">&nbsp;<span class="palet-var">stream</span>:&nbsp;Natural&nbsp;=&nbsp;0</p>
+<p class="mono">&nbsp;<span class="palet-var">ignore-case</span>:&nbsp;Bool&nbsp;=&nbsp;<span class="palet-val">#f</span></p>
+<p class="mono">&nbsp;<span class="palet-var">max-count</span>:&nbsp;(U Natural Nil)&nbsp;=&nbsp;<span class="palet-val">nil</span></p>
+</div>
+<p>When <span class="palet-var">pattern</span>, a RegEx Expression, matches a subtitle line, consider that time the line occupies as loud.</p>
+
+<h2>Operators</h2>
+<div id="or" class="palet-block">
+<p class="mono">(<b>or</b>&nbsp;<span class="palet-var">operand</span>&nbsp;<span class="palet-var">...</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
+<p class="mono">&nbsp;<span class="palet-var">operand</span>:&nbsp;<a href="#bool-array?">bool-array?</a></p>
+</div>
+<p>"Logical Or" two or more boolean arrays. If they are different lengths, use the biggest one.</p>
+
+<div id="and" class="palet-block">
+<p class="mono">(<b>and</b>&nbsp;<span class="palet-var">operand</span>&nbsp;<span class="palet-var">...</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
+<p class="mono">&nbsp;<span class="palet-var">operand</span>:&nbsp;<a href="#bool-array?">bool-array?</a></p>
+</div>
+<p>"Logical And" two or more boolean arrays.</p>
 </div>
 </section>
 </body>
