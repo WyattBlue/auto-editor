@@ -11,7 +11,6 @@
 make compile
 
 # Run local
-python build.py 
 make
 
 # Publish

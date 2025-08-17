@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{{ init_head }}
+{{ headerdesc "Options" "These are the options and flags that auto-editor uses." }}
+{{ head_icon }}
+<style>
+{{ core_style }}
+</style>
+<body>
+{{ nav }}
+<section class="section">
+<div class="container">
+<h2>Editing Options:</h2>
+<h3><code>--margin LENGTH</code></h3>
+<h4>Aliases: <code>-m</code></h4>
+<p>Set sections near "loud" as "loud" too if section is less than LENGTH away</p>
+<h3><code>--edit METHOD</code></h3>
+<p>Set an expression which determines how to make auto edits</p>
+<h3><code>--export EXPORT:ATTRS?</code></h3>
+<h4>Aliases: <code>-ex</code></h4>
+<p>Choose the export mode</p>
+<h3><code>--output FILE</code></h3>
+<h4>Aliases: <code>--output-file</code> <code>-o</code></h4>
+<p>Set the name/path of the new output file</p>
+<h3><code>--silent-speed NUM</code></h3>
+<h4>Aliases: <code>-s</code></h4>
+<p>Set speed of sections marked "silent" to NUM</p>
+<h3><code>--video-speed NUM</code></h3>
+<h4>Aliases: <code>--sounded-speed</code> <code>-v</code></h4>
+<p>Set speed of sections marked "loud" to NUM</p>
+<h3><code>--cut-out [START,STOP ...]</code></h3>
+<p>The range of media that will be removed completely, regardless of the value of silent speed</p>
+<h3><code>--add-in [START,STOP ...]</code></h3>
+<p>The range of media that will be added in, opposite of --cut-out</p>
+<h3><code>--set-speed-for-range [SPEED,START,STOP ...]</code></h3>
+<h4>Aliases: <code>--set-speed</code></h4>
+<p>Set an arbitrary speed for a given range</p>
+<h2>Timeline Options:</h2>
+<h3><code>--frame-rate NUM</code></h3>
+<h4>Aliases: <code>-fps</code> <code>-r</code> <code>--time-base</code> <code>-tb</code></h4>
+<p>Set timeline frame rate</p>
+<h3><code>--sample-rate NAT</code></h3>
+<h4>Aliases: <code>-ar</code></h4>
+<p>Set timeline sample rate</p>
+<h3><code>--resolution WIDTH,HEIGHT</code></h3>
+<h4>Aliases: <code>-res</code></h4>
+<p>Set timeline width and height</p>
+<h3><code>--background COLOR</code></h3>
+<h4>Aliases: <code>-b</code></h4>
+<p>Set the background as a solid RGB color</p>
+<h2>URL Download Options:</h2>
+<h3><code>--yt-dlp-location PATH</code></h3>
+<p>Set a custom path to yt-dlp</p>
+<h3><code>--download-format FORMAT</code></h3>
+<p>Set the yt-dlp download format (--format, -f)</p>
+<h3><code>--output-format TEMPLATE</code></h3>
+<p>Set the yt-dlp output file template (--output, -o)</p>
+<h3><code>--yt-dlp-extras CMD</code></h3>
+<p>Add extra options for yt-dlp. Must be in quotes</p>
+<h2>Display Options:</h2>
+<h3><code>--progress PROGRESS</code></h3>
+<p>Set what type of progress bar to use</p>
+<h3><code>--debug</code></h3>
+<p>Show debugging messages and values</p>
+<h3><code>--quiet</code></h3>
+<h4>Aliases: <code>-q</code></h4>
+<p>Display less output</p>
+<h3><code>--preview</code></h3>
+<h4>Aliases: <code>--stats</code></h4>
+<p>Show stats on how the input will be cut and halt</p>
+<h2>Container Settings:</h2>
+<h3><code>-sn</code></h3>
+<p>Disable the inclusion of subtitle streams in the output file</p>
+<h3><code>-dn</code></h3>
+<p>Disable the inclusion of data streams in the output file</p>
+<h3><code>--faststart</code></h3>
+<p>Enable movflags +faststart, recommended for web (default)</p>
+<h3><code>--no-faststart</code></h3>
+<p>Disable movflags +faststart, will be faster for large files</p>
+<h3><code>--fragmented</code></h3>
+<p>Use fragmented mp4/mov to allow playback before video is complete
+See: https://ffmpeg.org/ffmpeg-formats.html#Fragmentation</p>
+<h3><code>--no-fragmented</code></h3>
+<p>Do not use fragmented mp4/mov for better compatibility (default)</p>
+<h2>Video Rendering:</h2>
+<h3><code>--video-codec ENCODER</code></h3>
+<h4>Aliases: <code>-vcodec</code> <code>-c:v</code></h4>
+<p>Set video codec for output media</p>
+<h3><code>--video-bitrate BITRATE</code></h3>
+<h4>Aliases: <code>-b:v</code></h4>
+<p>Set the number of bits per second for video</p>
+<h3><code>-vprofile PROFILE</code></h3>
+<h4>Aliases: <code>-profile:v</code></h4>
+<p>Set the video profile. For h264: high, main, or baseline</p>
+<h3><code>--scale NUM</code></h3>
+<p>Scale the output video's resolution by NUM factor</p>
+<h3><code>--no-seek</code></h3>
+<p>Disable file seeking when rendering video. Helpful for debugging desync issues</p>
+<h2>Audio Rendering:</h2>
+<h3><code>--audio-codec ENCODER</code></h3>
+<h4>Aliases: <code>-acodec</code> <code>-c:a</code></h4>
+<p>Set audio codec for output media</p>
+<h3><code>--audio-layout LAYOUT</code></h3>
+<h4>Aliases: <code>-channel-layout</code> <code>-layout</code></h4>
+<p>Set the audio layout for the output media/timeline</p>
+<h3><code>--audio-bitrate BITRATE</code></h3>
+<h4>Aliases: <code>-b:a</code></h4>
+<p>Set the number of bits per second for audio</p>
+<h3><code>--mix-audio-streams</code></h3>
+<p>Mix all audio streams together into one</p>
+<h3><code>--keep-tracks-separate</code></h3>
+<p>Don't mix all audio streams into one when exporting (default)</p>
+<h3><code>--audio-normalize NORM-TYPE</code></h3>
+<p>Apply audio rendering to all audio tracks. Applied right before rendering the output file</p>
+<h2>Miscellaneous:</h2>
+<h3><code>--no-cache</code></h3>
+<p>Don't look for or write a cache file</p>
+<h3><code>--no-open</code></h3>
+<p>Do not open the output file after editing is done</p>
+<h3><code>--temp-dir PATH</code></h3>
+<p>Set where the temporary directory is located</p>
+<h3><code>--player CMD</code></h3>
+<h4>Aliases: <code>-p</code></h4>
+<p>Set player to open output media files</p>
+<h3><code>--version</code></h3>
+<h4>Aliases: <code>-V</code></h4>
+<p>Display version and halt</p>
+</div>
+</section>
+</body>
+</html>

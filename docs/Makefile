@@ -15,13 +15,11 @@ endif
 html: $(SRC_FILES)
 	rm -rf public
 	cp -R src public
-	python3 build.py
 	./make
 
 htmldev: $(SRC_FILES)
 	rm -rf public
 	cp -R src public
-	python3 build.py
 	./make --dev
 
 local: html
