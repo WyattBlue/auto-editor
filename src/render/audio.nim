@@ -129,11 +129,10 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
           if frame.format == AV_SAMPLE_FMT_S16.cint:
             # Interleaved 16-bit
             let audioData = cast[ptr UncheckedArray[int16]](frame.data[0])
-            for i in 0..<samplesToProcess:
-              let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * 2  # Interleaved index
-              for ch in 0 ..< channels:
-                result[resultIndex + ch] = audioData[frameIndex * channels + ch]
+            let sourceOffset = samplesSkippedInFrame * channels
+            let destOffset = totalSamples * channels
+            let bytesToCopy = samplesToProcess * channels * sizeof(int16)
+            copyMem(addr result[destOffset], addr audioData[sourceOffset], bytesToCopy)
 
           elif frame.format == AV_SAMPLE_FMT_S16P.cint:
             # Planar 16-bit
@@ -169,6 +168,27 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
                   let floatSample = channelData[frameIndex]
                   let clampedSample = max(-1.0, min(1.0, floatSample))
                   result[resultIndex + ch] = int16(clampedSample * 32767.0)
+
+          elif frame.format == AV_SAMPLE_FMT_S32.cint:
+            # Interleaved 32-bit
+            let audioData = cast[ptr UncheckedArray[int32]](frame.data[0])
+            for i in 0..<samplesToProcess:
+              let frameIndex = samplesSkippedInFrame + i
+              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              for ch in 0 ..< channels:
+                # Convert 32-bit to 16-bit by shifting right 16 bits
+                result[resultIndex + ch] = int16(audioData[frameIndex * channels + ch] shr 16)
+
+          elif frame.format == AV_SAMPLE_FMT_S32P.cint:
+            # Planar 32-bit
+            for i in 0..<samplesToProcess:
+              let frameIndex = samplesSkippedInFrame + i
+              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              for ch in 0 ..< channels:
+                if frame.data[ch] != nil:
+                  let channelData = cast[ptr UncheckedArray[int32]](frame.data[ch])
+                  # Convert 32-bit to 16-bit by shifting right 16 bits
+                  result[resultIndex + ch] = int16(channelData[frameIndex] shr 16)
           else:
             error &"Unsupported audio format: {av_get_sample_fmt_name(frame.format)}"
 
