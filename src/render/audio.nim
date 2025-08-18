@@ -62,7 +62,7 @@ proc close(getter: Getter) =
   avcodec_free_context(addr getter.decoderCtx)
   getter.container.close()
 
-proc get(getter: Getter, start: int, endSample: int): seq[seq[int16]] =
+proc get(getter: Getter, start: int, endSample: int): seq[int16] =
   # start/end is in samples
   let container = getter.container
   let stream = getter.stream
@@ -70,8 +70,8 @@ proc get(getter: Getter, start: int, endSample: int): seq[seq[int16]] =
 
   let targetSamples = endSample - start
 
-  # Initialize result with proper size (default zero-filled)
-  result = @[newSeq[int16](targetSamples), newSeq[int16](targetSamples)]
+  # Initialize result with proper size for interleaved stereo (default zero-filled)
+  result = newSeq[int16](targetSamples * 2)
 
   # Convert sample position to time and seek
   let sampleRate = stream.codecpar.sample_rate
@@ -131,59 +131,49 @@ proc get(getter: Getter, start: int, endSample: int): seq[seq[int16]] =
             let audioData = cast[ptr UncheckedArray[int16]](frame.data[0])
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
-              for ch in 0..<channels:
-                result[ch][totalSamples + i] = audioData[frameIndex * channels + ch]
+              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              for ch in 0 ..< channels:
+                result[resultIndex + ch] = audioData[frameIndex * channels + ch]
 
           elif frame.format == AV_SAMPLE_FMT_S16P.cint:
             # Planar 16-bit
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
-              for ch in 0..<channels:
+              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              for ch in 0 ..< channels:
                 if frame.data[ch] != nil:
                   let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-                  result[ch][totalSamples + i] = channelData[frameIndex]
+                  result[resultIndex + ch] = channelData[frameIndex]
 
           elif frame.format == AV_SAMPLE_FMT_FLT.cint:
             # Interleaved float
             let audioData = cast[ptr UncheckedArray[cfloat]](frame.data[0])
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
-              for ch in 0..<channels:
+              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              for ch in 0 ..< channels:
                 # Convert float to 16-bit int with proper clamping
                 let floatSample = audioData[frameIndex * channels + ch]
                 let clampedSample = max(-1.0, min(1.0, floatSample))
-                result[ch][totalSamples + i] = int16(clampedSample * 32767.0)
+                result[resultIndex + ch] = int16(clampedSample * 32767.0)
 
           elif frame.format == AV_SAMPLE_FMT_FLTP.cint:
             # Planar float
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
-              for ch in 0..<channels:
+              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              for ch in 0 ..< channels:
                 if frame.data[ch] != nil:
                   let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
                   # Convert float to 16-bit int with proper clamping
                   let floatSample = channelData[frameIndex]
                   let clampedSample = max(-1.0, min(1.0, floatSample))
-                  result[ch][totalSamples + i] = int16(clampedSample * 32767.0)
+                  result[resultIndex + ch] = int16(clampedSample * 32767.0)
           else:
-            # Unsupported format - samples already initialized to silence
-            discard
+            error &"Unsupported audio format: {av_get_sample_fmt_name(frame.format)}"
 
           totalSamples += samplesToProcess
           samplesProcessed += samples
-
-  # If we have mono input, duplicate to second channel
-  if result.len >= 2 and result[0].len > 0 and result[1].len > 0:
-    # Check if second channel is all zeros (mono source)
-    var isSecondChannelEmpty = true
-    for i in 0..<min(1000, result[1].len): # Check more samples for accuracy
-      if result[1][i] != 0:
-        isSecondChannelEmpty = false
-        break
-
-    if isSecondChannelEmpty:
-      # Copy first channel to second for stereo output using copyMem
-      copyMem(addr result[1][0], addr result[0][0], result[0].len * sizeof(int16))
 
 proc createAudioFilterGraph(clip: Clip, sr: int, layout: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
@@ -251,17 +241,17 @@ proc createAudioFilterGraph(clip: Clip, sr: int, layout: string): (ptr AVFilterG
   return (filterGraph, bufferSrc, bufferSink)
 
 # Returns seq[int16] where channel data is interleaved: [L, R, L, R, L, R] etc.
-proc processAudioClip(clip: Clip, data: seq[seq[int16]], sourceSr: cint, targetSr: cint): seq[int16] =
-  if data.len == 0 or data[0].len == 0:
+proc processAudioClip(clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
+  if data.len == 0:
     return @[]
 
   # First apply speed/volume processing at source sample rate (if needed)
   var processedData = data
   if clip.speed != 1.0 or clip.volume != 1.0:
-    let actualChannels = data.len
-    let channels = if actualChannels == 1: 1 else: 2
-    let samples = data[0].len
-    let layout = (if channels == 1: "mono" else: "stereo")
+    # Data is interleaved: [L, R, L, R, ...] so always stereo
+    let channels = 2
+    let samples = data.len div 2
+    let layout = "stereo"
     let (filterGraph, bufferSrc, bufferSink) = createAudioFilterGraph(clip, sourceSr, layout)
     defer:
       if filterGraph != nil:
@@ -284,22 +274,13 @@ proc processAudioClip(clip: Clip, data: seq[seq[int16]], sourceSr: cint, targetS
     if av_frame_get_buffer(inputFrame, 0) < 0:
       error "Could not allocate input audio frame buffer"
 
-    # Copy input data to frame (planar format)
+    # Copy input data to frame (convert from interleaved to planar format)
     for ch in 0..<channels:
       let channelData = cast[ptr UncheckedArray[int16]](inputFrame.data[ch])
       for i in 0..<samples:
-        if ch == 0:
-          if i < data[0].len:
-            channelData[i] = data[0][i]
-          else:
-            channelData[i] = 0
-        elif ch == 1:
-          if actualChannels >= 2 and i < data[1].len:
-            channelData[i] = data[1][i]
-          elif i < data[0].len:
-            channelData[i] = data[0][i]
-          else:
-            channelData[i] = 0
+        let srcIndex = i * 2 + ch  # Interleaved index
+        if srcIndex < data.len:
+          channelData[i] = data[srcIndex]
         else:
           channelData[i] = 0
 
@@ -327,15 +308,15 @@ proc processAudioClip(clip: Clip, data: seq[seq[int16]], sourceSr: cint, targetS
 
       outputFrames.add(outputFrame)
 
-    # Convert output frames back to seq[seq[int16]]
+    # Convert output frames back to interleaved seq[int16]
     if outputFrames.len == 0:
-      processedData = @[newSeq[int16](0), newSeq[int16](0)]
+      processedData = @[]
     else:
       var totalSamples = 0
       for frame in outputFrames:
         totalSamples += frame.nb_samples.int
 
-      processedData = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
+      processedData = newSeq[int16](totalSamples * 2)  # Interleaved stereo
 
       var sampleOffset = 0
       for frame in outputFrames:
@@ -343,48 +324,45 @@ proc processAudioClip(clip: Clip, data: seq[seq[int16]], sourceSr: cint, targetS
         let frameChannels = min(frame.ch_layout.nb_channels.int, 2)
 
         if frame.format == AV_SAMPLE_FMT_S16P.cint:
-          for ch in 0..<min(processedData.len, frameChannels):
-            if frame.data[ch] != nil:
-              let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-              for i in 0..<frameSamples:
-                if sampleOffset + i < processedData[ch].len:
-                  processedData[ch][sampleOffset + i] = channelData[i]
+          # Convert from planar to interleaved
+          for i in 0..<frameSamples:
+            let interleavedIndex = (sampleOffset + i) * 2
+            for ch in 0..<frameChannels:
+              if frame.data[ch] != nil and interleavedIndex + ch < processedData.len:
+                let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
+                processedData[interleavedIndex + ch] = channelData[i]
         elif frame.format == AV_SAMPLE_FMT_S16.cint:
+          # Already interleaved, just copy
           let audioData = cast[ptr UncheckedArray[int16]](frame.data[0])
           for i in 0..<frameSamples:
-            for ch in 0..<min(processedData.len, frameChannels):
-              if sampleOffset + i < processedData[ch].len:
-                processedData[ch][sampleOffset + i] = audioData[i * frameChannels + ch]
+            let interleavedIndex = (sampleOffset + i) * 2
+            for ch in 0..<frameChannels:
+              if interleavedIndex + ch < processedData.len:
+                processedData[interleavedIndex + ch] = audioData[i * frameChannels + ch]
 
         sampleOffset += frameSamples
 
-      # Duplicate mono to stereo if needed
-      if processedData.len >= 2 and processedData[0].len > 0 and processedData[1].len > 0:
+      # Duplicate mono to stereo if needed (in interleaved format)
+      if processedData.len >= 2:
         var isSecondChannelEmpty = true
-        for i in 0..<min(1000, processedData[1].len):
-          if processedData[1][i] != 0:
+        for i in 0..<min(1000, processedData.len div 2):
+          if processedData[i * 2 + 1] != 0:
             isSecondChannelEmpty = false
             break
         if isSecondChannelEmpty:
-          copyMem(addr processedData[1][0], addr processedData[0][0], processedData[0].len * sizeof(int16))
+          for i in 0..<(processedData.len div 2):
+            processedData[i * 2 + 1] = processedData[i * 2]
 
   # Now resample from source to target sample rate
   if sourceSr == targetSr:
-    # Convert from channel-separated to interleaved format
-    let channels = min(processedData.len, 2)
-    let samples = if processedData.len > 0: processedData[0].len else: 0
-    result = newSeq[int16](samples * 2)  # Always use stereo output
-    for i in 0..<samples:
-      result[i * 2] = if channels > 0 and i < processedData[0].len: processedData[0][i] else: 0
-      result[i * 2 + 1] = if channels > 1 and i < processedData[1].len: processedData[1][i] else: 
-                           (if channels > 0 and i < processedData[0].len: processedData[0][i] else: 0)
-    return result
+    # Data is already in interleaved format
+    return processedData
 
-  if processedData.len == 0 or processedData[0].len == 0:
+  if processedData.len == 0:
     return @[]
 
-  let channels = processedData.len
-  let samples = processedData[0].len
+  let channels = 2  # Always stereo interleaved
+  let samples = processedData.len div 2
 
   # Create resampler for this conversion
   var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, if channels == 1: "mono" else: "stereo", targetSr.int)
@@ -406,12 +384,13 @@ proc processAudioClip(clip: Clip, data: seq[seq[int16]], sourceSr: cint, targetS
   if av_frame_get_buffer(inputFrame, 0) < 0:
     error "Could not allocate input frame buffer for resampling"
 
-  # Copy data to input frame
+  # Copy data to input frame (convert from interleaved to planar)
   for ch in 0..<channels:
     let channelData = cast[ptr UncheckedArray[int16]](inputFrame.data[ch])
     for i in 0..<samples:
-      if i < processedData[ch].len:
-        channelData[i] = processedData[ch][i]
+      let srcIndex = i * 2 + ch  # Interleaved index
+      if srcIndex < processedData.len:
+        channelData[i] = processedData[srcIndex]
       else:
         channelData[i] = 0
 
