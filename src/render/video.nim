@@ -171,6 +171,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
           "language": tl.v[0].lang}.toTable)
   let codec = encoderCtx.codec
 
+  if codec.id == 173:
+    discard av_opt_set(encoderCtx.priv_data, "x265-params", "log-level=error", 0)
+
   encoderCtx.framerate = targetFps
   encoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
 
