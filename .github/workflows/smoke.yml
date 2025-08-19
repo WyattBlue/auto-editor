@@ -48,6 +48,8 @@ jobs:
         run: nimble make
       - name: Test
         run: nimble test
+      - name: e2e Test
+        run: python3 -m pip install av && python3 tests/test.py
 
   windows:
     runs-on: ubuntu-latest

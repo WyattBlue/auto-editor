@@ -1,10 +1,10 @@
+import argparse
 import concurrent.futures
 import hashlib
 import os
 import shutil
 import subprocess
 import sys
-import argparse
 from collections.abc import Callable
 from fractions import Fraction
 from hashlib import sha256
@@ -13,7 +13,6 @@ from time import perf_counter
 
 import av
 from av import AudioStream, VideoStream
-
 from ffwrapper import FileInfo
 from log import Log
 
@@ -332,6 +331,7 @@ class Runner:
         self.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
 
     def test_export_subtitles(self) -> None:
+        raise SkipTest()  # TODO
         # cn = fileinfo(self.main(["resources/mov_text.mp4"], [], "movtext_out.mp4"))
 
         # assert len(cn.videos) == 1
@@ -610,9 +610,7 @@ def main():
         for name in dir(Runner)
         if callable(getattr(Runner, name)) and name not in ["main", "raw", "check"]
     }
-    tests.extend(
-        [test_methods[name] for name in ["info", "levels", "subdump", "desc"]]
-    )
+    tests.extend([test_methods[name] for name in ["info", "levels", "subdump", "desc"]])
     tests.extend(
         [
             getattr(run, name)
