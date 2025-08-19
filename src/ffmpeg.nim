@@ -4,13 +4,15 @@ when defined(macosx):
 when defined(linux):
   {.passL: "-L./build/lib/x86_64-linux-gnu -L./build/lib64"}
 {.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil".}
-{.passL: "-lmp3lame -lopus -lvpx -lx264 -lx265 -ldav1d -lSvtAv1Enc -lm".}
+{.passL: "-lmp3lame -lopus -lvpx -lx264 -ldav1d -lSvtAv1Enc".}
 
-when defined(macosx): # For x265
-  {.passL: "-lc++"}
-else:
-  {.passL: "-lstdc++"}
-
+when not defined(disable_hevc):
+  {.passL: "-lx265".}
+  when defined(macosx):
+    {.passL: "-lc++"}
+  else:
+    {.passL: "-lstdc++"}
+{.passL: "-lm".}
 
 import std/posix
 

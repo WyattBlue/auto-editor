@@ -15,12 +15,13 @@ requires "checksums"
 import std/os
 import std/[strutils, strformat]
 
+var disableHevc = (if getEnv("DISABLE_HEVC").len > 0: "-d:disable_hevc" else: "")
 
 task test, "Test the project":
-  exec "nim c -r tests/rationals"
+  exec &"nim c {disableHevc} -r tests/rationals"
 
 task make, "Export the project":
-  exec "nim c -d:danger --out:auto-editor src/main.nim"
+  exec &"nim c -d:danger {disableHevc} --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
     exec "stat -f \"%z bytes\" ./auto-editor"
@@ -58,6 +59,7 @@ type Package = object
   sha256: string
   buildArguments: seq[string]
   buildSystem: string = "autoconf"
+  ffFlag: string = ""
 
 let nvheaders = Package(
   name: "nv-codec-headers",
@@ -69,24 +71,28 @@ let lame = Package(
   sourceUrl: "http://deb.debian.org/debian/pool/main/l/lame/lame_3.100.orig.tar.gz",
   sha256: "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e",
   buildArguments: @["--disable-frontend", "--disable-decoder", "--disable-gtktest"],
+  ffFlag: "--enable-libmp3lame",
 )
 let opus = Package(
   name: "opus",
   sourceUrl: "https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz",
   sha256: "65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1",
   buildArguments: @["--disable-doc", "--disable-extra-programs"],
+  ffFlag: "--enable-libopus",
 )
 let vpx = Package(
   name: "libvpx",
   sourceUrl: "https://github.com/webmproject/libvpx/archive/refs/tags/v1.15.2.tar.gz",
   sha256: "26fcd3db88045dee380e581862a6ef106f49b74b6396ee95c2993a260b4636aa",
   buildArguments: "--disable-dependency-tracking --disable-examples --disable-unit-tests --enable-pic --enable-runtime-cpu-detect --enable-vp9-highbitdepth".split(" "),
+  ffFlag: "--enable-libvpx",
 )
 let dav1d = Package(
   name: "dav1d",
   sourceUrl: "https://code.videolan.org/videolan/dav1d/-/archive/1.5.1/dav1d-1.5.1.tar.bz2",
   sha256: "4eddffd108f098e307b93c9da57b6125224dc5877b1b3d157b31be6ae8f1f093",
   buildSystem: "meson",
+  ffFlag: "--enable-libdav1d",
 )
 let svtav1 = Package(
   name: "libsvtav1",
@@ -94,18 +100,21 @@ let svtav1 = Package(
   sha256: "8231b63ea6c50bae46a019908786ebfa2696e5743487270538f3c25fddfa215a",
   buildSystem: "cmake",
   buildArguments: @["-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=ON"],
+  ffFlag: "--enable-libsvtav1",
 )
 let x264 = Package(
   name: "x264",
   sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/32c3b801191522961102d4bea292cdb61068d0dd/x264-32c3b801191522961102d4bea292cdb61068d0dd.tar.bz2",
   sha256: "d7748f350127cea138ad97479c385c9a35a6f8527bc6ef7a52236777cf30b839",
   buildArguments: "--disable-cli --disable-lsmash --disable-swscale --disable-ffms --enable-strip".split(" "),
+  ffFlag: "--enable-libx264",
 )
 let x265 = Package(
   name: "x265",
   sourceUrl: "https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz",
   sha256: "a31699c6a89806b74b0151e5e6a7df65de4b49050482fe5ebf8a4379d7af8f29",
   buildSystem: "x265",
+  ffFlag: "--enable-libx265"
 )
 let ffmpeg = Package(
   name: "ffmpeg",
@@ -115,7 +124,10 @@ let ffmpeg = Package(
 var packages: seq[Package] = @[]
 if not defined(macosx):
   packages.add nvheaders
-packages &= [lame, opus, vpx, dav1d, svtav1, x264, x265]
+packages &= [lame, opus, vpx, dav1d, svtav1, x264]
+if disableHevc.len == 0:
+  packages.add x265
+
 
 func location(package: Package): string = # tar location
   if package.name == "libvpx":
@@ -450,20 +462,18 @@ var commonFlags = &"""
   --disable-indevs \
   --disable-outdevs \
   --disable-xlib \
+  --disable-bsfs \
   --disable-filters \
   --enable-filter=scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
-  --enable-libmp3lame \
-  --enable-libopus \
-  --enable-libvpx \
-  --enable-libdav1d \
-  --enable-libsvtav1 \
-  --enable-libx264 \
-  --enable-libx265 \
   --disable-encoder={encodersDisabled} \
   --disable-decoder={decodersDisabled} \
   --disable-demuxer={demuxersDisabled} \
   --disable-muxer={muxersDisabled} \
 """
+
+for package in packages:
+  if package.ffFlag != "":
+    commonFlags &= &"  {package.ffFlag} \\\n"
 
 if defined(arm) or defined(arm64):
   commonFlags &= "  --enable-neon \\\n"
@@ -535,7 +545,7 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
   if not dirExists("build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
-    exec "nim c -d:danger --os:windows --cpu:amd64 --cc:gcc " &
+    exec "nim c -d:danger " & disableHevc & " --os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
          "--passL:-lbcrypt " & # Add Windows Bcrypt library
