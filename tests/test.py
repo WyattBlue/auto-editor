@@ -4,8 +4,8 @@ import os
 import shutil
 import subprocess
 import sys
+import argparse
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from fractions import Fraction
 from hashlib import sha256
 from tempfile import mkdtemp
@@ -16,26 +16,12 @@ from av import AudioStream, VideoStream
 
 from ffwrapper import FileInfo
 from log import Log
-from vanparse import ArgumentParser
 
 
-@dataclass(slots=True)
-class TestArgs:
-    only: list[str] = field(default_factory=list)
-    help: bool = False
-    no_failfast: bool = False
-    category: str = "cli"
-
-
-def test_options(parser: ArgumentParser) -> ArgumentParser:
-    parser.add_argument("--only", "-n", nargs="*")
-    parser.add_argument("--no-failfast", flag=True)
-    parser.add_required(
-        "category",
-        nargs=1,
-        choices=("cli", "sub", "all"),
-        metavar="category [options]",
-    )
+def test_options() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Test options")
+    parser.add_argument("--only", "-n", nargs="*", default=[])
+    parser.add_argument("--no-failfast", action="store_true", default=False)
     return parser
 
 
@@ -394,7 +380,9 @@ class Runner:
                 continue
 
             p_xml = self.main([f"resources/{test_name}"], ["-exp"], "out.xml")
-            self.main([p_xml], [])
+
+            # TODO: Support premiere XML as input.
+            # self.main([p_xml], [])
 
     def test_export(self):
         for test_name in all_files:
@@ -547,7 +535,7 @@ class Runner:
         )
 
 
-def run_tests(tests: list[Callable], args: TestArgs) -> None:
+def run_tests(tests: list[Callable], args) -> None:
     if args.only != []:
         tests = list(filter(lambda t: t.__name__ in args.only, tests))
 
@@ -613,33 +601,25 @@ def run_tests(tests: list[Callable], args: TestArgs) -> None:
     )
 
 
-def main(sys_args: list[str] | None = None) -> None:
-    if sys_args is None:
-        sys_args = sys.argv[1:]
-
-    args = test_options(ArgumentParser("test")).parse_args(TestArgs, sys_args)
+def main():
+    args = test_options().parse_args()
     run = Runner()
     tests = []
-
     test_methods = {
         name: getattr(run, name)
         for name in dir(Runner)
         if callable(getattr(Runner, name)) and name not in ["main", "raw", "check"]
     }
-
-    if args.category in {"sub", "all"}:
-        tests.extend(
-            [test_methods[name] for name in ["info", "levels", "subdump", "desc"]]
-        )
-
-    if args.category in {"cli", "all"}:
-        tests.extend(
-            [
-                getattr(run, name)
-                for name in dir(Runner)
-                if callable(getattr(Runner, name)) and name.startswith("test_")
-            ]
-        )
+    tests.extend(
+        [test_methods[name] for name in ["info", "levels", "subdump", "desc"]]
+    )
+    tests.extend(
+        [
+            getattr(run, name)
+            for name in dir(Runner)
+            if callable(getattr(Runner, name)) and name.startswith("test_")
+        ]
+    )
     try:
         run_tests(tests, args)
     except KeyboardInterrupt:
