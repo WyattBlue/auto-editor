@@ -23,6 +23,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
       - name: Nim
         if: runner.os != 'macOS'
         uses: jiro4989/setup-nim-action@v2
@@ -42,6 +46,7 @@ jobs:
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           fi
+          echo "DISABLE_HEVC=1" >> $GITHUB_ENV
       - name: Build FFmpeg
         run: nimble makeff
       - name: Compile
@@ -66,6 +71,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mingw-w64 mingw-w64-tools mingw-w64-x86-64-dev
           sudo apt-get install -y build-essential pkg-config nasm git
+          echo "DISABLE_HEVC=1" >> $GITHUB_ENV
       - name: Build FFmpeg
         run: nimble makeffwin
       - name: Compile
