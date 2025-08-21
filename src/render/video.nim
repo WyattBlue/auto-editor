@@ -152,7 +152,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
     if src notin cns:
       cns[src] = av.open(src[])
-      decoders[src] = initDecoder(cns[src].video[0].codecpar)
+
+      let decoderCtx = initDecoder(cns[src].video[0].codecpar)
+      decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
+      decoders[src] = decoderCtx
 
   var targetWidth: cint = cint(tl.res[0])
   var targetHeight: cint = cint(tl.res[1])
@@ -204,13 +207,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
   for src, cn in cns:
     if len(cn.video) > 0:
+      let stream = cn.video[0]
       if args.noSeek:
         seekCost[src] = int(high(uint32) - 1)
         tous[src] = 1000
       else:
         # Keyframes are usually spread out every 5 seconds or less.
         seekCost[src] = toInt(targetFps * AVRational(num: 5, den: 1))
-        tous[src] = 1000
+        tous[src] = int(stream.time_base.den div stream.avg_frame_rate)
 
       if src == firstSrc and encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
         pix_fmt = AVPixelFormat(cn.video[0].codecpar.format)
@@ -348,6 +352,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
       frame.pts = index.int64
       frame.time_base = av_inv_q(tl.tb)
+      frame.duration = index.int64
       yield (frame, index)
 
     if scaleGraph != nil:

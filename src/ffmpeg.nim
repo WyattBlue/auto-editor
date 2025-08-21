@@ -360,8 +360,7 @@ type
     time_base*: AVRational # time base of the packet
 
   # https://ffmpeg.org/doxygen/7.0/structAVFrame.html
-  AVFrame* {.importc: "AVFrame", header: "<libavutil/frame.h>",
-      bycopy.} = object
+  AVFrame* {.importc: "AVFrame", header: "<libavutil/frame.h>", bycopy.} = object
     data*: array[8, ptr uint8]
     linesize*: array[8, cint]
     extended_data*: ptr ptr uint8
@@ -371,23 +370,20 @@ type
     pict_type*: AVPictureType
     sample_aspect_ratio*: AVRational
     pts*: int64
-    pkt_dts*: int64
     time_base*: AVRational
     quality*: cint
     opaque*: pointer
     repeat_pict*: cint
     sample_rate*: cint
+    duration*: int64
     # buf*: array[8, ptr AVBufferRef]
     # extended_buf*: ptr ptr AVBufferRef
     nb_extended_buf*: cint
-    # side_data*: ptr ptr AVFrameSideData
-    # nb_side_data*: cint
     flags*: cint
     color_range*: AVColorRange
     color_primaries*: AVColorPrimaries
     color_trc*: AVColorTransferCharacteristic
     colorspace*: AVColorSpace
-    best_effort_timestamp*: int64
     metadata*: ptr AVDictionary
     decode_error_flags*: cint
     crop_top*: csize_t
