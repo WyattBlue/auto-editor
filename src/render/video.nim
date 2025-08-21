@@ -270,6 +270,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   var frameIndex = -1
   var frame: ptr AVFrame = av_frame_clone(nullFrame)
   var objList: seq[VideoFrame] = @[]
+  var lastProcessedFrame: ptr AVFrame = nil
+  var lastFrameIndex = -1
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int) =
     # Process each frame in timeline order like Python version
@@ -279,21 +281,34 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       for layer in tl.v:
         for obj in layer.clips:
           if index >= obj.start and index < (obj.start + obj.dur):
-            let i = int(round(float(obj.offset + index - obj.start) * obj.speed))
+            # Convert timeline position from target framerate to source framerate
+            let timelinePos = obj.offset + index - obj.start
+            let srcStream = cns[obj.src].video[0]
+            let srcTb = srcStream.avg_frame_rate
+            let sourceFramePos = int(round(float(timelinePos) * srcTb.float / tl.tb.float))
+            let i = int(round(float(sourceFramePos) * obj.speed))
             objList.add VideoFrame(index: i, src: obj.src)
 
       if tl.chunks.isSome:
-        # When there can be valid gaps in the timeline.
+        # When there can be valid gaps in the timeline and no objects for this frame.
         frame = av_frame_clone(nullFrame)
-      # else, use the last frame
+      # else, use the last frame or process objects
 
       for obj in objList:
+        # Check if we can reuse the last processed frame
+        if obj.index == lastFrameIndex and lastProcessedFrame != nil:
+          frame = av_frame_clone(lastProcessedFrame)
+          continue
+          
         var myStream: ptr AVStream = cns[obj.src].video[0]
         if frameIndex > obj.index:
           debug(&"Seek: {frameIndex} -> 0")
           cns[obj.src].seek(0)
           avcodec_flush_buffers(decoders[obj.src])
 
+        # obj.index is already in source frame coordinates, no conversion needed
+        let srcTb = myStream.avg_frame_rate
+        
         while frameIndex < obj.index:
           # Check if skipping ahead is worth it.
           if obj.index - frameIndex > seekCost[obj.src] and frameIndex > seekThreshold:
@@ -307,7 +322,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
           var foundFrame = false
           for decodedFrame in cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
             frame = decodedFrame
-            frameIndex = int(round(decodedFrame.time(myStream.time_base) * tl.tb.float))
+            frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
             foundFrame = true
             break
 
@@ -353,9 +368,19 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       frame.pts = index.int64
       frame.time_base = av_inv_q(tl.tb)
       frame.duration = index.int64
+      
+      # Update cache for frame reuse BEFORE yielding (which will unref the frame)
+      if objList.len > 0:
+        if lastProcessedFrame != nil:
+          av_frame_free(addr lastProcessedFrame)
+        lastProcessedFrame = av_frame_clone(frame)
+        lastFrameIndex = objList[0].index
+      
       yield (frame, index)
 
     if scaleGraph != nil:
       scaleGraph.cleanup()
     av_frame_free(addr nullFrame)
+    if lastProcessedFrame != nil:
+      av_frame_free(addr lastProcessedFrame)
     debug(&"Total frames saved seeking: {framesSaved}"))
