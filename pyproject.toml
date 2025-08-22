@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auto-editor"
-version = "29.0.1"
+version = "29.0.2"
 description = "Auto-Editor: Effort free video editing!"
 readme = "README.md"
 license = "Unlicense"
@@ -22,9 +22,6 @@ auto-editor = "auto_editor.cli:cli"
 
 [tool.setuptools.packages.find]
 include = ["auto_editor*"]
-
-[tool.setuptools.package-data]
-auto_editor = ["bin/*"]
 
 [project.urls]
 "Bug Tracker" = "https://github.com/WyattBlue/auto-editor/issues"
