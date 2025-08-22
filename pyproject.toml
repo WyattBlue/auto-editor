@@ -1,15 +1,14 @@
 [build-system]
-requires = ["setuptools>=77", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools>=77"]
 
 [project]
 name = "auto-editor"
-version = "29.0.2"
+version = "29.0.3"
 description = "Auto-Editor: Effort free video editing!"
 readme = "README.md"
 license = "Unlicense"
 authors = [{ name = "WyattBlue", email = "wyattblue@auto-editor.com" }]
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = []
 keywords = [
     "video", "audio", "media", "editor", "editing",
@@ -18,13 +17,13 @@ keywords = [
 ]
 
 [project.scripts]
-auto-editor = "auto_editor.cli:cli"
+auto-editor = "auto_editor.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["auto_editor*"]
 
 [project.urls]
-"Bug Tracker" = "https://github.com/WyattBlue/auto-editor/issues"
+"Bug Tracker" = "https://github.com/WyattBlue/auto-editor/discussions"
 "Source Code" = "https://github.com/WyattBlue/auto-editor"
 homepage = "https://auto-editor.com"
 
