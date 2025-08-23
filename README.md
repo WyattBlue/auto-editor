@@ -148,13 +148,6 @@ List all available options:
 auto-editor --help
 ```
 
-Use `--help` with a specific option to learn more about it:
-
-```
-auto-editor -c:v --help
-auto-editor --margin --help
-```
-
 <h3 align="center">Auto-Editor is available on all major platforms</h3>
 <p align="center"><img src="https://auto-editor.com/img/cross-platform.webp" width="500" title="Windows, MacOS, and Linux"></p>
 
