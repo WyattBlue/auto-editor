@@ -1,5 +1,7 @@
+import std/strformat
 import ../ffmpeg
 import ../av
+import ../log
 
 proc main*(args: seq[string]) =
   if args.len < 1:
