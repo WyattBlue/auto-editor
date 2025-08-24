@@ -10,13 +10,12 @@ when defined(linux):
 when defined(macosx):
   {.passL: "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation".}
 
-
+when defined(macosx): # C++ linkers
+  {.passL: "-lc++"}
+else:
+  {.passL: "-lstdc++"}
 when not defined(disable_hevc):
   {.passL: "-lx265".}
-  when defined(macosx):
-    {.passL: "-lc++"}
-  else:
-    {.passL: "-lstdc++"}
 {.passL: "-lm".}
 
 import std/posix

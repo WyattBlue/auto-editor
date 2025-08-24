@@ -204,8 +204,8 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
 
   if crossWindows:
     cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-    cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
-    cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
+    cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix")
+    cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix")
     cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
@@ -260,8 +260,8 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
     # Add cross-compilation flags if needed
     if crossWindows:
       cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-      cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
-      cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
+      cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix")
+      cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix")
       cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
       cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
       cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
@@ -292,8 +292,8 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
     # Add cross-compilation flags if needed
     if crossWindows:
       cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-      cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
-      cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
+      cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix")
+      cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix")
       cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
       cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
       cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
@@ -322,8 +322,8 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   # Add cross-compilation flags if needed
   if crossWindows:
     cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-    cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
-    cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
+    cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix")
+    cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix")
     cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
@@ -389,8 +389,8 @@ proc mesonBuild(buildPath: string, crossWindows: bool = false) =
     let crossFile = "build_meson/meson-cross.txt"
     writeFile(crossFile, """
 [binaries]
-c = 'x86_64-w64-mingw32-gcc'
-cpp = 'x86_64-w64-mingw32-g++'
+c = 'x86_64-w64-mingw32-gcc-posix'
+cpp = 'x86_64-w64-mingw32-g++-posix'
 ar = 'x86_64-w64-mingw32-ar'
 strip = 'x86_64-w64-mingw32-strip'
 pkgconfig = 'x86_64-w64-mingw32-pkg-config'
@@ -431,7 +431,7 @@ proc ffmpegSetup(crossWindows: bool) =
         exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
         let patchFile = &"../patches/{package.name}.patch"
         if fileExists(patchFile):
-          let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1"
+          let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1 --force"
           echo "Applying patch: ", cmd
           exec cmd
 
@@ -458,7 +458,7 @@ proc ffmpegSetup(crossWindows: bool) =
                   args.add("--target=x86_64-win64-gcc")
                 else:
                   args.add("--host=x86_64-w64-mingw32")
-                envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
+                envPrefix = "CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
               let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
               echo "RUN: ", cmd
               exec cmd
@@ -511,9 +511,19 @@ task makeff, "Build FFmpeg from source":
   when defined(linux):
     pkgConfigPaths.add(buildPath / "lib/x86_64-linux-gnu/pkgconfig")
     pkgConfigPaths.add(buildPath / "lib64/pkgconfig")
+    # Add common cmake install paths for pkg-config files
+    pkgConfigPaths.add(buildPath / "lib/cmake")
+    pkgConfigPaths.add(buildPath / "share/pkgconfig")
   putEnv("PKG_CONFIG_PATH", pkgConfigPaths.join(":"))
 
   ffmpegSetup(crossWindows=false)
+
+  # Debug: List pkg-config files to verify whisper.pc exists
+  when defined(linux):
+    echo "Checking for whisper.pc files:"
+    exec &"find {buildPath} -name 'whisper.pc' -type f"
+    echo "Current PKG_CONFIG_PATH: ", getEnv("PKG_CONFIG_PATH")
+    exec "pkg-config --list-all | grep whisper || echo 'whisper not found in pkg-config'"
 
   # Configure and build FFmpeg
   withDir "ffmpeg_sources/ffmpeg":
@@ -541,7 +551,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
     when defined(linux):
       ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
     
-    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
+    exec (&"""CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
       --extra-ldflags="{ldflags}" \
@@ -558,8 +568,8 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
     exec "nim c -d:danger " & disableHevc & " --os:windows --cpu:amd64 --cc:gcc " &
-         "--gcc.exe:x86_64-w64-mingw32-gcc " &
-         "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
+         "--gcc.exe:x86_64-w64-mingw32-gcc-posix " &
+         "--gcc.linkerexe:x86_64-w64-mingw32-gcc-posix " &
          "--passL:-lbcrypt " & # Add Windows Bcrypt library
          "--passL:-lstdc++ " & # Add C++ standard library
          "--passL:-static " &
