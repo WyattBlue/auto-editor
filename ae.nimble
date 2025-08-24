@@ -102,6 +102,14 @@ let svtav1 = Package(
   buildArguments: @["-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=ON"],
   ffFlag: "--enable-libsvtav1",
 )
+let whisper = Package(
+  name: "whisper",
+  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.7.6.tar.gz",
+  sha256: "166140e9a6d8a36f787a2bd77f8f44dd64874f12dd8359ff7c1f4f9acb86202e",
+  buildSystem: "cmake",
+  buildArguments: @["-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF"],
+  ffFlag: "--enable-whisper",
+)
 let x264 = Package(
   name: "x264",
   sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/32c3b801191522961102d4bea292cdb61068d0dd/x264-32c3b801191522961102d4bea292cdb61068d0dd.tar.bz2",
@@ -124,7 +132,7 @@ let ffmpeg = Package(
 var packages: seq[Package] = @[]
 if not defined(macosx):
   packages.add nvheaders
-packages &= [lame, opus, vpx, dav1d, svtav1, x264]
+packages &= [whisper, lame, opus, vpx, dav1d, svtav1, x264]
 if disableHevc.len == 0:
   packages.add x265
 
@@ -134,6 +142,8 @@ func location(package: Package): string = # tar location
     "v1.15.2.tar.gz"
   elif package.name == "nv-codec-headers":
     "n13.0.19.0.tar.gz"
+  elif package.name == "whisper":
+    "v1.7.6.tar.gz"
   else:
     package.sourceUrl.split("/")[^1]
 
@@ -142,6 +152,8 @@ func dirName(package: Package): string =
     return "libvpx-1.15.2"
   if package.name == "nv-codec-headers":
     return "nv-codec-headers-n13.0.19.0"
+  if package.name == "whisper":
+    return "whisper.cpp-1.7.6"
 
   var name = package.location
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
@@ -464,7 +476,7 @@ var commonFlags = &"""
   --disable-xlib \
   --disable-bsfs \
   --disable-filters \
-  --enable-filter=scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
+  --enable-filter=whisper,scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
   --disable-encoder={encodersDisabled} \
   --disable-decoder={decodersDisabled} \
   --disable-demuxer={demuxersDisabled} \

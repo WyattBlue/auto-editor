@@ -8,7 +8,7 @@ import about
 import edit
 import log
 import ffmpeg
-import cmds/[info, desc, cache, levels, subdump]
+import cmds/[info, desc, cache, levels, subdump, whisper]
 import util/[color, fun]
 
 import tinyre
@@ -249,6 +249,16 @@ proc downloadVideo(myInput: string, args: mainArgs): string =
 
   return location
 
+proc listAvailableFilters(): string =
+  result = "Filters:"
+  var opaque: pointer = nil
+  var filter: ptr AVFilter = av_filter_iterate(addr opaque)
+
+  while filter != nil:
+    if filter.name != nil:
+      result &= &" {filter.name}"
+    filter = av_filter_iterate(addr opaque)
+
 proc main() =
   if paramCount() < 1:
     if stdin.isatty():
@@ -274,6 +284,9 @@ judge making cuts.
     quit(0)
   elif paramStr(1) == "subdump":
     subdump.main(commandLineParams()[1..^1])
+    quit(0)
+  elif paramStr(1) == "whisper":
+    whisper.main(commandLineParams()[1..^1])
     quit(0)
 
   var args = mainArgs()
@@ -436,6 +449,7 @@ judge making cuts.
     quit(0)
 
   if args.input == "" and isDebug:
+    echo "Auto-Editor: ", version
     when defined(windows):
       var cpuArchitecture: string
       when defined(amd64):
@@ -452,7 +466,7 @@ judge making cuts.
     else:
       let plat = uname()
       echo "OS: ", plat.sysname, " ", plat.release, " ", plat.machine
-    echo "Auto-Editor: ", version
+    echo listAvailableFilters()
     quit(0)
 
   let myInput = args.input

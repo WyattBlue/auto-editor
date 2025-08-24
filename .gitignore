@@ -2,6 +2,7 @@ auto-editor
 build
 ffmpeg_sources
 .vscode
+*.bin
 tests/*
 !tests/*.nim
 !tests/*.py
