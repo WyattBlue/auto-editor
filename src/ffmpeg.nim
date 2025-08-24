@@ -6,16 +6,20 @@ when defined(linux):
 {.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil".}
 {.passL: "-lmp3lame -lopus -lvpx -lx264 -ldav1d -lSvtAv1Enc".}
 
-{.passL: "-lwhisper -lggml -lggml-cpu -lggml-blas -lggml-metal -lggml-base".}
-when defined(macosx):
-  {.passL: "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation".}
+when defined(enable_whisper):
+  {.passL: "-lwhisper -lggml -lggml-cpu -lggml-blas -lggml-metal -lggml-base".}
+  when defined(macosx):
+    {.passL: "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation".}
 
-when defined(macosx): # C++ linkers
-  {.passL: "-lc++"}
-else:
-  {.passL: "-lstdc++"}
-when not defined(disable_hevc):
+when defined(enable_hevc):
   {.passL: "-lx265".}
+
+when defined(enable_hevc) or defined(enable_whisper):
+  when defined(macosx): # C++ linkers
+    {.passL: "-lc++"}
+  else:
+    {.passL: "-lstdc++"}
+
 {.passL: "-lm".}
 
 import std/posix
