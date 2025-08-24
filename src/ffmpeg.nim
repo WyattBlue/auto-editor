@@ -6,6 +6,11 @@ when defined(linux):
 {.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil".}
 {.passL: "-lmp3lame -lopus -lvpx -lx264 -ldav1d -lSvtAv1Enc".}
 
+{.passL: "-lwhisper -lggml -lggml-cpu -lggml-blas -lggml-metal -lggml-base".}
+when defined(macosx):
+  {.passL: "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation".}
+
+
 when not defined(disable_hevc):
   {.passL: "-lx265".}
   when defined(macosx):
@@ -727,6 +732,8 @@ proc avfilter_link*(src: ptr AVFilterContext, srcpad: cuint,
 
 # Filter lookup
 proc avfilter_get_by_name*(name: cstring): ptr AVFilter {.importc,
+    header: "<libavfilter/avfilter.h>".}
+proc av_filter_iterate*(opaque: ptr pointer): ptr AVFilter {.importc,
     header: "<libavfilter/avfilter.h>".}
 
 # Filter input/output management

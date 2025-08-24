@@ -1,0 +1,13 @@
+--- a/cmake/whisper.pc.in
++++ b/cmake/whisper.pc.in
+@@ -6,5 +6,9 @@ includedir=${prefix}/include
+ Name: whisper
+ Description: Port of OpenAI's Whisper model in C/C++
+ Version: @PROJECT_VERSION@
+-Libs: -L${libdir} -lggml  -lggml-base -lwhisper
++Libs: -L${libdir} -lwhisper -lggml -lggml-cpu -lggml-blas -lggml-metal -lggml-base
++Libs.private: -framework Accelerate -framework Metal -framework MetalKit -framework Foundation -lstdc++ -lc++
+ Cflags: -I${includedir}
++
++Requires:
++Conflicts:
