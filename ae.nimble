@@ -15,13 +15,20 @@ requires "checksums"
 import std/os
 import std/[strutils, strformat]
 
-var disableHevc = (if getEnv("DISABLE_HEVC").len > 0: "-d:disable_hevc" else: "")
+var disableHevc = getEnv("DISABLE_HEVC").len > 0
+var enableWhisper = defined(macosx)
+var flags = ""
+
+if not disableHevc:
+  flags &= "-d:enable_hevc "
+if enableWhisper:
+  flags &= "-d:enable_whisper "
 
 task test, "Test the project":
-  exec &"nim c {disableHevc} -r tests/rationals"
+  exec &"nim c {flags} -r tests/rationals"
 
 task make, "Export the project":
-  exec &"nim c -d:danger {disableHevc} --out:auto-editor src/main.nim"
+  exec &"nim c -d:danger {flags} --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
     exec "stat -f \"%z bytes\" ./auto-editor"
@@ -132,8 +139,10 @@ let ffmpeg = Package(
 var packages: seq[Package] = @[]
 if not defined(macosx):
   packages.add nvheaders
-packages &= [whisper, lame, opus, vpx, dav1d, svtav1, x264]
-if disableHevc.len == 0:
+if enableWhisper:
+  packages.add whisper
+packages &= [lame, opus, vpx, dav1d, svtav1, x264]
+if not disableHevc:
   packages.add x265
 
 
@@ -567,7 +576,7 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
   if not dirExists("build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
-    exec "nim c -d:danger " & disableHevc & " --os:windows --cpu:amd64 --cc:gcc " &
+    exec "nim c -d:danger " & flags & " --os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc-posix " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc-posix " &
          "--passL:-lbcrypt " & # Add Windows Bcrypt library
