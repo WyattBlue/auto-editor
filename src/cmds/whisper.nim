@@ -1,33 +1,63 @@
-import std/strformat
+import std/[parseutils, strformat, strutils]
 import ../ffmpeg
 import ../av
 import ../log
+import ../util/fun
 
-proc main*(args: seq[string]) =
-  if args.len < 1:
+
+proc main*(cArgs: seq[string]) =
+  var isDebug = false
+  var inputPath: string = ""
+  var model: string = ""
+  var queue: int = 10
+  var vadModel: string = ""
+
+  if cArgs.len < 1:
     echo "Whisper front-end"
     quit(0)
 
-  let inputPath = args[0]
-  let model = args[1]
+  var expecting: string = ""
+  for rawKey in cArgs:
+    let key = handleKey(rawKey)
+    case key:
+    of "--debug":
+      isDebug = true
+    of "--queue":
+      expecting = "queue"
+    of "--vad-model":
+      expecting = "vad-model"
+    else:
+      if key.startsWith("--"):
+        error &"Unknown option: {key}"
 
-  av_log_set_level(AV_LOG_QUIET)
+      case expecting:
+      of "":
+        if inputPath == "":
+          inputPath = key
+        elif model == "":
+          model = key
+      of "queue":
+        queue = parseInt(key)
+      of "vad-model":
+        vadModel = key
+      expecting = ""
 
-  let input = av.open(inputPath)
+  if inputPath == "":
+    error "A media file is needed"
+  if model == "":
+    error "A model is needed, you came find them here: https://huggingface.co/ggerganov/whisper.cpp"
+  if queue < 1 or queue > 1000:
+    error &"Invalid queue value: {queue}"
+
+  if not isDebug:
+    av_log_set_level(AV_LOG_QUIET)
+
+  let input = (try: av.open(inputPath) except: error "Invalid media file")
   defer: input.close()
 
-  # Use the `whisper` filter. From audio stream 0, print out the new subtitles
-  
-  # Find audio stream
-  var audioStreamIndex = -1
-  for i in 0..<input.streams.len:
-    if input.streams[i].codecpar.codec_type == AVMEDIA_TYPE_AUDIO:
-      audioStreamIndex = i
-      break
-  
-  if audioStreamIndex == -1:
-    echo "No audio stream found"
-    quit(1)
+  if input.audio.len == 0:
+    error "No audio stream found"
+  let audioStreamIndex = input.audio[0].index
   
   let filterGraph = avfilter_graph_alloc()
   defer: avfilter_graph_free(addr filterGraph)
@@ -49,11 +79,11 @@ proc main*(args: seq[string]) =
     echo "Failed to create buffer source"
     quit(1)
 
-  # Create whisper filter - whisper filter outputs subtitles to stderr/stdout by default
   let whisperFilter = avfilter_get_by_name("whisper")
   var whisperCtx: ptr AVFilterContext
-  # Don't use destination - let whisper output as info messages and set frame metadata
-  let whisperArgs = "model=" & model
+  var whisperArgs = &"model={model}:queue={queue}"
+  if vadModel != "":
+    whisperArgs &= ":vad_model=" & vadModel
 
   if avfilter_graph_create_filter(addr whisperCtx, whisperFilter, "whisper", whisperArgs, nil, filterGraph) < 0:
     error &"Failed to create whisper filter with model: {model}"

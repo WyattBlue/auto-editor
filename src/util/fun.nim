@@ -4,6 +4,11 @@ from std/math import round, trunc, gcd
 
 import ../log
 
+func handleKey*(val: string): string =
+  if val.startsWith("--") and val.len >= 3:
+    return val[0 ..< 3] & val[3 .. ^1].replace("_", "-")
+  return val
+
 func splitext*(val: string): (string, string) =
   let (dir, name, ext) = splitFile(val)
   return (dir & "/" & name, ext)
