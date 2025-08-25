@@ -197,11 +197,6 @@ proc parseFrameRate(val: string): AVRational =
   return AVRational(val)
 
 
-func handleKey(val: string): string =
-  if val.startsWith("--") and val.len >= 3:
-    return val[0 ..< 3] & val[3 .. ^1].replace("_", "-")
-  return val
-
 proc downloadVideo(myInput: string, args: mainArgs): string =
   conwrite("Downloading video...")
 
