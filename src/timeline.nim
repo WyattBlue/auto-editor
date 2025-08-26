@@ -155,7 +155,7 @@ func makeSaneTimebase*(tb: AVRational): AVRational =
     return ntsc
   if tbFloat == round(filmNtsc.float64, 2):
     return filmNtsc
-  return tb
+  return av_d2q(tbFloat, 1000000)
 
 proc setStreamTo0*(tl: var v3, interner: var StringInterner) =
   var dirExists = false
