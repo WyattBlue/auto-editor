@@ -1,4 +1,4 @@
-import std/[parseutils, strformat, strutils]
+import std/[strformat, strutils]
 import ../ffmpeg
 import ../av
 import ../log
@@ -75,7 +75,7 @@ proc main*(cArgs: seq[string]) =
   let sampleFmtName = av_get_sample_fmt_name(cint(sampleFormat))
   let bufferArgs = "sample_rate=" & $sampleRate & ":sample_fmt=" & $sampleFmtName & ":channel_layout=" & $channelLayout
 
-  if avfilter_graph_create_filter(addr bufferCtx, abuffer, "in", bufferArgs, nil, filterGraph) < 0:
+  if avfilter_graph_create_filter(addr bufferCtx, abuffer, "in", bufferArgs.cstring, nil, filterGraph) < 0:
     echo "Failed to create buffer source"
     quit(1)
 
@@ -85,7 +85,7 @@ proc main*(cArgs: seq[string]) =
   if vadModel != "":
     whisperArgs &= ":vad_model=" & vadModel
 
-  if avfilter_graph_create_filter(addr whisperCtx, whisperFilter, "whisper", whisperArgs, nil, filterGraph) < 0:
+  if avfilter_graph_create_filter(addr whisperCtx, whisperFilter, "whisper", whisperArgs.cstring, nil, filterGraph) < 0:
     error &"Failed to create whisper filter with model: {model}"
 
   # Create buffer sink
