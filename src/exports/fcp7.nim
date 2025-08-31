@@ -23,7 +23,7 @@ come back the way they started.
 const DEPTH = "16"
 
 
-func set_tb_ntsc(tb: AVRational): (int64, string) =
+func setTbNtsc(tb: AVRational): (int64, string) =
   # See chart: https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/FinalCutPro_XML/FrameRate/FrameRate.html#//apple_ref/doc/uid/TP30001158-TPXREF103
   if tb == AVRational(num: 24000, den: 1001):
     return (24'i64, "TRUE")
@@ -224,9 +224,16 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         track.add clipitem
       audio.add track
 
+proc handlePath(src: ptr string): string =
+  let absPath = $src.absolutePath()
+  when defined(windows):
+    absPath.replace('\\', '/')
+  else:
+    absPath
+
 proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
   let (width, height) = tl.res
-  let (timebase, ntsc) = set_tb_ntsc(tl.tb)
+  let (timebase, ntsc) = setTbNtsc(tl.tb)
 
   var miToUrl = initTable[MediaInfo, string]()
   var miToId = initTable[MediaInfo, string]()
@@ -238,7 +245,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
     let the_id = &"file-{id_counter}"
     let src = ptrSrc[]
     let mi = initMediaInfo(src)
-    miToUrl[mi] = $src.absolutePath
+    miToUrl[mi] = handlePath(src)
     miToId[mi] = the_id
 
   proc make_filedef(clipitem: XmlNode, mi: MediaInfo) =
