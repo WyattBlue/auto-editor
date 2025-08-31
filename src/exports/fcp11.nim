@@ -1,7 +1,4 @@
-import std/os
-import std/xmltree
-import std/algorithm
-import std/[sets, tables]
+import std/[algorithm, os, sets, tables, xmltree]
 import std/[strformat, strutils]
 from std/math import round
 
@@ -49,8 +46,14 @@ func makeName(mi: MediaInfo, tb: AVRational): string =
     return "FFVideoFormat3840x2160p2398"
   return "FFVideoFormatRateUndefined"
 
-func pathToUri(a: string): string =
-  return "file://" & a
+proc pathToUri(a: string): string =
+  let absPath = a.absolutePath()
+
+  when defined(windows):
+    let normalizedPath = absPath.replace('\\', '/')
+    return "file:///" & normalizedPath
+  else:
+    return "file://" & absPath
 
 proc parseSMPTE*(val: string, fps: AVRational): int =
   if val.len == 0:
@@ -132,7 +135,7 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
         audioChannels = audioChannels, duration = fraction(tlDur))
 
     let mediaRep = newElement("media-rep")
-    mediaRep.attrs = {"kind": "original-media", "src": mi.path.absolutePath().pathToUri()}.toXmlAttributes
+    mediaRep.attrs = {"kind": "original-media", "src": mi.path.pathToUri()}.toXmlAttributes
 
     r2.add mediaRep
     resources.add r2
