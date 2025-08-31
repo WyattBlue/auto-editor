@@ -16,7 +16,7 @@ import std/os
 import std/[strutils, strformat]
 
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
-var enableWhisper = defined(macosx)
+var enableWhisper = false # defined(macosx) dummy this out for now
 var flags = ""
 
 if not disableHevc:
