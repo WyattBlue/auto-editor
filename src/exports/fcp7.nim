@@ -224,8 +224,8 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         track.add clipitem
       audio.add track
 
-proc handlePath(src: ptr string): string =
-  let absPath = $src.absolutePath()
+proc handlePath(src: string): string =
+  let absPath = src.absolutePath()
   when defined(windows):
     absPath.replace('\\', '/')
   else:
