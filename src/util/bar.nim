@@ -1,4 +1,7 @@
-import std/[times, math, strutils, strformat, terminal, os, osproc]
+import std/[times, math, strutils, strformat, terminal, os]
+
+when defined(macosx):
+  import std/osproc
 
 import ../log
 
