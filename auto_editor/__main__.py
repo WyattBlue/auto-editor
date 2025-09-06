@@ -1,5 +1,3 @@
-"""Main entry point for auto-editor when run as a module."""
-
 import platform
 import subprocess
 import sys
@@ -8,10 +6,7 @@ from pathlib import Path
 
 from . import __version__
 
-if __version__.startswith("29.0."):
-    version = "29.0.0"
-else:
-    version = __version__
+version = __version__
 
 
 def get_binary_info():
