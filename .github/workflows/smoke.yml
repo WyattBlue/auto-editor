@@ -4,6 +4,7 @@ on:
     paths-ignore:
       - '**.md'
       - '**.txt'
+      - '**.toml'
       - 'src/about.nim'
     branches:
       - master

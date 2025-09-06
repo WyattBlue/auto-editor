@@ -502,7 +502,7 @@ proc avcodec_flush_buffers*(avctx: ptr AVCodecContext) {.importc,
     header: "<libavcodec/avcodec.h>".}
 
 # Error
-func MKTAG*(a, b, c, d: char): cint {.inline.} =
+template MKTAG*(a, b, c, d: static[char]): cint =
   cast[cint]((a.uint32) or (b.uint32 shl 8) or (c.uint32 shl 16) or (d.uint32 shl 24))
 
 func AVERROR*(e: cint): cint {.inline.} = (-e)
@@ -615,13 +615,14 @@ const
   AVIO_FLAG_WRITE* = 2
 
 # Convert fourcc string to 32-bit integer (little-endian)
-proc fourccToInt*(fourcc: string): cuint =
-  if fourcc.len != 4:
-    return 0
-  result = cuint(fourcc[0].ord) or
-           (cuint(fourcc[1].ord) shl 8) or
-           (cuint(fourcc[2].ord) shl 16) or
-           (cuint(fourcc[3].ord) shl 24)
+template fourccToInt*(fourcc: static[string]): cuint =
+  when fourcc.len != 4:
+    {.error: "FOURCC must be exactly 4 characters long".}
+  else:
+    cuint(fourcc[0].ord) or
+    (cuint(fourcc[1].ord) shl 8) or
+    (cuint(fourcc[2].ord) shl 16) or
+    (cuint(fourcc[3].ord) shl 24)
 
 type AVProfile* {.importc, header: "<libavcodec/avcodec.h>".} = object
   profile*: cint
