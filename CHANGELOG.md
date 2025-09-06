@@ -5,3 +5,4 @@
 ## Features
 
 ## Fixes
+ - Can now play H265/HEVC video streams with QuickTime

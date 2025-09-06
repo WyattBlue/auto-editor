@@ -2,7 +2,7 @@
 when defined(macosx):
   {.passL: "-framework VideoToolbox -framework AudioToolbox -framework CoreFoundation -framework CoreMedia -framework CoreVideo".}
 when defined(linux):
-  {.passL: "-L./build/lib/x86_64-linux-gnu -L./build/lib64"}
+  {.passL: "-L./build/lib/x86_64-linux-gnu -L./build/lib64".}
 {.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil".}
 {.passL: "-lmp3lame -lopus -lvpx -lx264 -ldav1d -lSvtAv1Enc".}
 
@@ -16,9 +16,9 @@ when defined(enable_hevc):
 
 when defined(enable_hevc) or defined(enable_whisper):
   when defined(macosx): # C++ linkers
-    {.passL: "-lc++"}
+    {.passL: "-lc++".}
   else:
-    {.passL: "-lstdc++"}
+    {.passL: "-lstdc++".}
 
 {.passL: "-lm".}
 
@@ -37,7 +37,8 @@ proc av_add_q(b: AVRational, c: AVRational): AVRational {.importc,
 proc av_sub_q(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
 proc av_q2d*(a: AVRational): cdouble {.importc, header: "<libavutil/rational.h>".}
-proc av_d2q*(d: cdouble, max: cint): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_d2q*(d: cdouble, max: cint): AVRational {.importc,
+    header: "<libavutil/rational.h>".}
 proc av_inv_q*(a: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint, log_offset: cint,
     log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
@@ -325,7 +326,8 @@ proc av_get_pix_fmt_name*(pix_fmt: AVPixelFormat): cstring {.importc, cdecl.}
 proc avformat_query_codec*(ofmt: ptr AVOutputFormat, codec_id: AVCodecID,
   std_compliance: cint): cint {.importc, header: "<libavformat/avformat.h>".}
 
-proc av_codec_iterate*(opaque: ptr pointer): ptr AVCodec {.importc, header: "<libavcodec/avcodec.h>".}
+proc av_codec_iterate*(opaque: ptr pointer): ptr AVCodec {.importc,
+    header: "<libavcodec/avcodec.h>".}
 
 
 const FF_COMPLIANCE_STRICT*: cint = 1
@@ -504,7 +506,7 @@ func MKTAG*(a, b, c, d: char): cint {.inline.} =
   cast[cint]((a.uint32) or (b.uint32 shl 8) or (c.uint32 shl 16) or (d.uint32 shl 24))
 
 func AVERROR*(e: cint): cint {.inline.} = (-e)
-const AVERROR_EOF* = AVERROR(MKTAG('E','O','F',' '))
+const AVERROR_EOF* = AVERROR(MKTAG('E', 'O', 'F', ' '))
 let AVERROR_EAGAIN* = AVERROR(EAGAIN)
 
 const AV_ERROR_MAX_STRING_SIZE* = 64
@@ -606,10 +608,20 @@ proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
 
 const
   AV_CODEC_ID_NONE* = AVCodecID(0)
+  AV_CODEC_ID_HEVC* = AVCodecID(173)
   AV_CODEC_ID_AV1* = AVCodecID(225)
   AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2
+
+# Convert fourcc string to 32-bit integer (little-endian)
+proc fourccToInt*(fourcc: string): cuint =
+  if fourcc.len != 4:
+    return 0
+  result = cuint(fourcc[0].ord) or
+           (cuint(fourcc[1].ord) shl 8) or
+           (cuint(fourcc[2].ord) shl 16) or
+           (cuint(fourcc[3].ord) shl 24)
 
 type AVProfile* {.importc, header: "<libavcodec/avcodec.h>".} = object
   profile*: cint
@@ -644,8 +656,10 @@ proc avformat_write_header*(s: ptr AVFormatContext,
     options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
 proc av_write_trailer*(s: ptr AVFormatContext): cint {.importc,
     header: "<libavformat/avformat.h>".}
-proc av_guess_format*(short_name: cstring, filename: cstring, mime_type: cstring): ptr AVOutputFormat {.importc,
-    header: "<libavformat/avformat.h>".}
+proc av_guess_format*(short_name: cstring, filename: cstring,
+    mime_type: cstring): ptr AVOutputFormat {.importc,
+
+header: "<libavformat/avformat.h>".}
 proc avformat_free_context*(s: ptr AVFormatContext) {.importc,
     header: "<libavformat/avformat.h>".}
 proc avcodec_send_frame*(avctx: ptr AVCodecContext,
@@ -775,7 +789,8 @@ proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint, min_ts: int
     header: "<libavformat/avformat.h>".}
 
 # SwScale context and functions
-type SwsContext* {.importc: "struct SwsContext", header: "<libswscale/swscale.h>".} = object
+type SwsContext* {.importc: "struct SwsContext",
+    header: "<libswscale/swscale.h>".} = object
 
 proc sws_getCachedContext*(context: ptr SwsContext, srcW: cint, srcH: cint,
     srcFormat: AVPixelFormat, dstW: cint, dstH: cint, dstFormat: AVPixelFormat,

@@ -18,7 +18,8 @@ type VideoFrame = object
 func toInt(r: AVRational): int =
   (r.num div r.den).int
 
-proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0, height: cint = 0): ptr AVFrame =
+proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
+    height: cint = 0): ptr AVFrame =
   if frame == nil:
     return nil
 
@@ -49,10 +50,10 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0, heigh
 
   # Create swscale context
   let swsContext = sws_getCachedContext(
-    nil,  # No cached context for now
+    nil,          # No cached context for now
     srcWidth, srcHeight, srcFormat,
     dstWidth, dstHeight, format,
-    SWS_BILINEAR,  # Use bilinear interpolation
+    SWS_BILINEAR, # Use bilinear interpolation
     nil, nil, nil
   )
 
@@ -64,8 +65,8 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0, heigh
     swsContext,
     cast[ptr ptr uint8](addr frame.data[0]),
     cast[ptr cint](addr frame.linesize[0]),
-    0,  # srcSliceY
-    srcHeight,  # srcSliceH
+    0,         # srcSliceY
+    srcHeight, # srcSliceH
     cast[ptr ptr uint8](addr newFrame.data[0]),
     cast[ptr cint](addr newFrame.linesize[0])
   )
@@ -74,7 +75,7 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0, heigh
   sws_freeContext(swsContext)
 
   if ret < 0:
-    error "Failed to scale frame"  # Noreturn
+    error "Failed to scale frame" # Noreturn
 
   return newFrame
 
@@ -174,7 +175,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
           "language": tl.v[0].lang}.toTable)
   let codec = encoderCtx.codec
 
-  if codec.id == 173:
+  if codec.id == AV_CODEC_ID_HEVC:
+    let codecTag = fourccToInt("hvc1") # for QuickTime
+    if codecTag != 0:
+      outputStream.codecpar.codec_tag = codecTag
+      encoderCtx.codec_tag = codecTag
     discard av_opt_set(encoderCtx.priv_data, "x265-params", "log-level=error", 0)
 
   encoderCtx.framerate = targetFps
@@ -299,7 +304,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
         if obj.index == lastFrameIndex and lastProcessedFrame != nil:
           frame = av_frame_clone(lastProcessedFrame)
           continue
-          
+
         var myStream: ptr AVStream = cns[obj.src].video[0]
         if frameIndex > obj.index:
           debug(&"Seek: {frameIndex} -> 0")
@@ -308,7 +313,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
         # obj.index is already in source frame coordinates, no conversion needed
         let srcTb = myStream.avg_frame_rate
-        
+
         while frameIndex < obj.index:
           # Check if skipping ahead is worth it.
           if obj.index - frameIndex > seekCost[obj.src] and frameIndex > seekThreshold:
@@ -340,10 +345,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             let bufferSrc = resGraph.add("buffer", bufferArgs)
             let scaleFilter = resGraph.add("scale", globalScaleArgs)
-            let padFilter = resGraph.add("pad", &"{tl.res[0]}:{tl.res[1]}:-1:-1:color={bg}")
+            let padFilter = resGraph.add("pad",
+                &"{tl.res[0]}:{tl.res[1]}:-1:-1:color={bg}")
             let bufferSink = resGraph.add("buffersink")
 
-            resGraph.linkNodes(@[bufferSrc, scaleFilter, padFilter, bufferSink]).configure()
+            resGraph.linkNodes(@[bufferSrc, scaleFilter, padFilter,
+                bufferSink]).configure()
             resGraph.push(frame)
             let oldFrame = frame
             frame = resGraph.pull()
@@ -368,14 +375,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       frame.pts = index.int64
       frame.time_base = av_inv_q(tl.tb)
       frame.duration = index.int64
-      
+
       # Update cache for frame reuse BEFORE yielding (which will unref the frame)
       if objList.len > 0:
         if lastProcessedFrame != nil:
           av_frame_free(addr lastProcessedFrame)
         lastProcessedFrame = av_frame_clone(frame)
         lastFrameIndex = objList[0].index
-      
+
       yield (frame, index)
 
     if scaleGraph != nil:
