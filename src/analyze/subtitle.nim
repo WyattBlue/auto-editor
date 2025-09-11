@@ -1,10 +1,15 @@
+import std/strformat
 from std/math import round
 
-import ../[av, ffmpeg]
+import ../[av, log, ffmpeg]
 import tinyre
 
 proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
     stream: int32): seq[bool] =
+
+  if stream >= container.subtitle.len:
+    error &"subtitle stream '{stream}' does not exist."
+
   let
     formatCtx = container.formatContext
     s = container.subtitle[stream].index
