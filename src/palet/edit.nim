@@ -59,6 +59,27 @@ proc parseNat(val: string): int32 =
   if result < 0:
     error "Invalid natural: " & val
 
+proc parseBool(val: string): bool =
+  if val == "#t" or val == "true":
+    return true
+  if val == "#f" or val == "false":
+    return false
+  error "Invalid boolean (expected true or false): " & val
+
+proc parseColFunc(argPos: var int, isKey: var bool, argOrder: seq[string], expr: Expr, text: string): string =
+  if expr.kind == ExprList and expr.elements[0].isSymbol("=", text):
+    let node = expr.elements
+    let key = text[node[1].`from` ..< node[1].to]
+    isKey = true
+    argPos = argOrder.find(key)
+    if argPos == -1:
+      error &"got an unexpected keyword argument: {key}"
+    return text[node[2].`from` ..< node[2].to]
+  else:
+    if isKey:
+      error "Positional arguments must never come after keyword arguments"
+    return text[expr.`from` ..< expr.to]
+
 proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, bar: Bar): seq[bool] =
   var lexer = initLexer("--edit", args.edit)
   var parser = initParser(lexer)
@@ -75,6 +96,16 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
     let node = expr.elements
     if node[0].kind == ExprList and node.len == 1:
       return editEval(node[0], text)
+
+    var
+      threshold: float32 = 0.04
+      stream: int32 = 0
+      mincut = 6
+      minclip = 3
+      width: int32 = 400
+      blur: int32 = 9
+      isKey = false
+      argPos = 0
 
     if node[0].isSymbol("or", text):
       result = editEval(node[1], text)
@@ -93,36 +124,18 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
         error "Wrong arity"
       return not editEval(node[1], text)
     elif node[0].isSymbol("audio", text):
-      var threshold: float32 = 0.04
-      var stream: int32 = -1
-      var mincut = 6
-      var minclip = 3
-
-      var isKey = false
-      var argPos = 0
-      let argOrder = ["threshold", "stream", "mincut", "minclip"]
+      stream = -1 # Set to "all" by default
+      let argOrder = @["threshold", "stream", "mincut", "minclip"]
 
       for expr in node[1 ..< node.len]:
-        var val: string
-        if expr.kind == ExprList and expr.elements[0].isSymbol("=", text):
-          let node = expr.elements
-          let key = text[node[1].`from` ..< node[1].to]
-          isKey = true
-          argPos = argOrder.find(key)
-          if argPos == -1:
-            error &"got an unexpected keyword argument: {key}"
-          val = text[node[2].`from` ..< node[2].to]
-        else:
-          if isKey:
-            error "Positional arguments must never come after keyword arguments"
-          val = text[expr.`from` ..< expr.to]
+        let val = parseColFunc(argPos, isKey, argOrder, expr, text)
 
         case argPos:
         of 0: threshold = parseThres(val)
         of 1: stream = (if val == "all": -1 else: parseNat(val))
         of 2: mincut = parseNat(val)
         of 3: minclip = parseNat(val)
-        else: error &"Too many args"
+        else: error "Too many args"
 
         if not isKey:
           argPos += 1
@@ -142,36 +155,19 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
       mutRemoveSmall(result, mincut, false, true)
       return result
     elif node[0].isSymbol("motion", text):
-      var threshold: float32 = 0.02
-      var stream: int32 = 0
-      var width: int32 = 400
-      var blur: int32 = 9
+      threshold = 0.02 # Reduce default threshold
 
-      var isKey = false
-      var argPos = 0
-      let argOrder = ["threshold", "stream", "width", "blur"]
+      let argOrder = @["threshold", "stream", "width", "blur"]
 
       for expr in node[1 ..< node.len]:
-        var val: string
-        if expr.kind == ExprList and expr.elements[0].isSymbol("=", text):
-          let node = expr.elements
-          let key = text[node[1].`from` ..< node[1].to]
-          isKey = true
-          argPos = argOrder.find(key)
-          if argPos == -1:
-            error &"got an unexpected keyword argument: {key}"
-          val = text[node[2].`from` ..< node[2].to]
-        else:
-          if isKey:
-            error "Positional arguments must never come after keyword arguments"
-          val = text[expr.`from` ..< expr.to]
+        let val = parseColFunc(argPos, isKey, argOrder, expr, text)
 
         case argPos:
         of 0: threshold = parseThres(val)
         of 1: stream = parseNat(val)
         of 2: width = parseNat(val)
         of 3: blur = parseNat(val)
-        else: error &"Too many args"
+        else: error "Too many args"
 
         if not isKey:
           argPos += 1
@@ -179,10 +175,24 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
       return levels.mapIt(it >= threshold)
 
     elif node[0].isSymbol("subtitle", text):
-      var pattern: Re = re("")
-      let stream: int32 = 0
-      # FIXME
-      return subtitle(container, tb, pattern, stream)
+      let argOrder = @["pattern", "stream", "ignore-case"] # "max-count"]
+      var pattern = ""
+      var flags: set[ReFlag]
+
+      for expr in node[1 ..< node.len]:
+        let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+        case argPos:
+        of 0: pattern = val
+        of 1: stream = parseNat(val)
+        of 2:
+          if parseBool(val):
+            flags.incl reIgnoreCase
+        else: error "Too many args"
+
+      if pattern == "":
+        error "subtitle: pattern required"
+
+      return subtitle(container, tb, re(pattern, flags), stream)
     elif node[0].isSymbol("none", text):
       let length = mediaLength(container)
       let tbLength = (round((length * tb).float64)).int64
