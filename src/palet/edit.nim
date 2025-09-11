@@ -107,104 +107,129 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
       isKey = false
       argPos = 0
 
-    if node[0].isSymbol("or", text):
-      result = editEval(node[1], text)
-      for i in 2 ..< node.len:
-        result = result or editEval(node[i], text)
-    elif node[0].isSymbol("and", text):
-      result = editEval(node[1], text)
-      for i in 2 ..< node.len:
-        result = result and editEval(node[i], text)
-    elif node[0].isSymbol("xor", text):
-      result = editEval(node[1], text)
-      for i in 2 ..< node.len:
-        result = result xor editEval(node[i], text)
-    elif node[0].isSymbol("not", text):
-      if node.len != 2:
-        error "Wrong arity"
-      return not editEval(node[1], text)
-    elif node[0].isSymbol("audio", text):
-      stream = -1 # Set to "all" by default
-      let argOrder = @["threshold", "stream", "mincut", "minclip"]
+    if node[0].kind == ExprSym:
+      case text[node[0].`from` ..< node[0].to]:
+      of "or":
+        result = editEval(node[1], text)
+        for i in 2 ..< node.len:
+          result = result or editEval(node[i], text)
+      of "and":
+        result = editEval(node[1], text)
+        for i in 2 ..< node.len:
+          result = result and editEval(node[i], text)
+      of "xor":
+        result = editEval(node[1], text)
+        for i in 2 ..< node.len:
+          result = result xor editEval(node[i], text)
+      of "not":
+        if node.len != 2:
+          error "Wrong arity"
+        return not editEval(node[1], text)
+      of "audio":
+        stream = -1 # Set to "all" by default
+        let argOrder = @["threshold", "stream", "mincut", "minclip"]
 
-      for expr in node[1 ..< node.len]:
-        let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
 
-        case argPos:
-        of 0: threshold = parseThres(val)
-        of 1: stream = (if val == "all": -1 else: parseNat(val))
-        of 2: mincut = parseNat(val)
-        of 3: minclip = parseNat(val)
-        else: error "Too many args"
+          case argPos:
+          of 0: threshold = parseThres(val)
+          of 1: stream = (if val == "all": -1 else: parseNat(val))
+          of 2: mincut = parseNat(val)
+          of 3: minclip = parseNat(val)
+          else: error "Too many args"
 
-        if not isKey:
-          argPos += 1
+          if not isKey:
+            argPos += 1
 
-      if stream == -1:
-        for i in 0 ..< max(container.audio.len, 1): # Trigger err when no streams pres.
-          let levels = audio(bar, container, args.input, tb, i.int32)
-          if result.len == 0:
-            result = levels.mapIt(it >= threshold)
-          else:
-            result = result or levels.mapIt(it >= threshold)
+        if stream == -1:
+          for i in 0 ..< max(container.audio.len, 1): # Trigger err when no streams pres.
+            let levels = audio(bar, container, args.input, tb, i.int32)
+            if result.len == 0:
+              result = levels.mapIt(it >= threshold)
+            else:
+              result = result or levels.mapIt(it >= threshold)
+        else:
+          let levels = audio(bar, container, args.input, tb, stream)
+          result = levels.mapIt(it >= threshold)
+
+        mutRemoveSmall(result, minclip, true, false)
+        mutRemoveSmall(result, mincut, false, true)
+        return result
+      of "motion":
+        threshold = 0.02 # Reduce default threshold
+
+        let argOrder = @["threshold", "stream", "width", "blur"]
+
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+
+          case argPos:
+          of 0: threshold = parseThres(val)
+          of 1: stream = parseNat(val)
+          of 2: width = parseNat(val)
+          of 3: blur = parseNat(val)
+          else: error "Too many args"
+
+          if not isKey:
+            argPos += 1
+        let levels = motion(bar, container, args.input, tb, stream, width, blur)
+        return levels.mapIt(it >= threshold)
+      of "subtitle", "regex":
+        let argOrder = @["pattern", "stream", "ignore-case"] # "max-count"]
+        var pattern = ""
+        var flags: set[ReFlag]
+
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+          case argPos:
+          of 0: pattern = val
+          of 1: stream = parseNat(val)
+          of 2:
+            if parseBool(val):
+              flags.incl reIgnoreCase
+          else: error "Too many args"
+
+        if pattern == "":
+          error &"{text[node[0].`from` ..< node[0].to]}: pattern required"
+
+        return subtitle(container, tb, re(pattern, flags), stream)
+      of "word":
+        let argOrder = @["value", "stream", "ignore-case"]
+        var pattern = ""
+        var ignoreCase = true
+        var flags: set[ReFlag]
+
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+          case argPos:
+          of 0: pattern = escapeRe(val)
+          of 1: stream = parseNat(val)
+          of 2: ignoreCase = parseBool(val)
+
+          else: error "Too many args"
+
+        if pattern == "":
+          error &"words: value required"
+        pattern = "\\b" & pattern & "\\b"
+        if ignoreCase:
+          flags.incl reIgnoreCase
+        return subtitle(container, tb, re(pattern, flags), stream)
+
+      of "none":
+        let length = mediaLength(container)
+        let tbLength = (round((length * tb).float64)).int64
+
+        return newSeqWith(tbLength, true)
+      of "all", "all/e":
+        let length = mediaLength(container)
+        let tbLength = (round((length * tb).float64)).int64
+
+        return newSeqWith(tbLength, false)
       else:
-        let levels = audio(bar, container, args.input, tb, stream)
-        result = levels.mapIt(it >= threshold)
-
-      mutRemoveSmall(result, minclip, true, false)
-      mutRemoveSmall(result, mincut, false, true)
-      return result
-    elif node[0].isSymbol("motion", text):
-      threshold = 0.02 # Reduce default threshold
-
-      let argOrder = @["threshold", "stream", "width", "blur"]
-
-      for expr in node[1 ..< node.len]:
-        let val = parseColFunc(argPos, isKey, argOrder, expr, text)
-
-        case argPos:
-        of 0: threshold = parseThres(val)
-        of 1: stream = parseNat(val)
-        of 2: width = parseNat(val)
-        of 3: blur = parseNat(val)
-        else: error "Too many args"
-
-        if not isKey:
-          argPos += 1
-      let levels = motion(bar, container, args.input, tb, stream, width, blur)
-      return levels.mapIt(it >= threshold)
-
-    elif node[0].isSymbol("subtitle", text):
-      let argOrder = @["pattern", "stream", "ignore-case"] # "max-count"]
-      var pattern = ""
-      var flags: set[ReFlag]
-
-      for expr in node[1 ..< node.len]:
-        let val = parseColFunc(argPos, isKey, argOrder, expr, text)
-        case argPos:
-        of 0: pattern = val
-        of 1: stream = parseNat(val)
-        of 2:
-          if parseBool(val):
-            flags.incl reIgnoreCase
-        else: error "Too many args"
-
-      if pattern == "":
-        error "subtitle: pattern required"
-
-      return subtitle(container, tb, re(pattern, flags), stream)
-    elif node[0].isSymbol("none", text):
-      let length = mediaLength(container)
-      let tbLength = (round((length * tb).float64)).int64
-
-      return newSeqWith(tbLength, true)
-    elif node[0].isSymbol("all", text) or node[0].isSymbol("all/e", text):
-      let length = mediaLength(container)
-      let tbLength = (round((length * tb).float64)).int64
-
-      return newSeqWith(tbLength, false)
+        error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
     else:
-      error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
+      error "Expected a function"
 
   return editEval(expr, args.edit)
 
