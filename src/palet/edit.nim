@@ -52,7 +52,7 @@ proc parseThres(val: string): float32 =
     error &"Unknown unit: {unit}"
 
   if result < 0 or result > 1:
-    error &"Invalid threshold: {val}"
+    error &"Threshold not in range: {val} ({result})"
 
 proc parseNat(val: string): int32 =
   result = int32(parseInt(val))
