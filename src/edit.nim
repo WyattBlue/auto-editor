@@ -83,7 +83,7 @@ proc parseExportString*(exportStr: string): (string, string, string) =
     case paramName:
       of "name": name = value
       of "version": version = value
-      else: error &"Unknown paramter: {paramName}"
+      else: error &"Unknown parameter: {paramName}"
 
     # Skip comma
     if i < paramsStr.len and paramsStr[i] == ',':

@@ -29,6 +29,24 @@ func getNumber*(packed: PackedInt): int64 =
   else:
     raw
 
+type
+  NormKind* = enum
+    nkNull
+    nkEbu
+    nkPeak
+
+  Norm* = object
+    case kind*: NormKind
+    of nkNull:
+      discard
+    of nkEbu:
+      i*: float32      # -70.0 to 5.0, default -24.0
+      lra*: float32    # 1.0 to 50.0, default 7.0
+      tp*: float32     # -9.0 to 0.0, default -2.0
+      gain*: float32   # -99.0 to 99.0, default 0.0
+    of nkPeak:
+      t*: float32 # -99.0 to 0.0, default -8.0
+
 type mainArgs* = object
   input*: string = ""
 
@@ -81,7 +99,7 @@ type mainArgs* = object
   audioLayout*: string = ""
   audioBitrate*: int = -1
   mixAudioStreams*: bool = false
-  audioNormalize*: string = "#f"
+  audioNormalize*: Norm = Norm(kind: nkNull)
 
   # Misc.
   noOpen*: bool = false
