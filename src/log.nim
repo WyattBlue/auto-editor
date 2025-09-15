@@ -110,12 +110,15 @@ var tempDir* = ""
 let start* = epochTime()
 let noColor* = getEnv("NO_COLOR") != "" or getEnv("AV_LOG_FORCE_NOCOLOR") != ""
 
-proc conwrite*(msg: string) =
+proc conwrite*(msg: string) {.raises:[].} =
   if not quiet:
-    let columns = terminalWidth()
-    let buffer: string = " ".repeat(columns - msg.len - 3)
-    stdout.write("  " & msg & buffer & "\r")
-    stdout.flushFile()
+    try:
+      let columns = terminalWidth()
+      let buffer: string = " ".repeat(columns - msg.len - 3)
+      stdout.write("  " & msg & buffer & "\r")
+      stdout.flushFile()
+    except IOError:
+        discard
 
 proc debug*(msg: string) =
   if isDebug:
@@ -130,23 +133,26 @@ proc warning*(msg: string) =
     conwrite("")
     stderr.write(&"Warning! {msg}\n")
 
-proc closeTempDir*() =
+proc closeTempDir*() {.raises:[].} =
   if tempDir != "":
     try:
       removeDir(tempDir)
     except OSError:
       discard
 
-proc error*(msg: string) {.noreturn.} =
+proc error*(msg: string) {.noreturn, raises:[].} =
   closeTempDir()
   when defined(debug):
     raise newException(ValueError, msg)
   else:
     conwrite("")
-    if not noColor:
-      stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
-    else:
-      stderr.writeLine(&"Error! {msg}")
+    try:
+      if not noColor:
+        stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
+      else:
+        stderr.writeLine(&"Error! {msg}")
+    except IOError:
+      discard
     quit(1)
 
 
