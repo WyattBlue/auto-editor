@@ -10,6 +10,7 @@ import log
 import ffmpeg
 import cmds/[info, desc, cache, levels, subdump, whisper]
 import util/[color, fun]
+import palet/edit
 
 import tinyre
 
@@ -422,7 +423,7 @@ judge making cuts.
       of "layout":
         args.audioLayout = key
       of "audio-normalize":
-        args.audioNormalize = key
+        args.audioNormalize = parseNorm(key)
       of "audio-bitrate":
         args.audioBitrate = parseBitrate(key)
       of "progress":
