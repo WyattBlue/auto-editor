@@ -54,8 +54,11 @@ proc parseThres(val: string): float32 =
   if result < 0 or result > 1:
     error &"Threshold not in range: {val} ({result})"
 
-proc parseFloatInRange(val: string, min, max: float32): float32 =
-  result = parseFloat(val)
+proc parseFloatInRange(val: string, min, max: float32): float32 {.raises:[].} =
+  try:
+    result = parseFloat(val)
+  except ValueError:
+    error &"Invalid number: {val}"
   if result < min or result > max:
     error &"value {result} is outside range [{min}, {max}]"
 
