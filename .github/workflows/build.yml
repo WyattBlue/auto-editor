@@ -14,11 +14,9 @@ jobs:
           - os: ubuntu-latest
             arch: x86_64
             binary_name: auto-editor-linux-x86_64
-          - os: macos-13
-            arch: x86_64
+          - os: macos-15-intel
             binary_name: auto-editor-macos-x86_64
           - os: macos-latest
-            arch: arm64
             binary_name: auto-editor-macos-arm64
     steps:
       - name: Checkout
@@ -33,15 +31,16 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew update && brew install nim
-          brew unlink gettext libidn2 libpng libtiff libunistring libx11 libxau libxcb libxdmcp little-cms2 unbound
+          brew unlink cmake gettext libidn2 libpng libtiff libunistring libx11 libxau libxcb libxdmcp little-cms2 unbound
+          pip install "cmake<4"
       - name: Setup
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get update
             sudo apt-get install -y build-essential pkg-config nasm git
-          elif [ "${{ matrix.os }}" = "macos-13" ]; then
+          elif [ "${{ matrix.os }}" = "macos-15-intel" ]; then
             brew install nasm
-            echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> $GITHUB_ENV
+            echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           fi
