@@ -6,6 +6,7 @@ on:
       - '**.txt'
       - '**.toml'
       - 'src/about.nim'
+      - '.github/workflows/build.yml'
     branches:
       - master
   pull_request:
