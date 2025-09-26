@@ -385,6 +385,7 @@ proc editMedia*(args: var mainArgs) =
   else:
     makeMedia(args, tlV3, output, rule, bar)
 
+  bar.destroy()
   stopTimer()
 
   if not args.noOpen and exportKind == "default":
