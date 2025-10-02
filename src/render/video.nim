@@ -176,10 +176,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   let codec = encoderCtx.codec
 
   if codec.id == AV_CODEC_ID_HEVC:
-    let codecTag = fourccToInt("hvc1") # for QuickTime
-    if codecTag != 0:
-      outputStream.codecpar.codec_tag = codecTag
-      encoderCtx.codec_tag = codecTag
+    const codecTag = fourccToInt("hvc1") # for QuickTime
+    outputStream.codecpar.codec_tag = codecTag
+    encoderCtx.codec_tag = codecTag
     discard av_opt_set(encoderCtx.priv_data, "x265-params", "log-level=error", 0)
 
   encoderCtx.framerate = targetFps
