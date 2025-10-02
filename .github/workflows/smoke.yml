@@ -5,7 +5,7 @@ on:
       - '**.md'
       - '**.txt'
       - '**.toml'
-      - 'src/about.nim'
+      - '**about.nim'
       - '.github/workflows/build.yml'
     branches:
       - master
