@@ -34,6 +34,23 @@ Options:
                                   make auto edits
     -ex, --export EXPORT:ATTRS?   Choose the export mode. (default is
                                   "audio")
+    --when-normal ACTION          When the video is not silent (defined by --edit)
+                                  do an action. The default action being 'nil'.
+    --when-silent ACTION          When the video is silent (defined by --edit)
+                                  do an action. The default action being 'cut'.
+
+                                  Actions Available:
+                                    nil () ; unchanged/do nothing
+                                    cut () ; remove completely
+                                           ; (like setting the speed to inf)
+                                    speed (val: float)
+                                      ; Change the speed while preserving pitch.
+                                      ;   val: between (0-99999)
+                                    pitch (val: float)
+                                      ; Change the speed by varying pitch.
+                                      ;   val: between (0-99999)
+
+
     -o, --output FILE             Set the name/path of the new output file
     -s, --silent-speed NUM        Set speed of sections marked "silent" to
                                   NUM. (default is 99999)

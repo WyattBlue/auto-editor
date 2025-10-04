@@ -10,7 +10,6 @@ version = __version__
 
 
 def get_binary_info():
-    """Get the appropriate binary name and download URL for this platform."""
     system = platform.system().lower()
     machine = platform.machine().lower()
 
@@ -29,9 +28,21 @@ def get_binary_info():
     else:
         raise RuntimeError(f"Unsupported platform: {system} {machine}")
 
-    # Use the package version to construct the download URL
     url = f"https://github.com/WyattBlue/auto-editor/releases/download/{version}/{binary_name}"
     return binary_name, local_name, url
+
+
+def get_binary_version(binary_path):
+    try:
+        result = subprocess.run(
+            [str(binary_path), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return None
 
 
 def download_binary():
@@ -44,7 +55,11 @@ def download_binary():
     binary_path = bin_dir / local_name
 
     if binary_path.exists():
-        return binary_path
+        binary_version = get_binary_version(binary_path)
+        if binary_version == version:
+            return binary_path
+        print(f"Removing outdated version ({binary_version})...")
+        binary_path.unlink()
 
     print("Downloading auto-editor binary for your platform...")
     print(f"URL: {url}")
