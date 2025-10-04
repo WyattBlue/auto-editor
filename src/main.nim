@@ -1,8 +1,7 @@
-import std/[os, osproc, posix_utils]
-import std/[strformat, strutils]
-import std/terminal
-import std/uri
-import std/parseutils
+import std/[os, osproc, strformat, strutils]
+import std/[terminal, uri, parseutils]
+when not defined(windows):
+  import std/posix_utils
 
 import about
 import edit
