@@ -4,6 +4,7 @@ import std/sequtils
 import std/tables
 import std/os
 import std/memfiles
+import std/math
 
 import ../log
 import ../timeline
@@ -219,6 +220,7 @@ proc createAudioFilterGraph(clip: Clip, sr: int, layout: string): (ptr AVFilterG
   var filterChain: string
   var filters: seq[string] = @[]
 
+  # Apply filters per clip.
   if clip.speed != 1.0:
     let clampedSpeed = max(0.5, min(100.0, clip.speed))
     filters.add(fmt"atempo={clampedSpeed}")
@@ -267,7 +269,9 @@ proc processAudioClip(clip: Clip, data: seq[int16], sourceSr: cint, targetSr: ci
 
   # First apply speed/volume processing at source sample rate (if needed)
   var processedData = data
-  if clip.speed != 1.0 or clip.volume != 1.0:
+  let needsFiltering = clip.speed != 1.0 or clip.volume != 1.0
+
+  if needsFiltering:
     # Data is interleaved: [L, R, L, R, ...] so always stereo
     let channels = 2
     let samples = data.len div 2
@@ -359,6 +363,26 @@ proc processAudioClip(clip: Clip, data: seq[int16], sourceSr: cint, targetSr: ci
             for ch in 0..<frameChannels:
               if interleavedIndex + ch < processedData.len:
                 processedData[interleavedIndex + ch] = audioData[i * frameChannels + ch]
+        elif frame.format == AV_SAMPLE_FMT_FLTP.cint:
+          # Planar float - convert to int16
+          for i in 0..<frameSamples:
+            let interleavedIndex = (sampleOffset + i) * 2
+            for ch in 0..<frameChannels:
+              if frame.data[ch] != nil and interleavedIndex + ch < processedData.len:
+                let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
+                let floatSample = channelData[i]
+                let clampedSample = max(-1.0, min(1.0, floatSample))
+                processedData[interleavedIndex + ch] = int16(clampedSample * 32767.0)
+        elif frame.format == AV_SAMPLE_FMT_FLT.cint:
+          # Interleaved float - convert to int16
+          let audioData = cast[ptr UncheckedArray[cfloat]](frame.data[0])
+          for i in 0..<frameSamples:
+            let interleavedIndex = (sampleOffset + i) * 2
+            for ch in 0..<frameChannels:
+              if interleavedIndex + ch < processedData.len:
+                let floatSample = audioData[i * frameChannels + ch]
+                let clampedSample = max(-1.0, min(1.0, floatSample))
+                processedData[interleavedIndex + ch] = int16(clampedSample * 32767.0)
 
         sampleOffset += frameSamples
 
@@ -455,7 +479,7 @@ proc processAudioClip(clip: Clip, data: seq[int16], sourceSr: cint, targetSr: ci
 
 
 proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
-    int], mixLayers: bool): iterator(): (ptr AVFrame, int) =
+    int], mixLayers: bool, norm: Norm): iterator(): (ptr AVFrame, int) =
   var samples: Table[(string, int32), Getter]
   let targetChannels = 2
 
@@ -485,12 +509,14 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   let bufferIndex = if mixLayers: -1.int32 else: layerIndices[0].int32
   var audioBuffer = newAudioBuffer(bufferIndex, totalSamples, targetChannels)
 
-  # Process each layer and either mix or replace samples
+  # Cache source data for each clip (needed for two-pass peak normalization)
+  type ClipData = tuple[clip: Clip, srcData: seq[int16], sourceSr: cint, startSample: int, durSamples: int]
+  var clipDataCache: seq[ClipData] = @[]
+
+  # Collect and cache all source data
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
       let layer = tl.a[layerIndex]
-
-      # Process each clip in this layer
       for clip in layer.clips:
         let key = (clip.src[], clip.stream)
         if key in samples:
@@ -499,35 +525,63 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
           let sampStart = int(clip.offset.float64 * clip.speed * sourceSr / tb)
           let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed * sourceSr / tb)
           let srcData = getter.get(sampStart, sampEnd)
-
           let startSample = int(clip.start * sr.int64 * tb.den div tb.num)
           let durSamples = int(clip.dur * sr.int64 * tb.den div tb.num)
-          let processedData = processAudioClip(clip, srcData, getter.stream.codecpar.sample_rate, sr)
+          clipDataCache.add((clip, srcData, getter.stream.codecpar.sample_rate, startSample, durSamples))
 
-          if processedData.len > 0:
-            # processedData is now interleaved: [L, R, L, R, ...]
-            let numSamples = processedData.len div 2  # Always stereo output from processAudioClip
-            for i in 0 ..< min(durSamples, numSamples):
-              let outputSampleIndex = startSample + i
-              if outputSampleIndex < totalSamples:
-                # Calculate the base index in the memory-mapped array for this sample
-                let baseIndex = outputSampleIndex * targetChannels
+  # Process each clip
+  for data in clipDataCache:
+    let processedData = processAudioClip(data.clip, data.srcData, data.sourceSr, sr)
 
-                # Process left and right channels from interleaved data
-                for ch in 0 ..< min(targetChannels, 2):
-                  let flatIndex = baseIndex + ch
-                  let sourceIndex = i * 2 + ch
-                  if flatIndex < audioBuffer.len and sourceIndex < processedData.len:
-                    if mixLayers:
-                      # Mix: add new sample to existing
-                      let currentSample = audioBuffer[flatIndex].int32
-                      let newSample = processedData[sourceIndex].int32
-                      let mixed = currentSample + newSample
-                      # Clamp to 16-bit range to prevent overflow distortion
-                      audioBuffer[flatIndex] = int16(max(-32768, min(32767, mixed)))
-                    else:
-                      # Replace: direct assignment (for single layer)
-                      audioBuffer[flatIndex] = processedData[sourceIndex]
+    if processedData.len > 0:
+      # processedData is now interleaved: [L, R, L, R, ...]
+      let numSamples = processedData.len div 2  # Always stereo output from processAudioClip
+      for i in 0 ..< min(data.durSamples, numSamples):
+        let outputSampleIndex = data.startSample + i
+        if outputSampleIndex < totalSamples:
+          # Calculate the base index in the memory-mapped array for this sample
+          let baseIndex = outputSampleIndex * targetChannels
+
+          # Process left and right channels from interleaved data
+          for ch in 0 ..< min(targetChannels, 2):
+            let flatIndex = baseIndex + ch
+            let sourceIndex = i * 2 + ch
+            if flatIndex < audioBuffer.len and sourceIndex < processedData.len:
+              if mixLayers:
+                # Mix: add new sample to existing
+                let currentSample = audioBuffer[flatIndex].int32
+                let newSample = processedData[sourceIndex].int32
+                let mixed = currentSample + newSample
+                # Clamp to 16-bit range to prevent overflow distortion
+                audioBuffer[flatIndex] = int16(max(-32768, min(32767, mixed)))
+              else:
+                # Replace: direct assignment (for single layer)
+                audioBuffer[flatIndex] = processedData[sourceIndex]
+
+  # Calculate peak normalization adjustment if needed (first pass analysis)
+  var peakAdjustment: float32 = 0.0
+  if norm.kind == nkPeak:
+    var maxPeakLevel: float32 = -99.0
+
+    # Analyze the entire audio buffer to find global peak
+    for i in 0..<audioBuffer.len:
+      let sample = audioBuffer[i]
+      let amplitude = abs(sample.float32 / 32768.0)
+      if amplitude > 0.0:
+        let peakLevel = 20.0 * log10(amplitude)
+        if peakLevel > maxPeakLevel:
+          maxPeakLevel = peakLevel
+
+    peakAdjustment = norm.t - maxPeakLevel
+    debug fmt"current peak level: {maxPeakLevel}"
+    debug fmt"peak adjustment: {peakAdjustment:.3f}dB"
+
+    # Apply volume adjustment directly to the .map buffer
+    if peakAdjustment != 0.0:
+      let gainLinear = pow(10.0, peakAdjustment / 20.0)
+      for i in 0..<audioBuffer.len:
+        let adjusted = audioBuffer[i].float32 * gainLinear
+        audioBuffer[i] = int16(max(-32768.0, min(32767.0, adjusted)))
 
   # Yield audio frames in chunks
   var samplesYielded = 0
@@ -580,13 +634,13 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         getter.close()
       audioBuffer.memFile.close()
 
-proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int): iterator(): (
+proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm): iterator(): (
     ptr AVFrame, int) =
   # Create sequence of all layer indices efficiently
   let allLayerIndices = toSeq(0..<tl.a.len)
-  return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, mixLayers = true)
+  return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, mixLayers = true, norm)
 
 proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3,
-    frameSize: int): iterator(): (ptr AVFrame, int) =
-  return makeAudioFrames(fmt, tl, frameSize, @[index.int], mixLayers = false)
+    frameSize: int, norm: Norm): iterator(): (ptr AVFrame, int) =
+  return makeAudioFrames(fmt, tl, frameSize, @[index.int], mixLayers = false, norm)
 
