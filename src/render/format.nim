@@ -110,7 +110,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       audioEncoders.add(aEncCtx)
 
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-      let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize)
+      let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize, args.audioNormalize)
       audioFrameIters.add(audioFrameIter)
   elif not args.an:
     # Create separate streams for each timeline layer (existing behavior)
@@ -138,7 +138,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         audioEncoders.add(aEncCtx)
 
         let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl, frameSize)
+        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl, frameSize, args.audioNormalize)
         audioFrameIters.add(audioFrameIter)
 
   defer:

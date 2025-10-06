@@ -485,7 +485,7 @@ var commonFlags = &"""
   --disable-xlib \
   --disable-bsfs \
   --disable-filters \
-  --enable-filter=whisper,scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
+  --enable-filter=whisper,scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm \
   --disable-encoder={encodersDisabled} \
   --disable-decoder={decodersDisabled} \
   --disable-demuxer={demuxersDisabled} \
