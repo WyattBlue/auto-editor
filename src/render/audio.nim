@@ -5,14 +5,84 @@ import std/tables
 import std/os
 import std/memfiles
 import std/math
+import std/json
 
 import ../log
 import ../timeline
 import ../[av, ffmpeg]
 import ../resampler
+import ../graph
 
 const AV_CH_LAYOUT_STEREO = 3
 const AV_CH_LAYOUT_MONO = 1
+
+{.emit: """
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#include <libavutil/log.h>
+
+static char captured_json[16384];
+static int capture_enabled = 0;
+
+static void loudnorm_log_callback_wrapper(void* avcl, int level, const char* fmt, va_list vl) {
+    if (!capture_enabled) {
+        av_log_default_callback(avcl, level, fmt, vl);
+        return;
+    }
+
+    char buffer[4096];
+    vsnprintf(buffer, sizeof(buffer), fmt, vl);
+
+    // Look for JSON content
+    if (strchr(buffer, '{') != NULL && strchr(buffer, '}') != NULL) {
+        strncat(captured_json, buffer, sizeof(captured_json) - strlen(captured_json) - 1);
+    }
+
+    av_log_default_callback(avcl, level, fmt, vl);
+}
+
+static void enable_loudnorm_capture(void) {
+    capture_enabled = 1;
+    captured_json[0] = '\0';
+    av_log_set_callback(loudnorm_log_callback_wrapper);
+}
+
+static void disable_loudnorm_capture(void) {
+    capture_enabled = 0;
+    av_log_set_callback(av_log_default_callback);
+}
+
+static const char* get_captured_json(void) {
+    return captured_json;
+}
+""".}
+
+proc enableLoudnormCapture() {.importc: "enable_loudnorm_capture", nodecl.}
+proc disableLoudnormCapture() {.importc: "disable_loudnorm_capture", nodecl.}
+proc getCapturedJson(): cstring {.importc: "get_captured_json", nodecl.}
+
+proc parseLoudnormValue(node: JsonNode, field: string): float32 =
+  if node.hasKey(field):
+    let value = node[field]
+    if value.kind == JString:
+      let strVal = value.getStr()
+      if strVal == "-inf":
+        return -99.0
+      elif strVal == "inf":
+        return 0.0
+      else:
+        return parseFloat(strVal).float32
+    if value.kind == JFloat:
+      let valNum = value.getFloat()
+      if valNum == -Inf:
+        return -99.0
+      if valNum == Inf:
+        return 0.0
+      return valNum.float32
+    elif value.kind == JInt:
+      return value.getInt().float32
+  return 0.0
 
 type
   Getter = ref object
@@ -558,9 +628,9 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
                 # Replace: direct assignment (for single layer)
                 audioBuffer[flatIndex] = processedData[sourceIndex]
 
-  # Calculate peak normalization adjustment if needed (first pass analysis)
-  var peakAdjustment: float32 = 0.0
+  # Apply normalization if needed
   if norm.kind == nkPeak:
+    # Calculate peak normalization adjustment (first pass analysis)
     var maxPeakLevel: float32 = -99.0
 
     # Analyze the entire audio buffer to find global peak
@@ -572,7 +642,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         if peakLevel > maxPeakLevel:
           maxPeakLevel = peakLevel
 
-    peakAdjustment = norm.t - maxPeakLevel
+    let peakAdjustment = norm.t - maxPeakLevel
     debug fmt"current peak level: {maxPeakLevel}"
     debug fmt"peak adjustment: {peakAdjustment:.3f}dB"
 
@@ -582,6 +652,203 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       for i in 0..<audioBuffer.len:
         let adjusted = audioBuffer[i].float32 * gainLinear
         audioBuffer[i] = int16(max(-32768.0, min(32767.0, adjusted)))
+
+  elif norm.kind == nkEbu:
+    # Create a temporary buffer for the normalized audio
+    var normalizedBuffer = newSeq[int16](audioBuffer.len)
+
+    enableLoudnormCapture()
+    let firstPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:print_format=json"
+
+    let bufferArgs = &"sample_rate={sr}:sample_fmt=fltp:channel_layout=stereo:time_base=1/{sr}"
+    var analysisGraph = newGraph()
+    let analysisSrc = analysisGraph.add("abuffer", bufferArgs)
+    let analysisFilter = analysisGraph.add("loudnorm", firstPass)
+    let analysisSink = analysisGraph.add("abuffersink")
+    analysisGraph.linkNodes(@[analysisSrc, analysisFilter, analysisSink]).configure()
+
+    # Create input frame for analysis
+    var analysisFrame = av_frame_alloc()
+    if analysisFrame == nil:
+      error "Could not allocate input frame for loudnorm analysis"
+
+    analysisFrame.nb_samples = totalSamples.cint
+    analysisFrame.format = AV_SAMPLE_FMT_FLTP.cint
+    analysisFrame.ch_layout.nb_channels = targetChannels.cint
+    analysisFrame.ch_layout.order = 0
+    analysisFrame.ch_layout.u.mask = AV_CH_LAYOUT_STEREO
+    analysisFrame.sample_rate = sr.cint
+    analysisFrame.pts = 0
+
+    if av_frame_get_buffer(analysisFrame, 0) < 0:
+      error "Could not allocate input frame buffer for loudnorm analysis"
+
+    # Copy all data from audioBuffer to frame (convert int16 interleaved to planar float)
+    for ch in 0 ..< targetChannels:
+      let channelData = cast[ptr UncheckedArray[cfloat]](analysisFrame.data[ch])
+      for i in 0..<totalSamples:
+        let srcIndex = i * targetChannels + ch
+        if srcIndex < audioBuffer.len:
+          # Convert int16 to float [-1.0, 1.0]
+          channelData[i] = audioBuffer[srcIndex].cfloat / 32768.0
+        else:
+          channelData[i] = 0.0
+
+    # Push frame to analysis filter graph
+    analysisGraph.push(analysisFrame)
+    av_frame_free(addr analysisFrame)
+
+    # Flush the analysis filter graph
+    analysisGraph.flush()
+
+    # Pull all output frames from analysis (and discard them - we only need the stats)
+    while true:
+      let outputFrame = analysisGraph.tryPull()
+      if outputFrame == nil:
+        break
+      av_frame_free(addr outputFrame)
+
+    analysisGraph.cleanup()
+
+    # Disable log capture and restore default callback
+    disableLoudnormCapture()
+
+    var measuredI = norm.i
+    var measuredLRA = norm.lra
+    var measuredTP = norm.tp
+    var measuredThresh = -70.0'f32
+
+    let capturedJson = $getCapturedJson()
+    let jsonStart = capturedJson.find('{')
+    let jsonEnd = capturedJson.rfind('}')
+    if capturedJson.len > 0 and jsonStart >= 0 and jsonEnd > jsonStart:
+      let jsonStr = capturedJson[jsonStart..jsonEnd]
+      try:
+        let jsonData = parseJson(jsonStr)
+        measuredI = parseLoudnormValue(jsonData, "input_i")
+        measuredLRA = parseLoudnormValue(jsonData, "input_lra")
+        measuredTP = parseLoudnormValue(jsonData, "input_tp")
+        measuredThresh = parseLoudnormValue(jsonData, "input_thresh")
+        debug &"Measured: i={measuredI:.2f} lra={measuredLRA:.2f} tp={measuredTP:.2f} thresh={measuredThresh:.2f}"
+      except:
+        error "Error processing loudnorm output, using defaults"
+    else:
+      error "Error processing loudnorm output, using defaults"
+
+    let secondPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:linear=true:measured_i={measuredI}:measured_lra={measuredLRA}:measured_tp={measuredTP}:measured_thresh={measuredThresh}:print_format=none"
+
+    debug &"EBU norm: {secondPass}"
+    var loudnormGraph = newGraph()
+    let bufferSrc = loudnormGraph.add("abuffer", bufferArgs)
+    let loudnormFilter = loudnormGraph.add("loudnorm", secondPass)
+
+    let aformatArgs = fmt"sample_rates={sr}"
+    let aformat = loudnormGraph.add("aformat", aformatArgs)
+    let bufferSink = loudnormGraph.add("abuffersink")
+    loudnormGraph.linkNodes(@[bufferSrc, loudnormFilter, aformat, bufferSink]).configure()
+
+    # Create one large input frame with all audio data for normalization pass
+    var inputFrame = av_frame_alloc()
+    if inputFrame == nil:
+      error "Could not allocate input frame for loudnorm"
+
+    inputFrame.nb_samples = totalSamples.cint
+    inputFrame.format = AV_SAMPLE_FMT_FLTP.cint
+    inputFrame.ch_layout.nb_channels = targetChannels.cint
+    inputFrame.ch_layout.order = 0
+    inputFrame.ch_layout.u.mask = AV_CH_LAYOUT_STEREO
+    inputFrame.sample_rate = sr.cint
+    inputFrame.pts = 0
+
+    if av_frame_get_buffer(inputFrame, 0) < 0:
+      error "Could not allocate input frame buffer for loudnorm"
+
+    # Copy all data from audioBuffer to frame (convert int16 interleaved to planar float)
+    for ch in 0 ..< targetChannels:
+      let channelData = cast[ptr UncheckedArray[cfloat]](inputFrame.data[ch])
+      for i in 0..<totalSamples:
+        let srcIndex = i * targetChannels + ch
+        if srcIndex < audioBuffer.len:
+          # Convert int16 to float [-1.0, 1.0]
+          channelData[i] = audioBuffer[srcIndex].cfloat / 32768.0
+        else:
+          channelData[i] = 0.0
+
+    # Push frame to filter graph
+    loudnormGraph.push(inputFrame)
+    av_frame_free(addr inputFrame)
+
+    # Flush the filter graph
+    loudnormGraph.flush()
+
+    # Pull all output frames
+    var outputSamplesWritten = 0
+    while true:
+      let outputFrame = loudnormGraph.tryPull()
+      if outputFrame == nil:
+        break
+
+      # Copy filtered data back to normalizedBuffer
+      let frameSamples = outputFrame.nb_samples.int
+      let frameChannels = min(outputFrame.ch_layout.nb_channels.int, targetChannels)
+
+      # Handle different output formats from loudnorm filter
+      if outputFrame.format == AV_SAMPLE_FMT_DBL.cint:
+        # Interleaved double - loudnorm outputs this format
+        let audioData = cast[ptr UncheckedArray[cdouble]](outputFrame.data[0])
+        for i in 0..<frameSamples:
+          let destIndex = (outputSamplesWritten + i) * targetChannels
+          if destIndex + frameChannels <= normalizedBuffer.len:
+            for ch in 0..<frameChannels:
+              let doubleSample = audioData[i * frameChannels + ch]
+              let clampedSample = max(-1.0, min(1.0, doubleSample))
+              normalizedBuffer[destIndex + ch] = int16(clampedSample * 32767.0)
+      elif outputFrame.format == AV_SAMPLE_FMT_FLT.cint:
+        # Interleaved float
+        let audioData = cast[ptr UncheckedArray[cfloat]](outputFrame.data[0])
+        for i in 0..<frameSamples:
+          let destIndex = (outputSamplesWritten + i) * targetChannels
+          if destIndex + frameChannels <= normalizedBuffer.len:
+            for ch in 0..<frameChannels:
+              let floatSample = audioData[i * frameChannels + ch]
+              let clampedSample = max(-1.0, min(1.0, floatSample))
+              normalizedBuffer[destIndex + ch] = int16(clampedSample * 32767.0)
+      elif outputFrame.format == AV_SAMPLE_FMT_FLTP.cint:
+        # Planar float
+        for i in 0..<frameSamples:
+          let destIndex = (outputSamplesWritten + i) * targetChannels
+          if destIndex + frameChannels <= normalizedBuffer.len:
+            for ch in 0..<frameChannels:
+              if outputFrame.data[ch] != nil:
+                let channelData = cast[ptr UncheckedArray[cfloat]](outputFrame.data[ch])
+                let floatSample = channelData[i]
+                let clampedSample = max(-1.0, min(1.0, floatSample))
+                normalizedBuffer[destIndex + ch] = int16(clampedSample * 32767.0)
+      elif outputFrame.format == AV_SAMPLE_FMT_S16P.cint:
+        # Planar 16-bit
+        for i in 0..<frameSamples:
+          let destIndex = (outputSamplesWritten + i) * targetChannels
+          if destIndex + frameChannels <= normalizedBuffer.len:
+            for ch in 0..<frameChannels:
+              if outputFrame.data[ch] != nil:
+                let channelData = cast[ptr UncheckedArray[int16]](outputFrame.data[ch])
+                normalizedBuffer[destIndex + ch] = channelData[i]
+      else:
+        error fmt"Unexpected output format from loudnorm: {outputFrame.format}"
+
+      outputSamplesWritten += frameSamples
+      av_frame_free(addr outputFrame)
+
+    # Copy normalized data back to audioBuffer
+    # Take only what fits in audioBuffer (which is sized for totalSamples)
+    let samplesToCopy = min(outputSamplesWritten, totalSamples)
+
+    for i in 0..<(samplesToCopy * targetChannels):
+      if i < audioBuffer.len and i < normalizedBuffer.len:
+        audioBuffer[i] = normalizedBuffer[i]
+
+    # Clean up filter graph
+    loudnormGraph.cleanup()
 
   # Yield audio frames in chunks
   var samplesYielded = 0
