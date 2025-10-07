@@ -169,14 +169,30 @@ proc setOutput(userOut, `export`, path: string): (string, string) =
 proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
   if codec == "auto":
     if src.a.len == 0:
-      codec = "aac"
+      codec = rule.defaultAud
     else:
       codec = src.a[0].codec
       let avCodec = initCodec(codec)
       if avCodec == nil or avCodec.sample_fmts == nil:
         codec = "aac"
-    if codec notin rule.acodecs.mapIt($it.name) and rule.defaultAud != "none":
-      codec = rule.defaultAud
+
+      # For PCM-based containers (WAV, etc.), prefer PCM even if other codecs are supported
+      if ext in [".wav", ".aiff", ".au"] and rule.defaultAud.startsWith("pcm_"):
+        codec = rule.defaultAud
+      elif codec notin rule.acodecs.mapIt($it.name):
+        if rule.defaultAud != "none":
+          codec = rule.defaultAud
+        else:
+          codec = "aac"
+
+  if codec != "none" and codec notin rule.acodecs.mapIt($it.name):
+    let avCodec = initCodec(codec)
+    if avCodec == nil:
+      error &"Unknown encoder: {codec}"
+
+    # Normalize encoder names
+    if not rule.acodecs.anyIt(it.id == avCodec.id):
+      error &"'{avCodec.name}' audio encoder is not supported in the '{ext}' container"
 
   return codec
 

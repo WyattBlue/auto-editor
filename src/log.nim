@@ -140,7 +140,7 @@ proc closeTempDir*() {.raises:[].} =
     except OSError:
       discard
 
-proc error*(msg: string) {.noreturn, raises:[].} =
+proc error*(msg: string) {.noreturn.} =
   closeTempDir()
   when defined(debug):
     raise newException(ValueError, msg)

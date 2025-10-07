@@ -272,6 +272,7 @@ class Runner:
         input = ["resources/only-video/man-on-green-screen.gif"]
         out = self.main(input, ["--edit", "none", "--cut-out", "2sec,end"], "out.gif")
         assert fileinfo(out).videos[0].codec == "gif"
+        assert len(fileinfo(out).audios) == 0
 
     def test_margin(self):
         self.main(["example.mp4"], ["-m", "3"])
@@ -535,6 +536,47 @@ class Runner:
         self.main(
             ["example.mp4"], ["--audio-normalize", "ebu:i=-5,lra=20,gain=5,tp=-1"]
         )
+
+    def test_audio_norm_peak(self) -> None:
+        """Test that peak normalization increases loudness in the output."""
+        import wave
+        import struct
+
+        # First, create output with peak normalization
+        out = self.main(["example.mp4"], ["--audio-normalize", "peak:-3"], "peak_out.wav")
+
+        # Read the output WAV file and verify it's valid
+        with wave.open(out, 'rb') as wav_file:
+            # Get audio parameters
+            n_channels = wav_file.getnchannels()
+            sample_width = wav_file.getsampwidth()
+            n_frames = wav_file.getnframes()
+
+            # Read all frames
+            frames = wav_file.readframes(n_frames)
+
+            # Calculate peak amplitude
+            if sample_width == 2:  # 16-bit audio
+                samples = struct.unpack(f'{n_frames * n_channels}h', frames)
+                max_amplitude = max(abs(s) for s in samples)
+                # For peak:-3dB, we expect the peak to be close to -3dB
+                # which is about 70.7% of max (10^(-3/20) ≈ 0.707)
+                # Allow some tolerance
+                assert max_amplitude > 15000, f"Peak amplitude too low: {max_amplitude}"
+
+    def test_wav_output(self) -> None:
+        """Test that converting to WAV output produces a valid PCM file."""
+        out = self.main(["example.mp4"], [], "out.wav")
+        # Verify the output file is a valid media file with PCM audio
+        with av.open(out) as container:
+            assert len(container.streams) == 1
+            audio = container.streams[0]
+            assert isinstance(audio, AudioStream)
+            # Should be PCM codec, not AAC
+            assert audio.codec.name.startswith("pcm_"), f"Expected PCM codec, got {audio.codec.name}"
+            assert audio.sample_rate == 48000
+            # PCM formats may report layout differently
+            assert audio.channels == 2
 
 
 def run_tests(tests: list[Callable], args) -> None:
