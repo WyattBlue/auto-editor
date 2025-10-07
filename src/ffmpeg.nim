@@ -1,5 +1,11 @@
 import std/posix
 
+type
+  VaList* {.importc: "va_list", header: "<stdarg.h>", bycopy.} = object
+
+proc vsnprintf*(s: cstring, n: csize_t, format: cstring, ap: VaList): cint {.
+  importc, header: "<stdio.h>".}
+
 type AVRational* {.importc, header: "<libavutil/rational.h>", bycopy.} = object
   num*: cint
   den*: cint
@@ -273,6 +279,12 @@ const
   AV_LOG_TRACE* = 56   # Extremely verbose debugging
 
 proc av_log_set_level*(level: cint) {.importc, header: "<libavutil/log.h>".}
+
+type
+  AVLogCallback* = proc(avcl: pointer, level: cint, fmt: cstring, vl: VaList) {.cdecl.}
+
+proc av_log_set_callback*(callback: AVLogCallback) {.importc, header: "<libavutil/log.h>".}
+proc av_log_default_callback*(avcl: pointer, level: cint, fmt: cstring, vl: VaList) {.importc, header: "<libavutil/log.h>", cdecl.}
 
 proc av_samples_set_silence*(audio_data: ptr ptr uint8, offset: cint, nb_samples: cint,
                             nb_channels: cint,
