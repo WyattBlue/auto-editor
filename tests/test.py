@@ -538,42 +538,37 @@ class Runner:
         import struct
         import hashlib
 
-        # Create output with EBU normalization
         out_ebu = self.main(
-            ["example.mp4"], ["--audio-normalize", "ebu:i=-5,lra=20,gain=5,tp=-1"], "ebu_out.wav"
+            ["example.mp4"],
+            ["--audio-normalize", "ebu:i=-5,lra=20,gain=5,tp=-1"],
+            "ebu_out.wav",
         )
-
-        # Create output without normalization for comparison
         out_none = self.main(
             ["example.mp4"], ["--audio-normalize", "#f"], "no_norm_out.wav"
         )
 
-        # Read both files
-        with wave.open(out_ebu, 'rb') as ebu_file, wave.open(out_none, 'rb') as none_file:
+        with (
+            wave.open(out_ebu, "rb") as ebu_file,
+            wave.open(out_none, "rb") as none_file,
+        ):
             ebu_sr = ebu_file.getframerate()
             ebu_frames = ebu_file.getnframes()
-            ebu_channels = ebu_file.getnchannels()
+            ebu_chl = ebu_file.getnchannels()
 
             none_sr = none_file.getframerate()
             none_frames = none_file.getnframes()
-            none_channels = none_file.getnchannels()
+            none_chl = none_file.getnchannels()
 
-            # Both should have same sample rate and frame count (pitch preservation)
-            assert ebu_sr == none_sr == 48000, f"Sample rates differ: EBU={ebu_sr}, None={none_sr}"
-            assert ebu_channels == none_channels == 2, f"Channels differ: EBU={ebu_channels}, None={none_channels}"
+            assert ebu_sr == none_sr == 48000, f"sr differ: EBU={ebu_sr}, #f={none_sr}"
+            assert ebu_chl == none_chl == 2, f"{ebu_chl=} {none_chl=}"
 
             # Frame counts should match (no resampling/pitch shift)
-            assert ebu_frames == none_frames, \
-                f"Frame count mismatch: EBU={ebu_frames}, None={none_frames}. Pitch is likely wrong!"
-
-            # Calculate duration
+            assert ebu_frames == none_frames, (
+                f"Frame count mismatch: EBU={ebu_frames}, #f={none_frames}"
+            )
             duration = ebu_frames / ebu_sr
+            assert 17.0 < duration < 17.8
 
-            # The edited example.mp4 should be approximately 17.4 seconds
-            assert 17.0 < duration < 17.8, f"Duration {duration}s is incorrect (expected ~17.4s)"
-
-            # Read a sample of frames from the middle to verify data structure
-            # (Skip beginning in case of filter latency)
             middle_pos = ebu_frames // 2
             ebu_file.setpos(middle_pos)
             none_file.setpos(middle_pos)
@@ -581,40 +576,34 @@ class Runner:
             ebu_data = ebu_file.readframes(1000)
             none_data = none_file.readframes(1000)
 
-            # Unpack samples
-            ebu_samples = struct.unpack(f'{len(ebu_data)//2}h', ebu_data)
-            none_samples = struct.unpack(f'{len(none_data)//2}h', none_data)
+            ebu_samples = struct.unpack(f"{len(ebu_data) // 2}h", ebu_data)
+            none_samples = struct.unpack(f"{len(none_data) // 2}h", none_data)
 
-            # Verify we have actual audio data (not all zeros)
-            assert max(abs(s) for s in ebu_samples) > 100, "EBU output appears to be silent"
-            assert max(abs(s) for s in none_samples) > 100, "Non-normalized output appears to be silent"
+            assert max(abs(s) for s in ebu_samples) > 100, "EBU output is silent"
+            assert max(abs(s) for s in none_samples) > 100, "Non-norm output is silent"
 
     def test_audio_norm_peak(self) -> None:
         """Test that peak normalization increases loudness in the output."""
         import wave
         import struct
 
-        # First, create output with peak normalization
-        out = self.main(["example.mp4"], ["--audio-normalize", "peak:-3"], "peak_out.wav")
+        out = self.main(
+            ["example.mp4"], ["--audio-normalize", "peak:-3"], "peak_out.wav"
+        )
 
-        # Read the output WAV file and verify it's valid
-        with wave.open(out, 'rb') as wav_file:
-            # Get audio parameters
+        with wave.open(out, "rb") as wav_file:
             n_channels = wav_file.getnchannels()
             sample_width = wav_file.getsampwidth()
             n_frames = wav_file.getnframes()
 
-            # Read all frames
             frames = wav_file.readframes(n_frames)
 
-            # Calculate peak amplitude
-            if sample_width == 2:  # 16-bit audio
-                samples = struct.unpack(f'{n_frames * n_channels}h', frames)
-                max_amplitude = max(abs(s) for s in samples)
-                # For peak:-3dB, we expect the peak to be close to -3dB
-                # which is about 70.7% of max (10^(-3/20) ≈ 0.707)
-                # Allow some tolerance
-                assert max_amplitude > 15000, f"Peak amplitude too low: {max_amplitude}"
+            assert sample_width == 2  # 16-bit audio
+            samples = struct.unpack(f"{n_frames * n_channels}h", frames)
+            max_amplitude = max(abs(s) for s in samples)
+            # For peak:-3dB, we expect the peak to be close to -3dB
+            # which is about 70.7% of max (10^(-3/20) ≈ 0.707), Allow some tolerance
+            assert max_amplitude > 15000, f"Peak amplitude too low: {max_amplitude}"
 
     def test_wav_output(self) -> None:
         """Test that converting to WAV output produces a valid PCM file."""
@@ -625,9 +614,10 @@ class Runner:
             audio = container.streams[0]
             assert isinstance(audio, AudioStream)
             # Should be PCM codec, not AAC
-            assert audio.codec.name.startswith("pcm_"), f"Expected PCM codec, got {audio.codec.name}"
+            assert audio.codec.name.startswith("pcm_"), (
+                f"Expected PCM codec, got {audio.codec.name}"
+            )
             assert audio.sample_rate == 48000
-            # PCM formats may report layout differently
             assert audio.channels == 2
 
 
