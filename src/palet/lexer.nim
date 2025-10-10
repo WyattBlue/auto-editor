@@ -77,7 +77,7 @@ proc getNextToken(self: var Lexer): Token =
       self.advance()
       return Token(kind: Comma, `from`: self.pos - 1, to: self.pos)
 
-    if self.`char` in "0123456789.":
+    if self.`char` in "0123456789." or (self.`char` == '-' and self.pos + 1 < uint32(self.text.len) and self.text[self.pos + 1] in "0123456789."):
       let `from` = self.pos
       while self.`char` notin "()[]{}\",:;\0 \t\n\r\x0b\x0c":
         self.advance()
