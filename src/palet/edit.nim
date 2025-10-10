@@ -101,11 +101,6 @@ proc parseNorm*(norm: string): Norm =
     error "Should never happen"
 
   var
-    t: float32 = -8.0
-    i: float32 = -24.0
-    lra: float32 = 7.0
-    tp: float32 = -2.0
-    gain: float32 = 0.0
     isKey = false
     argPos = 0
 
@@ -121,7 +116,11 @@ proc parseNorm*(norm: string): Norm =
       case text[node[0].`from` ..< node[0].to]:
       of "ebu":
         let argOrder = @["i", "lra", "tp", "gain"]
-
+        var
+          i: float32 = -24.0
+          lra: float32 = 7.0
+          tp: float32 = -2.0
+          gain: float32 = 0.0
         for expr in node[1 ..< node.len]:
           let val = parseColFunc(argPos, isKey, argOrder, expr, text)
 
@@ -138,7 +137,7 @@ proc parseNorm*(norm: string): Norm =
         return Norm(kind: nkEbu, i: i, lra: lra, tp: tp, gain: gain)
       of "peak":
         let argOrder = @["t"]
-
+        var t: float32 = -8.0
         for expr in node[1 ..< node.len]:
           let val = parseColFunc(argPos, isKey, argOrder, expr, text)
 
