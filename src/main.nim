@@ -124,9 +124,9 @@ Options:
     -b:a, --audio-bitrate BITRATE
                                   Set the number of bits per second for audio
     --mix-audio-streams           Mix all audio streams together into one
-    --audio-normalize NORM-TYPE   Apply audio rendering to all audio tracks.
-                                  Applied right before rendering the output
-                                  file
+    --audio-normalize, -anorm NORM-TYPE
+                                  Apply audio normalizing (either ebu or peak).
+                                  Applied right before rendering the output file
 
   Miscellaneous:
     --no-open                     Do not open the output file after editing
@@ -384,7 +384,9 @@ judge making cuts.
       expecting = "frame-rate"
     of "-res", "--resolution":
       expecting = "resolution"
-    of "--temp-dir", "--progress", "--add-in", "--cut-out",  "--scale", "--audio-normalize",
+    of "-anorm", "--audio-normalize":
+      expecting = "audio-normalize"
+    of "--temp-dir", "--progress", "--add-in", "--cut-out",  "--scale",
         "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
       expecting = key[2..^1]
     else:
