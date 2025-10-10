@@ -235,7 +235,6 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
         return result
       of "motion":
         threshold = 0.02 # Reduce default threshold
-
         let argOrder = @["threshold", "stream", "width", "blur"]
 
         for expr in node[1 ..< node.len]:
@@ -283,11 +282,11 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
           of 0: pattern = escapeRe(val)
           of 1: stream = parseNat(val)
           of 2: ignoreCase = parseBool(val)
-
           else: error "Too many args"
 
         if pattern == "":
-          error &"words: value required"
+          error &"word: value required"
+
         pattern = "\\b" & pattern & "\\b"
         if ignoreCase:
           flags.incl reIgnoreCase
