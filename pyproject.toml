@@ -3,7 +3,6 @@ requires = ["setuptools>=77"]
 
 [project]
 name = "auto-editor"
-version = "29.1.0"
 description = "Auto-Editor: Effort free video editing!"
 readme = "README.md"
 license = "Unlicense"
@@ -15,12 +14,16 @@ keywords = [
     "processing", "nonlinear", "automatic", "silence-detect",
     "silence-removal", "silence-speedup", "motion-detection",
 ]
+dynamic = ["version"]
 
 [project.scripts]
 auto-editor = "auto_editor.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["auto_editor*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "auto_editor.__version__"}
 
 [project.urls]
 "Bug Tracker" = "https://github.com/WyattBlue/auto-editor/discussions"
