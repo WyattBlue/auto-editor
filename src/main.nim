@@ -18,21 +18,7 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
-proc printHelp() {.noreturn.} =
-  echo """Usage: [file | url ...] [options]
-
-Commands:
-  info desc cache levels subdump
-
-Options:
-  Editing Options:
-    -m, --margin LENGTH           Set sections near "loud" as "loud" too if
-                                  section is less than LENGTH away. (default
-                                  is "0.2s")
-    --edit METHOD                 Set an expression which determines how to
-                                  make auto edits
-    -ex, --export EXPORT:ATTRS?   Choose the export mode. (default is
-                                  "audio")
+#[
     --when-normal ACTION          When the video is not silent (defined by --edit)
                                   do an action. The default action being 'nil'.
     --when-silent ACTION          When the video is silent (defined by --edit)
@@ -49,7 +35,22 @@ Options:
                                       ; Change the speed by varying pitch.
                                       ;   val: between (0-99999)
 
+]#
 
+proc printHelp() {.noreturn.} =
+  echo """Usage: [file | url ...] [options]
+
+Commands:
+  info desc cache levels subdump
+
+Options:
+  Editing Options:
+    -m, --margin LENGTH           Set sections near "loud" as "loud" too if
+                                  section is less than LENGTH away. (default
+                                  is "0.2s")
+    --edit METHOD                 Set an expression which determines how to
+                                  make auto edits
+    -ex, --export EXPORT:ATTRS?   Choose the export mode. (default is "audio")
     -o, --output FILE             Set the name/path of the new output file
     -s, --silent-speed NUM        Set speed of sections marked "silent" to
                                   NUM. (default is 99999)
