@@ -290,7 +290,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             let srcStream = cns[obj.src].video[0]
             let srcTb = srcStream.avg_frame_rate
             let sourceFramePos = int(round(float(timelinePos) * srcTb.float / tl.tb.float))
-            let i = int(round(float(sourceFramePos) * obj.speed))
+
+            let effect = tl.effects[obj.effects]
+            let speed = (if effect.kind in [actSpeed, actPitch]: effect.val else: 1.0)
+
+            let i = int(round(float(sourceFramePos) * speed))
             objList.add VideoFrame(index: i, src: obj.src)
 
       if tl.chunks.isSome:

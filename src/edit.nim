@@ -1,8 +1,7 @@
 import std/[os, options, times, terminal, browsers]
 import std/[strutils, strformat]
 import std/sequtils
-import std/[sets, tables]
-import std/random
+import std/[random, sets]
 from std/math import round
 
 import av
@@ -91,22 +90,6 @@ proc parseExportString*(exportStr: string): (string, string, string) =
 
   return (kind, name, version)
 
-
-# Turn long silent/loud array to formatted chunk list.
-# Example: [1, 1, 1, 2, 2], {1: 1.0, 2: 1.5} => [(0, 3, 1.0), (3, 5, 1.5)]
-proc chunkify(arr: seq[int], smap: Table[int, float64]): seq[(int64, int64, float64)] =
-  if arr.len == 0:
-    return @[]
-
-  var start: int64 = 0
-  var j: int64 = 1
-  while j < arr.len:
-    if arr[j] != arr[j - 1]:
-      result.add (start, j, smap[arr[j - 1]])
-      start = j
-    inc j
-  result.add (start, arr.len.int64, smap[arr[j - 1]])
-
 func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (int64, int64) =
   var start = toTb(span[0], tb)
   var stop = toTb(span[1], tb)
@@ -116,10 +99,10 @@ func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (
     stop = max(0, arrayLen + stop)
   return (start, stop)
 
-proc applyToRange(speedIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64, value: int) =
-  let (start, stop) = normalizeRange(span, tb, speedIndex.len)
-  for i in start ..< min(stop, speedIndex.len):
-    speedIndex[i] = value
+proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64, value: int) =
+  let (start, stop) = normalizeRange(span, tb, actionIndex.len)
+  for i in start ..< min(stop, actionIndex.len):
+    actionIndex[i] = value
 
 proc setOutput(userOut, `export`, path: string): (string, string) =
   var dir, name, ext: string
@@ -258,33 +241,35 @@ proc editMedia*(args: var mainArgs) =
       let endMargin = toTb(args.margin[1], tb.float64)
       mutMargin(hasLoud, startMargin, endMargin)
 
-      var chunks: seq[(int64, int64, float64)] = @[]
+      var actionMap = @[args.whenSilent, args.whenNormal]
+      var actionIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
 
-      var speedIndex = hasLoud.map(proc(x: bool): int = int(x))
-      var speedMap = @[args.silentSpeed, args.videoSpeed]
-      var speedHash = {0: args.silentSpeed, 1: args.videoSpeed}.toTable
+      proc getActionIndex(action: Action): int =
+        let index = actionMap.find(action)
+        if index == -1:
+          actionMap.add(action)
+          return actionMap.len - 1
+        else:
+          return index
 
-      proc getSpeedIndex(speed: float64): int =
-        if speed in speedMap:
-          return speedMap.find(speed)
-        speedMap.add(speed)
-        speedHash[speedMap.len - 1] = speed
-        return speedMap.len - 1
+      const cut = Action(kind: actCut)
+      const myNil = Action(kind: actNil)
 
       for span in args.cutOut:
-        applyToRange(speedIndex, span, tb.float64, getSpeedIndex(99999.0))
+        applyToRange(actionIndex, span, tb.float64, getActionIndex(cut))
 
       for span in args.addIn:
-        applyToRange(speedIndex, span, tb.float64, 1)
+        applyToRange(actionIndex, span, tb.float64, getActionIndex(myNil))
 
       for speedRange in args.setSpeed:
         let speed = speedRange[0]
         let span = (speedRange[1], speedRange[2])
-        applyToRange(speedIndex, span, tb.float64, getSpeedIndex(speed))
+        let action = (if speed == 1.0: myNil else: Action(kind: actSpeed, val: speed))
+        applyToRange(actionIndex, span, tb.float64, getActionIndex(action))
 
-      chunks = chunkify(speedIndex, speedHash)
+      let bg = args.background
       mi = initMediaInfo(container.formatContext, args.input)
-      tlV3 = toNonLinear(addr args.input, tb, args.background, mi, chunks)
+      tlV3 = initLinearTimeline(addr args.input, tb, bg, mi, actionMap, actionIndex)
       applyArgs(tlV3, args)
 
   var exportKind, tlName, fcpVersion: string

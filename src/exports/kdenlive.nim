@@ -110,7 +110,8 @@ proc kdenliveWrite*(output: string, tl: v3) =
   var warpedClips: seq[int] = @[]
 
   for i, clip in clips:
-    if clip.speed != 1.0:
+    let effect = tl.effects[clip.effects]
+    if effect.kind == actSpeed:
       warpedClips.add(i)
 
   # create all producers for warped clips
@@ -130,14 +131,16 @@ proc kdenliveWrite*(output: string, tl: v3) =
         "out": globalOut
       }.toXmlAttributes()
 
+      let effect = tl.effects[clip.effects]
+
       var prodProp = newElement("property")
       prodProp.attrs = {"name": "resource"}.toXmlAttributes()
-      prodProp.add(newText(&"{clip.speed}:{path}"))
+      prodProp.add(newText(&"{effect.val}:{path}"))
       prod.add(prodProp)
 
       prodProp = newElement("property")
       prodProp.attrs = {"name": "warp_speed"}.toXmlAttributes()
-      prodProp.add(newText($clip.speed))
+      prodProp.add(newText($effect.val))
       prod.add(prodProp)
 
       prodProp = newElement("property")
@@ -437,11 +440,12 @@ proc kdenliveWrite*(output: string, tl: v3) =
         })
         var clipProd = ""
 
-        if clip.speed == 1.0:
-          clipProd = &"chain{i div 2}"
-        else:
+        let effect = tl.effects[clip.effects]
+        if effect.kind == actSpeed:
           clipProd = &"producer{producers}"
           inc producers
+        else:
+          clipProd = &"chain{i div 2}"
 
         let entry = newElement("entry")
         entry.attrs = {

@@ -20,7 +20,7 @@ test "struct-sizes":
   check(sizeof(ref seq) == 8)
   check(sizeof(VideoStream) == 128)
   check(sizeof(AudioStream) == 72)
-  check(sizeof(Clip) == 56)
+  check(sizeof(Clip) == 40)
 
 test "smpte":
   check(parseSMPTE("13:44:05:21", AVRational(num: 24000, den: 1001)) == 1186701)
