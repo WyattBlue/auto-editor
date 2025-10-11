@@ -4,12 +4,22 @@ on:
     paths-ignore:
       - '**.md'
       - '**.txt'
+      - '**.html'
+      - '**.css'
       - '**.toml'
       - '**about.nim'
       - '.github/workflows/build.yml'
     branches:
       - master
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '**.html'
+      - '**.css'
+      - '**.toml'
+      - '**about.nim'
+      - '.github/workflows/build.yml'
     branches:
       - master
 jobs:
