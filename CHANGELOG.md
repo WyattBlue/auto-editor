@@ -1,9 +1,9 @@
-# 29.1.0
+# 29.2.0
 
 ## Major
 
 ## Features
- - Drawing the progress bar now happens on a separate thread, improving performance.
+ - Restore `--audio-normalize` feature.
 
 ## Fixes
- - Can now play H265/HEVC video streams with QuickTime
+ - Correct the default codec for WAV files.
