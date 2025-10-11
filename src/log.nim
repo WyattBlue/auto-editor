@@ -31,9 +31,7 @@ func getNumber*(packed: PackedInt): int64 =
 
 type
   NormKind* = enum
-    nkNull
-    nkEbu
-    nkPeak
+    nkNull, nkEbu, nkPeak
 
   Norm* = object
     case kind*: NormKind
@@ -47,16 +45,35 @@ type
     of nkPeak:
       t*: float32 # -99.0 to 0.0, default -8.0
 
+  ActionKind* = enum
+    actNil, actCut, actSpeed, actPitch, actVolume
+
+  Action* = object
+    case kind*: ActionKind
+    of actNil, actCut:
+      discard
+    of actSpeed, actPitch, actVolume:
+      val*: float32
+
+func `==`*(a, b: Action): bool =
+  if a.kind != b.kind:
+    return false
+  case a.kind
+  of actNil, actCut:
+    return true
+  of actSpeed, actPitch, actVolume:
+    return a.val == b.val
+
 type mainArgs* = object
   input*: string = ""
 
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
   edit*: string = "audio"
+  whenNormal* = Action(kind: actNil)
+  whenSilent* = Action(kind: actCut)
   `export`*: string = ""
   output*: string = ""
-  silentSpeed*: float64 = 99999.0
-  videoSpeed*: float64 = 1.0
   cutOut*: seq[(PackedInt, PackedInt)]
   addIn*: seq[(PackedInt, PackedInt)]
   setSpeed*: seq[(float64, PackedInt, PackedInt)]

@@ -67,6 +67,7 @@ type Package = object
   buildArguments: seq[string]
   buildSystem: string = "autoconf"
   ffFlag: string = ""
+  mirrorUrl: string = ""
 
 let nvheaders = Package(
   name: "nv-codec-headers",
@@ -134,6 +135,7 @@ let x265 = Package(
 let ffmpeg = Package(
   name: "ffmpeg",
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz",
+  mirrorUrl: "https://auto-editor.com/ffmpeg-8.0.tar.xz",
   sha256: "b2751fccb6cc4c77708113cd78b561059b6fa904b24162fa0be2d60273d27b8e",
 )
 var packages: seq[Package] = @[]
@@ -429,7 +431,11 @@ proc ffmpegSetup(crossWindows: bool) =
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
       if not fileExists(package.location):
-        exec &"curl -O -L {package.sourceUrl}"
+
+        if package.mirrorUrl != "":
+          exec &"curl -O -L {package.mirrorUrl}"
+        else:
+          exec &"curl -O -L {package.sourceUrl}"
         checkHash(package, "ffmpeg_sources" / package.location)
 
       var tarArgs = "xf"
@@ -485,7 +491,7 @@ var commonFlags = &"""
   --disable-xlib \
   --disable-bsfs \
   --disable-filters \
-  --enable-filter=whisper,scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm \
+  --enable-filter=whisper,scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate \
   --disable-encoder={encodersDisabled} \
   --disable-decoder={decodersDisabled} \
   --disable-demuxer={demuxersDisabled} \
