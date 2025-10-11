@@ -19,8 +19,7 @@ type Clip* = object
   start*: int64
   dur*: int64
   offset*: int64
-  speed*: float64
-  volume*: float64
+  effects*: uint32  # Reference to global effects in Timeline.
   stream*: int32
 
 type ClipLayer* = object
@@ -42,6 +41,7 @@ type v3* = object
   res*: (int, int)
   v*: seq[ClipLayer]
   a*: seq[ClipLayer]
+  effects*: seq[Action]
   chunks*: Option[seq[(int64, int64, float64)]]
 
 
@@ -75,25 +75,53 @@ func `end`*(self: v3): int64 =
       let a = alayer.c[^1]
       result = max(result, a.start + a.dur)
 
-proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
-    chunks: seq[(int64, int64, float64)]): v3 =
+proc chunkify(arr: seq[int], effects: seq[Action]): seq[(int64, int64, int, Action)] =
+  if arr.len == 0:
+    return @[]
+
+  var start: int64 = 0
+  var j: int64 = 1
+  while j < arr.len:
+    if arr[j] != arr[j - 1]:
+      result.add (start, j, arr[j-1], effects[arr[j - 1]])
+      start = j
+    inc j
+  result.add (start, arr.len.int64, arr[j-1], effects[arr[j - 1]])
+
+proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo, effects: seq[Action], actionIndex: seq[int]): v3 =
   var clips: seq[Clip] = @[]
   var i: int64 = 0
   var start: int64 = 0
   var dur: int64
   var offset: int64
 
-  for chunk in chunks:
-    if chunk[2] > 0 and chunk[2] < 99999.0:
-      dur = int64(round(float64(chunk[1] - chunk[0]) / chunk[2]))
+  let pseudoChunks = chunkify(actionIndex, effects)
+  var chunks: seq[(int64, int64, float64)]
+
+  for chunk in pseudoChunks:
+    # Make normal chunks
+    let speed = (
+      if chunk[3].kind in [actSpeed, actPitch]: chunk[3].val
+      elif chunk[3].kind == actCut: 99999.0
+      else: 1.0
+    )
+    chunks.add (chunk[0], chunk[1], float64(speed))
+
+    # Make clips
+    if speed != 99999.0:
+      dur = int64(round(float64(chunk[1] - chunk[0]) / speed))
       if dur == 0:
         continue
 
-      offset = int64(float64(chunk[0]) / chunk[2])
+      offset = int64(float64(chunk[0]) / speed)
 
       if not (clips.len > 0 and clips[^1].start == start):
-        clips.add(Clip(src: src, start: start, dur: dur, offset: offset,
-            speed: chunk[2], volume: 1.0))
+        let effectIndex = chunk[2]
+        if effectIndex > int(high(uint32)):
+          error "Effect limit for timeline reached."
+        let e = uint32(effectIndex)
+        clips.add(Clip(src: src, start: start, dur: dur, offset: offset, effects: e))
+
       start += dur
       i += 1
 
@@ -116,9 +144,78 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
       alayer.c.add(audioClip)
     aspace.add(alayer)
 
-  result = v3(v: vspace, a: aspace, chunks: some(chunks))
-  result.background = bg
-  result.tb = tb
+  result = v3(tb: tb, v: vspace, a: aspace, background: bg)
+  result.effects = effects
+  result.chunks = some(chunks)
+  result.res = mi.getRes()
+  result.sr = 48000
+  result.layout = "stereo"
+  if mi.a.len > 0:
+    result.sr = mi.a[0].sampleRate
+    result.layout = mi.a[0].layout
+
+  if (result.v.len == 0 or result.v[0].len == 0) and (result.a.len == 0 or result.a[0].len == 0):
+    error "Timeline is empty, nothing to do."
+
+proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
+    chunks: seq[(int64, int64, float64)]): v3 =
+  var clips: seq[Clip] = @[]
+  var effects: seq[Action] = @[]
+  var i: int64 = 0
+  var start: int64 = 0
+  var dur: int64
+  var offset: int64
+
+  for chunk in chunks:
+    if chunk[2] > 0.0 and chunk[2] < 99999.0:
+      dur = int64(round(float64(chunk[1] - chunk[0]) / chunk[2]))
+      if dur == 0:
+        continue
+
+      offset = int64(float64(chunk[0]) / chunk[2])
+
+      if not (clips.len > 0 and clips[^1].start == start):
+        var effectIndex: int
+        if chunk[2] == 1.0:
+          effectIndex = effects.find(Action(kind: actNil))
+          if effectIndex == -1:
+            effects.add Action(kind: actNil)
+            effectIndex = effects.len - 1
+        else:
+          effectIndex = effects.find(Action(kind: actSpeed, val: chunk[2]))
+          if effectIndex == -1:
+            effects.add Action(kind: actSpeed, val: chunk[2])
+            effectIndex = effects.len - 1
+
+        if effectIndex > int(high(uint32)):
+          error "Effect limit for timeline reached."
+        let e = uint32(effectIndex)
+        clips.add(Clip(src: src, start: start, dur: dur, offset: offset, effects: e))
+
+      start += dur
+      i += 1
+
+  var vspace: seq[ClipLayer] = @[]
+  var aspace: seq[ClipLayer] = @[]
+
+  if mi.v.len > 0:
+    var vlayer = ClipLayer(lang: mi.v[0].lang, c: @[])
+    for clip in clips:
+      var videoClip = clip
+      videoClip.stream = 0
+      vlayer.c.add(videoClip)
+    vspace.add(vlayer)
+
+  for i in 0 ..< mi.a.len:
+    var alayer = ClipLayer(lang: mi.a[i].lang, c: @[])
+    for clip in clips:
+      var audioClip = clip
+      audioClip.stream = i.int32
+      alayer.c.add(audioClip)
+    aspace.add(alayer)
+
+  result = v3(tb: tb, v: vspace, a: aspace, background: bg, chunks: some(chunks))
+  result.effects = effects
   result.res = mi.getRes()
   result.sr = 48000
   result.layout = "stereo"

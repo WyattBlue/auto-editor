@@ -10,6 +10,16 @@ func `%`*(self: v1): JsonNode =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
   return %* {"version": "1", "source": self.source, "chunks": jsonChunks}
 
+func effectToString(act: Action): string =
+  if act.kind == actSpeed:
+    return "speed:" & $act.val
+  elif act.kind == actPitch:
+    return "pitch:" & $act.val
+  elif act.kind == actVolume:
+    return "volume:" & $act.val
+  else:
+    return ""
+
 func `%`*(self: v3): JsonNode =
   var videoTracks = newJArray()
   for track in self.v:
@@ -21,8 +31,11 @@ func `%`*(self: v3): JsonNode =
       clipObj["start"] = %clip.start
       clipObj["dur"] = %clip.dur
       clipObj["offset"] = %clip.offset
-      clipObj["speed"] = %clip.speed
       clipObj["stream"] = %clip.stream
+      if self.effects[clip.effects].kind notin [actNil, actCut]:
+        var effectArray = newJArray()
+        effectArray.add %effectToString(self.effects[clip.effects])
+        clipObj["effects"] = effectArray
       trackArray.add(clipObj)
     videoTracks.add(trackArray)
 
@@ -36,9 +49,11 @@ func `%`*(self: v3): JsonNode =
       clipObj["start"] = %clip.start
       clipObj["dur"] = %clip.dur
       clipObj["offset"] = %clip.offset
-      clipObj["speed"] = %clip.speed
-      clipObj["volume"] = %1
       clipObj["stream"] = %clip.stream
+      if self.effects[clip.effects].kind notin [actNil, actCut]:
+        var effectArray = newJArray()
+        effectArray.add %effectToString(self.effects[clip.effects])
+        clipObj["effects"] = effectArray
       trackArray.add(clipObj)
     audioTracks.add(trackArray)
 

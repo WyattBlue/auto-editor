@@ -266,7 +266,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
           totalSamples += samplesToProcess
           samplesProcessed += samples
 
-proc createAudioFilterGraph(clip: Clip, sr: int, layout: string): (ptr AVFilterGraph,
+proc createFilterGraph(effect: Action, sr: int, layout: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   var bufferSrc: ptr AVFilterContext = nil
@@ -279,24 +279,28 @@ proc createAudioFilterGraph(clip: Clip, sr: int, layout: string): (ptr AVFilterG
   var ret = avfilter_graph_create_filter(addr bufferSrc, avfilter_get_by_name("abuffer"),
                                         "in", bufferArgs.cstring, nil, filterGraph)
   if ret < 0:
-    error fmt"Cannot create audio buffer source: {ret}"
+    error &"Cannot create audio buffer source: {ret}"
 
   # Create buffer sink
   ret = avfilter_graph_create_filter(addr bufferSink, avfilter_get_by_name("abuffersink"),
                                     "out", nil, nil, filterGraph)
   if ret < 0:
-    error fmt"Cannot create audio buffer sink: {ret}"
+    error &"Cannot create audio buffer sink: {ret}"
 
   var filterChain: string
   var filters: seq[string] = @[]
 
-  # Apply filters per clip.
-  if clip.speed != 1.0:
-    let clampedSpeed = max(0.5, min(100.0, clip.speed))
-    filters.add(fmt"atempo={clampedSpeed}")
-
-  if clip.volume != 1.0:
-    filters.add(fmt"volume={clip.volume}")
+  case effect.kind
+  of actSpeed:
+    let clampedSpeed = max(0.5, min(100.0, effect.val))
+    filters.add &"atempo={clampedSpeed}"
+  of actPitch:
+    let clampedSpeed = max(0.5, min(100.0, effect.val))
+    filters.add &"asetrate={sr}*{clampedSpeed}"
+    filters.add &"aresample={sr}"
+  of actVolume:
+    filters.add &"volume={effect.val}"
+  else: discard
 
   if filters.len == 0:
     filterChain = "anull"
@@ -333,20 +337,22 @@ proc createAudioFilterGraph(clip: Clip, sr: int, layout: string): (ptr AVFilterG
   return (filterGraph, bufferSrc, bufferSink)
 
 # Returns seq[int16] where channel data is interleaved: [L, R, L, R, L, R] etc.
-proc processAudioClip(clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
+proc processAudioClip(tl: v3, clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
   if data.len == 0:
     return @[]
 
   # First apply speed/volume processing at source sample rate (if needed)
   var processedData = data
-  let needsFiltering = clip.speed != 1.0 or clip.volume != 1.0
+
+  let effect = tl.effects[clip.effects]
+  let needsFiltering = effect.kind in [actSpeed, actPitch, actVolume]
 
   if needsFiltering:
     # Data is interleaved: [L, R, L, R, ...] so always stereo
     let channels = 2
     let samples = data.len div 2
     let layout = "stereo"
-    let (filterGraph, bufferSrc, bufferSink) = createAudioFilterGraph(clip, sourceSr, layout)
+    let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(effect, sourceSr, layout)
     defer:
       if filterGraph != nil:
         avfilter_graph_free(addr filterGraph)
@@ -589,11 +595,15 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       let layer = tl.a[layerIndex]
       for clip in layer.clips:
         let key = (clip.src[], clip.stream)
+
+        let effect = tl.effects[clip.effects]
+        let speed = (if effect.kind in [actSpeed, actPitch]: effect.val else: 1.0)
+
         if key in samples:
           let getter = samples[key]
           let sourceSr = getter.stream.codecpar.sample_rate.float64
-          let sampStart = int(clip.offset.float64 * clip.speed * sourceSr / tb)
-          let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed * sourceSr / tb)
+          let sampStart = int(clip.offset.float64 * speed * sourceSr / tb)
+          let sampEnd = int(float64(clip.offset + clip.dur) * speed * sourceSr / tb)
           let srcData = getter.get(sampStart, sampEnd)
           let startSample = int(clip.start * sr.int64 * tb.den div tb.num)
           let durSamples = int(clip.dur * sr.int64 * tb.den div tb.num)
@@ -601,7 +611,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
   # Process each clip
   for data in clipDataCache:
-    let processedData = processAudioClip(data.clip, data.srcData, data.sourceSr, sr)
+    let processedData = processAudioClip(tl, data.clip, data.srcData, data.sourceSr, sr)
 
     if processedData.len > 0:
       # processedData is now interleaved: [L, R, L, R, ...]
