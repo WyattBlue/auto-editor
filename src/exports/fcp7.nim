@@ -9,6 +9,7 @@ when defined(windows):
 
 from std/math import ceil
 
+import ../log
 import ../media
 import ../timeline
 import ../ffmpeg
@@ -156,8 +157,9 @@ proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         link2.add elem("linkclipref", &"clipitem-{clip_item_num}")
         clipitem.add link2
 
-      if aclip.speed != 1:
-        clipitem.add speedup(aclip.speed * 100)
+      let effect = tl.effects[aclip.effects]
+      if effect.kind == actSpeed:
+        clipitem.add speedup(effect.val * 100)
 
       track.add clipitem
     audio.add track
@@ -221,8 +223,9 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         labels.add elem("label2", "Iris")
         clipitem.add labels
 
-        if aclip.speed != 1:
-          clipitem.add speedup(aclip.speed * 100)
+        let effect = tl.effects[aclip.effects]
+        if effect.kind == actSpeed:
+          clipitem.add speedup(effect.val * 100)
 
         track.add clipitem
       audio.add track
@@ -308,8 +311,10 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
       make_filedef(clipitem, mi)
 
       clipitem.add elem("compositemode", "normal")
-      if clip.speed != 1:
-        clipitem.add speedup(clip.speed * 100)
+
+      let effect = tl.effects[clip.effects]
+      if effect.kind == actSpeed:
+        clipitem.add speedup(effect.val * 100)
 
       if resolve:
         let link1 = newElement("link")

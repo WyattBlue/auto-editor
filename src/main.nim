@@ -18,7 +18,20 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
-#[
+
+proc printHelp() {.noreturn.} =
+  echo """Usage: [file | url ...] [options]
+
+Commands:
+  info desc cache levels subdump
+
+Options:
+  Editing Options:
+    -m, --margin LENGTH           Set sections near "loud" as "loud" too if
+                                  section is less than LENGTH away. (default
+                                  is "0.2s")
+    --edit METHOD                 Set an expression which determines how to
+                                  make auto edits
     --when-normal ACTION          When the video is not silent (defined by --edit)
                                   do an action. The default action being 'nil'.
     --when-silent ACTION          When the video is silent (defined by --edit)
@@ -34,22 +47,6 @@ setControlCHook(ctrlc)
                                     pitch (val: float)
                                       ; Change the speed by varying pitch.
                                       ;   val: between (0-99999)
-
-]#
-
-proc printHelp() {.noreturn.} =
-  echo """Usage: [file | url ...] [options]
-
-Commands:
-  info desc cache levels subdump
-
-Options:
-  Editing Options:
-    -m, --margin LENGTH           Set sections near "loud" as "loud" too if
-                                  section is less than LENGTH away. (default
-                                  is "0.2s")
-    --edit METHOD                 Set an expression which determines how to
-                                  make auto edits
     -ex, --export EXPORT:ATTRS?   Choose the export mode. (default is "audio")
     -o, --output FILE             Set the name/path of the new output file
     -s, --silent-speed NUM        Set speed of sections marked "silent" to
@@ -272,6 +269,31 @@ proc listAvailableFilters(): string =
       result &= &" {filter.name}"
     filter = av_filter_iterate(addr opaque)
 
+proc parseAction(val: string): Action =
+  if val == "nil":
+    return Action(kind: actNil)
+  if val == "cut":
+    return Action(kind: actCut)
+  if val.startsWith("speed:"):
+    let val = parseFloat(val[6 ..< val.len])
+    return Action(kind: actSpeed, val: val)
+  if val.startsWith("pitch:"):
+    let val = parseFloat(val[6 ..< val.len])
+    return Action(kind: actPitch, val: val)
+  if val.startsWith("volume:"):
+    let val = parseFloat(val[7 ..< val.len])
+    return Action(kind: actVolume, val: val)
+
+  error &"Invalid action: {val}"
+
+func actionFromUserSpeed(val: float64): Action =
+  if val == 1.0:
+    return Action(kind: actNil)
+  elif val <= 0.0 or val >= 99999.0:
+    return Action(kind: actCut)
+  else:
+    return Action(kind: actSpeed, val: val)
+
 proc main() =
   if paramCount() < 1:
     if stdin.isatty():
@@ -387,8 +409,9 @@ judge making cuts.
       expecting = "resolution"
     of "-anorm", "--audio-normalize":
       expecting = "audio-normalize"
-    of "--temp-dir", "--progress", "--add-in", "--cut-out",  "--scale",
-        "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
+    of "--temp-dir", "--progress", "--add-in", "--cut-out",  "--scale", "--when-silent",
+        "--when-normal", "--yt-dlp-location", "--download-format", "--output-format",
+        "--yt-dlp-extras":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -403,10 +426,14 @@ judge making cuts.
         args.`export` = key
       of "output":
         args.output = key
+      of "when-silent":
+        args.whenSilent = parseAction(key)
+      of "when-normal":
+        args.whenNormal = parseAction(key)
       of "silent-speed":
-        args.silentSpeed = parseSpeed(key, expecting)
+        args.whenSilent = actionFromUserSpeed(parseSpeed(key, expecting))
       of "video-speed":
-        args.videoSpeed = parseSpeed(key, expecting)
+        args.whenNormal = actionFromUserSpeed(parseSpeed(key, expecting))
       of "add-in":
         args.addIn.add parseTimeRange(key, expecting)
       of "cut-out":
