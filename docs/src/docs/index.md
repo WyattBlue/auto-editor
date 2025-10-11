@@ -8,7 +8,7 @@ See also: [reference](../ref)
 ---
 [How To Shrink File Size](./file-size)
 
-[Audio Normaliing](./anorm)
+[Audio Normalizing](./anorm)
 
 [Range Syntax](./range-syntax)
 

@@ -23,6 +23,4 @@ boop
 ------
 ```
 
-subdump won't work if the subtitle stream is interally represented as a bitmap image instead of formatted text.
-
-You may call subdump with `aesubdump`.
+subdump won't work if the subtitle stream is internally represented as a bitmap image instead of formatted text.
