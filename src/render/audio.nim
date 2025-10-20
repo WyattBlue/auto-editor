@@ -292,8 +292,13 @@ proc createFilterGraph(effect: Action, sr: int, layout: string): (ptr AVFilterGr
 
   case effect.kind
   of actSpeed:
-    let clampedSpeed = max(0.5, min(100.0, effect.val))
-    filters.add &"atempo={clampedSpeed}"
+    const maxAtempo = 6.0
+    var remainingSpeed = effect.val
+    while remainingSpeed > maxAtempo:
+      filters.add &"atempo={maxAtempo}"
+      remainingSpeed = remainingSpeed / maxAtempo
+    if remainingSpeed > 1.0 or remainingSpeed < 1.0:
+      filters.add &"atempo={remainingSpeed}"
   of actPitch:
     let clampedSpeed = max(0.5, min(100.0, effect.val))
     filters.add &"asetrate={sr}*{clampedSpeed}"
