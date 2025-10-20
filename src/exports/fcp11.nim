@@ -60,9 +60,9 @@ proc parseSMPTE*(val: string, fps: AVRational): int =
     return 0
 
   try:
-    var parts = val.split(":")
+    let parts = val.replace(";", ":").split(":")
     if len(parts) != 4:
-      raise newException(ValueError, &"Invalid SMPTE format: {val}")
+      raise newException(ValueError, "Invalid SMPTE format")
 
     let hours = parseInt(parts[0])
     let minutes = parseInt(parts[1])
@@ -71,7 +71,7 @@ proc parseSMPTE*(val: string, fps: AVRational): int =
 
     if hours < 0 or minutes < 0 or minutes >= 60 or seconds < 0 or seconds >=
         60 or frames < 0:
-      raise newException(ValueError, &"Invalid SMPTE values: {val}")
+      raise newException(ValueError, "Invalid SMPTE values")
 
     let timecodeFps = int(round(fps.num / fps.den))
     if frames >= timecodeFps:

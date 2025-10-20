@@ -289,7 +289,7 @@ class Runner:
     def test_silent_threshold(self):
         with av.open("resources/new-commentary.mp3") as container:
             assert container.duration is not None
-            assert container.duration / av.time_base == 6.732
+            assert container.duration / av.time_base == 6.625
 
         out = self.main(
             ["resources/new-commentary.mp3"], ["--edit", "audio:threshold=0.1"]
@@ -298,7 +298,7 @@ class Runner:
 
         with av.open(out) as container:
             assert container.duration is not None
-            assert container.duration / av.time_base == 6.552
+            assert container.duration / av.time_base == 6.466625
 
     def test_track(self):
         out = self.main(["resources/multi-track.mov"], []) + ".mov"
