@@ -31,11 +31,11 @@ Options:
                                   section is less than LENGTH away. (default
                                   is "0.2s")
     --edit METHOD                 Set an expression which determines how to
-                                  make auto edits
+                                  make auto edits. (default is "audio")
     --when-normal ACTION          When the video is not silent (defined by --edit)
-                                  do an action. The default action being 'nil'.
+                                  do an action. The default action being 'nil'
     --when-silent ACTION          When the video is silent (defined by --edit)
-                                  do an action. The default action being 'cut'.
+                                  do an action. The default action being 'cut'
 
                                   Actions Available:
                                     nil () ; unchanged/do nothing
@@ -46,20 +46,19 @@ Options:
                                       ;   val: between (0-99999)
                                     pitch (val: float)
                                       ; Change the speed by varying pitch.
-                                      ;   val: between (0-99999)
-    -ex, --export EXPORT:ATTRS?   Choose the export mode. (default is "audio")
+                                      ;   val: between [0.2-100]
+    -ex, --export EXPORT:ATTRS?   Choose the export mode.
     -o, --output FILE             Set the name/path of the new output file
-    -s, --silent-speed NUM        Set speed of sections marked "silent" to
-                                  NUM. (default is 99999)
-    -v, --sounded-speed, --video-speed NUM
-                                  Set speed of sections marked "loud" to
-                                  NUM. (default is 1)
-    --cut-out [START,STOP ...]    The range of media that will be removed
-                                  (cut out) completely
-    --add-in [START,STOP ...]     The range of media that will be added in,
-                                  will apply --video-speed
+    --cut-out [START,STOP ...]    The range of time that will be cut (removed)
+                                  completely
+    --add-in [START,STOP ...]     The range of time that will be leaved "as is"
     --set-speed, --set-speed-for-range [SPEED,START,STOP ...]
-                                  Set the SPEED for a given range
+                                  Set a SPEED for a given range in time
+    -s, --silent-speed NUM        [Deprecated] Set speed of sections marked
+                                  "silent" to NUM. (default is 99999)
+    -v, --sounded-speed, --video-speed NUM
+                                  [Deprecated] Set speed of sections marked "loud"
+                                  to NUM. (default is 1)
 
   Timeline Options:
     -tb, --time-base, -r, -fps, --frame-rate NUM

@@ -70,7 +70,7 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
 
   let resource_prop = newElement("property")
   resource_prop.attrs = {"name": "resource"}.toXmlAttributes()
-  resource_prop.add(newText(tl.background.toString))
+  resource_prop.add(newText(tl.bg.toString))
   producer.add(resource_prop)
 
   let service_prop = newElement("property")
