@@ -14,6 +14,17 @@ type v1* = object
   chunks*: seq[(int64, int64, float64)]
   source*: string
 
+type Clip2* = object
+  start*: int64
+  `end`*: int64
+  effect*: uint32
+
+type v2* = object
+  source*: string
+  tb*: AVRational
+  effects*: seq[Action]
+  clips*: seq[Clip2]
+
 type Clip* = object
   src*: ptr string
   start*: int64
@@ -35,14 +46,14 @@ func len*(layer: ClipLayer): int =
 
 type v3* = object
   tb*: AVRational
-  background*: RGBColor
+  bg*: RGBColor
   sr*: cint
   layout*: string
   res*: (int, int)
   v*: seq[ClipLayer]
   a*: seq[ClipLayer]
   effects*: seq[Action]
-  chunks*: Option[seq[(int64, int64, float64)]]
+  clips2*: Option[seq[Clip2]]  # Optional because tl might be non-linear.
 
 
 func len*(self: v3): int64 =
@@ -75,6 +86,9 @@ func `end`*(self: v3): int64 =
       let a = alayer.c[^1]
       result = max(result, a.start + a.dur)
 
+func timelineIsEmpty(self: v3): bool =
+  (self.v.len == 0 or self.v[0].len == 0) and (self.a.len == 0 or self.a[0].len == 0)
+
 proc chunkify(arr: seq[int], effects: seq[Action]): seq[(int64, int64, int, Action)] =
   if arr.len == 0:
     return @[]
@@ -96,7 +110,7 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
   var offset: int64
 
   let pseudoChunks = chunkify(actionIndex, effects)
-  var chunks: seq[(int64, int64, float64)]
+  var clips2: seq[Clip2]
 
   for chunk in pseudoChunks:
     # Make normal chunks
@@ -105,9 +119,16 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
       elif chunk[3].kind == actCut: 99999.0
       else: 1.0
     )
-    chunks.add (chunk[0], chunk[1], float64(speed))
 
-    # Make clips
+    let effectIndex = chunk[2]
+    if effectIndex > int(high(uint32)):
+      error "'Number of actions' limit for timeline reached."
+    let e = uint32(effectIndex)
+
+    # Always add to clips2, even for cuts (no holes)
+    clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
+
+    # Make clips (skip cuts for actual output clips)
     if speed != 99999.0:
       dur = int64(round(float64(chunk[1] - chunk[0]) / speed))
       if dur == 0:
@@ -116,11 +137,7 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
       offset = int64(float64(chunk[0]) / speed)
 
       if not (clips.len > 0 and clips[^1].start == start):
-        let effectIndex = chunk[2]
-        if effectIndex > int(high(uint32)):
-          error "Effect limit for timeline reached."
-        let e = uint32(effectIndex)
-        clips.add(Clip(src: src, start: start, dur: dur, offset: offset, effects: e))
+        clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
 
       start += dur
       i += 1
@@ -144,9 +161,12 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
       alayer.c.add(audioClip)
     aspace.add(alayer)
 
-  result = v3(tb: tb, v: vspace, a: aspace, background: bg)
-  result.effects = effects
-  result.chunks = some(chunks)
+  result = v3(tb: tb, v: vspace, a: aspace, bg: bg, effects: effects)
+
+  if result.timelineIsEmpty:
+    error "Timeline is empty, nothing to do."
+
+  result.clips2 = some(clips2)
   result.res = mi.getRes()
   result.sr = 48000
   result.layout = "stereo"
@@ -154,12 +174,11 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
     result.sr = mi.a[0].sampleRate
     result.layout = mi.a[0].layout
 
-  if (result.v.len == 0 or result.v[0].len == 0) and (result.a.len == 0 or result.a[0].len == 0):
-    error "Timeline is empty, nothing to do."
 
 proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
     chunks: seq[(int64, int64, float64)]): v3 =
   var clips: seq[Clip] = @[]
+  var clips2: seq[Clip2] = @[]
   var effects: seq[Action] = @[]
   var i: int64 = 0
   var start: int64 = 0
@@ -188,9 +207,10 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
             effectIndex = effects.len - 1
 
         if effectIndex > int(high(uint32)):
-          error "Effect limit for timeline reached."
+          error "'Number of actions' limit for timeline reached."
         let e = uint32(effectIndex)
-        clips.add(Clip(src: src, start: start, dur: dur, offset: offset, effects: e))
+        clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
+        clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
 
       start += dur
       i += 1
@@ -214,8 +234,12 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
       alayer.c.add(audioClip)
     aspace.add(alayer)
 
-  result = v3(tb: tb, v: vspace, a: aspace, background: bg, chunks: some(chunks))
+  result = v3(tb: tb, v: vspace, a: aspace, bg: bg, clips2: some(clips2))
   result.effects = effects
+
+  if result.timelineIsEmpty:
+    error "Timeline is empty, nothing to do."
+
   result.res = mi.getRes()
   result.sr = 48000
   result.layout = "stereo"
@@ -223,8 +247,64 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
     result.sr = mi.a[0].sampleRate
     result.layout = mi.a[0].layout
 
-  if (result.v.len == 0 or result.v[0].len == 0) and (result.a.len == 0 or result.a[0].len == 0):
+
+proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
+  clips2: seq[Clip2], effects: seq[Action]): v3 =
+  var clips: seq[Clip] = @[]
+  var start: int64 = 0
+  var dur: int64
+  var offset: int64
+
+  for clip2 in clips2:
+    let effect = effects[clip2.effect]
+    if effect.kind == actCut:
+      continue
+
+    var speed = 1.0
+    if effect.kind == actSpeed or effect.kind == actPitch:
+      speed = effect.val
+
+    dur = int64(round(float64(clip2.`end` - clip2.start) / speed))
+    if dur == 0:
+      continue
+
+    offset = int64(float64(clip2.start) / speed)
+    clips.add(Clip(src: src, start: start, dur: dur, offset: offset, effects: clip2.effect))
+
+    start += dur
+
+  var vspace: seq[ClipLayer] = @[]
+  var aspace: seq[ClipLayer] = @[]
+
+  if mi.v.len > 0:
+    var vlayer = ClipLayer(lang: mi.v[0].lang, c: @[])
+    for clip in clips:
+      var videoClip = clip
+      videoClip.stream = 0
+      vlayer.c.add(videoClip)
+    vspace.add(vlayer)
+
+  for i in 0 ..< mi.a.len:
+    var alayer = ClipLayer(lang: mi.a[i].lang, c: @[])
+    for clip in clips:
+      var audioClip = clip
+      audioClip.stream = i.int32
+      alayer.c.add(audioClip)
+    aspace.add(alayer)
+
+  result = v3(tb: tb, v: vspace, a: aspace, bg: bg, clips2: some(clips2))
+  result.effects = effects
+
+  if result.timelineIsEmpty:
     error "Timeline is empty, nothing to do."
+
+  result.res = mi.getRes()
+  result.sr = 48000
+  result.layout = "stereo"
+  if mi.a.len > 0:
+    result.sr = mi.a[0].sampleRate
+    result.layout = mi.a[0].layout
+
 
 proc applyArgs*(tl: var v3, args: mainArgs) =
   if args.sampleRate != -1:

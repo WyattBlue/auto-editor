@@ -252,7 +252,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
   let pixFmtName = $av_get_pix_fmt_name(pix_fmt)
   let graphTb = av_inv_q(targetFps)
-  let bg = tl.background.toString
+  let bg = tl.bg.toString
   let globalScaleArgs = &"{tl.res[0]}:{tl.res[1]}:force_original_aspect_ratio=decrease:eval=frame"
 
   if needsScaling:
@@ -297,7 +297,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             let i = int(round(float(sourceFramePos) * speed))
             objList.add VideoFrame(index: i, src: obj.src)
 
-      if tl.chunks.isSome:
+      if tl.clips2.isSome:
         # When there can be valid gaps in the timeline and no objects for this frame.
         frame = av_frame_clone(nullFrame)
       # else, use the last frame or process objects

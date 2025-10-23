@@ -300,7 +300,7 @@ proc createFilterGraph(effect: Action, sr: int, layout: string): (ptr AVFilterGr
     if remainingSpeed > 1.0 or remainingSpeed < 1.0:
       filters.add &"atempo={remainingSpeed}"
   of actPitch:
-    let clampedSpeed = max(0.5, min(100.0, effect.val))
+    let clampedSpeed = max(0.2, min(100.0, effect.val))
     filters.add &"asetrate={sr}*{clampedSpeed}"
     filters.add &"aresample={sr}"
   of actVolume:
@@ -566,6 +566,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
   let tb = tl.tb
   let sr = tl.sr
+
+  conWrite "Creating audio"
 
   # Collect all unique audio sources from specified layers
   for layerIndex in layerIndices:

@@ -127,6 +127,7 @@ proc setOutput(userOut, `export`, path: string): (string, string) =
       of ".mlt": myExport = "shotcut"
       of ".kdenlive": myExport = "kdenlive"
       of ".json", ".v1": myExport = "v1"
+      of ".v2": myExport = "v2"
       of ".v3": myExport = "v3"
       else: myExport = "default"
 
@@ -138,6 +139,7 @@ proc setOutput(userOut, `export`, path: string): (string, string) =
     of "v1":
       if ext != ".json":
         ext = ".v1"
+    of "v2": ext = ".v2"
     of "v3": ext = ".v3"
     else: discard
 
@@ -221,7 +223,7 @@ proc editMedia*(args: var mainArgs) =
       error "You need to give auto-editor an input file."
     let inputExt = splitFile(args.input).ext
 
-    if inputExt in [".v1", ".v3", ".json"]:
+    if inputExt in [".v1", ".v2", ".v3", ".json"]:
       tlV3 = readJson(readFile(args.input), interner)
       applyArgs(tlV3, args)
     else:
@@ -286,7 +288,7 @@ proc editMedia*(args: var mainArgs) =
     return
 
   case exportKind:
-  of "v1", "v3":
+  of "v1", "v2", "v3":
     exportJsonTl(tlV3, exportKind, output)
     return
   of "premiere":
@@ -347,23 +349,18 @@ proc editMedia*(args: var mainArgs) =
   debug &"Temp Directory: {tempDir}"
 
   if args.`export` == "clip-sequence":
-    if not isSome(tlV3.chunks):
+    if not isSome(tlV3.clips2):
       error "Timeline too complex to use clip-sequence export"
 
-    let chunks: seq[(int64, int64, float64)] = tlV3.chunks.unsafeGet()
-
-    proc padChunk(chunk: (int64, int64, float64), total: int64): seq[(int64, int64, float64)] =
-      let start = (if chunk[0] == 0'i64: @[] else: @[(0'i64, chunk[0], 99999.0)])
-      let `end` = (if chunk[1] == total: @[] else: @[(chunk[1], total, 99999.0)])
-      return start & @[chunk] & `end`
-
-    func appendFilename(path: string, val: string): string =
+    func appendFilename(path, val: string): string =
       let (dir, name, ext) = splitFile(path)
       return (dir / name) & val & ext
 
-    const black = RGBColor(red: 0, green: 0, blue: 0)
-    let totalFrames: int64 = chunks[^1][1] - 1
-    var clipNum = 0
+    let allClips2: seq[Clip2] = tlV3.clips2.unsafeGet()
+    var clips2: seq[Clip2] = @[]
+    for clip in allClips2:
+      if tlV3.effects[clip.effect].kind != actCut:
+        clips2.add(clip)
 
     let unique = tlV3.uniqueSources()
     var src: ptr string
@@ -373,16 +370,12 @@ proc editMedia*(args: var mainArgs) =
     if src == nil:
       error "Trying to render an empty timeline"
     let mi = initMediaInfo(src[])
+    const black = RGBColor(red: 0, green: 0, blue: 0)
 
-    for chunk in chunks:
-      if chunk[2] <= 0 or chunk[2] >= 99999:
-        continue
-
-      let paddedChunks = padChunk(chunk, totalFrames)
-      var myTimeline = toNonLinear(src, tlV3.tb, black, mi, paddedChunks)
+    for clipNum, clip2 in clips2.pairs:
+      var myTimeline = toNonLinear2(src, tlV3.tb, black, mi, @[clip2], tlV3.effects)
       applyArgs(myTimeline, args)
       makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar)
-      clipNum += 1
   else:
     makeMedia(args, tlV3, output, rule, bar)
 
