@@ -156,10 +156,10 @@ proc parseNorm*(norm: string): Norm =
 
   return normEval(expr, norm)
 
-
 proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, bar: Bar): seq[bool] =
   var lexer = initLexer("--edit", args.edit)
   var parser = initParser(lexer)
+  let tbFloat = float64(tb)
 
   let expressions: seq[Expr] = parser.parse()
   let expr = expressions[^1]
@@ -212,8 +212,8 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
           case argPos:
           of 0: threshold = parseThres(val)
           of 1: stream = (if val == "all": -1 else: parseNat(val))
-          of 2: mincut = parseNat(val)
-          of 3: minclip = parseNat(val)
+          of 2: mincut = parseTimeSimple(val).toTb(tbFloat)
+          of 3: minclip = parseTimeSimple(val).toTb(tbFloat)
           else: error "Too many args"
 
           if not isKey:
