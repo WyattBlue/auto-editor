@@ -49,13 +49,8 @@ func aspectRatio*(width, height: int): tuple[w, h: int] =
   let c = gcd(width, height)
   return (width div c, height div c)
 
-proc parseTime*(val: string): PackedInt =
-  if val == "start":
-    return pack(false, 0)
-  if val == "end":
-    return pack(false, 0x3FFFFFFFFFFFFFFF)
-
-  let tb = 1000.0
+proc parseTimeSimple*(val: string): PackedInt =
+  const tb = 1000.0
   let (num, unit) = splitNumStr(val)
   if unit in ["s", "sec", "secs", "second", "seconds"]:
     return pack(true, round(num * tb).int64)
@@ -69,6 +64,13 @@ proc parseTime*(val: string): PackedInt =
   if num != trunc(num):
     error &"'{val}': Time format expects an integer"
   return pack(false, num.int64)
+
+proc parseTime*(val: string): PackedInt =
+  if val == "start":
+    return pack(false, 0)
+  if val == "end":
+    return pack(false, 0x3FFFFFFFFFFFFFFF)
+  return parseTimeSimple(val)
 
 func toTb*(val: PackedInt, tb: float64): int64 =
   if val.getFlag:
