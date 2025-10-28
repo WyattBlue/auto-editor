@@ -330,11 +330,11 @@ proc createFilterGraph(effect: Action, sr: int, layout: string): (ptr AVFilterGr
   ret = avfilter_graph_parse_ptr(filterGraph, filterChain.cstring, addr inputs,
       addr outputs, nil)
   if ret < 0:
-    error fmt"Could not parse audio filter graph: {ret}"
+    error &"Could not parse audio filter graph: {ret}"
 
   ret = avfilter_graph_config(filterGraph, nil)
   if ret < 0:
-    error fmt"Could not configure audio filter graph: {ret}"
+    error &"Could not configure audio filter graph: {ret}"
 
   avfilter_inout_free(addr inputs)
   avfilter_inout_free(addr outputs)
@@ -342,14 +342,14 @@ proc createFilterGraph(effect: Action, sr: int, layout: string): (ptr AVFilterGr
   return (filterGraph, bufferSrc, bufferSink)
 
 # Returns seq[int16] where channel data is interleaved: [L, R, L, R, L, R] etc.
-proc processAudioClip(tl: v3, clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
+proc processAudioClip(ef: seq[Action], clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
   if data.len == 0:
     return @[]
 
   # First apply speed/volume processing at source sample rate (if needed)
   var processedData = data
 
-  let effect = tl.effects[clip.effects]
+  let effect = ef[clip.effects]
   let needsFiltering = effect.kind in [actSpeed, actPitch, actVolume]
 
   if needsFiltering:
@@ -618,7 +618,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
   # Process each clip
   for data in clipDataCache:
-    let processedData = processAudioClip(tl, data.clip, data.srcData, data.sourceSr, sr)
+    let processedData = processAudioClip(tl.effects, data.clip, data.srcData, data.sourceSr, sr)
 
     if processedData.len > 0:
       # processedData is now interleaved: [L, R, L, R, ...]
@@ -660,8 +660,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
           maxPeakLevel = peakLevel
 
     let peakAdjustment = norm.t - maxPeakLevel
-    debug fmt"current peak level: {maxPeakLevel}"
-    debug fmt"peak adjustment: {peakAdjustment:.3f}dB"
+    debug &"current peak level: {maxPeakLevel}"
+    debug &"peak adjustment: {peakAdjustment:.3f}dB"
 
     # Apply volume adjustment directly to the .map buffer
     if peakAdjustment != 0.0:

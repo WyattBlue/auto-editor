@@ -1,5 +1,4 @@
-import std/[strutils, strformat]
-import std/os
+import std/[os, strutils, strformat]
 from std/math import round, trunc, gcd
 
 import ../log
@@ -24,7 +23,7 @@ proc splitNumStr*(val: string): (float64, string) =
   try:
     floatNum = parseFloat(num.replace(" ", ""))
   except:
-    error fmt"Invalid number: '{val}'"
+    error &"Invalid number: '{val}'"
   return (floatNum, unit)
 
 proc parseBitrate*(input: string): int =
