@@ -10,7 +10,7 @@ func effectToString(act: Action): string =
   of actNil: "nil"
   of actCut: "cut"
   of actSpeed: "speed:" & $act.val
-  of actPitch: "pitch:" & $act.val
+  of actRate: "rate:" & $act.val
   of actVolume: "volume:" & $act.val
 
 func `%`(self: v1): JsonNode =
@@ -100,7 +100,7 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
         let effect = tlV3.effects[clip2.effect]
         if effect.kind == actCut:
           speed = 99999.0
-        elif effect.kind == actSpeed or effect.kind == actPitch:
+        elif effect.kind == actSpeed or effect.kind == actRate:
           speed = effect.val.float64
 
         chunks.add (clip2.start, clip2.`end`, speed)

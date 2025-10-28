@@ -44,7 +44,7 @@ Options:
                                     speed (val: float)
                                       ; Change the speed while preserving pitch.
                                       ;   val: between (0-99999)
-                                    pitch (val: float)
+                                    rate (val: float)
                                       ; Change the speed by varying pitch.
                                       ;   val: between [0.2-100]
     -ex, --export EXPORT:ATTRS?   Choose the export mode.
@@ -276,9 +276,9 @@ proc parseAction(val: string): Action =
   if val.startsWith("speed:"):
     let val = parseFloat(val[6 ..< val.len])
     return Action(kind: actSpeed, val: val)
-  if val.startsWith("pitch:"):
-    let val = parseFloat(val[6 ..< val.len])
-    return Action(kind: actPitch, val: val)
+  if val.startsWith("rate:"):
+    let val = parseFloat(val[5 ..< val.len])
+    return Action(kind: actRate, val: val)
   if val.startsWith("volume:"):
     let val = parseFloat(val[7 ..< val.len])
     return Action(kind: actVolume, val: val)

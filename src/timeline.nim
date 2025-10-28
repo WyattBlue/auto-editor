@@ -115,7 +115,7 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
   for chunk in pseudoChunks:
     # Make normal chunks
     let speed = (
-      if chunk[3].kind in [actSpeed, actPitch]: chunk[3].val
+      if chunk[3].kind in [actSpeed, actRate]: chunk[3].val
       elif chunk[3].kind == actCut: 99999.0
       else: 1.0
     )
@@ -261,7 +261,7 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
       continue
 
     var speed = 1.0
-    if effect.kind == actSpeed or effect.kind == actPitch:
+    if effect.kind == actSpeed or effect.kind == actRate:
       speed = effect.val
 
     dur = int64(round(float64(clip2.`end` - clip2.start) / speed))

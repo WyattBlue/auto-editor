@@ -299,7 +299,7 @@ proc createFilterGraph(effect: Action, sr: int, layout: string): (ptr AVFilterGr
       remainingSpeed = remainingSpeed / maxAtempo
     if remainingSpeed > 1.0 or remainingSpeed < 1.0:
       filters.add &"atempo={remainingSpeed}"
-  of actPitch:
+  of actRate:
     let clampedSpeed = max(0.2, min(100.0, effect.val))
     filters.add &"asetrate={sr}*{clampedSpeed}"
     filters.add &"aresample={sr}"
@@ -350,7 +350,7 @@ proc processAudioClip(ef: seq[Action], clip: Clip, data: seq[int16], sourceSr: c
   var processedData = data
 
   let effect = ef[clip.effects]
-  let needsFiltering = effect.kind in [actSpeed, actPitch, actVolume]
+  let needsFiltering = effect.kind in [actSpeed, actRate, actVolume]
 
   if needsFiltering:
     # Data is interleaved: [L, R, L, R, ...] so always stereo
@@ -604,7 +604,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         let key = (clip.src[], clip.stream)
 
         let effect = tl.effects[clip.effects]
-        let speed = (if effect.kind in [actSpeed, actPitch]: effect.val else: 1.0)
+        let speed = (if effect.kind in [actSpeed, actRate]: effect.val else: 1.0)
 
         if key in samples:
           let getter = samples[key]

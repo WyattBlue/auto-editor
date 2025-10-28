@@ -1,9 +1,11 @@
-# 29.2.0
+# 29.3.0
 
 ## Major
 
 ## Features
- - Restore `--audio-normalize` feature.
+ - Implement actions: `--when-silent`, `--when-normal`.
+ - Example: `--when-silent speed:2`, `--when-normal rate:1.25`
 
 ## Fixes
- - Correct the default codec for WAV files.
+ - Fix SMPTE timecode parsing for semi-colons.
+ - Fix high speeds causing crash

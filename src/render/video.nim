@@ -292,7 +292,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             let sourceFramePos = int(round(float(timelinePos) * srcTb.float / tl.tb.float))
 
             let effect = tl.effects[obj.effects]
-            let speed = (if effect.kind in [actSpeed, actPitch]: effect.val else: 1.0)
+            let speed = (if effect.kind in [actSpeed, actRate]: effect.val else: 1.0)
 
             let i = int(round(float(sourceFramePos) * speed))
             objList.add VideoFrame(index: i, src: obj.src)

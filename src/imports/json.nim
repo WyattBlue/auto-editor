@@ -20,7 +20,7 @@ proc parseEffect(val: string): Action =
     case effectType
     of "speed": return Action(kind: actSpeed, val: effectVal)
     of "volume": return Action(kind: actVolume, val: effectVal)
-    of "pitch": return Action(kind: actPitch, val: effectVal)
+    of "rate": return Action(kind: actRate, val: effectVal)
     else: error &"unknown action: {effectType}"
 
   error &"unknown action: {val}"
