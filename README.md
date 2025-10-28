@@ -67,10 +67,10 @@ auto-editor example.mp4 --edit motion:-19dB
 ```
 
 ### See What Auto-Editor Cuts Out
-To export what auto-editor normally cuts out. Set `--video-speed` to `99999` and `--silent-speed` to `1`. This is the reverse of the usual default values.  
+To export what auto-editor normally cuts out. Set `--when-normal` to `cut` and `--when-silent` to `nil` (leave as is). This is the reverse of the usual default values.
 
 ```
-auto-editor example.mp4 --video-speed 99999 --silent-speed 1
+auto-editor example.mp4 --when-normal cut --when-silent nil
 ```
 
 <h2 align="center">Exporting to Editors</h2>
@@ -103,7 +103,7 @@ auto-editor example.mp4 --export 'premiere:name=""Your name here""'
 
 If you want to split the clips, but don't want auto-editor to do any more editing. There's a simple command.
 ```
-auto-editor example.mp4 --silent-speed 1 --video-speed 1 --export premiere
+auto-editor example.mp4 --when-silent nil --when-normal nil --export premiere
 ```
 
 <h2 align="center">Manual Editing</h2>
