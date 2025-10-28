@@ -46,13 +46,13 @@ type
       t*: float32 # -99.0 to 0.0, default -8.0
 
   ActionKind* = enum
-    actNil, actCut, actSpeed, actPitch, actVolume
+    actNil, actCut, actSpeed, actRate, actVolume
 
   Action* = object
     case kind*: ActionKind
     of actNil, actCut:
       discard
-    of actSpeed, actPitch, actVolume:
+    of actSpeed, actRate, actVolume:
       val*: float32
 
 func `==`*(a, b: Action): bool =
@@ -61,7 +61,7 @@ func `==`*(a, b: Action): bool =
   case a.kind
   of actNil, actCut:
     return true
-  of actSpeed, actPitch, actVolume:
+  of actSpeed, actRate, actVolume:
     return a.val == b.val
 
 type mainArgs* = object
