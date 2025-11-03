@@ -119,11 +119,11 @@ proc media_def(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
   filedef.add mediadef
 
 proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
-    mi: MediaInfo), tl: v3) =
+    mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo]) =
   for t, alayer in tl.a.pairs:
     let track = newElement("track")
     for j, aclip in alayer.c.pairs:
-      let mi = initMediaInfo(aclip.src[])
+      let mi = ptrToMi[aclip.src]
 
       let start_val = $aclip.start
       let end_val = $(aclip.start + aclip.dur)
@@ -165,7 +165,7 @@ proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
     audio.add track
 
 proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
-    mi: MediaInfo), tl: v3) =
+    mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo]) =
   audio.add elem("numOutputChannels", "2")
   let aformat = newElement("format")
   let aschar = newElement("samplecharacteristics")
@@ -190,7 +190,7 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         track.add elem("outputchannelindex", $(channelcount + 1))
 
       for j, aclip in alayer.c.pairs:
-        let src = initMediaInfo(aclip.src[])
+        let src = ptrToMi[aclip.src]
 
         let start_val = $aclip.start
         let end_val = $(aclip.start + aclip.dur)
@@ -243,6 +243,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
 
   var miToUrl = initTable[MediaInfo, string]()
   var miToId = initTable[MediaInfo, string]()
+  var ptrToMi = initTable[ptr string, MediaInfo]() # Cache ptr -> MediaInfo lookup
   var fileDefs = initHashSet[string]() # Contains urls
 
   var id_counter = 0
@@ -253,6 +254,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
     let mi = initMediaInfo(src)
     miToUrl[mi] = handlePath(src)
     miToId[mi] = the_id
+    ptrToMi[ptrSrc] = mi # Store ptr -> MediaInfo mapping
 
   proc make_filedef(clipitem: XmlNode, mi: MediaInfo) =
     let pathurl = miToUrl[mi]
@@ -307,7 +309,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
       clipitem.add elem("in", in_val)
       clipitem.add elem("out", out_val)
 
-      let mi = initMediaInfo(clip.src[])
+      let mi = ptrToMi[clip.src]
       make_filedef(clipitem, mi)
 
       clipitem.add elem("compositemode", "normal")
@@ -340,9 +342,9 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
   # Audio definitions and clips
   let audio = newElement("audio")
   if resolve:
-    resolve_write_audio(audio, make_filedef, tl)
+    resolve_write_audio(audio, make_filedef, tl, ptrToMi)
   else:
-    premiere_write_audio(audio, make_filedef, tl)
+    premiere_write_audio(audio, make_filedef, tl, ptrToMi)
 
   media.add audio
   sequence.add media
