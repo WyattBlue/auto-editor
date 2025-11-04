@@ -20,7 +20,7 @@ jobs:
             binary_name: auto-editor-macos-arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Nim
         if: runner.os != 'macOS'
         uses: jiro4989/setup-nim-action@v2
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Nim
         uses: jiro4989/setup-nim-action@v2
         with:

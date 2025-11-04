@@ -10,6 +10,7 @@ on:
       - '**.css'
       - '**.toml'
       - '**about.nim'
+      - 'auto_editor/'
       - '.github/workflows/build.yml'
     branches:
       - master
@@ -21,6 +22,7 @@ on:
       - '**.css'
       - '**.toml'
       - '**about.nim'
+      - 'auto_editor/'
       - '.github/workflows/build.yml'
     branches:
       - master
@@ -75,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Nim
         uses: jiro4989/setup-nim-action@v2
         with:
