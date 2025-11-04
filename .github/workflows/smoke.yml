@@ -1,4 +1,6 @@
 name: smoke
+permissions:
+  contents: read
 on:
   push:
     paths-ignore:
