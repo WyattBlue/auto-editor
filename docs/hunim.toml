@@ -1,0 +1,4 @@
+baseURL = 'https://auto-editor.com/'
+languageCode = 'en-us'
+title = 'Auto-Editor'
+
