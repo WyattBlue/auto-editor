@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {{ init_head }}
+  <title>{{ .Title }}</title>{{ .MetaTags }}
+{{ head_icon }}
+<style>
+{{ core_style }}
+</style>{{ .Reload }}
+</head>
+<body>
+{{ nav }}
+<section class="section">
+<div class="container">
+{{ .Content }}
+</div>
+</section>
+</body>
+</html>

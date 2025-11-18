@@ -1,29 +1,11 @@
-.PHONY: local compile html upload default
+.PHONY: html upload default
 
-default: local
+default: html
 
 SRC_FILES := $(shell find src -type f)
 
-compile:
-	nim c -d:danger make
-ifeq ($(shell uname),Darwin)
-	strip -ur make && du --si -A make
-else
-	strip make && du -sh make
-endif
-
 html: $(SRC_FILES)
-	rm -rf public
-	cp -R src public
-	./make
-
-htmldev: $(SRC_FILES)
-	rm -rf public
-	cp -R src public
-	./make --dev
-
-local: html
-	bun run dev
+	hunim
 
 download:
 	rsync -rtvzP "root@auto-editor.com:/var/www/auto-editor/public/img" src
