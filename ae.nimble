@@ -100,7 +100,7 @@ let lame = Package(
   name: "lame",
   sourceUrl: "http://deb.debian.org/debian/pool/main/l/lame/lame_3.100.orig.tar.gz",
   sha256: "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e",
-  buildArguments: @["--disable-frontend", "--disable-decoder", "--disable-gtktest"],
+  buildArguments: @["--disable-frontend", "--disable-decoder", "--disable-gtktest", "--disable-dependency-tracking"],
   ffFlag: "--enable-libmp3lame",
 )
 let opus = Package(
@@ -156,9 +156,8 @@ let x265 = Package(
 )
 let ffmpeg = Package(
   name: "ffmpeg",
-  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz",
-  mirrorUrl: "https://auto-editor.com/ffmpeg-8.0.tar.xz",
-  sha256: "b2751fccb6cc4c77708113cd78b561059b6fa904b24162fa0be2d60273d27b8e",
+  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz",
+  sha256: "05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41",
 )
 var packages: seq[Package] = @[]
 if not defined(macosx):

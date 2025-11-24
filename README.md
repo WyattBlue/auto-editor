@@ -15,11 +15,7 @@ auto-editor path/to/your/video.mp4
 
 <h2 align="center">Installing</h2>
 
-```
-pip install auto-editor
-```
-
-See [Installing](https://auto-editor.com/installing) for additional information.
+See [Installing](https://auto-editor.com/installing) for more information.
 
 
 <h2 align="center">Cutting</h2>
