@@ -12,8 +12,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            arch: x86_64
             binary_name: auto-editor-linux-x86_64
+          - os: ubuntu-24.04-arm
+            binary_name: auto-editor-linux-arm64
           - os: macos-15-intel
             binary_name: auto-editor-macos-x86_64
           - os: macos-latest
@@ -22,7 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Nim
-        if: runner.os != 'macOS'
+        if: runner.os != 'macOS' && matrix.os != 'ubuntu-24.04-arm'
         uses: jiro4989/setup-nim-action@v2
         with:
           nim-version: "stable"
@@ -38,6 +39,18 @@ jobs:
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get update
             sudo apt-get install -y build-essential pkg-config nasm git
+          elif [ "${{ matrix.os }}" = "ubuntu-24.04-arm" ]; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential pkg-config git curl
+            curl -O https://nim-lang.org/download/nim-2.2.6.tar.xz
+            tar -xf nim-2.2.6.tar.xz
+            cd nim-2.2.6
+            sh build.sh
+            bin/nim c koch
+            ./koch boot -d:release
+            ./koch tools
+            echo "$PWD/nim-2.2.6/bin" >> $GITHUB_PATH
+            cd ..
           elif [ "${{ matrix.os }}" = "macos-15-intel" ]; then
             brew install nasm
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
