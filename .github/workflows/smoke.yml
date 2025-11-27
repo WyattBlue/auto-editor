@@ -43,7 +43,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.14"
-          cache: 'pip'
       - name: Nim
         if: runner.os != 'macOS'
         uses: jiro4989/setup-nim-action@v2
