@@ -41,7 +41,6 @@ class AudioStream:
 @dataclass(slots=True, frozen=True)
 class SubtitleStream:
     codec: str
-    ext: str
     lang: str | None
 
 
@@ -130,9 +129,7 @@ class FileInfo:
 
         for s in cont.streams.subtitles:
             codec = s.codec_context.name
-            sub_exts = {"mov_text": "srt", "ass": "ass", "webvtt": "vtt"}
-            ext = sub_exts.get(codec, "vtt")
-            subtitles += (SubtitleStream(codec, ext, s.language),)
+            subtitles += (SubtitleStream(codec, s.language),)
 
         bitrate = 0 if cont.bit_rate is None else cont.bit_rate
         dur = 0 if cont.duration is None else cont.duration / av.time_base
@@ -140,6 +137,3 @@ class FileInfo:
         cont.close()
 
         return FileInfo(Path(path), bitrate, dur, videos, audios, subtitles)
-
-    def __repr__(self) -> str:
-        return f"@{self.path.name}"
