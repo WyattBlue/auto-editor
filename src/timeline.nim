@@ -52,6 +52,7 @@ type v3* = object
   res*: (int, int)
   v*: seq[ClipLayer]
   a*: seq[ClipLayer]
+  s*: seq[ClipLayer]
   effects*: seq[Action]
   clips2*: Option[seq[Clip2]]  # Optional because tl might be non-linear.
 
@@ -144,6 +145,7 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
 
   var vspace: seq[ClipLayer] = @[]
   var aspace: seq[ClipLayer] = @[]
+  var sspace: seq[ClipLayer] = @[]
 
   if mi.v.len > 0:
     var vlayer = ClipLayer(lang: mi.v[0].lang, c: @[])
@@ -161,7 +163,15 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
       alayer.c.add(audioClip)
     aspace.add(alayer)
 
-  result = v3(tb: tb, v: vspace, a: aspace, bg: bg, effects: effects)
+  for i in 0 ..< mi.s.len:
+    var slayer = ClipLayer(lang: mi.s[i].lang, c: @[])
+    for clip in clips:
+      var subtitleClip = clip
+      subtitleClip.stream = i.int32
+      slayer.c.add(subtitleClip)
+    sspace.add(slayer)
+
+  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, effects: effects)
 
   if result.timelineIsEmpty:
     error "Timeline is empty, nothing to do."
@@ -217,6 +227,7 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
 
   var vspace: seq[ClipLayer] = @[]
   var aspace: seq[ClipLayer] = @[]
+  var sspace: seq[ClipLayer] = @[]
 
   if mi.v.len > 0:
     var vlayer = ClipLayer(lang: mi.v[0].lang, c: @[])
@@ -234,7 +245,15 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
       alayer.c.add(audioClip)
     aspace.add(alayer)
 
-  result = v3(tb: tb, v: vspace, a: aspace, bg: bg, clips2: some(clips2))
+  for i in 0 ..< mi.s.len:
+    var slayer = ClipLayer(lang: mi.s[i].lang, c: @[])
+    for clip in clips:
+      var subtitleClip = clip
+      subtitleClip.stream = i.int32
+      slayer.c.add(subtitleClip)
+    sspace.add(slayer)
+
+  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, clips2: some(clips2))
   result.effects = effects
 
   if result.timelineIsEmpty:
@@ -275,6 +294,7 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
 
   var vspace: seq[ClipLayer] = @[]
   var aspace: seq[ClipLayer] = @[]
+  var sspace: seq[ClipLayer] = @[]
 
   if mi.v.len > 0:
     var vlayer = ClipLayer(lang: mi.v[0].lang, c: @[])
@@ -292,7 +312,15 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
       alayer.c.add(audioClip)
     aspace.add(alayer)
 
-  result = v3(tb: tb, v: vspace, a: aspace, bg: bg, clips2: some(clips2))
+  for i in 0 ..< mi.s.len:
+    var slayer = ClipLayer(lang: mi.s[i].lang, c: @[])
+    for clip in clips:
+      var subtitleClip = clip
+      subtitleClip.stream = i.int32
+      slayer.c.add(subtitleClip)
+    sspace.add(slayer)
+
+  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, clips2: some(clips2))
   result.effects = effects
 
   if result.timelineIsEmpty:

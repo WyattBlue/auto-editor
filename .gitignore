@@ -11,6 +11,7 @@ tests/*
 *_ALTERED*
 *https*
 *.v3
+*.srt
 
 # OS Files
 .DS_Store

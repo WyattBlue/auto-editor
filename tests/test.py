@@ -332,17 +332,33 @@ class Runner:
         self.main(["example.mp4"], ["--export", 'premiere:name="Foo Bar"'])
 
     def test_export_subtitles(self) -> None:
-        raise SkipTest()  # TODO
-        # cn = fileinfo(self.main(["resources/mov_text.mp4"], [], "movtext_out.mp4"))
+        # Test mov_text subtitle stream handling
+        cn = fileinfo(self.main(["resources/mov_text.mp4"], [], "movtext_out.mp4"))
 
-        # assert len(cn.videos) == 1
-        # assert len(cn.audios) == 1
-        # assert len(cn.subtitles) == 1
+        assert len(cn.videos) == 1, "Should have exactly 1 video stream"
+        assert len(cn.audios) == 1, "Should have exactly 1 audio stream"
+        assert len(cn.subtitles) == 1, "Should have exactly 1 subtitle stream"
+        assert cn.subtitles[0].codec == "mov_text", f"Expected mov_text codec, got {cn.subtitles[0].codec}"
 
+        # Test WebVTT subtitle stream handling
         cn = fileinfo(self.main(["resources/webvtt.mkv"], [], "webvtt_out.mkv"))
-        assert len(cn.videos) == 1
-        assert len(cn.audios) == 1
-        assert len(cn.subtitles) == 1
+        assert len(cn.videos) == 1, "Should have exactly 1 video stream"
+        assert len(cn.audios) == 1, "Should have exactly 1 audio stream"
+        assert len(cn.subtitles) == 1, "Should have exactly 1 subtitle stream"
+        assert cn.subtitles[0].codec == "webvtt", f"Expected webvtt codec, got {cn.subtitles[0].codec}"
+
+    def test_sn(self) -> None:
+        # Test that -sn flag properly disables subtitle streams
+        cn = fileinfo(self.main(["resources/mov_text.mp4"], ["-sn"], "movtext_nosub.mp4"))
+        assert len(cn.videos) == 1, "Should have exactly 1 video stream"
+        assert len(cn.audios) == 1, "Should have exactly 1 audio stream"
+        assert len(cn.subtitles) == 0, "Should have 0 subtitle streams when -sn flag is used"
+
+        # Test that -sn flag works with webvtt too
+        cn = fileinfo(self.main(["resources/webvtt.mkv"], ["-sn"], "webvtt_nosub.mkv"))
+        assert len(cn.videos) == 1, "Should have exactly 1 video stream"
+        assert len(cn.audios) == 1, "Should have exactly 1 audio stream"
+        assert len(cn.subtitles) == 0, "Should have 0 subtitle streams when -sn flag is used"
 
     def test_scale(self) -> None:
         cn = fileinfo(self.main(["example.mp4"], ["--scale", "1.5"], "scale.mp4"))

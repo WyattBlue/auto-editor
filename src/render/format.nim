@@ -12,6 +12,7 @@ import ../av
 import ../util/[bar, rules]
 import video
 import audio
+import subtitle
 
 type Priority = object
   index: float64
@@ -145,6 +146,32 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
     for aEncCtx in audioEncoders:
       avcodec_free_context(addr aEncCtx)
 
+  # Setup subtitle streams
+  var subtitleStreams: seq[ptr AVStream] = @[]
+  var subtitleSources: seq[string] = @[]
+
+  if not args.sn and tl.s.len > 0:
+    for i in 0..<tl.s.len:
+      if tl.s[i].len > 0:
+        # Get source file and stream index from first clip
+        let firstClip = tl.s[i].c[0]
+        let sourcePath = firstClip.src[]
+        let streamIdx = firstClip.stream
+
+        # Open source container to get subtitle stream info
+        let srcContainer = av.open(sourcePath)
+        if streamIdx >= srcContainer.subtitle.len:
+          error &"Subtitle stream {streamIdx} not found in {sourcePath}"
+
+        let srcStream = srcContainer.subtitle[streamIdx]
+
+        # Add subtitle stream to output by copying from template
+        let sOutStream = output.addStreamFromTemplate(srcStream)
+        subtitleStreams.add(sOutStream)
+        subtitleSources.add(sourcePath)
+
+        srcContainer.close()
+
   var outPacket = av_packet_alloc()
   if outPacket == nil:
     error "Could not allocate output packet"
@@ -161,6 +188,10 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   for aEncCtx in audioEncoders:
     let name = aEncCtx.codec.canonicalName
     encoderTitles.add (if noColor: name else: &"\e[96m{name}")
+  for sStream in subtitleStreams:
+    let name = $sStream.name()
+    if name != "":
+      encoderTitles.add (if noColor: name else: &"\e[93m{name}")
 
   if noColor:
     title &= encoderTitles.join("+")
@@ -274,5 +305,13 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       av_packet_rescale_ts(outPacket, aEncCtx.time_base, audioStreams[i].time_base)
       output.mux(outPacket[])
       av_packet_unref(outPacket)
+
+  # Process subtitle streams
+  if not args.sn and subtitleStreams.len > 0:
+    for i in 0..<subtitleStreams.len:
+      let layer = tl.s[i]
+      let sourcePath = subtitleSources[i]
+      let outputStream = subtitleStreams[i]
+      remuxSubtitles(sourcePath, layer, outputStream, output, tl.tb)
 
   output.close()
