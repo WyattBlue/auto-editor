@@ -330,6 +330,8 @@ proc av_dict_get*(m: ptr AVDictionary, key: cstring,
 
 proc av_dict_set*(pm: ptr ptr AVDictionary, key: cstring, value: cstring,
                   flags: cint): cint {.importc, header: "<libavutil/dict.h>".}
+proc av_dict_copy*(dst: ptr ptr AVDictionary, src: ptr AVDictionary,
+    flags: cint): cint {.importc, header: "<libavutil/dict.h>".}
 proc av_dict_free*(m: ptr ptr AVDictionary) {.importc,
     header: "<libavutil/dict.h>".}
 
@@ -454,6 +456,8 @@ proc av_init_packet*(pkt: ptr AVPacket) {.importc,
     header: "<libavcodec/packet.h>".}
 proc av_packet_unref*(pkt: ptr AVPacket) {.importc, cdecl.}
 proc av_packet_ref*(dst: ptr AVPacket, src: ptr AVPacket): cint {.importc,
+    header: "<libavcodec/packet.h>".}
+proc av_new_packet*(pkt: ptr AVPacket, size: cint): cint {.importc,
     header: "<libavcodec/packet.h>".}
 
 # Frames
@@ -636,6 +640,9 @@ proc avcodec_descriptor_get*(id: AVCodecID): ptr AVCodecDescriptor {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_from_context*(par: ptr AVCodecParameters,
     codec: ptr AVCodecContext): cint {.importc,
+        header: "<libavcodec/avcodec.h>".}
+proc avcodec_parameters_copy*(dst: ptr AVCodecParameters,
+    src: ptr AVCodecParameters): cint {.importc,
         header: "<libavcodec/avcodec.h>".}
 proc avio_open*(s: ptr pointer, filename: cstring, flags: cint): cint {.importc,
     header: "<libavformat/avio.h>".}

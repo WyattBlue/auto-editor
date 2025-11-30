@@ -360,6 +360,29 @@ class Runner:
         assert len(cn.audios) == 1, "Should have exactly 1 audio stream"
         assert len(cn.subtitles) == 0, "Should have 0 subtitle streams when -sn flag is used"
 
+    def test_attachment_copy(self) -> None:
+        """Test that attachment streams are copied from input to output."""
+        # Use pre-made test file with an attachment
+        test_input = "resources/testsrc_with_attachment.mkv"
+
+        # Test that attachments are copied by default
+        cn = fileinfo(self.main([test_input], ["--edit", "none"], "with_attachment.mkv"))
+        assert len(cn.videos) == 1, "Should have exactly 1 video stream"
+        assert len(cn.audios) == 1, "Should have exactly 1 audio stream"
+        assert len(cn.attachments) == 1, "Should have 1 attachment stream"
+        assert cn.attachments[0].filename == "test_attachment.txt", (
+            f"Attachment filename should be 'test_attachment.txt', got {cn.attachments[0].filename}"
+        )
+        assert cn.attachments[0].mimetype == "text/plain", (
+            f"Attachment mimetype should be 'text/plain', got {cn.attachments[0].mimetype}"
+        )
+
+        # Test that -dn flag properly disables attachment streams
+        cn = fileinfo(self.main([test_input], ["--edit", "none", "-dn"], "no_attachment.mkv"))
+        assert len(cn.videos) == 1, "Should have exactly 1 video stream"
+        assert len(cn.audios) == 1, "Should have exactly 1 audio stream"
+        assert len(cn.attachments) == 0, "Should have 0 attachment streams when -dn flag is used"
+
     def test_scale(self) -> None:
         cn = fileinfo(self.main(["example.mp4"], ["--scale", "1.5"], "scale.mp4"))
         assert cn.videos[0].fps == 30
