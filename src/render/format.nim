@@ -172,6 +172,39 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
         srcContainer.close()
 
+  if not args.dn:
+    # Get the first source file from the timeline
+    var sourcePath: string = ""
+    block findSource:
+      for vlayer in tl.v:
+        if vlayer.c.len > 0:
+          sourcePath = vlayer.c[0].src[]
+          break findSource
+      for alayer in tl.a:
+        if alayer.c.len > 0:
+          sourcePath = alayer.c[0].src[]
+          break findSource
+
+    if sourcePath != "":
+      let srcContainer = av.open(sourcePath)
+      defer: srcContainer.close()
+
+      if srcContainer.attachment.len > 0:
+        # Copy each attachment stream
+        for attachStream in srcContainer.attachment:
+          # Create attachment stream directly (attachments don't have decoders)
+          let attachOutStream = avformat_new_stream(output.formatCtx, nil)
+          if attachOutStream == nil:
+            error "Could not allocate attachment stream"
+
+          # Copy codec parameters directly
+          if avcodec_parameters_copy(attachOutStream.codecpar, attachStream.codecpar) < 0:
+            error "Could not copy attachment codec parameters"
+
+          # Copy stream metadata
+          if attachStream.metadata != nil:
+            discard av_dict_copy(addr attachOutStream.metadata, attachStream.metadata, 0)
+
   var outPacket = av_packet_alloc()
   if outPacket == nil:
     error "Could not allocate output packet"

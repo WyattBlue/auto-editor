@@ -45,6 +45,13 @@ class SubtitleStream:
 
 
 @dataclass(slots=True, frozen=True)
+class AttachmentStream:
+    codec: str
+    filename: str | None
+    mimetype: str | None
+
+
+@dataclass(slots=True, frozen=True)
 class FileInfo:
     path: Path
     bitrate: int
@@ -52,6 +59,7 @@ class FileInfo:
     videos: tuple[VideoStream, ...]
     audios: tuple[AudioStream, ...]
     subtitles: tuple[SubtitleStream, ...]
+    attachments: tuple[AttachmentStream, ...]
 
     @classmethod
     def init(self, path: str, log: Log) -> FileInfo:
@@ -67,6 +75,7 @@ class FileInfo:
         videos: tuple[VideoStream, ...] = ()
         audios: tuple[AudioStream, ...] = ()
         subtitles: tuple[SubtitleStream, ...] = ()
+        attachments: tuple[AttachmentStream, ...] = ()
 
         for v in cont.streams.video:
             if v.duration is not None and v.time_base is not None:
@@ -131,9 +140,16 @@ class FileInfo:
             codec = s.codec_context.name
             subtitles += (SubtitleStream(codec, s.language),)
 
+        for stream in cont.streams:
+            if stream.type == "attachment":
+                codec = stream.codec_context.name if stream.codec_context and stream.codec_context.name else "unknown"
+                filename = stream.metadata.get("filename", None)
+                mimetype = stream.metadata.get("mimetype", None)
+                attachments += (AttachmentStream(codec, filename, mimetype),)
+
         bitrate = 0 if cont.bit_rate is None else cont.bit_rate
         dur = 0 if cont.duration is None else cont.duration / av.time_base
 
         cont.close()
 
-        return FileInfo(Path(path), bitrate, dur, videos, audios, subtitles)
+        return FileInfo(Path(path), bitrate, dur, videos, audios, subtitles, attachments)
