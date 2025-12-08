@@ -15,7 +15,6 @@ when defined(macosx):
   {.passC: "-ffast-math".}
 else:
   {.passC: "-fno-signaling-nans -fno-math-errno -fno-trapping-math -freciprocal-math".}
-{.passL: "-flto".}
 
 type
   AudioIterator = ref object

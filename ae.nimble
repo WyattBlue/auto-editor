@@ -28,7 +28,7 @@ task test, "Test the project":
   exec &"nim c {flags} -r tests/rationals"
 
 task make, "Export the project":
-  exec &"nim c -d:danger --panics:on {flags} --passC:\"-flto\" --out:auto-editor src/main.nim"
+  exec &"nim c -d:danger --panics:on {flags} --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
     exec "stat -f \"%z bytes\" ./auto-editor"
