@@ -9,7 +9,7 @@ func effectToString(act: Action): string =
   case act.kind
   of actCut: "cut"
   of actSpeed: "speed:" & $act.val
-  of actRate: "rate:" & $act.val
+  of actVarispeed: "varispeed:" & $act.val
   of actVolume: "volume:" & $act.val
 
 func effectGroupToJson(actions: seq[Action]): JsonNode =
@@ -124,7 +124,7 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
         for effect in effectGroup:
           if effect.kind == actCut:
             speed = 99999.0
-          elif effect.kind == actSpeed or effect.kind == actRate:
+          elif effect.kind == actSpeed or effect.kind == actVarispeed:
             speed *= effect.val.float64
 
         chunks.add (clip2.start, clip2.`end`, speed)

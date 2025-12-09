@@ -44,7 +44,7 @@ Options:
                                     speed (val: float)
                                       ; Change the speed while preserving pitch.
                                       ;   val: between (0-99999)
-                                    rate (val: float)
+                                    varispeed (val: float)
                                       ; Change the speed by varying pitch.
                                       ;   val: between [0.2-100]
     -ex, --export EXPORT:ATTRS?   Choose the export mode.
@@ -285,12 +285,12 @@ proc parseActions(val: string): seq[Action] =
           result.add Action(kind: actSpeed, val: value)
         except ValueError:
           error &"Invalid speed value in action: {trimmedPart}"
-      elif trimmedPart.startsWith("rate:"):
+      elif trimmedPart.startsWith("varispeed:"):
         try:
-          let value = parseFloat(trimmedPart[5 ..< trimmedPart.len])
-          result.add Action(kind: actRate, val: value)
+          let value = parseFloat(trimmedPart[10 ..< trimmedPart.len])
+          result.add Action(kind: actVarispeed, val: value)
         except ValueError:
-          error &"Invalid rate value in action: {trimmedPart}"
+          error &"Invalid varispeed value in action: {trimmedPart}"
       elif trimmedPart.startsWith("volume:"):
         try:
           let value = parseFloat(trimmedPart[7 ..< trimmedPart.len])
