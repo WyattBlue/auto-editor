@@ -7,10 +7,8 @@ import ../media
 import ../util/color
 
 proc parseEffect(val: string): Action =
-  # Parse effect strings like "speed:2.0", "volume:1.5", or simple "cut", "nil"
   if val == "cut":
     return Action(kind: actCut)
-  # "nil" is represented by empty seq, so we don't create an Action for it
 
   let parts = val.split(":")
   if parts.len == 2:
@@ -35,12 +33,9 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[se
   if node.hasKey("effects") and node["effects"].kind == JArray:
     for effectNode in node["effects"]:
       let effectStr = effectNode.getStr()
-      if effectStr != "nil":  # Skip "nil" - empty seq handles it
+      if effectStr != "nil":
         clipActions.add parseEffect(effectStr)
 
-  # Empty clipActions means nil/no-op - this is valid
-
-  # Find or add the action group to the effects list
   let effectIndex = effects.find(clipActions)
   if effectIndex == -1:
     effects.add(clipActions)

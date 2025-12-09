@@ -114,13 +114,11 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
   var clips2: seq[Clip2]
 
   for chunk in pseudoChunks:
-    # Make normal chunks - extract speed from action group
     let actionGroup = chunk[3]
     var speed = 1.0
     for action in actionGroup:
       if action.kind in [actSpeed, actRate]:
-        speed = action.val
-        break
+        speed *= action.val
       elif action.kind == actCut:
         speed = 99999.0
         break
@@ -210,7 +208,7 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
       if not (clips.len > 0 and clips[^1].start == start):
         var effectIndex: int
         if chunk[2] == 1.0:
-          let emptySeq: seq[Action] = @[]  # Empty seq means nil/no-op
+          let emptySeq: seq[Action] = @[]
           effectIndex = effects.find(emptySeq)
           if effectIndex == -1:
             effects.add emptySeq
@@ -289,7 +287,7 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
         isCut = true
         break
       elif effect.kind == actSpeed or effect.kind == actRate:
-        speed = effect.val
+        speed *= effect.val
 
     if isCut:
       continue

@@ -613,8 +613,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         var speed = 1.0
         for effect in effectGroup:
           if effect.kind in [actSpeed, actRate]:
-            speed = effect.val
-            break
+            speed *= effect.val
 
         if key in samples:
           let getter = samples[key]

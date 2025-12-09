@@ -14,7 +14,7 @@ func effectToString(act: Action): string =
 
 func effectGroupToJson(actions: seq[Action]): JsonNode =
   if actions.len == 0:
-    return %"nil"  # Empty seq means nil/no-op
+    return %"nil"
   elif actions.len == 1:
     return %effectToString(actions[0])
   else:
@@ -48,8 +48,6 @@ func `%`*(self: v3): JsonNode =
       clipObj["offset"] = %clip.offset
       clipObj["stream"] = %clip.stream
       let effectGroup = self.effects[clip.effects]
-      # Empty seq means nil/no-op, don't include effects
-      # Only include effects if non-empty and not just cut
       var hasNonTrivialEffect = false
       if effectGroup.len > 0:
         for effect in effectGroup:
@@ -76,8 +74,6 @@ func `%`*(self: v3): JsonNode =
       clipObj["offset"] = %clip.offset
       clipObj["stream"] = %clip.stream
       let effectGroup = self.effects[clip.effects]
-      # Empty seq means nil/no-op, don't include effects
-      # Only include effects if non-empty and not just cut
       var hasNonTrivialEffect = false
       if effectGroup.len > 0:
         for effect in effectGroup:
@@ -128,10 +124,8 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
         for effect in effectGroup:
           if effect.kind == actCut:
             speed = 99999.0
-            break
           elif effect.kind == actSpeed or effect.kind == actRate:
-            speed = effect.val.float64
-            break
+            speed *= effect.val.float64
 
         chunks.add (clip2.start, clip2.`end`, speed)
 

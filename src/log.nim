@@ -70,7 +70,7 @@ type mainArgs* = object
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
   edit*: string = "audio"
-  whenNormal*: seq[Action] = @[]  # Empty seq means no-op/nil
+  whenNormal*: seq[Action] = @[]
   whenSilent*: seq[Action] = @[Action(kind: actCut)]
   `export`*: string = ""
   output*: string = ""
