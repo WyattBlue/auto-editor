@@ -6,15 +6,17 @@ title: Auto-Editor - Docs
 See also: [reference](../ref)
 
 ---
-[How To Shrink File Size](./file-size)
+[Actions](./actions)
 
 [Audio Normalizing](./anorm)
 
-[Range Syntax](./range-syntax)
+[How To Shrink File Size](./file-size)
 
 [Subcommands](./subcommands)
 
 [Supported Media](./supported-media)
+
+[Range Syntax](./range-syntax)
 
 ### Timeline Documentation
 [The v1 format](./v1)
