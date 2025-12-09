@@ -7,11 +7,8 @@ import ../media
 import ../util/color
 
 proc parseEffect(val: string): Action =
-  # Parse effect strings like "speed:2.0", "volume:1.5", or simple "cut", "nil"
   if val == "cut":
     return Action(kind: actCut)
-  if val == "nil":
-    return Action(kind: actNil)
 
   let parts = val.split(":")
   if parts.len == 2:
@@ -25,22 +22,23 @@ proc parseEffect(val: string): Action =
 
   error &"unknown action: {val}"
 
-proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Action]): Clip =
+proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[seq[Action]]): Clip =
   result.src = interner.intern(node["src"].getStr())
   result.start = node["start"].getInt()
   result.dur = node["dur"].getInt()
   result.offset = node["offset"].getInt()
   result.stream = node["stream"].getInt().int32
 
-  var clipAction = Action(kind: actNil)
+  var clipActions: seq[Action] = @[]
   if node.hasKey("effects") and node["effects"].kind == JArray:
     for effectNode in node["effects"]:
-      clipAction = parseEffect(effectNode.getStr())
+      let effectStr = effectNode.getStr()
+      if effectStr != "nil":
+        clipActions.add parseEffect(effectStr)
 
-  # Find or add the action to the effects list
-  let effectIndex = effects.find(clipAction)
+  let effectIndex = effects.find(clipActions)
   if effectIndex == -1:
-    effects.add(clipAction)
+    effects.add(clipActions)
     result.effects = uint32(effects.len - 1)
   else:
     result.effects = uint32(effectIndex)
@@ -95,7 +93,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
 proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   let input = jsonNode["source"].getStr()
   let ptrInput = intern(interner, input)
-  var effects: seq[Action]
+  var effects: seq[seq[Action]]
   var clips: seq[Clip2]
   let tb: AVRational = jsonNode["tb"].getStr()
 
@@ -109,11 +107,17 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
 
   if jsonNode.hasKey("effects") and jsonNode["effects"].kind == JArray:
     for effectNode in jsonNode["effects"]:
-      # TODO: Support multiple actions
-      let clipAction = parseEffect(effectNode.getStr())
-      let effectIndex = effects.find(clipAction)
+      # Support single action strings or arrays of actions
+      var actionGroup: seq[Action] = @[]
+      if effectNode.kind == JString:
+        actionGroup.add parseEffect(effectNode.getStr())
+      elif effectNode.kind == JArray:
+        for actionStr in effectNode:
+          actionGroup.add parseEffect(actionStr.getStr())
+
+      let effectIndex = effects.find(actionGroup)
       if effectIndex == -1:
-        effects.add(clipAction)
+        effects.add(actionGroup)
 
   let mi = initMediaInfo(input)
   let bg = RGBColor(red: 0, green: 0, blue: 0)

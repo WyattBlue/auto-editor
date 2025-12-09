@@ -110,9 +110,11 @@ proc kdenliveWrite*(output: string, tl: v3) =
   var warpedClips: seq[int] = @[]
 
   for i, clip in clips:
-    let effect = tl.effects[clip.effects]
-    if effect.kind == actSpeed:
-      warpedClips.add(i)
+    let effectGroup = tl.effects[clip.effects]
+    for effect in effectGroup:
+      if effect.kind == actSpeed:
+        warpedClips.add(i)
+        break
 
   # create all producers for warped clips
   for clipIdx in warpedClips:
@@ -131,16 +133,21 @@ proc kdenliveWrite*(output: string, tl: v3) =
         "out": globalOut
       }.toXmlAttributes()
 
-      let effect = tl.effects[clip.effects]
+      let effectGroup = tl.effects[clip.effects]
+      var speedVal = 1.0
+      for effect in effectGroup:
+        if effect.kind == actSpeed:
+          speedVal = effect.val
+          break
 
       var prodProp = newElement("property")
       prodProp.attrs = {"name": "resource"}.toXmlAttributes()
-      prodProp.add(newText(&"{effect.val}:{path}"))
+      prodProp.add(newText(&"{speedVal}:{path}"))
       prod.add(prodProp)
 
       prodProp = newElement("property")
       prodProp.attrs = {"name": "warp_speed"}.toXmlAttributes()
-      prodProp.add(newText($effect.val))
+      prodProp.add(newText($speedVal))
       prod.add(prodProp)
 
       prodProp = newElement("property")
@@ -440,8 +447,14 @@ proc kdenliveWrite*(output: string, tl: v3) =
         })
         var clipProd = ""
 
-        let effect = tl.effects[clip.effects]
-        if effect.kind == actSpeed:
+        let effectGroup = tl.effects[clip.effects]
+        var hasSpeed = false
+        for effect in effectGroup:
+          if effect.kind == actSpeed:
+            hasSpeed = true
+            break
+
+        if hasSpeed:
           clipProd = &"producer{producers}"
           inc producers
         else:

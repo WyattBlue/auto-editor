@@ -245,19 +245,21 @@ proc editMedia*(args: var mainArgs) =
       let endMargin = toTb(args.margin[1], tb.float64)
       mutMargin(hasLoud, startMargin, endMargin)
 
-      var actionMap = @[args.whenSilent, args.whenNormal]
+      var actionMap: seq[seq[Action]] = @[]
+      actionMap.add(args.whenSilent)
+      actionMap.add(args.whenNormal)
       var actionIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
 
-      proc getActionIndex(action: Action): int =
-        let index = actionMap.find(action)
+      proc getActionIndex(actions: seq[Action]): int =
+        let index = actionMap.find(actions)
         if index == -1:
-          actionMap.add(action)
+          actionMap.add(actions)
           return actionMap.len - 1
         else:
           return index
 
-      const cut = Action(kind: actCut)
-      const myNil = Action(kind: actNil)
+      let cut = @[Action(kind: actCut)]
+      let myNil: seq[Action] = @[]
 
       for span in args.cutOut:
         applyToRange(actionIndex, span, tb.float64, getActionIndex(cut))
@@ -268,7 +270,7 @@ proc editMedia*(args: var mainArgs) =
       for speedRange in args.setSpeed:
         let speed = speedRange[0]
         let span = (speedRange[1], speedRange[2])
-        let action = (if speed == 1.0: myNil else: Action(kind: actSpeed, val: speed))
+        let action = (if speed == 1.0: myNil else: @[Action(kind: actSpeed, val: speed)])
         applyToRange(actionIndex, span, tb.float64, getActionIndex(action))
 
       let bg = args.background
@@ -361,7 +363,13 @@ proc editMedia*(args: var mainArgs) =
     let allClips2: seq[Clip2] = tlV3.clips2.unsafeGet()
     var clips2: seq[Clip2] = @[]
     for clip in allClips2:
-      if tlV3.effects[clip.effect].kind != actCut:
+      let effectGroup = tlV3.effects[clip.effect]
+      var isCut = false
+      for effect in effectGroup:
+        if effect.kind == actCut:
+          isCut = true
+          break
+      if not isCut:
         clips2.add(clip)
 
     let unique = tlV3.uniqueSources()

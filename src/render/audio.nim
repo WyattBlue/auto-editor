@@ -266,7 +266,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
           totalSamples += samplesToProcess
           samplesProcessed += samples
 
-proc createFilterGraph(effect: Action, sr: int, layout: string): (ptr AVFilterGraph,
+proc createFilterGraph(effects: seq[Action], sr: int, layout: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   var bufferSrc: ptr AVFilterContext = nil
@@ -290,22 +290,24 @@ proc createFilterGraph(effect: Action, sr: int, layout: string): (ptr AVFilterGr
   var filterChain: string
   var filters: seq[string] = @[]
 
-  case effect.kind
-  of actSpeed:
-    const maxAtempo = 6.0
-    var remainingSpeed = effect.val
-    while remainingSpeed > maxAtempo:
-      filters.add &"atempo={maxAtempo}"
-      remainingSpeed = remainingSpeed / maxAtempo
-    if remainingSpeed > 1.0 or remainingSpeed < 1.0:
-      filters.add &"atempo={remainingSpeed}"
-  of actRate:
-    let clampedSpeed = max(0.2, min(100.0, effect.val))
-    filters.add &"asetrate={sr}*{clampedSpeed}"
-    filters.add &"aresample={sr}"
-  of actVolume:
-    filters.add &"volume={effect.val}"
-  else: discard
+  # Build filter chain from all effects in the group
+  for effect in effects:
+    case effect.kind
+    of actSpeed:
+      const maxAtempo = 6.0
+      var remainingSpeed = effect.val
+      while remainingSpeed > maxAtempo:
+        filters.add &"atempo={maxAtempo}"
+        remainingSpeed = remainingSpeed / maxAtempo
+      if remainingSpeed > 1.0 or remainingSpeed < 1.0:
+        filters.add &"atempo={remainingSpeed}"
+    of actRate:
+      let clampedSpeed = max(0.2, min(100.0, effect.val))
+      filters.add &"asetrate={sr}*{clampedSpeed}"
+      filters.add &"aresample={sr}"
+    of actVolume:
+      filters.add &"volume={effect.val}"
+    else: discard
 
   if filters.len == 0:
     filterChain = "anull"
@@ -342,22 +344,26 @@ proc createFilterGraph(effect: Action, sr: int, layout: string): (ptr AVFilterGr
   return (filterGraph, bufferSrc, bufferSink)
 
 # Returns seq[int16] where channel data is interleaved: [L, R, L, R, L, R] etc.
-proc processAudioClip(ef: seq[Action], clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
+proc processAudioClip(ef: seq[seq[Action]], clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
   if data.len == 0:
     return @[]
 
   # First apply speed/volume processing at source sample rate (if needed)
   var processedData = data
 
-  let effect = ef[clip.effects]
-  let needsFiltering = effect.kind in [actSpeed, actRate, actVolume]
+  let effectGroup = ef[clip.effects]
+  var needsFiltering = false
+  for effect in effectGroup:
+    if effect.kind in [actSpeed, actRate, actVolume]:
+      needsFiltering = true
+      break
 
   if needsFiltering:
     # Data is interleaved: [L, R, L, R, ...] so always stereo
     let channels = 2
     let samples = data.len div 2
     let layout = "stereo"
-    let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(effect, sourceSr, layout)
+    let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(effectGroup, sourceSr, layout)
     defer:
       if filterGraph != nil:
         avfilter_graph_free(addr filterGraph)
@@ -603,8 +609,11 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       for clip in layer.clips:
         let key = (clip.src[], clip.stream)
 
-        let effect = tl.effects[clip.effects]
-        let speed = (if effect.kind in [actSpeed, actRate]: effect.val else: 1.0)
+        let effectGroup = tl.effects[clip.effects]
+        var speed = 1.0
+        for effect in effectGroup:
+          if effect.kind in [actSpeed, actRate]:
+            speed *= effect.val
 
         if key in samples:
           let getter = samples[key]

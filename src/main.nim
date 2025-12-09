@@ -268,30 +268,47 @@ proc listAvailableFilters(): string =
       result &= &" {filter.name}"
     filter = av_filter_iterate(addr opaque)
 
-proc parseAction(val: string): Action =
-  if val == "nil":
-    return Action(kind: actNil)
-  if val == "cut":
-    return Action(kind: actCut)
-  if val.startsWith("speed:"):
-    let val = parseFloat(val[6 ..< val.len])
-    return Action(kind: actSpeed, val: val)
-  if val.startsWith("rate:"):
-    let val = parseFloat(val[5 ..< val.len])
-    return Action(kind: actRate, val: val)
-  if val.startsWith("volume:"):
-    let val = parseFloat(val[7 ..< val.len])
-    return Action(kind: actVolume, val: val)
+proc parseActions(val: string): seq[Action] =
+  try:
+    let parts = val.strip().split(",")
 
-  error &"Invalid action: {val}"
+    for part in parts:
+      let trimmedPart = part.strip()
 
-func actionFromUserSpeed(val: float64): Action =
+      if trimmedPart == "nil":
+        discard
+      elif trimmedPart == "cut":
+        result.add Action(kind: actCut)
+      elif trimmedPart.startsWith("speed:"):
+        try:
+          let value = parseFloat(trimmedPart[6 ..< trimmedPart.len])
+          result.add Action(kind: actSpeed, val: value)
+        except ValueError:
+          error &"Invalid speed value in action: {trimmedPart}"
+      elif trimmedPart.startsWith("rate:"):
+        try:
+          let value = parseFloat(trimmedPart[5 ..< trimmedPart.len])
+          result.add Action(kind: actRate, val: value)
+        except ValueError:
+          error &"Invalid rate value in action: {trimmedPart}"
+      elif trimmedPart.startsWith("volume:"):
+        try:
+          let value = parseFloat(trimmedPart[7 ..< trimmedPart.len])
+          result.add Action(kind: actVolume, val: value)
+        except ValueError:
+          error &"Invalid volume value in action: {trimmedPart}"
+      else:
+        error &"Invalid action: {trimmedPart}"
+  except Exception as e:
+    error &"Error parsing actions '{val}': {e.msg}"
+
+func actionFromUserSpeed(val: float64): seq[Action] =
   if val == 1.0:
-    return Action(kind: actNil)
+    return @[]
   elif val <= 0.0 or val >= 99999.0:
-    return Action(kind: actCut)
+    return @[Action(kind: actCut)]
   else:
-    return Action(kind: actSpeed, val: val)
+    return @[Action(kind: actSpeed, val: val)]
 
 proc main() =
   if paramCount() < 1:
@@ -426,9 +443,9 @@ judge making cuts.
       of "output":
         args.output = key
       of "when-silent":
-        args.whenSilent = parseAction(key)
+        args.whenSilent = parseActions(key)
       of "when-normal":
-        args.whenNormal = parseAction(key)
+        args.whenNormal = parseActions(key)
       of "silent-speed":
         args.whenSilent = actionFromUserSpeed(parseSpeed(key, expecting))
       of "video-speed":

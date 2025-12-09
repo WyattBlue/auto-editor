@@ -46,11 +46,11 @@ type
       t*: float32 # -99.0 to 0.0, default -8.0
 
   ActionKind* = enum
-    actNil, actCut, actSpeed, actRate, actVolume
+    actCut, actSpeed, actRate, actVolume
 
   Action* = object
     case kind*: ActionKind
-    of actNil, actCut:
+    of actCut:
       discard
     of actSpeed, actRate, actVolume:
       val*: float32
@@ -59,7 +59,7 @@ func `==`*(a, b: Action): bool =
   if a.kind != b.kind:
     return false
   case a.kind
-  of actNil, actCut:
+  of actCut:
     return true
   of actSpeed, actRate, actVolume:
     return a.val == b.val
@@ -70,8 +70,8 @@ type mainArgs* = object
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
   edit*: string = "audio"
-  whenNormal* = Action(kind: actNil)
-  whenSilent* = Action(kind: actCut)
+  whenNormal*: seq[Action] = @[]
+  whenSilent*: seq[Action] = @[Action(kind: actCut)]
   `export`*: string = ""
   output*: string = ""
   cutOut*: seq[(PackedInt, PackedInt)]
@@ -159,18 +159,15 @@ proc closeTempDir*() {.raises:[].} =
 
 proc error*(msg: string) {.noreturn.} =
   closeTempDir()
-  when defined(debug):
-    raise newException(ValueError, msg)
-  else:
-    conwrite("")
-    try:
-      if not noColor:
-        stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
-      else:
-        stderr.writeLine(&"Error! {msg}")
-    except IOError:
-      discard
-    quit(1)
+  conwrite("")
+  try:
+    if not noColor:
+      stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
+    else:
+      stderr.writeLine(&"Error! {msg}")
+  except IOError:
+    discard
+  quit(1)
 
 
 type StringInterner* = object

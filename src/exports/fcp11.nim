@@ -172,25 +172,27 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
 
     spine.add(asset)
 
-    let effect = tl.effects[clip.effects]
-    if effect.kind == actSpeed:
-      # See the "Time Maps" section.
-      # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
+    let effectGroup = tl.effects[clip.effects]
+    for effect in effectGroup:
+      if effect.kind == actSpeed:
+        # See the "Time Maps" section.
+        # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
 
-      let timemap = newElement("timeMap")
-      let timept1 = newElement("timept")
-      timept1.attrs = {"time": "0s", "value": "0s", "interp": "smooth2"}.toXmlAttributes
-      timemap.add(timept1)
+        let timemap = newElement("timeMap")
+        let timept1 = newElement("timept")
+        timept1.attrs = {"time": "0s", "value": "0s", "interp": "smooth2"}.toXmlAttributes
+        timemap.add(timept1)
 
-      let timept2 = newElement("timept")
-      timept2.attrs = {
-        "time": fraction(int(srcDur.float / effect.val)),
-        "value": fraction(srcDur),
-        "interp": "smooth2"
-      }.toXmlAttributes
-      timemap.add(timept2)
+        let timept2 = newElement("timept")
+        timept2.attrs = {
+          "time": fraction(int(srcDur.float / effect.val)),
+          "value": fraction(srcDur),
+          "interp": "smooth2"
+        }.toXmlAttributes
+        timemap.add(timept2)
 
-      asset.add(timemap)
+        asset.add(timemap)
+        break
 
   var clips: ClipLayer
   if tl.v.len > 0 and tl.v[0].len > 0:

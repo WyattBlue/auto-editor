@@ -7,11 +7,18 @@ import ../util/color
 
 func effectToString(act: Action): string =
   case act.kind
-  of actNil: "nil"
   of actCut: "cut"
   of actSpeed: "speed:" & $act.val
   of actRate: "rate:" & $act.val
   of actVolume: "volume:" & $act.val
+
+func effectGroupToJson(actions: seq[Action]): JsonNode =
+  if actions.len == 0:
+    return %"nil"
+  elif actions.len == 1:
+    return %effectToString(actions[0])
+  else:
+    return %actions.mapIt(effectToString(it))
 
 func `%`(self: v1): JsonNode =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
@@ -19,7 +26,7 @@ func `%`(self: v1): JsonNode =
 
 func `%`(self: v2): JsonNode =
   let jsonClips = self.clips.mapIt(%[%it.start, %it.`end`, %it.`effect`])
-  let jsonEffects = self.effects.mapIt(%effectToString(it))
+  let jsonEffects = self.effects.mapIt(effectGroupToJson(it))
   return %* {
     "version": "2",
     "source": self.source,
@@ -40,9 +47,17 @@ func `%`*(self: v3): JsonNode =
       clipObj["dur"] = %clip.dur
       clipObj["offset"] = %clip.offset
       clipObj["stream"] = %clip.stream
-      if self.effects[clip.effects].kind notin [actNil, actCut]:
+      let effectGroup = self.effects[clip.effects]
+      var hasNonTrivialEffect = false
+      if effectGroup.len > 0:
+        for effect in effectGroup:
+          if effect.kind != actCut:
+            hasNonTrivialEffect = true
+            break
+      if hasNonTrivialEffect:
         var effectArray = newJArray()
-        effectArray.add %effectToString(self.effects[clip.effects])
+        for effect in effectGroup:
+          effectArray.add %effectToString(effect)
         clipObj["effects"] = effectArray
       trackArray.add(clipObj)
     videoTracks.add(trackArray)
@@ -58,9 +73,17 @@ func `%`*(self: v3): JsonNode =
       clipObj["dur"] = %clip.dur
       clipObj["offset"] = %clip.offset
       clipObj["stream"] = %clip.stream
-      if self.effects[clip.effects].kind notin [actNil, actCut]:
+      let effectGroup = self.effects[clip.effects]
+      var hasNonTrivialEffect = false
+      if effectGroup.len > 0:
+        for effect in effectGroup:
+          if effect.kind != actCut:
+            hasNonTrivialEffect = true
+            break
+      if hasNonTrivialEffect:
         var effectArray = newJArray()
-        effectArray.add %effectToString(self.effects[clip.effects])
+        for effect in effectGroup:
+          effectArray.add %effectToString(effect)
         clipObj["effects"] = effectArray
       trackArray.add(clipObj)
     audioTracks.add(trackArray)
@@ -97,11 +120,12 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
       var chunks: seq[(int64, int64, float64)] = @[]
       for clip2 in clips2:
         var speed = 1.0
-        let effect = tlV3.effects[clip2.effect]
-        if effect.kind == actCut:
-          speed = 99999.0
-        elif effect.kind == actSpeed or effect.kind == actRate:
-          speed = effect.val.float64
+        let effectGroup = tlV3.effects[clip2.effect]
+        for effect in effectGroup:
+          if effect.kind == actCut:
+            speed = 99999.0
+          elif effect.kind == actSpeed or effect.kind == actRate:
+            speed *= effect.val.float64
 
         chunks.add (clip2.start, clip2.`end`, speed)
 
