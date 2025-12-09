@@ -70,8 +70,8 @@ type mainArgs* = object
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
   edit*: string = "audio"
-  whenNormal* = Action(kind: actNil)
-  whenSilent* = Action(kind: actCut)
+  whenNormal*: seq[Action] = @[Action(kind: actNil)]
+  whenSilent*: seq[Action] = @[Action(kind: actCut)]
   `export`*: string = ""
   output*: string = ""
   cutOut*: seq[(PackedInt, PackedInt)]
@@ -159,18 +159,15 @@ proc closeTempDir*() {.raises:[].} =
 
 proc error*(msg: string) {.noreturn.} =
   closeTempDir()
-  when defined(debug):
-    raise newException(ValueError, msg)
-  else:
-    conwrite("")
-    try:
-      if not noColor:
-        stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
-      else:
-        stderr.writeLine(&"Error! {msg}")
-    except IOError:
-      discard
-    quit(1)
+  conwrite("")
+  try:
+    if not noColor:
+      stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
+    else:
+      stderr.writeLine(&"Error! {msg}")
+  except IOError:
+    discard
+  quit(1)
 
 
 type StringInterner* = object

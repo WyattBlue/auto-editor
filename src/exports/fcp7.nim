@@ -157,9 +157,11 @@ proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         link2.add elem("linkclipref", &"clipitem-{clip_item_num}")
         clipitem.add link2
 
-      let effect = tl.effects[aclip.effects]
-      if effect.kind == actSpeed:
-        clipitem.add speedup(effect.val * 100)
+      let effectGroup = tl.effects[aclip.effects]
+      for effect in effectGroup:
+        if effect.kind == actSpeed:
+          clipitem.add speedup(effect.val * 100)
+          break
 
       track.add clipitem
     audio.add track
@@ -223,9 +225,11 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         labels.add elem("label2", "Iris")
         clipitem.add labels
 
-        let effect = tl.effects[aclip.effects]
-        if effect.kind == actSpeed:
-          clipitem.add speedup(effect.val * 100)
+        let effectGroup = tl.effects[aclip.effects]
+        for effect in effectGroup:
+          if effect.kind == actSpeed:
+            clipitem.add speedup(effect.val * 100)
+            break
 
         track.add clipitem
       audio.add track
@@ -314,9 +318,11 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
 
       clipitem.add elem("compositemode", "normal")
 
-      let effect = tl.effects[clip.effects]
-      if effect.kind == actSpeed:
-        clipitem.add speedup(effect.val * 100)
+      let effectGroup = tl.effects[clip.effects]
+      for effect in effectGroup:
+        if effect.kind == actSpeed:
+          clipitem.add speedup(effect.val * 100)
+          break
 
       if resolve:
         let link1 = newElement("link")

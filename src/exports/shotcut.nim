@@ -119,12 +119,20 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
     var resource: string
     var caption: string
 
-    let effect = tl.effects[clip.effects]
-    if effect.kind == actSpeed:
+    let effectGroup = tl.effects[clip.effects]
+    var speedVal = 0.0
+    var hasSpeed = false
+    for effect in effectGroup:
+      if effect.kind == actSpeed:
+        speedVal = effect.val
+        hasSpeed = true
+        break
+
+    if hasSpeed:
       chain = newElement("producer")
       chain.attrs = {"id": &"producer{producers}", "out": length}.toXmlAttributes()
-      resource = fmt"{effect.val}:{src}"
-      caption = fmt"{splitFile(src).name} ({effect.val}x)"
+      resource = fmt"{speedVal}:{src}"
+      caption = fmt"{splitFile(src).name} ({speedVal}x)"
       inc producers
     else:
       resource = src
@@ -142,10 +150,10 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
     chain_resource_prop.add(newText(resource))
     chain.add(chain_resource_prop)
 
-    if effect.kind == actSpeed:
+    if hasSpeed:
       let warp_speed_prop = newElement("property")
       warp_speed_prop.attrs = {"name": "warp_speed"}.toXmlAttributes()
-      warp_speed_prop.add(newText($effect.val))
+      warp_speed_prop.add(newText($speedVal))
       chain.add(warp_speed_prop)
 
       let warp_pitch_prop = newElement("property")
@@ -185,7 +193,13 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
     let out_time = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
 
     var tag_name = fmt"chain{i}"
-    if tl.effects[clip.effects].kind == actSpeed:
+    let effectGroup = tl.effects[clip.effects]
+    var hasSpeed = false
+    for effect in effectGroup:
+      if effect.kind == actSpeed:
+        hasSpeed = true
+        break
+    if hasSpeed:
       tag_name = fmt"producer{producers}"
       inc producers
 
