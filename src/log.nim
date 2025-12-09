@@ -46,11 +46,11 @@ type
       t*: float32 # -99.0 to 0.0, default -8.0
 
   ActionKind* = enum
-    actNil, actCut, actSpeed, actRate, actVolume
+    actCut, actSpeed, actRate, actVolume
 
   Action* = object
     case kind*: ActionKind
-    of actNil, actCut:
+    of actCut:
       discard
     of actSpeed, actRate, actVolume:
       val*: float32
@@ -59,7 +59,7 @@ func `==`*(a, b: Action): bool =
   if a.kind != b.kind:
     return false
   case a.kind
-  of actNil, actCut:
+  of actCut:
     return true
   of actSpeed, actRate, actVolume:
     return a.val == b.val
@@ -70,7 +70,7 @@ type mainArgs* = object
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
   edit*: string = "audio"
-  whenNormal*: seq[Action] = @[Action(kind: actNil)]
+  whenNormal*: seq[Action] = @[]  # Empty seq means no-op/nil
   whenSilent*: seq[Action] = @[Action(kind: actCut)]
   `export`*: string = ""
   output*: string = ""

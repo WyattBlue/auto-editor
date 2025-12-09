@@ -10,8 +10,7 @@ proc parseEffect(val: string): Action =
   # Parse effect strings like "speed:2.0", "volume:1.5", or simple "cut", "nil"
   if val == "cut":
     return Action(kind: actCut)
-  if val == "nil":
-    return Action(kind: actNil)
+  # "nil" is represented by empty seq, so we don't create an Action for it
 
   let parts = val.split(":")
   if parts.len == 2:
@@ -35,11 +34,11 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[se
   var clipActions: seq[Action] = @[]
   if node.hasKey("effects") and node["effects"].kind == JArray:
     for effectNode in node["effects"]:
-      clipActions.add parseEffect(effectNode.getStr())
+      let effectStr = effectNode.getStr()
+      if effectStr != "nil":  # Skip "nil" - empty seq handles it
+        clipActions.add parseEffect(effectStr)
 
-  # If no effects were found, use nil
-  if clipActions.len == 0:
-    clipActions.add Action(kind: actNil)
+  # Empty clipActions means nil/no-op - this is valid
 
   # Find or add the action group to the effects list
   let effectIndex = effects.find(clipActions)

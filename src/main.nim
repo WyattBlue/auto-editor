@@ -276,7 +276,8 @@ proc parseActions(val: string): seq[Action] =
       let trimmedPart = part.strip()
 
       if trimmedPart == "nil":
-        result.add Action(kind: actNil)
+        # Empty seq means nil/no-op - don't add anything
+        discard
       elif trimmedPart == "cut":
         result.add Action(kind: actCut)
       elif trimmedPart.startsWith("speed:"):
@@ -304,7 +305,7 @@ proc parseActions(val: string): seq[Action] =
 
 func actionFromUserSpeed(val: float64): seq[Action] =
   if val == 1.0:
-    return @[Action(kind: actNil)]
+    return @[]  # Empty seq means nil/no-op
   elif val <= 0.0 or val >= 99999.0:
     return @[Action(kind: actCut)]
   else:

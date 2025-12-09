@@ -7,14 +7,15 @@ import ../util/color
 
 func effectToString(act: Action): string =
   case act.kind
-  of actNil: "nil"
   of actCut: "cut"
   of actSpeed: "speed:" & $act.val
   of actRate: "rate:" & $act.val
   of actVolume: "volume:" & $act.val
 
 func effectGroupToJson(actions: seq[Action]): JsonNode =
-  if actions.len == 1:
+  if actions.len == 0:
+    return %"nil"  # Empty seq means nil/no-op
+  elif actions.len == 1:
     return %effectToString(actions[0])
   else:
     return %actions.mapIt(effectToString(it))
@@ -47,11 +48,14 @@ func `%`*(self: v3): JsonNode =
       clipObj["offset"] = %clip.offset
       clipObj["stream"] = %clip.stream
       let effectGroup = self.effects[clip.effects]
+      # Empty seq means nil/no-op, don't include effects
+      # Only include effects if non-empty and not just cut
       var hasNonTrivialEffect = false
-      for effect in effectGroup:
-        if effect.kind notin [actNil, actCut]:
-          hasNonTrivialEffect = true
-          break
+      if effectGroup.len > 0:
+        for effect in effectGroup:
+          if effect.kind != actCut:
+            hasNonTrivialEffect = true
+            break
       if hasNonTrivialEffect:
         var effectArray = newJArray()
         for effect in effectGroup:
@@ -72,11 +76,14 @@ func `%`*(self: v3): JsonNode =
       clipObj["offset"] = %clip.offset
       clipObj["stream"] = %clip.stream
       let effectGroup = self.effects[clip.effects]
+      # Empty seq means nil/no-op, don't include effects
+      # Only include effects if non-empty and not just cut
       var hasNonTrivialEffect = false
-      for effect in effectGroup:
-        if effect.kind notin [actNil, actCut]:
-          hasNonTrivialEffect = true
-          break
+      if effectGroup.len > 0:
+        for effect in effectGroup:
+          if effect.kind != actCut:
+            hasNonTrivialEffect = true
+            break
       if hasNonTrivialEffect:
         var effectArray = newJArray()
         for effect in effectGroup:

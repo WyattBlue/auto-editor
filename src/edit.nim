@@ -259,7 +259,7 @@ proc editMedia*(args: var mainArgs) =
           return index
 
       let cut = @[Action(kind: actCut)]
-      let myNil = @[Action(kind: actNil)]
+      let myNil: seq[Action] = @[]  # Empty seq means nil/no-op
 
       for span in args.cutOut:
         applyToRange(actionIndex, span, tb.float64, getActionIndex(cut))

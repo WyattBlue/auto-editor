@@ -210,9 +210,10 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
       if not (clips.len > 0 and clips[^1].start == start):
         var effectIndex: int
         if chunk[2] == 1.0:
-          effectIndex = effects.find(@[Action(kind: actNil)])
+          let emptySeq: seq[Action] = @[]  # Empty seq means nil/no-op
+          effectIndex = effects.find(emptySeq)
           if effectIndex == -1:
-            effects.add @[Action(kind: actNil)]
+            effects.add emptySeq
             effectIndex = effects.len - 1
         else:
           effectIndex = effects.find(@[Action(kind: actSpeed, val: chunk[2])])
