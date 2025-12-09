@@ -117,7 +117,7 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
     let actionGroup = chunk[3]
     var speed = 1.0
     for action in actionGroup:
-      if action.kind in [actSpeed, actRate]:
+      if action.kind in [actSpeed, actVarispeed]:
         speed *= action.val
       elif action.kind == actCut:
         speed = 99999.0
@@ -286,7 +286,7 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
       if effect.kind == actCut:
         isCut = true
         break
-      elif effect.kind == actSpeed or effect.kind == actRate:
+      elif effect.kind == actSpeed or effect.kind == actVarispeed:
         speed *= effect.val
 
     if isCut:

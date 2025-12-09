@@ -68,7 +68,7 @@ func allCuts(tl: v3, inLen: int): seq[int] =
     let effectGroup = tl.effects[clip.effects]
     var speed = 1.0
     for effect in effectGroup:
-      if effect.kind in [actSpeed, actRate]:
+      if effect.kind in [actSpeed, actVarispeed]:
         speed *= effect.val
     let oldOffset = clip.offset.float64 * speed
     clipSpans.add((round(oldOffset), round(oldOffset + clip.dur.float64)))

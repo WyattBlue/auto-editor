@@ -294,7 +294,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             let effectGroup = tl.effects[obj.effects]
             var speed = 1.0
             for effect in effectGroup:
-              if effect.kind in [actSpeed, actRate]:
+              if effect.kind in [actSpeed, actVarispeed]:
                 speed *= effect.val
 
             let i = int(round(float(sourceFramePos) * speed))
