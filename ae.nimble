@@ -105,8 +105,8 @@ let lame = Package(
 )
 let opus = Package(
   name: "opus",
-  sourceUrl: "https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz",
-  sha256: "65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1",
+  sourceUrl: "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.6.tar.gz",
+  sha256: "b7637334527201fdfd6dd6a02e67aceffb0e5e60155bbd89175647a80301c92c",
   buildArguments: @["--disable-doc", "--disable-extra-programs"],
   ffFlag: "--enable-libopus",
 )
