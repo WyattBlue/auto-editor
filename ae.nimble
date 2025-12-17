@@ -277,7 +277,9 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   var commonArgs = @[
     &"-DCMAKE_INSTALL_PREFIX={buildPath}",
     "-DCMAKE_BUILD_TYPE=Release",
-    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"  # CMake 4 compatibility for subdirectories
+    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",  # CMake 4 compatibility for subdirectories
+    "-DENABLE_LIBNUMA=OFF",  # Disable NUMA support (~50KB savings)
+    "-DENABLE_PPA=OFF"  # Disable Picture Performance Analysis (~100KB+ savings)
   ]
 
   # Add cross-compilation flags if needed
