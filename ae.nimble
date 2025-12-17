@@ -250,157 +250,114 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
     makeInstall()
 
 proc x265Build(buildPath: string, crossWindows: bool = false) =
-  # Build x265 three times following the Python approach:
+  # Build x265 three times following the Homebrew approach:
   #  1: Build 12 bits static library version in separate directory
-  #  2: Build 10 bits static library version in separate directory  
+  #  2: Build 10 bits static library version in separate directory
   #  3: Build 8 bits version, linking also 10 and 12 bits
   # This last version will support 8, 10 and 12 bits pixel formats
 
-  # Install intermediate builds in dummy directory
-  let dummyInstallPath = absolutePath("dummy_install_path")
-  mkDir(dummyInstallPath)
-
   # For 10/12 bits version, only x86_64 has assembly instructions available
-  var flagsHighBits: seq[string] = @[]
+  var highBitDepthArgs: seq[string] = @[
+    "-DHIGH_BIT_DEPTH=ON",
+    "-DEXPORT_C_API=OFF",
+    "-DENABLE_SHARED=OFF",
+    "-DENABLE_CLI=OFF"
+  ]
 
   let isLinuxAarch64 = defined(linux) and hostCPU == "arm64"
   let isX86_64 = hostCPU in ["amd64", "i386"] # Nim uses "amd64" for x86_64
 
   if not isX86_64:
-    flagsHighBits.add("-DENABLE_ASSEMBLY=0")
-    flagsHighBits.add("-DENABLE_ALTIVEC=0")
+    highBitDepthArgs.add("-DENABLE_ASSEMBLY=OFF")
 
-    if isLinuxAarch64:
-      flagsHighBits.add("-DENABLE_SVE2=OFF")
+  if isLinuxAarch64:
+    highBitDepthArgs.add("-DENABLE_SVE2=OFF")
 
-  # Build 12-bit version in x265-12bits directory
-  echo "Building x265 12-bit..."
-  mkDir("x265-12bits")
-  withDir("x265-12bits"):
-    var cmakeArgs = @[
-      &"-DCMAKE_INSTALL_PREFIX={dummyInstallPath}",
-      "-DCMAKE_BUILD_TYPE=Release",
-      "-DBUILD_SHARED_LIBS=OFF",
-      "-DBUILD_STATIC_LIBS=ON",
-      "-DHIGH_BIT_DEPTH=1",
-      "-DMAIN12=1",
-      "-DEXPORT_C_API=0",
-      "-DENABLE_CLI=0",
-      "-DENABLE_SHARED=0"
-    ] & flagsHighBits
-    
-    # Add cross-compilation flags if needed
-    if crossWindows:
-      cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-      cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix")
-      cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix")
-      cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
-      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
-      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
-      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
-    
-    let cmakeCmd = "cmake ../source " & cmakeArgs.join(" ")
-    echo "RUN: ", cmakeCmd
-    exec cmakeCmd
-    makeInstall()
-    # Rename library in build directory
-    exec "mv libx265.a libx265-12bits.a"
-
-  # Build 10-bit version in x265-10bits directory
-  echo "Building x265 10-bit..."
-  mkDir("x265-10bits")
-  withDir("x265-10bits"):
-    var cmakeArgs = @[
-      &"-DCMAKE_INSTALL_PREFIX={dummyInstallPath}",
-      "-DCMAKE_BUILD_TYPE=Release",
-      "-DBUILD_SHARED_LIBS=OFF",
-      "-DBUILD_STATIC_LIBS=ON",
-      "-DHIGH_BIT_DEPTH=1",
-      "-DEXPORT_C_API=0",
-      "-DENABLE_CLI=0",
-      "-DENABLE_SHARED=0"
-    ] & flagsHighBits
-    
-    # Add cross-compilation flags if needed
-    if crossWindows:
-      cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-      cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix")
-      cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix")
-      cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
-      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
-      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
-      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
-    
-    let cmakeCmd = "cmake ../source " & cmakeArgs.join(" ")
-    echo "RUN: ", cmakeCmd
-    exec cmakeCmd
-    makeInstall()
-    # Rename library in build directory
-    exec "mv libx265.a libx265-10bits.a"
-
-  # Build 8-bit version (without multi-bit linking via CMake)
-  echo "Building x265 8-bit..."
-  var cmakeArgs = @[
+  # Common cmake args for all builds
+  var commonArgs = @[
     &"-DCMAKE_INSTALL_PREFIX={buildPath}",
     "-DCMAKE_BUILD_TYPE=Release",
-    "-DBUILD_SHARED_LIBS=OFF",
-    "-DBUILD_STATIC_LIBS=ON",
-    "-DENABLE_SHARED=0"
+    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"  # CMake 4 compatibility for subdirectories
   ]
-  
-  if isLinuxAarch64:
-    cmakeArgs.add("-DENABLE_SVE2=OFF")
 
   # Add cross-compilation flags if needed
   if crossWindows:
-    cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-    cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix")
-    cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix")
-    cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
-    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
-    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
-    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+    commonArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
+    commonArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix")
+    commonArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix")
+    commonArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
+    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
+    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
 
-  let cmakeCmd = "cmake source " & cmakeArgs.join(" ")
-  echo "RUN: ", cmakeCmd
-  exec cmakeCmd
-  exec "make x265-static"  # Only build the static target
-  
-  # Manually combine all three libraries using libtool
-  echo "Combining x265 libraries for multi-bit depth support..."
-  mkDir("temp_combine")
-  withDir("temp_combine"):
-    # Copy all three libraries
-    cpFile("../libx265.a", "libx265_8bit.a")
-    cpFile("../x265-10bits/libx265-10bits.a", "libx265-10bits.a") 
-    cpFile("../x265-12bits/libx265-12bits.a", "libx265-12bits.a")
-    
-    # Combine using libtool (macOS/BSD) or ar (Linux/Windows cross-compilation)
-    when defined(macosx):
-      exec "libtool -static -o libx265_combined.a libx265_8bit.a libx265-10bits.a libx265-12bits.a"
-    else:
-      # For Linux or cross-compilation, use ar with a script
-      var arCommand = "ar"
-      if crossWindows:
-        arCommand = "x86_64-w64-mingw32-ar"
-      
-      exec "echo 'CREATE libx265_combined.a' > combine.mri"
-      exec "echo 'ADDLIB libx265_8bit.a' >> combine.mri"
-      exec "echo 'ADDLIB libx265-10bits.a' >> combine.mri" 
-      exec "echo 'ADDLIB libx265-12bits.a' >> combine.mri"
-      exec "echo 'SAVE' >> combine.mri"
-      exec "echo 'END' >> combine.mri"
+  # Build 12-bit version
+  echo "Building x265 12-bit..."
+  var cmake12Args = @["-S", "source", "-B", "12bit", "-DMAIN12=ON"] & highBitDepthArgs & commonArgs
+  let cmake12Cmd = "cmake " & cmake12Args.join(" ")
+  echo "RUN: ", cmake12Cmd
+  exec cmake12Cmd
+  exec "cmake --build 12bit"
+  exec "mv 12bit/libx265.a 12bit/libx265_main12.a"
+
+  # Build 10-bit version
+  echo "Building x265 10-bit..."
+  var cmake10Args = @["-S", "source", "-B", "10bit", "-DENABLE_HDR10_PLUS=ON"] & highBitDepthArgs & commonArgs
+  let cmake10Cmd = "cmake " & cmake10Args.join(" ")
+  echo "RUN: ", cmake10Cmd
+  exec cmake10Cmd
+  exec "cmake --build 10bit"
+  exec "mv 10bit/libx265.a 10bit/libx265_main10.a"
+
+  # Build 8-bit version with linked 10-bit and 12-bit
+  echo "Building x265 8-bit with multi-bit-depth support..."
+
+  # Create 8bit directory and copy the 10-bit and 12-bit libraries first
+  mkDir("8bit")
+  cpFile("10bit/libx265_main10.a", "8bit/libx265_main10.a")
+  cpFile("12bit/libx265_main12.a", "8bit/libx265_main12.a")
+
+  # Build cmake command with proper quoting for arguments containing semicolons
+  var cmake8Cmd = "cmake -S source -B 8bit"
+  cmake8Cmd &= " \"-DEXTRA_LIB=x265_main10.a;x265_main12.a\""
+  cmake8Cmd &= " -DEXTRA_LINK_FLAGS=-L."
+  cmake8Cmd &= " -DLINKED_10BIT=ON"
+  cmake8Cmd &= " -DLINKED_12BIT=ON"
+  cmake8Cmd &= " -DENABLE_SHARED=OFF"
+  cmake8Cmd &= " -DENABLE_CLI=OFF"
+  for arg in commonArgs:
+    cmake8Cmd &= " " & arg
+
+  if isLinuxAarch64:
+    cmake8Cmd &= " -DENABLE_SVE2=OFF"
+
+  echo "RUN: ", cmake8Cmd
+  exec cmake8Cmd
+  exec "cmake --build 8bit"
+
+  # Manually combine all three libraries for multi-bit-depth support
+  echo "Combining x265 libraries for multi-bit-depth support..."
+  when defined(macosx):
+    exec "libtool -static -o 8bit/libx265_combined.a 8bit/libx265.a 10bit/libx265_main10.a 12bit/libx265_main12.a"
+  else:
+    # For Linux or cross-compilation, use ar with MRI script
+    var arCommand = "ar"
+    if crossWindows:
+      arCommand = "x86_64-w64-mingw32-ar"
+
+    exec "echo 'CREATE 8bit/libx265_combined.a' > 8bit/combine.mri"
+    exec "echo 'ADDLIB 8bit/libx265.a' >> 8bit/combine.mri"
+    exec "echo 'ADDLIB 10bit/libx265_main10.a' >> 8bit/combine.mri"
+    exec "echo 'ADDLIB 12bit/libx265_main12.a' >> 8bit/combine.mri"
+    exec "echo 'SAVE' >> 8bit/combine.mri"
+    exec "echo 'END' >> 8bit/combine.mri"
+    withDir "8bit":
       exec &"{arCommand} -M < combine.mri"
-    
-    # Install the combined library and headers manually
-    mkDir(&"{buildPath}/lib")
-    mkDir(&"{buildPath}/include") 
-    mkDir(&"{buildPath}/lib/pkgconfig")
-    
-    cpFile("libx265_combined.a", &"{buildPath}/lib/libx265.a")
-    cpFile("../x265_config.h", &"{buildPath}/include/x265_config.h")
-    cpFile("../source/x265.h", &"{buildPath}/include/x265.h")
-    cpFile("../x265.pc", &"{buildPath}/lib/pkgconfig/x265.pc")
+
+  # Replace the 8-bit only library with the combined one
+  exec "mv 8bit/libx265_combined.a 8bit/libx265.a"
+
+  # Install from 8bit build
+  exec "cmake --install 8bit"
 
 
 proc mesonBuild(buildPath: string, crossWindows: bool = false) =
@@ -537,7 +494,18 @@ commonFlags &= "--disable-autodetect"
 
 
 proc setupDeps() =
-  exec "pip install meson ninja"
+  let (mesonOutput, mesonCode) = gorgeEx("command -v meson")
+  let (ninjaOutput, ninjaCode) = gorgeEx("command -v ninja")
+
+  var toInstall: seq[string] = @[]
+
+  if mesonCode != 0:
+    toInstall.add("meson")
+  if ninjaCode != 0:
+    toInstall.add("ninja")
+
+  if toInstall.len > 0:
+    exec "pip install " & toInstall.join(" ")
 
 task makeff, "Build FFmpeg from source":
   setupDeps()
