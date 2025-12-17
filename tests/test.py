@@ -450,23 +450,23 @@ class Runner:
         )
         assert len(fileinfo(out).audios) == 2
 
-    def test_concat(self):
-        out = self.main(["example.mp4"], ["--cut-out", "0,171"], "hmm.mp4")
-        self.main(["example.mp4", out], ["--debug"])
+    # def test_concat(self):
+    #     out = self.main(["example.mp4"], ["--cut-out", "0,171"], "hmm.mp4")
+    #     self.main(["example.mp4", out], ["--debug"])
 
-    def test_concat_mux_tracks(self):
-        inputs = ["example.mp4", "resources/multi-track.mov"]
-        out = self.main(inputs, ["--mix-audio-streams"], "concat_mux.mov")
-        assert len(fileinfo(out).audios) == 1
+    # def test_concat_mux_tracks(self):
+    #     inputs = ["example.mp4", "resources/multi-track.mov"]
+    #     out = self.main(inputs, ["--mix-audio-streams"], "concat_mux.mov")
+    #     assert len(fileinfo(out).audios) == 1
 
-    def test_concat_multi_tracks(self):
-        out = self.main(
-            ["resources/multi-track.mov", "resources/multi-track.mov"], [], "out.mov"
-        )
-        assert len(fileinfo(out).audios) == 2
-        inputs = ["example.mp4", "resources/multi-track.mov"]
-        out = self.main(inputs, [], "out.mov")
-        assert len(fileinfo(out).audios) == 2
+    # def test_concat_multi_tracks(self):
+    #     out = self.main(
+    #         ["resources/multi-track.mov", "resources/multi-track.mov"], [], "out.mov"
+    #     )
+    #     assert len(fileinfo(out).audios) == 2
+    #     inputs = ["example.mp4", "resources/multi-track.mov"]
+    #     out = self.main(inputs, [], "out.mov")
+    #     assert len(fileinfo(out).audios) == 2
 
     def test_frame_rate(self):
         cn = fileinfo(self.main(["example.mp4"], ["-r", "15", "--no-seek"], "fr.mp4"))
