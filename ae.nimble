@@ -346,13 +346,14 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
     if crossWindows:
       arCommand = "x86_64-w64-mingw32-ar"
 
-    exec "echo 'CREATE 8bit/libx265_combined.a' > 8bit/combine.mri"
-    exec "echo 'ADDLIB 8bit/libx265.a' >> 8bit/combine.mri"
-    exec "echo 'ADDLIB 10bit/libx265_main10.a' >> 8bit/combine.mri"
-    exec "echo 'ADDLIB 12bit/libx265_main12.a' >> 8bit/combine.mri"
-    exec "echo 'SAVE' >> 8bit/combine.mri"
-    exec "echo 'END' >> 8bit/combine.mri"
+    # Create MRI script with paths relative to 8bit directory
     withDir "8bit":
+      exec "echo 'CREATE libx265_combined.a' > combine.mri"
+      exec "echo 'ADDLIB libx265.a' >> combine.mri"
+      exec "echo 'ADDLIB libx265_main10.a' >> combine.mri"
+      exec "echo 'ADDLIB libx265_main12.a' >> combine.mri"
+      exec "echo 'SAVE' >> combine.mri"
+      exec "echo 'END' >> combine.mri"
       exec &"{arCommand} -M < combine.mri"
 
   # Replace the 8-bit only library with the combined one
