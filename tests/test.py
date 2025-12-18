@@ -13,8 +13,7 @@ from time import perf_counter
 
 import av
 from av import AudioStream, VideoStream
-from ffwrapper import FileInfo
-from log import Log
+from ffwrapper import FileInfo, Log
 
 
 def test_options() -> argparse.ArgumentParser:
@@ -39,7 +38,7 @@ all_files = (
     "mov_text.mp4",
     "testsrc.mkv",
 )
-log = Log(is_debug=True)
+log = Log()
 
 
 def fileinfo(path: str) -> FileInfo:

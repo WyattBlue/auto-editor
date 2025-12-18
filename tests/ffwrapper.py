@@ -1,12 +1,30 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
 import av
 
-from log import Log
+
+class Log:
+    def debug(self, message: object) -> None:
+        self.conwrite("")
+        sys.stderr.write(f"Debug: {message}\n")
+
+    def print(self, message: str) -> None:
+        self.conwrite("")
+        sys.stdout.write(f"{message}\n")
+
+    def warning(self, message: str) -> None:
+        self.conwrite("")
+        sys.stderr.write(f"Warning! {message}\n")
+
+    def error(self, message: str | Exception):
+        if isinstance(message, str):
+            raise Exception(message)
+        raise message
 
 
 @dataclass(slots=True, frozen=True)
@@ -63,14 +81,7 @@ class FileInfo:
 
     @classmethod
     def init(self, path: str, log: Log) -> FileInfo:
-        try:
-            cont = av.open(path, "r")
-        except av.error.FileNotFoundError:
-            log.error(f"Input file doesn't exist: {path}")
-        except av.error.IsADirectoryError:
-            log.error(f"Expected a media file, but got a directory: {path}")
-        except av.error.InvalidDataError:
-            log.error(f"Invalid data when processing: {path}")
+        cont = av.open(path, "r")
 
         videos: tuple[VideoStream, ...] = ()
         audios: tuple[AudioStream, ...] = ()
