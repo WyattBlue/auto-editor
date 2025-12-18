@@ -471,6 +471,8 @@ var commonFlags = &"""
   --disable-outdevs \
   --disable-xlib \
   --disable-bsfs \
+  --disable-protocols \
+  --enable-protocol=file \
   --disable-filters \
   --enable-filter=whisper,scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate \
   --disable-encoder={encodersDisabled} \
