@@ -258,28 +258,26 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
 
   # For 10/12 bits version, only x86_64 has assembly instructions available
   var highBitDepthArgs: seq[string] = @[
-    "-DHIGH_BIT_DEPTH=ON",
-    "-DEXPORT_C_API=OFF",
-    "-DENABLE_SHARED=OFF",
-    "-DENABLE_CLI=OFF"
+    "-DHIGH_BIT_DEPTH=1",
+    "-DEXPORT_C_API=0",
+    "-DENABLE_SHARED=0",
+    "-DENABLE_CLI=0"
   ]
 
   let isLinuxAarch64 = defined(linux) and hostCPU == "arm64"
   let isX86_64 = hostCPU in ["amd64", "i386"] # Nim uses "amd64" for x86_64
 
   if not isX86_64:
-    highBitDepthArgs.add("-DENABLE_ASSEMBLY=OFF")
+    highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")
 
   if isLinuxAarch64:
-    highBitDepthArgs.add("-DENABLE_SVE2=OFF")
+    highBitDepthArgs.add("-DENABLE_SVE2=0")
 
   # Common cmake args for all builds
   var commonArgs = @[
     &"-DCMAKE_INSTALL_PREFIX={buildPath}",
     "-DCMAKE_BUILD_TYPE=Release",
     "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",  # CMake 4 compatibility for subdirectories
-    "-DENABLE_LIBNUMA=OFF",  # Disable NUMA support (~50KB savings)
-    "-DENABLE_PPA=OFF"  # Disable Picture Performance Analysis (~100KB+ savings)
   ]
 
   # Add cross-compilation flags if needed
@@ -292,7 +290,6 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
     commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
     commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
 
-  # Build 12-bit version
   echo "Building x265 12-bit..."
   var cmake12Args = @["-S", "source", "-B", "12bit", "-DMAIN12=ON"] & highBitDepthArgs & commonArgs
   let cmake12Cmd = "cmake " & cmake12Args.join(" ")
@@ -303,7 +300,8 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
 
   # Build 10-bit version
   echo "Building x265 10-bit..."
-  var cmake10Args = @["-S", "source", "-B", "10bit", "-DENABLE_HDR10_PLUS=ON"] & highBitDepthArgs & commonArgs
+  var cmake10Args = @["-S", "source", "-B", "10bit"] & highBitDepthArgs & commonArgs
+  # Not applied for size: "-DENABLE_HDR10_PLUS=ON"
   let cmake10Cmd = "cmake " & cmake10Args.join(" ")
   echo "RUN: ", cmake10Cmd
   exec cmake10Cmd
@@ -322,15 +320,15 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   var cmake8Cmd = "cmake -S source -B 8bit"
   cmake8Cmd &= " \"-DEXTRA_LIB=x265_main10.a;x265_main12.a\""
   cmake8Cmd &= " -DEXTRA_LINK_FLAGS=-L."
-  cmake8Cmd &= " -DLINKED_10BIT=ON"
-  cmake8Cmd &= " -DLINKED_12BIT=ON"
-  cmake8Cmd &= " -DENABLE_SHARED=OFF"
-  cmake8Cmd &= " -DENABLE_CLI=OFF"
+  cmake8Cmd &= " -DLINKED_10BIT=1"
+  cmake8Cmd &= " -DLINKED_12BIT=1"
+  cmake8Cmd &= " -DENABLE_SHARED=0"
+  cmake8Cmd &= " -DENABLE_CLI=0"
   for arg in commonArgs:
     cmake8Cmd &= " " & arg
 
   if isLinuxAarch64:
-    cmake8Cmd &= " -DENABLE_SVE2=OFF"
+    cmake8Cmd &= " -DENABLE_SVE2=0"
 
   echo "RUN: ", cmake8Cmd
   exec cmake8Cmd
