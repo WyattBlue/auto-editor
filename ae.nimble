@@ -17,6 +17,7 @@ import std/[strutils, strformat]
 
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
 var enableWhisper = false # defined(macosx) dummy this out for now
+var enable12bit = getEnv("ENABLE_12BIT").len > 0
 var flags = ""
 
 if not disableHevc:
@@ -250,11 +251,11 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
     makeInstall()
 
 proc x265Build(buildPath: string, crossWindows: bool = false) =
-  # Build x265 three times following the Homebrew approach:
-  #  1: Build 12 bits static library version in separate directory
+  # Build x265 multiple times following the Homebrew approach:
+  #  1: Build 12 bits static library version in separate directory (if enabled)
   #  2: Build 10 bits static library version in separate directory
-  #  3: Build 8 bits version, linking also 10 and 12 bits
-  # This last version will support 8, 10 and 12 bits pixel formats
+  #  3: Build 8 bits version, linking also 10 and optionally 12 bits
+  # By default supports 8 and 10 bits pixel formats (12-bit disabled for size)
 
   # For 10/12 bits version, only x86_64 has assembly instructions available
   var highBitDepthArgs: seq[string] = @[
@@ -290,13 +291,15 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
     commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
     commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
 
-  echo "Building x265 12-bit..."
-  var cmake12Args = @["-S", "source", "-B", "12bit", "-DMAIN12=ON"] & highBitDepthArgs & commonArgs
-  let cmake12Cmd = "cmake " & cmake12Args.join(" ")
-  echo "RUN: ", cmake12Cmd
-  exec cmake12Cmd
-  exec "cmake --build 12bit"
-  exec "mv 12bit/libx265.a 12bit/libx265_main12.a"
+  # Build 12-bit version (optional, disabled by default for size)
+  if enable12bit:
+    echo "Building x265 12-bit..."
+    var cmake12Args = @["-S", "source", "-B", "12bit", "-DMAIN12=ON"] & highBitDepthArgs & commonArgs
+    let cmake12Cmd = "cmake " & cmake12Args.join(" ")
+    echo "RUN: ", cmake12Cmd
+    exec cmake12Cmd
+    exec "cmake --build 12bit"
+    exec "mv 12bit/libx265.a 12bit/libx265_main12.a"
 
   # Build 10-bit version
   echo "Building x265 10-bit..."
@@ -308,20 +311,25 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   exec "cmake --build 10bit"
   exec "mv 10bit/libx265.a 10bit/libx265_main10.a"
 
-  # Build 8-bit version with linked 10-bit and 12-bit
+  # Build 8-bit version with linked 10-bit and optionally 12-bit
   echo "Building x265 8-bit with multi-bit-depth support..."
 
-  # Create 8bit directory and copy the 10-bit and 12-bit libraries first
+  # Create 8bit directory and copy the 10-bit library
   mkDir("8bit")
   cpFile("10bit/libx265_main10.a", "8bit/libx265_main10.a")
-  cpFile("12bit/libx265_main12.a", "8bit/libx265_main12.a")
 
-  # Build cmake command with proper quoting for arguments containing semicolons
+  # Build cmake command
   var cmake8Cmd = "cmake -S source -B 8bit"
-  cmake8Cmd &= " \"-DEXTRA_LIB=x265_main10.a;x265_main12.a\""
+  if enable12bit:
+    # Copy 12-bit library and configure for 12-bit support
+    cpFile("12bit/libx265_main12.a", "8bit/libx265_main12.a")
+    cmake8Cmd &= " \"-DEXTRA_LIB=x265_main10.a;x265_main12.a\""
+    cmake8Cmd &= " -DLINKED_12BIT=1"
+  else:
+    cmake8Cmd &= " -DEXTRA_LIB=x265_main10.a"
+
   cmake8Cmd &= " -DEXTRA_LINK_FLAGS=-L."
   cmake8Cmd &= " -DLINKED_10BIT=1"
-  cmake8Cmd &= " -DLINKED_12BIT=1"
   cmake8Cmd &= " -DENABLE_SHARED=0"
   cmake8Cmd &= " -DENABLE_CLI=0"
   for arg in commonArgs:
@@ -334,10 +342,13 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   exec cmake8Cmd
   exec "cmake --build 8bit"
 
-  # Manually combine all three libraries for multi-bit-depth support
+  # Manually combine libraries for multi-bit-depth support
   echo "Combining x265 libraries for multi-bit-depth support..."
   when defined(macosx):
-    exec "libtool -static -o 8bit/libx265_combined.a 8bit/libx265.a 10bit/libx265_main10.a 12bit/libx265_main12.a"
+    if enable12bit:
+      exec "libtool -static -o 8bit/libx265_combined.a 8bit/libx265.a 10bit/libx265_main10.a 12bit/libx265_main12.a"
+    else:
+      exec "libtool -static -o 8bit/libx265_combined.a 8bit/libx265.a 10bit/libx265_main10.a"
   else:
     # For Linux or cross-compilation, use ar with MRI script
     var arCommand = "ar"
@@ -349,7 +360,8 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
       exec "echo 'CREATE libx265_combined.a' > combine.mri"
       exec "echo 'ADDLIB libx265.a' >> combine.mri"
       exec "echo 'ADDLIB libx265_main10.a' >> combine.mri"
-      exec "echo 'ADDLIB libx265_main12.a' >> combine.mri"
+      if enable12bit:
+        exec "echo 'ADDLIB libx265_main12.a' >> combine.mri"
       exec "echo 'SAVE' >> combine.mri"
       exec "echo 'END' >> combine.mri"
       exec &"{arCommand} -M < combine.mri"
