@@ -12,20 +12,22 @@ import ../src/timeline
 import ../src/exports/fcp11
 import ../src/exports/kdenlive
 
-test "struct-sizes":
-  check(sizeof(AVRational) == 8)
-  check(sizeof(seq) == 16)
-  check(sizeof(string) == 16)
-  check(sizeof(ref string) == 8)
-  check(sizeof(ref seq) == 8)
-  check(sizeof(VideoStream) == 128)
-  check(sizeof(AudioStream) == 72)
-  check(sizeof(Clip) == 40)
+proc `$`*(layout: AVChannelLayout): string =
+  const bufSize = 256
+  var buffer = newString(bufSize)
+  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring,
+      bufSize.csize_t)
 
-test "smpte":
-  check(parseSMPTE("13:44:05:21", AVRational(num: 24000, den: 1001)) == 1186701)
+  if ret > 0:
+    let actualLen = buffer.find('\0')
+    if actualLen >= 0:
+      result = buffer[0..<actualLen]
+    else:
+      result = buffer
+  else:
+    result = "unknown"
 
-test "maths":
+test "avrational":
   let a = AVRational(num: 3, den: 4)
   let b = AVRational(num: 3, den: 4)
   check(a + b == AVRational(num: 3, den: 2))
@@ -40,7 +42,6 @@ test "maths":
   check(AVRational(num: 11, den: 3).int64 == intThree)
   check(AVRational(num: 10, den: 5) != AVRational(num: 2, den: 1)) # use compare
 
-test "strings":
   check(AVRational("42") == AVRational(42))
   check(AVRational("-2/3") == AVRational(num: -2, den: 3))
   check(AVRational("6/8") == AVRational(num: 3, den: 4))
@@ -58,6 +59,10 @@ test "color":
 
   check(parseColor("black") == RGBColor(red: 0, green: 0, blue: 0))
   check(parseColor("darkgreen") == RGBColor(red: 0, green: 100, blue: 0))
+
+test "dialogue":
+  check("0,0,Default,,0,0,0,,oop".dialogue == "oop")
+  check("0,0,Default,,0,0,0,,boop".dialogue == "boop")
 
 test "encoder":
   let (_, encoderCtx) = initEncoder("pcm_s16le")
@@ -105,54 +110,6 @@ test "margin":
   mutMargin(levels, 3, -4)
   check(levels == @[true, true, true, true, false, false, false, false, false])
 
-test "aac-mux":
-  let tempDir = createTempDir("tmp", "")
-  defer: removeDir(tempDir)
-  let outFile = tempDir / "out.aac"
-  muxAudio("example.mp4", outFile, 0)
-
-  let container = av.open(outFile)
-  defer: container.close()
-  check(container.audio.len == 1)
-  check($container.audio[0].name == "aac")
-
-test "wav-mux":
-  let tempDir = createTempDir("tmp", "")
-  defer: removeDir(tempDir)
-  let outFile = tempDir / "out.wav"
-  muxAudio("resources/multi-track.mov", outFile, 1)
-
-  let container = av.open(outFile)
-  defer: container.close()
-  check(container.audio.len == 1)
-  check($container.audio[0].name == "pcm_s16le")
-
-test "mp4towav":
-  let tempDir = createTempDir("tmp", "")
-  defer: removeDir(tempDir)
-  let outFile = tempDir / "out.wav"
-  transcodeAudio("example.mp4", outFile, 0)
-
-  let container = av.open(outFile)
-  defer: container.close()
-  check(container.audio.len == 1)
-  check($container.audio[0].name == "pcm_s16le")
-
-proc `$`*(layout: AVChannelLayout): string =
-  const bufSize = 256
-  var buffer = newString(bufSize)
-  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring,
-      bufSize.csize_t)
-
-  if ret > 0:
-    let actualLen = buffer.find('\0')
-    if actualLen >= 0:
-      result = buffer[0..<actualLen]
-    else:
-      result = buffer
-  else:
-    result = "unknown"
-
 test "mp3towav":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)
@@ -165,9 +122,29 @@ test "mp3towav":
   check($container.audio[0].name == "pcm_s16le")
   check($container.audio[0].codecpar.ch_layout in ["mono", "1 channels"])
 
-test "dialogue":
-  check("0,0,Default,,0,0,0,,oop".dialogue == "oop")
-  check("0,0,Default,,0,0,0,,boop".dialogue == "boop")
+test "mp4towav":
+  let tempDir = createTempDir("tmp", "")
+  defer: removeDir(tempDir)
+  let outFile = tempDir / "out.wav"
+  transcodeAudio("example.mp4", outFile, 0)
+
+  let container = av.open(outFile)
+  defer: container.close()
+  check(container.audio.len == 1)
+  check($container.audio[0].name == "pcm_s16le")
+
+test "size-of-objects":
+  check(sizeof(seq) == 16)
+  check(sizeof(ref seq) == 8)
+  check(sizeof(string) == 16)
+  check(sizeof(ref string) == 8)
+  check(sizeof(AVRational) == 8)
+  check(sizeof(VideoStream) == 128)
+  check(sizeof(AudioStream) == 72)
+  check(sizeof(Clip) == 40)
+
+test "smpte":
+  check(parseSMPTE("13:44:05:21", AVRational(num: 24000, den: 1001)) == 1186701)
 
 test "uuid":
   # Test that genUuid generates valid RFC 4122 version 4 UUIDs

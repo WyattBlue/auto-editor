@@ -24,8 +24,8 @@ if not disableHevc:
 if enableWhisper:
   flags &= "-d:enable_whisper "
 
-task test, "Test the project":
-  exec &"nim c {flags} -r tests/rationals"
+task test, "Run unit tests":
+  exec &"nim c {flags} -r tests/unit"
 
 task make, "Export the project":
   exec &"nim c -d:danger --panics:on {flags} --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
