@@ -114,19 +114,6 @@ proc processAndEncodeFrame(
   return processedAny
 
 
-proc muxAudio*(inputPath, outputPath: string, index: int) =
-  var c = av.open(inputPath)
-  defer: c.close()
-  var output = openWrite(outputPath)
-  defer: output.close()
-
-  let audioStream = c.audio[index]
-  discard output.addStreamFromTemplate(audioStream)
-  for packet in c.demux(audioStream.index):
-    packet.stream_index = 0 # Always 0 for single-stream output
-    output.mux(packet)
-
-
 proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
   var ret: cint
   var container: InputContainer
