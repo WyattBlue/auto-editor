@@ -125,7 +125,7 @@ type
     iformat*: pointer
     oformat*: ptr AVOutputFormat
     priv_data*: pointer
-    pb*: pointer
+    pb*: pointer # ptr AVIOContext
     ctx_flags*: cint
     nb_streams*: cuint
     streams*: ptr UncheckedArray[ptr AVStream]
