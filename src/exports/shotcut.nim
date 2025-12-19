@@ -5,6 +5,7 @@ import ../ffmpeg
 import ../log
 import ../util/[color, fun]
 from std/os import splitFile
+from std/math import log10
 
 #[
 
@@ -15,13 +16,18 @@ https://mltframework.org/docs/mltxml/
 
 ]#
 
+proc addProp(parent: XmlNode, name: string, value: string) =
+  let prop = newElement("property")
+  prop.attrs = {"name": name}.toXmlAttributes()
+  prop.add(newText(value))
+  parent.add(prop)
 
 proc shotcut_write_mlt*(output: string, tl: v3) =
   let mlt = newElement("mlt")
   mlt.attrs = {
     "LC_NUMERIC": "C",
-    "version": "7.9.0",
-    "title": "Shotcut version 22.09.23",
+    "version": "7.33.0",
+    "title": "Shotcut version 25.10.31",
     "producer": "main_bin"
   }.toXmlAttributes()
 
@@ -47,46 +53,19 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
 
   let playlist_bin = newElement("playlist")
   playlist_bin.attrs = {"id": "main_bin"}.toXmlAttributes()
-  let xml_retain_prop = newElement("property")
-  xml_retain_prop.attrs = {"name": "xml_retain"}.toXmlAttributes()
-  xml_retain_prop.add(newText("1"))
-  playlist_bin.add(xml_retain_prop)
+  playlist_bin.addProp("xml_retain", "1")
   mlt.add(playlist_bin)
 
   let global_out = toTimecode(float(tl.len / tl.tb), Code.standard)
 
   let producer = newElement("producer")
   producer.attrs = {"id": "bg"}.toXmlAttributes()
-
-  let length_prop = newElement("property")
-  length_prop.attrs = {"name": "length"}.toXmlAttributes()
-  length_prop.add(newText(global_out))
-  producer.add(length_prop)
-
-  let eof_prop = newElement("property")
-  eof_prop.attrs = {"name": "eof"}.toXmlAttributes()
-  eof_prop.add(newText("pause"))
-  producer.add(eof_prop)
-
-  let resource_prop = newElement("property")
-  resource_prop.attrs = {"name": "resource"}.toXmlAttributes()
-  resource_prop.add(newText(tl.bg.toString))
-  producer.add(resource_prop)
-
-  let service_prop = newElement("property")
-  service_prop.attrs = {"name": "mlt_service"}.toXmlAttributes()
-  service_prop.add(newText("color"))
-  producer.add(service_prop)
-
-  let format_prop = newElement("property")
-  format_prop.attrs = {"name": "mlt_image_format"}.toXmlAttributes()
-  format_prop.add(newText("rgba"))
-  producer.add(format_prop)
-
-  let aspect_prop = newElement("property")
-  aspect_prop.attrs = {"name": "aspect_ratio"}.toXmlAttributes()
-  aspect_prop.add(newText("1"))
-  producer.add(aspect_prop)
+  producer.addProp("length", global_out)
+  producer.addProp("eof", "pause")
+  producer.addProp("resource", tl.bg.toString)
+  producer.addProp("mlt_service", "color")
+  producer.addProp("mlt_image_format", "rgba")
+  producer.addProp("aspect_ratio", "1")
 
   mlt.add(producer)
 
@@ -103,7 +82,7 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
   mlt.add(playlist)
 
   var chains = 0
-  var producers = 0
+  var clipTagNames: seq[string] = @[]
 
   var layer: ClipLayer
   if tl.v.len > 0:
@@ -115,97 +94,83 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
     let src = clip.src[]
     let length = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
 
-    var chain: XmlNode
-    var resource: string
-    var caption: string
-
     let effectGroup = tl.effects[clip.effects]
-    var speedVal = 0.0
-    var hasSpeed = false
+
+    # Calculate combined speed from all speed/varispeed effects
+    var speedVal = 1.0
+    var lastSpeedWasVarispeed = false
+    var volumeVal = 1.0
     for effect in effectGroup:
       if effect.kind == actSpeed:
-        speedVal = effect.val
-        hasSpeed = true
-        break
+        speedVal *= effect.val
+        lastSpeedWasVarispeed = false
+      elif effect.kind == actVarispeed:
+        speedVal *= effect.val
+        lastSpeedWasVarispeed = true
+      elif effect.kind == actVolume:
+        volumeVal *= effect.val
 
-    if hasSpeed:
-      chain = newElement("producer")
-      chain.attrs = {"id": &"producer{producers}", "out": length}.toXmlAttributes()
-      resource = fmt"{speedVal}:{src}"
-      caption = fmt"{splitFile(src).name} ({speedVal}x)"
-      inc producers
-    else:
-      resource = src
-      caption = splitFile(src).name
-      chain = newElement("chain")
-      chain.attrs = {"id": &"chain{chains}", "out": length}.toXmlAttributes()
-
-    let chain_length_prop = newElement("property")
-    chain_length_prop.attrs = {"name": "length"}.toXmlAttributes()
-    chain_length_prop.add(newText(length))
-    chain.add(chain_length_prop)
-
-    let chain_resource_prop = newElement("property")
-    chain_resource_prop.attrs = {"name": "resource"}.toXmlAttributes()
-    chain_resource_prop.add(newText(resource))
-    chain.add(chain_resource_prop)
-
-    if hasSpeed:
-      let warp_speed_prop = newElement("property")
-      warp_speed_prop.attrs = {"name": "warp_speed"}.toXmlAttributes()
-      warp_speed_prop.add(newText($speedVal))
-      chain.add(warp_speed_prop)
-
-      let warp_pitch_prop = newElement("property")
-      warp_pitch_prop.attrs = {"name": "warp_pitch"}.toXmlAttributes()
-      warp_pitch_prop.add(newText("1"))
-      chain.add(warp_pitch_prop)
-
-      let timewarp_service_prop = newElement("property")
-      timewarp_service_prop.attrs = {"name": "mlt_service"}.toXmlAttributes()
-      timewarp_service_prop.add(newText("timewarp"))
-      chain.add(timewarp_service_prop)
-
-    let caption_prop = newElement("property")
-    caption_prop.attrs = {"name": "caption"}.toXmlAttributes()
-    caption_prop.add(newText(caption))
-    chain.add(caption_prop)
-
-    mlt.add(chain)
+    let tagName = &"chain{chains}"
     inc chains
+
+    if speedVal != 1.0:
+      # Create producer with timewarp for speed effects
+      let producer = newElement("producer")
+      producer.attrs = {"id": tagName, "out": length}.toXmlAttributes()
+      producer.addProp("length", length)
+      producer.addProp("eof", "pause")
+      producer.addProp("resource", fmt"{speedVal}:{src}")
+      producer.addProp("warp_speed", $speedVal)
+      producer.addProp("warp_resource", src)
+      producer.addProp("mlt_service", "timewarp")
+      producer.addProp("shotcut:producer", "avformat")
+      if not lastSpeedWasVarispeed:
+        producer.addProp("warp_pitch", "1")
+      producer.addProp("shotcut:caption", fmt"{splitFile(src).name} ({speedVal}x)")
+
+      # Add volume filter if needed
+      if volumeVal != 1.0:
+        let filter = newElement("filter")
+        let volumeDb = 20.0 * log10(volumeVal)
+        filter.addProp("mlt_service", "volume")
+        filter.addProp("level", $volumeDb)
+        producer.add(filter)
+
+      mlt.add(producer)
+    else:
+      # Create chain without speed effects
+      let chain = newElement("chain")
+      chain.attrs = {"id": tagName, "out": length}.toXmlAttributes()
+      chain.addProp("length", length)
+      chain.addProp("eof", "pause")
+      chain.addProp("resource", src)
+      chain.addProp("mlt_service", "avformat")
+      chain.addProp("caption", splitFile(src).name)
+
+      # Add volume filter if needed
+      if volumeVal != 1.0:
+        let filter = newElement("filter")
+        let volumeDb = 20.0 * log10(volumeVal)
+        filter.addProp("mlt_service", "volume")
+        filter.addProp("level", $volumeDb)
+        chain.add(filter)
+
+      mlt.add(chain)
+
+    clipTagNames.add(tagName)
 
   let main_playlist = newElement("playlist")
   main_playlist.attrs = {"id": "playlist0"}.toXmlAttributes()
+  main_playlist.addProp("shotcut:video", "1")
+  main_playlist.addProp("shotcut:name", "V1")
 
-  let video_prop = newElement("property")
-  video_prop.attrs = {"name": "shotcut:video"}.toXmlAttributes()
-  video_prop.add(newText("1"))
-  main_playlist.add(video_prop)
-
-  let name_prop = newElement("property")
-  name_prop.attrs = {"name": "shotcut:name"}.toXmlAttributes()
-  name_prop.add(newText("V1"))
-  main_playlist.add(name_prop)
-
-  producers = 0
   for i, clip in layer.clips:
     let in_time = to_timecode(float(clip.offset / tb), Code.standard)
     let out_time = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
 
-    var tag_name = fmt"chain{i}"
-    let effectGroup = tl.effects[clip.effects]
-    var hasSpeed = false
-    for effect in effectGroup:
-      if effect.kind == actSpeed:
-        hasSpeed = true
-        break
-    if hasSpeed:
-      tag_name = fmt"producer{producers}"
-      inc producers
-
     let playlist_entry = newElement("entry")
     playlist_entry.attrs = {
-      "producer": tag_name,
+      "producer": clipTagNames[i],
       "in": in_time,
       "out": out_time
     }.toXmlAttributes()
@@ -220,15 +185,8 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
     "out": global_out
   }.toXmlAttributes()
 
-  let shotcut_prop = newElement("property")
-  shotcut_prop.attrs = {"name": "shotcut"}.toXmlAttributes()
-  shotcut_prop.add(newText("1"))
-  tractor.add(shotcut_prop)
-
-  let audio_channels_prop = newElement("property")
-  audio_channels_prop.attrs = {"name": "shotcut:projectAudioChannels"}.toXmlAttributes()
-  audio_channels_prop.add(newText("2"))
-  tractor.add(audio_channels_prop)
+  tractor.addProp("shotcut", "1")
+  tractor.addProp("shotcut:projectAudioChannels", "2")
 
   let bg_track = newElement("track")
   bg_track.attrs = {"producer": "background"}.toXmlAttributes()

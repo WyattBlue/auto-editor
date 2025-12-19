@@ -1,11 +1,9 @@
-# 29.4.0
+# 29.5.0
 
 ## Major
 
 ## Features
- - Edit subtitles
- - Copy attachments
+ - Shotcut: Support varispeed and volume
 
 ## Fixes
- - Upgrade ffmpeg 8.0 -> 8.0.1
- - Upgrade dav1d 1.5.1 -> 1.5.2
+ - 
