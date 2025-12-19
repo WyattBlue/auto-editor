@@ -135,9 +135,11 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
       let effectGroup = tl.effects[clip.effects]
       var speedVal = 1.0
+      var warpPitch = false
       for effect in effectGroup:
-        if effect.kind == actSpeed:
+        if effect.kind == actSpeed or effect.kind == actVarispeed:
           speedVal = effect.val
+          warpPitch = effect.kind == actSpeed
           break
 
       var prodProp = newElement("property")
@@ -157,7 +159,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
       prodProp = newElement("property")
       prodProp.attrs = {"name": "warp_pitch"}.toXmlAttributes()
-      prodProp.add(newText("0"))
+      prodProp.add(newText(if warpPitch: "1" else: "0"))
       prod.add(prodProp)
 
       prodProp = newElement("property")
