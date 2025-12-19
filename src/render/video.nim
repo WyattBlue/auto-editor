@@ -223,7 +223,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       if src == firstSrc and encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
         pix_fmt = AVPixelFormat(cn.video[0].codecpar.format)
 
-  debug(&"Clips: {tl.v}")
+  # debug(&"Clips: {tl.v}")
 
   var needValidFmt = true
   if codec.pix_fmts != nil:
@@ -276,6 +276,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   var objList: seq[VideoFrame] = @[]
   var lastProcessedFrame: ptr AVFrame = nil
   var lastFrameIndex = -1
+  var lastKeyframePos = initTable[ptr string, int]()
+  var lastSeekTarget = initTable[ptr string, int]()
+
+  # Initialize lastKeyframePos to 0 for all sources (frame 0 is always seekable)
+  for src in tl.uniqueSources:
+    lastKeyframePos[src] = 0
+    lastSeekTarget[src] = -1  # -1 means no seek has been performed yet
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int) =
     # Process each frame in timeline order like Python version
@@ -313,9 +320,20 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
         var myStream: ptr AVStream = cns[obj.src].video[0]
         if frameIndex > obj.index:
-          debug(&"Seek: {frameIndex} -> 0")
-          cns[obj.src].seek(0)
-          avcodec_flush_buffers(decoders[obj.src])
+          # Seek to last known keyframe only if it's before our target
+          if obj.src notin lastKeyframePos or lastKeyframePos[obj.src] >= obj.index:
+            let lastKf = if obj.src in lastKeyframePos: $lastKeyframePos[obj.src] else: "none"
+            error(&"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {obj.index}, last keyframe: {lastKf})")
+
+          let seekTarget = lastKeyframePos[obj.src]
+
+          # Only perform the seek if it's different from the last one
+          if lastSeekTarget[obj.src] != seekTarget:
+            debug(&"Seek: {frameIndex} -> {seekTarget}")
+            cns[obj.src].seek(seekTarget * tous[obj.src], stream = myStream)
+            avcodec_flush_buffers(decoders[obj.src])
+            lastSeekTarget[obj.src] = seekTarget
+          frameIndex = seekTarget
 
         # obj.index is already in source frame coordinates, no conversion needed
         let srcTb = myStream.avg_frame_rate
@@ -328,12 +346,19 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             debug &"Seek: {frameIndex} -> {obj.index}"
             cns[obj.src].seek(obj.index * tous[obj.src], stream = myStream)
             avcodec_flush_buffers(decoders[obj.src])
+            lastSeekTarget[obj.src] = obj.index
 
           let decoder: ptr AVCodecContext = decoders[obj.src]
           var foundFrame = false
           for decodedFrame in cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
             frame = decodedFrame
             frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
+
+            # Track keyframe positions for smarter backward seeking
+            # Only track I-frames that are at or before our target to avoid overshooting
+            if decodedFrame.pict_type == AV_PICTURE_TYPE_I and frameIndex <= obj.index:
+              lastKeyframePos[obj.src] = frameIndex
+
             foundFrame = true
             break
 
@@ -342,7 +367,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             break
 
           if seekFrame.isSome:
-            debug &"Skipped {frameIndex - seekFrame.get} frame indexes"
+            debug &"Skipped {frameIndex - seekFrame.get} timebase units"
             framesSaved += frameIndex - seekFrame.get
             seekFrame = none(int)
 
