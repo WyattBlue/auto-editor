@@ -1,5 +1,5 @@
 # Package
-version = "29.4.0"
+version = "29.5.0"
 author = "WyattBlue"
 description = "Auto-Editor: Efficient media analysis and rendering"
 license = "Unlicense"
@@ -16,7 +16,7 @@ import std/os
 import std/[strutils, strformat]
 
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
-var enableWhisper = false # defined(macosx) dummy this out for now
+var enableWhisper = defined(macosx)
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
 var flags = ""
 
@@ -135,8 +135,8 @@ let svtav1 = Package(
 )
 let whisper = Package(
   name: "whisper",
-  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.7.6.tar.gz",
-  sha256: "166140e9a6d8a36f787a2bd77f8f44dd64874f12dd8359ff7c1f4f9acb86202e",
+  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.2.tar.gz",
+  sha256: "bcee25589bb8052d9e155369f6759a05729a2022d2a8085c1aa4345108523077",
   buildSystem: "cmake",
   buildArguments: @["-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF"],
   ffFlag: "--enable-whisper",
@@ -176,7 +176,7 @@ func location(package: Package): string = # tar location
   elif package.name == "nv-codec-headers":
     "n13.0.19.0.tar.gz"
   elif package.name == "whisper":
-    "v1.7.6.tar.gz"
+    "v1.8.2.tar.gz"
   else:
     package.sourceUrl.split("/")[^1]
 
@@ -186,7 +186,7 @@ func dirName(package: Package): string =
   if package.name == "nv-codec-headers":
     return "nv-codec-headers-n13.0.19.0"
   if package.name == "whisper":
-    return "whisper.cpp-1.7.6"
+    return "whisper.cpp-1.8.2"
 
   var name = package.location
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
@@ -470,6 +470,11 @@ proc ffmpegSetup(crossWindows: bool) =
               exec cmd
             makeInstall()
 
+var filters: seq[string]
+if enableWhisper:
+  filters.add "whisper"
+filters.add "scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
+
 var commonFlags = &"""
   --enable-version3 \
   --enable-static \
@@ -484,7 +489,7 @@ var commonFlags = &"""
   --disable-protocols \
   --enable-protocol=file \
   --disable-filters \
-  --enable-filter=whisper,scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate \
+  --enable-filter={filters.join(",")} \
   --disable-encoder={encodersDisabled} \
   --disable-decoder={decodersDisabled} \
   --disable-demuxer={demuxersDisabled} \
