@@ -16,8 +16,11 @@ import std/os
 import std/[strutils, strformat]
 
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
-var enableWhisper = defined(macosx)
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
+var enableWhisper = getEnv("ENABLE_WHISPER").len > 0 or defined(macosx)
+if getEnv("DISABLE_WHISPER").len > 0:
+  enableWhisper = false
+
 var flags = ""
 
 if not disableHevc:
@@ -473,7 +476,9 @@ proc ffmpegSetup(crossWindows: bool) =
                 else:
                   args.add("--host=x86_64-w64-mingw32")
                 envPrefix = "CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
-              let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
+              if package.name != "x264":
+                args.add "--disable-shared"
+              let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --enable-static " & args.join(" ")
               echo "RUN: ", cmd
               exec cmd
             makeInstall()
