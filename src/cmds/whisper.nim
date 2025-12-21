@@ -20,6 +20,15 @@ proc main*(cArgs: seq[string]) =
   for rawKey in cArgs:
     let key = handleKey(rawKey)
     case key:
+    of "--help":
+      echo """Usage: file model [options]
+
+Options:
+  --debug
+  --queue NUM
+  --vad-model VAD-MODEL
+"""
+      quit(0)
     of "--debug":
       isDebug = true
     of "--queue":
