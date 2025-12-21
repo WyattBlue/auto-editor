@@ -3,11 +3,10 @@ build
 ffmpeg_sources
 .vscode
 *.bin
+*.onnx
 tests/*
 !tests/*.nim
 !tests/*.py
-
-# Auto-Editor Generated Files
 *_ALTERED*
 *https*
 *.v3
