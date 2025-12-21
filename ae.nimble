@@ -138,7 +138,14 @@ let whisper = Package(
   sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.2.tar.gz",
   sha256: "bcee25589bb8052d9e155369f6759a05729a2022d2a8085c1aa4345108523077",
   buildSystem: "cmake",
-  buildArguments: @["-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF"],
+  buildArguments: @[
+    "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
+    "-DWHISPER_BUILD_EXAMPLES=OFF",
+    "-DWHISPER_BUILD_TESTS=OFF",
+    "-DWHISPER_BUILD_SERVER=OFF",
+    when defined(macosx) and hostCPU == "arm64": "-DGGML_METAL=ON" else: "-DGGML_METAL=OFF",
+    when defined(macosx): "-DGGML_METAL_EMBED_LIBRARY=ON" else: "-DGGML_METAL_EMBED_LIBRARY=OFF",
+  ],
   ffFlag: "--enable-whisper",
 )
 let x264 = Package(
