@@ -3,8 +3,10 @@
 ## Major
 
 ## Features
- - Shotcut: Support varispeed and volume
- - Kdenlive: Support varispeed
+ - Shotcut: Support the varispeed and volume effects
+ - Kdenlive: Support the varispeed effect
+ - `--cut` is now an alias for `--cut-out`
+ - `--keep` is now an alias for `--add-in`
 
 ## Fixes
  - Video rendering: Improve worst case performance with a better seeking algorithm

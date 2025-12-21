@@ -21,7 +21,7 @@ proc main*(cArgs: seq[string]) =
     let key = handleKey(rawKey)
     case key:
     of "--help":
-      echo """Usage: file model [options]
+      echo """usage: file model [options]
 
 Options:
   --debug
