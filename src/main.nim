@@ -20,7 +20,7 @@ setControlCHook(ctrlc)
 
 
 proc printHelp() {.noreturn.} =
-  echo """Usage: [file | url ...] [options]
+  echo """usage: [file | url ...] [options]
 
 Commands:
   info desc cache levels subdump
@@ -49,16 +49,16 @@ Options:
                                       ;   val: between [0.2-100]
     -ex, --export EXPORT:ATTRS?   Choose the export mode.
     -o, --output FILE             Set the name/path of the new output file
-    --cut-out [START,STOP ...]    The range of time that will be cut (removed)
-                                  completely
-    --add-in [START,STOP ...]     The range of time that will be leaved "as is"
+    --cut-out, --cut [START,STOP ...]
+                                  The range of time that will be cut (removed)
+    --add-in, --keep [START,STOP ...]
+                                  The range of time that will be leaved "as is"
     --set-speed, --set-speed-for-range [SPEED,START,STOP ...]
                                   Set a SPEED for a given range in time
     -s, --silent-speed NUM        [Deprecated] Set speed of sections marked
                                   "silent" to NUM. (default is 99999)
-    -v, --sounded-speed, --video-speed NUM
-                                  [Deprecated] Set speed of sections marked "loud"
-                                  to NUM. (default is 1)
+    -v, --video-speed NUM         [Deprecated] Set speed of sections marked
+                                  "loud" to NUM. (default is 1)
 
   Timeline Options:
     -tb, --time-base, -r, -fps, --frame-rate NUM
@@ -425,9 +425,12 @@ judge making cuts.
       expecting = "resolution"
     of "-anorm", "--audio-normalize":
       expecting = "audio-normalize"
-    of "--temp-dir", "--progress", "--add-in", "--cut-out",  "--scale", "--when-silent",
-        "--when-normal", "--yt-dlp-location", "--download-format", "--output-format",
-        "--yt-dlp-extras":
+    of "--add-in", "--keep":
+      expecting = "add-in"
+    of "--cut-out", "--cut":
+      expecting = "cut-out"
+    of "--temp-dir", "--progress", "--scale", "--when-silent", "--when-normal",
+        "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -500,7 +503,7 @@ judge making cuts.
       expecting = ""
 
   if expecting != "":
-    error(&"--{expecting} needs argument.")
+    error &"--{expecting} needs argument."
 
   if showVersion:
     echo version
@@ -532,10 +535,10 @@ judge making cuts.
     args.input = downloadVideo(myInput, args)
   elif splitFile(myInput).ext == "":
     if dirExists(myInput):
-      error(&"Input must be a file or a URL, not a directory.")
+      error &"Input must be a file or a URL, not a directory."
     if myInput.startswith("-"):
-      error(&"Option/Input file doesn't exist: {myInput}")
-    error(&"Input file must have an extension: {myInput}")
+      error &"Option/Input file doesn't exist: {myInput}"
+    error &"Input file must have an extension: {myInput}"
 
   editMedia(args)
 
