@@ -6,9 +6,12 @@ import ../util/fun
 
 
 proc main*(cArgs: seq[string]) =
-  var isDebug = false
   var inputPath: string = ""
   var model: string = ""
+  var isDebug = false
+  var isSplit = false
+  var format = "text"
+  var output = "-"
   var queue: int = 10
   var vadModel: string = ""
 
@@ -25,12 +28,23 @@ proc main*(cArgs: seq[string]) =
 
 Options:
   --debug
-  --queue NUM
-  --vad-model VAD-MODEL
+  --split-words, -sw
+  --format FORMAT        Output in a specific format (default text)
+                         Choices: text, srt, json
+  --output FILE          Choose where to output (defaults to stdout)
+  --queue SECS           The maximum size in seconds that will be queued into
+                         before processing. (default 10)
+  --vad-model VAD-MODEL  Set Voice activity detection (VAD) model.
 """
       quit(0)
     of "--debug":
       isDebug = true
+    of "--split-words", "-sw":
+      isSplit = true
+    of "--format":
+      expecting = "format"
+    of "--output":
+      expecting = "output"
     of "--queue":
       expecting = "queue"
     of "--vad-model":
@@ -45,6 +59,10 @@ Options:
           inputPath = key
         elif model == "":
           model = key
+      of "format":
+        format = key
+      of "output":
+        output = key
       of "queue":
         queue = parseInt(key)
       of "vad-model":
@@ -57,6 +75,8 @@ Options:
     error "A model is needed, you came find them here: https://huggingface.co/ggerganov/whisper.cpp"
   if queue < 1 or queue > 1000:
     error &"Invalid queue value: {queue}"
+  if format notin ["text", "srt", "json"]:
+    error &"Invalid format: {format}. Choices: text, srt, json"
 
   if not isDebug:
     av_log_set_level(AV_LOG_QUIET)
@@ -90,7 +110,14 @@ Options:
 
   let whisperFilter = avfilter_get_by_name("whisper")
   var whisperCtx: ptr AVFilterContext
-  var whisperArgs = &"model={model}:queue={queue}"
+
+  let maxLen = if isSplit: "1" else: "0"
+  var whisperArgs = &"model={model}:queue={queue}:format={format}:max_len={maxLen}"
+  if output == "-":
+    whisperArgs &= ":destination=/dev/stdout"
+  else:
+    whisperArgs &= &":destination={output}"
+
   if vadModel != "":
     whisperArgs &= ":vad_model=" & vadModel
 
@@ -127,21 +154,12 @@ Options:
     if av_buffersrc_write_frame(bufferCtx, decodedFrame) < 0:
       echo "Error feeding frame to filter"
       continue
-    
-    # Try to get output from whisper filter - check frame metadata for subtitle text
+
+    # Try to get output from whisper filter
     while av_buffersink_get_frame_flags(sinkCtx, outputFrame, 0) >= 0:
-      # Check frame metadata for whisper text
-      if outputFrame.metadata != nil:
-        let whisperTextEntry = av_dict_get(outputFrame.metadata, "lavfi.whisper.text", nil, 0)
-        if whisperTextEntry != nil and whisperTextEntry.value != nil:
-          echo $whisperTextEntry.value
       av_frame_unref(outputFrame)
-  
+
   # Flush the filter
   if av_buffersrc_write_frame(bufferCtx, nil) >= 0:
     while av_buffersink_get_frame_flags(sinkCtx, outputFrame, 0) >= 0:
-      if outputFrame.metadata != nil:
-        let whisperTextEntry = av_dict_get(outputFrame.metadata, "lavfi.whisper.text", nil, 0)
-        if whisperTextEntry != nil and whisperTextEntry.value != nil:
-          echo $whisperTextEntry.value
       av_frame_unref(outputFrame)
