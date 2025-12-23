@@ -17,7 +17,7 @@ import std/[strutils, strformat]
 
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
-var enableWhisper = getEnv("ENABLE_WHISPER").len > 0 or defined(macosx)
+var enableWhisper = true
 if getEnv("DISABLE_WHISPER").len > 0:
   enableWhisper = false
 
@@ -273,9 +273,22 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
 
   # Fix whisper.pc file to include correct library order and dependencies
   if package.name == "whisper":
-    let pcFile = buildPath / "lib/pkgconfig/whisper.pc"
+    # Check multiple possible locations for whisper.pc on Linux
+    var pcFile = buildPath / "lib/pkgconfig/whisper.pc"
+    when defined(linux):
+      if not fileExists(pcFile):
+        let altLocations = @[
+          buildPath / "lib/x86_64-linux-gnu/pkgconfig/whisper.pc",
+          buildPath / "lib64/pkgconfig/whisper.pc",
+          buildPath / "share/pkgconfig/whisper.pc"
+        ]
+        for loc in altLocations:
+          if fileExists(loc):
+            pcFile = loc
+            break
+
     if fileExists(pcFile):
-      echo "Fixing whisper.pc file..."
+      echo "Fixing whisper.pc file at: ", pcFile
       var content = readFile(pcFile)
 
       # Replace the Libs line with correct library order and add Libs.private
@@ -284,23 +297,33 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper -lggml-cpu -lggml-blas -lggml-metal"
         )
-      else:
+      elif defined(macosx):
         content = content.replace(
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper -lggml-cpu -lggml-blas"
         )
+      else:
+        # On Linux, libggml-blas doesn't exist, only add -lggml-cpu
+        content = content.replace(
+          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
+          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper -lggml-cpu"
+        )
 
-      # Add Libs.private after Libs line if on macOS
-      when defined(macosx):
-        if not content.contains("Libs.private:"):
-          var libsPrivate = "-framework Accelerate -framework MetalKit -framework Foundation -lstdc++ -lc++"
+      if not content.contains("Libs.private:"):
+        var libsPrivate = ""
+        when defined(macosx):
+          libsPrivate = "-framework Accelerate -framework MetalKit -framework Foundation"
           when hostCPU == "arm64":
-            libsPrivate = "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation -lstdc++ -lc++"
+            libsPrivate = "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation"
 
-          content = content.replace(
-            "Cflags: -I${includedir}",
-            &"Libs.private: {libsPrivate}\nCflags: -I${{includedir}}\n\nRequires:\nConflicts:"
-          )
+        when defined(macosx):
+          libsPrivate &= " -lc++"
+        else:
+          libsPrivate = "-lpthread -lm -lstdc++"
+        content = content.replace(
+          "Cflags: -I${includedir}",
+          &"Libs.private: {libsPrivate}\nCflags: -I${{includedir}}\n\nRequires:\nConflicts:"
+        )
 
       writeFile(pcFile, content)
 
@@ -470,6 +493,9 @@ proc ffmpegSetup(crossWindows: bool) =
   # Create directories
   mkDir("ffmpeg_sources")
   mkDir("build")
+
+  if crossWindows:
+    enableWhisper = false
 
   let buildPath = absolutePath("build")
 
