@@ -181,15 +181,17 @@ let ffmpeg = Package(
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz",
   sha256: "05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41",
 )
-var packages: seq[Package] = @[]
-if not defined(macosx):
-  packages.add nvheaders
-if enableWhisper:
-  packages.add whisper
-packages &= [lame, opus, vpx, dav1d, svtav1, x264]
-if not disableHevc:
-  packages.add x265
 
+proc setupPackages(enableWhisper: bool): seq[Package] =
+  result = @[]
+  if not defined(macosx):
+    result.add nvheaders
+  if enableWhisper:
+    result.add whisper
+  result &= [lame, opus, vpx, dav1d, svtav1, x264]
+  if not disableHevc:
+    result.add x265
+  return result
 
 func location(package: Package): string = # tar location
   if package.name == "libvpx":
@@ -272,41 +274,27 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
     makeInstall()
 
   # Fix whisper.pc file to include correct library order and dependencies
-  if package.name == "whisper":
-    # Check multiple possible locations for whisper.pc on Linux
-    var pcFile = buildPath / "lib/pkgconfig/whisper.pc"
-    when defined(linux):
-      if not fileExists(pcFile):
-        let altLocations = @[
-          buildPath / "lib/x86_64-linux-gnu/pkgconfig/whisper.pc",
-          buildPath / "lib64/pkgconfig/whisper.pc",
-          buildPath / "share/pkgconfig/whisper.pc"
-        ]
-        for loc in altLocations:
-          if fileExists(loc):
-            pcFile = loc
-            break
-
+  if package.name == "whisper" and not crossWindows:
+    let pcFile = buildPath / "lib/pkgconfig/whisper.pc"
     if fileExists(pcFile):
-      echo "Fixing whisper.pc file at: ", pcFile
+      echo "Fixing whisper.pc file"
       var content = readFile(pcFile)
 
       # Replace the Libs line with correct library order and add Libs.private
       when defined(macosx) and defined(arm64):
         content = content.replace(
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
-          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper -lggml-cpu -lggml-blas -lggml-metal"
+          "Libs: -L${libdir} -lggml -lggml-base -lwhisper -lggml-cpu -lggml-blas -lggml-metal"
         )
       elif defined(macosx):
         content = content.replace(
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
-          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper -lggml-cpu -lggml-blas"
+          "Libs: -L${libdir} -lggml -lggml-base -lwhisper -lggml-cpu -lggml-blas"
         )
       else:
-        # On Linux, libggml-blas doesn't exist, only add -lggml-cpu
         content = content.replace(
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
-          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper -lggml-cpu"
+          "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu"
         )
 
       if not content.contains("Libs.private:"):
@@ -319,7 +307,7 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
         when defined(macosx):
           libsPrivate &= " -lc++"
         else:
-          libsPrivate = "-lpthread -lm -lstdc++"
+          libsPrivate = "-lgomp -lpthread -lm -lstdc++"
         content = content.replace(
           "Cflags: -I${includedir}",
           &"Libs.private: {libsPrivate}\nCflags: -I${{includedir}}\n\nRequires:\nConflicts:"
@@ -494,10 +482,8 @@ proc ffmpegSetup(crossWindows: bool) =
   mkDir("ffmpeg_sources")
   mkDir("build")
 
-  if crossWindows:
-    enableWhisper = false
-
   let buildPath = absolutePath("build")
+  let packages = setupPackages(enableWhisper=enableWhisper and not crossWindows)
 
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
@@ -522,6 +508,8 @@ proc ffmpegSetup(crossWindows: bool) =
           exec cmd
 
       if package.name == "ffmpeg": # build later
+        continue
+      if package.name == "whisper" and crossWindows:
         continue
 
       withDir package.name:
@@ -557,42 +545,44 @@ if enableWhisper:
   filters.add "whisper"
 filters.add "scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
 
-var commonFlags = &"""
-  --enable-version3 \
-  --enable-static \
-  --disable-shared \
-  --disable-programs \
-  --disable-doc \
-  --disable-network \
-  --disable-indevs \
-  --disable-outdevs \
-  --disable-xlib \
-  --disable-bsfs \
-  --disable-protocols \
-  --enable-protocol=file \
-  --disable-filters \
-  --enable-filter={filters.join(",")} \
-  --disable-encoder={encodersDisabled} \
-  --disable-decoder={decodersDisabled} \
-  --disable-demuxer={demuxersDisabled} \
-  --disable-muxer={muxersDisabled} \
-"""
+proc setupCommonFlags(packages: seq[Package]): string =
+  var commonFlags = &"""
+    --enable-version3 \
+    --enable-static \
+    --disable-shared \
+    --disable-programs \
+    --disable-doc \
+    --disable-network \
+    --disable-indevs \
+    --disable-outdevs \
+    --disable-xlib \
+    --disable-bsfs \
+    --disable-protocols \
+    --enable-protocol=file \
+    --disable-filters \
+    --enable-filter={filters.join(",")} \
+    --disable-encoder={encodersDisabled} \
+    --disable-decoder={decodersDisabled} \
+    --disable-demuxer={demuxersDisabled} \
+    --disable-muxer={muxersDisabled} \
+  """
 
-for package in packages:
-  if package.ffFlag != "":
-    commonFlags &= &"  {package.ffFlag} \\\n"
+  for package in packages:
+    if package.ffFlag != "":
+      commonFlags &= &"  {package.ffFlag} \\\n"
 
-if defined(arm) or defined(arm64):
-  commonFlags &= "  --enable-neon \\\n"
+  if defined(arm) or defined(arm64):
+    commonFlags &= "  --enable-neon \\\n"
 
-if defined(macosx):
-  commonFlags &= "  --enable-videotoolbox \\\n"
-  commonFlags &= "  --enable-audiotoolbox \\\n"
-else:
-  commonFlags &= "  --enable-nvenc \\\n"
-  commonFlags &= "  --enable-ffnvcodec \\\n"
+  if defined(macosx):
+    commonFlags &= "  --enable-videotoolbox \\\n"
+    commonFlags &= "  --enable-audiotoolbox \\\n"
+  else:
+    commonFlags &= "  --enable-nvenc \\\n"
+    commonFlags &= "  --enable-ffnvcodec \\\n"
 
-commonFlags &= "--disable-autodetect"
+  commonFlags &= "--disable-autodetect"
+  return commonFlags
 
 
 proc setupDeps() =
@@ -624,6 +614,8 @@ task makeff, "Build FFmpeg from source":
 
   ffmpegSetup(crossWindows=false)
 
+  let packages = setupPackages(enableWhisper=true)
+
   # Debug: List pkg-config files to verify whisper.pc exists
   when defined(linux):
     echo "Checking for whisper.pc files:"
@@ -641,7 +633,7 @@ task makeff, "Build FFmpeg from source":
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
       --extra-ldflags="{ldflags}" \
-      --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
+      --extra-libs="-lpthread -lm" \""" & "\n" & setupCommonFlags(packages)
     makeInstall()
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
@@ -649,7 +641,10 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
   let buildPath = absolutePath("build")
   putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
 
+  enableWhisper = false
   ffmpegSetup(crossWindows=true)
+
+  let packages = setupPackages(enableWhisper=false)
 
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
@@ -657,6 +652,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
     when defined(linux):
       ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
     
+    let commonFlags = setupCommonFlags(packages)
     exec (&"""CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
@@ -670,6 +666,9 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 
 task windows, "Cross-compile to Windows (requires mingw-w64)":
   echo "Cross-compiling for Windows (64-bit)..."
+
+  flags = flags.replace("-d:enable_whisper", "")
+
   if not dirExists("build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
