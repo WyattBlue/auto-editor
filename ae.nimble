@@ -271,6 +271,39 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
     exec cmakeCmd
     makeInstall()
 
+  # Fix whisper.pc file to include correct library order and dependencies
+  if package.name == "whisper":
+    let pcFile = buildPath / "lib/pkgconfig/whisper.pc"
+    if fileExists(pcFile):
+      echo "Fixing whisper.pc file..."
+      var content = readFile(pcFile)
+
+      # Replace the Libs line with correct library order and add Libs.private
+      when defined(macosx) and defined(arm64):
+        content = content.replace(
+          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
+          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper -lggml-cpu -lggml-blas -lggml-metal"
+        )
+      else:
+        content = content.replace(
+          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
+          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper -lggml-cpu -lggml-blas"
+        )
+
+      # Add Libs.private after Libs line if on macOS
+      when defined(macosx):
+        if not content.contains("Libs.private:"):
+          var libsPrivate = "-framework Accelerate -framework MetalKit -framework Foundation -lstdc++ -lc++"
+          when hostCPU == "arm64":
+            libsPrivate = "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation -lstdc++ -lc++"
+
+          content = content.replace(
+            "Cflags: -I${includedir}",
+            &"Libs.private: {libsPrivate}\nCflags: -I${{includedir}}\n\nRequires:\nConflicts:"
+          )
+
+      writeFile(pcFile, content)
+
 proc x265Build(buildPath: string, crossWindows: bool = false) =
   # Build x265 multiple times following the Homebrew approach:
   #  1: Build 12 bits static library version in separate directory (if enabled)
