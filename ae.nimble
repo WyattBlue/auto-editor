@@ -17,12 +17,9 @@ import std/[strutils, strformat]
 
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
-var enableWhisper = true
-if getEnv("DISABLE_WHISPER").len > 0:
-  enableWhisper = false
+var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 
 var flags = ""
-
 if not disableHevc:
   flags &= "-d:enable_hevc "
 if enableWhisper:
