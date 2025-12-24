@@ -109,7 +109,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
       "aspect_ratio": [ratioWidth, ratioHeight],
       "pixel_aspect_ratio": v.sar,
       "duration": v.duration,
-      "pix_fmt": v.pix_fmt,
+      "pix_fmt": $av_get_pix_fmt_name(v.pix_fmt),
       "color_range": v.color_range,
       "color_space": v.color_space,
       "color_primaries": v.color_primaries,

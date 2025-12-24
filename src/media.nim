@@ -13,7 +13,7 @@ type
     lang*: string
     timebase*: AVRational
     sar*: AVRational
-    pix_fmt*: string
+    pix_fmt*: AVPixelFormat
     width*: cint
     height*: cint
     color_range*: cint
@@ -127,7 +127,7 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext,
         lang: lang,
         timebase: stream.time_base,
         sar: sar,
-        pix_fmt: $av_get_pix_fmt_name(codecCtx.pix_fmt),
+        pix_fmt: codecCtx.pix_fmt,
         width: codecCtx.width,
         height: codecCtx.height,
         color_range: codecCtx.color_range,
