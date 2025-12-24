@@ -89,5 +89,3 @@ jobs:
           files: auto-editor-windows-amd64.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-

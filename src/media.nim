@@ -45,7 +45,6 @@ type
     duration*: float64
     bitrate*: int64
     timecode*: string # In SMPTE
-    recommendedTimebase*: string
     v*: seq[VideoStream]
     a*: seq[AudioStream]
     s*: seq[SubtitleStream]
