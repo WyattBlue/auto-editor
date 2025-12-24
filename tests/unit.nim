@@ -139,7 +139,7 @@ test "size-of-objects":
   check(sizeof(string) == 16)
   check(sizeof(ref string) == 8)
   check(sizeof(AVRational) == 8)
-  check(sizeof(VideoStream) == 128)
+  check(sizeof(VideoStream) == 120)
   check(sizeof(AudioStream) == 72)
   check(sizeof(Clip) == 40)
 

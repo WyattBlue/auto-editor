@@ -23,7 +23,7 @@ func getColorspace(mi: MediaInfo): string =
     return "1-1-1 (Rec. 709)"
 
   let s = mi.v[0]
-  if s.pix_fmt == "rgb24":
+  if s.pix_fmt == AV_PIX_FMT_RGB24:
     return "sRGB IEC61966-2.1"
   if s.color_space == 5: # "bt470bg"
     return "5-1-6 (Rec. 601 PAL)"
