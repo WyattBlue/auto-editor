@@ -42,7 +42,7 @@ Auto-Editor is available on apt:
 sudo apt install auto-editor
 ```
 
-Auto-Editor is avaiable on the Arch Linux AUR:
+Auto-Editor is available on the Arch Linux AUR:
 
 ```
 yay -S auto-editor
@@ -50,7 +50,7 @@ yay -S auto-editor
 
 ## Method 3: Pip
 
-Notice: It is not recommned to use this method because new versions of auto-editor are no longer being published on pip.
+Notice: It is not recommended to use this method because new versions of auto-editor are no longer being published on pip.
 
 First, download and install [Python](https://python.org)
 <blockquote><p>If you are installing on Windows, make sure "Add Python 3.x to PATH" is checked.</p></blockquote>
