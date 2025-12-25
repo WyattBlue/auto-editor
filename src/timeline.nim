@@ -34,8 +34,8 @@ type Clip* = object
   stream*: int32
 
 type ClipLayer* = object
-  lang*: string = "und"
   c*: seq[Clip] = @[]
+  lang*: Lang = ['u', 'n', 'd', '\0']
 
 # Whatever floats your boat
 func clips*(layer: ClipLayer): seq[Clip] =

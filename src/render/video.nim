@@ -5,6 +5,7 @@ from std/math import round
 
 import ../log
 import ../av
+import ../media
 import ../ffmpeg
 import ../timeline
 import ../util/color
@@ -172,7 +173,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   debug &"Creating video stream with codec: {args.videoCodec}"
   var (outputStream, encoderCtx) = output.addStream(args.videoCodec,
       rate = targetFps, width = targetWidth, height = targetHeight, metadata = {
-          "language": tl.v[0].lang}.toTable)
+          "language": $tl.v[0].lang}.toTable)
   let codec = encoderCtx.codec
 
   if codec.id == AV_CODEC_ID_HEVC:
