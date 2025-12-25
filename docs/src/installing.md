@@ -5,12 +5,13 @@ title: Auto-Editor - Install
 # Installing Auto-Editor
 
 ## Method 1 (Recommended)
+Get the offical binary, available on Windows, MacOS, and x86_64 Linux.
 
-Step 1, go to the [Releases page](https://github.com/WyattBlue/auto-editor/releases) on GitHub, and download the binary for your platform (Note which folder you've downloaded it too).
+ 1. go to the [Releases page](https://github.com/WyattBlue/auto-editor/releases) on GitHub, and download the binary for your platform.
 
-Step 2, rename the binary to auto-editor (or auto-editor.exe for Windows)
+ 2. rename the binary to auto-editor (or auto-editor.exe for Windows).
 
-Step 3, In the terminal/PowerShell, `cd` into your downloads folder.
+ 3. In the terminal/PowerShell, `cd` into your downloads folder.
 
 If you're on MacOS/Linux, run:
 
@@ -18,40 +19,43 @@ If you're on MacOS/Linux, run:
 chmod +x ./auto-editor
 ```
 
-Step 4, Run Auto-Editor in the terminal. Because the binaries are unsigned, you may get "Unknown developer" warnings. Ignore them.
+ 4. Run Auto-Editor in the terminal. Because the binaries are unsigned, you may get "Unknown developer" warnings. Ignore them.
 
-Step 5, run:
+Congratulations, auto-editor should now be installed. To verify auto-editor is installed, run:
 
 ```
 ./auto-editor --help
 ```
 
-to verify it's working. It's recommended to place the binary in a PATH directory so that it's available as `auto-editor` no matter your current working directory.
+It's recommended to place the binary in a PATH directory so that `auto-editor` is always available no matter your current working directory.
 
 
-## Method 2: Homebrew
-If you're on MacOS (or Linux) run this to install auto-editor:
+## Method 2: Platform Installers
+If you're on MacOS, it's recommend to use [Homebrew](https://homebrew.sh):
 ```
 brew install auto-editor
 ```
 
-Notify the homebrew package maintainers if this doesn't work.
-
-## Method 3: Apt
-If you're on a Debian-based Linux distro, run:
+Auto-Editor is available on apt:
 
 ```
 sudo apt install auto-editor
 ```
 
-(If you can contact the Debian maintainers, tell them open-cv isn't an auto-editor dependency)
+Auto-Editor is avaiable on the Arch Linux AUR:
 
+```
+yay -S auto-editor
+```
 
-## Method 4: Pip (Deprecated)
+## Method 3: Pip
+
+Notice: It is not recommned to use this method because new versions of auto-editor are no longer being published on pip.
+
 First, download and install [Python](https://python.org)
-<blockquote><p>If you are installing on Windows, make sure "Add Python 3.14 to PATH" is checked.</p></blockquote>
+<blockquote><p>If you are installing on Windows, make sure "Add Python 3.x to PATH" is checked.</p></blockquote>
 
-Once that's done, you should have pip on your PATH. That means when you run `pip3` on your console, you should get a list of commands and not `command not found`. If you don't have pip on your PATH, try reinstalling Python.
+Once that's done, you should have pip on your PATH. That means when you run `pip` on your console, you should get a list of commands and not `command not found`. If you don't have pip on your PATH, try reinstalling Python.
 
 Then run:
 ```
@@ -73,8 +77,29 @@ If you would like to uninstall auto-editor, run:
 pip uninstall auto-editor
 ```
 
+## Installing from Source (unix-like):
+
+Install nim, make sure `nimble` is available. You'll also need cmake, meson, and ninja.
+
+```
+nimble makeff  # Downloads and builds all dependencies
+nimble make
+```
+
+## Installing from Source (Windows)
+To build an `.exe`, you'll need to install [WSL](https://learn.microsoft.com/en-us/windows/wsl/about), then install nim on that environment. Make sure `nimble` is available. You'll also need cmake, meson, and ninja.
+
+Then run:
+
+```
+nimble makeffwin
+nimble windows
+```
+
 ## Optional Dependencies
 If yt-dlp is installed, auto-editor can download and use URLs as inputs.
 ```
 auto-editor "https://www.youtube.com/watch?v=kcs82HnguGc"
 ```
+
+How yt-dlp is installed does not matter.
