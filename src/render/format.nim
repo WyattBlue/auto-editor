@@ -9,6 +9,7 @@ import ../timeline
 import ../ffmpeg
 import ../log
 import ../av
+import ../media
 import ../util/[bar, rules]
 import video
 import audio
@@ -114,12 +115,12 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize, args.audioNormalize)
       audioFrameIters.add(audioFrameIter)
   elif not args.an:
-    # Create separate streams for each timeline layer (existing behavior)
+    # Create separate streams for each timeline layer
     for i in 0..<tl.a.len:
       if tl.a[i].len > 0: # Only create stream if track has clips
         let rate = AVRational(num: tl.sr, den: 1)
         var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate = rate,
-            layout = tl.layout, metadata = {"language": tl.a[i].lang}.toTable)
+            layout = tl.layout, metadata = {"language": $tl.a[i].lang}.toTable)
         let encoder = aEncCtx.codec
         checkAudioEncoder(encoder, tl.sr)
         aEncCtx.open()

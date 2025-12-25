@@ -1,12 +1,17 @@
-import std/hashes
-
 import av
 import ffmpeg
+
+type Lang* = array[4, char]
+
+func `$`*(lang: Lang): string =
+  for i in 0 ..< 4:
+    if lang[i] == '\0':
+      break
+    result.add lang[i]
 
 type
   VideoStream* = object
     timecode*: string
-    lang*: string
     duration*: float64
     bitrate*: int64
     avg_rate*: AVRational
@@ -14,6 +19,7 @@ type
     sar*: AVRational
     pix_fmt*: AVPixelFormat
     codecId*: AVCodecID
+    lang*: Lang
     width*: cint
     height*: cint
     color_range*: cint
@@ -22,19 +28,18 @@ type
     color_transfer*: cint
 
   AudioStream* = object
-    lang*: string
     layout*: string
     duration*: float64
     bitrate*: int64
     codecId*: AVCodecID
+    lang*: Lang
     sampleRate*: cint
     channels*: cint
 
   SubtitleStream* = object
-    lang*: string
     duration*: float64
-    bitrate*: int64
     codecId*: AVCodecID
+    lang*: Lang
 
   DataStream* = object
     timecode*: string
@@ -50,12 +55,6 @@ type
     s*: seq[SubtitleStream]
     d*: seq[DataStream]
 
-
-proc hash*(mi: MediaInfo): Hash =
-  hash(mi.path)
-
-func `==`*(a, b: MediaInfo): bool =
-  a.path == b.path
 
 func getRes*(self: MediaInfo): (int, int) =
   if self.v.len > 0:
@@ -85,7 +84,13 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
 
     let metadata = cast[ptr AVDictionary](stream.metadata)
     let entry = av_dict_get(metadata, "language", nil, 0)
-    let lang = (if entry == nil: "und" else: $entry.value)
+
+    var lang: Lang
+    if entry == nil:
+      lang = ['u', 'n', 'd', '\0']
+    else:
+      for i in 0 ..< min(entry.value.len, 4):
+        lang[i] = entry.value[i]
 
     var duration: float64
     if stream.duration == AV_NOPTS_VALUE:
@@ -131,12 +136,9 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
         channels: codecParameters.ch_layout.nb_channels,
       ))
     elif codecParameters.codec_type == AVMEDIA_TYPE_SUBTITLE:
-      result.s.add(SubtitleStream(
-        duration: duration,
-        bitrate: codecCtx.bit_rate,
-        codecId: codecCtx.codec_id,
-        lang: lang,
-      ))
+      result.s.add(
+        SubtitleStream(duration: duration, codecId: codecCtx.codec_id, lang: lang)
+      )
     elif codecParameters.codec_type == AVMEDIA_TYPE_DATA:
       let timecodeEntry = av_dict_get(metadata, "timecode", nil, 0)
       let timecodeStr = (if timecodeEntry == nil: "" else: $timecodeEntry.value)

@@ -12,7 +12,7 @@ import ../src/timeline
 import ../src/exports/fcp11
 import ../src/exports/kdenlive
 
-proc `$`*(layout: AVChannelLayout): string =
+func `$`*(layout: AVChannelLayout): string =
   const bufSize = 256
   var buffer = newString(bufSize)
   let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring,
@@ -134,18 +134,25 @@ test "mp4towav":
   check($container.audio[0].name == "pcm_s16le")
 
 test "size-of-objects":
-  check(sizeof(seq) == 16)
-  check(sizeof(ref seq) == 8)
-  check(sizeof(string) == 16)
-  check(sizeof(ref string) == 8)
-  check(sizeof(AVCodecID) == 4)
-  check(sizeof(AVPixelFormat) == 4)
-  check(sizeof(AVRational) == 8)
-  check(sizeof(VideoStream) == 104)
-  check(sizeof(AudioStream) == 64)
-  check(sizeof(SubtitleStream) == 40)
-  check(sizeof(MediaInfo) == 96)
-  check(sizeof(Clip) == 40)
+  check sizeof(seq) == 16
+  check sizeof(ref seq) == 8
+  check sizeof(string) == 16
+  check sizeof(ref string) == 8
+  check sizeof(AVCodecID) == 4
+  check sizeof(AVPixelFormat) == 4
+  check sizeof(AVRational) == 8
+  check sizeof(VideoStream) == 96
+  check sizeof(AudioStream) == 48
+  check sizeof(SubtitleStream) == 16
+  check sizeof(MediaInfo) == 96
+  check sizeof(Clip) == 40
+
+test "lang-to-string":
+  check sizeof(Lang) == 4
+  var a: Lang = ['a', 's', 'd', 'f']
+  check $a == "asdf"
+  a  = ['e', 'n', 'g', '\0']
+  check $a == "eng"
 
 test "smpte":
   check(parseSMPTE("13:44:05:21", AVRational(num: 24000, den: 1001)) == 1186701)

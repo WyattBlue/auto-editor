@@ -74,7 +74,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   result.v = @[]
   if jsonNode.hasKey("v") and jsonNode["v"].kind == JArray:
     for trackNode in jsonNode["v"]:
-      var track = ClipLayer(lang: "und", c: @[])
+      var track: ClipLayer
       if trackNode.kind == JArray:
         for videoNode in trackNode:
           track.c.add(parseClip(videoNode, interner, result.effects))
@@ -84,7 +84,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   result.a = @[]
   if jsonNode.hasKey("a") and jsonNode["a"].kind == JArray:
     for trackNode in jsonNode["a"]:
-      var track = ClipLayer(lang: "und", c: @[])
+      var track: ClipLayer
       if trackNode.kind == JArray:
         for audioNode in trackNode:
           track.c.add(parseClip(audioNode, interner, result.effects))

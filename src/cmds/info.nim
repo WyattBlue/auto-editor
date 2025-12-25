@@ -8,10 +8,13 @@ import ../media
 import ../log
 import ../util/fun
 
-proc genericTrack(lang: string, bitrate: int) =
+func `%`*(lang: Lang): JsonNode =
+  %($lang)
+
+proc genericTrack(lang: Lang, bitrate: int) =
   if bitrate != 0:
     echo &"     - bitrate: {bitrate}"
-  if lang != "und":
+  if lang != ['u', 'n', 'd', '\0']:
     echo &"     - lang: {lang}"
 
 func bt709(val: int): string =
@@ -47,7 +50,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo &"     - pixel aspect ratio: {v.sar}"
     if v.duration != 0.0:
       echo &"     - duration: {v.duration}"
-    echo &"     - pix fmt: {v.pix_fmt}"
+    echo &"     - pix fmt: {av_get_pix_fmt_name(v.pix_fmt)}"
 
     if v.color_range == 1:
       echo "     - color range: 1 (tv)"
@@ -82,7 +85,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
   for track, s in fileInfo.s:
     echo &"   - track {track}:"
     echo &"     - codec: {$avcodec_get_name(s.codecId)}"
-    genericTrack(s.lang, s.bitrate)
+    genericTrack(s.lang, 0)
 
   if fileInfo.d.len > 0:
     echo " - data:"
