@@ -138,9 +138,13 @@ test "size-of-objects":
   check(sizeof(ref seq) == 8)
   check(sizeof(string) == 16)
   check(sizeof(ref string) == 8)
+  check(sizeof(AVCodecID) == 4)
+  check(sizeof(AVPixelFormat) == 4)
   check(sizeof(AVRational) == 8)
-  check(sizeof(VideoStream) == 120)
-  check(sizeof(AudioStream) == 72)
+  check(sizeof(VideoStream) == 104)
+  check(sizeof(AudioStream) == 64)
+  check(sizeof(SubtitleStream) == 40)
+  check(sizeof(MediaInfo) == 96)
   check(sizeof(Clip) == 40)
 
 test "smpte":

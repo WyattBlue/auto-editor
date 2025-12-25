@@ -81,6 +81,15 @@ proc parseSMPTE*(val: string, fps: AVRational): int =
   except ValueError as e:
     error(&"Cannot parse SMPTE timecode '{val}': {e.msg}")
 
+func timecode(self: MediaInfo): string = # In SMPTE
+  for d in self.d:
+    if d.timecode.len > 0:
+      return d.timecode
+  for v in self.v:
+    if v.timecode.len > 0:
+      return v.timecode
+  return "00:00:00:00"
+
 proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3) =
   func fraction(val: int): string =
     if val == 0:

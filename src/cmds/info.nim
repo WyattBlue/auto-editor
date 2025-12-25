@@ -10,37 +10,44 @@ import ../util/fun
 
 proc genericTrack(lang: string, bitrate: int) =
   if bitrate != 0:
-    echo fmt"     - bitrate: {bitrate}"
+    echo &"     - bitrate: {bitrate}"
   if lang != "und":
-    echo fmt"     - lang: {lang}"
+    echo &"     - lang: {lang}"
 
 func bt709(val: int): string =
   if val == 1:
     return "1 (bt709)"
   return $val
 
-proc printYamlInfo(fileInfo: MediaInfo) =
-  echo fileInfo.path, ":"
+func fourccToString(fourcc: uint32): string =
+  var buf: array[5, char]
+  buf[0] = char(fourcc and 0xFF)
+  buf[1] = char((fourcc shr 8) and 0xFF)
+  buf[2] = char((fourcc shr 16) and 0xFF)
+  buf[3] = char((fourcc shr 24) and 0xFF)
+  buf[4] = '\0'
+  return $cast[cstring](addr buf[0])
 
+proc printYamlInfo(fileInfo: MediaInfo) =
   var tb = AVRational(30)
   if fileInfo.v.len > 0:
     tb = makeSaneTimebase(fileInfo.v[0].avg_rate)
-  echo fmt" - recommendedTimebase: {tb.num}/{tb.den}"
+  echo &"{fileInfo.path}:\n - recommendedTimebase: {tb.num}/{tb.den}"
 
   if fileInfo.v.len > 0:
-    echo fmt" - video:"
+    echo " - video:"
   for track, v in fileInfo.v:
     let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height)
 
-    echo fmt"   - track {track}:"
-    echo fmt"     - codec: {v.codec}"
-    echo fmt"     - fps: {v.avg_rate}"
-    echo fmt"     - resolution: {v.width}x{v.height}"
-    echo fmt"     - aspect ratio: {ratioWidth}:{ratioHeight}"
-    echo fmt"     - pixel aspect ratio: {v.sar}"
+    echo &"   - track {track}:"
+    echo &"     - codec: {$avcodec_get_name(v.codecId)}"
+    echo &"     - fps: {v.avg_rate}"
+    echo &"     - resolution: {v.width}x{v.height}"
+    echo &"     - aspect ratio: {ratioWidth}:{ratioHeight}"
+    echo &"     - pixel aspect ratio: {v.sar}"
     if v.duration != 0.0:
-      echo fmt"     - duration: {v.duration}"
-    echo fmt"     - pix fmt: {v.pix_fmt}"
+      echo &"     - duration: {v.duration}"
+    echo &"     - pix fmt: {v.pix_fmt}"
 
     if v.color_range == 1:
       echo "     - color range: 1 (tv)"
@@ -50,44 +57,44 @@ proc printYamlInfo(fileInfo: MediaInfo) =
       echo &"     - color range: {v.color_range}"
 
     if v.color_space != 2:
-      echo fmt"     - color space: {v.color_space.bt709}"
+      echo &"     - color space: {v.color_space.bt709}"
     if v.color_primaries != 2:
-      echo fmt"     - color primaries: {v.color_primaries.bt709}"
+      echo &"     - color primaries: {v.color_primaries.bt709}"
     if v.color_transfer != 2:
-      echo fmt"     - color transfer: {v.color_transfer.bt709}"
-    echo fmt"     - timebase: {v.timebase}"
+      echo &"     - color transfer: {v.color_transfer.bt709}"
+    echo &"     - timebase: {v.timebase}"
     genericTrack(v.lang, v.bitrate)
 
 
   if fileInfo.a.len > 0:
-    echo fmt" - audio:"
+    echo " - audio:"
   for track, a in fileInfo.a:
-    echo fmt"   - track {track}:"
-    echo fmt"     - codec: {a.codec}"
-    echo fmt"     - layout: {a.layout}"
-    echo fmt"     - samplerate: {a.samplerate}"
+    echo &"   - track {track}:"
+    echo &"     - codec: {$avcodec_get_name(a.codecId)}"
+    echo &"     - layout: {a.layout}"
+    echo &"     - samplerate: {a.samplerate}"
     if a.duration != 0.0:
-      echo fmt"     - duration: {a.duration}"
+      echo &"     - duration: {a.duration}"
     genericTrack(a.lang, a.bitrate)
 
   if fileInfo.s.len > 0:
-    echo fmt" - subtitle:"
+    echo " - subtitle:"
   for track, s in fileInfo.s:
-    echo fmt"   - track {track}:"
-    echo fmt"     - codec: {s.codec}"
+    echo &"   - track {track}:"
+    echo &"     - codec: {$avcodec_get_name(s.codecId)}"
     genericTrack(s.lang, s.bitrate)
 
   if fileInfo.d.len > 0:
-    echo fmt" - data:"
+    echo " - data:"
   for track, d in fileInfo.d:
-    echo fmt"   - track {track}:"
-    echo fmt"     - codec: {d.codec}"
-    echo fmt"     - timecode: {d.timecode}"
+    echo &"   - track {track}:"
+    echo &"     - codec: {$avcodec_get_name(d.codecId)} ({fourccToString(d.tag)})"
+    echo &"     - timecode: {d.timecode}"
 
   echo " - container:"
   if fileInfo.duration != 0.0:
-    echo fmt"   - duration: {fileInfo.duration}"
-  echo fmt"   - bitrate: {fileInfo.bitrate}"
+    echo &"   - duration: {fileInfo.duration}"
+  echo &"   - bitrate: {fileInfo.bitrate}"
 
 
 func getJsonInfo(fileInfo: MediaInfo): JsonNode =
@@ -103,7 +110,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
   for v in fileInfo.v:
     let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height)
     varr.add( %* {
-      "codec": v.codec,
+      "codec": $avcodec_get_name(v.codecId),
       "fps": $v.avg_rate,
       "resolution": [v.width, v.height],
       "aspect_ratio": [ratioWidth, ratioHeight],
@@ -120,7 +127,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
     })
 
   for a in fileInfo.a:
-    aarr.add( %* {"codec": a.codec, "layout": a.layout,
+    aarr.add( %* {"codec": $avcodec_get_name(a.codecId), "layout": a.layout,
         "samplerate": a.sampleRate, "duration": a.duration,
         "bitrate": a.bitrate, "lang": a.lang})
 
@@ -175,8 +182,7 @@ proc main*(args: seq[string]) =
       if isJson:
         fileInfo[inputFile] = %* {"type": "invalid"}
       else:
-        echo inputFile & ""
-        echo " - Invalid\n"
+        echo inputFile & "\n - Invalid\n"
 
   if isJson:
     echo pretty(fileInfo)
