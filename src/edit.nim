@@ -156,7 +156,7 @@ proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules):
     if src.a.len == 0:
       codec = rule.defaultAud
     else:
-      codec = src.a[0].codec
+      codec = $avcodec_get_name(src.a[0].codecId)
       let avCodec = initCodec(codec)
       if avCodec == nil or avCodec.sample_fmts == nil:
         codec = "aac"
@@ -183,7 +183,7 @@ proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules):
 
 proc setVideoCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
   if codec == "auto":
-    codec = (if src.v.len == 0: "h264" else: src.v[0].codec)
+    codec = (if src.v.len == 0: "h264" else: $avcodec_get_name(src.v[0].codecId))
     if codec notin rule.vcodecs.mapIt($it.name) and rule.defaultVid != "none":
       return rule.default_vid
     return codec
