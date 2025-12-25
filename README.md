@@ -144,9 +144,6 @@ List all available options:
 auto-editor --help
 ```
 
-<h3 align="center">Auto-Editor is available on all major platforms</h3>
-<p align="center"><img src="https://auto-editor.com/img/cross-platform.webp" width="500" title="Windows, MacOS, and Linux"></p>
-
 ## Articles
  - [How to Install Auto-Editor](https://auto-editor.com/installing)
  - [All the Options (And What They Do)](https://auto-editor.com/ref/options)
