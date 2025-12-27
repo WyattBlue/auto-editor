@@ -643,20 +643,15 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
-    var ldflags = &"-L{buildPath}/lib"
-    when defined(linux):
-      ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
-    
-    let commonFlags = setupCommonFlags(packages)
     exec (&"""CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
-      --extra-ldflags="{ldflags}" \
+      --extra-ldflags="-L{buildPath}/lib" \
       --extra-libs="-lpthread -lm -lstdc++" \
       --arch=x86_64 \
       --target-os=mingw32 \
       --cross-prefix=x86_64-w64-mingw32- \
-      --enable-cross-compile \""" & "\n" & commonFlags)
+      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages))
     makeInstall()
 
 task windows, "Cross-compile to Windows (requires mingw-w64)":
