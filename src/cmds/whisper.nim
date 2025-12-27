@@ -9,7 +9,7 @@ proc main*(cArgs: seq[string]) =
   var inputPath: string = ""
   var model: string = ""
   var isDebug = false
-  var isSplit = false
+  var splitWords = false
   var format = "text"
   var output = "-"
   var queue: int = 10
@@ -40,7 +40,7 @@ Options:
     of "--debug":
       isDebug = true
     of "--split-words", "-sw":
-      isSplit = true
+      splitWords = true
     of "--format":
       expecting = "format"
     of "--output":
@@ -111,8 +111,9 @@ Options:
   let whisperFilter = avfilter_get_by_name("whisper")
   var whisperCtx: ptr AVFilterContext
 
-  let maxLen = if isSplit: "1" else: "0"
-  var whisperArgs = &"model={model}:queue={queue}:format={format}:max_len={maxLen}"
+  var whisperArgs = &"model={model}:queue={queue}:format={format}"
+  if splitWords:
+    whisperArgs &= ":max_len=1"
   if output == "-":
     whisperArgs &= ":destination=/dev/stdout"
   else:
