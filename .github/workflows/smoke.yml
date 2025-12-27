@@ -29,8 +29,6 @@ on:
 jobs:
   main:
     runs-on: ${{ matrix.os }}
-    container: ${{ matrix.container }}
-    timeout-minutes: ${{ matrix.timeout || 60 }}
     strategy:
       matrix:
         include:
