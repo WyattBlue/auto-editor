@@ -29,6 +29,8 @@ on:
 jobs:
   main:
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    timeout-minutes: ${{ matrix.timeout || 60 }}
     strategy:
       matrix:
         include:
@@ -62,6 +64,33 @@ jobs:
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           fi
+          echo "DISABLE_HEVC=1" >> $GITHUB_ENV
+      - name: Build FFmpeg
+        run: nimble makeff
+      - name: Compile
+        run: nimble make
+      - name: Test
+        run: nimble test
+      - name: e2e Test
+        run: python3 -m pip install av && python3 tests/test.py
+
+  linuxarm:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install Homebrew
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+      - name: Setup
+        run: |
+          brew install nim
+          sudo apt-get install -y build-essential pkg-config git
           echo "DISABLE_HEVC=1" >> $GITHUB_ENV
       - name: Build FFmpeg
         run: nimble makeff
