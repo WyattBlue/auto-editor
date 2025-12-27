@@ -29,13 +29,14 @@ on:
 jobs:
   main:
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    timeout-minutes: ${{ matrix.timeout || 60 }}
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
-            arch: x86_64
           - os: macos-latest
-            arch: arm64
+          - os: ubuntu-22.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -43,22 +44,20 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.14"
-      - name: Nim
+      - name: Install Homebrew
         if: runner.os != 'macOS'
-        uses: jiro4989/setup-nim-action@v2
-        with:
-          nim-version: "stable"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install packages for macOS
-        if: runner.os == 'macOS'
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+      - name: Install packages
         run: |
           brew update && brew install nim
-          brew unlink gettext libidn2 libpng libtiff libunistring libx11 libxau libxcb libxdmcp little-cms2 unbound
       - name: Setup
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            sudo apt-get update
             sudo apt-get install -y build-essential pkg-config nasm git
+          elif [ "${{ matrix.os }}" = "ubuntu-22.04-arm" ]; then
+            sudo apt-get install -y build-essential pkg-config git
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           fi

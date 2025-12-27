@@ -602,7 +602,10 @@ task makeff, "Build FFmpeg from source":
   # Set PKG_CONFIG_PATH to include both standard and architecture-specific paths
   var pkgConfigPaths = @[buildPath / "lib/pkgconfig"]
   when defined(linux):
-    pkgConfigPaths.add(buildPath / "lib/x86_64-linux-gnu/pkgconfig")
+    when defined(arm64):
+      pkgConfigPaths.add(buildPath / "lib/aarch64-linux-gnu/pkgconfig")
+    else:
+      pkgConfigPaths.add(buildPath / "lib/x86_64-linux-gnu/pkgconfig")
     pkgConfigPaths.add(buildPath / "lib64/pkgconfig")
     # Add common cmake install paths for pkg-config files
     pkgConfigPaths.add(buildPath / "lib/cmake")
@@ -620,16 +623,11 @@ task makeff, "Build FFmpeg from source":
     echo "Current PKG_CONFIG_PATH: ", getEnv("PKG_CONFIG_PATH")
     exec "pkg-config --list-all | grep whisper || echo 'whisper not found in pkg-config'"
 
-  # Configure and build FFmpeg
   withDir "ffmpeg_sources/ffmpeg":
-    var ldflags = &"-L{buildPath}/lib"
-    when defined(linux):
-      ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
-
     exec &"""./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
-      --extra-ldflags="{ldflags}" \
+      --extra-ldflags="-L{buildPath}/lib" \
       --extra-libs="-lpthread -lm" \""" & "\n" & setupCommonFlags(packages)
     makeInstall()
 
@@ -645,20 +643,15 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
-    var ldflags = &"-L{buildPath}/lib"
-    when defined(linux):
-      ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
-    
-    let commonFlags = setupCommonFlags(packages)
     exec (&"""CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
-      --extra-ldflags="{ldflags}" \
+      --extra-ldflags="-L{buildPath}/lib" \
       --extra-libs="-lpthread -lm -lstdc++" \
       --arch=x86_64 \
       --target-os=mingw32 \
       --cross-prefix=x86_64-w64-mingw32- \
-      --enable-cross-compile \""" & "\n" & commonFlags)
+      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages))
     makeInstall()
 
 task windows, "Cross-compile to Windows (requires mingw-w64)":
