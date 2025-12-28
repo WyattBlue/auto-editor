@@ -1,7 +1,4 @@
-import std/sets
-import std/options
-import std/os
-import std/tables
+import std/[os, sets, tables]
 from std/math import round
 
 import ffmpeg
@@ -54,8 +51,7 @@ type v3* = object
   a*: seq[ClipLayer]
   s*: seq[ClipLayer]
   effects*: seq[seq[Action]]
-  clips2*: Option[seq[Clip2]]  # Optional because tl might be non-linear.
-
+  clips2*: seq[Clip2]  # Empty when the timeline is non-linear.
 
 func len*(self: v3): int64 =
   result = 0
@@ -89,6 +85,9 @@ func `end`*(self: v3): int64 =
 
 func timelineIsEmpty(self: v3): bool =
   (self.v.len == 0 or self.v[0].len == 0) and (self.a.len == 0 or self.a[0].len == 0)
+
+func isNonlinear*(self: v3): bool =
+  return self.clips2.len == 0 and not self.timelineIsEmpty
 
 proc chunkify(arr: seq[int], effects: seq[seq[Action]]): seq[(int64, int64, int, seq[Action])] =
   if arr.len == 0:
@@ -178,7 +177,7 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
   if result.timelineIsEmpty:
     error "Timeline is empty, nothing to do."
 
-  result.clips2 = some(clips2)
+  result.clips2 = clips2
   result.res = mi.getRes()
   result.sr = 48000
   result.layout = "stereo"
@@ -256,7 +255,7 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
       slayer.c.add(subtitleClip)
     sspace.add(slayer)
 
-  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, clips2: some(clips2))
+  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, clips2: clips2)
   result.effects = effects
 
   if result.timelineIsEmpty:
@@ -329,7 +328,7 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
       slayer.c.add(subtitleClip)
     sspace.add(slayer)
 
-  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, clips2: some(clips2))
+  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, clips2: clips2)
   result.effects = effects
 
   if result.timelineIsEmpty:

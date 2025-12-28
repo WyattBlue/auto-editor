@@ -103,7 +103,7 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
   var tlJson: JsonNode
 
   if `export` == "v1" or `export` == "v2":
-    if tlV3.clips2.isNone:
+    if tlV3.isNonlinear:
       error "No chunks available for export"
 
     var source: string = ""
@@ -112,7 +112,7 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
     elif tlV3.a.len > 0 and tlV3.a[0].len > 0:
       source = tlV3.a[0].c[0].src[]
 
-    let clips2 = tlV3.clips2.unsafeGet()
+    let clips2 = tlV3.clips2
     let tb = tlV3.tb
     if `export` == "v2":
       tlJson = %v2(source: source, tb: tb, clips: clips2, effects: tlV3.effects)
