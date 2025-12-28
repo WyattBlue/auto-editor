@@ -1,5 +1,4 @@
-import std/[os, osproc, strformat, strutils]
-import std/[terminal, uri, parseutils]
+import std/[os, osproc, parseutils, sequtils, strformat, strutils, terminal, uri]
 when not defined(windows):
   import std/posix_utils
 
@@ -18,13 +17,19 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
+type Command* = tuple[name: string, handler: proc(args: seq[string])]
+const commands*: seq[Command] = @[
+  ("cache", cache.main),
+  ("desc", desc.main),
+  ("info", info.main),
+  ("levels", levels.main),
+  ("subdump", subdump.main),
+  ("whisper", whisper.main),
+]
 
 proc printHelp() {.noreturn.} =
-  echo """usage: [file | url ...] [options]
-
-Commands:
-  info desc cache levels subdump
-
+  echo "usage: [file | url ...] [options]\n\nCommands:\n  " &
+    commands.mapIt(it[0]).join(" ") & "\n\n" & """
 Options:
   Editing Options:
     -m, --margin LENGTH           Set sections near "loud" as "loud" too if
@@ -321,24 +326,11 @@ change the method of editing like using audio loudness and video motion to
 judge making cuts.
 """
       quit(0)
-  elif paramStr(1) == "info":
-    info.main(commandLineParams()[1..^1])
-    quit(0)
-  elif paramStr(1) == "desc":
-    desc.main(commandLineParams()[1..^1])
-    quit(0)
-  elif paramStr(1) == "cache":
-    cache.main(commandLineParams()[1..^1])
-    quit(0)
-  elif paramStr(1) == "levels":
-    levels.main(commandLineParams()[1..^1])
-    quit(0)
-  elif paramStr(1) == "subdump":
-    subdump.main(commandLineParams()[1..^1])
-    quit(0)
-  elif paramStr(1) == "whisper":
-    whisper.main(commandLineParams()[1..^1])
-    quit(0)
+  else:
+    for command in commands:
+      if paramStr(1) == command.name:
+        command.handler(commandLineParams()[1..^1])
+        quit(0)
 
   var args = mainArgs()
   var showVersion: bool = false
