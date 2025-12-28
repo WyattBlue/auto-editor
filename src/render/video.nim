@@ -5,10 +5,9 @@ from std/math import round
 
 import ../log
 import ../av
-import ../media
 import ../ffmpeg
 import ../timeline
-import ../util/color
+import ../util/[color, lang]
 import ../graph
 
 # Helps with timing, may be extended.
@@ -173,7 +172,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   debug &"Creating video stream with codec: {args.videoCodec}"
   var (outputStream, encoderCtx) = output.addStream(args.videoCodec,
       rate = targetFps, width = targetWidth, height = targetHeight, metadata = {
-          "language": $tl.v[0].lang}.toTable)
+          "language": $tl.langs[0]}.toTable)
   let codec = encoderCtx.codec
 
   if codec.id == AV_CODEC_ID_HEVC:
@@ -292,7 +291,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       objList = @[]
 
       for layer in tl.v:
-        for obj in layer.clips:
+        for obj in layer:
           if index >= obj.start and index < (obj.start + obj.dur):
             # Convert timeline position from target framerate to source framerate
             let timelinePos = obj.offset + index - obj.start

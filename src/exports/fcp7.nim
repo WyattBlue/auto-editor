@@ -122,7 +122,7 @@ proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
     mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo]) =
   for t, alayer in tl.a.pairs:
     let track = newElement("track")
-    for j, aclip in alayer.c.pairs:
+    for j, aclip in alayer.pairs:
       let mi = ptrToMi[aclip.src]
 
       let start_val = $aclip.start
@@ -130,7 +130,7 @@ proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
       let in_val = $aclip.offset
       let out_val = $(aclip.offset + aclip.dur)
 
-      let clip_item_num = if mi.v.len == 0: j + 1 else: alayer.c.len + 1 + j
+      let clip_item_num = if mi.v.len == 0: j + 1 else: alayer.len + 1 + j
 
       let clipitem = newElement("clipitem")
       clipitem.attrs = {"id": &"clipitem-{clip_item_num}"}.toXmlAttributes
@@ -191,7 +191,7 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
       if has_video:
         track.add elem("outputchannelindex", $(channelcount + 1))
 
-      for j, aclip in alayer.c.pairs:
+      for j, aclip in alayer.pairs:
         let src = ptrToMi[aclip.src]
 
         let start_val = $aclip.start
@@ -298,7 +298,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
   if tl.v.len > 0 and tl.v[0].len > 0:
     let track = newElement("track")
 
-    for j, clip in tl.v[0].c.pairs:
+    for j, clip in tl.v[0].pairs:
       let start_val = $clip.start
       let end_val = $(clip.start + clip.dur)
       let in_val = $clip.offset

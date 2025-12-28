@@ -5,7 +5,7 @@ import ffmpeg
 import media
 import log
 import wavutil
-import util/color
+import util/[color, lang]
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]
@@ -30,26 +30,16 @@ type Clip* = object
   effects*: uint32  # Reference to global effects in Timeline.
   stream*: int32
 
-type ClipLayer* = object
-  c*: seq[Clip] = @[]
-  lang*: Lang = ['u', 'n', 'd', '\0']
-
-# Whatever floats your boat
-func clips*(layer: ClipLayer): seq[Clip] =
-  layer.c
-
-func len*(layer: ClipLayer): int =
-  len(layer.c)
-
 type v3* = object
   tb*: AVRational
   bg*: RGBColor
   sr*: cint
   layout*: string
   res*: (int, int)
-  v*: seq[ClipLayer]
-  a*: seq[ClipLayer]
-  s*: seq[ClipLayer]
+  v*: seq[seq[Clip]]
+  a*: seq[seq[Clip]]
+  s*: seq[seq[Clip]]
+  langs*: seq[Lang] # Video, Audio (flattened).
   effects*: seq[seq[Action]]
   clips2*: seq[Clip2]  # Empty when the timeline is non-linear.
 
@@ -57,30 +47,28 @@ func len*(self: v3): int64 =
   result = 0
   for clips in self.v:
     if len(clips) > 0:
-      result = max(result, clips.c[^1].start + clips.c[^1].dur)
+      result = max(result, clips[^1].start + clips[^1].dur)
   for clips in self.a:
     if len(clips) > 0:
-      result = max(result, clips.c[^1].start + clips.c[^1].dur)
+      result = max(result, clips[^1].start + clips[^1].dur)
 
 func uniqueSources*(self: v3): HashSet[ptr string] =
   for vlayer in self.v:
-    for video in vlayer.c:
+    for video in vlayer:
       result.incl(video.src)
-
   for alayer in self.a:
-    for audio in alayer.c:
+    for audio in alayer:
       result.incl(audio.src)
-
 
 func `end`*(self: v3): int64 =
   result = 0
   for vlayer in self.v:
-    if vlayer.c.len > 0:
-      let v = vlayer.c[^1]
+    if vlayer.len > 0:
+      let v = vlayer[^1]
       result = max(result, v.start + v.dur)
   for alayer in self.a:
-    if alayer.c.len > 0:
-      let a = alayer.c[^1]
+    if alayer.len > 0:
+      let a = alayer[^1]
       result = max(result, a.start + a.dur)
 
 func timelineIsEmpty(self: v3): bool =
@@ -101,6 +89,44 @@ proc chunkify(arr: seq[int], effects: seq[seq[Action]]): seq[(int64, int64, int,
       start = j
     inc j
   result.add (start, arr.len.int64, arr[j-1], effects[arr[j - 1]])
+
+
+proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
+  if mi.v.len > 0:
+    var vlayer = newSeqOfCap[Clip](clips.len)
+    for clip in clips:
+      var videoClip = clip
+      videoClip.stream = 0
+      vlayer.add videoClip
+    tl.v.add vlayer
+    tl.langs.add mi.v[0].lang
+
+  for i in 0 ..< mi.a.len:
+    var alayer = newSeqOfCap[Clip](clips.len)
+    for clip in clips:
+      var audioClip = clip
+      audioClip.stream = i.int32
+      alayer.add audioClip
+    tl.a.add alayer
+    tl.langs.add mi.a[i].lang
+
+  for i in 0 ..< mi.s.len:
+    var slayer = newSeqOfCap[Clip](clips.len)
+    for clip in clips:
+      var subtitleClip = clip
+      subtitleClip.stream = i.int32
+      slayer.add subtitleClip
+    tl.s.add slayer
+
+  if tl.timelineIsEmpty:
+    error "Timeline is empty, nothing to do."
+
+  tl.sr = 48000
+  tl.layout = "stereo"
+  if mi.a.len > 0:
+    tl.sr = mi.a[0].sampleRate
+    tl.layout = mi.a[0].layout
+
 
 proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo, effects: seq[seq[Action]], actionIndex: seq[int]): v3 =
   var clips: seq[Clip] = @[]
@@ -144,47 +170,8 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
       start += dur
       i += 1
 
-  var vspace: seq[ClipLayer] = @[]
-  var aspace: seq[ClipLayer] = @[]
-  var sspace: seq[ClipLayer] = @[]
-
-  if mi.v.len > 0:
-    var vlayer = ClipLayer(lang: mi.v[0].lang, c: @[])
-    for clip in clips:
-      var videoClip = clip
-      videoClip.stream = 0
-      vlayer.c.add(videoClip)
-    vspace.add(vlayer)
-
-  for i in 0 ..< mi.a.len:
-    var alayer = ClipLayer(lang: mi.a[i].lang, c: @[])
-    for clip in clips:
-      var audioClip = clip
-      audioClip.stream = i.int32
-      alayer.c.add(audioClip)
-    aspace.add(alayer)
-
-  for i in 0 ..< mi.s.len:
-    var slayer = ClipLayer(lang: mi.s[i].lang, c: @[])
-    for clip in clips:
-      var subtitleClip = clip
-      subtitleClip.stream = i.int32
-      slayer.c.add(subtitleClip)
-    sspace.add(slayer)
-
-  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, effects: effects)
-
-  if result.timelineIsEmpty:
-    error "Timeline is empty, nothing to do."
-
-  result.clips2 = clips2
-  result.res = mi.getRes()
-  result.sr = 48000
-  result.layout = "stereo"
-  if mi.a.len > 0:
-    result.sr = mi.a[0].sampleRate
-    result.layout = mi.a[0].layout
-
+  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes())
+  mutHelper(result, mi, clips)
 
 proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
     chunks: seq[(int64, int64, float64)]): v3 =
@@ -227,47 +214,8 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
       start += dur
       i += 1
 
-  var vspace: seq[ClipLayer] = @[]
-  var aspace: seq[ClipLayer] = @[]
-  var sspace: seq[ClipLayer] = @[]
-
-  if mi.v.len > 0:
-    var vlayer = ClipLayer(lang: mi.v[0].lang, c: @[])
-    for clip in clips:
-      var videoClip = clip
-      videoClip.stream = 0
-      vlayer.c.add(videoClip)
-    vspace.add(vlayer)
-
-  for i in 0 ..< mi.a.len:
-    var alayer = ClipLayer(lang: mi.a[i].lang, c: @[])
-    for clip in clips:
-      var audioClip = clip
-      audioClip.stream = i.int32
-      alayer.c.add(audioClip)
-    aspace.add(alayer)
-
-  for i in 0 ..< mi.s.len:
-    var slayer = ClipLayer(lang: mi.s[i].lang, c: @[])
-    for clip in clips:
-      var subtitleClip = clip
-      subtitleClip.stream = i.int32
-      slayer.c.add(subtitleClip)
-    sspace.add(slayer)
-
-  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, clips2: clips2)
-  result.effects = effects
-
-  if result.timelineIsEmpty:
-    error "Timeline is empty, nothing to do."
-
-  result.res = mi.getRes()
-  result.sr = 48000
-  result.layout = "stereo"
-  if mi.a.len > 0:
-    result.sr = mi.a[0].sampleRate
-    result.layout = mi.a[0].layout
-
+  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes())
+  mutHelper(result, mi, clips)
 
 proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
   clips2: seq[Clip2], effects: seq[seq[Action]]): v3 =
@@ -300,47 +248,8 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
 
     start += dur
 
-  var vspace: seq[ClipLayer] = @[]
-  var aspace: seq[ClipLayer] = @[]
-  var sspace: seq[ClipLayer] = @[]
-
-  if mi.v.len > 0:
-    var vlayer = ClipLayer(lang: mi.v[0].lang, c: @[])
-    for clip in clips:
-      var videoClip = clip
-      videoClip.stream = 0
-      vlayer.c.add(videoClip)
-    vspace.add(vlayer)
-
-  for i in 0 ..< mi.a.len:
-    var alayer = ClipLayer(lang: mi.a[i].lang, c: @[])
-    for clip in clips:
-      var audioClip = clip
-      audioClip.stream = i.int32
-      alayer.c.add(audioClip)
-    aspace.add(alayer)
-
-  for i in 0 ..< mi.s.len:
-    var slayer = ClipLayer(lang: mi.s[i].lang, c: @[])
-    for clip in clips:
-      var subtitleClip = clip
-      subtitleClip.stream = i.int32
-      slayer.c.add(subtitleClip)
-    sspace.add(slayer)
-
-  result = v3(tb: tb, v: vspace, a: aspace, s: sspace, bg: bg, clips2: clips2)
-  result.effects = effects
-
-  if result.timelineIsEmpty:
-    error "Timeline is empty, nothing to do."
-
-  result.res = mi.getRes()
-  result.sr = 48000
-  result.layout = "stereo"
-  if mi.a.len > 0:
-    result.sr = mi.a[0].sampleRate
-    result.layout = mi.a[0].layout
-
+  result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes())
+  mutHelper(result, mi, clips)
 
 proc applyArgs*(tl: var v3, args: mainArgs) =
   if args.sampleRate != -1:
@@ -391,7 +300,7 @@ proc setStreamTo0*(tl: var v3, interner: var StringInterner) =
     return cache[newtrack]
 
   for layer in tl.a.mitems:
-    for clip in layer.c.mitems:
+    for clip in layer.mitems:
       if clip.stream > 0:
         let mi = makeTrack(clip.stream, clip.src[])
         clip.src = interner.intern(mi.path)

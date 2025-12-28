@@ -93,9 +93,9 @@ proc kdenliveWrite*(output: string, tl: v3) =
   # Get all clips
   var clips: seq[Clip]
   if tl.v.len > 0:
-    clips = tl.v[0].clips
+    clips = tl.v[0]
   elif tl.a.len > 0:
-    clips = tl.a[0].clips
+    clips = tl.a[0]
   else:
     clips = @[]
 
@@ -218,7 +218,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
   # create chains, playlists and tractors for audio channels
   for i, audio in tl.a:
-    let path = $audio.clips[0].src[]
+    let path = $audio[0].src[]
 
     if path notin sourceIds:
       sourceIds[path] = $sourceId
@@ -311,7 +311,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
   # create chains, playlists and tractors for video channels
   for i, video in tl.v:
-    let path = $video.clips[0].src[]
+    let path = $video[0].src[]
 
     if path notin sourceIds:
       sourceIds[path] = $sourceId

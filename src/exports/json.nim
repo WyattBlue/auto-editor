@@ -2,8 +2,7 @@ import std/[json, options, sequtils]
 
 import ../timeline
 import ../log
-import ../util/color
-
+import ../util/[color, lang]
 
 func effectToString(act: Action): string =
   case act.kind
@@ -39,7 +38,7 @@ func `%`*(self: v3): JsonNode =
   var videoTracks = newJArray()
   for track in self.v:
     var trackArray = newJArray()
-    for clip in track.clips:
+    for clip in track:
       var clipObj = newJObject()
       clipObj["name"] = %"video"
       clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
@@ -65,7 +64,7 @@ func `%`*(self: v3): JsonNode =
   var audioTracks = newJArray()
   for track in self.a:
     var trackArray = newJArray()
-    for clip in track.clips:
+    for clip in track:
       var clipObj = newJObject()
       clipObj["name"] = %"audio"
       clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
@@ -95,6 +94,7 @@ func `%`*(self: v3): JsonNode =
     "resolution": [self.res[0], self.res[1]],
     "samplerate": self.sr,
     "layout": self.layout,
+    "langs": self.langs,
     "v": videoTracks,
     "a": audioTracks,
   }
@@ -108,9 +108,9 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
 
     var source: string = ""
     if tlV3.v.len > 0 and tlV3.v[0].len > 0:
-      source = tlV3.v[0].c[0].src[]
+      source = tlV3.v[0][0].src[]
     elif tlV3.a.len > 0 and tlV3.a[0].len > 0:
-      source = tlV3.a[0].c[0].src[]
+      source = tlV3.a[0][0].src[]
 
     let clips2 = tlV3.clips2
     let tb = tlV3.tb
