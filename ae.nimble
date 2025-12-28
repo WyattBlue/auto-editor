@@ -272,7 +272,16 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
     makeInstall()
 
   # Fix whisper.pc file to include correct library order and dependencies
-  if package.name == "whisper" and not crossWindows:
+  if package.name == "whisper":
+    # Fix library naming for cross-compilation - add lib prefix if missing
+    let libDir = buildPath / "lib"
+    for libFile in ["ggml.a", "ggml-base.a", "ggml-cpu.a"]:
+      let srcFile = libDir / libFile
+      let dstFile = libDir / ("lib" & libFile)
+      if fileExists(srcFile) and not fileExists(dstFile):
+        echo &"Renaming {srcFile} to {dstFile}"
+        exec &"mv \"{srcFile}\" \"{dstFile}\""
+    
     let pcFile = buildPath / "lib/pkgconfig/whisper.pc"
     if fileExists(pcFile):
       echo "Fixing whisper.pc file"
@@ -481,7 +490,7 @@ proc ffmpegSetup(crossWindows: bool) =
   mkDir("build")
 
   let buildPath = absolutePath("build")
-  let packages = setupPackages(enableWhisper=enableWhisper and not crossWindows)
+  let packages = setupPackages(enableWhisper=enableWhisper)
 
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
@@ -506,8 +515,6 @@ proc ffmpegSetup(crossWindows: bool) =
           exec cmd
 
       if package.name == "ffmpeg": # build later
-        continue
-      if package.name == "whisper" and crossWindows:
         continue
 
       withDir package.name:
@@ -615,7 +622,7 @@ task makeff, "Build FFmpeg from source":
 
   ffmpegSetup(crossWindows=false)
 
-  let packages = setupPackages(enableWhisper=true)
+  let packages = setupPackages(enableWhisper=enableWhisper)
 
   # Debug: List pkg-config files to verify whisper.pc exists
   when defined(linux):
@@ -637,10 +644,9 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
   let buildPath = absolutePath("build")
   putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
 
-  enableWhisper = false
   ffmpegSetup(crossWindows=true)
 
-  let packages = setupPackages(enableWhisper=false)
+  let packages = setupPackages(enableWhisper=enableWhisper)
 
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
@@ -657,8 +663,6 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 
 task windows, "Cross-compile to Windows (requires mingw-w64)":
   echo "Cross-compiling for Windows (64-bit)..."
-
-  flags = flags.replace("-d:enable_whisper", "")
 
   if not dirExists("build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."

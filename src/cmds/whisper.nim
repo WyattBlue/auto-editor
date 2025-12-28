@@ -54,15 +54,15 @@ Options:
         if inputPath == "":
           inputPath = key
         elif model == "":
-          model = key
+          model = key.replace("\\", "\\\\").replace(":", "\\:")
       of "format":
         format = key
       of "output":
-        output = key
+        output = key.replace("\\", "\\\\").replace(":", "\\:")
       of "queue":
         queue = parseInt(key)
       of "vad-model":
-        vadModel = key
+        vadModel = key.replace("\\", "\\\\").replace(":", "\\:")
       expecting = ""
 
   if inputPath == "":
@@ -100,8 +100,9 @@ Options:
   let sampleFmtName = av_get_sample_fmt_name(cint(sampleFormat))
   let bufferArgs = "sample_rate=" & $sampleRate & ":sample_fmt=" & $sampleFmtName & ":channel_layout=" & $channelLayout
 
-  if avfilter_graph_create_filter(addr bufferCtx, abuffer, "in", bufferArgs.cstring, nil, filterGraph) < 0:
-    echo "Failed to create buffer source"
+  var ret = avfilter_graph_create_filter(addr bufferCtx, abuffer, "in", bufferArgs.cstring, nil, filterGraph)
+  if ret < 0:
+    echo &"Failed to create buffer source: {ret}"
     quit(1)
 
   let whisperFilter = avfilter_get_by_name("whisper")
@@ -111,15 +112,19 @@ Options:
   if splitWords:
     whisperArgs &= ":max_len=1"
   if output == "-":
-    whisperArgs &= ":destination=/dev/stdout"
+    when defined(windows):
+      whisperArgs &= ":destination=CON"
+    else:
+      whisperArgs &= ":destination=/dev/stdout"
   else:
-    whisperArgs &= &":destination={output}"
+    whisperArgs &= ":destination=" & output
 
   if vadModel != "":
     whisperArgs &= ":vad_model=" & vadModel
 
-  if avfilter_graph_create_filter(addr whisperCtx, whisperFilter, "whisper", whisperArgs.cstring, nil, filterGraph) < 0:
-    error &"Failed to create whisper filter with model: {model}"
+  ret = avfilter_graph_create_filter(addr whisperCtx, whisperFilter, "whisper", whisperArgs.cstring, nil, filterGraph)
+  if ret < 0:
+    error &"Failed to create whisper filter with result: {ret}, model: {model}"
 
   # Create buffer sink
   let abuffersink = avfilter_get_by_name("abuffersink")
