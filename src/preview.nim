@@ -64,7 +64,7 @@ func allCuts(tl: v3, inLen: int): seq[int] =
   let tb = tl.tb
   var clipSpans: seq[(int, int)] = @[]
 
-  for clip in tl.a[0].clips:
+  for clip in tl.a[0]:
     let effectGroup = tl.effects[clip.effects]
     var speed = 1.0
     for effect in effectGroup:
@@ -113,7 +113,7 @@ proc preview*(tl: v3) =
     echo timeFrame("diff", diff, tb, "0.0%")
 
   var clipLens: seq[int] = @[]
-  for clip in tl.a[0].clips:
+  for clip in tl.a[0]:
     clipLens.add clip.dur
 
   stdout.write("clips:\n - amount:    " & $clipLens.len & "\n")

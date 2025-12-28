@@ -9,8 +9,7 @@ import ../timeline
 import ../ffmpeg
 import ../log
 import ../av
-import ../media
-import ../util/[bar, rules]
+import ../util/[bar, lang, rules]
 import video
 import audio
 import subtitle
@@ -120,7 +119,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       if tl.a[i].len > 0: # Only create stream if track has clips
         let rate = AVRational(num: tl.sr, den: 1)
         var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate = rate,
-            layout = tl.layout, metadata = {"language": $tl.a[i].lang}.toTable)
+            layout = tl.layout, metadata = {"language": $tl.langs[tl.v.len + i]}.toTable)
         let encoder = aEncCtx.codec
         checkAudioEncoder(encoder, tl.sr)
         aEncCtx.open()
@@ -155,7 +154,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
     for i in 0..<tl.s.len:
       if tl.s[i].len > 0:
         # Get source file and stream index from first clip
-        let firstClip = tl.s[i].c[0]
+        let firstClip = tl.s[i][0]
         let sourcePath = firstClip.src[]
         let streamIdx = firstClip.stream
 
@@ -178,12 +177,12 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
     var sourcePath: string = ""
     block findSource:
       for vlayer in tl.v:
-        if vlayer.c.len > 0:
-          sourcePath = vlayer.c[0].src[]
+        if vlayer.len > 0:
+          sourcePath = vlayer[0].src[]
           break findSource
       for alayer in tl.a:
-        if alayer.c.len > 0:
-          sourcePath = alayer.c[0].src[]
+        if alayer.len > 0:
+          sourcePath = alayer[0].src[]
           break findSource
 
     if sourcePath != "":

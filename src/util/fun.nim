@@ -30,7 +30,7 @@ proc parseBitrate*(input: string): int =
   if input == "auto":
     return -1
 
-  let (val, unit) = split_num_str(input)
+  let (val, unit) = splitNumStr(input)
   if unit.toLowerAscii() == "k":
     return int(val * 1000)
   if unit == "M":

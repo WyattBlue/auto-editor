@@ -203,7 +203,7 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
         asset.add(timemap)
         break
 
-  var clips: ClipLayer
+  var clips: seq[Clip]
   if tl.v.len > 0 and tl.v[0].len > 0:
     clips = tl.v[0]
   elif tl.a.len > 0 and tl.a[0].len > 0:
@@ -215,7 +215,7 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
       all_refs.add("r" & $((i + 1) * 2))
 
   for my_ref in all_refs.reversed:
-    for clip in clips.c:
+    for clip in clips:
       make_clip(my_ref, clip)
 
   if output == "-":

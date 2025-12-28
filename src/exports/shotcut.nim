@@ -84,13 +84,13 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
   var chains = 0
   var clipTagNames: seq[string] = @[]
 
-  var layer: ClipLayer
+  var layer: seq[Clip]
   if tl.v.len > 0:
     layer = tl.v[0]
   elif tl.a.len > 0:
     layer = tl.a[0]
 
-  for clip in layer.clips:
+  for clip in layer:
     let src = clip.src[]
     let length = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
 
@@ -164,7 +164,7 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
   main_playlist.addProp("shotcut:video", "1")
   main_playlist.addProp("shotcut:name", "V1")
 
-  for i, clip in layer.clips:
+  for i, clip in layer:
     let in_time = to_timecode(float(clip.offset / tb), Code.standard)
     let out_time = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
 

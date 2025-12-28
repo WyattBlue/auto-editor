@@ -6,9 +6,9 @@ import ../av
 # Simple subtitle remuxing: copy subtitle packets from source, adjusting timestamps
 # Note: This approach works well for text-based subtitles (SRT, ASS, WebVTT, etc.)
 # For bitmap subtitles (DVD/PGS), the timestamps are adjusted but the visual data remains unchanged
-proc remuxSubtitles*(sourcePath: string, layer: ClipLayer, outputStream: ptr AVStream,
+proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVStream,
     output: var OutputContainer, timelineTb: AVRational) =
-  if layer.c.len == 0:
+  if layer.len == 0:
     return
 
   # Open source container for each remux operation
@@ -18,7 +18,7 @@ proc remuxSubtitles*(sourcePath: string, layer: ClipLayer, outputStream: ptr AVS
   let formatCtx = srcContainer.formatContext
   let outTb = outputStream.time_base
 
-  for clip in layer.c:
+  for clip in layer:
     if clip.stream >= srcContainer.subtitle.len:
       continue
 

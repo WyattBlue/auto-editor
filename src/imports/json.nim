@@ -4,7 +4,7 @@ import ../log
 import ../timeline
 import ../ffmpeg
 import ../media
-import ../util/color
+import ../util/[color, lang]
 
 proc parseEffect(val: string): Action =
   if val == "cut":
@@ -71,24 +71,33 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
 
   result.effects = @[]
 
-  result.v = @[]
   if jsonNode.hasKey("v") and jsonNode["v"].kind == JArray:
     for trackNode in jsonNode["v"]:
-      var track: ClipLayer
+      var track: seq[Clip]
       if trackNode.kind == JArray:
         for videoNode in trackNode:
-          track.c.add(parseClip(videoNode, interner, result.effects))
-      result.v.add(track)
+          track.add(parseClip(videoNode, interner, result.effects))
+      result.v.add track
 
   # Parse audio tracks
-  result.a = @[]
   if jsonNode.hasKey("a") and jsonNode["a"].kind == JArray:
     for trackNode in jsonNode["a"]:
-      var track: ClipLayer
+      var track: seq[Clip]
       if trackNode.kind == JArray:
         for audioNode in trackNode:
-          track.c.add(parseClip(audioNode, interner, result.effects))
-      result.a.add(track)
+          track.add(parseClip(audioNode, interner, result.effects))
+      result.a.add track
+
+  if jsonNode.hasKey("langs") and jsonNode["langs"].kind == JArray:
+    for trackNode in jsonNode["langs"]:
+      result.langs.add toLang(trackNode.getStr())
+
+  if result.langs.len > result.v.len + result.a.len:
+    result.langs.setLen(result.v.len + result.a.len)
+
+  while result.langs.len < result.v.len + result.a.len:
+    result.langs.add ['u', 'n', 'd', '\0']
+
 
 proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   let input = jsonNode["source"].getStr()

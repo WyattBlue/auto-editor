@@ -579,7 +579,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
       let layer = tl.a[layerIndex]
-      for clip in layer.clips:
+      for clip in layer:
         let key = (clip.src[], clip.stream)
         if key notin samples:
           samples[key] = newGetter(clip.src[], clip.stream.int, sr)
@@ -589,7 +589,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
       let layer = tl.a[layerIndex]
-      for clip in layer.clips:
+      for clip in layer:
         totalDuration = max(totalDuration, clip.start + clip.dur)
 
   let totalSamples = int(totalDuration * sr.int64 * tb.den div tb.num)
@@ -606,7 +606,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
       let layer = tl.a[layerIndex]
-      for clip in layer.clips:
+      for clip in layer:
         let key = (clip.src[], clip.stream)
 
         let effectGroup = tl.effects[clip.effects]

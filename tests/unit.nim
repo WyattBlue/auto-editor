@@ -1,15 +1,12 @@
 import unittest
 import std/[os, tempfiles]
 
-import ../src/[av, ffmpeg]
-import ../src/util/[fun, color]
-import ../src/edit
-import ../src/wavutil
+import ../src/[av, edit, ffmpeg, timeline]
+import ../src/util/[color, fun, lang]
 import ../src/cmds/info
 import ../src/media
-import ../src/timeline
-import ../src/exports/fcp11
-import ../src/exports/kdenlive
+import ../src/wavutil
+import ../src/exports/[kdenlive, fcp11]
 
 func `$`*(layout: AVChannelLayout): string =
   const bufSize: csize_t = 256
@@ -146,7 +143,7 @@ test "size-of-objects":
   check sizeof(Clip) == 40
 
   check sizeof(RGBColor) == 3
-  check sizeof(v3) == 128
+  check sizeof(v3) == 144
 
 test "lang-to-string":
   check sizeof(Lang) == 4

@@ -6,10 +6,7 @@ import ../ffmpeg
 import ../timeline
 import ../media
 import ../log
-import ../util/fun
-
-func `%`*(lang: Lang): JsonNode =
-  %($lang)
+import ../util/[fun, lang]
 
 proc genericTrack(lang: Lang, bitrate: int) =
   if bitrate != 0:

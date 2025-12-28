@@ -1,13 +1,6 @@
 import av
 import ffmpeg
-
-type Lang* = array[4, char]
-
-func `$`*(lang: Lang): string =
-  for i in 0 ..< 4:
-    if lang[i] == '\0':
-      break
-    result.add lang[i]
+import util/lang
 
 type
   VideoStream* = object
