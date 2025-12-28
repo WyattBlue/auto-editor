@@ -15,10 +15,6 @@ proc main*(cArgs: seq[string]) =
   var queue: int = 10
   var vadModel: string = ""
 
-  if cArgs.len < 1:
-    echo "Whisper front-end"
-    quit(0)
-
   var expecting: string = ""
   for rawKey in cArgs:
     let key = handleKey(rawKey)

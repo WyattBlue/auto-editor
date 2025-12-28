@@ -14,10 +14,6 @@ type levelArgs* = object
   noCache*: bool = false
 
 proc main*(strArgs: seq[string]) =
-  if strArgs.len < 1:
-    echo "Display loudness over time"
-    quit(0)
-
   var args = levelArgs()
   var expecting: string = ""
   var inputFile: string = ""

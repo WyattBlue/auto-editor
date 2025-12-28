@@ -148,10 +148,6 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
 
 
 proc main*(args: seq[string]) =
-  if args.len < 1:
-    echo "Retrieve information and properties about media files"
-    quit(0)
-
   av_log_set_level(AV_LOG_QUIET)
 
   var isJson = false

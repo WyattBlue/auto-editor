@@ -3,6 +3,7 @@ when not defined(windows):
   import std/posix_utils
 
 import about
+import cli
 import edit
 import log
 import ffmpeg
@@ -17,8 +18,8 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
-type Command* = tuple[name: string, handler: proc(args: seq[string])]
-const commands*: seq[Command] = @[
+type Command = tuple[name: string, handler: proc(args: seq[string])]
+const cmdHandlers: seq[Command] = @[
   ("cache", cache.main),
   ("desc", desc.main),
   ("info", info.main),
@@ -327,9 +328,12 @@ judge making cuts.
 """
       quit(0)
   else:
-    for command in commands:
+    for (command, cmdHandler) in zip(commands, cmdHandlers):
       if paramStr(1) == command.name:
-        command.handler(commandLineParams()[1..^1])
+        if paramCount() < 2 and command.help != "":
+          echo command.help
+        else:
+          cmdHandler.handler(commandLineParams()[1..^1])
         quit(0)
 
   var args = mainArgs()
