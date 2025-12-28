@@ -279,6 +279,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   var lastFrameIndex = -1
   var lastKeyframePos = initTable[ptr string, int]()
   var lastSeekTarget = initTable[ptr string, int]()
+  let isNonlinear = tl.isNonlinear
 
   # Initialize lastKeyframePos to 0 for all sources (frame 0 is always seekable)
   for src in tl.uniqueSources:
@@ -308,10 +309,19 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             let i = int(round(float(sourceFramePos) * speed))
             objList.add VideoFrame(index: i, src: obj.src)
 
-      if tl.clips2.isSome:
+      if isNonlinear:
         # When there can be valid gaps in the timeline and no objects for this frame.
         frame = av_frame_clone(nullFrame)
-      # else, use the last frame or process objects
+      elif pix_fmt == AV_PIX_FMT_RGB8:
+        if lastProcessedFrame != nil:
+          let oldFrame = frame
+          frame = av_frame_clone(lastProcessedFrame)
+          if oldFrame != nil and oldFrame != nullFrame:
+            av_frame_free(addr oldFrame)
+        else:
+          frame = av_frame_clone(nullFrame)
+      else:
+        discard # use the last frame
 
       for obj in objList:
         # Check if we can reuse the last processed frame
@@ -410,7 +420,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
       # Update cache for frame reuse BEFORE yielding (which will unref the frame)
       if objList.len > 0:
-        if lastProcessedFrame != nil:
+        if lastProcessedFrame != nil and lastProcessedFrame != nullFrame:
           av_frame_free(addr lastProcessedFrame)
         lastProcessedFrame = av_frame_clone(frame)
         lastFrameIndex = objList[0].index
@@ -419,7 +429,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
     if scaleGraph != nil:
       scaleGraph.cleanup()
-    av_frame_free(addr nullFrame)
-    if lastProcessedFrame != nil:
+    if lastProcessedFrame != nil and lastProcessedFrame != nullFrame:
       av_frame_free(addr lastProcessedFrame)
-    debug(&"Total frames saved seeking: {framesSaved}"))
+    av_frame_free(addr nullFrame)
+    debug &"Total frames saved seeking: {framesSaved}")

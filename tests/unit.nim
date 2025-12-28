@@ -1,6 +1,5 @@
 import unittest
-import std/os
-import std/tempfiles
+import std/[os, tempfiles]
 
 import ../src/[av, ffmpeg]
 import ../src/util/[fun, color]
@@ -13,10 +12,9 @@ import ../src/exports/fcp11
 import ../src/exports/kdenlive
 
 func `$`*(layout: AVChannelLayout): string =
-  const bufSize = 256
+  const bufSize: csize_t = 256
   var buffer = newString(bufSize)
-  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring,
-      bufSize.csize_t)
+  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring, bufSize)
 
   if ret > 0:
     let actualLen = buffer.find('\0')
@@ -30,48 +28,48 @@ func `$`*(layout: AVChannelLayout): string =
 test "avrational":
   let a = AVRational(num: 3, den: 4)
   let b = AVRational(num: 3, den: 4)
-  check(a + b == AVRational(num: 3, den: 2))
-  check(a + a == a * 2)
+  check a + b == AVRational(num: 3, den: 2)
+  check a + a == a * 2
 
   let intThree: int64 = 3
-  check(intThree / AVRational(3) == AVRational(1))
-  check(intThree * AVRational(3) == AVRational(9))
+  check intThree / AVRational(3) == AVRational(1)
+  check intThree * AVRational(3) == AVRational(9)
 
-  check(AVRational(num: 9, den: 3).int64 == intThree)
-  check(AVRational(num: 10, den: 3).int64 == intThree)
-  check(AVRational(num: 11, den: 3).int64 == intThree)
-  check(AVRational(num: 10, den: 5) != AVRational(num: 2, den: 1)) # use compare
+  check AVRational(num: 9, den: 3).int64 == intThree
+  check AVRational(num: 10, den: 3).int64 == intThree
+  check AVRational(num: 11, den: 3).int64 == intThree
+  check AVRational(num: 10, den: 5) != AVRational(num: 2, den: 1) # use compare
 
-  check(AVRational("42") == AVRational(42))
-  check(AVRational("-2/3") == AVRational(num: -2, den: 3))
-  check(AVRational("6/8") == AVRational(num: 3, den: 4))
-  check(AVRational("1.5") == AVRational(num: 3, den: 2))
+  check AVRational("42") == AVRational(42)
+  check AVRational("-2/3") == AVRational(num: -2, den: 3)
+  check AVRational("6/8") == AVRational(num: 3, den: 4)
+  check AVRational("1.5") == AVRational(num: 3, den: 2)
 
 test "color":
-  check(RGBColor(red: 0, green: 0, blue: 0).toString == "#000000")
-  check(RGBColor(red: 255, green: 255, blue: 255).toString == "#ffffff")
+  check RGBColor(red: 0, green: 0, blue: 0).toString == "#000000"
+  check RGBColor(red: 255, green: 255, blue: 255).toString == "#ffffff"
 
-  check(parseColor("#000") == RGBColor(red: 0, green: 0, blue: 0))
-  check(parseColor("#000000") == RGBColor(red: 0, green: 0, blue: 0))
-  check(parseColor("#FFF") == RGBColor(red: 255, green: 255, blue: 255))
-  check(parseColor("#fff") == RGBColor(red: 255, green: 255, blue: 255))
-  check(parseColor("#FFFFFF") == RGBColor(red: 255, green: 255, blue: 255))
+  check parseColor("#000") == RGBColor(red: 0, green: 0, blue: 0)
+  check parseColor("#000000") == RGBColor(red: 0, green: 0, blue: 0)
+  check parseColor("#FFF") == RGBColor(red: 255, green: 255, blue: 255)
+  check parseColor("#fff") == RGBColor(red: 255, green: 255, blue: 255)
+  check parseColor("#FFFFFF") == RGBColor(red: 255, green: 255, blue: 255)
 
-  check(parseColor("black") == RGBColor(red: 0, green: 0, blue: 0))
-  check(parseColor("darkgreen") == RGBColor(red: 0, green: 100, blue: 0))
+  check parseColor("black") == RGBColor(red: 0, green: 0, blue: 0)
+  check parseColor("darkgreen") == RGBColor(red: 0, green: 100, blue: 0)
 
 test "dialogue":
-  check("0,0,Default,,0,0,0,,oop".dialogue == "oop")
-  check("0,0,Default,,0,0,0,,boop".dialogue == "boop")
+  check "0,0,Default,,0,0,0,,oop".dialogue == "oop"
+  check "0,0,Default,,0,0,0,,boop".dialogue == "boop"
 
 test "encoder":
   let (_, encoderCtx) = initEncoder("pcm_s16le")
-  check(encoderCtx.codec_type == AVMEDIA_TYPE_AUDIO)
-  check(encoderCtx.bit_rate != 0)
+  check encoderCtx.codec_type == AVMEDIA_TYPE_AUDIO
+  check encoderCtx.bit_rate != 0
 
   let (_, encoderCtx2) = initEncoder(AV_CODEC_ID_PCM_S16LE)
-  check(encoderCtx2.codec_type == AVMEDIA_TYPE_AUDIO)
-  check(encoderCtx2.bit_rate != 0)
+  check encoderCtx2.codec_type == AVMEDIA_TYPE_AUDIO
+  check encoderCtx2.bit_rate != 0
 
 test "exports":
   check(parseExportString("premiere:name=a,version=3") == ("premiere", "a", "3"))
@@ -118,9 +116,9 @@ test "mp3towav":
 
   let container = av.open(outFile)
   defer: container.close()
-  check(container.audio.len == 1)
-  check($container.audio[0].name == "pcm_s16le")
-  check($container.audio[0].codecpar.ch_layout in ["mono", "1 channels"])
+  check container.audio.len == 1
+  check $container.audio[0].name == "pcm_s16le"
+  check $container.audio[0].codecpar.ch_layout in ["mono", "1 channels"]
 
 test "mp4towav":
   let tempDir = createTempDir("tmp", "")
@@ -130,8 +128,8 @@ test "mp4towav":
 
   let container = av.open(outFile)
   defer: container.close()
-  check(container.audio.len == 1)
-  check($container.audio[0].name == "pcm_s16le")
+  check container.audio.len == 1
+  check $container.audio[0].name == "pcm_s16le"
 
 test "size-of-objects":
   check sizeof(seq) == 16
@@ -147,6 +145,9 @@ test "size-of-objects":
   check sizeof(MediaInfo) == 96
   check sizeof(Clip) == 40
 
+  check sizeof(RGBColor) == 3
+  check sizeof(v3) == 128
+
 test "lang-to-string":
   check sizeof(Lang) == 4
   var a: Lang = ['a', 's', 'd', 'f']
@@ -155,7 +156,7 @@ test "lang-to-string":
   check $a == "eng"
 
 test "smpte":
-  check(parseSMPTE("13:44:05:21", AVRational(num: 24000, den: 1001)) == 1186701)
+  check parseSMPTE("13:44:05:21", AVRational(num: 24000, den: 1001)) == 1186701
 
 test "uuid":
   # Test that genUuid generates valid RFC 4122 version 4 UUIDs

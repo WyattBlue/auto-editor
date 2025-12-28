@@ -1,4 +1,4 @@
-import std/[os, options, times, terminal, browsers]
+import std/[os, times, terminal, browsers]
 import std/[strutils, strformat]
 import std/sequtils
 import std/[random, sets]
@@ -353,16 +353,15 @@ proc editMedia*(args: var mainArgs) =
   debug &"Temp Directory: {tempDir}"
 
   if args.`export` == "clip-sequence":
-    if not isSome(tlV3.clips2):
+    if tlV3.isNonlinear:
       error "Timeline too complex to use clip-sequence export"
 
     func appendFilename(path, val: string): string =
       let (dir, name, ext) = splitFile(path)
       return (dir / name) & val & ext
 
-    let allClips2: seq[Clip2] = tlV3.clips2.unsafeGet()
     var clips2: seq[Clip2] = @[]
-    for clip in allClips2:
+    for clip in tlV3.clips2:
       let effectGroup = tlV3.effects[clip.effect]
       var isCut = false
       for effect in effectGroup:
