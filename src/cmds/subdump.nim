@@ -4,10 +4,6 @@ import ../log
 
 
 proc main*(args: seq[string]) =
-  if args.len < 1:
-    echo "Dump text-based subtitles to stdout with formatting stripped out"
-    quit(0)
-
   av_log_set_level(AV_LOG_QUIET)
 
   let packet = av_packet_alloc()
