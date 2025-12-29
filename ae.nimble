@@ -151,6 +151,7 @@ let whisper = Package(
   buildSystem: "cmake",
   buildArguments: @[
     "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
+    "-DGGML_USE_CUDA=" & (when defined(macosx): "OFF" else: "ON"),
     "-DWHISPER_SDL2=OFF",
     "-DWHISPER_BUILD_EXAMPLES=OFF",
     "-DWHISPER_BUILD_TESTS=OFF",
