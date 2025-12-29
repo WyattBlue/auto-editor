@@ -19,12 +19,15 @@ import src/cli
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
+var enableCuda =  getEnv("ENABLE_CUDA").len > 0 and not defined(macosx)
 
 var flags = ""
 if not disableHevc:
   flags &= "-d:enable_hevc "
 if enableWhisper:
   flags &= "-d:enable_whisper "
+if enableCuda:
+  flags &= "-d:enable_cuda "
 
 task test, "Run unit tests":
   exec &"nim c {flags} -r tests/unit"
@@ -151,6 +154,7 @@ let whisper = Package(
   buildSystem: "cmake",
   buildArguments: @[
     "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
+    "-DGGML_CUDA=" & (if enableCuda: "ON" else: "OFF"),
     "-DWHISPER_SDL2=OFF",
     "-DWHISPER_BUILD_EXAMPLES=OFF",
     "-DWHISPER_BUILD_TESTS=OFF",
@@ -258,12 +262,21 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
 
   if crossWindows:
     cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
+    cmakeArgs.add("-DCMAKE_SYSTEM_PROCESSOR=AMD64")
     cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc-posix")
     cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++-posix")
     cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+
+    # CUDA configuration for cross-compilation
+    if enableCuda and package.name == "whisper":
+      let cudaPath = getEnv("CUDA_PATH", "/usr/local/cuda-12.8")
+      cmakeArgs.add(&"-DCUDAToolkit_ROOT={cudaPath}")
+      cmakeArgs.add(&"-DCUDA_TOOLKIT_ROOT_DIR={cudaPath}")
+      cmakeArgs.add("-DCMAKE_CUDA_COMPILER=" & cudaPath / "bin/nvcc")
+      cmakeArgs.add("-DGGML_CUDA_ARCHITECTURES=52;61;70;75;80;86;89;90")
 
   withDir "build_cmake":
     let cmakeCmd = "cmake " & cmakeArgs.join(" ") & " .."
@@ -281,7 +294,16 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
       if fileExists(srcFile) and not fileExists(dstFile):
         echo &"Renaming {srcFile} to {dstFile}"
         exec &"mv \"{srcFile}\" \"{dstFile}\""
-    
+
+    # Handle CUDA library naming for cross-compilation
+    if crossWindows and enableCuda:
+      for libFile in ["ggml-cuda.a"]:
+        let srcFile = libDir / libFile
+        let dstFile = libDir / ("lib" & libFile)
+        if fileExists(srcFile) and not fileExists(dstFile):
+          echo &"Renaming {srcFile} to {dstFile}"
+          exec &"mv \"{srcFile}\" \"{dstFile}\""
+
     let pcFile = buildPath / "lib/pkgconfig/whisper.pc"
     if fileExists(pcFile):
       echo "Fixing whisper.pc file"
@@ -299,9 +321,16 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
           "Libs: -L${libdir} -lggml -lggml-base -lwhisper -lggml-cpu -lggml-blas"
         )
       else:
+        let cudaPath = getEnv("CUDA_PATH", "/usr/local/cuda-12.8")
         content = content.replace(
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
-          "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu"
+          (if enableCuda:
+            (if crossWindows:
+              # For Windows cross-compilation, use static CUDA libraries
+              &"Libs: -L${{libdir}} -lwhisper -lggml-base -lggml -lggml-cpu -lggml-cuda -L{cudaPath}/lib64/stubs -lcuda -L{cudaPath}/lib64 -lcudart_static -lcublas -lcublasLt"
+            else:
+              &"Libs: -L${{libdir}} -lwhisper -lggml-base -lggml -lggml-cpu -lggml-cuda -L{cudaPath}/lib64 -lcuda -lcudart -lcudart -lcublasLt")
+          else: "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu")
         )
 
       if not content.contains("Libs.private:"):

@@ -32,8 +32,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-          - os: macos-latest
+          # - os: ubuntu-latest
+          # - os: macos-latest
           - os: ubuntu-22.04-arm
     steps:
       - name: Checkout
@@ -81,10 +81,18 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install mingw-w64
         run: |
+          wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
           sudo apt-get update
+
           sudo apt-get install -y mingw-w64 mingw-w64-tools mingw-w64-x86-64-dev
           sudo apt-get install -y build-essential pkg-config nasm git
+          sudo apt-get install -y cuda-toolkit-12-8
           echo "DISABLE_HEVC=1" >> $GITHUB_ENV
+          echo "ENABLE_CUDA=1" >> $GITHUB_ENV
+          echo "CUDA_PATH=/usr/local/cuda-12.8" >> $GITHUB_ENV
+          echo "/usr/local/cuda-12.8/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: Build FFmpeg
         run: nimble makeffwin
       - name: Compile
