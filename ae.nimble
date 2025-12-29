@@ -151,7 +151,7 @@ let whisper = Package(
   buildSystem: "cmake",
   buildArguments: @[
     "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
-    "-DGGML_USE_CUDA=" & (when defined(macosx): "OFF" else: "ON"),
+    "-DGGML_CUDA=" & (when defined(macosx): "OFF" else: "ON"),
     "-DWHISPER_SDL2=OFF",
     "-DWHISPER_BUILD_EXAMPLES=OFF",
     "-DWHISPER_BUILD_TESTS=OFF",
@@ -624,13 +624,6 @@ task makeff, "Build FFmpeg from source":
   ffmpegSetup(crossWindows=false)
 
   let packages = setupPackages(enableWhisper=enableWhisper)
-
-  # Debug: List pkg-config files to verify whisper.pc exists
-  when defined(linux):
-    echo "Checking for whisper.pc files:"
-    exec &"find {buildPath} -name 'whisper.pc' -type f"
-    echo "Current PKG_CONFIG_PATH: ", getEnv("PKG_CONFIG_PATH")
-    exec "pkg-config --list-all | grep whisper || echo 'whisper not found in pkg-config'"
 
   withDir "ffmpeg_sources/ffmpeg":
     exec &"""./configure --prefix="{buildPath}" \
