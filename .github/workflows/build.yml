@@ -40,8 +40,9 @@ jobs:
             echo "ENABLE_CUDA=1" >> $GITHUB_ENV
             echo "CUDA_PATH=/usr/local/cuda-12.8" >> $GITHUB_ENV
             echo "/usr/local/cuda-12.8/bin" >> $GITHUB_PATH
-            echo "LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:/usr/local/cuda-12.8/lib64/stubs:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+            echo "LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64/stubs:/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
             echo "LDFLAGS=-L/usr/local/cuda-12.8/lib64/stubs -L/usr/local/cuda-12.8/lib64" >> $GITHUB_ENV
+            sudo ln -sf /usr/local/cuda-12.8/lib64/stubs/libcuda.so /usr/local/cuda-12.8/lib64/stubs/libcuda.so.1
           elif [ "${{ matrix.os }}" = "ubuntu-24.04-arm" ]; then
             wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/arm64/cuda-keyring_1.1-1_all.deb
             sudo dpkg -i cuda-keyring_1.1-1_all.deb
@@ -50,8 +51,9 @@ jobs:
             echo "ENABLE_CUDA=1" >> $GITHUB_ENV
             echo "CUDA_PATH=/usr/local/cuda-12.8" >> $GITHUB_ENV
             echo "/usr/local/cuda-12.8/bin" >> $GITHUB_PATH
-            echo "LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:/usr/local/cuda-12.8/lib64/stubs:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+            echo "LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64/stubs:/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
             echo "LDFLAGS=-L/usr/local/cuda-12.8/lib64/stubs -L/usr/local/cuda-12.8/lib64" >> $GITHUB_ENV
+            sudo ln -sf /usr/local/cuda-12.8/lib64/stubs/libcuda.so /usr/local/cuda-12.8/lib64/stubs/libcuda.so.1
           elif [ "${{ matrix.os }}" = "macos-15-intel" ]; then
             brew install nasm
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
