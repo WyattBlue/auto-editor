@@ -30,11 +30,12 @@ jobs:
   main:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
           - os: macos-latest
-          - os: ubuntu-22.04-arm
+          - os: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -52,13 +53,15 @@ jobs:
           brew update && brew install nim
       - name: Setup
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
             sudo apt-get install -y build-essential pkg-config nasm git
-          elif [ "${{ matrix.os }}" = "ubuntu-22.04-arm" ]; then
+          elif [ "${{ matrix.os }}" = "ubuntu-24.04-arm" ]; then
             sudo apt-get install -y build-essential pkg-config git
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           fi
+          echo "DISABLE_VPX=1" >> $GITHUB_ENV
+          echo "DISABLE_SVTAV1=1" >> $GITHUB_ENV
           echo "DISABLE_HEVC=1" >> $GITHUB_ENV
       - name: Build FFmpeg
         run: nimble makeff
@@ -83,7 +86,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y mingw-w64 mingw-w64-tools mingw-w64-x86-64-dev
-          sudo apt-get install -y build-essential pkg-config nasm git
+          sudo apt-get install -y build-essential pkg-config nasm git meson
           echo "DISABLE_HEVC=1" >> $GITHUB_ENV
       - name: Build FFmpeg
         run: nimble makeffwin

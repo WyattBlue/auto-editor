@@ -16,15 +16,24 @@ import std/os
 import std/[strutils, strformat]
 import src/cli
 
+var disableVpx = getEnv("DISABLE_VPX").len > 0
+var disableSvtAv1 = getEnv("DISABLE_SVTAV1").len > 0
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
+var enableCuda = getEnv("ENABLE_CUDA").len > 0 and not defined(macosx)
 
 var flags = ""
+if not disableVpx:
+  flags &= "-d:enable_vpx "
+if not disableSvtAv1:
+  flags &= "-d:enable_svtav1 "
 if not disableHevc:
   flags &= "-d:enable_hevc "
 if enableWhisper:
   flags &= "-d:enable_whisper "
+if enableCuda:
+  flags &= "-d:enable_cuda "
 
 task test, "Run unit tests":
   exec &"nim c {flags} -r tests/unit"
@@ -151,6 +160,7 @@ let whisper = Package(
   buildSystem: "cmake",
   buildArguments: @[
     "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
+    "-DGGML_CUDA=" & (if enableCuda: "ON" else: "OFF"),
     "-DWHISPER_SDL2=OFF",
     "-DWHISPER_BUILD_EXAMPLES=OFF",
     "-DWHISPER_BUILD_TESTS=OFF",
@@ -186,7 +196,11 @@ proc setupPackages(enableWhisper: bool): seq[Package] =
     result.add nvheaders
   if enableWhisper:
     result.add whisper
-  result &= [lame, opus, vpx, dav1d, svtav1, x264]
+  result &= [lame, opus, dav1d, x264]
+  if not disableVpx:
+    result.add vpx
+  if not disableSvtAv1:
+    result.add svtav1
   if not disableHevc:
     result.add x265
   return result
@@ -301,7 +315,8 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
       else:
         content = content.replace(
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
-          "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu"
+          (if enableCuda: "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu -lggml-cuda -L/usr/local/cuda-12.8/lib64/stubs -L/usr/local/cuda-12.8/lib64 -lcuda -lcudart -lcublas -lcublasLt"
+           else: "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu")
         )
 
       if not content.contains("Libs.private:"):
@@ -624,19 +639,16 @@ task makeff, "Build FFmpeg from source":
 
   let packages = setupPackages(enableWhisper=enableWhisper)
 
-  # Debug: List pkg-config files to verify whisper.pc exists
-  when defined(linux):
-    echo "Checking for whisper.pc files:"
-    exec &"find {buildPath} -name 'whisper.pc' -type f"
-    echo "Current PKG_CONFIG_PATH: ", getEnv("PKG_CONFIG_PATH")
-    exec "pkg-config --list-all | grep whisper || echo 'whisper not found in pkg-config'"
-
   withDir "ffmpeg_sources/ffmpeg":
-    exec &"""./configure --prefix="{buildPath}" \
-      --pkg-config-flags="--static" \
-      --extra-cflags="-I{buildPath}/include" \
-      --extra-ldflags="-L{buildPath}/lib" \
-      --extra-libs="-lpthread -lm" \""" & "\n" & setupCommonFlags(packages)
+    try:
+      exec &"""./configure --prefix="{buildPath}" \
+        --pkg-config-flags="--static" \
+        --extra-cflags="-I{buildPath}/include" \
+        --extra-ldflags="-L{buildPath}/lib" \
+        --extra-libs="-lpthread -lm" \""" & "\n" & setupCommonFlags(packages)
+    except OSError:
+      exec "cat ./ffbuild/config.log"
+      quit(1)
     makeInstall()
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":

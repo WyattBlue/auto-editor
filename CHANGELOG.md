@@ -1,14 +1,13 @@
-# 29.5.0
+# 29.6.0
 
 ## Major
 
 ## Features
- - Whisper is now built by default on MacOS
- - Shotcut: Support the varispeed and volume effects
- - Kdenlive: Support the varispeed effect
- - Whisper: support splitting words via `--split-words`
- - `--cut` is now an alias for `--cut-out`
- - `--keep` is now an alias for `--add-in`
+ - Linux Aarch64 is now available as an official binary.
+ - Whisper is now built on all platforms.
+ - Cuda for whisper can now be built as an opt-in feature for Linux.
+ - NOTE: Cuda Whisper for Windows cannot be built because NVIDIA does not provide MingW binaries. An alternative is to use the Linux binary in WSL.
 
 ## Fixes
- - Video rendering: Improve worst case performance with a better seeking algorithm
+ - Use the last video frame instead of inserting a black frame.
+ - Whisper command: properly escape files with colons and backslashes.
