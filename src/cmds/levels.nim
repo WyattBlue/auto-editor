@@ -116,10 +116,11 @@ proc main*(strArgs: seq[string]) =
   elif editMethod == "subtitle":
     if container.subtitle.len == 0:
       error "No Subtitle stream"
-    if container.subtitle.len <= userStream:
-      error fmt"Subtitle stream out of range: {userStream}"
 
-    for value in subtitle(container, tb, pattern, userStream):
+    let (ret, values) = subtitle(container, tb, pattern, userStream)
+    if ret != -1:
+      error &"Subtitle stream out of range: {ret}"
+    for value in values:
       echo (if value: "1" else: "0")
 
   if editMethod != "subtitle" and not args.noCache:
