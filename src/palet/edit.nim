@@ -269,7 +269,10 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
         if pattern == "":
           error &"{text[node[0].`from` ..< node[0].to]}: pattern required"
 
-        return subtitle(container, tb, re(pattern, flags), stream)
+        let (ret, val) = subtitle(container, tb, re(pattern, flags), stream)
+        if ret != -1:
+          error &"regex: subtitle stream '{ret}' does not exist."
+        return val
       of "word":
         let argOrder = @["value", "stream", "ignore-case"]
         var pattern = ""
@@ -290,7 +293,10 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
         pattern = "\\b" & pattern & "\\b"
         if ignoreCase:
           flags.incl reIgnoreCase
-        return subtitle(container, tb, re(pattern, flags), stream)
+        let (ret, val) = subtitle(container, tb, re(pattern, flags), stream)
+        if ret != -1:
+          error &"word: subtitle stream '{ret}' does not exist."
+        return val
 
       of "none":
         let length = mediaLength(container)

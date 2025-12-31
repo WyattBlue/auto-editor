@@ -1,14 +1,13 @@
-import std/strformat
 from std/math import round
 
-import ../[av, log, ffmpeg]
+import ../[av, ffmpeg]
 import tinyre
 
 proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
-    stream: int32): seq[bool] =
+    stream: int32): (int32, seq[bool]) {.raises:[].} =
 
   if stream >= container.subtitle.len:
-    error &"subtitle stream '{stream}' does not exist."
+    return (stream, @[])
 
   let
     formatCtx = container.formatContext
@@ -53,7 +52,9 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
             if match(assText.dialogue, pattern).len > 0:
               spans.add((start, `end`))
 
-  result = newSeq[bool](length)
+  var val = newSeq[bool](length)
   for span in spans:
     for i in span[0] ..< span[1]:
-      result[i] = true
+      val[i] = true
+
+  return (-1, val)
