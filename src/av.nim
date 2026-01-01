@@ -70,7 +70,7 @@ type InputContainer* = object
   attachment*: seq[ptr AVStream]
   streams*: seq[ptr AVStream]
 
-proc open*(filename: string): InputContainer =
+proc open*(filename: string): InputContainer {.raises:[IOError].} =
   result = InputContainer()
   result.packet = av_packet_alloc()
 
