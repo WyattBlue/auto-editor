@@ -578,8 +578,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   # Collect all unique audio sources from specified layers
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
-      let layer = tl.a[layerIndex]
-      for clip in layer:
+      for clip in tl.a[layerIndex]:
         let key = (clip.src[], clip.stream)
         if key notin samples:
           samples[key] = newGetter(clip.src[], clip.stream.int, sr)
@@ -588,8 +587,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   var totalDuration = 0
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
-      let layer = tl.a[layerIndex]
-      for clip in layer:
+      for clip in tl.a[layerIndex]:
         totalDuration = max(totalDuration, clip.start + clip.dur)
 
   let totalSamples = int(totalDuration * sr.int64 * tb.den div tb.num)
@@ -605,8 +603,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   # Collect and cache all source data
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
-      let layer = tl.a[layerIndex]
-      for clip in layer:
+      for clip in tl.a[layerIndex]:
         let key = (clip.src[], clip.stream)
 
         let effectGroup = tl.effects[clip.effects]
@@ -651,10 +648,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
                 # Clamp to 16-bit range to prevent overflow distortion
                 audioBuffer[flatIndex] = int16(max(-32768, min(32767, mixed)))
               else:
-                # Replace: direct assignment (for single layer)
                 audioBuffer[flatIndex] = processedData[sourceIndex]
 
-  # Apply normalization if needed
   if norm.kind == nkPeak:
     # Calculate peak normalization adjustment (first pass analysis)
     var maxPeakLevel: float32 = -99.0
@@ -720,11 +715,9 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         else:
           channelData[i] = 0.0
 
-    # Push frame to analysis filter graph
     analysisGraph.push(analysisFrame)
     av_frame_free(addr analysisFrame)
 
-    # Flush the analysis filter graph
     analysisGraph.flush()
 
     # Pull all output frames from analysis (and discard them - we only need the stats)
@@ -735,8 +728,6 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       av_frame_free(addr outputFrame)
 
     analysisGraph.cleanup()
-
-    # Disable log capture and restore default callback
     disableLoudnormCapture()
 
     var measuredI = norm.i
@@ -800,11 +791,9 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         else:
           channelData[i] = 0.0
 
-    # Push frame to filter graph
     loudnormGraph.push(inputFrame)
     av_frame_free(addr inputFrame)
 
-    # Flush the filter graph
     loudnormGraph.flush()
 
     # Pull all output frames
@@ -873,7 +862,6 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       if i < audioBuffer.len and i < normalizedBuffer.len:
         audioBuffer[i] = normalizedBuffer[i]
 
-    # Clean up filter graph
     loudnormGraph.cleanup()
 
   # Yield audio frames in chunks
