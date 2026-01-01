@@ -39,7 +39,7 @@ proc elem(tag, text: string): XmlNode =
   e.add newText(text)
   return e
 
-proc param(id, name, value: string, min = "", max = ""): XmlNode =
+func param(id, name, value: string, min = "", max = ""): XmlNode =
   let p = <>parameter(authoringApp = "PremierePro")
   p.add elem("parameterid", id)
   p.add elem("name", name)
@@ -48,7 +48,7 @@ proc param(id, name, value: string, min = "", max = ""): XmlNode =
   p.add elem("value", value)
   return p
 
-proc speedup(speed: float): XmlNode =
+func speedup(speed: float): XmlNode =
   let fil = newElement("filter")
   let effect = newElement("effect")
   effect.add elem("name", "Time Remap")
@@ -150,7 +150,7 @@ proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
 
       let effectGroup = tl.effects[aclip.effects]
       for effect in effectGroup:
-        if effect.kind == actSpeed:
+        if effect.kind in [actSpeed, actVarispeed]:
           clipitem.add speedup(effect.val * 100)
           break
 
@@ -218,7 +218,7 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
 
         let effectGroup = tl.effects[aclip.effects]
         for effect in effectGroup:
-          if effect.kind == actSpeed:
+          if effect.kind in [actSpeed, actVarispeed]:
             clipitem.add speedup(effect.val * 100)
             break
 
@@ -311,7 +311,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
 
       let effectGroup = tl.effects[clip.effects]
       for effect in effectGroup:
-        if effect.kind == actSpeed:
+        if effect.kind in [actSpeed, actVarispeed]:
           clipitem.add speedup(effect.val * 100)
           break
 
