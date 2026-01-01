@@ -1,8 +1,8 @@
 import std/[math, options, os, sequtils, strformat, strutils]
 import lexer
 import ../[av, ffmpeg, log]
-import ../util/[bar, fun]
 import ../analyze/[audio, motion, subtitle]
+import ../util/[bar, fun]
 
 import tinyre
 
@@ -20,7 +20,7 @@ func `or`(a, b: seq[bool]): seq[bool] =
 func `and`(a, b: seq[bool]): seq[bool] =
   result = newSeq[bool](min(a.len, b.len))
   for i in 0 ..< result.len:
-    result[i] = a[i] or b[i]
+    result[i] = a[i] and b[i]
 
 func `xor`(a, b: seq[bool]): seq[bool] =
   result = newSeq[bool](max(a.len, b.len))
