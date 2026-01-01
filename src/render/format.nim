@@ -182,7 +182,9 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       defer: srcContainer.close()
 
       # Copy each attachment stream
-      for attachStream in srcContainer.attachment:
+      for attachStream in srcContainer.streams:
+        if attachStream.codecpar.codec_type != AVMEDIA_TYPE_ATTACHMENT:
+          continue
         # Create attachment stream directly (attachments don't have decoders)
         let attachOutStream = avformat_new_stream(output.formatCtx, nil)
         if attachOutStream == nil:

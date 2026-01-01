@@ -62,7 +62,6 @@ type InputContainer* = object
   video*: seq[ptr AVStream]
   audio*: seq[ptr AVStream]
   subtitle*: seq[ptr AVStream]
-  attachment*: seq[ptr AVStream]
   streams*: seq[ptr AVStream]
 
 proc open*(filename: string): InputContainer {.raises:[IOError].} =
@@ -87,8 +86,6 @@ proc open*(filename: string): InputContainer {.raises:[IOError].} =
       result.audio.add(stream)
     of AVMEDIA_TYPE_SUBTITLE:
       result.subtitle.add(stream)
-    of AVMEDIA_TYPE_ATTACHMENT:
-      result.attachment.add(stream)
     else:
       discard
 
