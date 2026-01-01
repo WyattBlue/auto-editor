@@ -180,7 +180,7 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
 
     let effectGroup = tl.effects[clip.effects]
     for effect in effectGroup:
-      if effect.kind == actSpeed:
+      if effect.kind in [actSpeed, actVarispeed]:
         # See the "Time Maps" section.
         # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
 
