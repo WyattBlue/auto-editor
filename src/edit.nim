@@ -1,7 +1,5 @@
-import std/[os, times, terminal, browsers]
-import std/[strutils, strformat]
-import std/sequtils
-import std/[random, sets]
+import std/[os, random, sets, sequtils, strformat, strutils, terminal, times]
+from std/browsers import openDefaultBrowser
 from std/math import round
 
 import av
@@ -203,7 +201,7 @@ proc editMedia*(args: var mainArgs) =
   av_log_set_level(AV_LOG_QUIET)
 
   var tlV3: v3
-  var interner = newStringInterner()
+  var interner: StringInterner
   var output: string
   var usePath: string = ""
   var mi: MediaInfo

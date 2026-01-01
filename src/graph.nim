@@ -3,19 +3,14 @@ import std/strformat
 import ffmpeg
 import log
 
-type
-  Graph* = ref object
-    graph: ptr AVFilterGraph
-    nodes: seq[ptr AVFilterContext]
-    configured: bool
-
-  BlockingIOError* = object of CatchableError
-  EOFError* = object of CatchableError
+type Graph* = ref object
+  nodes: seq[ptr AVFilterContext]
+  graph: ptr AVFilterGraph
+  configured: bool = false
 
 proc newGraph*(): Graph =
   result = Graph()
   result.nodes = @[]
-  result.configured = false
   result.graph = avfilter_graph_alloc()
   if result.graph == nil:
     error "Could not allocate filter graph"
@@ -35,39 +30,30 @@ proc add*(graph: Graph, name: string, filterArgs: string = ""): ptr AVFilterCont
 
   let filter = avfilter_get_by_name(name.cstring)
   if filter == nil:
-    error fmt"Filter '{name}' not found"
+    error &"Filter '{name}' not found"
 
   let ret = avfilter_graph_create_filter(
-    addr filterCtx,
-    filter,
-    filterName.cstring,
-    args,
-    nil,
-    graph.graph
+    addr filterCtx, filter, filterName.cstring, args, nil, graph.graph
   )
-
   if ret < 0:
-    error fmt"Cannot create filter '{name}' with args '{filterArgs}': {ret}"
-
+    error &"Cannot create filter '{name}' with args '{filterArgs}': {ret}"
   if filterCtx == nil:
-    error fmt"Filter context is nil for '{name}'"
+    error &"Filter context is nil for '{name}'"
 
   graph.nodes.add(filterCtx)
-
   return filterCtx
 
 proc linkNodes*(graph: Graph, nodes: seq[ptr AVFilterContext]): Graph =
   if graph.configured:
     error "Cannot link nodes after graph is configured"
-
   if nodes.len < 2:
     error "Need at least 2 nodes to link"
 
   # Link nodes sequentially: nodes[0] -> nodes[1] -> nodes[2] -> ...
-  for i in 0..<(nodes.len - 1):
+  for i in 0 ..< (nodes.len - 1):
     var ret = avfilter_link(nodes[i], 0, nodes[i + 1], 0)
     if ret < 0:
-      error fmt"Could not link node {i} to node {i + 1}: {ret}"
+      error &"Could not link node {i} to node {i + 1}: {ret}"
 
   return graph
 
@@ -77,7 +63,7 @@ proc configure*(graph: Graph) =
 
   let ret = avfilter_graph_config(graph.graph, nil)
   if ret < 0:
-    error fmt"Could not configure filter graph: {ret}"
+    error &"Could not configure filter graph: {ret}"
 
   graph.configured = true
 
@@ -101,13 +87,12 @@ proc findBufferSource(graph: Graph): ptr AVFilterContext =
 proc findBufferSink(graph: Graph): ptr AVFilterContext =
   if not graph.configured:
     error "Graph must be configured before finding buffer sink"
-
   if graph.graph == nil:
     error "Filter graph is nil"
 
   # Safety check for reasonable filter count
   if graph.graph.nb_filters < 0 or graph.graph.nb_filters > 1000:
-    error fmt"Invalid filter count: {graph.graph.nb_filters}"
+    error &"Invalid filter count: {graph.graph.nb_filters}"
 
   # Look for buffersink or abuffersink filter in the graph
   for i in 0 ..< graph.graph.nb_filters:
@@ -130,7 +115,7 @@ proc push*(graph: Graph, frame: ptr AVFrame) =
 
   let ret = av_buffersrc_write_frame(bufferSource, frame)
   if ret < 0:
-    error fmt"Error pushing frame to graph: {ret}"
+    error &"Error pushing frame to graph: {ret}"
 
 proc pull*(graph: Graph): ptr AVFrame =
   # Caller responsible for freeing frames
@@ -166,7 +151,6 @@ proc tryPull*(graph: Graph): ptr AVFrame =
   if ret < 0:
     av_frame_free(addr frame)
     return nil
-
   return frame
 
 proc flush*(graph: Graph) =
@@ -175,7 +159,6 @@ proc flush*(graph: Graph) =
     error "Graph must be configured before flushing"
 
   let bufferSource = graph.findBufferSource()
-
   let ret = av_buffersrc_write_frame(bufferSource, nil)
   if ret < 0:
-    error fmt"Error flushing graph: {ret}"
+    error &"Error flushing graph: {ret}"

@@ -1,18 +1,9 @@
-import std/xmltree
-import std/strformat
-import std/tables
-import std/sets
-import std/os
-
+import std/[os, sets, strformat, tables, xmltree]
+from std/math import ceil
 when defined(windows):
   import std/strutils
 
-from std/math import ceil
-
-import ../log
-import ../media
-import ../timeline
-import ../ffmpeg
+import ../[ffmpeg, log, media, timeline]
 
 #[
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format

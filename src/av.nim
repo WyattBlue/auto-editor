@@ -7,11 +7,6 @@ import util/dict
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
 
-# func pretty(ctx: ptr AVCodecContext): string =
-#   if ctx == nil:
-#     return "nil"
-#   return &"<AVCodecContext width: {ctx.width}, height: {ctx.height}, bit_rate={ctx.bit_rate}, framerate={ctx.framerate}>"
-
 proc initCodec*(name: string): ptr AVCodec =
   result = avcodec_find_encoder_by_name(name.cstring)
   if result == nil:

@@ -18,9 +18,9 @@ proc prettyTime(myTime: float, ampm: bool): string =
     elif hours > 12:
       hours -= 12
     let ampmMarker = (if newTime.hour >= 12: "PM" else: "AM")
-    result = fmt"{hours:02}:{minutes:02} {ampmMarker}"
+    result = &"{hours:02}:{minutes:02} {ampmMarker}"
   else:
-    result = fmt"{hours:02}:{minutes:02}"
+    result = &"{hours:02}:{minutes:02}"
 
 type
   BarConfig = object
@@ -67,7 +67,7 @@ proc formatProgressOutput(config: BarConfig, title: string, lenTitle: int, progr
   if config.machine:
     let indexClamped = min(currentIndex, total)
     let secsTilEta = round(begin + rate - epochTime(), 2)
-    return fmt"{title}~{indexClamped}~{total}~{secsTilEta}"
+    return &"{title}~{indexClamped}~{total}~{secsTilEta}"
   else:
     let newTime = prettyTime(begin + rate, config.ampm)
     let percent = round(progress * 100, 1)
@@ -77,7 +77,7 @@ proc formatProgressOutput(config: BarConfig, title: string, lenTitle: int, progr
     let barLen = max(1, columns - lenTitle - 35)
     let barString = createBarString(config, progress, barLen)
 
-    return fmt"  {config.icon}{title} {barString} {pPad}{percent}%  ETA {newTime}    "
+    return &"  {config.icon}{title} {barString} {pPad}{percent}%  ETA {newTime}    "
 
 proc progressWorker(data: ThreadData) {.thread.} =
   ## Background thread worker that handles progress bar updates with full format

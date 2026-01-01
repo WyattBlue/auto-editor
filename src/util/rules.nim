@@ -1,7 +1,6 @@
 import std/strformat
 
-import ../ffmpeg
-import ../log
+import ../[ffmpeg, log]
 
 func defaultVideoCodec*(self: ptr AVOutputFormat): string =
   let codecId = self.video_codec

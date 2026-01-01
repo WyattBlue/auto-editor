@@ -1,14 +1,7 @@
-import std/os
-import std/options
-import std/tables
-import std/heapqueue
-import std/[strformat, strutils]
+import std/[heapqueue, os, options, strformat, strutils, tables]
 from std/math import round
 
-import ../timeline
-import ../ffmpeg
-import ../log
-import ../av
+import ../[av, ffmpeg, log, timeline]
 import ../util/[bar, lang, rules]
 import video
 import audio
@@ -25,7 +18,6 @@ func initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Pri
   result.stream = stream
 
 func `<`(a, b: Priority): bool = a.index < b.index
-
 
 proc checkAudioEncoder(encoder: ptr AVCodec, rate: cint) =
   if encoder.sample_fmts == nil:
@@ -103,9 +95,9 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
       if args.audioBitrate >= 0:
         aEncCtx.bit_rate = args.audioBitrate
-        debug(&"audio bitrate: {aEncCtx.bit_rate}")
+        debug &"audio bitrate: {aEncCtx.bit_rate}"
       else:
-        debug(&"[auto] audio bitrate: {aEncCtx.bit_rate}")
+        debug &"[auto] audio bitrate: {aEncCtx.bit_rate}"
 
       audioStreams.add(aOutStream)
       audioEncoders.add(aEncCtx)
@@ -131,9 +123,9 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
         if args.audioBitrate >= 0:
           aEncCtx.bit_rate = args.audioBitrate
-          debug(&"audio bitrate: {aEncCtx.bit_rate}")
+          debug &"audio bitrate: {aEncCtx.bit_rate}"
         else:
-          debug(&"[auto] audio bitrate: {aEncCtx.bit_rate}")
+          debug &"[auto] audio bitrate: {aEncCtx.bit_rate}"
 
         audioStreams.add(aOutStream)
         audioEncoders.add(aEncCtx)

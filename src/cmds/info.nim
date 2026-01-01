@@ -1,11 +1,6 @@
-import std/json
-import std/[strformat, strutils]
+import std/[json, strformat, strutils]
 
-import ../av
-import ../ffmpeg
-import ../timeline
-import ../media
-import ../log
+import ../[av, ffmpeg, log, media, timeline]
 import ../util/[fun, lang]
 
 proc genericTrack(lang: Lang, bitrate: int) =

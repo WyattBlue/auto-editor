@@ -768,7 +768,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     let bufferSrc = loudnormGraph.add("abuffer", bufferArgs)
     let loudnormFilter = loudnormGraph.add("loudnorm", secondPass)
 
-    let aformatArgs = fmt"sample_rates={sr}"
+    let aformatArgs = &"sample_rates={sr}"
     let aformat = loudnormGraph.add("aformat", aformatArgs)
     let bufferSink = loudnormGraph.add("abuffersink")
     loudnormGraph.linkNodes(@[bufferSrc, loudnormFilter, aformat, bufferSink]).configure()
@@ -860,7 +860,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
                 let channelData = cast[ptr UncheckedArray[int16]](outputFrame.data[ch])
                 normalizedBuffer[destIndex + ch] = channelData[i]
       else:
-        error fmt"Unexpected output format from loudnorm: {outputFrame.format}"
+        error &"Unexpected output format from loudnorm: {outputFrame.format}"
 
       outputSamplesWritten += frameSamples
       av_frame_free(addr outputFrame)

@@ -1,7 +1,5 @@
 import std/[strformat, strutils]
-import ../ffmpeg
-import ../av
-import ../log
+import ../[av, ffmpeg, log]
 import ../util/fun
 
 

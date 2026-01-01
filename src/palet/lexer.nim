@@ -77,7 +77,8 @@ proc getNextToken(self: var Lexer): Token =
       self.advance()
       return Token(kind: Comma, `from`: self.pos - 1, to: self.pos)
 
-    if self.`char` in "0123456789." or (self.`char` == '-' and self.pos + 1 < uint32(self.text.len) and self.text[self.pos + 1] in "0123456789."):
+    if self.`char` in "0123456789." or (self.`char` == '-' and self.pos + 1 < uint32(
+        self.text.len) and self.text[self.pos + 1] in "0123456789."):
       let `from` = self.pos
       while self.`char` notin "()[]{}\",:;\0 \t\n\r\x0b\x0c":
         self.advance()
@@ -152,7 +153,8 @@ proc expr(self: var Parser): Expr =
         # Check if this argument is followed by = (assignment syntax)
         if self.currentToken.kind == Equal:
           self.eat()
-          let equalExpr = Expr(kind: ExprSym, `from`: self.currentToken.`from` - 1, to: self.currentToken.`from`)
+          let equalExpr = Expr(kind: ExprSym, `from`: self.currentToken.`from` - 1,
+              to: self.currentToken.`from`)
           let value = self.expr()
           arg = Expr(kind: ExprList, elements: @[equalExpr, arg, value], `from`: arg.`from`, to: value.to)
 
@@ -163,7 +165,8 @@ proc expr(self: var Parser): Expr =
         else:
           break
 
-      return Expr(kind: ExprList, elements: elements, `from`: token.`from`, to: self.currentToken.`from`)
+      return Expr(kind: ExprList, elements: elements, `from`: token.`from`,
+          to: self.currentToken.`from`)
     else:
       return symExpr
   of Equal:
@@ -182,13 +185,13 @@ proc parse*(self: var Parser): seq[Expr] =
 
   # If we have multiple tokens at the top level, wrap them in a list
   if tokens.len > 1:
-    tokens.delete(0)  # Delete extra Symbol
+    tokens.delete(0) # Delete extra Symbol
     result.add(Expr(kind: ExprList, elements: tokens, `from`: 0, to: uint32(self.lexer.text.len)))
   else:
     result = tokens
 
 # Pretty printing functions
-proc printExpr*(expr: Expr, text: string): string =
+proc printExpr(expr: Expr, text: string): string =
   case expr.kind:
   of ExprNum:
     return "Num:" & text[expr.`from` ..< expr.to]

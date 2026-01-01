@@ -4,7 +4,7 @@ import ../ffmpeg
 
 const AV_DICT_IGNORE_SUFFIX = 2
 
-proc avdict_to_dict*(input: ptr AVDictionary): Table[string, string] =
+func avdict_to_dict*(input: ptr AVDictionary): Table[string, string] =
   var element: ptr AVDictionaryEntry = nil
   while true:
     element = av_dict_get(input, "", element, AV_DICT_IGNORE_SUFFIX)

@@ -1,11 +1,6 @@
-import std/strformat
-import std/options
-import std/math
+import std/[math, options, strformat]
 
-import ../av
-import ../log
-import ../cache
-import ../ffmpeg
+import ../[av, cache, ffmpeg, log]
 import ../util/bar
 
 type
@@ -200,7 +195,7 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     return cacheData.get()
 
   if stream < 0 or stream >= container.video.len:
-    error fmt"motion: video stream '{stream}' does not exist."
+    error &"motion: video stream '{stream}' does not exist."
 
   let videoStream: ptr AVStream = container.video[stream]
 

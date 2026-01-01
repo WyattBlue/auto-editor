@@ -1,7 +1,4 @@
-import ../ffmpeg
-import ../av
-import ../log
-
+import ../[av, ffmpeg, log]
 
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
