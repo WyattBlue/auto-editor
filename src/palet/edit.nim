@@ -1,14 +1,8 @@
-import std/[strformat, strutils]
-import std/sequtils
-import std/math
-
+import std/[math, options, os, sequtils, strformat, strutils]
 import lexer
-import ../av
-import ../log
-import ../ffmpeg
-import ../util/bar
+import ../[av, ffmpeg, log]
+import ../util/[bar, fun]
 import ../analyze/[audio, motion, subtitle]
-import ../util/fun
 
 import tinyre
 
@@ -47,7 +41,7 @@ proc parseThres(val: string): float32 =
   elif unit == "dB":
     result = float32(pow(10, num / 20))
   elif unit == "":
-    result =  float32(num)
+    result = float32(num)
   else:
     error &"Unknown unit: {unit}"
 
@@ -155,6 +149,15 @@ proc parseNorm*(norm: string): Norm =
       error "Invalid audio norm expression."
 
   return normEval(expr, norm)
+
+proc findExternSubs(input: string): Option[InputContainer] =
+  try:
+    some(av.open(input.changeFileExt("srt")))
+  except IOError:
+    try:
+      some(av.open(input.changeFileExt("ass")))
+    except IOError:
+      none(InputContainer)
 
 proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, bar: Bar): seq[bool] =
   var lexer = initLexer("--edit", args.edit)
@@ -269,10 +272,20 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
         if pattern == "":
           error &"{text[node[0].`from` ..< node[0].to]}: pattern required"
 
-        let (ret, val) = subtitle(container, tb, re(pattern, flags), stream)
+        let regexPattern = re(pattern, flags)
+        let (ret, val) = subtitle(container, tb, regexPattern, stream)
         if ret != -1:
-          error &"regex: subtitle stream '{ret}' does not exist."
-        return val
+          let subcontainer = findExternSubs(args.input)
+          if subcontainer.isNone():
+            error &"regex: subtitle stream '{ret}' does not exist."
+
+          let index = int32(stream - container.subtitle.len)
+          let (ret, val) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+          if ret != -1:
+            error &"regex: subtitle stream '{ret}' does not exist."
+          return val
+        else:
+          return val
       of "word":
         let argOrder = @["value", "stream", "ignore-case"]
         var pattern = ""
@@ -293,11 +306,21 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
         pattern = "\\b" & pattern & "\\b"
         if ignoreCase:
           flags.incl reIgnoreCase
-        let (ret, val) = subtitle(container, tb, re(pattern, flags), stream)
-        if ret != -1:
-          error &"word: subtitle stream '{ret}' does not exist."
-        return val
 
+        let regexPattern = re(pattern, flags)
+        let (ret, val) = subtitle(container, tb, regexPattern, stream)
+        if ret != -1:
+          let subcontainer = findExternSubs(args.input)
+          if subcontainer.isNone():
+            error &"word: subtitle stream '{ret}' does not exist."
+
+          let index = int32(stream - container.subtitle.len)
+          let (ret, val) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+          if ret != -1:
+            error &"word: subtitle stream '{ret}' does not exist."
+          return val
+        else:
+          return val
       of "none":
         let length = mediaLength(container)
         let tbLength = (round((length * tb).float64)).int64
