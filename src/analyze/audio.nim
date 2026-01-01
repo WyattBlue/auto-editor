@@ -1,13 +1,7 @@
-import std/math
-import std/strformat
-import std/options
+import std/[math, options, strformat]
 
-import ../av
-import ../log
-import ../cache
-import ../ffmpeg
+import ../[av, cache, ffmpeg, log, resampler]
 import ../util/bar
-import ../resampler
 
 # Enable project wide
 when defined(macosx):
@@ -94,7 +88,7 @@ proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
       av_frame_free(addr resampledFrame)
 
   except ValueError as e:
-    error fmt"Error resampling audio frame: {e.msg}"
+    error &"Error resampling audio frame: {e.msg}"
 
 proc hasChunk(iter: AudioIterator): bool =
   let availableSamples = av_audio_fifo_size(iter.fifo)
@@ -151,7 +145,7 @@ proc flushResampler(iter: AudioIterator) =
       av_frame_free(addr flushedFrame)
 
   except ValueError as e:
-    error fmt"Error flushing audio resampler: {e.msg}"
+    error &"Error flushing audio resampler: {e.msg}"
 
 iterator loudness*(processor: var AudioProcessor, container: InputContainer): float32 =
   var frame = av_frame_alloc()
@@ -186,7 +180,7 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     return cacheData.get()
 
   if stream < 0 or stream >= container.audio.len:
-    error fmt"audio: audio stream '{stream}' does not exist."
+    error &"audio: audio stream '{stream}' does not exist."
 
   let audioStream: ptr AVStream = container.audio[stream]
 

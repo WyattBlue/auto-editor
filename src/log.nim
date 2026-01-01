@@ -1,13 +1,7 @@
-import std/[os, envvars]
-import std/times
+import std/[envvars, math, os, strformat, strutils, tables, terminal, times]
 
-import std/tables
-import std/terminal
-import std/[strutils, strformat]
-import std/math
-
-import util/color
 import ffmpeg
+import util/color
 
 type BarType* = enum
   modern, classic, ascii, machine, none
@@ -38,12 +32,12 @@ type
     of nkNull:
       discard
     of nkEbu:
-      i*: float32      # -70.0 to 5.0, default -24.0
-      lra*: float32    # 1.0 to 50.0, default 7.0
-      tp*: float32     # -9.0 to 0.0, default -2.0
-      gain*: float32   # -99.0 to 99.0, default 0.0
+      i*: float32    # -70.0 to 5.0, default -24.0
+      lra*: float32  # 1.0 to 50.0, default 7.0
+      tp*: float32   # -9.0 to 0.0, default -2.0
+      gain*: float32 # -99.0 to 99.0, default 0.0
     of nkPeak:
-      t*: float32 # -99.0 to 0.0, default -8.0
+      t*: float32    # -99.0 to 0.0, default -8.0
 
   ActionKind* = enum
     actCut, actSpeed, actVarispeed, actVolume
@@ -127,7 +121,7 @@ var tempDir* = ""
 let start* = epochTime()
 let noColor* = getEnv("NO_COLOR") != "" or getEnv("AV_LOG_FORCE_NOCOLOR") != ""
 
-proc conwrite*(msg: string) {.raises:[].} =
+proc conwrite*(msg: string) {.raises: [].} =
   if not quiet:
     try:
       let columns = terminalWidth()
@@ -135,7 +129,7 @@ proc conwrite*(msg: string) {.raises:[].} =
       stdout.write("  " & msg & buffer & "\r")
       stdout.flushFile()
     except IOError:
-        discard
+      discard
 
 proc debug*(msg: string) =
   if isDebug:
@@ -150,7 +144,7 @@ proc warning*(msg: string) =
     conwrite("")
     stderr.write(&"Warning! {msg}\n")
 
-proc closeTempDir*() {.raises:[].} =
+proc closeTempDir*() {.raises: [].} =
   if tempDir != "":
     try:
       removeDir(tempDir)
@@ -170,25 +164,21 @@ proc error*(msg: string) {.noreturn.} =
   quit(1)
 
 
-type StringInterner* = object
-  strings*: Table[string, ptr string]
-
-func newStringInterner*(): StringInterner =
-  result.strings = initTable[string, ptr string]()
+type StringInterner* = Table[string, ptr string]
 
 proc intern*(interner: var StringInterner, s: string): ptr string =
-  if s in interner.strings:
-    return interner.strings[s]
+  if s in interner:
+    return interner[s]
 
   let internedStr = cast[ptr string](alloc0(sizeof(string)))
   internedStr[] = s
-  interner.strings[s] = internedStr
+  interner[s] = internedStr
   return internedStr
 
 proc cleanup*(interner: var StringInterner) =
-  for ptrStr in interner.strings.values:
+  for ptrStr in interner.values:
     dealloc(ptrStr)
-  interner.strings.clear()
+  interner.clear()
 
 
 type Code* = enum
@@ -201,27 +191,25 @@ func toTimecode*(secs: float, fmt: Code): string =
     sign = "-"
     seconds = -seconds
 
-  let total_seconds = seconds
-  let m_float = total_seconds / 60.0
-  let h_float = m_float / 60.0
+  let totalSeconds = seconds
+  let mFloat = totalSeconds / 60.0
+  let hFloat = mFloat / 60.0
 
-  let h = int(h_float)
-  let m = int(m_float) mod 60
-  let s = total_seconds mod 60.0
+  let h = int(hFloat)
+  let m = int(mFloat) mod 60
+  let s = totalSeconds mod 60.0
 
   case fmt:
   of webvtt:
-    if h == 0:
-      return fmt"{sign}{m:02d}:{s:06.3f}"
-    return fmt"{sign}{h:02d}:{m:02d}:{s:06.3f}"
+    (if h == 0: &"{sign}{m:02d}:{s:06.3f}" else: &"{sign}{h:02d}:{m:02d}:{s:06.3f}")
   of srt, mov_text:
-    let s_str = fmt"{s:06.3f}".replace(".", ",")
-    return fmt"{sign}{h:02d}:{m:02d}:{s_str}"
+    let sStr = (&"{s:06.3f}").replace(".", ",")
+    &"{sign}{h:02d}:{m:02d}:{sStr}"
   of standard:
-    return fmt"{sign}{h:02d}:{m:02d}:{s:06.3f}"
+    &"{sign}{h:02d}:{m:02d}:{s:06.3f}"
   of ass:
-    return fmt"{sign}{h:d}:{m:02d}:{s:05.2f}"
+    &"{sign}{h:d}:{m:02d}:{s:05.2f}"
   of rass:
-    return fmt"{sign}{h:d}:{m:02d}:{s:02.0f}"
+    &"{sign}{h:d}:{m:02d}:{s:02.0f}"
   of display:
-    return fmt"{sign}{h:d}:{m:02d}:{s.round.int:02d}"
+    &"{sign}{h:d}:{m:02d}:{s.round.int:02d}"

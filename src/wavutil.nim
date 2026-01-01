@@ -18,7 +18,7 @@ proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint,
 
 proc createResampler(encoderCtx: ptr AVCodecContext): AudioResampler =
   # Create resampler based on encoder format requirements
-  let outputLayout = if encoderCtx.ch_layout.nb_channels == 1: "mono" else: "stereo" 
+  let outputLayout = if encoderCtx.ch_layout.nb_channels == 1: "mono" else: "stereo"
   return newAudioResampler(
     encoderCtx.sample_fmt,
     outputLayout,
@@ -64,12 +64,12 @@ proc processAndEncodeFrame(
       try:
         # Use the AudioResampler to convert the frame
         let resampledFrames = audioResampler.resample(inputFrame)
-        
+
         # Add all resampled frames to buffer
         for resampledFrame in resampledFrames:
           if addSamplesToBuffer(audioBuffer, resampledFrame) < 0:
             error "Failed to add samples to buffer"
-          
+
           # Free resampled frames if they're different from input frame
           if resampledFrame != inputFrame:
             av_frame_free(addr resampledFrame)
@@ -177,7 +177,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
   if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
     ret = avio_open(addr outputCtx.pb, outputPath.cstring, AVIO_FLAG_WRITE)
     if ret < 0:
-      error fmt"Could not open output file '{outputPath}'"
+      error &"Could not open output file '{outputPath}'"
 
   if avformat_write_header(outputCtx, nil) < 0:
     error "Error occurred when opening output file"

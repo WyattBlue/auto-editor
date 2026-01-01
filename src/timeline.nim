@@ -27,7 +27,7 @@ type Clip* = object
   start*: int64
   dur*: int64
   offset*: int64
-  effects*: uint32  # Reference to global effects in Timeline.
+  effects*: uint32 # Reference to global effects in Timeline.
   stream*: int32
 
 type v3* = object
@@ -39,9 +39,9 @@ type v3* = object
   v*: seq[seq[Clip]]
   a*: seq[seq[Clip]]
   s*: seq[seq[Clip]]
-  langs*: seq[Lang] # Video, Audio (flattened).
+  langs*: seq[Lang]   # Video, Audio (flattened).
   effects*: seq[seq[Action]]
-  clips2*: seq[Clip2]  # Empty when the timeline is non-linear.
+  clips2*: seq[Clip2] # Empty when the timeline is non-linear.
 
 func len*(self: v3): int64 =
   result = 0
@@ -128,7 +128,8 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
     tl.layout = mi.a[0].layout
 
 
-proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo, effects: seq[seq[Action]], actionIndex: seq[int]): v3 =
+proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
+  effects: seq[seq[Action]], actionIndex: seq[int]): v3 =
   var clips: seq[Clip] = @[]
   var i: int64 = 0
   var start: int64 = 0

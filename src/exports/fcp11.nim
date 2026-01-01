@@ -2,10 +2,7 @@ import std/[algorithm, os, sets, tables, xmltree]
 import std/[strformat, strutils]
 from std/math import round
 
-import ../media
-import ../log
-import ../ffmpeg
-import ../timeline
+import ../[ffmpeg, log, media, timeline]
 
 #[
 Export a FCPXML 11 file readable with Final Cut Pro 10.6.8 or later.
@@ -165,7 +162,7 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
   lib.add evt
   fcpxml.add lib
 
-  proc make_clip(`ref`: string, clip: Clip) =
+  proc makeClip(`ref`: string, clip: Clip) =
     let src = ptrToMi[clip.src]
     let startPoint = parseSMPTE(src.timecode, tl.tb)
 
@@ -216,7 +213,7 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
 
   for my_ref in all_refs.reversed:
     for clip in clips:
-      make_clip(my_ref, clip)
+      makeClip(my_ref, clip)
 
   if output == "-":
     echo $fcpxml

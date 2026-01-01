@@ -1,11 +1,7 @@
-import std/options
-import std/[strformat, strutils]
+import std/[options, strformat, strutils]
 
-import ../av
-import ../ffmpeg
+import ../[av, cache, ffmpeg, log]
 import ../analyze/[audio, motion, subtitle]
-import ../log
-import ../cache
 import ../palet/edit
 
 type levelArgs* = object
@@ -28,7 +24,7 @@ proc main*(strArgs: seq[string]) =
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
-        error(fmt"Unknown option: {key}")
+        error &"Unknown option: {key}"
 
       case expecting
       of "":
@@ -40,17 +36,17 @@ proc main*(strArgs: seq[string]) =
       expecting = ""
 
   if expecting != "":
-    error(fmt"--{expecting} needs argument.")
+    error &"--{expecting} needs argument."
 
   if inputFile == "":
-    error("Expecting an input file.")
+    error "Expecting an input file."
 
   av_log_set_level(AV_LOG_QUIET)
   let tb = AVRational(args.timebase)
   let chunkDuration: float64 = av_inv_q(tb)
   let (editMethod, _, userStream, width, blur, pattern) = parseEditString2(args.edit)
   if editMethod notin ["audio", "motion", "subtitle"]:
-    error fmt"Unknown editing method: {editMethod}"
+    error &"Unknown editing method: {editMethod}"
 
   let cacheArgs = (if editMethod == "audio": $userStream else: &"{userStream},{width},{blur}")
 
@@ -80,7 +76,7 @@ proc main*(strArgs: seq[string]) =
     if container.audio.len == 0:
       error "No audio stream"
     if container.audio.len <= userStream:
-      error fmt"Audio stream out of range: {userStream}"
+      error &"Audio stream out of range: {userStream}"
 
     let audioStream: ptr AVStream = container.audio[userStream]
     var processor = AudioProcessor(
@@ -98,7 +94,7 @@ proc main*(strArgs: seq[string]) =
     if container.video.len == 0:
       error "No audio stream"
     if container.video.len <= userStream:
-      error fmt"Video stream out of range: {userStream}"
+      error &"Video stream out of range: {userStream}"
 
     let videoStream: ptr AVStream = container.video[userStream]
     var processor = VideoProcessor(

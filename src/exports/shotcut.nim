@@ -1,11 +1,10 @@
-import std/xmltree
-import std/strformat
-import ../timeline
-import ../ffmpeg
-import ../log
-import ../util/[color, fun]
+import std/[strformat, xmltree]
 from std/os import splitFile
 from std/math import log10
+
+import ../[log, ffmpeg, timeline]
+import ../util/[color, fun]
+
 
 #[
 
@@ -16,7 +15,7 @@ https://mltframework.org/docs/mltxml/
 
 ]#
 
-proc addProp(parent: XmlNode, name: string, value: string) =
+func addProp(parent: XmlNode, name, value: string) =
   let prop = newElement("property")
   prop.attrs = {"name": name}.toXmlAttributes()
   prop.add(newText(value))
@@ -119,14 +118,14 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
       producer.attrs = {"id": tagName, "out": length}.toXmlAttributes()
       producer.addProp("length", length)
       producer.addProp("eof", "pause")
-      producer.addProp("resource", fmt"{speedVal}:{src}")
+      producer.addProp("resource", &"{speedVal}:{src}")
       producer.addProp("warp_speed", $speedVal)
       producer.addProp("warp_resource", src)
       producer.addProp("mlt_service", "timewarp")
       producer.addProp("shotcut:producer", "avformat")
       if not lastSpeedWasVarispeed:
         producer.addProp("warp_pitch", "1")
-      producer.addProp("shotcut:caption", fmt"{splitFile(src).name} ({speedVal}x)")
+      producer.addProp("shotcut:caption", &"{splitFile(src).name} ({speedVal}x)")
 
       # Add volume filter if needed
       if volumeVal != 1.0:

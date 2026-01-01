@@ -1,7 +1,6 @@
 import std/[json, os, tables, strformat, xmltree, sysrand, strutils]
-import ../timeline
+import ../[log, timeline]
 import ../util/fun
-import ../log
 
 proc genUuid*(): string =
   var bytes: array[16, byte]

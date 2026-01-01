@@ -1,6 +1,5 @@
+import std/[strutils, strformat, parseutils]
 import ../ffmpeg
-import std/[strutils, strformat]
-import std/parseutils
 
 type RGBColor* = object
   red*: uint8
@@ -12,9 +11,9 @@ func toString*(color: RGBColor): string =
     redHex = toHex(color.red, 2)
     greenHex = toHex(color.green, 2)
     blueHex = toHex(color.blue, 2)
-  result = fmt"#{redHex}{greenHex}{blueHex}".toLowerAscii
+  result = (&"#{redHex}{greenHex}{blueHex}").toLowerAscii
 
-proc findColor(name: string): RGBColor =
+func findColor(name: string): RGBColor {.raises: [ValueError].} =
   var rgba: array[4, uint8]
   let parseResult = av_parse_color(cast[ptr uint8](addr rgba[0]), cstring(name), -1, nil)
   if parseResult >= 0:
@@ -22,7 +21,7 @@ proc findColor(name: string): RGBColor =
   else:
     raise newException(ValueError, "Unknown color: " & name)
 
-proc parseColor*(hexString: string): RGBColor =
+func parseColor*(hexString: string): RGBColor {.raises: [ValueError].} =
   if not hexString.startsWith("#"):
     try:
       return findColor(hexString)
@@ -37,14 +36,13 @@ proc parseColor*(hexString: string): RGBColor =
       discard parseHex(hexValue[1] & hexValue[1], result.green)
       discard parseHex(hexValue[2] & hexValue[2], result.blue)
     except:
-      raise newException(ValueError, fmt"Invalid 3-digit hex color format: {hexString}")
+      raise newException(ValueError, &"Invalid 3-digit hex color format: {hexString}")
   of 6:
     try:
       discard parseHex[uint8](hexValue[0..1], result.red)
       discard parseHex[uint8](hexValue[2..3], result.green)
       discard parseHex[uint8](hexValue[4..5], result.blue)
     except:
-      raise newException(ValueError, fmt"Invalid 6-digit hex color format: {hexString}")
+      raise newException(ValueError, &"Invalid 6-digit hex color format: {hexString}")
   else:
-    raise newException(ValueError, fmt"Invalid hex color string length: {hexString}. Expected #RGB or #RRGGBB format.")
-
+    raise newException(ValueError, &"Invalid hex color string length: {hexString}. Expected #RGB or #RRGGBB format.")

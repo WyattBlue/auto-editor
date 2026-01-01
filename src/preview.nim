@@ -1,12 +1,10 @@
-import std/sets
-import std/[strutils, strformat]
-import std/algorithm
+import std/[algorithm, sets, strutils, strformat]
 from std/math import round
 
 import av
 import ffmpeg
-import timeline
 import log
+import timeline
 
 proc timeFrame(title: string, ticks: int, tb: float, per: string = ""): string =
   let tc = toTimecode(ticks.float64 / tb, Code.ass)
@@ -16,11 +14,11 @@ proc timeFrame(title: string, ticks: int, tb: float, per: string = ""): string =
 
   let titlePart = alignLeft(title & ":", tp)
   let tcPart = alignLeft(tc, tcp)
-  let ticksPart = alignLeft(fmt"({ticks})", 6)
+  let ticksPart = alignLeft(&"({ticks})", 6)
 
-  return fmt" - {titlePart} {tcPart} {ticksPart}{endStr}"
+  return &" - {titlePart} {tcPart} {ticksPart}{endStr}"
 
-proc timeFrame(title: string, ticks: float, tb: float, per: string = ""): string =
+func timeFrame(title: string, ticks: float, tb: float, per: string = ""): string =
   let tc = toTimecode(ticks / tb, Code.ass)
   let tp = (if tc.startsWith("-"): 9 else: 10)
   let tcp = (if tc.startsWith("-"): 12 else: 11)
@@ -28,10 +26,9 @@ proc timeFrame(title: string, ticks: float, tb: float, per: string = ""): string
 
   let titlePart = alignLeft(title & ":", tp)
   let tcPart = alignLeft(tc, tcp)
-  let ticksPart = alignLeft(fmt"({ticks:.2f})", 6)
+  let ticksPart = alignLeft(&"({ticks:.2f})", 6)
 
-  return fmt" - {titlePart} {tcPart} {ticksPart}{endStr}"
-
+  return &" - {titlePart} {tcPart} {ticksPart}{endStr}"
 
 func mean(data: seq[int]): float =
   var sum = 0
@@ -54,7 +51,6 @@ func median(data: seq[int]): float =
     let mid1 = sortedData[(n div 2) - 1]
     let mid2 = sortedData[n div 2]
     return (mid1 + mid2) / 2
-
 
 func round(a: float): int =
   int(math.round(a))
@@ -105,9 +101,9 @@ proc preview*(tl: v3) =
   echo timeFrame("input", inputLength, tb, "100.0%")
 
   if inputLength != 0:
-    let outputPercent = fmt"{round((outputLength / inputLength) * 100, 2)}%"
+    let outputPercent = &"{round((outputLength / inputLength) * 100, 2)}%"
     echo timeFrame("output", outputLength, tb, outputPercent)
-    echo timeFrame("diff", diff, tb, fmt"{round((diff / inputLength) * 100, 2)}%")
+    echo timeFrame("diff", diff, tb, &"{round((diff / inputLength) * 100, 2)}%")
   else:
     echo timeFrame("output", outputLength, tb, "0.0%")
     echo timeFrame("diff", diff, tb, "0.0%")

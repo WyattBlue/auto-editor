@@ -1,5 +1,4 @@
-import ../av
-import ../ffmpeg
+import ../[av, ffmpeg]
 
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
@@ -15,4 +14,3 @@ proc main*(args: seq[string]) =
       stdout.write("\nNo description.\n\n")
 
     container.close()
-

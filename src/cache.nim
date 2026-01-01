@@ -1,16 +1,13 @@
-import std/options
-import std/[os, times, streams]
-import std/[strutils, strformat]
-import std/algorithm
+import std/[algorithm, options, os, streams, strformat, strutils, times]
 import checksums/sha1
+import about
 import ffmpeg
 import log
-import about
 
 proc procTag(path: string, tb: AVRational, kind, args: string): string =
   let modTime = getLastModificationTime(path).toUnix().int
   let (_, name, ext) = splitFile(path)
-  let key = fmt"{name}{ext}:{modTime:x}:{tb}:{args}"
+  let key = &"{name}{ext}:{modTime:x}:{tb}:{args}"
   return ($secureHash(key))[0..<16].toLowerAscii() & kind
 
 proc saveFloats(filename: string, data: seq[float32]) =
@@ -32,7 +29,6 @@ proc loadFloats(filename: string): seq[float32] =
   for i in 0..<length:
     result[i] = fs.readFloat32()
 
-
 proc readCache*(path: string, tb: AVRational, kind, args: string): Option[seq[float32]] =
   let temp: string = getTempDir()
   let cacheFile = temp / &"ae-{version}" / &"{procTag(path, tb, kind, args)}.bin"
@@ -48,19 +44,19 @@ proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind,
   if data.len <= 10:
     return
 
-  let workdir = getTempDir() / fmt"ae-{version}"
+  let workdir = getTempDir() / &"ae-{version}"
   try:
     createDir(workdir)
   except OSError:
     discard
 
   let cacheTag = procTag(path, tb, kind, args)
-  let cacheFile = workdir / fmt"{cacheTag}.bin"
+  let cacheFile = workdir / &"{cacheTag}.bin"
 
   try:
     saveFloats(cacheFile, data)
   except Exception as e:
-    error fmt"Cache write failed: {e.msg}"
+    error &"Cache write failed: {e.msg}"
 
   var cacheEntries: seq[CacheEntry] = @[]
 
@@ -77,7 +73,7 @@ proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind,
     cacheEntries.sort(proc(a, b: CacheEntry): int = cmp(a.mtime, b.mtime))
 
     # Remove oldest files until we're back to 10
-    for i in 0..<(cacheEntries.len - 10):
+    for i in 0 ..< (cacheEntries.len - 10):
       try:
         removeFile(cacheEntries[i].path)
       except OSError:

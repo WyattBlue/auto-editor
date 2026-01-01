@@ -301,7 +301,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
           else: error "Too many args"
 
         if pattern == "":
-          error &"word: value required"
+          error "word: value required"
 
         pattern = "\\b" & pattern & "\\b"
         if ignoreCase:
