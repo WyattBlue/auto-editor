@@ -89,8 +89,8 @@ disableEncoders &= "a64_multi,a64_multi5,ttml".split(",")
 disableDecoders &= @["flv", "snow"]
 disableEncoders &= @["flv", "snow"]
 disableMuxers &= @["flv", "f4v", "rso", "segafilm"]
-disableDemuxers &= @["flv", "live_flv", "kux", "a64", "alp", "apm", "mm", "pp_bnk", "rso", "vmd", "sdns"]
-disableDemuxers &= @["segafilm"]
+disableDemuxers &= @["a64", "alp", "apm", "bink", "binka", "flv", "kux", "live_flv", "mm", "pp_bnk", "rso"]
+disableDemuxers &= @["sdns", "segafilm", "vmd"]
 
 # Image formats
 disableDecoders &= @["tiff"]
@@ -147,8 +147,8 @@ let dav1d = Package(
 )
 let svtav1 = Package(
   name: "libsvtav1",
-  sourceUrl: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.1.0/SVT-AV1-v3.1.0.tar.bz2",
-  sha256: "8231b63ea6c50bae46a019908786ebfa2696e5743487270538f3c25fddfa215a",
+  sourceUrl: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.1.2/SVT-AV1-v3.1.2.tar.bz2",
+  sha256: "802e9bb2b14f66e8c638f54857ccb84d3536144b0ae18b9f568bbf2314d2de88",
   buildSystem: "cmake",
   buildArguments: @["-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=ON"],
   ffFlag: "--enable-libsvtav1",
