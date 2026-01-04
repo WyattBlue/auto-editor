@@ -60,7 +60,7 @@ var disableMuxers: seq[string] = @[]
 disableEncoders &= "avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis".split(",")
 
 # Can only decode (ambiguous encoder), Video [A-C]
-disableDecoders &= "4xm,aasc,agm,aic,anm,ansi,apv,arbc,argo,aura,aura2,avrn,avs,bethsoftvid,bfi,binkvideo,bmv_video,brender_pix,c93,cavs,cdgraphics,cdtoons,cdxl,clearvideo,cllc,cmv,cpia,cri,cscd,cyuv".split(",")
+disableDecoders &= "4xm,aasc,agm,aic,anm,ansi,apv,arbc,argo,aura,aura2,avrn,avs,bethsoftvid,bfi,bink,binkvideo,bmv_video,brender_pix,c93,cavs,cdgraphics,cdtoons,cdxl,clearvideo,cllc,cmv,cpia,cri,cscd,cyuv".split(",")
 # [D-I]
 disableDecoders &= "dds,dfa,dsicinvideo,dxa,dxtory,escape124,escape130,fic,flic,fmvc,fraps,frwu,g2m,gdv,gem,hnm4video,hq_hqa,hqx,hymt,idcin,idf,iff_ilbm,imm4,imm5,indeo2,indeo3,indeo4,indeo5,interplayvideo,ipu".split(",")
 # [J-M]
@@ -110,12 +110,26 @@ type Package = object
   buildArguments: seq[string]
   buildSystem: string = "autoconf"
   ffFlag: string = ""
-  mirrorUrl: string = ""
 
 let nvheaders = Package(
   name: "nv-codec-headers",
   sourceUrl: "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.0.19.0.tar.gz",
   sha256: "86d15d1a7c0ac73a0eafdfc57bebfeba7da8264595bf531cf4d8db1c22940116",
+)
+let libvpl = Package(
+  name: "libvpl",
+  sourceUrl: "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz",
+  sha256: "d60931937426130ddad9f1975c010543f0da99e67edb1c6070656b7947f633b6",
+  buildSystem: "cmake",
+  buildArguments: @[
+    "-DINSTALL_LIB=ON",
+    "-DINSTALL_DEV=ON",
+    "-DINSTALL_EXAMPLES=OFF",
+    "-DBUILD_EXPERIMENTAL=OFF",
+    "-DBUILD_TESTS=OFF",
+    "-DBUILD_EXAMPLES=OFF",
+  ],
+  ffFlag: "--enable-libvpl",
 )
 let lame = Package(
   name: "lame",
@@ -193,7 +207,7 @@ let ffmpeg = Package(
 proc setupPackages(enableWhisper: bool): seq[Package] =
   result = @[]
   if not defined(macosx):
-    result.add nvheaders
+    result &= [nvheaders, libvpl]
   if enableWhisper:
     result.add whisper
   result &= [lame, opus, dav1d, x264]
@@ -205,19 +219,14 @@ proc setupPackages(enableWhisper: bool): seq[Package] =
     result.add x265
   return result
 
-func location(package: Package): string = # tar location
-  if package.name == "libvpx":
-    "v1.15.2.tar.gz"
-  elif package.name == "nv-codec-headers":
-    "n13.0.19.0.tar.gz"
-  elif package.name == "whisper":
-    "v1.8.2.tar.gz"
-  else:
-    package.sourceUrl.split("/")[^1]
+func location(package: Package): string =
+  package.sourceUrl.split("/")[^1]
 
 func dirName(package: Package): string =
   if package.name == "libvpx":
     return "libvpx-1.15.2"
+  if package.name == "libvpl":
+    return "libvpl-2.16.0"
   if package.name == "nv-codec-headers":
     return "nv-codec-headers-n13.0.19.0"
   if package.name == "whisper":
@@ -500,7 +509,6 @@ endian = 'little'
     exec "ninja install"
 
 proc ffmpegSetup(crossWindows: bool) =
-  # Create directories
   mkDir("ffmpeg_sources")
   mkDir("build")
 
@@ -510,11 +518,7 @@ proc ffmpegSetup(crossWindows: bool) =
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
       if not fileExists(package.location):
-
-        if package.mirrorUrl != "":
-          exec &"curl -O -L {package.mirrorUrl}"
-        else:
-          exec &"curl -O -L {package.sourceUrl}"
+        exec &"curl -O -L {package.sourceUrl}"
         checkHash(package, "ffmpeg_sources" / package.location)
 
       var tarArgs = "xf"
@@ -645,7 +649,7 @@ task makeff, "Build FFmpeg from source":
         --pkg-config-flags="--static" \
         --extra-cflags="-I{buildPath}/include" \
         --extra-ldflags="-L{buildPath}/lib" \
-        --extra-libs="-lpthread -lm" \""" & "\n" & setupCommonFlags(packages)
+        --extra-libs="-lpthread -lm -lstdc++" \""" & "\n" & setupCommonFlags(packages)
     except OSError:
       exec "cat ./ffbuild/config.log"
       quit(1)
@@ -679,11 +683,9 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
   if not dirExists("build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
-    exec "nim c -d:danger " & flags & " --os:windows --cpu:amd64 --cc:gcc " &
+    exec "nim c -d:danger -d:windows " & flags & " --os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc-posix " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc-posix " &
-         "--passL:-lbcrypt " & # Add Windows Bcrypt library
-         "--passL:-lstdc++ " & # Add C++ standard library
          "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
 
