@@ -55,14 +55,15 @@ var disableDecoders: seq[string] = @[]
 var disableEncoders: seq[string] = @[]
 var disableDemuxers: seq[string] = @[]
 var disableMuxers: seq[string] = @[]
+var disableParsers: seq[string] = @[]
 
 # Marked as 'Experimental'
-disableEncoders &= "avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis".split(",")
+disableEncoders &= "avui,dca,mlp,opus,s302m,truehd,vorbis".split(",")
 
 # Can only decode (ambiguous encoder), Video [A-C]
 disableDecoders &= "4xm,aasc,agm,aic,anm,ansi,apv,arbc,argo,aura,aura2,avrn,avs,bethsoftvid,bfi,bink,binkvideo,bmv_video,brender_pix,c93,cavs,cdgraphics,cdtoons,cdxl,clearvideo,cllc,cmv,cpia,cri,cscd,cyuv".split(",")
 # [D-I]
-disableDecoders &= "dds,dfa,dsicinvideo,dxa,dxtory,escape124,escape130,fic,flic,fmvc,fraps,frwu,g2m,gdv,gem,hnm4video,hq_hqa,hqx,hymt,idcin,idf,iff_ilbm,imm4,imm5,indeo2,indeo3,indeo4,indeo5,interplayvideo,ipu".split(",")
+disableDecoders &= "dds,dfa,dsicinvideo,dxa,dxtory,escape124,escape130,fic,flic,fmvc,fraps,frwu,g2m,gdv,gem,hnm4video,hq_hqa,hqx,hymt,idcin,idf,iff_ilbm,imm4,imm5,indeo2,indeo3,indeo4,indeo5,interplay_video,ipu".split(",")
 # [J-M]
 disableDecoders &= "jv,kgv1,kmvc,lagarith,lead,loco,lscr,m101,mad,mdec,media100,mimic,mjpegb,mmvideo,mobiclip,motionpixels,msa1,mscc,msmpeg4v1,msp2,mss1,mss2,mszh,mts2,mv30,mvc1,mvc2,mvdv,mvha,mwsc,mxpeg".split(",")
 # [N-S]
@@ -78,7 +79,7 @@ disableDecoders &= "8svx_exp,8svx_fib,aac_latm,acelp.kelvin,adpcm_4xm,adpcm_afc,
 disableDecoders &= "binkaudio_dct,binkaudio_rdft,bmv_audio,bonk,cbd2_dpcm,cook,derf_dpcm,dolby_e,dsd_lsbf,dsd_lsbf_planar,dsd_msbf,dsd_msbf_planar,dsicinaudio,dss_sp,dst,dvaudio,evrc,fastaudio,ftr".split(",")
 disableDemuxers.add "bethsoftvid"
 # [G-Q]
-disableDecoders &= "g728,g729,gremlin_dpcm,gsm,gsm_ms,hca,hcom,iac,imc,interplay_dpcm,interplayacm,mace3,mace6,metasound,misc4,mp1,mp3adu,msnsiren,musepack7,musepack8,osq,paf_audio,qcelp,qdm2,qdmc,qoa".split(",")
+disableDecoders &= "g728,g729,gremlin_dpcm,gsm,gsm_ms,hca,hcom,iac,imc,interplay_dpcm,interplay_acm,mace3,mace6,metasound,misc4,mp1,mp3adu,msnsiren,musepack7,musepack8,osq,paf_audio,qcelp,qdm2,qdmc,qoa".split(",")
 # [R-Z]
 disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dpcm,tak,truespeech,twinvq,vmdaudio,wady_dpcm,wavarc,wavesynth,westwood_snd1,wmalossless,wmapro,wmavoice,xan_dpcm,xma1,xma2".split(",")
 
@@ -86,22 +87,18 @@ disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dp
 disableEncoders &= "a64_multi,a64_multi5,ttml".split(",")
 
 # Technically obsolete
-disableDecoders &= @["flv", "snow"]
-disableEncoders &= @["flv", "snow"]
-disableMuxers &= @["flv", "f4v", "rso", "segafilm"]
-disableDemuxers &= @["a64", "alp", "apm", "bink", "binka", "flv", "kux", "live_flv", "mm", "pp_bnk", "rso"]
-disableDemuxers &= @["sdns", "segafilm", "vmd"]
+disableDecoders &= "flv,jacosub,nellymoser,smacker,snow,sonic,sonic_ls".split(",")
+disableEncoders &= "flv,nellymoser,snow,sonic".split(",")
+disableMuxers &= "flv,f4v,jacosub,rso,segafilm".split(",")
+disableDemuxers &= @["a64", "alp", "apm", "bink", "binka", "flv", "jacosub", "kux",
+ "live_flv", "mm", "pp_bnk", "rso", "sdns", "segafilm", "smacker", "vmd"]
+disableParsers &= @["misc4", "tak"]
 
 # Image formats
-disableDecoders &= @["tiff"]
-disableEncoders &= @["tiff"]
-disableMuxers &= @["ico"]
-disableDemuxers &= @["ico", "image_tiff_pipe", "image_svg_pipe"]
-
-let encodersDisabled = disableEncoders.join(",")
-let decodersDisabled = disableDecoders.join(",")
-let demuxersDisabled = disableDemuxers.join(",")
-let muxersDisabled = disableMuxers.join(",")
+disableDecoders.add "tiff"
+disableEncoders.add "tiff"
+disableMuxers.add "ico"
+disableDemuxers &= "ico,image_tiff_pipe,image_svg_pipe".split(",")
 
 type Package = object
   name: string
@@ -571,25 +568,26 @@ filters.add "scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo
 
 proc setupCommonFlags(packages: seq[Package]): string =
   var commonFlags = &"""
-    --enable-version3 \
-    --enable-static \
-    --disable-shared \
-    --disable-programs \
-    --disable-doc \
-    --disable-network \
-    --disable-indevs \
-    --disable-outdevs \
-    --disable-xlib \
-    --disable-bsfs \
-    --disable-protocols \
-    --enable-protocol=file \
-    --disable-filters \
-    --enable-filter={filters.join(",")} \
-    --disable-encoder={encodersDisabled} \
-    --disable-decoder={decodersDisabled} \
-    --disable-demuxer={demuxersDisabled} \
-    --disable-muxer={muxersDisabled} \
-  """
+  --enable-version3 \
+  --enable-static \
+  --disable-shared \
+  --disable-programs \
+  --disable-doc \
+  --disable-network \
+  --disable-indevs \
+  --disable-outdevs \
+  --disable-xlib \
+  --disable-bsfs \
+  --disable-protocols \
+  --enable-protocol=file \
+  --disable-filters \
+  --enable-filter={filters.join(",")} \
+  --disable-encoder={disableEncoders.join(",")} \
+  --disable-decoder={disableDecoders.join(",")} \
+  --disable-demuxer={disableDemuxers.join(",")} \
+  --disable-muxer={disableMuxers.join(",")} \
+  --disable-parser={disableParsers.join(",")} \
+"""
 
   for package in packages:
     if package.ffFlag != "":
