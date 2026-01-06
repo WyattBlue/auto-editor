@@ -509,14 +509,12 @@ judge making cuts.
     echo "Auto-Editor: ", version
     when defined(windows):
       var cpuArchitecture: string
-      when defined(amd64):
-        cpuArchitecture = "amd64"
+      when defined(amd64) or defined(x86_64):
+        cpuArchitecture = "x86_64"
       elif defined(i386):
         cpuArchitecture = "i386"
-      elif defined(arm64):
-        cpuArchitecture = "arm64"
-      elif defined(arm):
-        cpuArchitecture = "arm"
+      elif defined(arm64) or defined(aarch64):
+        cpuArchitecture = "aarch64"
       else:
         cpuArchitecture = "unknown"
       echo "OS: Windows ", cpuArchitecture
