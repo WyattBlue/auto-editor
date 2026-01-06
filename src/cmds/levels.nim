@@ -2,22 +2,93 @@ import std/[options, strformat, strutils]
 
 import ../[av, cache, ffmpeg, log]
 import ../analyze/[audio, motion, subtitle]
-import ../palet/edit
 
-type levelArgs* = object
-  timebase*: string = "30/1"
-  edit*: string = "audio"
-  noCache*: bool = false
+import tinyre
+
+proc parseEdit(editStr: string): (string, string, int32, int32, int32) =
+  var
+    stream: int32 = 0
+    pattern = ""
+    width: int32 = 400
+    blur: int32 = 9
+
+  let colonPos = editStr.find(':')
+  if colonPos == -1:
+    return (editStr, pattern, stream, width, blur)
+
+  let kind = editStr[0 ..< colonPos]
+  let paramsStr = editStr[colonPos+1..^1]
+
+  var i = 0
+  while i < paramsStr.len:
+    while i < paramsStr.len and paramsStr[i] == ' ':
+      inc i
+
+    if i >= paramsStr.len:
+      break
+
+    var paramStart = i
+    while i < paramsStr.len and paramsStr[i] != '=':
+      inc i
+
+    if i >= paramsStr.len:
+      error &"No parameter found. Expected this format: method:key=value"
+
+    let paramName = paramsStr[paramStart..<i]
+    inc i
+
+    var value = ""
+    if i < paramsStr.len and paramsStr[i] == '"':
+      inc i
+      while i < paramsStr.len:
+        if paramsStr[i] == '\\' and i + 1 < paramsStr.len:
+          # Handle escape sequences
+          inc i
+          case paramsStr[i]:
+            of '"': value.add('"')
+            of '\\': value.add('\\')
+            else:
+              value.add('\\')
+              value.add(paramsStr[i])
+        elif paramsStr[i] == '"':
+          inc i
+          break
+        else:
+          value.add(paramsStr[i])
+        inc i
+    else:
+      # Unquoted value (until comma or end)
+      while i < paramsStr.len and paramsStr[i] != ',':
+        value.add(paramsStr[i])
+        inc i
+
+    case paramName:
+      of "stream": stream = parseInt(value).int32
+      of "width": width = parseInt(value).int32
+      of "blur": blur = parseInt(value).int32
+      of "pattern": pattern = value
+      of "threshold": error "threshold parameter not allowed for levels command"
+      else: error &"Unknown parameter: {paramName}"
+
+    # Skip comma
+    if i < paramsStr.len and paramsStr[i] == ',':
+      inc i
+
+  return (kind, pattern, stream, width, blur)
+
 
 proc main*(strArgs: seq[string]) =
-  var args = levelArgs()
-  var expecting: string = ""
-  var inputFile: string = ""
+  var
+    expecting = ""
+    inputFile = ""
+    edit = "audio"
+    tb = AVRational(num: 30, den: 1)
+    noCache = false
 
   for key in strArgs:
     case key
     of "--no-cache":
-      args.noCache = true
+      noCache = true
     of "-tb":
       expecting = "timebase"
     of "--timebase", "--edit":
@@ -28,11 +99,14 @@ proc main*(strArgs: seq[string]) =
 
       case expecting
       of "":
+        if inputFile != "":
+          error &"Input file is already set: {key}"
         inputFile = key
       of "timebase":
-        args.timebase = key
+        try: tb = AVRational(key)
+        except ValueError: error &"Invalid rational number: {key}"
       of "edit":
-        args.edit = key
+        edit = key
       expecting = ""
 
   if expecting != "":
@@ -42,20 +116,17 @@ proc main*(strArgs: seq[string]) =
     error "Expecting an input file."
 
   av_log_set_level(AV_LOG_QUIET)
-  let tb = AVRational(args.timebase)
   let chunkDuration: float64 = av_inv_q(tb)
-  let (editMethod, _, userStream, width, blur, pattern) = parseEditString2(args.edit)
-  if editMethod notin ["audio", "motion", "subtitle"]:
+  let (editMethod, pattern, userStream, width, blur) = parseEdit(edit)
+
+  if editMethod notin ["audio", "motion", "subtitle", "word", "regex"]:
     error &"Unknown editing method: {editMethod}"
-
-  let cacheArgs = (if editMethod == "audio": $userStream else: &"{userStream},{width},{blur}")
-
   if userStream < 0:
     error "Stream must be positive"
 
-  echo "\n@start"
+  let cacheArgs = if editMethod == "audio": $userStream else: &"{userStream},{width},{blur}"
 
-  if not args.noCache:
+  if not noCache:
     let cacheData = readCache(inputFile, tb, editMethod, cacheArgs)
     if cacheData.isSome:
       for loudnessValue in cacheData.get():
@@ -71,6 +142,8 @@ proc main*(strArgs: seq[string]) =
   except IOError as e:
     error e.msg
   defer: container.close()
+
+  echo "\n@start"
 
   if editMethod == "audio":
     if container.audio.len == 0:
@@ -109,15 +182,21 @@ proc main*(strArgs: seq[string]) =
       data.add value
     echo ""
 
-  elif editMethod == "subtitle":
+  elif editMethod in ["subtitle", "word", "regex"]:
     if container.subtitle.len == 0:
       error "No Subtitle stream"
 
-    let (ret, values) = subtitle(container, tb, pattern, userStream)
+    var regPattern: Re
+    try:
+      regPattern = if editMethod == "word": re("\\b" & escapeRe(pattern) & "\\b") else: re(pattern)
+    except ValueError:
+      error &"Invalid regex expression: {pattern}"
+
+    let (ret, values) = subtitle(container, tb, regPattern, userStream)
     if ret != -1:
       error &"Subtitle stream out of range: {ret}"
     for value in values:
       echo (if value: "1" else: "0")
 
-  if editMethod != "subtitle" and not args.noCache:
+  if not noCache and editMethod notin ["subtitle", "word", "regex"]:
     writeCache(data, inputFile, tb, editMethod, cacheArgs)
