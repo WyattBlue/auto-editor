@@ -98,7 +98,7 @@ jobs:
         run: nimble windows
       - name: Rename binary
         run: |
-          mv auto-editor.exe auto-editor-windows-amd64.exe
+          mv auto-editor.exe auto-editor-windows-x86_64.exe
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
