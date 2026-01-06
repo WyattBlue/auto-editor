@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from fractions import Fraction
 from hashlib import sha256
 from tempfile import mkdtemp
@@ -13,7 +14,50 @@ from time import perf_counter
 
 import av
 from av import AudioStream, VideoStream
-from ffwrapper import FileInfo, Log
+
+
+@dataclass(slots=True, frozen=True)
+class Video:
+    width: int
+    height: int
+    codec: str
+    fps: Fraction
+    duration: float
+    sar: Fraction
+    time_base: Fraction | None
+    pix_fmt: str | None
+    color_range: int
+    color_space: int
+    color_primaries: int
+    color_transfer: int
+    bitrate: int
+    lang: str | None
+
+
+@dataclass(slots=True, frozen=True)
+class Audio:
+    codec: str
+    samplerate: int
+    layout: str
+    channels: int
+    duration: float
+    bitrate: int
+    lang: str | None
+
+
+@dataclass(slots=True, frozen=True)
+class Subtitle:
+    codec: str
+    lang: str | None
+
+
+@dataclass(slots=True)
+class FileInfo:
+    bitrate: int
+    duration: float
+    videos: tuple[Video, ...]
+    audios: tuple[Audio, ...]
+    subtitles: tuple[Subtitle, ...]
 
 
 def test_options() -> argparse.ArgumentParser:
@@ -29,20 +73,69 @@ def pipe_to_console(cmd: list[str]) -> tuple[int, str, str]:
     return process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
 
 
-all_files = (
-    "aac.m4a",
-    "alac.m4a",
-    "wav/pcm-f32le.wav",
-    "wav/pcm-s32le.wav",
-    "multi-track.mov",
-    "mov_text.mp4",
-    "testsrc.mkv",
-)
-log = Log()
-
-
 def fileinfo(path: str) -> FileInfo:
-    return FileInfo.init(path, log)
+    cont = av.open(path, "r")
+
+    videos: tuple[Video, ...] = ()
+    audios: tuple[Audio, ...] = ()
+    subtitles: tuple[Subtitle, ...] = ()
+
+    for v in cont.streams.video:
+        vdur = 0.0
+        if v.duration is not None and v.time_base is not None:
+            vdur = float(v.duration * v.time_base)
+        fps = v.average_rate
+        sar = Fraction(1)
+        if v.sample_aspect_ratio is not None:
+            sar = v.sample_aspect_ratio
+
+        cc = v.codec_context
+        videos += (
+            Video(
+                v.width,
+                v.height,
+                v.codec.canonical_name,
+                fps,
+                vdur,
+                sar,
+                v.time_base,
+                getattr(v.format, "name", None),
+                cc.color_range,
+                cc.colorspace,
+                cc.color_primaries,
+                cc.color_trc,
+                0 if v.bit_rate is None else v.bit_rate,
+                v.language,
+            ),
+        )
+
+    for a in cont.streams.audio:
+        adur = 0.0
+        if a.duration is not None and a.time_base is not None:
+            adur = float(a.duration * a.time_base)
+
+        a_cc = a.codec_context
+        audios += (
+            Audio(
+                a_cc.codec.canonical_name,
+                0 if a_cc.sample_rate is None else a_cc.sample_rate,
+                a.layout.name,
+                a_cc.channels,
+                adur,
+                0 if a_cc.bit_rate is None else a_cc.bit_rate,
+                a.language,
+            ),
+        )
+
+    for s in cont.streams.subtitles:
+        codec = s.codec_context.name
+        subtitles += (Subtitle(codec, s.language),)
+
+    bitrate = 0 if cont.bit_rate is None else cont.bit_rate
+    dur = 0 if cont.duration is None else cont.duration / av.time_base
+
+    cont.close()
+    return FileInfo(bitrate, dur, videos, audios, subtitles)
 
 
 def calculate_sha256(filename: str) -> str:
@@ -56,6 +149,16 @@ def calculate_sha256(filename: str) -> str:
 class SkipTest(Exception):
     pass
 
+
+all_files = (
+    "aac.m4a",
+    "alac.m4a",
+    "wav/pcm-f32le.wav",
+    "wav/pcm-s32le.wav",
+    "multi-track.mov",
+    "mov_text.mp4",
+    "testsrc.mkv",
+)
 
 class Runner:
     def __init__(self) -> None:
@@ -361,26 +464,27 @@ class Runner:
 
     def test_attachment_copy(self) -> None:
         """Test that attachment streams are copied from input to output."""
-        # Use pre-made test file with an attachment
         test_input = "resources/testsrc_with_attachment.mkv"
-
-        # Test that attachments are copied by default
-        cn = fileinfo(self.main([test_input], ["--edit", "none"], "with_attachment.mkv"))
-        assert len(cn.videos) == 1, "Should have exactly 1 video stream"
-        assert len(cn.audios) == 1, "Should have exactly 1 audio stream"
-        assert len(cn.attachments) == 1, "Should have 1 attachment stream"
-        assert cn.attachments[0].filename == "test_attachment.txt", (
-            f"Attachment filename should be 'test_attachment.txt', got {cn.attachments[0].filename}"
-        )
-        assert cn.attachments[0].mimetype == "text/plain", (
-            f"Attachment mimetype should be 'text/plain', got {cn.attachments[0].mimetype}"
-        )
-
-        # Test that -dn flag properly disables attachment streams
-        cn = fileinfo(self.main([test_input], ["--edit", "none", "-dn"], "no_attachment.mkv"))
-        assert len(cn.videos) == 1, "Should have exactly 1 video stream"
-        assert len(cn.audios) == 1, "Should have exactly 1 audio stream"
-        assert len(cn.attachments) == 0, "Should have 0 attachment streams when -dn flag is used"
+        new_file = self.main([test_input], ["--edit", "none"], "with_attachment.mkv")
+        try:
+            cn = av.open(new_file)
+            assert cn.streams[0].type == "video"
+            assert cn.streams[1].type == "audio"
+            attachment = cn.streams[2]
+            assert attachment.type == "attachment"
+            assert len(cn.streams) == 3
+            assert attachment.metadata.get("filename", None) == "test_attachment.txt"
+            assert attachment.metadata.get("mimetype", None) == "text/plain"
+        finally:
+            cn.close()
+        new_file = self.main([test_input], ["--edit", "none", "-dn"], "no_attachment.mkv")
+        try:
+            cn = av.open(new_file)
+            assert cn.streams[0].type == "video", "Should have exactly 1 video stream"
+            assert cn.streams[1].type == "audio", "Should have exactly 1 audio stream"
+            assert len(cn.streams) == 2, "Should have 0 attachment streams when -dn flag is used"
+        finally:
+            cn.close()
 
     def test_scale(self) -> None:
         cn = fileinfo(self.main(["example.mp4"], ["--scale", "1.5"], "scale.mp4"))
@@ -572,9 +676,9 @@ class Runner:
 
     def test_audio_norm_ebu(self) -> None:
         """Test that EBU normalization preserves correct pitch/duration."""
-        import wave
-        import struct
         import hashlib
+        import struct
+        import wave
 
         out_ebu = self.main(
             ["example.mp4"],
@@ -622,8 +726,8 @@ class Runner:
 
     def test_audio_norm_peak(self) -> None:
         """Test that peak normalization increases loudness in the output."""
-        import wave
         import struct
+        import wave
 
         out = self.main(
             ["example.mp4"], ["--audio-normalize", "peak:-3"], "peak_out.wav"
