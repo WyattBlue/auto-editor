@@ -1,7 +1,7 @@
 # Package
 version = "29.6.0"
 author = "WyattBlue"
-description = "Auto-Editor: Efficient media analysis and rendering"
+description = "Effort free video editing!"
 license = "Unlicense"
 srcDir = "src"
 bin = @["main=auto-editor"]
@@ -151,8 +151,8 @@ let vpx = Package(
 )
 let dav1d = Package(
   name: "dav1d",
-  sourceUrl: "https://code.videolan.org/videolan/dav1d/-/archive/1.5.2/dav1d-1.5.2.tar.bz2",
-  sha256: "c748a3214cf02a6d23bc179a0e8caea9d6ece1e46314ef21f5508ca6b5de6262",
+  sourceUrl: "https://code.videolan.org/videolan/dav1d/-/archive/1.5.3/dav1d-1.5.3.tar.bz2",
+  sha256: "e099f53253f6c247580c554d53a13f1040638f2066edc3c740e4c2f15174ce22",
   buildSystem: "meson",
   ffFlag: "--enable-libdav1d",
 )
