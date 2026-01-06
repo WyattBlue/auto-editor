@@ -73,15 +73,16 @@ jobs:
         run: python3 -m pip install av && python3 tests/test.py
 
   windows:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Nim
-        uses: jiro4989/setup-nim-action@v2
-        with:
-          nim-version: "stable"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Homebrew
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+      - name: Install nim
+        run: brew update && brew install nim
       - name: Install mingw-w64
         run: |
           sudo apt-get update
