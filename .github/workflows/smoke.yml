@@ -10,7 +10,6 @@ on:
       - '**.css'
       - '**.toml'
       - '**about.nim'
-      - 'auto_editor/'
       - '.github/workflows/build.yml'
     branches:
       - master
@@ -22,7 +21,6 @@ on:
       - '**.css'
       - '**.toml'
       - '**about.nim'
-      - 'auto_editor/'
       - '.github/workflows/build.yml'
     branches:
       - master
@@ -49,8 +47,7 @@ jobs:
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
       - name: Install packages
-        run: |
-          brew update && brew install nim
+        run: brew update && brew install nim
       - name: Setup
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
@@ -95,3 +92,27 @@ jobs:
         run: nimble makeffwin
       - name: Compile
         run: nimble windows
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: auto-editor-windows
+          path: auto-editor.exe
+
+  windows-test:
+    needs: windows
+    runs-on: windows-latest
+    env:
+      DISABLE_HEVC: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Download auto-editor.exe
+        uses: actions/download-artifact@v4
+        with:
+          name: auto-editor-windows
+      - name: e2e Test
+        run: python -m pip install av && python tests/test.py
