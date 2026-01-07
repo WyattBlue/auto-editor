@@ -126,6 +126,8 @@ proc main*(strArgs: seq[string]) =
 
   let cacheArgs = if editMethod == "audio": $userStream else: &"{userStream},{width},{blur}"
 
+  echo "\n@start"
+
   if not noCache:
     let cacheData = readCache(inputFile, tb, editMethod, cacheArgs)
     if cacheData.isSome:
@@ -142,8 +144,6 @@ proc main*(strArgs: seq[string]) =
   except IOError as e:
     error e.msg
   defer: container.close()
-
-  echo "\n@start"
 
   if editMethod == "audio":
     if container.audio.len == 0:
