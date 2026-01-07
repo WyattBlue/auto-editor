@@ -116,13 +116,12 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
 
   if jsonNode.hasKey("effects") and jsonNode["effects"].kind == JArray:
     for effectNode in jsonNode["effects"]:
-      # Support single action strings or arrays of actions
       var actionGroup: seq[Action] = @[]
-      if effectNode.kind == JString:
-        actionGroup.add parseEffect(effectNode.getStr())
-      elif effectNode.kind == JArray:
+      if effectNode.kind == JArray:
         for actionStr in effectNode:
           actionGroup.add parseEffect(actionStr.getStr())
+      else:
+        error "effects must be a list of lists"
 
       let effectIndex = effects.find(actionGroup)
       if effectIndex == -1:

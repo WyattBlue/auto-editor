@@ -12,12 +12,7 @@ func effectToString(act: Action): string =
   of actVolume: "volume:" & $act.val
 
 func effectGroupToJson(actions: seq[Action]): JsonNode =
-  if actions.len == 0:
-    return %"nil"
-  elif actions.len == 1:
-    return %effectToString(actions[0])
-  else:
-    return %actions.mapIt(effectToString(it))
+  return %actions.mapIt(effectToString(it))
 
 func `%`(self: v1): JsonNode =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
