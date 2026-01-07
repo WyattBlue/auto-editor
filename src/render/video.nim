@@ -44,9 +44,10 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
   newFrame.pts = frame.pts
   newFrame.time_base = frame.time_base
 
-  # Allocate buffer for new frame
-  if av_frame_get_buffer(newFrame, 32) < 0:
-    error "Failed to allocate buffer for new frame"
+  var ret = av_frame_get_buffer(newFrame, 32)
+  if ret < 0:
+    echo prettyFrame(newFrame)
+    error &"Failed to allocate buffer for new frame: {ret}"
 
   # Create swscale context
   let swsContext = sws_getCachedContext(
@@ -61,7 +62,7 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
     error "Failed to create swscale context"
 
   # Perform the conversion
-  let ret = sws_scale(
+  ret = sws_scale(
     swsContext,
     cast[ptr ptr uint8](addr frame.data[0]),
     cast[ptr cint](addr frame.linesize[0]),
@@ -223,8 +224,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       if src == firstSrc and encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
         pix_fmt = AVPixelFormat(cn.video[0].codecpar.format)
 
-  # debug(&"Clips: {tl.v}")
-
   var needValidFmt = true
   if codec.pix_fmts != nil:
     var i = 0
@@ -279,6 +278,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   var lastKeyframePos = initTable[ptr string, int]()
   var lastSeekTarget = initTable[ptr string, int]()
   let isNonlinear = tl.isNonlinear
+
+  debug &"isNonlinear: {isNonlinear}"
 
   # Initialize lastKeyframePos to 0 for all sources (frame 0 is always seekable)
   for src in tl.uniqueSources:

@@ -3,13 +3,6 @@ import std/[math, options, strformat]
 import ../[av, cache, ffmpeg, log, resampler]
 import ../util/bar
 
-# Enable project wide
-when defined(macosx):
-  # Apply fast-math for clang: see https://simonbyrne.github.io/notes/fastmath/
-  {.passC: "-ffast-math".}
-else:
-  {.passC: "-fno-signaling-nans -fno-math-errno -fno-trapping-math -freciprocal-math".}
-
 type
   AudioIterator = ref object
     resampler: AudioResampler

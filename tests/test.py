@@ -18,8 +18,7 @@ from av import AudioStream, VideoStream
 
 @dataclass(slots=True, frozen=True)
 class Video:
-    width: int
-    height: int
+    res: tuple[int, int]
     codec: str
     fps: Fraction
     duration: float
@@ -92,8 +91,7 @@ def fileinfo(path: str) -> FileInfo:
         cc = v.codec_context
         videos += (
             Video(
-                v.width,
-                v.height,
+                (v.width, v.height),
                 v.codec.canonical_name,
                 fps,
                 vdur,
@@ -426,17 +424,15 @@ class Runner:
         out = self.main([v1], ["-res", "720,720"], "output.mp4")
 
         output = fileinfo(out)
-        assert output.videos[0].width == 720
-        assert output.videos[0].height == 720
+        assert output.videos[0].res == (720, 720), output.videos[0].res
         assert len(output.audios) == 1
 
     def test_res_with_v2(self):
         v2 = self.main(["example.mp4"], ["--export", "v2"], "input.v2")
-        out = self.main([v2], ["-res", "720,720"], "output.mp4")
+        out = self.main([v2], ["-res", "720,720"], "output2.mp4")
 
         output = fileinfo(out)
-        assert output.videos[0].width == 720
-        assert output.videos[0].height == 720
+        assert output.videos[0].res == (720, 720), output.videos[0].res
         assert len(output.audios) == 1
 
     def test_premiere_named_export(self) -> None:
@@ -498,14 +494,12 @@ class Runner:
     def test_scale(self) -> None:
         cn = fileinfo(self.main(["example.mp4"], ["--scale", "1.5"], "scale.mp4"))
         assert cn.videos[0].fps == 30
-        assert cn.videos[0].width == 1920
-        assert cn.videos[0].height == 1080
+        assert cn.videos[0].res == (1920, 1080)
         assert cn.audios[0].samplerate == 48000
 
         cn = fileinfo(self.main(["example.mp4"], ["--scale", "0.2"], "scale.mp4"))
         assert cn.videos[0].fps == 30
-        assert cn.videos[0].width == 256
-        assert cn.videos[0].height == 144
+        assert cn.videos[0].res == (256, 144)
         assert cn.audios[0].samplerate == 48000
 
     def test_resolution(self):
@@ -515,8 +509,7 @@ class Runner:
         cn = fileinfo(out)
 
         assert cn.videos[0].fps == 30
-        assert cn.videos[0].width == 700
-        assert cn.videos[0].height == 380
+        assert cn.videos[0].res == (700, 380)
         assert cn.audios[0].samplerate == 48000
 
     # def test_premiere_multi(self):
