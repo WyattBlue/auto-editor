@@ -1,5 +1,5 @@
 # Package
-version = "29.6.0"
+version = "29.6.1"
 author = "WyattBlue"
 description = "Effort free video editing!"
 license = "Unlicense"
