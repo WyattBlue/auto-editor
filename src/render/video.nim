@@ -334,13 +334,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
           # Seek to last known keyframe only if it's before our target
           if obj.src notin lastKeyframePos or lastKeyframePos[obj.src] >= obj.index:
             let lastKf = if obj.src in lastKeyframePos: $lastKeyframePos[obj.src] else: "none"
-            error(&"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {obj.index}, last keyframe: {lastKf})")
+            error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {obj.index}, last keyframe: {lastKf})"
 
           let seekTarget = lastKeyframePos[obj.src]
 
           # Only perform the seek if it's different from the last one
           if lastSeekTarget[obj.src] != seekTarget:
-            debug(&"Seek: {frameIndex} -> {seekTarget}")
+            debug &"Seek: {frameIndex} -> {seekTarget}"
             cns[obj.src].seek(seekTarget * tous[obj.src], stream = myStream)
             avcodec_flush_buffers(decoders[obj.src])
             lastSeekTarget[obj.src] = seekTarget
@@ -406,6 +406,19 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
         frame = scaleGraph.pull()
         if oldFrame != nil and oldFrame != nullFrame:
           av_frame_free(addr oldFrame)
+
+      # Validate frame before reformatting
+      if frame != nil and (frame.width <= 0 or frame.height <= 0):
+        debug &"Warning: Invalid frame at {index}tb, using fallback"
+        av_frame_free(addr frame)
+        if lastProcessedFrame != nil:
+          frame = av_frame_clone(lastProcessedFrame)
+          if frame == nil:
+            frame = av_frame_clone(nullFrame)
+        else:
+          frame = av_frame_clone(nullFrame)
+        if frame == nil:
+          error &"Failed to create fallback frame at {index}tb"
 
       let reformattedFrame = frame.reformat(pix_fmt)
       if reformattedFrame != nil and reformattedFrame != frame:
