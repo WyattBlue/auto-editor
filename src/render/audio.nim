@@ -16,51 +16,45 @@ import ../graph
 const AV_CH_LAYOUT_STEREO = 3
 const AV_CH_LAYOUT_MONO = 1
 
-{.emit: """
-#include <stdarg.h>
-#include <stdio.h>
-#include <string.h>
-#include <libavutil/log.h>
+# Import C string functions for JSON capture
+proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
+proc strncat(dest: cstring, src: cstring, n: csize_t): cstring {.
+  importc, header: "<string.h>".}
+proc strlen(s: cstring): csize_t {.importc, header: "<string.h>".}
 
-static char captured_json[16384];
-static int capture_enabled = 0;
+# Static storage for captured JSON output from loudnorm filter
+var capturedJson: array[16384, char]
+var captureEnabled: bool = false
 
-static void loudnorm_log_callback_wrapper(void* avcl, int level, const char* fmt, va_list vl) {
-    if (!capture_enabled) {
-        av_log_default_callback(avcl, level, fmt, vl);
-        return;
-    }
+# Custom log callback to capture loudnorm JSON output
+proc loudnormLogCallbackWrapper(avcl: pointer, level: cint, fmt: cstring, vl: VaList) {.cdecl.} =
+  if not captureEnabled:
+    av_log_default_callback(avcl, level, fmt, vl)
+    return
 
-    char buffer[4096];
-    vsnprintf(buffer, sizeof(buffer), fmt, vl);
+  var buffer: array[4096, char]
+  discard vsnprintf(cast[cstring](addr buffer[0]), 4096, fmt, vl)
 
-    // Look for JSON content
-    if (strchr(buffer, '{') != NULL && strchr(buffer, '}') != NULL) {
-        strncat(captured_json, buffer, sizeof(captured_json) - strlen(captured_json) - 1);
-    }
+  # Look for JSON content
+  let bufStr = cast[cstring](addr buffer[0])
+  if strchr(bufStr, ord('{').cint) != nil and strchr(bufStr, ord('}').cint) != nil:
+    let capturedPtr = cast[cstring](addr capturedJson[0])
+    let remaining = 16384 - strlen(capturedPtr) - 1
+    discard strncat(capturedPtr, bufStr, remaining.csize_t)
 
-    av_log_default_callback(avcl, level, fmt, vl);
-}
+  av_log_default_callback(avcl, level, fmt, vl)
 
-static void enable_loudnorm_capture(void) {
-    capture_enabled = 1;
-    captured_json[0] = '\0';
-    av_log_set_callback(loudnorm_log_callback_wrapper);
-}
+proc enableLoudnormCapture() =
+  captureEnabled = true
+  capturedJson[0] = '\0'
+  av_log_set_callback(loudnormLogCallbackWrapper)
 
-static void disable_loudnorm_capture(void) {
-    capture_enabled = 0;
-    av_log_set_callback(av_log_default_callback);
-}
+proc disableLoudnormCapture() =
+  captureEnabled = false
+  av_log_set_callback(av_log_default_callback)
 
-static const char* get_captured_json(void) {
-    return captured_json;
-}
-""".}
-
-proc enableLoudnormCapture() {.importc: "enable_loudnorm_capture", nodecl.}
-proc disableLoudnormCapture() {.importc: "disable_loudnorm_capture", nodecl.}
-proc getCapturedJson(): cstring {.importc: "get_captured_json", nodecl.}
+proc getCapturedJson(): cstring =
+  return cast[cstring](addr capturedJson[0])
 
 proc parseLoudnormValue(node: JsonNode, field: string): float32 =
   if node.hasKey(field):
