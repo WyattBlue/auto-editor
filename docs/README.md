@@ -1,17 +1,12 @@
 # Source Code, Documents, and Resources for https://auto-editor.com.
 
 ## Requirements
- - BunJS
- - Python
- - Nim
+ - [Hunim](https://github.com/WyattBlue/hunim)
  - rsync and ssh (for deployment)
 
 ```
-# Compile Nim, get resources
-make compile
-
 # Run local
-make
+hunim server
 
 # Publish
 make upload
@@ -19,8 +14,8 @@ make upload
 
 ## Server Requirements
  - systemd
- - reverse proxy (nginx, etc)
- - BunJS
+ - reverse proxy (nginx, etc.)
+ - [bun](https://bun.com)
 
 ## Deployment Example
 
