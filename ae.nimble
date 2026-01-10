@@ -692,19 +692,4 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
     exec "x86_64-w64-mingw32-strip -s auto-editor.exe"
 
 task zshcomplete, "Generate zsh completions":
-  echo "#compdef auto-editor"
-  echo ""
-  echo "_auto-editor() {"
-  echo "  local -a subcommands"
-  echo "  subcommands=("
-  for (command, help) in commands:
-    if help != "":
-      echo "    '" & command & ":" & help.replace("'", "'\\''") & "'"
-    else:
-      echo "    '" & command & "'"
-  echo "  )"
-  echo ""
-  echo "  _describe 'command' subcommands"
-  echo "}"
-  echo ""
-  echo "_auto-editor \"$@\""
+  zshcomplete()
