@@ -21,6 +21,7 @@ var disableSvtAv1 = getEnv("DISABLE_SVTAV1").len > 0
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
+var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 var enableCuda = getEnv("ENABLE_CUDA").len > 0 and not defined(macosx)
 
 var flags = ""
@@ -32,6 +33,8 @@ if not disableHevc:
   flags &= "-d:enable_hevc "
 if enableWhisper:
   flags &= "-d:enable_whisper "
+if enableVpl:
+  flags &= "-d:enable_vpl"
 if enableCuda:
   flags &= "-d:enable_cuda "
 
@@ -48,8 +51,8 @@ task make, "Export the project":
     exec "strip -s auto-editor"
 
 task cleanff, "Remove":
-  rmDir("ffmpeg_sources")
-  rmDir("build")
+  rmDir "ffmpeg_sources"
+  rmDir "build"
 
 var disableDecoders: seq[string] = @[]
 var disableEncoders: seq[string] = @[]
@@ -204,7 +207,9 @@ let ffmpeg = Package(
 proc setupPackages(enableWhisper: bool): seq[Package] =
   result = @[]
   if not defined(macosx):
-    result &= [nvheaders, libvpl]
+    result.add nvheaders
+  if enableVpl:
+    result.add libvpl
   if enableWhisper:
     result.add whisper
   result &= [lame, opus, dav1d, x264]
@@ -681,8 +686,8 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
   if not dirExists("build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
-    exec "nim c -d:danger --panics:on -d:windows " & flags & " --os:windows --cpu:amd64 " &
-         "--cc:gcc " &
+    exec "nim c -d:danger --panics:on -d:windows " & flags & " --passC:-flto --passL:-flto " &
+         "--os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc-posix " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc-posix " &
          "--passL:-static " &
