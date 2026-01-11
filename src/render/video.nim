@@ -46,7 +46,6 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
 
   var ret = av_frame_get_buffer(newFrame, 32)
   if ret < 0:
-    echo prettyFrame(newFrame)
     error &"Failed to allocate buffer for new frame: {ret}"
 
   # Create swscale context
