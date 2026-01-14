@@ -37,7 +37,6 @@ jobs:
             sudo dpkg -i cuda-keyring_1.1-1_all.deb
             sudo apt update
             sudo apt-get install -y build-essential pkg-config nasm git cuda-cudart-12-8 cuda-cudart-dev-12-8 libcublas-dev-12-8 cuda-nvcc-12-8
-            echo "ENABLE_CUDA=1" >> $GITHUB_ENV
             echo "CUDA_PATH=/usr/local/cuda-12.8" >> $GITHUB_ENV
             echo "/usr/local/cuda-12.8/bin" >> $GITHUB_PATH
             echo "LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64/stubs:/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
@@ -48,7 +47,6 @@ jobs:
             sudo dpkg -i cuda-keyring_1.1-1_all.deb
             sudo apt update
             sudo apt-get install -y build-essential pkg-config git cuda-cudart-12-8 cuda-cudart-dev-12-8 libcublas-dev-12-8 cuda-nvcc-12-8
-            echo "ENABLE_CUDA=1" >> $GITHUB_ENV
             echo "CUDA_PATH=/usr/local/cuda-12.8" >> $GITHUB_ENV
             echo "/usr/local/cuda-12.8/bin" >> $GITHUB_PATH
             echo "LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64/stubs:/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
@@ -60,20 +58,30 @@ jobs:
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
           fi
-      - name: Build FFmpeg
+      - name: GCC/Clang version
+        run: gcc --version
+      - name: Build FFmpeg (non-CUDA)
         run: nimble makeff
-      - name: Compile
-        run: nimble make
+      - name: Compile (non-CUDA)
+        run: nimble make && mv auto-editor ${{ matrix.binary_name }}
       - name: Test
         run: nimble test
-      - name: Rename binary
-        run: |
-          mv auto-editor ${{ matrix.binary_name }}
+
+      - name: Build FFmpeg (CUDA)
+        if: runner.os == 'Linux'
+        run: ENABLE_CUDA=1 nimble makeff
+      - name: Compile (CUDA)
+        if: runner.os == 'Linux'
+        run: ENABLE_CUDA=1 nimble make && mv auto-editor ${{ matrix.binary_name }}-cuda
+      - name: Test
+        if: runner.os == 'Linux'
+        run: ENABLE_CUDA=1 nimble test
+
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ matrix.binary_name }}
+          files: ${{ matrix.binary_name }}*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -95,10 +103,7 @@ jobs:
       - name: Build FFmpeg
         run: nimble makeffwin
       - name: Compile
-        run: nimble windows
-      - name: Rename binary
-        run: |
-          mv auto-editor.exe auto-editor-windows-x86_64.exe
+        run: nimble windows && mv auto-editor.exe auto-editor-windows-x86_64.exe
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
