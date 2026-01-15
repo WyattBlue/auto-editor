@@ -18,7 +18,6 @@ import src/cli
 var disableVpx = getEnv("DISABLE_VPX").len > 0
 var disableSvtAv1 = getEnv("DISABLE_SVTAV1").len > 0
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
-var disableDav1d = getEnv("DISABLE_DAV1D").len > 0
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
@@ -214,9 +213,7 @@ proc setupPackages(enableWhisper: bool): seq[Package] =
     result.add libvpl
   if enableWhisper:
     result.add whisper
-  result &= [lame, opus, x264]
-  if not disableDav1d:
-    result.add dav1d
+  result &= [lame, opus, dav1d, x264]
   if not disableVpx:
     result.add vpx
   if not disableSvtAv1:
