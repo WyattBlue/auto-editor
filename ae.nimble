@@ -170,8 +170,8 @@ let svtav1 = Package(
 )
 let whisper = Package(
   name: "whisper",
-  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.2.tar.gz",
-  sha256: "bcee25589bb8052d9e155369f6759a05729a2022d2a8085c1aa4345108523077",
+  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.3.tar.gz",
+  sha256: "870ba21409cdf66697dc4db15ebdb13bc67037d76c7cc63756c81471d8f1731a",
   buildSystem: "cmake",
   buildArguments: @[
     "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
@@ -233,7 +233,7 @@ func dirName(package: Package): string =
   if package.name == "nv-codec-headers":
     return "nv-codec-headers-n13.0.19.0"
   if package.name == "whisper":
-    return "whisper.cpp-1.8.2"
+    return "whisper.cpp-1.8.3"
 
   var name = package.location
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
