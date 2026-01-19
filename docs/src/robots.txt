@@ -1,0 +1,2 @@
+User-agent: *
+Sitemap: https://auto-editor.com/sitemap.xml
