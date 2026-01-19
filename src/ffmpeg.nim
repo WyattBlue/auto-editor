@@ -1,5 +1,3 @@
-import std/posix
-
 type
   VaList* {.importc: "va_list", header: "<stdarg.h>", bycopy.} = object
 
@@ -459,6 +457,7 @@ template MKTAG*(a, b, c, d: static[char]): cint =
 
 func AVERROR*(e: cint): cint {.inline.} = (-e)
 const AVERROR_EOF* = AVERROR(MKTAG('E', 'O', 'F', ' '))
+let EAGAIN {.importc: "EAGAIN", header: "<errno.h>".}: cint
 let AVERROR_EAGAIN* = AVERROR(EAGAIN)
 
 const AV_ERROR_MAX_STRING_SIZE* = 64
