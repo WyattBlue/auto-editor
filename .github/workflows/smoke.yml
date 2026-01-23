@@ -117,4 +117,55 @@ jobs:
         with:
           name: auto-editor-windows
       - name: e2e Test
-        run: python -m pip install av && python tests/test.py
+        run: python -m pip install av --pre --extra-index-url "https://pyav.basswood-io.com/pypi/simple/" && python tests/test.py
+
+  windows-arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Homebrew
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+      - name: Install nim
+        run: brew update && brew install nim
+      - name: Install llvm-mingw
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config git meson
+          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-aarch64.tar.xz
+          tar xf llvm-mingw.tar.xz
+          echo "$PWD/llvm-mingw-20250114-ucrt-ubuntu-20.04-aarch64/bin" >> $GITHUB_PATH
+          echo "DISABLE_VPX=1" >> $GITHUB_ENV
+          echo "DISABLE_SVTAV1=1" >> $GITHUB_ENV
+          echo "DISABLE_HEVC=1" >> $GITHUB_ENV
+          echo "DISABLE_WHISPER=1" >> $GITHUB_ENV
+      - name: Build FFmpeg
+        run: nimble makeffwinarm
+      - name: Compile
+        run: nimble windowsarm
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: auto-editor-windows-arm
+          path: auto-editor.exe
+
+  windows-arm-test:
+    needs: windows-arm
+    runs-on: windows-11-arm
+    env:
+      DISABLE_HEVC: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Download auto-editor.exe
+        uses: actions/download-artifact@v4
+        with:
+          name: auto-editor-windows-arm
+      - name: e2e Test
+        run: python -m pip install av --pre --extra-index-url "https://pyav.basswood-io.com/pypi/simple/" && python tests/test.py

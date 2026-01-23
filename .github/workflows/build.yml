@@ -111,3 +111,34 @@ jobs:
           files: auto-editor-windows-x86_64.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows-arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Homebrew
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+      - name: Install nim
+        run: brew update && brew install nim
+      - name: Install llvm-mingw
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config git meson
+          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-aarch64.tar.xz
+          tar xf llvm-mingw.tar.xz
+          echo "$PWD/llvm-mingw-20250114-ucrt-ubuntu-20.04-aarch64/bin" >> $GITHUB_PATH
+          echo "DISABLE_WHISPER=1" >> $GITHUB_ENV
+      - name: Build FFmpeg
+        run: nimble makeffwinarm
+      - name: Compile
+        run: nimble windowsarm && mv auto-editor.exe auto-editor-windows-aarch64.exe
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: auto-editor-windows-aarch64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

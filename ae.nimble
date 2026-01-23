@@ -205,11 +205,11 @@ let ffmpeg = Package(
   sha256: "05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41",
 )
 
-proc setupPackages(enableWhisper: bool): seq[Package] =
+proc setupPackages(enableWhisper: bool, crossWindowsArm: bool = false): seq[Package] =
   result = @[]
-  if not defined(macosx):
+  if not defined(macosx) and not crossWindowsArm:
     result.add nvheaders
-  if enableVpl:
+  if enableVpl and not crossWindowsArm:
     result.add libvpl
   if enableWhisper:
     result.add whisper
@@ -272,7 +272,7 @@ proc makeInstall() =
     exec "make -j4"
   exec "make install"
 
-proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false) =
+proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false, crossWindowsArm: bool = false) =
   mkDir("build_cmake")
 
   var cmakeArgs = @[
@@ -282,7 +282,18 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
     "-DBUILD_STATIC_LIBS=ON",
   ] & package.buildArguments
 
-  if crossWindows:
+  if crossWindowsArm:
+    cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
+    cmakeArgs.add("-DCMAKE_SYSTEM_PROCESSOR=aarch64")
+    cmakeArgs.add("-DCMAKE_C_COMPILER=aarch64-w64-mingw32-clang")
+    cmakeArgs.add("-DCMAKE_CXX_COMPILER=aarch64-w64-mingw32-clang++")
+    cmakeArgs.add("-DCMAKE_RC_COMPILER=llvm-windres")
+    cmakeArgs.add("-DCMAKE_AR=llvm-ar")
+    cmakeArgs.add("-DCMAKE_RANLIB=llvm-ranlib")
+    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
+    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+  elif crossWindows:
     cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
     cmakeArgs.add(&"-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc{posix}")
     cmakeArgs.add(&"-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++{posix}")
@@ -349,7 +360,7 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false)
 
       writeFile(pcFile, content)
 
-proc x265Build(buildPath: string, crossWindows: bool = false) =
+proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: bool = false) =
   # Build x265 multiple times following the Homebrew approach:
   #  1: Build 12 bits static library version in separate directory (if enabled)
   #  2: Build 10 bits static library version in separate directory
@@ -367,7 +378,7 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   let isLinuxAarch64 = defined(linux) and hostCPU == "arm64"
   let isX86_64 = hostCPU in ["amd64", "i386"] # Nim uses "amd64" for x86_64
 
-  if not isX86_64:
+  if not isX86_64 or crossWindowsArm:
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")
 
   if isLinuxAarch64:
@@ -381,7 +392,19 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   ]
 
   # Add cross-compilation flags if needed
-  if crossWindows:
+  if crossWindowsArm:
+    commonArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
+    commonArgs.add("-DCMAKE_SYSTEM_PROCESSOR=aarch64")
+    commonArgs.add("-DCMAKE_C_COMPILER=aarch64-w64-mingw32-clang")
+    commonArgs.add("-DCMAKE_CXX_COMPILER=aarch64-w64-mingw32-clang++")
+    commonArgs.add("-DCMAKE_RC_COMPILER=llvm-windres")
+    commonArgs.add("-DCMAKE_AR=llvm-ar")
+    commonArgs.add("-DCMAKE_RANLIB=llvm-ranlib")
+    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
+    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+    highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")  # No x86 assembly for ARM64
+  elif crossWindows:
     commonArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
     commonArgs.add(&"-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc{posix}")
     commonArgs.add(&"-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++{posix}")
@@ -451,7 +474,9 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   else:
     # For Linux or cross-compilation, use ar with MRI script
     var arCommand = "ar"
-    if crossWindows:
+    if crossWindowsArm:
+      arCommand = "llvm-ar"
+    elif crossWindows:
       arCommand = "x86_64-w64-mingw32-ar"
 
     # Create MRI script with paths relative to 8bit directory
@@ -472,7 +497,7 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   exec "cmake --install 8bit"
 
 
-proc mesonBuild(buildPath: string, crossWindows: bool = false) =
+proc mesonBuild(buildPath: string, crossWindows: bool = false, crossWindowsArm: bool = false) =
   mkDir("build_meson")
 
   var mesonArgs = @[
@@ -485,7 +510,25 @@ proc mesonBuild(buildPath: string, crossWindows: bool = false) =
     "-Denable_tests=false"
   ]
 
-  if crossWindows:
+  if crossWindowsArm:
+    # Create cross-compilation file for meson (Windows ARM64)
+    let crossFile = "build_meson/meson-cross.txt"
+    writeFile(crossFile, """
+[binaries]
+c = 'aarch64-w64-mingw32-clang'
+cpp = 'aarch64-w64-mingw32-clang++'
+ar = 'llvm-ar'
+strip = 'llvm-strip'
+pkgconfig = 'pkg-config'
+
+[host_machine]
+system = 'windows'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
+""")
+    mesonArgs.add("--cross-file=meson-cross.txt")
+  elif crossWindows:
     # Create cross-compilation file for meson
     let crossFile = "build_meson/meson-cross.txt"
     writeFile(crossFile, &"""
@@ -511,12 +554,12 @@ endian = 'little'
     exec "ninja"
     exec "ninja install"
 
-proc ffmpegSetup(crossWindows: bool) =
+proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
   mkDir("ffmpeg_sources")
   mkDir("build")
 
   let buildPath = absolutePath("build")
-  let packages = setupPackages(enableWhisper=enableWhisper)
+  let packages = setupPackages(enableWhisper=enableWhisper, crossWindowsArm=crossWindowsArm)
 
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
@@ -541,11 +584,11 @@ proc ffmpegSetup(crossWindows: bool) =
 
       withDir package.name:
         if package.buildSystem == "cmake":
-          cmakeBuild(package, buildPath, crossWindows)
+          cmakeBuild(package, buildPath, crossWindows, crossWindowsArm)
         elif package.buildSystem == "x265":
-          x265build(buildPath, crossWindows)
+          x265build(buildPath, crossWindows, crossWindowsArm)
         elif package.buildSystem == "meson":
-          mesonBuild(buildPath, crossWindows)
+          mesonBuild(buildPath, crossWindows, crossWindowsArm)
         else:
           # Special handling for nv-codec-headers which doesn't use configure
           if package.name == "nv-codec-headers":
@@ -554,7 +597,15 @@ proc ffmpegSetup(crossWindows: bool) =
             if not fileExists("Makefile") or package.name == "x264":
               var args = package.buildArguments
               var envPrefix = ""
-              if crossWindows:
+              if crossWindowsArm:
+                if package.name == "libvpx":
+                  args.add("--target=arm64-win64-gcc")
+                else:
+                  args.add("--host=aarch64-w64-mingw32")
+                if package.name == "opus":
+                  args.add("--disable-rtcd")
+                envPrefix = "CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib "
+              elif crossWindows:
                 if package.name == "libvpx":
                   args.add("--target=x86_64-win64-gcc")
                 else:
@@ -572,7 +623,7 @@ if enableWhisper:
   filters.add "whisper"
 filters.add "scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
 
-proc setupCommonFlags(packages: seq[Package]): string =
+proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false): string =
   var commonFlags = &"""
   --enable-version3 \
   --enable-static \
@@ -599,13 +650,13 @@ proc setupCommonFlags(packages: seq[Package]): string =
     if package.ffFlag != "":
       commonFlags &= &"  {package.ffFlag} \\\n"
 
-  if defined(arm) or defined(arm64):
+  if defined(arm) or defined(arm64) or crossWindowsArm:
     commonFlags &= "  --enable-neon \\\n"
 
   if defined(macosx):
     commonFlags &= "  --enable-videotoolbox \\\n"
     commonFlags &= "  --enable-audiotoolbox \\\n"
-  else:
+  elif not crossWindowsArm:
     commonFlags &= "  --enable-nvenc \\\n"
     commonFlags &= "  --enable-ffnvcodec \\\n"
 
@@ -659,9 +710,10 @@ task makeff, "Build FFmpeg from source":
       quit(1)
     makeInstall()
 
+let buildPath = absolutePath("build")
+
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
   setupDeps()
-  let buildPath = absolutePath("build")
   putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
 
   ffmpegSetup(crossWindows=true)
@@ -697,6 +749,47 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
 
     # Strip the Windows binary
     exec "x86_64-w64-mingw32-strip -s auto-editor.exe"
+
+task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
+  setupDeps()
+  let pkgConfigPath = buildPath / "lib/pkgconfig"
+  putEnv("PKG_CONFIG_PATH", pkgConfigPath)
+  putEnv("PKG_CONFIG_LIBDIR", pkgConfigPath)
+
+  ffmpegSetup(crossWindows=false, crossWindowsArm=true)
+
+  let packages = setupPackages(enableWhisper=enableWhisper, crossWindowsArm=true)
+
+  # Configure and build FFmpeg with llvm-mingw for ARM64
+  withDir "ffmpeg_sources/ffmpeg":
+    exec (&"""CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib PKG_CONFIG_PATH="{pkgConfigPath}" PKG_CONFIG_LIBDIR="{pkgConfigPath}" ./configure --prefix="{buildPath}" \
+      --pkg-config=pkg-config \
+      --pkg-config-flags="--static" \
+      --extra-cflags="-I{buildPath}/include" \
+      --extra-ldflags="-L{buildPath}/lib" \
+      --extra-libs="-lpthread -lm -lstdc++" \
+      --arch=aarch64 \
+      --target-os=mingw32 \
+      --cross-prefix=aarch64-w64-mingw32- \
+      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, crossWindowsArm=true))
+
+    makeInstall()
+
+task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
+  echo "Cross-compiling for Windows ARM64..."
+
+  if not dirExists("build"):
+    echo "FFmpeg for Windows ARM64 not found. Run 'nimble makeffwinarm' first."
+  else:
+    exec "nim c -d:danger --panics:on -d:windows -d:windows_arm " & flags &
+         "--os:windows --cpu:arm64 --cc:clang " &
+         "--clang.exe:aarch64-w64-mingw32-clang " &
+         "--clang.linkerexe:aarch64-w64-mingw32-clang " &
+         "--passL:-static " &
+         "--out:auto-editor.exe src/main.nim"
+
+    # Strip the Windows binary
+    exec "llvm-strip -s auto-editor.exe"
 
 task zshcomplete, "Generate zsh completions":
   zshcomplete()
