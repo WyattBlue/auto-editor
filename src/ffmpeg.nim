@@ -745,8 +745,6 @@ proc avformat_index_get_entries_count*(st: ptr AVStream): cint {.importc,
     header: "<libavformat/avformat.h>".}
 proc avformat_index_get_entry*(st: ptr AVStream, idx: cint): ptr AVIndexEntry {.importc,
     header: "<libavformat/avformat.h>".}
-proc avformat_index_get_entry_from_timestamp*(st: ptr AVStream, wanted_timestamp: int64,
-    flags: cint): ptr AVIndexEntry {.importc, header: "<libavformat/avformat.h>".}
 
 # Helper to check if entry is a keyframe using inline C
 proc isKeyframe*(entry: ptr AVIndexEntry): bool {.inline.} =
