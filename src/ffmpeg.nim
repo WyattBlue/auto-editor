@@ -731,6 +731,27 @@ proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint, min_ts: int
     ts: int64, max_ts: int64, flags: cint): cint {.importc,
     header: "<libavformat/avformat.h>".}
 
+# Index entries (for seeking optimization)
+# AVIndexEntry uses bitfields in C (flags:2, size:30), so we use incompleteStruct
+# and access through the API functions
+type
+  AVIndexEntry* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
+    pos*: int64        # byte position in file
+    timestamp*: int64  # timestamp in stream time_base units
+
+const AVINDEX_KEYFRAME* = 0x0001
+
+proc avformat_index_get_entries_count*(st: ptr AVStream): cint {.importc,
+    header: "<libavformat/avformat.h>".}
+proc avformat_index_get_entry*(st: ptr AVStream, idx: cint): ptr AVIndexEntry {.importc,
+    header: "<libavformat/avformat.h>".}
+proc avformat_index_get_entry_from_timestamp*(st: ptr AVStream, wanted_timestamp: int64,
+    flags: cint): ptr AVIndexEntry {.importc, header: "<libavformat/avformat.h>".}
+
+# Helper to check if entry is a keyframe using inline C
+proc isKeyframe*(entry: ptr AVIndexEntry): bool {.inline.} =
+  {.emit: "result = (`entry`->flags & AVINDEX_KEYFRAME) != 0;".}
+
 # SwScale context and functions
 type SwsContext* {.importc: "struct SwsContext",
     header: "<libswscale/swscale.h>".} = object
