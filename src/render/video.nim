@@ -17,13 +17,15 @@ type VideoFrame = object
 
 # Keyframe index built from AVIndexEntry for efficient seeking
 type KeyframeIndex = object
-  frames: seq[int]  # sorted list of keyframe frame numbers
-  hasIndex: bool    # whether the demuxer provided index entries
+  frames: seq[int]   # sorted list of keyframe frame numbers
+  avgInterval: int   # average interval between keyframes (for seek decisions)
+  hasIndex: bool     # whether the demuxer provided index entries
 
-proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational): KeyframeIndex =
+proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: int): KeyframeIndex =
   ## Build a keyframe index from the stream's index entries.
   result.frames = @[]
   result.hasIndex = false
+  result.avgInterval = defaultInterval
 
   let count = avformat_index_get_entries_count(stream)
   if count <= 0:
@@ -37,6 +39,13 @@ proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational): KeyframeIndex =
     if entry != nil and entry.isKeyframe:
       let frameNum = int(round(float(entry.timestamp) * float(tb.num) / float(tb.den) * float(fps)))
       result.frames.add(frameNum)
+
+  # Compute average interval from actual keyframes
+  if result.frames.len >= 2:
+    var total = 0
+    for i in 1 ..< result.frames.len:
+      total += result.frames[i] - result.frames[i - 1]
+    result.avgInterval = total div (result.frames.len - 1)
 
 proc findNearestKeyframeBefore(index: KeyframeIndex, targetFrame: int): int =
   ## Find the nearest keyframe at or before targetFrame using binary search.
@@ -55,17 +64,6 @@ proc findNearestKeyframeBefore(index: KeyframeIndex, targetFrame: int): int =
       hi = mid - 1
 
   return index.frames[lo]
-
-proc computeAverageKeyframeInterval(index: KeyframeIndex): int =
-  ## Compute the average interval between keyframes.
-  if index.frames.len < 2:
-    return 150  # Default: 5 seconds at 30fps
-
-  var total = 0
-  for i in 1 ..< index.frames.len:
-    total += index.frames[i] - index.frames[i - 1]
-
-  return total div (index.frames.len - 1)
 
 func toInt(r: AVRational): int =
   (r.num div r.den).int
@@ -192,7 +190,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
   var cns = initTable[ptr string, InputContainer]()
   var decoders = initTable[ptr string, ptr AVCodecContext]()
-  var seekCost = initTable[ptr string, int]()
   var tous = initTable[ptr string, int]()
   var keyframeIndices = initTable[ptr string, KeyframeIndex]()
 
@@ -265,25 +262,19 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   for src, cn in cns:
     if len(cn.video) > 0:
       let stream = cn.video[0]
+      let defaultInterval = toInt(targetFps * AVRational(num: 5, den: 1))  # 5 seconds
       if args.noSeek:
-        seekCost[src] = int(high(uint32) - 1)
         tous[src] = 1000
-        keyframeIndices[src] = KeyframeIndex(frames: @[], hasIndex: false)
+        keyframeIndices[src] = KeyframeIndex(frames: @[], hasIndex: false, avgInterval: int(high(uint32) - 1))
       else:
         tous[src] = int(float(stream.time_base.den) / float(stream.avg_frame_rate))
+        keyframeIndices[src] = buildKeyframeIndex(stream, stream.avg_frame_rate, defaultInterval)
 
-        # Build keyframe index from demuxer's index entries
-        let kfIndex = buildKeyframeIndex(stream, stream.avg_frame_rate)
-        keyframeIndices[src] = kfIndex
-
-        if kfIndex.hasIndex and kfIndex.frames.len >= 2:
-          # Use actual keyframe interval from index
-          seekCost[src] = computeAverageKeyframeInterval(kfIndex)
-          debug &"Source {src[]}: {kfIndex.frames.len} keyframes indexed, avg interval: {seekCost[src]} frames"
+        let kfIndex = keyframeIndices[src]
+        if kfIndex.hasIndex:
+          debug &"Source {src[]}: {kfIndex.frames.len} keyframes indexed, avg interval: {kfIndex.avgInterval} frames"
         else:
-          # Fallback: Keyframes are usually spread out every 5 seconds or less.
-          seekCost[src] = toInt(targetFps * AVRational(num: 5, den: 1))
-          debug &"Source {src[]}: no index entries, using estimated seek cost: {seekCost[src]} frames"
+          debug &"Source {src[]}: no index entries, using estimated interval: {kfIndex.avgInterval} frames"
 
       if src == firstSrc and encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
         pix_fmt = AVPixelFormat(cn.video[0].codecpar.format)
@@ -423,9 +414,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
         while frameIndex < obj.index:
           # Check if skipping ahead is worth it
-          if obj.index - frameIndex > seekCost[obj.src] and frameIndex > seekThreshold:
+          if obj.index - frameIndex > keyframeIndices[obj.src].avgInterval and frameIndex > seekThreshold:
             if lastSeekTarget[obj.src] != obj.index:
-              seekThreshold = frameIndex + (seekCost[obj.src] div 2)
+              seekThreshold = frameIndex + (keyframeIndices[obj.src].avgInterval div 2)
               seekFrame = some(frameIndex)
 
               debug &"Seek: {frameIndex} -> {obj.index}"
