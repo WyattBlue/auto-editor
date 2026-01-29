@@ -15,6 +15,56 @@ type VideoFrame = object
   index: int
   src: ptr string
 
+# Keyframe index built from AVIndexEntry for efficient seeking
+type KeyframeIndex = object
+  frames: seq[int]   # sorted list of keyframe frame numbers
+  avgInterval: int   # average interval between keyframes (for seek decisions)
+  hasIndex: bool     # whether the demuxer provided index entries
+
+proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: int): KeyframeIndex =
+  ## Build a keyframe index from the stream's index entries.
+  result.frames = @[]
+  result.hasIndex = false
+  result.avgInterval = defaultInterval
+
+  let count = avformat_index_get_entries_count(stream)
+  if count <= 0:
+    return
+
+  result.hasIndex = true
+  let tb = stream.time_base
+
+  for i in 0 ..< count:
+    let entry = avformat_index_get_entry(stream, i)
+    if entry != nil and entry.isKeyframe:
+      let frameNum = int(round(float(entry.timestamp) * float(tb.num) / float(tb.den) * float(fps)))
+      result.frames.add(frameNum)
+
+  # Compute average interval from actual keyframes
+  if result.frames.len >= 2:
+    var total = 0
+    for i in 1 ..< result.frames.len:
+      total += result.frames[i] - result.frames[i - 1]
+    result.avgInterval = total div (result.frames.len - 1)
+
+proc findNearestKeyframeBefore(index: KeyframeIndex, targetFrame: int): int =
+  ## Find the nearest keyframe at or before targetFrame using binary search.
+  ## Returns -1 if no suitable keyframe found.
+  if index.frames.len == 0 or targetFrame < index.frames[0]:
+    return -1
+
+  var lo = 0
+  var hi = index.frames.len - 1
+
+  while lo < hi:
+    let mid = (lo + hi + 1) div 2
+    if index.frames[mid] <= targetFrame:
+      lo = mid
+    else:
+      hi = mid - 1
+
+  return index.frames[lo]
+
 func toInt(r: AVRational): int =
   (r.num div r.den).int
 
@@ -140,8 +190,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
   var cns = initTable[ptr string, InputContainer]()
   var decoders = initTable[ptr string, ptr AVCodecContext]()
-  var seekCost = initTable[ptr string, int]()
   var tous = initTable[ptr string, int]()
+  var keyframeIndices = initTable[ptr string, KeyframeIndex]()
 
   var pix_fmt = AV_PIX_FMT_YUV420P # Reasonable default
   let targetFps = tl.tb # Always constant
@@ -212,13 +262,19 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   for src, cn in cns:
     if len(cn.video) > 0:
       let stream = cn.video[0]
+      let defaultInterval = toInt(targetFps * AVRational(num: 5, den: 1))  # 5 seconds
       if args.noSeek:
-        seekCost[src] = int(high(uint32) - 1)
         tous[src] = 1000
+        keyframeIndices[src] = KeyframeIndex(frames: @[], hasIndex: false, avgInterval: int(high(uint32) - 1))
       else:
-        # Keyframes are usually spread out every 5 seconds or less.
-        seekCost[src] = toInt(targetFps * AVRational(num: 5, den: 1))
-        tous[src] = int(stream.time_base.den div stream.avg_frame_rate)
+        tous[src] = int(float(stream.time_base.den) / float(stream.avg_frame_rate))
+        keyframeIndices[src] = buildKeyframeIndex(stream, stream.avg_frame_rate, defaultInterval)
+
+        let kfIndex = keyframeIndices[src]
+        if kfIndex.hasIndex:
+          debug &"Source {src[]}: {kfIndex.frames.len} keyframes indexed, avg interval: {kfIndex.avgInterval} frames"
+        else:
+          debug &"Source {src[]}: no index entries, using estimated interval: {kfIndex.avgInterval} frames"
 
       if src == firstSrc and encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
         pix_fmt = AVPixelFormat(cn.video[0].codecpar.format)
@@ -285,6 +341,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
     lastKeyframePos[src] = 0
     lastSeekTarget[src] = -1  # -1 means no seek has been performed yet
 
+  # Helper to find best keyframe for backward seeking
+  proc findBestKeyframe(src: ptr string, targetFrame: int): int =
+    let kfIndex = keyframeIndices[src]
+    if kfIndex.hasIndex and kfIndex.frames.len > 0:
+      let kf = findNearestKeyframeBefore(kfIndex, targetFrame)
+      if kf >= 0:
+        return kf
+    return lastKeyframePos[src]
+
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int) =
     # Process each frame in timeline order like Python version
     for index in 0 ..< tl.`end`:
@@ -330,16 +395,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
         var myStream: ptr AVStream = cns[obj.src].video[0]
         if frameIndex > obj.index:
-          # Seek to last known keyframe only if it's before our target
-          if obj.src notin lastKeyframePos or lastKeyframePos[obj.src] >= obj.index:
-            let lastKf = if obj.src in lastKeyframePos: $lastKeyframePos[obj.src] else: "none"
-            error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {obj.index}, last keyframe: {lastKf})"
+          let seekTarget = findBestKeyframe(obj.src, obj.index)
 
-          let seekTarget = lastKeyframePos[obj.src]
+          if seekTarget < 0 or seekTarget >= obj.index:
+            let kfIndex = keyframeIndices[obj.src]
+            let indexInfo = if kfIndex.hasIndex: &"{kfIndex.frames.len} indexed" else: "no index"
+            error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {obj.index}, seekTarget: {seekTarget}, {indexInfo})"
 
-          # Only perform the seek if it's different from the last one
           if lastSeekTarget[obj.src] != seekTarget:
-            debug &"Seek: {frameIndex} -> {seekTarget}"
+            debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {obj.index})"
             cns[obj.src].seek(seekTarget * tous[obj.src], stream = myStream)
             avcodec_flush_buffers(decoders[obj.src])
             lastSeekTarget[obj.src] = seekTarget
@@ -349,14 +413,16 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
         let srcTb = myStream.avg_frame_rate
 
         while frameIndex < obj.index:
-          # Check if skipping ahead is worth it.
-          if obj.index - frameIndex > seekCost[obj.src] and frameIndex > seekThreshold:
-            seekThreshold = frameIndex + (seekCost[obj.src] div 2)
-            seekFrame = some(frameIndex)
-            debug &"Seek: {frameIndex} -> {obj.index}"
-            cns[obj.src].seek(obj.index * tous[obj.src], stream = myStream)
-            avcodec_flush_buffers(decoders[obj.src])
-            lastSeekTarget[obj.src] = obj.index
+          # Check if skipping ahead is worth it
+          if obj.index - frameIndex > keyframeIndices[obj.src].avgInterval and frameIndex > seekThreshold:
+            if lastSeekTarget[obj.src] != obj.index:
+              seekThreshold = frameIndex + (keyframeIndices[obj.src].avgInterval div 2)
+              seekFrame = some(frameIndex)
+
+              debug &"Seek: {frameIndex} -> {obj.index}"
+              cns[obj.src].seek(obj.index * tous[obj.src], stream = myStream)
+              avcodec_flush_buffers(decoders[obj.src])
+              lastSeekTarget[obj.src] = obj.index
 
           let decoder: ptr AVCodecContext = decoders[obj.src]
           var foundFrame = false
@@ -377,8 +443,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             break
 
           if seekFrame.isSome:
-            debug &"Skipped {frameIndex - seekFrame.get} timebase units"
-            framesSaved += frameIndex - seekFrame.get
+            let framesAvoided = frameIndex - seekFrame.get
+            debug &"Seek landed at frame {frameIndex}, avoided decoding {framesAvoided} frames"
+            framesSaved += framesAvoided
             seekFrame = none(int)
 
           if (frame.width.int, frame.height.int) != tl.res:
@@ -444,4 +511,4 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
     if lastProcessedFrame != nil and lastProcessedFrame != nullFrame:
       av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)
-    debug &"Total frames saved seeking: {framesSaved}")
+    debug &"Total frames avoided decoding via seeks: {framesSaved}")
