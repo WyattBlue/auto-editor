@@ -42,6 +42,9 @@ if enableCuda:
 task test, "Run unit tests":
   exec &"nim c {flags} -r tests/unit"
 
+task sprint, "Build the project quickly":
+  exec &"nim c -d:danger --panics:on {flags} --out:auto-editor src/main.nim"
+
 task make, "Export the project":
   exec &"nim c -d:danger --panics:on {flags} --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
   when defined(macosx):
