@@ -18,19 +18,9 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
-type Command = tuple[name: string, handler: proc(args: seq[string])]
-const cmdHandlers: seq[Command] = @[
-  ("cache", cache.main),
-  ("desc", desc.main),
-  ("info", info.main),
-  ("levels", levels.main),
-  ("subdump", subdump.main),
-  ("whisper", whisper.main),
-]
-
 proc printHelp() {.noreturn.} =
   echo "usage: [file | url ...] [options]\n\nCommands:\n  " &
-    commands.mapIt(it[0]).join(" ") & "\n\n" & """
+    commands.mapIt(it.name).join(" ") & "\n\n" & """
 Options:
   Editing Options:
     -m, --margin LENGTH           Set sections near "loud" as "loud" too if
@@ -328,13 +318,7 @@ judge making cuts.
 """
       quit(0)
   else:
-    for (command, cmdHandler) in zip(commands, cmdHandlers):
-      if paramStr(1) == command.name:
-        if paramCount() < 2 and command.help != "":
-          echo command.help
-        else:
-          cmdHandler.handler(commandLineParams()[1..^1])
-        quit(0)
+    genCmdCases(paramStr(1))
 
   var args = mainArgs()
   var showVersion: bool = false
@@ -342,39 +326,13 @@ judge making cuts.
 
   for rawKey in commandLineParams():
     let key = handleKey(rawKey)
+
+    if genFlagCases(key, args):
+      continue
+
     case key:
     of "-h", "--help":
       printHelp()
-    of "-V", "--version":
-      showVersion = true
-    of "-q", "--quiet":
-      quiet = true
-    of "--debug":
-      isDebug = true
-    of "--preview", "--stats":
-      args.preview = true
-    of "--no-open":
-      args.noOpen = true
-    of "--no-seek":
-      args.noSeek = true
-    of "--faststart":
-      args.faststart = true
-    of "--no-faststart":
-      args.noFaststart = true
-    of "--fragmented":
-      args.fragmented = true
-    of "--no-fragmented":
-      args.noFragmented = true
-    of "--mix-audio-streams":
-      args.mixAudioStreams = true
-    of "-vn":
-      args.vn = true
-    of "-an":
-      args.an = true
-    of "-dn":
-      args.dn = true
-    of "-sn":
-      args.sn = true
     of "-ex", "--export":
       expecting = "export"
     of "-exp", "--export-to-premiere":
