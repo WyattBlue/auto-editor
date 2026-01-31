@@ -36,7 +36,7 @@ Options:
     -m, --margin LENGTH           Set sections near "loud" as "loud" too if
                                   section is less than LENGTH away. (default
                                   is "0.2s")
-    --edit METHOD                 Set an expression which determines how to
+    -e, --edit METHOD             Set an expression which determines how to
                                   make auto edits. (default is "audio")
     --when-normal ACTION          When the video is not silent (defined by --edit)
                                   do an action. The default action being 'nil'
@@ -407,7 +407,7 @@ judge making cuts.
       expecting = "audio-bitrate"
     of "-layout", "-channel-layout", "--audio-layout":
       expecting = "layout"
-    of "--edit", "--edit-based-on":
+    of "-e", "--edit", "--edit-based-on":
       expecting = "edit"
     of "--set-speed", "--set-speed-for-range":
       expecting = "set-speed"
