@@ -18,117 +18,108 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
+proc wrapText(text: string, width, indent: int): string =
+  let text = text.strip(leading = true, trailing = true, chars = {'\n'})
+  if text.len == 0:
+    return ""
+  let indentStr = " ".repeat(indent)
+  var outLines: seq[string] = @[]
+  var isFirst = true
+
+  for line in text.split("\n"):
+    if line.len == 0:
+      outLines.add("")
+      continue
+
+    # Detect leading whitespace
+    var leadingSpaces = 0
+    for c in line:
+      if c == ' ':
+        leadingSpaces += 1
+      else:
+        break
+    let lineIndent = " ".repeat(leadingSpaces)
+    let content = line[leadingSpaces .. ^1]
+
+    var currentLine = ""
+    for word in content.splitWhitespace():
+      if currentLine.len == 0:
+        currentLine = word
+      elif leadingSpaces + currentLine.len + 1 + word.len <= width:
+        currentLine &= " " & word
+      else:
+        if isFirst:
+          outLines.add(lineIndent & currentLine)
+          isFirst = false
+        else:
+          outLines.add(indentStr & lineIndent & currentLine)
+        currentLine = word
+    if currentLine.len > 0:
+      if isFirst:
+        outLines.add(lineIndent & currentLine)
+        isFirst = false
+      else:
+        outLines.add(indentStr & lineIndent & currentLine)
+
+  result = outLines.join("\n")
+
+proc categoryName(c: Categories): string =
+  case c
+  of cEdit: "Editing Options"
+  of cTl: "Timeline Options"
+  of cUrl: "URL Download Options"
+  of cDis: "Display Options"
+  of cCon: "Container Settings"
+  of cVid: "Video Rendering"
+  of cAud: "Audio Rendering"
+  of cMis: "Miscellaneous"
+
 proc printHelp() {.noreturn.} =
-  echo "usage: [file | url ...] [options]\n\nCommands:\n  " &
-    commands.mapIt(it.name).join(" ") & "\n\n" & """
-Options:
-  Editing Options:
-    -m, --margin LENGTH           Set sections near "loud" as "loud" too if
-                                  section is less than LENGTH away. (default
-                                  is "0.2s")
-    -e, --edit METHOD             Set an expression which determines how to
-                                  make auto edits. (default is "audio")
-    --when-normal ACTION          When the video is not silent (defined by --edit)
-                                  do an action. The default action being 'nil'
-    --when-silent ACTION          When the video is silent (defined by --edit)
-                                  do an action. The default action being 'cut'
+  let termWidth = max(terminalWidth(), 40)
+  let optWidth = min(32, termWidth div 3)
+  let helpWidth = termWidth - optWidth - 4
 
-                                  Actions Available:
-                                    nil () ; unchanged/do nothing
-                                    cut () ; remove completely
-                                           ; (like setting the speed to inf)
-                                    speed (val: float)
-                                      ; Change the speed while preserving pitch.
-                                      ;   val: between (0-99999)
-                                    varispeed (val: float)
-                                      ; Change the speed by varying pitch.
-                                      ;   val: between [0.2-100]
-    -ex, --export EXPORT:ATTRS?   Choose the export mode.
-    -o, --output FILE             Set the name/path of the new output file
-    --cut-out, --cut [START,STOP ...]
-                                  The range of time that will be cut (removed)
-    --add-in, --keep [START,STOP ...]
-                                  The range of time that will be leaved "as is"
-    --set-speed, --set-speed-for-range [SPEED,START,STOP ...]
-                                  Set a SPEED for a given range in time
-    -s, --silent-speed NUM        [Deprecated] Set speed of sections marked
-                                  "silent" to NUM. (default is 99999)
-    -v, --video-speed NUM         [Deprecated] Set speed of sections marked
-                                  "loud" to NUM. (default is 1)
+  echo "usage: [file | url ...] [options]\n"
+  echo "Commands:"
+  echo "  " & commands.mapIt(it.name).join(" ") & "\n"
+  echo "Options:"
 
-  Timeline Options:
-    -tb, --time-base, -r, -fps, --frame-rate NUM
-                                  Set timeline frame rate
-    -ar, --sample-rate NAT        Set timeline sample rate
-    -res, --resolution WIDTH,HEIGHT
-                                  Set timeline width and height
-    -b, -bg, --background COLOR   Set the background as a solid RGB color
+  var currentCat: Categories = cEdit
+  var first = true
 
-  URL Download Options:
-    --yt-dlp-location PATH        Set a custom path to yt-dlp
-    --download-format FORMAT      Set the yt-dlp download format (--format,
-                                  -f)
-    --output-format TEMPLATE      Set the yt-dlp output file template (
-                                  --output, -o)
-    --yt-dlp-extras CMD           Add extra options for yt-dlp. Must be in
-                                  quotes
+  for opt in mainOptions:
+    if opt.help == "":
+      continue
 
-  Display Options:
-    --progress PROGRESS           Set what type of progress bar to use
-    --debug                       Show debugging messages and values
-    -q, --quiet                   Display less output
-    --preview, --stats            Show stats on how the input will be cut
-                                  and halt
+    if opt.c != currentCat or first:
+      currentCat = opt.c
+      if first:
+        first = false
+      else:
+        echo ""
+      echo "  " & categoryName(currentCat) & ":"
 
-  Container Settings:
-    -vn                           Disable the inclusion of video streams
-    -an                           Disable the inclusion of audio streams
-    -sn                           Disable the inclusion of subtitle streams
-    -dn                           Disable the inclusion of data streams
-    --faststart                   Enable movflags +faststart, recommended for
-                                  web (default)
-    --no-faststart                Disable movflags +faststart, will be faster
-                                  for large files
-    --fragmented                  Use fragmented mp4/mov to allow playback
-                                  before video is complete. See:
-                                  ffmpeg.org/ffmpeg-formats.html#Fragmentation
-    --no-fragmented               Do not use fragmented mp4/mov for better
-                                  compatibility (default)
+    var optStr = "    " & opt.names
+    if opt.metavar != "":
+      optStr &= " " & opt.metavar
 
-  Video Rendering:
-    -c:v, -vcodec, --video-codec ENCODER
-                                  Set video codec for output media
-    -b:v, --video-bitrate BITRATE
-                                  Set the number of bits per second for video
-    -profile:v, -vprofile PROFILE
-                                  Set the video profile. For h264: high, main,
-                                  or baseline
-    --scale NUM                   Scale the output video's resolution by NUM
-                                  factor
-    --no-seek                     Disable file seeking when rendering video.
-                                  Helpful for debugging desync issues
+    if optStr.len >= optWidth:
+      echo optStr
+      let wrapped = wrapText(opt.help, helpWidth, 0)
+      for line in wrapped.split("\n"):
+        echo " ".repeat(optWidth) & line
+    else:
+      let padding = optWidth - optStr.len
+      let wrapped = wrapText(opt.help, helpWidth, optWidth)
+      let helpLines = wrapped.split("\n")
+      echo optStr & " ".repeat(padding) & helpLines[0]
+      for i in 1 ..< helpLines.len:
+        echo helpLines[i]
 
-  Audio Rendering:
-    -c:a, -acodec, --audio-codec ENCODER
-                                  Set audio codec for output media
-    -layout, -channel-layout, --audio-layout LAYOUT
-                                  Set the audio layout for the output
-                                  media/timeline
-    -b:a, --audio-bitrate BITRATE
-                                  Set the number of bits per second for audio
-    --mix-audio-streams           Mix all audio streams together into one
-    --audio-normalize, -anorm NORM-TYPE
-                                  Apply audio normalizing (either ebu or peak).
-                                  Applied right before rendering the output file
+  echo "\n    -h, --help" & " ".repeat(optWidth - 14) &
+    wrapText("Show info about this program then exit", helpWidth, optWidth)
+  echo ""
 
-  Miscellaneous:
-    --no-open                     Do not open the output file after editing
-                                  is done
-    --temp-dir PATH               Set where the temporary directory is located
-    -V, --version                 Display version and halt
-    -h, --help                    Show info about this program or option
-                                  then exit
-"""
   quit(0)
 
 proc parseMargin(val: string): (PackedInt, PackedInt) =
@@ -324,71 +315,19 @@ judge making cuts.
   var showVersion: bool = false
   var expecting: string = ""
 
-  for rawKey in commandLineParams():
+  let cmdLineParams = commandLineParams()
+  for rawKey in cmdLineParams:
     let key = handleKey(rawKey)
 
-    if genFlagCases(key, args):
+    if genCliMacro(key, args):
       continue
 
     case key:
     of "-h", "--help":
       printHelp()
-    of "-ex", "--export":
-      expecting = "export"
-    of "-exp", "--export-to-premiere":
-      args.`export` = "premiere"
-    of "-exr", "--export-to-resolve":
-      args.`export` = "resolve"
-    of "-exf", "--export-to-final-cut-pro":
-      args.`export` = "final-cut-pro"
-    of "-exs", "--export-to-shotcut":
-      args.`export` = "shotcut"
-    of "-exk", "--export-to-kdenlive":
-      args.`export` = "kdenlive"
-    of "-o", "--output":
-      expecting = "output"
-    of "-m", "--margin", "--frame-margin":
-      expecting = "margin"
-    of "-s", "--silent-speed":
-      expecting = "silent-speed"
-    of "-v", "--video-speed", "--sounded-speed":
-      expecting = "video-speed"
-    of "-c:v", "-vcodec", "--video-codec":
-      expecting = "video-codec"
-    of "-b:v", "--video-bitrate":
-      expecting = "video-bitrate"
-    of "-profile:v", "-vprofile":
-      expecting = "vprofile"
-    of "-c:a", "-acodec", "--audio-codec":
-      expecting = "audio-codec"
-    of "-b:a", "--audio-bitrate":
-      expecting = "audio-bitrate"
-    of "-layout", "-channel-layout", "--audio-layout":
-      expecting = "layout"
-    of "-e", "--edit", "--edit-based-on":
-      expecting = "edit"
-    of "--set-speed", "--set-speed-for-range":
-      expecting = "set-speed"
-    of "-b", "-bg", "--background":
-      expecting = "background"
-    of "-ar", "--sample-rate":
-      expecting = "sample-rate"
-    of "-tb", "--time-base", "-r", "-fps", "--frame-rate":
-      expecting = "frame-rate"
-    of "-res", "--resolution":
-      expecting = "resolution"
-    of "-anorm", "--audio-normalize":
-      expecting = "audio-normalize"
-    of "--add-in", "--keep":
-      expecting = "add-in"
-    of "--cut-out", "--cut":
-      expecting = "cut-out"
-    of "--temp-dir", "--progress", "--scale", "--when-silent", "--when-normal",
-        "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
-      expecting = key[2..^1]
     else:
       if key.startsWith("--"):
-        error(&"Unknown option: {key}")
+        error &"Unknown option: {key}"
 
       case expecting
       of "":
@@ -431,13 +370,13 @@ judge making cuts.
         args.sampleRate = parseSampleRate(key)
       of "frame-rate":
         args.frameRate = parseFrameRate(key)
-      of "video-codec":
+      of "vcodec":
         args.videoCodec = key
       of "video-bitrate":
         args.videoBitrate = parseBitrate(key)
       of "vprofile":
         args.vprofile = key
-      of "audio-codec":
+      of "acodec":
         args.audioCodec = key
       of "layout":
         args.audioLayout = key
@@ -452,12 +391,12 @@ judge making cuts.
           error &"{key} is not a choice for --progress\nchoices are:\n  modern, classic, ascii, machine, none"
       of "margin":
         args.margin = parseMargin(key)
-      of "temp-dir":
+      of "tempdir":
         tempDir = key
       expecting = ""
 
   if expecting != "":
-    error &"--{expecting} needs argument."
+    error &"{cmdLineParams[^1]} needs argument."
 
   if showVersion:
     echo version
