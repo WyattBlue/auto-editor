@@ -145,7 +145,7 @@ proc zshcomplete*() =
   echo "#compdef auto-editor"
   echo ""
   echo "_auto-editor() {"
-  echo "  local -a subcommands"
+  echo "  local -a subcommands options"
   echo "  subcommands=("
   for cmd in commands:
     if cmd.help != "":
@@ -153,9 +153,23 @@ proc zshcomplete*() =
     else:
       echo "    '" & cmd.name & "'"
   echo "  )"
+  echo "  options=("
+  for opt in mainOptions:
+    if opt.kind == Special:
+      continue
+    # Get first line of help for description
+    let desc = if opt.help != "": opt.help.split('\n')[0].replace("'", "'\\''").replace(":", "\\:") else: ""
+    for name in opt.names.split(", "):
+      let n = name.strip().replace(":", "\\:")
+      if desc != "":
+        echo "    '" & n & ":" & desc & "'"
+      else:
+        echo "    '" & n & "'"
+  echo "  )"
   echo """
   if (( CURRENT == 2 )); then
     _describe 'command' subcommands
+    _describe 'option' options
     _files
   else
     case "$words[2]" in
@@ -163,6 +177,7 @@ proc zshcomplete*() =
         # No file completion for cache command
         ;;
       *)
+        _describe 'option' options
         _files
         ;;
     esac
