@@ -42,7 +42,8 @@ proc checkAudioEncoder(encoder: ptr AVCodec, rate: cint) =
     let allowedStr = allowed.join(" ")
     error &"samplerate '{rate}' not allowed for {encoder.name}.\nAllowed: {allowedStr}"
 
-proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: Bar) =
+proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: Bar,
+    cache: MediaCache = nil) =
   var options: Table[string, string]
   var movFlags: seq[string] = @[]
   if args.fragmented and not args.noFragmented:
@@ -66,7 +67,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
     return
   if rules.defaultVid notin ["none", "png"] and tl.v.len > 0 and tl.v[0].len > 0:
     if not args.vn:
-      (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
+      (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args, cache)
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
@@ -103,7 +104,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       audioEncoders.add(aEncCtx)
 
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-      let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize, args.audioNormalize)
+      let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize, args.audioNormalize, cache)
       audioFrameIters.add(audioFrameIter)
   elif not args.an:
     # Create separate streams for each timeline layer
@@ -131,10 +132,12 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         audioEncoders.add(aEncCtx)
 
         let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl, frameSize, args.audioNormalize)
+        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl, frameSize, args.audioNormalize, cache)
         audioFrameIters.add(audioFrameIter)
 
   defer:
+    if vEncCtx != nil:
+      avcodec_free_context(addr vEncCtx)
     for aEncCtx in audioEncoders:
       avcodec_free_context(addr aEncCtx)
 

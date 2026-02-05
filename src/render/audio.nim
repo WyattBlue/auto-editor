@@ -84,6 +84,7 @@ type
     stream*: ptr AVStream
     decoderCtx*: ptr AVCodecContext
     rate*: int
+    ownsContainer*: bool
 
   AudioBuffer = ref object
     memFile*: MemFile
@@ -122,10 +123,19 @@ proc newGetter(path: string, stream: int, rate: int): Getter =
   result.stream = result.container.audio[stream]
   result.rate = result.stream.codecpar.sample_rate.int  # Use source sample rate, not target
   result.decoderCtx = initDecoder(result.stream.codecpar)
+  result.ownsContainer = true
+
+proc newGetter(container: InputContainer, stream: int): Getter =
+  result = new(Getter)
+  result.container = container
+  result.stream = result.container.audio[stream]
+  result.rate = result.stream.codecpar.sample_rate.int
+  result.decoderCtx = initDecoder(result.stream.codecpar)
 
 proc close(getter: Getter) =
   avcodec_free_context(addr getter.decoderCtx)
-  getter.container.close()
+  if getter.ownsContainer:
+    getter.container.close()
 
 proc get(getter: Getter, start: int, endSample: int): seq[int16] =
   # start/end is in samples
@@ -560,7 +570,8 @@ proc processAudioClip(ef: seq[seq[Action]], clip: Clip, data: seq[int16], source
 
 
 proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
-    int], mixLayers: bool, norm: Norm): iterator(): (ptr AVFrame, int) =
+    int], mixLayers: bool, norm: Norm,
+    cache: MediaCache = nil): iterator(): (ptr AVFrame, int) =
   var samples: Table[(string, int32), Getter]
   let targetChannels = 2
 
@@ -575,7 +586,10 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       for clip in tl.a[layerIndex]:
         let key = (clip.src[], clip.stream)
         if key notin samples:
-          samples[key] = newGetter(clip.src[], clip.stream.int, sr)
+          if cache != nil and clip.src in cache.cns:
+            samples[key] = newGetter(cache.cns[clip.src], clip.stream.int)
+          else:
+            samples[key] = newGetter(clip.src[], clip.stream.int, sr)
 
   # Calculate total duration across specified layers
   var totalDuration = 0
@@ -909,13 +923,14 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         getter.close()
       audioBuffer.memFile.close()
 
-proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm): iterator(): (
+proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm,
+    cache: MediaCache = nil): iterator(): (
     ptr AVFrame, int) =
   # Create sequence of all layer indices efficiently
   let allLayerIndices = toSeq(0..<tl.a.len)
-  return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, mixLayers = true, norm)
+  return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, mixLayers = true, norm, cache)
 
 proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3,
-    frameSize: int, norm: Norm): iterator(): (ptr AVFrame, int) =
-  return makeAudioFrames(fmt, tl, frameSize, @[index.int], mixLayers = false, norm)
+    frameSize: int, norm: Norm, cache: MediaCache = nil): iterator(): (ptr AVFrame, int) =
+  return makeAudioFrames(fmt, tl, frameSize, @[index.int], mixLayers = false, norm, cache)
 

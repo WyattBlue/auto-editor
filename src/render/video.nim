@@ -185,10 +185,11 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
-proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
+proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
+    cache: MediaCache = nil):
     (ptr AVCodecContext, ptr AVStream, iterator(): (ptr AVFrame, int)) =
 
-  var cns = initTable[ptr string, InputContainer]()
+  let myCache = if cache != nil: cache else: newMediaCache()
   var decoders = initTable[ptr string, ptr AVCodecContext]()
   var tous = initTable[ptr string, int]()
   var keyframeIndices = initTable[ptr string, KeyframeIndex]()
@@ -201,12 +202,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
     if firstSrc == nil:
       firstSrc = src
 
-    if src notin cns:
-      cns[src] = av.open(src[])
+    if src notin myCache.cns:
+      myCache.cns[src] = av.open(src[])
 
-      let decoderCtx = initDecoder(cns[src].video[0].codecpar)
-      decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
-      decoders[src] = decoderCtx
+    let decoderCtx = initDecoder(myCache.cns[src].video[0].codecpar)
+    decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
+    decoders[src] = decoderCtx
 
   var targetWidth: cint = cint(tl.res[0])
   var targetHeight: cint = cint(tl.res[1])
@@ -234,7 +235,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   encoderCtx.framerate = targetFps
   encoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
 
-  let src = cns[firstSrc]
+  let src = myCache.cns[firstSrc]
   let color_range = src.video[0].codecpar.color_range
   let colorspace = src.video[0].codecpar.color_space
   let color_prim = src.video[0].codecpar.color_primaries
@@ -259,7 +260,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   if sar != 0:
     encoderCtx.sample_aspect_ratio = sar
 
-  for src, cn in cns:
+  for src, cn in myCache.cns:
     if len(cn.video) > 0:
       let stream = cn.video[0]
       let defaultInterval = toInt(targetFps * AVRational(num: 5, den: 1))  # 5 seconds
@@ -360,7 +361,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
           if index >= obj.start and index < (obj.start + obj.dur):
             # Convert timeline position from target framerate to source framerate
             let timelinePos = obj.offset + index - obj.start
-            let srcStream = cns[obj.src].video[0]
+            let srcStream = myCache.cns[obj.src].video[0]
             let srcTb = srcStream.avg_frame_rate
             let sourceFramePos = int(round(float(timelinePos) * srcTb.float / tl.tb.float))
 
@@ -393,21 +394,22 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
           frame = av_frame_clone(lastProcessedFrame)
           continue
 
-        var myStream: ptr AVStream = cns[obj.src].video[0]
+        var myStream: ptr AVStream = myCache.cns[obj.src].video[0]
         if frameIndex > obj.index:
           let seekTarget = findBestKeyframe(obj.src, obj.index)
 
-          if seekTarget < 0 or seekTarget >= obj.index:
+          if seekTarget < 0 or seekTarget > obj.index:
             let kfIndex = keyframeIndices[obj.src]
             let indexInfo = if kfIndex.hasIndex: &"{kfIndex.frames.len} indexed" else: "no index"
             error &"Cannot seek backward: no suitable keyframe found (frameIndex: {frameIndex}, target: {obj.index}, seekTarget: {seekTarget}, {indexInfo})"
 
           if lastSeekTarget[obj.src] != seekTarget:
             debug &"Seek backward: from {frameIndex} to keyframe {seekTarget} (need frame {obj.index})"
-            cns[obj.src].seek(seekTarget * tous[obj.src], stream = myStream)
+            myCache.cns[obj.src].seek(seekTarget * tous[obj.src], stream = myStream)
             avcodec_flush_buffers(decoders[obj.src])
             lastSeekTarget[obj.src] = seekTarget
-          frameIndex = seekTarget
+          # Use min to ensure the decode loop runs even when seekTarget == obj.index
+          frameIndex = min(seekTarget, obj.index - 1)
 
         # obj.index is already in source frame coordinates, no conversion needed
         let srcTb = myStream.avg_frame_rate
@@ -420,13 +422,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
               seekFrame = some(frameIndex)
 
               debug &"Seek: {frameIndex} -> {obj.index}"
-              cns[obj.src].seek(obj.index * tous[obj.src], stream = myStream)
+              myCache.cns[obj.src].seek(obj.index * tous[obj.src], stream = myStream)
               avcodec_flush_buffers(decoders[obj.src])
               lastSeekTarget[obj.src] = obj.index
 
           let decoder: ptr AVCodecContext = decoders[obj.src]
           var foundFrame = false
-          for decodedFrame in cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
+          for decodedFrame in myCache.cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
             frame = decodedFrame
             frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
 
@@ -511,4 +513,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
     if lastProcessedFrame != nil and lastProcessedFrame != nullFrame:
       av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)
+    for src, decoder in decoders:
+      var p = decoder
+      avcodec_free_context(addr p)
     debug &"Total frames avoided decoding via seeks: {framesSaved}")
