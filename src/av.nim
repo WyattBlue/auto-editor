@@ -202,6 +202,18 @@ proc close*(container: InputContainer) =
     av_packet_free(addr container.packet)
   avformat_close_input(addr container.formatContext)
 
+type MediaCache* = ref object
+  cns*: Table[ptr string, InputContainer]
+
+proc newMediaCache*(): MediaCache =
+  new(result)
+  result.cns = initTable[ptr string, InputContainer]()
+
+proc close*(cache: MediaCache) =
+  for cn in cache.cns.values:
+    cn.close()
+  cache.cns.clear()
+
 
 type OutputContainer* = object
   file: string

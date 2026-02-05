@@ -379,10 +379,13 @@ proc editMedia*(args: var mainArgs) =
     let mi = initMediaInfo(src[])
     const black = RGBColor(red: 0, green: 0, blue: 0)
 
+    var cache = newMediaCache()
+    defer: cache.close()
+
     for clipNum, clip2 in clips2.pairs:
       var myTimeline = toNonLinear2(src, tlV3.tb, black, mi, @[clip2], tlV3.effects)
       applyArgs(myTimeline, args)
-      makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar)
+      makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar, cache)
   else:
     makeMedia(args, tlV3, output, rule, bar)
 
