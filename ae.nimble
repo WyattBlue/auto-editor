@@ -286,16 +286,8 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false,
   ] & package.buildArguments
 
   if crossWindowsArm:
-    cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-    cmakeArgs.add("-DCMAKE_SYSTEM_PROCESSOR=aarch64")
-    cmakeArgs.add("-DCMAKE_C_COMPILER=aarch64-w64-mingw32-clang")
-    cmakeArgs.add("-DCMAKE_CXX_COMPILER=aarch64-w64-mingw32-clang++")
-    cmakeArgs.add("-DCMAKE_RC_COMPILER=llvm-windres")
-    cmakeArgs.add("-DCMAKE_AR=llvm-ar")
-    cmakeArgs.add("-DCMAKE_RANLIB=llvm-ranlib")
-    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
-    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
-    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+    let toolchainFile = buildPath.parentDir / "cmake" / "aarch64-w64-mingw32.cmake"
+    cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
   elif crossWindows:
     cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
     cmakeArgs.add(&"-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc{posix}")
@@ -396,16 +388,8 @@ proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: b
 
   # Add cross-compilation flags if needed
   if crossWindowsArm:
-    commonArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-    commonArgs.add("-DCMAKE_SYSTEM_PROCESSOR=aarch64")
-    commonArgs.add("-DCMAKE_C_COMPILER=aarch64-w64-mingw32-clang")
-    commonArgs.add("-DCMAKE_CXX_COMPILER=aarch64-w64-mingw32-clang++")
-    commonArgs.add("-DCMAKE_RC_COMPILER=llvm-windres")
-    commonArgs.add("-DCMAKE_AR=llvm-ar")
-    commonArgs.add("-DCMAKE_RANLIB=llvm-ranlib")
-    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
-    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
-    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+    let toolchainFile = buildPath.parentDir / "cmake" / "aarch64-w64-mingw32.cmake"
+    commonArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")  # No x86 assembly for ARM64
   elif crossWindows:
     commonArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
