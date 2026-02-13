@@ -23,3 +23,6 @@ __pycache__/
 *.pyo
 *.spec
 *.egg-info/
+nimble.develop
+nimble.paths
+nimbledeps
