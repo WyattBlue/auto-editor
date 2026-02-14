@@ -78,7 +78,7 @@ disableDecoders &= "notchlc,nuv,paf_video,pdv,pgx,photocd,pictor,pixlet,prosumer
 # [T-VP]
 disableDecoders &= "targa_y216,tdsc,tgq,tgv,thp,tiertexseqvideo,tmv,tqi,truemotion1,truemotion2,truemotion2rt,tscc,tscc2,txd,ulti,v210x,vb,vble,vc1,vc1image,vcr1,vixl,vmdvideo,vmix,vmnc,vp3,vp4,vp5,vp6,vp6a,vp6f,vp7".split(",")
 # [VQ-Z]
-disableDecoders &= "vqc,vvc,wcmv,wmv3,wmv3image,wnv1,ws_vqa,xan_wc3,xan_wc4,xbin,xpm,ylc,yop,zerocodec".split(",")
+disableDecoders &= "vplayer,vqc,vvc,wcmv,wmv3,wmv3image,wnv1,ws_vqa,xan_wc3,xan_wc4,xbin,xpm,ylc,yop,zerocodec".split(",")
 
 # Can only decode, Audio [0-A]
 disableDecoders &= "8svx_exp,8svx_fib,aac_latm,acelp.kelvin,adpcm_4xm,adpcm_afc,adpcm_agm,adpcm_aica,adpcm_ct,adpcm_dtk,adpcm_ea,adpcm_ea_maxis_xa,adpcm_ea_r1,adpcm_ea_r2,adpcm_ea_r3,adpcm_ea_xas,adpcm_ima_acorn,adpcm_ima_apc".split(",")
@@ -98,12 +98,16 @@ disableDecoders &= "flv,jacosub,nellymoser,smacker,snow,sonic,sonic_ls,utvideo".
 disableEncoders &= "flv,nellymoser,snow,sonic,utvideo".split(",")
 disableMuxers &= "flv,f4v,jacosub,rso,segafilm".split(",")
 disableDemuxers &= @["a64", "alp", "apm", "bink", "binka", "flv", "jacosub", "kux",
- "live_flv", "mm", "pp_bnk", "rso", "sdns", "segafilm", "smacker", "vmd"]
+ "live_flv", "mm", "pp_bnk", "rso", "sdns", "segafilm", "smush", "smacker", "vmd"]
 disableParsers &= @["misc4", "tak"]
 
+# Irrelevant to this project
+disableMuxers &= "framecrc,framehash,framemd5,hash,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
+disableDemuxers &= "vplayer".split(",")
+
 # Image formats
-disableDecoders.add "tiff"
-disableEncoders.add "tiff"
+disableDecoders &= "sunrast,tiff".split(",")
+disableEncoders &= "sunrast,tiff".split(",")
 disableMuxers.add "ico"
 disableDemuxers &= "ico,image_tiff_pipe,image_svg_pipe".split(",")
 
