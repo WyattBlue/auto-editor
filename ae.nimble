@@ -94,8 +94,8 @@ disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dp
 disableEncoders &= "a64_multi,a64_multi5,ttml".split(",")
 
 # Technically obsolete
-disableDecoders &= "flv,jacosub,nellymoser,smacker,snow,sonic,sonic_ls".split(",")
-disableEncoders &= "flv,nellymoser,snow,sonic".split(",")
+disableDecoders &= "flv,jacosub,nellymoser,smacker,snow,sonic,sonic_ls,utvideo".split(",")
+disableEncoders &= "flv,nellymoser,snow,sonic,utvideo".split(",")
 disableMuxers &= "flv,f4v,jacosub,rso,segafilm".split(",")
 disableDemuxers &= @["a64", "alp", "apm", "bink", "binka", "flv", "jacosub", "kux",
  "live_flv", "mm", "pp_bnk", "rso", "sdns", "segafilm", "smacker", "vmd"]
