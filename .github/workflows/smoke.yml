@@ -47,9 +47,9 @@ jobs:
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
       - name: Install packages
-        run: brew update && brew install nim
+        run: brew install nim
       - name: GCC/Clang version
-        run: gcc --version
+        run: nim --version && gcc --version
       - name: Setup
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
@@ -81,7 +81,7 @@ jobs:
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
       - name: Install nim
-        run: brew update && brew install nim
+        run: brew install nim
       - name: Install mingw-w64
         run: |
           sudo apt-get update
@@ -129,7 +129,7 @@ jobs:
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
       - name: Install nim
-        run: brew update && brew install nim
+        run: brew install nim
       - name: Install llvm-mingw
         run: |
           sudo apt-get update
