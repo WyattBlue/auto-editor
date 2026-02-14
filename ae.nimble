@@ -94,11 +94,10 @@ disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dp
 disableEncoders &= "a64_multi,a64_multi5,ttml".split(",")
 
 # Technically obsolete
-disableDecoders &= "alias_pix,cinepak,cljr,cllc,flv,jacosub,magicyuv,nellymoser,smacker,snow,sonic,sonic_ls,utvideo".split(",")
-disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,flv,magicyuv,nellymoser,snow,sonic,utvideo".split(",")
-disableMuxers &= "flv,f4v,jacosub,rso,segafilm".split(",")
-disableDemuxers &= @["a64", "alp", "apm", "bink", "binka", "flv", "jacosub", "kux",
- "live_flv", "mm", "pp_bnk", "rso", "sdns", "segafilm", "smush", "smacker", "vmd"]
+disableDecoders &= "alias_pix,cinepak,cljr,cllc,comfortnoise,flv,jacosub,magicyuv,nellymoser,pgmyuv,smacker,smc,snow,sonic,sonic_ls,utvideo".split(",")
+disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,flv,magicyuv,nellymoser,pgmyuv,smc,snow,sonic,utvideo".split(",")
+disableMuxers &= "flv,f4v,jacosub,rso,segafilm,sup,swf,truehd,rm".split(",")
+disableDemuxers &= "a64,alp,apm,bink,binka,flv,jacosub,kux,live_flv,mm,pp_bnk,rso,rm,sdns,segafilm,smush,smacker,vmd".split(",")
 disableParsers &= @["misc4", "tak"]
 
 # Irrelevant to this project
