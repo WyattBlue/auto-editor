@@ -32,10 +32,10 @@ type OptDef* = object
 const mainOptions*: seq[OptDef] = @[
   OptDef(names: "-e, --edit", c: cEdit, datum: "edit", metavar: "METHOD", help: """
 Set an expression which determines how to make auto edits. (default is "audio")"""),
-  OptDef(names: "--when-normal", c: cEdit, datum: "when-normal", metavar: "ACTION",
-    help: "When the video is not silent (defined by --edit) do an action. The default action being 'nil'"),
-  OptDef(names: "--when-silent", c: cEdit, datum: "when-silent", metavar: "ACTION", help: """
-When the video is silent (defined by --edit) do an action. The default action being 'cut'
+  OptDef(names: "-w1, --when-active, --when-normal", c: cEdit, datum: "when-normal", metavar: "ACTION",
+    help: "When a segment is active (defined by --edit) do an action. The default action being 'nil'"),
+  OptDef(names: "-w0, --when-inactive, --when-silent", c: cEdit, datum: "when-silent", metavar: "ACTION", help: """
+When a segment is inactive (defined by --edit) do an action. The default action being 'cut'
 
 Actions available:
   nil, unchanged/do nothing
@@ -58,13 +58,13 @@ Set sections near "loud" as "loud" too if section is less than LENGTH away. (def
   OptDef(names: "--cut-out, --cut", c: cEdit, datum: "cut-out",
     metavar: "[START,STOP ...]", help: "The range that will be cut/removed"),
   OptDef(names: "--add-in, --keep", c: cEdit, datum: "add-in",
-    metavar: "[START,STOP ...]", help: "The range that will be leaved \"as is\", overridding other actions"),
+    metavar: "[START,STOP ...]", help: "The range that will be leaved \"as is\", overriding other actions"),
   OptDef(names: "--set-speed, --set-speed-for-range", c: cEdit, datum: "set-speed",
     metavar: "[SPEED,START,STOP ...]", help: "Set a SPEED for a given range"),
   OptDef(names: "-s, --silent-speed", c: cEdit, datum: "silent-speed", metavar: "NUM",
-    help: "[Deprecated] Set speed of sections marked \"silent\" to NUM. (default is 99999)"),
+    help: "[Deprecated] Set speed of inactive segments to NUM. (default is 99999)"),
   OptDef(names: "-v, --video-speed", c: cEdit, datum: "video-speed", metavar: "NUM",
-    help: "[Deprecated] Set speed of sections marked \"loud\" to NUM. (default is 1)"),
+    help: "[Deprecated] Set speed of active segments to NUM. (default is 1)"),
 
   OptDef(names: "-tb, --time-base, -r, -fps, --frame-rate", c: cTl, datum: "frame-rate",
     metavar: "NUM", help: "Set timeline frame rate"),
