@@ -45,6 +45,8 @@ Actions available:
   varispeed, (val: float),
     change the speed by varying pitch. val: between [0.2-100]
   invert, invert all pixels in a video
+  zoom, (val: float),
+    zoom in/out with a factor of val. val: between (0-100]
   """),
   OptDef(names: "-m, --margin", c: cEdit, datum: "margin", metavar: "LENGTH", help: """
 Set sections near "loud" as "loud" too if section is less than LENGTH away. (default is "0.2s")"""),
