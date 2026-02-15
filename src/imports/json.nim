@@ -9,6 +9,8 @@ import ../util/[color, lang]
 proc parseEffect(val: string): Action =
   if val == "cut":
     return Action(kind: actCut)
+  if val == "invert":
+    return Action(kind: actInvert)
 
   let parts = val.split(":")
   if parts.len == 2:
@@ -18,6 +20,7 @@ proc parseEffect(val: string): Action =
     of "speed": return Action(kind: actSpeed, val: effectVal)
     of "volume": return Action(kind: actVolume, val: effectVal)
     of "varispeed": return Action(kind: actVarispeed, val: effectVal)
+    of "zoom": return Action(kind: actZoom, val: effectVal)
     else: error &"unknown action: {effectType}"
 
   error &"unknown action: {val}"

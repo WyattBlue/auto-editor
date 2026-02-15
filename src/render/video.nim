@@ -14,8 +14,7 @@ import ../graph
 type VideoFrame = object
   index: int
   src: ptr string
-  invert: bool
-  zoom: float32
+  effects: seq[Action]
 
 # Keyframe index built from AVIndexEntry for efficient seeking
 type KeyframeIndex = object
@@ -373,16 +372,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               if effect.kind in [actSpeed, actVarispeed]:
                 speed *= effect.val
 
-            var invert = false
-            var zoom: float32 = 0.0
-            for effect in effectGroup:
-              if effect.kind == actInvert:
-                invert = true
-              if effect.kind == actZoom:
-                zoom = effect.val
-
             let i = int(round(float(sourceFramePos) * speed))
-            objList.add VideoFrame(index: i, src: obj.src, invert: invert, zoom: zoom)
+            objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup)
 
       if isNonlinear:
         # When there can be valid gaps in the timeline and no objects for this frame.
@@ -485,63 +476,52 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if oldFrame != nil and oldFrame != nullFrame:
           av_frame_free(addr oldFrame)
 
-      # Apply zoom filter if any object in the list has zoom set
-      block:
-        var zoomVal: float32 = 0.0
-        for obj in objList:
-          if obj.zoom > 0.0:
-            zoomVal = obj.zoom
-            break
-        if zoomVal > 0.0 and zoomVal != 1.0 and frame != nil and frame.width > 0 and frame.height > 0:
-          let origW = frame.width
-          let origH = frame.height
-          let scaledW = max(cint(float(origW) * zoomVal), 2)
-          let scaledH = max(cint(float(origH) * zoomVal), 2)
-          let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW, scaledH)
-          if scaledFrame != frame:
+      # Apply video effects in order
+      if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
+        for effect in objList[0].effects:
+          if effect.kind == actZoom and effect.val != 1.0:
+            let origW = frame.width
+            let origH = frame.height
+            let scaledW = max(cint(float(origW) * effect.val), 2)
+            let scaledH = max(cint(float(origH) * effect.val), 2)
+            let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW, scaledH)
+            if scaledFrame != frame:
+              let oldFrame = frame
+              frame = scaledFrame
+              if oldFrame != nil and oldFrame != nullFrame:
+                av_frame_free(addr oldFrame)
+            let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
+            let zoomBufArgs = &"video_size={scaledW}x{scaledH}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            var zoomGraph = newGraph()
+            let bufferSrc = zoomGraph.add("buffer", zoomBufArgs)
+            if effect.val > 1.0:
+              let cropFilter = zoomGraph.add("crop", &"{origW}:{origH}")
+              let bufferSink = zoomGraph.add("buffersink")
+              zoomGraph.linkNodes(@[bufferSrc, cropFilter, bufferSink]).configure()
+            else:
+              let padFilter = zoomGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
+              let bufferSink = zoomGraph.add("buffersink")
+              zoomGraph.linkNodes(@[bufferSrc, padFilter, bufferSink]).configure()
+            zoomGraph.push(frame)
+            let oldFrame2 = frame
+            frame = zoomGraph.pull()
+            if oldFrame2 != nil and oldFrame2 != nullFrame:
+              av_frame_free(addr oldFrame2)
+            zoomGraph.cleanup()
+          elif effect.kind == actInvert:
+            let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            var negGraph = newGraph()
+            let bufferSrc = negGraph.add("buffer", bufferArgs)
+            let negFilter = negGraph.add("negate")
+            let bufferSink = negGraph.add("buffersink")
+            negGraph.linkNodes(@[bufferSrc, negFilter, bufferSink]).configure()
+            negGraph.push(frame)
             let oldFrame = frame
-            frame = scaledFrame
+            frame = negGraph.pull()
             if oldFrame != nil and oldFrame != nullFrame:
               av_frame_free(addr oldFrame)
-          let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
-          let zoomBufArgs = &"video_size={scaledW}x{scaledH}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-          var zoomGraph = newGraph()
-          let bufferSrc = zoomGraph.add("buffer", zoomBufArgs)
-          if zoomVal > 1.0:
-            let cropFilter = zoomGraph.add("crop", &"{origW}:{origH}")
-            let bufferSink = zoomGraph.add("buffersink")
-            zoomGraph.linkNodes(@[bufferSrc, cropFilter, bufferSink]).configure()
-          else:
-            let padFilter = zoomGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
-            let bufferSink = zoomGraph.add("buffersink")
-            zoomGraph.linkNodes(@[bufferSrc, padFilter, bufferSink]).configure()
-          zoomGraph.push(frame)
-          let oldFrame2 = frame
-          frame = zoomGraph.pull()
-          if oldFrame2 != nil and oldFrame2 != nullFrame:
-            av_frame_free(addr oldFrame2)
-          zoomGraph.cleanup()
-
-      # Apply negate filter if any object in the list has invert set
-      block:
-        var needsInvert = false
-        for obj in objList:
-          if obj.invert:
-            needsInvert = true
-            break
-        if needsInvert and frame != nil and frame.width > 0 and frame.height > 0:
-          let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-          var negGraph = newGraph()
-          let bufferSrc = negGraph.add("buffer", bufferArgs)
-          let negFilter = negGraph.add("negate")
-          let bufferSink = negGraph.add("buffersink")
-          negGraph.linkNodes(@[bufferSrc, negFilter, bufferSink]).configure()
-          negGraph.push(frame)
-          let oldFrame = frame
-          frame = negGraph.pull()
-          if oldFrame != nil and oldFrame != nullFrame:
-            av_frame_free(addr oldFrame)
-          negGraph.cleanup()
+            negGraph.cleanup()
 
       # Validate frame before reformatting
       if frame != nil and (frame.width <= 0 or frame.height <= 0):
