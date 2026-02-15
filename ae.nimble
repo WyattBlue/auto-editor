@@ -611,7 +611,7 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
 var filters: seq[string]
 if enableWhisper:
   filters.add "whisper"
-filters.add "scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
+filters.add "scale,pad,format,gblur,lut,negate,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
 
 proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false): string =
   var commonFlags = &"""

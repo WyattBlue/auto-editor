@@ -43,7 +43,9 @@ Actions available:
   speed, (val: float),
     change the speed while preserving pitch. val: between (0-99999)
   varispeed, (val: float),
-    change the speed by varying pitch. val: between [0.2-100]"""),
+    change the speed by varying pitch. val: between [0.2-100]
+  invert, invert all pixels in a video
+  """),
   OptDef(names: "-m, --margin", c: cEdit, datum: "margin", metavar: "LENGTH", help: """
 Set sections near "loud" as "loud" too if section is less than LENGTH away. (default is "0.2s")"""),
   OptDef(names: "-ex, --export", datum: "export",
@@ -56,11 +58,11 @@ Set sections near "loud" as "loud" too if section is less than LENGTH away. (def
   OptDef(names: "-o, --output", c: cEdit, datum: "output",
     metavar: "FILE", help: "Set the name/path of the new output file"),
   OptDef(names: "--cut-out, --cut", c: cEdit, datum: "cut-out",
-    metavar: "[START,STOP ...]", help: "The range that will be cut/removed"),
+    metavar: "[START,STOP ...]", help: "Set segment(s) that will be cut/removed"),
   OptDef(names: "--add-in, --keep", c: cEdit, datum: "add-in",
-    metavar: "[START,STOP ...]", help: "The range that will be leaved \"as is\", overriding other actions"),
+    metavar: "[START,STOP ...]", help: "Set segment(s) that are leaved \"as is\", overriding other actions"),
   OptDef(names: "--set-speed, --set-speed-for-range", c: cEdit, datum: "set-speed",
-    metavar: "[SPEED,START,STOP ...]", help: "Set a SPEED for a given range"),
+    metavar: "[SPEED,START,STOP ...]", help: "Set segment(s) to a SPEED, overriding other actions"),
   OptDef(names: "-s, --silent-speed", c: cEdit, datum: "silent-speed", metavar: "NUM",
     help: "[Deprecated] Set speed of inactive segments to NUM. (default is 99999)"),
   OptDef(names: "-v, --video-speed", c: cEdit, datum: "video-speed", metavar: "NUM",
