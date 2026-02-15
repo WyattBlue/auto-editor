@@ -286,6 +286,14 @@ proc parseActions(val: string): seq[Action] =
           result.add Action(kind: actVolume, val: value)
         except ValueError:
           error &"Invalid volume value in action: {trimmedPart}"
+      elif trimmedPart.startsWith("zoom:"):
+        try:
+          let value = parseFloat(trimmedPart[5 ..< trimmedPart.len])
+          if value <= 0.0:
+            error "zoom value must be greater than 0.0"
+          result.add Action(kind: actZoom, val: value)
+        except ValueError:
+          error &"Invalid zoom value in action: {trimmedPart}"
       else:
         error &"Invalid action: {trimmedPart}"
   except Exception as e:
