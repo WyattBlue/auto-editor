@@ -49,6 +49,15 @@ type
     of actSpeed, actVarispeed, actVolume, actZoom:
       val*: float32
 
+func `$`*(act: Action): string =
+  case act.kind
+  of actCut: "cut"
+  of actSpeed: "speed:" & $act.val
+  of actVarispeed: "varispeed:" & $act.val
+  of actVolume: "volume:" & $act.val
+  of actInvert: "invert"
+  of actZoom: "zoom:" & $act.val
+
 func `==`*(a, b: Action): bool =
   if a.kind != b.kind:
     return false

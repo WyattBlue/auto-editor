@@ -4,17 +4,8 @@ import ../timeline
 import ../log
 import ../util/[color, lang]
 
-func effectToString(act: Action): string =
-  case act.kind
-  of actCut: "cut"
-  of actSpeed: "speed:" & $act.val
-  of actVarispeed: "varispeed:" & $act.val
-  of actVolume: "volume:" & $act.val
-  of actInvert: "invert"
-  of actZoom: "zoom:" & $act.val
-
 func effectGroupToJson(actions: seq[Action]): JsonNode =
-  return %actions.mapIt(effectToString(it))
+  return %actions.mapIt($it)
 
 func `%`(self: v1): JsonNode =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
@@ -53,7 +44,7 @@ func `%`*(self: v3): JsonNode =
       if hasNonTrivialEffect:
         var effectArray = newJArray()
         for effect in effectGroup:
-          effectArray.add %effectToString(effect)
+          effectArray.add %($(effect))
         clipObj["effects"] = effectArray
       trackArray.add(clipObj)
     videoTracks.add(trackArray)
@@ -79,7 +70,7 @@ func `%`*(self: v3): JsonNode =
       if hasNonTrivialEffect:
         var effectArray = newJArray()
         for effect in effectGroup:
-          effectArray.add %effectToString(effect)
+          effectArray.add %($(effect))
         clipObj["effects"] = effectArray
       trackArray.add(clipObj)
     audioTracks.add(trackArray)
