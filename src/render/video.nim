@@ -14,6 +14,7 @@ import ../graph
 type VideoFrame = object
   index: int
   src: ptr string
+  invert: bool
 
 # Keyframe index built from AVIndexEntry for efficient seeking
 type KeyframeIndex = object
@@ -371,8 +372,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               if effect.kind in [actSpeed, actVarispeed]:
                 speed *= effect.val
 
+            var invert = false
+            for effect in effectGroup:
+              if effect.kind == actInvert:
+                invert = true
+
             let i = int(round(float(sourceFramePos) * speed))
-            objList.add VideoFrame(index: i, src: obj.src)
+            objList.add VideoFrame(index: i, src: obj.src, invert: invert)
 
       if isNonlinear:
         # When there can be valid gaps in the timeline and no objects for this frame.
@@ -474,6 +480,27 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         frame = scaleGraph.pull()
         if oldFrame != nil and oldFrame != nullFrame:
           av_frame_free(addr oldFrame)
+
+      # Apply negate filter if any object in the list has invert set
+      block:
+        var needsInvert = false
+        for obj in objList:
+          if obj.invert:
+            needsInvert = true
+            break
+        if needsInvert and frame != nil and frame.width > 0 and frame.height > 0:
+          let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+          var negGraph = newGraph()
+          let bufferSrc = negGraph.add("buffer", bufferArgs)
+          let negFilter = negGraph.add("negate")
+          let bufferSink = negGraph.add("buffersink")
+          negGraph.linkNodes(@[bufferSrc, negFilter, bufferSink]).configure()
+          negGraph.push(frame)
+          let oldFrame = frame
+          frame = negGraph.pull()
+          if oldFrame != nil and oldFrame != nullFrame:
+            av_frame_free(addr oldFrame)
+          negGraph.cleanup()
 
       # Validate frame before reformatting
       if frame != nil and (frame.width <= 0 or frame.height <= 0):

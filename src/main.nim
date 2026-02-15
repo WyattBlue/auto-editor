@@ -266,6 +266,8 @@ proc parseActions(val: string): seq[Action] =
         discard
       elif trimmedPart == "cut":
         result.add Action(kind: actCut)
+      elif trimmedPart == "invert":
+        result.add Action(kind: actInvert)
       elif trimmedPart.startsWith("speed:"):
         try:
           let value = parseFloat(trimmedPart[6 ..< trimmedPart.len])

@@ -10,6 +10,7 @@ func effectToString(act: Action): string =
   of actSpeed: "speed:" & $act.val
   of actVarispeed: "varispeed:" & $act.val
   of actVolume: "volume:" & $act.val
+  of actInvert: "invert"
 
 func effectGroupToJson(actions: seq[Action]): JsonNode =
   return %actions.mapIt(effectToString(it))
