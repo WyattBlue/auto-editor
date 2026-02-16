@@ -7,7 +7,7 @@ import cli
 import edit
 import log
 import ffmpeg
-import cmds/[info, desc, cache, levels, subdump, whisper]
+import cmds/[completion, info, desc, cache, levels, subdump, whisper]
 import util/[color, fun]
 import palet/edit
 
@@ -307,6 +307,11 @@ func actionFromUserSpeed(val: float64): seq[Action] =
   else:
     return @[Action(kind: actSpeed, val: val)]
 
+func handleLegacyOptions(val: string): string =
+  if val.startsWith("--") and val.len >= 3:
+    return val[0 ..< 3] & val[3 .. ^1].replace("_", "-")
+  return val
+
 proc main() =
   if paramCount() < 1:
     if stdin.isatty():
@@ -327,8 +332,7 @@ judge making cuts.
 
   let cmdLineParams = commandLineParams()
   for rawKey in cmdLineParams:
-    let key = handleKey(rawKey)
-
+    let key = handleLegacyOptions(rawKey)
     if genCliMacro(key, args):
       continue
 
