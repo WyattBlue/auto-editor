@@ -6,6 +6,7 @@ type CmdDef* = object
 
 const commands*: seq[CmdDef] = @[
   CmdDef(name: "cache", help: ""),
+  CmdDef(name: "completion", help: "Generate completions for shells"),
   CmdDef(name: "desc", help: "Display a media file's description metadata"),
   CmdDef(name: "info", help: "Retrieve information and properties about media files"),
   CmdDef(name: "levels", help: "Display loudness over time"),
@@ -32,9 +33,9 @@ type OptDef* = object
 const mainOptions*: seq[OptDef] = @[
   OptDef(names: "-e, --edit", c: cEdit, datum: "edit", metavar: "METHOD", help: """
 Set an expression which determines how to make auto edits. (default is "audio")"""),
-  OptDef(names: "-w1, --when-active, --when-normal", c: cEdit, datum: "when-normal", metavar: "ACTION",
+  OptDef(names: "-w:1, --when-active, --when-normal", c: cEdit, datum: "when-normal", metavar: "ACTION",
     help: "When a segment is active (defined by --edit) do an action. The default action being 'nil'"),
-  OptDef(names: "-w0, --when-inactive, --when-silent", c: cEdit, datum: "when-silent", metavar: "ACTION", help: """
+  OptDef(names: "-w:0, --when-inactive, --when-silent", c: cEdit, datum: "when-silent", metavar: "ACTION", help: """
 When a segment is inactive (defined by --edit) do an action. The default action being 'cut'
 
 Actions available:

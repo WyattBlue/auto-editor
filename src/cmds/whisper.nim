@@ -1,6 +1,5 @@
 import std/[strformat, strutils]
 import ../[av, ffmpeg, log]
-import ../util/fun
 
 
 proc main*(cArgs: seq[string]) =
@@ -14,8 +13,7 @@ proc main*(cArgs: seq[string]) =
   var vadModel: string = ""
 
   var expecting: string = ""
-  for rawKey in cArgs:
-    let key = handleKey(rawKey)
+  for key in cArgs:
     case key:
     of "--help":
       echo """usage: file model [options]
