@@ -1,6 +1,37 @@
-import std/[strformat, strutils]
-import ../[av, ffmpeg, log]
+import std/[strformat, strutils, terminal]
+import ../[av, cli, ffmpeg, log]
+import ../util/fun
 
+proc printHelp(opts: seq[OptDef]) =
+  let termWidth = max(terminalWidth(), 40)
+  let optWidth = min(32, termWidth div 3)
+  let helpWidth = termWidth - optWidth - 4
+
+  echo "usage: file model [options]\n"
+  echo "Options:"
+
+  for opt in opts:
+    var optStr = "    " & opt.names
+    if opt.metavar != "":
+      optStr &= " " & opt.metavar
+
+    if optStr.len >= optWidth:
+      echo optStr
+      let wrapped = wrapText(opt.help, helpWidth, 0)
+      for line in wrapped.split("\n"):
+        echo " ".repeat(optWidth) & line
+    else:
+      let padding = optWidth - optStr.len
+      let wrapped = wrapText(opt.help, helpWidth, optWidth)
+      let helpLines = wrapped.split("\n")
+      echo optStr & " ".repeat(padding) & helpLines[0]
+      for i in 1 ..< helpLines.len:
+        echo helpLines[i]
+
+  echo "\n    -h, --help" & " ".repeat(optWidth - 14) &
+    wrapText("Show info about this program then exit", helpWidth, optWidth)
+  echo ""
+  quit(0)
 
 proc main*(cArgs: seq[string]) =
   var inputPath: string = ""
@@ -14,52 +45,27 @@ proc main*(cArgs: seq[string]) =
 
   var expecting: string = ""
   for key in cArgs:
-    case key:
-    of "--help":
-      echo """usage: file model [options]
-
-Options:
-  --debug
-  --split-words, -sw
-  --format FORMAT        Output in a specific format (default text)
-                         Choices: text, srt, json
-  --output FILE          Choose where to output (defaults to stdout)
-  --queue SECS           The maximum size in seconds that will be queued into
-                         before processing. (default 10)
-  --vad-model VAD-MODEL  Set Voice activity detection (VAD) model.
-"""
-      quit(0)
-    of "--debug":
-      isDebug = true
-    of "--split-words", "-sw":
-      splitWords = true
-    of "--format":
-      expecting = "format"
-    of "--output":
-      expecting = "output"
-    of "--queue":
-      expecting = "queue"
-    of "--vad-model":
-      expecting = "vad-model"
-    else:
-      if key.startsWith("--"):
-        error &"Unknown option: {key}"
-
-      case expecting:
-      of "":
-        if inputPath == "":
-          inputPath = key
-        elif model == "":
-          model = key.replace("\\", "\\\\").replace(":", "\\:")
-      of "format":
-        format = key
-      of "output":
-        output = key.replace("\\", "\\\\").replace(":", "\\:")
-      of "queue":
-        queue = parseInt(key)
-      of "vad-model":
-        vadModel = key.replace("\\", "\\\\").replace(":", "\\:")
-      expecting = ""
+    if genCliMacro(key, args, whisperOptions):
+      continue
+    if key in ["-h", "--help"]:
+      printHelp(whisperOptions)
+    if key.startsWith("--"):
+      error &"Unknown option: {key}"
+    case expecting:
+    of "":
+      if inputPath == "":
+        inputPath = key
+      elif model == "":
+        model = key.replace("\\", "\\\\").replace(":", "\\:")
+    of "format":
+      format = key
+    of "output":
+      output = key.replace("\\", "\\\\").replace(":", "\\:")
+    of "queue":
+      queue = parseInt(key)
+    of "vad-model":
+      vadModel = key.replace("\\", "\\\\").replace(":", "\\:")
+    expecting = ""
 
   if inputPath == "":
     error "A media file is needed"

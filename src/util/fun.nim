@@ -3,6 +3,51 @@ from std/math import round, trunc, gcd
 
 import ../log
 
+func wrapText*(text: string, width, indent: int): string =
+  let text = text.strip(leading = true, trailing = true, chars = {'\n'})
+  if text.len == 0:
+    return ""
+  let indentStr = " ".repeat(indent)
+  var outLines: seq[string] = @[]
+  var isFirst = true
+
+  for line in text.split("\n"):
+    if line.len == 0:
+      outLines.add("")
+      continue
+
+    # Detect leading whitespace
+    var leadingSpaces = 0
+    for c in line:
+      if c == ' ':
+        leadingSpaces += 1
+      else:
+        break
+    let lineIndent = " ".repeat(leadingSpaces)
+    let content = line[leadingSpaces .. ^1]
+
+    var currentLine = ""
+    for word in content.splitWhitespace():
+      if currentLine.len == 0:
+        currentLine = word
+      elif leadingSpaces + currentLine.len + 1 + word.len <= width:
+        currentLine &= " " & word
+      else:
+        if isFirst:
+          outLines.add(lineIndent & currentLine)
+          isFirst = false
+        else:
+          outLines.add(indentStr & lineIndent & currentLine)
+        currentLine = word
+    if currentLine.len > 0:
+      if isFirst:
+        outLines.add(lineIndent & currentLine)
+        isFirst = false
+      else:
+        outLines.add(indentStr & lineIndent & currentLine)
+
+  result = outLines.join("\n")
+
 func splitext*(val: string): (string, string) =
   let (dir, name, ext) = splitFile(val)
   return (dir & "/" & name, ext)
