@@ -18,53 +18,10 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
-proc wrapText(text: string, width, indent: int): string =
-  let text = text.strip(leading = true, trailing = true, chars = {'\n'})
-  if text.len == 0:
-    return ""
-  let indentStr = " ".repeat(indent)
-  var outLines: seq[string] = @[]
-  var isFirst = true
 
-  for line in text.split("\n"):
-    if line.len == 0:
-      outLines.add("")
-      continue
-
-    # Detect leading whitespace
-    var leadingSpaces = 0
-    for c in line:
-      if c == ' ':
-        leadingSpaces += 1
-      else:
-        break
-    let lineIndent = " ".repeat(leadingSpaces)
-    let content = line[leadingSpaces .. ^1]
-
-    var currentLine = ""
-    for word in content.splitWhitespace():
-      if currentLine.len == 0:
-        currentLine = word
-      elif leadingSpaces + currentLine.len + 1 + word.len <= width:
-        currentLine &= " " & word
-      else:
-        if isFirst:
-          outLines.add(lineIndent & currentLine)
-          isFirst = false
-        else:
-          outLines.add(indentStr & lineIndent & currentLine)
-        currentLine = word
-    if currentLine.len > 0:
-      if isFirst:
-        outLines.add(lineIndent & currentLine)
-        isFirst = false
-      else:
-        outLines.add(indentStr & lineIndent & currentLine)
-
-  result = outLines.join("\n")
-
-proc categoryName(c: Categories): string =
+func categoryName(c: Categories): string =
   case c
+  of cNone: ""
   of cEdit: "Editing Options"
   of cTl: "Timeline Options"
   of cUrl: "URL Download Options"
@@ -119,7 +76,6 @@ proc printHelp() {.noreturn.} =
   echo "\n    -h, --help" & " ".repeat(optWidth - 14) &
     wrapText("Show info about this program then exit", helpWidth, optWidth)
   echo ""
-
   quit(0)
 
 proc parseMargin(val: string): (PackedInt, PackedInt) =
@@ -333,81 +289,77 @@ judge making cuts.
   let cmdLineParams = commandLineParams()
   for rawKey in cmdLineParams:
     let key = handleLegacyOptions(rawKey)
-    if genCliMacro(key, args):
+    if genCliMacro(key, args, mainOptions):
       continue
-
-    case key:
-    of "-h", "--help":
+    if key in ["-h", "--help"]:
       printHelp()
-    else:
-      if key.startsWith("--"):
-        error &"Unknown option: {key}"
-
-      case expecting
-      of "":
-        args.input = key
-      of "edit":
-        args.edit = key
-      of "export":
-        args.`export` = key
-      of "output":
-        args.output = key
-      of "when-silent":
-        args.whenSilent = parseActions(key)
-      of "when-normal":
-        args.whenNormal = parseActions(key)
-      of "silent-speed":
-        args.whenSilent = actionFromUserSpeed(parseSpeed(key, expecting))
-      of "video-speed":
-        args.whenNormal = actionFromUserSpeed(parseSpeed(key, expecting))
-      of "add-in":
-        args.addIn.add parseTimeRange(key, expecting)
-      of "cut-out":
-        args.cutOut.add parseTimeRange(key, expecting)
-      of "set-speed":
-        args.setSpeed.add parseSpeedRange(key)
-      of "yt-dlp-location":
-        args.ytDlpLocation = key
-      of "download-format":
-        args.downloadFormat = key
-      of "output-format":
-        args.outputFormat = key
-      of "yt-dlp-extras":
-        args.ytDlpExtras = key
-      of "scale":
-        args.scale = parseNum(key, expecting)
-      of "resolution":
-        args.resolution = parseResolution(key, expecting)
-      of "background":
-        args.background = parseColor(key)
-      of "sample-rate":
-        args.sampleRate = parseSampleRate(key)
-      of "frame-rate":
-        args.frameRate = parseFrameRate(key)
-      of "vcodec":
-        args.videoCodec = key
-      of "video-bitrate":
-        args.videoBitrate = parseBitrate(key)
-      of "vprofile":
-        args.vprofile = key
-      of "acodec":
-        args.audioCodec = key
-      of "layout":
-        args.audioLayout = key
-      of "audio-normalize":
-        args.audioNormalize = parseNorm(key)
-      of "audio-bitrate":
-        args.audioBitrate = parseBitrate(key)
-      of "progress":
-        try:
-          args.progress = parseEnum[BarType](key)
-        except ValueError:
-          error &"{key} is not a choice for --progress\nchoices are:\n  modern, classic, ascii, machine, none"
-      of "margin":
-        args.margin = parseMargin(key)
-      of "tempdir":
-        tempDir = key
-      expecting = ""
+    if key.startsWith("--"):
+      error &"Unknown option: {key}"
+    case expecting
+    of "":
+      args.input = key
+    of "edit":
+      args.edit = key
+    of "export":
+      args.`export` = key
+    of "output":
+      args.output = key
+    of "when-silent":
+      args.whenSilent = parseActions(key)
+    of "when-normal":
+      args.whenNormal = parseActions(key)
+    of "silent-speed":
+      args.whenSilent = actionFromUserSpeed(parseSpeed(key, expecting))
+    of "video-speed":
+      args.whenNormal = actionFromUserSpeed(parseSpeed(key, expecting))
+    of "add-in":
+      args.addIn.add parseTimeRange(key, expecting)
+    of "cut-out":
+      args.cutOut.add parseTimeRange(key, expecting)
+    of "set-speed":
+      args.setSpeed.add parseSpeedRange(key)
+    of "yt-dlp-location":
+      args.ytDlpLocation = key
+    of "download-format":
+      args.downloadFormat = key
+    of "output-format":
+      args.outputFormat = key
+    of "yt-dlp-extras":
+      args.ytDlpExtras = key
+    of "scale":
+      args.scale = parseNum(key, expecting)
+    of "resolution":
+      args.resolution = parseResolution(key, expecting)
+    of "background":
+      args.background = parseColor(key)
+    of "sample-rate":
+      args.sampleRate = parseSampleRate(key)
+    of "frame-rate":
+      args.frameRate = parseFrameRate(key)
+    of "vcodec":
+      args.videoCodec = key
+    of "video-bitrate":
+      args.videoBitrate = parseBitrate(key)
+    of "vprofile":
+      args.vprofile = key
+    of "acodec":
+      args.audioCodec = key
+    of "layout":
+      args.audioLayout = key
+    of "audio-normalize":
+      args.audioNormalize = parseNorm(key)
+    of "audio-bitrate":
+      args.audioBitrate = parseBitrate(key)
+    of "progress":
+      try:
+        args.progress = parseEnum[BarType](key)
+      except ValueError:
+        error &"{key} is not a choice for --progress\nchoices are:\n  modern, classic, ascii, machine, none"
+    of "margin":
+      args.margin = parseMargin(key)
+    of "tempdir":
+      tempDir = key
+    expecting = ""
 
   if expecting != "":
     error &"{cmdLineParams[^1]} needs argument."

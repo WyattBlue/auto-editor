@@ -15,7 +15,7 @@ const commands*: seq[CmdDef] = @[
 ]
 
 type Categories* = enum
-  cEdit cTl cUrl cDis cCon cVid cAud cMis
+  cNone cEdit cTl cUrl cDis cCon cVid cAud cMis
 
 type OptKind* = enum
   Regular   # expecting = $datum
@@ -25,10 +25,23 @@ type OptKind* = enum
 type OptDef* = object
   names*: string
   kind*: OptKind = Regular
-  c*: Categories
+  c*: Categories = cNone
   datum*: string
   metavar*: string  # Shouldn't be set for flags.
   help*: string
+
+const whisperOptions*: seq[OptDef] = @[
+  OptDef(names: "--debug", kind: Flag, datum: "isDebug", help: ""),
+  OptDef(names: "-sw, --split-words", kind: Flag, datum: "splitWords", help: ""),
+  OptDef(names: "--format", datum: "format", metavar: "FORMAT",
+    help: "Output in a specific format {text|srt|json} (default text)"),
+  OptDef(names: "--output", datum: "output", metavar: "FILE",
+    help: "Choose where to output (defaults to stdout)"),
+  OptDef(names: "--queue", datum: "queue", metavar: "SECS",
+    help: "The maximum size in seconds that will be queued into before processing. (default 10)"),
+  OptDef(names: "--vad-model", datum: "vad-model", metavar: "VAD-MODEL",
+    help: "Set Voice activity detection (VAD) model"),
+]
 
 const mainOptions*: seq[OptDef] = @[
   OptDef(names: "-e, --edit", c: cEdit, datum: "edit", metavar: "METHOD", help: """
@@ -240,7 +253,7 @@ macro genCmdCases*(keyIdent: untyped): untyped =
   result.add(elseBranch)
 
 
-macro genCliMacro*(keyIdent, argsIdent: untyped): untyped =
+macro genCliMacro*(keyIdent, argsIdent: untyped, myOpts: static seq[OptDef]): untyped =
   ## Generates a case statement for CLI option handling.
   ## - Flag: sets datum to true
   ## - Special: sets args.export to datum string
@@ -248,7 +261,7 @@ macro genCliMacro*(keyIdent, argsIdent: untyped): untyped =
   result = newNimNode(nnkCaseStmt)
   result.add(keyIdent)
 
-  for opt in mainOptions:
+  for opt in myOpts:
     var branch = newNimNode(nnkOfBranch)
 
     for name in opt.names.split(", "):
