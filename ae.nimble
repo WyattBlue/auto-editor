@@ -88,16 +88,16 @@ disableDemuxers.add "bethsoftvid"
 # [G-Q]
 disableDecoders &= "g728,g729,gremlin_dpcm,gsm,gsm_ms,hca,hcom,iac,imc,interplay_dpcm,interplay_acm,mace3,mace6,metasound,misc4,mp1,mp3adu,msnsiren,musepack7,musepack8,osq,paf_audio,qcelp,qdm2,qdmc,qoa".split(",")
 # [R-Z]
-disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dpcm,tak,truespeech,twinvq,vmdaudio,wady_dpcm,wavarc,wavesynth,westwood_snd1,wmalossless,wmapro,wmavoice,xan_dpcm,xma1,xma2".split(",")
+disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dpcm,tak,truespeech,twinvq,vmdaudio,wady_dpcm,wavarc,wavesynth,westwood_snd1,wmalossless,wmapro,wmavoice,xan_dpcm,xma1,xma2,zero12v".split(",")
 
 # Can only encode
 disableEncoders &= "a64_multi,a64_multi5,ttml".split(",")
 
 # Technically obsolete
-disableDecoders &= "alias_pix,cinepak,cljr,cllc,comfortnoise,flv,jacosub,magicyuv,nellymoser,pgmyuv,smacker,smc,snow,sonic,sonic_ls,utvideo".split(",")
-disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,flv,magicyuv,nellymoser,pgmyuv,smc,snow,sonic,utvideo".split(",")
-disableMuxers &= "flv,f4v,jacosub,rso,segafilm,sup,swf,truehd,rm".split(",")
-disableDemuxers &= "a64,alp,apm,bink,binka,flv,jacosub,kux,live_flv,mm,pp_bnk,rso,rm,sdns,segafilm,smush,smacker,vmd".split(",")
+disableDecoders &= "alias_pix,ape,cinepak,cljr,cllc,comfortnoise,flv,jacosub,magicyuv,nellymoser,pgmyuv,smacker,smc,snow,sonic,sonic_ls,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,flv,magicyuv,nellymoser,pgmyuv,smc,snow,sonic,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+disableMuxers &= "flv,f4v,jacosub,nut,rm,rso,segafilm,sup,swf,truehd,wsaud,wtv,wv".split(",")
+disableDemuxers &= "a64,alp,ape,apm,bink,binka,flv,jacosub,kux,live_flv,mm,nistsphere,nut,pp_bnk,redspark,rm,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
 disableParsers &= @["misc4", "tak"]
 
 # Irrelevant to this project
