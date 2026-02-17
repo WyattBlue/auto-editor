@@ -8,7 +8,6 @@ bin = @["main=auto-editor"]
 
 # Dependencies
 requires "nim >= 2.2.2"
-requires "checksums"
 requires "tinyre#77469f5"
 
 # Tasks
