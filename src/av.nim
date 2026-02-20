@@ -68,9 +68,13 @@ proc open*(filename: string): InputContainer {.raises:[IOError].} =
   result = InputContainer()
   result.packet = av_packet_alloc()
 
-  if avformat_open_input(addr result.formatContext, filename.cstring, nil,
-      nil) != 0:
-    raise newException(IOError, "Could not open input file: " & filename)
+  var ret = avformat_open_input(addr result.formatContext, filename.cstring, nil, nil)
+  if ret == AVERROR(ENOENT):
+    raise newException(IOError, &"Input file doesn't exist: {filename}")
+  elif ret == AVERROR_INVALIDDATA:
+    raise newException(IOError, &"Invalid media data: {filename}")
+  elif ret != 0:
+    raise newException(IOError, &"[{ret}] Could not open input file: {filename}")
 
   if avformat_find_stream_info(result.formatContext, nil) < 0:
     avformat_close_input(addr result.formatContext)

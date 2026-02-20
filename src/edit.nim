@@ -226,9 +226,7 @@ proc editMedia*(args: var mainArgs) =
       applyArgs(tlV3, args)
     else:
       # Make `timeline` from media file
-      var container = (
-        try: av.open(args.input) except IOError: error &"Input file doesn't exist: {args.input}"
-      )
+      var container = (try: av.open(args.input) except IOError as e: error e.msg)
       defer: container.close()
 
       usePath = args.input

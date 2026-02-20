@@ -459,6 +459,9 @@ func AVERROR*(e: cint): cint {.inline.} = (-e)
 const AVERROR_EOF* = AVERROR(MKTAG('E', 'O', 'F', ' '))
 let EAGAIN {.importc: "EAGAIN", header: "<errno.h>".}: cint
 let AVERROR_EAGAIN* = AVERROR(EAGAIN)
+let ENOENT* {.importc: "ENOENT", header: "<errno.h>".}: cint
+let AVERROR_INVALIDDATA* {.importc: "AVERROR_INVALIDDATA",
+    header: "<libavutil/error.h>".}: cint
 
 const AV_ERROR_MAX_STRING_SIZE* = 64
 
