@@ -512,12 +512,12 @@ class Runner:
         assert cn.videos[0].res == (700, 380)
         assert cn.audios[0].samplerate == 48000
 
-    # def test_premiere_multi(self):
-    #     p_xml = self.main([f"resources/multi-track.mov"], ["-exp"], "multi.xml")
+    def test_premiere_multi(self):
+        p_xml = self.main([f"resources/multi-track.mov"], ["-exp"], "multi.xml")
 
-    #     cn = fileinfo(self.main([p_xml], []))
-    #     assert len(cn.videos) == 1
-    #     assert len(cn.audios) == 2
+        cn = fileinfo(self.main([p_xml], [], "multi_ALT.mp4"))
+        assert len(cn.videos) == 1
+        assert len(cn.audios) == 2
 
     def test_premiere(self) -> None:
         for test_name in all_files:
@@ -525,9 +525,7 @@ class Runner:
                 continue
 
             p_xml = self.main([f"resources/{test_name}"], ["-exp"], "out.xml")
-
-            # TODO: Support premiere XML as input.
-            # self.main([p_xml], [])
+            self.main([p_xml], [])
 
     def test_export(self):
         for test_name in all_files:

@@ -10,7 +10,7 @@ import timeline
 import palet/edit
 import util/[color, bar, fun, rules]
 
-import imports/json
+import imports/[fcp7, json]
 import exports/[fcp7, fcp11, json, shotcut, kdenlive]
 import preview
 import render/format
@@ -224,6 +224,10 @@ proc editMedia*(args: var mainArgs) =
     if inputExt in [".v1", ".v2", ".v3", ".json"]:
       tlV3 = readJson(readFile(args.input), interner)
       applyArgs(tlV3, args)
+    elif inputExt == ".xml":
+      tlV3 = fcp7ReadXml(args.input, interner)
+      applyArgs(tlV3, args)
+      usePath = args.input
     else:
       # Make `timeline` from media file
       var container = (try: av.open(args.input) except IOError as e: error e.msg)
