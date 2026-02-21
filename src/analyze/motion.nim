@@ -221,4 +221,4 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.`end`()
 
-  writeCache(result, path, tb, "motion", cacheArgs)
+  writeCache(result, tb, path, "motion", cacheArgs)

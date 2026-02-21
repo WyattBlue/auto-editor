@@ -198,4 +198,4 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.`end`()
 
-  writeCache(result, path, tb, "audio", $stream)
+  writeCache(result, tb, path, "audio", $stream)
