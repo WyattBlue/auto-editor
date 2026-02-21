@@ -9,7 +9,7 @@ bin = @["main=auto-editor"]
 # Dependencies
 requires "nim >= 2.2.2"
 requires "tinyre#77469f5"
-requires "https://github.com/WyattBlue/csort"
+requires "https://github.com/WyattBlue/csort == 1.0.0"
 
 # Tasks
 import std/[os, strutils, strformat]
