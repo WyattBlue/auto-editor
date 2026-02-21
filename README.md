@@ -102,6 +102,19 @@ If you want to split the clips, but don't want auto-editor to do any more editin
 auto-editor example.mp4 --when-silent nil --when-normal nil --export premiere
 ```
 
+<h2 align="center">Importing timeline files</h2>
+Auto-Editor can read fcp7 xml files and render them as media files:
+
+```
+auto-editor myFcp7File.xml -o render.mp4
+```
+
+Available Importers:
+ - Auto-Editor timeline files (`.v1`, `.v2`, `.v3`)
+ - FCP7 XML (experimental)
+
+PRs implementing more importers are encouraged.
+
 <h2 align="center">Manual Editing</h2>
 
 Use the `--cut-out` option to always remove a section.
