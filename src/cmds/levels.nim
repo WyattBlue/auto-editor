@@ -199,4 +199,4 @@ proc main*(strArgs: seq[string]) =
       echo (if value: "1" else: "0")
 
   if not noCache and editMethod notin ["subtitle", "word", "regex"]:
-    writeCache(data, inputFile, tb, editMethod, cacheArgs)
+    writeCache(data, tb, inputFile, editMethod, cacheArgs)

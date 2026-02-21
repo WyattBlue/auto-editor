@@ -201,8 +201,9 @@ proc readCache*(path: string, tb: AVRational, kind, args: string): Option[seq[fl
 
 type CacheEntry = tuple[path: string, mtime: Time]
 
-proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind,
-    args: string) =
+const cacheFileLimit = 255
+
+proc writeCache*(data: seq[float32], tb: AVRational, path, kind, args: string) =
   if data.len <= 10:
     return
 
@@ -231,12 +232,12 @@ proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind,
     discard
 
   # Sort by modification time (oldest first) and remove excess files
-  if cacheEntries.len > 10:
+  if cacheEntries.len > cacheFileLimit:
     cacheEntries.sort(proc(a, b: CacheEntry): int = cmp(a.mtime, b.mtime))
 
-    # Remove oldest files until we're back to 10
-    for i in 0 ..< (cacheEntries.len - 10):
+    # Remove oldest files until we're back to the limit
+    for i in 0 ..< cacheEntries.len - cacheFileLimit:
       try:
-        removeFile(cacheEntries[i].path)
+        removeFile cacheEntries[i].path
       except OSError:
         discard
