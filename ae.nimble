@@ -19,31 +19,19 @@ var disableVpx = getEnv("DISABLE_VPX").len > 0
 var disableSvtAv1 = getEnv("DISABLE_SVTAV1").len > 0
 var disableHevc = getEnv("DISABLE_HEVC").len > 0
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
-var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
-var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
+let enableWhisper = getEnv("DISABLE_WHISPER").len == 0
+let enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
 let posix = if false: "-posix" else: ""  # Ubuntu vs Homebrew
 
-var flags = ""
-if not disableVpx:
-  flags &= "-d:enable_vpx "
-if not disableSvtAv1:
-  flags &= "-d:enable_svtav1 "
-if not disableHevc:
-  flags &= "-d:enable_hevc "
-if enableWhisper:
-  flags &= "-d:enable_whisper "
-if enableVpl:
-  flags &= "-d:enable_vpl "
-
 task test, "Run unit tests":
-  exec &"nim c {flags} -r tests/unit"
+  exec &"nim c -r tests/unit"
 
 task sprint, "Build the project quickly":
-  exec &"nim c -d:danger --panics:on {flags} --out:auto-editor src/main.nim"
+  exec &"nim c -d:danger --panics:on --out:auto-editor src/main.nim"
 
 task make, "Export the project":
-  exec &"nim c -d:danger --panics:on {flags} --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
+  exec &"nim c -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
     exec "stat -f \"%z bytes\" ./auto-editor"
@@ -368,11 +356,9 @@ proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: b
     "-DENABLE_SHARED=0",
     "-DENABLE_CLI=0"
   ]
-
   let isLinuxAarch64 = defined(linux) and hostCPU == "arm64"
-  let isX86_64 = hostCPU in ["amd64", "i386"] # Nim uses "amd64" for x86_64
 
-  if not isX86_64 or crossWindowsArm:
+  if hostCPU != "amd64" or crossWindowsArm:
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")
 
   if isLinuxAarch64:
@@ -726,8 +712,7 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
     # lto causes issues with GCC.
-    exec "nim c -d:danger --panics:on -d:windows " & flags &
-         "--os:windows --cpu:amd64 --cc:gcc " &
+    exec "nim c -d:danger --panics:on --os:windows --cpu:amd64 --cc:gcc " &
         &"--gcc.exe:x86_64-w64-mingw32-gcc{posix} " &
         &"--gcc.linkerexe:x86_64-w64-mingw32-gcc{posix} " &
          "--passL:-static " &
@@ -767,8 +752,7 @@ task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
   if not dirExists("build"):
     echo "FFmpeg for Windows ARM64 not found. Run 'nimble makeffwinarm' first."
   else:
-    exec "nim c -d:danger --panics:on -d:windows -d:windows_arm " & flags &
-         "--os:windows --cpu:arm64 --cc:clang " &
+    exec "nim c -d:danger --panics:on --os:windows --cpu:arm64 --cc:clang " &
          "--clang.exe:aarch64-w64-mingw32-clang " &
          "--clang.linkerexe:aarch64-w64-mingw32-clang " &
          "--passL:-static " &
