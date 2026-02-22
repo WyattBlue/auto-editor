@@ -267,10 +267,12 @@ const
 
 proc av_log_set_level*(level: cint) {.importc, header: "<libavutil/log.h>".}
 
-type AVLogCallback* = proc(avcl: pointer, level: cint, fmt: cstring, vl: VaList) {.cdecl.}
+type
+  ConstCString* {.importc: "const char*", nodecl.} = cstring
+  AVLogCallback* = proc(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl.}
 
 proc av_log_set_callback*(callback: AVLogCallback) {.importc, header: "<libavutil/log.h>".}
-proc av_log_default_callback*(avcl: pointer, level: cint, fmt: cstring, vl: VaList) {.cdecl, importc, header: "<libavutil/log.h>".}
+proc av_log_default_callback*(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl, importc, header: "<libavutil/log.h>".}
 
 proc av_samples_set_silence*(audio_data: ptr ptr uint8, offset: cint, nb_samples: cint,
                             nb_channels: cint,
