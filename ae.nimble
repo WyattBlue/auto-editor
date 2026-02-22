@@ -21,7 +21,6 @@ var disableHevc = getEnv("DISABLE_HEVC").len > 0
 var enable12bit = getEnv("ENABLE_12BIT").len > 0
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
-var enableCuda = getEnv("ENABLE_CUDA").len > 0 and not defined(macosx)
 
 let posix = if false: "-posix" else: ""  # Ubuntu vs Homebrew
 
@@ -36,8 +35,6 @@ if enableWhisper:
   flags &= "-d:enable_whisper "
 if enableVpl:
   flags &= "-d:enable_vpl "
-if enableCuda:
-  flags &= "-d:enable_cuda "
 
 task test, "Run unit tests":
   exec &"nim c {flags} -r tests/unit"
@@ -181,7 +178,7 @@ let whisper = Package(
   buildSystem: "cmake",
   buildArguments: @[
     "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
-    "-DGGML_CUDA=" & (if enableCuda: "ON" else: "OFF"),
+    "-DGGML_CUDA=OFF",
     "-DWHISPER_SDL2=OFF",
     "-DWHISPER_BUILD_EXAMPLES=OFF",
     "-DWHISPER_BUILD_TESTS=OFF",
@@ -336,8 +333,7 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false,
       else:
         content = content.replace(
           "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
-          (if enableCuda: "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu -lggml-cuda -L/usr/local/cuda-12.8/lib64/stubs -L/usr/local/cuda-12.8/lib64 -lcuda -lcudart -lcublas -lcublasLt"
-           else: "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu")
+          "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu",
         )
 
       if not content.contains("Libs.private:"):

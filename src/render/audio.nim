@@ -27,7 +27,7 @@ var capturedJson: array[16384, char]
 var captureEnabled: bool = false
 
 # Custom log callback to capture loudnorm JSON output
-proc loudnormLogCallbackWrapper(avcl: pointer, level: cint, fmt: cstring, vl: VaList) {.cdecl.} =
+proc loudnormLogCallbackWrapper(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl.} =
   if not captureEnabled:
     av_log_default_callback(avcl, level, fmt, vl)
     return

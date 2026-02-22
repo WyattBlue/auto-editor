@@ -33,25 +33,11 @@ jobs:
       - name: Setup
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
-            wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
-            sudo dpkg -i cuda-keyring_1.1-1_all.deb
             sudo apt update
-            sudo apt-get install -y build-essential pkg-config nasm git cuda-cudart-12-8 cuda-cudart-dev-12-8 libcublas-dev-12-8 cuda-nvcc-12-8
-            echo "CUDA_PATH=/usr/local/cuda-12.8" >> $GITHUB_ENV
-            echo "/usr/local/cuda-12.8/bin" >> $GITHUB_PATH
-            echo "LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64/stubs:/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-            echo "LDFLAGS=-L/usr/local/cuda-12.8/lib64/stubs -L/usr/local/cuda-12.8/lib64" >> $GITHUB_ENV
-            sudo ln -sf /usr/local/cuda-12.8/lib64/stubs/libcuda.so /usr/local/cuda-12.8/lib64/stubs/libcuda.so.1
+            sudo apt-get install -y build-essential pkg-config nasm git
           elif [ "${{ matrix.os }}" = "ubuntu-24.04-arm" ]; then
-            wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/arm64/cuda-keyring_1.1-1_all.deb
-            sudo dpkg -i cuda-keyring_1.1-1_all.deb
             sudo apt update
-            sudo apt-get install -y build-essential pkg-config git cuda-cudart-12-8 cuda-cudart-dev-12-8 libcublas-dev-12-8 cuda-nvcc-12-8
-            echo "CUDA_PATH=/usr/local/cuda-12.8" >> $GITHUB_ENV
-            echo "/usr/local/cuda-12.8/bin" >> $GITHUB_PATH
-            echo "LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64/stubs:/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-            echo "LDFLAGS=-L/usr/local/cuda-12.8/lib64/stubs -L/usr/local/cuda-12.8/lib64" >> $GITHUB_ENV
-            sudo ln -sf /usr/local/cuda-12.8/lib64/stubs/libcuda.so /usr/local/cuda-12.8/lib64/stubs/libcuda.so.1
+            sudo apt-get install -y build-essential pkg-config git
           elif [ "${{ matrix.os }}" = "macos-15-intel" ]; then
             brew install nasm
             echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
@@ -60,22 +46,12 @@ jobs:
           fi
       - name: GCC/Clang version
         run: gcc --version
-      - name: Build FFmpeg (non-CUDA)
+      - name: Build FFmpeg
         run: nimble makeff
-      - name: Compile (non-CUDA)
+      - name: Compile
         run: nimble make && mv auto-editor ${{ matrix.binary_name }}
       - name: Test
         run: nimble test
-
-      - name: Build FFmpeg (CUDA)
-        if: runner.os == 'Linux'
-        run: ENABLE_CUDA=1 nimble makeff
-      - name: Compile (CUDA)
-        if: runner.os == 'Linux'
-        run: ENABLE_CUDA=1 nimble make && mv auto-editor ${{ matrix.binary_name }}-cuda
-      - name: Test
-        if: runner.os == 'Linux'
-        run: ENABLE_CUDA=1 nimble test
 
       - name: Upload to Release
         if: github.event_name == 'release'
