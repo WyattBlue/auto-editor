@@ -25,13 +25,13 @@ let enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 let posix = if false: "-posix" else: ""  # Ubuntu vs Homebrew
 
 task test, "Run unit tests":
-  exec &"nim c -r tests/unit"
+  exec "nim c -r tests/unit"
 
 task sprint, "Build the project quickly":
-  exec &"nim c -d:danger --panics:on --out:auto-editor src/main.nim"
+  exec "nim c -d:danger --panics:on --out:auto-editor src/main.nim"
 
 task make, "Export the project":
-  exec &"nim c -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
+  exec "nim c -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
     exec "stat -f \"%z bytes\" ./auto-editor"
@@ -79,8 +79,8 @@ disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dp
 disableEncoders &= "a64_multi,a64_multi5,ttml".split(",")
 
 # Technically obsolete
-disableDecoders &= "alias_pix,ape,cinepak,cljr,cllc,comfortnoise,flv,jacosub,magicyuv,nellymoser,pgmyuv,smacker,smc,snow,sonic,sonic_ls,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
-disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,flv,magicyuv,nellymoser,pgmyuv,smc,snow,sonic,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+disableDecoders &= "alias_pix,ape,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,jacosub,magicyuv,nellymoser,pgmyuv,smacker,smc,snow,sonic,sonic_ls,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,magicyuv,nellymoser,pgmyuv,smc,snow,sonic,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
 disableMuxers &= "flv,f4v,jacosub,nut,rm,rso,segafilm,sup,swf,truehd,wsaud,wtv,wv".split(",")
 disableDemuxers &= "a64,alp,ape,apm,bink,binka,flv,jacosub,kux,live_flv,mm,nistsphere,nut,pp_bnk,redspark,rm,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
 disableParsers &= @["misc4", "tak"]
@@ -356,7 +356,7 @@ proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: b
     "-DENABLE_SHARED=0",
     "-DENABLE_CLI=0"
   ]
-  let isLinuxAarch64 = defined(linux) and hostCPU == "arm64"
+  let isLinuxAarch64 = hostOS == "linux" and hostCPU == "arm64"
 
   if hostCPU != "amd64" or crossWindowsArm:
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")
