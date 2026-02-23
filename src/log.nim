@@ -1,4 +1,4 @@
-import std/[envvars, math, os, strformat, strutils, tables, terminal, times]
+import std/[envvars, math, options, os, strformat, strutils, tables, terminal, times]
 
 import ffmpeg
 import util/color
@@ -84,7 +84,7 @@ type mainArgs* = object
   # Timeline Options
   sampleRate*: cint = -1
   frameRate*: AVRational = AVRational(num: 0, den: 0)
-  background* = RGBColor(red: 0, green: 0, blue: 0)
+  background*: Option[RGBColor] = none(RGBColor)
   resolution*: (int, int) = (0, 0)
 
   # URL download Options

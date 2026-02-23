@@ -1,4 +1,4 @@
-import std/[os, sets, tables]
+import std/[options, os, sets, tables]
 from std/math import round
 
 import ffmpeg
@@ -261,6 +261,8 @@ proc applyArgs*(tl: var v3, args: mainArgs) =
     tl.layout = args.audioLayout
   if args.frameRate != AVRational(num: 0, den: 0):
     tl.tb = args.frameRate
+  if args.background.isSome:
+    tl.bg = args.background.get()
 
 func stem(path: string): string =
   splitFile(path).name

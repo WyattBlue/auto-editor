@@ -326,7 +326,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var seekFrame = none(int)
   var framesSaved = 0
 
-  var nullFrame = makeSolid(targetWidth, targetHeight, args.background)
+  var nullFrame = makeSolid(targetWidth, targetHeight, tl.bg)
   var frameIndex = -1
   var frame: ptr AVFrame = av_frame_clone(nullFrame)
   var objList: seq[VideoFrame] = @[]
