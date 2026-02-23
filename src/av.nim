@@ -380,9 +380,9 @@ proc open*(ctx: ptr AVCodecContext) =
       ctx.time_base = AVRational(num: 1, den: ctx.sample_rate)
     else:
       ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
+  let codecName = if ctx.codec != nil and ctx.codec.name != nil: $ctx.codec.name else: "unknown"
   let ret = avcodec_open2(ctx, ctx.codec, nil)
   if ret < 0:
-    let codecName = if ctx.codec != nil and ctx.codec.name != nil: $ctx.codec.name else: "unknown"
     error &"Could not open encoder '{codecName}': {av_err2str(ret)}"
 
 proc setProfileOrErr*(ctx: ptr AVCodecContext, to: string) =

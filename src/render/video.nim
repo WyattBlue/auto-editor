@@ -216,8 +216,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var needsScaling = false
 
   if args.scale != 1.0:
-    targetWidth = max(cint(round(tl.res[0].float64 * args.scale)), 2)
-    targetHeight = max(cint(round(tl.res[1].float64 * args.scale)), 2)
+    targetWidth = max(cint(round(tl.res[0].float64 * args.scale)) and not 1.cint, 2)
+    targetHeight = max(cint(round(tl.res[1].float64 * args.scale)) and not 1.cint, 2)
     needsScaling = true
 
 
