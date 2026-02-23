@@ -1,4 +1,4 @@
-import std/[json, options, sequtils]
+import std/[json, sequtils]
 
 import ../timeline
 import ../log
