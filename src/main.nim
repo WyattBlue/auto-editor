@@ -1,4 +1,4 @@
-import std/[os, osproc, parseutils, sequtils, strformat, strutils, terminal, uri]
+import std/[options, os, osproc, parseutils, sequtils, strformat, strutils, terminal, uri]
 when not defined(windows):
   import std/posix_utils
 
@@ -331,7 +331,7 @@ judge making cuts.
     of "resolution":
       args.resolution = parseResolution(key, expecting)
     of "background":
-      args.background = parseColor(key)
+      args.background = some(parseColor(key))
     of "sample-rate":
       args.sampleRate = parseSampleRate(key)
     of "frame-rate":

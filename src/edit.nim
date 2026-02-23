@@ -1,4 +1,4 @@
-import std/[os, random, sets, sequtils, strformat, strutils, terminal, times]
+import std/[options, os, random, sets, sequtils, strformat, strutils, terminal, times]
 from std/browsers import openDefaultBrowser
 from std/math import round
 
@@ -273,7 +273,7 @@ proc editMedia*(args: var mainArgs) =
         let action = (if speed == 1.0: myNil else: @[Action(kind: actSpeed, val: speed)])
         applyToRange(actionIndex, span, tb.float64, getActionIndex(action))
 
-      let bg = args.background
+      let bg = args.background.get(RGBColor(red: 0, green: 0, blue: 0))
       mi = initMediaInfo(container.formatContext, args.input)
       tlV3 = initLinearTimeline(addr args.input, tb, bg, mi, actionMap, actionIndex)
       applyArgs(tlV3, args)
