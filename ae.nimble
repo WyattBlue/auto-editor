@@ -13,7 +13,6 @@ requires "csort == 1.0.0"
 
 # Tasks
 import std/[os, strutils, strformat]
-import src/cli
 
 var disableVpx = getEnv("DISABLE_VPX").len > 0
 var disableSvtAv1 = getEnv("DISABLE_SVTAV1").len > 0
@@ -761,5 +760,3 @@ task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
     # Strip the Windows binary
     exec "llvm-strip -s auto-editor.exe"
 
-task zshcomplete, "Generate zsh completions":
-  zshcomplete()
