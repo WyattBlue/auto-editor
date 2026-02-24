@@ -313,10 +313,11 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         output.mux(outPacket[])
         av_packet_unref(outPacket)
 
-        if frameType == AVMEDIA_TYPE_AUDIO:
-          av_frame_free(addr frame)
-        elif frameType == AVMEDIA_TYPE_VIDEO:
+        if frameType == AVMEDIA_TYPE_VIDEO:
           av_frame_unref(frame)
+
+      if frameType == AVMEDIA_TYPE_AUDIO:
+        av_frame_free(addr frame)
 
   bar.`end`()
 

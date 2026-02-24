@@ -884,6 +884,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     while samplesYielded < totalSamples:
       let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
 
+      av_frame_unref(frame)
       frame.nb_samples = currentFrameSize.cint
       frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
       frame.ch_layout.nb_channels = targetChannels.cint
