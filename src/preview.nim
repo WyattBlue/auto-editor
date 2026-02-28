@@ -85,7 +85,7 @@ func allCuts(tl: v3, inLen: int): seq[int] =
   return cutLens
 
 
-proc preview*(tl: v3) =
+proc preview*(tl: var v3) =
   conwrite("")
 
   var inputLength = 0
@@ -110,6 +110,12 @@ proc preview*(tl: v3) =
     echo timeFrame("diff", diff, tb, "0.0%")
 
   var clipLens: seq[int] = @[]
+  if tl.a.len == 0:
+    if tl.v.len != 0:
+      tl.a.add tl.v[0]
+    else:
+      tl.a.add @[]
+
   for clip in tl.a[0]:
     clipLens.add clip.dur
 
