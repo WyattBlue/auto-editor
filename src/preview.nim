@@ -112,7 +112,7 @@ proc preview*(tl: var v3) =
   var clipLens: seq[int] = @[]
   if tl.a.len == 0:
     if tl.v.len != 0:
-      tl.a.add tl.v[0]
+      tl.a.add move(tl.v[0])
     else:
       tl.a.add @[]
 
