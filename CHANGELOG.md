@@ -11,3 +11,4 @@ CUDA support if you really need it.
  - Switch to `config.nims` so that the correct flags are always passed no matter what nimble command is used.
  - Fix `--scale` not rounding to nearest 2 when most video formats require it.
  - `--preview`: Fix crash when there are no audio clips in the timeline.
+ - Dramatically reduce peak memory usage for media rendering by optimizing audio code 
