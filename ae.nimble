@@ -26,9 +26,6 @@ let posix = if false: "-posix" else: ""  # Ubuntu vs Homebrew
 task test, "Run unit tests":
   exec "nim c -r tests/unit"
 
-task sprint, "Build the project quickly":
-  exec "nim c -d:danger --panics:on --out:auto-editor src/main.nim"
-
 task make, "Export the project":
   exec "nim c -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
   when defined(macosx):
