@@ -371,16 +371,7 @@ judge making cuts.
   if args.input == "" and isDebug:
     echo "Auto-Editor: ", version
     when defined(windows):
-      var cpuArchitecture: string
-      when defined(amd64) or defined(x86_64):
-        cpuArchitecture = "x86_64"
-      elif defined(i386):
-        cpuArchitecture = "i386"
-      elif defined(arm64) or defined(aarch64):
-        cpuArchitecture = "aarch64"
-      else:
-        cpuArchitecture = "unknown"
-      echo "OS: Windows ", cpuArchitecture
+      echo "OS: Windows ", when hostCPU == "amd64": "x86_64" else: hostCPU
     else:
       let plat = uname()
       echo "OS: ", plat.sysname, " ", plat.release, " ", plat.machine
