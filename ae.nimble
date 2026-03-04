@@ -172,6 +172,21 @@ let whisper = Package(
   ],
   ffFlag: "--enable-whisper",
 )
+let openssl = Package(
+  name: "openssl",
+  sourceUrl: "https://github.com/openssl/openssl/releases/download/openssl-3.6.1/openssl-3.6.1.tar.gz",
+  sha256: "b1bfedcd5b289ff22aee87c9d600f515767ebf45f77168cb6d64f231f518a82e",
+  buildArguments: (
+    "no-ssl3 no-ssl3-method no-zlib no-dso no-engine no-threads no-autoalginit no-ssl " &
+    "no-tls no-dtls no-quic no-dsa no-dh no-ecdh no-ecdsa no-srp no-psk no-des no-rc4 " &
+    "no-rc2 no-rc5 no-bf no-cast no-camellia no-aria no-seed no-idea no-sm4 no-md4 " &
+    "no-rmd160 no-whirlpool no-blake2 no-cms no-ocsp no-ts no-ct no-comp no-srtp " &
+    "no-chacha no-poly1305 no-ec2m no-sm2 no-sm3 no-mdc2 no-async no-ui-console " &
+    "no-autoload-config no-legacy no-sctp no-http no-filenames no-err " &
+    "-DOPENSSL_SMALL_FOOTPRINT -Os"
+  ).split(" "),
+  buildSystem: "openssl",
+)
 let x264 = Package(
   name: "x264",
   sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2",
@@ -200,7 +215,7 @@ proc setupPackages(enableWhisper: bool, crossWindowsArm: bool = false): seq[Pack
     result.add libvpl
   if enableWhisper:
     result.add whisper
-  result &= [lame, opus, dav1d, x264]
+  result &= [openssl, lame, opus, dav1d, x264]
   if not disableVpx:
     result.add vpx
   if not disableSvtAv1:
@@ -522,6 +537,38 @@ endian = 'little'
     exec "ninja"
     exec "ninja install"
 
+proc opensslBuild(package: Package, buildPath: string, crossWindows: bool = false, crossWindowsArm: bool = false) =
+  var configArgs = @[&"--prefix={buildPath}", "--libdir=lib", "no-shared"] & package.buildArguments
+
+  if crossWindowsArm:
+    configArgs.add("mingw64")
+    configArgs.add("--cross-compile-prefix=aarch64-w64-mingw32-")
+    configArgs.add("no-asm")  # mingw64 target selects x86_64 asm, which won't compile on aarch64
+  elif crossWindows:
+    configArgs.add("mingw64")
+    configArgs.add("--cross-compile-prefix=x86_64-w64-mingw32-")
+  elif defined(macosx):
+    when hostCPU == "arm64":
+      configArgs.add("darwin64-arm64-cc")
+    else:
+      configArgs.add("darwin64-x86_64-cc")
+  else:  # linux
+    when hostCPU == "arm64":
+      configArgs.add("linux-aarch64")
+    else:
+      configArgs.add("linux-x86_64")
+
+  let cmd = "./Configure " & configArgs.join(" ")
+  echo "RUN: ", cmd
+  exec cmd
+  when defined(macosx):
+    exec "make -j$(sysctl -n hw.ncpu)"
+  elif defined(linux):
+    exec "make -j$(nproc)"
+  else:
+    exec "make -j4"
+  exec "make install_sw"
+
 proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
   mkDir("ffmpeg_sources")
   mkDir("build")
@@ -557,6 +604,8 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
           x265build(buildPath, crossWindows, crossWindowsArm)
         elif package.buildSystem == "meson":
           mesonBuild(buildPath, crossWindows, crossWindowsArm)
+        elif package.buildSystem == "openssl":
+          opensslBuild(package, buildPath, crossWindows, crossWindowsArm)
         else:
           # Special handling for nv-codec-headers which doesn't use configure
           if package.name == "nv-codec-headers":
