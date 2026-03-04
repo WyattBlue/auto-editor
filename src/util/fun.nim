@@ -1,7 +1,18 @@
-import std/[os, strutils, strformat]
+import std/[base64, os, strutils, strformat]
 from std/math import round, trunc, gcd
 
 import ../log
+
+func hexToBytes*(hex: string): seq[byte] =
+  result = newSeq[byte](hex.len div 2)
+  for i in 0 ..< result.len:
+    result[i] = parseHexInt(hex[i * 2 .. i * 2 + 1]).byte
+
+func b64urlDecode*(s: string): seq[byte] =
+  var padded = s.replace('-', '+').replace('_', '/')
+  while padded.len mod 4 != 0:
+    padded &= "="
+  cast[seq[byte]](base64.decode(padded))
 
 func wrapText*(text: string, width, indent: int): string =
   let text = text.strip(leading = true, trailing = true, chars = {'\n'})

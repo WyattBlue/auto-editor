@@ -153,6 +153,51 @@ proc parseFrameRate(val: string): AVRational =
     return AVRational(num: 24, den: 1)
   return AVRational(val)
 
+const PUBLIC_KEY_HEX = "aa8512235f1e329522c00b23e473a810a31ec8ee9c727cda91c779c9db6aae0f"
+
+proc EVP_PKEY_new_raw_public_key(typ: cint, e: pointer, key: ptr byte, keylen: csize_t): pointer {.importc, cdecl.}
+proc EVP_PKEY_free(pkey: pointer) {.importc, cdecl.}
+proc EVP_MD_CTX_new(): pointer {.importc, cdecl.}
+proc EVP_MD_CTX_free(ctx: pointer) {.importc, cdecl.}
+proc EVP_DigestVerifyInit(ctx: pointer, pctx: ptr pointer, md: pointer, e: pointer, pkey: pointer): cint {.importc, cdecl.}
+proc EVP_DigestVerify(ctx: pointer, sig: ptr byte, siglen: csize_t, tbs: ptr byte, tbslen: csize_t): cint {.importc, cdecl.}
+
+func validateKey(val: string): (bool, string) =
+  if val == "":
+    return (false, "")
+
+  let parts = val.split('.')
+  if parts.len != 2:
+    return (false, "bfmt")
+
+  let payloadBytes = b64urlDecode(parts[0])
+  let sigBytes = b64urlDecode(parts[1])
+
+  if sigBytes.len != 64:
+    return (false, "Bad signature length")
+
+  let pubKeyBytes = hexToBytes(PUBLIC_KEY_HEX)
+  let pkey = EVP_PKEY_new_raw_public_key(1087.cint, nil, unsafeAddr pubKeyBytes[0], 32)
+  if pkey == nil:
+    return (false, "Failed to load public key")
+  defer: EVP_PKEY_free(pkey)
+
+  let mdctx = EVP_MD_CTX_new()
+  if mdctx == nil:
+    return (false, "Failed to create MD_CTX")
+  defer: EVP_MD_CTX_free(mdctx)
+
+  if EVP_DigestVerifyInit(mdctx, nil, nil, nil, pkey) <= 0:
+    return (false,  "Failed to init DigestVerify")
+
+  let valid = EVP_DigestVerify(mdctx,
+    unsafeAddr sigBytes[0], sigBytes.len.csize_t,
+    unsafeAddr payloadBytes[0], payloadBytes.len.csize_t) == 1
+
+  if valid:
+    return (true, cast[string](payloadBytes))
+  return (false, "Incorrect key")
+
 
 proc downloadVideo(myInput: string, args: mainArgs): string =
   conwrite("Downloading video...")
@@ -285,6 +330,9 @@ judge making cuts.
   var args = mainArgs()
   var showVersion: bool = false
   var expecting: string = ""
+  var licenseKey: string
+
+  var inputs: seq[string] = @[]
 
   let cmdLineParams = commandLineParams()
   for rawKey in cmdLineParams:
@@ -297,7 +345,7 @@ judge making cuts.
       error &"Unknown option: {key}"
     case expecting
     of "":
-      args.input = key
+      inputs.add key
     of "edit":
       args.edit = key
     of "export":
@@ -357,6 +405,8 @@ judge making cuts.
         error &"{key} is not a choice for --progress\nchoices are:\n  modern, classic, ascii, machine, none"
     of "margin":
       args.margin = parseMargin(key)
+    of "key":
+      licenseKey = key
     of "tempdir":
       tempDir = key
     expecting = ""
@@ -368,7 +418,7 @@ judge making cuts.
     echo version
     quit(0)
 
-  if args.input == "" and isDebug:
+  if inputs.len == 0 and isDebug:
     echo "Auto-Editor: ", version
     when defined(windows):
       echo "OS: Windows ", when hostCPU == "amd64": "x86_64" else: hostCPU
@@ -378,15 +428,30 @@ judge making cuts.
     echo listAvailableFilters()
     quit(0)
 
-  let myInput = args.input
-  if myInput.startswith("http://") or myInput.startswith("https://"):
-    args.input = downloadVideo(myInput, args)
-  elif splitFile(myInput).ext == "":
-    if dirExists(myInput):
-      error &"Input must be a file or a URL, not a directory."
-    if myInput.startswith("-"):
-      error &"Option/Input file doesn't exist: {myInput}"
-    error &"Input file must have an extension: {myInput}"
+  if inputs.len > 1:
+    let (isValid, reason) = validateKey(licenseKey)
+    if not isValid:
+      echo "inputs: [" & inputs.join(", ") & "]"
+      if reason == "":
+        error "You must provide a license key to enable using multiple inputs.\n(set a value to -k)"
+      elif reason == "bfmt":
+        error "License key is in a bad format.\nYou can get a key at https://app.auto-editor.com"
+      else:
+        error reason
+
+    debug &"You have a valid license: {reason}"
+
+  args.input = inputs[0]
+
+  for myInput in inputs:
+    if myInput.startswith("http://") or myInput.startswith("https://"):
+      args.input = downloadVideo(myInput, args)
+    elif splitFile(myInput).ext == "":
+      if dirExists(myInput):
+        error &"Input must be a file or a URL, not a directory."
+      if myInput.startswith("-"):
+        error &"Option/Input file doesn't exist: {myInput}"
+      error &"Input file must have an extension: {myInput}"
 
   editMedia(args)
 

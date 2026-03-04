@@ -26,12 +26,13 @@ if enableHevc:
   switch("passL", "-lx265")
 if enableVpl and not (hostCPU == "arm64" and hostOS == "windows"):
   switch("passL", "-lvpl")
+switch("passL", "-lssl -lcrypto")
 
 when hostOS == "macosx":
   switch("passL", "-framework VideoToolbox -framework AudioToolbox")
   switch("passL", "-framework CoreFoundation -framework CoreMedia -framework CoreVideo")
 elif hostOS == "windows":
-  switch("passL", "-lpthread -lbcrypt -lsetupapi -lole32 -luuid")
+  switch("passL", "-lpthread -lbcrypt -lsetupapi -lole32 -luuid -lcrypt32 -lws2_32")
 elif hostOS == "linux":
   when hostCPU == "arm64":
     switch("passL", "-L./build/lib/aarch64-linux-gnu")

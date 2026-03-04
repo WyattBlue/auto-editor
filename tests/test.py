@@ -544,14 +544,13 @@ class Runner:
         self.main(["example.mp4"], ["--video-codec", "h264"])
         self.main(["example.mp4"], ["--audio-codec", "ac3"])
 
-    # Issue #241
-    def test_multi_track_edit(self):
-        out = self.main(
-            ["example.mp4", "resources/multi-track.mov"],
-            ["--edit", "audio:stream=1"],
-            "multi-track_ALTERED.mov",
-        )
-        assert len(fileinfo(out).audios) == 2
+    # def test_multi_track_edit(self):
+    #     out = self.main(
+    #         ["example.mp4", "resources/multi-track.mov"],
+    #         ["--edit", "audio:stream=1"],
+    #         "multi-track_ALTERED.mov",
+    #     )
+    #     assert len(fileinfo(out).audios) == 2
 
     # def test_concat(self):
     #     out = self.main(["example.mp4"], ["--cut-out", "0,171"], "hmm.mp4")
