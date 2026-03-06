@@ -163,5 +163,8 @@ auto-editor --help
  - [Docs](https://auto-editor.com/docs)
  - [Blog](https://basswood-io.com/blog/)
 
+## GUI Application
+There is a graphical application [available](https://app.auto-editor.com) under a propriety license. No GUI code, or proprietary code/assets, are included in this repository.
+
 ## Copyright
-Auto-Editor is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE) and includes all directories besides the ones listed below. Auto-Editor was created by [these people.](https://auto-editor.com/blog/thank-you-early-testers)
+Everything in this repository is under the [Public Domain](https://github.com/WyattBlue/auto-editor/blob/master/LICENSE). Binary artifacts in the "Releases" section may be under various open source licenses.
