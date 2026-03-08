@@ -79,9 +79,14 @@ Set sections near "loud" as "loud" too if section is less than LENGTH away. (def
     metavar: "[START,STOP ...]", help: "Set segment(s) that are leaved \"as is\", overriding other actions"),
   OptDef(names: "--set-speed, --set-speed-for-range", c: cEdit, datum: "set-speed",
     metavar: "[SPEED,START,STOP ...]", help: "Set segment(s) to a SPEED, overriding other actions"),
-  OptDef(names: "-s, --silent-speed", c: cEdit, datum: "silent-speed", metavar: "NUM",
+  OptDef(names: "--set-action", c: cEdit, datum: "set-action", metavar: "ACTION,start,end",
+    help: """Set a time segment to an ACTION, overriding other actions
+Examples:
+  --set-action nil,0,5sec
+  --set-action speed:1.5,varispeed:1.5,30sec,end"""),
+  OptDef(names: "--silent-speed", c: cEdit, datum: "silent-speed", metavar: "NUM",
     help: "[Deprecated] Set speed of inactive segments to NUM. (default is 99999)"),
-  OptDef(names: "-v, --video-speed", c: cEdit, datum: "video-speed", metavar: "NUM",
+  OptDef(names: "--video-speed", c: cEdit, datum: "video-speed", metavar: "NUM",
     help: "[Deprecated] Set speed of active segments to NUM. (default is 1)"),
 
   OptDef(names: "-tb, --time-base, -r, -fps, --frame-rate", c: cTl, datum: "frame-rate",
@@ -157,7 +162,7 @@ Apply audio normalizing (either ebu or peak). Applied right before rendering the
     help: "Provide a license key, which activates certain features"),
   OptDef(names: "--temp-dir", c: cMis, datum: "tempdir",
     metavar: "PATH", help: "Set where the temporary directory is located"),
-  OptDef(names: "-V, --version", c: cMis, kind: Flag, datum: "showVersion",
+  OptDef(names: "-V, -v, --version", c: cMis, kind: Flag, datum: "showVersion",
     help: "Show info about this program or option"),
 ]
 
