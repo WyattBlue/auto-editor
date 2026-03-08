@@ -79,7 +79,7 @@ type mainArgs* = object
   output*: string = ""
   cutOut*: seq[(PackedInt, PackedInt)]
   addIn*: seq[(PackedInt, PackedInt)]
-  setSpeed*: seq[(float64, PackedInt, PackedInt)]
+  setAction*: seq[(seq[Action], PackedInt, PackedInt)]
 
   # Timeline Options
   sampleRate*: cint = -1

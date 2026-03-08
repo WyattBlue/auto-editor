@@ -267,11 +267,9 @@ proc editMedia*(args: var mainArgs) =
       for span in args.addIn:
         applyToRange(actionIndex, span, tb.float64, getActionIndex(myNil))
 
-      for speedRange in args.setSpeed:
-        let speed = speedRange[0]
-        let span = (speedRange[1], speedRange[2])
-        let action = (if speed == 1.0: myNil else: @[Action(kind: actSpeed, val: speed)])
-        applyToRange(actionIndex, span, tb.float64, getActionIndex(action))
+      for actionRange in args.setAction:
+        let span = (actionRange[1], actionRange[2])
+        applyToRange(actionIndex, span, tb.float64, getActionIndex(actionRange[0]))
 
       let bg = args.background.get(RGBColor(red: 0, green: 0, blue: 0))
       mi = initMediaInfo(container.formatContext, args.input)

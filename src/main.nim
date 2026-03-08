@@ -117,20 +117,6 @@ proc parseResolution(val, opt: string): (int, int) =
   if result[0] < 1 or result[1] < 1:
     error &"--{opt} must be positive"
 
-proc parseSpeed(val, opt: string): float64 =
-  result = parseNum(val, opt)
-  if result <= 0.0 or result > 99999.0:
-    result = 99999.0
-
-proc parseSpeedRange(val: string): (float64, PackedInt, PackedInt) =
-  let vals = val.strip().split(",")
-  if vals.len < 3:
-    error &"--set-speed has too few arguments"
-  if vals.len > 3:
-    error &"--set-speed has too many arguments"
-  return (parseSpeed(vals[0], "set-speed"), parseTime(vals[1]), parseTime(vals[2]))
-
-
 proc parseSampleRate(val: string): cint =
   let (num, unit) = splitNumStr(val)
   if unit == "kHz" or unit == "KHz":
@@ -300,6 +286,11 @@ proc parseActions(val: string): seq[Action] =
   except Exception as e:
     error &"Error parsing actions '{val}': {e.msg}"
 
+proc parseSpeed(val, opt: string): float64 =
+  result = parseNum(val, opt)
+  if result <= 0.0 or result > 99999.0:
+    result = 99999.0
+
 func actionFromUserSpeed(val: float64): seq[Action] =
   if val == 1.0:
     return @[]
@@ -307,6 +298,26 @@ func actionFromUserSpeed(val: float64): seq[Action] =
     return @[Action(kind: actCut)]
   else:
     return @[Action(kind: actSpeed, val: val)]
+
+proc parseSpeedRange(val: string): (seq[Action], PackedInt, PackedInt) =
+  let vals = val.strip().split(",")
+  if vals.len < 3:
+    error &"--set-speed has too few arguments"
+  if vals.len > 3:
+    error &"--set-speed has too many arguments"
+
+  let speed = parseSpeed(vals[0], "set-speed")
+  let action = actionFromUserSpeed(speed)
+  return (action, parseTime(vals[1]), parseTime(vals[2]))
+
+proc parseActionAndRange(val: string): (seq[Action], PackedInt, PackedInt) =
+  let parts = val.strip().split(",")
+  if parts.len < 3:
+    error "--set-action has too few arguments"
+  let actionStr = parts[0 ..< parts.len - 2].join(",")
+  let startTime = parseTime(parts[^2])
+  let endTime = parseTime(parts[^1])
+  return (parseActions(actionStr), startTime, endTime)
 
 func handleLegacyOptions(val: string): string =
   if val.startsWith("--") and val.len >= 3:
@@ -365,7 +376,9 @@ judge making cuts.
     of "cut-out":
       args.cutOut.add parseTimeRange(key, expecting)
     of "set-speed":
-      args.setSpeed.add parseSpeedRange(key)
+      args.setAction.add parseSpeedRange(key)
+    of "set-action":
+      args.setAction.add parseActionAndRange(key)
     of "yt-dlp-location":
       args.ytDlpLocation = key
     of "download-format":
