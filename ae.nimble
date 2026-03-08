@@ -177,12 +177,14 @@ let openssl = Package(
   sourceUrl: "https://github.com/openssl/openssl/releases/download/openssl-3.6.1/openssl-3.6.1.tar.gz",
   sha256: "b1bfedcd5b289ff22aee87c9d600f515767ebf45f77168cb6d64f231f518a82e",
   buildArguments: (
-    "no-ssl3 no-ssl3-method no-zlib no-dso no-engine no-threads no-autoalginit no-ssl " &
-    "no-tls no-dtls no-quic no-dsa no-dh no-ecdh no-ecdsa no-srp no-psk no-des no-rc4 " &
+    "no-ssl3-method no-zlib no-dso no-engine no-threads no-autoalginit no-ssl " &
+    "no-tls no-quic no-dsa no-dh no-ecdh no-ecdsa no-srp no-psk no-des no-rc4 " &
     "no-rc2 no-rc5 no-bf no-cast no-camellia no-aria no-seed no-idea no-sm4 no-md4 " &
     "no-rmd160 no-whirlpool no-blake2 no-cms no-ocsp no-ts no-ct no-comp no-srtp " &
     "no-chacha no-poly1305 no-ec2m no-sm2 no-sm3 no-mdc2 no-async no-ui-console " &
     "no-autoload-config no-legacy no-sctp no-http no-filenames no-err " &
+    "no-autoerrinit no-atexit no-pinshared no-rdrand no-rfc3779 no-gost " &
+    "no-nextprotoneg no-tls-deprecated-ec no-sock no-dgram no-posix-io no-stdio " &
     "-DOPENSSL_SMALL_FOOTPRINT -Os"
   ).split(" "),
   buildSystem: "openssl",
