@@ -1,14 +1,10 @@
-# 29.8.1
+# 30.0.0
 
 ## Major
 
 ## Features
- -
+ - Add `--set-action`
 
 ## Fixes
- - Remove "Cuda" builds because they were too big and bloated. You can compile whisper-cpp's cli with
-CUDA support if you really need it.
- - Switch to `config.nims` so that the correct flags are always passed no matter what nimble command is used.
- - Fix `--scale` not rounding to nearest 2 when most video formats require it.
- - `--preview`: Fix crash when there are no audio clips in the timeline.
- - Dramatically reduce peak memory usage for media rendering by optimizing audio code 
+ - whisper: Add `--language`, `--translate`, threads setting, and enable BLAS on MacOS. 
+ - whisper: Downscale samplerate to 16k for better accuracy 
