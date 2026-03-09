@@ -38,10 +38,13 @@ proc main*(cArgs: seq[string]) =
   var model: string = ""
   var isDebug = false
   var splitWords = false
+  var language = "auto"
+  var translate = false  # to English
   var format = "text"
   var output = "-"
-  var queue: int = 10
+  var queue: int = 30
   var vadModel: string = ""
+  var threads = 4
 
   var expecting: string = ""
   for key in cArgs:
@@ -57,6 +60,8 @@ proc main*(cArgs: seq[string]) =
         inputPath = key
       elif model == "":
         model = key.replace("\\", "\\\\").replace(":", "\\:")
+    of "language":
+      language = key
     of "format":
       format = key
     of "output":
@@ -65,6 +70,8 @@ proc main*(cArgs: seq[string]) =
       queue = parseInt(key)
     of "vad-model":
       vadModel = key.replace("\\", "\\\\").replace(":", "\\:")
+    of "threads":
+      threads = parseInt(key)
     expecting = ""
 
   if inputPath == "":
@@ -76,8 +83,7 @@ proc main*(cArgs: seq[string]) =
   if format notin ["text", "srt", "json"]:
     error &"Invalid format: {format}. Choices: text, srt, json"
 
-  if not isDebug:
-    av_log_set_level(AV_LOG_QUIET)
+  av_log_set_level(if isDebug: AV_LOG_DEBUG else: AV_LOG_ERROR)
 
   let input = (try: av.open(inputPath) except: error "Invalid media file")
   defer: input.close()
@@ -95,7 +101,7 @@ proc main*(cArgs: seq[string]) =
   
   let audioStream = input.streams[audioStreamIndex]
   let sampleRate = audioStream.codecpar.sample_rate
-  let channelLayout = audioStream.codecpar.ch_layout.u.mask
+  let channelLayout = "stereo"
   let sampleFormat = cast[AVSampleFormat](audioStream.codecpar.format)
 
   # Get sample format name
@@ -121,9 +127,11 @@ proc main*(cArgs: seq[string]) =
   let whisperFilter = avfilter_get_by_name("whisper")
   var whisperCtx: ptr AVFilterContext
 
-  var whisperArgs = &"model={model}:queue={queue}:format={format}"
+  var whisperArgs = &"model={model}:language={language}:queue={queue}:format={format}"
   if splitWords:
     whisperArgs &= ":max_len=1"
+  if translate:
+    whisperArgs &= ":translate=1"
   if output == "-":
     when defined(windows):
       whisperArgs &= ":destination=CON"
@@ -135,6 +143,7 @@ proc main*(cArgs: seq[string]) =
   if vadModel != "":
     whisperArgs &= ":vad_model=" & vadModel
 
+  debug whisperArgs
   ret = avfilter_graph_create_filter(addr whisperCtx, whisperFilter, "whisper", whisperArgs.cstring, nil, filterGraph)
   if ret < 0:
     error &"Failed to create whisper filter with result: {ret}, model: {model}"
@@ -153,6 +162,8 @@ proc main*(cArgs: seq[string]) =
     error "Failed to link resample to whisper"
   if avfilter_link(whisperCtx, 0, sinkCtx, 0) < 0:
     error "Failed to link whisper to sink"
+
+  filterGraph.nb_threads = threads.cint
 
   if avfilter_graph_config(filterGraph, nil) < 0:
     error "Failed to configure filter graph"

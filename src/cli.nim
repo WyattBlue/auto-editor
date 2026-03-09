@@ -33,14 +33,20 @@ type OptDef* = object
 const whisperOptions*: seq[OptDef] = @[
   OptDef(names: "--debug", kind: Flag, datum: "isDebug", help: ""),
   OptDef(names: "-sw, --split-words", kind: Flag, datum: "splitWords", help: ""),
+  OptDef(names: "-l, --language", datum: "language", metavar: "LANG",
+    help: "Set the language instead of using \"auto\". Examples: en, ja"),
   OptDef(names: "--format", datum: "format", metavar: "FORMAT",
     help: "Output in a specific format {text|srt|json} (default text)"),
   OptDef(names: "--output", datum: "output", metavar: "FILE",
     help: "Choose where to output (defaults to stdout)"),
+  OptDef(names: "-tr, --translate", kind: Flag, datum: "translate",
+    help: "Translate from source language to english"),
   OptDef(names: "--queue", datum: "queue", metavar: "SECS",
-    help: "The maximum size in seconds that will be queued into before processing. (default 10)"),
+    help: "The maximum size in seconds that will be queued into before processing. (default 30)"),
   OptDef(names: "--vad-model", datum: "vad-model", metavar: "VAD-MODEL",
     help: "Set Voice activity detection (VAD) model"),
+  OptDef(names: "--threads", datum: "threads", metavar: "N",
+    help: "Number of CPU threads for whisper processing (default 4)"),
 ]
 
 const mainOptions*: seq[OptDef] = @[

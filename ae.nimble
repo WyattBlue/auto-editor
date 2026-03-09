@@ -169,6 +169,7 @@ let whisper = Package(
     "-DWHISPER_BUILD_SERVER=OFF",
     when defined(macosx) and hostCPU == "arm64": "-DGGML_METAL=ON" else: "-DGGML_METAL=OFF",
     when defined(macosx): "-DGGML_METAL_EMBED_LIBRARY=ON" else: "-DGGML_METAL_EMBED_LIBRARY=OFF",
+    when defined(macosx): "-DGGML_BLAS=ON" else: "-DGGML_BLAS=OFF",
   ],
   ffFlag: "--enable-whisper",
 )
