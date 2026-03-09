@@ -212,68 +212,83 @@ proc editMedia*(args: var mainArgs) =
 
   let bar = initBar(args.progress)
 
-  if args.input == "" and not stdin.isatty():
+  if args.inputs.len == 0 and not stdin.isatty():
     let stdinContent = readAll(stdin)
     tlV3 = readJson(stdinContent, interner)
     applyArgs(tlV3, args)
   else:
-    if args.input == "":
+    if args.inputs.len == 0:
       error "You need to give auto-editor an input file."
-    let inputExt = splitFile(args.input).ext
+    let input = args.inputs[0]
+    let inputExt = splitFile(input).ext
 
     if inputExt in [".v1", ".v2", ".v3", ".json"]:
-      tlV3 = readJson(readFile(args.input), interner)
+      tlV3 = readJson(readFile(input), interner)
       applyArgs(tlV3, args)
     elif inputExt == ".xml":
-      tlV3 = fcp7ReadXml(args.input, interner)
+      tlV3 = fcp7ReadXml(input, interner)
       applyArgs(tlV3, args)
-      usePath = args.input
+      usePath = input
     else:
-      # Make `timeline` from media file
-      var container = (try: av.open(args.input) except IOError as e: error e.msg)
-      defer: container.close()
-
-      usePath = args.input
+      usePath = input
       var tb = AVRational(30)
       if args.frameRate != AVRational(num: 0, den: 0):
         tb = args.frameRate
-      elif container.video.len > 0:
-        tb = makeSaneTimebase(container.video[0].avg_frame_rate)
-
-      var hasLoud = interpretEdit(args, container, tb, bar)
-      let startMargin = toTb(args.margin[0], tb.float64)
-      let endMargin = toTb(args.margin[1], tb.float64)
-      mutMargin(hasLoud, startMargin, endMargin)
-
-      var actionMap: seq[seq[Action]] = @[]
-      actionMap.add(args.whenSilent)
-      actionMap.add(args.whenNormal)
-      var actionIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
-
-      proc getActionIndex(actions: seq[Action]): int =
-        let index = actionMap.find(actions)
-        if index == -1:
-          actionMap.add(actions)
-          return actionMap.len - 1
-        else:
-          return index
-
-      let cut = @[Action(kind: actCut)]
-      let myNil: seq[Action] = @[]
-
-      for span in args.cutOut:
-        applyToRange(actionIndex, span, tb.float64, getActionIndex(cut))
-
-      for span in args.addIn:
-        applyToRange(actionIndex, span, tb.float64, getActionIndex(myNil))
-
-      for actionRange in args.setAction:
-        let span = (actionRange[1], actionRange[2])
-        applyToRange(actionIndex, span, tb.float64, getActionIndex(actionRange[0]))
 
       let bg = args.background.get(RGBColor(red: 0, green: 0, blue: 0))
-      mi = initMediaInfo(container.formatContext, args.input)
-      tlV3 = initLinearTimeline(addr args.input, tb, bg, mi, actionMap, actionIndex)
+      var tlInitialized = false
+
+      for i in 0 ..< args.inputs.len:
+        var container = (try: av.open(args.inputs[i]) except IOError as e: error e.msg)
+        defer: container.close()
+
+        if i == 0 and args.frameRate == AVRational(num: 0, den: 0):
+          if container.video.len > 0:
+            tb = makeSaneTimebase(container.video[0].avg_frame_rate)
+
+        var singleArgs = args
+        singleArgs.inputs = @[args.inputs[i]]
+
+        var hasLoud = interpretEdit(singleArgs, @[container], tb, bar)
+        let startMargin = toTb(args.margin[0], tb.float64)
+        let endMargin = toTb(args.margin[1], tb.float64)
+        mutMargin(hasLoud, startMargin, endMargin)
+
+        var actionMap: seq[seq[Action]] = @[]
+        actionMap.add(args.whenSilent)
+        actionMap.add(args.whenNormal)
+        var actionIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
+
+        proc getActionIndex(actions: seq[Action]): int =
+          let index = actionMap.find(actions)
+          if index == -1:
+            actionMap.add(actions)
+            return actionMap.len - 1
+          else:
+            return index
+
+        let cut = @[Action(kind: actCut)]
+        let myNil: seq[Action] = @[]
+
+        for span in args.cutOut:
+          applyToRange(actionIndex, span, tb.float64, getActionIndex(cut))
+
+        for span in args.addIn:
+          applyToRange(actionIndex, span, tb.float64, getActionIndex(myNil))
+
+        for actionRange in args.setAction:
+          let span = (actionRange[1], actionRange[2])
+          applyToRange(actionIndex, span, tb.float64, getActionIndex(actionRange[0]))
+
+        let inputMi = initMediaInfo(container.formatContext, args.inputs[i])
+
+        if not tlInitialized:
+          mi = inputMi
+          tlV3 = initLinearTimeline(addr args.inputs[i], tb, bg, mi, actionMap, actionIndex)
+          tlInitialized = true
+        else:
+          appendLinearTimeline(tlV3, addr args.inputs[i], inputMi, actionIndex)
+
       applyArgs(tlV3, args)
 
   var exportKind, tlName, fcpVersion: string
@@ -323,7 +338,8 @@ proc editMedia*(args: var mainArgs) =
   let (_, _, outExt) = splitFile(output)
   let rule = initRules(outExt.toLowerAscii)
   args.videoCodec = setVideoCodec(args.videoCodec, outExt, mi, rule)
-  args.audioCodec = setAudioCodec(args.audioCodec, outExt, mi, rule)
+  if args.audioCodec != "auto":
+    args.audioCodec = setAudioCodec(args.audioCodec, outExt, mi, rule)
 
   proc createAlphanumTempDir(length: int = 8): string =
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789"

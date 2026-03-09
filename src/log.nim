@@ -68,7 +68,7 @@ func `==`*(a, b: Action): bool =
     return a.val == b.val
 
 type mainArgs* = object
-  input*: string = ""
+  inputs*: seq[string]
 
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
