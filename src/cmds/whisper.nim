@@ -107,6 +107,17 @@ proc main*(cArgs: seq[string]) =
     echo &"Failed to create buffer source: {ret}"
     quit(1)
 
+  # Resample to 16kHz for best whisper accuracy; keep original rate if already <=16kHz
+  let targetSampleRate = if sampleRate > 16000: 16000 else: sampleRate
+
+  let aresample = avfilter_get_by_name("aresample")
+  var resampleCtx: ptr AVFilterContext
+  let resampleArgs = $targetSampleRate
+
+  ret = avfilter_graph_create_filter(addr resampleCtx, aresample, "resample", resampleArgs.cstring, nil, filterGraph)
+  if ret < 0:
+    error &"Failed to create aresample filter: {ret}"
+
   let whisperFilter = avfilter_get_by_name("whisper")
   var whisperCtx: ptr AVFilterContext
 
@@ -135,9 +146,11 @@ proc main*(cArgs: seq[string]) =
   if avfilter_graph_create_filter(addr sinkCtx, abuffersink, "out", nil, nil, filterGraph) < 0:
     error "Failed to create buffer sink"
 
-  # Link filters: buffer -> whisper -> sink
-  if avfilter_link(bufferCtx, 0, whisperCtx, 0) < 0:
-    error "Failed to link buffer to whisper"
+  # Link filters: buffer -> resample -> whisper -> sink
+  if avfilter_link(bufferCtx, 0, resampleCtx, 0) < 0:
+    error "Failed to link buffer to resample"
+  if avfilter_link(resampleCtx, 0, whisperCtx, 0) < 0:
+    error "Failed to link resample to whisper"
   if avfilter_link(whisperCtx, 0, sinkCtx, 0) < 0:
     error "Failed to link whisper to sink"
 
