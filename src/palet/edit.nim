@@ -150,7 +150,7 @@ proc parseNorm*(norm: string): Norm =
 
   return normEval(expr, norm)
 
-proc findExternSubs(input: string): Option[InputContainer] =
+proc findExternSubs(input: string): Option[InputContainer] {.raises: [].} =
   try:
     some(av.open(input.changeFileExt("srt")))
   except IOError:
@@ -159,7 +159,7 @@ proc findExternSubs(input: string): Option[InputContainer] =
     except IOError:
       none(InputContainer)
 
-proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, bar: Bar): seq[bool] =
+proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRational, bar: Bar): seq[bool] =
   var lexer = initLexer("--edit", args.edit)
   var parser = initParser(lexer)
   let tbFloat = float64(tb)
@@ -222,16 +222,22 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
           if not isKey:
             argPos += 1
 
-        if stream == -1:
-          for i in 0 ..< max(container.audio.len, 1): # Trigger err when no streams pres.
-            let levels = audio(bar, container, args.input, tb, i.int32)
+        for ci in 0 ..< containers.len:
+          let container = containers[ci]
+          let inp = args.inputs[ci]
+          if stream == -1:
+            for i in 0 ..< container.audio.len:
+              let levels = audio(bar, container, inp, tb, i.int32)
+              if result.len == 0:
+                result = levels.mapIt(it >= threshold)
+              else:
+                result = result or levels.mapIt(it >= threshold)
+          else:
+            let levels = audio(bar, container, inp, tb, stream)
             if result.len == 0:
               result = levels.mapIt(it >= threshold)
             else:
               result = result or levels.mapIt(it >= threshold)
-        else:
-          let levels = audio(bar, container, args.input, tb, stream)
-          result = levels.mapIt(it >= threshold)
 
         mutRemoveSmall(result, minclip, true, false)
         mutRemoveSmall(result, mincut, false, true)
@@ -252,8 +258,14 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
 
           if not isKey:
             argPos += 1
-        let levels = motion(bar, container, args.input, tb, stream, width, blur)
-        return levels.mapIt(it >= threshold)
+
+        for ci in 0 ..< containers.len:
+          let levels = motion(bar, containers[ci], args.inputs[ci], tb, stream, width, blur)
+          if result.len == 0:
+            result = levels.mapIt(it >= threshold)
+          else:
+            result = result or levels.mapIt(it >= threshold)
+        return result
       of "subtitle", "regex":
         let argOrder = @["pattern", "stream", "ignore-case"] # "max-count"]
         var pattern = ""
@@ -273,19 +285,27 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
           error &"{text[node[0].`from` ..< node[0].to]}: pattern required"
 
         let regexPattern = re(pattern, flags)
-        let (ret, val) = subtitle(container, tb, regexPattern, stream)
-        if ret != -1:
-          let subcontainer = findExternSubs(args.input)
-          if subcontainer.isNone():
-            error &"regex: subtitle stream '{ret}' does not exist."
-
-          let index = int32(stream - container.subtitle.len)
-          let (ret, val) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+        for ci in 0 ..< containers.len:
+          let container = containers[ci]
+          let (ret, val) = subtitle(container, tb, regexPattern, stream)
+          var subResult: seq[bool]
           if ret != -1:
-            error &"regex: subtitle stream '{ret}' does not exist."
-          return val
-        else:
-          return val
+            let subcontainer = findExternSubs(args.inputs[ci])
+            if subcontainer.isNone():
+              error &"regex: subtitle stream '{ret}' does not exist."
+
+            let index = int32(stream - container.subtitle.len)
+            let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+            if ret2 != -1:
+              error &"regex: subtitle stream '{ret2}' does not exist."
+            subResult = val2
+          else:
+            subResult = val
+          if result.len == 0:
+            result = subResult
+          else:
+            result = result or subResult
+        return result
       of "word":
         let argOrder = @["value", "stream", "ignore-case"]
         var pattern = ""
@@ -308,26 +328,34 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
           flags.incl reIgnoreCase
 
         let regexPattern = re(pattern, flags)
-        let (ret, val) = subtitle(container, tb, regexPattern, stream)
-        if ret != -1:
-          let subcontainer = findExternSubs(args.input)
-          if subcontainer.isNone():
-            error &"word: subtitle stream '{ret}' does not exist."
-
-          let index = int32(stream - container.subtitle.len)
-          let (ret, val) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+        for ci in 0 ..< containers.len:
+          let container = containers[ci]
+          let (ret, val) = subtitle(container, tb, regexPattern, stream)
+          var subResult: seq[bool]
           if ret != -1:
-            error &"word: subtitle stream '{ret}' does not exist."
-          return val
-        else:
-          return val
+            let subcontainer = findExternSubs(args.inputs[ci])
+            if subcontainer.isNone():
+              error &"word: subtitle stream '{ret}' does not exist."
+
+            let index = int32(stream - container.subtitle.len)
+            let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+            if ret2 != -1:
+              error &"word: subtitle stream '{ret2}' does not exist."
+            subResult = val2
+          else:
+            subResult = val
+          if result.len == 0:
+            result = subResult
+          else:
+            result = result or subResult
+        return result
       of "none":
-        let length = mediaLength(container)
+        let length = mediaLength(containers[0])
         let tbLength = (round((length * tb).float64)).int64
 
         return newSeqWith(tbLength, true)
       of "all", "all/e":
-        let length = mediaLength(container)
+        let length = mediaLength(containers[0])
         let tbLength = (round((length * tb).float64)).int64
 
         return newSeqWith(tbLength, false)

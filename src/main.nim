@@ -343,8 +343,6 @@ judge making cuts.
   var expecting: string = ""
   var licenseKey: string
 
-  var inputs: seq[string] = @[]
-
   let cmdLineParams = commandLineParams()
   for rawKey in cmdLineParams:
     let key = handleLegacyOptions(rawKey)
@@ -356,7 +354,7 @@ judge making cuts.
       error &"Unknown option: {key}"
     case expecting
     of "":
-      inputs.add key
+      args.inputs.add key
     of "edit":
       args.edit = key
     of "export":
@@ -431,7 +429,7 @@ judge making cuts.
     echo version
     quit(0)
 
-  if inputs.len == 0 and isDebug:
+  if args.inputs.len == 0 and isDebug:
     echo "Auto-Editor: ", version
     when defined(windows):
       echo "OS: Windows ", when hostCPU == "amd64": "x86_64" else: hostCPU
@@ -441,10 +439,13 @@ judge making cuts.
     echo listAvailableFilters()
     quit(0)
 
-  if inputs.len > 1:
+  if args.inputs.len > 1:
+    if licenseKey == "":
+      licenseKey = getEnv("AE_PRIVATE_LK", "")
+
     let (isValid, reason) = validateKey(licenseKey)
     if not isValid:
-      echo "inputs: [" & inputs.join(", ") & "]"
+      echo "inputs: [" & args.inputs.join(", ") & "]"
       if reason == "":
         error "You must provide a license key to enable using multiple inputs.\n(set a value to -k)"
       elif reason == "bfmt":
@@ -454,15 +455,13 @@ judge making cuts.
 
     debug &"You have a valid license: {reason}"
 
-  args.input = inputs[0]
-
-  for myInput in inputs:
-    if myInput.startswith("http://") or myInput.startswith("https://"):
-      args.input = downloadVideo(myInput, args)
+  for i, myInput in args.inputs:
+    if myInput.startsWith("http://") or myInput.startsWith("https://"):
+      args.inputs[i] = downloadVideo(myInput, args)
     elif splitFile(myInput).ext == "":
       if dirExists(myInput):
         error &"Input must be a file or a URL, not a directory."
-      if myInput.startswith("-"):
+      if myInput.startsWith("-"):
         error &"Option/Input file doesn't exist: {myInput}"
       error &"Input file must have an extension: {myInput}"
 

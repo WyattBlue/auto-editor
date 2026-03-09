@@ -174,6 +174,69 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
   result = v3(tb: tb, bg: bg, effects: effects, clips2: clips2, res: mi.getRes())
   mutHelper(result, mi, clips)
 
+proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionIndex: seq[int]) =
+  let startOffset = tl.`end`
+  var clips: seq[Clip] = @[]
+  var timelineStart: int64 = startOffset
+  var dur: int64
+  var offset: int64
+
+  let pseudoChunks = chunkify(actionIndex, tl.effects)
+
+  for chunk in pseudoChunks:
+    let actionGroup = chunk[3]
+    var speed = 1.0
+    for action in actionGroup:
+      if action.kind in [actSpeed, actVarispeed]:
+        speed *= action.val
+      elif action.kind == actCut:
+        speed = 99999.0
+        break
+
+    let effectIndex = chunk[2]
+    if effectIndex > int(high(uint32)):
+      error "'Number of actions' limit for timeline reached."
+    let e = uint32(effectIndex)
+
+    tl.clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
+
+    if speed != 99999.0:
+      dur = int64(round(float64(chunk[1] - chunk[0]) / speed))
+      if dur == 0:
+        continue
+
+      offset = int64(float64(chunk[0]) / speed)
+
+      if not (clips.len > 0 and clips[^1].start == timelineStart):
+        clips.add Clip(src: src, start: timelineStart, dur: dur, offset: offset, effects: e)
+
+      timelineStart += dur
+
+  if mi.v.len > 0:
+    if tl.v.len == 0:
+      tl.v.add @[]
+    for clip in clips:
+      var videoClip = clip
+      videoClip.stream = 0
+      tl.v[0].add videoClip
+
+  for i in 0 ..< mi.a.len:
+    if tl.a.len <= i:
+      tl.a.add @[]
+      tl.langs.add mi.a[i].lang
+    for clip in clips:
+      var audioClip = clip
+      audioClip.stream = i.int32
+      tl.a[i].add audioClip
+
+  for i in 0 ..< mi.s.len:
+    while tl.s.len <= i:
+      tl.s.add @[]
+    for clip in clips:
+      var subtitleClip = clip
+      subtitleClip.stream = i.int32
+      tl.s[i].add subtitleClip
+
 proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
     chunks: seq[(int64, int64, float64)]): v3 =
   var clips: seq[Clip] = @[]

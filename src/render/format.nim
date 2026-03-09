@@ -1,7 +1,7 @@
-import std/[heapqueue, os, options, strformat, strutils, tables]
+import std/[heapqueue, os, options, sequtils, strformat, strutils, tables]
 from std/math import round
 
-import ../[av, ffmpeg, log, timeline]
+import ../[av, ffmpeg, log, media, timeline]
 import ../util/[bar, lang, rules]
 import video
 import audio
@@ -18,6 +18,25 @@ func initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Pri
   result.stream = stream
 
 func `<`(a, b: Priority): bool = a.index < b.index
+
+proc resolveAudioCodec(layer: seq[Clip], outputPath: string, rules: Rules): string =
+  if layer.len == 0:
+    return rules.defaultAud
+  let firstClip = layer[0]
+  let srcMi = initMediaInfo(firstClip.src[])
+  let stream = int(firstClip.stream)
+  if stream >= srcMi.a.len:
+    return rules.defaultAud
+  var codec = $avcodec_get_name(srcMi.a[stream].codecId)
+  let avCodec = initCodec(codec)
+  if avCodec == nil or avCodec.sample_fmts == nil:
+    codec = "aac"
+  let (_, _, outExt) = splitFile(outputPath)
+  if outExt in [".wav", ".aiff", ".au"] and rules.defaultAud.startsWith("pcm_"):
+    return rules.defaultAud
+  if codec notin rules.acodecs.mapIt($it.name):
+    return if rules.defaultAud != "none": rules.defaultAud else: "aac"
+  return codec
 
 proc checkAudioEncoder(encoder: ptr AVCodec, rate: cint) =
   if encoder.sample_fmts == nil:
@@ -83,7 +102,17 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
     if hasAnyClips:
       let rate = AVRational(num: tl.sr, den: 1)
-      var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate = rate,
+      let mixCodec = if args.audioCodec == "auto":
+        block:
+          var firstLayer: seq[Clip]
+          for layer in tl.a:
+            if layer.len > 0:
+              firstLayer = layer
+              break
+          resolveAudioCodec(firstLayer, outputPath, rules)
+      else:
+        args.audioCodec
+      var (aOutStream, aEncCtx) = output.addStream(mixCodec, rate = rate,
           layout = tl.layout, metadata = {"language": "und"}.toTable)
       let encoder = aEncCtx.codec
       checkAudioEncoder(encoder, tl.sr)
@@ -111,7 +140,11 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
     for i in 0..<tl.a.len:
       if tl.a[i].len > 0: # Only create stream if track has clips
         let rate = AVRational(num: tl.sr, den: 1)
-        var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate = rate,
+        let layerCodec = if args.audioCodec == "auto":
+          resolveAudioCodec(tl.a[i], outputPath, rules)
+        else:
+          args.audioCodec
+        var (aOutStream, aEncCtx) = output.addStream(layerCodec, rate = rate,
             layout = tl.layout, metadata = {"language": $tl.langs[tl.v.len + i]}.toTable)
         let encoder = aEncCtx.codec
         checkAudioEncoder(encoder, tl.sr)
