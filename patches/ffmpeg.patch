@@ -72,3 +72,83 @@ diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
      { "vad_model", "Path to the VAD model file", OFFSET(vad_model_path), AV_OPT_TYPE_STRING,.flags = FLAGS },
      { "vad_threshold", "VAD threshold", OFFSET(vad_threshold), AV_OPT_TYPE_FLOAT, {.dbl = 0.5}, 0.0, 1.0, .flags = FLAGS },
      { "vad_min_speech_duration", "Minimum speech duration for VAD", OFFSET(vad_min_speech_duration), AV_OPT_TYPE_DURATION, {.i64 = 100000}, 20000, HOURS, .flags = FLAGS },
+commit 141fa7403308e817cb702ea9def2d93795d42e54
+Author: WyattBlue <wyattblue@auto-editor.com>
+Date:   Mon Mar 9 00:23:36 2026 -0400
+
+    avfilter/af_whisper: Add translate parameter
+
+diff --git a/doc/filters.texi b/doc/filters.texi
+index 5d222c6b96..f0be01e3f7 100644
+--- a/doc/filters.texi
++++ b/doc/filters.texi
+@@ -7743,6 +7743,10 @@ The file path of the downloaded whisper.cpp model (mandatory).
+ The language to use for transcription ('auto' for auto-detect).
+ Default value: @code{"auto"}
+ 
++@item translate
++If enabled, translate the transcription from the source language to English.
++Default value: @code{"false"}
++
+ @item queue
+ The maximum size that will be queued into the filter before processing the audio
+ with whisper. Using a small value the audio stream will be processed more often,
+diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
+index 299a8bca7a..56324db603 100644
+--- a/libavfilter/af_whisper.c
++++ b/libavfilter/af_whisper.c
+@@ -42,6 +42,7 @@ typedef struct WhisperContext {
+     const AVClass *class;
+     char *model_path;
+     char *language;
++    bool translate;
+     bool use_gpu;
+     int gpu_device;
+     char *vad_model_path;
+@@ -200,6 +201,7 @@ static void run_transcription(AVFilterContext *ctx, AVFrame *frame, int samples)
+ 
+     struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+     params.language = wctx->language;
++    params.translate = wctx->translate;
+     params.n_threads = ff_filter_get_nb_threads(ctx);
+     params.print_special = 0;
+     params.print_progress = 0;
+@@ -443,6 +445,7 @@ static int query_formats(const AVFilterContext *ctx,
+ static const AVOption whisper_options[] = {
+     { "model", "Path to the whisper.cpp model file", OFFSET(model_path), AV_OPT_TYPE_STRING,.flags = FLAGS },
+     { "language", "Language for transcription ('auto' for auto-detect)", OFFSET(language), AV_OPT_TYPE_STRING, {.str = "auto"}, .flags = FLAGS },
++    { "translate", "Translate from source language to English", OFFSET(translate), AV_OPT_TYPE_BOOL, {.i64 = 0}, 0, 1, .flags = FLAGS },
+     { "queue", "Audio queue size", OFFSET(queue), AV_OPT_TYPE_DURATION, {.i64 = 3000000}, 20000, HOURS, .flags = FLAGS },
+     { "use_gpu", "Use GPU for processing", OFFSET(use_gpu), AV_OPT_TYPE_BOOL, {.i64 = 1}, 0, 1, .flags = FLAGS },
+     { "gpu_device", "GPU device to use", OFFSET(gpu_device), AV_OPT_TYPE_INT, {.i64 = 0}, 0, INT_MAX, .flags = FLAGS },
+diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
+--- a/libavfilter/af_whisper.c
++++ b/libavfilter/af_whisper.c
+@@ -44,3 +44,6 @@ typedef struct WhisperContext {
+     bool translate;
+     bool use_gpu;
++    bool flash_attn;
++    int beam_size;
++    int best_of;
+     int gpu_device;
+@@ -89,3 +92,4 @@ static int whisper_init(AVFilterContext *ctx)
+     params.use_gpu = wctx->use_gpu;
+     params.gpu_device = wctx->gpu_device;
++    params.flash_attn = wctx->flash_attn;
+
+@@ -201,4 +207,8 @@ static void run_transcription(AVFilterContext *ctx, AVFrame *frame, int samples)
+-    struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
++    struct whisper_full_params params = wctx->beam_size > 1
++        ? whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH)
++        : whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+     params.language = wctx->language;
+     params.translate = wctx->translate;
++    params.beam_search.beam_size = wctx->beam_size;
++    params.greedy.best_of = wctx->best_of;
+     params.n_threads = ff_filter_get_nb_threads(ctx);
+@@ -447,2 +456,5 @@ static const AVOption whisper_options[] = {
+     { "translate", "Translate from source language to English", OFFSET(translate), AV_OPT_TYPE_BOOL, {.i64 = 0}, 0, 1, .flags = FLAGS },
++    { "flash_attn", "Use flash attention", OFFSET(flash_attn), AV_OPT_TYPE_BOOL, {.i64 = 0}, 0, 1, .flags = FLAGS },
++    { "beam_size", "Beam size (>1 enables beam search)", OFFSET(beam_size), AV_OPT_TYPE_INT, {.i64 = 1}, 1, INT_MAX, .flags = FLAGS },
++    { "best_of", "Best of N for greedy sampling", OFFSET(best_of), AV_OPT_TYPE_INT, {.i64 = 5}, 1, INT_MAX, .flags = FLAGS },
+     { "queue", "Audio queue size", OFFSET(queue), AV_OPT_TYPE_DURATION, {.i64 = 3000000}, 20000, HOURS, .flags = FLAGS },
