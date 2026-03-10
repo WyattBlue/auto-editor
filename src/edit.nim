@@ -98,7 +98,7 @@ func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (
   return (start, stop)
 
 proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64,
-  value: int, maxLen: int = 0) =
+  value: int, maxLen: int) =
   let len = if maxLen > 0: maxLen else: actionIndex.len
   let (start, stop) = normalizeRange(span, tb, len)
   let cappedStop = min(stop, len.int64)
@@ -272,21 +272,12 @@ proc editMedia*(args: var mainArgs) =
           else:
             return index
 
-        let cut = @[Action(kind: actCut)]
-        let myNil: seq[Action] = @[]
-
         var conLen = 0
         proc getConLen(): int =
           if conLen == 0: conLen = int(round((mediaLength(container) * tb).float64))
           conLen
 
         let tbf = tb.float64
-        for span in args.cutOut:
-          applyToRange(actionIndex, span, tbf, getActionIndex(cut), getConLen())
-
-        for span in args.addIn:
-          applyToRange(actionIndex, span, tbf, getActionIndex(myNil), getConLen())
-
         for actionRange in args.setAction:
           let span = (actionRange[1], actionRange[2])
           applyToRange(actionIndex, span, tbf, getActionIndex(actionRange[0]), getConLen())

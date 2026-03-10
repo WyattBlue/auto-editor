@@ -78,8 +78,6 @@ type mainArgs* = object
   whenSilent*: seq[Action] = @[Action(kind: actCut)]
   `export`*: string = ""
   output*: string = ""
-  cutOut*: seq[(PackedInt, PackedInt)]
-  addIn*: seq[(PackedInt, PackedInt)]
   setAction*: seq[(seq[Action], PackedInt, PackedInt)]
 
   # URL download Options
