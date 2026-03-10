@@ -162,8 +162,10 @@ Examples:
     metavar: "NORM-TYPE", help: """
 Apply audio normalizing (either ebu or peak). Applied right before rendering the output file"""),
 
+  OptDef(names: "--open", c: cMis, kind: Flag, datum: "args.open",
+    help: "Open the output file after editing is done"),
   OptDef(names: "--no-open", c: cMis, kind: Flag, datum: "args.noOpen",
-    help: "Do not open the output file after editing is done"),
+    help: "Do not open the output file after editing is done (default)"),
   OptDef(names: "-k, --license-key", c: cMis, datum: "key",
     help: "Provide a license key, which activates certain features"),
   OptDef(names: "--temp-dir", c: cMis, datum: "tempdir",
