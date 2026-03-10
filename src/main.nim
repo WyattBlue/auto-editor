@@ -364,9 +364,13 @@ judge making cuts.
     of "video-speed":
       args.whenNormal = actionFromUserSpeed(parseSpeed(key, expecting))
     of "add-in":
-      args.addIn.add parseTimeRange(key, expecting)
+      block:
+        let span = parseTimeRange(key, expecting)
+        args.setAction.add (@[], span[0], span[1])
     of "cut-out":
-      args.cutOut.add parseTimeRange(key, expecting)
+      block:
+        let span = parseTimeRange(key, expecting)
+        args.setAction.add (@[Action(kind: actCut)], span[0], span[1])
     of "set-speed":
       args.setAction.add parseSpeedRange(key)
     of "set-action":
