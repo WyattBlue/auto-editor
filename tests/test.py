@@ -333,8 +333,8 @@ class Runner:
         self.main(["example.mp4"], ["--edit", "audio:threshold=4%"])
 
     def test_sr_units(self):
-        self.main(["example.mp4"], ["--sample_rate", "44100 Hz"])
-        self.main(["example.mp4"], ["--sample_rate", "44.1 kHz"])
+        self.main(["example.mp4"], ["--sample-rate", "44100 Hz"])
+        self.main(["example.mp4"], ["--sample-rate", "44.1 kHz"])
 
     def test_video_speed(self):
         self.main(["example.mp4"], ["--video-speed", "1.5"])
