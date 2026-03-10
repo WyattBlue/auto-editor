@@ -344,26 +344,17 @@ class Runner:
         Cut out the last 5 seconds of a media file by using negative number in the
         range.
         """
-        self.main(["example.mp4"], ["--edit", "none", "--cut-out", "-5secs,end"])
-        self.main(["example.mp4"], ["--edit", "all", "--add-in", "-5secs,end"])
+        self.main(["example.mp4"], ["--edit", "none", "--cut", "-5secs,end"])
+        self.main(["example.mp4"], ["--edit", "all", "--keep", "-5secs,end"])
 
     def test_cut_out(self):
         self.main(
             ["example.mp4"],
-            [
-                "--edit",
-                "none",
-                "--video-speed",
-                "2",
-                "--silent-speed",
-                "3",
-                "--cut",
-                "2secs,10secs",
-            ],
+            ["--edit", "none", "--when-active", "speed:2", "--cut", "2secs,10secs"],
         )
         self.main(
             ["example.mp4"],
-            ["--edit", "all", "--video-speed", "2", "--keep", "2secs,10secs"],
+            ["--edit", "all", "-w:1", "speed:2", "--keep", "2secs,10secs"],
         )
 
     def test_gif(self):
