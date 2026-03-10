@@ -268,9 +268,57 @@ macro genCmdCases*(keyIdent: untyped): untyped =
   result.add(elseBranch)
 
 
+func argsFlags(): seq[string] {.compileTime.} =
+  for opt in mainOptions:
+    if opt.kind == Flag and opt.datum.startsWith("args."):
+      result.add(opt.datum[5..^1])
+
+macro genFlagInterface*(argsType: untyped): untyped =
+  ## Generates getter/setter procs for each args.* flag using bitpacking on flags: uint32.
+  result = newStmtList()
+  let flags = argsFlags()
+  for i, name in flags:
+    let maskVal = 1'u32 shl uint32(i)
+    let mask = newLit(maskVal)
+    let notMask = newLit(not maskVal)
+    let argsParam = ident("args")
+    let valParam = ident("val")
+
+    # func name*(args: ArgsType): bool = (args.flags and mask) != 0
+    let getter = newProc(
+      newNimNode(nnkPostfix).add(ident("*"), ident(name)),
+      [ident("bool"), newIdentDefs(argsParam, argsType)],
+      newNimNode(nnkInfix).add(ident("!="),
+        newNimNode(nnkInfix).add(ident("and"),
+          newDotExpr(argsParam, ident("flags")), mask),
+        newLit(0'u32)),
+      nnkFuncDef)
+    result.add(getter)
+
+    # func `name=`*(args: var ArgsType, val: bool)
+    let setterBody = newNimNode(nnkIfStmt).add(
+      newNimNode(nnkElifBranch).add(valParam,
+        newStmtList(newAssignment(
+          newDotExpr(argsParam, ident("flags")),
+          newNimNode(nnkInfix).add(ident("or"),
+            newDotExpr(argsParam, ident("flags")), mask)))),
+      newNimNode(nnkElse).add(newStmtList(newAssignment(
+        newDotExpr(argsParam, ident("flags")),
+        newNimNode(nnkInfix).add(ident("and"),
+          newDotExpr(argsParam, ident("flags")), notMask)))))
+    let setter = newProc(
+      newNimNode(nnkPostfix).add(ident("*"),
+        newNimNode(nnkAccQuoted).add(ident(name & "="))),
+      [newEmptyNode(),
+       newIdentDefs(argsParam, newNimNode(nnkVarTy).add(argsType)),
+       newIdentDefs(valParam, ident("bool"))],
+      setterBody,
+      nnkFuncDef)
+    result.add(setter)
+
 macro genCliMacro*(keyIdent, argsIdent: untyped, myOpts: static seq[OptDef]): untyped =
   ## Generates a case statement for CLI option handling.
-  ## - Flag: sets datum to true
+  ## - Flag: sets datum to true (or bitpacks into args.flags if datum starts with "args.")
   ## - Special: sets args.export to datum string
   ## - Regular: sets expecting to datum string
   result = newNimNode(nnkCaseStmt)
@@ -286,13 +334,12 @@ macro genCliMacro*(keyIdent, argsIdent: untyped, myOpts: static seq[OptDef]): un
 
     case opt.kind
     of Flag:
-      # Generate: datum = true
-      let parts = opt.datum.split(".")
-      var target: NimNode
-      if parts.len == 2 and parts[0] == "args":
-        target = newDotExpr(argsIdent, ident(parts[1]))
-      else:
-        target = ident(opt.datum)
+      # Generate: datum = true  (for args.X, this calls the generated setter)
+      let target =
+        if opt.datum.startsWith("args."):
+          newDotExpr(argsIdent, ident(opt.datum[5..^1]))
+        else:
+          ident(opt.datum)
       stmts.add(newAssignment(target, ident("true")))
     of Special:
       # Generate: args.`export` = "datum"

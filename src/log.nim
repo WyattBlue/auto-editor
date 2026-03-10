@@ -2,6 +2,7 @@ import std/[envvars, math, options, os, strformat, strutils, tables, terminal, t
 
 import ffmpeg
 import util/color
+import cli
 
 type BarType* = enum
   modern, classic, ascii, machine, none
@@ -81,49 +82,32 @@ type mainArgs* = object
   addIn*: seq[(PackedInt, PackedInt)]
   setAction*: seq[(seq[Action], PackedInt, PackedInt)]
 
-  # Timeline Options
-  sampleRate*: cint = -1
-  frameRate*: AVRational = AVRational(num: 0, den: 0)
-  background*: Option[RGBColor] = none(RGBColor)
-  resolution*: (int, int) = (0, 0)
-
   # URL download Options
   ytDlpLocation*: string = "yt-dlp"
   downloadFormat*: string
   outputFormat*: string
   ytDlpExtras*: string
 
-  # Display Options
-  progress*: BarType = modern
-  preview*: bool = false
+  # Timeline Options
+  resolution*: (int, int) = (0, 0)
+  sampleRate*: cint = -1
+  frameRate*: AVRational = AVRational(num: 0, den: 0)
+  background*: Option[RGBColor] = none(RGBColor)
 
-  # Container Settings
-  vn*: bool = false
-  an*: bool = false
-  sn*: bool = false
-  dn*: bool = false
-  faststart*: bool = false
-  noFaststart*: bool = false
-  fragmented*: bool = false
-  noFragmented*: bool = false
-
-  # Video Rendering
+  # Rendering
   videoCodec*: string = "auto"
-  videoBitrate*: int = -1
   vprofile*: string
-  noSeek*: bool = false
-  scale*: float = 1.0
-
-  # Audio Rendering
   audioCodec*: string = "auto"
   audioLayout*: string = ""
+  videoBitrate*: int = -1
   audioBitrate*: int = -1
-  mixAudioStreams*: bool = false
-  audioNormalize*: Norm = Norm(kind: nkNull)
+  scale*: float = 1.0
 
-  # Misc.
-  open*: bool = false
-  noOpen*: bool = false
+  audioNormalize*: Norm = Norm(kind: nkNull)
+  progress*: BarType = modern
+  flags: uint32
+
+genFlagInterface(mainArgs)
 
 var isDebug* = false
 var quiet* = false
