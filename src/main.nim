@@ -319,11 +319,6 @@ proc parseActionAndRange(val: string): (seq[Action], PackedInt, PackedInt) =
   let endTime = parseTime(parts[^1])
   return (parseActions(actionStr), startTime, endTime)
 
-func handleLegacyOptions(val: string): string =
-  if val.startsWith("--") and val.len >= 3:
-    return val[0 ..< 3] & val[3 .. ^1].replace("_", "-")
-  return val
-
 proc main() =
   if paramCount() < 1:
     if stdin.isatty():
@@ -344,8 +339,7 @@ judge making cuts.
   var licenseKey: string
 
   let cmdLineParams = commandLineParams()
-  for rawKey in cmdLineParams:
-    let key = handleLegacyOptions(rawKey)
+  for key in cmdLineParams:
     if genCliMacro(key, args, mainOptions):
       continue
     if key in ["-h", "--help"]:
