@@ -354,7 +354,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
         let tbLength = (round((length * tb).float64)).int64
 
         return newSeqWith(tbLength, true)
-      of "all", "all/e":
+      of "all", "all/e":  # TODO: Remove all/e next major release
         let length = mediaLength(containers[0])
         let tbLength = (round((length * tb).float64)).int64
 

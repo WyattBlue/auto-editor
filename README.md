@@ -139,14 +139,14 @@ auto-editor example.mp4 --add-in 30sec,40sec 120,150sec
 
 And of course, you can use any `--edit` configuration.
 
-If you don't want **any automatic cuts**, you can use `--edit none` or `--edit all/e`
+If you don't want **any automatic cuts**, you can use `--edit none` or `--edit all`
 
 ```
 # Cut out the first 5 seconds, leave the rest untouched.
 auto-editor example.mp4 --edit none --cut-out 0,5sec
 
 # Leave in the first 5 seconds, cut everything else out.
-auto-editor example.mp4 --edit all/e --add-in 0,5sec
+auto-editor example.mp4 --edit all --add-in 0,5sec
 ```
 
 <h2 align="center">More Options</h2>
