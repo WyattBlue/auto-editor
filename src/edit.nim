@@ -408,6 +408,8 @@ proc editMedia*(args: var mainArgs) =
   bar.destroy()
   stopTimer()
 
-  if not args.noOpen and exportKind == "default":
+  if args.noOpen:
+    discard
+  elif args.open:
     openDefaultBrowser(output)
   closeTempDir()

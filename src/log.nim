@@ -122,6 +122,7 @@ type mainArgs* = object
   audioNormalize*: Norm = Norm(kind: nkNull)
 
   # Misc.
+  open*: bool = false
   noOpen*: bool = false
 
 var isDebug* = false
