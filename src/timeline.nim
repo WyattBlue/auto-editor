@@ -19,7 +19,7 @@ type Clip2* = object
 type v2* = object
   source*: string
   tb*: AVRational
-  effects*: seq[seq[Action]]
+  effects*: seq[Actions]
   clips*: seq[Clip2]
 
 type Clip* = object
@@ -40,7 +40,7 @@ type v3* = object
   a*: seq[seq[Clip]]
   s*: seq[seq[Clip]]
   langs*: seq[Lang]   # Video, Audio (flattened).
-  effects*: seq[seq[Action]]
+  effects*: seq[Actions]
   clips2*: seq[Clip2] # Empty when the timeline is non-linear.
 
 func len*(self: v3): int64 =
@@ -77,7 +77,7 @@ func timelineIsEmpty(self: v3): bool =
 func isNonlinear*(self: v3): bool =
   return self.clips2.len == 0 and not self.timelineIsEmpty
 
-proc chunkify(arr: seq[int], effects: seq[seq[Action]]): seq[(int64, int64, int, seq[Action])] =
+proc chunkify(arr: seq[int], effects: seq[Actions]): seq[(int64, int64, int, Actions)] =
   if arr.len == 0:
     return @[]
 
@@ -129,7 +129,7 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
 
 
 proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
-  effects: seq[seq[Action]], actionIndex: seq[int]): v3 =
+  effects: seq[Actions], actionIndex: seq[int]): v3 =
   var clips: seq[Clip] = @[]
   var i: int64 = 0
   var start: int64 = 0
@@ -142,12 +142,12 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
   for chunk in pseudoChunks:
     let actionGroup = chunk[3]
     var speed = 1.0
-    for action in actionGroup:
-      if action.kind in [actSpeed, actVarispeed]:
-        speed *= action.val
-      elif action.kind == actCut:
-        speed = 99999.0
-        break
+    if actionGroup.isCut:
+      speed = 99999.0
+    else:
+      for action in actionGroup:
+        if action.kind in [actSpeed, actVarispeed]:
+          speed *= action.val
 
     let effectIndex = chunk[2]
     if effectIndex > int(high(uint32)):
@@ -186,12 +186,12 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
   for chunk in pseudoChunks:
     let actionGroup = chunk[3]
     var speed = 1.0
-    for action in actionGroup:
-      if action.kind in [actSpeed, actVarispeed]:
-        speed *= action.val
-      elif action.kind == actCut:
-        speed = 99999.0
-        break
+    if actionGroup.isCut:
+      speed = 99999.0
+    else:
+      for action in actionGroup:
+        if action.kind in [actSpeed, actVarispeed]:
+          speed *= action.val
 
     let effectIndex = chunk[2]
     if effectIndex > int(high(uint32)):
@@ -241,7 +241,7 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
     chunks: seq[(int64, int64, float64)]): v3 =
   var clips: seq[Clip] = @[]
   var clips2: seq[Clip2] = @[]
-  var effects: seq[seq[Action]] = @[]
+  var effects: seq[Actions] = @[]
   var i: int64 = 0
   var start: int64 = 0
   var dur: int64
@@ -258,15 +258,15 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
       if not (clips.len > 0 and clips[^1].start == start):
         var effectIndex: int
         if chunk[2] == 1.0:
-          let emptySeq: seq[Action] = @[]
-          effectIndex = effects.find(emptySeq)
+          effectIndex = effects.find(aNil)
           if effectIndex == -1:
-            effects.add emptySeq
+            effects.add aNil
             effectIndex = effects.len - 1
         else:
-          effectIndex = effects.find(@[Action(kind: actSpeed, val: chunk[2])])
+          let a = newActions([Action(kind: actSpeed, val: float32(chunk[2]))])
+          effectIndex = effects.find(a)
           if effectIndex == -1:
-            effects.add @[Action(kind: actSpeed, val: chunk[2])]
+            effects.add a
             effectIndex = effects.len - 1
 
         if effectIndex > int(high(uint32)):
@@ -282,7 +282,7 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
   mutHelper(result, mi, clips)
 
 proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
-  clips2: seq[Clip2], effects: seq[seq[Action]]): v3 =
+  clips2: seq[Clip2], effects: seq[Actions]): v3 =
   var clips: seq[Clip] = @[]
   var start: int64 = 0
   var dur: int64
@@ -290,18 +290,12 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
 
   for clip2 in clips2:
     let effectGroup = effects[clip2.effect]
-    var isCut = false
-    var speed = 1.0
-
-    for effect in effectGroup:
-      if effect.kind == actCut:
-        isCut = true
-        break
-      elif effect.kind == actSpeed or effect.kind == actVarispeed:
-        speed *= effect.val
-
-    if isCut:
+    if effectGroup.isCut:
       continue
+    var speed = 1.0
+    for effect in effectGroup:
+      if effect.kind == actSpeed or effect.kind == actVarispeed:
+        speed *= effect.val
 
     dur = int64(round(float64(clip2.`end` - clip2.start) / speed))
     if dur == 0:

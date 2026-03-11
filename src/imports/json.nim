@@ -6,9 +6,7 @@ import ../ffmpeg
 import ../media
 import ../util/[color, lang]
 
-proc parseEffect(val: string): Action =
-  if val == "cut":
-    return Action(kind: actCut)
+proc parseAction(val: string): Action =
   if val == "invert":
     return Action(kind: actInvert)
 
@@ -25,23 +23,29 @@ proc parseEffect(val: string): Action =
 
   error &"unknown action: {val}"
 
-proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[seq[Action]]): Clip =
+proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Actions]): Clip =
   result.src = interner.intern(node["src"].getStr())
   result.start = node["start"].getInt()
   result.dur = node["dur"].getInt()
   result.offset = node["offset"].getInt()
   result.stream = node["stream"].getInt().int32
 
-  var clipActions: seq[Action] = @[]
+  var group = aNil
   if node.hasKey("effects") and node["effects"].kind == JArray:
+    var list: seq[Action]
     for effectNode in node["effects"]:
       let effectStr = effectNode.getStr()
-      if effectStr != "nil":
-        clipActions.add parseEffect(effectStr)
+      if effectStr == "cut":
+        group = aCut
+        break
+      elif effectStr != "nil":
+        list.add parseAction(effectStr)
+    if group.isEmpty:
+      group = newActions(list)
 
-  let effectIndex = effects.find(clipActions)
+  let effectIndex = effects.find(group)
   if effectIndex == -1:
-    effects.add(clipActions)
+    effects.add(group)
     result.effects = uint32(effects.len - 1)
   else:
     result.effects = uint32(effectIndex)
@@ -105,7 +109,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
 proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   let input = jsonNode["source"].getStr()
   let ptrInput = intern(interner, input)
-  var effects: seq[seq[Action]]
+  var effects: seq[Actions]
   var clips: seq[Clip2]
   let tb: AVRational = jsonNode["tb"].getStr()
 
@@ -119,16 +123,24 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
 
   if jsonNode.hasKey("effects") and jsonNode["effects"].kind == JArray:
     for effectNode in jsonNode["effects"]:
-      var actionGroup: seq[Action] = @[]
+      var group = aNil
       if effectNode.kind == JArray:
-        for actionStr in effectNode:
-          actionGroup.add parseEffect(actionStr.getStr())
+        var list: seq[Action]
+        for actionNode in effectNode:
+          let s = actionNode.getStr()
+          if s == "cut":
+            group = aCut
+            break
+          elif s != "nil":
+            list.add parseAction(s)
+        if group.isEmpty:
+          group = newActions(list)
       else:
         error "effects must be a list of lists"
 
-      let effectIndex = effects.find(actionGroup)
+      let effectIndex = effects.find(group)
       if effectIndex == -1:
-        effects.add(actionGroup)
+        effects.add(group)
 
   let mi = initMediaInfo(input)
   let bg = RGBColor(red: 0, green: 0, blue: 0)

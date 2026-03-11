@@ -14,7 +14,7 @@ import ../graph
 type VideoFrame = object
   index: int
   src: ptr string
-  effects: seq[Action]
+  effects: Actions
 
 # Keyframe index built from AVIndexEntry for efficient seeking
 type KeyframeIndex = object

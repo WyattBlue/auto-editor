@@ -270,7 +270,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
           totalSamples += samplesToProcess
           samplesProcessed += samples
 
-proc createFilterGraph(effects: seq[Action], sr: int, layout: string): (ptr AVFilterGraph,
+proc createFilterGraph(effects: Actions, sr: int, layout: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   var bufferSrc: ptr AVFilterContext = nil
@@ -348,7 +348,7 @@ proc createFilterGraph(effects: seq[Action], sr: int, layout: string): (ptr AVFi
   return (filterGraph, bufferSrc, bufferSink)
 
 # Returns seq[int16] where channel data is interleaved: [L, R, L, R, L, R] etc.
-proc processAudioClip(ef: seq[seq[Action]], clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
+proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
   if data.len == 0:
     return @[]
 
