@@ -34,6 +34,18 @@ func `not`(a: seq[bool]): seq[bool] =
   for i in 0 ..< a.len:
     result[i] = not a[i]
 
+proc orWithThreshold(result: var seq[bool], levels: seq[float32], threshold: float32) =
+  if result.len == 0:
+    result = newSeq[bool](levels.len)
+    for i in 0 ..< levels.len:
+      result[i] = levels[i] >= threshold
+  else:
+    let n = min(result.len, levels.len)
+    for i in 0 ..< n:
+      result[i] = result[i] or (levels[i] >= threshold)
+    for i in result.len ..< levels.len:
+      result.add levels[i] >= threshold
+
 proc parseThres(val: string): float32 =
   let (num, unit) = splitNumStr(val)
   if unit == "%":
@@ -227,17 +239,9 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
           let inp = args.inputs[ci]
           if stream == -1:
             for i in 0 ..< container.audio.len:
-              let levels = audio(bar, container, inp, tb, i.int32)
-              if result.len == 0:
-                result = levels.mapIt(it >= threshold)
-              else:
-                result = result or levels.mapIt(it >= threshold)
+              result.orWithThreshold(audio(bar, container, inp, tb, i.int32), threshold)
           else:
-            let levels = audio(bar, container, inp, tb, stream)
-            if result.len == 0:
-              result = levels.mapIt(it >= threshold)
-            else:
-              result = result or levels.mapIt(it >= threshold)
+            result.orWithThreshold(audio(bar, container, inp, tb, stream), threshold)
 
         mutRemoveSmall(result, minclip, true, false)
         mutRemoveSmall(result, mincut, false, true)
@@ -260,11 +264,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
             argPos += 1
 
         for ci in 0 ..< containers.len:
-          let levels = motion(bar, containers[ci], args.inputs[ci], tb, stream, width, blur)
-          if result.len == 0:
-            result = levels.mapIt(it >= threshold)
-          else:
-            result = result or levels.mapIt(it >= threshold)
+          result.orWithThreshold(motion(bar, containers[ci], args.inputs[ci], tb, stream, width, blur), threshold)
         return result
       of "subtitle", "regex":
         let argOrder = @["pattern", "stream", "ignore-case"] # "max-count"]

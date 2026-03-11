@@ -148,8 +148,8 @@ proc mutRemoveSmall*(arr: var seq[bool], lim: int, replace, with: bool) =
 
 proc mutMargin*(arr: var seq[bool], startM, endM: int) =
   # Find start and end indexes
-  var startIndex: seq[int] = @[]
-  var endIndex: seq[int] = @[]
+  var startIndex = newSeqOfCap[int](32)
+  var endIndex = newSeqOfCap[int](32)
   let arrlen = len(arr)
   for j in 1 ..< arrlen:
     if arr[j] != arr[j - 1]:
