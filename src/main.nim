@@ -242,35 +242,33 @@ proc listAvailableFilters(): string =
       result &= &" {filter.name}"
     filter = av_filter_iterate(addr opaque)
 
-proc parseActions(val: string): seq[Action] =
+proc parseActions(val: string): Actions =
   try:
-    let parts = val.strip().split(",")
-
-    for part in parts:
+    var list: seq[Action]
+    for part in val.strip().split(","):
       let trimmedPart = part.strip()
-
       if trimmedPart == "nil":
         discard
       elif trimmedPart == "cut":
-        result.add Action(kind: actCut)
+        return aCut
       elif trimmedPart == "invert":
-        result.add Action(kind: actInvert)
+        list.add Action(kind: actInvert)
       elif trimmedPart.startsWith("speed:"):
         try:
           let value = parseFloat(trimmedPart[6 ..< trimmedPart.len])
-          result.add Action(kind: actSpeed, val: value)
+          list.add Action(kind: actSpeed, val: value)
         except ValueError:
           error &"Invalid speed value in action: {trimmedPart}"
       elif trimmedPart.startsWith("varispeed:"):
         try:
           let value = parseFloat(trimmedPart[10 ..< trimmedPart.len])
-          result.add Action(kind: actVarispeed, val: value)
+          list.add Action(kind: actVarispeed, val: value)
         except ValueError:
           error &"Invalid varispeed value in action: {trimmedPart}"
       elif trimmedPart.startsWith("volume:"):
         try:
           let value = parseFloat(trimmedPart[7 ..< trimmedPart.len])
-          result.add Action(kind: actVolume, val: value)
+          list.add Action(kind: actVolume, val: value)
         except ValueError:
           error &"Invalid volume value in action: {trimmedPart}"
       elif trimmedPart.startsWith("zoom:"):
@@ -278,11 +276,12 @@ proc parseActions(val: string): seq[Action] =
           let value = parseFloat(trimmedPart[5 ..< trimmedPart.len])
           if value <= 0.0:
             error "zoom value must be greater than 0.0"
-          result.add Action(kind: actZoom, val: value)
+          list.add Action(kind: actZoom, val: value)
         except ValueError:
           error &"Invalid zoom value in action: {trimmedPart}"
       else:
         error &"Invalid action: {trimmedPart}"
+    return newActions(list)
   except Exception as e:
     error &"Error parsing actions '{val}': {e.msg}"
 
@@ -291,15 +290,12 @@ proc parseSpeed(val, opt: string): float64 =
   if result <= 0.0 or result > 99999.0:
     result = 99999.0
 
-func actionFromUserSpeed(val: float64): seq[Action] =
-  if val == 1.0:
-    return @[]
-  elif val <= 0.0 or val >= 99999.0:
-    return @[Action(kind: actCut)]
-  else:
-    return @[Action(kind: actSpeed, val: val)]
+proc actionFromUserSpeed(val: float64): Actions =
+  if val == 1.0: aNil
+  elif val <= 0.0 or val >= 99999.0: aCut
+  else: newActions([Action(kind: actSpeed, val: val)])
 
-proc parseSpeedRange(val: string): (seq[Action], PackedInt, PackedInt) =
+proc parseSpeedRange(val: string): (Actions, PackedInt, PackedInt) =
   let vals = val.strip().split(",")
   if vals.len < 3:
     error &"--set-speed has too few arguments"
@@ -310,7 +306,7 @@ proc parseSpeedRange(val: string): (seq[Action], PackedInt, PackedInt) =
   let action = actionFromUserSpeed(speed)
   return (action, parseTime(vals[1]), parseTime(vals[2]))
 
-proc parseActionAndRange(val: string): (seq[Action], PackedInt, PackedInt) =
+proc parseActionAndRange(val: string): (Actions, PackedInt, PackedInt) =
   let parts = val.strip().split(",")
   if parts.len < 3:
     error "--set-action has too few arguments"
@@ -366,11 +362,11 @@ judge making cuts.
     of "add-in":
       block:
         let span = parseTimeRange(key, expecting)
-        args.setAction.add (@[], span[0], span[1])
+        args.setAction.add (aNil, span[0], span[1])
     of "cut-out":
       block:
         let span = parseTimeRange(key, expecting)
-        args.setAction.add (@[Action(kind: actCut)], span[0], span[1])
+        args.setAction.add (aCut, span[0], span[1])
     of "set-speed":
       args.setAction.add parseSpeedRange(key)
     of "set-action":

@@ -4,8 +4,11 @@ import ../timeline
 import ../log
 import ../util/[color, lang]
 
-func effectGroupToJson(actions: seq[Action]): JsonNode =
-  return %actions.mapIt($it)
+func effectGroupToJson(actions: Actions): JsonNode =
+  if actions.isCut: return %["cut"]
+  var parts: seq[string]
+  for a in actions: parts.add $a
+  return %parts
 
 func `%`(self: v1): JsonNode =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
@@ -35,17 +38,8 @@ func `%`*(self: v3): JsonNode =
       clipObj["offset"] = %clip.offset
       clipObj["stream"] = %clip.stream
       let effectGroup = self.effects[clip.effects]
-      var hasNonTrivialEffect = false
-      if effectGroup.len > 0:
-        for effect in effectGroup:
-          if effect.kind != actCut:
-            hasNonTrivialEffect = true
-            break
-      if hasNonTrivialEffect:
-        var effectArray = newJArray()
-        for effect in effectGroup:
-          effectArray.add %($(effect))
-        clipObj["effects"] = effectArray
+      if not effectGroup.isEmpty:
+        clipObj["effects"] = effectGroupToJson(effectGroup)
       trackArray.add(clipObj)
     videoTracks.add(trackArray)
 
@@ -61,17 +55,8 @@ func `%`*(self: v3): JsonNode =
       clipObj["offset"] = %clip.offset
       clipObj["stream"] = %clip.stream
       let effectGroup = self.effects[clip.effects]
-      var hasNonTrivialEffect = false
-      if effectGroup.len > 0:
-        for effect in effectGroup:
-          if effect.kind != actCut:
-            hasNonTrivialEffect = true
-            break
-      if hasNonTrivialEffect:
-        var effectArray = newJArray()
-        for effect in effectGroup:
-          effectArray.add %($(effect))
-        clipObj["effects"] = effectArray
+      if not effectGroup.isEmpty:
+        clipObj["effects"] = effectGroupToJson(effectGroup)
       trackArray.add(clipObj)
     audioTracks.add(trackArray)
 
@@ -109,11 +94,12 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
       for clip2 in clips2:
         var speed = 1.0
         let effectGroup = tlV3.effects[clip2.effect]
-        for effect in effectGroup:
-          if effect.kind == actCut:
-            speed = 99999.0
-          elif effect.kind == actSpeed or effect.kind == actVarispeed:
-            speed *= effect.val.float64
+        if effectGroup.isCut:
+          speed = 99999.0
+        else:
+          for effect in effectGroup:
+            if effect.kind == actSpeed or effect.kind == actVarispeed:
+              speed *= effect.val.float64
 
         chunks.add (clip2.start, clip2.`end`, speed)
 
