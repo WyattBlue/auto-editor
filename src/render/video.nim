@@ -100,30 +100,19 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
     error &"Failed to allocate buffer for new frame: {ret}"
 
   # Create swscale context
-  let swsContext = sws_getCachedContext(
-    nil,          # No cached context for now
-    srcWidth, srcHeight, srcFormat,
-    dstWidth, dstHeight, format,
-    SWS_BILINEAR, # Use bilinear interpolation
-    nil, nil, nil
-  )
+  var swsContext = sws_alloc_context()
 
   if swsContext == nil:
-    error "Failed to create swscale context"
+    error "Failed to allocate swscale context"
+
+  swsContext.flags = SWS_BILINEAR.cuint
+  swsContext.threads = 0  # Auto-select based on available CPUs
 
   # Perform the conversion
-  ret = sws_scale(
-    swsContext,
-    cast[ptr ptr uint8](addr frame.data[0]),
-    cast[ptr cint](addr frame.linesize[0]),
-    0,         # srcSliceY
-    srcHeight, # srcSliceH
-    cast[ptr ptr uint8](addr newFrame.data[0]),
-    cast[ptr cint](addr newFrame.linesize[0])
-  )
+  ret = sws_scale_frame(swsContext, newFrame, frame)
 
   # Clean up the context
-  sws_freeContext(swsContext)
+  sws_free_context(addr swsContext)
 
   if ret < 0:
     error "Failed to scale frame" # Noreturn
