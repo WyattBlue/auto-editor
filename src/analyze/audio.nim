@@ -190,6 +190,7 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     inaccurateDur = container.duration / float(tb)
 
   bar.start(inaccurateDur, "Analyzing audio volume")
+  result = newSeqOfCap[float32](int(inaccurateDur) + 1)
   var i: float = 0
   for value in processor.loudness(container):
     result.add value
