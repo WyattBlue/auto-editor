@@ -758,18 +758,17 @@ proc isKeyframe*(entry: ptr AVIndexEntry): bool {.inline.} =
 # SwScale context and functions
 type SwsContext* {.importc: "struct SwsContext",
     header: "<libswscale/swscale.h>".} = object
+  flags*: cuint
+  threads*: cint
 
-proc sws_getCachedContext*(context: ptr SwsContext, srcW: cint, srcH: cint,
-    srcFormat: AVPixelFormat, dstW: cint, dstH: cint, dstFormat: AVPixelFormat,
-    flags: cint, srcFilter: pointer, dstFilter: pointer,
-    param: pointer): ptr SwsContext {.importc, header: "<libswscale/swscale.h>".}
-
-proc sws_scale*(c: ptr SwsContext, srcSlice: ptr ptr uint8, srcStride: ptr cint,
-    srcSliceY: cint, srcSliceH: cint, dst: ptr ptr uint8,
-    dstStride: ptr cint): cint {.importc, header: "<libswscale/swscale.h>".}
-
-proc sws_freeContext*(swsContext: ptr SwsContext) {.importc,
+proc sws_alloc_context*(): ptr SwsContext {.importc,
     header: "<libswscale/swscale.h>".}
+
+proc sws_free_context*(swsContext: ptr ptr SwsContext) {.importc,
+    header: "<libswscale/swscale.h>".}
+
+proc sws_scale_frame*(c: ptr SwsContext, dst: ptr AVFrame,
+    src: ptr AVFrame): cint {.importc, header: "<libswscale/swscale.h>".}
 
 # SwScale constants
 const
