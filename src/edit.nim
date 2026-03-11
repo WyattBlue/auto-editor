@@ -259,9 +259,7 @@ proc editMedia*(args: var mainArgs) =
         let endMargin = toTb(args.margin[1], tb.float64)
         mutMargin(hasLoud, startMargin, endMargin)
 
-        var actionMap: seq[Actions] = @[]
-        actionMap.add(args.whenSilent)
-        actionMap.add(args.whenNormal)
+        var actionMap: seq[Actions] = @[args.whenSilent, args.whenNormal]
         var actionIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
 
         proc getActionIndex(actions: Actions): int =
