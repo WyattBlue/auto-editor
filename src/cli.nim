@@ -37,7 +37,7 @@ const whisperOptions*: seq[OptDef] = @[
     help: "Set the language instead of using \"auto\". Examples: en, ja"),
   OptDef(names: "--format", datum: "format", metavar: "FORMAT",
     help: "Output in a specific format {text|srt|json} (default text)"),
-  OptDef(names: "--output", datum: "output", metavar: "FILE",
+  OptDef(names: "-o, --output", datum: "output", metavar: "FILE",
     help: "Choose where to output (defaults to stdout)"),
   OptDef(names: "-tr, --translate", kind: Flag, datum: "translate",
     help: "Translate from source language to english"),
