@@ -167,7 +167,7 @@ class Runner:
 
     def main(self, inputs: list[str], cmd: list[str], output: str | None = None) -> str:
         assert inputs
-        cmd = self.program + inputs + cmd + ["--no-open", "--progress", "none"]
+        cmd = self.program + inputs + cmd + ["--progress", "none"]
         temp_dir = self.temp_dir
         if not os.path.exists(temp_dir):
             raise ValueError("Where's the temp dir")
@@ -380,7 +380,7 @@ class Runner:
         """Input file must have an extension. Throw error if none is given."""
         path = os.path.join(self.temp_dir, "example")
         shutil.copy("example.mp4", path)
-        self.check([path, "--no-open"], "must have an extension")
+        self.check([path], "must have an extension")
 
     def test_silent_threshold(self):
         with av.open("resources/new-commentary.mp3") as container:
