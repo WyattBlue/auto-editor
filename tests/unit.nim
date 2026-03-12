@@ -8,19 +8,6 @@ import ../src/media
 import ../src/wavutil
 import ../src/exports/[kdenlive, fcp11]
 
-func `$`*(layout: AVChannelLayout): string =
-  const bufSize: csize_t = 256
-  var buffer = newString(bufSize)
-  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring, bufSize)
-
-  if ret > 0:
-    let actualLen = buffer.find('\0')
-    if actualLen >= 0:
-      result = buffer[0..<actualLen]
-    else:
-      result = buffer
-  else:
-    result = "unknown"
 
 test "avrational":
   let a = AVRational(num: 3, den: 4)
