@@ -46,8 +46,10 @@ proc newAudioIterator(sampleRate: cint, channelLayout: AVChannelLayout,
   if result.fifo == nil:
     error "Could not allocate audio FIFO"
 
-  # Pre-allocate buffer for reading chunks
-  result.maxBufferSize = int(result.exactSize)
+  # Pre-allocate buffer for reading chunks.
+  # Add 2 extra samples: accumulated rounding error can push currentSize up to
+  # ceil(exactSize), and +1 guards against any edge-case off-by-one.
+  result.maxBufferSize = int(result.exactSize) + 2
   let ret = av_samples_alloc(addr result.readBuffer, nil, result.channelCount.cint,
                            result.maxBufferSize.cint, result.targetFormat, 0)
   if ret < 0:

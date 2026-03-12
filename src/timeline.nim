@@ -125,7 +125,13 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
   tl.layout = "stereo"
   if mi.a.len > 0:
     tl.sr = mi.a[0].sampleRate
-    tl.layout = mi.a[0].layout
+    # Normalize UNSPEC layouts (e.g. "1 channels", "2 channels") to NATIVE.
+    # UNSPEC layout strings contain spaces which break FFmpeg filter arg parsing.
+    var chLayout: AVChannelLayout
+    if av_channel_layout_from_string(addr chLayout, mi.a[0].layout.cstring) < 0 or
+        chLayout.order == 0: # AV_CHANNEL_ORDER_UNSPEC
+      av_channel_layout_default(addr chLayout, max(1, chLayout.nb_channels).cint)
+    tl.layout = $chLayout
 
 
 proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,

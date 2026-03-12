@@ -94,7 +94,13 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if frame.pts != AV_NOPTS_VALUE:
       extraArgs = &":time_base={resampler.`template`.time_base}"
 
-    let inputLayoutName = $frame.ch_layout
+    # Normalize UNSPEC layouts to NATIVE before embedding in filter args.
+    # UNSPEC layouts produce strings like "2 channels" which contain spaces
+    # that break FFmpeg's "key=value:key=value" option parsing on Windows.
+    var inputChLayout = frame.ch_layout
+    if inputChLayout.order == 0: # AV_CHANNEL_ORDER_UNSPEC
+      av_channel_layout_default(addr inputChLayout, max(1, inputChLayout.nb_channels).cint)
+    let inputLayoutName = $inputChLayout
     let inputFormatName = getFormatName(AVSampleFormat(frame.format))
 
     let abuffer_args = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:channel_layout={inputLayoutName}{extraArgs}"
@@ -106,7 +112,10 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
       raise newException(ValueError, &"Could not create abuffer: {ret}")
 
     # Create aformat filter
-    let outputLayoutName = $resampler.layout
+    var outputChLayout = resampler.layout
+    if outputChLayout.order == 0: # AV_CHANNEL_ORDER_UNSPEC
+      av_channel_layout_default(addr outputChLayout, max(1, outputChLayout.nb_channels).cint)
+    let outputLayoutName = $outputChLayout
     let outputFormatName = getFormatName(resampler.format)
     let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:channel_layouts={outputLayoutName}"
 

@@ -335,14 +335,15 @@ func `$`*(layout: AVChannelLayout): string =
   var buffer = newString(bufSize)
   let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring, bufSize)
 
-  if ret > 0:
-    let actualLen = buffer.find('\0')
-    if actualLen >= 0:
-      result = buffer[0..<actualLen]
-    else:
-      result = buffer
+  # if ret > 0:
+  #   let actualLen = buffer.find('\0')
+  #   return (if actualLen >= 0: buffer[0..<actualLen] else: buffer)
+  if layout.nb_channels == 1:
+    return "mono"
+  elif layout.nb_channels == 2:
+    return "stereo"
   else:
-    result = "unknown"
+    return "unknown"
 
 type
   AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>", bycopy.} = object
