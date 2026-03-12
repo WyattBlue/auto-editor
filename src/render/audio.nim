@@ -289,15 +289,19 @@ proc createFilterGraph(effects: Actions, sr: int, layout: string): (ptr AVFilter
   if filterGraph == nil:
     error "Could not allocate audio filter graph"
 
-  # Normalize UNSPEC layouts (e.g. "2 channels") to NATIVE before embedding
-  # in filter args — spaces in UNSPEC strings break FFmpeg's option parsing.
+  stderr.writeLine(&"[DBG createFilterGraph] input layout=\"{layout}\"")
   var chLayout: AVChannelLayout
-  if av_channel_layout_from_string(addr chLayout, layout.cstring) < 0 or chLayout.order == 0:
+  let cfgParseRet = av_channel_layout_from_string(addr chLayout, layout.cstring)
+  stderr.writeLine(&"[DBG createFilterGraph] parse ret={cfgParseRet} order={chLayout.order} nb={chLayout.nb_channels}")
+  if cfgParseRet < 0 or chLayout.order == 0:
     av_channel_layout_default(addr chLayout, max(1, chLayout.nb_channels).cint)
+    stderr.writeLine(&"[DBG createFilterGraph] normalized to \"{$chLayout}\"")
   let safeLayout = $chLayout
   let bufferArgs = &"sample_rate={sr}:sample_fmt=s16p:channel_layout={safeLayout}:time_base=1/{sr}"
+  stderr.writeLine(&"[DBG createFilterGraph] bufferArgs=\"{bufferArgs}\"")
   var ret = avfilter_graph_create_filter(addr bufferSrc, avfilter_get_by_name("abuffer"),
                                         "in", bufferArgs.cstring, nil, filterGraph)
+  stderr.writeLine(&"[DBG createFilterGraph] avfilter_graph_create_filter ret={ret}")
   if ret < 0:
     error &"Cannot create audio buffer source: {ret}"
 

@@ -94,30 +94,34 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if frame.pts != AV_NOPTS_VALUE:
       extraArgs = &":time_base={resampler.`template`.time_base}"
 
-    # Normalize UNSPEC layouts to NATIVE before embedding in filter args.
-    # UNSPEC layouts produce strings like "2 channels" which contain spaces
-    # that break FFmpeg's "key=value:key=value" option parsing on Windows.
     var inputChLayout = frame.ch_layout
+    stderr.writeLine(&"[DBG resampler] raw frame ch_layout: order={inputChLayout.order} nb={inputChLayout.nb_channels} mask={inputChLayout.u.mask} str=\"{$inputChLayout}\"")
     if inputChLayout.order == 0: # AV_CHANNEL_ORDER_UNSPEC
       av_channel_layout_default(addr inputChLayout, max(1, inputChLayout.nb_channels).cint)
+      stderr.writeLine(&"[DBG resampler] normalized input layout to: \"{$inputChLayout}\"")
     let inputLayoutName = $inputChLayout
     let inputFormatName = getFormatName(AVSampleFormat(frame.format))
 
     let abuffer_args = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:channel_layout={inputLayoutName}{extraArgs}"
+    stderr.writeLine(&"[DBG resampler] abuffer_args=\"{abuffer_args}\"")
 
     var ret = avfilter_graph_create_filter(addr resampler.abuffer, avfilter_get_by_name("abuffer"),
                                           "in", abuffer_args.cstring, nil,
                                               resampler.graph)
+    stderr.writeLine(&"[DBG resampler] avfilter_graph_create_filter(abuffer) ret={ret}")
     if ret < 0:
       raise newException(ValueError, &"Could not create abuffer: {ret}")
 
     # Create aformat filter
     var outputChLayout = resampler.layout
+    stderr.writeLine(&"[DBG resampler] raw resampler layout: order={outputChLayout.order} nb={outputChLayout.nb_channels} mask={outputChLayout.u.mask} str=\"{$outputChLayout}\"")
     if outputChLayout.order == 0: # AV_CHANNEL_ORDER_UNSPEC
       av_channel_layout_default(addr outputChLayout, max(1, outputChLayout.nb_channels).cint)
+      stderr.writeLine(&"[DBG resampler] normalized output layout to: \"{$outputChLayout}\"")
     let outputLayoutName = $outputChLayout
     let outputFormatName = getFormatName(resampler.format)
     let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:channel_layouts={outputLayoutName}"
+    stderr.writeLine(&"[DBG resampler] aformatArgs=\"{aformatArgs}\"")
 
     var aformat: ptr AVFilterContext = nil
     ret = avfilter_graph_create_filter(addr aformat, avfilter_get_by_name("aformat"),
@@ -133,11 +137,14 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     # Link filters: abuffer -> aformat -> abuffersink
     ret = avfilter_link(resampler.abuffer, 0, aformat, 0)
     ret = avfilter_link(aformat, 0, resampler.abuffersink, 0)
+    stderr.writeLine("[DBG resampler] configuring filter graph...")
     ret = avfilter_graph_config(resampler.graph, nil)
+    stderr.writeLine(&"[DBG resampler] avfilter_graph_config ret={ret}")
     if ret < 0:
       raise newException(ValueError, &"Could not configure filter graph: {ret}")
 
   if frame != nil:
+    stderr.writeLine(&"[DBG resampler] writing frame: fmt={frame.format} nb_samples={frame.nb_samples} nb={frame.ch_layout.nb_channels} rate={frame.sample_rate}")
     # Only validate critical properties that would break the filter graph
     if (frame.format != resampler.`template`.format or
         frame.ch_layout.nb_channels != resampler.`template`.ch_layout.nb_channels or
@@ -145,6 +152,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
       error "Frame does not match AudioResampler setup"
 
   let ret = av_buffersrc_write_frame(resampler.abuffer, frame)
+  stderr.writeLine(&"[DBG resampler] av_buffersrc_write_frame ret={ret}")
   if ret < 0:
     error &"Error pushing frame to filter: {ret}"
 
@@ -155,6 +163,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if outFrame == nil:
       error "Could not alloc output frame"
 
+    stderr.writeLine("[DBG resampler] calling av_buffersink_get_frame...")
     if av_buffersink_get_frame(resampler.abuffersink, outFrame) < 0:
       av_frame_free(addr outFrame)
       break

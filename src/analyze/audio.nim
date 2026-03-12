@@ -50,8 +50,10 @@ proc newAudioIterator(sampleRate: cint, channelLayout: AVChannelLayout,
   # Add 2 extra samples: accumulated rounding error can push currentSize up to
   # ceil(exactSize), and +1 guards against any edge-case off-by-one.
   result.maxBufferSize = int(result.exactSize) + 2
+  stderr.writeLine(&"[DBG audio iter] exactSize={result.exactSize} maxBufferSize={result.maxBufferSize} channelCount={result.channelCount} sr={sampleRate}")
   let ret = av_samples_alloc(addr result.readBuffer, nil, result.channelCount.cint,
                            result.maxBufferSize.cint, result.targetFormat, 0)
+  stderr.writeLine(&"[DBG audio iter] av_samples_alloc ret={ret}")
   if ret < 0:
     error "Could not allocate read buffer"
 
@@ -95,6 +97,9 @@ proc readChunk(iter: AudioIterator): float32 =
   let sizeWithError = iter.exactSize + iter.accumulatedError
   let currentSize = round(sizeWithError).int
   iter.accumulatedError = sizeWithError - float64(currentSize)
+
+  if currentSize > iter.maxBufferSize:
+    stderr.writeLine(&"[DBG readChunk] OVERFLOW: currentSize={currentSize} > maxBufferSize={iter.maxBufferSize} exactSize={iter.exactSize} accErr={iter.accumulatedError}")
 
   # Use pre-allocated buffer - no allocation needed!
   let samples = cast[ptr UncheckedArray[float32]](iter.readBuffer)

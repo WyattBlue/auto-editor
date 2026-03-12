@@ -1,4 +1,4 @@
-import std/[options, os, sets, tables]
+import std/[options, os, sets, tables, strformat]
 from std/math import round
 
 import ffmpeg
@@ -125,13 +125,17 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
   tl.layout = "stereo"
   if mi.a.len > 0:
     tl.sr = mi.a[0].sampleRate
+    stderr.writeLine(&"[DBG mutHelper] mi.a[0].layout=\"{mi.a[0].layout}\" sr={mi.a[0].sampleRate}")
     # Normalize UNSPEC layouts (e.g. "1 channels", "2 channels") to NATIVE.
     # UNSPEC layout strings contain spaces which break FFmpeg filter arg parsing.
     var chLayout: AVChannelLayout
-    if av_channel_layout_from_string(addr chLayout, mi.a[0].layout.cstring) < 0 or
-        chLayout.order == 0: # AV_CHANNEL_ORDER_UNSPEC
+    let parseRet = av_channel_layout_from_string(addr chLayout, mi.a[0].layout.cstring)
+    stderr.writeLine(&"[DBG mutHelper] av_channel_layout_from_string ret={parseRet} order={chLayout.order} nb={chLayout.nb_channels}")
+    if parseRet < 0 or chLayout.order == 0: # AV_CHANNEL_ORDER_UNSPEC
       av_channel_layout_default(addr chLayout, max(1, chLayout.nb_channels).cint)
+      stderr.writeLine(&"[DBG mutHelper] normalized to order={chLayout.order} nb={chLayout.nb_channels} str=\"{$chLayout}\"")
     tl.layout = $chLayout
+    stderr.writeLine(&"[DBG mutHelper] tl.layout=\"{tl.layout}\" tl.sr={tl.sr}")
 
 
 proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
