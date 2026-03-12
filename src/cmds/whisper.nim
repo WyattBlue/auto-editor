@@ -78,7 +78,7 @@ proc main*(cArgs: seq[string]) =
     error "A media file is needed"
   if model == "":
     error "A model is needed, you came find them here: https://huggingface.co/ggerganov/whisper.cpp"
-  if queue < 1 or queue > 1000:
+  if queue < 1 or queue > 86400:
     error &"Invalid queue value: {queue}"
   if format notin ["text", "srt", "json"]:
     error &"Invalid format: {format}. Choices: text, srt, json"
