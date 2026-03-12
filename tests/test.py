@@ -543,7 +543,10 @@ class Runner:
     def test_clip_sequence(self) -> None:
         for test_name in all_files:
             test_file = f"resources/{test_name}"
-            self.main([test_file], ["--export", "clip-sequence"])
+            try:
+                self.main([test_file], ["--export", "clip-sequence"])
+            except Exception as e:
+                raise Exception(f"{test_file}: {e}") from e
 
     def test_codecs(self) -> None:
         self.main(["example.mp4"], ["--video-codec", "h264"])

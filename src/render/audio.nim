@@ -13,8 +13,7 @@ import ../[av, ffmpeg]
 import ../resampler
 import ../graph
 
-const AV_CH_LAYOUT_STEREO = 3
-const AV_CH_LAYOUT_MONO = 1
+const AV_CH_LAYOUT_STEREO = 3'u64
 
 # Import C string functions for JSON capture
 proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
@@ -85,6 +84,8 @@ type
     decoderCtx*: ptr AVCodecContext
     rate*: int
     ownsContainer*: bool
+    channels*: int
+    layout*: string
 
   AudioBuffer = ref object
     memFile*: MemFile
@@ -124,6 +125,8 @@ proc newGetter(path: string, stream: int, rate: int): Getter =
   result.rate = result.stream.codecpar.sample_rate.int  # Use source sample rate, not target
   result.decoderCtx = initDecoder(result.stream.codecpar)
   result.ownsContainer = true
+  result.channels = result.stream.codecpar.ch_layout.nb_channels.int
+  result.layout = $result.stream.codecpar.ch_layout
 
 proc newGetter(container: InputContainer, stream: int): Getter =
   result = new(Getter)
@@ -131,6 +134,8 @@ proc newGetter(container: InputContainer, stream: int): Getter =
   result.stream = result.container.audio[stream]
   result.rate = result.stream.codecpar.sample_rate.int
   result.decoderCtx = initDecoder(result.stream.codecpar)
+  result.channels = result.stream.codecpar.ch_layout.nb_channels.int
+  result.layout = $result.stream.codecpar.ch_layout
 
 proc close(getter: Getter) =
   avcodec_free_context(addr getter.decoderCtx)
@@ -145,8 +150,8 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
 
   let targetSamples = endSample - start
 
-  # Initialize result with proper size for interleaved stereo (default zero-filled)
-  result = newSeq[int16](targetSamples * 2)
+  # Initialize result with proper size for interleaved multi-channel (default zero-filled)
+  result = newSeq[int16](targetSamples * getter.channels)
 
   # Convert sample position to time and seek
   let sampleRate = stream.codecpar.sample_rate
@@ -180,7 +185,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
     if packet.stream_index == stream.index:
       if avcodec_send_packet(decoderCtx, packet) >= 0:
         while avcodec_receive_frame(decoderCtx, frame) >= 0 and totalSamples < targetSamples:
-          let channels = min(frame.ch_layout.nb_channels.int, 2) # Limit to stereo
+          let channels = frame.ch_layout.nb_channels.int
           let samples = frame.nb_samples.int
 
           # Convert frame PTS to sample position
@@ -213,7 +218,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
             # Planar 16-bit
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              let resultIndex = (totalSamples + i) * channels
               for ch in 0 ..< channels:
                 if frame.data[ch] != nil:
                   let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
@@ -224,7 +229,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
             let audioData = cast[ptr UncheckedArray[cfloat]](frame.data[0])
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              let resultIndex = (totalSamples + i) * channels
               for ch in 0 ..< channels:
                 # Convert float to 16-bit int with proper clamping
                 let floatSample = audioData[frameIndex * channels + ch]
@@ -235,7 +240,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
             # Planar float
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              let resultIndex = (totalSamples + i) * channels
               for ch in 0 ..< channels:
                 if frame.data[ch] != nil:
                   let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
@@ -249,7 +254,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
             let audioData = cast[ptr UncheckedArray[int32]](frame.data[0])
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              let resultIndex = (totalSamples + i) * channels
               for ch in 0 ..< channels:
                 # Convert 32-bit to 16-bit by shifting right 16 bits
                 result[resultIndex + ch] = int16(audioData[frameIndex * channels + ch] shr 16)
@@ -258,7 +263,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
             # Planar 32-bit
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
-              let resultIndex = (totalSamples + i) * 2  # Interleaved index
+              let resultIndex = (totalSamples + i) * channels
               for ch in 0 ..< channels:
                 if frame.data[ch] != nil:
                   let channelData = cast[ptr UncheckedArray[int32]](frame.data[ch])
@@ -269,6 +274,11 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
 
           totalSamples += samplesToProcess
           samplesProcessed += samples
+
+proc getChannelLayout(layoutStr: string): AVChannelLayout =
+  let ret = av_channel_layout_from_string(addr result, layoutStr.cstring)
+  if ret < 0:
+    av_channel_layout_default(addr result, 2)
 
 proc createFilterGraph(effects: Actions, sr: int, layout: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
@@ -347,8 +357,8 @@ proc createFilterGraph(effects: Actions, sr: int, layout: string): (ptr AVFilter
 
   return (filterGraph, bufferSrc, bufferSink)
 
-# Returns seq[int16] where channel data is interleaved: [L, R, L, R, L, R] etc.
-proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint): seq[int16] =
+# Returns seq[int16] where channel data is interleaved: [ch0, ch1, ..., ch0, ch1, ...] etc.
+proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint, sourceLayout: string = "stereo"): seq[int16] =
   if data.len == 0:
     return @[]
 
@@ -363,10 +373,10 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
       break
 
   if needsFiltering:
-    # Data is interleaved: [L, R, L, R, ...] so always stereo
-    let channels = 2
-    let samples = data.len div 2
-    let layout = "stereo"
+    let chLayout = getChannelLayout(sourceLayout)
+    let channels = chLayout.nb_channels
+    let samples = data.len div channels
+    let layout = sourceLayout
     let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(effectGroup, sourceSr, layout)
     defer:
       if filterGraph != nil:
@@ -380,9 +390,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
 
     inputFrame.nb_samples = samples.cint
     inputFrame.format = AV_SAMPLE_FMT_S16P.cint
-    inputFrame.ch_layout.nb_channels = channels.cint
-    inputFrame.ch_layout.order = 0
-    inputFrame.ch_layout.u.mask = (if channels == 1: AV_CH_LAYOUT_MONO else: AV_CH_LAYOUT_STEREO)
+    inputFrame.ch_layout = chLayout
     inputFrame.sample_rate = sourceSr
     inputFrame.pts = AV_NOPTS_VALUE
 
@@ -393,7 +401,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
     for ch in 0..<channels:
       let channelData = cast[ptr UncheckedArray[int16]](inputFrame.data[ch])
       for i in 0..<samples:
-        let srcIndex = i * 2 + ch  # Interleaved index
+        let srcIndex = i * channels + ch
         if srcIndex < data.len:
           channelData[i] = data[srcIndex]
         else:
@@ -431,18 +439,18 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
       for frame in outputFrames:
         totalSamples += frame.nb_samples.int
 
-      processedData = newSeq[int16](totalSamples * 2)  # Interleaved stereo
+      processedData = newSeq[int16](totalSamples * channels)
 
       var sampleOffset = 0
       for frame in outputFrames:
         let frameSamples = frame.nb_samples.int
-        let frameChannels = min(frame.ch_layout.nb_channels.int, 2)
+        let frameChannels = frame.ch_layout.nb_channels.int
 
         if frame.format == AV_SAMPLE_FMT_S16P.cint:
           # Convert from planar to interleaved
           for i in 0..<frameSamples:
-            let interleavedIndex = (sampleOffset + i) * 2
-            for ch in 0..<frameChannels:
+            let interleavedIndex = (sampleOffset + i) * channels
+            for ch in 0..<min(frameChannels, channels):
               if frame.data[ch] != nil and interleavedIndex + ch < processedData.len:
                 let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
                 processedData[interleavedIndex + ch] = channelData[i]
@@ -450,15 +458,15 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
           # Already interleaved, just copy
           let audioData = cast[ptr UncheckedArray[int16]](frame.data[0])
           for i in 0..<frameSamples:
-            let interleavedIndex = (sampleOffset + i) * 2
-            for ch in 0..<frameChannels:
+            let interleavedIndex = (sampleOffset + i) * channels
+            for ch in 0..<min(frameChannels, channels):
               if interleavedIndex + ch < processedData.len:
                 processedData[interleavedIndex + ch] = audioData[i * frameChannels + ch]
         elif frame.format == AV_SAMPLE_FMT_FLTP.cint:
           # Planar float - convert to int16
           for i in 0..<frameSamples:
-            let interleavedIndex = (sampleOffset + i) * 2
-            for ch in 0..<frameChannels:
+            let interleavedIndex = (sampleOffset + i) * channels
+            for ch in 0..<min(frameChannels, channels):
               if frame.data[ch] != nil and interleavedIndex + ch < processedData.len:
                 let channelData = cast[ptr UncheckedArray[cfloat]](frame.data[ch])
                 let floatSample = channelData[i]
@@ -468,25 +476,14 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
           # Interleaved float - convert to int16
           let audioData = cast[ptr UncheckedArray[cfloat]](frame.data[0])
           for i in 0..<frameSamples:
-            let interleavedIndex = (sampleOffset + i) * 2
-            for ch in 0..<frameChannels:
+            let interleavedIndex = (sampleOffset + i) * channels
+            for ch in 0..<min(frameChannels, channels):
               if interleavedIndex + ch < processedData.len:
                 let floatSample = audioData[i * frameChannels + ch]
                 let clampedSample = max(-1.0, min(1.0, floatSample))
                 processedData[interleavedIndex + ch] = int16(clampedSample * 32767.0)
 
         sampleOffset += frameSamples
-
-      # Duplicate mono to stereo if needed (in interleaved format)
-      if processedData.len >= 2:
-        var isSecondChannelEmpty = true
-        for i in 0..<min(1000, processedData.len div 2):
-          if processedData[i * 2 + 1] != 0:
-            isSecondChannelEmpty = false
-            break
-        if isSecondChannelEmpty:
-          for i in 0..<(processedData.len div 2):
-            processedData[i * 2 + 1] = processedData[i * 2]
 
   # Now resample from source to target sample rate
   if sourceSr == targetSr:
@@ -496,11 +493,12 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
   if processedData.len == 0:
     return @[]
 
-  let channels = 2  # Always stereo interleaved
-  let samples = processedData.len div 2
+  let resChLayout = getChannelLayout(sourceLayout)
+  let channels = resChLayout.nb_channels
+  let samples = processedData.len div channels
 
   # Create resampler for this conversion
-  var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, if channels == 1: "mono" else: "stereo", targetSr.int)
+  var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, sourceLayout, targetSr.int)
 
   # Create input frame
   var inputFrame = av_frame_alloc()
@@ -510,9 +508,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
 
   inputFrame.nb_samples = samples.cint
   inputFrame.format = AV_SAMPLE_FMT_S16P.cint
-  inputFrame.ch_layout.nb_channels = channels.cint
-  inputFrame.ch_layout.order = 0
-  inputFrame.ch_layout.u.mask = if channels == 1: AV_CH_LAYOUT_MONO else: AV_CH_LAYOUT_STEREO
+  inputFrame.ch_layout = resChLayout
   inputFrame.sample_rate = sourceSr
   inputFrame.pts = AV_NOPTS_VALUE
 
@@ -523,7 +519,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
   for ch in 0..<channels:
     let channelData = cast[ptr UncheckedArray[int16]](inputFrame.data[ch])
     for i in 0..<samples:
-      let srcIndex = i * 2 + ch  # Interleaved index
+      let srcIndex = i * channels + ch
       if srcIndex < processedData.len:
         channelData[i] = processedData[srcIndex]
       else:
@@ -533,47 +529,41 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
   let outputFrames = resampler.resample(inputFrame)
 
   # Convert back to interleaved seq[int16]
-  var tempChannelData: array[2, seq[int16]]
-  tempChannelData[0] = @[]
-  tempChannelData[1] = @[]
+  var tempChannelData = newSeq[seq[int16]](channels)
 
   for frame in outputFrames:
     let frameSamples = frame.nb_samples.int
-    let frameChannels = min(frame.ch_layout.nb_channels.int, 2)
+    let frameChannels = frame.ch_layout.nb_channels.int
 
     # Extend temp arrays
     let currentLen = tempChannelData[0].len
-    tempChannelData[0].setLen(currentLen + frameSamples)
-    tempChannelData[1].setLen(currentLen + frameSamples)
+    for ch in 0..<channels:
+      tempChannelData[ch].setLen(currentLen + frameSamples)
 
     # Copy frame data
     if frame.format == AV_SAMPLE_FMT_S16P.cint:
-      for ch in 0..<frameChannels:
+      for ch in 0..<min(frameChannels, channels):
         if frame.data[ch] != nil:
           let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
           for i in 0..<frameSamples:
             tempChannelData[ch][currentLen + i] = channelData[i]
 
-    # Duplicate mono to stereo if needed
-    if frameChannels == 1:
-      for i in 0..<frameSamples:
-        tempChannelData[1][currentLen + i] = tempChannelData[0][currentLen + i]
-
     av_frame_free(addr frame)
 
   # Convert from channel-separated to interleaved format
   let totalSamples = tempChannelData[0].len
-  result = newSeq[int16](totalSamples * 2)  # Always stereo output
+  result = newSeq[int16](totalSamples * channels)
   for i in 0..<totalSamples:
-    result[i * 2] = tempChannelData[0][i]
-    result[i * 2 + 1] = tempChannelData[1][i]
+    for ch in 0..<channels:
+      result[i * channels + ch] = tempChannelData[ch][i]
 
 
 proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
     int], mixLayers: bool, norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int) =
   var samples: Table[(string, int32), Getter]
-  let targetChannels = 2
+  let targetChLayout = getChannelLayout(tl.layout)
+  let targetChannels = targetChLayout.nb_channels
 
   let tb = tl.tb
   let sr = tl.sr
@@ -624,17 +614,18 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
           let startSample = int(clip.start * sr.int64 * tb.den div tb.num)
           let durSamples = int(clip.dur * sr.int64 * tb.den div tb.num)
 
-          let processedData = processAudioClip(tl.effects, clip, srcData, getter.stream.codecpar.sample_rate, sr)
+          let processedData = processAudioClip(tl.effects, clip, srcData, getter.stream.codecpar.sample_rate, sr, getter.layout)
 
           if processedData.len > 0:
-            let numSamples = processedData.len div 2
+            let sourceChannels = getter.channels
+            let numSamples = processedData.len div sourceChannels
             for i in 0 ..< min(durSamples, numSamples):
               let outputSampleIndex = startSample + i
               if outputSampleIndex < totalSamples:
                 let baseIndex = outputSampleIndex * targetChannels
-                for ch in 0 ..< min(targetChannels, 2):
+                for ch in 0 ..< min(targetChannels, sourceChannels):
                   let flatIndex = baseIndex + ch
-                  let sourceIndex = i * 2 + ch
+                  let sourceIndex = i * sourceChannels + ch
                   if flatIndex < audioBuffer.len and sourceIndex < processedData.len:
                     if mixLayers:
                       let currentSample = audioBuffer[flatIndex].int32
@@ -861,7 +852,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   # Yield audio frames in chunks
   var samplesYielded = 0
   var frameIndex = 0
-  var resampler = newAudioResampler(fmt, "stereo", sr)
+  var resampler = newAudioResampler(fmt, tl.layout, sr)
   var frame = av_frame_alloc()
   if frame == nil:
     error "Could not allocate audio frame"
@@ -873,9 +864,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       av_frame_unref(frame)
       frame.nb_samples = currentFrameSize.cint
       frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
-      frame.ch_layout.nb_channels = targetChannels.cint
-      frame.ch_layout.order = 0
-      frame.ch_layout.u.mask = AV_CH_LAYOUT_STEREO
+      frame.ch_layout = targetChLayout
       frame.sample_rate = sr.cint
       frame.pts = samplesYielded.int64
       frame.time_base = AVRational(num: 1, den: sr.cint)

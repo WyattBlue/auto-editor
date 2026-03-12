@@ -13,20 +13,12 @@ type AudioResampler* = object
   frameSize: int
   isPassthrough: bool
 
-func stringToChannelLayout(layout: string): AVChannelLayout =
-  if layout == "mono":
-    result.nb_channels = 1
-    result.order = 0 # AV_CHANNEL_ORDER_NATIVE
-    result.u.mask = 1 # AV_CH_LAYOUT_MONO
-  elif layout == "stereo":
+proc stringToChannelLayout(layout: string): AVChannelLayout =
+  let ret = av_channel_layout_from_string(addr result, layout.cstring)
+  if ret < 0:
     result.nb_channels = 2
     result.order = 0 # AV_CHANNEL_ORDER_NATIVE
     result.u.mask = 3 # AV_CH_LAYOUT_STEREO
-  else:
-    result.nb_channels = 0
-    result.order = 0
-    result.u.mask = 0
-  return result
 
 func getFormatName(format: AVSampleFormat): string =
   let name = av_get_sample_fmt_name(format.cint)
