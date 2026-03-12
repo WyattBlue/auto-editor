@@ -225,23 +225,32 @@ class Runner:
     def test_parser(self):
         self.check(["example.mp4", "--margin"], "needs argument")
 
-    def info(self):
+    def test_cmd_info(self):
         self.raw(["info", "example.mp4"])
         self.raw(["info", "resources/only-video/man-on-green-screen.mp4"])
         self.raw(["info", "resources/multi-track.mov"])
         self.raw(["info", "resources/new-commentary.mp3"])
         self.raw(["info", "resources/testsrc.mkv"])
 
-    def levels(self):
+    def test_cmd_levels(self):
         self.raw(["levels", "resources/multi-track.mov"])
         self.raw(["levels", "resources/new-commentary.mp3"])
 
-    def subdump(self):
+    def test_cmd_subdump(self):
         self.raw(["subdump", "resources/mov_text.mp4"])
         self.raw(["subdump", "resources/webvtt.mkv"])
 
-    def desc(self):
+    def test_cmd_desc(self):
         self.raw(["desc", "example.mp4"])
+
+    def test_cmd_whisper(self) -> None:
+        model = "ffmpeg_sources/whisper/models/for-tests-ggml-tiny.bin"
+        if not os.path.exists(model):
+            raise SkipTest()
+
+        cmd = ["whisper", "resources/new-commentary.mp3", model, "--debug"]
+        returncode, stdout, stderr = pipe_to_console(self.program + cmd)
+        assert "run transcription at 31752 ms, 106000/106000 samples" in stderr
 
     def test_movflags(self) -> None:
         file = "resources/testsrc.mp4"
@@ -849,7 +858,6 @@ def main():
         for name in dir(Runner)
         if callable(getattr(Runner, name)) and name not in ["main", "raw", "check"]
     }
-    tests.extend([test_methods[name] for name in ["info", "levels", "subdump", "desc"]])
     tests.extend(
         [
             getattr(run, name)
