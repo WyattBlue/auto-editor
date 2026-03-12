@@ -330,7 +330,7 @@ class Runner:
             assert audio.codec.name == "aac"
             assert audio.sample_rate == 48000
             assert audio.language == "eng"
-            assert audio.layout.name == "mono"
+            assert audio.layout.name == "mono", audio.layout.name
 
     # PR #260
     def test_high_speed(self):

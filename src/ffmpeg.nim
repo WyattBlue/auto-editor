@@ -89,7 +89,6 @@ const AV_PIX_FMT_YUV420P* = AVPixelFormat(0)
 const AV_PIX_FMT_YUYV422* = AVPixelFormat(1)
 const AV_PIX_FMT_RGB24* = AVPixelFormat(2)
 const AV_PIX_FMT_RGB8* = AVPixelFormat(20)
-const AV_PIX_FMT_YUV422P10LE* = AVPixelFormat(64)
 
 type
   AVDictionary* {.importc, incompleteStruct, header: "<libavutil/dict.h>".} = object
@@ -611,6 +610,10 @@ proc avcodec_descriptor_get*(id: AVCodecID): ptr AVCodecDescriptor {.importc,
 proc avcodec_parameters_from_context*(par: ptr AVCodecParameters,
     codec: ptr AVCodecContext): cint {.importc,
         header: "<libavcodec/avcodec.h>".}
+proc avcodec_find_best_pix_fmt_of_list*(pix_fmts: ptr UncheckedArray[AVPixelFormat],
+    src_pix_fmt: AVPixelFormat, has_alpha: cint,
+    loss_ptr: ptr cint): AVPixelFormat {.importc,
+        header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_copy*(dst: ptr AVCodecParameters,
     src: ptr AVCodecParameters): cint {.importc,
         header: "<libavcodec/avcodec.h>".}
@@ -771,9 +774,7 @@ proc isKeyframe*(entry: ptr AVIndexEntry): bool {.inline.} =
 
 # SwScale context and functions
 type SwsContext* {.importc: "struct SwsContext",
-    header: "<libswscale/swscale.h>".} = object
-  flags*: cuint
-  threads*: cint
+    header: "<libswscale/swscale.h>", incompleteStruct.} = object
 
 proc sws_alloc_context*(): ptr SwsContext {.importc,
     header: "<libswscale/swscale.h>".}
@@ -784,8 +785,3 @@ proc sws_free_context*(swsContext: ptr ptr SwsContext) {.importc,
 proc sws_scale_frame*(c: ptr SwsContext, dst: ptr AVFrame,
     src: ptr AVFrame): cint {.importc, header: "<libswscale/swscale.h>".}
 
-# SwScale constants
-const
-  SWS_BILINEAR* = 2
-  SWS_BICUBIC* = 4
-  SWS_LANCZOS* = 512

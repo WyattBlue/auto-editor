@@ -70,7 +70,7 @@ func toInt(r: AVRational): int =
   (r.num div r.den).int
 
 proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
-    height: cint = 0): ptr AVFrame =
+    height: cint = 0, ctx: ptr SwsContext = nil): ptr AVFrame =
   if frame == nil:
     return nil
 
@@ -94,28 +94,31 @@ proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0,
   newFrame.height = dstHeight
   newFrame.pts = frame.pts
   newFrame.time_base = frame.time_base
+  newFrame.color_range = frame.color_range
+  newFrame.color_primaries = frame.color_primaries
+  newFrame.color_trc = frame.color_trc
+  newFrame.colorspace = frame.colorspace
 
   var ret = av_frame_get_buffer(newFrame, 32)
   if ret < 0:
     error &"Failed to allocate buffer for new frame: {ret}"
 
-  # Create swscale context
-  var swsContext = sws_alloc_context()
+  var ownedCtx: ptr SwsContext = nil
+  let swsCtx = if ctx != nil:
+    ctx
+  else:
+    ownedCtx = sws_alloc_context()
+    if ownedCtx == nil:
+      error "Failed to allocate sws context"
+    ownedCtx
 
-  if swsContext == nil:
-    error "Failed to allocate swscale context"
+  ret = sws_scale_frame(swsCtx, newFrame, frame)
 
-  swsContext.flags = SWS_BILINEAR.cuint
-  swsContext.threads = 0  # Auto-select based on available CPUs
-
-  # Perform the conversion
-  ret = sws_scale_frame(swsContext, newFrame, frame)
-
-  # Clean up the context
-  sws_free_context(addr swsContext)
+  if ownedCtx != nil:
+    sws_free_context(addr ownedCtx)
 
   if ret < 0:
-    error "Failed to scale frame" # Noreturn
+    error "Failed to scale frame"
 
   return newFrame
 
@@ -280,10 +283,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       i += 1
 
   if needValidFmt:
-    if codec.canonicalName == "gif":
-      pix_fmt = AV_PIX_FMT_RGB8
-    elif codec.canonicalName == "prores":
-      pix_fmt = AV_PIX_FMT_YUV422P10LE
+    if codec.pix_fmts != nil:
+      let best = avcodec_find_best_pix_fmt_of_list(codec.pix_fmts, pix_fmt, 0, nil)
+      pix_fmt = if best != AV_PIX_FMT_NONE: best else: AV_PIX_FMT_YUV420P
     else:
       pix_fmt = AV_PIX_FMT_YUV420P
 
@@ -292,6 +294,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   encoderCtx.pix_fmt = pix_fmt
   encoderCtx.open()
+  pix_fmt = encoderCtx.pix_fmt
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters to stream"
 
@@ -309,6 +312,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let bufferSink = scaleGraph.add("buffersink")
 
     scaleGraph.linkNodes(@[bufferSrc, scaleFilter, bufferSink]).configure()
+
+  # Create a persistent sws context for the per-frame pixel format conversion.
+  # Reusing it avoids the per-frame alloc/init overhead of the new sws API.
+  var reformatCtx: ptr SwsContext = nil
+  if pix_fmt != AVPixelFormat(src.video[0].codecpar.format):
+    reformatCtx = sws_alloc_context()
+    if reformatCtx == nil:
+      error "Failed to allocate reformat sws context"
+    discard av_opt_set_int(reformatCtx, "threads", 0, 0)
 
   # First few frames can have an abnormal keyframe count, so never seek there.
   var seekThreshold = 10
@@ -525,7 +537,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if frame == nil:
           error &"Failed to create fallback frame at {index}tb"
 
-      let reformattedFrame = frame.reformat(pix_fmt)
+      let reformattedFrame = frame.reformat(pix_fmt, ctx = reformatCtx)
       if reformattedFrame != nil and reformattedFrame != frame:
         let oldFrame = frame
         frame = reformattedFrame
@@ -547,6 +559,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
     if scaleGraph != nil:
       scaleGraph.cleanup()
+    if reformatCtx != nil:
+      sws_free_context(addr reformatCtx)
     if lastProcessedFrame != nil and lastProcessedFrame != nullFrame:
       av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)
