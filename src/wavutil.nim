@@ -18,7 +18,7 @@ proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint,
 
 proc createResampler(encoderCtx: ptr AVCodecContext): AudioResampler =
   # Create resampler based on encoder format requirements
-  let outputLayout = if encoderCtx.ch_layout.nb_channels == 1: "mono" else: "stereo"
+  let outputLayout = $encoderCtx.ch_layout
   return newAudioResampler(
     encoderCtx.sample_fmt,
     outputLayout,
