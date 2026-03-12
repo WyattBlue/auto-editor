@@ -331,6 +331,20 @@ proc av_channel_layout_default*(ch_layout: ptr AVChannelLayout,
 proc av_channel_layout_from_string*(channel_layout: ptr AVChannelLayout,
     char: cstring): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
+func `$`*(layout: AVChannelLayout): string =
+  const bufSize: csize_t = 256
+  var buffer = newString(bufSize)
+  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring, bufSize)
+
+  if ret > 0:
+    let actualLen = buffer.find('\0')
+    if actualLen >= 0:
+      result = buffer[0..<actualLen]
+    else:
+      result = buffer
+  else:
+    result = "unknown"
+
 type
   AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>", bycopy.} = object
     buf*: pointer          # reference counted buffer holding the data

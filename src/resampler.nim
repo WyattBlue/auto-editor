@@ -32,13 +32,6 @@ func getFormatName(format: AVSampleFormat): string =
   let name = av_get_sample_fmt_name(format.cint)
   (if name != nil: $name else: "none")
 
-func getLayoutName(layout: AVChannelLayout): string =
-  if layout.nb_channels == 1:
-    "mono"
-  elif layout.nb_channels == 2:
-    "stereo"
-  else:
-    &"{layout.nb_channels}channels"
 
 proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int = 0,
     frameSize: int = 0): AudioResampler =
@@ -109,7 +102,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if frame.pts != AV_NOPTS_VALUE:
       extraArgs = &":time_base={resampler.`template`.time_base}"
 
-    let inputLayoutName = getLayoutName(frame.ch_layout)
+    let inputLayoutName = $frame.ch_layout
     let inputFormatName = getFormatName(AVSampleFormat(frame.format))
 
     let abuffer_args = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:channel_layout={inputLayoutName}{extraArgs}"
@@ -121,7 +114,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
       raise newException(ValueError, &"Could not create abuffer: {ret}")
 
     # Create aformat filter
-    let outputLayoutName = getLayoutName(resampler.layout)
+    let outputLayoutName = $resampler.layout
     let outputFormatName = getFormatName(resampler.format)
     let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:channel_layouts={outputLayoutName}"
 

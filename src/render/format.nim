@@ -113,7 +113,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       else:
         args.audioCodec
       var (aOutStream, aEncCtx) = output.addStream(mixCodec, rate = rate,
-          layout = tl.layout, metadata = {"language": "und"}.toTable)
+          layout = "stereo", metadata = {"language": "und"}.toTable)
       let encoder = aEncCtx.codec
       checkAudioEncoder(encoder, tl.sr)
       aEncCtx.open()
@@ -145,7 +145,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         else:
           args.audioCodec
         var (aOutStream, aEncCtx) = output.addStream(layerCodec, rate = rate,
-            layout = tl.layout, metadata = {"language": $tl.langs[tl.v.len + i]}.toTable)
+            layout = "stereo", metadata = {"language": $tl.langs[tl.v.len + i]}.toTable)
         let encoder = aEncCtx.codec
         checkAudioEncoder(encoder, tl.sr)
         aEncCtx.open()

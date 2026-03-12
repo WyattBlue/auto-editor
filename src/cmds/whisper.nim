@@ -102,10 +102,7 @@ proc main*(cArgs: seq[string]) =
   let audioStream = input.streams[audioStreamIndex]
   let sampleRate = audioStream.codecpar.sample_rate
   let sampleFormat = cast[AVSampleFormat](audioStream.codecpar.format)
-  let channelLayout =
-    if audioStream.codecpar.ch_layout.nb_channels == 1: "mono"
-    elif audioStream.codecpar.ch_layout.nb_channels == 2: "stereo"
-    else: &"{audioStream.codecpar.ch_layout.nb_channels}channels"
+  let channelLayout = $audioStream.codecpar.ch_layout
 
   # Get sample format name
   let sampleFmtName = av_get_sample_fmt_name(cint(sampleFormat))
