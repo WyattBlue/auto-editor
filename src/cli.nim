@@ -11,7 +11,7 @@ const commands*: seq[CmdDef] = @[
   CmdDef(name: "info", help: "Retrieve information and properties about media files"),
   CmdDef(name: "levels", help: "Display loudness over time"),
   CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out"),
-  CmdDef(name: "whisper", help: "Transcribe audio with ggml models"),
+  CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]"),
 ]
 
 type Categories* = enum
