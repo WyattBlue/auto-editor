@@ -36,8 +36,7 @@ proc newAudioIterator(sampleRate: cint, channelLayout: AVChannelLayout,
   result.totalFramesProcessed = 0
   result.totalSamplesWritten = 0
 
-  # Initialize AudioResampler to convert to float format
-  let layoutName = if channelLayout.nb_channels == 1: "mono" else: "stereo"
+  let layoutName = $channelLayout
   result.resampler = newAudioResampler(format = AV_SAMPLE_FMT_FLT, layout = layoutName,
       rate = sampleRate.int)
 

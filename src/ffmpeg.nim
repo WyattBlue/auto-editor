@@ -333,6 +333,9 @@ proc av_channel_layout_from_string*(channel_layout: ptr AVChannelLayout,
 func `$`*(layout: AVChannelLayout): string =
   const bufSize: csize_t = 256
   var buffer = newString(bufSize)
+  if layout.unsafeAddr == nil:
+    return "error"
+
   let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring, bufSize)
 
   if ret > 0:

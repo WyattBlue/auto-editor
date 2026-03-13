@@ -153,7 +153,6 @@ class SkipTest(Exception):
 all_files = (
     "aac.m4a",
     "alac.m4a",
-    "wav/pcm-f32le.wav",
     "wav/pcm-s32le.wav",
     "multi-track.mov",
     "mov_text.mp4",
@@ -375,6 +374,10 @@ class Runner:
         out = self.main(input, ["--edit", "none", "--cut-out", "2sec,end"], "out.gif")
         assert fileinfo(out).videos[0].codec == "gif"
         assert len(fileinfo(out).audios) == 0
+
+    def test_pcm_f32le(self):
+        input = ["resources/wav/pcm-f32le.wav"]
+        out = self.main(input, ["--edit", "audio", "--debug"], "f32out.wav")
 
     def test_margin(self):
         inputs = ["resources/testsrc.mp4"]  # only one ever.
