@@ -1,4 +1,4 @@
-import std/[strformat, strutils, terminal]
+import std/[os, strformat, strutils, terminal]
 import ../[av, cli, ffmpeg, log]
 import ../util/fun
 
@@ -7,7 +7,7 @@ proc printHelp(opts: seq[OptDef]) =
   let optWidth = min(32, termWidth div 3)
   let helpWidth = termWidth - optWidth - 4
 
-  echo "usage: file model [options]\n"
+  echo "Usage: <file> <model> [options]\n"
   echo "Options:"
 
   for opt in opts:
@@ -60,6 +60,8 @@ proc main*(cArgs: seq[string]) =
         inputPath = key
       elif model == "":
         model = key.replace("\\", "\\\\").replace(":", "\\:")
+      else:
+        error "Got too many arguments\nUsage: <file> <model> [options]"
     of "language":
       language = key
     of "format":
@@ -145,7 +147,12 @@ proc main*(cArgs: seq[string]) =
 
   debug whisperArgs
   ret = avfilter_graph_create_filter(addr whisperCtx, whisperFilter, "whisper", whisperArgs.cstring, nil, filterGraph)
-  if ret < 0:
+  if ret == -5:
+    if model.fileExists:
+      error &"Invalid model: {model}"
+    else:
+      error &"Expected this path to exist: {model}"
+  elif ret < 0:
     error &"Failed to create whisper filter with result: {ret}, model: {model}"
 
   # Create buffer sink
