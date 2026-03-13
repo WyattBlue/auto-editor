@@ -31,7 +31,7 @@ proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int =
   if layout != "":
     result.layout = stringToChannelLayout(layout)
   else:
-    result.layout = AVChannelLayout()
+    error "Layout is none"
   result.rate = rate
   result.frameSize = frameSize
   result.graph = nil
@@ -39,6 +39,7 @@ proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int =
   result.isPassthrough = false
   result.abuffer = nil
   result.abuffersink = nil
+  debug "new Audio Sampler: " & $result
 
 proc `=destroy`*(resampler: var AudioResampler) =
   if resampler.graph != nil:
@@ -53,7 +54,10 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
 
   # Shortcut for passthrough
   if resampler.isPassthrough:
-    return @[frame]
+    let cloned = av_frame_clone(frame)
+    if cloned == nil:
+      raise newException(ValueError, "Could not clone passthrough frame")
+    return @[cloned]
 
   # Take source settings from the first frame
   if resampler.graph == nil:
@@ -81,7 +85,10 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
         frame.sample_rate == resampler.rate.cint and
         resampler.frameSize == 0):
       resampler.isPassthrough = true
-      return @[frame]
+      let cloned = av_frame_clone(frame)
+      if cloned == nil:
+        raise newException(ValueError, "Could not clone passthrough frame")
+      return @[cloned]
 
     # Handle resampling with aformat filter
     # (similar to configure_output_audio_filter from ffmpeg)
