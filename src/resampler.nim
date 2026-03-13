@@ -6,7 +6,9 @@ type AudioResampler* = object
   format: AVSampleFormat
   layout: AVChannelLayout
   graph*: ptr AVFilterGraph
-  `template`: ptr AVFrame
+  templateFormat: cint
+  templateChannels: cint
+  templateRate: cint
   abuffer: ptr AVFilterContext
   abuffersink: ptr AVFilterContext
   rate: int
@@ -35,7 +37,6 @@ proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int =
   result.rate = rate
   result.frameSize = frameSize
   result.graph = nil
-  result.`template` = nil
   result.isPassthrough = false
   result.abuffer = nil
   result.abuffersink = nil
@@ -44,8 +45,6 @@ proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int =
 proc `=destroy`*(resampler: var AudioResampler) =
   if resampler.graph != nil:
     avfilter_graph_free(addr resampler.graph)
-  if resampler.`template` != nil:
-    av_frame_free(addr resampler.`template`)
 
 proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFrame] =
   # We don't have any input, so don't bother even setting up
@@ -61,15 +60,6 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
 
   # Take source settings from the first frame
   if resampler.graph == nil:
-    resampler.`template` = av_frame_alloc()
-    if resampler.`template` == nil:
-      raise newException(ValueError, "Could not allocate template frame")
-
-    # Copy frame properties to template
-    av_frame_unref(resampler.`template`)
-    if av_frame_ref(resampler.`template`, frame) < 0:
-      raise newException(ValueError, "Could not reference template frame")
-
     # Set some default descriptors
     if resampler.format == AV_SAMPLE_FMT_NONE:
       resampler.format = AVSampleFormat(frame.format)
@@ -77,6 +67,10 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
       resampler.layout = frame.ch_layout
     if resampler.rate == 0:
       resampler.rate = frame.sample_rate
+
+    resampler.templateFormat = frame.format
+    resampler.templateChannels = frame.ch_layout.nb_channels
+    resampler.templateRate = frame.sample_rate
 
     # Check if we can passthrough or if there is actually work to do
     if (frame.format.int == resampler.format.int and
@@ -99,7 +93,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     # Create buffer source
     var extraArgs = ""
     if frame.pts != AV_NOPTS_VALUE:
-      extraArgs = &":time_base={resampler.`template`.time_base}"
+      extraArgs = &":time_base={frame.time_base}"
 
     let inputLayoutName = $frame.ch_layout
     let inputFormatName = getFormatName(AVSampleFormat(frame.format))
@@ -135,11 +129,14 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if ret < 0:
       raise newException(ValueError, &"Could not configure filter graph: {ret}")
 
+    if resampler.frameSize > 0:
+      av_buffersink_set_frame_size(resampler.abuffersink, resampler.frameSize.cuint)
+
   if frame != nil:
     # Only validate critical properties that would break the filter graph
-    if (frame.format != resampler.`template`.format or
-        frame.ch_layout.nb_channels != resampler.`template`.ch_layout.nb_channels or
-        frame.sample_rate != resampler.`template`.sample_rate):
+    if (frame.format != resampler.templateFormat or
+        frame.ch_layout.nb_channels != resampler.templateChannels or
+        frame.sample_rate != resampler.templateRate):
       error "Frame does not match AudioResampler setup"
 
   let ret = av_buffersrc_write_frame(resampler.abuffer, frame)

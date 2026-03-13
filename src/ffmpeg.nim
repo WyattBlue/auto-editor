@@ -735,6 +735,8 @@ proc av_buffersrc_add_frame*(ctx: ptr AVFilterContext,
     frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersrc.h>".}
 proc av_buffersink_get_frame*(ctx: ptr AVFilterContext,
     frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersink.h>".}
+proc av_buffersink_set_frame_size*(ctx: ptr AVFilterContext,
+    frame_size: cuint) {.importc, header: "<libavfilter/buffersink.h>".}
 proc av_buffersink_get_frame_flags*(ctx: ptr AVFilterContext,
     frame: ptr AVFrame, flags: cint): cint {.importc,
     header: "<libavfilter/buffersink.h>".}
