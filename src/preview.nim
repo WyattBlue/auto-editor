@@ -76,11 +76,15 @@ func allCuts(tl: v3, inLen: int): seq[int] =
     if i == 0 and clipSpans[i][0] != 0:
       cutLens.add(clipSpans[i][0])
 
-    cutLens.add(clipSpans[i + 1][0] - clipSpans[i][1])
+    let cutLen = clipSpans[i + 1][0] - clipSpans[i][1]
+    if cutLen > 0:
+      cutLens.add(cutLen)
     i += 1
 
   if clipSpans.len > 0 and clipSpans[^1][1] < round(inLen / tb):
-    cutLens.add(inLen - clipSpans[^1][1])
+    let trailingCut = inLen - clipSpans[^1][1]
+    if trailingCut > 0:
+      cutLens.add(trailingCut)
 
   return cutLens
 
