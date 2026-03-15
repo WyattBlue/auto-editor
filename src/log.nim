@@ -120,6 +120,7 @@ type mainArgs* = object
 
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
+  smooth*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 100)) # 0.2s,0.1s
   edit*: string = "audio"
   whenNormal*: Actions = aNil
   whenSilent*: Actions = aCut

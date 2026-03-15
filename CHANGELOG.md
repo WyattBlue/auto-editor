@@ -6,6 +6,7 @@
  - Will no longer handle options with underscores. Use dashes instead. e.g. `--sample_rate` -> `sample-rate`
 
 ## Features
+ - Add `--smooth` for setting mincut and minclip respectively. 
  - Add `--set-action`. Allows adding any action anywhere, and is preferred over video/silent speed.
  - whisper: Add `--language`, `--translate`, `--threads`.
 

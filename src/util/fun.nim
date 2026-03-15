@@ -127,24 +127,48 @@ func toTb*(val: PackedInt, tb: float64): int64 =
     return int64(val.getNumber / 1000 * tb)
   return val.getNumber
 
-proc mutRemoveSmall*(arr: var seq[bool], lim: int, replace, with: bool) =
-  var startP = 0
-  var active = false
-  for j, item in arr.pairs:
-    if item == replace:
-      if not active:
-        startP = j
-        active = true
+proc smoothing*(val: var seq[bool], mincut: int, minclip: int) =
+  var prev: seq[bool]
+  while prev != val:
+    prev = val
+    var next = prev
+    var startP = 0
+    var active = false
 
-      if j == len(arr) - 1 and j - startP < lim:
-        for i in startP ..< arr.len:
-          arr[i] = with
-    elif active:
-      if j - startP < lim:
-        for i in startP ..< j:
-          arr[i] = with
-      active = false
+    for j, item in prev.pairs:
+      if item == true:
+        if not active:
+          startP = j
+          active = true
 
+        if j == len(prev) - 1 and j - startP < minclip:
+          for i in startP ..< prev.len:
+            next[i] = false
+      elif active:
+        if j - startP < minclip:
+          for i in startP ..< j:
+            next[i] = false
+        active = false
+
+    startP = 0
+    active = false
+
+    for j, item in prev.pairs:
+      if item == false:
+        if not active:
+          startP = j
+          active = true
+
+        if j == len(prev) - 1 and j - startP < mincut:
+          for i in startP ..< prev.len:
+            next[i] = true
+      elif active:
+        if j - startP < mincut:
+          for i in startP ..< j:
+            next[i] = true
+        active = false
+
+    val = next
 
 proc mutMargin*(arr: var seq[bool], startM, endM: int) =
   # Find start and end indexes

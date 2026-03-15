@@ -255,9 +255,14 @@ proc editMedia*(args: var mainArgs) =
         singleArgs.inputs = @[args.inputs[i]]
 
         var hasLoud = interpretEdit(singleArgs, @[container], tb, bar)
-        let startMargin = toTb(args.margin[0], tb.float64)
-        let endMargin = toTb(args.margin[1], tb.float64)
+        let tbf = tb.float64
+        let startMargin = toTb(args.margin[0], tbf)
+        let endMargin = toTb(args.margin[1], tbf)
+        let mincut = toTb(args.smooth[0], tbf)
+        let minclip = toTb(args.smooth[1], tbf)
+
         mutMargin(hasLoud, startMargin, endMargin)
+        smoothing(hasLoud, mincut, minclip)
 
         var actionMap: seq[Actions] = @[args.whenSilent, args.whenNormal]
         var actionIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
@@ -275,7 +280,6 @@ proc editMedia*(args: var mainArgs) =
           if conLen == 0: conLen = int(round((mediaLength(container) * tb).float64))
           conLen
 
-        let tbf = tb.float64
         for actionRange in args.setAction:
           let span = (actionRange[1], actionRange[2])
           applyToRange(actionIndex, span, tbf, getActionIndex(actionRange[0]), getConLen())

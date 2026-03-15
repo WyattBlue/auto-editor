@@ -46,13 +46,11 @@
 <p>All the edit methods are listed below:</p>
 <h2>Edit Methods</h2>
 <div id="audio" class="palet-block">
-<p class="mono">(<b>audio</b>&nbsp;<span class="palet-var">[threshold]</span>&nbsp;<span class="palet-var">[stream]</span>&nbsp;<span class="palet-var">[mincut]</span>&nbsp;<span class="palet-var">[minclip]</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
+<p class="mono">(<b>audio</b>&nbsp;<span class="palet-var">[threshold]</span>&nbsp;<span class="palet-var">[stream]</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
 <p class="mono">&nbsp;<span class="palet-var">threshold</span>:&nbsp;Threshold&nbsp;=&nbsp;0.04</p>
 <p class="mono">&nbsp;<span class="palet-var">stream</span>:&nbsp;(U Natural 'all)&nbsp;=&nbsp;'all</p>
-<p class="mono">&nbsp;<span class="palet-var">mincut</span>:&nbsp;Natural&nbsp;=&nbsp;6</p>
-<p class="mono">&nbsp;<span class="palet-var">minclip</span>:&nbsp;Natural&nbsp;=&nbsp;3</p>
 </div>
-<p>Do a one-pass audio filter based on loudest sample in a timebase section, divided by the max value a sample can be. Then apply minclip, then mincut since this method particular benenfits.</p>
+<p>Do a one-pass audio filter based on loudest sample in a timebase section, divided by the max value a sample can be.</p>
 
 <div id="motion" class="palet-block">
 <p class="mono">(<b>motion</b>&nbsp;<span class="palet-var">[threshold]</span>&nbsp;<span class="palet-var">[stream]</span>&nbsp;<span class="palet-var">[blur]</span>&nbsp;<span class="palet-var">[width]</span>)&nbsp;→&nbsp;<a href="#bool-array?">bool-array?</a>&nbsp;&nbsp;Procedure</p>
