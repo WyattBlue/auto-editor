@@ -3,33 +3,16 @@ import about
 import ffmpeg
 import log
 
-# macOS's ld appears to remove more deadcode when this linker is placed here.
-{.passL: "-lcrypto".}
-
-const Sha1DigestSize = 20
-
-type
-  Sha1Digest = array[0 .. Sha1DigestSize - 1, uint8]
-  SecureHash = distinct Sha1Digest
-
-proc SHA1(d: ptr uint8, n: csize_t, md: ptr uint8): ptr uint8
-  {.importc: "SHA1", header: "<openssl/sha.h>".}
-
-proc secureHash(str: openArray[char]): SecureHash =
-  var digest: Sha1Digest
-  discard SHA1(cast[ptr uint8](unsafeAddr str[0]), csize_t(str.len), addr digest[0])
-  SecureHash(digest)
-
-proc `$`*(self: SecureHash): string =
-  result = ""
-  for v in Sha1Digest(self):
-    result.add(toHex(int(v), 2))
+import nimcrypto/sha
 
 proc procTag(path: string, tb: AVRational, kind, args: string): string =
   let modTime = getLastModificationTime(path).toUnix().int
   let (_, name, ext) = splitFile(path)
   let key = &"{name}{ext}:{modTime:x}:{tb}:{args}"
-  return ($secureHash(key))[0..<16].toLowerAscii() & kind
+  var ctx: sha1
+  ctx.init()
+  ctx.update(key)
+  return ($ctx.finish())[0..<16].toLowerAscii() & kind
 
 proc saveFloats(filename: string, data: seq[float32]) =
   let fs = newFileStream(filename, fmWrite)

@@ -12,6 +12,7 @@ import util/[color, fun]
 import palet/edit
 
 import tinyre
+import vendor/libp2p/ed25519
 
 proc ctrlc() {.noconv.} =
   error "Keyboard Interrupt"
@@ -141,14 +142,7 @@ proc parseFrameRate(val: string): AVRational =
 
 const PUBLIC_KEY_HEX = "aa8512235f1e329522c00b23e473a810a31ec8ee9c727cda91c779c9db6aae0f"
 
-proc EVP_PKEY_new_raw_public_key(typ: cint, e: pointer, key: ptr byte, keylen: csize_t): pointer {.importc, cdecl.}
-proc EVP_PKEY_free(pkey: pointer) {.importc, cdecl.}
-proc EVP_MD_CTX_new(): pointer {.importc, cdecl.}
-proc EVP_MD_CTX_free(ctx: pointer) {.importc, cdecl.}
-proc EVP_DigestVerifyInit(ctx: pointer, pctx: ptr pointer, md: pointer, e: pointer, pkey: pointer): cint {.importc, cdecl.}
-proc EVP_DigestVerify(ctx: pointer, sig: ptr byte, siglen: csize_t, tbs: ptr byte, tbslen: csize_t): cint {.importc, cdecl.}
-
-func validateKey(val: string): (bool, string) =
+proc validateKey(val: string): (bool, string) =
   if val == "":
     return (false, "")
 
@@ -159,28 +153,18 @@ func validateKey(val: string): (bool, string) =
   let payloadBytes = b64urlDecode(parts[0])
   let sigBytes = b64urlDecode(parts[1])
 
-  if sigBytes.len != 64:
+  if sigBytes.len != EdSignatureSize:
     return (false, "Bad signature length")
 
-  let pubKeyBytes = hexToBytes(PUBLIC_KEY_HEX)
-  let pkey = EVP_PKEY_new_raw_public_key(1087.cint, nil, unsafeAddr pubKeyBytes[0], 32)
-  if pkey == nil:
+  var pubKey: EdPublicKey
+  if not init(pubKey, PUBLIC_KEY_HEX):
     return (false, "Failed to load public key")
-  defer: EVP_PKEY_free(pkey)
 
-  let mdctx = EVP_MD_CTX_new()
-  if mdctx == nil:
-    return (false, "Failed to create MD_CTX")
-  defer: EVP_MD_CTX_free(mdctx)
+  var sig: EdSignature
+  if not init(sig, sigBytes):
+    return (false, "Bad signature length")
 
-  if EVP_DigestVerifyInit(mdctx, nil, nil, nil, pkey) <= 0:
-    return (false,  "Failed to init DigestVerify")
-
-  let valid = EVP_DigestVerify(mdctx,
-    unsafeAddr sigBytes[0], sigBytes.len.csize_t,
-    unsafeAddr payloadBytes[0], payloadBytes.len.csize_t) == 1
-
-  if valid:
+  if verify(sig, payloadBytes, pubKey):
     return (true, cast[string](payloadBytes))
   return (false, "Incorrect key")
 
