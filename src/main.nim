@@ -2,14 +2,9 @@ import std/[options, os, osproc, parseutils, sequtils, strformat, strutils, term
 when not defined(windows):
   import std/posix_utils
 
-import about
-import cli
-import edit
-import log
-import ffmpeg
+import ./[about, cli, conductor, edit, ffmpeg, log]
 import cmds/[completion, info, desc, cache, levels, subdump, whisper]
 import util/[color, fun]
-import palet/edit
 
 import tinyre
 import vendor/libp2p/ed25519
