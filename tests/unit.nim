@@ -1,11 +1,9 @@
 import unittest
 import std/[os, tempfiles]
 
-import ../src/[av, edit, ffmpeg, timeline]
-import ../src/util/[color, fun, lang]
+import ../src/[av, conductor, ffmpeg, media, timeline, wavutil]
 import ../src/cmds/info
-import ../src/media
-import ../src/wavutil
+import ../src/util/[color, fun, lang]
 import ../src/exports/[kdenlive, fcp11]
 
 
