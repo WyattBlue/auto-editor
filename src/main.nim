@@ -79,12 +79,12 @@ proc printHelp() {.noreturn.} =
   echo ""
   quit(0)
 
-proc parseMargin(val: string): (PackedInt, PackedInt) =
+proc parseTwoLengths(val, opt: string): (PackedInt, PackedInt) =
   var vals = val.strip().split(",")
   if vals.len == 1:
     vals.add vals[0]
   if vals.len != 2:
-    error "--margin has too many arguments."
+    error &"--{opt} has too many arguments."
   if "end" in vals:
     error "Invalid number: 'end'"
   if "start" in vals:
@@ -393,7 +393,9 @@ judge making cuts.
       except ValueError:
         error &"{key} is not a choice for --progress\nchoices are:\n  modern, classic, ascii, machine, none"
     of "margin":
-      args.margin = parseMargin(key)
+      args.margin = parseTwoLengths(key, expecting)
+    of "smooth":
+      args.smooth = parseTwoLengths(key, expecting)
     of "key":
       licenseKey = key
     of "tempdir":

@@ -406,7 +406,8 @@ class Runner:
 
         with av.open(out) as container:
             assert container.duration is not None
-            assert container.duration / av.time_base == 6.466625
+            dur = container.duration / av.time_base
+            assert dur == 6.6, dur
 
     def test_track(self):
         out = self.main(["resources/multi-track.mov"], []) + ".mov"

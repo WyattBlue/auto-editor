@@ -174,7 +174,6 @@ proc findExternSubs(input: string): Option[InputContainer] {.raises: [].} =
 proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRational, bar: Bar): seq[bool] =
   var lexer = initLexer("--edit", args.edit)
   var parser = initParser(lexer)
-  let tbFloat = float64(tb)
 
   let expressions: seq[Expr] = parser.parse()
   let expr = expressions[^1]
@@ -192,8 +191,6 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
     var
       threshold: float32 = 0.04
       stream: int32 = 0
-      mincut = 6
-      minclip = 3
       width: int32 = 400
       blur: int32 = 9
       isKey = false
@@ -219,7 +216,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
         return not editEval(node[1], text)
       of "audio":
         stream = -1 # Set to "all" by default
-        let argOrder = @["threshold", "stream", "mincut", "minclip"]
+        let argOrder = @["threshold", "stream"]
 
         for expr in node[1 ..< node.len]:
           let val = parseColFunc(argPos, isKey, argOrder, expr, text)
@@ -227,8 +224,6 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
           case argPos:
           of 0: threshold = parseThres(val)
           of 1: stream = (if val == "all": -1 else: parseNat(val))
-          of 2: mincut = parseTimeSimple(val).toTb(tbFloat)
-          of 3: minclip = parseTimeSimple(val).toTb(tbFloat)
           else: error "Too many args"
 
           if not isKey:
@@ -242,9 +237,6 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
               result.orWithThreshold(audio(bar, container, inp, tb, i.int32), threshold)
           else:
             result.orWithThreshold(audio(bar, container, inp, tb, stream), threshold)
-
-        mutRemoveSmall(result, minclip, true, false)
-        mutRemoveSmall(result, mincut, false, true)
         return result
       of "motion":
         threshold = 0.02 # Reduce default threshold
