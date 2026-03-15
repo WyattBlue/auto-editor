@@ -1,413 +1,355 @@
-import std/[options, os, random, sets, sequtils, strformat, strutils, terminal, times]
-from std/browsers import openDefaultBrowser
-from std/math import round
+import std/[math, options, os, sequtils, strformat, strutils]
+import ./[av, editlexer, ffmpeg, log]
+import ./analyze/[audio, motion, subtitle]
+import ./util/[bar, fun]
 
-import av
-import log
-import media
-import ffmpeg
-import timeline
-import palet/edit
-import util/[color, bar, fun, rules]
-
-import imports/[fcp7, json]
-import exports/[fcp7, fcp11, json, shotcut, kdenlive]
-import preview
-import render/format
-
-proc stopTimer() =
-  let secondLen: float = round(epochTime() - start, 2)
-  let minuteLen = toTimecode(secondLen, display)
-
-  echo &"Finished. took {secondLen} seconds ({minuteLen})"
+import tinyre
 
 
-proc parseExportString*(exportStr: string): (string, string, string) =
-  var kind = exportStr
-  var name = "Auto-Editor Media Group"
-  var version = "11"
+func isSymbol(self: Expr, name, text: string): bool =
+  self.kind == ExprSym and name == text[self.`from` ..< self.to]
 
-  let colonPos = exportStr.find(':')
-  if colonPos == -1:
-    return (kind, name, version)
+func `or`(a, b: seq[bool]): seq[bool] =
+  result = newSeq[bool](max(a.len, b.len))
+  for i in 0 ..< result.len:
+    let aVal = if i < a.len: a[i] else: false
+    let bVal = if i < b.len: b[i] else: false
+    result[i] = aVal or bVal
 
-  kind = exportStr[0..colonPos-1]
-  let paramsStr = exportStr[colonPos+1..^1]
+func `and`(a, b: seq[bool]): seq[bool] =
+  result = newSeq[bool](min(a.len, b.len))
+  for i in 0 ..< result.len:
+    result[i] = a[i] and b[i]
 
-  var i = 0
-  while i < paramsStr.len:
-    while i < paramsStr.len and paramsStr[i] == ' ':
-      inc i
+func `xor`(a, b: seq[bool]): seq[bool] =
+  result = newSeq[bool](max(a.len, b.len))
+  for i in 0 ..< result.len:
+    let aVal = if i < a.len: a[i] else: false
+    let bVal = if i < b.len: b[i] else: false
+    result[i] = aVal xor bVal
 
-    if i >= paramsStr.len:
-      break
+func `not`(a: seq[bool]): seq[bool] =
+  result = newSeq[bool](a.len)
+  for i in 0 ..< a.len:
+    result[i] = not a[i]
 
-    var paramStart = i
-    while i < paramsStr.len and paramsStr[i] != '=':
-      inc i
-
-    if i >= paramsStr.len:
-      break
-
-    let paramName = paramsStr[paramStart..i-1]
-    inc i
-
-    var value = ""
-    if i < paramsStr.len and paramsStr[i] == '"':
-      inc i
-      while i < paramsStr.len:
-        if paramsStr[i] == '\\' and i + 1 < paramsStr.len:
-          # Handle escape sequences
-          inc i
-          case paramsStr[i]:
-            of '"': value.add('"')
-            of '\\': value.add('\\')
-            else:
-              value.add('\\')
-              value.add(paramsStr[i])
-        elif paramsStr[i] == '"':
-          inc i
-          break
-        else:
-          value.add(paramsStr[i])
-        inc i
-    else:
-      # Unquoted value (until comma or end)
-      while i < paramsStr.len and paramsStr[i] != ',':
-        value.add(paramsStr[i])
-        inc i
-
-    case paramName:
-      of "name": name = value
-      of "version": version = value
-      else: error &"Unknown parameter: {paramName}"
-
-    # Skip comma
-    if i < paramsStr.len and paramsStr[i] == ',':
-      inc i
-
-  return (kind, name, version)
-
-func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (int64, int64) =
-  var start = toTb(span[0], tb)
-  var stop = toTb(span[1], tb)
-  if start < 0:
-    start = max(0, arrayLen + start)
-  if stop < 0:
-    stop = max(0, arrayLen + stop)
-  return (start, stop)
-
-proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64,
-  value: int, maxLen: int) =
-  let len = if maxLen > 0: maxLen else: actionIndex.len
-  let (start, stop) = normalizeRange(span, tb, len)
-  let cappedStop = min(stop, len.int64)
-  if cappedStop > actionIndex.len:
-    actionIndex.setLen(cappedStop)
-  for i in start ..< min(stop, actionIndex.len):
-    actionIndex[i] = value
-
-proc setOutput(userOut, `export`, path: string): (string, string) =
-  var dir, name, ext: string
-  if userOut == "" or userOut == "-":
-    if path == "":
-      error "`--output` must be set." # When a timeline file is the input.
-    (dir, name, ext) = splitFile(path)
+proc orWithThreshold(result: var seq[bool], levels: seq[float32], threshold: float32) =
+  if result.len == 0:
+    result = newSeq[bool](levels.len)
+    for i in 0 ..< levels.len:
+      result[i] = levels[i] >= threshold
   else:
-    (dir, name, ext) = splitFile(userOut)
+    let n = min(result.len, levels.len)
+    for i in 0 ..< n:
+      result[i] = result[i] or (levels[i] >= threshold)
+    for i in result.len ..< levels.len:
+      result.add levels[i] >= threshold
 
-  let root = dir / name
-
-  if ext == "":
-    # Use `mp4` as the default, because it is most compatible.
-    ext = (if path == "": ".mp4" else: splitFile(path).ext)
-
-  var myExport = `export` # Create mutable copy
-  if myExport == "":
-    case ext:
-      of ".xml": myExport = "premiere"
-      of ".fcpxml": myExport = "final-cut-pro"
-      of ".mlt": myExport = "shotcut"
-      of ".kdenlive": myExport = "kdenlive"
-      of ".json", ".v1": myExport = "v1"
-      of ".v2": myExport = "v2"
-      of ".v3": myExport = "v3"
-      else: myExport = "default"
-
-  case myExport:
-    of "premiere", "resolve-fcp7": ext = ".xml"
-    of "final-cut-pro", "resolve": ext = ".fcpxml"
-    of "shotcut": ext = ".mlt"
-    of "kdenlive": ext = ".kdenlive"
-    of "v1":
-      if ext != ".json":
-        ext = ".v1"
-    of "v2": ext = ".v2"
-    of "v3": ext = ".v3"
-    else: discard
-
-  if userOut == "-":
-    return ("-", myExport)
-  if userOut == "":
-    return (&"{root}_ALTERED{ext}", myExport)
-
-  return (&"{root}{ext}", myExport)
-
-
-proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
-  if codec == "auto":
-    if src.a.len == 0:
-      codec = rule.defaultAud
-    else:
-      codec = $avcodec_get_name(src.a[0].codecId)
-      let avCodec = initCodec(codec)
-      if avCodec == nil or avCodec.sample_fmts == nil:
-        codec = "aac"
-
-      # For PCM-based containers (WAV, etc.), prefer PCM even if other codecs are supported
-      if ext in [".wav", ".aiff", ".au"] and rule.defaultAud.startsWith("pcm_"):
-        codec = rule.defaultAud
-      elif codec notin rule.acodecs.mapIt($it.name):
-        if rule.defaultAud != "none":
-          codec = rule.defaultAud
-        else:
-          codec = "aac"
-
-  if codec != "none" and codec notin rule.acodecs.mapIt($it.name):
-    let avCodec = initCodec(codec)
-    if avCodec == nil:
-      error &"Unknown encoder: {codec}"
-
-    # Normalize encoder names
-    if not rule.acodecs.anyIt(it.id == avCodec.id):
-      error &"'{avCodec.name}' audio encoder is not supported in the '{ext}' container"
-
-  return codec
-
-proc setVideoCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
-  if codec == "auto":
-    codec = (if src.v.len == 0: "h264" else: $avcodec_get_name(src.v[0].codecId))
-    if codec notin rule.vcodecs.mapIt($it.name) and rule.defaultVid != "none":
-      return rule.default_vid
-    return codec
-
-  if codec notin rule.vcodecs.mapIt($it.name):
-    let avCodec = initCodec(codec)
-    if avCodec == nil:
-      error &"Unknown encoder: {codec}"
-
-    # Normalize encoder names
-    if not rule.vcodecs.anyIt(it.id == avCodec.id):
-      error &"'{avCodec.name}' video encoder is not supported in the '{ext}' container"
-
-  return codec
-
-proc editMedia*(args: var mainArgs) =
-  av_log_set_level(AV_LOG_QUIET)
-
-  var tlV3: v3
-  var interner: StringInterner
-  var output: string
-  var usePath: string = ""
-  var mi: MediaInfo
-  defer: interner.cleanup()
-
-  if args.progress == BarType.machine and args.output != "-":
-    conwrite("Starting")
-
-  let bar = initBar(args.progress)
-
-  if args.inputs.len == 0 and not stdin.isatty():
-    let stdinContent = readAll(stdin)
-    tlV3 = readJson(stdinContent, interner)
-    applyArgs(tlV3, args)
+proc parseThres(val: string): float32 =
+  let (num, unit) = splitNumStr(val)
+  if unit == "%":
+    result = float32(num / 100)
+  elif unit == "dB":
+    result = float32(pow(10, num / 20))
+  elif unit == "":
+    result = float32(num)
   else:
-    if args.inputs.len == 0:
-      error "You need to give auto-editor an input file."
-    let input = args.inputs[0]
-    let inputExt = splitFile(input).ext
+    error &"Unknown unit: {unit}"
 
-    if inputExt in [".v1", ".v2", ".v3", ".json"]:
-      tlV3 = readJson(readFile(input), interner)
-      applyArgs(tlV3, args)
-    elif inputExt == ".xml":
-      tlV3 = fcp7ReadXml(input, interner)
-      applyArgs(tlV3, args)
-      usePath = input
+  if result < 0 or result > 1:
+    error &"Threshold not in range: {val} ({result})"
+
+proc parseFloatInRange(val: string, min, max: float32): float32 {.raises:[].} =
+  try:
+    result = parseFloat(val)
+  except ValueError:
+    error &"Invalid number: {val}"
+  if result < min or result > max:
+    error &"value {result} is outside range [{min}, {max}]"
+
+proc parseNat(val: string): int32 =
+  result = int32(parseInt(val))
+  if result < 0:
+    error "Invalid natural: " & val
+
+proc parseBool(val: string): bool =
+  if val == "#t" or val == "true":
+    return true
+  if val == "#f" or val == "false":
+    return false
+  error "Invalid boolean (expected true or false): " & val
+
+proc parseColFunc(argPos: var int, isKey: var bool, argOrder: seq[string], expr: Expr, text: string): string =
+  if expr.kind == ExprList and expr.elements[0].isSymbol("=", text):
+    let node = expr.elements
+    let key = text[node[1].`from` ..< node[1].to]
+    isKey = true
+    argPos = argOrder.find(key)
+    if argPos == -1:
+      error &"got an unexpected keyword argument: {key}"
+    return text[node[2].`from` ..< node[2].to]
+  else:
+    if isKey:
+      error "Positional arguments must never come after keyword arguments"
+    return text[expr.`from` ..< expr.to]
+
+
+proc parseNorm*(norm: string): Norm =
+  if norm == "#f" or norm == "false":
+    return Norm(kind: nkNull)
+
+  var lexer = initLexer("--audio-normalize", norm)
+  var parser = initParser(lexer)
+  let expressions: seq[Expr] = parser.parse()
+  let expr = expressions[^1]
+  if expr.kind != ExprList:
+    error "Should never happen"
+
+  var
+    isKey = false
+    argPos = 0
+
+  proc normEval(expr: Expr, text: string): Norm =
+    if expr.kind != ExprList or expr.elements.len == 0:
+      error "Bad kind"
+
+    let node = expr.elements
+    if node[0].kind == ExprList and node.len == 1:
+      return normEval(node[0], text)
+
+    if node[0].kind == ExprSym:
+      case text[node[0].`from` ..< node[0].to]:
+      of "ebu":
+        let argOrder = @["i", "lra", "tp", "gain"]
+        var
+          i: float32 = -24.0
+          lra: float32 = 7.0
+          tp: float32 = -2.0
+          gain: float32 = 0.0
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+
+          case argPos:
+          of 0: i = parseFloatInRange(val, -70.0, 5.0)
+          of 1: lra = parseFloatInRange(val, 1.0, 50.0)
+          of 2: tp = parseFloatInRange(val, -9.0, 0.0)
+          of 3: gain = parseFloatInRange(val, -99.0, 99.0)
+          else: error "Too many args"
+
+          if not isKey:
+            argPos += 1
+
+        return Norm(kind: nkEbu, i: i, lra: lra, tp: tp, gain: gain)
+      of "peak":
+        let argOrder = @["t"]
+        var t: float32 = -8.0
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+
+          case argPos:
+          of 0: t = parseFloatInRange(val, -99.0, 0.0)
+          else: error "Too many args"
+
+          if not isKey:
+            argPos += 1
+
+        return Norm(kind: nkPeak, t: t)
+      else:
+        error &"Unknown audio norm: {text[node[0].`from` ..< node[0].to]}"
     else:
-      usePath = input
-      var tb = AVRational(30)
-      if args.frameRate != AVRational(num: 0, den: 0):
-        tb = args.frameRate
+      error "Invalid audio norm expression."
 
-      let bg = args.background.get(RGBColor(red: 0, green: 0, blue: 0))
-      var tlInitialized = false
+  return normEval(expr, norm)
 
-      for i in 0 ..< args.inputs.len:
-        var container = (try: av.open(args.inputs[i]) except IOError as e: error e.msg)
-        defer: container.close()
+proc findExternSubs(input: string): Option[InputContainer] {.raises: [].} =
+  try:
+    some(av.open(input.changeFileExt("srt")))
+  except IOError:
+    try:
+      some(av.open(input.changeFileExt("ass")))
+    except IOError:
+      none(InputContainer)
 
-        if i == 0 and args.frameRate == AVRational(num: 0, den: 0):
-          if container.video.len > 0:
-            tb = makeSaneTimebase(container.video[0].avg_frame_rate)
+proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRational, bar: Bar): seq[bool] =
+  var lexer = initLexer("--edit", args.edit)
+  var parser = initParser(lexer)
 
-        var singleArgs = args
-        singleArgs.inputs = @[args.inputs[i]]
+  let expressions: seq[Expr] = parser.parse()
+  let expr = expressions[^1]
+  if expr.kind != ExprList:
+    error "Should never happen"
 
-        var hasLoud = interpretEdit(singleArgs, @[container], tb, bar)
-        let tbf = tb.float64
-        let startMargin = toTb(args.margin[0], tbf)
-        let endMargin = toTb(args.margin[1], tbf)
-        let mincut = toTb(args.smooth[0], tbf)
-        let minclip = toTb(args.smooth[1], tbf)
+  proc editEval(expr: Expr, text: string): seq[bool] =
+    if expr.kind != ExprList or expr.elements.len == 0:
+      error "Bad kind"
 
-        mutMargin(hasLoud, startMargin, endMargin)
-        smoothing(hasLoud, mincut, minclip)
+    let node = expr.elements
+    if node[0].kind == ExprList and node.len == 1:
+      return editEval(node[0], text)
 
-        var actionMap: seq[Actions] = @[args.whenSilent, args.whenNormal]
-        var actionIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
+    var
+      threshold: float32 = 0.04
+      stream: int32 = 0
+      width: int32 = 400
+      blur: int32 = 9
+      isKey = false
+      argPos = 0
 
-        proc getActionIndex(actions: Actions): int =
-          let index = actionMap.find(actions)
-          if index == -1:
-            actionMap.add(actions)
-            return actionMap.len - 1
+    if node[0].kind == ExprSym:
+      case text[node[0].`from` ..< node[0].to]:
+      of "or":
+        result = editEval(node[1], text)
+        for i in 2 ..< node.len:
+          result = result or editEval(node[i], text)
+      of "and":
+        result = editEval(node[1], text)
+        for i in 2 ..< node.len:
+          result = result and editEval(node[i], text)
+      of "xor":
+        result = editEval(node[1], text)
+        for i in 2 ..< node.len:
+          result = result xor editEval(node[i], text)
+      of "not":
+        if node.len != 2:
+          error "Wrong arity"
+        return not editEval(node[1], text)
+      of "audio":
+        stream = -1 # Set to "all" by default
+        let argOrder = @["threshold", "stream"]
+
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+
+          case argPos:
+          of 0: threshold = parseThres(val)
+          of 1: stream = (if val == "all": -1 else: parseNat(val))
+          else: error "Too many args"
+
+          if not isKey:
+            argPos += 1
+
+        for ci in 0 ..< containers.len:
+          let container = containers[ci]
+          let inp = args.inputs[ci]
+          if stream == -1:
+            for i in 0 ..< container.audio.len:
+              result.orWithThreshold(audio(bar, container, inp, tb, i.int32), threshold)
           else:
-            return index
+            result.orWithThreshold(audio(bar, container, inp, tb, stream), threshold)
+        return result
+      of "motion":
+        threshold = 0.02 # Reduce default threshold
+        let argOrder = @["threshold", "stream", "width", "blur"]
 
-        var conLen = 0
-        proc getConLen(): int =
-          if conLen == 0: conLen = int(round((mediaLength(container) * tb).float64))
-          conLen
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
 
-        for actionRange in args.setAction:
-          let span = (actionRange[1], actionRange[2])
-          applyToRange(actionIndex, span, tbf, getActionIndex(actionRange[0]), getConLen())
+          case argPos:
+          of 0: threshold = parseThres(val)
+          of 1: stream = parseNat(val)
+          of 2: width = parseNat(val)
+          of 3: blur = parseNat(val)
+          else: error "Too many args"
 
-        let inputMi = initMediaInfo(container.formatContext, args.inputs[i])
+          if not isKey:
+            argPos += 1
 
-        if not tlInitialized:
-          mi = inputMi
-          tlV3 = initLinearTimeline(addr args.inputs[i], tb, bg, mi, actionMap, actionIndex)
-          tlInitialized = true
-        else:
-          appendLinearTimeline(tlV3, addr args.inputs[i], inputMi, actionIndex)
+        for ci in 0 ..< containers.len:
+          result.orWithThreshold(motion(bar, containers[ci], args.inputs[ci], tb, stream, width, blur), threshold)
+        return result
+      of "subtitle", "regex":
+        let argOrder = @["pattern", "stream", "ignore-case"] # "max-count"]
+        var pattern = ""
+        var flags: set[ReFlag]
 
-      applyArgs(tlV3, args)
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+          case argPos:
+          of 0: pattern = val
+          of 1: stream = parseNat(val)
+          of 2:
+            if parseBool(val):
+              flags.incl reIgnoreCase
+          else: error "Too many args"
 
-  var exportKind, tlName, fcpVersion: string
-  if args.`export` == "":
-    (output, exportKind) = setOutput(args.output, "", usePath)
-    tlName = "Auto-Editor Media Group"
-    fcpVersion = "11"
-  else:
-    (exportKind, tlName, fcpVersion) = parseExportString(args.`export`)
-    (output, _) = setOutput(args.output, exportKind, usePath)
+        if pattern == "":
+          error &"{text[node[0].`from` ..< node[0].to]}: pattern required"
 
-  if args.preview:
-    preview(tlV3)
-    return
+        let regexPattern = re(pattern, flags)
+        for ci in 0 ..< containers.len:
+          let container = containers[ci]
+          let (ret, val) = subtitle(container, tb, regexPattern, stream)
+          var subResult: seq[bool]
+          if ret != -1:
+            let subcontainer = findExternSubs(args.inputs[ci])
+            if subcontainer.isNone():
+              error &"regex: subtitle stream '{ret}' does not exist."
 
-  case exportKind:
-  of "v1", "v2", "v3":
-    exportJsonTl(tlV3, exportKind, output)
-    return
-  of "premiere":
-    fcp7_write_xml(tlName, output, false, tlV3)
-    return
-  of "resolve-fcp7":
-    fcp7_write_xml(tlName, output, true, tlV3)
-    return
-  of "final-cut-pro":
-    fcp11_write_xml(tlName, fcpVersion, output, false, tlV3)
-    return
-  of "resolve":
-    tlV3.setStreamTo0(interner)
-    fcp11_write_xml(tlName, fcpVersion, output, true, tlV3)
-    return
-  of "shotcut":
-    shotcut_write_mlt(output, tlV3)
-    return
-  of "kdenlive":
-    kdenliveWrite(output, tlV3)
-    return
-  of "default", "clip-sequence":
-    discard
-  else:
-    error &"Unknown export format: {exportKind}"
+            let index = int32(stream - container.subtitle.len)
+            let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+            if ret2 != -1:
+              error &"regex: subtitle stream '{ret2}' does not exist."
+            subResult = val2
+          else:
+            subResult = val
+          if result.len == 0:
+            result = subResult
+          else:
+            result = result or subResult
+        return result
+      of "word":
+        let argOrder = @["value", "stream", "ignore-case"]
+        var pattern = ""
+        var ignoreCase = true
+        var flags: set[ReFlag]
 
-  if output == "-":
-    error "Exporting media files to stdout is not supported."
+        for expr in node[1 ..< node.len]:
+          let val = parseColFunc(argPos, isKey, argOrder, expr, text)
+          case argPos:
+          of 0: pattern = escapeRe(val)
+          of 1: stream = parseNat(val)
+          of 2: ignoreCase = parseBool(val)
+          else: error "Too many args"
 
-  let (_, _, outExt) = splitFile(output)
-  let rule = initRules(outExt.toLowerAscii)
-  args.videoCodec = setVideoCodec(args.videoCodec, outExt, mi, rule)
-  if args.audioCodec != "auto":
-    args.audioCodec = setAudioCodec(args.audioCodec, outExt, mi, rule)
+        if pattern == "":
+          error "word: value required"
 
-  proc createAlphanumTempDir(length: int = 8): string =
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-    const prefix = "tmp"
-    var suffix = ""
-    for i in 0..<length:
-      suffix.add(chars[rand(chars.len - 1)])
+        pattern = "\\b" & pattern & "\\b"
+        if ignoreCase:
+          flags.incl reIgnoreCase
 
-    let dirName = prefix & suffix
-    let fullPath = getTempDir() / dirName
-    createDir(fullPath)
-    return fullPath
+        let regexPattern = re(pattern, flags)
+        for ci in 0 ..< containers.len:
+          let container = containers[ci]
+          let (ret, val) = subtitle(container, tb, regexPattern, stream)
+          var subResult: seq[bool]
+          if ret != -1:
+            let subcontainer = findExternSubs(args.inputs[ci])
+            if subcontainer.isNone():
+              error &"word: subtitle stream '{ret}' does not exist."
 
-  if tempDir == "":
-    randomize()
-    tempDir = createAlphanumTempDir()
-  else:
-    if fileExists(tempDir):
-      error "Temp directory cannot be an already existing file."
-    if dirExists(tempDir):
-      discard
+            let index = int32(stream - container.subtitle.len)
+            let (ret2, val2) = subtitle(subcontainer.unsafeGet(), tb, regexPattern, index)
+            if ret2 != -1:
+              error &"word: subtitle stream '{ret2}' does not exist."
+            subResult = val2
+          else:
+            subResult = val
+          if result.len == 0:
+            result = subResult
+          else:
+            result = result or subResult
+        return result
+      of "none":
+        let length = mediaLength(containers[0])
+        let tbLength = (round((length * tb).float64)).int64
+
+        return newSeqWith(tbLength, true)
+      of "all", "all/e":  # TODO: Remove all/e next major release
+        return @[]
+      else:
+        error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
     else:
-      createDir(tempDir)
+      error "Expected a function"
 
-  debug &"Temp Directory: {tempDir}"
-
-  if args.`export` == "clip-sequence":
-    if tlV3.isNonlinear:
-      error "Timeline too complex to use clip-sequence export"
-
-    func appendFilename(path, val: string): string =
-      let (dir, name, ext) = splitFile(path)
-      return (dir / name) & val & ext
-
-    var clips2: seq[Clip2] = @[]
-    for clip in tlV3.clips2:
-      if not tlV3.effects[clip.effect].isCut:
-        clips2.add(clip)
-
-    let unique = tlV3.uniqueSources()
-    var src: ptr string
-    for u in unique:
-      src = u
-      break
-    if src == nil:
-      error "Trying to render an empty timeline"
-    let mi = initMediaInfo(src[])
-    const black = RGBColor(red: 0, green: 0, blue: 0)
-
-    var cache = newMediaCache()
-    defer: cache.close()
-
-    for clipNum, clip2 in clips2.pairs:
-      var myTimeline = toNonLinear2(src, tlV3.tb, black, mi, @[clip2], tlV3.effects)
-      applyArgs(myTimeline, args)
-      makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar, cache)
-  else:
-    makeMedia(args, tlV3, output, rule, bar)
-
-  bar.destroy()
-  stopTimer()
-
-  if args.noOpen:
-    discard
-  elif args.open:
-    openDefaultBrowser(output)
-  closeTempDir()
+  return editEval(expr, args.edit)
