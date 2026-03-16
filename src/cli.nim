@@ -17,6 +17,18 @@ const commands*: seq[CmdDef] = @[
 type Categories* = enum
   cNone cEdit cTl cUrl cDis cCon cVid cAud cMis
 
+func categoryName*(c: Categories): string =
+  case c
+  of cNone: ""
+  of cEdit: "Editing Options"
+  of cTl: "Timeline Options"
+  of cUrl: "URL Download Options"
+  of cDis: "Display Options"
+  of cCon: "Container Settings"
+  of cVid: "Video Rendering"
+  of cAud: "Audio Rendering"
+  of cMis: "Miscellaneous"
+
 type OptKind* = enum
   Regular   # expecting = $datum
   Flag      # $datum = true
