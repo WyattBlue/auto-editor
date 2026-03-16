@@ -13,8 +13,6 @@ import ../[av, ffmpeg]
 import ../resampler
 import ../graph
 
-const AV_CH_LAYOUT_STEREO = 3'u64
-
 # Import C string functions for JSON capture
 proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
 proc strncat(dest: cstring, src: cstring, n: csize_t): cstring {.
@@ -390,7 +388,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
 
     inputFrame.nb_samples = samples.cint
     inputFrame.format = AV_SAMPLE_FMT_S16P.cint
-    inputFrame.ch_layout = chLayout
+    discard av_channel_layout_copy(addr inputFrame.ch_layout, addr chLayout)
     inputFrame.sample_rate = sourceSr
     inputFrame.pts = AV_NOPTS_VALUE
 
@@ -508,7 +506,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: 
 
   inputFrame.nb_samples = samples.cint
   inputFrame.format = AV_SAMPLE_FMT_S16P.cint
-  inputFrame.ch_layout = resChLayout
+  discard av_channel_layout_copy(addr inputFrame.ch_layout, addr resChLayout)
   inputFrame.sample_rate = sourceSr
   inputFrame.pts = AV_NOPTS_VALUE
 
@@ -680,9 +678,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
     analysisFrame.nb_samples = totalSamples.cint
     analysisFrame.format = AV_SAMPLE_FMT_FLTP.cint
-    analysisFrame.ch_layout.nb_channels = targetChannels.cint
-    analysisFrame.ch_layout.order = 0
-    analysisFrame.ch_layout.u.mask = AV_CH_LAYOUT_STEREO
+    av_channel_layout_default(addr analysisFrame.ch_layout, targetChannels.cint)
     analysisFrame.sample_rate = sr.cint
     analysisFrame.pts = 0
 
@@ -756,9 +752,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
     inputFrame.nb_samples = totalSamples.cint
     inputFrame.format = AV_SAMPLE_FMT_FLTP.cint
-    inputFrame.ch_layout.nb_channels = targetChannels.cint
-    inputFrame.ch_layout.order = 0
-    inputFrame.ch_layout.u.mask = AV_CH_LAYOUT_STEREO
+    av_channel_layout_default(addr inputFrame.ch_layout, targetChannels.cint)
     inputFrame.sample_rate = sr.cint
     inputFrame.pts = 0
 
@@ -864,7 +858,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       av_frame_unref(frame)
       frame.nb_samples = currentFrameSize.cint
       frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
-      frame.ch_layout = targetChLayout
+      discard av_channel_layout_copy(addr frame.ch_layout, addr targetChLayout)
       frame.sample_rate = sr.cint
       frame.pts = samplesYielded.int64
       frame.time_base = AVRational(num: 1, den: sr.cint)

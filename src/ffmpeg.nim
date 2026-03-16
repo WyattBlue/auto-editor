@@ -96,15 +96,8 @@ type
     key*: cstring
     value*: cstring
 
-  AVChannelLayout* {.importc, completeStruct, header: "<libavutil/channel_layout.h>", bycopy.} = object
-    order*: cint
+  AVChannelLayout* {.importc, incompleteStruct, header: "<libavutil/channel_layout.h>".} = object
     nb_channels*: cint
-    u*: AVChannelLayoutMask
-    opaque: pointer
-
-  AVChannelLayoutMask* {.union.} = object
-    mask*: uint64
-    map*: array[64, uint8]
 
   AVOutputFormat* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
     name*: cstring
@@ -329,15 +322,15 @@ proc av_channel_layout_default*(ch_layout: ptr AVChannelLayout,
     nb_channels: cint) {.importc, header: "<libavutil/channel_layout.h>".}
 proc av_channel_layout_from_string*(channel_layout: ptr AVChannelLayout,
     char: cstring): cint {.importc, header: "<libavutil/channel_layout.h>".}
+proc av_channel_layout_copy*(dst, src: ptr AVChannelLayout): cint {.importc,
+    header: "<libavutil/channel_layout.h>".}
+proc av_channel_layout_compare*(chl, chl1: ptr AVChannelLayout): cint {.importc,
+    header: "<libavutil/channel_layout.h>".}
 
-func `$`*(layout: AVChannelLayout): string =
+func `$`*(layout: ptr AVChannelLayout): string =
   const bufSize: csize_t = 256
   var buffer = newString(bufSize)
-  if layout.unsafeAddr == nil:
-    return "error"
-
-  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring, bufSize)
-
+  let ret = av_channel_layout_describe(layout, buffer.cstring, bufSize)
   if ret > 0:
     let actualLen = buffer.find('\0')
     if actualLen >= 0:
@@ -346,6 +339,13 @@ func `$`*(layout: AVChannelLayout): string =
       result = buffer
   else:
     result = "unknown"
+
+template `$`*(layout: AVChannelLayout): string = $(unsafeAddr layout)
+
+proc `=copy`*(dest: var AVChannelLayout, src: AVChannelLayout) {.error:
+    "Direct copy of AVChannelLayout is forbidden. Use av_channel_layout_copy() instead.".}
+proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
+  discard av_channel_layout_copy(addr dest, unsafeAddr src)
 
 type
   AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>", bycopy.} = object

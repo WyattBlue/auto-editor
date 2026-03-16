@@ -18,9 +18,7 @@ type AudioResampler* = object
 proc stringToChannelLayout(layout: string): AVChannelLayout =
   let ret = av_channel_layout_from_string(addr result, layout.cstring)
   if ret < 0:
-    result.nb_channels = 2
-    result.order = 0 # AV_CHANNEL_ORDER_NATIVE
-    result.u.mask = 3 # AV_CH_LAYOUT_STEREO
+    av_channel_layout_default(addr result, 2)  # 'Stereo' as fallback.
 
 func getFormatName(format: AVSampleFormat): string =
   let name = av_get_sample_fmt_name(format.cint)
@@ -64,7 +62,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if resampler.format == AV_SAMPLE_FMT_NONE:
       resampler.format = AVSampleFormat(frame.format)
     if resampler.layout.nb_channels == 0:
-      resampler.layout = frame.ch_layout
+      discard av_channel_layout_copy(addr resampler.layout, addr frame.ch_layout)
     if resampler.rate == 0:
       resampler.rate = frame.sample_rate
 
@@ -74,8 +72,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
 
     # Check if we can passthrough or if there is actually work to do
     if (frame.format.int == resampler.format.int and
-        frame.ch_layout.nb_channels == resampler.layout.nb_channels and
-        frame.ch_layout.u.mask == resampler.layout.u.mask and
+        av_channel_layout_compare(addr frame.ch_layout, addr resampler.layout) == 0 and
         frame.sample_rate == resampler.rate.cint and
         resampler.frameSize == 0):
       resampler.isPassthrough = true

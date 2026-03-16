@@ -84,7 +84,7 @@ proc processAndEncodeFrame(
 
   # Set up encoder frame properties
   encoderFrame.format = encoderCtx.sample_fmt.cint
-  encoderFrame.ch_layout = encoderCtx.ch_layout
+  discard av_channel_layout_copy(addr encoderFrame.ch_layout, addr encoderCtx.ch_layout)
   encoderFrame.sample_rate = encoderCtx.sample_rate
   encoderFrame.nb_samples = audioBuffer.frameSize
 
@@ -142,7 +142,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
 
   let (encoder, encoderCtx) = initEncoder(outputCtx.oformat.audio_codec)
   encoderCtx.sample_rate = decoderCtx.sample_rate
-  encoderCtx.ch_layout = decoderCtx.ch_layout
+  discard av_channel_layout_copy(addr encoderCtx.ch_layout, addr decoderCtx.ch_layout)
   encoderCtx.time_base = AVRational(num: 1, den: encoderCtx.sample_rate)
 
   if (outputCtx.oformat.flags and AVFMT_GLOBALHEADER) != 0:
@@ -247,7 +247,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
       var silenceFrame = av_frame_alloc()
       if silenceFrame != nil:
         silenceFrame.format = encoderCtx.sample_fmt.cint
-        silenceFrame.ch_layout = encoderCtx.ch_layout
+        discard av_channel_layout_copy(addr silenceFrame.ch_layout, addr encoderCtx.ch_layout)
         silenceFrame.sample_rate = encoderCtx.sample_rate
         silenceFrame.nb_samples = silenceSamples
 

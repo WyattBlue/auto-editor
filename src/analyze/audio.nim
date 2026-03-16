@@ -24,7 +24,7 @@ type
     audioIndex*: cint
     chunkDuration*: float64
 
-proc newAudioIterator(sampleRate: cint, channelLayout: AVChannelLayout,
+proc newAudioIterator(sampleRate: cint, channelLayout: ptr AVChannelLayout,
     chunkDuration: float64): AudioIterator =
   result = AudioIterator()
   result.sampleRate = sampleRate
@@ -153,7 +153,7 @@ iterator loudness*(processor: var AudioProcessor, container: InputContainer): fl
   for decodedFrame in container.decode(processor.audioIndex, processor.codecCtx, frame):
     if processor.`iterator` == nil:
       processor.`iterator` = newAudioIterator(decodedFrame.sample_rate,
-        decodedFrame.ch_layout, processor.chunkDuration)
+        addr decodedFrame.ch_layout, processor.chunkDuration)
 
     processor.`iterator`.writeFrame(decodedFrame)
 
