@@ -240,4 +240,4 @@ Set where the temporary directory is located
 Show info about this program or option
 
 ---
-Version 29.8.2<br>Generated: 2026-03-15.
+Version 30.0.0<br>Generated: 2026-03-16.
