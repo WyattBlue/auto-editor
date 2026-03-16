@@ -7,7 +7,7 @@ import ffmpeg
 import log
 import timeline
 
-proc timeFrame(title: string, ticks: int, tb: float, per: string = ""): string =
+func timeFrame(title: string, ticks: int, tb: float, per: string = ""): string =
   let tc = toTimecode(ticks.float64 / tb, Code.ass)
   let tp = (if tc.startsWith("-"): 9 else: 10)
   let tcp = (if tc.startsWith("-"): 12 else: 11)

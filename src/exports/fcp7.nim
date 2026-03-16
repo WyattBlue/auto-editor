@@ -34,7 +34,7 @@ func setTbNtsc(tb: AVRational): (int64, string) =
   return (tb.int64, "FALSE")
 
 
-proc elem(tag, text: string): XmlNode =
+func elem(tag, text: string): XmlNode =
   let e = newElement(tag)
   e.add newText(text)
   return e
