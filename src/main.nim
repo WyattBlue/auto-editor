@@ -15,24 +15,12 @@ proc ctrlc() {.noconv.} =
 setControlCHook(ctrlc)
 
 
-func categoryName(c: Categories): string =
-  case c
-  of cNone: ""
-  of cEdit: "Editing Options"
-  of cTl: "Timeline Options"
-  of cUrl: "URL Download Options"
-  of cDis: "Display Options"
-  of cCon: "Container Settings"
-  of cVid: "Video Rendering"
-  of cAud: "Audio Rendering"
-  of cMis: "Miscellaneous"
-
 proc printHelp() {.noreturn.} =
   let termWidth = max(terminalWidth(), 40)
   let optWidth = min(32, termWidth div 3)
   let helpWidth = termWidth - optWidth - 4
 
-  echo "usage: [file | url ...] [options]\n"
+  echo "Usage: [file | url ...] [options]\n"
   echo "Commands:"
   echo "  " & commands.mapIt(it.name).join(" ") & "\n"
   echo "Options:"
