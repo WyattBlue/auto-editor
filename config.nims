@@ -31,7 +31,7 @@ when hostOS == "macosx":
   switch("passL", "-framework VideoToolbox -framework AudioToolbox")
   switch("passL", "-framework CoreFoundation -framework CoreMedia -framework CoreVideo")
 elif hostOS == "windows":
-  switch("passL", "-lpthread -lbcrypt -lsetupapi -lole32 -luuid -lcrypt32 -lws2_32")
+  switch("passL", "-lpthread -lbcrypt -lsetupapi -lole32 -luuid")
 elif hostOS == "linux":
   when hostCPU == "arm64":
     switch("passL", "-L./build/lib/aarch64-linux-gnu")
