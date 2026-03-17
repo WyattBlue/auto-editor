@@ -351,9 +351,6 @@ proc `=copy`*(dest: var AVChannelLayout, src: AVChannelLayout) {.error:
     "Direct copy of AVChannelLayout is forbidden. Use av_channel_layout_copy() instead.".}
 
 proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
-  # av_channel_layout_copy internally calls av_channel_layout_uninit(dest),
-  # which crashes if dest contains garbage. Zero first to be safe.
-  zeroMem(addr dest, sizeof(dest))
   discard av_channel_layout_copy(addr dest, unsafeAddr src)
 
 type

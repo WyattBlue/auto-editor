@@ -31,8 +31,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # - os: ubuntu-24.04
-          # - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
           - os: macos-latest
     steps:
       - name: Checkout

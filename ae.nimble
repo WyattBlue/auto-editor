@@ -75,15 +75,16 @@ disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dp
 # Can only encode
 disableEncoders &= "a64_multi,a64_multi5,ttml".split(",")
 
-# Technically obsolete
-disableDecoders &= "alias_pix,ape,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,jacosub,magicyuv,nellymoser,pgmyuv,smacker,smc,snow,sonic,sonic_ls,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
-disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,magicyuv,nellymoser,pgmyuv,smc,snow,sonic,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+# Technically obsolete [adpcm]
+disableDecoders &= "adpcm_adx,adpcm_argo,adpcm_g722,adpcm_g726,adpcm_g726le,adpcm_ima_alp,adpcm_ima_amv,adpcm_ima_apm,adpcm_ima_cunning,adpcm_ima_dat4,adpcm_ima_dk3,adpcm_ima_dk4,adpcm_ima_ea_eacs,adpcm_ima_ea_sead,adpcm_ima_iss,adpcm_ima_moflex,adpcm_ima_mtf,adpcm_ima_oki,adpcm_ima_qt,adpcm_ima_qt_at,adpcm_ima_rad,adpcm_ima_smjpeg,adpcm_ima_ssi,adpcm_ima_wav,adpcm_ima_ws,adpcm_ima_xbox,adpcm_ms,adpcm_mtaf,adpcm_psx,adpcm_sanyo,adpcm_sbpro_2,adpcm_sbpro_3,adpcm_sbpro_4,adpcm_swf,adpcm_thp,adpcm_thp_le,adpcm_vima,adpcm_xa,adpcm_xmd,adpcm_yamaha,adpcm_zork".split(",")
+disableEncoders &= "adpcm_adx,adpcm_argo,adpcm_g722,adpcm_g726,adpcm_g726le,adpcm_ima_alp,adpcm_ima_amv,adpcm_ima_apm,adpcm_ima_qt,adpcm_ima_ssi,adpcm_ima_wav,adpcm_ima_ws,adpcm_ms,adpcm_swf,adpcm_yamaha".split(",")
+
+# Technically obsolute
+disableDecoders &= "alias_pix,ape,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,jacosub,magicyuv,nellymoser,pgmyuv,speedhq,smacker,smc,snow,sonic,sonic_ls,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,magicyuv,nellymoser,pgmyuv,speedhq,smc,snow,sonic,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
 disableMuxers &= "flv,f4v,jacosub,nut,rm,rso,segafilm,sup,swf,truehd,wsaud,wtv,wv".split(",")
 disableDemuxers &= "a64,alp,ape,apm,bink,binka,flv,jacosub,kux,live_flv,mm,nistsphere,nut,pp_bnk,redspark,rm,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
 disableParsers &= @["misc4", "tak"]
-
-disableDecoders.add "speedhq"
-disableEncoders.add "speedhq"
 
 # Irrelevant to this project
 disableMuxers &= "framecrc,framehash,framemd5,hash,hls,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
@@ -599,7 +600,6 @@ filters.add "scale,crop,pad,format,gblur,lut,negate,aformat,abuffer,abuffersink,
 proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false): string =
   var commonFlags = &"""
   --enable-version3 \
-  --enable-memory-poisoning \
   --enable-static \
   --disable-shared \
   --disable-programs \

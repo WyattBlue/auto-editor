@@ -38,6 +38,7 @@ proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int =
   result.isPassthrough = false
   result.abuffer = nil
   result.abuffersink = nil
+  debug "new Audio Sampler: " & $result
 
 proc `=destroy`*(resampler: var AudioResampler) =
   if resampler.graph != nil:
