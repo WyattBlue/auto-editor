@@ -377,6 +377,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   let pixFmtName = $av_get_pix_fmt_name(pix_fmt)
   let graphTb = av_inv_q(targetFps)
   let bg = tl.bg.toString
+  let globalScaleArgs = &"{tl.res[0]}:{tl.res[1]}:force_original_aspect_ratio=decrease:eval=frame"
 
   if needsScaling:
     let bufferArgs = &"video_size={tl.res[0]}x{tl.res[1]}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
@@ -532,10 +533,22 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             seekFrame = none(int)
 
           if (frame.width.int, frame.height.int) != tl.res:
+            var resGraph = newGraph()
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            let bufferSrc = resGraph.add("buffer", bufferArgs)
+            let scaleFilter = resGraph.add("scale", globalScaleArgs)
+            let padFilter = resGraph.add("pad",
+                &"{tl.res[0]}:{tl.res[1]}:-1:-1:color={bg}")
+            let bufferSink = resGraph.add("buffersink")
+
+            resGraph.linkNodes(@[bufferSrc, scaleFilter, padFilter,
+                bufferSink]).configure()
+            resGraph.push(frame)
             let oldFrame = frame
-            frame = scaleWithPad(frame, cint(tl.res[0]), cint(tl.res[1]), tl.bg)
+            frame = resGraph.pull()
             if oldFrame != nil and oldFrame != nullFrame:
               av_frame_free(addr oldFrame)
+            resGraph.cleanup()
 
       if scaleGraph != nil and frame.width != targetWidth:
         scaleGraph.push(frame)

@@ -38,7 +38,7 @@ diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
 @@ -198,8 +202,13 @@ static void run_transcription(AVFilterContext *ctx, AVFrame *frame, int samples)
             "run transcription at %" PRId64 " ms, %d/%d samples (%.2f seconds)...\n",
             timestamp_ms, samples, wctx->audio_buffer_fill_size, duration);
- 
+
 -    struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
 +    struct whisper_full_params params = wctx->beam_size > 1
 +        ? whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH)
@@ -55,7 +55,7 @@ diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
      params.max_len = wctx->max_len;
      params.token_timestamps = (wctx->max_len > 0);
 +    params.split_on_word = (wctx->max_len > 0);
- 
+
      if (whisper_full(wctx->ctx_wsp, params, wctx->audio_buffer, samples) != 0) {
          av_log(ctx, AV_LOG_ERROR, "Failed to process audio with whisper.cpp\n");
 @@ -443,6 +453,10 @@ static int query_formats(const AVFilterContext *ctx,
@@ -69,3 +69,29 @@ diff --git a/libavfilter/af_whisper.c b/libavfilter/af_whisper.c
      { "queue", "Audio queue size", OFFSET(queue), AV_OPT_TYPE_DURATION, {.i64 = 3000000}, 20000, HOURS, .flags = FLAGS },
      { "use_gpu", "Use GPU for processing", OFFSET(use_gpu), AV_OPT_TYPE_BOOL, {.i64 = 1}, 0, 1, .flags = FLAGS },
      { "gpu_device", "GPU device to use", OFFSET(gpu_device), AV_OPT_TYPE_INT, {.i64 = 0}, 0, INT_MAX, .flags = FLAGS },
+diff --git a/libavfilter/vf_pad.c b/libavfilter/vf_pad.c
+--- a/libavfilter/vf_pad.c
++++ b/libavfilter/vf_pad.c
+@@ -239,11 +239,21 @@
+     int plane;
+
+     if (s->inlink_w <= 0)
++        return NULL;
++
++    /* When s->x > 0 the per-plane data pointers would be shifted by a
++     * sub-linesize pixel amount after allocation.  Upstream SIMD output
++     * routines (e.g. the scale filter's NEON code on Windows ARM64) may
++     * fault on such non-linesize-aligned pointers.  Return NULL so the
++     * upstream filter allocates its own buffer; filter_frame will copy
++     * the data into the padded output instead, which is always safe.
++     * Vertical-only offsets (s->y) are always linesize-aligned and safe. */
++    if (s->x)
+         return NULL;
+
+     frame = ff_get_video_buffer(inlink->dst->outputs[0],
+                                 w + (s->w - s->in_w),
+-                                h + (s->h - s->in_h) + (s->x > 0));
++                                h + (s->h - s->in_h));
+
+     if (!frame)
+         return NULL;
