@@ -126,6 +126,7 @@ test "size-of-objects":
   check sizeof(SubtitleStream) == 16
   check sizeof(MediaInfo) == 96
   check sizeof(Clip) == 40
+  check sizeof(AVChannelLayout) == 24
 
   check sizeof(RGBColor) == 3
   check sizeof(v3) == 144

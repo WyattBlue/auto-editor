@@ -43,6 +43,7 @@ proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int =
 proc `=destroy`*(resampler: var AudioResampler) =
   if resampler.graph != nil:
     avfilter_graph_free(addr resampler.graph)
+  av_channel_layout_uninit(addr resampler.layout)
 
 proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFrame] =
   # We don't have any input, so don't bother even setting up
@@ -81,13 +82,10 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
         raise newException(ValueError, "Could not clone passthrough frame")
       return @[cloned]
 
-    # Handle resampling with aformat filter
-    # (similar to configure_output_audio_filter from ffmpeg)
     resampler.graph = avfilter_graph_alloc()
     if resampler.graph == nil:
       raise newException(ValueError, "Could not allocate filter graph")
 
-    # Create buffer source
     var extraArgs = ""
     if frame.pts != AV_NOPTS_VALUE:
       extraArgs = &":time_base={frame.time_base}"
@@ -103,7 +101,6 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if ret < 0:
       raise newException(ValueError, &"Could not create abuffer: {ret}")
 
-    # Create aformat filter
     let outputLayoutName = $resampler.layout
     let outputFormatName = getFormatName(resampler.format)
     let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:channel_layouts={outputLayoutName}"
@@ -115,11 +112,9 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if ret < 0:
       raise newException(ValueError, &"Could not create aformat: {ret}")
 
-    # Create buffer sink
     ret = avfilter_graph_create_filter(addr resampler.abuffersink, avfilter_get_by_name("abuffersink"),
                                       "out", nil, nil, resampler.graph)
 
-    # Link filters: abuffer -> aformat -> abuffersink
     ret = avfilter_link(resampler.abuffer, 0, aformat, 0)
     ret = avfilter_link(aformat, 0, resampler.abuffersink, 0)
     ret = avfilter_graph_config(resampler.graph, nil)
@@ -140,7 +135,6 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
   if ret < 0:
     error &"Error pushing frame to filter: {ret}"
 
-  # Pull output frames
   var output: seq[ptr AVFrame] = @[]
   while true:
     var outFrame = av_frame_alloc()
