@@ -430,7 +430,7 @@ class Runner:
 
     def test_res_with_v1(self):
         v1 = self.main(["example.mp4"], ["--export", "v1"], "input.v1")
-        out = self.main([v1], ["-res", "720,720"], "output.mp4")
+        out = self.main([v1], ["-res", "720,720", "--debug"], "output1.mp4")
 
         output = fileinfo(out)
         assert output.videos[0].res == (720, 720), output.videos[0].res
@@ -438,10 +438,19 @@ class Runner:
 
     def test_res_with_v2(self):
         v2 = self.main(["example.mp4"], ["--export", "v2"], "input.v2")
-        out = self.main([v2], ["-res", "720,720"], "output2.mp4")
+        out = self.main([v2], ["-res", "720,720", "--debug"], "output2.mp4")
 
         output = fileinfo(out)
         assert output.videos[0].res == (720, 720), output.videos[0].res
+        assert len(output.audios) == 1
+
+    def test_res_with_v3(self):
+        v3 = self.main(["example.mp4"], ["--export", "v3"], "input.v3")
+        assert v3.endswith("input.v3")
+        out = self.main([v3], ["-res", "700,380", "--debug"], "output3.mp4")
+
+        output = fileinfo(out)
+        assert output.videos[0].res == (700, 380), output.videos[0].res
         assert len(output.audios) == 1
 
     def test_premiere_named_export(self) -> None:
@@ -854,7 +863,10 @@ def run_tests(tests: list[Callable], args) -> None:
     print(
         f"\nCompleted  {passed}/{total}\nreal time: {real_time} secs   total: {total_time} secs"
     )
-
+    if passed == total:
+        quit(0)
+    else:
+        quit(1)
 
 def main():
     args = test_options().parse_args()

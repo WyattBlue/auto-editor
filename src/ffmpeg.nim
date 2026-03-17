@@ -96,8 +96,11 @@ type
     key*: cstring
     value*: cstring
 
-  AVChannelLayout* {.importc, incompleteStruct, header: "<libavutil/channel_layout.h>".} = object
-    nb_channels*: cint
+  AVChannelLayout* {.importc, completeStruct, header: "<libavutil/channel_layout.h>".} = object
+    order: cint        # AVChannelOrder enum (4 bytes)
+    nb_channels*: cint # (4 bytes)
+    u_mask: uint64     # union u — largest member (8 bytes)
+    opaque: pointer    # (8 bytes)
 
   AVOutputFormat* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
     name*: cstring
@@ -326,6 +329,8 @@ proc av_channel_layout_copy*(dst, src: ptr AVChannelLayout): cint {.importc,
     header: "<libavutil/channel_layout.h>".}
 proc av_channel_layout_compare*(chl, chl1: ptr AVChannelLayout): cint {.importc,
     header: "<libavutil/channel_layout.h>".}
+proc av_channel_layout_uninit*(channel_layout: ptr AVChannelLayout) {.importc,
+    header: "<libavutil/channel_layout.h>".}
 
 func `$`*(layout: ptr AVChannelLayout): string =
   const bufSize: csize_t = 256
@@ -344,7 +349,11 @@ template `$`*(layout: AVChannelLayout): string = $(unsafeAddr layout)
 
 proc `=copy`*(dest: var AVChannelLayout, src: AVChannelLayout) {.error:
     "Direct copy of AVChannelLayout is forbidden. Use av_channel_layout_copy() instead.".}
+
 proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
+  # av_channel_layout_copy internally calls av_channel_layout_uninit(dest),
+  # which crashes if dest contains garbage. Zero first to be safe.
+  zeroMem(addr dest, sizeof(dest))
   discard av_channel_layout_copy(addr dest, unsafeAddr src)
 
 type

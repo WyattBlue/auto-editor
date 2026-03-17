@@ -82,9 +82,12 @@ disableMuxers &= "flv,f4v,jacosub,nut,rm,rso,segafilm,sup,swf,truehd,wsaud,wtv,w
 disableDemuxers &= "a64,alp,ape,apm,bink,binka,flv,jacosub,kux,live_flv,mm,nistsphere,nut,pp_bnk,redspark,rm,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
 disableParsers &= @["misc4", "tak"]
 
+disableDecoders.add "speedhq"
+disableEncoders.add "speedhq"
+
 # Irrelevant to this project
-disableMuxers &= "framecrc,framehash,framemd5,hash,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
-disableDemuxers &= "vplayer".split(",")
+disableMuxers &= "framecrc,framehash,framemd5,hash,hls,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
+disableDemuxers &= "hls,jpegxl_anim,vplayer".split(",")
 
 # Image formats
 disableDecoders &= "sunrast,tiff".split(",")
@@ -596,6 +599,7 @@ filters.add "scale,crop,pad,format,gblur,lut,negate,aformat,abuffer,abuffersink,
 proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false): string =
   var commonFlags = &"""
   --enable-version3 \
+  --enable-memory-poisoning \
   --enable-static \
   --disable-shared \
   --disable-programs \

@@ -178,6 +178,82 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
+proc scaleWithPad(src: ptr AVFrame, targetW, targetH: cint, bg: RGBColor): ptr AVFrame =
+  ## Scale src to fit within targetW x targetH preserving aspect ratio,
+  ## centering with bg color padding. Returns a new YUV420P frame.
+  ## Uses sws_scale_frame + manual pixel copy to avoid filter graph NEON
+  ## crashes on Windows ARM64.
+  let srcW = src.width
+  let srcH = src.height
+
+  # Compute fitted dims (equivalent to scale=force_original_aspect_ratio=decrease)
+  var scaledW = targetW
+  var scaledH = targetH
+  if srcW.int * targetH.int > srcH.int * targetW.int:
+    scaledH = cint((srcH.int * targetW.int) div srcW.int) and not 1.cint
+    if scaledH < 2: scaledH = 2
+  elif srcH.int * targetW.int > srcW.int * targetH.int:
+    scaledW = cint((srcW.int * targetH.int) div srcH.int) and not 1.cint
+    if scaledW < 2: scaledW = 2
+
+  # Create background frame (YUV420P, same as makeSolid output)
+  var output = makeSolid(targetW, targetH, bg)
+  if output == nil:
+    error "Could not create background frame in scaleWithPad"
+  output.pts = src.pts
+  output.time_base = src.time_base
+
+  # Scale + convert to YUV420P. Use a valid sws context but don't pre-allocate
+  # the destination buffer — sws_scale_frame calls av_frame_get_buffer itself
+  # when dst->data[0] is null, which avoids failures with unusual source frame
+  # layouts (e.g. dvvideo). A nil context is not safe in FFmpeg 8.1+.
+  var scaled = av_frame_alloc()
+  if scaled == nil:
+    av_frame_free(addr output)
+    error "Could not allocate scaled frame"
+  scaled.format = AV_PIX_FMT_YUV420P.cint
+  scaled.width = scaledW
+  scaled.height = scaledH
+  # Propagate interlaced flags so sws_frame_setup doesn't reject mismatched frames.
+  # AV_FRAME_FLAG_INTERLACED = 1<<3, AV_FRAME_FLAG_TOP_FIELD_FIRST = 1<<4
+  scaled.flags = src.flags and (8 or 16).cint
+  var swsCtx = sws_alloc_context()
+  if swsCtx == nil:
+    av_frame_free(addr scaled)
+    av_frame_free(addr output)
+    error "Could not allocate sws context in scaleWithPad"
+  let scaleRet = sws_scale_frame(swsCtx, scaled, src)
+  sws_free_context(addr swsCtx)
+  if scaleRet < 0:
+    av_frame_free(addr scaled)
+    av_frame_free(addr output)
+    error &"Could not scale frame in scaleWithPad: {scaleRet}"
+
+  # Even pixel offsets required for YUV420P chroma subsampling
+  let ox = ((targetW - scaledW) div 2) and not 1.cint
+  let oy = ((targetH - scaledH) div 2) and not 1.cint
+
+  # Copy Y plane
+  for y in 0 ..< scaled.height.int:
+    let sp = cast[pointer](cast[int](scaled.data[0]) + y * scaled.linesize[0].int)
+    let dp = cast[pointer](cast[int](output.data[0]) + (oy.int + y) * output.linesize[0].int + ox.int)
+    copyMem(dp, sp, scaled.width.int)
+
+  # Copy U plane (half dimensions for YUV420P)
+  for y in 0 ..< (scaled.height div 2).int:
+    let sp = cast[pointer](cast[int](scaled.data[1]) + y * scaled.linesize[1].int)
+    let dp = cast[pointer](cast[int](output.data[1]) + ((oy div 2).int + y) * output.linesize[1].int + (ox div 2).int)
+    copyMem(dp, sp, (scaled.width div 2).int)
+
+  # Copy V plane (half dimensions for YUV420P)
+  for y in 0 ..< (scaled.height div 2).int:
+    let sp = cast[pointer](cast[int](scaled.data[2]) + y * scaled.linesize[2].int)
+    let dp = cast[pointer](cast[int](output.data[2]) + ((oy div 2).int + y) * output.linesize[2].int + (ox div 2).int)
+    copyMem(dp, sp, (scaled.width div 2).int)
+
+  av_frame_free(addr scaled)
+  return output
+
 proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     cache: MediaCache = nil):
     (ptr AVCodecContext, ptr AVStream, iterator(): (ptr AVFrame, int)) =
@@ -301,7 +377,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   let pixFmtName = $av_get_pix_fmt_name(pix_fmt)
   let graphTb = av_inv_q(targetFps)
   let bg = tl.bg.toString
-  let globalScaleArgs = &"{tl.res[0]}:{tl.res[1]}:force_original_aspect_ratio=decrease:eval=frame"
 
   if needsScaling:
     let bufferArgs = &"video_size={tl.res[0]}x{tl.res[1]}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
@@ -354,8 +429,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     return lastKeyframePos[src]
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int) =
+    debug &"video iter: started, frame={cast[int](frame):#x} nullFrame={cast[int](nullFrame):#x}"
     # Process each frame in timeline order like Python version
     for index in 0 ..< tl.`end`:
+      debug &"video iter: index={index}"
       objList = @[]
 
       for layer in tl.v:
@@ -366,7 +443,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let srcStream = myCache.cns[obj.src].video[0]
             let srcTb = srcStream.avg_frame_rate
             let sourceFramePos = int(round(float(timelinePos) * srcTb.float / tl.tb.float))
-
             let effectGroup = tl.effects[obj.effects]
             var speed = 1.0
             for effect in effectGroup:
@@ -376,21 +452,22 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let i = int(round(float(sourceFramePos) * speed))
             objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup)
 
+      debug &"video iter: objList.len={objList.len} isNonlinear={isNonlinear}"
       if isNonlinear:
         # When there can be valid gaps in the timeline and no objects for this frame.
         frame = av_frame_clone(nullFrame)
-      elif pix_fmt == AV_PIX_FMT_RGB8:
-        if lastProcessedFrame != nil:
-          let oldFrame = frame
+      else:
+        # Always start with a fresh frame to avoid reusing encoder-unref'd frames
+        let oldFrame = frame
+        if pix_fmt == AV_PIX_FMT_RGB8 and lastProcessedFrame != nil:
           frame = av_frame_clone(lastProcessedFrame)
-          if oldFrame != nil and oldFrame != nullFrame:
-            av_frame_free(addr oldFrame)
         else:
           frame = av_frame_clone(nullFrame)
-      else:
-        discard # use the last frame
+        if oldFrame != nil and oldFrame != nullFrame:
+          av_frame_free(addr oldFrame)
 
       for obj in objList:
+        debug &"video iter: obj.index={obj.index} frameIndex={frameIndex}"
         # Check if we can reuse the last processed frame
         if obj.index == lastFrameIndex and lastProcessedFrame != nil:
           frame = av_frame_clone(lastProcessedFrame)
@@ -428,9 +505,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               avcodec_flush_buffers(decoders[obj.src])
               lastSeekTarget[obj.src] = obj.index
 
+          debug &"video iter: before flushDecode frameIndex={frameIndex}"
           let decoder: ptr AVCodecContext = decoders[obj.src]
           var foundFrame = false
           for decodedFrame in myCache.cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
+            debug &"video iter: flushDecode yielded frame {frame.width}x{frame.height}"
             frame = decodedFrame
             frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
 
@@ -453,22 +532,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             seekFrame = none(int)
 
           if (frame.width.int, frame.height.int) != tl.res:
-            var resGraph = newGraph()
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            let bufferSrc = resGraph.add("buffer", bufferArgs)
-            let scaleFilter = resGraph.add("scale", globalScaleArgs)
-            let padFilter = resGraph.add("pad",
-                &"{tl.res[0]}:{tl.res[1]}:-1:-1:color={bg}")
-            let bufferSink = resGraph.add("buffersink")
-
-            resGraph.linkNodes(@[bufferSrc, scaleFilter, padFilter,
-                bufferSink]).configure()
-            resGraph.push(frame)
             let oldFrame = frame
-            frame = resGraph.pull()
+            frame = scaleWithPad(frame, cint(tl.res[0]), cint(tl.res[1]), tl.bg)
             if oldFrame != nil and oldFrame != nullFrame:
               av_frame_free(addr oldFrame)
-            resGraph.cleanup()
 
       if scaleGraph != nil and frame.width != targetWidth:
         scaleGraph.push(frame)
@@ -537,6 +604,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if frame == nil:
           error &"Failed to create fallback frame at {index}tb"
 
+      debug &"video iter: before reformat frame={frame.width}x{frame.height}"
       let reformattedFrame = frame.reformat(pix_fmt, ctx = reformatCtx)
       if reformattedFrame != nil and reformattedFrame != frame:
         let oldFrame = frame
@@ -555,6 +623,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         lastProcessedFrame = av_frame_clone(frame)
         lastFrameIndex = objList[0].index
 
+      debug &"video iter: yielding frame={frame.width}x{frame.height} pts={frame.pts}"
       yield (frame, index)
 
     if scaleGraph != nil:

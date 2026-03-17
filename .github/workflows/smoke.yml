@@ -31,9 +31,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          # - os: ubuntu-24.04
+          # - os: ubuntu-24.04-arm
           - os: macos-latest
-          - os: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -84,7 +84,6 @@ jobs:
         run: brew install nim
       - name: Install mingw-w64
         run: |
-          sudo apt-get update
           sudo apt-get install -y mingw-w64 mingw-w64-tools mingw-w64-x86-64-dev
           sudo apt-get install -y build-essential pkg-config nasm git meson
           echo "DISABLE_VPX=1" >> $GITHUB_ENV
@@ -132,7 +131,6 @@ jobs:
         run: brew install nim
       - name: Install llvm-mingw
         run: |
-          sudo apt-get update
           sudo apt-get install -y build-essential pkg-config git meson
           curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-aarch64.tar.xz
           tar xf llvm-mingw.tar.xz

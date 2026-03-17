@@ -847,6 +847,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   var samplesYielded = 0
   var frameIndex = 0
   var resampler = newAudioResampler(fmt, tl.layout, sr)
+
   var frame = av_frame_alloc()
   if frame == nil:
     error "Could not allocate audio frame"
@@ -859,6 +860,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       frame.nb_samples = currentFrameSize.cint
       frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
       discard av_channel_layout_copy(addr frame.ch_layout, addr targetChLayout)
+
       frame.sample_rate = sr.cint
       frame.pts = samplesYielded.int64
       frame.time_base = AVRational(num: 1, den: sr.cint)
