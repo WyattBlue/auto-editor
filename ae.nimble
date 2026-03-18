@@ -99,18 +99,14 @@ disableEncoders &= ["h261"]
 disableParsers.add "h261"
 
 # Irrelevant to this project
-disableDecoders &= "targa".split(",")
-disableEncoders &= "targa".split(",")
-disableMuxers &= "framecrc,framehash,framemd5,hash,hls,image2pipe,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
-disableDemuxers &= "hls,image2pipe,jpegxl_anim,vplayer".split(",")
+disableDecoders &= "jpeg2000,jpegls,sunrast,targa,tiff".split(",")
+disableEncoders &= "jpeg2000,jpegls,sunrast,targa,tiff".split(",")
+disableMuxers &= "framecrc,framehash,framemd5,hash,hls,ico,image2,image2pipe,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
+disableDemuxers &= "hls,ico,image_tiff_pipe,image_svg_pipe,image2,image2pipe,jpegxl_anim,vplayer".split(",")
+disableParsers &= "jpeg2000,jpegxs".split(",")
 
 disableDemuxers &= "image_bmp_pipe,image_cri_pipe,image_dpx_pipe,image_exr_pipe,image_gem_pipe,image_gif_pipe,image_hdr_pipe,image_j2k_pipe,image_jpeg_pipe,image_jpegls_pipe,image_jpegxl_pipe,image_jpegxs_pipe,image_pam_pipe,image_pbm_pipe,image_pcx_pipe,image_pfm_pipe,image_pgm_pipe,image_pgmyuv_pipe,image_pgx_pipe,image_phm_pipe,image_photocd_pipe,image_pictor_pipe,image_png_pipe,image_ppm_pipe,image_psd_pipe,image_qdraw_pipe,image_qoi_pipe,image_sgi_pipe,image_sunrast_pipe,image_vbn_pipe,image_webp_pipe,image_xbm_pipe,image_xpm_pipe,image_xwd_pipe".split(",")
 
-# Image formats
-disableDecoders &= "sunrast,tiff".split(",")
-disableEncoders &= "sunrast,tiff".split(",")
-disableMuxers.add "ico"
-disableDemuxers &= "ico,image_tiff_pipe,image_svg_pipe".split(",")
 
 type Package = object
   name: string
