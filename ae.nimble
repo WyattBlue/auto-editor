@@ -80,15 +80,31 @@ disableDecoders &= "adpcm_adx,adpcm_argo,adpcm_g722,adpcm_g726,adpcm_g726le,adpc
 disableEncoders &= "adpcm_adx,adpcm_argo,adpcm_g722,adpcm_g726,adpcm_g726le,adpcm_ima_alp,adpcm_ima_amv,adpcm_ima_apm,adpcm_ima_qt,adpcm_ima_ssi,adpcm_ima_wav,adpcm_ima_ws,adpcm_ms,adpcm_swf,adpcm_yamaha".split(",")
 
 # Technically obsolute
-disableDecoders &= "alias_pix,ape,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,jacosub,magicyuv,nellymoser,pgmyuv,speedhq,smacker,smc,snow,sonic,sonic_ls,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
-disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,magicyuv,nellymoser,pgmyuv,speedhq,smc,snow,sonic,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
-disableMuxers &= "flv,f4v,jacosub,nut,rm,rso,segafilm,sup,swf,truehd,wsaud,wtv,wv".split(",")
-disableDemuxers &= "a64,alp,ape,apm,bink,binka,flv,jacosub,kux,live_flv,mm,nistsphere,nut,pp_bnk,redspark,rm,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
+disableDecoders &= "alias_pix,ape,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,jacosub,magicyuv,nellymoser,pcm_vidc,pgmyuv,speedhq,speex,smacker,smc,snow,sonic,sonic_ls,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,magicyuv,nellymoser,pcm_vidc,pgmyuv,speedhq,speex,smc,snow,sonic,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+disableMuxers &= "flv,f4v,jacosub,nut,pcm_vidc,rm,rso,segafilm,sup,swf,truehd,wsaud,wtv,wv".split(",")
+disableDemuxers &= "a64,alp,ape,apm,bink,binka,flv,jacosub,kux,live_flv,mm,nistsphere,nut,pcm_vidc,pp_bnk,redspark,rm,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
 disableParsers &= @["misc4", "tak"]
 
+disableDemuxers &= ["pcm_alaw", "pcm_mulaw"]
+disableMuxers &= ["pcm_alaw", "pcm_mulaw"]
+disableDecoders &= ["pcm_alaw", "pcm_mulaw"]
+disableEncoders &= ["pcm_alaw", "pcm_mulaw"]
+
+## h26 whatever
+disableDemuxers &= ["h261"]
+disableMuxers &= ["h261", "rtp", "rtp_mpegts"]
+disableDecoders &= ["h261"]
+disableEncoders &= ["h261"]
+disableParsers.add "h261"
+
 # Irrelevant to this project
-disableMuxers &= "framecrc,framehash,framemd5,hash,hls,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
-disableDemuxers &= "hls,jpegxl_anim,vplayer".split(",")
+disableDecoders &= "targa".split(",")
+disableEncoders &= "targa".split(",")
+disableMuxers &= "framecrc,framehash,framemd5,hash,hls,image2pipe,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
+disableDemuxers &= "hls,image2pipe,jpegxl_anim,vplayer".split(",")
+
+disableDemuxers &= "image_bmp_pipe,image_cri_pipe,image_dpx_pipe,image_exr_pipe,image_gem_pipe,image_gif_pipe,image_hdr_pipe,image_j2k_pipe,image_jpeg_pipe,image_jpegls_pipe,image_jpegxl_pipe,image_jpegxs_pipe,image_pam_pipe,image_pbm_pipe,image_pcx_pipe,image_pfm_pipe,image_pgm_pipe,image_pgmyuv_pipe,image_pgx_pipe,image_phm_pipe,image_photocd_pipe,image_pictor_pipe,image_png_pipe,image_ppm_pipe,image_psd_pipe,image_qdraw_pipe,image_qoi_pipe,image_sgi_pipe,image_sunrast_pipe,image_vbn_pipe,image_webp_pipe,image_xbm_pipe,image_xpm_pipe,image_xwd_pipe".split(",")
 
 # Image formats
 disableDecoders &= "sunrast,tiff".split(",")
