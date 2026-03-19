@@ -1,10 +1,19 @@
 import std/[times, math, strutils, strformat, terminal, os]
 import std/[typedthreads, atomics]
+when not defined(windows):
+  import std/posix
+  var SIGWINCH {.importc, header: "<signal.h>".}: cint
 
 when defined(macosx):
   import std/osproc
 
 import ../log
+
+when not defined(windows):
+  var termResized {.global.}: Atomic[bool]
+
+  proc sigwinchHandler(sig: cint) {.noconv.} =
+    termResized.store(true)
 
 proc prettyTime(myTime: float, ampm: bool): string =
   ## Format time as a pretty string
@@ -27,16 +36,15 @@ type
     icon: string
     chars: seq[string]
     brackets: tuple[left, right: string]
+    partWidth: int
     machine: bool
     hide: bool
-    partWidth: int
     ampm: bool
 
   ThreadData = ref object
     progress: Atomic[float]
     total: Atomic[float]
     shouldStop: Atomic[bool]
-    hasUpdate: Atomic[bool]
     title: string
     lenTitle: int
     begin: float
@@ -63,7 +71,7 @@ proc createBarString(config: BarConfig, progress: float, width: int): string =
            config.chars[0].repeat(max(0, width - wholeWidth - 1)) &
            config.brackets.right
 
-proc formatProgressOutput(config: BarConfig, title: string, lenTitle: int, progress: float, rate: float, begin: float, currentIndex: float, total: float): string =
+proc formatProgressOutput(config: BarConfig, title: string, lenTitle: int, progress, rate, begin, currentIndex, total: float, columns: int): string =
   if config.machine:
     let indexClamped = min(currentIndex, total)
     let secsTilEta = round(begin + rate - epochTime(), 2)
@@ -73,7 +81,6 @@ proc formatProgressOutput(config: BarConfig, title: string, lenTitle: int, progr
     let percent = round(progress * 100, 1)
     let pPad = " ".repeat(max(0, 4 - ($percent).len))
 
-    let columns = terminalWidth()
     let barLen = max(1, columns - lenTitle - 35)
     let barString = createBarString(config, progress, barLen)
 
@@ -83,17 +90,19 @@ proc progressWorker(data: ThreadData) {.thread.} =
   ## Background thread worker that handles progress bar updates with full format
   var lastProgress: float = -1
   let config = data.config[]  # Dereference once and cache
-  const sleepRate = 16 # ~60 FPS update rate
+  const sleepRate = 8 # ~120 FPS update rate
+  var columns = terminalWidth()
 
   while not data.shouldStop.load():
-    let hasUpdate = data.hasUpdate.load()
-    if not hasUpdate:
-      sleep(sleepRate)
-      continue
+    when not defined(windows):
+      if termResized.load():
+        columns = terminalWidth()
+        termResized.store(false)
+    else:
+      columns = terminalWidth()
 
     let currentProgress = data.progress.load()
     if currentProgress == lastProgress:
-      data.hasUpdate.store(false)
       sleep(sleepRate)
       continue
 
@@ -101,12 +110,11 @@ proc progressWorker(data: ThreadData) {.thread.} =
     let progress = if total == 0: 0.0 else: min(1.0, max(0.0, currentProgress / total))
     let rate = if progress == 0: 0.0 else: (epochTime() - data.begin) / progress
 
-    let output = formatProgressOutput(config, data.title, data.lenTitle, progress, rate, data.begin, currentProgress, total)
+    let output = formatProgressOutput(config, data.title, data.lenTitle, progress, rate, data.begin, currentProgress, total, columns)
     stdout.write(output & "\r")
     stdout.flushFile()
 
     lastProgress = currentProgress
-    data.hasUpdate.store(false)
     sleep(sleepRate)
 
 proc initBar*(barType: BarType, threaded: bool = true): Bar =
@@ -153,16 +161,17 @@ proc initBar*(barType: BarType, threaded: bool = true): Bar =
   )
   result = Bar(hide: hide, config: config, stack: @[])
   if not hide:
+    when not defined(windows):
+      termResized.store(false)
+      signal(SIGWINCH, sigwinchHandler)
     result.threadData = ThreadData(config: addr result.config)
     result.threadData.shouldStop.store(false)
-    result.threadData.hasUpdate.store(false)
     createThread(result.progressThread, progressWorker, result.threadData)
 
 
 func tick*(bar: Bar, index: float) =
   if not bar.hide:
     bar.threadData.progress.store(index)
-    bar.threadData.hasUpdate.store(true)
 
 proc start*(bar: Bar, total: float, title: string) =
   if bar.hide:
@@ -186,7 +195,6 @@ proc start*(bar: Bar, total: float, title: string) =
   bar.threadData.total.store(total)
   bar.threadData.progress.store(0.0)
   bar.threadData.begin = epochTime()
-  bar.threadData.hasUpdate.store(true)
 
 proc `end`*(bar: Bar) =
   let columns = terminalWidth()
