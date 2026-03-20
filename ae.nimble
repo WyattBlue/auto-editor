@@ -154,7 +154,7 @@ let vpx = Package(
   name: "libvpx",
   sourceUrl: "https://github.com/webmproject/libvpx/archive/refs/tags/v1.16.0.tar.gz",
   sha256: "7a479a3c66b9f5d5542a4c6a1b7d3768a983b1e5c14c60a9396edc9b649e015c",
-  buildArguments: "--disable-dependency-tracking --disable-examples --disable-unit-tests --enable-pic --enable-runtime-cpu-detect --enable-vp9-highbitdepth".split(" "),
+  buildArguments: "--disable-dependency-tracking --disable-examples --disable-unit-tests --enable-runtime-cpu-detect --enable-vp9-highbitdepth".split(" "),
   ffFlag: "--enable-libvpx",
 )
 let dav1d = Package(
@@ -174,8 +174,8 @@ let svtav1 = Package(
 )
 let whisper = Package(
   name: "whisper",
-  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.3.tar.gz",
-  sha256: "870ba21409cdf66697dc4db15ebdb13bc67037d76c7cc63756c81471d8f1731a",
+  sourceUrl: "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.4.tar.gz",
+  sha256: "b26f30e52c095ccb75da40b168437736605eb280de57381887bf9e2b65f31e66",
   buildSystem: "cmake",
   buildArguments: @[
     "-DGGML_NATIVE=OFF", # Favor portability, don't use native CPU instructions
@@ -238,7 +238,7 @@ func dirName(package: Package): string =
   if package.name == "nv-codec-headers":
     return "nv-codec-headers-n13.0.19.0"
   if package.name == "whisper":
-    return "whisper.cpp-1.8.3"
+    return "whisper.cpp-1.8.4"
 
   var name = package.location
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
