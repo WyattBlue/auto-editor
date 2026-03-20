@@ -290,6 +290,8 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false,
   if crossWindowsArm:
     let toolchainFile = buildPath.parentDir / "cmake" / "aarch64-w64-mingw32.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
+    if package.name == "whisper":
+      cmakeArgs.add("-DGGML_OPENMP=OFF")
   elif crossWindows:
     cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
     cmakeArgs.add(&"-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc{posix}")
@@ -315,46 +317,41 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false,
       if fileExists(srcFile) and not fileExists(dstFile):
         echo &"Renaming {srcFile} to {dstFile}"
         exec &"mv \"{srcFile}\" \"{dstFile}\""
+
+    # ggml-base.a is built but not installed by cmake; copy it manually
+    let ggmlBaseDst = libDir / "libggml-base.a"
+    if not fileExists(ggmlBaseDst):
+      let ggmlBaseSrc = "build_cmake/ggml/src/ggml-base.a"
+      if fileExists(ggmlBaseSrc):
+        echo &"Copying {ggmlBaseSrc} to {ggmlBaseDst}"
+        exec &"cp \"{ggmlBaseSrc}\" \"{ggmlBaseDst}\""
     
+    # Write whisper.pc from scratch to avoid format changes breaking string substitution
     let pcFile = buildPath / "lib/pkgconfig/whisper.pc"
-    if fileExists(pcFile):
-      echo "Fixing whisper.pc file"
-      var content = readFile(pcFile)
+    echo "Writing whisper.pc file"
+    when defined(macosx) and hostCPU == "arm64":
+      let libs = "-L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu -lggml-blas -lggml-metal"
+      let libsPrivate = "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation -lc++"
+    elif defined(macosx):
+      let libs = "-L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu -lggml-blas"
+      let libsPrivate = "-framework Accelerate -framework MetalKit -framework Foundation -lc++"
+    else:
+      let libs = "-L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu"
+      # OpenMP is disabled for Windows ARM cross-compile; native Linux uses libgomp
+      let libsPrivate = if crossWindowsArm: "-lpthread -lm -lstdc++"
+                        else: "-lgomp -lpthread -lm -lstdc++"
+    writeFile(pcFile, &"""prefix={buildPath}
+exec_prefix=${{prefix}}
+libdir=${{exec_prefix}}/lib
+includedir=${{prefix}}/include
 
-      # Replace the Libs line with correct library order and add Libs.private
-      when defined(macosx) and defined(arm64):
-        content = content.replace(
-          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
-          "Libs: -L${libdir} -lggml -lggml-base -lwhisper -lggml-cpu -lggml-blas -lggml-metal"
-        )
-      elif defined(macosx):
-        content = content.replace(
-          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
-          "Libs: -L${libdir} -lggml -lggml-base -lwhisper -lggml-cpu -lggml-blas"
-        )
-      else:
-        content = content.replace(
-          "Libs: -L${libdir} -lggml  -lggml-base -lwhisper",
-          "Libs: -L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu",
-        )
-
-      if not content.contains("Libs.private:"):
-        var libsPrivate = ""
-        when defined(macosx):
-          libsPrivate = "-framework Accelerate -framework MetalKit -framework Foundation"
-          when hostCPU == "arm64":
-            libsPrivate = "-framework Accelerate -framework Metal -framework MetalKit -framework Foundation"
-
-        when defined(macosx):
-          libsPrivate &= " -lc++"
-        else:
-          libsPrivate = "-lgomp -lpthread -lm -lstdc++"
-        content = content.replace(
-          "Cflags: -I${includedir}",
-          &"Libs.private: {libsPrivate}\nCflags: -I${{includedir}}\n\nRequires:\nConflicts:"
-        )
-
-      writeFile(pcFile, content)
+Name: whisper
+Description: whisper.cpp
+Version: 1.8.4
+Libs: {libs}
+Libs.private: {libsPrivate}
+Cflags: -I${{includedir}}
+""")
 
 proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: bool = false) =
   # Build x265 multiple times following the Homebrew approach:
