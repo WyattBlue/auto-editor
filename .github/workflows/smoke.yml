@@ -97,7 +97,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: auto-editor-windows
-          path: auto-editor.exe
+          path: |
+            auto-editor.exe
+            ffmpeg_sources/whisper/models/for-tests-ggml-tiny.bin
 
   windows-test:
     needs: windows
@@ -146,7 +148,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: auto-editor-windows-arm
-          path: auto-editor.exe
+          path: |
+            auto-editor.exe
+            ffmpeg_sources/whisper/models/for-tests-ggml-tiny.bin
 
   windows-arm-test:
     needs: windows-arm
