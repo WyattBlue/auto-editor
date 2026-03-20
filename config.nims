@@ -50,7 +50,7 @@ if enableWhisper:
       switch("passL", "-lggml-metal")
     switch("passL", "-framework Accelerate")
     switch("passL", "-framework Metal -framework MetalKit -framework Foundation")
-  else:
+  elif not (hostOS == "windows" and hostCPU == "arm64"):
     switch("passL", "-lgomp")
 
 if enableHevc or enableWhisper or defined(linux):
