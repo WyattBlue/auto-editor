@@ -132,13 +132,12 @@ jobs:
       - name: Install llvm-mingw
         run: |
           sudo apt-get install -y build-essential pkg-config git meson
-          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-ubuntu-20.04-aarch64.tar.xz
+          curl -L -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20260311/llvm-mingw-20260311-ucrt-ubuntu-22.04-aarch64.tar.xz
           tar xf llvm-mingw.tar.xz
-          echo "$PWD/llvm-mingw-20250114-ucrt-ubuntu-20.04-aarch64/bin" >> $GITHUB_PATH
+          echo "$PWD/llvm-mingw-20260311-ucrt-ubuntu-22.04-aarch64/bin" >> $GITHUB_PATH
           echo "DISABLE_VPX=1" >> $GITHUB_ENV
           echo "DISABLE_SVTAV1=1" >> $GITHUB_ENV
           echo "DISABLE_HEVC=1" >> $GITHUB_ENV
-          echo "DISABLE_WHISPER=1" >> $GITHUB_ENV
       - name: Build FFmpeg
         run: nimble makeffwinarm
       - name: Compile
