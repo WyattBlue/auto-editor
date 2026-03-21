@@ -12,11 +12,11 @@ type
     sampleRate: cint
     channelCount: cint
     targetFormat: AVSampleFormat
-    isInitialized: bool
-    totalFramesProcessed: int
-    totalSamplesWritten: int
     readBuffer: ptr uint8
     maxBufferSize: int
+    totalFramesProcessed: int = 0
+    totalSamplesWritten: int = 0
+    isInitialized: bool = false
 
   AudioProcessor* = object
     `iterator`*: AudioIterator
@@ -29,16 +29,13 @@ proc newAudioIterator(sampleRate: cint, channelLayout: ptr AVChannelLayout,
   result = AudioIterator()
   result.sampleRate = sampleRate
   result.channelCount = channelLayout.nb_channels
-  result.targetFormat = AV_SAMPLE_FMT_FLT # 32-bit float, interleaved
+  result.targetFormat = AV_SAMPLE_FMT_S16
   result.exactSize = chunkDuration * float64(sampleRate)
   result.accumulatedError = 0.0
-  result.isInitialized = false
-  result.totalFramesProcessed = 0
-  result.totalSamplesWritten = 0
 
   let layoutName = $channelLayout
-  result.resampler = newAudioResampler(format = AV_SAMPLE_FMT_FLT, layout = layoutName,
-      rate = sampleRate.int)
+  result.resampler = newAudioResampler(format = AV_SAMPLE_FMT_S16, layout = layoutName,
+      rate = sampleRate)
 
   # Initialize audio FIFO
   result.fifo = av_audio_fifo_alloc(result.targetFormat, result.channelCount, 1024)
@@ -47,8 +44,8 @@ proc newAudioIterator(sampleRate: cint, channelLayout: ptr AVChannelLayout,
 
   # Pre-allocate buffer for reading chunks
   result.maxBufferSize = int(result.exactSize)
-  let ret = av_samples_alloc(addr result.readBuffer, nil, result.channelCount.cint,
-                           result.maxBufferSize.cint, result.targetFormat, 0)
+  let ret = av_samples_alloc(addr result.readBuffer, nil, result.channelCount,
+                             result.maxBufferSize.cint, result.targetFormat, 0)
   if ret < 0:
     error "Could not allocate read buffer"
 
@@ -93,32 +90,19 @@ proc readChunk(iter: AudioIterator): float32 =
   let currentSize = round(sizeWithError).int
   iter.accumulatedError = sizeWithError - float64(currentSize)
 
-  # Use pre-allocated buffer - no allocation needed!
-  let samples = cast[ptr UncheckedArray[float32]](iter.readBuffer)
-  let samplesRead = av_audio_fifo_read(iter.fifo, cast[pointer](
-      addr iter.readBuffer), currentSize.cint)
+  let samples = cast[ptr UncheckedArray[int16]](iter.readBuffer)
+  let samplesRead = av_audio_fifo_read(
+    iter.fifo, cast[pointer](addr iter.readBuffer), currentSize.cint
+  )
   let totalSamples = samplesRead * iter.channelCount
 
-  # Process 4 floats at once using SIMD-like operations
-  let simdWidth = 4
-  let simdSamples = totalSamples and not (simdWidth - 1) # Round down to multiple of 4
+  var maxAbs: int32 = 0
+  for i in 0 ..< totalSamples:
+    let v = abs(int32(samples[i]))
+    if v > maxAbs:
+      maxAbs = v
 
-  var maxAbs: float32 = 0.0
-
-  # SIMD-style loop (unrolled)
-  for i in countup(0, simdSamples - 1, simdWidth):
-    let v0 = abs(samples[i])
-    let v1 = abs(samples[i + 1])
-    let v2 = abs(samples[i + 2])
-    let v3 = abs(samples[i + 3])
-
-    maxAbs = max(maxAbs, max(max(v0, v1), max(v2, v3)))
-
-  # Handle remaining samples
-  for i in simdSamples ..< totalSamples:
-    maxAbs = max(maxAbs, abs(samples[i]))
-
-  return maxAbs
+  return float32(maxAbs) / 32768.0'f32
 
 proc flushResampler(iter: AudioIterator) =
   # Flush the resampler by passing nil frame
