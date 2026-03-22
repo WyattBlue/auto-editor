@@ -3,6 +3,17 @@ import std/[math, options, strformat]
 import ../[av, cache, ffmpeg, log, resampler]
 import ../util/bar
 
+when defined(arm64) or defined(aarch64):
+  type
+    Vec16x8 {.importc: "int16x8_t", header: "<arm_neon.h>".} = object
+
+  proc neonLoad16(p: ptr int16): Vec16x8 {.importc: "vld1q_s16", header: "<arm_neon.h>".}
+  proc neonDup16(x: int16): Vec16x8 {.importc: "vdupq_n_s16", header: "<arm_neon.h>".}
+  # Saturating abs: clamps -32768 -> 32767 rather than wrapping
+  proc neonQAbs16(v: Vec16x8): Vec16x8 {.importc: "vqabsq_s16", header: "<arm_neon.h>".}
+  proc neonMax16(a, b: Vec16x8): Vec16x8 {.importc: "vmaxq_s16", header: "<arm_neon.h>".}
+  proc neonMaxAcross16(v: Vec16x8): int16 {.importc: "vmaxvq_s16", header: "<arm_neon.h>".}
+
 type
   AudioIterator = ref object
     resampler: AudioResampler
@@ -96,13 +107,25 @@ proc readChunk(iter: AudioIterator): float32 =
   )
   let totalSamples = samplesRead * iter.channelCount
 
-  var maxAbs: int32 = 0
-  for i in 0 ..< totalSamples:
-    let v = abs(int32(samples[i]))
-    if v > maxAbs:
-      maxAbs = v
-
-  return float32(maxAbs) / 32768.0'f32
+  when defined(arm64) or defined(aarch64):
+    var vmax = neonDup16(0'i16)
+    var i = 0
+    while i + 8 <= totalSamples:
+      vmax = neonMax16(vmax, neonQAbs16(neonLoad16(addr samples[i])))
+      i += 8
+    var maxAbs = int32(neonMaxAcross16(vmax))
+    while i < totalSamples:
+      let v = abs(int32(samples[i]))
+      if v > maxAbs: maxAbs = v
+      i += 1
+    return float32(maxAbs) / 32767.0'f32
+  else:
+    var maxAbs: int32 = 0
+    for i in 0 ..< totalSamples:
+      let v = abs(int32(samples[i]))
+      if v > maxAbs:
+        maxAbs = v
+    return float32(maxAbs) / 32767.0'f32
 
 proc flushResampler(iter: AudioIterator) =
   # Flush the resampler by passing nil frame
