@@ -161,6 +161,8 @@ Examples:
     metavar: "ENCODER", help: "Set video codec for output media"),
   OptDef(names: "-b:v, --video-bitrate", c: cVid, datum: "video-bitrate",
     metavar: "BITRATE", help: "Set the number of bits per second for video"),
+  OptDef(names: "-crf", c: cVid, datum: "crf", metavar: "NUM",
+    help: "Set the Constant Rate Factor for quality-based encoding. Lower = better quality. [0-63]"),
   OptDef(names: "-profile:v, -vprofile", c: cVid, datum: "vprofile",
     metavar: "PROFILE", help: "Set the video profile. For h264: high, main, or baseline"),
   OptDef(names: "--scale", c: cVid, datum: "scale", metavar: "NUM",

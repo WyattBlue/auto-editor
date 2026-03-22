@@ -290,9 +290,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
     if finished(videoFrameIter):
       videoFrame = nil
     else:
-      debug "format: calling videoFrameIter()"
       (videoFrame, index) = videoFrameIter()
-      debug "format: videoFrameIter() returned"
       if videoFrame != nil:
         earliestVideoIndex = some(index)
         frameQueue.push(initPriority(float(index), videoFrame, vOutStream))

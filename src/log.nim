@@ -148,6 +148,7 @@ type mainArgs* = object
   videoBitrate*: int = -1
   audioBitrate*: int = -1
   scale*: float = 1.0
+  crf*: int8 = -1
 
   audioNormalize*: Norm = Norm(kind: nkNull)
   progress*: BarType = modern
