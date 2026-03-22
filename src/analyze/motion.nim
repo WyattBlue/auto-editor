@@ -190,9 +190,10 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32): float32
 proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   stream, width, blur: int32): seq[float32] =
   let cacheArgs = &"{stream},{width},{blur}"
-  let cacheData = readCache(path, tb, "motion", cacheArgs)
-  if cacheData.isSome:
-    return cacheData.get()
+  if not noCache:
+    let cacheData = readCache(path, tb, "motion", cacheArgs)
+    if cacheData.isSome:
+      return cacheData.get()
 
   if stream < 0 or stream >= container.video.len:
     error &"motion: video stream '{stream}' does not exist."
@@ -221,4 +222,5 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.`end`()
 
-  writeCache(result, tb, path, "motion", cacheArgs)
+  if not noCache:
+    writeCache(result, tb, path, "motion", cacheArgs)

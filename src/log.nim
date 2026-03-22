@@ -157,6 +157,7 @@ genFlagInterface(mainArgs)
 
 var isDebug* = false
 var quiet* = false
+var noCache* = false
 var tempDir* = ""
 let start* = epochTime()
 let noColor* = getEnv("NO_COLOR") != "" or getEnv("AV_LOG_FORCE_NOCOLOR") != ""
