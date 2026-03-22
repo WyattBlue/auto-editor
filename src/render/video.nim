@@ -368,6 +368,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   if args.vprofile != "":
     encoderCtx.setProfileOrErr(args.vprofile)
 
+  if args.crf >= 0:
+    discard av_opt_set(encoderCtx.priv_data, "crf", cstring($args.crf), 0)
+    debug &"crf: {args.crf}"
+
   encoderCtx.pix_fmt = pix_fmt
   encoderCtx.open()
   pix_fmt = encoderCtx.pix_fmt
@@ -429,10 +433,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     return lastKeyframePos[src]
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int) =
-    debug &"video iter: started, frame={cast[int](frame):#x} nullFrame={cast[int](nullFrame):#x}"
     # Process each frame in timeline order like Python version
     for index in 0 ..< tl.`end`:
-      debug &"video iter: index={index}"
       objList = @[]
 
       for layer in tl.v:
@@ -452,7 +454,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let i = int(round(float(sourceFramePos) * speed))
             objList.add VideoFrame(index: i, src: obj.src, effects: effectGroup)
 
-      debug &"video iter: objList.len={objList.len} isNonlinear={isNonlinear}"
       if isNonlinear:
         # When there can be valid gaps in the timeline and no objects for this frame.
         frame = av_frame_clone(nullFrame)
@@ -467,7 +468,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           av_frame_free(addr oldFrame)
 
       for obj in objList:
-        debug &"video iter: obj.index={obj.index} frameIndex={frameIndex}"
         # Check if we can reuse the last processed frame
         if obj.index == lastFrameIndex and lastProcessedFrame != nil:
           frame = av_frame_clone(lastProcessedFrame)
@@ -505,11 +505,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               avcodec_flush_buffers(decoders[obj.src])
               lastSeekTarget[obj.src] = obj.index
 
-          debug &"video iter: before flushDecode frameIndex={frameIndex}"
           let decoder: ptr AVCodecContext = decoders[obj.src]
           var foundFrame = false
           for decodedFrame in myCache.cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
-            debug &"video iter: flushDecode yielded frame {frame.width}x{frame.height}"
             frame = decodedFrame
             frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
 
@@ -604,7 +602,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if frame == nil:
           error &"Failed to create fallback frame at {index}tb"
 
-      debug &"video iter: before reformat frame={frame.width}x{frame.height}"
       let reformattedFrame = frame.reformat(pix_fmt, ctx = reformatCtx)
       if reformattedFrame != nil and reformattedFrame != frame:
         let oldFrame = frame
@@ -623,7 +620,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         lastProcessedFrame = av_frame_clone(frame)
         lastFrameIndex = objList[0].index
 
-      debug &"video iter: yielding frame={frame.width}x{frame.height} pts={frame.pts}"
       yield (frame, index)
 
     if scaleGraph != nil:

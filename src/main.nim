@@ -360,6 +360,11 @@ judge making cuts.
       args.videoCodec = key
     of "video-bitrate":
       args.videoBitrate = parseBitrate(key)
+    of "crf":
+      var val: int
+      discard parseSaturatedNatural(key, val)
+      if val >= 65: error "constant rate factor is too high: " & key
+      args.crf = val.int8
     of "vprofile":
       args.vprofile = key
     of "acodec":
