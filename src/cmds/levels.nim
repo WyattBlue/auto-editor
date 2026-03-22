@@ -83,7 +83,6 @@ proc main*(strArgs: seq[string]) =
     inputFile = ""
     edit = "audio"
     tb = AVRational(num: 30, den: 1)
-    noCache = false
 
   for key in strArgs:
     case key

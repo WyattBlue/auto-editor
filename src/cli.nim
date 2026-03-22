@@ -180,6 +180,8 @@ Examples:
     metavar: "NORM-TYPE", help: """
 Apply audio normalizing (either ebu or peak). Applied right before rendering the output file"""),
 
+  OptDef(names: "--no-cache", c: cMis, kind: Flag, datum: "noCache",
+    help: "Disable reading and writing cache files"),
   OptDef(names: "--open", c: cMis, kind: Flag, datum: "args.open",
     help: "Open the output file after editing is done"),
   OptDef(names: "--no-open", c: cMis, kind: Flag, datum: "args.noOpen",

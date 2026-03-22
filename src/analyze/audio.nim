@@ -174,9 +174,10 @@ iterator loudness*(processor: var AudioProcessor, container: InputContainer): fl
 
 proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     stream: int32): seq[float32] =
-  let cacheData = readCache(path, tb, "audio", $stream)
-  if cacheData.isSome:
-    return cacheData.get()
+  if not noCache:
+    let cacheData = readCache(path, tb, "audio", $stream)
+    if cacheData.isSome:
+      return cacheData.get()
 
   if stream < 0 or stream >= container.audio.len:
     error &"audio: audio stream '{stream}' does not exist."
@@ -205,4 +206,5 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.`end`()
 
-  writeCache(result, tb, path, "audio", $stream)
+  if not noCache:
+    writeCache(result, tb, path, "audio", $stream)
