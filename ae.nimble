@@ -166,8 +166,8 @@ let dav1d = Package(
 )
 let svtav1 = Package(
   name: "libsvtav1",
-  sourceUrl: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v4.0.1/SVT-AV1-v4.0.1.tar.bz2",
-  sha256: "df2a2dd51512717e8c3637072750a3899c3a69d684accccace33c1c467f7e852",
+  sourceUrl: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v4.1.0/SVT-AV1-v4.1.0.tar.bz2",
+  sha256: "184162d3db3a4448882b17230413b4938ca252eef6b3c5e2f1236b2fcf497881",
   buildSystem: "cmake",
   buildArguments: @["-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=ON"],
   ffFlag: "--enable-libsvtav1",
