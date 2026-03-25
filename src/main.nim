@@ -421,8 +421,6 @@ judge making cuts.
       else:
         error reason
 
-    debug &"You have a valid license: {reason}"
-
   for i, myInput in args.inputs:
     if myInput.startsWith("http://") or myInput.startsWith("https://"):
       args.inputs[i] = downloadVideo(myInput, args)

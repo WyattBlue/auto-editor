@@ -430,7 +430,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       let kf = findNearestKeyframeBefore(kfIndex, targetFrame)
       if kf >= 0:
         return kf
-    return lastKeyframePos[src]
+    let fallback = lastKeyframePos[src]
+    if fallback <= targetFrame:
+      return fallback
+    return 0  # frame 0 is always seekable
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int) =
     # Process each frame in timeline order like Python version
