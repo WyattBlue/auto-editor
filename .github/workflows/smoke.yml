@@ -24,6 +24,8 @@ on:
       - '.github/workflows/build.yml'
     branches:
       - master
+env:
+  AE_PRIVATE_LK: ${{ secrets.AE_PRIVATE_LK }}
 jobs:
   main:
     runs-on: ${{ matrix.os }}

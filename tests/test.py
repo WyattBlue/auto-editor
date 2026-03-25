@@ -276,9 +276,11 @@ class Runner:
 
     def test_example(self) -> None:
         out = self.main(["example.mp4"], [], output="example_ALTERED.mp4")
+        outdur = 0
         with av.open(out) as container:
             assert container.duration is not None
             assert container.duration > 17300000 and container.duration < 2 << 24
+            outdur = container.duration
 
             assert len(container.streams) == 2
             video = container.streams[0]
@@ -295,6 +297,12 @@ class Runner:
             assert audio.sample_rate == 48000
             assert audio.language == "eng"
             assert audio.layout.name == "stereo"
+
+        tlf = self.main(["example.mp4", "example.mp4"], ["--export", "v3"], output="out.v3")
+        out2 = self.main([tlf], [], output="tl_out.mp4")
+        with av.open(out2) as container:
+            assert container.duration is not None
+            assert container.duration == outdur * 2, outdur * 2
 
     def test_video_to_mp3(self) -> None:
         out = self.main(["example.mp4"], [], output="example_ALTERED.mp3")
