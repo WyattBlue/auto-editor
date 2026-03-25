@@ -56,11 +56,11 @@ disableDecoders &= "dds,dfa,dsicinvideo,dxa,dxtory,escape124,escape130,fic,flic,
 # [J-M]
 disableDecoders &= "jv,kgv1,kmvc,lagarith,lead,loco,lscr,m101,mad,mdec,media100,mimic,mjpegb,mmvideo,mobiclip,motionpixels,msa1,mscc,msmpeg4v1,msp2,mss1,mss2,mszh,mts2,mv30,mvc1,mvc2,mvdv,mvha,mwsc,mxpeg".split(",")
 # [N-S]
-disableDecoders &= "notchlc,nuv,paf_video,pdv,pgx,photocd,pictor,pixlet,prosumer,psd,ptx,qdraw,qpeg,rasc,rl2,rscc,rtv1,rv30,rv40,rv60,sanm,scpr,screenpresso,sga,sgirle,sheervideo,simbiosis_imx,smackvideo,smvjpeg,sp5x,srgc,svq3".split(",")
+disableDecoders &= "notchlc,nuv,paf_video,pdv,pgx,photocd,pictor,pixlet,prosumer,psd,ptx,qdraw,qpeg,rasc,rl2,rscc,rtv1,rv10,rv20,rv30,rv40,rv60,sanm,scpr,screenpresso,sga,sgirle,sheervideo,simbiosis_imx,smackvideo,smvjpeg,sp5x,srgc,svq3".split(",")
 # [T-VP]
 disableDecoders &= "targa_y216,tdsc,tgq,tgv,thp,tiertexseqvideo,tmv,tqi,truemotion1,truemotion2,truemotion2rt,tscc,tscc2,txd,ulti,v210x,vb,vble,vc1,vc1image,vcr1,vixl,vmdvideo,vmix,vmnc,vp3,vp4,vp5,vp6,vp6a,vp6f,vp7".split(",")
 # [VQ-Z]
-disableDecoders &= "vplayer,vqc,vvc,wcmv,wmv3,wmv3image,wnv1,ws_vqa,xan_wc3,xan_wc4,xbin,xpm,ylc,yop,zerocodec".split(",")
+disableDecoders &= "vplayer,vqc,vvc,wcmv,wmv1,wmv2,wmv3,wmv3image,wnv1,ws_vqa,xan_wc3,xan_wc4,xbin,xpm,ylc,yop,zerocodec".split(",")
 
 # Can only decode, Audio [0-A]
 disableDecoders &= "8svx_exp,8svx_fib,aac_latm,acelp.kelvin,adpcm_4xm,adpcm_afc,adpcm_agm,adpcm_aica,adpcm_ct,adpcm_dtk,adpcm_ea,adpcm_ea_maxis_xa,adpcm_ea_r1,adpcm_ea_r2,adpcm_ea_r3,adpcm_ea_xas,adpcm_ima_acorn,adpcm_ima_apc".split(",")
@@ -70,7 +70,7 @@ disableDemuxers.add "bethsoftvid"
 # [G-Q]
 disableDecoders &= "g728,g729,gremlin_dpcm,gsm,gsm_ms,hca,hcom,iac,imc,interplay_dpcm,interplay_acm,mace3,mace6,metasound,misc4,mp1,mp3adu,msnsiren,musepack7,musepack8,osq,paf_audio,qcelp,qdm2,qdmc,qoa".split(",")
 # [R-Z]
-disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dpcm,tak,truespeech,twinvq,vmdaudio,wady_dpcm,wavarc,wavesynth,westwood_snd1,wmalossless,wmapro,wmavoice,xan_dpcm,xma1,xma2,zero12v".split(",")
+disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dpcm,tak,truespeech,twinvq,vmdaudio,wady_dpcm,wavarc,wavesynth,westwood_snd1,wmalossless,wmapro,wmav1,wmav2,wmavoice,xan_dpcm,xma1,xma2,zero12v".split(",")
 
 # Can only encode
 disableEncoders &= "a64_multi,a64_multi5,ttml".split(",")
@@ -81,7 +81,7 @@ disableEncoders &= "adpcm_adx,adpcm_argo,adpcm_g722,adpcm_g726,adpcm_g726le,adpc
 
 # Technically obsolute
 disableDecoders &= "alias_pix,ape,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,jacosub,magicyuv,nellymoser,pcm_vidc,pgmyuv,speedhq,speex,smacker,smc,snow,sonic,sonic_ls,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
-disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,magicyuv,nellymoser,pcm_vidc,pgmyuv,speedhq,speex,smc,snow,sonic,utvideo,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+disableEncoders &= "a64multi,a64multi5,alias_pix,cinepak,cljr,cllc,comfortnoise,ffvhuff,ffwavesynth,flv,huffyuv,magicyuv,nellymoser,pcm_vidc,pgmyuv,rv10,rv20,speedhq,speex,smc,snow,sonic,utvideo,wmav1,wmav2,wmv1,wmv2,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
 disableMuxers &= "flv,f4v,jacosub,nut,pcm_vidc,rm,rso,segafilm,sup,swf,truehd,wsaud,wtv,wv".split(",")
 disableDemuxers &= "a64,alp,ape,apm,bink,binka,flv,jacosub,kux,live_flv,mm,nistsphere,nut,pcm_vidc,pp_bnk,redspark,rm,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
 disableParsers &= @["misc4", "tak"]
