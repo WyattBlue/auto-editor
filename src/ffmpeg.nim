@@ -299,6 +299,8 @@ proc avformat_query_codec*(ofmt: ptr AVOutputFormat, codec_id: AVCodecID,
 
 proc av_codec_iterate*(opaque: ptr pointer): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
+proc av_codec_is_encoder*(codec: ptr AVCodec): cint {.importc,
+    header: "<libavcodec/codec.h>".}
 
 
 const FF_COMPLIANCE_STRICT*: cint = 1
