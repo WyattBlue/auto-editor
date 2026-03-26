@@ -150,6 +150,11 @@ class SkipTest(Exception):
     pass
 
 
+def requires_lk(func):
+    func._requires_lk = True
+    return func
+
+
 all_files = (
     "aac.m4a",
     "alac.m4a",
@@ -274,6 +279,7 @@ class Runner:
         assert fast != nofast, "+faststart is not being applied"
         assert frag not in (fast, nofast), "fragmented output should diff."
 
+    @requires_lk
     def test_example(self) -> None:
         out = self.main(["example.mp4"], [], output="example_ALTERED.mp4")
         outdur = 0
@@ -573,6 +579,7 @@ class Runner:
         self.main(["example.mp4"], ["--video-codec", "h264"])
         self.main(["example.mp4"], ["--audio-codec", "ac3"])
 
+    @requires_lk
     def test_concat_hetero_track(self):
         out = self.main(
             ["example.mp4", "resources/multi-track.mov"], [],
@@ -580,10 +587,12 @@ class Runner:
         )
         assert len(fileinfo(out).audios) == 2
 
+    @requires_lk
     def test_concat(self):
         out = self.main(["example.mp4"], ["--cut-out", "0,171"], "hmm.mp4")
         self.main(["example.mp4", out], ["--debug"])
 
+    @requires_lk
     def test_concat_mux_tracks(self):
         inputs = ["example.mp4", "resources/multi-track.mov"]
         info = fileinfo(self.main(inputs, ["--mix-audio-streams"], "concat_mux.mov"))
@@ -592,6 +601,7 @@ class Runner:
         assert info.audios[0].codec == "aac"
         assert info.videos[0].codec == "h264"
 
+    @requires_lk
     def test_concat_multi_tracks(self):
         out = self.main(
             ["resources/multi-track.mov", "resources/multi-track.mov"], [], "out.mov"
@@ -809,7 +819,7 @@ def run_tests(tests: list[Callable], args) -> None:
             f = lambda: (_ for _ in ()).throw(SkipTest())
             f.__name__ = t.__name__
             return f
-        tests = [make_skip(t) if t.__name__.startswith("test_concat") else t for t in tests]
+        tests = [make_skip(t) if getattr(t.__func__, "_requires_lk", False) else t for t in tests]
 
     total_time = 0.0
     real_time = perf_counter()
