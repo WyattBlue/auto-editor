@@ -182,6 +182,9 @@ Set video codec for output media
 
 Set the number of bits per second for video
 
+### `-crf NUM`
+Set the Constant Rate Factor for quality-based encoding. Lower = better quality. [0-63]
+
 ### `-vprofile PROFILE`
 #### Aliases: `-profile:v`
 
@@ -220,6 +223,9 @@ Apply audio normalizing (either ebu or peak). Applied right before rendering the
 
 ## Miscellaneous:
 
+### `--no-cache`
+Disable reading and writing cache files
+
 ### `--open`
 Open the output file after editing is done
 
@@ -240,4 +246,4 @@ Set where the temporary directory is located
 Show info about this program or option
 
 ---
-Version 30.0.0<br>Generated: 2026-03-16.
+Version 30.1.1<br>Generated: 2026-03-26.
