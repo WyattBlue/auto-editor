@@ -1,10 +1,8 @@
 #!/usr/bin/env -S nim e --hints:off
 mode = ScriptMode.Silent
 
-# For: docs/src/ref/options.md
-
 import std/[strutils, sequtils]
-import ../src/[about, cli]
+import ../../src/[about, cli]
 
 func toMarkdown(v: string): string =
   v.replace("[Deprecated]", "\\[Deprecated\\]").replace("--", "\\--").replace("\n", "\n\n")
@@ -43,8 +41,7 @@ proc renderOpt(opt: OptDef): string =
 
 const catOrder = [cEdit, cTl, cUrl, cDis, cCon, cVid, cAud, cMis]
 
-var output = "---\ntitle: Options\n---\n\n"
-
+var output = ""
 for cat in catOrder:
   var section = ""
   for opt in mainOptions:
