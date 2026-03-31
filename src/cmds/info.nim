@@ -166,11 +166,36 @@ proc printEncoders(fmtName: string) =
   echo "s: " & subs.join(",")
   echo "other: " & others.join(",")
 
+proc printDecoders(fmtName: string) =
+  let fakeName = "output." & fmtName
+  let ofmt = av_guess_format(nil, fakeName.cstring, nil)
+  if ofmt == nil:
+    error &"Unknown format: {fmtName}"
+
+  var videos, audios, subs, others: seq[string]
+  var opaque: pointer = nil
+  while true:
+    let codec = av_codec_iterate(addr opaque)
+    if codec == nil: break
+    if av_codec_is_decoder(codec) == 0: continue
+    if avformat_query_codec(ofmt, codec.id, FF_COMPLIANCE_STRICT) > 0:
+      case codec.`type`
+      of AVMEDIA_TYPE_VIDEO: videos.add $codec.name
+      of AVMEDIA_TYPE_AUDIO: audios.add $codec.name
+      of AVMEDIA_TYPE_SUBTITLE: subs.add $codec.name
+      else: others.add $codec.name
+
+  echo "v: " & videos.join(",")
+  echo "a: " & audios.join(",")
+  echo "s: " & subs.join(",")
+  echo "other: " & others.join(",")
+
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
   var isJson = false
   var encodersFmt = ""
+  var decodersFmt = ""
   var inputFiles: seq[string] = @[]
 
   var i = 0
@@ -183,6 +208,11 @@ proc main*(args: seq[string]) =
       if i >= args.len:
         error "-encoders requires a format argument"
       encodersFmt = args[i]
+    elif key == "-decoders":
+      inc i
+      if i >= args.len:
+        error "-decoders requires a format argument"
+      decodersFmt = args[i]
     else:
       if key.startsWith("--"):
         error &"Unknown option: {key}"
@@ -191,6 +221,10 @@ proc main*(args: seq[string]) =
 
   if encodersFmt != "":
     printEncoders(encodersFmt)
+    return
+
+  if decodersFmt != "":
+    printDecoders(decodersFmt)
     return
 
   var fileInfo: JsonNode = %* {}
