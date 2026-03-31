@@ -16,9 +16,10 @@
 -endif()
 +
 
- project (x265)
+-project (x265)
 -cmake_minimum_required (VERSION 2.8.8) # OBJECT libraries require 2.8.8
-+cmake_minimum_required (VERSION 2.8.8...3.10) # OBJECT libraries require 2.8.8
++cmake_minimum_required (VERSION 3.31.6)
++project (x265)
  include(CheckIncludeFiles)
  include(CheckFunctionExists)
  include(CheckSymbolExists)
@@ -31,21 +32,11 @@
      set(CLANG 1)
  endif()
  if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
-@@ -740,6 +736,9 @@
-     if(ARM OR CROSS_COMPILE_ARM)
-     # compile ARM arch asm files here
-         enable_language(ASM)
-+        if(APPLE)
-+            set(ARM_ARGS ${ARM_ARGS} -arch ${CMAKE_OSX_ARCHITECTURES})
-+        endif()
-         foreach(ASM ${ARM_ASMS})
- 			set(ASM_SRC ${CMAKE_CURRENT_SOURCE_DIR}/common/arm/${ASM})
-             list(APPEND ASM_SRCS ${ASM_SRC})
 --- a/source/dynamicHDR10/CMakeLists.txt
 +++ b/source/dynamicHDR10/CMakeLists.txt
 @@ -13 +13 @@
 -cmake_minimum_required (VERSION 2.8.11)
-+cmake_minimum_required (VERSION 2.8.11...3.10)
++cmake_minimum_required (VERSION 3.31.6)
 --- a/source/encoder/CMakeLists.txt
 +++ b/source/encoder/CMakeLists.txt
 @@ -22,7 +22,9 @@
@@ -59,4 +50,3 @@
 +        set_source_files_properties(api.cpp PROPERTIES COMPILE_FLAGS ${APIFLAGSTR})
 +    endif(APIFLAGS)
  endif(EXTRA_LIB)
- 

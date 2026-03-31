@@ -99,7 +99,7 @@ disableEncoders &= ["h261"]
 disableParsers.add "h261"
 
 # Irrelevant to this project
-disableDecoders &= "dirac,jpeg2000,jpegls,msrle,sunrast,targa,tiff".split(",")
+disableDecoders &= "cc_dec,dirac,jpeg2000,jpegls,mpl2,msrle,pgssub,sami,subviewer,subviewer1,sunrast,targa,tiff".split(",")
 disableEncoders &= "dirac,jpeg2000,jpegls,msrle,sunrast,targa,tiff".split(",")
 disableMuxers &= "framecrc,framehash,framemd5,hash,hls,ico,image2,image2pipe,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
 disableDemuxers &= "hls,ico,image_tiff_pipe,image_svg_pipe,image2,image2pipe,jpegxl_anim,vplayer".split(",")
