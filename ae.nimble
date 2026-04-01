@@ -287,6 +287,11 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false,
     "-DBUILD_STATIC_LIBS=ON",
   ] & package.buildArguments
 
+  if package.name == "libsvtav1" or package.name == "whisper":
+    let srcDir = absolutePath(".")
+    cmakeArgs.add(&"-DCMAKE_C_FLAGS=-ffile-prefix-map={srcDir}/=")
+    cmakeArgs.add(&"-DCMAKE_CXX_FLAGS=-ffile-prefix-map={srcDir}/=")
+
   if crossWindowsArm:
     let toolchainFile = buildPath.parentDir / "cmake" / "aarch64-w64-mingw32.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
