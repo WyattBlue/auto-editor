@@ -1,5 +1,7 @@
-import std/[options, os, osproc, parseutils, sequtils, strformat, strutils, terminal, uri]
-when not defined(windows):
+import std/[options, os, parseutils, sequtils, strformat, strutils, terminal]
+when not defined(wasmBuild):
+  import std/[osproc, uri]
+when not defined(windows) and not defined(wasmBuild):
   import std/posix_utils
 
 import ./[about, cli, conductor, edit, ffmpeg, log]
@@ -16,7 +18,7 @@ setControlCHook(ctrlc)
 
 
 proc printHelp() {.noreturn.} =
-  let termWidth = max(terminalWidth(), 40)
+  let termWidth = (when defined(wasmBuild): 70 else: max(terminalWidth(), 40))
   let optWidth = min(32, termWidth div 3)
   let helpWidth = termWidth - optWidth - 4
 
@@ -152,52 +154,53 @@ proc validateKey(val: string): (bool, string) =
   return (false, "Incorrect key")
 
 
-proc downloadVideo(myInput: string, args: mainArgs): string =
-  conwrite("Downloading video...")
+when not defined(wasmBuild):
+  proc downloadVideo(myInput: string, args: mainArgs): string =
+    conwrite("Downloading video...")
 
-  proc getDomain(url: string): string =
-    let parsed = parseUri(url)
-    var hostname = parsed.hostname
-    if hostname.startsWith("www."):
-      hostname = hostname[4..^1]
-    return hostname
+    proc getDomain(url: string): string =
+      let parsed = parseUri(url)
+      var hostname = parsed.hostname
+      if hostname.startsWith("www."):
+        hostname = hostname[4..^1]
+      return hostname
 
-  var downloadFormat = args.downloadFormat
-  if downloadFormat == "" and getDomain(myInput) == "youtube.com":
-    downloadFormat = "bestvideo[ext=mp4]+bestaudio[ext=m4a]"
+    var downloadFormat = args.downloadFormat
+    if downloadFormat == "" and getDomain(myInput) == "youtube.com":
+      downloadFormat = "bestvideo[ext=mp4]+bestaudio[ext=m4a]"
 
-  var outputFormat: string
-  if args.outputFormat == "":
-    outputFormat = replacef(splitext(myInput)[0], re"\W+", "-") & ".%(ext)s"
-  else:
-    outputFormat = args.outputFormat
+    var outputFormat: string
+    if args.outputFormat == "":
+      outputFormat = replacef(splitext(myInput)[0], re"\W+", "-") & ".%(ext)s"
+    else:
+      outputFormat = args.outputFormat
 
-  var cmd: seq[string] = @[]
-  if downloadFormat != "":
-    cmd.add(@["-f", downloadFormat])
+    var cmd: seq[string] = @[]
+    if downloadFormat != "":
+      cmd.add(@["-f", downloadFormat])
 
-  cmd.add(@["-o", outputFormat, myInput])
-  if args.yt_dlp_extras != "":
-    cmd.add(args.ytDlpExtras.split(" "))
+    cmd.add(@["-o", outputFormat, myInput])
+    if args.yt_dlp_extras != "":
+      cmd.add(args.ytDlpExtras.split(" "))
 
-  let ytDlpPath = args.ytDlpLocation
-  var location: string
-  try:
-    location = execProcess(ytDlpPath,
-      args = @["--get-filename", "--no-warnings"] & cmd,
-      options = {poUsePath}).strip()
-  except OSError:
-    error "Program `yt-dlp` must be installed and on PATH."
+    let ytDlpPath = args.ytDlpLocation
+    var location: string
+    try:
+      location = execProcess(ytDlpPath,
+        args = @["--get-filename", "--no-warnings"] & cmd,
+        options = {poUsePath}).strip()
+    except OSError:
+      error "Program `yt-dlp` must be installed and on PATH."
 
-  if not fileExists(location):
-    let p = startProcess(ytDlpPath, args = cmd, options = {poUsePath, poParentStreams})
-    defer: p.close()
-    discard p.waitForExit()
+    if not fileExists(location):
+      let p = startProcess(ytDlpPath, args = cmd, options = {poUsePath, poParentStreams})
+      defer: p.close()
+      discard p.waitForExit()
 
-  if not fileExists(location):
-    error &"Download file wasn't created: {location}"
+    if not fileExists(location):
+      error &"Download file wasn't created: {location}"
 
-  return location
+    return location
 
 proc listAvailableFilters(): string =
   result = "Filters:"
@@ -401,6 +404,8 @@ judge making cuts.
     echo "Auto-Editor: ", version
     when defined(windows):
       echo "OS: Windows ", when hostCPU == "amd64": "x86_64" else: hostCPU
+    elif defined(wasmBuild):
+      echo "OS: wasm32"
     else:
       let plat = uname()
       echo "OS: ", plat.sysname, " ", plat.release, " ", plat.machine
@@ -423,7 +428,10 @@ judge making cuts.
 
   for i, myInput in args.inputs:
     if myInput.startsWith("http://") or myInput.startsWith("https://"):
-      args.inputs[i] = downloadVideo(myInput, args)
+      when defined(wasmBuild):
+        error "URL inputs are not supported in the wasm build."
+      else:
+        args.inputs[i] = downloadVideo(myInput, args)
     elif splitFile(myInput).ext == "":
       if dirExists(myInput):
         error &"Input must be a file or a URL, not a directory."

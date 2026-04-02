@@ -1,6 +1,7 @@
 import std/[times, math, strutils, strformat, terminal, os]
-import std/[typedthreads, atomics]
-when not defined(windows):
+when not defined(wasmBuild):
+  import std/[typedthreads, atomics]
+when not defined(windows) and not defined(wasmBuild):
   import std/posix
   var SIGWINCH {.importc, header: "<signal.h>".}: cint
 
@@ -9,7 +10,7 @@ when defined(macosx):
 
 import ../log
 
-when not defined(windows):
+when not defined(windows) and not defined(wasmBuild):
   var termResized {.global.}: Atomic[bool]
 
   proc sigwinchHandler(sig: cint) {.noconv.} =
@@ -42,9 +43,10 @@ type
     ampm: bool
 
   ThreadData = ref object
-    progress: Atomic[float]
-    total: Atomic[float]
-    shouldStop: Atomic[bool]
+    when not defined(wasmBuild):
+      progress: Atomic[float]
+      total: Atomic[float]
+      shouldStop: Atomic[bool]
     title: string
     lenTitle: int
     begin: float
@@ -53,8 +55,9 @@ type
   Bar* = ref object
     config: BarConfig
     stack: seq[tuple[title: string, lenTitle: int, total: float, begin: float]]
-    progressThread: Thread[ThreadData]
-    threadData: ThreadData
+    when not defined(wasmBuild):
+      progressThread: Thread[ThreadData]
+      threadData: ThreadData
     hide: bool
 
 proc createBarString(config: BarConfig, progress: float, width: int): string =
@@ -86,38 +89,41 @@ proc formatProgressOutput(config: BarConfig, title: string, lenTitle: int, progr
 
     return &"  {config.icon}{title} {barString} {pPad}{percent}%  ETA {newTime}    "
 
-proc progressWorker(data: ThreadData) {.thread.} =
-  ## Background thread worker that handles progress bar updates with full format
-  var lastProgress: float = -1
-  let config = data.config[]  # Dereference once and cache
-  const sleepRate = 8 # ~120 FPS update rate
-  var columns = terminalWidth()
+when not defined(wasmBuild):
+  proc progressWorker(data: ThreadData) {.thread.} =
+    ## Background thread worker that handles progress bar updates with full format
+    var lastProgress: float = -1
+    let config = data.config[]  # Dereference once and cache
+    const sleepRate = 8 # ~120 FPS update rate
+    var columns = terminalWidth()
 
-  while not data.shouldStop.load():
-    when not defined(windows):
-      if termResized.load():
+    while not data.shouldStop.load():
+      when not defined(windows):
+        if termResized.load():
+          columns = terminalWidth()
+          termResized.store(false)
+      else:
         columns = terminalWidth()
-        termResized.store(false)
-    else:
-      columns = terminalWidth()
 
-    let currentProgress = data.progress.load()
-    if currentProgress == lastProgress:
+      let currentProgress = data.progress.load()
+      if currentProgress == lastProgress:
+        sleep(sleepRate)
+        continue
+
+      let total = data.total.load()
+      let progress = if total == 0: 0.0 else: min(1.0, max(0.0, currentProgress / total))
+      let rate = if progress == 0: 0.0 else: (epochTime() - data.begin) / progress
+
+      let output = formatProgressOutput(config, data.title, data.lenTitle, progress, rate, data.begin, currentProgress, total, columns)
+      stdout.write(output & "\r")
+      stdout.flushFile()
+
+      lastProgress = currentProgress
       sleep(sleepRate)
-      continue
-
-    let total = data.total.load()
-    let progress = if total == 0: 0.0 else: min(1.0, max(0.0, currentProgress / total))
-    let rate = if progress == 0: 0.0 else: (epochTime() - data.begin) / progress
-
-    let output = formatProgressOutput(config, data.title, data.lenTitle, progress, rate, data.begin, currentProgress, total, columns)
-    stdout.write(output & "\r")
-    stdout.flushFile()
-
-    lastProgress = currentProgress
-    sleep(sleepRate)
 
 proc initBar*(barType: BarType, threaded: bool = true): Bar =
+  when defined(wasmBuild):
+    return Bar(hide: true, config: BarConfig(), stack: @[])
   var icon = "⏳"
   var chars = @[" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
   var brackets = (left: "|", right: "|")
@@ -160,18 +166,20 @@ proc initBar*(barType: BarType, threaded: bool = true): Bar =
     ampm: ampm
   )
   result = Bar(hide: hide, config: config, stack: @[])
-  if not hide:
-    when not defined(windows):
-      termResized.store(false)
-      signal(SIGWINCH, sigwinchHandler)
-    result.threadData = ThreadData(config: addr result.config)
-    result.threadData.shouldStop.store(false)
-    createThread(result.progressThread, progressWorker, result.threadData)
+  when not defined(wasmBuild):
+    if not hide:
+      when not defined(windows):
+        termResized.store(false)
+        signal(SIGWINCH, sigwinchHandler)
+      result.threadData = ThreadData(config: addr result.config)
+      result.threadData.shouldStop.store(false)
+      createThread(result.progressThread, progressWorker, result.threadData)
 
 
 func tick*(bar: Bar, index: float) =
-  if not bar.hide:
-    bar.threadData.progress.store(index)
+  when not defined(wasmBuild):
+    if not bar.hide:
+      bar.threadData.progress.store(index)
 
 proc start*(bar: Bar, total: float, title: string) =
   if bar.hide:
@@ -190,13 +198,16 @@ proc start*(bar: Bar, total: float, title: string) =
     elif c == 'm':
       inEscape = false
 
-  bar.threadData.title = title
-  bar.threadData.lenTitle = lenTitle
-  bar.threadData.total.store(total)
-  bar.threadData.progress.store(0.0)
-  bar.threadData.begin = epochTime()
+  when not defined(wasmBuild):
+    bar.threadData.title = title
+    bar.threadData.lenTitle = lenTitle
+    bar.threadData.total.store(total)
+    bar.threadData.progress.store(0.0)
+    bar.threadData.begin = epochTime()
 
 proc `end`*(bar: Bar) =
+  if bar.hide:
+    return
   let columns = terminalWidth()
   stdout.write(" ".repeat(max(0, columns - 2)) & "\r")
   stdout.flushFile()
@@ -204,6 +215,7 @@ proc `end`*(bar: Bar) =
     bar.stack.setLen(bar.stack.len - 1)
 
 proc destroy*(bar: Bar) =
-  if bar.threadData != nil:
-    bar.threadData.shouldStop.store(true)
-    joinThread(bar.progressThread)
+  when not defined(wasmBuild):
+    if bar.threadData != nil:
+      bar.threadData.shouldStop.store(true)
+      joinThread(bar.progressThread)

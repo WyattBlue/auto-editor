@@ -28,7 +28,7 @@ func setTbNtsc(tb: AVRational): (int64, string) =
     return (60'i64, "TRUE")
 
   var ctb = int64(ceil(tb.float64))
-  if ctb notin [24, 30, 60] and tb == ctb * AVRational(num: 999, den: 1000):
+  if ctb notin [int64(24), 30, 60] and tb == ctb * AVRational(num: 999, den: 1000):
     return (ctb, "TRUE")
 
   return (tb.int64, "FALSE")

@@ -3,7 +3,7 @@ import std/[json, strformat, strutils]
 import ../[av, ffmpeg, log, media, timeline]
 import ../util/[fun, lang]
 
-proc genericTrack(lang: Lang, bitrate: int) =
+proc genericTrack(lang: Lang, bitrate: int64) =
   if bitrate != 0:
     echo &"     - bitrate: {bitrate}"
   if lang != ['u', 'n', 'd', '\0']:

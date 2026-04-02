@@ -88,10 +88,10 @@ func timecode(self: MediaInfo): string = # In SMPTE
   return "00:00:00:00"
 
 proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3) =
-  func fraction(val: int): string =
+  func fraction(val: int64): string =
     if val == 0:
       return "0s"
-    return &"{val * tl.tb.den.int}/{tl.tb.num}s"
+    return &"{val * tl.tb.den}/{tl.tb.num}s"
 
   var verStr: string
   if version == "11":
@@ -106,7 +106,7 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
   fcpxml.add(resources)
 
   var srcDur = 0
-  var tlDur = (if resolve: 0 else: tl.len)
+  var tlDur: int64 = (if resolve: 0 else: tl.len)
   var projName: string
 
   var ptrToMi = initTable[ptr string, MediaInfo]()

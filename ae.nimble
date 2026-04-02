@@ -611,7 +611,7 @@ if enableWhisper:
   filters.add "whisper"
 filters.add "scale,crop,pad,format,gblur,lut,negate,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
 
-proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false): string =
+proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false, crossWasm: bool = false): string =
   var commonFlags = &"""
   --enable-version3 \
   --enable-static \
@@ -638,15 +638,16 @@ proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false): st
     if package.ffFlag != "":
       commonFlags &= &"  {package.ffFlag} \\\n"
 
-  if defined(arm) or defined(arm64) or crossWindowsArm:
-    commonFlags &= "  --enable-neon \\\n"
+  if not crossWasm:
+    if defined(arm) or defined(arm64) or crossWindowsArm:
+      commonFlags &= "  --enable-neon \\\n"
 
-  if defined(macosx):
-    commonFlags &= "  --enable-videotoolbox \\\n"
-    commonFlags &= "  --enable-audiotoolbox \\\n"
-  elif not crossWindowsArm:
-    commonFlags &= "  --enable-nvenc \\\n"
-    commonFlags &= "  --enable-ffnvcodec \\\n"
+    if defined(macosx):
+      commonFlags &= "  --enable-videotoolbox \\\n"
+      commonFlags &= "  --enable-audiotoolbox \\\n"
+    elif not crossWindowsArm:
+      commonFlags &= "  --enable-nvenc \\\n"
+      commonFlags &= "  --enable-ffnvcodec \\\n"
 
   commonFlags &= "--disable-autodetect"
   return commonFlags
@@ -777,3 +778,61 @@ task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
     # Strip the Windows binary
     exec "llvm-strip -s auto-editor.exe"
 
+let wasmBuildPath = absolutePath("build_wasm")
+
+task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
+  setupDeps()
+  putEnv("PKG_CONFIG_PATH", wasmBuildPath / "lib/pkgconfig")
+
+  mkDir("ffmpeg_sources")
+  mkDir("build_wasm")
+
+  withDir "ffmpeg_sources":
+    if not fileExists(ffmpeg.location):
+      exec &"curl -O -L {ffmpeg.sourceUrl}"
+      checkHash(ffmpeg, "ffmpeg_sources" / ffmpeg.location)
+
+    if not dirExists(ffmpeg.name):
+      exec &"tar xf {ffmpeg.location} && mv {ffmpeg.dirName} {ffmpeg.name}"
+      let patchFile = "../patches/ffmpeg.patch"
+      if fileExists(patchFile):
+        let cmd = &"patch -d {ffmpeg.name} -i {absolutePath(patchFile)} -p1 --force"
+        echo "Applying patch: ", cmd
+        exec cmd
+
+  withDir "ffmpeg_sources/ffmpeg":
+    if fileExists("Makefile"):
+      exec "make clean"
+    exec (&"""./configure --prefix="{wasmBuildPath}" \
+      --cc=emcc \
+      --cxx=em++ \
+      --ar=emar \
+      --ranlib=emranlib \
+      --nm=emnm \
+      --enable-cross-compile \
+      --target-os=none \
+      --arch=x86_32 \
+      --disable-x86asm \
+      --disable-inline-asm \
+      --disable-pthreads \
+      --disable-w32threads \
+      --disable-os2threads \""" & "\n" & setupCommonFlags(@[], crossWasm=true))
+    makeInstall()
+
+task makewasm, "Compile to wasm (requires emscripten)":
+  echo "Compiling for wasm (browser)..."
+
+  if not dirExists("build_wasm"):
+    echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
+  else:
+    exec "nim c -d:danger --panics:on -d:nimNoGetRandom -d:wasmBuild --threads:off --os:linux --cpu:wasm32 --cc:clang " &
+        "--clang.exe:emcc " &
+        "--clang.linkerexe:emcc " &
+        "--passL:-sALLOW_MEMORY_GROWTH=1 " &
+        "--passL:-sSTACK_SIZE=1048576 " &
+        "--passL:-sMODULARIZE=1 " &
+        "--passL:-sEXPORT_NAME=AutoEditor " &
+        "--passL:-sINVOKE_RUN=0 " &
+        "--passL:-sEXPORTED_RUNTIME_METHODS=[FS,callMain] " &
+        "--passL:-sENVIRONMENT=web " &
+        "--out:auto-editor-web.js src/main.nim"

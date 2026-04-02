@@ -164,14 +164,17 @@ let start* = epochTime()
 let noColor* = getEnv("NO_COLOR") != "" or getEnv("AV_LOG_FORCE_NOCOLOR") != ""
 
 proc conwrite*(msg: string) {.raises: [].} =
-  if not quiet:
-    try:
-      let columns = terminalWidth()
-      let buffer: string = " ".repeat(columns - msg.len - 3)
-      stdout.write("  " & msg & buffer & "\r")
-      stdout.flushFile()
-    except IOError:
-      discard
+  when defined(wasmBuild):
+    try: stdout.write(msg) except IOError: discard
+  else:
+    if not quiet:
+      try:
+        let columns = terminalWidth()
+        let buffer: string = " ".repeat(columns - msg.len - 3)
+        stdout.write("  " & msg & buffer & "\r")
+        stdout.flushFile()
+      except IOError:
+        discard
 
 proc debug*(msg: string) =
   if isDebug:

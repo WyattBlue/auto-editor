@@ -1,5 +1,6 @@
 auto-editor
 build
+build_*
 ffmpeg_sources
 .vscode
 *.bin
@@ -17,7 +18,7 @@ tests/*
 *.dylib
 *.o
 
-# Python Generated Files
+# Generated Files
 __pycache__/
 *.pyc
 *.pyo
@@ -26,3 +27,7 @@ __pycache__/
 nimble.develop
 nimble.paths
 nimbledeps
+
+# Wasm Files
+*\.wasm
+*-web\.js

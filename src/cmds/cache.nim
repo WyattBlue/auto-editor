@@ -2,7 +2,7 @@ import std/[os, strformat, terminal]
 
 import ../about
 
-func formatBytes(intSize: int): (string, string) =
+func formatBytes(intSize: BiggestInt): (string, string) =
   if intSize < 1024:
     return ($intSize, "B")
   var size = intSize.float / 1024.0
@@ -21,7 +21,7 @@ proc main*(args: seq[string]) =
     except: discard
     return
 
-  var totalSize = 0
+  var totalSize: BiggestInt = 0
   try:
     for (kind, path) in walkDir(cacheDir):
       if kind == pcFile:

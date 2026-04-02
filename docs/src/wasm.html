@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>auto-editor wasm test</title>
+  <style>
+    body { font-family: monospace; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+    input, button, select { margin: 4px 0; }
+    #log { background: #111; color: #eee; padding: 12px; height: 300px; overflow-y: auto;
+           white-space: pre-wrap; font-size: 13px; margin-top: 12px; }
+    button { cursor: pointer; padding: 6px 14px; }
+    #downloadArea { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h2>auto-editor</h2>
+
+  <label>Input file: <input type="file" id="fileInput"></label><br>
+  <label>Extra args: <input type="text" id="argsInput" value="-c:v mpeg4" size="40"></label><br>
+  <label>Output name: <input type="text" id="outputName" value="out.mp4" size="20"></label><br>
+  <button onclick="runEditor()">Run</button>
+  <button onclick="document.getElementById('log').textContent=''">Clear log</button>
+
+  <div id="log"></div>
+  <div id="downloadArea"></div>
+
+  <script src="auto-editor-web.js"></script>
+  <script>
+    function log(msg) {
+      const el = document.getElementById('log');
+      el.textContent += msg + '\n';
+      el.scrollTop = el.scrollHeight;
+    }
+
+    async function runEditor() {
+      const fileInput = document.getElementById('fileInput');
+      if (!fileInput.files.length) { log('No file selected.'); return; }
+
+      const file = fileInput.files[0];
+      const ext = file.name.split('.').pop();
+      const inputPath = '/input.' + ext;
+      const outputName = document.getElementById('outputName').value.trim() || 'out.mp4';
+      const outputPath = '/' + outputName;
+
+      log('Loading ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)...');
+      const data = new Uint8Array(await file.arrayBuffer());
+
+      log('Initializing wasm module...');
+      let module;
+      try {
+        module = await AutoEditor({
+          print:    (t) => log(t),
+          printErr: (t) => log(t),
+          locateFile: (f) => f,
+        });
+      } catch (e) {
+        log('Module init failed: ' + e);
+        return;
+      }
+
+      module.FS.writeFile(inputPath, data);
+      log('Wrote ' + inputPath + ' to virtual FS.');
+
+      const extraArgs = document.getElementById('argsInput').value.trim().split(/\s+/).filter(Boolean);
+      const args = [inputPath, ...extraArgs, '-o', outputPath];
+      log('Running: auto-editor ' + args.join(' '));
+
+      try {
+        module.callMain(args);
+      } catch (e) {
+        log('Error: ' + e);
+        return;
+      }
+
+      let outData;
+      try {
+        outData = module.FS.readFile(outputPath);
+      } catch (e) {
+        log('Could not read output file: ' + e);
+        return;
+      }
+
+      log('Done. Output size: ' + (outData.byteLength / 1024 / 1024).toFixed(2) + ' MB');
+
+      const blob = new Blob([outData]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = outputName;
+      a.textContent = 'Download ' + outputName;
+      const area = document.getElementById('downloadArea');
+      area.innerHTML = '';
+      area.appendChild(a);
+    }
+  </script>
+</body>
+</html>

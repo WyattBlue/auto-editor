@@ -1,5 +1,6 @@
 import std/[options, os, random, sets, sequtils, strformat, strutils, terminal, times]
-from std/browsers import openDefaultBrowser
+when not defined(wasmBuild):
+  from std/browsers import openDefaultBrowser
 from std/math import round
 
 import ./[av, edit, ffmpeg, log, media, timeline]
@@ -404,5 +405,6 @@ proc editMedia*(args: var mainArgs) =
   if args.noOpen:
     discard
   elif args.open:
-    openDefaultBrowser(output)
+    when not defined(wasmBuild):
+      openDefaultBrowser(output)
   closeTempDir()
