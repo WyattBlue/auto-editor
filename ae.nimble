@@ -832,6 +832,35 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
       exec &"""emconfigure ./configure --prefix="{wasmBuildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
     makeInstall()
 
+  # Build dav1d
+  withDir "ffmpeg_sources":
+    if not fileExists(dav1d.location):
+      exec &"curl -O -L {dav1d.sourceUrl}"
+      checkHash(dav1d, "ffmpeg_sources" / dav1d.location)
+
+    if not dirExists(dav1d.name):
+      exec &"tar xjf {dav1d.location} && mv {dav1d.dirName} {dav1d.name}"
+
+  withDir &"ffmpeg_sources/{dav1d.name}":
+    mkDir("build_meson")
+    writeFile("build_meson/meson-cross.txt", """
+[binaries]
+c = 'emcc'
+cpp = 'em++'
+ar = 'emar'
+
+[host_machine]
+system = 'emscripten'
+cpu_family = 'wasm32'
+cpu = 'wasm32'
+endian = 'little'
+""")
+    withDir "build_meson":
+      if not fileExists("build.ninja"):
+        exec &"""meson setup --prefix="{wasmBuildPath}" --buildtype=release --default-library=static -Denable_docs=false -Denable_tools=false -Denable_examples=false -Denable_tests=false -Denable_asm=false -Dc_args="-matomics -mbulk-memory" --cross-file=meson-cross.txt .."""
+      exec "ninja"
+      exec "ninja install"
+
   # lame ships no .pc file; create one so FFmpeg's configure can find it
   mkDir(wasmBuildPath / "lib" / "pkgconfig")
   writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc",
@@ -875,7 +904,7 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
       --disable-w32threads \
       --disable-os2threads \
       --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
-      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus], crossWasm=true))
+      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus, dav1d], crossWasm=true))
     makeInstall()
 
 task makewasmweb, "Compile to wasm for browser (requires emscripten)":
