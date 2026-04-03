@@ -5,12 +5,14 @@
   <title>Auto-Editor cli for wasm</title>
   {{ head_icon }}
   <style>
-    body { font-family: monospace; max-width: 700px; margin: 40px auto; padding: 0 20px; }
-    input, button, select { margin: 4px 0; }
-    #log { background: #111; color: #eee; padding: 12px; height: 300px; overflow-y: auto;
-           white-space: pre-wrap; font-size: 13px; margin-top: 12px; }
-    button { cursor: pointer; padding: 6px 14px; }
-    #downloadArea { margin-top: 12px; }
+  {{ core_style }}
+  label { color: var(--charcoal-100) }
+  body { font-family: monospace; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+  input, button, select { margin: 4px 0; }
+  #log { background: #111; color: #eee; padding: 12px; height: 300px; overflow-y: auto;
+         white-space: pre-wrap; font-size: 13px; margin-top: 12px; }
+  button { cursor: pointer; padding: 6px 14px; }
+  #downloadArea { margin-top: 12px; }
   </style>
 </head>
 <body>

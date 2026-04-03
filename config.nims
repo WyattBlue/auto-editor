@@ -21,7 +21,9 @@ switch("passC", "-fno-signaling-nans -fno-math-errno -fno-trapping-math -fno-sig
 switch("passL", "-lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil")
 
 # Codec libraries
-if hostCPU != "wasm32":
+if hostCPU == "wasm32":
+  switch("passL", "-lmp3lame")
+else:
   switch("passL", "-lmp3lame -lopus -lx264 -ldav1d")
   if enableVpx:
     switch("passL", "-lvpx")

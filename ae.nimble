@@ -787,6 +787,35 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
   mkDir("ffmpeg_sources")
   mkDir("build_wasm")
 
+  # Build lame
+  withDir "ffmpeg_sources":
+    if not fileExists(lame.location):
+      exec &"curl -O -L {lame.sourceUrl}"
+      checkHash(lame, "ffmpeg_sources" / lame.location)
+
+    if not dirExists(lame.name):
+      exec &"tar xf {lame.location} && mv {lame.dirName} {lame.name}"
+
+  withDir &"ffmpeg_sources/{lame.name}":
+    if not fileExists("Makefile"):
+      let args = lame.buildArguments.join(" ")
+      exec &"""emconfigure ./configure --prefix="{wasmBuildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
+    makeInstall()
+
+  # lame ships no .pc file; create one so FFmpeg's configure can find it
+  mkDir(wasmBuildPath / "lib" / "pkgconfig")
+  writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc",
+    "prefix=" & wasmBuildPath & "\n" &
+    "exec_prefix=${prefix}\n" &
+    "libdir=${prefix}/lib\n" &
+    "includedir=${prefix}/include\n" &
+    "\nName: mp3lame\n" &
+    "Description: MPEG Layer 3 audio codec\n" &
+    "Version: 3.100\n" &
+    "Libs: -L${libdir} -lmp3lame\n" &
+    "Cflags: -I${includedir}\n")
+
+  # Build FFmpeg
   withDir "ffmpeg_sources":
     if not fileExists(ffmpeg.location):
       exec &"curl -O -L {ffmpeg.sourceUrl}"
@@ -814,11 +843,11 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
       --arch=x86_32 \
       --disable-x86asm \
       --disable-inline-asm \
-      --disable-pthreads \
+      --enable-pthreads \
       --disable-w32threads \
       --disable-os2threads \
-      --extra-cflags="-matomics -mbulk-memory" \
-      --extra-ldflags="-matomics -mbulk-memory" \""" & "\n" & setupCommonFlags(@[], crossWasm=true))
+      --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
+      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame], crossWasm=true))
     makeInstall()
 
 task makewasmweb, "Compile to wasm for browser (requires emscripten)":
