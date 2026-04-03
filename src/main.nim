@@ -1,6 +1,7 @@
 import std/[options, os, parseutils, sequtils, strformat, strutils]
 when not defined(wasmBuild):
   import std/[osproc, uri]
+  import cmds/completion
 when defined(wasmBuild):
   {.emit: """
 extern int main(int argc, char** argv, char** env);
@@ -12,7 +13,7 @@ when not defined(windows) and not defined(wasmBuild):
   import std/posix_utils
 
 import ./[about, cli, conductor, edit, ffmpeg, log]
-import cmds/[completion, info, desc, cache, levels, subdump, whisper]
+import cmds/[info, desc, cache, levels, subdump, whisper]
 import util/[color, fun, term]
 
 import tinyre

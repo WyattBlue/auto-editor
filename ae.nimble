@@ -1017,10 +1017,12 @@ task makewasmweb, "Compile to wasm for browser (requires emscripten)":
         "--clang.linkerexe:emcc " &
         "--passC:-pthread " &
         "--passL:-pthread " &
+        "--passL:-sINITIAL_MEMORY=67108864 " &
         "--passL:-sALLOW_MEMORY_GROWTH=1 " &
+        "--passL:-sMAXIMUM_MEMORY=4294967296 " &
         "--passL:-Wno-pthreads-mem-growth " &
         "--passL:-sSTACK_SIZE=1048576 " &
-        "--passL:-sPTHREAD_POOL_SIZE=4 " &
+        "--passL:-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency " &
         "--passL:-sPROXY_TO_PTHREAD=1 " &
         "--passL:-sEXIT_RUNTIME=1 " &
         "--passL:-sMODULARIZE=1 " &

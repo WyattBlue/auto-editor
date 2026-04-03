@@ -7,25 +7,39 @@
   <style>
   {{ core_style }}
   label { color: var(--charcoal-100) }
-  body { font-family: monospace; max-width: 700px; margin: 40px auto; padding: 0 20px; }
-  input, button, select { margin: 4px 0; }
-  #log { background: #111; color: #eee; padding: 12px; height: 300px; overflow-y: auto;
-         white-space: pre-wrap; font-size: 13px; margin-top: 12px; }
+  input, button, select { margin: 4px 0 }
+  #hero { font-family: monospace }
+  .notice { color: var(--charcoal-400) }
+  #log {
+    font-family: monospace;
+    background: #111;
+    color: #eee;
+    padding: 12px;
+    height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-size: 13px;
+    margin-top: 12px;
+  }
   button { cursor: pointer; padding: 6px 14px; }
   #downloadArea { margin-top: 12px; }
   .tabs { display: flex; margin-bottom: -1px; }
   .tab-btn { padding: 7px 18px; border: 1px solid #555; background: #1a1a1a; color: #888;
-             cursor: pointer; border-bottom: none; }
+             cursor: pointer; margin: 0}
   .tab-btn.active { background: #2a2a2a; color: #eee; }
   .tab-panel { display: none; border: 1px solid #555; padding: 16px 12px; }
   .tab-panel.active { display: block; }
   </style>
 </head>
 <body>
-  <h2>Auto-Editor cli for wasm</h2>
-
+  {{ nav }}
+<section class="section">
+<div class="container">
+  <h2 id="hero">Auto-Editor cli for wasm</h2>
+  <p class="tiny notice">wasm32 has a memory limit of 4GB. Importing or exporting big files may fail.</p>
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('main', this)">Main</button>
+    <button class="tab-btn" onclick="switchTab('info', this)">Info</button>
     <button class="tab-btn" onclick="switchTab('whisper', this)">Whisper</button>
   </div>
 
@@ -42,6 +56,12 @@
     <label>Model file: <input type="file" id="whisperModel" accept=".bin"></label><br>
     <label>Arguments: <input type="text" id="whisperArgs" value="" size="40"></label><br>
     <button id="whisperRunBtn" onclick="runWhisper()">Run</button>
+    <button onclick="clearLog()">Clear log</button>
+  </div>
+
+  <div id="tab-info" class="tab-panel">
+    <label>Input file: <input type="file" id="infoFileInput"></label><br>
+    <button id="infoRunBtn" onclick="runInfo()">Run</button>
     <button onclick="clearLog()">Clear log</button>
   </div>
 
@@ -110,150 +130,120 @@
       }
     }
 
-    async function runEditor() {
-      const fileInput = document.getElementById('fileInput');
-      if (!fileInput.files.length) { handleOutput('No file selected.'); return; }
+    function mb(n) { return (n / 1024 / 1024).toFixed(1); }
 
-      const btn = document.getElementById('runBtn');
+    function createDownload(data, name) {
+      const blob = data instanceof Blob ? data : new Blob([data]);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.textContent = 'Download ' + name;
+      const area = document.getElementById('downloadArea');
+      area.innerHTML = '';
+      area.appendChild(a);
+    }
+
+    // entries: [{file, path}]. Returns module on success, null on failure.
+    async function runModule(btn, args, entries) {
       btn.disabled = true;
+      for (const {file} of entries)
+        handleOutput(`Loading ${file.name} (${mb(file.size)} MB)...`);
 
-      const file = fileInput.files[0];
-      const ext = file.name.split('.').pop();
-      const inputPath = '/input.' + ext;
+      const buffers = await Promise.all(
+        entries.map(({file}) => file.arrayBuffer().then(b => new Uint8Array(b)))
+      );
+      handleOutput('Running: auto-editor ' + args.join(' '));
+
+      let resolve, reject;
+      const done = new Promise((res, rej) => { resolve = res; reject = rej; });
+
+      let mod;
+      try {
+        mod = await AutoEditor({
+          arguments: args,
+          preRun: [(m) => entries.forEach(({path}, i) => m.FS.writeFile(path, buffers[i]))],
+          print:    handleOutput,
+          printErr: handleOutput,
+          locateFile: (f) => f,
+          onExit: (code) => code === 0 ? resolve() : reject(new Error('exited with code ' + code)),
+        });
+      } catch (e) {
+        handleOutput('Module init failed: ' + e);
+        btn.disabled = false;
+        return null;
+      }
+
+      try {
+        await done;
+      } catch (e) {
+        handleOutput('Error: ' + e.message);
+        btn.disabled = false;
+        return null;
+      }
+
+      btn.disabled = false;
+      return mod;
+    }
+
+    async function runEditor() {
+      const fileEl = document.getElementById('fileInput');
+      if (!fileEl.files.length) { handleOutput('No file selected.'); return; }
+      const file = fileEl.files[0];
+      const inputPath = '/input.' + file.name.split('.').pop();
       const outputName = document.getElementById('outputName').value.trim() || 'out.mp4';
       const outputPath = '/' + outputName;
       const extraArgs = document.getElementById('argsInput').value.trim().split(/\s+/).filter(Boolean);
-      const args = [inputPath, ...extraArgs, '-o', outputPath];
 
-      handleOutput('Loading ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)...');
-      const data = new Uint8Array(await file.arrayBuffer());
-
-      handleOutput('Running: auto-editor ' + args.join(' '));
-
-      let resolveExit, rejectExit;
-      const exitPromise = new Promise((res, rej) => { resolveExit = res; rejectExit = rej; });
-
-      let module;
-      try {
-        module = await AutoEditor({
-          arguments: args,
-          preRun: [(mod) => { mod.FS.writeFile(inputPath, data); }],
-          print:    handleOutput,
-          printErr: handleOutput,
-          locateFile: (f) => f,
-          onExit: (code) => {
-            if (code === 0) resolveExit();
-            else rejectExit(new Error('auto-editor exited with code ' + code));
-          },
-        });
-      } catch (e) {
-        handleOutput('Module init failed: ' + e);
-        btn.disabled = false;
-        return;
-      }
-
-      try {
-        await exitPromise;
-      } catch (e) {
-        handleOutput('Error: ' + e.message);
-        btn.disabled = false;
-        return;
-      }
+      const mod = await runModule(
+        document.getElementById('runBtn'),
+        [inputPath, ...extraArgs, '-o', outputPath],
+        [{file, path: inputPath}]
+      );
+      if (!mod) return;
 
       let outData;
       try {
-        outData = module.FS.readFile(outputPath);
+        outData = mod.FS.readFile(outputPath);
       } catch (e) {
         handleOutput('Could not read output file: ' + e);
-        btn.disabled = false;
         return;
       }
-
-      handleOutput('Done. Output size: ' + (outData.byteLength / 1024 / 1024).toFixed(2) + ' MB');
-
-      const blob = new Blob([outData]);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = outputName;
-      a.textContent = 'Download ' + outputName;
-      const area = document.getElementById('downloadArea');
-      area.innerHTML = '';
-      area.appendChild(a);
-
-      btn.disabled = false;
+      handleOutput('Done. Output size: ' + mb(outData.byteLength) + ' MB');
+      createDownload(outData, outputName);
     }
 
     async function runWhisper() {
-      const fileInput = document.getElementById('whisperFileInput');
-      if (!fileInput.files.length) { handleOutput('No file selected.'); return; }
-
-      const btn = document.getElementById('whisperRunBtn');
-      btn.disabled = true;
-
-      const modelInput = document.getElementById('whisperModel');
-      if (!modelInput.files.length) { handleOutput('No model file selected.'); btn.disabled = false; return; }
-
-      const file = fileInput.files[0];
-      const modelFile = modelInput.files[0];
-      const ext = file.name.split('.').pop();
-      const inputPath = '/input.' + ext;
-      const modelPath = '/model.bin';
+      const fileEl = document.getElementById('whisperFileInput');
+      const modelEl = document.getElementById('whisperModel');
+      if (!fileEl.files.length) { handleOutput('No file selected.'); return; }
+      if (!modelEl.files.length) { handleOutput('No model file selected.'); return; }
+      const file = fileEl.files[0];
+      const inputPath = '/input.' + file.name.split('.').pop();
       const extraArgs = document.getElementById('whisperArgs').value.trim().split(/\s+/).filter(Boolean);
-      const args = ['whisper', inputPath, modelPath, ...extraArgs];
 
-      handleOutput('Loading ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)...');
-      handleOutput('Loading model ' + modelFile.name + ' (' + (modelFile.size / 1024 / 1024).toFixed(1) + ' MB)...');
-      const [data, modelData] = await Promise.all([
-        file.arrayBuffer().then(b => new Uint8Array(b)),
-        modelFile.arrayBuffer().then(b => new Uint8Array(b)),
-      ]);
-
-      handleOutput('Running: auto-editor ' + args.join(' '));
-
-      let resolveExit, rejectExit;
-      const exitPromise = new Promise((res, rej) => { resolveExit = res; rejectExit = rej; });
-
-      try {
-        await AutoEditor({
-          arguments: args,
-          preRun: [(mod) => { mod.FS.writeFile(inputPath, data); mod.FS.writeFile(modelPath, modelData); }],
-          print:    handleOutput,
-          printErr: handleOutput,
-          locateFile: (f) => f,
-          onExit: (code) => {
-            if (code === 0) resolveExit();
-            else rejectExit(new Error('auto-editor exited with code ' + code));
-          },
-        });
-      } catch (e) {
-        handleOutput('Module init failed: ' + e);
-        btn.disabled = false;
-        return;
-      }
-
-      try {
-        await exitPromise;
-      } catch (e) {
-        handleOutput('Error: ' + e.message);
-        btn.disabled = false;
-        return;
-      }
+      const mod = await runModule(
+        document.getElementById('whisperRunBtn'),
+        ['whisper', inputPath, '/model.bin', ...extraArgs],
+        [{file, path: inputPath}, {file: modelEl.files[0], path: '/model.bin'}]
+      );
+      if (!mod) return;
 
       handleOutput('Done.');
-
       const transcript = document.getElementById('log').textContent;
-      const blob = new Blob([transcript], {type: 'text/plain'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name.replace(/\.[^.]+$/, '') + '.txt';
-      a.textContent = 'Download transcript';
-      const area = document.getElementById('downloadArea');
-      area.innerHTML = '';
-      area.appendChild(a);
+      createDownload(new Blob([transcript], {type: 'text/plain'}), file.name.replace(/\.[^.]+$/, '') + '.txt');
+    }
 
-      btn.disabled = false;
+    async function runInfo() {
+      const fileEl = document.getElementById('infoFileInput');
+      if (!fileEl.files.length) { handleOutput('No file selected.'); return; }
+      const file = fileEl.files[0];
+      const inputPath = '/input.' + file.name.split('.').pop();
+
+      await runModule(
+        document.getElementById('infoRunBtn'),
+        ['info', inputPath],
+        [{file, path: inputPath}]
+      );
     }
   </script>
 </body>

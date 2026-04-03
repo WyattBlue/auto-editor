@@ -87,15 +87,6 @@ proc formatProgressOutput(config: BarConfig, title: string, lenTitle: int, progr
 
     return &"  {config.icon}{title} {barString} {pPad}{percent}%  ETA {newTime}    "
 
-when defined(wasmBuild):
-  {.emit: """
-#include <emscripten.h>
-static void wasm_progress_write(const char* text) {
-  EM_ASM({ out(UTF8ToString($0) + '\r'); }, text);
-}
-""".}
-  proc wasmProgressWrite(text: cstring) {.importc: "wasm_progress_write", nodecl.}
-
 proc progressWorker(data: ThreadData) {.thread.} =
   ## Background thread worker that handles progress bar updates with full format
   var lastProgress: float = -1
