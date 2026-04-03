@@ -13,16 +13,37 @@
          white-space: pre-wrap; font-size: 13px; margin-top: 12px; }
   button { cursor: pointer; padding: 6px 14px; }
   #downloadArea { margin-top: 12px; }
+  .tabs { display: flex; margin-bottom: -1px; }
+  .tab-btn { padding: 7px 18px; border: 1px solid #555; background: #1a1a1a; color: #888;
+             cursor: pointer; border-bottom: none; }
+  .tab-btn.active { background: #2a2a2a; color: #eee; }
+  .tab-panel { display: none; border: 1px solid #555; padding: 16px 12px; }
+  .tab-panel.active { display: block; }
   </style>
 </head>
 <body>
   <h2>Auto-Editor cli for wasm</h2>
 
-  <label>Input file: <input type="file" id="fileInput"></label><br>
-  <label>Arguments: <input type="text" id="argsInput" value="-c:v h264" size="40"></label><br>
-  <label>Output name: <input type="text" id="outputName" value="out.mp4" size="20"></label><br>
-  <button id="runBtn" onclick="runEditor()">Run</button>
-  <button onclick="document.getElementById('log').textContent='';progressLineActive=false;pendingOutput.length=0">Clear log</button>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('main', this)">Main</button>
+    <button class="tab-btn" onclick="switchTab('whisper', this)">Whisper</button>
+  </div>
+
+  <div id="tab-main" class="tab-panel active">
+    <label>Input file: <input type="file" id="fileInput"></label><br>
+    <label>Arguments: <input type="text" id="argsInput" value="-c:v h264" size="40"></label><br>
+    <label>Output name: <input type="text" id="outputName" value="out.mp4" size="20"></label><br>
+    <button id="runBtn" onclick="runEditor()">Run</button>
+    <button onclick="clearLog()">Clear log</button>
+  </div>
+
+  <div id="tab-whisper" class="tab-panel">
+    <label>Input file: <input type="file" id="whisperFileInput"></label><br>
+    <label>Model file: <input type="file" id="whisperModel" accept=".bin"></label><br>
+    <label>Arguments: <input type="text" id="whisperArgs" value="" size="40"></label><br>
+    <button id="whisperRunBtn" onclick="runWhisper()">Run</button>
+    <button onclick="clearLog()">Clear log</button>
+  </div>
 
   <div id="log"></div>
   <div id="downloadArea"></div>
@@ -32,6 +53,21 @@
     let progressLineActive = false;
     const pendingOutput = [];
     let rafPending = false;
+
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      btn.classList.add('active');
+      clearLog();
+    }
+
+    function clearLog() {
+      document.getElementById('log').textContent = '';
+      document.getElementById('downloadArea').innerHTML = '';
+      progressLineActive = false;
+      pendingOutput.length = 0;
+    }
 
     function stripAnsi(str) {
       return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
@@ -97,8 +133,6 @@
       let resolveExit, rejectExit;
       const exitPromise = new Promise((res, rej) => { resolveExit = res; rejectExit = rej; });
 
-      // Module is initialized with arguments pre-set. preRun writes the input file
-      // before main() starts. With PROXY_TO_PTHREAD, main() runs in a worker thread.
       let module;
       try {
         module = await AutoEditor({
@@ -143,6 +177,78 @@
       a.href = url;
       a.download = outputName;
       a.textContent = 'Download ' + outputName;
+      const area = document.getElementById('downloadArea');
+      area.innerHTML = '';
+      area.appendChild(a);
+
+      btn.disabled = false;
+    }
+
+    async function runWhisper() {
+      const fileInput = document.getElementById('whisperFileInput');
+      if (!fileInput.files.length) { handleOutput('No file selected.'); return; }
+
+      const btn = document.getElementById('whisperRunBtn');
+      btn.disabled = true;
+
+      const modelInput = document.getElementById('whisperModel');
+      if (!modelInput.files.length) { handleOutput('No model file selected.'); btn.disabled = false; return; }
+
+      const file = fileInput.files[0];
+      const modelFile = modelInput.files[0];
+      const ext = file.name.split('.').pop();
+      const inputPath = '/input.' + ext;
+      const modelPath = '/model.bin';
+      const extraArgs = document.getElementById('whisperArgs').value.trim().split(/\s+/).filter(Boolean);
+      const args = ['whisper', inputPath, modelPath, ...extraArgs];
+
+      handleOutput('Loading ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)...');
+      handleOutput('Loading model ' + modelFile.name + ' (' + (modelFile.size / 1024 / 1024).toFixed(1) + ' MB)...');
+      const [data, modelData] = await Promise.all([
+        file.arrayBuffer().then(b => new Uint8Array(b)),
+        modelFile.arrayBuffer().then(b => new Uint8Array(b)),
+      ]);
+
+      handleOutput('Running: auto-editor ' + args.join(' '));
+
+      let resolveExit, rejectExit;
+      const exitPromise = new Promise((res, rej) => { resolveExit = res; rejectExit = rej; });
+
+      try {
+        await AutoEditor({
+          arguments: args,
+          preRun: [(mod) => { mod.FS.writeFile(inputPath, data); mod.FS.writeFile(modelPath, modelData); }],
+          print:    handleOutput,
+          printErr: handleOutput,
+          locateFile: (f) => f,
+          onExit: (code) => {
+            if (code === 0) resolveExit();
+            else rejectExit(new Error('auto-editor exited with code ' + code));
+          },
+        });
+      } catch (e) {
+        handleOutput('Module init failed: ' + e);
+        btn.disabled = false;
+        return;
+      }
+
+      try {
+        await exitPromise;
+      } catch (e) {
+        handleOutput('Error: ' + e.message);
+        btn.disabled = false;
+        return;
+      }
+
+      handleOutput('Done.');
+
+      const transcript = document.getElementById('log').textContent;
+      const blob = new Blob([transcript], {type: 'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name.replace(/\.[^.]+$/, '') + '.txt';
+      a.textContent = 'Download transcript';
       const area = document.getElementById('downloadArea');
       area.innerHTML = '';
       area.appendChild(a);

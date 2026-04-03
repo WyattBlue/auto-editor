@@ -875,6 +875,65 @@ endian = 'little'
       exec &"""emconfigure ./configure --prefix="{wasmBuildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
     makeInstall()
 
+  # Build whisper
+  withDir "ffmpeg_sources":
+    if not fileExists(whisper.location):
+      exec &"curl -O -L {whisper.sourceUrl}"
+      checkHash(whisper, "ffmpeg_sources" / whisper.location)
+
+    if not dirExists(whisper.name):
+      exec &"tar xf {whisper.location} && mv {whisper.dirName} {whisper.name}"
+
+  withDir &"ffmpeg_sources/{whisper.name}":
+    mkDir("build_wasm_cmake")
+    withDir "build_wasm_cmake":
+      if not fileExists("CMakeCache.txt"):
+        exec &"""emcmake cmake .. \
+          -DCMAKE_INSTALL_PREFIX="{wasmBuildPath}" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DGGML_NATIVE=OFF \
+          -DGGML_CUDA=OFF \
+          -DGGML_METAL=OFF \
+          -DGGML_BLAS=OFF \
+          -DGGML_OPENMP=OFF \
+          -DGGML_BACKEND_DL=OFF \
+          -DWHISPER_SDL2=OFF \
+          -DWHISPER_BUILD_EXAMPLES=OFF \
+          -DWHISPER_BUILD_TESTS=OFF \
+          -DWHISPER_BUILD_SERVER=OFF"""
+      exec "make -j4"
+      exec "make install"
+
+  # Fix ggml library names (cmake installs without lib prefix on some platforms)
+  let whisperLibDir = wasmBuildPath / "lib"
+  for libFile in ["ggml.a", "ggml-base.a", "ggml-cpu.a"]:
+    let srcFile = whisperLibDir / libFile
+    let dstFile = whisperLibDir / ("lib" & libFile)
+    if fileExists(srcFile) and not fileExists(dstFile):
+      exec &"mv \"{srcFile}\" \"{dstFile}\""
+
+  # ggml-base.a is built but not always installed; copy manually if needed
+  let ggmlBaseDst = whisperLibDir / "libggml-base.a"
+  if not fileExists(ggmlBaseDst):
+    let ggmlBaseSrc = &"ffmpeg_sources/{whisper.name}/build_wasm_cmake/ggml/src/ggml-base.a"
+    if fileExists(ggmlBaseSrc):
+      exec &"cp \"{ggmlBaseSrc}\" \"{ggmlBaseDst}\""
+
+  # Write whisper.pc so FFmpeg's configure can find it
+  writeFile(whisperLibDir / "pkgconfig" / "whisper.pc", &"""prefix={wasmBuildPath}
+exec_prefix=${{prefix}}
+libdir=${{exec_prefix}}/lib
+includedir=${{prefix}}/include
+
+Name: whisper
+Description: whisper.cpp
+Version: 1.8.4
+Libs: -L${{libdir}} -lwhisper -lggml-base -lggml -lggml-cpu
+Libs.private: -lpthread -lm -lstdc++
+Cflags: -I${{includedir}}
+""")
+
   # lame ships no .pc file; create one so FFmpeg's configure can find it
   mkDir(wasmBuildPath / "lib" / "pkgconfig")
   writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc",
@@ -918,7 +977,7 @@ endian = 'little'
       --disable-w32threads \
       --disable-os2threads \
       --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
-      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus, dav1d, vpx], crossWasm=true))
+      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus, dav1d, vpx, whisper], crossWasm=true))
     makeInstall()
 
 task makewasmweb, "Compile to wasm for browser (requires emscripten)":

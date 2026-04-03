@@ -1,7 +1,7 @@
 var enableVpx = getEnv("DISABLE_VPX").len == 0
 var enableSvtav1 = getEnv("DISABLE_SVTAV1").len == 0
 var enableHevc = getEnv("DISABLE_HEVC").len == 0
-var enableWhisper = getEnv("DISABLE_WHISPER").len == 0 and hostCPU != "wasm32"
+var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
 when hostCPU == "wasm32":
@@ -55,7 +55,7 @@ if enableWhisper:
       switch("passL", "-lggml-metal")
     switch("passL", "-framework Accelerate")
     switch("passL", "-framework Metal -framework MetalKit -framework Foundation")
-  elif not (hostOS == "windows" and hostCPU == "arm64"):
+  elif not (hostOS == "windows" and hostCPU == "arm64") and hostCPU != "wasm32":
     switch("passL", "-lgomp")
 
 if enableHevc or enableWhisper or defined(linux):
