@@ -108,8 +108,6 @@ proc progressWorker(data: ThreadData) {.thread.} =
       if termResized.load():
         columns = terminalWidth()
         termResized.store(false)
-    elif not defined(windows):
-      discard
     else:
       columns = terminalWidth()
 

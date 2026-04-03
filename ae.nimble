@@ -934,6 +934,32 @@ Libs.private: -lpthread -lm -lstdc++
 Cflags: -I${{includedir}}
 """)
 
+  # Build SVT-AV1
+  withDir "ffmpeg_sources":
+    if not fileExists(svtav1.location):
+      exec &"curl -O -L {svtav1.sourceUrl}"
+      checkHash(svtav1, "ffmpeg_sources" / svtav1.location)
+
+    if not dirExists(svtav1.name):
+      exec &"tar xjf {svtav1.location} && mv {svtav1.dirName} {svtav1.name}"
+
+  withDir &"ffmpeg_sources/{svtav1.name}":
+    mkDir("build_wasm_cmake")
+    withDir "build_wasm_cmake":
+      if not fileExists("CMakeCache.txt"):
+        exec &"""emcmake cmake .. \
+          -DCMAKE_INSTALL_PREFIX="{wasmBuildPath}" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DBUILD_APPS=OFF \
+          -DBUILD_DEC=OFF \
+          -DBUILD_ENC=ON \
+          -DENABLE_NASM=OFF \
+          -DCMAKE_C_FLAGS="-matomics -mbulk-memory" \
+          -DCMAKE_CXX_FLAGS="-matomics -mbulk-memory" """
+      exec "make -j4"
+      exec "make install"
+
   # lame ships no .pc file; create one so FFmpeg's configure can find it
   mkDir(wasmBuildPath / "lib" / "pkgconfig")
   writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc",
@@ -977,7 +1003,7 @@ Cflags: -I${{includedir}}
       --disable-w32threads \
       --disable-os2threads \
       --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
-      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus, dav1d, vpx, whisper], crossWasm=true))
+      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus, dav1d, vpx, svtav1, whisper], crossWasm=true))
     makeInstall()
 
 task makewasmweb, "Compile to wasm for browser (requires emscripten)":

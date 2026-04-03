@@ -24,9 +24,9 @@ switch("passL", "-lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil
 switch("passL", "-lmp3lame -lopus -lx264 -ldav1d")
 if enableVpx:
   switch("passL", "-lvpx")
+if enableSvtav1:
+  switch("passL", "-lSvtAv1Enc")
 if hostCPU != "wasm32":
-  if enableSvtav1:
-    switch("passL", "-lSvtAv1Enc")
   if enableHevc:
     switch("passL", "-lx265")
   if enableVpl and not (hostCPU == "arm64" and hostOS == "windows"):
