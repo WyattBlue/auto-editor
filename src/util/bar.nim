@@ -212,8 +212,6 @@ proc start*(bar: Bar, total: float, title: string) =
   bar.threadData.begin = epochTime()
 
 proc `end`*(bar: Bar) =
-  if bar.hide:
-    return
   let columns = terminalWidth()
   stdout.write(" ".repeat(max(0, columns - 2)) & "\r")
   stdout.flushFile()

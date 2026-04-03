@@ -861,6 +861,20 @@ endian = 'little'
       exec "ninja"
       exec "ninja install"
 
+  # Build libvpx
+  withDir "ffmpeg_sources":
+    if not fileExists(vpx.location):
+      exec &"curl -O -L {vpx.sourceUrl}"
+      checkHash(vpx, "ffmpeg_sources" / vpx.location)
+
+    if not dirExists(vpx.name):
+      exec &"tar xf {vpx.location} && mv {vpx.dirName} {vpx.name}"
+
+  withDir &"ffmpeg_sources/{vpx.name}":
+    if not fileExists("Makefile"):
+      exec &"""emconfigure ./configure --prefix="{wasmBuildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
+    makeInstall()
+
   # lame ships no .pc file; create one so FFmpeg's configure can find it
   mkDir(wasmBuildPath / "lib" / "pkgconfig")
   writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc",
@@ -904,7 +918,7 @@ endian = 'little'
       --disable-w32threads \
       --disable-os2threads \
       --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
-      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus, dav1d], crossWasm=true))
+      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus, dav1d, vpx], crossWasm=true))
     makeInstall()
 
 task makewasmweb, "Compile to wasm for browser (requires emscripten)":
@@ -928,5 +942,4 @@ task makewasmweb, "Compile to wasm for browser (requires emscripten)":
         "--passL:-sEXPORT_NAME=AutoEditor " &
         "--passL:-sEXPORTED_RUNTIME_METHODS=[FS] " &
         "--passL:-sENVIRONMENT=web,worker " &
-        "--passL:-sEMULATE_FUNCTION_POINTER_CASTS=1 " &
         "--out:docs/src/auto-editor-web.js src/main.nim"
