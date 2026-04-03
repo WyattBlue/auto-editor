@@ -816,23 +816,30 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
       --disable-inline-asm \
       --disable-pthreads \
       --disable-w32threads \
-      --disable-os2threads \""" & "\n" & setupCommonFlags(@[], crossWasm=true))
+      --disable-os2threads \
+      --extra-cflags="-matomics -mbulk-memory" \
+      --extra-ldflags="-matomics -mbulk-memory" \""" & "\n" & setupCommonFlags(@[], crossWasm=true))
     makeInstall()
 
-task makewasm, "Compile to wasm (requires emscripten)":
+task makewasmweb, "Compile to wasm for browser (requires emscripten)":
   echo "Compiling for wasm (browser)..."
 
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
   else:
-    exec "nim c -d:danger --panics:on -d:nimNoGetRandom -d:wasmBuild --threads:off --os:linux --cpu:wasm32 --cc:clang " &
+    exec "nim c -d:danger --panics:on -d:nimNoGetRandom -d:wasmBuild -d:wasmThreads --threads:on --os:linux --cpu:wasm32 --cc:clang " &
         "--clang.exe:emcc " &
         "--clang.linkerexe:emcc " &
+        "--passC:-pthread " &
+        "--passL:-pthread " &
         "--passL:-sALLOW_MEMORY_GROWTH=1 " &
+        "--passL:-Wno-pthreads-mem-growth " &
         "--passL:-sSTACK_SIZE=1048576 " &
+        "--passL:-sPTHREAD_POOL_SIZE=4 " &
+        "--passL:-sPROXY_TO_PTHREAD=1 " &
+        "--passL:-sEXIT_RUNTIME=1 " &
         "--passL:-sMODULARIZE=1 " &
         "--passL:-sEXPORT_NAME=AutoEditor " &
-        "--passL:-sINVOKE_RUN=0 " &
-        "--passL:-sEXPORTED_RUNTIME_METHODS=[FS,callMain] " &
-        "--passL:-sENVIRONMENT=web " &
-        "--out:auto-editor-web.js src/main.nim"
+        "--passL:-sEXPORTED_RUNTIME_METHODS=[FS] " &
+        "--passL:-sENVIRONMENT=web,worker " &
+        "--out:docs/src/auto-editor-web.js src/main.nim"

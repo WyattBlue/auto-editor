@@ -1,16 +1,8 @@
-import std/strformat
-import std/strutils
-import std/sequtils
-import std/tables
-import std/os
+import std/[json, math, strformat, strutils, sequtils, tables]
 when not defined(wasmBuild):
-  import std/memfiles
-import std/math
-import std/json
+  import std/[memfiles, os]
 
-import ../log
-import ../timeline
-import ../[av, ffmpeg]
+import ../[av, ffmpeg, log, timeline]
 import ../resampler
 import ../graph
 
@@ -45,13 +37,11 @@ proc loudnormLogCallbackWrapper(avcl: pointer, level: cint, fmt: ConstCString, v
 proc enableLoudnormCapture() =
   captureEnabled = true
   capturedJson[0] = '\0'
-  when not defined(wasmBuild):
-    av_log_set_callback(loudnormLogCallbackWrapper)
+  av_log_set_callback(loudnormLogCallbackWrapper)
 
 proc disableLoudnormCapture() =
   captureEnabled = false
-  when not defined(wasmBuild):
-    av_log_set_callback(av_log_default_callback)
+  av_log_set_callback(av_log_default_callback)
 
 proc getCapturedJson(): cstring =
   return cast[cstring](addr capturedJson[0])
@@ -739,15 +729,9 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         measuredThresh = parseLoudnormValue(jsonData, "input_thresh")
         debug &"Measured: i={measuredI:.2f} lra={measuredLRA:.2f} tp={measuredTP:.2f} thresh={measuredThresh:.2f}"
       except:
-        when defined(wasmBuild):
-          debug "loudnorm capture unavailable in wasm, using defaults"
-        else:
-          error "Error processing loudnorm output, using defaults"
+        error "Error processing loudnorm output"
     else:
-      when defined(wasmBuild):
-        debug "loudnorm capture unavailable in wasm, using defaults"
-      else:
-        error "Error processing loudnorm output, using defaults"
+      error "Error processing loudnorm output"
 
     let secondPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:linear=true:measured_i={measuredI}:measured_lra={measuredLRA}:measured_tp={measuredTP}:measured_thresh={measuredThresh}:print_format=none"
 

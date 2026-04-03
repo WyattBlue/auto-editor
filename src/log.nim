@@ -1,7 +1,7 @@
-import std/[envvars, math, options, os, strformat, strutils, tables, terminal, times]
+import std/[envvars, math, options, os, strformat, strutils, tables, times]
 
 import ffmpeg
-import util/color
+import util/[color, term]
 import cli
 
 type BarType* = enum
@@ -164,17 +164,14 @@ let start* = epochTime()
 let noColor* = getEnv("NO_COLOR") != "" or getEnv("AV_LOG_FORCE_NOCOLOR") != ""
 
 proc conwrite*(msg: string) {.raises: [].} =
-  when defined(wasmBuild):
-    try: stdout.write(msg) except IOError: discard
-  else:
-    if not quiet:
-      try:
-        let columns = terminalWidth()
-        let buffer: string = " ".repeat(columns - msg.len - 3)
-        stdout.write("  " & msg & buffer & "\r")
-        stdout.flushFile()
-      except IOError:
-        discard
+  if not quiet:
+    try:
+      let columns = terminalWidth()
+      let buffer: string = " ".repeat(columns - msg.len - 3)
+      stdout.write("  " & msg & buffer & "\r")
+      stdout.flushFile()
+    except IOError:
+      discard
 
 proc debug*(msg: string) =
   if isDebug:

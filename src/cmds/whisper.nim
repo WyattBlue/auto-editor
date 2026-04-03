@@ -1,9 +1,9 @@
-import std/[os, strformat, strutils, terminal]
+import std/[os, strformat, strutils]
 import ../[av, cli, ffmpeg, log]
-import ../util/fun
+import ../util/[fun, term]
 
 proc printHelp(opts: seq[OptDef]) =
-  let termWidth = max(when defined(wasmBuild): 70 else: terminalWidth(), 40)
+  let termWidth = max(terminalWidth(), 40)
   let optWidth = min(32, termWidth div 3)
   let helpWidth = termWidth - optWidth - 4
 

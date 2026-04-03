@@ -1,12 +1,19 @@
-import std/[options, os, parseutils, sequtils, strformat, strutils, terminal]
+import std/[options, os, parseutils, sequtils, strformat, strutils]
 when not defined(wasmBuild):
   import std/[osproc, uri]
+when defined(wasmBuild):
+  {.emit: """
+extern int main(int argc, char** argv, char** env);
+int __main_argc_argv(int argc, char** argv) {
+  return main(argc, argv, (char**)0);
+}
+""".}
 when not defined(windows) and not defined(wasmBuild):
   import std/posix_utils
 
 import ./[about, cli, conductor, edit, ffmpeg, log]
 import cmds/[completion, info, desc, cache, levels, subdump, whisper]
-import util/[color, fun]
+import util/[color, fun, term]
 
 import tinyre
 import vendor/libp2p/ed25519
@@ -18,7 +25,7 @@ setControlCHook(ctrlc)
 
 
 proc printHelp() {.noreturn.} =
-  let termWidth = (when defined(wasmBuild): 70 else: max(terminalWidth(), 40))
+  let termWidth = max(terminalWidth(), 40)
   let optWidth = min(32, termWidth div 3)
   let helpWidth = termWidth - optWidth - 4
 

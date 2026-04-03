@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ .Lang }}">
 <head>
   <meta charset="UTF-8">
-  <title>auto-editor wasm test</title>
+  <title>Auto-Editor cli for wasm</title>
+  {{ head_icon }}
   <style>
     body { font-family: monospace; max-width: 700px; margin: 40px auto; padding: 0 20px; }
     input, button, select { margin: 4px 0; }
@@ -13,62 +14,113 @@
   </style>
 </head>
 <body>
-  <h2>auto-editor</h2>
+  <h2>Auto-Editor cli for wasm</h2>
 
   <label>Input file: <input type="file" id="fileInput"></label><br>
-  <label>Extra args: <input type="text" id="argsInput" value="-c:v mpeg4" size="40"></label><br>
+  <label>Arguments: <input type="text" id="argsInput" value="-c:v mpeg4" size="40"></label><br>
   <label>Output name: <input type="text" id="outputName" value="out.mp4" size="20"></label><br>
-  <button onclick="runEditor()">Run</button>
-  <button onclick="document.getElementById('log').textContent=''">Clear log</button>
+  <button id="runBtn" onclick="runEditor()">Run</button>
+  <button onclick="document.getElementById('log').textContent='';progressLineActive=false;pendingOutput.length=0">Clear log</button>
 
   <div id="log"></div>
   <div id="downloadArea"></div>
 
   <script src="auto-editor-web.js"></script>
   <script>
-    function log(msg) {
+    let progressLineActive = false;
+    const pendingOutput = [];
+    let rafPending = false;
+
+    function stripAnsi(str) {
+      return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    }
+
+    function flushOutput() {
+      rafPending = false;
+      if (pendingOutput.length === 0) return;
       const el = document.getElementById('log');
-      el.textContent += msg + '\n';
+      let text = el.textContent;
+      for (const {msg, isProgress} of pendingOutput) {
+        if (isProgress) {
+          if (progressLineActive) {
+            const lastNl = text.lastIndexOf('\n', text.length - 2);
+            text = text.substring(0, lastNl + 1) + msg + '\n';
+          } else {
+            text += msg + '\n';
+            progressLineActive = true;
+          }
+        } else {
+          text += msg + '\n';
+          progressLineActive = false;
+        }
+      }
+      pendingOutput.length = 0;
+      el.textContent = text;
       el.scrollTop = el.scrollHeight;
+    }
+
+    function handleOutput(text) {
+      const clean = stripAnsi(text);
+      if (clean.includes('\r')) {
+        pendingOutput.push({msg: clean.replace(/\r/g, '').trimEnd(), isProgress: true});
+      } else {
+        pendingOutput.push({msg: clean, isProgress: false});
+      }
+      if (!rafPending) {
+        rafPending = true;
+        requestAnimationFrame(flushOutput);
+      }
     }
 
     async function runEditor() {
       const fileInput = document.getElementById('fileInput');
-      if (!fileInput.files.length) { log('No file selected.'); return; }
+      if (!fileInput.files.length) { handleOutput('No file selected.'); return; }
+
+      const btn = document.getElementById('runBtn');
+      btn.disabled = true;
 
       const file = fileInput.files[0];
       const ext = file.name.split('.').pop();
       const inputPath = '/input.' + ext;
       const outputName = document.getElementById('outputName').value.trim() || 'out.mp4';
       const outputPath = '/' + outputName;
+      const extraArgs = document.getElementById('argsInput').value.trim().split(/\s+/).filter(Boolean);
+      const args = [inputPath, ...extraArgs, '-o', outputPath];
 
-      log('Loading ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)...');
+      handleOutput('Loading ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)...');
       const data = new Uint8Array(await file.arrayBuffer());
 
-      log('Initializing wasm module...');
+      handleOutput('Running: auto-editor ' + args.join(' '));
+
+      let resolveExit, rejectExit;
+      const exitPromise = new Promise((res, rej) => { resolveExit = res; rejectExit = rej; });
+
+      // Module is initialized with arguments pre-set. preRun writes the input file
+      // before main() starts. With PROXY_TO_PTHREAD, main() runs in a worker thread.
       let module;
       try {
         module = await AutoEditor({
-          print:    (t) => log(t),
-          printErr: (t) => log(t),
+          arguments: args,
+          preRun: [(mod) => { mod.FS.writeFile(inputPath, data); }],
+          print:    handleOutput,
+          printErr: handleOutput,
           locateFile: (f) => f,
+          onExit: (code) => {
+            if (code === 0) resolveExit();
+            else rejectExit(new Error('auto-editor exited with code ' + code));
+          },
         });
       } catch (e) {
-        log('Module init failed: ' + e);
+        handleOutput('Module init failed: ' + e);
+        btn.disabled = false;
         return;
       }
 
-      module.FS.writeFile(inputPath, data);
-      log('Wrote ' + inputPath + ' to virtual FS.');
-
-      const extraArgs = document.getElementById('argsInput').value.trim().split(/\s+/).filter(Boolean);
-      const args = [inputPath, ...extraArgs, '-o', outputPath];
-      log('Running: auto-editor ' + args.join(' '));
-
       try {
-        module.callMain(args);
+        await exitPromise;
       } catch (e) {
-        log('Error: ' + e);
+        handleOutput('Error: ' + e.message);
+        btn.disabled = false;
         return;
       }
 
@@ -76,11 +128,12 @@
       try {
         outData = module.FS.readFile(outputPath);
       } catch (e) {
-        log('Could not read output file: ' + e);
+        handleOutput('Could not read output file: ' + e);
+        btn.disabled = false;
         return;
       }
 
-      log('Done. Output size: ' + (outData.byteLength / 1024 / 1024).toFixed(2) + ' MB');
+      handleOutput('Done. Output size: ' + (outData.byteLength / 1024 / 1024).toFixed(2) + ' MB');
 
       const blob = new Blob([outData]);
       const url = URL.createObjectURL(blob);
@@ -91,6 +144,8 @@
       const area = document.getElementById('downloadArea');
       area.innerHTML = '';
       area.appendChild(a);
+
+      btn.disabled = false;
     }
   </script>
 </body>
