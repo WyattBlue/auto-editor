@@ -802,6 +802,21 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
       exec &"""emconfigure ./configure --prefix="{wasmBuildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
     makeInstall()
 
+  # Build x264
+  withDir "ffmpeg_sources":
+    if not fileExists(x264.location):
+      exec &"curl -O -L {x264.sourceUrl}"
+      checkHash(x264, "ffmpeg_sources" / x264.location)
+
+    if not dirExists(x264.name):
+      exec &"tar xjf {x264.location} && mv {x264.dirName} {x264.name}"
+
+  withDir &"ffmpeg_sources/{x264.name}":
+    if not fileExists("config.mak"):
+      exec &"""CFLAGS="-matomics -mbulk-memory" emconfigure ./configure --prefix="{wasmBuildPath}" --host=i686-gnu --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
+    exec "emmake make -j4"
+    exec "make install"
+
   # lame ships no .pc file; create one so FFmpeg's configure can find it
   mkDir(wasmBuildPath / "lib" / "pkgconfig")
   writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc",
@@ -830,8 +845,6 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
         exec cmd
 
   withDir "ffmpeg_sources/ffmpeg":
-    if fileExists("Makefile"):
-      exec "make clean"
     exec (&"""./configure --prefix="{wasmBuildPath}" \
       --cc=emcc \
       --cxx=em++ \
@@ -847,7 +860,7 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
       --disable-w32threads \
       --disable-os2threads \
       --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
-      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame], crossWasm=true))
+      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264], crossWasm=true))
     makeInstall()
 
 task makewasmweb, "Compile to wasm for browser (requires emscripten)":
@@ -871,4 +884,5 @@ task makewasmweb, "Compile to wasm for browser (requires emscripten)":
         "--passL:-sEXPORT_NAME=AutoEditor " &
         "--passL:-sEXPORTED_RUNTIME_METHODS=[FS] " &
         "--passL:-sENVIRONMENT=web,worker " &
+        "--passL:-sEMULATE_FUNCTION_POINTER_CASTS=1 " &
         "--out:docs/src/auto-editor-web.js src/main.nim"

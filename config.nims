@@ -22,7 +22,7 @@ switch("passL", "-lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil
 
 # Codec libraries
 if hostCPU == "wasm32":
-  switch("passL", "-lmp3lame")
+  switch("passL", "-lmp3lame -lx264")
 else:
   switch("passL", "-lmp3lame -lopus -lx264 -ldav1d")
   if enableVpx:
