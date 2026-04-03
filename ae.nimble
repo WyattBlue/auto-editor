@@ -817,6 +817,21 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
     exec "emmake make -j4"
     exec "make install"
 
+  # Build opus
+  withDir "ffmpeg_sources":
+    if not fileExists(opus.location):
+      exec &"curl -O -L {opus.sourceUrl}"
+      checkHash(opus, "ffmpeg_sources" / opus.location)
+
+    if not dirExists(opus.name):
+      exec &"tar xf {opus.location} && mv {opus.dirName} {opus.name}"
+
+  withDir &"ffmpeg_sources/{opus.name}":
+    if not fileExists("Makefile"):
+      let args = (opus.buildArguments & @["--disable-rtcd"]).join(" ")
+      exec &"""emconfigure ./configure --prefix="{wasmBuildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
+    makeInstall()
+
   # lame ships no .pc file; create one so FFmpeg's configure can find it
   mkDir(wasmBuildPath / "lib" / "pkgconfig")
   writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc",
@@ -860,7 +875,7 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
       --disable-w32threads \
       --disable-os2threads \
       --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
-      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264], crossWasm=true))
+      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus], crossWasm=true))
     makeInstall()
 
 task makewasmweb, "Compile to wasm for browser (requires emscripten)":
