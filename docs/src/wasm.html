@@ -147,12 +147,12 @@
     async function runModule(btn, args, entries) {
       btn.disabled = true;
       for (const {file} of entries)
-        handleOutput(`Loading ${file.name} (${mb(file.size)} MB)...`);
+        handleOutput(`<wasm>load ${file.name} (${mb(file.size)} MB)</wasm>`);
 
       const buffers = await Promise.all(
         entries.map(({file}) => file.arrayBuffer().then(b => new Uint8Array(b)))
       );
-      handleOutput('Running: auto-editor ' + args.join(' '));
+      handleOutput('<wasm>$ auto-editor ' + args.join(' ') + '</wasm>');
 
       let resolve, reject;
       const done = new Promise((res, rej) => { resolve = res; reject = rej; });
@@ -168,7 +168,7 @@
           onExit: (code) => code === 0 ? resolve() : reject(new Error('exited with code ' + code)),
         });
       } catch (e) {
-        handleOutput('Module init failed: ' + e);
+        handleOutput('<wasm>module init failed: ' + e + '</wasm>');
         btn.disabled = false;
         return null;
       }
@@ -176,7 +176,7 @@
       try {
         await done;
       } catch (e) {
-        handleOutput('Error: ' + e.message);
+        handleOutput('<wasm>' + e.message + '</wasm>');
         btn.disabled = false;
         return null;
       }
@@ -187,28 +187,31 @@
 
     async function runEditor() {
       const fileEl = document.getElementById('fileInput');
-      if (!fileEl.files.length) { handleOutput('No file selected.'); return; }
-      const file = fileEl.files[0];
-      const inputPath = '/input.' + file.name.split('.').pop();
-      const outputName = document.getElementById('outputName').value.trim() || 'out.mp4';
+      const outputName = document.getElementById('outputName').value.trim();
       const outputPath = '/' + outputName;
       const extraArgs = document.getElementById('argsInput').value.trim().split(/\s+/).filter(Boolean);
 
-      const mod = await runModule(
-        document.getElementById('runBtn'),
-        [inputPath, ...extraArgs, '-o', outputPath],
-        [{file, path: inputPath}]
-      );
-      if (!mod) return;
+      const hasFile = fileEl.files.length > 0;
+      const file = hasFile ? fileEl.files[0] : null;
+      const inputPath = hasFile ? '/input.' + file.name.split('.').pop() : null;
 
+      const args = [
+        ...(inputPath ? [inputPath] : []),
+        ...extraArgs,
+        ...(outputName ? ['-o', outputPath] : []),
+      ];
+      const inputFiles = inputPath ? [{ file, path: inputPath }] : [];
+
+      const mod = await runModule(document.getElementById('runBtn'), args, inputFiles);
+      if (!mod || !outputName) return;
       let outData;
       try {
         outData = mod.FS.readFile(outputPath);
       } catch (e) {
-        handleOutput('Could not read output file: ' + e);
+        handleOutput('<wasm>could not read output file: ' + e + '</wasm>');
         return;
       }
-      handleOutput('Done. Output size: ' + mb(outData.byteLength) + ' MB');
+      handleOutput('<wasm>output size: ' + mb(outData.byteLength) + ' MB</wasm>');
       createDownload(outData, outputName);
     }
 
