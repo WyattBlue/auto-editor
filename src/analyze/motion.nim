@@ -144,7 +144,7 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame 
 iterator motionness*(processor: var VideoProcessor, width, blur: int32): float32 =
   var totalPixels: int = 0
   var firstTime: bool = true
-  var prev_index = -1
+  var prevIndex: int64 = -1
   var prevFrame: ptr UncheckedArray[uint8] = nil
   var currentFrame: ptr UncheckedArray[uint8] = nil
 
@@ -181,11 +181,11 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32): float32
       firstTime = false
 
     # Yield value for each frame index between previous and current
-    for i in 0 ..< index - prev_index:
+    for i in 0 ..< index - prevIndex:
       yield value
 
     swap(prevFrame, currentFrame)
-    prev_index = index
+    prevIndex = index
 
 proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   stream, width, blur: int32): seq[float32] =

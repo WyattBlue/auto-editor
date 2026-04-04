@@ -25,6 +25,10 @@ app.use(express.static("public", {
     if (path.extname(filep) === "") {
       res.set("Content-Type", "text/html");
     }
+    if (filep.includes("/wasm") || filep.endsWith(".wasm") || filep.endsWith(".js")) {
+      res.set("Cross-Origin-Opener-Policy", "same-origin");
+      res.set("Cross-Origin-Embedder-Policy", "require-corp");
+    }
   }
 }));
 

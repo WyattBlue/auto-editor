@@ -150,7 +150,7 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
           speed *= action.val
 
     let effectIndex = chunk[2]
-    if effectIndex > int(high(uint32)):
+    if effectIndex > int64(high(uint32)):
       error "'Number of actions' limit for timeline reached."
     let e = uint32(effectIndex)
 
@@ -194,7 +194,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
           speed *= action.val
 
     let effectIndex = chunk[2]
-    if effectIndex > int(high(uint32)):
+    if effectIndex > int64(high(uint32)):
       error "'Number of actions' limit for timeline reached."
     let e = uint32(effectIndex)
 
@@ -269,7 +269,7 @@ proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
             effects.add a
             effectIndex = effects.len - 1
 
-        if effectIndex > int(high(uint32)):
+        if effectIndex > int64(high(uint32)):
           error "'Number of actions' limit for timeline reached."
         let e = uint32(effectIndex)
         clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)

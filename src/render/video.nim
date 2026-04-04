@@ -256,7 +256,7 @@ proc scaleWithPad(src: ptr AVFrame, targetW, targetH: cint, bg: RGBColor): ptr A
 
 proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     cache: MediaCache = nil):
-    (ptr AVCodecContext, ptr AVStream, iterator(): (ptr AVFrame, int)) =
+    (ptr AVCodecContext, ptr AVStream, iterator(): (ptr AVFrame, int64)) =
 
   let myCache = if cache != nil: cache else: newMediaCache()
   var decoders = initTable[ptr string, ptr AVCodecContext]()
@@ -335,7 +335,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       let defaultInterval = toInt(targetFps * AVRational(num: 5, den: 1))  # 5 seconds
       if args.noSeek:
         tous[src] = 1000
-        keyframeIndices[src] = KeyframeIndex(frames: @[], hasIndex: false, avgInterval: int(high(uint32) - 1))
+        keyframeIndices[src] = KeyframeIndex(frames: @[], hasIndex: false, avgInterval: high(int))
       else:
         tous[src] = int(float(stream.time_base.den) / float(stream.avg_frame_rate))
         keyframeIndices[src] = buildKeyframeIndex(stream, stream.avg_frame_rate, defaultInterval)
@@ -435,7 +435,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       return fallback
     return 0  # frame 0 is always seekable
 
-  return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int) =
+  return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     # Process each frame in timeline order like Python version
     for index in 0 ..< tl.`end`:
       objList = @[]

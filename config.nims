@@ -4,8 +4,12 @@ var enableHevc = getEnv("DISABLE_HEVC").len == 0
 var enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 var enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
-switch("passC", "-I./build/include")
-switch("passL", "-L./build/lib")
+when hostCPU == "wasm32":
+  switch("passC", "-I./build_wasm/include")
+  switch("passL", "-L./build_wasm/lib")
+else:
+  switch("passC", "-I./build/include")
+  switch("passL", "-L./build/lib")
 
 when defined(gcc):
   switch("passC", "-Wno-incompatible-pointer-types")
@@ -22,17 +26,18 @@ if enableVpx:
   switch("passL", "-lvpx")
 if enableSvtav1:
   switch("passL", "-lSvtAv1Enc")
-if enableHevc:
-  switch("passL", "-lx265")
-if enableVpl and not (hostCPU == "arm64" and hostOS == "windows"):
-  switch("passL", "-lvpl")
+if hostCPU != "wasm32":
+  if enableHevc:
+    switch("passL", "-lx265")
+  if enableVpl and not (hostCPU == "arm64" and hostOS == "windows"):
+    switch("passL", "-lvpl")
 
 when hostOS == "macosx":
   switch("passL", "-framework VideoToolbox -framework AudioToolbox")
   switch("passL", "-framework CoreFoundation -framework CoreMedia -framework CoreVideo")
 elif hostOS == "windows":
   switch("passL", "-lpthread -lbcrypt -lsetupapi -lole32 -luuid")
-elif hostOS == "linux":
+elif hostOS == "linux" and hostCPU != "wasm32":
   when hostCPU == "arm64":
     switch("passL", "-L./build/lib/aarch64-linux-gnu")
   else:
@@ -50,7 +55,7 @@ if enableWhisper:
       switch("passL", "-lggml-metal")
     switch("passL", "-framework Accelerate")
     switch("passL", "-framework Metal -framework MetalKit -framework Foundation")
-  elif not (hostOS == "windows" and hostCPU == "arm64"):
+  elif not (hostOS == "windows" and hostCPU == "arm64") and hostCPU != "wasm32":
     switch("passL", "-lgomp")
 
 if enableHevc or enableWhisper or defined(linux):

@@ -1,15 +1,8 @@
-import std/strformat
-import std/strutils
-import std/sequtils
-import std/tables
-import std/os
-import std/memfiles
-import std/math
-import std/json
+import std/[json, math, strformat, strutils, sequtils, tables]
+when not defined(wasmBuild):
+  import std/[memfiles, os]
 
-import ../log
-import ../timeline
-import ../[av, ffmpeg]
+import ../[av, ffmpeg, log, timeline]
 import ../resampler
 import ../graph
 
@@ -86,25 +79,32 @@ type
     layout*: string
 
   AudioBuffer = ref object
-    memFile*: MemFile
+    when not defined(wasmBuild):
+      memFile*: MemFile
+      tempFilePath*: string
+    else:
+      heapData*: seq[int16]
     data*: ptr UncheckedArray[int16]
     size*: int
     channels*: int
     samples*: int
-    tempFilePath*: string
 
 proc newAudioBuffer(index: int32, samples: int, channels: int): AudioBuffer =
   result = new(AudioBuffer)
   result.samples = samples
   result.channels = channels
   result.size = samples * channels * sizeof(int16)
-  result.tempFilePath = tempDir / &"{index}.map"
 
-  # Memory map the file
-  result.memFile = memfiles.open(result.tempFilePath, mode = fmReadWrite,
-      newFileSize = result.size)
-  result.data = cast[ptr UncheckedArray[int16]](result.memFile.mem)
-  # Note: Memory-mapped files are zero-initialized by the OS
+  when defined(wasmBuild):
+    result.heapData = newSeq[int16](samples * channels)
+    result.data = cast[ptr UncheckedArray[int16]](addr result.heapData[0])
+  else:
+    result.tempFilePath = tempDir / &"{index}.map"
+    # Memory map the file
+    result.memFile = memfiles.open(result.tempFilePath, mode = fmReadWrite,
+        newFileSize = result.size)
+    result.data = cast[ptr UncheckedArray[int16]](result.memFile.mem)
+    # Note: Memory-mapped files are zero-initialized by the OS
 
 proc `[]`*(buffer: AudioBuffer, index: int): int16 {.inline.} =
   buffer.data[index]
@@ -580,7 +580,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
             samples[key] = newGetter(clip.src[], clip.stream.int, sr)
 
   # Calculate total duration across specified layers
-  var totalDuration = 0
+  var totalDuration: int64 = 0
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
       for clip in tl.a[layerIndex]:
@@ -729,9 +729,9 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         measuredThresh = parseLoudnormValue(jsonData, "input_thresh")
         debug &"Measured: i={measuredI:.2f} lra={measuredLRA:.2f} tp={measuredTP:.2f} thresh={measuredThresh:.2f}"
       except:
-        error "Error processing loudnorm output, using defaults"
+        error "Error processing loudnorm output"
     else:
-      error "Error processing loudnorm output, using defaults"
+      error "Error processing loudnorm output"
 
     let secondPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:linear=true:measured_i={measuredI}:measured_lra={measuredLRA}:measured_tp={measuredTP}:measured_thresh={measuredThresh}:print_format=none"
 
@@ -891,7 +891,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       av_frame_free(addr frame)
       for getter in samples.values:
         getter.close()
-      audioBuffer.memFile.close()
+      when not defined(wasmBuild):
+        audioBuffer.memFile.close()
 
 proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm,
     cache: MediaCache = nil): iterator(): (

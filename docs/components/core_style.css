@@ -59,18 +59,13 @@ hr {
   width: auto;
 }
 
-.navbar>.container {
-  padding-top: 13px;
-  display: flex;
-}
-
 .navbar-brand {
   margin-left: -.75rem;
   display: flex;
   min-height: 3.25rem;
 }
-
-.hero, .navbar, .navbar-menu, .navbar-start {
+.navbar > .container { display: flex }
+.navbar, .navbar-menu, .navbar-start {
   display: flex;
   align-items: stretch;
 }
@@ -87,7 +82,8 @@ img { max-width: 100%; height: auto }
   cursor: pointer;
   display: flex;
   align-items: center;
-  padding: .5rem .75rem;
+  padding: .5rem .4rem;
+  margin: 0 0.25rem;
   position: relative;
   text-decoration: none;
 }
@@ -177,17 +173,16 @@ pre {line-height: 1.25}
   p, li, th, pre, blockquote, .small {font-size: 1.1rem}
   pre {padding: 1rem 1.25rem}
   pre {line-height: 1}
+  .navbar-link, a.navbar-item { padding: .5rem .3rem }
 }
 
 @media (max-width: 45em){
-  .navbar-start > .navbar-item {font-size: 1em}
+  .navbar-start > .navbar-item {font-size: 1em }
+  .navbar-link, a.navbar-item { padding: .5rem .2rem }
 }
 
-table {
-  border-collapse: collapse;
-}
+table { border-collapse: collapse }
 th, td { padding: 10px }
-
 
 h1 {
   margin-bottom: 1.5rem;

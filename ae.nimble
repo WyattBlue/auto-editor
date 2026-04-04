@@ -268,6 +268,25 @@ proc checkHash(package: Package, filename: string) =
     quit(1)
 
 
+proc downloadAndExtract(package: Package) =
+  ## Download, verify, extract and patch a package.
+  ## Must be called inside withDir "ffmpeg_sources".
+  if not fileExists(package.location):
+    exec &"curl -O -L {package.sourceUrl}"
+    checkHash(package, "ffmpeg_sources" / package.location)
+
+  var tarArgs = "xf"
+  if package.location.endsWith("bz2"):
+    tarArgs = "xjf"
+
+  if not dirExists(package.name):
+    exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
+    let patchFile = &"../patches/{package.name}.patch"
+    if fileExists(patchFile):
+      let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1 --force"
+      echo "Applying patch: ", cmd
+      exec cmd
+
 proc makeInstall() =
   when defined(macosx):
     exec "make -j$(sysctl -n hw.ncpu)"
@@ -551,23 +570,8 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
 
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
-      if not fileExists(package.location):
-        exec &"curl -O -L {package.sourceUrl}"
-        checkHash(package, "ffmpeg_sources" / package.location)
-
-      var tarArgs = "xf"
-      if package.location.endsWith("bz2"):
-        tarArgs = "xjf"
-
-      if not dirExists(package.name):
-        exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
-        let patchFile = &"../patches/{package.name}.patch"
-        if fileExists(patchFile):
-          let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1 --force"
-          echo "Applying patch: ", cmd
-          exec cmd
-
-      if package.name == "ffmpeg": # build later
+      downloadAndExtract(package)
+      if package.name == "ffmpeg":
         continue
 
       withDir package.name:
@@ -611,7 +615,7 @@ if enableWhisper:
   filters.add "whisper"
 filters.add "scale,crop,pad,format,gblur,lut,negate,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
 
-proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false): string =
+proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false, crossWasm: bool = false): string =
   var commonFlags = &"""
   --enable-version3 \
   --enable-static \
@@ -638,15 +642,16 @@ proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false): st
     if package.ffFlag != "":
       commonFlags &= &"  {package.ffFlag} \\\n"
 
-  if defined(arm) or defined(arm64) or crossWindowsArm:
-    commonFlags &= "  --enable-neon \\\n"
+  if not crossWasm:
+    if defined(arm) or defined(arm64) or crossWindowsArm:
+      commonFlags &= "  --enable-neon \\\n"
 
-  if defined(macosx):
-    commonFlags &= "  --enable-videotoolbox \\\n"
-    commonFlags &= "  --enable-audiotoolbox \\\n"
-  elif not crossWindowsArm:
-    commonFlags &= "  --enable-nvenc \\\n"
-    commonFlags &= "  --enable-ffnvcodec \\\n"
+    if defined(macosx):
+      commonFlags &= "  --enable-videotoolbox \\\n"
+      commonFlags &= "  --enable-audiotoolbox \\\n"
+    elif not crossWindowsArm:
+      commonFlags &= "  --enable-nvenc \\\n"
+      commonFlags &= "  --enable-ffnvcodec \\\n"
 
   commonFlags &= "--disable-autodetect"
   return commonFlags
@@ -777,3 +782,179 @@ task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
     # Strip the Windows binary
     exec "llvm-strip -s auto-editor.exe"
 
+let wasmBuildPath = absolutePath("build_wasm")
+
+proc autoconfBuildWasm(package: Package, buildPath: string) =
+  case package.name
+  of "x264":
+    if not fileExists("config.mak"):
+      exec &"""CFLAGS="-matomics -mbulk-memory" emconfigure ./configure --prefix="{buildPath}" --host=i686-gnu --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
+    exec "emmake make -j4"
+    exec "make install"
+  of "libvpx":
+    if not fileExists("Makefile"):
+      exec &"""emconfigure ./configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
+    makeInstall()
+  else:
+    # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
+    let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
+    if not fileExists("Makefile"):
+      let args = (package.buildArguments & extraArgs).join(" ")
+      exec &"""emconfigure ./configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
+    makeInstall()
+
+proc cmakeBuildWasm(package: Package, buildPath: string) =
+  mkDir("build_wasm_cmake")
+  withDir "build_wasm_cmake":
+    if not fileExists("CMakeCache.txt"):
+      var args = @[
+        &"-DCMAKE_INSTALL_PREFIX={buildPath}",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DBUILD_SHARED_LIBS=OFF",
+      ]
+      case package.name
+      of "whisper":
+        args &= @[
+          "-DGGML_NATIVE=OFF", "-DGGML_CUDA=OFF", "-DGGML_METAL=OFF",
+          "-DGGML_BLAS=OFF", "-DGGML_OPENMP=OFF", "-DGGML_BACKEND_DL=OFF",
+          "-DWHISPER_SDL2=OFF", "-DWHISPER_BUILD_EXAMPLES=OFF",
+          "-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF",
+        ]
+      of "libsvtav1":
+        args &= @[
+          "-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=OFF",
+          "\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
+          "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\"",
+        ]
+      else:
+        args &= package.buildArguments
+        args &= @["\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
+                  "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\""]
+      exec "emcmake cmake .. " & args.join(" ")
+    exec "make -j4"
+    exec "make install"
+
+  if package.name == "whisper":
+    let libDir = buildPath / "lib"
+    for libFile in ["ggml.a", "ggml-base.a", "ggml-cpu.a"]:
+      let srcFile = libDir / libFile
+      let dstFile = libDir / ("lib" & libFile)
+      if fileExists(srcFile) and not fileExists(dstFile):
+        exec &"mv \"{srcFile}\" \"{dstFile}\""
+    let ggmlBaseDst = libDir / "libggml-base.a"
+    if not fileExists(ggmlBaseDst):
+      let ggmlBaseSrc = "build_wasm_cmake/ggml/src/ggml-base.a"
+      if fileExists(ggmlBaseSrc):
+        exec &"cp \"{ggmlBaseSrc}\" \"{ggmlBaseDst}\""
+    writeFile(libDir / "pkgconfig" / "whisper.pc", &"""prefix={buildPath}
+exec_prefix=${{prefix}}
+libdir=${{exec_prefix}}/lib
+includedir=${{prefix}}/include
+
+Name: whisper
+Description: whisper.cpp
+Version: 1.8.4
+Libs: -L${{libdir}} -lwhisper -lggml-base -lggml -lggml-cpu
+Libs.private: -lpthread -lm -lstdc++
+Cflags: -I${{includedir}}
+""")
+
+proc mesonBuildWasm(package: Package, buildPath: string) =
+  mkDir("build_meson")
+  writeFile("build_meson/meson-cross.txt", """
+[binaries]
+c = 'emcc'
+cpp = 'em++'
+ar = 'emar'
+
+[host_machine]
+system = 'emscripten'
+cpu_family = 'wasm32'
+cpu = 'wasm32'
+endian = 'little'
+""")
+  withDir "build_meson":
+    if not fileExists("build.ninja"):
+      exec &"""meson setup --prefix="{buildPath}" --buildtype=release --default-library=static -Denable_docs=false -Denable_tools=false -Denable_examples=false -Denable_tests=false -Denable_asm=false -Dc_args="-matomics -mbulk-memory" --cross-file=meson-cross.txt .."""
+    exec "ninja"
+    exec "ninja install"
+
+proc wasmBuildPackage(package: Package, buildPath: string) =
+  case package.buildSystem
+  of "cmake": cmakeBuildWasm(package, buildPath)
+  of "meson": mesonBuildWasm(package, buildPath)
+  else: autoconfBuildWasm(package, buildPath)
+
+let wasmPackages = @[lame, x264, opus, dav1d, vpx, whisper, svtav1]
+
+task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
+  setupDeps()
+  putEnv("PKG_CONFIG_PATH", wasmBuildPath / "lib/pkgconfig")
+  mkDir("ffmpeg_sources")
+  mkDir("build_wasm")
+
+  withDir "ffmpeg_sources":
+    for package in @[ffmpeg] & wasmPackages:
+      downloadAndExtract(package)
+
+  for package in wasmPackages:
+    withDir &"ffmpeg_sources/{package.name}":
+      wasmBuildPackage(package, wasmBuildPath)
+
+  # lame ships no .pc file; create one so FFmpeg's configure can find it
+  mkDir(wasmBuildPath / "lib" / "pkgconfig")
+  writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc", &"""prefix={wasmBuildPath}
+exec_prefix=${{prefix}}
+libdir=${{prefix}}/lib
+includedir=${{prefix}}/include
+
+Name: mp3lame
+Description: MPEG Layer 3 audio codec
+Version: 3.100
+Libs: -L${{libdir}} -lmp3lame
+Cflags: -I${{includedir}}
+""")
+
+  withDir "ffmpeg_sources/ffmpeg":
+    exec (&"""./configure --prefix="{wasmBuildPath}" \
+      --cc=emcc \
+      --cxx=em++ \
+      --ar=emar \
+      --ranlib=emranlib \
+      --nm=emnm \
+      --enable-cross-compile \
+      --target-os=none \
+      --arch=x86_32 \
+      --disable-x86asm \
+      --disable-inline-asm \
+      --enable-pthreads \
+      --disable-w32threads \
+      --disable-os2threads \
+      --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
+      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(wasmPackages, crossWasm=true))
+    makeInstall()
+
+task makewasmweb, "Compile to wasm for browser (requires emscripten)":
+  echo "Compiling for wasm (browser)..."
+
+  if not dirExists("build_wasm"):
+    echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
+  else:
+    exec "nim c -d:danger --panics:on -d:nimNoGetRandom -d:wasmBuild -d:wasmThreads --threads:on --os:linux --cpu:wasm32 --cc:clang " &
+        "--clang.exe:emcc " &
+        "--clang.linkerexe:emcc " &
+        "--passC:-pthread " &
+        "--passL:-pthread " &
+        "--passL:-sINITIAL_MEMORY=67108864 " &
+        "--passL:-sALLOW_MEMORY_GROWTH=1 " &
+        "--passL:-sMAXIMUM_MEMORY=4294967296 " &
+        "--passL:-Wno-pthreads-mem-growth " &
+        "--passL:-sSTACK_SIZE=1048576 " &
+        "--passL:-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency " &
+        "--passL:-sPROXY_TO_PTHREAD=1 " &
+        "--passL:-sEXIT_RUNTIME=1 " &
+        "--passL:-sMODULARIZE=1 " &
+        "--passL:-sEXPORT_NAME=AutoEditor " &
+        "--passL:-sEXPORTED_RUNTIME_METHODS=[FS] " &
+        "--passL:-sENVIRONMENT=web,worker " &
+        "--out:docs/src/auto-editor-web.js src/main.nim"

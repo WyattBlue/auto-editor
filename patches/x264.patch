@@ -1,0 +1,114 @@
+--- a/common/threadpool.c
++++ b/common/threadpool.c
+@@ -45,8 +45,9 @@
+     x264_sync_frame_list_t done;   /* list of jobs that have finished processing */
+ };
+
+-REALIGN_STACK static void *threadpool_thread( x264_threadpool_t *pool )
++REALIGN_STACK static void *threadpool_thread( void *arg )
+ {
++    x264_threadpool_t *pool = arg;
+     while( !pool->exit )
+     {
+         x264_threadpool_job_t *job = NULL;
+@@ -95,7 +96,7 @@
+        x264_sync_frame_list_push( &pool->uninit, (void*)job );
+     }
+     for( int i = 0; i < pool->threads; i++ )
+-        if( x264_pthread_create( pool->thread_handle+i, NULL, (void*)threadpool_thread, pool ) )
++        if( x264_pthread_create( pool->thread_handle+i, NULL, threadpool_thread, pool ) )
+             goto fail;
+
+     return 0;
+--- a/encoder/lookahead.c
++++ b/encoder/lookahead.c
+@@ -87,8 +87,9 @@
+     x264_pthread_mutex_unlock( &h->lookahead->ofbuf.mutex );
+ }
+
+-REALIGN_STACK static void *lookahead_thread( x264_t *h )
++REALIGN_STACK static void *lookahead_thread( void *arg )
+ {
++    x264_t *h = arg;
+     while( 1 )
+     {
+         x264_pthread_mutex_lock( &h->lookahead->ifbuf.mutex );
+@@ -158,7 +159,7 @@
+     if( x264_macroblock_thread_allocate( look_h, 1 ) < 0 )
+         goto fail;
+
+-    if( x264_pthread_create( &look->thread_handle, NULL, (void*)lookahead_thread, look_h ) )
++    if( x264_pthread_create( &look->thread_handle, NULL, lookahead_thread, look_h ) )
+         goto fail;
+     look->b_thread_active = 1;
+
+--- a/encoder/encoder.c
++++ b/encoder/encoder.c
+@@ -3156,8 +3156,9 @@
+         memcpy( &dst->stat, &src->stat, offsetof(x264_t, stat.frame) - offsetof(x264_t, stat) );
+ }
+
+-static void *slices_write( x264_t *h )
++static void *slices_write( void *arg )
+ {
++    x264_t *h = arg;
+     int i_slice_num = 0;
+     int last_thread_mb = h->sh.i_last_mb;
+     int round_bias = h->param.i_avcintra_class ? 0 : h->param.i_slice_count/2;
+@@ -3249,7 +3250,7 @@
+     }
+     /* dispatch */
+     for( int i = 0; i < h->param.i_threads; i++ )
+-        x264_threadpool_run( h->threadpool, (void*)slices_write, h->thread[i] );
++        x264_threadpool_run( h->threadpool, slices_write, h->thread[i] );
+     /* wait */
+     for( int i = 0; i < h->param.i_threads; i++ )
+         x264_threadslice_cond_wait( h->thread[i], 1 );
+@@ -3886,7 +3887,7 @@
+     h->i_threadslice_end = h->mb.i_mb_height;
+     if( h->i_thread_frames > 1 )
+     {
+-        x264_threadpool_run( h->threadpool, (void*)slices_write, h );
++        x264_threadpool_run( h->threadpool, slices_write, h );
+         h->b_thread_active = 1;
+     }
+     else if( h->param.b_sliced_threads )
+--- a/encoder/slicetype.c
++++ b/encoder/slicetype.c
+@@ -811,8 +811,9 @@
+     int *output_intra;
+ } x264_slicetype_slice_t;
+
+-static void slicetype_slice_cost( x264_slicetype_slice_t *s )
++static void *slicetype_slice_cost( void *arg )
+ {
++    x264_slicetype_slice_t *s = arg;
+     x264_t *h = s->h;
+
+     /* Lowres lookahead goes backwards because the MVs are used as predictors in the main encode.
+@@ -831,6 +832,7 @@
+         for( h->mb.i_mb_x = start_x; h->mb.i_mb_x >= end_x; h->mb.i_mb_x-- )
+             slicetype_mb_cost( h, s->a, s->frames, s->p0, s->p1, s->b, s->dist_scale_factor,
+                                s->do_search, s->w, s->output_inter, s->output_intra );
++    return NULL;
+ }
+
+ static int slicetype_frame_cost( x264_t *h, x264_mb_analysis_t *a,
+@@ -926,7 +928,7 @@
+                     output_inter[i+1] = output_inter[i] + thread_output_size + PAD_SIZE;
+                     output_intra[i+1] = output_intra[i] + thread_output_size + PAD_SIZE;
+
+-                    x264_threadpool_run( h->lookaheadpool, (void*)slicetype_slice_cost, &s[i] );
++                    x264_threadpool_run( h->lookaheadpool, slicetype_slice_cost, &s[i] );
+                 }
+                 for( int i = 0; i < h->param.i_lookahead_threads; i++ )
+                     x264_threadpool_wait( h->lookaheadpool, &s[i] );
+@@ -940,7 +942,7 @@
+                 output_inter[0][NUM_ROWS] = output_intra[0][NUM_ROWS] = h->mb.i_mb_height;
+                 x264_slicetype_slice_t s = (x264_slicetype_slice_t){ h, a, frames, p0, p1, b, dist_scale_factor, do_search, w,
+                     output_inter[0], output_intra[0] };
+-                slicetype_slice_cost( &s );
++                slicetype_slice_cost( &s );  /* direct call, cast discards return value */
+             }
+
+             /* Sum up accumulators */

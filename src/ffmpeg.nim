@@ -36,10 +36,10 @@ proc `*`*(a, b: AVRational): AVRational =
 proc `/`*(a, b: AVRational): AVRational =
   av_div_q(a, b)
 
-proc `/`*(a: int64, b: AVRational): AVRational =
+proc `/`*[T: int64 | int32](a: T, b: AVRational): AVRational =
   AVRational(num: a.cint, den: 1) / b
 
-proc `*`*(a: int64, b: AVRational): AVRational =
+proc `*`*[T: int64 | int32](a: T, b: AVRational): AVRational =
   AVRational(num: a.cint, den: 1) * b
 
 func `$`*(a: AVRational): string =
@@ -53,6 +53,9 @@ converter toDouble*(r: AVRational): cdouble =
 
 converter toInt64*(r: AVRational): int64 =
   (r.num div r.den).int64
+
+converter toInt32*(r: AVRational): int32 =
+  (r.num div r.den).int32
 
 converter toAVRational*(num: int): AVRational =
   AVRational(num: num.cint, den: 1)

@@ -82,7 +82,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
   var vEncCtx: ptr AVCodecContext = nil
   var vOutStream: ptr AVStream = nil
-  var videoFrameIter: iterator(): (ptr AVFrame, int) = iterator(): (ptr AVFrame, int) =
+  var videoFrameIter: iterator(): (ptr AVFrame, int64) = iterator(): (ptr AVFrame, int64) =
     return
   if rules.defaultVid notin ["none", "png"] and tl.v.len > 0 and tl.v[0].len > 0:
     if not args.vn:
@@ -266,14 +266,14 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
   # Priority queue for ordered frames by time_base.
   var frameQueue = initHeapQueue[Priority]()
-  var earliestVideoIndex = none(int)
+  var earliestVideoIndex = none(int64)
   var latestAudioIndices: seq[float64] = @[]
   for i in 0..<audioFrameIters.len:
     latestAudioIndices.add(-Inf)
 
   var videoFrame: ptr AVFrame
   var audioFrames: seq[ptr AVFrame] = newSeq[ptr AVFrame](audioFrameIters.len)
-  var index: int
+  var index: int64
 
   while true:
     if not earliestVideoIndex.isSome:

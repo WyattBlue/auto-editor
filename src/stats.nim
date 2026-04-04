@@ -7,7 +7,9 @@ import ffmpeg
 import log
 import timeline
 
-func timeFrame(title: string, ticks: int, tb: float, per: string = ""): string =
+type f64 = float64
+
+func timeFrame(title: string, ticks: int64, tb: float, per: string = ""): string =
   let tc = toTimecode(ticks.float64 / tb, Code.ass)
   let tp = (if tc.startsWith("-"): 9 else: 10)
   let tcp = (if tc.startsWith("-"): 12 else: 11)
@@ -19,7 +21,7 @@ func timeFrame(title: string, ticks: int, tb: float, per: string = ""): string =
 
   return &" - {titlePart} {tcPart} {ticksPart}{endStr}"
 
-func timeFrame(title: string, ticks: float, tb: float, per: string = ""): string =
+func timeFrame(title: string, ticks: f64, tb: f64, per: string = ""): string =
   let tc = toTimecode(ticks / tb, Code.ass)
   let tp = (if tc.startsWith("-"): 9 else: 10)
   let tcp = (if tc.startsWith("-"): 12 else: 11)
@@ -31,14 +33,14 @@ func timeFrame(title: string, ticks: float, tb: float, per: string = ""): string
 
   return &" - {titlePart} {tcPart} {ticksPart}{endStr}"
 
-func mean(data: seq[int]): float =
-  var sum = 0
+func mean(data: seq[int64]): f64 =
+  var sum: int64 = 0
   for d in data:
     sum += d
 
   return sum / data.len
 
-func median(data: seq[int]): float =
+func median(data: seq[int64]): f64 =
   if data.len == 0:
     return 0.0
 
@@ -53,13 +55,13 @@ func median(data: seq[int]): float =
     let mid2 = sortedData[n div 2]
     return (mid1 + mid2) / 2
 
-func round(a: float): int =
-  int(math.round(a))
+func round(a: f64): int64 =
+  int64(math.round(a))
 
-func allCuts(tl: v3, inLen: int): seq[int] =
+func allCuts(tl: v3, inLen: int64): seq[int64] =
   # Calculate cuts
   let tb = tl.tb
-  var clipSpans: seq[(int, int)] = @[]
+  var clipSpans: seq[(int64, int64)] = @[]
 
   for clip in tl.a[0]:
     let effectGroup = tl.effects[clip.effects]
@@ -67,10 +69,10 @@ func allCuts(tl: v3, inLen: int): seq[int] =
     for effect in effectGroup:
       if effect.kind in [actSpeed, actVarispeed]:
         speed *= effect.val
-    let oldOffset = clip.offset.float64 * speed
-    clipSpans.add((round(oldOffset), round(oldOffset + clip.dur.float64)))
+    let oldOffset = clip.offset.f64 * speed
+    clipSpans.add((round(oldOffset), round(oldOffset + clip.dur.f64)))
 
-  var cutLens: seq[int] = @[]
+  var cutLens: seq[int64] = @[]
   var i = 0
   while i < len(clipSpans) - 1:
     if i == 0 and clipSpans[i][0] != 0:
@@ -90,30 +92,30 @@ func allCuts(tl: v3, inLen: int): seq[int] =
 
 
 proc preview*(tl: var v3) =
-  conwrite("")
+  clearline()
 
-  var inputLength = 0
+  var inputLength: int64 = 0
   for src in tl.uniqueSources:
     let container = av.open(src[])
     let mediaLength: AVRational = container.mediaLength()
-    inputLength += round((mediaLength * tl.tb).float64).int
+    inputLength += round((mediaLength * tl.tb).f64).int64
 
   let outputLength = tl.len
   let diff = outputLength - inputLength
-  let tb = tl.tb.float64
+  let tb: f64 = tl.tb.f64
 
   stdout.write("\nlength:\n")
   echo timeFrame("input", inputLength, tb, "100.0%")
 
   if inputLength != 0:
-    let outputPercent = &"{round((outputLength / inputLength) * 100, 2)}%"
+    let outputPercent = &"{round((outputLength.f64 / inputLength.f64) * 100, 2)}%"
     echo timeFrame("output", outputLength, tb, outputPercent)
-    echo timeFrame("diff", diff, tb, &"{round((diff / inputLength) * 100, 2)}%")
+    echo timeFrame("diff", diff, tb, &"{round((diff.f64 / inputLength.f64) * 100, 2)}%")
   else:
     echo timeFrame("output", outputLength, tb, "0.0%")
     echo timeFrame("diff", diff, tb, "0.0%")
 
-  var clipLens: seq[int] = @[]
+  var clipLens: seq[int64] = @[]
   if tl.a.len == 0:
     if tl.v.len != 0:
       tl.a.add move(tl.v[0])

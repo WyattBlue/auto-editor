@@ -1,7 +1,7 @@
-import std/[envvars, math, options, os, strformat, strutils, tables, terminal, times]
+import std/[envvars, math, options, os, strformat, strutils, tables, times]
 
 import ffmpeg
-import util/color
+import util/[color, term]
 import cli
 
 type BarType* = enum
@@ -166,16 +166,21 @@ let noColor* = getEnv("NO_COLOR") != "" or getEnv("AV_LOG_FORCE_NOCOLOR") != ""
 proc conwrite*(msg: string) {.raises: [].} =
   if not quiet:
     try:
-      let columns = terminalWidth()
-      let buffer: string = " ".repeat(columns - msg.len - 3)
-      stdout.write("  " & msg & buffer & "\r")
+      when defined(wasmBuild):
+        wasmProgressWrite(("  " & msg).cstring)
+      else:
+        let columns = terminalWidth()
+        let buffer: string = " ".repeat(columns - msg.len - 3)
+        stdout.write("  " & msg & buffer & "\r")
       stdout.flushFile()
     except IOError:
       discard
 
+proc clearline* = (when not defined(wasmBuild): conwrite(""))
+
 proc debug*(msg: string) =
   if isDebug:
-    conwrite("")
+    clearline()
     if not noColor:
       stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
     else:
@@ -183,7 +188,7 @@ proc debug*(msg: string) =
 
 proc warning*(msg: string) =
   if not quiet:
-    conwrite("")
+    clearline()
     stderr.write(&"Warning! {msg}\n")
 
 proc closeTempDir*() {.raises: [].} =
@@ -195,7 +200,7 @@ proc closeTempDir*() {.raises: [].} =
 
 proc error*(msg: string) {.noreturn.} =
   closeTempDir()
-  conwrite("")
+  clearline()
   try:
     if not noColor:
       stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)

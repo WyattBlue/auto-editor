@@ -1,4 +1,4 @@
-import std/[times, math, strutils, strformat, terminal, os]
+import std/[times, math, strutils, strformat, os]
 import std/[typedthreads, atomics]
 when not defined(windows):
   import std/posix
@@ -8,6 +8,7 @@ when defined(macosx):
   import std/osproc
 
 import ../log
+import ./term
 
 when not defined(windows):
   var termResized {.global.}: Atomic[bool]
@@ -94,7 +95,7 @@ proc progressWorker(data: ThreadData) {.thread.} =
   var columns = terminalWidth()
 
   while not data.shouldStop.load():
-    when not defined(windows):
+    when not defined(windows) and not defined(wasmBuild):
       if termResized.load():
         columns = terminalWidth()
         termResized.store(false)
@@ -111,8 +112,11 @@ proc progressWorker(data: ThreadData) {.thread.} =
     let rate = if progress == 0: 0.0 else: (epochTime() - data.begin) / progress
 
     let output = formatProgressOutput(config, data.title, data.lenTitle, progress, rate, data.begin, currentProgress, total, columns)
-    stdout.write(output & "\r")
-    stdout.flushFile()
+    when defined(wasmBuild):
+      wasmProgressWrite(output.cstring)
+    else:
+      stdout.write(output & "\r")
+      stdout.flushFile()
 
     lastProgress = currentProgress
     sleep(sleepRate)
