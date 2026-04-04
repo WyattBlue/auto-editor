@@ -268,6 +268,25 @@ proc checkHash(package: Package, filename: string) =
     quit(1)
 
 
+proc downloadAndExtract(package: Package) =
+  ## Download, verify, extract and patch a package.
+  ## Must be called inside withDir "ffmpeg_sources".
+  if not fileExists(package.location):
+    exec &"curl -O -L {package.sourceUrl}"
+    checkHash(package, "ffmpeg_sources" / package.location)
+
+  var tarArgs = "xf"
+  if package.location.endsWith("bz2"):
+    tarArgs = "xjf"
+
+  if not dirExists(package.name):
+    exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
+    let patchFile = &"../patches/{package.name}.patch"
+    if fileExists(patchFile):
+      let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1 --force"
+      echo "Applying patch: ", cmd
+      exec cmd
+
 proc makeInstall() =
   when defined(macosx):
     exec "make -j$(sysctl -n hw.ncpu)"
@@ -551,23 +570,8 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
 
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
-      if not fileExists(package.location):
-        exec &"curl -O -L {package.sourceUrl}"
-        checkHash(package, "ffmpeg_sources" / package.location)
-
-      var tarArgs = "xf"
-      if package.location.endsWith("bz2"):
-        tarArgs = "xjf"
-
-      if not dirExists(package.name):
-        exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
-        let patchFile = &"../patches/{package.name}.patch"
-        if fileExists(patchFile):
-          let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1 --force"
-          echo "Applying patch: ", cmd
-          exec cmd
-
-      if package.name == "ffmpeg": # build later
+      downloadAndExtract(package)
+      if package.name == "ffmpeg":
         continue
 
       withDir package.name:
@@ -780,148 +784,69 @@ task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
 
 let wasmBuildPath = absolutePath("build_wasm")
 
-task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
-  setupDeps()
-  putEnv("PKG_CONFIG_PATH", wasmBuildPath / "lib/pkgconfig")
-
-  mkDir("ffmpeg_sources")
-  mkDir("build_wasm")
-
-  # Build lame
-  withDir "ffmpeg_sources":
-    if not fileExists(lame.location):
-      exec &"curl -O -L {lame.sourceUrl}"
-      checkHash(lame, "ffmpeg_sources" / lame.location)
-
-    if not dirExists(lame.name):
-      exec &"tar xf {lame.location} && mv {lame.dirName} {lame.name}"
-
-  withDir &"ffmpeg_sources/{lame.name}":
-    if not fileExists("Makefile"):
-      let args = lame.buildArguments.join(" ")
-      exec &"""emconfigure ./configure --prefix="{wasmBuildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
-    makeInstall()
-
-  # Build x264
-  withDir "ffmpeg_sources":
-    if not fileExists(x264.location):
-      exec &"curl -O -L {x264.sourceUrl}"
-      checkHash(x264, "ffmpeg_sources" / x264.location)
-
-    if not dirExists(x264.name):
-      exec &"tar xjf {x264.location} && mv {x264.dirName} {x264.name}"
-
-  withDir &"ffmpeg_sources/{x264.name}":
+proc autoconfBuildWasm(package: Package, buildPath: string) =
+  case package.name
+  of "x264":
     if not fileExists("config.mak"):
-      exec &"""CFLAGS="-matomics -mbulk-memory" emconfigure ./configure --prefix="{wasmBuildPath}" --host=i686-gnu --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
+      exec &"""CFLAGS="-matomics -mbulk-memory" emconfigure ./configure --prefix="{buildPath}" --host=i686-gnu --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
     exec "emmake make -j4"
     exec "make install"
-
-  # Build opus
-  withDir "ffmpeg_sources":
-    if not fileExists(opus.location):
-      exec &"curl -O -L {opus.sourceUrl}"
-      checkHash(opus, "ffmpeg_sources" / opus.location)
-
-    if not dirExists(opus.name):
-      exec &"tar xf {opus.location} && mv {opus.dirName} {opus.name}"
-
-  withDir &"ffmpeg_sources/{opus.name}":
+  of "libvpx":
     if not fileExists("Makefile"):
-      let args = (opus.buildArguments & @["--disable-rtcd"]).join(" ")
-      exec &"""emconfigure ./configure --prefix="{wasmBuildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
+      exec &"""emconfigure ./configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
+    makeInstall()
+  else:
+    # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
+    let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
+    if not fileExists("Makefile"):
+      let args = (package.buildArguments & extraArgs).join(" ")
+      exec &"""emconfigure ./configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
     makeInstall()
 
-  # Build dav1d
-  withDir "ffmpeg_sources":
-    if not fileExists(dav1d.location):
-      exec &"curl -O -L {dav1d.sourceUrl}"
-      checkHash(dav1d, "ffmpeg_sources" / dav1d.location)
+proc cmakeBuildWasm(package: Package, buildPath: string) =
+  mkDir("build_wasm_cmake")
+  withDir "build_wasm_cmake":
+    if not fileExists("CMakeCache.txt"):
+      var args = @[
+        &"-DCMAKE_INSTALL_PREFIX={buildPath}",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DBUILD_SHARED_LIBS=OFF",
+      ]
+      case package.name
+      of "whisper":
+        args &= @[
+          "-DGGML_NATIVE=OFF", "-DGGML_CUDA=OFF", "-DGGML_METAL=OFF",
+          "-DGGML_BLAS=OFF", "-DGGML_OPENMP=OFF", "-DGGML_BACKEND_DL=OFF",
+          "-DWHISPER_SDL2=OFF", "-DWHISPER_BUILD_EXAMPLES=OFF",
+          "-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF",
+        ]
+      of "libsvtav1":
+        args &= @[
+          "-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=OFF",
+          "\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
+          "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\"",
+        ]
+      else:
+        args &= package.buildArguments
+        args &= @["\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
+                  "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\""]
+      exec "emcmake cmake .. " & args.join(" ")
+    exec "make -j4"
+    exec "make install"
 
-    if not dirExists(dav1d.name):
-      exec &"tar xjf {dav1d.location} && mv {dav1d.dirName} {dav1d.name}"
-
-  withDir &"ffmpeg_sources/{dav1d.name}":
-    mkDir("build_meson")
-    writeFile("build_meson/meson-cross.txt", """
-[binaries]
-c = 'emcc'
-cpp = 'em++'
-ar = 'emar'
-
-[host_machine]
-system = 'emscripten'
-cpu_family = 'wasm32'
-cpu = 'wasm32'
-endian = 'little'
-""")
-    withDir "build_meson":
-      if not fileExists("build.ninja"):
-        exec &"""meson setup --prefix="{wasmBuildPath}" --buildtype=release --default-library=static -Denable_docs=false -Denable_tools=false -Denable_examples=false -Denable_tests=false -Denable_asm=false -Dc_args="-matomics -mbulk-memory" --cross-file=meson-cross.txt .."""
-      exec "ninja"
-      exec "ninja install"
-
-  # Build libvpx
-  withDir "ffmpeg_sources":
-    if not fileExists(vpx.location):
-      exec &"curl -O -L {vpx.sourceUrl}"
-      checkHash(vpx, "ffmpeg_sources" / vpx.location)
-
-    if not dirExists(vpx.name):
-      exec &"tar xf {vpx.location} && mv {vpx.dirName} {vpx.name}"
-
-  withDir &"ffmpeg_sources/{vpx.name}":
-    if not fileExists("Makefile"):
-      exec &"""emconfigure ./configure --prefix="{wasmBuildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
-    makeInstall()
-
-  # Build whisper
-  withDir "ffmpeg_sources":
-    if not fileExists(whisper.location):
-      exec &"curl -O -L {whisper.sourceUrl}"
-      checkHash(whisper, "ffmpeg_sources" / whisper.location)
-
-    if not dirExists(whisper.name):
-      exec &"tar xf {whisper.location} && mv {whisper.dirName} {whisper.name}"
-
-  withDir &"ffmpeg_sources/{whisper.name}":
-    mkDir("build_wasm_cmake")
-    withDir "build_wasm_cmake":
-      if not fileExists("CMakeCache.txt"):
-        exec &"""emcmake cmake .. \
-          -DCMAKE_INSTALL_PREFIX="{wasmBuildPath}" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=OFF \
-          -DGGML_NATIVE=OFF \
-          -DGGML_CUDA=OFF \
-          -DGGML_METAL=OFF \
-          -DGGML_BLAS=OFF \
-          -DGGML_OPENMP=OFF \
-          -DGGML_BACKEND_DL=OFF \
-          -DWHISPER_SDL2=OFF \
-          -DWHISPER_BUILD_EXAMPLES=OFF \
-          -DWHISPER_BUILD_TESTS=OFF \
-          -DWHISPER_BUILD_SERVER=OFF"""
-      exec "make -j4"
-      exec "make install"
-
-  # Fix ggml library names (cmake installs without lib prefix on some platforms)
-  let whisperLibDir = wasmBuildPath / "lib"
-  for libFile in ["ggml.a", "ggml-base.a", "ggml-cpu.a"]:
-    let srcFile = whisperLibDir / libFile
-    let dstFile = whisperLibDir / ("lib" & libFile)
-    if fileExists(srcFile) and not fileExists(dstFile):
-      exec &"mv \"{srcFile}\" \"{dstFile}\""
-
-  # ggml-base.a is built but not always installed; copy manually if needed
-  let ggmlBaseDst = whisperLibDir / "libggml-base.a"
-  if not fileExists(ggmlBaseDst):
-    let ggmlBaseSrc = &"ffmpeg_sources/{whisper.name}/build_wasm_cmake/ggml/src/ggml-base.a"
-    if fileExists(ggmlBaseSrc):
-      exec &"cp \"{ggmlBaseSrc}\" \"{ggmlBaseDst}\""
-
-  # Write whisper.pc so FFmpeg's configure can find it
-  writeFile(whisperLibDir / "pkgconfig" / "whisper.pc", &"""prefix={wasmBuildPath}
+  if package.name == "whisper":
+    let libDir = buildPath / "lib"
+    for libFile in ["ggml.a", "ggml-base.a", "ggml-cpu.a"]:
+      let srcFile = libDir / libFile
+      let dstFile = libDir / ("lib" & libFile)
+      if fileExists(srcFile) and not fileExists(dstFile):
+        exec &"mv \"{srcFile}\" \"{dstFile}\""
+    let ggmlBaseDst = libDir / "libggml-base.a"
+    if not fileExists(ggmlBaseDst):
+      let ggmlBaseSrc = "build_wasm_cmake/ggml/src/ggml-base.a"
+      if fileExists(ggmlBaseSrc):
+        exec &"cp \"{ggmlBaseSrc}\" \"{ggmlBaseDst}\""
+    writeFile(libDir / "pkgconfig" / "whisper.pc", &"""prefix={buildPath}
 exec_prefix=${{prefix}}
 libdir=${{exec_prefix}}/lib
 includedir=${{prefix}}/include
@@ -934,58 +859,61 @@ Libs.private: -lpthread -lm -lstdc++
 Cflags: -I${{includedir}}
 """)
 
-  # Build SVT-AV1
+proc mesonBuildWasm(package: Package, buildPath: string) =
+  mkDir("build_meson")
+  writeFile("build_meson/meson-cross.txt", """
+[binaries]
+c = 'emcc'
+cpp = 'em++'
+ar = 'emar'
+
+[host_machine]
+system = 'emscripten'
+cpu_family = 'wasm32'
+cpu = 'wasm32'
+endian = 'little'
+""")
+  withDir "build_meson":
+    if not fileExists("build.ninja"):
+      exec &"""meson setup --prefix="{buildPath}" --buildtype=release --default-library=static -Denable_docs=false -Denable_tools=false -Denable_examples=false -Denable_tests=false -Denable_asm=false -Dc_args="-matomics -mbulk-memory" --cross-file=meson-cross.txt .."""
+    exec "ninja"
+    exec "ninja install"
+
+proc wasmBuildPackage(package: Package, buildPath: string) =
+  case package.buildSystem
+  of "cmake": cmakeBuildWasm(package, buildPath)
+  of "meson": mesonBuildWasm(package, buildPath)
+  else: autoconfBuildWasm(package, buildPath)
+
+let wasmPackages = @[lame, x264, opus, dav1d, vpx, whisper, svtav1]
+
+task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
+  setupDeps()
+  putEnv("PKG_CONFIG_PATH", wasmBuildPath / "lib/pkgconfig")
+  mkDir("ffmpeg_sources")
+  mkDir("build_wasm")
+
   withDir "ffmpeg_sources":
-    if not fileExists(svtav1.location):
-      exec &"curl -O -L {svtav1.sourceUrl}"
-      checkHash(svtav1, "ffmpeg_sources" / svtav1.location)
+    for package in @[ffmpeg] & wasmPackages:
+      downloadAndExtract(package)
 
-    if not dirExists(svtav1.name):
-      exec &"tar xjf {svtav1.location} && mv {svtav1.dirName} {svtav1.name}"
-
-  withDir &"ffmpeg_sources/{svtav1.name}":
-    mkDir("build_wasm_cmake")
-    withDir "build_wasm_cmake":
-      if not fileExists("CMakeCache.txt"):
-        exec &"""emcmake cmake .. \
-          -DCMAKE_INSTALL_PREFIX="{wasmBuildPath}" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=OFF \
-          -DBUILD_APPS=OFF \
-          -DBUILD_DEC=OFF \
-          -DBUILD_ENC=ON \
-          -DENABLE_NASM=OFF \
-          -DCMAKE_C_FLAGS="-matomics -mbulk-memory" \
-          -DCMAKE_CXX_FLAGS="-matomics -mbulk-memory" """
-      exec "make -j4"
-      exec "make install"
+  for package in wasmPackages:
+    withDir &"ffmpeg_sources/{package.name}":
+      wasmBuildPackage(package, wasmBuildPath)
 
   # lame ships no .pc file; create one so FFmpeg's configure can find it
   mkDir(wasmBuildPath / "lib" / "pkgconfig")
-  writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc",
-    "prefix=" & wasmBuildPath & "\n" &
-    "exec_prefix=${prefix}\n" &
-    "libdir=${prefix}/lib\n" &
-    "includedir=${prefix}/include\n" &
-    "\nName: mp3lame\n" &
-    "Description: MPEG Layer 3 audio codec\n" &
-    "Version: 3.100\n" &
-    "Libs: -L${libdir} -lmp3lame\n" &
-    "Cflags: -I${includedir}\n")
+  writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc", &"""prefix={wasmBuildPath}
+exec_prefix=${{prefix}}
+libdir=${{prefix}}/lib
+includedir=${{prefix}}/include
 
-  # Build FFmpeg
-  withDir "ffmpeg_sources":
-    if not fileExists(ffmpeg.location):
-      exec &"curl -O -L {ffmpeg.sourceUrl}"
-      checkHash(ffmpeg, "ffmpeg_sources" / ffmpeg.location)
-
-    if not dirExists(ffmpeg.name):
-      exec &"tar xf {ffmpeg.location} && mv {ffmpeg.dirName} {ffmpeg.name}"
-      let patchFile = "../patches/ffmpeg.patch"
-      if fileExists(patchFile):
-        let cmd = &"patch -d {ffmpeg.name} -i {absolutePath(patchFile)} -p1 --force"
-        echo "Applying patch: ", cmd
-        exec cmd
+Name: mp3lame
+Description: MPEG Layer 3 audio codec
+Version: 3.100
+Libs: -L${{libdir}} -lmp3lame
+Cflags: -I${{includedir}}
+""")
 
   withDir "ffmpeg_sources/ffmpeg":
     exec (&"""./configure --prefix="{wasmBuildPath}" \
@@ -1003,7 +931,7 @@ Cflags: -I${{includedir}}
       --disable-w32threads \
       --disable-os2threads \
       --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
-      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(@[lame, x264, opus, dav1d, vpx, svtav1, whisper], crossWasm=true))
+      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(wasmPackages, crossWasm=true))
     makeInstall()
 
 task makewasmweb, "Compile to wasm for browser (requires emscripten)":
