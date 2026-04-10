@@ -24,28 +24,28 @@ let enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
 let buildPath = absolutePath("build")
 
-let posix = if false: "-posix" else: ""  # Ubuntu vs Homebrew
+let posix = if false: "-posix" else: ""
+
+proc unixStrip =
+  when defined(macosx):
+    exec "strip -ur auto-editor"
+    exec "stat -f \"%z bytes\" ./auto-editor"
+    echo ""
+  when defined(linux):
+    exec "strip -s auto-editor"
+    exec "stat -c \"%s bytes\" ./auto-editor"
+    echo ""
 
 task test, "Run unit tests":
   exec "nim c -r tests/unit"
 
 task make, "Export the project":
   exec "nim c -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
-  when defined(macosx):
-    exec "strip -ur auto-editor"
-    exec "stat -f \"%z bytes\" ./auto-editor"
-    echo ""
-  when defined(linux):
-    exec "strip -s auto-editor"
+  unixStrip()
 
 task brewmake, "Build auto-editor with deps dynamically linked.":
   exec "nim c -d:dynamic -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
-  when defined(macosx):
-    exec "strip -ur auto-editor"
-    exec "stat -f \"%z bytes\" ./auto-editor"
-    echo ""
-  when defined(linux):
-    exec "strip -s auto-editor"
+  unixStrip()
 
 task cleanff, "Remove":
   rmDir "ffmpeg_sources"
