@@ -22,6 +22,8 @@ var enable12bit = getEnv("ENABLE_12BIT").len > 0
 let enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 let enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
+let buildPath = absolutePath("build")
+
 let posix = if false: "-posix" else: ""  # Ubuntu vs Homebrew
 
 task test, "Run unit tests":
@@ -565,7 +567,6 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
   mkDir("ffmpeg_sources")
   mkDir("build")
 
-  let buildPath = absolutePath("build")
   let packages = setupPackages(enableWhisper=enableWhisper, crossWindowsArm=crossWindowsArm)
 
   withDir "ffmpeg_sources":
@@ -673,7 +674,6 @@ proc setupDeps() =
 
 task makeff, "Build FFmpeg from source":
   setupDeps()
-  let buildPath = absolutePath("build")
   # Set PKG_CONFIG_PATH to include both standard and architecture-specific paths
   var pkgConfigPaths = @[buildPath / "lib/pkgconfig"]
   when defined(linux):
@@ -702,8 +702,6 @@ task makeff, "Build FFmpeg from source":
       exec "cat ./ffbuild/config.log"
       quit(1)
     makeInstall()
-
-let buildPath = absolutePath("build")
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
   setupDeps()
