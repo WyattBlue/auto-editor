@@ -309,20 +309,20 @@ proc editMedia*(args: var mainArgs) =
     exportJsonTl(tlV3, exportKind, output)
     return
   of "premiere":
-    fcp7_write_xml(tlName, output, false, tlV3)
+    fcp7WriteXml(tlName, output, false, tlV3)
     return
   of "resolve-fcp7":
-    fcp7_write_xml(tlName, output, true, tlV3)
+    fcp7WriteXml(tlName, output, true, tlV3)
     return
   of "final-cut-pro":
-    fcp11_write_xml(tlName, fcpVersion, output, false, tlV3)
+    fcp11WriteXml(tlName, fcpVersion, output, false, tlV3)
     return
   of "resolve":
     tlV3.setStreamTo0(interner)
-    fcp11_write_xml(tlName, fcpVersion, output, true, tlV3)
+    fcp11WriteXml(tlName, fcpVersion, output, true, tlV3)
     return
   of "shotcut":
-    shotcut_write_mlt(output, tlV3)
+    shotcutWriteMlt(output, tlV3)
     return
   of "kdenlive":
     kdenliveWrite(output, tlV3)

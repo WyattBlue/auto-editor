@@ -21,7 +21,7 @@ func addProp(parent: XmlNode, name, value: string) =
   prop.add(newText(value))
   parent.add(prop)
 
-proc shotcut_write_mlt*(output: string, tl: v3) =
+proc shotcutWriteMlt*(output: string, tl: v3) =
   let mlt = newElement("mlt")
   mlt.attrs = {
     "LC_NUMERIC": "C",
@@ -50,10 +50,10 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
   }.toXmlAttributes()
   mlt.add(profile)
 
-  let playlist_bin = newElement("playlist")
-  playlist_bin.attrs = {"id": "main_bin"}.toXmlAttributes()
-  playlist_bin.addProp("xml_retain", "1")
-  mlt.add(playlist_bin)
+  let playlistBin = newElement("playlist")
+  playlistBin.attrs = {"id": "main_bin"}.toXmlAttributes()
+  playlistBin.addProp("xml_retain", "1")
+  mlt.add(playlistBin)
 
   let global_out = toTimecode(float(tl.len / tl.tb), Code.standard)
 
