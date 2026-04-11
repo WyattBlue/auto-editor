@@ -68,11 +68,24 @@
   <div id="log"></div>
   <div id="downloadArea"></div>
 
-  <script src="auto-editor-web.js"></script>
   <script>
+    const wasmBinaryPromise = fetch('auto-editor-web.wasm').then(r => r.arrayBuffer());
+    const mainScriptBlobPromise = fetch('auto-editor-web.js')
+      .then(r => r.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        return new Promise((resolve) => {
+          const s = document.createElement('script');
+          s.src = url;
+          s.onload = () => resolve(url);
+          document.head.appendChild(s);
+        });
+      });
+
     let progressLineActive = false;
     const pendingOutput = [];
     let rafPending = false;
+    let logText = '';
 
     function switchTab(name, btn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -84,9 +97,12 @@
 
     function clearLog() {
       document.getElementById('log').textContent = '';
-      document.getElementById('downloadArea').innerHTML = '';
+      document.getElementById('downloadArea').replaceChildren();
+      if (downloadUrl) { URL.revokeObjectURL(downloadUrl); downloadUrl = null; }
       progressLineActive = false;
       pendingOutput.length = 0;
+      rafPending = false;
+      logText = '';
     }
 
     function stripAnsi(str) {
@@ -97,7 +113,7 @@
       rafPending = false;
       if (pendingOutput.length === 0) return;
       const el = document.getElementById('log');
-      let text = el.textContent;
+      let text = logText;
       for (const {msg, isProgress} of pendingOutput) {
         if (isProgress) {
           if (progressLineActive) {
@@ -113,17 +129,15 @@
         }
       }
       pendingOutput.length = 0;
+      logText = text;
       el.textContent = text;
       el.scrollTop = el.scrollHeight;
     }
 
     function handleOutput(text) {
       const clean = stripAnsi(text);
-      if (clean.includes('\r')) {
-        pendingOutput.push({msg: clean.replace(/\r/g, '').trimEnd(), isProgress: true});
-      } else {
-        pendingOutput.push({msg: clean, isProgress: false});
-      }
+      const isProgress = clean.includes('\r');
+      pendingOutput.push({msg: isProgress ? clean.replace(/\r/g, '').trimEnd() : clean, isProgress});
       if (!rafPending) {
         rafPending = true;
         requestAnimationFrame(flushOutput);
@@ -132,57 +146,60 @@
 
     function mb(n) { return (n / 1024 / 1024).toFixed(1); }
 
+    let downloadUrl = null;
     function createDownload(data, name) {
+      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
       const blob = data instanceof Blob ? data : new Blob([data]);
+      downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = downloadUrl;
       a.download = name;
       a.textContent = 'Download ' + name;
       const area = document.getElementById('downloadArea');
-      area.innerHTML = '';
-      area.appendChild(a);
+      area.replaceChildren(a);
     }
 
-    // entries: [{file, path}]. Returns module on success, null on failure.
     async function runModule(btn, args, entries) {
       btn.disabled = true;
-      for (const {file} of entries)
-        handleOutput(`<wasm>load ${file.name} (${mb(file.size)} MB)</wasm>`);
-
-      const buffers = await Promise.all(
-        entries.map(({file}) => file.arrayBuffer().then(b => new Uint8Array(b)))
-      );
-      handleOutput('<wasm>$ auto-editor ' + args.join(' ') + '</wasm>');
-
-      let resolve, reject;
-      const done = new Promise((res, rej) => { resolve = res; reject = rej; });
-
-      let mod;
       try {
-        mod = await AutoEditor({
-          arguments: args,
-          preRun: [(m) => entries.forEach(({path}, i) => m.FS.writeFile(path, buffers[i]))],
-          print:    handleOutput,
-          printErr: handleOutput,
-          locateFile: (f) => f,
-          onExit: (code) => code === 0 ? resolve() : reject(new Error('exited with code ' + code)),
-        });
-      } catch (e) {
-        handleOutput('<wasm>module init failed: ' + e + '</wasm>');
-        btn.disabled = false;
-        return null;
-      }
+        for (const {file} of entries)
+          handleOutput(`<wasm>load ${file.name} (${mb(file.size)} MB)</wasm>`);
 
-      try {
-        await done;
-      } catch (e) {
-        handleOutput('<wasm>' + e.message + '</wasm>');
-        btn.disabled = false;
-        return null;
-      }
+        const buffers = await Promise.all(
+          entries.map(({file}) => file.arrayBuffer().then(b => new Uint8Array(b)))
+        );
+        handleOutput('<wasm>$ auto-editor ' + args.join(' ') + '</wasm>');
 
-      btn.disabled = false;
-      return mod;
+        let resolve, reject;
+        const done = new Promise((res, rej) => { resolve = res; reject = rej; });
+
+        let mod;
+        try {
+          mod = await AutoEditor({
+            arguments: args,
+            preRun: [(m) => entries.forEach(({path}, i) => m.FS.writeFile(path, buffers[i]))],
+            print:    handleOutput,
+            printErr: handleOutput,
+            wasmBinary: await wasmBinaryPromise,
+            mainScriptUrlOrBlob: await mainScriptBlobPromise,
+            onExit: (code) => code === 0 ? resolve() : reject(new Error('exited with code ' + code)),
+          });
+        } catch (e) {
+          handleOutput('<wasm>module init failed: ' + e + '</wasm>');
+          return null;
+        }
+
+        try {
+          await done;
+        } catch (e) {
+          handleOutput('<wasm>' + e.message + '</wasm>');
+          return null;
+        }
+
+        return mod;
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     async function runEditor() {
