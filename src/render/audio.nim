@@ -74,9 +74,9 @@ type
     stream*: ptr AVStream
     decoderCtx*: ptr AVCodecContext
     rate*: int
-    ownsContainer*: bool
-    channels*: int
     layout*: string
+    channels*: cint
+    ownsContainer*: bool
 
   AudioBuffer = ref object
     when not defined(wasmBuild):
@@ -86,10 +86,10 @@ type
       heapData*: seq[int16]
     data*: ptr UncheckedArray[int16]
     size*: int
-    channels*: int
     samples*: int
+    channels*: cint
 
-proc newAudioBuffer(index: int32, samples: int, channels: int): AudioBuffer =
+proc newAudioBuffer(index: int32, samples: int, channels: cint): AudioBuffer =
   result = new(AudioBuffer)
   result.samples = samples
   result.channels = channels
@@ -123,7 +123,7 @@ proc newGetter(path: string, stream: int, rate: int): Getter =
   result.rate = result.stream.codecpar.sample_rate.int  # Use source sample rate, not target
   result.decoderCtx = initDecoder(result.stream.codecpar)
   result.ownsContainer = true
-  result.channels = result.stream.codecpar.ch_layout.nb_channels.int
+  result.channels = result.stream.codecpar.ch_layout.nb_channels
   result.layout = $result.stream.codecpar.ch_layout
 
 proc newGetter(container: InputContainer, stream: int): Getter =
@@ -132,7 +132,7 @@ proc newGetter(container: InputContainer, stream: int): Getter =
   result.stream = result.container.audio[stream]
   result.rate = result.stream.codecpar.sample_rate.int
   result.decoderCtx = initDecoder(result.stream.codecpar)
-  result.channels = result.stream.codecpar.ch_layout.nb_channels.int
+  result.channels = result.stream.codecpar.ch_layout.nb_channels
   result.layout = $result.stream.codecpar.ch_layout
 
 proc close(getter: Getter) =
@@ -183,7 +183,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
     if packet.stream_index == stream.index:
       if avcodec_send_packet(decoderCtx, packet) >= 0:
         while avcodec_receive_frame(decoderCtx, frame) >= 0 and totalSamples < targetSamples:
-          let channels = frame.ch_layout.nb_channels.int
+          let channels = frame.ch_layout.nb_channels
           let samples = frame.nb_samples.int
 
           # Convert frame PTS to sample position
