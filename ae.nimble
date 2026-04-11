@@ -47,9 +47,12 @@ task brewmake, "Build auto-editor with deps dynamically linked.":
   exec "nim c -d:dynamic -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
   unixStrip()
 
-task cleanff, "Remove":
-  rmDir "ffmpeg_sources"
+task cleanff, "Clean build files":
   rmDir "build"
+  rmDir "build_wasm"
+  for kind, path in walkDir("ffmpeg_sources"):
+    if kind == pcDir: rmDir path
+
 
 var disableDecoders: seq[string] = @[]
 var disableEncoders: seq[string] = @[]

@@ -230,16 +230,15 @@ proc main*(args: seq[string]) =
   var fileInfo: JsonNode = %* {}
   for inputFile in inputFiles:
     try:
-      var container = av.open(inputFile)
-      let mediaInfo = initMediaInfo(container.formatContext, inputFile)
-      container.close()
+      let formatCtx = av.openFormatCtx(inputFile.cstring)
+      let mediaInfo = initMediaInfo(formatCtx, inputFile)
+      avformat_close_input(addr formatCtx)
 
       if isJson:
         fileInfo[inputFile] = getJsonInfo(mediaInfo)
       else:
         printYamlInfo(mediaInfo)
         echo ""
-
     except IOError:
       if isJson:
         fileInfo[inputFile] = %* {"type": "invalid"}

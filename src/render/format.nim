@@ -214,11 +214,12 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
           break findSource
 
     if sourcePath != "":
-      let srcContainer = av.open(sourcePath)
-      defer: srcContainer.close()
+      let formatCtx = av.openFormatCtx(sourcePath.cstring)
+      defer: avformat_close_input(addr formatCtx)
 
       # Copy each attachment stream
-      for attachStream in srcContainer.streams:
+      for i in 0 ..< formatCtx.nb_streams:
+        let attachStream = formatCtx.streams[i]
         if attachStream.codecpar.codec_type != AVMEDIA_TYPE_ATTACHMENT:
           continue
         # Create attachment stream directly (attachments don't have decoders)

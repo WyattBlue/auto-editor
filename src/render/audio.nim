@@ -356,7 +356,7 @@ proc createFilterGraph(effects: Actions, sr: int, layout: string): (ptr AVFilter
   return (filterGraph, bufferSrc, bufferSink)
 
 # Returns seq[int16] where channel data is interleaved: [ch0, ch1, ..., ch0, ch1, ...] etc.
-proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr: cint, targetSr: cint, sourceLayout: string = "stereo"): seq[int16] =
+proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, targetSr: cint, sourceLayout: string): seq[int16] =
   if data.len == 0:
     return @[]
 
