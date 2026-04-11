@@ -26,14 +26,29 @@ let buildPath = absolutePath("build")
 
 let posix = if false: "-posix" else: ""
 
-proc unixStrip =
+proc stripProgram(forWasm, gccWin, llvmWin: bool = false) =
+  var file = "auto-editor"
+  if gccWin or llvmWin:
+    file = "auto-editor.exe"
+  elif forWasm:
+    file = "docs/src/auto-editor-web.wasm"
+
+  if forWasm:
+    exec "wasm-strip " & file
+  elif gccWin:
+    exec "x86_64-w64-mingw32-strip -s " & file
+  elif llvmWin:
+    exec "llvm-strip -s " & file
+  elif defined(macosx):
+    exec "strip -ur " & file
+  elif defined(linux):
+    exec "strip -s " & file
+
   when defined(macosx):
-    exec "strip -ur auto-editor"
-    exec "stat -f \"%z bytes\" ./auto-editor"
+    exec &"stat -f \"%z bytes\" ./{file}"
     echo ""
-  when defined(linux):
-    exec "strip -s auto-editor"
-    exec "stat -c \"%s bytes\" ./auto-editor"
+  elif defined(linux):
+    exec &"stat -c \"%s bytes\" ./{file}"
     echo ""
 
 task test, "Run unit tests":
@@ -41,11 +56,11 @@ task test, "Run unit tests":
 
 task make, "Export the project":
   exec "nim c -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
-  unixStrip()
+  stripProgram()
 
 task brewmake, "Build auto-editor with deps dynamically linked.":
   exec "nim c -d:dynamic -d:danger --panics:on --passC:-flto --passL:-flto --out:auto-editor src/main.nim"
-  unixStrip()
+  stripProgram()
 
 task cleanff, "Clean build files":
   rmDir "build"
@@ -748,9 +763,7 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
         &"--gcc.linkerexe:x86_64-w64-mingw32-gcc{posix} " &
          "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
-
-    # Strip the Windows binary
-    exec "x86_64-w64-mingw32-strip -s auto-editor.exe"
+    stripProgram(gccWin=true)
 
 task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
   setupDeps()
@@ -788,9 +801,7 @@ task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
          "--clang.linkerexe:aarch64-w64-mingw32-clang " &
          "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
-
-    # Strip the Windows binary
-    exec "llvm-strip -s auto-editor.exe"
+    stripProgram(llvmWin=true)
 
 let wasmBuildPath = absolutePath("build_wasm")
 
@@ -944,17 +955,19 @@ Cflags: -I${{includedir}}
       --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(wasmPackages, crossWasm=true))
     makeInstall()
 
-task makewasmweb, "Compile to wasm for browser (requires emscripten)":
+task makewasmweb, "Compile to wasm for browser (requires emscripten, wabt)":
   echo "Compiling for wasm (browser)..."
 
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
   else:
-    exec "nim c -d:danger --panics:on -d:nimNoGetRandom -d:wasmBuild -d:wasmThreads --threads:on --os:linux --cpu:wasm32 --cc:clang " &
+    exec "nim c -d:danger --panics:on -d:nimNoGetRandom -d:wasmBuild --threads:on --os:linux --cpu:wasm32 --cc:clang " &
         "--clang.exe:emcc " &
         "--clang.linkerexe:emcc " &
         "--passC:-pthread " &
+        "--passC:-g0 " &
         "--passL:-pthread " &
+        "--passL:-g0 " &
         "--passL:-sINITIAL_MEMORY=67108864 " &
         "--passL:-sALLOW_MEMORY_GROWTH=1 " &
         "--passL:-sMAXIMUM_MEMORY=4294967296 " &
@@ -968,3 +981,4 @@ task makewasmweb, "Compile to wasm for browser (requires emscripten)":
         "--passL:-sEXPORTED_RUNTIME_METHODS=[FS] " &
         "--passL:-sENVIRONMENT=web,worker " &
         "--out:docs/src/auto-editor-web.js src/main.nim"
+    stripProgram(forWasm=true)
