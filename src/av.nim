@@ -62,27 +62,25 @@ type InputContainer* = object
   video*: seq[ptr AVStream]
   audio*: seq[ptr AVStream]
   subtitle*: seq[ptr AVStream]
-  streams*: seq[ptr AVStream]
 
-proc open*(filename: string): InputContainer {.raises:[IOError].} =
-  result = InputContainer()
-  result.packet = av_packet_alloc()
-
-  var ret = avformat_open_input(addr result.formatContext, filename.cstring, nil, nil)
+proc openFormatCtx*(file: cstring): ptr AVFormatContext {.raises:[IOError].} =
+  var ret = avformat_open_input(addr result, file, nil, nil)
   if ret == AVERROR(ENOENT):
-    raise newException(IOError, &"Input file doesn't exist: {filename}")
+    raise newException(IOError, &"Input file doesn't exist: {file}")
   elif ret == AVERROR_INVALIDDATA:
-    raise newException(IOError, &"Invalid media data: {filename}")
+    raise newException(IOError, &"Invalid media data: {file}")
   elif ret != 0:
-    raise newException(IOError, &"[{ret}] Could not open input file: {filename}")
+    raise newException(IOError, &"[{ret}] Could not open input file: {file}")
 
-  if avformat_find_stream_info(result.formatContext, nil) < 0:
-    avformat_close_input(addr result.formatContext)
+  if avformat_find_stream_info(result, nil) < 0:
+    avformat_close_input(addr result)
     raise newException(IOError, "Could not find stream information")
 
-  for i in 0 ..< result.formatContext.nb_streams.int:
+proc open*(filename: string): InputContainer {.raises:[IOError].} =
+  result.packet = av_packet_alloc()
+  result.formatContext = openFormatCtx(filename.cstring)
+  for i in 0 ..< result.formatContext.nb_streams:
     let stream: ptr AVStream = result.formatContext.streams[i]
-    result.streams.add(stream)
     case stream.codecpar.codecType
     of AVMEDIA_TYPE_VIDEO:
       result.video.add(stream)
@@ -93,25 +91,13 @@ proc open*(filename: string): InputContainer {.raises:[IOError].} =
     else:
       discard
 
-
-iterator demux*(self: InputContainer, index: int): var AVPacket =
-  while av_read_frame(self.formatContext, self.packet) >= 0:
-    if self.packet.stream_index.int == index:
-      yield self.packet[]
-    av_packet_unref(self.packet)
-
-
 func duration*(container: InputContainer): float64 =
   if container.formatContext.duration != AV_NOPTS_VALUE:
     return float64(container.formatContext.duration) / AV_TIME_BASE
   return 0.0
 
-func bitRate*(container: InputContainer): int64 =
-  return container.formatContext.bit_rate
-
 proc mediaLength*(container: InputContainer): AVRational =
   # Get the mediaLength in seconds.
-
   var formatCtx = container.formatContext
   var audioStreamIndex = (if container.audio.len == 0: -1 else: container.audio[0].index)
   var videoStreamIndex = (if container.video.len == 0: -1 else: container.video[0].index)
@@ -195,8 +181,8 @@ proc seek*(container: InputContainer, offset: int64, backward: bool = true, stre
   if backward:
     flags |= AVSEEK_FLAG_BACKWARD
 
-  var stream_index: cint = (if stream == nil: -1 else: stream.index)
-  var ret = av_seek_frame(container.formatContext, stream_index, offset, flags)
+  var streamIndex: cint = (if stream == nil: -1 else: stream.index)
+  var ret = av_seek_frame(container.formatContext, streamIndex, offset, flags)
   if ret < 0:
     error "Error seeking frame"
   # Callers need to call `avcodec_flush_buffers()` after.
@@ -234,7 +220,7 @@ proc openWrite*(file: string): OutputContainer =
   if formatCtx == nil:
     error "Could not create output context"
 
-  for i in 0 ..< formatCtx.nb_streams.int:
+  for i in 0 ..< formatCtx.nb_streams:
     if formatCtx.streams[i].codecpar.codec_type == AVMEDIA_TYPE_VIDEO:
       result.video.add formatCtx.streams[i]
 

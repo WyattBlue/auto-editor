@@ -44,7 +44,7 @@ proc main*(cArgs: seq[string]) =
   var output = "-"
   var queue: int = 30
   var vadModel: string = ""
-  var threads = 4
+  var threads: cint = 4
 
   var expecting: string = ""
   for key in cArgs:
@@ -73,7 +73,7 @@ proc main*(cArgs: seq[string]) =
     of "vad-model":
       vadModel = key.replace("\\", "\\\\").replace(":", "\\:")
     of "threads":
-      threads = parseInt(key)
+      threads = parseInt(key).cint
     expecting = ""
 
   if inputPath == "":
@@ -92,7 +92,6 @@ proc main*(cArgs: seq[string]) =
 
   if input.audio.len == 0:
     error "No audio stream found"
-  let audioStreamIndex = input.audio[0].index
   
   let filterGraph = avfilter_graph_alloc()
   defer: avfilter_graph_free(addr filterGraph)
@@ -101,7 +100,7 @@ proc main*(cArgs: seq[string]) =
   let abuffer = avfilter_get_by_name("abuffer")
   var bufferCtx: ptr AVFilterContext
   
-  let audioStream = input.streams[audioStreamIndex]
+  let audioStream = input.audio[0]
   let sampleRate = audioStream.codecpar.sample_rate
   let sampleFormat = cast[AVSampleFormat](audioStream.codecpar.format)
   let channelLayout = $audioStream.codecpar.ch_layout
@@ -170,7 +169,7 @@ proc main*(cArgs: seq[string]) =
   if avfilter_link(whisperCtx, 0, sinkCtx, 0) < 0:
     error "Failed to link whisper to sink"
 
-  filterGraph.nb_threads = threads.cint
+  filterGraph.nb_threads = threads
 
   if avfilter_graph_config(filterGraph, nil) < 0:
     error "Failed to configure filter graph"
@@ -184,8 +183,8 @@ proc main*(cArgs: seq[string]) =
   
   let outputFrame = av_frame_alloc()
   defer: av_frame_free(addr outputFrame)
-  
-  for decodedFrame in input.decode(cint(audioStreamIndex), decoderCtx, frame):
+
+  for decodedFrame in input.decode(input.audio[0].index, decoderCtx, frame):
     if av_buffersrc_write_frame(bufferCtx, decodedFrame) < 0:
       echo "Error feeding frame to filter"
       continue

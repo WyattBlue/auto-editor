@@ -4,8 +4,7 @@ proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
   for inputFile in args:
-    var container = av.open(inputFile)
-    let formatContext = container.formatContext
+    let formatContext = av.openFormatCtx(inputFile.cstring)
     var entry = av_dict_get(formatContext.metadata, "description", nil, 0)
 
     if entry != nil:
@@ -13,4 +12,4 @@ proc main*(args: seq[string]) =
     else:
       stdout.write("\nNo description.\n\n")
 
-    container.close()
+    avformat_close_input(addr formatContext)
