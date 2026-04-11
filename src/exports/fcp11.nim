@@ -87,7 +87,7 @@ func timecode(self: MediaInfo): string = # In SMPTE
       return v.timecode
   return "00:00:00:00"
 
-proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3) =
+proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
   func fraction(val: int64): string =
     if val == 0:
       return "0s"
@@ -206,14 +206,14 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
   elif tl.a.len > 0 and tl.a[0].len > 0:
     clips = tl.a[0]
 
-  var all_refs: seq[string] = @["r2"]
+  var allRefs: seq[string] = @["r2"]
   if resolve:
     for i in 1 ..< tl.a.len:
-      all_refs.add("r" & $((i + 1) * 2))
+      allRefs.add("r" & $((i + 1) * 2))
 
-  for my_ref in all_refs.reversed:
+  for myRef in allRefs.reversed:
     for clip in clips:
-      makeClip(my_ref, clip)
+      makeClip(myRef, clip)
 
   if output == "-":
     echo $fcpxml

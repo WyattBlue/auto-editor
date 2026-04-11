@@ -61,7 +61,7 @@ func speedup(speed: float): XmlNode =
   return fil
 
 
-proc media_def(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
+proc mediaDef(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
     ntsc: string) =
   filedef.add elem("name", mi.path.splitFile.name)
   filedef.add elem("pathurl", url)
@@ -109,30 +109,30 @@ proc media_def(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
 
   filedef.add mediadef
 
-proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
+proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
     mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo]) =
   for t, alayer in tl.a.pairs:
     let track = newElement("track")
     for j, aclip in alayer.pairs:
       let mi = ptrToMi[aclip.src]
 
-      let start_val = $aclip.start
-      let end_val = $(aclip.start + aclip.dur)
-      let in_val = $aclip.offset
-      let out_val = $(aclip.offset + aclip.dur)
+      let startVal = $aclip.start
+      let endVal = $(aclip.start + aclip.dur)
+      let inVal = $aclip.offset
+      let outVal = $(aclip.offset + aclip.dur)
 
-      let clip_item_num = if mi.v.len == 0: j + 1 else: alayer.len + 1 + j
+      let clipItemNum = if mi.v.len == 0: j + 1 else: alayer.len + 1 + j
 
       let clipitem = newElement("clipitem")
-      clipitem.attrs = {"id": &"clipitem-{clip_item_num}"}.toXmlAttributes
+      clipitem.attrs = {"id": &"clipitem-{clipItemNum}"}.toXmlAttributes
       clipitem.add elem("name", mi.path.splitFile.name)
-      clipitem.add elem("start", start_val)
-      clipitem.add elem("end", end_val)
+      clipitem.add elem("start", startVal)
+      clipitem.add elem("end", endVal)
       clipitem.add elem("enabled", "TRUE")
-      clipitem.add elem("in", in_val)
-      clipitem.add elem("out", out_val)
+      clipitem.add elem("in", inVal)
+      clipitem.add elem("out", outVal)
 
-      make_filedef(clipitem, mi)
+      makeFiledef(clipitem, mi)
 
       let sourcetrack = newElement("sourcetrack")
       sourcetrack.add elem("mediatype", "audio")
@@ -145,7 +145,7 @@ proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         link1.add elem("mediatype", "video")
         clipitem.add link1
         let link2 = newElement("link")
-        link2.add elem("linkclipref", &"clipitem-{clip_item_num}")
+        link2.add elem("linkclipref", &"clipitem-{clipItemNum}")
         clipitem.add link2
 
       let effectGroup = tl.effects[aclip.effects]
@@ -157,7 +157,7 @@ proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
       track.add clipitem
     audio.add track
 
-proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
+proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
     mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo]) =
   audio.add elem("numOutputChannels", "2")
   let aformat = newElement("format")
@@ -167,7 +167,7 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
   aformat.add aschar
   audio.add aformat
 
-  let has_video = tl.v.len > 0 and tl.v[0].len > 0
+  let hasVideo = tl.v.len > 0 and tl.v[0].len > 0
   var t = 0
   for alayer in tl.a:
     for channelcount in 0..1: # Because "stereo" is hardcoded
@@ -179,33 +179,33 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         "premiereTrackType": "Stereo"
       }.toXmlAttributes
 
-      if has_video:
+      if hasVideo:
         track.add elem("outputchannelindex", $(channelcount + 1))
 
       for j, aclip in alayer.pairs:
         let src = ptrToMi[aclip.src]
 
-        let start_val = $aclip.start
-        let end_val = $(aclip.start + aclip.dur)
-        let in_val = $aclip.offset
-        let out_val = $(aclip.offset + aclip.dur)
+        let startVal = $aclip.start
+        let endVal = $(aclip.start + aclip.dur)
+        let inVal = $aclip.offset
+        let outVal = $(aclip.offset + aclip.dur)
 
-        let clip_item_num = if not has_video: j + 1 else: alayer.len + 1 + j + (
+        let clipItemNum = if not hasVideo: j + 1 else: alayer.len + 1 + j + (
             t * alayer.len)
 
         let clipitem = newElement("clipitem")
         clipitem.attrs = {
-          "id": &"clipitem-{clip_item_num}",
+          "id": &"clipitem-{clipItemNum}",
           "premiereChannelType": "stereo"
         }.toXmlAttributes
         clipitem.add elem("name", src.path.splitFile.name)
         clipitem.add elem("enabled", "TRUE")
-        clipitem.add elem("start", start_val)
-        clipitem.add elem("end", end_val)
-        clipitem.add elem("in", in_val)
-        clipitem.add elem("out", out_val)
+        clipitem.add elem("start", startVal)
+        clipitem.add elem("end", endVal)
+        clipitem.add elem("in", inVal)
+        clipitem.add elem("out", outVal)
 
-        make_filedef(clipitem, src)
+        makeFiledef(clipitem, src)
 
         let sourcetrack = newElement("sourcetrack")
         sourcetrack.add elem("mediatype", "audio")
@@ -232,7 +232,7 @@ proc handlePath(src: string): string =
   else:
     absPath
 
-proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
+proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   let (width, height) = tl.res
   let (timebase, ntsc) = setTbNtsc(tl.tb)
 
@@ -241,27 +241,25 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
   var ptrToMi = initTable[ptr string, MediaInfo]() # Cache ptr -> MediaInfo lookup
   var fileDefs = initHashSet[string]() # Contains urls
 
-  var id_counter = 0
+  var idCounter = 0
   for ptrSrc in tl.uniqueSources:
-    id_counter += 1
-    let the_id = &"file-{id_counter}"
+    idCounter += 1
     let src = ptrSrc[]
     let mi = initMediaInfo(src)
     miToUrl[mi] = handlePath(src)
-    miToId[mi] = the_id
+    miToId[mi] = &"file-{idCounter}"
     ptrToMi[ptrSrc] = mi # Store ptr -> MediaInfo mapping
 
-  proc make_filedef(clipitem: XmlNode, mi: MediaInfo) =
+  proc makeFiledef(clipitem: XmlNode, mi: MediaInfo) =
     let pathurl = miToUrl[mi]
     let filedef = <>file(id = miToId[mi])
     if pathurl notin fileDefs:
-      media_def(filedef, pathurl, mi, tl, timebase, ntsc)
+      mediaDef(filedef, pathurl, mi, tl, timebase, ntsc)
       fileDefs.incl(pathurl)
     clipitem.add filedef
 
   let xmeml = <>xmeml(version = "5")
-  let sequence = (if resolve: <>sequence() else: <>sequence(
-      explodedTracks = "true"))
+  let sequence = (if resolve: <>sequence() else: <>sequence(explodedTracks = "true"))
 
   sequence.add elem("name", name)
   sequence.add elem("duration", $tl.len)
@@ -290,22 +288,22 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
     let track = newElement("track")
 
     for j, clip in tl.v[0].pairs:
-      let start_val = $clip.start
-      let end_val = $(clip.start + clip.dur)
-      let in_val = $clip.offset
-      let out_val = $(clip.offset + clip.dur)
+      let startVal = $clip.start
+      let endVal = $(clip.start + clip.dur)
+      let inVal = $clip.offset
+      let outVal = $(clip.offset + clip.dur)
 
-      let this_clipid = &"clipitem-{j + 1}"
-      let clipitem = <>clipitem(id = this_clipid)
+      let thisClipid = &"clipitem-{j + 1}"
+      let clipitem = <>clipitem(id = thisClipid)
       clipitem.add elem("name", clip.src[].splitFile.name)
       clipitem.add elem("enabled", "TRUE")
-      clipitem.add elem("start", start_val)
-      clipitem.add elem("end", end_val)
-      clipitem.add elem("in", in_val)
-      clipitem.add elem("out", out_val)
+      clipitem.add elem("start", startVal)
+      clipitem.add elem("end", endVal)
+      clipitem.add elem("in", inVal)
+      clipitem.add elem("out", outVal)
 
       let mi = ptrToMi[clip.src]
-      make_filedef(clipitem, mi)
+      makeFiledef(clipitem, mi)
 
       clipitem.add elem("compositemode", "normal")
 
@@ -317,7 +315,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
 
       if resolve:
         let link1 = newElement("link")
-        link1.add elem("linkclipref", this_clipid)
+        link1.add elem("linkclipref", thisClipid)
         clipitem.add link1
         let link2 = newElement("link")
         link2.add elem("linkclipref", &"clipitem-{tl.v[0].len + j + 1}")
@@ -339,9 +337,9 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
   # Audio definitions and clips
   let audio = newElement("audio")
   if resolve:
-    resolve_write_audio(audio, make_filedef, tl, ptrToMi)
+    resolveWriteAudio(audio, makeFiledef, tl, ptrToMi)
   else:
-    premiere_write_audio(audio, make_filedef, tl, ptrToMi)
+    premiereWriteAudio(audio, makeFiledef, tl, ptrToMi)
 
   media.add audio
   sequence.add media
