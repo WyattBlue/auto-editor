@@ -887,6 +887,7 @@ proc mesonBuildWasm(package: Package, buildPath: string) =
 c = 'emcc'
 cpp = 'em++'
 ar = 'emar'
+strip = 'wasm-strip'
 
 [host_machine]
 system = 'emscripten'
@@ -961,7 +962,7 @@ task makewasmweb, "Compile to wasm for browser (requires emscripten, wabt)":
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
   else:
-    exec "nim c -d:danger --panics:on -d:nimNoGetRandom -d:wasmBuild --threads:on --os:linux --cpu:wasm32 --cc:clang " &
+    exec "nim c -d:danger --panics:on -d:wasmBuild -d:nimNoGetRandom --passC:-flto --passL:-flto --threads:on --os:linux --cpu:wasm32 --cc:clang " &
         "--clang.exe:emcc " &
         "--clang.linkerexe:emcc " &
         "--passC:-pthread " &
