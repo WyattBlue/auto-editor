@@ -8,8 +8,7 @@ import ../graph
 
 # Import C string functions for JSON capture
 proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
-proc strncat(dest: cstring, src: cstring, n: csize_t): cstring {.
-  importc, header: "<string.h>".}
+proc strncat(dest, src: cstring, n: csize_t): cstring {.importc, header: "<string.h>".}
 proc strlen(s: cstring): csize_t {.importc, header: "<string.h>".}
 
 # Static storage for captured JSON output from loudnorm filter
@@ -140,7 +139,7 @@ proc close(getter: Getter) =
   if getter.ownsContainer:
     getter.container.close()
 
-proc get(getter: Getter, start: int, endSample: int): seq[int16] =
+proc get(getter: Getter, start, endSample: int): seq[int16] =
   # start/end is in samples
   let container = getter.container
   let stream = getter.stream
@@ -155,8 +154,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
   let sampleRate = stream.codecpar.sample_rate
   let timeBase = stream.time_base
   let startTimeInSeconds = start.float / sampleRate.float
-  let startPts = int64(startTimeInSeconds / (timeBase.num.float /
-      timeBase.den.float))
+  let startPts = int64(startTimeInSeconds * timeBase.den.float / timeBase.num.float)
 
   # Seek to the approximate position
   if av_seek_frame(container.formatContext, stream.index, startPts,
@@ -184,7 +182,7 @@ proc get(getter: Getter, start: int, endSample: int): seq[int16] =
       if avcodec_send_packet(decoderCtx, packet) >= 0:
         while avcodec_receive_frame(decoderCtx, frame) >= 0 and totalSamples < targetSamples:
           let channels = frame.ch_layout.nb_channels
-          let samples = frame.nb_samples.int
+          let samples = frame.nb_samples
 
           # Convert frame PTS to sample position
           let frameSamplePos = if frame.pts != AV_NOPTS_VALUE:
@@ -497,7 +495,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
   let samples = processedData.len div channels
 
   # Create resampler for this conversion
-  var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, sourceLayout, targetSr.int)
+  var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, strToLayout(sourceLayout), targetSr)
 
   # Create input frame
   var inputFrame = av_frame_alloc()
@@ -540,7 +538,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
       tempChannelData[ch].setLen(currentLen + frameSamples)
 
     # Copy frame data
-    if frame.format == AV_SAMPLE_FMT_S16P.cint:
+    if frame.format == AV_SAMPLE_FMT_S16P:
       for ch in 0..<min(frameChannels, channels):
         if frame.data[ch] != nil:
           let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
@@ -559,7 +557,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
 
 proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
     int], mixLayers: bool, norm: Norm,
-    cache: MediaCache = nil): iterator(): (ptr AVFrame, int) =
+    cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
   var samples: Table[(string, int32), Getter]
   let targetChLayout = getChannelLayout(tl.layout)
   let targetChannels = targetChLayout.nb_channels
@@ -567,7 +565,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   let tb = tl.tb
   let sr = tl.sr
 
-  conWrite "Creating audio"
+  conwrite "Creating audio"
 
   # Collect all unique audio sources from specified layers
   for layerIndex in layerIndices:
@@ -680,7 +678,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
     analysisFrame.nb_samples = totalSamples.cint
     analysisFrame.format = AV_SAMPLE_FMT_FLTP.cint
-    av_channel_layout_default(addr analysisFrame.ch_layout, targetChannels.cint)
+    av_channel_layout_default(addr analysisFrame.ch_layout, targetChannels)
     analysisFrame.sample_rate = sr.cint
     analysisFrame.pts = 0
 
@@ -754,7 +752,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
     inputFrame.nb_samples = totalSamples.cint
     inputFrame.format = AV_SAMPLE_FMT_FLTP.cint
-    av_channel_layout_default(addr inputFrame.ch_layout, targetChannels.cint)
+    av_channel_layout_default(addr inputFrame.ch_layout, targetChannels)
     inputFrame.sample_rate = sr.cint
     inputFrame.pts = 0
 
@@ -847,13 +845,14 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
   # Yield audio frames in chunks
   var samplesYielded = 0
-  var frameIndex = 0
-  var resampler = newAudioResampler(fmt, tl.layout, sr)
+  var frameIndex = 0'i64
+
+  var resampler = newAudioResampler(fmt, strToLayout(tl.layout), sr)
   var frame = av_frame_alloc()
   if frame == nil:
     error "Could not allocate audio frame"
 
-  return iterator(): (ptr AVFrame, int) =
+  return iterator(): (ptr AVFrame, int64) =
     while samplesYielded < totalSamples:
       let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
 
@@ -861,9 +860,9 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       frame.nb_samples = currentFrameSize.cint
       frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
       discard av_channel_layout_copy(addr frame.ch_layout, addr targetChLayout)
-      frame.sample_rate = sr.cint
+      frame.sample_rate = sr
       frame.pts = samplesYielded.int64
-      frame.time_base = AVRational(num: 1, den: sr.cint)
+      frame.time_base = AVRational(num: 1, den: sr)
 
       if av_frame_get_buffer(frame, 0) < 0:
         error "Could not allocate audio frame buffer"
@@ -897,13 +896,12 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         audioBuffer.memFile.close()
 
 proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm,
-    cache: MediaCache = nil): iterator(): (
-    ptr AVFrame, int) =
+    cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
   # Create sequence of all layer indices efficiently
   let allLayerIndices = toSeq(0..<tl.a.len)
   return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, mixLayers = true, norm, cache)
 
 proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3,
-    frameSize: int, norm: Norm, cache: MediaCache = nil): iterator(): (ptr AVFrame, int) =
+    frameSize: int, norm: Norm, cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
   return makeAudioFrames(fmt, tl, frameSize, @[index.int], mixLayers = false, norm, cache)
 
