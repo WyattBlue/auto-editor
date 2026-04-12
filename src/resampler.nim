@@ -3,114 +3,102 @@ import log
 import ffmpeg
 
 type AudioResampler* = object
-  format: AVSampleFormat
-  layout: AVChannelLayout
   graph*: ptr AVFilterGraph
-  templateFormat: cint
-  templateChannels: cint
-  templateRate: cint
+  layout: ref AVChannelLayout
   abuffer: ptr AVFilterContext
   abuffersink: ptr AVFilterContext
-  rate: int
-  frameSize: int
+  frameSize: cint
+  templateFormat: cint
+  templateRate: cint
+  format: cint
+  rate: cint
   isPassthrough: bool
 
-proc stringToChannelLayout(layout: string): AVChannelLayout =
-  let ret = av_channel_layout_from_string(addr result, layout.cstring)
-  if ret < 0:
-    av_channel_layout_default(addr result, 2) # 'Stereo' as fallback.
 
-func getFormatName(format: AVSampleFormat): string =
-  let name = av_get_sample_fmt_name(format.cint)
+func getFormatName(format: cint): string =
+  let name = av_get_sample_fmt_name(format)
   (if name != nil: $name else: "none")
 
+proc strToLayout*(layout: string): ref AVChannelLayout =
+  if layout == "":
+    error "Invalid layout"
+  new(result)
+  let ret = av_channel_layout_from_string(addr result[], layout.cstring)
+  if ret < 0:
+    error "Invalid layout"
 
-proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int = 0,
-    frameSize: int = 0): AudioResampler =
-  result.format = format
-  if layout != "":
-    result.layout = stringToChannelLayout(layout)
-  else:
-    error "Layout is none"
-  result.rate = rate
-  result.frameSize = frameSize
+proc newAudioResampler*(format: AVSampleFormat, layout: ref AVChannelLayout, rate: cint,
+    frameSize: cint = 0): AudioResampler =
   result.graph = nil
-  result.isPassthrough = false
+  result.layout = layout
   result.abuffer = nil
   result.abuffersink = nil
+  result.frameSize = frameSize
+  result.format = format.cint
+  result.rate = rate
+  result.isPassthrough = false
   debug "new Audio Sampler: " & $result
 
 proc `=destroy`*(resampler: var AudioResampler) =
   if resampler.graph != nil:
     avfilter_graph_free(addr resampler.graph)
-  av_channel_layout_uninit(addr resampler.layout)
 
 proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFrame] =
   # We don't have any input, so don't bother even setting up
   if resampler.graph == nil and frame == nil:
     return @[]
 
-  # Shortcut for passthrough
   if resampler.isPassthrough:
     let cloned = av_frame_clone(frame)
     if cloned == nil:
-      raise newException(ValueError, "Could not clone passthrough frame")
+      error "Could not clone passthrough frame"
     return @[cloned]
 
   # Take source settings from the first frame
   if resampler.graph == nil:
     # Set some default descriptors
     if resampler.format == AV_SAMPLE_FMT_NONE:
-      resampler.format = AVSampleFormat(frame.format)
+      resampler.format = frame.format
     if resampler.layout.nb_channels == 0:
-      discard av_channel_layout_copy(addr resampler.layout, addr frame.ch_layout)
+      discard av_channel_layout_copy(addr resampler.layout[], addr frame.ch_layout)
     if resampler.rate == 0:
       resampler.rate = frame.sample_rate
 
     resampler.templateFormat = frame.format
-    resampler.templateChannels = frame.ch_layout.nb_channels
     resampler.templateRate = frame.sample_rate
 
     # Check if we can passthrough or if there is actually work to do
-    if (frame.format.int == resampler.format.int and
-        av_channel_layout_compare(addr frame.ch_layout, addr resampler.layout) == 0 and
-        frame.sample_rate == resampler.rate.cint and
-        resampler.frameSize == 0):
+    if (frame.format == resampler.format and
+        frame.sample_rate == resampler.rate and
+        resampler.frameSize == 0 and
+        av_channel_layout_compare(addr frame.ch_layout, addr resampler.layout[]) == 0):
       resampler.isPassthrough = true
       let cloned = av_frame_clone(frame)
       if cloned == nil:
-        raise newException(ValueError, "Could not clone passthrough frame")
+        error "Could not clone passthrough frame"
       return @[cloned]
 
     resampler.graph = avfilter_graph_alloc()
     if resampler.graph == nil:
-      raise newException(ValueError, "Could not allocate filter graph")
+      error "Could not allocate filter graph"
 
-    var extraArgs = ""
-    if frame.pts != AV_NOPTS_VALUE:
-      extraArgs = &":time_base={frame.time_base}"
-
-    let inputLayoutName = $frame.ch_layout
-    let inputFormatName = getFormatName(AVSampleFormat(frame.format))
-
-    let abuffer_args = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:channel_layout={inputLayoutName}{extraArgs}"
+    let inputFormatName = getFormatName(frame.format)
+    let extraArgs = (if frame.pts != AV_NOPTS_VALUE: &":time_base={frame.time_base}" else: "")
+    let abufferArgs = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:channel_layout={frame.ch_layout}{extraArgs}"
 
     var ret = avfilter_graph_create_filter(addr resampler.abuffer, avfilter_get_by_name("abuffer"),
-                                          "in", abuffer_args.cstring, nil,
-                                              resampler.graph)
+                                          "in", abufferArgs.cstring, nil, resampler.graph)
     if ret < 0:
-      raise newException(ValueError, &"Could not create abuffer: {ret}")
+      error &"Could not create abuffer: {ret}"
 
-    let outputLayoutName = $resampler.layout
     let outputFormatName = getFormatName(resampler.format)
-    let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:channel_layouts={outputLayoutName}"
+    let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:channel_layouts={resampler.layout}"
 
     var aformat: ptr AVFilterContext = nil
     ret = avfilter_graph_create_filter(addr aformat, avfilter_get_by_name("aformat"),
-                                      "aformat", aformatArgs.cstring, nil,
-                                          resampler.graph)
+                                      "aformat", aformatArgs.cstring, nil, resampler.graph)
     if ret < 0:
-      raise newException(ValueError, &"Could not create aformat: {ret}")
+      error &"Could not create aformat: {ret}"
 
     ret = avfilter_graph_create_filter(addr resampler.abuffersink, avfilter_get_by_name("abuffersink"),
                                       "out", nil, nil, resampler.graph)
@@ -119,7 +107,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     ret = avfilter_link(aformat, 0, resampler.abuffersink, 0)
     ret = avfilter_graph_config(resampler.graph, nil)
     if ret < 0:
-      raise newException(ValueError, &"Could not configure filter graph: {ret}")
+      error &"Could not configure filter graph: {ret}"
 
     if resampler.frameSize > 0:
       av_buffersink_set_frame_size(resampler.abuffersink, resampler.frameSize.cuint)
@@ -127,15 +115,14 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
   if frame != nil:
     # Only validate critical properties that would break the filter graph
     if (frame.format != resampler.templateFormat or
-        frame.ch_layout.nb_channels != resampler.templateChannels or
-        frame.sample_rate != resampler.templateRate):
-      error "Frame does not match AudioResampler setup"
+        frame.sample_rate != resampler.templateRate or
+        av_channel_layout_compare(addr frame.ch_layout, addr resampler.layout[]) != 0):
+      error "Frame does not match resampler setup"
 
   let ret = av_buffersrc_write_frame(resampler.abuffer, frame)
   if ret < 0:
     error &"Error pushing frame to filter: {ret}"
 
-  var output: seq[ptr AVFrame] = @[]
   while true:
     var outFrame = av_frame_alloc()
     if outFrame == nil:
@@ -145,6 +132,4 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
       av_frame_free(addr outFrame)
       break
 
-    output.add(outFrame)
-
-  return output
+    result.add(outFrame)

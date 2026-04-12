@@ -24,6 +24,14 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
+when not defined(wasmBuild) and not defined(windows):
+  when defined(debug):
+    import std/[posix, strutils]
+    proc sigsegvHandler(sig: cint) {.noconv.} =
+      writeStackTrace()
+      exitnow(1)
+    discard signal(SIGSEGV, sigsegvHandler)
+
 
 proc printHelp() {.noreturn.} =
   let termWidth = max(terminalWidth(), 40)

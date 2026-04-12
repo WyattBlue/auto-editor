@@ -719,7 +719,12 @@ class Runner:
         assert fileinfo(out).videos[0].sar == Fraction(2, 3)
 
     def test_audio_norm_f(self) -> None:
-        self.main(["example.mp4"], ["--audio-normalize", "#f"])
+        import wave
+
+        out_none = self.main(["example.mp4"], ["-anorm", "#f"], "f.wav")
+        with wave.open(out_none, "rb") as none_file:
+            assert none_file.getnchannels() == 2
+            assert none_file.getframerate() == 48000
 
     def test_audio_norm_ebu(self) -> None:
         """Test that EBU normalization preserves correct pitch/duration."""

@@ -90,7 +90,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
-  var audioFrameIters: seq[iterator(): (ptr AVFrame, int)] = @[]
+  var audioFrameIters: seq[iterator(): (ptr AVFrame, int64)] = @[]
 
   if not args.an and args.mixAudioStreams and tl.a.len > 0:
     # Create a single audio stream for mixed output

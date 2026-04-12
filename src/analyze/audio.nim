@@ -43,10 +43,10 @@ proc newAudioIterator(sampleRate: cint, channelLayout: ptr AVChannelLayout,
   result.targetFormat = AV_SAMPLE_FMT_S16
   result.exactSize = chunkDuration * float64(sampleRate)
   result.accumulatedError = 0.0
-
-  let layoutName = $channelLayout
-  result.resampler = newAudioResampler(format = AV_SAMPLE_FMT_S16, layout = layoutName,
-      rate = sampleRate)
+  var layoutRef: ref AVChannelLayout
+  new(layoutRef)
+  discard av_channel_layout_copy(addr layoutRef[], channelLayout)
+  result.resampler = newAudioResampler(AV_SAMPLE_FMT_S16, layoutRef, sampleRate)
 
   # Initialize audio FIFO
   result.fifo = av_audio_fifo_alloc(result.targetFormat, result.channelCount, 1024)
@@ -129,22 +129,15 @@ proc readChunk(iter: AudioIterator): float32 =
 
 proc flushResampler(iter: AudioIterator) =
   # Flush the resampler by passing nil frame
-  try:
-    let flushedFrames = iter.resampler.resample(nil)
+  let flushedFrames = iter.resampler.resample(nil)
 
-    # Write all flushed frames to FIFO
-    for flushedFrame in flushedFrames:
-      let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr flushedFrame.data[0]),
-                                  flushedFrame.nb_samples)
-      if ret < flushedFrame.nb_samples:
-        error "Could not write flushed data to FIFO"
-      iter.totalSamplesWritten += flushedFrame.nb_samples
-
-      # Free the flushed frame
-      av_frame_free(addr flushedFrame)
-
-  except ValueError as e:
-    error &"Error flushing audio resampler: {e.msg}"
+  for flushedFrame in flushedFrames:
+    let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr flushedFrame.data[0]),
+                                flushedFrame.nb_samples)
+    if ret < flushedFrame.nb_samples:
+      error "Could not write flushed data to FIFO"
+    iter.totalSamplesWritten += flushedFrame.nb_samples
+    av_frame_free(addr flushedFrame)
 
 iterator loudness*(processor: var AudioProcessor, container: InputContainer): float32 =
   var frame = av_frame_alloc()

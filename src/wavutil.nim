@@ -16,16 +16,6 @@ proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint,
   if result.fifo == nil:
     error "Could not allocate audio FIFO"
 
-proc createResampler(encoderCtx: ptr AVCodecContext): AudioResampler =
-  # Create resampler based on encoder format requirements
-  let outputLayout = $encoderCtx.ch_layout
-  return newAudioResampler(
-    encoderCtx.sample_fmt,
-    outputLayout,
-    encoderCtx.sample_rate,
-    if encoderCtx.frame_size > 0: encoderCtx.frame_size else: 1024
-  )
-
 proc addSamplesToBuffer(buffer: var AudioBuffer, frame: ptr AVFrame): cint =
   return av_audio_fifo_write(buffer.fifo, cast[ptr pointer](addr frame.data[0]),
       frame.nb_samples)
@@ -114,7 +104,7 @@ proc processAndEncodeFrame(
   return processedAny
 
 
-proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
+proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int) =
   var ret: cint
   var container: InputContainer
   try:
@@ -152,22 +142,23 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
     error "Could not open encoder"
   defer: avcodec_free_context(addr encoderCtx)
 
-  let requiredFrameSize = if encoderCtx.frame_size >
-      0: encoderCtx.frame_size else: 1024
-
+  let frameSize: cint = if encoderCtx.frame_size > 0: encoderCtx.frame_size else: 1024
   var audioBuffer = initAudioBuffer(
-    encoderCtx.sample_fmt, encoderCtx.ch_layout.nb_channels, requiredFrameSize
+    encoderCtx.sample_fmt, encoderCtx.ch_layout.nb_channels, frameSize
   )
   defer:
     if audioBuffer.fifo != nil:
       av_audio_fifo_free(audioBuffer.fifo)
 
-  var audioResampler = createResampler(encoderCtx)
-
+  var layoutRef: ref AVChannelLayout
+  new(layoutRef)
+  discard av_channel_layout_copy(addr layoutRef[], addr encoderCtx.ch_layout)
+  var audioResampler = newAudioResampler(
+    encoderCtx.sample_fmt, layoutRef, encoderCtx.sample_rate, frameSize
+  )
   let outputStream: ptr AVStream = avformat_new_stream(outputCtx, nil)
   if outputStream == nil:
     error "Could not allocate output stream"
-
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters"
 
@@ -175,8 +166,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
   outputStream.codecpar.codec_tag = 0
 
   if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
-    ret = avio_open(addr outputCtx.pb, outputPath.cstring, AVIO_FLAG_WRITE)
-    if ret < 0:
+    if avio_open(addr outputCtx.pb, outputPath.cstring, AVIO_FLAG_WRITE) < 0:
       error &"Could not open output file '{outputPath}'"
 
   if avformat_write_header(outputCtx, nil) < 0:
@@ -242,7 +232,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
   # Process any remaining buffered samples (pad with silence if needed)
   let remainingSamples = av_audio_fifo_size(audioBuffer.fifo)
   if remainingSamples > 0:
-    let silenceSamples = requiredFrameSize - remainingSamples
+    let silenceSamples = frameSize - remainingSamples
     if silenceSamples > 0:
       var silenceFrame = av_frame_alloc()
       if silenceFrame != nil:

@@ -237,6 +237,9 @@ type
     profile*: cint
     # ... other fields omitted for brevity
 
+proc `==`*(a: AVSampleFormat, b: cint): bool = cint(ord(a)) == b
+proc `==`*(a: cint, b: AVSampleFormat): bool = a == cint(ord(b))
+
 const
   AVMEDIA_TYPE_UNKNOWN* = AVMediaType(-1)
   AVMEDIA_TYPE_VIDEO* = AVMediaType(0)
@@ -336,7 +339,7 @@ proc av_channel_layout_copy*(dst, src: ptr AVChannelLayout): cint {.importc,
     header: "<libavutil/channel_layout.h>".}
 proc av_channel_layout_compare*(chl, chl1: ptr AVChannelLayout): cint {.importc,
     header: "<libavutil/channel_layout.h>".}
-proc av_channel_layout_uninit*(channel_layout: ptr AVChannelLayout) {.importc,
+proc av_channel_layout_uninit(channel_layout: ptr AVChannelLayout) {.importc,
     header: "<libavutil/channel_layout.h>".}
 
 func `$`*(layout: ptr AVChannelLayout): string =
@@ -357,8 +360,13 @@ template `$`*(layout: AVChannelLayout): string = $(unsafeAddr layout)
 proc `=copy`*(dest: var AVChannelLayout, src: AVChannelLayout) {.error:
     "Direct copy of AVChannelLayout is forbidden. Use av_channel_layout_copy() instead.".}
 
+proc `=destroy`*(layout: var AVChannelLayout) =
+  av_channel_layout_uninit(addr layout)
+
 proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
   discard av_channel_layout_copy(addr dest, unsafeAddr src)
+
+func `$`*(layout: ref AVChannelLayout): string = $(addr layout[])
 
 type
   AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>", bycopy.} = object
