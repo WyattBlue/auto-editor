@@ -18,7 +18,7 @@ type AudioResampler* = object
 proc stringToChannelLayout(layout: string): AVChannelLayout =
   let ret = av_channel_layout_from_string(addr result, layout.cstring)
   if ret < 0:
-    av_channel_layout_default(addr result, 2)  # 'Stereo' as fallback.
+    av_channel_layout_default(addr result, 2) # 'Stereo' as fallback.
 
 func getFormatName(format: AVSampleFormat): string =
   let name = av_get_sample_fmt_name(format.cint)

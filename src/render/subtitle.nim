@@ -78,7 +78,8 @@ proc remuxSubtitles*(sourcePath: string, layer: seq[Clip], outputStream: ptr AVS
             outPacket.dts = AV_NOPTS_VALUE
 
           if packet.duration != AV_NOPTS_VALUE:
-            outPacket.duration = int64(float64(packet.duration) * float64(timelineTb) * float64(srcTb) / (float64(timelineTb) * float64(outTb)))
+            outPacket.duration = int64(float64(packet.duration) * float64(timelineTb) * float64(srcTb) / (
+                float64(timelineTb) * float64(outTb)))
 
           # Mux the packet
           output.mux(outPacket)

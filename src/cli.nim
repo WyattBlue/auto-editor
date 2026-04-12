@@ -31,16 +31,16 @@ func categoryName*(c: Categories): string =
   of cMis: "Miscellaneous"
 
 type OptKind* = enum
-  Regular   # expecting = $datum
-  Flag      # $datum = true
-  Special  # args.`export` = "$datum"
+  Regular # expecting = $datum
+  Flag    # $datum = true
+  Special # args.`export` = "$datum"
 
 type OptDef* = object
   names*: string
   kind*: OptKind = Regular
   c*: Categories = cNone
   datum*: string
-  metavar*: string  # Shouldn't be set for flags.
+  metavar*: string # Shouldn't be set for flags.
   help*: string
 
 const whisperOptions*: seq[OptDef] = @[
@@ -63,11 +63,13 @@ const whisperOptions*: seq[OptDef] = @[
 ]
 
 const mainOptions*: seq[OptDef] = @[
-  OptDef(names: "-e, --edit", c: cEdit, datum: "edit", metavar: "METHOD", help: """
+  OptDef(names: "-e, --edit", c: cEdit, datum: "edit", metavar: "METHOD",
+      help: """
 Set an expression which determines how to make auto edits. (default is "audio")"""),
   OptDef(names: "-w:1, --when-active, --when-normal", c: cEdit, datum: "when-normal", metavar: "ACTION",
     help: "When a segment is active (defined by --edit) do an action. The default action being 'nil'"),
-  OptDef(names: "-w:0, --when-inactive, --when-silent", c: cEdit, datum: "when-silent", metavar: "ACTION", help: """
+  OptDef(names: "-w:0, --when-inactive, --when-silent", c: cEdit, datum: "when-silent", metavar: "ACTION",
+      help: """
 When a segment is inactive (defined by --edit) do an action. The default action being 'cut'
 
 Actions available:
@@ -81,9 +83,11 @@ Actions available:
   zoom, (val: float),
     zoom in/out with a factor of val. val: between (0-100]
   """),
-  OptDef(names: "-m, --margin", c: cEdit, datum: "margin", metavar: "LENGTH[,LENGTH?]", help: """
+  OptDef(names: "-m, --margin", c: cEdit, datum: "margin", metavar: "LENGTH[,LENGTH?]",
+      help: """
 Set sections near "loud" as "loud" too if section is less than LENGTH away. (default is "0.2s")"""),
-  OptDef(names: "--smooth", c: cEdit, datum: "smooth", metavar: "MINCUT[,MINCLIP?]", help: """
+  OptDef(names: "--smooth", c: cEdit, datum: "smooth", metavar: "MINCUT[,MINCLIP?]",
+      help: """
 Make sections 'smoother' by applying minimum cut and minimum clip rules. (default is 0.2s,0.1s)
 Examples:
   --smooth 0.2s,0.1s  # Set mincut to 0.2 seconds, minclip to 0.1 seconds.
@@ -129,7 +133,7 @@ Examples:
     help: "Set the yt-dlp download format (--format, -f)"),
   OptDef(names: "--output-format", c: cUrl, datum: "output-format", metavar: "TEMPLATE",
     help: "Set the yt-dlp output file template (--output, -o)"),
-  OptDef(names: "--yt-dlp-extras", c: cUrl, datum: "yt-dlp-extras",  metavar: "CMD",
+  OptDef(names: "--yt-dlp-extras", c: cUrl, datum: "yt-dlp-extras", metavar: "CMD",
     help: "Add extra options for yt-dlp. Must be in quotes"),
 
   OptDef(names: "--progress", c: cDis, datum: "progress", metavar: "PROGRESS",

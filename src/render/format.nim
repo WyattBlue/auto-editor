@@ -165,7 +165,8 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         audioEncoders.add(aEncCtx)
 
         let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl, frameSize, args.audioNormalize, cache)
+        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl, frameSize,
+            args.audioNormalize, cache)
         audioFrameIters.add(audioFrameIter)
 
   defer:

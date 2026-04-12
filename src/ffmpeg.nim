@@ -362,16 +362,16 @@ proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
 
 type
   AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>", bycopy.} = object
-    buf*: pointer          # reference counted buffer holding the data
-    pts*: int64            # presentation timestamp in time_base units
-    dts*: int64            # decompression timestamp in time_base units
+    buf*: pointer       # reference counted buffer holding the data
+    pts*: int64         # presentation timestamp in time_base units
+    dts*: int64         # decompression timestamp in time_base units
     data: pointer
     size: cint
-    stream_index*: cint    # stream index this packet belongs to
+    stream_index*: cint # stream index this packet belongs to
     flags*: cint
     side_data: pointer
     side_data_elems: cint
-    duration*: int64       # duration of this packet in time_base units, 0 if unknown
+    duration*: int64    # duration of this packet in time_base units, 0 if unknown
     pos: int64
     opaque: pointer
     opaque_ref: pointer
@@ -776,8 +776,8 @@ proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint, min_ts: int
 # and access through the API functions
 type
   AVIndexEntry* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
-    pos*: int64        # byte position in file
-    timestamp*: int64  # timestamp in stream time_base units
+    pos*: int64       # byte position in file
+    timestamp*: int64 # timestamp in stream time_base units
 
 const AVINDEX_KEYFRAME* = 0x0001
 

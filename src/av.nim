@@ -63,7 +63,7 @@ type InputContainer* = object
   audio*: seq[ptr AVStream]
   subtitle*: seq[ptr AVStream]
 
-proc openFormatCtx*(file: cstring): ptr AVFormatContext {.raises:[IOError].} =
+proc openFormatCtx*(file: cstring): ptr AVFormatContext {.raises: [IOError].} =
   var ret = avformat_open_input(addr result, file, nil, nil)
   if ret == AVERROR(ENOENT):
     raise newException(IOError, &"Input file doesn't exist: {file}")
@@ -76,7 +76,7 @@ proc openFormatCtx*(file: cstring): ptr AVFormatContext {.raises:[IOError].} =
     avformat_close_input(addr result)
     raise newException(IOError, "Could not find stream information")
 
-proc open*(filename: string): InputContainer {.raises:[IOError].} =
+proc open*(filename: string): InputContainer {.raises: [IOError].} =
   result.packet = av_packet_alloc()
   result.formatContext = openFormatCtx(filename.cstring)
   for i in 0 ..< result.formatContext.nb_streams:
@@ -129,7 +129,8 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   error "No audio or video stream found"
 
-iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext, frame: ptr AVFrame): ptr AVFrame =
+iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext,
+    frame: ptr AVFrame): ptr AVFrame =
   var ret: cint
   var packet = container.packet
   while av_read_frame(container.formatContext, packet) >= 0:
@@ -149,7 +150,8 @@ iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecCo
 
         yield frame
 
-iterator flushDecode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext, frame: ptr AVFrame): ptr AVFrame =
+iterator flushDecode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext,
+    frame: ptr AVFrame): ptr AVFrame =
   var ret: cint
   var packet = container.packet
   var flushing = false
@@ -158,7 +160,7 @@ iterator flushDecode*(container: InputContainer, index: cint, codecCtx: ptr AVCo
     ret = av_read_frame(container.formatContext, packet)
     if ret < 0:
       flushing = true
-      ret = avcodec_send_packet(codecCtx, nil)  # Flush
+      ret = avcodec_send_packet(codecCtx, nil) # Flush
     else:
       if packet.stream_index == index:
         ret = avcodec_send_packet(codecCtx, packet)
@@ -261,7 +263,8 @@ proc addStreamFromTemplate*(self: var OutputContainer,
 
   return stream
 
-proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, width: cint = 640, height: cint = 480, layout: string = "", metadata: Table[string, string] = initTable[string, string]()): (
+proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, width: cint = 640,
+    height: cint = 480, layout: string = "", metadata: Table[string, string] = initTable[string, string]()): (
     ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   if codec == nil:
