@@ -101,15 +101,19 @@ proc parseNum(val, opt: string): float64 =
   else:
     error &"--{opt} has unknown unit: {unit}"
 
-proc parseResolution(val, opt: string): (int, int) =
+proc parseResolution(val, opt: string): (int32, int32) =
   let vals = val.strip().split(",")
   if len(vals) != 2:
     error &"'{val}': --{opt} takes two numbers"
 
-  discard parseSaturatedNatural(vals[0], result[0])
-  discard parseSaturatedNatural(vals[1], result[1])
-  if result[0] < 1 or result[1] < 1:
+  var a, b: int
+  discard parseSaturatedNatural(vals[0], a)
+  discard parseSaturatedNatural(vals[1], b)
+  if a < 1 or b < 1:
     error &"--{opt} must be positive"
+  if a > high(int32) or b > high(int32):
+    error &"--{opt} got an invalid/too high number"
+  return (a.int32, b.int32)
 
 proc parseSampleRate(val: string): cint =
   let (num, unit) = splitNumStr(val)

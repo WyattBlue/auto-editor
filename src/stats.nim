@@ -9,8 +9,8 @@ import timeline
 
 type f64 = float64
 
-func timeFrame(title: string, ticks: int64, tb: float, per: string = ""): string =
-  let tc = toTimecode(ticks.float64 / tb, Code.ass)
+func timeFrame(title: string, ticks: int64, tb: f64, per: string = ""): string =
+  let tc = toTimecode(ticks.f64 / tb, Code.ass)
   let tp = (if tc.startsWith("-"): 9 else: 10)
   let tcp = (if tc.startsWith("-"): 12 else: 11)
   let endStr = (if per == "": "" else: " " & alignLeft(per, 7))
@@ -21,7 +21,7 @@ func timeFrame(title: string, ticks: int64, tb: float, per: string = ""): string
 
   return &" - {titlePart} {tcPart} {ticksPart}{endStr}"
 
-func timeFrame(title: string, ticks: f64, tb: f64, per: string = ""): string =
+func timeFrame(title: string, ticks, tb: f64, per: string = ""): string =
   let tc = toTimecode(ticks / tb, Code.ass)
   let tp = (if tc.startsWith("-"): 9 else: 10)
   let tcp = (if tc.startsWith("-"): 12 else: 11)
@@ -49,7 +49,7 @@ func median(data: seq[int64]): f64 =
 
   let n = sortedData.len
   if n mod 2 == 1:
-    return float(sortedData[n div 2])
+    return f64(sortedData[n div 2])
   else:
     let mid1 = sortedData[(n div 2) - 1]
     let mid2 = sortedData[n div 2]

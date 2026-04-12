@@ -13,8 +13,8 @@ type
     pix_fmt*: AVPixelFormat
     codecId*: AVCodecID
     lang*: Lang
-    width*: cint
-    height*: cint
+    width*: int32
+    height*: int32
     color_range*: cint
     color_space*: cint
     color_primaries*: cint
@@ -49,7 +49,7 @@ type
     d*: seq[DataStream]
 
 
-func getRes*(self: MediaInfo): (int, int) =
+func getRes*(self: MediaInfo): (int32, int32) =
   if self.v.len > 0:
     return (self.v[0].width, self.v[0].height)
   else:
@@ -57,11 +57,6 @@ func getRes*(self: MediaInfo): (int, int) =
 
 proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo =
   result.path = path
-  result.v = @[]
-  result.a = @[]
-  result.s = @[]
-  result.d = @[]
-
   result.bitrate = formatContext.bit_rate
   if formatContext.duration != AV_NOPTS_VALUE:
     result.duration = float64(formatContext.duration) / AV_TIME_BASE

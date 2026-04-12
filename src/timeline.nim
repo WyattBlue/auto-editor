@@ -35,7 +35,7 @@ type v3* = object
   bg*: RGBColor
   sr*: cint
   layout*: string
-  res*: (int, int)
+  res*: (int32, int32)
   v*: seq[seq[Clip]]
   a*: seq[seq[Clip]]
   s*: seq[seq[Clip]]

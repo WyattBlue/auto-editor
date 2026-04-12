@@ -135,7 +135,7 @@ type mainArgs* = object
   ytDlpExtras*: string
 
   # Timeline Options
-  resolution*: (int, int) = (0, 0)
+  resolution*: (int32, int32) = (0, 0)
   sampleRate*: cint = -1
   frameRate*: AVRational = AVRational(num: 0, den: 0)
   background*: Option[RGBColor] = none(RGBColor)

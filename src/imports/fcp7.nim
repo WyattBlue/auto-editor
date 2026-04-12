@@ -153,7 +153,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
     error "No <media> found in XML"
 
   var sr: cint = 48000
-  var res = (1920, 1080)
+  var res = (1920'i32, 1080'i32)
   var sources: Table[string, ptr string]
   var effects: seq[Actions] = @[]
   var vobjs: seq[seq[Clip]] = @[]
@@ -170,12 +170,12 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
           for fc in vidChild:
             if fc.kind != xnElement: continue
             if fc.tag == "samplecharacteristics":
-              var w = 1920
-              var h = 1080
+              var w = 1920'i32
+              var h = 1080'i32
               for sc in fc:
                 if sc.kind != xnElement: continue
-                if sc.tag == "width": w = parseInt(sc.innerText.strip())
-                elif sc.tag == "height": h = parseInt(sc.innerText.strip())
+                if sc.tag == "width": w = parseInt(sc.innerText.strip()).int32
+                elif sc.tag == "height": h = parseInt(sc.innerText.strip()).int32
               res = (w, h)
         of "track":
           let clips = parseTrack(vidChild, sources, effects, interner)
