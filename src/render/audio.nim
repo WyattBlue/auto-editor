@@ -120,7 +120,7 @@ proc newGetter(path: string, stream: int, rate: int): Getter =
   result = new(Getter)
   result.container = av.open(path)
   result.stream = result.container.audio[stream]
-  result.rate = result.stream.codecpar.sample_rate.int  # Use source sample rate, not target
+  result.rate = result.stream.codecpar.sample_rate.int # Use source sample rate, not target
   result.decoderCtx = initDecoder(result.stream.codecpar)
   result.ownsContainer = true
   result.channels = result.stream.codecpar.ch_layout.nb_channels
@@ -356,7 +356,8 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: string): (ptr AVFilte
   return (filterGraph, bufferSrc, bufferSink)
 
 # Returns seq[int16] where channel data is interleaved: [ch0, ch1, ..., ch0, ch1, ...] etc.
-proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, targetSr: cint, sourceLayout: string): seq[int16] =
+proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, targetSr: cint,
+    sourceLayout: string): seq[int16] =
   if data.len == 0:
     return @[]
 
@@ -612,7 +613,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
           let startSample = int(clip.start * sr.int64 * tb.den div tb.num)
           let durSamples = int(clip.dur * sr.int64 * tb.den div tb.num)
 
-          let processedData = processAudioClip(tl.effects, clip, srcData, getter.stream.codecpar.sample_rate, sr, getter.layout)
+          let processedData = processAudioClip(tl.effects, clip, srcData,
+              getter.stream.codecpar.sample_rate, sr, getter.layout)
 
           if processedData.len > 0:
             let sourceChannels = getter.channels

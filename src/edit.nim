@@ -59,7 +59,7 @@ proc parseThres(val: string): float32 =
   if result < 0 or result > 1:
     error &"Threshold not in range: {val} ({result})"
 
-proc parseFloatInRange(val: string, min, max: float32): float32 {.raises:[].} =
+proc parseFloatInRange(val: string, min, max: float32): float32 {.raises: [].} =
   try:
     result = parseFloat(val)
   except ValueError:
@@ -79,7 +79,8 @@ proc parseBool(val: string): bool =
     return false
   error "Invalid boolean (expected true or false): " & val
 
-proc parseColFunc(argPos: var int, isKey: var bool, argOrder: seq[string], expr: Expr, text: string): string =
+proc parseColFunc(argPos: var int, isKey: var bool, argOrder: seq[string], expr: Expr,
+    text: string): string =
   if expr.kind == ExprList and expr.elements[0].isSymbol("=", text):
     let node = expr.elements
     let key = text[node[1].`from` ..< node[1].to]
@@ -345,7 +346,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
         let tbLength = (round((length * tb).float64)).int
 
         return newSeqWith(tbLength, true)
-      of "all", "all/e":  # TODO: Remove all/e next major release
+      of "all", "all/e": # TODO: Remove all/e next major release
         return @[]
       else:
         error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"

@@ -39,7 +39,7 @@ proc main*(cArgs: seq[string]) =
   var isDebug = false
   var splitWords = false
   var language = "auto"
-  var translate = false  # to English
+  var translate = false # to English
   var format = "text"
   var output = "-"
   var queue: int = 30
@@ -92,22 +92,22 @@ proc main*(cArgs: seq[string]) =
 
   if input.audio.len == 0:
     error "No audio stream found"
-  
+
   let filterGraph = avfilter_graph_alloc()
   defer: avfilter_graph_free(addr filterGraph)
-  
+
   # Create buffer source for audio input
   let abuffer = avfilter_get_by_name("abuffer")
   var bufferCtx: ptr AVFilterContext
-  
+
   let audioStream = input.audio[0]
   let sampleRate = audioStream.codecpar.sample_rate
   let sampleFormat = cast[AVSampleFormat](audioStream.codecpar.format)
   let channelLayout = $audioStream.codecpar.ch_layout
 
   # Get sample format name
-  let sampleFmtName = av_get_sample_fmt_name(cint(sampleFormat))
-  let bufferArgs = "sample_rate=" & $sampleRate & ":sample_fmt=" & $sampleFmtName & ":channel_layout=" & $channelLayout
+  let sampleFmtName = av_get_sample_fmt_name(sampleFormat.cint)
+  let bufferArgs = &"sample_rate={sampleRate}:sample_fmt={$sampleFmtName}:channel_layout={channelLayout}"
 
   var ret = avfilter_graph_create_filter(addr bufferCtx, abuffer, "in", bufferArgs.cstring, nil, filterGraph)
   if ret < 0:
@@ -119,9 +119,9 @@ proc main*(cArgs: seq[string]) =
 
   let aresample = avfilter_get_by_name("aresample")
   var resampleCtx: ptr AVFilterContext
-  let resampleArgs = $targetSampleRate
+  let resampleArgs = ($targetSampleRate).cstring
 
-  ret = avfilter_graph_create_filter(addr resampleCtx, aresample, "resample", resampleArgs.cstring, nil, filterGraph)
+  ret = avfilter_graph_create_filter(addr resampleCtx, aresample, "resample", resampleArgs, nil, filterGraph)
   if ret < 0:
     error &"Failed to create aresample filter: {ret}"
 
@@ -180,7 +180,7 @@ proc main*(cArgs: seq[string]) =
 
   let frame = av_frame_alloc()
   defer: av_frame_free(addr frame)
-  
+
   let outputFrame = av_frame_alloc()
   defer: av_frame_free(addr outputFrame)
 

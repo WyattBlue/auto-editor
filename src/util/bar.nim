@@ -49,7 +49,7 @@ type
     title: string
     lenTitle: int
     begin: float
-    config: ptr BarConfig  # Share constant config via pointer
+    config: ptr BarConfig # Share constant config via pointer
 
   Bar* = ref object
     config: BarConfig
@@ -72,7 +72,8 @@ proc createBarString(config: BarConfig, progress: float, width: int): string =
            config.chars[0].repeat(max(0, width - wholeWidth - 1)) &
            config.brackets.right
 
-proc formatProgressOutput(config: BarConfig, title: string, lenTitle: int, progress, rate, begin, currentIndex, total: float, columns: int): string =
+proc formatProgressOutput(config: BarConfig, title: string, lenTitle, columns: int,
+    progress, rate, begin, currentIndex, total: float): string =
   if config.machine:
     let indexClamped = min(currentIndex, total)
     let secsTilEta = round(begin + rate - epochTime(), 2)
@@ -90,7 +91,7 @@ proc formatProgressOutput(config: BarConfig, title: string, lenTitle: int, progr
 proc progressWorker(data: ThreadData) {.thread.} =
   ## Background thread worker that handles progress bar updates with full format
   var lastProgress: float = -1
-  let config = data.config[]  # Dereference once and cache
+  let config = data.config[] # Dereference once and cache
   const sleepRate = 8 # ~120 FPS update rate
   var columns = terminalWidth()
 
@@ -111,7 +112,8 @@ proc progressWorker(data: ThreadData) {.thread.} =
     let progress = if total == 0: 0.0 else: min(1.0, max(0.0, currentProgress / total))
     let rate = if progress == 0: 0.0 else: (epochTime() - data.begin) / progress
 
-    let output = formatProgressOutput(config, data.title, data.lenTitle, progress, rate, data.begin, currentProgress, total, columns)
+    let output = formatProgressOutput(config, data.title, data.lenTitle, columns,
+        progress, rate, data.begin, currentProgress, total)
     when defined(wasmBuild):
       wasmProgressWrite(output.cstring)
     else:
@@ -121,7 +123,7 @@ proc progressWorker(data: ThreadData) {.thread.} =
     lastProgress = currentProgress
     sleep(sleepRate)
 
-proc initBar*(barType: BarType, threaded: bool = true): Bar =
+proc initBar*(barType: BarType): Bar =
   var icon = "⏳"
   var chars = @[" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
   var brackets = (left: "|", right: "|")

@@ -50,7 +50,7 @@ type
     of actSpeed, actVarispeed, actVolume, actZoom:
       val*: float32
 
-  Actions* = distinct int  # A fat pointer to a list of Action(s).
+  Actions* = distinct int # A fat pointer to a list of Action(s).
 
 func `$`*(act: Action): string =
   case act.kind

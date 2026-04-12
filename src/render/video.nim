@@ -18,9 +18,9 @@ type VideoFrame = object
 
 # Keyframe index built from AVIndexEntry for efficient seeking
 type KeyframeIndex = object
-  frames: seq[int]   # sorted list of keyframe frame numbers
-  avgInterval: int   # average interval between keyframes (for seek decisions)
-  hasIndex: bool     # whether the demuxer provided index entries
+  frames: seq[int] # sorted list of keyframe frame numbers
+  avgInterval: int # average interval between keyframes (for seek decisions)
+  hasIndex: bool   # whether the demuxer provided index entries
 
 proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: int): KeyframeIndex =
   ## Build a keyframe index from the stream's index entries.
@@ -331,7 +331,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   for src, cn in myCache.cns:
     if len(cn.video) > 0:
       let stream = cn.video[0]
-      let defaultInterval = toInt(targetFps * AVRational(num: 5, den: 1))  # 5 seconds
+      let defaultInterval = toInt(targetFps * AVRational(num: 5, den: 1))
       if args.noSeek:
         tous[src] = 1000
         keyframeIndices[src] = KeyframeIndex(frames: @[], hasIndex: false, avgInterval: high(int))
@@ -420,7 +420,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   # Initialize lastKeyframePos to 0 for all sources (frame 0 is always seekable)
   for src in tl.uniqueSources:
     lastKeyframePos[src] = 0
-    lastSeekTarget[src] = -1  # -1 means no seek has been performed yet
+    lastSeekTarget[src] = -1 # -1 means no seek has been performed yet
 
   # Helper to find best keyframe for backward seeking
   proc findBestKeyframe(src: ptr string, targetFrame: int): int =
@@ -432,7 +432,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     let fallback = lastKeyframePos[src]
     if fallback <= targetFrame:
       return fallback
-    return 0  # frame 0 is always seekable
+    return 0 # frame 0 is always seekable
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     # Process each frame in timeline order like Python version
