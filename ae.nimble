@@ -70,13 +70,9 @@ task cleanff, "Clean build files":
 
 
 var disableDecoders: seq[string] = @[]
-var disableEncoders: seq[string] = @[]
 var disableDemuxers: seq[string] = @[]
 var disableMuxers: seq[string] = @[]
 var disableParsers: seq[string] = @[]
-
-# Marked as 'Experimental'
-disableEncoders &= "avui,dca,mlp,opus,s302m,truehd,vorbis".split(",")
 
 # Can only decode (ambiguous encoder), Video [A-C]
 disableDecoders &= "4xm,aasc,agm,aic,anm,ansi,apv,arbc,argo,aura,aura2,avrn,avs,bethsoftvid,bfi,bink,binkvideo,bmv_video,brender_pix,c93,cavs,cdgraphics,cdtoons,cdxl,clearvideo,cllc,cmv,cpia,cri,cscd,cyuv".split(",")
@@ -95,46 +91,37 @@ disableDecoders &= "vplayer,vqc,vvc,wcmv,wmv1,wmv2,wmv3,wmv3image,wnv1,ws_vqa,xa
 disableDecoders &= "8svx_exp,8svx_fib,aac_latm,acelp.kelvin,adpcm_4xm,adpcm_afc,adpcm_agm,adpcm_aica,adpcm_ct,adpcm_dtk,adpcm_ea,adpcm_ea_maxis_xa,adpcm_ea_r1,adpcm_ea_r2,adpcm_ea_r3,adpcm_ea_xas,adpcm_ima_acorn,adpcm_ima_apc".split(",")
 # [B-F]
 disableDecoders &= "binkaudio_dct,binkaudio_rdft,bmv_audio,bonk,cbd2_dpcm,cook,derf_dpcm,dolby_e,dsd_lsbf,dsd_lsbf_planar,dsd_msbf,dsd_msbf_planar,dsicinaudio,dss_sp,dst,dvaudio,evrc,fastaudio,ftr".split(",")
-disableDemuxers.add "bethsoftvid"
 # [G-Q]
 disableDecoders &= "g728,g729,gremlin_dpcm,gsm,gsm_ms,hca,hcom,iac,imc,interplay_dpcm,interplay_acm,mace3,mace6,metasound,misc4,mp1,mp3adu,msnsiren,musepack7,musepack8,osq,paf_audio,qcelp,qdm2,qdmc,qoa".split(",")
 # [R-Z]
 disableDecoders &= "ra_288,ralf,rka,sdx2_dpcm,shorten,sipr,siren,smackaud,sol_dpcm,tak,truespeech,twinvq,vmdaudio,wady_dpcm,wavarc,wavesynth,westwood_snd1,wmalossless,wmapro,wmav1,wmav2,wmavoice,xan_dpcm,xma1,xma2,zero12v".split(",")
 
-# Can only encode
-disableEncoders &= "a64_multi,a64_multi5,ttml".split(",")
-
 # Technically obsolete [adpcm]
 disableDecoders &= "adpcm_adx,adpcm_argo,adpcm_g722,adpcm_g726,adpcm_g726le,adpcm_ima_alp,adpcm_ima_amv,adpcm_ima_apm,adpcm_ima_cunning,adpcm_ima_dat4,adpcm_ima_dk3,adpcm_ima_dk4,adpcm_ima_ea_eacs,adpcm_ima_ea_sead,adpcm_ima_iss,adpcm_ima_moflex,adpcm_ima_mtf,adpcm_ima_oki,adpcm_ima_qt,adpcm_ima_qt_at,adpcm_ima_rad,adpcm_ima_smjpeg,adpcm_ima_ssi,adpcm_ima_wav,adpcm_ima_ws,adpcm_ima_xbox,adpcm_ms,adpcm_mtaf,adpcm_psx,adpcm_sanyo,adpcm_sbpro_2,adpcm_sbpro_3,adpcm_sbpro_4,adpcm_swf,adpcm_thp,adpcm_thp_le,adpcm_vima,adpcm_xa,adpcm_xmd,adpcm_yamaha,adpcm_zork".split(",")
-disableEncoders &= "adpcm_adx,adpcm_argo,adpcm_g722,adpcm_g726,adpcm_g726le,adpcm_ima_alp,adpcm_ima_amv,adpcm_ima_apm,adpcm_ima_qt,adpcm_ima_ssi,adpcm_ima_wav,adpcm_ima_ws,adpcm_ms,adpcm_swf,adpcm_yamaha".split(",")
 
 # Technically obsolute
-disableDecoders &= "alias_pix,apac,ape,atrac1,atrac3,atrac3al,atrac3p,atrac3pal,atrac9,asv1,asv2,avrp,bmp,ccaption,cinepak,cljr,cllc,comfortnoise,dpx,eacmv,eamad,eatgq,eatgv,eatqi,eightbps,eightsvx_exp,eightsvx_fib,ffvhuff,ffwavesynth,flv,g723_1,g726,g726le,g728,g729,hnm4_video,huffyuv,ircam,jacosub,magicyuv,nellymoser,on2avc,pam,pbm,pcm_vidc,pgmyuv,pjs,qtrle,ra_144,roq,roq_dpcm,rpza,r10k,r210,sgi,speedhq,speex,smacker,smc,snow,sonic,sonic_ls,utvideo,v210,v308,v408,v410,wbmp,wrapped_avframe,ws_snd1,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
-disableEncoders &= "a64multi,a64multi5,alias_pix,asv1,asv2,avrp,bmp,cinepak,cljr,cllc,comfortnoise,dpx,ffvhuff,ffwavesynth,g723_1,flv,huffyuv,magicyuv,nellymoser,pam,pbm,pcm_vidc,pgmyuv,qtrle,ra_144,roq,roq_dpcm,rpza,rv10,rv20,r10k,r210,sgi,speedhq,speex,smc,snow,sonic,utvideo,v210,v308,v408,v410,wbmp,wmav1,wmav2,wmv1,wmv2,wrapped_avframe,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
-disableMuxers &= "cavsvideo,flv,f4v,g722,g723_1,g726,g726le,gxf,ircam,jacosub,mcc,mxf,mxf_d10,mxf_opatom,nut,pcm_vidc,rm,roq,rso,segafilm,sup,swf,truehd,ttml,voc,wsaud,wtv,wv".split(",")
-disableDemuxers &= "a64,alp,ape,apm,bink,binka,cavsvideo,dsicin,flv,g722,g723_1,g726,g726le,g728,g729,gxf,jacosub,kux,live_flv,mcc,mm,mxf,nistsphere,nut,pcm_vidc,pjs,pp_bnk,redspark,rm,roq,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,voc,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
+disableDecoders &= "alias_pix,apac,ape,atrac1,atrac3,atrac3al,atrac3p,atrac3pal,atrac9,asv1,asv2,avrp,bmp,ccaption,cinepak,cljr,cllc,comfortnoise,dpx,eacmv,eamad,eatgq,eatgv,eatqi,eightbps,eightsvx_exp,eightsvx_fib,ffvhuff,ffwavesynth,flv,g723_1,g726,g726le,g728,g729,hnm4_video,huffyuv,ircam,jacosub,magicyuv,nellymoser,on2avc,pam,pbm,pcm_vidc,pgmyuv,pjs,qtrle,ra_144,roq,roq_dpcm,rpza,r10k,r210,sgi,speedhq,speex,smacker,smc,snow,sonic,sonic_ls,subrip,utvideo,v210,v308,v408,v410,wbmp,wrapped_avframe,ws_snd1,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
+disableMuxers &= "amv,cavsvideo,flv,f4v,g722,g723_1,g726,g726le,gxf,ircam,jacosub,mcc,mxf,mxf_d10,mxf_opatom,nut,pcm_vidc,rm,roq,rso,segafilm,sup,swf,truehd,ttml,voc,wsaud,wtv,wv".split(",")
+disableDemuxers &= "a64,alp,ape,apm,bethsoftvid,bink,binka,cavsvideo,dsicin,flv,g722,g723_1,g726,g726le,g728,g729,gxf,ircam,jacosub,kux,live_flv,mcc,mm,mxf,nistsphere,nut,pcm_vidc,pjs,pp_bnk,redspark,rm,roq,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,voc,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
 disableParsers &= "bmp,cavsvideo,cook,dpx,g723_1,g729,misc4,sipr,tak,xbm,xma,xwd".split(",")
 
 disableDemuxers &= ["pcm_alaw", "pcm_mulaw"]
 disableMuxers &= ["pcm_alaw", "pcm_mulaw"]
 disableDecoders &= ["pcm_alaw", "pcm_mulaw"]
-disableEncoders &= ["pcm_alaw", "pcm_mulaw"]
 
 ## h26 whatever
 disableDemuxers &= ["h261"]
 disableMuxers &= ["h261", "rtp", "rtp_mpegts"]
 disableDecoders &= ["h261"]
-disableEncoders &= ["h261"]
 disableParsers.add "h261"
 
 # Irrelevant to this project
 disableDecoders &= "cc_dec,dirac,fits,jpeg2000,jpegls,mpl2,msrle,pgssub,qoi,sami,subviewer,subviewer1,sunrast,targa,tiff".split(",")
-disableEncoders &= "anull,dirac,fits,jpeg2000,jpegls,msrle,qoi,sunrast,targa,tiff,vnull".split(",")
-disableMuxers &= "fits,framecrc,framehash,framemd5,hash,hls,ico,image2,image2pipe,segment,md5,smoothstreaming,stream_segment,streamhash,uncodedframecrc".split(",")
+disableMuxers &= "fits,framecrc,framehash,framemd5,hash,hls,ico,image2,image2pipe,md5,rawvideo,segment,smoothstreaming,stream_segment,streamhash,tee,uncodedframecrc".split(",")
 disableDemuxers &= "fits,hls,ico,image_tiff_pipe,image_svg_pipe,image2,image2pipe,jpegxl_anim,vplayer".split(",")
 disableParsers &= "jpeg2000,jpegxs,qoi".split(",")
 
-disableDemuxers &= "image_bmp_pipe,image_cri_pipe,image_dpx_pipe,image_exr_pipe,image_gem_pipe,image_gif_pipe,image_hdr_pipe,image_j2k_pipe,image_jpeg_pipe,image_jpegls_pipe,image_jpegxl_pipe,image_jpegxs_pipe,image_pam_pipe,image_pbm_pipe,image_pcx_pipe,image_pfm_pipe,image_pgm_pipe,image_pgmyuv_pipe,image_pgx_pipe,image_phm_pipe,image_photocd_pipe,image_pictor_pipe,image_png_pipe,image_ppm_pipe,image_psd_pipe,image_qdraw_pipe,image_qoi_pipe,image_sgi_pipe,image_sunrast_pipe,image_vbn_pipe,image_webp_pipe,image_xbm_pipe,image_xpm_pipe,image_xwd_pipe".split(",")
+disableDemuxers &= "image_bmp_pipe,image_cri_pipe,image_dds_pipe,image_dpx_pipe,image_exr_pipe,image_gem_pipe,image_gif_pipe,image_hdr_pipe,image_j2k_pipe,image_jpeg_pipe,image_jpegls_pipe,image_jpegxl_pipe,image_jpegxs_pipe,image_pam_pipe,image_pbm_pipe,image_pcx_pipe,image_pfm_pipe,image_pgm_pipe,image_pgmyuv_pipe,image_pgx_pipe,image_phm_pipe,image_photocd_pipe,image_pictor_pipe,image_png_pipe,image_ppm_pipe,image_psd_pipe,image_qdraw_pipe,image_qoi_pipe,image_sgi_pipe,image_sunrast_pipe,image_vbn_pipe,image_webp_pipe,image_xbm_pipe,image_xpm_pipe,image_xwd_pipe".split(",")
 
 
 type Package = object
@@ -644,6 +631,31 @@ if enableWhisper:
 filters.add "scale,crop,pad,format,gblur,lut,negate,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
 
 proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false, crossWasm: bool = false): string =
+  var enableEncoders: seq[string] = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,prores,prores_aw,prores_ks,srt,ssa,text,webvtt".split(",")
+
+  enableEncoders.add "pcm_f16le,pcm_f24le,pcm_f32be,pcm_f32le,pcm_f64be,pcm_f64le".split(",")
+  for t in ["s", "u"]:
+    enableEncoders.add &"pcm_{t}8"
+    for size in ["16", "24", "32", "64"]:
+      if t == "u" and size == "64": continue
+      enableEncoders.add &"pcm_{t}{size}le"
+  enableEncoders &= "pcm_bluray,pcm_s32le_planar,pcm_s24le_planar,pcm_s16be_planar,pcm_s16le_planar,pcm_s8_planar".split(",")
+
+  if not disableVpx:
+    enableEncoders &= ["libvpx_vp8", "libvpx_vp9"]
+  if not disableHevc and not crossWasm:
+    enableEncoders.add "libx265"
+  if not disableSvtAv1:
+    enableEncoders.add "libsvtav1"
+
+  if not crossWasm:
+    when defined(macosx):
+      enableEncoders.add "aac_at,alac_at,h264_videotoolbox,hevc_videotoolbox,prores_videotoolbox".split(",")
+    else:
+      enableEncoders.add "av1_nvenc,h264_nvenc,hevc_nvenc"
+    if enableVpl:
+      enableEncoders.add "av1_qsv,hevc_qsv,mjpeg_qsv,mpeg2_qsv,vc1_qsv,vp8_qsv,vp9_qsv,vvc_qsv"
+
   var commonFlags = &"""
   --enable-version3 \
   --enable-static \
@@ -659,7 +671,8 @@ proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false, cro
   --enable-protocol=file \
   --disable-filters \
   --enable-filter={filters.join(",")} \
-  --disable-encoder={disableEncoders.join(",")} \
+  --disable-encoders \
+  --enable-encoder={enableEncoders.join(",")} \
   --disable-decoder={disableDecoders.join(",")} \
   --disable-demuxer={disableDemuxers.join(",")} \
   --disable-muxer={disableMuxers.join(",")} \
