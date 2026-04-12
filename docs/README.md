@@ -1,7 +1,7 @@
-# Source Code, Documents, and Resources for https://auto-editor.com.
+# Source Code, Documents, and Resources For https://auto-editor.com.
 
 ## Requirements
- - [Hunim](https://github.com/WyattBlue/hunim)
+ - [Hunim](https://github.com/basswood-io/hunim)
  - rsync and ssh (for deployment)
 
 ```
