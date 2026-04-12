@@ -72,9 +72,9 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
 
   let resArray = jsonNode["resolution"]
   if resArray.len >= 2:
-    result.res = (resArray[0].getInt(), resArray[1].getInt())
+    result.res = (resArray[0].getInt().int32, resArray[1].getInt().int32)
   else:
-    result.res = (1920, 1080)
+    result.res = (1920'i32, 1080'i32)
 
   result.effects = @[]
 

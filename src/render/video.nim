@@ -178,7 +178,7 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
-proc scaleWithPad(src: ptr AVFrame, targetW, targetH: cint, bg: RGBColor): ptr AVFrame =
+proc scaleWithPad(src: ptr AVFrame, targetW, targetH: int32, bg: RGBColor): ptr AVFrame =
   ## Scale src to fit within targetW x targetH preserving aspect ratio,
   ## centering with bg color padding. Returns a new YUV420P frame.
   ## Uses sws_scale_frame + manual pixel copy to avoid filter graph NEON
@@ -278,16 +278,15 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     decoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
     decoders[src] = decoderCtx
 
-  var targetWidth: cint = cint(tl.res[0])
-  var targetHeight: cint = cint(tl.res[1])
+  var targetWidth = tl.res[0]
+  var targetHeight = tl.res[1]
   var scaleGraph: Graph = nil
   var needsScaling = false
 
   if args.scale != 1.0:
-    targetWidth = max(cint(round(tl.res[0].float64 * args.scale)) and not 1.cint, 2)
-    targetHeight = max(cint(round(tl.res[1].float64 * args.scale)) and not 1.cint, 2)
+    targetWidth = max(int32(round(tl.res[0].float64 * args.scale)) and not 1'i32, 2)
+    targetHeight = max(int32(round(tl.res[1].float64 * args.scale)) and not 1'i32, 2)
     needsScaling = true
-
 
   debug &"Creating video stream with codec: {args.videoCodec}"
   var (outputStream, encoderCtx) = output.addStream(args.videoCodec,
@@ -532,9 +531,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             framesSaved += framesAvoided
             seekFrame = none(int)
 
-          if (frame.width.int, frame.height.int) != tl.res:
+          if (frame.width.int32, frame.height.int32) != tl.res:
             let oldFrame = frame
-            frame = scaleWithPad(frame, cint(tl.res[0]), cint(tl.res[1]), tl.bg)
+            frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg)
             if oldFrame != nil and oldFrame != nullFrame:
               av_frame_free(addr oldFrame)
 

@@ -278,7 +278,7 @@ proc getChannelLayout(layoutStr: string): AVChannelLayout =
   if ret < 0:
     av_channel_layout_default(addr result, 2)
 
-proc createFilterGraph(effects: Actions, sr: int, layout: string): (ptr AVFilterGraph,
+proc createFilterGraph(effects: Actions, sr: cint, layout: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   var bufferSrc: ptr AVFilterContext = nil
