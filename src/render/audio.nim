@@ -271,11 +271,6 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
           totalSamples += samplesToProcess
           samplesProcessed += samples
 
-proc getChannelLayout(layoutStr: string): AVChannelLayout =
-  let ret = av_channel_layout_from_string(addr result, layoutStr.cstring)
-  if ret < 0:
-    av_channel_layout_default(addr result, 2)
-
 proc createFilterGraph(effects: Actions, sr: cint, layout: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
@@ -359,6 +354,9 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
   if data.len == 0:
     return @[]
 
+  let chLayout = initLayout(sourceLayout)
+  let channels = chLayout.nb_channels
+
   # First apply speed/volume processing at source sample rate (if needed)
   var processedData = data
 
@@ -370,8 +368,6 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
       break
 
   if needsFiltering:
-    let chLayout = getChannelLayout(sourceLayout)
-    let channels = chLayout.nb_channels
     let samples = data.len div channels
     let layout = sourceLayout
     let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(effectGroup, sourceSr, layout)
@@ -387,7 +383,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
 
     inputFrame.nb_samples = samples.cint
     inputFrame.format = AV_SAMPLE_FMT_S16P.cint
-    discard av_channel_layout_copy(addr inputFrame.ch_layout, addr chLayout)
+    discard av_channel_layout_copy(addr inputFrame.ch_layout, addr chLayout[])
     inputFrame.sample_rate = sourceSr
     inputFrame.pts = AV_NOPTS_VALUE
 
@@ -490,14 +486,8 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
   if processedData.len == 0:
     return @[]
 
-  let resChLayout = getChannelLayout(sourceLayout)
-  let channels = resChLayout.nb_channels
   let samples = processedData.len div channels
-
-  # Create resampler for this conversion
-  var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, strToLayout(sourceLayout), targetSr)
-
-  # Create input frame
+  var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, chLayout, targetSr)
   var inputFrame = av_frame_alloc()
   if inputFrame == nil:
     error "Could not allocate input frame for resampling"
@@ -505,7 +495,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
 
   inputFrame.nb_samples = samples.cint
   inputFrame.format = AV_SAMPLE_FMT_S16P.cint
-  discard av_channel_layout_copy(addr inputFrame.ch_layout, addr resChLayout)
+  discard av_channel_layout_copy(addr inputFrame.ch_layout, addr chLayout[])
   inputFrame.sample_rate = sourceSr
   inputFrame.pts = AV_NOPTS_VALUE
 
@@ -558,10 +548,9 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
 proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
     int], mixLayers: bool, norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
-  var samples: Table[(string, int32), Getter]
-  let targetChLayout = getChannelLayout(tl.layout)
-  let targetChannels = targetChLayout.nb_channels
 
+  var samples: Table[(string, int32), Getter]
+  let targetChannels = tl.layout.nb_channels
   let tb = tl.tb
   let sr = tl.sr
 
@@ -847,7 +836,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   var samplesYielded = 0
   var frameIndex = 0'i64
 
-  var resampler = newAudioResampler(fmt, strToLayout(tl.layout), sr)
+  var resampler = newAudioResampler(fmt, tl.layout, sr)
   var frame = av_frame_alloc()
   if frame == nil:
     error "Could not allocate audio frame"
@@ -859,7 +848,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       av_frame_unref(frame)
       frame.nb_samples = currentFrameSize.cint
       frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
-      discard av_channel_layout_copy(addr frame.ch_layout, addr targetChLayout)
+      discard av_channel_layout_copy(addr frame.ch_layout, addr tl.layout[])
       frame.sample_rate = sr
       frame.pts = samplesYielded.int64
       frame.time_base = AVRational(num: 1, den: sr)

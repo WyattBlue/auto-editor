@@ -19,15 +19,7 @@ func getFormatName(format: cint): string =
   let name = av_get_sample_fmt_name(format)
   (if name != nil: $name else: "none")
 
-proc strToLayout*(layout: string): ref AVChannelLayout =
-  if layout == "":
-    error "Invalid layout"
-  new(result)
-  let ret = av_channel_layout_from_string(addr result[], layout.cstring)
-  if ret < 0:
-    error "Invalid layout"
-
-proc newAudioResampler*(format: AVSampleFormat, layout: ref AVChannelLayout, rate: cint,
+func newAudioResampler*(format: AVSampleFormat, layout: ref AVChannelLayout, rate: cint,
     frameSize: cint = 0): AudioResampler =
   result.graph = nil
   result.layout = layout
@@ -37,7 +29,6 @@ proc newAudioResampler*(format: AVSampleFormat, layout: ref AVChannelLayout, rat
   result.format = format.cint
   result.rate = rate
   result.isPassthrough = false
-  debug "new Audio Sampler: " & $result
 
 proc `=destroy`*(resampler: var AudioResampler) =
   if resampler.graph != nil:

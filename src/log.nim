@@ -260,3 +260,12 @@ func toTimecode*(secs: float, fmt: Code): string =
     &"{sign}{h:d}:{m:02d}:{s:02.0f}"
   of display:
     &"{sign}{h:d}:{m:02d}:{s.round.int:02d}"
+
+
+proc initLayout*(layout: string): ref AVChannelLayout =
+  if layout == "":
+    error "Invalid layout"
+  new(result)
+  let ret = av_channel_layout_from_string(addr result[], layout.cstring)
+  if ret < 0:
+    error "Invalid layout"

@@ -129,7 +129,7 @@ test "size-of-objects":
   check sizeof(AVChannelLayout) == 24
 
   check sizeof(RGBColor) == 3
-  check sizeof(v3) == 136
+  check sizeof(v3) == 128
 
 test "lang-to-string":
   check sizeof(Lang) == 4

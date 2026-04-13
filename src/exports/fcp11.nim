@@ -152,7 +152,7 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
   let evt = <>event(name = group_name)
   let proj = <>project(name = projName)
   let sequence = <>sequence(format = "r1", tcStart = "0s", tcFormat = "NDF",
-      audioLayout = tl.layout, audioRate = (if tl.sr ==
+      audioLayout = $(tl.layout), audioRate = (if tl.sr ==
       44100: "44.1k" else: "48k"))
   let spine = <>spine()
 

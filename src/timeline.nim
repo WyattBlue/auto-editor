@@ -31,11 +31,11 @@ type Clip* = object
   stream*: int32
 
 type v3* = object
+  layout*: ref AVChannelLayout
+  res*: (int32, int32)
   tb*: AVRational
   bg*: RGBColor
   sr*: cint
-  layout*: string
-  res*: (int32, int32)
   v*: seq[seq[Clip]]
   a*: seq[seq[Clip]]
   s*: seq[seq[Clip]]
@@ -59,17 +59,6 @@ func uniqueSources*(self: v3): HashSet[ptr string] =
   for alayer in self.a:
     for audio in alayer:
       result.incl(audio.src)
-
-func `end`*(self: v3): int64 =
-  result = 0
-  for vlayer in self.v:
-    if vlayer.len > 0:
-      let v = vlayer[^1]
-      result = max(result, v.start + v.dur)
-  for alayer in self.a:
-    if alayer.len > 0:
-      let a = alayer[^1]
-      result = max(result, a.start + a.dur)
 
 func timelineIsEmpty(self: v3): bool =
   (self.v.len == 0 or self.v[0].len == 0) and (self.a.len == 0 or self.a[0].len == 0)
@@ -121,14 +110,15 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
   if tl.timelineIsEmpty:
     error "Timeline is empty, nothing to do."
 
-  tl.sr = 48000
-  tl.layout = "stereo"
   if mi.a.len > 0:
     tl.sr = mi.a[0].sampleRate
-    tl.layout = mi.a[0].layout
+    tl.layout = initLayout(mi.a[0].layout)
+  else:
+    tl.sr = 48000
+    tl.layout = initLayout("stereo")
 
 
-proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
+proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
   effects: seq[Actions], actionIndex: seq[int]): v3 =
   var clips: seq[Clip] = @[]
   var i: int64 = 0
@@ -175,7 +165,7 @@ proc initLinearTimeline*(src: ptr string, tb: AvRational, bg: RGBColor, mi: Medi
   mutHelper(result, mi, clips)
 
 proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionIndex: seq[int]) =
-  let startOffset = tl.`end`
+  let startOffset = tl.len
   var clips: seq[Clip] = @[]
   var timelineStart: int64 = startOffset
   var dur: int64
@@ -237,7 +227,7 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
       subtitleClip.stream = i.int32
       tl.s[i].add subtitleClip
 
-proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
+proc toNonLinear*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
     chunks: seq[(int64, int64, float64)]): v3 =
   var clips: seq[Clip] = @[]
   var clips2: seq[Clip2] = @[]
@@ -315,7 +305,7 @@ proc applyArgs*(tl: var v3, args: mainArgs) =
   if args.resolution[0] != 0:
     tl.res = args.resolution
   if args.audioLayout != "":
-    tl.layout = args.audioLayout
+    tl.layout = initLayout(args.audioLayout)
   if args.frameRate != AVRational(num: 0, den: 0):
     tl.tb = args.frameRate
   if args.background.isSome:
