@@ -333,7 +333,7 @@ proc setStreamTo0*(tl: var v3, interner: var StringInterner) =
   var dirExists = false
   var cache = initTable[string, MediaInfo]()
 
-  proc makeTrack(i: int64, path: string): MediaInfo =
+  proc makeTrack(i: int32, path: string): MediaInfo =
     let folder: string = path.parentDir / (path.stem & "_tracks")
     if not dirExists:
       try:

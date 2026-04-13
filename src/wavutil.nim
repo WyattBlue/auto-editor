@@ -104,7 +104,7 @@ proc processAndEncodeFrame(
   return processedAny
 
 
-proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int) =
+proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int32) =
   var ret: cint
   var container: InputContainer
   try:
