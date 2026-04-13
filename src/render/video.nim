@@ -436,7 +436,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     # Process each frame in timeline order like Python version
-    for index in 0 ..< tl.`end`:
+    for index in 0 ..< tl.len:
       objList = @[]
 
       for layer in tl.v:

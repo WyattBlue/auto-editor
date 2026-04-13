@@ -51,9 +51,9 @@ type
 
 func getRes*(self: MediaInfo): (int32, int32) =
   if self.v.len > 0:
-    return (self.v[0].width, self.v[0].height)
+    (self.v[0].width, self.v[0].height)
   else:
-    return (1920, 1080)
+    (1920, 1080)
 
 proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo =
   result.path = path
@@ -136,6 +136,6 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
       )
 
 proc initMediaInfo*(path: string): MediaInfo =
-  let container = av.open(path)
-  result = initMediaInfo(container.formatContext, path)
-  container.close()
+  let formatCtx = av.openFormatCtx(path)
+  result = initMediaInfo(formatCtx, path)
+  avformat_close_input(addr formatCtx)

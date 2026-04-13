@@ -204,7 +204,7 @@ proc fcp7ReadXml*(path: string, interner: var StringInterner): v3 =
     else: discard
 
   let bg = RGBColor(red: 0, green: 0, blue: 0)
-  result = v3(tb: tb, bg: bg, sr: sr, layout: "stereo", res: res,
-              v: vobjs, a: aobjs, effects: effects)
+  result = v3(tb: tb, bg: bg, sr: sr, res: res, v: vobjs, a: aobjs, effects: effects)
+  result.layout = initLayout("stereo")
   while result.langs.len < result.v.len + result.a.len:
     result.langs.add ['u', 'n', 'd', '\0']

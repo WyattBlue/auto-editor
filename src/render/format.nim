@@ -261,7 +261,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
     title &= encoderTitles.join("+")
   else:
     title &= encoderTitles.join("\e[0m+") & "\e[0m"
-  bar.start(tl.`end`.float, title)
+  bar.start(tl.len.float64, title)
 
   var shouldGetAudio: seq[bool] = newSeq[bool](audioFrameIters.len)
   const MAX_AUDIO_AHEAD = 30 # In timebase, how far audio can be ahead of video.

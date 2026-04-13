@@ -356,6 +356,7 @@ func `$`*(layout: ptr AVChannelLayout): string =
     result = "unknown"
 
 template `$`*(layout: AVChannelLayout): string = $(unsafeAddr layout)
+func `$`*(layout: ref AVChannelLayout): string = $(addr layout[])
 
 proc `=copy`*(dest: var AVChannelLayout, src: AVChannelLayout) {.error:
     "Direct copy of AVChannelLayout is forbidden. Use av_channel_layout_copy() instead.".}
@@ -365,8 +366,6 @@ proc `=destroy`*(layout: var AVChannelLayout) =
 
 proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
   discard av_channel_layout_copy(addr dest, unsafeAddr src)
-
-func `$`*(layout: ref AVChannelLayout): string = $(addr layout[])
 
 type
   AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>", bycopy.} = object

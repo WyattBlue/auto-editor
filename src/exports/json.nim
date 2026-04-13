@@ -1,7 +1,6 @@
 import std/[json, sequtils]
 
-import ../timeline
-import ../log
+import ../[ffmpeg, log, timeline]
 import ../util/[color, lang]
 
 func effectGroupToJson(actions: Actions): JsonNode =
@@ -66,7 +65,7 @@ func `%`*(self: v3): JsonNode =
     "background": self.bg.toString,
     "resolution": [self.res[0], self.res[1]],
     "samplerate": self.sr,
-    "layout": self.layout,
+    "layout": $(self.layout),
     "langs": self.langs,
     "v": videoTracks,
     "a": audioTracks,

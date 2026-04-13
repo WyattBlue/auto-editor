@@ -68,7 +68,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   if not jsonNode.hasKey("resolution") or jsonNode["resolution"].kind != JArray:
     error("'resolution' has bad structure")
 
-  result.layout = jsonNode["layout"].getStr()
+  result.layout = initLayout(jsonNode["layout"].getStr())
 
   let resArray = jsonNode["resolution"]
   if resArray.len >= 2:

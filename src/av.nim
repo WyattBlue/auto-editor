@@ -264,7 +264,7 @@ proc addStreamFromTemplate*(self: var OutputContainer,
   return stream
 
 proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, width: cint = 640,
-    height: cint = 480, layout: string = "", metadata: Table[string, string] = initTable[string, string]()): (
+    height: cint = 480, layout: ref AVChannelLayout = nil, metadata: Table[string, string] = initTable[string, string]()): (
     ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   if codec == nil:
@@ -302,11 +302,10 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, 
     ctx.bit_rate_tolerance = 32000
     ctx.sample_rate = rate.num div rate.den
     stream.time_base = ctx.time_base
-    if layout == "":
+    if layout == nil:
       av_channel_layout_default(addr ctx.ch_layout, 2)
     else:
-      if av_channel_layout_from_string(addr ctx.ch_layout, layout.cstring) < 0:
-        error &"Unknown layout: {layout}"
+      discard av_channel_layout_copy(addr ctx.ch_layout, addr layout[])
 
   # Some formats want stream headers to be separate
   if (format.oformat.flags and AVFMT_GLOBALHEADER) != 0:
