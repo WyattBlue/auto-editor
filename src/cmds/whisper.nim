@@ -94,39 +94,37 @@ proc main*(cArgs: seq[string]) =
     error "No audio stream found"
 
   let filterGraph = avfilter_graph_alloc()
+  if filterGraph == nil: error "out of memory"
   defer: avfilter_graph_free(addr filterGraph)
 
-  # Create buffer source for audio input
   let abuffer = avfilter_get_by_name("abuffer")
-  var bufferCtx: ptr AVFilterContext
+  let abuffersink = avfilter_get_by_name("abuffersink")
+  let aresample = avfilter_get_by_name("aresample")
+  let whisperFilter = avfilter_get_by_name("whisper")
+  if whisperFilter == nil:
+    error "Could not find whisper filter, it may not be enabled."
 
   let audioStream = input.audio[0]
   let sampleRate = audioStream.codecpar.sample_rate
   let sampleFormat = cast[AVSampleFormat](audioStream.codecpar.format)
-  let channelLayout = $audioStream.codecpar.ch_layout
 
-  # Get sample format name
   let sampleFmtName = av_get_sample_fmt_name(sampleFormat.cint)
-  let bufferArgs = &"sample_rate={sampleRate}:sample_fmt={$sampleFmtName}:channel_layout={channelLayout}"
+  let chLayout = $audioStream.codecpar.ch_layout
+  let bufferArgs = &"sample_rate={sampleRate}:sample_fmt={sampleFmtName}:channel_layout={chLayout}"
 
-  var ret = avfilter_graph_create_filter(addr bufferCtx, abuffer, "in", bufferArgs.cstring, nil, filterGraph)
+  var bufferCtx: ptr AVFilterContext
+  var ret = avfilter_graph_create_filter(addr bufferCtx, abuffer, nil, bufferArgs.cstring, nil, filterGraph)
   if ret < 0:
-    echo &"Failed to create buffer source: {ret}"
-    quit(1)
+    error &"Failed to create buffer source: {ret}"
 
   # Resample to 16kHz for best whisper accuracy; keep original rate if already <=16kHz
   let targetSampleRate = if sampleRate > 16000: 16000 else: sampleRate
 
-  let aresample = avfilter_get_by_name("aresample")
-  var resampleCtx: ptr AVFilterContext
   let resampleArgs = ($targetSampleRate).cstring
-
-  ret = avfilter_graph_create_filter(addr resampleCtx, aresample, "resample", resampleArgs, nil, filterGraph)
+  var resampleCtx: ptr AVFilterContext
+  ret = avfilter_graph_create_filter(addr resampleCtx, aresample, nil, resampleArgs, nil, filterGraph)
   if ret < 0:
     error &"Failed to create aresample filter: {ret}"
-
-  let whisperFilter = avfilter_get_by_name("whisper")
-  var whisperCtx: ptr AVFilterContext
 
   var whisperArgs = &"model={model}:language={language}:queue={queue}:format={format}"
   if splitWords:
@@ -145,7 +143,8 @@ proc main*(cArgs: seq[string]) =
     whisperArgs &= ":vad_model=" & vadModel
 
   debug whisperArgs
-  ret = avfilter_graph_create_filter(addr whisperCtx, whisperFilter, "whisper", whisperArgs.cstring, nil, filterGraph)
+  var whisperCtx: ptr AVFilterContext
+  ret = avfilter_graph_create_filter(addr whisperCtx, whisperFilter, nil, whisperArgs.cstring, nil, filterGraph)
   if ret == -5:
     if model.fileExists:
       error &"Invalid model: {model}"
@@ -154,20 +153,12 @@ proc main*(cArgs: seq[string]) =
   elif ret < 0:
     error &"Failed to create whisper filter with result: {ret}, model: {model}"
 
-  # Create buffer sink
-  let abuffersink = avfilter_get_by_name("abuffersink")
   var sinkCtx: ptr AVFilterContext
-
-  if avfilter_graph_create_filter(addr sinkCtx, abuffersink, "out", nil, nil, filterGraph) < 0:
-    error "Failed to create buffer sink"
-
-  # Link filters: buffer -> resample -> whisper -> sink
-  if avfilter_link(bufferCtx, 0, resampleCtx, 0) < 0:
-    error "Failed to link buffer to resample"
-  if avfilter_link(resampleCtx, 0, whisperCtx, 0) < 0:
-    error "Failed to link resample to whisper"
-  if avfilter_link(whisperCtx, 0, sinkCtx, 0) < 0:
-    error "Failed to link whisper to sink"
+  ret = avfilter_graph_create_filter(addr sinkCtx, abuffersink, nil, nil, nil, filterGraph)
+  if ret >= 0: ret = avfilter_link(bufferCtx, 0, resampleCtx, 0)
+  if ret >= 0: ret = avfilter_link(resampleCtx, 0, whisperCtx, 0)
+  if ret >= 0: ret = avfilter_link(whisperCtx, 0, sinkCtx, 0)
+  if ret < 0: error "Failed to connect filters"
 
   filterGraph.nb_threads = threads
 
