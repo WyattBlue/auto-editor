@@ -172,3 +172,15 @@ jobs:
           name: auto-editor-windows-arm
       - name: e2e Test
         run: python -m pip install av && python tests/test.py --no-failfast
+
+  wasm:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install packages
+        run: brew install nim emscripten wabt
+      - name: GCC/Clang version
+        run: nim --version && gcc --version
+      - name: Build
+        run: nimble makeffwasm && nimble makewasmweb
