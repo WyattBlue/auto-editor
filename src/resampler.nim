@@ -73,35 +73,36 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if resampler.graph == nil:
       error "Could not allocate filter graph"
 
+    let abuffer = avfilter_get_by_name("abuffer")
+    let aformat = avfilter_get_by_name("aformat")
+    let asink = avfilter_get_by_name("abuffersink")
+
     let inputFormatName = getFormatName(frame.format)
     let extraArgs = (if frame.pts != AV_NOPTS_VALUE: &":time_base={frame.time_base}" else: "")
     let abufferArgs = &"sample_rate={frame.sample_rate}:sample_fmt={inputFormatName}:channel_layout={frame.ch_layout}{extraArgs}"
 
-    var ret = avfilter_graph_create_filter(addr resampler.abuffer, avfilter_get_by_name("abuffer"),
-                                          "in", abufferArgs.cstring, nil, resampler.graph)
+    var ret = avfilter_graph_create_filter(addr resampler.abuffer, abuffer, nil, abufferArgs.cstring, nil, resampler.graph)
     if ret < 0:
-      error &"Could not create abuffer: {ret}"
+      error "Could not create abuffer"
 
     let outputFormatName = getFormatName(resampler.format)
     let aformatArgs = &"sample_rates={resampler.rate}:sample_fmts={outputFormatName}:channel_layouts={resampler.layout}"
 
-    var aformat: ptr AVFilterContext = nil
-    ret = avfilter_graph_create_filter(addr aformat, avfilter_get_by_name("aformat"),
-                                      "aformat", aformatArgs.cstring, nil, resampler.graph)
+    var aformatCtx: ptr AVFilterContext = nil
+    ret = avfilter_graph_create_filter(addr aformatCtx, aformat, nil, aformatArgs.cstring, nil, resampler.graph)
     if ret < 0:
-      error &"Could not create aformat: {ret}"
+      error "Could not create aformat"
 
-    ret = avfilter_graph_create_filter(addr resampler.abuffersink, avfilter_get_by_name("abuffersink"),
-                                      "out", nil, nil, resampler.graph)
-
-    ret = avfilter_link(resampler.abuffer, 0, aformat, 0)
-    ret = avfilter_link(aformat, 0, resampler.abuffersink, 0)
-    ret = avfilter_graph_config(resampler.graph, nil)
+    ret = avfilter_graph_create_filter(addr resampler.abuffersink, asink, nil, nil, nil, resampler.graph)
     if ret < 0:
-      error &"Could not configure filter graph: {ret}"
-
+      error "Could not create abuffersink"
     if resampler.frameSize > 0:
       av_buffersink_set_frame_size(resampler.abuffersink, resampler.frameSize.cuint)
+
+    if ret >= 0: ret = avfilter_link(resampler.abuffer, 0, aformatCtx, 0)
+    if ret >= 0: ret = avfilter_link(aformatCtx, 0, resampler.abuffersink, 0)
+    if ret >= 0: ret = avfilter_graph_config(resampler.graph, nil)
+    if ret < 0: error "Failed to connect filters"
 
   if frame != nil:
     # Only validate critical properties that would break the filter graph
