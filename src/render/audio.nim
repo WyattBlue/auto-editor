@@ -72,9 +72,8 @@ type
     container*: InputContainer
     stream*: ptr AVStream
     decoderCtx*: ptr AVCodecContext
-    rate*: int
-    layout*: string
-    channels*: cint
+    layout*: ref AVChannelLayout
+    rate*: cint
     ownsContainer*: bool
 
   AudioBuffer = ref object
@@ -111,28 +110,29 @@ proc `[]`*(buffer: AudioBuffer, index: int): int16 {.inline.} =
 proc `[]=`*(buffer: AudioBuffer, index: int, value: int16) {.inline.} =
   buffer.data[index] = value
 
-proc len(buffer: AudioBuffer): int {.inline.} =
+func len(buffer: AudioBuffer): int {.inline.} =
   ## Get total number of samples (all channels)
   buffer.size div sizeof(int16)
 
-proc newGetter(path: string, stream: int, rate: int): Getter =
+func channels(self: Getter): cint =
+  self.layout.nb_channels
+
+proc newGetter(path: string, stream: int32, rate: cint): Getter =
   result = new(Getter)
   result.container = av.open(path)
   result.stream = result.container.audio[stream]
-  result.rate = result.stream.codecpar.sample_rate.int # Use source sample rate, not target
+  result.rate = result.stream.codecpar.sample_rate # Use source sample rate, not target
   result.decoderCtx = initDecoder(result.stream.codecpar)
+  result.layout = initLayout($result.stream.codecpar.ch_layout)
   result.ownsContainer = true
-  result.channels = result.stream.codecpar.ch_layout.nb_channels
-  result.layout = $result.stream.codecpar.ch_layout
 
-proc newGetter(container: InputContainer, stream: int): Getter =
+proc newGetter(container: InputContainer, stream: int32): Getter =
   result = new(Getter)
   result.container = container
   result.stream = result.container.audio[stream]
-  result.rate = result.stream.codecpar.sample_rate.int
+  result.rate = result.stream.codecpar.sample_rate
   result.decoderCtx = initDecoder(result.stream.codecpar)
-  result.channels = result.stream.codecpar.ch_layout.nb_channels
-  result.layout = $result.stream.codecpar.ch_layout
+  result.layout = initLayout($result.stream.codecpar.ch_layout)
 
 proc close(getter: Getter) =
   avcodec_free_context(addr getter.decoderCtx)
@@ -271,30 +271,29 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
           totalSamples += samplesToProcess
           samplesProcessed += samples
 
-proc createFilterGraph(effects: Actions, sr: cint, layout: string): (ptr AVFilterGraph,
-    ptr AVFilterContext, ptr AVFilterContext) =
-  var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
-  var bufferSrc: ptr AVFilterContext = nil
-  var bufferSink: ptr AVFilterContext = nil
+proc createFilterGraph(effects: Actions, sr: cint, layout: ref AVChannelLayout):
+  (ptr AVFilterGraph, ptr AVFilterContext, ptr AVFilterContext) =
 
+  let filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   if filterGraph == nil:
     error "Could not allocate audio filter graph"
 
+  let abuffer = avfilter_get_by_name("abuffer")
+  let asink = avfilter_get_by_name("abuffersink")
+
   let bufferArgs = &"sample_rate={sr}:sample_fmt=s16p:channel_layout={layout}:time_base=1/{sr}"
-  var ret = avfilter_graph_create_filter(addr bufferSrc, avfilter_get_by_name("abuffer"),
-                                        "in", bufferArgs.cstring, nil, filterGraph)
+  let bufferSrc: ptr AVFilterContext = nil
+  var ret = avfilter_graph_create_filter(addr bufferSrc, abuffer, nil,
+                                         bufferArgs.cstring, nil, filterGraph)
   if ret < 0:
     error &"Cannot create audio buffer source: {ret}"
 
-  # Create buffer sink
-  ret = avfilter_graph_create_filter(addr bufferSink, avfilter_get_by_name("abuffersink"),
-                                    "out", nil, nil, filterGraph)
+  let bufferSink: ptr AVFilterContext = nil
+  ret = avfilter_graph_create_filter(addr bufferSink, asink, nil, nil, nil, filterGraph)
   if ret < 0:
     error &"Cannot create audio buffer sink: {ret}"
 
-  var filterChain: string
   var filters: seq[string] = @[]
-
   # Build filter chain from all effects in the group
   for effect in effects:
     case effect.kind
@@ -314,10 +313,7 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: string): (ptr AVFilte
       filters.add &"volume={effect.val}"
     else: discard
 
-  if filters.len == 0:
-    filterChain = "anull"
-  else:
-    filterChain = filters.join(",")
+  let filterChain = (if filters.len == 0: "anull" else: filters.join(","))
 
   var inputs = avfilter_inout_alloc()
   var outputs = avfilter_inout_alloc()
@@ -350,16 +346,14 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: string): (ptr AVFilte
 
 # Returns seq[int16] where channel data is interleaved: [ch0, ch1, ..., ch0, ch1, ...] etc.
 proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, targetSr: cint,
-    sourceLayout: string): seq[int16] =
+    layout: ref AVChannelLayout): seq[int16] =
   if data.len == 0:
     return @[]
-
-  let chLayout = initLayout(sourceLayout)
-  let channels = chLayout.nb_channels
 
   # First apply speed/volume processing at source sample rate (if needed)
   var processedData = data
 
+  let channels = layout.nb_channels
   let effectGroup = ef[clip.effects]
   var needsFiltering = false
   for effect in effectGroup:
@@ -369,7 +363,6 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
 
   if needsFiltering:
     let samples = data.len div channels
-    let layout = sourceLayout
     let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(effectGroup, sourceSr, layout)
     defer:
       if filterGraph != nil:
@@ -383,7 +376,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
 
     inputFrame.nb_samples = samples.cint
     inputFrame.format = AV_SAMPLE_FMT_S16P.cint
-    discard av_channel_layout_copy(addr inputFrame.ch_layout, addr chLayout[])
+    discard av_channel_layout_copy(addr inputFrame.ch_layout, addr layout[])
     inputFrame.sample_rate = sourceSr
     inputFrame.pts = AV_NOPTS_VALUE
 
@@ -437,7 +430,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
       var sampleOffset = 0
       for frame in outputFrames:
         let frameSamples = frame.nb_samples.int
-        let frameChannels = frame.ch_layout.nb_channels.int
+        let frameChannels = frame.ch_layout.nb_channels
 
         if frame.format == AV_SAMPLE_FMT_S16P.cint:
           # Convert from planar to interleaved
@@ -487,7 +480,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
     return @[]
 
   let samples = processedData.len div channels
-  var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, chLayout, targetSr)
+  var resampler = newAudioResampler(AV_SAMPLE_FMT_S16P, layout, targetSr)
   var inputFrame = av_frame_alloc()
   if inputFrame == nil:
     error "Could not allocate input frame for resampling"
@@ -495,7 +488,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
 
   inputFrame.nb_samples = samples.cint
   inputFrame.format = AV_SAMPLE_FMT_S16P.cint
-  discard av_channel_layout_copy(addr inputFrame.ch_layout, addr chLayout[])
+  discard av_channel_layout_copy(addr inputFrame.ch_layout, addr layout[])
   inputFrame.sample_rate = sourceSr
   inputFrame.pts = AV_NOPTS_VALUE
 
@@ -520,7 +513,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
 
   for frame in outputFrames:
     let frameSamples = frame.nb_samples.int
-    let frameChannels = frame.ch_layout.nb_channels.int
+    let frameChannels = frame.ch_layout.nb_channels
 
     # Extend temp arrays
     let currentLen = tempChannelData[0].len
@@ -563,9 +556,9 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         let key = (clip.src[], clip.stream)
         if key notin samples:
           if cache != nil and clip.src in cache.cns:
-            samples[key] = newGetter(cache.cns[clip.src], clip.stream.int)
+            samples[key] = newGetter(cache.cns[clip.src], clip.stream)
           else:
-            samples[key] = newGetter(clip.src[], clip.stream.int, sr)
+            samples[key] = newGetter(clip.src[], clip.stream, sr)
 
   # Calculate total duration across specified layers
   var totalDuration: int64 = 0
