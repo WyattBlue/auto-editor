@@ -3,11 +3,6 @@ import ../[av, ffmpeg, log]
 proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
-  let packet = av_packet_alloc()
-  if packet == nil:
-    quit(1)
-  defer: av_packet_free(addr packet)
-
   var container: InputContainer
   for inputFile in args:
     try:
@@ -27,13 +22,13 @@ proc main*(args: seq[string]) =
 
       var codecCtx = initDecoder(formatCtx.streams[s].codecpar)
       var subtitle: AVSubtitle
-      while av_read_frame(formatCtx, packet) >= 0:
-        defer: av_packet_unref(packet)
+      while av_read_frame(formatCtx, container.packet) >= 0:
+        defer: av_packet_unref(container.packet)
 
-        if packet.stream_index == s.cint:
+        if container.packet.stream_index == s.cint:
           var gotSubtitle: cint = 0
           let ret = avcodec_decode_subtitle2(codecCtx, addr subtitle,
-            addr gotSubtitle, packet)
+            addr gotSubtitle, container.packet)
 
           if ret >= 0 and gotSubtitle != 0:
             defer: avsubtitle_free(addr subtitle)
