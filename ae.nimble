@@ -226,7 +226,7 @@ let ffmpeg = Package(
   sha256: "b072aed6871998cce9b36e7774033105ca29e33632be5b6347f3206898e0756a",
 )
 
-proc setupPackages(enableWhisper: bool, crossWindowsArm: bool = false): seq[Package] =
+proc selectPackages(enableWhisper: bool, crossWindowsArm: bool = false): seq[Package] =
   result = @[]
   if not defined(macosx) and not crossWindowsArm:
     result.add nvheaders
@@ -276,26 +276,19 @@ proc getFileHash(filename: string): string =
     raise newException(IOError, "Cannot hash file: " & filename)
   return output.split()[0]
 
-proc checkHash(package: Package, filename: string) =
-  let hash = getFileHash(filename)
-  if package.sha256 != hash:
-    echo filename
-    echo &"sha256 hash of {package.name} tarball do not match!\nExpected: {package.sha256}\nGot: {hash}"
-    quit(1)
-
-
-proc downloadAndExtract(package: Package) =
-  ## Download, verify, extract and patch a package.
-  ## Must be called inside withDir "ffmpeg_sources".
+proc download(package: Package) =
   if not fileExists(package.location):
     exec &"curl -O -L {package.sourceUrl}"
-    checkHash(package, "ffmpeg_sources" / package.location)
+    let filename = "ffmpeg_sources" / package.location
+    let hash = getFileHash(filename)
+    if package.sha256 != hash:
+      echo &"{filename}\nsha256 hash of {package.name} tarball do not match!"
+      echo &"Expected: {package.sha256}\nGot: {hash}"
+      quit(1)
 
-  var tarArgs = "xf"
-  if package.location.endsWith("bz2"):
-    tarArgs = "xjf"
-
+proc extract(package: Package) =
   if not dirExists(package.name):
+    let tarArgs = (if package.location.endsWith("bz2"): "xjf" else: "xf")
     exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
     let patchFile = &"../patches/{package.name}.patch"
     if fileExists(patchFile):
@@ -303,7 +296,7 @@ proc downloadAndExtract(package: Package) =
       echo "Applying patch: ", cmd
       exec cmd
 
-proc makeInstall() =
+proc makeInstall =
   when defined(macosx):
     exec "make -j$(sysctl -n hw.ncpu)"
   elif defined(linux):
@@ -581,11 +574,11 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
   mkDir("ffmpeg_sources")
   mkDir("build")
 
-  let packages = setupPackages(enableWhisper=enableWhisper, crossWindowsArm=crossWindowsArm)
+  let packages = selectPackages(enableWhisper=enableWhisper, crossWindowsArm=crossWindowsArm)
 
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
-      downloadAndExtract(package)
+      package.extract()
       if package.name == "ffmpeg":
         continue
 
@@ -620,17 +613,14 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
                 envPrefix = &"CC=x86_64-w64-mingw32-gcc{posix} CXX=x86_64-w64-mingw32-g++{posix} AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
               if package.name != "x264":
                 args.add "--disable-shared"
+              exec "chmod +x configure"
               let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --enable-static " & args.join(" ")
               echo "RUN: ", cmd
               exec cmd
             makeInstall()
 
-var filters: seq[string]
-if enableWhisper:
-  filters.add "whisper"
-filters.add "scale,crop,pad,format,gblur,lut,negate,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
 
-proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false, crossWasm: bool = false): string =
+proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: bool = false): string =
   var enableEncoders: seq[string] = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,prores,prores_aw,prores_ks,srt,ssa,text,webvtt".split(",")
 
   enableEncoders.add "pcm_f16le,pcm_f24le,pcm_f32be,pcm_f32le,pcm_f64be,pcm_f64le".split(",")
@@ -641,12 +631,17 @@ proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false, cro
       enableEncoders.add &"pcm_{t}{size}le"
   enableEncoders &= "pcm_bluray,pcm_s32le_planar,pcm_s24le_planar,pcm_s16be_planar,pcm_s16le_planar,pcm_s8_planar".split(",")
 
-  if not disableVpx:
-    enableEncoders &= ["libvpx_vp8", "libvpx_vp9"]
-  if not disableHevc and not crossWasm:
-    enableEncoders.add "libx265"
-  if not disableSvtAv1:
-    enableEncoders.add "libsvtav1"
+  var filters = "scale,crop,pad,format,gblur,lut,negate,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
+
+  for package in packages:
+    if package.name == "libvpx":
+      enableEncoders &= ["libvpx_vp8", "libvpx_vp9"]
+    if package.name == "x265":
+      enableEncoders.add "libx265"
+    if package.name == "libsvtav1":
+      enableEncoders.add "libsvtav1"
+    if package.name == "whisper":
+      filters.add "whisper"
 
   if not crossWasm:
     when defined(macosx):
@@ -684,33 +679,35 @@ proc setupCommonFlags(packages: seq[Package], crossWindowsArm: bool = false, cro
       commonFlags &= &"  {package.ffFlag} \\\n"
 
   if not crossWasm:
-    if defined(arm) or defined(arm64) or crossWindowsArm:
+    if defined(arm) or defined(arm64) or winArm:
       commonFlags &= "  --enable-neon \\\n"
 
     if defined(macosx):
       commonFlags &= "  --enable-videotoolbox \\\n"
       commonFlags &= "  --enable-audiotoolbox \\\n"
-    elif not crossWindowsArm:
+    elif not winArm:
       commonFlags &= "  --enable-nvenc \\\n"
       commonFlags &= "  --enable-ffnvcodec \\\n"
 
   commonFlags &= "--disable-autodetect"
   return commonFlags
 
-
-proc setupDeps() =
+proc setupDeps =
   let (mesonOutput, mesonCode) = gorgeEx("command -v meson")
   let (ninjaOutput, ninjaCode) = gorgeEx("command -v ninja")
 
   var toInstall: seq[string] = @[]
-
-  if mesonCode != 0:
-    toInstall.add("meson")
-  if ninjaCode != 0:
-    toInstall.add("ninja")
-
+  if mesonCode != 0: toInstall.add "meson"
+  if ninjaCode != 0: toInstall.add "ninja"
   if toInstall.len > 0:
     exec "pip install " & toInstall.join(" ")
+
+task downloaddeps, "Download and Extract Cxx Dependencies":
+  let allPackages = @[ffmpeg, nvheaders, libvpl, whisper, lame, opus, dav1d, x264, vpx, svtav1, x265]
+  mkDir "ffmpeg_sources"
+  withDir "ffmpeg_sources":
+    for package in allPackages:
+      download(package)
 
 task makeff, "Build FFmpeg from source":
   setupDeps()
@@ -729,7 +726,7 @@ task makeff, "Build FFmpeg from source":
 
   ffmpegSetup(crossWindows=false)
 
-  let packages = setupPackages(enableWhisper=enableWhisper)
+  let packages = selectPackages(enableWhisper=enableWhisper)
 
   withDir "ffmpeg_sources/ffmpeg":
     try:
@@ -748,8 +745,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
   putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
 
   ffmpegSetup(crossWindows=true)
-
-  let packages = setupPackages(enableWhisper=enableWhisper)
+  let packages = selectPackages(enableWhisper=enableWhisper)
 
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
@@ -786,7 +782,7 @@ task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
 
   ffmpegSetup(crossWindows=false, crossWindowsArm=true)
 
-  let packages = setupPackages(enableWhisper=enableWhisper, crossWindowsArm=true)
+  let packages = selectPackages(enableWhisper=enableWhisper, crossWindowsArm=true)
 
   # Configure and build FFmpeg with llvm-mingw for ARM64
   withDir "ffmpeg_sources/ffmpeg":
@@ -799,7 +795,7 @@ task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
       --arch=aarch64 \
       --target-os=mingw32 \
       --cross-prefix=aarch64-w64-mingw32- \
-      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, crossWindowsArm=true))
+      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, winArm=true))
 
     makeInstall()
 
@@ -822,17 +818,20 @@ proc autoconfBuildWasm(package: Package, buildPath: string) =
   case package.name
   of "x264":
     if not fileExists("config.mak"):
+      exec "chmod +x configure"
       exec &"""CFLAGS="-matomics -mbulk-memory" emconfigure ./configure --prefix="{buildPath}" --host=i686-gnu --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
     exec "emmake make -j4"
     exec "make install"
   of "libvpx":
     if not fileExists("Makefile"):
+      exec "chmod +x configure"
       exec &"""emconfigure ./configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
     makeInstall()
   else:
     # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
     let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
     if not fileExists("Makefile"):
+      exec "chmod +x configure"
       let args = (package.buildArguments & extraArgs).join(" ")
       exec &"""emconfigure ./configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
     makeInstall()
@@ -920,7 +919,6 @@ proc wasmBuildPackage(package: Package, buildPath: string) =
   of "meson": mesonBuildWasm(package, buildPath)
   else: autoconfBuildWasm(package, buildPath)
 
-let wasmPackages = @[lame, x264, opus, dav1d, vpx, whisper, svtav1]
 
 task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
   setupDeps()
@@ -928,11 +926,10 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
   mkDir("ffmpeg_sources")
   mkDir("build_wasm")
 
-  withDir "ffmpeg_sources":
-    for package in @[ffmpeg] & wasmPackages:
-      downloadAndExtract(package)
-
+  withDir "ffmpeg_sources": ffmpeg.extract()
+  let wasmPackages = @[lame, x264, opus, dav1d, vpx, whisper, svtav1]
   for package in wasmPackages:
+    withDir "ffmpeg_sources": package.extract()
     withDir &"ffmpeg_sources/{package.name}":
       wasmBuildPackage(package, wasmBuildPath)
 
@@ -971,7 +968,6 @@ Cflags: -I${{includedir}}
 
 task makewasmweb, "Compile to wasm for browser (requires emscripten, wabt)":
   echo "Compiling for wasm (browser)..."
-
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
   else:
