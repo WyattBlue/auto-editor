@@ -32,13 +32,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Cache tarballs
+        id: cache-tarballs
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg_sources
+          key: tarballs-${{ hashFiles('ae.nimble') }}
       - name: Homebrew
+        if: steps.cache-tarballs.outputs.cache-hit != 'true'
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
       - name: Install packages
+        if: steps.cache-tarballs.outputs.cache-hit != 'true'
         run: brew install nim
       - name: Download
+        if: steps.cache-tarballs.outputs.cache-hit != 'true'
         run: nimble downloaddeps
       - name: Upload artifact
         uses: actions/upload-artifact@v7
