@@ -1,5 +1,4 @@
-type
-  VaList* {.importc: "va_list", header: "<stdarg.h>", bycopy.} = object
+type VaList* {.importc: "va_list", header: "<stdarg.h>", bycopy.} = object
 
 proc vsnprintf*(s: cstring, n: csize_t, format: cstring, ap: VaList): cint {.
   importc, header: "<stdio.h>".}
@@ -8,17 +7,12 @@ type AVRational* {.importc, completeStruct, header: "<libavutil/rational.h>", by
   num*: cint
   den*: cint
 
-proc av_mul_q(b: AVRational, c: AVRational): AVRational {.importc,
-    header: "<libavutil/rational.h>".}
-proc av_div_q(b: AVRational, c: AVRational): AVRational {.importc,
-    header: "<libavutil/rational.h>".}
-proc av_add_q(b: AVRational, c: AVRational): AVRational {.importc,
-    header: "<libavutil/rational.h>".}
-proc av_sub_q(b: AVRational, c: AVRational): AVRational {.importc,
-    header: "<libavutil/rational.h>".}
+proc av_mul_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_div_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_add_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_sub_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_q2d*(a: AVRational): cdouble {.importc, header: "<libavutil/rational.h>".}
-proc av_d2q*(d: cdouble, max: cint): AVRational {.importc,
-    header: "<libavutil/rational.h>".}
+proc av_d2q*(d: cdouble, max: cint): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_inv_q*(a: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint, log_offset: cint,
     log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
@@ -89,7 +83,6 @@ proc `$`*(a: AVPixelFormat): string {.borrow.}
 
 const AV_PIX_FMT_NONE* = AVPixelFormat(-1)
 const AV_PIX_FMT_YUV420P* = AVPixelFormat(0)
-const AV_PIX_FMT_YUYV422* = AVPixelFormat(1)
 const AV_PIX_FMT_RGB24* = AVPixelFormat(2)
 const AV_PIX_FMT_RGB8* = AVPixelFormat(20)
 
@@ -100,10 +93,10 @@ type
     value*: cstring
 
   AVChannelLayout* {.importc, completeStruct, header: "<libavutil/channel_layout.h>".} = object
-    order: cint        # AVChannelOrder enum (4 bytes)
-    nb_channels*: cint # (4 bytes)
-    u_mask: uint64     # union u — largest member (8 bytes)
-    opaque: pointer    # (8 bytes)
+    order: cint
+    nb_channels*: cint
+    u_mask: uint64
+    opaque: pointer
 
   AVOutputFormat* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
     name*: cstring
@@ -169,8 +162,7 @@ type
     bits_per_raw_sample*: cint
     profile*: cint
     level*: cint
-    width*: cint
-    height*: cint
+    width*, height*: cint
     sample_aspect_ratio*: AVRational
     field_order*: cint
     color_range*: AVColorRange
@@ -204,7 +196,7 @@ type
     codec_id*: AVCodecID
     codec_tag*: cuint
     priv_data*: pointer
-    internal*: pointer
+    internal: pointer
     opaque*: pointer
     bit_rate*: int64
     bit_rate_tolerance*: cint
@@ -417,10 +409,7 @@ type
     decode_error_flags*: cint
     hw_frames_ctx: pointer
     opaque_ref: pointer
-    crop_top: csize_t
-    crop_bottom: csize_t
-    crop_left: csize_t
-    crop_right: csize_t
+    crop_top, crop_bottom, crop_left, crop_right: csize_t
     private_ref: pointer
     ch_layout*: AVChannelLayout
     duration*: int64
@@ -451,7 +440,7 @@ proc av_packet_alloc*(): ptr AVPacket {.importc, header: "<libavcodec/packet.h>"
 proc av_packet_free*(pkt: ptr ptr AVPacket) {.importc, header: "<libavcodec/packet.h>".}
 proc av_init_packet*(pkt: ptr AVPacket) {.importc, header: "<libavcodec/packet.h>".}
 proc av_packet_unref*(pkt: ptr AVPacket) {.importc.}
-proc av_packet_ref*(dst: ptr AVPacket, src: ptr AVPacket): cint {.importc,
+proc av_packet_ref*(dst, src: ptr AVPacket): cint {.importc,
     header: "<libavcodec/packet.h>".}
 proc av_new_packet*(pkt: ptr AVPacket, size: cint): cint {.importc,
     header: "<libavcodec/packet.h>".}
@@ -761,16 +750,10 @@ proc av_buffersink_get_frame_flags*(ctx: ptr AVFilterContext,
     frame: ptr AVFrame, flags: cint): cint {.importc,
     header: "<libavfilter/buffersink.h>".}
 
-
 # String utilities for filters
 proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}
 
-# Seeking
-const
-  AVSEEK_FLAG_BACKWARD* = 1
-  AVSEEK_FLAG_BYTE* = 2
-  AVSEEK_FLAG_ANY* = 4
-  AVSEEK_FLAG_FRAME* = 8
+const AVSEEK_FLAG_BACKWARD* = 1
 
 proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint, timestamp: int64,
     flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}
@@ -778,13 +761,9 @@ proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint, min_ts: int
     ts: int64, max_ts: int64, flags: cint): cint {.importc,
     header: "<libavformat/avformat.h>".}
 
-# Index entries (for seeking optimization)
-# AVIndexEntry uses bitfields in C (flags:2, size:30), so we use incompleteStruct
-# and access through the API functions
-type
-  AVIndexEntry* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
-    pos*: int64       # byte position in file
-    timestamp*: int64 # timestamp in stream time_base units
+type AVIndexEntry* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
+  pos*: int64       # byte position in file
+  timestamp*: int64 # timestamp in stream time_base units
 
 const AVINDEX_KEYFRAME* = 0x0001
 
@@ -798,15 +777,11 @@ proc isKeyframe*(entry: ptr AVIndexEntry): bool {.inline.} =
   {.emit: "result = (`entry`->flags & AVINDEX_KEYFRAME) != 0;".}
 
 # SwScale context and functions
-type SwsContext* {.importc: "struct SwsContext",
-    header: "<libswscale/swscale.h>", incompleteStruct.} = object
+type SwsContext* {.importc, header: "<libswscale/swscale.h>", incompleteStruct.} = object
 
-proc sws_alloc_context*(): ptr SwsContext {.importc,
-    header: "<libswscale/swscale.h>".}
-
+proc sws_alloc_context*(): ptr SwsContext {.importc, header: "<libswscale/swscale.h>".}
 proc sws_free_context*(swsContext: ptr ptr SwsContext) {.importc,
     header: "<libswscale/swscale.h>".}
-
-proc sws_scale_frame*(c: ptr SwsContext, dst: ptr AVFrame,
-    src: ptr AVFrame): cint {.importc, header: "<libswscale/swscale.h>".}
+proc sws_scale_frame*(c: ptr SwsContext, dst, src: ptr AVFrame): cint {.importc,
+    header: "<libswscale/swscale.h>".}
 
