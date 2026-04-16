@@ -613,7 +613,6 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
                 envPrefix = &"CC=x86_64-w64-mingw32-gcc{posix} CXX=x86_64-w64-mingw32-g++{posix} AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
               if package.name != "x264":
                 args.add "--disable-shared"
-              exec "chmod +x configure"
               let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --enable-static " & args.join(" ")
               echo "RUN: ", cmd
               exec cmd
@@ -818,20 +817,17 @@ proc autoconfBuildWasm(package: Package, buildPath: string) =
   case package.name
   of "x264":
     if not fileExists("config.mak"):
-      exec "chmod +x configure"
       exec &"""CFLAGS="-matomics -mbulk-memory" emconfigure ./configure --prefix="{buildPath}" --host=i686-gnu --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
     exec "emmake make -j4"
     exec "make install"
   of "libvpx":
     if not fileExists("Makefile"):
-      exec "chmod +x configure"
       exec &"""emconfigure ./configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
     makeInstall()
   else:
     # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
     let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
     if not fileExists("Makefile"):
-      exec "chmod +x configure"
       let args = (package.buildArguments & extraArgs).join(" ")
       exec &"""emconfigure ./configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
     makeInstall()
