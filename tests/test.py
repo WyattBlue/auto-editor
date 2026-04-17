@@ -814,6 +814,84 @@ class Runner:
             assert audio.sample_rate == 48000
             assert audio.channels == 2
 
+    def test_reordered_streams(self) -> None:
+        """
+        Files with audio before video in stream order must not produce black screens.
+        Replicates a file created with: ffmpeg -i example.mp4 -map 0:a:0 -map 0:v:0 -c copy out.mp4
+        """
+        import ctypes, math
+        input_path = os.path.join(self.temp_dir, "audio_first.mp4")
+        fps, sr, duration, width, height = Fraction(30), 48000, 2, 320, 240
+        with av.open(input_path, "w") as dst:
+            # Audio FIRST so it gets stream index 0
+            dst_audio = dst.add_stream("aac", rate=sr)
+            dst_audio.codec_context.layout = "stereo"
+            # Video SECOND so it gets stream index 1
+            dst_video = dst.add_stream("libx264", rate=fps)
+            dst_video.codec_context.width = width
+            dst_video.codec_context.height = height
+            dst_video.codec_context.pix_fmt = "yuv420p"
+
+            y_fill = bytes([100]) * (width * height)        # Y=100, not black
+            uv_fill = bytes([128]) * (width * height // 4)  # neutral chroma
+            for i in range(duration * fps.numerator):
+                vf = av.VideoFrame(width, height, "yuv420p")
+                vf.planes[0].update(y_fill)
+                vf.planes[1].update(uv_fill)
+                vf.planes[2].update(uv_fill)
+                vf.pts = i
+                vf.time_base = Fraction(1, fps.numerator)
+                for pkt in dst_video.encode(vf):
+                    dst.mux(pkt)
+            for pkt in dst_video.encode(None):
+                dst.mux(pkt)
+
+            frame_size = dst_audio.codec_context.frame_size or 1024
+            total_samples, pts, i = duration * sr, 0, 0
+            while i < total_samples:
+                n = min(frame_size, total_samples - i)
+                af = av.AudioFrame(format="fltp", layout="stereo", samples=n)
+                af.sample_rate = sr
+                af.pts = pts
+                samples = [math.sin(2 * math.pi * 440 * (i + j) / sr) for j in range(n)]
+                for ch in range(2):
+                    ptr = ctypes.cast(af.planes[ch].buffer_ptr, ctypes.POINTER(ctypes.c_float))
+                    for j in range(n):
+                        ptr[j] = samples[j]
+                for pkt in dst_audio.encode(af):
+                    dst.mux(pkt)
+                i += n
+                pts += n
+            for pkt in dst_audio.encode(None):
+                dst.mux(pkt)
+
+        with av.open(input_path) as container:
+            assert container.streams[0].type == "audio", "stream 0 should be audio"
+            assert container.streams[1].type == "video", "stream 1 should be video"
+
+        out = self.main([input_path], [], "reordered_out.mp4")
+
+        with av.open(out) as container:
+            assert len(container.streams.video) == 1
+            assert len(container.streams.audio) == 1
+
+            video_stream = container.streams.video[0]
+            non_black = 0
+            total = 0
+
+            for frame in container.decode(video_stream):
+                # Check Y (luma) plane: all-zero Y means black
+                if max(bytes(frame.planes[0])) > 10:
+                    non_black += 1
+                total += 1
+                if total >= 30:
+                    break
+
+            # With the stream-ordering bug, only the first ~thread_count frames
+            # are decoded correctly; the rest are black. Require 25/30 non-black
+            # to catch that regression while tolerating any machine up to ~24 cores.
+            assert non_black >= 25, f"Only {non_black}/30 non-black frames"
+
 
 def run_tests(tests: list[Callable], args) -> None:
     if args.only != []:
