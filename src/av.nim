@@ -154,25 +154,27 @@ iterator flushDecode*(container: InputContainer, index: cint, codecCtx: ptr AVCo
     frame: ptr AVFrame): ptr AVFrame =
   var ret: cint
   var packet = container.packet
-  var flushing = false
 
+  var flushing = false
   while not flushing:
+    var shouldReceive = false
     ret = av_read_frame(container.formatContext, packet)
     if ret < 0:
       flushing = true
+      shouldReceive = true
       ret = avcodec_send_packet(codecCtx, nil) # Flush
     else:
-      if packet.stream_index == index:
+      # Save stream_index BEFORE av_packet_unref resets it to 0
+      shouldReceive = packet.stream_index == index
+      if shouldReceive:
         ret = avcodec_send_packet(codecCtx, packet)
       av_packet_unref(packet)
 
-    # Only try to receive frames if we're processing the right stream or flushing
-    if (not flushing and packet.stream_index == index) or flushing:
+    # Only try to receive frames if we sent a packet from the target stream or are flushing
+    if shouldReceive:
       while true:
         ret = avcodec_receive_frame(codecCtx, frame)
-        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
-          break
-        elif ret < 0:
+        if ret < 0:
           break
         else:
           yield frame
