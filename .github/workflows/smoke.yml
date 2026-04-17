@@ -136,7 +136,7 @@ jobs:
       - name: Compile
         run: nimble windows
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: auto-editor-windows
           path: |
@@ -193,7 +193,7 @@ jobs:
       - name: Compile
         run: nimble windowsarm
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: auto-editor-windows-arm
           path: |
