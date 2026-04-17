@@ -578,6 +578,7 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
 
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
+      package.download()
       package.extract()
       if package.name == "ffmpeg":
         continue
@@ -909,25 +910,23 @@ endian = 'little'
     exec "ninja"
     exec "ninja install"
 
-proc wasmBuildPackage(package: Package, buildPath: string) =
-  case package.buildSystem
-  of "cmake": cmakeBuildWasm(package, buildPath)
-  of "meson": mesonBuildWasm(package, buildPath)
-  else: autoconfBuildWasm(package, buildPath)
-
-
 task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
   setupDeps()
   putEnv("PKG_CONFIG_PATH", wasmBuildPath / "lib/pkgconfig")
   mkDir("ffmpeg_sources")
   mkDir("build_wasm")
 
-  withDir "ffmpeg_sources": ffmpeg.extract()
-  let wasmPackages = @[lame, x264, opus, dav1d, vpx, whisper, svtav1]
+  let wasmPackages = @[ffmpeg, lame, x264, opus, dav1d, vpx, whisper, svtav1]
   for package in wasmPackages:
-    withDir "ffmpeg_sources": package.extract()
+    withDir "ffmpeg_sources":
+      package.download()
+      package.extract()
+    if package.name == "ffmpeg": continue
     withDir &"ffmpeg_sources/{package.name}":
-      wasmBuildPackage(package, wasmBuildPath)
+      case package.buildSystem
+      of "cmake": cmakeBuildWasm(package, wasmBuildPath)
+      of "meson": mesonBuildWasm(package, wasmBuildPath)
+      else: autoconfBuildWasm(package, wasmBuildPath)
 
   # lame ships no .pc file; create one so FFmpeg's configure can find it
   mkDir(wasmBuildPath / "lib" / "pkgconfig")
