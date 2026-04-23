@@ -24,8 +24,6 @@ let enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
 let buildPath = absolutePath("build")
 
-let posix = if false: "-posix" else: ""
-
 proc stripProgram(forWasm, gccWin, llvmWin: bool = false) =
   var file = "auto-editor"
   if gccWin or llvmWin:
@@ -327,8 +325,8 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false,
       cmakeArgs.add("-DGGML_OPENMP=OFF")
   elif crossWindows:
     cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-    cmakeArgs.add(&"-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc{posix}")
-    cmakeArgs.add(&"-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++{posix}")
+    cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
+    cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
     cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
@@ -422,8 +420,8 @@ proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: b
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")  # No x86 assembly for ARM64
   elif crossWindows:
     commonArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-    commonArgs.add(&"-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc{posix}")
-    commonArgs.add(&"-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++{posix}")
+    commonArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
+    commonArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
     commonArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
     commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
     commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
@@ -549,8 +547,8 @@ endian = 'little'
     let crossFile = "build_meson/meson-cross.txt"
     writeFile(crossFile, &"""
 [binaries]
-c = 'x86_64-w64-mingw32-gcc{posix}'
-cpp = 'x86_64-w64-mingw32-g++{posix}'
+c = 'x86_64-w64-mingw32-gcc'
+cpp = 'x86_64-w64-mingw32-g++'
 ar = 'x86_64-w64-mingw32-ar'
 strip = 'x86_64-w64-mingw32-strip'
 pkgconfig = 'pkg-config'
@@ -611,7 +609,7 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
                   args.add("--target=x86_64-win64-gcc")
                 else:
                   args.add("--host=x86_64-w64-mingw32")
-                envPrefix = &"CC=x86_64-w64-mingw32-gcc{posix} CXX=x86_64-w64-mingw32-g++{posix} AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
+                envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
               if package.name != "x264":
                 args.add "--disable-shared"
               let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --enable-static " & args.join(" ")
@@ -749,7 +747,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
-    exec (&"""CC=x86_64-w64-mingw32-gcc{posix} CXX=x86_64-w64-mingw32-g++{posix} AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
+    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
       --extra-ldflags="-L{buildPath}/lib" \
@@ -768,8 +766,8 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
   else:
     # lto causes issues with GCC.
     exec "nim c -d:danger --panics:on --os:windows --cpu:amd64 --cc:gcc " &
-        &"--gcc.exe:x86_64-w64-mingw32-gcc{posix} " &
-        &"--gcc.linkerexe:x86_64-w64-mingw32-gcc{posix} " &
+         "--gcc.exe:x86_64-w64-mingw32-gcc " &
+         "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
          "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
     stripProgram(gccWin=true)
