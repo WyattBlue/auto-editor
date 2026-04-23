@@ -1,0 +1,12 @@
+[binaries]
+c = 'aarch64-w64-mingw32-clang'
+cpp = 'aarch64-w64-mingw32-clang++'
+ar = 'llvm-ar'
+strip = 'llvm-strip'
+pkgconfig = 'pkg-config'
+
+[host_machine]
+system = 'windows'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
