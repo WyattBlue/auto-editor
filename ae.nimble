@@ -23,6 +23,7 @@ let enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 let enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
 let buildPath = absolutePath("build")
+let wasmBuildPath = absolutePath("build_wasm")
 
 proc stripProgram(forWasm, gccWin, llvmWin: bool = false) =
   var file = "auto-editor"
@@ -303,8 +304,9 @@ proc makeInstall =
     exec "make -j4"
   exec "make install"
 
-proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false, crossWindowsArm: bool = false) =
-  mkDir("build_cmake")
+proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm: bool) =
+  let cmakeBuildDir = buildPath / "pkg" / package.name
+  mkDir(cmakeBuildDir)
 
   var cmakeArgs = @[
     &"-DCMAKE_INSTALL_PREFIX={buildPath}",
@@ -313,17 +315,17 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false,
     "-DBUILD_STATIC_LIBS=ON",
   ] & package.buildArguments
 
+  let sourceDir = absolutePath(".")
   if package.name == "libsvtav1" or package.name == "whisper":
-    let srcDir = absolutePath(".")
-    cmakeArgs.add(&"-DCMAKE_C_FLAGS=-ffile-prefix-map={srcDir}/=")
-    cmakeArgs.add(&"-DCMAKE_CXX_FLAGS=-ffile-prefix-map={srcDir}/=")
+    cmakeArgs.add(&"-DCMAKE_C_FLAGS=-ffile-prefix-map={sourceDir}/=")
+    cmakeArgs.add(&"-DCMAKE_CXX_FLAGS=-ffile-prefix-map={sourceDir}/=")
 
-  if crossWindowsArm:
-    let toolchainFile = buildPath.parentDir / "cmake" / "aarch64-w64-mingw32.cmake"
+  if crossWinArm:
+    let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     if package.name == "whisper":
       cmakeArgs.add("-DGGML_OPENMP=OFF")
-  elif crossWindows:
+  elif crossWin:
     cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
     cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
     cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
@@ -332,8 +334,8 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false,
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
 
-  withDir "build_cmake":
-    let cmakeCmd = "cmake " & cmakeArgs.join(" ") & " .."
+  withDir cmakeBuildDir:
+    let cmakeCmd = "cmake " & cmakeArgs.join(" ") & " " & sourceDir
     echo "RUN: ", cmakeCmd
     exec cmakeCmd
     makeInstall()
@@ -369,7 +371,7 @@ proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false,
     else:
       let libs = "-L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu"
       # OpenMP is disabled for Windows ARM cross-compile; native Linux uses libgomp
-      let libsPrivate = if crossWindowsArm: "-lpthread -lm -lstdc++"
+      let libsPrivate = if crossWinArm: "-lpthread -lm -lstdc++"
                         else: "-lgomp -lpthread -lm -lstdc++"
     writeFile(pcFile, &"""prefix={buildPath}
 exec_prefix=${{prefix}}
@@ -384,12 +386,105 @@ Libs.private: {libsPrivate}
 Cflags: -I${{includedir}}
 """)
 
-proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: bool = false) =
+proc cmakeBuildWasm(package: Package, buildPath: string) =
+  let cmakeBuildDir = buildPath / "pkg" / package.name
+  mkDir(cmakeBuildDir)
+
+  let sourceDir = absolutePath(".")
+  withDir cmakeBuildDir:
+    if not fileExists("CMakeCache.txt"):
+      var args = @[
+        &"-DCMAKE_INSTALL_PREFIX={buildPath}",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DBUILD_SHARED_LIBS=OFF",
+      ]
+      case package.name
+      of "whisper":
+        args &= @[
+          "-DGGML_NATIVE=OFF", "-DGGML_CUDA=OFF", "-DGGML_METAL=OFF",
+          "-DGGML_BLAS=OFF", "-DGGML_OPENMP=OFF", "-DGGML_BACKEND_DL=OFF",
+          "-DWHISPER_SDL2=OFF", "-DWHISPER_BUILD_EXAMPLES=OFF",
+          "-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF",
+        ]
+      of "libsvtav1":
+        args &= @[
+          "-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=OFF",
+          "\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
+          "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\"",
+        ]
+      else:
+        args &= package.buildArguments
+        args &= @["\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
+                  "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\""]
+      exec "emcmake cmake " & sourceDir & " " & args.join(" ")
+    exec "make -j4 && make install"
+
+  if package.name == "whisper":
+    let libDir = buildPath / "lib"
+    for libFile in ["ggml.a", "ggml-base.a", "ggml-cpu.a"]:
+      let srcFile = libDir / libFile
+      let dstFile = libDir / ("lib" & libFile)
+      if fileExists(srcFile) and not fileExists(dstFile):
+        exec &"mv \"{srcFile}\" \"{dstFile}\""
+    let ggmlBaseDst = libDir / "libggml-base.a"
+    if not fileExists(ggmlBaseDst):
+      let ggmlBaseSrc = cmakeBuildDir / "ggml/src/ggml-base.a"
+      if fileExists(ggmlBaseSrc):
+        exec &"cp \"{ggmlBaseSrc}\" \"{ggmlBaseDst}\""
+    writeFile(libDir / "pkgconfig" / "whisper.pc", &"""prefix={buildPath}
+exec_prefix=${{prefix}}
+libdir=${{exec_prefix}}/lib
+includedir=${{prefix}}/include
+
+Name: whisper
+Description: whisper.cpp
+Version: 1.8.4
+Libs: -L${{libdir}} -lwhisper -lggml-base -lggml -lggml-cpu
+Libs.private: -lpthread -lm -lstdc++
+Cflags: -I${{includedir}}
+""")
+
+proc mesonBuild(package: Package, buildPath: string, wasm, crossWin, crossWinArm: bool) =
+  let mesonBuildDir = buildPath / "pkg" / package.name
+  let root = buildPath.parentDir
+  mkDir(mesonBuildDir)
+
+  var mesonArgs = @[
+    &"--prefix={buildPath}",
+    "--buildtype=release",
+    "--default-library=static",
+    "-Denable_docs=false",
+    "-Denable_tools=false",
+    "-Denable_examples=false",
+    "-Denable_tests=false"
+  ]
+  if wasm:
+    mesonArgs.add "-Denable_asm=false"
+    mesonArgs.add "-Dc_args=\"-matomics -mbulk-memory\""
+    mesonArgs.add &"--cross-file={root}/scripts/wasm32-emcc.txt"
+  elif crossWinArm:
+    mesonArgs.add &"--cross-file={root}/scripts/aarch64-w64-mingw32.txt"
+  elif crossWin:
+    mesonArgs.add &"--cross-file={root}/scripts/x86_64-w64-mingw32.txt"
+
+  let sourceDir = absolutePath(".")
+  withDir mesonBuildDir:
+    exec ("meson setup " & mesonArgs.join(" ") & " " & sourceDir)
+    exec "ninja"
+    exec "ninja install"
+
+proc x265Build(buildPath: string, crossWindows, crossWindowsArm: bool) =
   # Build x265 multiple times following the Homebrew approach:
   #  1: Build 12 bits static library version in separate directory (if enabled)
   #  2: Build 10 bits static library version in separate directory
   #  3: Build 8 bits version, linking also 10 and optionally 12 bits
   # By default supports 8 and 10 bits pixel formats (12-bit disabled for size)
+
+  let sourceDir = absolutePath("source")
+  let pkgDir = buildPath / "pkg"
+  let dir12bit = pkgDir / "x265_12bit"
+  let dir10bit = pkgDir / "x265_10bit"
+  let dir8bit = pkgDir / "x265_8bit"
 
   # For 10/12 bits version, only x86_64 has assembly instructions available
   var highBitDepthArgs: seq[string] = @[
@@ -406,16 +501,14 @@ proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: b
   if isLinuxAarch64:
     highBitDepthArgs.add("-DENABLE_SVE2=0")
 
-  # Common cmake args for all builds
   var commonArgs = @[
     &"-DCMAKE_INSTALL_PREFIX={buildPath}",
     "-DCMAKE_BUILD_TYPE=Release",
-    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",  # CMake 4 compatibility for subdirectories
+    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
   ]
 
-  # Add cross-compilation flags if needed
   if crossWindowsArm:
-    let toolchainFile = buildPath.parentDir / "cmake" / "aarch64-w64-mingw32.cmake"
+    let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
     commonArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")  # No x86 assembly for ARM64
   elif crossWindows:
@@ -430,35 +523,35 @@ proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: b
   # Build 12-bit version (optional, disabled by default for size)
   if enable12bit:
     echo "Building x265 12-bit..."
-    var cmake12Args = @["-S", "source", "-B", "12bit", "-DMAIN12=ON"] & highBitDepthArgs & commonArgs
+    var cmake12Args = @["-S", sourceDir, "-B", dir12bit, "-DMAIN12=ON"] & highBitDepthArgs & commonArgs
     let cmake12Cmd = "cmake " & cmake12Args.join(" ")
     echo "RUN: ", cmake12Cmd
     exec cmake12Cmd
-    exec "cmake --build 12bit"
-    exec "mv 12bit/libx265.a 12bit/libx265_main12.a"
+    exec &"cmake --build {dir12bit}"
+    exec &"mv {dir12bit}/libx265.a {dir12bit}/libx265_main12.a"
 
   # Build 10-bit version
   echo "Building x265 10-bit..."
-  var cmake10Args = @["-S", "source", "-B", "10bit"] & highBitDepthArgs & commonArgs
+  var cmake10Args = @["-S", sourceDir, "-B", dir10bit] & highBitDepthArgs & commonArgs
   # Not applied for size: "-DENABLE_HDR10_PLUS=ON"
   let cmake10Cmd = "cmake " & cmake10Args.join(" ")
   echo "RUN: ", cmake10Cmd
   exec cmake10Cmd
-  exec "cmake --build 10bit"
-  exec "mv 10bit/libx265.a 10bit/libx265_main10.a"
+  exec &"cmake --build {dir10bit}"
+  exec &"mv {dir10bit}/libx265.a {dir10bit}/libx265_main10.a"
 
   # Build 8-bit version with linked 10-bit and optionally 12-bit
   echo "Building x265 8-bit with multi-bit-depth support..."
 
   # Create 8bit directory and copy the 10-bit library
-  mkDir("8bit")
-  cpFile("10bit/libx265_main10.a", "8bit/libx265_main10.a")
+  mkDir(dir8bit)
+  cpFile(dir10bit / "libx265_main10.a", dir8bit / "libx265_main10.a")
 
   # Build cmake command
-  var cmake8Cmd = "cmake -S source -B 8bit"
+  var cmake8Cmd = &"cmake -S {sourceDir} -B {dir8bit}"
   if enable12bit:
     # Copy 12-bit library and configure for 12-bit support
-    cpFile("12bit/libx265_main12.a", "8bit/libx265_main12.a")
+    cpFile(dir12bit / "libx265_main12.a", dir8bit / "libx265_main12.a")
     cmake8Cmd &= " \"-DEXTRA_LIB=x265_main10.a;x265_main12.a\""
     cmake8Cmd &= " -DLINKED_12BIT=1"
   else:
@@ -476,15 +569,15 @@ proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: b
 
   echo "RUN: ", cmake8Cmd
   exec cmake8Cmd
-  exec "cmake --build 8bit"
+  exec &"cmake --build {dir8bit}"
 
   # Manually combine libraries for multi-bit-depth support
   echo "Combining x265 libraries for multi-bit-depth support..."
   when defined(macosx):
     if enable12bit:
-      exec "libtool -static -o 8bit/libx265_combined.a 8bit/libx265.a 10bit/libx265_main10.a 12bit/libx265_main12.a"
+      exec &"libtool -static -o {dir8bit}/libx265_combined.a {dir8bit}/libx265.a {dir10bit}/libx265_main10.a {dir12bit}/libx265_main12.a"
     else:
-      exec "libtool -static -o 8bit/libx265_combined.a 8bit/libx265.a 10bit/libx265_main10.a"
+      exec &"libtool -static -o {dir8bit}/libx265_combined.a {dir8bit}/libx265.a {dir10bit}/libx265_main10.a"
   else:
     # For Linux or cross-compilation, use ar with MRI script
     var arCommand = "ar"
@@ -493,8 +586,7 @@ proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: b
     elif crossWindows:
       arCommand = "x86_64-w64-mingw32-ar"
 
-    # Create MRI script with paths relative to 8bit directory
-    withDir "8bit":
+    withDir dir8bit:
       exec "echo 'CREATE libx265_combined.a' > combine.mri"
       exec "echo 'ADDLIB libx265.a' >> combine.mri"
       exec "echo 'ADDLIB libx265_main10.a' >> combine.mri"
@@ -505,74 +597,16 @@ proc x265Build(buildPath: string, crossWindows: bool = false, crossWindowsArm: b
       exec &"{arCommand} -M < combine.mri"
 
   # Replace the 8-bit only library with the combined one
-  exec "mv 8bit/libx265_combined.a 8bit/libx265.a"
+  exec &"mv {dir8bit}/libx265_combined.a {dir8bit}/libx265.a"
 
   # Install from 8bit build
-  exec "cmake --install 8bit"
-
-
-proc mesonBuild(buildPath: string, crossWindows: bool = false, crossWindowsArm: bool = false) =
-  mkDir("build_meson")
-
-  var mesonArgs = @[
-    &"--prefix={buildPath}",
-    "--buildtype=release",
-    "--default-library=static",
-    "-Denable_docs=false",
-    "-Denable_tools=false",
-    "-Denable_examples=false",
-    "-Denable_tests=false"
-  ]
-
-  if crossWindowsArm:
-    # Create cross-compilation file for meson (Windows ARM64)
-    let crossFile = "build_meson/meson-cross.txt"
-    writeFile(crossFile, """
-[binaries]
-c = 'aarch64-w64-mingw32-clang'
-cpp = 'aarch64-w64-mingw32-clang++'
-ar = 'llvm-ar'
-strip = 'llvm-strip'
-pkgconfig = 'pkg-config'
-
-[host_machine]
-system = 'windows'
-cpu_family = 'aarch64'
-cpu = 'aarch64'
-endian = 'little'
-""")
-    mesonArgs.add("--cross-file=meson-cross.txt")
-  elif crossWindows:
-    # Create cross-compilation file for meson
-    let crossFile = "build_meson/meson-cross.txt"
-    writeFile(crossFile, &"""
-[binaries]
-c = 'x86_64-w64-mingw32-gcc'
-cpp = 'x86_64-w64-mingw32-g++'
-ar = 'x86_64-w64-mingw32-ar'
-strip = 'x86_64-w64-mingw32-strip'
-pkgconfig = 'pkg-config'
-
-[host_machine]
-system = 'windows'
-cpu_family = 'x86_64'
-cpu = 'x86_64'
-endian = 'little'
-""")
-    mesonArgs.add("--cross-file=meson-cross.txt")
-
-  withDir "build_meson":
-    let mesonCmd = "meson setup " & mesonArgs.join(" ") & " .."
-    echo "RUN: ", mesonCmd
-    exec mesonCmd
-    exec "ninja"
-    exec "ninja install"
+  exec &"cmake --install {dir8bit}"
 
 proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
   mkDir("ffmpeg_sources")
   mkDir("build")
 
-  let packages = selectPackages(enableWhisper=enableWhisper, crossWindowsArm=crossWindowsArm)
+  let packages = selectPackages(enableWhisper, crossWindowsArm=crossWindowsArm)
 
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
@@ -584,38 +618,42 @@ proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
       withDir package.name:
         if package.buildSystem == "cmake":
           cmakeBuild(package, buildPath, crossWindows, crossWindowsArm)
+        elif package.buildSystem == "meson":
+          mesonBuild(package, buildPath, false, crossWindows, crossWindowsArm)
         elif package.buildSystem == "x265":
           x265build(buildPath, crossWindows, crossWindowsArm)
-        elif package.buildSystem == "meson":
-          mesonBuild(buildPath, crossWindows, crossWindowsArm)
         else:
           # Special handling for nv-codec-headers which doesn't use configure
           if package.name == "nv-codec-headers":
             exec &"make install PREFIX=\"{buildPath}\""
           else:
-            if not fileExists("Makefile") or package.name == "x264":
-              var args = package.buildArguments
-              var envPrefix = ""
-              if crossWindowsArm:
-                if package.name == "libvpx":
-                  args.add("--target=arm64-win64-gcc")
-                else:
-                  args.add("--host=aarch64-w64-mingw32")
-                if package.name == "opus":
-                  args.add("--disable-rtcd")
-                envPrefix = "CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib "
-              elif crossWindows:
-                if package.name == "libvpx":
-                  args.add("--target=x86_64-win64-gcc")
-                else:
-                  args.add("--host=x86_64-w64-mingw32")
-                envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
-              if package.name != "x264":
-                args.add "--disable-shared"
-              let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --enable-static " & args.join(" ")
-              echo "RUN: ", cmd
-              exec cmd
-            makeInstall()
+            let sourceDir = absolutePath(".")
+            let autoBuildDir = buildPath / "pkg" / package.name
+            mkDir(autoBuildDir)
+            withDir autoBuildDir:
+              if not fileExists("Makefile") or package.name == "x264":
+                var args = package.buildArguments
+                var envPrefix = ""
+                if crossWindowsArm:
+                  if package.name == "libvpx":
+                    args.add("--target=arm64-win64-gcc")
+                  else:
+                    args.add("--host=aarch64-w64-mingw32")
+                  if package.name == "opus":
+                    args.add("--disable-rtcd")
+                  envPrefix = "CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib "
+                elif crossWindows:
+                  if package.name == "libvpx":
+                    args.add("--target=x86_64-win64-gcc")
+                  else:
+                    args.add("--host=x86_64-w64-mingw32")
+                  envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
+                if package.name != "x264":
+                  args.add "--disable-shared"
+                let cmd = &"{envPrefix}{sourceDir}/configure --prefix=\"{buildPath}\" --enable-static " & args.join(" ")
+                echo "RUN: ", cmd
+                exec cmd
+              makeInstall()
 
 
 proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: bool = false): string =
@@ -726,15 +764,18 @@ task makeff, "Build FFmpeg from source":
 
   let packages = selectPackages(enableWhisper=enableWhisper)
 
-  withDir "ffmpeg_sources/ffmpeg":
+  let ffmpegSrcDir = absolutePath("ffmpeg_sources/ffmpeg")
+  let ffmpegBuildDir = buildPath / "pkg" / "ffmpeg"
+  mkDir(ffmpegBuildDir)
+  withDir ffmpegBuildDir:
     try:
-      exec &"""./configure --prefix="{buildPath}" \
+      exec &"""{ffmpegSrcDir}/configure --prefix="{buildPath}" \
         --pkg-config-flags="--static" \
         --extra-cflags="-I{buildPath}/include" \
         --extra-ldflags="-L{buildPath}/lib" \
         --extra-libs="-lpthread -lm -lstdc++" \""" & "\n" & setupCommonFlags(packages)
     except OSError:
-      exec "cat ./ffbuild/config.log"
+      exec &"cat {ffmpegSrcDir}/ffbuild/config.log"
       quit(1)
     makeInstall()
 
@@ -746,8 +787,11 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
   let packages = selectPackages(enableWhisper=enableWhisper)
 
   # Configure and build FFmpeg with MinGW
-  withDir "ffmpeg_sources/ffmpeg":
-    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
+  let ffmpegSrcDirWin = absolutePath("ffmpeg_sources/ffmpeg")
+  let ffmpegBuildDirWin = buildPath / "pkg" / "ffmpeg"
+  mkDir(ffmpegBuildDirWin)
+  withDir ffmpegBuildDirWin:
+    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" {ffmpegSrcDirWin}/configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
       --extra-ldflags="-L{buildPath}/lib" \
@@ -783,8 +827,11 @@ task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
   let packages = selectPackages(enableWhisper=enableWhisper, crossWindowsArm=true)
 
   # Configure and build FFmpeg with llvm-mingw for ARM64
-  withDir "ffmpeg_sources/ffmpeg":
-    exec (&"""CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib PKG_CONFIG_PATH="{pkgConfigPath}" PKG_CONFIG_LIBDIR="{pkgConfigPath}" ./configure --prefix="{buildPath}" \
+  let ffmpegSrcDirWinArm = absolutePath("ffmpeg_sources/ffmpeg")
+  let ffmpegBuildDirWinArm = buildPath / "pkg" / "ffmpeg"
+  mkDir(ffmpegBuildDirWinArm)
+  withDir ffmpegBuildDirWinArm:
+    exec (&"""CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib PKG_CONFIG_PATH="{pkgConfigPath}" PKG_CONFIG_LIBDIR="{pkgConfigPath}" {ffmpegSrcDirWinArm}/configure --prefix="{buildPath}" \
       --pkg-config=pkg-config \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
@@ -794,7 +841,6 @@ task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
       --target-os=mingw32 \
       --cross-prefix=aarch64-w64-mingw32- \
       --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, winArm=true))
-
     makeInstall()
 
 task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
@@ -810,103 +856,29 @@ task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
          "--out:auto-editor.exe src/main.nim"
     stripProgram(llvmWin=true)
 
-let wasmBuildPath = absolutePath("build_wasm")
 
 proc autoconfBuildWasm(package: Package, buildPath: string) =
-  case package.name
-  of "x264":
-    if not fileExists("config.mak"):
-      exec &"""CFLAGS="-matomics -mbulk-memory" emconfigure ./configure --prefix="{buildPath}" --host=i686-gnu --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
-    exec "emmake make -j4"
-    exec "make install"
-  of "libvpx":
-    if not fileExists("Makefile"):
-      exec &"""emconfigure ./configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
-    makeInstall()
-  else:
-    # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
-    let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
-    if not fileExists("Makefile"):
-      let args = (package.buildArguments & extraArgs).join(" ")
-      exec &"""emconfigure ./configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
-    makeInstall()
-
-proc cmakeBuildWasm(package: Package, buildPath: string) =
-  mkDir("build_wasm_cmake")
-  withDir "build_wasm_cmake":
-    if not fileExists("CMakeCache.txt"):
-      var args = @[
-        &"-DCMAKE_INSTALL_PREFIX={buildPath}",
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-DBUILD_SHARED_LIBS=OFF",
-      ]
-      case package.name
-      of "whisper":
-        args &= @[
-          "-DGGML_NATIVE=OFF", "-DGGML_CUDA=OFF", "-DGGML_METAL=OFF",
-          "-DGGML_BLAS=OFF", "-DGGML_OPENMP=OFF", "-DGGML_BACKEND_DL=OFF",
-          "-DWHISPER_SDL2=OFF", "-DWHISPER_BUILD_EXAMPLES=OFF",
-          "-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF",
-        ]
-      of "libsvtav1":
-        args &= @[
-          "-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=OFF",
-          "\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
-          "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\"",
-        ]
-      else:
-        args &= package.buildArguments
-        args &= @["\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
-                  "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\""]
-      exec "emcmake cmake .. " & args.join(" ")
-    exec "make -j4"
-    exec "make install"
-
-  if package.name == "whisper":
-    let libDir = buildPath / "lib"
-    for libFile in ["ggml.a", "ggml-base.a", "ggml-cpu.a"]:
-      let srcFile = libDir / libFile
-      let dstFile = libDir / ("lib" & libFile)
-      if fileExists(srcFile) and not fileExists(dstFile):
-        exec &"mv \"{srcFile}\" \"{dstFile}\""
-    let ggmlBaseDst = libDir / "libggml-base.a"
-    if not fileExists(ggmlBaseDst):
-      let ggmlBaseSrc = "build_wasm_cmake/ggml/src/ggml-base.a"
-      if fileExists(ggmlBaseSrc):
-        exec &"cp \"{ggmlBaseSrc}\" \"{ggmlBaseDst}\""
-    writeFile(libDir / "pkgconfig" / "whisper.pc", &"""prefix={buildPath}
-exec_prefix=${{prefix}}
-libdir=${{exec_prefix}}/lib
-includedir=${{prefix}}/include
-
-Name: whisper
-Description: whisper.cpp
-Version: 1.8.4
-Libs: -L${{libdir}} -lwhisper -lggml-base -lggml -lggml-cpu
-Libs.private: -lpthread -lm -lstdc++
-Cflags: -I${{includedir}}
-""")
-
-proc mesonBuildWasm(package: Package, buildPath: string) =
-  mkDir("build_meson")
-  writeFile("build_meson/meson-cross.txt", """
-[binaries]
-c = 'emcc'
-cpp = 'em++'
-ar = 'emar'
-strip = 'wasm-strip'
-
-[host_machine]
-system = 'emscripten'
-cpu_family = 'wasm32'
-cpu = 'wasm32'
-endian = 'little'
-""")
-  withDir "build_meson":
-    if not fileExists("build.ninja"):
-      exec &"""meson setup --prefix="{buildPath}" --buildtype=release --default-library=static -Denable_docs=false -Denable_tools=false -Denable_examples=false -Denable_tests=false -Denable_asm=false -Dc_args="-matomics -mbulk-memory" --cross-file=meson-cross.txt .."""
-    exec "ninja"
-    exec "ninja install"
+  let sourceDir = absolutePath(".")
+  let autoBuildDir = buildPath / "pkg" / package.name
+  mkDir(autoBuildDir)
+  withDir autoBuildDir:
+    case package.name
+    of "x264":
+      if not fileExists("config.mak"):
+        exec &"""CFLAGS="-matomics -mbulk-memory" emconfigure {sourceDir}/configure --prefix="{buildPath}" --host=i686-gnu --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
+      exec "emmake make -j4"
+      exec "make install"
+    of "libvpx":
+      if not fileExists("Makefile"):
+        exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
+      makeInstall()
+    else:
+      # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
+      let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
+      if not fileExists("Makefile"):
+        let args = (package.buildArguments & extraArgs).join(" ")
+        exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
+      makeInstall()
 
 task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
   setupDeps()
@@ -923,7 +895,7 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
     withDir &"ffmpeg_sources/{package.name}":
       case package.buildSystem
       of "cmake": cmakeBuildWasm(package, wasmBuildPath)
-      of "meson": mesonBuildWasm(package, wasmBuildPath)
+      of "meson": mesonBuild(package, wasmBuildPath, true, false, false)
       else: autoconfBuildWasm(package, wasmBuildPath)
 
   # lame ships no .pc file; create one so FFmpeg's configure can find it
@@ -940,13 +912,17 @@ Libs: -L${{libdir}} -lmp3lame
 Cflags: -I${{includedir}}
 """)
 
-  withDir "ffmpeg_sources/ffmpeg":
-    exec (&"""./configure --prefix="{wasmBuildPath}" \
+  let ffmpegSrcDirWasm = absolutePath("ffmpeg_sources/ffmpeg")
+  let ffmpegBuildDirWasm = wasmBuildPath / "pkg" / "ffmpeg"
+  mkDir(ffmpegBuildDirWasm)
+  withDir ffmpegBuildDirWasm:
+    exec (&"""PKG_CONFIG_PATH="{wasmBuildPath}/lib/pkgconfig" {ffmpegSrcDirWasm}/configure --prefix="{wasmBuildPath}" \
       --cc=emcc \
       --cxx=em++ \
       --ar=emar \
       --ranlib=emranlib \
       --nm=emnm \
+      --pkg-config-flags="--static" \
       --enable-cross-compile \
       --target-os=none \
       --arch=x86_32 \
