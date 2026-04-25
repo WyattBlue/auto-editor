@@ -11,12 +11,6 @@ import exports/[fcp7, fcp11, json, shotcut, kdenlive]
 import render/format
 import stats
 
-proc stopTimer() =
-  let secondLen: float = round(epochTime() - start, 2)
-  let minuteLen = toTimecode(secondLen, display)
-
-  echo &"Finished. took {secondLen} seconds ({minuteLen})"
-
 
 proc parseExportString*(exportStr: string): (string, string, string) =
   var kind = exportStr
@@ -85,8 +79,8 @@ proc parseExportString*(exportStr: string): (string, string, string) =
   return (kind, name, version)
 
 func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (int, int) =
-  var start = toTb(span[0], tb).int
-  var stop = toTb(span[1], tb).int
+  var start = toTb(span[0], tb)
+  var stop = toTb(span[1], tb)
   if start < 0:
     start = max(0, arrayLen + start)
   if stop < 0:
@@ -400,7 +394,9 @@ proc editMedia*(args: var mainArgs) =
     makeMedia(args, tlV3, output, rule, bar)
 
   bar.destroy()
-  stopTimer()
+
+  let seconds = round(epochTime() - start, 2)
+  echo &"Finished. took {seconds} seconds ({toTimecode(seconds, Code.display)})"
 
   if args.noOpen:
     discard
