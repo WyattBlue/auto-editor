@@ -8,7 +8,6 @@ bin = @["main=auto-editor"]
 
 # Dependencies
 requires "nim >= 2.2.2"
-requires "tinyre#77469f5"
 requires "csort == 1.0.0"
 requires "nimcrypto == 0.7.3"
 

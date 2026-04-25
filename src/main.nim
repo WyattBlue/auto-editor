@@ -16,7 +16,7 @@ import ./[about, cli, conductor, edit, ffmpeg, log]
 import cmds/[info, desc, cache, levels, subdump, whisper]
 import util/[color, fun, term]
 
-import tinyre
+import vendor/tinyre/tinyre
 import vendor/libp2p/ed25519
 
 proc ctrlc() {.noconv.} =
@@ -191,7 +191,7 @@ when not defined(wasmBuild):
 
     var outputFormat: string
     if args.outputFormat == "":
-      outputFormat = replacef(splitext(myInput)[0], re"\W+", "-") & ".%(ext)s"
+      outputFormat = replace(splitext(myInput)[0], re"\W+", "-") & ".%(ext)s"
     else:
       outputFormat = args.outputFormat
 

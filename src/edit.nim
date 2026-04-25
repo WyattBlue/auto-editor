@@ -3,8 +3,7 @@ import ./[av, editlexer, ffmpeg, log]
 import ./analyze/[audio, motion, subtitle]
 import ./util/[bar, fun]
 
-import tinyre
-
+import ./vendor/tinyre/tinyre
 
 func isSymbol(self: Expr, name, text: string): bool =
   self.kind == ExprSym and name == text[self.`from` ..< self.to]
@@ -261,7 +260,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
       of "subtitle", "regex":
         let argOrder = @["pattern", "stream", "ignore-case"] # "max-count"]
         var pattern = ""
-        var flags: set[ReFlag]
+        var flags = {reUtf8}
 
         for expr in node[1 ..< node.len]:
           let val = parseColFunc(argPos, isKey, argOrder, expr, text)

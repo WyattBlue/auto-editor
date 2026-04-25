@@ -2,10 +2,9 @@ import unittest
 import std/[os, tempfiles]
 
 import ../src/[av, conductor, ffmpeg, media, timeline, wavutil]
-import ../src/cmds/info
 import ../src/util/[color, fun, lang]
 import ../src/exports/[kdenlive, fcp11]
-
+import ../src/vendor/tinyre/tinyre
 
 test "avrational":
   let a = AVRational(num: 3, den: 4)
@@ -60,9 +59,6 @@ test "exports":
       "Hello \" World", "11"))
   check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere",
       "Hello \\ World", "11"))
-
-test "info":
-  main(@["example.mp4"])
 
 test "margin":
   var levels: seq[bool]
@@ -137,6 +133,14 @@ test "lang-to-string":
   check $a == "asdf"
   a  = ['e', 'n', 'g', '\0']
   check $a == "eng"
+
+test "re":
+  check match("abc123", re"\d+") == @["123"]
+  check match("abc123", re(".", {reGlobal})) == @["a", "b", "c", "1", "2", "3"]
+  check match("abc123", re("ABC", {reIgnoreCase})) == @["abc"]
+  check match("abc123", re"ABC") != @["abc"]
+  check match("中文", re("..", {reUtf8})) == @["中文"]
+  check match("中文", re"..") != @["中文"]
 
 test "smpte":
   check parseSMPTE("13:44:05:21", AVRational(num: 24000, den: 1001)) == 1186701
