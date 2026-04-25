@@ -122,12 +122,12 @@ proc parseTime*(val: string): PackedInt =
     return pack(false, 0x3FFFFFFFFFFFFFFF)
   return parseTimeSimple(val)
 
-func toTb*(val: PackedInt, tb: float64): int64 =
+func toTb*(val: PackedInt, tb: float64): int =
   if val.getFlag:
-    return int64(val.getNumber.float64 / 1000.0 * tb)
-  return val.getNumber
+    return int(val.getNumber.float64 / 1000.0 * tb)
+  return int(val.getNumber)
 
-proc smoothing*(val: var seq[bool], mincut, minclip: int64) =
+proc smoothing*(val: var seq[bool], mincut, minclip: int) =
   var prev: seq[bool]
   while prev != val:
     prev = val
@@ -170,7 +170,7 @@ proc smoothing*(val: var seq[bool], mincut, minclip: int64) =
 
     val = next
 
-proc mutMargin*(arr: var seq[bool], startM, endM: int64) =
+proc mutMargin*(arr: var seq[bool], startM, endM: int) =
   # Find start and end indexes
   var startIndex = newSeqOfCap[int](32)
   var endIndex = newSeqOfCap[int](32)
