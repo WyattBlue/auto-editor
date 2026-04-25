@@ -38,28 +38,32 @@ proc resolveAudioCodec(layer: seq[Clip], outputPath: string, rules: Rules): stri
     return if rules.defaultAud != "none": rules.defaultAud else: "aac"
   return codec
 
-proc checkAudioEncoder(encoder: ptr AVCodec, rate: cint) =
-  if encoder.sample_fmts == nil:
-    error &"{encoder.name}: No known audio formats avail."
+proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
+  if ctx.codec.sample_fmts == nil:
+    error &"{ctx.codec.name}: No known audio formats avail."
 
-  var allowed: seq[cint]
+  var myOut: pointer = nil
+  var num: cint = 0
+  discard avcodec_get_supported_config(
+    ctx, nil, AV_CODEC_CONFIG_SAMPLE_RATE, 0.cuint, addr myOut, addr num
+  )
 
-  if encoder.supported_samplerates != nil:
-    var i: cint = 0
-    let samplerates = cast[ptr UncheckedArray[cint]](encoder.supported_samplerates)
-    while samplerates[i] != 0:
-      allowed.add samplerates[i]
-      inc i
-  else:
-    if encoder.id == 86018: # aac_at
-      allowed = @[48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000]
+  const AAC_AT_RATES = [48000.cint, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000]
+
+  if myOut == nil:
+    if ctx.codec.id == 86018:  # aac_at
+      if rate notin AAC_AT_RATES:
+        error &"AudioToolbox only supports these samplerates: " & AAC_AT_RATES.join(", ")
     else:
       debug "audio encoder claims to support every samplerate"
       return
 
-  if rate notin allowed:
-    let allowedStr = allowed.join(" ")
-    error &"samplerate '{rate}' not allowed for {encoder.name}.\nAllowed: {allowedStr}"
+  let rates = cast[ptr UncheckedArray[cint]](myOut)
+  for i in 0..<num:
+    if rates[i] == rate:
+      return
+
+  error &"samplerate '{rate}' not allowed for {ctx.codec.name}."
 
 proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: Bar,
     cache: MediaCache = nil) =
@@ -115,7 +119,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       var (aOutStream, aEncCtx) = output.addStream(mixCodec, rate = rate,
           layout = tl.layout, metadata = {"language": "und"}.toTable)
       let encoder = aEncCtx.codec
-      checkAudioEncoder(encoder, tl.sr)
+      checkAudioCtx(aEncCtx, tl.sr)
       aEncCtx.open()
 
       # Update stream parameters after opening encoder for formats like AAC in MKV
@@ -147,7 +151,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         var (aOutStream, aEncCtx) = output.addStream(layerCodec, rate = rate,
             layout = tl.layout, metadata = {"language": $tl.langs[tl.v.len + i]}.toTable)
         let encoder = aEncCtx.codec
-        checkAudioEncoder(encoder, tl.sr)
+        checkAudioCtx(aEncCtx, tl.sr)
         aEncCtx.open()
 
         # Update stream parameters after opening encoder for formats like AAC in MKV
