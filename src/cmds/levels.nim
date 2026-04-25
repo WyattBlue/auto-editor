@@ -3,7 +3,7 @@ import std/[options, strformat, strutils]
 import ../[av, cache, ffmpeg, log]
 import ../analyze/[audio, motion, subtitle]
 
-import tinyre
+import ../vendor/tinyre/tinyre
 
 proc parseEdit(editStr: string): (string, string, int32, int32, int32) =
   var

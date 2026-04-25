@@ -1,7 +1,7 @@
 from std/math import round
 
 import ../[av, ffmpeg]
-import tinyre
+import ../vendor/tinyre/tinyre
 
 proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
     stream: int32): (int32, seq[bool]) {.raises: [].} =
