@@ -84,9 +84,9 @@ proc parseExportString*(exportStr: string): (string, string, string) =
 
   return (kind, name, version)
 
-func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (int64, int64) =
-  var start = toTb(span[0], tb)
-  var stop = toTb(span[1], tb)
+func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (int, int) =
+  var start = toTb(span[0], tb).int
+  var stop = toTb(span[1], tb).int
   if start < 0:
     start = max(0, arrayLen + start)
   if stop < 0:
@@ -97,7 +97,7 @@ proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: f
   value: int, maxLen: int) =
   let len = if maxLen > 0: maxLen else: actionIndex.len
   let (start, stop) = normalizeRange(span, tb, len)
-  let cappedStop = min(stop, len.int64)
+  let cappedStop: int = min(stop, len)
   if cappedStop > actionIndex.len:
     actionIndex.setLen(cappedStop)
   for i in start ..< min(stop, actionIndex.len):
