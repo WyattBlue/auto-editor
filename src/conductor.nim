@@ -210,7 +210,7 @@ proc editMedia*(args: var mainArgs) =
   if args.inputs.len == 0 and not stdin.isatty():
     let stdinContent = readAll(stdin)
     tlV3 = readJson(stdinContent, interner)
-    applyArgs(tlV3, args)
+    tlV3.applyArgs(args)
   else:
     if args.inputs.len == 0:
       error "You need to give auto-editor an input file."
@@ -219,10 +219,10 @@ proc editMedia*(args: var mainArgs) =
 
     if inputExt in [".v1", ".v2", ".v3", ".json"]:
       tlV3 = readJson(readFile(input), interner)
-      applyArgs(tlV3, args)
+      tlV3.applyArgs(args)
     elif inputExt == ".xml":
       tlV3 = fcp7ReadXml(input, interner)
-      applyArgs(tlV3, args)
+      tlV3.applyArgs(args)
       usePath = input
     else:
       usePath = input
@@ -283,7 +283,7 @@ proc editMedia*(args: var mainArgs) =
         else:
           appendLinearTimeline(tlV3, addr args.inputs[i], inputMi, actionIndex)
 
-      applyArgs(tlV3, args)
+      tlV3.applyArgs(args)
 
   var exportKind, tlName, fcpVersion: string
   if args.`export` == "":

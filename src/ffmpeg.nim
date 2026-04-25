@@ -143,11 +143,7 @@ type
     name*: cstring
     `type`*: AVMediaType
     id*: AVCodecID
-    capabilities*: cint
-    max_lowres*: uint8
-    supported_framerates*: ptr AVRational
     pix_fmts*: ptr UncheckedArray[AVPixelFormat]
-    supported_samplerates*: ptr cint
     sample_fmts*: ptr UncheckedArray[AVSampleFormat]
 
   AVCodecParameters* {.importc, incompleteStruct, header: "<libavcodec/avcodec.h>".} = object
@@ -174,8 +170,16 @@ type
     ch_layout*: AVChannelLayout
     sample_rate*: cint
 
-  AVSampleFormat* {.importc: "enum AVSampleFormat",
-      header: "<libavutil/samplefmt.h>".} = enum
+  AVCodecConfig* {.importc: "enum AVCodecConfig", header: "<libavcodec/codec.h>".} = enum
+    AV_CODEC_CONFIG_PIX_FORMAT,
+    AV_CODEC_CONFIG_FRAME_RATE,
+    AV_CODEC_CONFIG_SAMPLE_RATE,
+    AV_CODEC_CONFIG_SAMPLE_FORMAT,
+    AV_CODEC_CONFIG_CHANNEL_LAYOUT,
+    AV_CODEC_CONFIG_COLOR_RANGE,
+    AV_CODEC_CONFIG_COLOR_SPACE
+
+  AVSampleFormat* {.importc: "enum AVSampleFormat", header: "<libavutil/samplefmt.h>".} = enum
     AV_SAMPLE_FMT_NONE = -1,
     AV_SAMPLE_FMT_U8,
     AV_SAMPLE_FMT_S16,
@@ -301,7 +305,9 @@ proc av_codec_is_encoder*(codec: ptr AVCodec): cint {.importc,
     header: "<libavcodec/codec.h>".}
 proc av_codec_is_decoder*(codec: ptr AVCodec): cint {.importc,
     header: "<libavcodec/codec.h>".}
-
+proc avcodec_get_supported_config*(avctx: ptr AVCodecContext, codec: ptr AVCodec,
+  config: AVCodecConfig, flags: cuint, out_configs: ptr pointer,
+  out_num_configs: ptr cint): cint {.importc, header: "<libavcodec/codec.h>".}
 
 const FF_COMPLIANCE_STRICT*: cint = 1
 const FF_COMPLIANCE_NORMAL*: cint = 0
