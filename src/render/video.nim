@@ -7,7 +7,7 @@ import ../log
 import ../av
 import ../ffmpeg
 import ../timeline
-import ../util/[color, lang]
+import ../util/color
 import ../graph
 
 # Helps with timing, may be extended.
@@ -289,9 +289,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     needsScaling = true
 
   debug &"Creating video stream with codec: {args.videoCodec}"
-  var (outputStream, encoderCtx) = output.addStream(args.videoCodec,
-      rate = targetFps, width = targetWidth, height = targetHeight, metadata = {
-          "language": $tl.langs[0]}.toTable)
+  var (outputStream, encoderCtx) = output.addStream(args.videoCodec, targetFps,
+      lang = tl.langs[0], width = targetWidth, height = targetHeight)
   let codec = encoderCtx.codec
 
   if codec.id == ID_HEVC:

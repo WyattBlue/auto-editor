@@ -163,16 +163,6 @@ proc setAudioCodec(inCodec, ext: string, src: MediaInfo, rule: Rules): string =
           codec = $avcodec_get_name(rule.defaultAud)
         else:
           codec = "aac"
-
-  if codec notin rule.acodecs.mapIt($it.name):
-    let avCodec = initCodec(codec)
-    if avCodec == nil:
-      error &"Unknown encoder: {codec}"
-
-    # Normalize encoder names
-    if not rule.acodecs.anyIt(it.id == avCodec.id):
-      error &"'{avCodec.name}' audio encoder is not supported in the '{ext}' container"
-
   return codec
 
 proc setVideoCodec(inCodec, ext: string, src: MediaInfo, rule: Rules): string =
@@ -181,17 +171,6 @@ proc setVideoCodec(inCodec, ext: string, src: MediaInfo, rule: Rules): string =
     codec = (if src.v.len == 0: "h264" else: $avcodec_get_name(src.v[0].codecId))
     if codec notin rule.vcodecs.mapIt($it.name) and rule.defaultVid != ID_NONE:
       return $avcodec_get_name(rule.default_vid)
-    return codec
-
-  if codec notin rule.vcodecs.mapIt($it.name):
-    let avCodec = initCodec(codec)
-    if avCodec == nil:
-      error &"Unknown encoder: {codec}"
-
-    # Normalize encoder names
-    if not rule.vcodecs.anyIt(it.id == avCodec.id):
-      error &"'{avCodec.name}' video encoder is not supported in the '{ext}' container"
-
   return codec
 
 proc editMedia*(args: var mainArgs) =

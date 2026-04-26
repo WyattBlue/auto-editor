@@ -2,7 +2,7 @@ import std/[heapqueue, os, options, sequtils, strformat, strutils, tables]
 from std/math import round
 
 import ../[av, ffmpeg, log, media, timeline]
-import ../util/[bar, lang, rules]
+import ../util/[bar, rules]
 import video
 import audio
 import subtitle
@@ -116,7 +116,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       else:
         args.audioCodec
       var (aOutStream, aEncCtx) = output.addStream(mixCodec, rate = rate,
-          layout = tl.layout, metadata = {"language": "und"}.toTable)
+          lang = ['u', 'n', 'd', '\0'], layout = tl.layout)
       let encoder = aEncCtx.codec
       checkAudioCtx(aEncCtx, tl.sr)
       aEncCtx.open()
@@ -148,7 +148,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         else:
           args.audioCodec
         var (aOutStream, aEncCtx) = output.addStream(layerCodec, rate = rate,
-            layout = tl.layout, metadata = {"language": $tl.langs[tl.v.len + i]}.toTable)
+            lang = tl.langs[tl.v.len + i], layout = tl.layout)
         let encoder = aEncCtx.codec
         checkAudioCtx(aEncCtx, tl.sr)
         aEncCtx.open()
