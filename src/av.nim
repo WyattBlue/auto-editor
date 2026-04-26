@@ -2,7 +2,7 @@ import std/[strformat, strutils, sequtils, tables, sets]
 
 import ffmpeg
 import log
-import util/dict
+import util/[dict, lang]
 
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
@@ -33,7 +33,7 @@ proc initEncoder*(id: AVCodecID): (ptr AVCodec, ptr AVCodecContext) =
 proc initEncoder*(name: string): (ptr AVCodec, ptr AVCodecContext) =
   let codec = initCodec(name)
   if codec == nil:
-    error "Codec not found: " & name
+    error "Unknown encoder: " & name
   return (codec, initEnCtx(codec))
 
 proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
@@ -265,12 +265,11 @@ proc addStreamFromTemplate*(self: var OutputContainer,
 
   return stream
 
-proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, width: cint = 640,
-    height: cint = 480, layout: ref AVChannelLayout = nil, metadata: Table[string, string] = initTable[string, string]()): (
-    ptr AVStream, ptr AVCodecContext) =
+proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, lang: Lang,
+    width: cint = 640, height: cint = 480, layout: ref AVChannelLayout = nil): (ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   if codec == nil:
-    error "Codec not found: " & codecName
+    error "Encoder not found: " & codecName
   let format = self.formatCtx
 
   # Assert that this format supports the requested codec.
@@ -318,9 +317,7 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, 
   if avcodec_parameters_from_context(stream.codecpar, ctx) < 0:
     error "Could not set ctx parameters"
 
-  if metadata.len > 0:
-    dictToAvdict(addr stream.metadata, metadata)
-
+  discard av_dict_set(addr stream.metadata, "language", ($lang).cstring, 0)
   return (stream, ctx)
 
 proc startEncoding*(self: var OutputContainer) =
@@ -422,8 +419,6 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
     error "Failed to reference packet"
 
   discard av_interleaved_write_frame(self.formatCtx, self.packet)
-  # if ret < 0:
-  #   echo &"Failed to write packet: {ret}"
 
 iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame, packet: ptr AVPacket): ptr AVPacket =
   let isFlush: bool = frame == nil
