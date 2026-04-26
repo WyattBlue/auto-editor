@@ -294,7 +294,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           "language": $tl.langs[0]}.toTable)
   let codec = encoderCtx.codec
 
-  if codec.id == AV_CODEC_ID_HEVC:
+  if codec.id == ID_HEVC:
     const codecTag = fourccToInt("hvc1") # for QuickTime
     outputStream.codecpar.codec_tag = codecTag
     encoderCtx.codec_tag = codecTag

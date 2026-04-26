@@ -144,10 +144,11 @@ proc setOutput(userOut, `export`, path: string): (string, string) =
   return (&"{root}{ext}", myExport)
 
 
-proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
+proc setAudioCodec(inCodec, ext: string, src: MediaInfo, rule: Rules): string =
+  var codec = inCodec
   if codec == "auto":
     if src.a.len == 0:
-      codec = rule.defaultAud
+      codec = $avcodec_get_name(rule.defaultAud)
     else:
       codec = $avcodec_get_name(src.a[0].codecId)
       let avCodec = initCodec(codec)
@@ -155,15 +156,15 @@ proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules):
         codec = "aac"
 
       # For PCM-based containers (WAV, etc.), prefer PCM even if other codecs are supported
-      if ext in [".wav", ".aiff", ".au"] and rule.defaultAud.startsWith("pcm_"):
-        codec = rule.defaultAud
+      if ext in [".wav", ".aiff", ".au"] and rule.defaultAud.isPCM:
+        codec = $avcodec_get_name(rule.defaultAud)
       elif codec notin rule.acodecs.mapIt($it.name):
-        if rule.defaultAud != "none":
-          codec = rule.defaultAud
+        if rule.defaultAud != ID_NONE:
+          codec = $avcodec_get_name(rule.defaultAud)
         else:
           codec = "aac"
 
-  if codec != "none" and codec notin rule.acodecs.mapIt($it.name):
+  if codec notin rule.acodecs.mapIt($it.name):
     let avCodec = initCodec(codec)
     if avCodec == nil:
       error &"Unknown encoder: {codec}"
@@ -174,11 +175,12 @@ proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules):
 
   return codec
 
-proc setVideoCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
+proc setVideoCodec(inCodec, ext: string, src: MediaInfo, rule: Rules): string =
+  var codec = inCodec
   if codec == "auto":
     codec = (if src.v.len == 0: "h264" else: $avcodec_get_name(src.v[0].codecId))
-    if codec notin rule.vcodecs.mapIt($it.name) and rule.defaultVid != "none":
-      return rule.default_vid
+    if codec notin rule.vcodecs.mapIt($it.name) and rule.defaultVid != ID_NONE:
+      return $avcodec_get_name(rule.default_vid)
     return codec
 
   if codec notin rule.vcodecs.mapIt($it.name):
