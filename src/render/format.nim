@@ -19,23 +19,21 @@ func initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Pri
 
 func `<`(a, b: Priority): bool = a.index < b.index
 
-proc resolveAudioCodec(layer: seq[Clip], outputPath: string, rules: Rules): string =
+proc resolveAudioCodec(layer: seq[Clip], outExt: string, rules: Rules): AVCodecID =
   if layer.len == 0:
     return rules.defaultAud
+  if outExt in [".wav", ".aiff", ".au"] and rules.defaultAud.isPCM:
+    return rules.defaultAud
+
   let firstClip = layer[0]
   let srcMi = initMediaInfo(firstClip.src[])
   let stream = int(firstClip.stream)
   if stream >= srcMi.a.len:
     return rules.defaultAud
-  var codec = $avcodec_get_name(srcMi.a[stream].codecId)
-  let avCodec = initCodec(codec)
-  if avCodec == nil or avCodec.sample_fmts == nil:
-    codec = "aac"
-  let (_, _, outExt) = splitFile(outputPath)
-  if outExt in [".wav", ".aiff", ".au"] and rules.defaultAud.startsWith("pcm_"):
-    return rules.defaultAud
-  if codec notin rules.acodecs.mapIt($it.name):
-    return if rules.defaultAud != "none": rules.defaultAud else: "aac"
+
+  let codec = srcMi.a[stream].codecId
+  if codec notin rules.acodecs.mapIt(it.id):
+    return (if rules.defaultAud == ID_NONE: ID_AAC else: rules.defaultAud)
   return codec
 
 proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
@@ -51,7 +49,7 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
   const AAC_AT_RATES = [48000.cint, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000]
 
   if myOut == nil:
-    if ctx.codec.id == 86018:  # aac_at
+    if ctx.codec.id == ID_AAC:
       if rate notin AAC_AT_RATES:
         error &"AudioToolbox only supports these samplerates: " & AAC_AT_RATES.join(", ")
     else:
@@ -82,13 +80,14 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   var output = openWrite(outputPath)
   output.options = options
 
-  let (_, _, ext) = splitFile(outputPath)
+  let (_, _, outExt) = splitFile(outputPath)
 
   var vEncCtx: ptr AVCodecContext = nil
   var vOutStream: ptr AVStream = nil
   var videoFrameIter: iterator(): (ptr AVFrame, int64) = iterator(): (ptr AVFrame, int64) =
     return
-  if rules.defaultVid notin ["none", "png"] and tl.v.len > 0 and tl.v[0].len > 0:
+
+  if rules.defaultVid notin [ID_NONE, ID_PNG] and tl.v.len > 0 and tl.v[0].len > 0:
     if not args.vn:
       (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args, cache)
 
@@ -113,7 +112,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
             if layer.len > 0:
               firstLayer = layer
               break
-          resolveAudioCodec(firstLayer, outputPath, rules)
+          $avcodec_get_name(resolveAudioCodec(firstLayer, outExt, rules))
       else:
         args.audioCodec
       var (aOutStream, aEncCtx) = output.addStream(mixCodec, rate = rate,
@@ -145,7 +144,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       if tl.a[i].len > 0: # Only create stream if track has clips
         let rate = AVRational(num: tl.sr, den: 1)
         let layerCodec = if args.audioCodec == "auto":
-          resolveAudioCodec(tl.a[i], outputPath, rules)
+          $avcodec_get_name(resolveAudioCodec(tl.a[i], outExt, rules))
         else:
           args.audioCodec
         var (aOutStream, aEncCtx) = output.addStream(layerCodec, rate = rate,
@@ -247,7 +246,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
   output.startEncoding()
 
-  var title = &"({ext[1 .. ^1]}) "
+  var title = &"({outExt[1 .. ^1]}) "
   var encoderTitles: seq[string] = @[]
 
   if vEncCtx != nil:

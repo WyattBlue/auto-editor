@@ -2,41 +2,17 @@ import std/strformat
 
 import ../[ffmpeg, log]
 
-func defaultVideoCodec*(self: ptr AVOutputFormat): string =
-  let codecId = self.video_codec
-  if codecId != AV_CODEC_ID_NONE:
-    let codecName = avcodec_get_name(codecId)
-    if codecName != nil:
-      return $codecName
-  return "none"
-
-func defaultAudioCodec*(self: ptr AVOutputFormat): string =
-  let codecId = self.audio_codec
-  if codecId != AV_CODEC_ID_NONE:
-    let codecName = avcodec_get_name(codecId)
-    if codecName != nil:
-      return $codecName
-  return "none"
-
-func defaultSubtitleCodec*(self: ptr AVOutputFormat): string =
-  let codecId = self.subtitle_codec
-  if codecId != AV_CODEC_ID_NONE:
-    let codecName = avcodec_get_name(codecId)
-    if codecName != nil:
-      return $codecName
-  return "none"
-
 
 type Rules* = object
   vcodecs*: seq[ptr AVCodec]
   acodecs*: seq[ptr AVCodec]
   scodecs*: seq[ptr AVCodec]
-  defaultVid*: string
-  defaultAud*: string
-  defaultSub*: string
-  maxVideos*: int = -1
-  maxAudios*: int = -1
-  maxSubtitles*: int = -1
+  defaultVid*: AVCodecID
+  defaultAud*: AVCodecID
+  defaultSub*: AVCodecID
+  # maxVideos*: int = -1
+  # maxAudios*: int = -1
+  # maxSubtitles*: int = -1
   allowImage*: bool
 
 proc initRules*(ext: string): Rules =
@@ -44,9 +20,9 @@ proc initRules*(ext: string): Rules =
   if format == nil:
     error &"Extension: {ext} has no known formats"
 
-  result.defaultVid = format.defaultVideoCodec()
-  result.defaultAud = format.defaultAudioCodec()
-  result.defaultSub = format.defaultSubtitleCodec()
+  result.defaultVid = format.video_codec
+  result.defaultAud = format.audio_codec
+  result.defaultSub = format.subtitle_codec
   result.allowImage = ext in ["mp4", "mkv"]
 
   var codec: ptr AVCodec

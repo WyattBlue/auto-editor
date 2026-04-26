@@ -48,7 +48,7 @@ test "encoder":
   check encoderCtx.codec_type == AVMEDIA_TYPE_AUDIO
   check encoderCtx.bit_rate != 0
 
-  let (_, encoderCtx2) = initEncoder(AV_CODEC_ID_PCM_S16LE)
+  let (_, encoderCtx2) = initEncoder(ID_PCM_S16LE)
   check encoderCtx2.codec_type == AVMEDIA_TYPE_AUDIO
   check encoderCtx2.bit_rate != 0
 

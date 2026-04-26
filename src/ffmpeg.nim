@@ -582,12 +582,18 @@ proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
     header: "<libavutil/samplefmt.h>".}
 
 const
-  AV_CODEC_ID_NONE* = AVCodecID(0)
-  AV_CODEC_ID_HEVC* = AVCodecID(173)
-  AV_CODEC_ID_AV1* = AVCodecID(225)
-  AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
+  ID_NONE* = AVCodecID(0)
+  ID_PNG* = AVCodecID(61)
+  ID_HEVC* = AVCodecID(173)
+  ID_AV1* = AVCodecID(225)
+  ID_PCM_S16LE* = AVCodecID(65536)
+  ID_AAC* = AVCodecID(86018)
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2
+
+func isPCM*(id: AVCodecID): bool =
+  let n = ord(id)
+  return n >= 0x10000 and n < 0x11000
 
 # Convert fourcc string to 32-bit integer (little-endian)
 template fourccToInt*(fourcc: static[string]): cuint =
