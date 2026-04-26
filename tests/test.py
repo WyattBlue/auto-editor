@@ -635,26 +635,26 @@ class Runner:
         assert video.fps == 60, video.fps
         assert video.duration - 17.33333333333333333333333 < 0.3
 
-    # def embedded_image(self):
-    #     out1 = self.main(["resources/embedded-image/h264-png.mp4"], [])
-    #     cn = fileinfo(out1)
-    #     assert cn.videos[0].codec == "h264"
-    #     assert cn.videos[1].codec == "png"
+    def test_embedded_image(self):
+        out1 = self.main(["resources/embedded-image/h264-png.mp4"], [], "em.mp4")
+        cn = fileinfo(out1)
+        assert cn.videos[0].codec == "h264"
+        # assert cn.videos[1].codec == "png"
 
-    #     out2 = self.main(["resources/embedded-image/h264-mjpeg.mp4"], [])
-    #     cn = fileinfo(out2)
-    #     assert cn.videos[0].codec == "h264"
-    #     assert cn.videos[1].codec == "mjpeg"
+        out2 = self.main(["resources/embedded-image/h264-mjpeg.mp4"], [], "em.mp4")
+        cn = fileinfo(out2)
+        assert cn.videos[0].codec == "h264"
+        # assert cn.videos[1].codec == "mjpeg"
 
-    #     out3 = self.main(["resources/embedded-image/h264-png.mkv"], [])
-    #     cn = fileinfo(out3)
-    #     assert cn.videos[0].codec == "h264"
-    #     assert cn.videos[1].codec == "png"
+        out3 = self.main(["resources/embedded-image/h264-png.mkv"], [], "em.mkv")
+        cn = fileinfo(out3)
+        assert cn.videos[0].codec == "h264"
+        # assert cn.videos[1].codec == "png"
 
-    #     out4 = self.main(["resources/embedded-image/h264-mjpeg.mkv"], [])
-    #     cn = fileinfo(out4)
-    #     assert cn.videos[0].codec == "h264"
-    #     assert cn.videos[1].codec == "mjpeg"
+        out4 = self.main(["resources/embedded-image/h264-mjpeg.mkv"], [], "em.mkv")
+        cn = fileinfo(out4)
+        assert cn.videos[0].codec == "h264"
+        # assert cn.videos[1].codec == "mjpeg"
 
     def test_motion(self):
         self.main(

@@ -220,7 +220,9 @@ proc editMedia*(args: var mainArgs) =
 
         if i == 0 and args.frameRate == AVRational(num: 0, den: 0):
           if container.video.len > 0:
-            tb = makeSaneTimebase(container.video[0].avg_frame_rate)
+            let avgFr = container.video[0].avg_frame_rate
+            if avgFr.num > 0 and avgFr.den > 0:
+              tb = makeSaneTimebase(avgFr)
 
         var singleArgs = args
         singleArgs.inputs = @[args.inputs[i]]
