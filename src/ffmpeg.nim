@@ -129,6 +129,22 @@ type
     max_analyze_duration: int64
     metadata*: ptr AVDictionary
 
+  AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>"} = object
+    buf*: pointer
+    pts*: int64
+    dts*: int64
+    data*: ptr uint8
+    size*: cint
+    stream_index*: cint
+    flags*: cint
+    side_data: pointer
+    side_data_elems: cint
+    duration*: int64
+    pos: int64
+    opaque: pointer
+    opaque_ref: pointer
+    time_base*: AVRational
+
   AVStream* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
     index*: cint
     codecpar*: ptr AVCodecParameters
@@ -138,6 +154,8 @@ type
     sample_aspect_ratio*: AVRational
     metadata*: ptr AVDictionary
     avg_frame_rate*: AVRational
+    attached_pic*: AVPacket
+    disposition*: cint
 
   AVCodec* {.importc, incompleteStruct, header: "<libavcodec/codec.h>".} = object
     name*: cstring
@@ -366,24 +384,8 @@ proc `=sink`*(dest: var AVChannelLayout, src: AVChannelLayout) =
   discard av_channel_layout_copy(addr dest, unsafeAddr src)
 
 type
-  AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>", bycopy.} = object
-    buf*: pointer       # reference counted buffer holding the data
-    pts*: int64         # presentation timestamp in time_base units
-    dts*: int64         # decompression timestamp in time_base units
-    data: pointer
-    size: cint
-    stream_index*: cint # stream index this packet belongs to
-    flags*: cint
-    side_data: pointer
-    side_data_elems: cint
-    duration*: int64    # duration of this packet in time_base units, 0 if unknown
-    pos: int64
-    opaque: pointer
-    opaque_ref: pointer
-    time_base*: AVRational
-
   # https://ffmpeg.org/doxygen/8.0/structAVFrame.html
-  AVFrame* {.importc, completeStruct, header: "<libavutil/frame.h>", bycopy.} = object
+  AVFrame* {.importc, completeStruct, header: "<libavutil/frame.h>"} = object
     data*: array[8, ptr uint8]
     linesize*: array[8, cint]
     extended_data*: ptr ptr uint8
@@ -590,6 +592,7 @@ const
   ID_AAC* = AVCodecID(86018)
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2
+  AV_DISPOSITION_ATTACHED_PIC* = 0x0400.cint
 
 func isPCM*(id: AVCodecID): bool =
   let n = ord(id)
