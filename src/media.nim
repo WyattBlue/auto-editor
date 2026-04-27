@@ -47,6 +47,7 @@ type
     a*: seq[AudioStream]
     s*: seq[SubtitleStream]
     d*: seq[DataStream]
+    i*: seq[VideoStream]
 
 
 func getRes*(self: MediaInfo): (int32, int32) =
@@ -93,7 +94,7 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
       let sar = (if codecCtx.sample_aspect_ratio == 0: AVRational(
           1) else: codecCtx.sample_aspect_ratio)
 
-      result.v.add(VideoStream(
+      let newStream = VideoStream(
         duration: duration,
         bitrate: codecCtx.bit_rate,
         avg_rate: stream.avg_frame_rate,
@@ -109,7 +110,12 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
         color_space: codecCtx.colorspace,
         color_primaries: codecCtx.color_primaries,
         color_transfer: codecCtx.color_trc,
-      ))
+      )
+      if (stream.disposition and AV_DISPOSITION_ATTACHED_PIC) != 0:
+        result.i.add newStream
+      else:
+        result.v.add newStream
+
     elif codecParameters.codec_type == AVMEDIA_TYPE_AUDIO:
       var layout: array[64, char]
       discard av_channel_layout_describe(addr codecCtx.ch_layout, cast[

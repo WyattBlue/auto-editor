@@ -86,6 +86,33 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo &"     - codec: {$avcodec_get_name(d.codecId)} ({fourccToString(d.tag)})"
     echo &"     - timecode: {d.timecode}"
 
+  if fileInfo.i.len > 0:
+    echo " - image:"
+  for track, i in fileInfo.i:
+    let (ratioWidth, ratioHeight) = aspectRatio(i.width, i.height)
+
+    echo &"   - track {track}:"
+    echo &"     - codec: {$avcodec_get_name(i.codecId)}"
+    echo &"     - resolution: {i.width}x{i.height}"
+    echo &"     - aspect ratio: {ratioWidth}:{ratioHeight}"
+    echo &"     - pixel aspect ratio: {i.sar}"
+    echo &"     - pix fmt: {av_get_pix_fmt_name(i.pix_fmt)}"
+
+    if i.color_range == 1:
+      echo "     - color range: 1 (tv)"
+    elif i.color_range == 2:
+      echo "     - color range: 2 (pc)"
+    elif i.color_range != 0:
+      echo &"     - color range: {i.color_range}"
+
+    if i.color_space != 2:
+      echo &"     - color space: {i.color_space.bt709}"
+    if i.color_primaries != 2:
+      echo &"     - color primaries: {i.color_primaries.bt709}"
+    if i.color_transfer != 2:
+      echo &"     - color transfer: {i.color_transfer.bt709}"
+    genericTrack(i.lang, i.bitrate)
+
   echo " - container:"
   if fileInfo.duration != 0.0:
     echo &"   - duration: {fileInfo.duration}"
@@ -93,11 +120,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
 
 
 func getJsonInfo(fileInfo: MediaInfo): JsonNode =
-  var
-    varr: seq[JsonNode] = @[]
-    aarr: seq[JsonNode] = @[]
-    sarr: seq[JsonNode] = @[]
-
+  var varr, aarr, sarr, iarr: seq[JsonNode] = @[]
   var tb = AVRational(30)
   if fileInfo.v.len > 0:
     tb = makeSaneTimebase(fileInfo.v[0].avg_rate)
@@ -109,7 +132,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
       "fps": $v.avg_rate,
       "resolution": [v.width, v.height],
       "aspect_ratio": [ratioWidth, ratioHeight],
-      "pixel_aspect_ratio": v.sar,
+      "pixel_aspect_ratio": $v.sar,
       "duration": v.duration,
       "pix_fmt": $av_get_pix_fmt_name(v.pix_fmt),
       "color_range": v.color_range,
@@ -129,12 +152,28 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
   for s in fileInfo.s:
     sarr.add( %* s)
 
+  for i in fileInfo.i:
+    let (ratioWidth, ratioHeight) = aspectRatio(i.width, i.height)
+    iarr.add( %* {
+      "codec": $avcodec_get_name(i.codecId),
+      "resolution": [i.width, i.height],
+      "aspect_ratio": [ratioWidth, ratioHeight],
+      "pixel_aspect_ratio": $i.sar,
+      "pix_fmt": $av_get_pix_fmt_name(i.pix_fmt),
+      "color_range": i.color_range,
+      "color_space": i.color_space,
+      "color_primaries": i.color_primaries,
+      "color_transfer": i.color_transfer,
+      "lang": i.lang
+    })
+
   result = %* {
     "type": "media",
     "recommendedTimebase": $tb.num & "/" & $tb.den,
     "video": varr,
     "audio": aarr,
     "subtitle": sarr,
+    "image": iarr,
     "container": {
       "duration": fileInfo.duration,
       "bitrate": fileInfo.bitrate

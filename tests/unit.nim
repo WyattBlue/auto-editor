@@ -120,7 +120,7 @@ test "size-of-objects":
   check sizeof(VideoStream) == 96
   check sizeof(AudioStream) == 48
   check sizeof(SubtitleStream) == 16
-  check sizeof(MediaInfo) == 96
+  check sizeof(MediaInfo) == 112
   check sizeof(Clip) == 40
   check sizeof(AVChannelLayout) == 24
 
