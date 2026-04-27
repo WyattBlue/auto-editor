@@ -19,6 +19,21 @@ func initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Pri
 
 func `<`(a, b: Priority): bool = a.index < b.index
 
+func pngDimensions(data: ptr uint8, size: cint): (cint, cint) =
+  const sig = [0x89'u8, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+  if size < 24:
+    return (0, 0)
+  let b = cast[ptr UncheckedArray[uint8]](data)
+  for i in 0..7:
+    if b[i] != sig[i]:
+      return (0, 0)
+  # IHDR: sig(8) + chunk_len(4) + "IHDR"(4) + width(4) + height(4)
+  let w = (b[16].cint shl 24) or (b[17].cint shl 16) or
+          (b[18].cint shl 8) or b[19].cint
+  let h = (b[20].cint shl 24) or (b[21].cint shl 16) or
+          (b[22].cint shl 8) or b[23].cint
+  return (w, h)
+
 proc resolveAudioCodec(layer: seq[Clip], outExt: string, rules: Rules): AVCodecID =
   if layer.len == 0:
     return rules.defaultAud
@@ -204,6 +219,17 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
         srcContainer.close()
 
+  var imageStreams: seq[(ptr AVStream, ptr AVPacket)] = @[]
+  var imageSourceCtx: ptr AVFormatContext = nil
+  defer:
+    if imageSourceCtx != nil:
+      avformat_close_input(addr imageSourceCtx)
+
+  var outPacket = av_packet_alloc()
+  if outPacket == nil:
+    error "Could not allocate output packet"
+  defer: av_packet_free(addr outPacket)
+
   if not args.dn:
     # Get the first source file from the timeline
     var sourcePath: string = ""
@@ -218,31 +244,39 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
           break findSource
 
     if sourcePath != "":
-      let formatCtx = av.openFormatCtx(sourcePath.cstring)
-      defer: avformat_close_input(addr formatCtx)
+      imageSourceCtx = av.openFormatCtx(sourcePath.cstring)
 
-      # Copy each attachment stream
-      for i in 0 ..< formatCtx.nb_streams:
-        let attachStream = formatCtx.streams[i]
-        if attachStream.codecpar.codec_type != AVMEDIA_TYPE_ATTACHMENT:
-          continue
-        # Create attachment stream directly (attachments don't have decoders)
-        let attachOutStream = avformat_new_stream(output.formatCtx, nil)
-        if attachOutStream == nil:
-          error "Could not allocate attachment stream"
-
-        # Copy codec parameters directly
-        if avcodec_parameters_copy(attachOutStream.codecpar, attachStream.codecpar) < 0:
-          error "Could not copy attachment codec parameters"
-
-        # Copy stream metadata
-        if attachStream.metadata != nil:
-          discard av_dict_copy(addr attachOutStream.metadata, attachStream.metadata, 0)
-
-  var outPacket = av_packet_alloc()
-  if outPacket == nil:
-    error "Could not allocate output packet"
-  defer: av_packet_free(addr outPacket)
+      for i in 0 ..< imageSourceCtx.nb_streams:
+        let strm = imageSourceCtx.streams[i]
+        if strm.codecpar.codec_type == AVMEDIA_TYPE_ATTACHMENT:
+          let outStrm = avformat_new_stream(output.formatCtx, nil)
+          if outStrm == nil:
+            error "Could not allocate attachment stream"
+          if avcodec_parameters_copy(outStrm.codecpar, strm.codecpar) < 0:
+            error "Could not copy attachment codec parameters"
+          if strm.metadata != nil:
+            discard av_dict_copy(addr outStrm.metadata, strm.metadata, 0)
+        elif strm.codecpar.codec_type == AVMEDIA_TYPE_VIDEO and
+            (strm.disposition and AV_DISPOSITION_ATTACHED_PIC) != 0:
+          if avformat_query_codec(output.formatCtx.oformat, strm.codecpar.codec_id,
+              FF_COMPLIANCE_EXPERIMENTAL) == 0:
+            continue
+          let outStrm = avformat_new_stream(output.formatCtx, nil)
+          if outStrm == nil:
+            error "Could not allocate image stream"
+          if avcodec_parameters_copy(outStrm.codecpar, strm.codecpar) < 0:
+            error "Could not copy image codec parameters"
+          if outStrm.codecpar.width == 0 or outStrm.codecpar.height == 0:
+            if strm.codecpar.codec_id == ID_PNG:
+              let (w, h) = pngDimensions(strm.attached_pic.data, strm.attached_pic.size)
+              if w > 0 and h > 0:
+                outStrm.codecpar.width = w
+                outStrm.codecpar.height = h
+          outStrm.time_base = strm.time_base
+          outStrm.disposition = strm.disposition
+          if strm.metadata != nil:
+            discard av_dict_copy(addr outStrm.metadata, strm.metadata, 0)
+          imageStreams.add((outStrm, addr strm.attached_pic))
 
   output.startEncoding()
 
@@ -372,6 +406,13 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       outPacket.stream_index = audioStreams[i].index
       av_packet_rescale_ts(outPacket, aEncCtx.time_base, audioStreams[i].time_base)
       output.mux(outPacket[])
+      av_packet_unref(outPacket)
+
+  # Copy embedded images
+  for (outStream, cachedPkt) in imageStreams:
+    if cachedPkt != nil and av_packet_ref(outPacket, cachedPkt) >= 0:
+      outPacket.stream_index = outStream.index
+      discard av_interleaved_write_frame(output.formatCtx, outPacket)
       av_packet_unref(outPacket)
 
   # Process subtitle streams
