@@ -939,9 +939,7 @@ task makewasmweb, "Compile to wasm for browser (requires emscripten, wabt)":
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
   else:
-    exec "nim c -d:danger --panics:on -d:wasmBuild -d:nimNoGetRandom --passC:-flto --passL:-flto --threads:on --os:linux --cpu:wasm32 --cc:clang " &
-        "--clang.exe:emcc " &
-        "--clang.linkerexe:emcc " &
+    exec "nim c -d:danger --panics:on -d:emscripten --passC:-flto --passL:-flto --threads:on --os:linux --cpu:wasm32 " &
         "--passC:-pthread " &
         "--passC:-g0 " &
         "--passL:-pthread " &

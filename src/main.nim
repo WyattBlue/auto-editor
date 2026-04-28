@@ -1,15 +1,15 @@
 import std/[options, os, parseutils, sequtils, strformat, strutils]
-when not defined(wasmBuild):
+when not defined(emscripten):
   import std/[osproc, uri]
   import cmds/completion
-when defined(wasmBuild):
+when defined(emscripten):
   {.emit: """
 extern int main(int argc, char** argv, char** env);
 int __main_argc_argv(int argc, char** argv) {
   return main(argc, argv, (char**)0);
 }
 """.}
-when not defined(windows) and not defined(wasmBuild):
+when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
 import ./[about, cli, conductor, edit, ffmpeg, log]
@@ -24,13 +24,12 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
-when not defined(wasmBuild) and not defined(windows):
-  when defined(debug):
-    import std/[posix, strutils]
-    proc sigsegvHandler(sig: cint) {.noconv.} =
-      writeStackTrace()
-      exitnow(1)
-    discard signal(SIGSEGV, sigsegvHandler)
+when defined(debug) and not defined(emscripten) and not defined(windows):
+  import std/[posix, strutils]
+  proc sigsegvHandler(sig: cint) {.noconv.} =
+    writeStackTrace()
+    exitnow(1)
+  discard signal(SIGSEGV, sigsegvHandler)
 
 
 proc printHelp() {.noreturn.} =
@@ -174,7 +173,7 @@ proc validateKey(val: string): (bool, string) =
   return (false, "Incorrect key")
 
 
-when not defined(wasmBuild):
+when not defined(emscripten):
   proc downloadVideo(myInput: string, args: mainArgs): string =
     conwrite("Downloading video...")
 
@@ -424,7 +423,7 @@ judge making cuts.
     echo "Auto-Editor: ", version
     when defined(windows):
       echo "OS: Windows ", when hostCPU == "amd64": "x86_64" else: hostCPU
-    elif defined(wasmBuild):
+    elif defined(emscripten):
       echo "OS: wasm32"
     else:
       let plat = uname()
@@ -448,7 +447,7 @@ judge making cuts.
 
   for i, myInput in args.inputs:
     if myInput.startsWith("http://") or myInput.startsWith("https://"):
-      when defined(wasmBuild):
+      when defined(emscripten):
         error "URL inputs are not supported in the wasm build."
       else:
         args.inputs[i] = downloadVideo(myInput, args)

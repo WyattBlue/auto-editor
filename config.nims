@@ -17,6 +17,11 @@ else:
   when hostCPU == "wasm32":
     switch("passC", "-I./build_wasm/include")
     switch("passL", "-L./build_wasm/lib")
+    switch("define", "noSignalHandler")
+    switch("define", "nimNoGetRandom")
+    --cc:clang
+    --clang.exe:emcc
+    --clang.linkerexe:emcc
   else:
     switch("passC", "-I./build/include")
     switch("passL", "-L./build/lib")
