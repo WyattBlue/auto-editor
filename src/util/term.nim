@@ -1,6 +1,6 @@
 import std/terminal
 
-when defined(wasmBuild):
+when defined(emscripten):
   {.emit: "#include <emscripten.h>".}
   proc terminalWidth*(): int = 80
   proc wasmProgressWrite*(text: cstring) =

@@ -96,7 +96,7 @@ proc progressWorker(data: ThreadData) {.thread.} =
   var columns = terminalWidth()
 
   while not data.shouldStop.load():
-    when not defined(windows) and not defined(wasmBuild):
+    when not defined(windows) and not defined(emscripten):
       if termResized.load():
         columns = terminalWidth()
         termResized.store(false)
@@ -114,7 +114,7 @@ proc progressWorker(data: ThreadData) {.thread.} =
 
     let output = formatProgressOutput(config, data.title, data.lenTitle, columns,
         progress, rate, data.begin, currentProgress, total)
-    when defined(wasmBuild):
+    when defined(emscripten):
       wasmProgressWrite(output.cstring)
     else:
       stdout.write(output & "\r")

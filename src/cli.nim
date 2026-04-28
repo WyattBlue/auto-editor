@@ -12,7 +12,7 @@ const commands*: seq[CmdDef] = @[
   CmdDef(name: "subdump", help: "Dump text-based subtitles to stdout with formatting stripped out"),
   CmdDef(name: "whisper", help: "Transcribe audio with ggml models\nUsage: <file> <model> [options]"),
 ] & (
-  when defined(wasmBuild): @[] else: @[CmdDef(name: "completion", help: "Generate completions for shells")]
+  when defined(emscripten): @[] else: @[CmdDef(name: "completion", help: "Generate completions for shells")]
 )
 
 type Categories* = enum

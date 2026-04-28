@@ -1,5 +1,5 @@
 import std/[json, math, strformat, strutils, sequtils, tables]
-when not defined(wasmBuild):
+when not defined(emscripten):
   import std/[memfiles, os]
 
 import ../[av, ffmpeg, log, timeline]
@@ -77,7 +77,7 @@ type
     ownsContainer*: bool
 
   AudioBuffer = ref object
-    when not defined(wasmBuild):
+    when not defined(emscripten):
       memFile*: MemFile
       tempFilePath*: string
     else:
@@ -93,7 +93,7 @@ proc newAudioBuffer(index: int32, samples: int, channels: cint): AudioBuffer =
   result.channels = channels
   result.size = samples * channels * sizeof(int16)
 
-  when defined(wasmBuild):
+  when defined(emscripten):
     result.heapData = newSeq[int16](samples * channels)
     result.data = cast[ptr UncheckedArray[int16]](addr result.heapData[0])
   else:
@@ -874,7 +874,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       av_frame_free(addr frame)
       for getter in samples.values:
         getter.close()
-      when not defined(wasmBuild):
+      when not defined(emscripten):
         audioBuffer.memFile.close()
 
 proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm,

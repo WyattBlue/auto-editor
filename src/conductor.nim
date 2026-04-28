@@ -1,5 +1,5 @@
 import std/[options, os, random, sets, sequtils, strformat, strutils, terminal, times]
-when not defined(wasmBuild):
+when not defined(emscripten):
   from std/browsers import openDefaultBrowser
 from std/math import round
 
@@ -384,6 +384,6 @@ proc editMedia*(args: var mainArgs) =
   if args.noOpen:
     discard
   elif args.open:
-    when not defined(wasmBuild):
+    when not defined(emscripten):
       openDefaultBrowser(output)
   closeTempDir()
