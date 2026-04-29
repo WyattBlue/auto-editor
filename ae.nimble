@@ -934,7 +934,7 @@ Cflags: -I${{includedir}}
       --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(wasmPackages, crossWasm=true))
     makeInstall()
 
-task makewasmweb, "Compile to wasm for browser (requires emscripten, wabt)":
+task makewasm, "Compile to wasm32 (requires emscripten, wabt)":
   echo "Compiling for wasm (browser)..."
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
