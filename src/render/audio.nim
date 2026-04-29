@@ -299,12 +299,18 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: ref AVChannelLayout):
     case effect.kind
     of actSpeed:
       const maxAtempo = 6.0
+      const minAtempo = 0.5
       var remainingSpeed = effect.val
       while remainingSpeed > maxAtempo:
         filters.add &"atempo={maxAtempo}"
         remainingSpeed = remainingSpeed / maxAtempo
-      if remainingSpeed > 1.0 or remainingSpeed < 1.0:
+      while remainingSpeed < minAtempo:
+        filters.add &"atempo={minAtempo}"
+        remainingSpeed = remainingSpeed / minAtempo
+
+      if remainingSpeed != 1.0:
         filters.add &"atempo={remainingSpeed}"
+
     of actVarispeed:
       let clampedSpeed = max(0.2, min(100.0, effect.val))
       filters.add &"asetrate={sr}*{clampedSpeed}"
