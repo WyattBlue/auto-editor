@@ -1,4 +1,4 @@
-import std/strutils
+import std/[strformat, strutils]
 
 var enableVpx = getEnv("DISABLE_VPX").len == 0
 var enableSvtav1 = getEnv("DISABLE_SVTAV1").len == 0
@@ -14,16 +14,19 @@ when defined(dynamic):
   if ffmpegLibs.exitCode == 0:
     switch("passL", ffmpegLibs.output.strip())
 else:
+  let buildPath = (
+    if hostCPU == "wasm32": "build_wasm"
+    elif hostOS == "windows" and hostCPU == "arm64": "build_winarm"
+    elif hostOS == "windows" and hostCPU != "arm64": "build_win"
+    else: "build"
+  )
+  switch("passC", &"-I./{buildPath}/include")
+  switch("passL", &"-L./{buildPath}/lib")
   when hostCPU == "wasm32":
-    switch("passC", "-I./build_wasm/include")
-    switch("passL", "-L./build_wasm/lib")
     switch("define", "noSignalHandler")
     --cc:clang
     --clang.exe:emcc
     --clang.linkerexe:emcc
-  else:
-    switch("passC", "-I./build/include")
-    switch("passL", "-L./build/lib")
 
 # See for details: https://simonbyrne.github.io/notes/fastmath/
 switch("passC", "-fno-signaling-nans -fno-math-errno -fno-trapping-math -fno-signed-zeros")

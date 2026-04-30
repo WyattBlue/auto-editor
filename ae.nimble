@@ -21,7 +21,9 @@ var enable12bit = getEnv("ENABLE_12BIT").len > 0
 let enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 let enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
-let buildPath = absolutePath("build")
+let nativeBuildPath = absolutePath("build")
+let winBuildPath = absolutePath("build_win")
+let winArmBuildPath = absolutePath("build_winarm")
 let wasmBuildPath = absolutePath("build_wasm")
 
 proc stripProgram(forWasm, gccWin, llvmWin: bool = false) =
@@ -62,6 +64,8 @@ task brewmake, "Build auto-editor with deps dynamically linked.":
 
 task cleanff, "Clean build files":
   rmDir "build"
+  rmDir "build_win"
+  rmDir "build_winarm"
   rmDir "build_wasm"
   for kind, path in walkDir("ffmpeg_sources"):
     if kind == pcDir: rmDir path
@@ -224,7 +228,7 @@ let ffmpeg = Package(
   sha256: "b072aed6871998cce9b36e7774033105ca29e33632be5b6347f3206898e0756a",
 )
 
-proc selectPackages(enableWhisper: bool, crossWindowsArm: bool = false): seq[Package] =
+proc selectPackages(crossWindowsArm: bool = false): seq[Package] =
   result = @[]
   if not defined(macosx) and not crossWindowsArm:
     result.add nvheaders
@@ -601,11 +605,11 @@ proc x265Build(buildPath: string, crossWindows, crossWindowsArm: bool) =
   # Install from 8bit build
   exec &"cmake --install {dir8bit}"
 
-proc ffmpegSetup(crossWindows: bool, crossWindowsArm: bool = false) =
+proc ffmpegSetup(buildPath: string, crossWindows, crossWindowsArm: bool = false) =
   mkDir("ffmpeg_sources")
   mkDir("build")
 
-  let packages = selectPackages(enableWhisper, crossWindowsArm=crossWindowsArm)
+  let packages = selectPackages(crossWindowsArm=crossWindowsArm)
 
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
@@ -746,6 +750,8 @@ task downloaddeps, "Download and Extract Cxx Dependencies":
 
 task makeff, "Build FFmpeg from source":
   setupDeps()
+  let buildPath = nativeBuildPath
+
   # Set PKG_CONFIG_PATH to include both standard and architecture-specific paths
   var pkgConfigPaths = @[buildPath / "lib/pkgconfig"]
   when defined(linux):
@@ -759,9 +765,8 @@ task makeff, "Build FFmpeg from source":
     pkgConfigPaths.add(buildPath / "share/pkgconfig")
   putEnv("PKG_CONFIG_PATH", pkgConfigPaths.join(":"))
 
-  ffmpegSetup(crossWindows=false)
-
-  let packages = selectPackages(enableWhisper=enableWhisper)
+  ffmpegSetup(buildPath)
+  let packages = selectPackages()
 
   let ffmpegSrcDir = absolutePath("ffmpeg_sources/ffmpeg")
   let ffmpegBuildDir = buildPath / "pkg" / "ffmpeg"
@@ -780,20 +785,20 @@ task makeff, "Build FFmpeg from source":
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
   setupDeps()
-  putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
+  putEnv("PKG_CONFIG_PATH", winBuildPath / "lib/pkgconfig")
 
-  ffmpegSetup(crossWindows=true)
-  let packages = selectPackages(enableWhisper=enableWhisper)
+  ffmpegSetup(winBuildPath, crossWindows=true)
+  let packages = selectPackages()
 
   # Configure and build FFmpeg with MinGW
   let ffmpegSrcDirWin = absolutePath("ffmpeg_sources/ffmpeg")
-  let ffmpegBuildDirWin = buildPath / "pkg" / "ffmpeg"
+  let ffmpegBuildDirWin = winBuildPath / "pkg" / "ffmpeg"
   mkDir(ffmpegBuildDirWin)
   withDir ffmpegBuildDirWin:
-    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" {ffmpegSrcDirWin}/configure --prefix="{buildPath}" \
+    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{winBuildPath}/lib/pkgconfig" {ffmpegSrcDirWin}/configure --prefix="{winBuildPath}" \
       --pkg-config-flags="--static" \
-      --extra-cflags="-I{buildPath}/include" \
-      --extra-ldflags="-L{buildPath}/lib" \
+      --extra-cflags="-I{winBuildPath}/include" \
+      --extra-ldflags="-L{winBuildPath}/lib" \
       --extra-libs="-lpthread -lm -lstdc++" \
       --arch=x86_64 \
       --target-os=mingw32 \
@@ -804,7 +809,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 task windows, "Cross-compile to Windows (requires mingw-w64)":
   echo "Cross-compiling for Windows (64-bit)..."
 
-  if not dirExists("build"):
+  if not dirExists(winBuildPath):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
     # lto causes issues with GCC.
@@ -817,24 +822,23 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
 
 task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
   setupDeps()
-  let pkgConfigPath = buildPath / "lib/pkgconfig"
+  let pkgConfigPath = winArmBuildPath  / "lib/pkgconfig"
   putEnv("PKG_CONFIG_PATH", pkgConfigPath)
   putEnv("PKG_CONFIG_LIBDIR", pkgConfigPath)
 
-  ffmpegSetup(crossWindows=false, crossWindowsArm=true)
-
-  let packages = selectPackages(enableWhisper=enableWhisper, crossWindowsArm=true)
+  ffmpegSetup(winArmBuildPath, crossWindowsArm=true)
+  let packages = selectPackages(crossWindowsArm=true)
 
   # Configure and build FFmpeg with llvm-mingw for ARM64
   let ffmpegSrcDirWinArm = absolutePath("ffmpeg_sources/ffmpeg")
-  let ffmpegBuildDirWinArm = buildPath / "pkg" / "ffmpeg"
+  let ffmpegBuildDirWinArm = winArmBuildPath / "pkg" / "ffmpeg"
   mkDir(ffmpegBuildDirWinArm)
   withDir ffmpegBuildDirWinArm:
-    exec (&"""CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib PKG_CONFIG_PATH="{pkgConfigPath}" PKG_CONFIG_LIBDIR="{pkgConfigPath}" {ffmpegSrcDirWinArm}/configure --prefix="{buildPath}" \
+    exec (&"""CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib PKG_CONFIG_PATH="{pkgConfigPath}" PKG_CONFIG_LIBDIR="{pkgConfigPath}" {ffmpegSrcDirWinArm}/configure --prefix="{winArmBuildPath}" \
       --pkg-config=pkg-config \
       --pkg-config-flags="--static" \
-      --extra-cflags="-I{buildPath}/include" \
-      --extra-ldflags="-L{buildPath}/lib" \
+      --extra-cflags="-I{winArmBuildPath}/include" \
+      --extra-ldflags="-L{winArmBuildPath}/lib" \
       --extra-libs="-lpthread -lm -lstdc++" \
       --arch=aarch64 \
       --target-os=mingw32 \
@@ -845,7 +849,7 @@ task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
 task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
   echo "Cross-compiling for Windows ARM64..."
 
-  if not dirExists("build"):
+  if not dirExists(winArmBuildPath):
     echo "FFmpeg for Windows ARM64 not found. Run 'nimble makeffwinarm' first."
   else:
     exec "nim c -d:danger --panics:on --os:windows --cpu:arm64 --cc:clang " &
