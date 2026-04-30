@@ -21,10 +21,12 @@ var enable12bit = getEnv("ENABLE_12BIT").len > 0
 let enableWhisper = getEnv("DISABLE_WHISPER").len == 0
 let enableVpl = getEnv("DISABLE_VPL").len == 0 and not defined(macosx)
 
-let nativeBuildPath = absolutePath("build")
-let winBuildPath = absolutePath("build_win")
-let winArmBuildPath = absolutePath("build_winarm")
-let wasmBuildPath = absolutePath("build_wasm")
+let
+  nativeBuildPath = absolutePath("build")
+  winBuildPath = absolutePath("build_win")
+  winArmBuildPath = absolutePath("build_winarm")
+  wasmBuildPath = absolutePath("build_wasm")
+  ffmpegSrcDir = absolutePath("ffmpeg_sources/ffmpeg")
 
 proc stripProgram(forWasm, gccWin, llvmWin: bool = false) =
   var file = "auto-editor"
@@ -605,12 +607,12 @@ proc x265Build(buildPath: string, crossWindows, crossWindowsArm: bool) =
   # Install from 8bit build
   exec &"cmake --install {dir8bit}"
 
-proc ffmpegSetup(buildPath: string, crossWindows, crossWindowsArm: bool = false) =
+proc ffmpegSetup(buildPath: string): seq[Package] =
+  let crossWindows = buildPath.endsWith("_win")
+  let crossWindowsArm = buildPath.endsWith("_winarm")
+  let packages = selectPackages(crossWindowsArm)
+
   mkDir("ffmpeg_sources")
-  mkDir("build")
-
-  let packages = selectPackages(crossWindowsArm=crossWindowsArm)
-
   withDir "ffmpeg_sources":
     for package in @[ffmpeg] & packages:
       package.download()
@@ -657,7 +659,7 @@ proc ffmpegSetup(buildPath: string, crossWindows, crossWindowsArm: bool = false)
                 echo "RUN: ", cmd
                 exec cmd
               makeInstall()
-
+  return packages
 
 proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: bool = false): string =
   var enableEncoders: seq[string] = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,prores,prores_aw,prores_ks,srt,ssa,text,webvtt".split(",")
@@ -765,10 +767,8 @@ task makeff, "Build FFmpeg from source":
     pkgConfigPaths.add(buildPath / "share/pkgconfig")
   putEnv("PKG_CONFIG_PATH", pkgConfigPaths.join(":"))
 
-  ffmpegSetup(buildPath)
-  let packages = selectPackages()
+  let packages = ffmpegSetup(buildPath)
 
-  let ffmpegSrcDir = absolutePath("ffmpeg_sources/ffmpeg")
   let ffmpegBuildDir = buildPath / "pkg" / "ffmpeg"
   mkDir(ffmpegBuildDir)
   withDir ffmpegBuildDir:
@@ -786,16 +786,12 @@ task makeff, "Build FFmpeg from source":
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
   setupDeps()
   putEnv("PKG_CONFIG_PATH", winBuildPath / "lib/pkgconfig")
+  let packages = ffmpegSetup(winBuildPath)
 
-  ffmpegSetup(winBuildPath, crossWindows=true)
-  let packages = selectPackages()
-
-  # Configure and build FFmpeg with MinGW
-  let ffmpegSrcDirWin = absolutePath("ffmpeg_sources/ffmpeg")
   let ffmpegBuildDirWin = winBuildPath / "pkg" / "ffmpeg"
   mkDir(ffmpegBuildDirWin)
   withDir ffmpegBuildDirWin:
-    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{winBuildPath}/lib/pkgconfig" {ffmpegSrcDirWin}/configure --prefix="{winBuildPath}" \
+    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{winBuildPath}/lib/pkgconfig" {ffmpegSrcDir}/configure --prefix="{winBuildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{winBuildPath}/include" \
       --extra-ldflags="-L{winBuildPath}/lib" \
@@ -826,15 +822,12 @@ task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
   putEnv("PKG_CONFIG_PATH", pkgConfigPath)
   putEnv("PKG_CONFIG_LIBDIR", pkgConfigPath)
 
-  ffmpegSetup(winArmBuildPath, crossWindowsArm=true)
-  let packages = selectPackages(crossWindowsArm=true)
+  let packages = ffmpegSetup(winArmBuildPath)
 
-  # Configure and build FFmpeg with llvm-mingw for ARM64
-  let ffmpegSrcDirWinArm = absolutePath("ffmpeg_sources/ffmpeg")
   let ffmpegBuildDirWinArm = winArmBuildPath / "pkg" / "ffmpeg"
   mkDir(ffmpegBuildDirWinArm)
   withDir ffmpegBuildDirWinArm:
-    exec (&"""CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib PKG_CONFIG_PATH="{pkgConfigPath}" PKG_CONFIG_LIBDIR="{pkgConfigPath}" {ffmpegSrcDirWinArm}/configure --prefix="{winArmBuildPath}" \
+    exec (&"""CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib PKG_CONFIG_PATH="{pkgConfigPath}" PKG_CONFIG_LIBDIR="{pkgConfigPath}" {ffmpegSrcDir}/configure --prefix="{winArmBuildPath}" \
       --pkg-config=pkg-config \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{winArmBuildPath}/include" \
@@ -915,11 +908,10 @@ Libs: -L${{libdir}} -lmp3lame
 Cflags: -I${{includedir}}
 """)
 
-  let ffmpegSrcDirWasm = absolutePath("ffmpeg_sources/ffmpeg")
   let ffmpegBuildDirWasm = wasmBuildPath / "pkg" / "ffmpeg"
   mkDir(ffmpegBuildDirWasm)
   withDir ffmpegBuildDirWasm:
-    exec (&"""PKG_CONFIG_PATH="{wasmBuildPath}/lib/pkgconfig" {ffmpegSrcDirWasm}/configure --prefix="{wasmBuildPath}" \
+    exec (&"""PKG_CONFIG_PATH="{wasmBuildPath}/lib/pkgconfig" {ffmpegSrcDir}/configure --prefix="{wasmBuildPath}" \
       --cc=emcc \
       --cxx=em++ \
       --ar=emar \
