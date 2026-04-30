@@ -389,6 +389,8 @@ judge making cuts.
       args.crf = val.int8
     of "vprofile":
       args.vprofile = key
+    of "preset":
+      args.preset = key
     of "acodec":
       args.audioCodec = key
     of "layout":
