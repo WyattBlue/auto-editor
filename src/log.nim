@@ -142,7 +142,8 @@ type mainArgs* = object
 
   # Rendering
   videoCodec*: string = "auto"
-  vprofile*: string
+  preset*: string = ""
+  vprofile*: string = ""
   audioCodec*: string = "auto"
   audioLayout*: string = ""
   videoBitrate*: int = -1

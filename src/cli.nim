@@ -170,6 +170,8 @@ Examples:
     help: "Set the Constant Rate Factor for quality-based encoding. Lower = better quality. [0-63]"),
   OptDef(names: "-profile:v, -vprofile", c: cVid, datum: "vprofile",
     metavar: "PROFILE", help: "Set the video profile. For h264: high, main, or baseline"),
+  OptDef(names: "-preset, --preset", c: cVid, datum: "preset", metavar: "PRESET",
+    help: "Set the video encoder's preset (e.g. ultrafast, medium, slow)"),
   OptDef(names: "--scale", c: cVid, datum: "scale", metavar: "NUM",
     help: "Scale the output video's resolution by NUM factor"),
   OptDef(names: "--no-seek", c: cVid, kind: Flag, datum: "args.noSeek",

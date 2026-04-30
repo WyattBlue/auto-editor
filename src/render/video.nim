@@ -370,6 +370,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     discard av_opt_set(encoderCtx.priv_data, "crf", cstring($args.crf), 0)
     debug &"crf: {args.crf}"
 
+  if args.preset != "":
+    discard av_opt_set(encoderCtx.priv_data, "preset", cstring(args.preset), 0)
+    debug &"preset: {args.preset}"
+
   encoderCtx.pix_fmt = pix_fmt
   encoderCtx.open()
   pix_fmt = encoderCtx.pix_fmt
