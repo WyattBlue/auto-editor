@@ -152,32 +152,32 @@ iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecCo
 
 iterator flushDecode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext,
     frame: ptr AVFrame): ptr AVFrame =
+  ## Drain-first decode loop. Always pulls all available frames out of the
+  ## decoder before sending more packets, so we never hit AVERROR(EAGAIN) on
+  ## send (which would silently drop the packet under the previous pattern).
   var ret: cint
   var packet = container.packet
+  var flushed = false
 
-  var flushing = false
-  while not flushing:
-    var shouldReceive = false
+  while true:
+    ret = avcodec_receive_frame(codecCtx, frame)
+    if ret == 0:
+      yield frame
+      continue
+    if ret != AVERROR_EAGAIN:
+      break # AVERROR_EOF or fatal error
+
+    if flushed:
+      break
+
     ret = av_read_frame(container.formatContext, packet)
     if ret < 0:
-      flushing = true
-      shouldReceive = true
-      ret = avcodec_send_packet(codecCtx, nil) # Flush
+      discard avcodec_send_packet(codecCtx, nil) # signal end-of-stream
+      flushed = true
     else:
-      # Save stream_index BEFORE av_packet_unref resets it to 0
-      shouldReceive = packet.stream_index == index
-      if shouldReceive:
-        ret = avcodec_send_packet(codecCtx, packet)
+      if packet.stream_index == index:
+        discard avcodec_send_packet(codecCtx, packet)
       av_packet_unref(packet)
-
-    # Only try to receive frames if we sent a packet from the target stream or are flushing
-    if shouldReceive:
-      while true:
-        ret = avcodec_receive_frame(codecCtx, frame)
-        if ret < 0:
-          break
-        else:
-          yield frame
 
 proc seek*(container: InputContainer, offset: int64, backward: bool = true, stream: ptr AVStream = nil) =
   var flags: cint = 0
