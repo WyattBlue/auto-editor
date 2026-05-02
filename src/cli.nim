@@ -1,4 +1,4 @@
-import std/[macros, strutils]
+import std/[macros, strformat, strutils]
 
 type CmdDef* = object
   name*: string
@@ -29,6 +29,17 @@ func categoryName*(c: Categories): string =
   of cVid: "Video Rendering"
   of cAud: "Audio Rendering"
   of cMis: "Miscellaneous"
+
+type Link = object
+  href*: string
+  a*: string
+
+func `$`(link: Link): string =
+  when defined(nimscript): &"<a href=\"{link.href}\">{link.a}</a>"
+  else: &"\e]8;;{link.href}\e\\{link.a}\e]8;;\e\\"
+
+const fragmented = Link(href: "https://ffmpeg.org/ffmpeg-formats.html#Fragmentation", a: "fragmented")
+const ytDlp = Link(href: "https://github.com/yt-dlp/yt-dlp", a: "yt-dlp")
 
 type OptKind* = enum
   Regular # expecting = $datum
@@ -128,7 +139,7 @@ Examples:
     help: "Set the background as a solid RGB color"),
 
   OptDef(names: "--yt-dlp-location", c: cUrl, datum: "yt-dlp-location", metavar: "PATH",
-    help: "Set a custom path to yt-dlp"),
+    help: &"Set a custom path to {ytDlp}"),
   OptDef(names: "--download-format", c: cUrl, datum: "download-format", metavar: "FORMAT",
     help: "Set the yt-dlp download format (--format, -f)"),
   OptDef(names: "--output-format", c: cUrl, datum: "output-format", metavar: "TEMPLATE",
@@ -158,7 +169,7 @@ Examples:
   OptDef(names: "--no-faststart", c: cCon, kind: Flag, datum: "args.noFaststart",
     help: "Disable movflags +faststart, will be faster for large files"),
   OptDef(names: "--fragmented", c: cCon, kind: Flag, datum: "args.fragmented",
-    help: "Use fragmented mp4/mov to allow playback before video is complete. See: ffmpeg.org/ffmpeg-formats.html#Fragmentation"),
+    help: &"Use {fragmented} mp4/mov to allow playback before video is complete."),
   OptDef(names: "--no-fragmented", c: cCon, kind: Flag, datum: "args.noFragmented",
     help: "Do not use fragmented mp4/mov for better compatibility (default)"),
 

@@ -14,6 +14,21 @@ func b64urlDecode*(s: string): seq[byte] =
     padded &= "="
   cast[seq[byte]](base64.decode(padded))
 
+func visibleLen(s: string): int =
+  # Count only visible characters, skipping OSC escape sequences (\e]...\e\)
+  var i = 0
+  while i < s.len:
+    if s[i] == '\e' and i + 1 < s.len and s[i + 1] == ']':
+      i += 2
+      while i < s.len:
+        if s[i] == '\e' and i + 1 < s.len and s[i + 1] == '\\':
+          i += 2
+          break
+        i += 1
+    else:
+      result += 1
+      i += 1
+
 func wrapText*(text: string, width, indent: int): string =
   let text = text.strip(leading = true, trailing = true, chars = {'\n'})
   if text.len == 0:
@@ -41,7 +56,7 @@ func wrapText*(text: string, width, indent: int): string =
     for word in content.splitWhitespace():
       if currentLine.len == 0:
         currentLine = word
-      elif leadingSpaces + currentLine.len + 1 + word.len <= width:
+      elif leadingSpaces + visibleLen(currentLine) + 1 + visibleLen(word) <= width:
         currentLine &= " " & word
       else:
         if isFirst:
