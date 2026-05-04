@@ -2,7 +2,7 @@ import std/[strformat, xmltree]
 from std/os import splitFile
 from std/math import log10
 
-import ../[log, ffmpeg, timeline]
+import ../[action, log, ffmpeg, timeline]
 import ../util/[color, fun]
 
 

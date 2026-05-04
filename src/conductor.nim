@@ -3,7 +3,7 @@ when not defined(emscripten):
   from std/browsers import openDefaultBrowser
 from std/math import round
 
-import ./[av, edit, ffmpeg, log, media, timeline]
+import ./[av, action, edit, ffmpeg, log, media, timeline]
 import util/[color, bar, fun, rules]
 
 import imports/[fcp7, json]

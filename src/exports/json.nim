@@ -1,6 +1,6 @@
 import std/[json, sequtils]
 
-import ../[ffmpeg, log, timeline]
+import ../[action, ffmpeg, log, timeline]
 import ../util/[color, lang]
 
 func effectGroupToJson(actions: Actions): JsonNode =
