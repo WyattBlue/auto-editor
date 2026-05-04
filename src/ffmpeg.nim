@@ -1,11 +1,9 @@
+import ./util/rational
+
 type VaList* {.importc: "va_list", header: "<stdarg.h>", bycopy.} = object
 
 proc vsnprintf*(s: cstring, n: csize_t, format: cstring, ap: VaList): cint {.
   importc, header: "<stdio.h>".}
-
-type AVRational* {.importc, completeStruct, header: "<libavutil/rational.h>", bycopy.} = object
-  num*: cint
-  den*: cint
 
 proc av_mul_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_div_q(b, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
@@ -30,29 +28,14 @@ proc `*`*(a, b: AVRational): AVRational =
 proc `/`*(a, b: AVRational): AVRational =
   av_div_q(a, b)
 
-proc `/`*[T: int64 | int32](a: T, b: AVRational): AVRational =
-  AVRational(num: a.cint, den: 1) / b
-
 proc `*`*[T: int64 | int32](a: T, b: AVRational): AVRational =
   AVRational(num: a.cint, den: 1) * b
 
-func `$`*(a: AVRational): string =
-  if a.den == 1:
-    return $a.num
-  else:
-    return $a.num & "/" & $a.den
+proc `/`*[T: int64 | int32](a: T, b: AVRational): AVRational =
+  AVRational(num: a.cint, den: 1) / b
 
 converter toDouble*(r: AVRational): cdouble =
   av_q2d(r)
-
-converter toInt64*(r: AVRational): int64 =
-  (r.num div r.den).int64
-
-converter toInt32*(r: AVRational): int32 =
-  (r.num div r.den).int32
-
-converter toAVRational*(num: int): AVRational =
-  AVRational(num: num.cint, den: 1)
 
 converter toAVRational*(s: string): AVRational =
   if s.len == 0:

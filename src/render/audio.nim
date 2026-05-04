@@ -2,8 +2,8 @@ import std/[json, math, strformat, strutils, sequtils, tables]
 when not defined(emscripten):
   import std/[memfiles, os]
 
-import ../[action, av, ffmpeg, graph, log, timeline]
-import ../resampler
+import ../[action, av, ffmpeg, graph, log, resampler, timeline]
+import ../util/rational
 
 # Import C string functions for JSON capture
 proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
@@ -120,9 +120,12 @@ proc newGetter(path: string, stream: int32, rate: cint): Getter =
   result = new(Getter)
   result.container = av.open(path)
   result.stream = result.container.audio[stream]
-  result.rate = result.stream.codecpar.sample_rate # Use source sample rate, not target
+  result.rate = rate
   result.decoderCtx = initDecoder(result.stream.codecpar)
-  result.layout = initLayout($result.stream.codecpar.ch_layout)
+  new(result.layout)
+  discard av_channel_layout_copy(
+    addr result.layout[], addr result.stream.codecpar.ch_layout
+  )
   result.ownsContainer = true
 
 proc newGetter(container: InputContainer, stream: int32): Getter =
@@ -131,7 +134,10 @@ proc newGetter(container: InputContainer, stream: int32): Getter =
   result.stream = result.container.audio[stream]
   result.rate = result.stream.codecpar.sample_rate
   result.decoderCtx = initDecoder(result.stream.codecpar)
-  result.layout = initLayout($result.stream.codecpar.ch_layout)
+  new(result.layout)
+  discard av_channel_layout_copy(
+    addr result.layout[], addr result.stream.codecpar.ch_layout
+  )
 
 proc close(getter: Getter) =
   avcodec_free_context(addr getter.decoderCtx)

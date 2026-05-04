@@ -1,7 +1,5 @@
-import ../timeline
-import ../ffmpeg
-import ../log
-import ../av
+import ../[av, log, ffmpeg, timeline]
+import ../util/rational
 
 # Simple subtitle remuxing: copy subtitle packets from source, adjusting timestamps
 # Note: This approach works well for text-based subtitles (SRT, ASS, WebVTT, etc.)

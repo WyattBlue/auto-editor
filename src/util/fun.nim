@@ -1,5 +1,5 @@
 import std/[base64, os, strutils, strformat]
-from std/math import round, trunc, gcd
+from std/math import gcd, `mod`, round, trunc
 
 import ../log
 
@@ -74,9 +74,48 @@ func wrapText*(text: string, width, indent: int): string =
 
   result = outLines.join("\n")
 
+type Code* = enum
+  webvtt, srt, mov_text, standard, ass, rass, display
+
+func toTimecode*(secs: float, fmt: Code): string =
+  var sign = ""
+  var seconds = secs
+  if seconds < 0:
+    sign = "-"
+    seconds = -seconds
+
+  let totalSeconds = seconds
+  let mFloat = totalSeconds / 60.0
+  let hFloat = mFloat / 60.0
+
+  let h = int(hFloat)
+  let m = int(mFloat) mod 60
+  let s = totalSeconds mod 60.0
+
+  case fmt:
+  of webvtt:
+    (if h == 0: &"{sign}{m:02d}:{s:06.3f}" else: &"{sign}{h:02d}:{m:02d}:{s:06.3f}")
+  of srt, mov_text:
+    let sStr = (&"{s:06.3f}").replace(".", ",")
+    &"{sign}{h:02d}:{m:02d}:{sStr}"
+  of standard:
+    &"{sign}{h:02d}:{m:02d}:{s:06.3f}"
+  of ass:
+    &"{sign}{h:d}:{m:02d}:{s:05.2f}"
+  of rass:
+    &"{sign}{h:d}:{m:02d}:{s:02.0f}"
+  of display:
+    &"{sign}{h:d}:{m:02d}:{s.round.int:02d}"
+
 func splitext*(val: string): (string, string) =
   let (dir, name, ext) = splitFile(val)
   return (dir & "/" & name, ext)
+
+func aspectRatio*(width, height: int): tuple[w, h: int] =
+  if height == 0:
+    return (0, 0)
+  let c = gcd(width, height)
+  return (width div c, height div c)
 
 proc splitNumStr*(val: string): (float64, string) =
   var index = 0
@@ -107,12 +146,6 @@ proc parseBitrate*(input: string): int =
     return int(val)
 
   error &"Unknown bitrate: {input}"
-
-func aspectRatio*(width, height: int): tuple[w, h: int] =
-  if height == 0:
-    return (0, 0)
-  let c = gcd(width, height)
-  return (width div c, height div c)
 
 proc parseTimeSimple*(val: string): PackedInt =
   const tb = 1000.0

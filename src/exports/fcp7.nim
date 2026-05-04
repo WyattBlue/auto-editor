@@ -4,6 +4,7 @@ when defined(windows):
   import std/strutils
 
 import ../[action, ffmpeg, media, timeline]
+import ../util/rational
 
 #[
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format

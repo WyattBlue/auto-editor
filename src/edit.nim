@@ -1,7 +1,7 @@
 import std/[math, options, os, sequtils, strformat, strutils]
 import ./[av, editlexer, ffmpeg, log]
 import ./analyze/[audio, motion, subtitle]
-import ./util/[bar, fun]
+import ./util/[bar, fun, rational]
 
 import ./vendor/tinyre/tinyre
 

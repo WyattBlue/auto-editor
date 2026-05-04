@@ -4,7 +4,7 @@ when not defined(emscripten):
 from std/math import round
 
 import ./[av, action, edit, ffmpeg, log, media, timeline]
-import util/[color, bar, fun, rules]
+import util/[color, bar, fun, rules, rational]
 
 import imports/[fcp7, json]
 import exports/[fcp7, fcp11, json, shotcut, kdenlive]

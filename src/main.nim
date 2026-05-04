@@ -14,7 +14,7 @@ when not defined(windows) and not defined(emscripten):
 
 import ./[about, action, cli, conductor, edit, ffmpeg, log]
 import cmds/[info, desc, cache, levels, subdump, whisper]
-import util/[color, fun, term]
+import util/[color, fun, term, rational]
 
 import vendor/tinyre/tinyre
 import vendor/libp2p/ed25519

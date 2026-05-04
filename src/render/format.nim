@@ -2,7 +2,7 @@ import std/[heapqueue, os, options, sequtils, strformat, strutils, tables]
 from std/math import round
 
 import ../[av, ffmpeg, log, media, timeline]
-import ../util/[bar, rules]
+import ../util/[bar, rules, rational]
 import video
 import audio
 import subtitle

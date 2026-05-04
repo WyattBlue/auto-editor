@@ -1,7 +1,7 @@
 import std/[math, options, strformat]
 
 import ../[av, cache, ffmpeg, log]
-import ../util/bar
+import ../util/[bar, rational]
 
 type VideoProcessor* = object
   formatCtx*: ptr AVFormatContext

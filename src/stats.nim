@@ -3,6 +3,7 @@ from std/math import round
 import csort
 
 import ./[action, av, ffmpeg, log, timeline]
+import ./util/[fun, rational]
 
 type f64 = float64
 

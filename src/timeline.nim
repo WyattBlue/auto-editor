@@ -1,8 +1,8 @@
 import std/[options, os, sets, tables]
 from std/math import round
 
-import ./[action, ffmpeg, media, log, wavutil]
-import ./util/[color, lang]
+import ./[action, av, ffmpeg, media, log, wavutil]
+import ./util/[color, lang, rational]
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]

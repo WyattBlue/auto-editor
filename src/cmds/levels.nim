@@ -1,5 +1,6 @@
 import std/[options, strformat, strutils]
 
+import ../util/rational
 import ../[av, cache, ffmpeg, log]
 import ../analyze/[audio, motion, subtitle]
 

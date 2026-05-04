@@ -1,7 +1,7 @@
 import std/[strutils, streams, tables, uri, xmlparser, xmltree]
 
-import ../[action, ffmpeg, log, timeline]
-import ../util/color
+import ../[action, av, ffmpeg, log, timeline]
+import ../util/[color, rational]
 
 func uriToPath(uri: string): string =
   var path = uri

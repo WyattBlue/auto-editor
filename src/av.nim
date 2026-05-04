@@ -1,8 +1,7 @@
 import std/[strformat, strutils, sequtils, tables, sets]
 
-import ffmpeg
-import log
-import util/[dict, lang]
+import ./[ffmpeg, log]
+import ./util/[dict, lang, rational]
 
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
@@ -467,6 +466,12 @@ func name*(stream: ptr AVStream): string =
 
   return ""
 
+proc initLayout*(layout: string): ref AVChannelLayout =
+  if layout == "":
+    error "Invalid layout"
+  new(result)
+  if av_channel_layout_from_string(addr result[], layout.cstring) < 0:
+    error "Invalid layout"
 
 func canonicalName*(codec: ptr AVCodec): string =
   return $avcodec_get_name(codec.id)
