@@ -373,7 +373,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters to stream"
 
-  let pixFmtName = $av_get_pix_fmt_name(pix_fmt)
+  let pixFmtName = $pix_fmt
   let graphTb = av_inv_q(targetFps)
   let bg = tl.bg.toString
 
@@ -554,7 +554,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               frame = scaledFrame
               if oldFrame != nil and oldFrame != nullFrame:
                 av_frame_free(addr oldFrame)
-            let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
+            let frameFmtName = $AVPixelFormat(frame.format)
             let zoomBufArgs = &"video_size={scaledW}x{scaledH}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             var zoomGraph = newGraph()
             let bufferSrc = zoomGraph.add("buffer", zoomBufArgs)
@@ -573,7 +573,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               av_frame_free(addr oldFrame2)
             zoomGraph.cleanup()
           elif effect.kind == actHflip:
-            let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
+            let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             var negGraph = newGraph()
             let bufferSrc = negGraph.add("buffer", bufferArgs)
@@ -587,7 +587,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               av_frame_free(addr oldFrame)
             negGraph.cleanup()
           elif effect.kind == actVflip:
-            let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
+            let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             var negGraph = newGraph()
             let bufferSrc = negGraph.add("buffer", bufferArgs)
@@ -601,7 +601,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               av_frame_free(addr oldFrame)
             negGraph.cleanup()
           elif effect.kind == actInvert:
-            let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
+            let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             var negGraph = newGraph()
             let bufferSrc = negGraph.add("buffer", bufferArgs)

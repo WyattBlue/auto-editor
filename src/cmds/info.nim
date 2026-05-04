@@ -42,7 +42,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo &"     - pixel aspect ratio: {v.sar}"
     if v.duration != 0.0:
       echo &"     - duration: {v.duration}"
-    echo &"     - pix fmt: {av_get_pix_fmt_name(v.pix_fmt)}"
+    echo &"     - pix fmt: {v.pix_fmt}"
 
     if v.color_range == 1:
       echo "     - color range: 1 (tv)"
@@ -96,7 +96,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo &"     - resolution: {i.width}x{i.height}"
     echo &"     - aspect ratio: {ratioWidth}:{ratioHeight}"
     echo &"     - pixel aspect ratio: {i.sar}"
-    echo &"     - pix fmt: {av_get_pix_fmt_name(i.pix_fmt)}"
+    echo &"     - pix fmt: {i.pix_fmt}"
 
     if i.color_range == 1:
       echo "     - color range: 1 (tv)"
@@ -134,7 +134,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
       "aspect_ratio": [ratioWidth, ratioHeight],
       "pixel_aspect_ratio": $v.sar,
       "duration": v.duration,
-      "pix_fmt": $av_get_pix_fmt_name(v.pix_fmt),
+      "pix_fmt": $v.pix_fmt,
       "color_range": v.color_range,
       "color_space": v.color_space,
       "color_primaries": v.color_primaries,
@@ -159,7 +159,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
       "resolution": [i.width, i.height],
       "aspect_ratio": [ratioWidth, ratioHeight],
       "pixel_aspect_ratio": $i.sar,
-      "pix_fmt": $av_get_pix_fmt_name(i.pix_fmt),
+      "pix_fmt": $i.pix_fmt,
       "color_range": i.color_range,
       "color_space": i.color_space,
       "color_primaries": i.color_primaries,

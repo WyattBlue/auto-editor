@@ -477,22 +477,6 @@ func time*(frame: ptr AVFrame, tb: AVRational): float64 =
     return -1.0
   return float(frame.pts) * float(tb.num) / float(tb.den)
 
-func prettyFrame*(frame: ptr AVFrame): string =
-  func pixFmtName(format: cint): string =
-    let name = av_get_pix_fmt_name(AVPixelFormat(format))
-    (if name != nil: $name else: "Unknown(" & $format & ")")
-
-  func sampFmtName(format: cint): string =
-    let name = av_get_sample_fmt_name(format)
-    (if name != nil: $name else: "Unknown(" & $format & ")")
-
-  if frame == nil:
-    return "<AVFrame nil>"
-  if frame.width > 2:
-    return &"<AVFrame format={pixFmtName(frame.format)} width={frame.width} height={frame.height} base={frame.time_base}>"
-
-  return &"<AVFrame format={sampFmtName(frame.format)} samples={frame.nb_samples}>"
-
 func dialogue*(assText: string): string =
   let textLen = assText.len
   var
