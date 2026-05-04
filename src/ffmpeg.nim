@@ -78,8 +78,10 @@ type
   AVColorSpace* = cint
   AVPixelFormat* = distinct cint
 
-proc `==`*(x, y: AVPixelFormat): bool {.borrow.}
-proc `$`*(a: AVPixelFormat): string {.borrow.}
+proc av_get_pix_fmt_name(pix_fmt: AVPixelFormat): cstring {.importc.}
+
+func `==`*(x, y: AVPixelFormat): bool {.borrow.}
+func `$`*(pix_fmt: AVPixelFormat): string = $av_get_pix_fmt_name(pix_fmt)
 
 const AV_PIX_FMT_NONE* = AVPixelFormat(-1)
 const AV_PIX_FMT_YUV420P* = AVPixelFormat(0)
@@ -313,7 +315,6 @@ proc avcodec_get_name*(id: AVCodecID): cstring {.importc,
 proc av_get_channel_layout_string*(buf: cstring, buf_size: cint,
     nb_channels: cint, channel_layout: uint64): cstring {.importc,
     header: "<libavutil/channel_layout.h>".}
-proc av_get_pix_fmt_name*(pix_fmt: AVPixelFormat): cstring {.importc.}
 proc avformat_query_codec*(ofmt: ptr AVOutputFormat, codec_id: AVCodecID,
   std_compliance: cint): cint {.importc, header: "<libavformat/avformat.h>".}
 

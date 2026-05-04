@@ -3,14 +3,13 @@ import std/[math, options, strformat]
 import ../[av, cache, ffmpeg, log]
 import ../util/bar
 
-type
-  VideoProcessor* = object
-    formatCtx*: ptr AVFormatContext
-    codecCtx*: ptr AVCodecContext
-    tb*: AVRational
-    videoIndex*: cint
+type VideoProcessor* = object
+  formatCtx*: ptr AVFormatContext
+  codecCtx*: ptr AVCodecContext
+  tb*: AVRational
+  videoIndex*: cint
 
-proc createFilterGraph(timeBase: AVRational, pixFmtName: cstring,
+proc createFilterGraph(timeBase: AVRational, pixFmtName: string,
     codecCtx: ptr AVCodecContext, filter: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
@@ -61,8 +60,7 @@ proc createFilterGraph(timeBase: AVRational, pixFmtName: cstring,
   if ret < 0:
     error "Could not parse filter graph"
 
-  ret = avfilter_graph_config(filterGraph, nil)
-  if ret < 0:
+  if avfilter_graph_config(filterGraph, nil) < 0:
     error "Could not configure filter graph"
 
   avfilter_inout_free(addr inputs)
@@ -89,8 +87,8 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame 
   let timeBase = processor.tb
 
   let pixelFormat = processor.codecCtx.pix_fmt
-  let pixFmtName = av_get_pix_fmt_name(pixelFormat)
-  if pixFmtName == nil:
+  let pixFmtName = $pixelFormat
+  if pixFmtName == "":
     error &"Could not get pixel format name for format: {ord(pixelFormat)}"
 
   let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(
