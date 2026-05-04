@@ -1,7 +1,7 @@
 import std/[math, options, strformat]
 
 import ../[av, cache, ffmpeg, log, resampler]
-import ../util/bar
+import ../util/[bar, rational]
 
 when defined(arm64) or defined(aarch64):
   type

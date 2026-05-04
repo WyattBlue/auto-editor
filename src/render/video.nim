@@ -1,10 +1,8 @@
-import std/[sets, tables]
-import std/options
-import std/strformat
+import std/[options, sets, strformat, tables]
 from std/math import round
 
 import ../[action, av, ffmpeg, graph, log, timeline]
-import ../util/color
+import ../util/[color, rational]
 
 # Helps with timing, may be extended.
 type VideoFrame = object

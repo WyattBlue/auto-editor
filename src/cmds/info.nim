@@ -1,7 +1,7 @@
 import std/[json, strformat, strutils]
 
 import ../[av, ffmpeg, log, media, timeline]
-import ../util/[fun, lang]
+import ../util/[fun, lang, rational]
 
 proc genericTrack(lang: Lang, bitrate: int64) =
   if bitrate != 0:

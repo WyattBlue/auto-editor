@@ -1,6 +1,7 @@
 from std/math import round
 
 import ../[av, ffmpeg]
+import ../util/rational
 import ../vendor/tinyre/tinyre
 
 proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,

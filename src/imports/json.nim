@@ -1,7 +1,7 @@
 import std/[strformat, strutils, json]
 
-import ../[action, ffmpeg, media, log, timeline]
-import ../util/[color, lang]
+import ../[action, av, ffmpeg, media, log, timeline]
+import ../util/[color, lang, rational]
 
 proc parseAction(val: string): Action =
   if val == "invert":

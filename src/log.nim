@@ -1,7 +1,9 @@
-import std/[envvars, math, options, os, strformat, strutils, tables, times]
+import std/[envvars, options, os, strformat, tables, times]
+when not defined(emscripten):
+  import std/strutils
 
 import ./[action, cli, ffmpeg]
-import util/[color, term]
+import ./util/[color, rational, term]
 
 type BarType* = enum
   modern, classic, ascii, machine, none
@@ -151,46 +153,3 @@ proc cleanup*(interner: var StringInterner) =
   for ptrStr in interner.values:
     dealloc(ptrStr)
   interner.clear()
-
-
-type Code* = enum
-  webvtt, srt, mov_text, standard, ass, rass, display
-
-func toTimecode*(secs: float, fmt: Code): string =
-  var sign = ""
-  var seconds = secs
-  if seconds < 0:
-    sign = "-"
-    seconds = -seconds
-
-  let totalSeconds = seconds
-  let mFloat = totalSeconds / 60.0
-  let hFloat = mFloat / 60.0
-
-  let h = int(hFloat)
-  let m = int(mFloat) mod 60
-  let s = totalSeconds mod 60.0
-
-  case fmt:
-  of webvtt:
-    (if h == 0: &"{sign}{m:02d}:{s:06.3f}" else: &"{sign}{h:02d}:{m:02d}:{s:06.3f}")
-  of srt, mov_text:
-    let sStr = (&"{s:06.3f}").replace(".", ",")
-    &"{sign}{h:02d}:{m:02d}:{sStr}"
-  of standard:
-    &"{sign}{h:02d}:{m:02d}:{s:06.3f}"
-  of ass:
-    &"{sign}{h:d}:{m:02d}:{s:05.2f}"
-  of rass:
-    &"{sign}{h:d}:{m:02d}:{s:02.0f}"
-  of display:
-    &"{sign}{h:d}:{m:02d}:{s.round.int:02d}"
-
-
-proc initLayout*(layout: string): ref AVChannelLayout =
-  if layout == "":
-    error "Invalid layout"
-  new(result)
-  let ret = av_channel_layout_from_string(addr result[], layout.cstring)
-  if ret < 0:
-    error "Invalid layout"

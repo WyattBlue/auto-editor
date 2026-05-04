@@ -3,6 +3,7 @@ import std/[strformat, strutils]
 from std/math import round
 
 import ../[action, ffmpeg, log, media, timeline]
+import ../util/rational
 
 #[
 Export a FCPXML 11 file readable with Final Cut Pro 10.6.8 or later.

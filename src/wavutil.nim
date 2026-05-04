@@ -1,9 +1,7 @@
 import std/strformat
 
-import av
-import ffmpeg
-import log
-import resampler
+import ./[av, ffmpeg, log, resampler]
+import ./util/rational
 
 type AudioBuffer = object
   fifo: ptr AVAudioFifo

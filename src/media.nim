@@ -1,6 +1,5 @@
-import av
-import ffmpeg
-import util/lang
+import ./[av, ffmpeg]
+import ./util/[lang, rational]
 
 type
   VideoStream* = object
