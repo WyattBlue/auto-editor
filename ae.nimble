@@ -672,7 +672,7 @@ proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: b
       enableEncoders.add &"pcm_{t}{size}le"
   enableEncoders &= "pcm_bluray,pcm_s32le_planar,pcm_s24le_planar,pcm_s16be_planar,pcm_s16le_planar,pcm_s8_planar".split(",")
 
-  var filters = "scale,crop,pad,format,gblur,lut,negate,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
+  var filters = "scale,crop,pad,format,gblur,hflip,lut,negate,vflip,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
 
   for package in packages:
     if package.name == "libvpx":

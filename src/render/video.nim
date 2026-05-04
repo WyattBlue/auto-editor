@@ -3,12 +3,8 @@ import std/options
 import std/strformat
 from std/math import round
 
-import ../log
-import ../av
-import ../ffmpeg
-import ../timeline
+import ../[action, av, ffmpeg, graph, log, timeline]
 import ../util/color
-import ../graph
 
 # Helps with timing, may be extended.
 type VideoFrame = object
@@ -576,6 +572,34 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             if oldFrame2 != nil and oldFrame2 != nullFrame:
               av_frame_free(addr oldFrame2)
             zoomGraph.cleanup()
+          elif effect.kind == actHflip:
+            let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            var negGraph = newGraph()
+            let bufferSrc = negGraph.add("buffer", bufferArgs)
+            let hFilter = negGraph.add("hflip")
+            let bufferSink = negGraph.add("buffersink")
+            negGraph.linkNodes(@[bufferSrc, hFilter, bufferSink]).configure()
+            negGraph.push(frame)
+            let oldFrame = frame
+            frame = negGraph.pull()
+            if oldFrame != nil and oldFrame != nullFrame:
+              av_frame_free(addr oldFrame)
+            negGraph.cleanup()
+          elif effect.kind == actVflip:
+            let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            var negGraph = newGraph()
+            let bufferSrc = negGraph.add("buffer", bufferArgs)
+            let vFilter = negGraph.add("vflip")
+            let bufferSink = negGraph.add("buffersink")
+            negGraph.linkNodes(@[bufferSrc, vFilter, bufferSink]).configure()
+            negGraph.push(frame)
+            let oldFrame = frame
+            frame = negGraph.pull()
+            if oldFrame != nil and oldFrame != nullFrame:
+              av_frame_free(addr oldFrame)
+            negGraph.cleanup()
           elif effect.kind == actInvert:
             let frameFmtName = $av_get_pix_fmt_name(AVPixelFormat(frame.format))
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"

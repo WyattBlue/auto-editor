@@ -1,9 +1,6 @@
 import std/[strformat, strutils, json]
 
-import ../log
-import ../timeline
-import ../ffmpeg
-import ../media
+import ../[action, ffmpeg, media, log, timeline]
 import ../util/[color, lang]
 
 proc parseAction(val: string): Action =

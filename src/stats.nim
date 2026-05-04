@@ -2,10 +2,7 @@ import std/[sets, strutils, strformat]
 from std/math import round
 import csort
 
-import av
-import ffmpeg
-import log
-import timeline
+import ./[action, av, ffmpeg, log, timeline]
 
 type f64 = float64
 

@@ -12,7 +12,7 @@ int __main_argc_argv(int argc, char** argv) {
 when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
-import ./[about, cli, conductor, edit, ffmpeg, log]
+import ./[about, action, cli, conductor, edit, ffmpeg, log]
 import cmds/[info, desc, cache, levels, subdump, whisper]
 import util/[color, fun, term]
 
@@ -236,12 +236,11 @@ proc parseActions(val: string): Actions =
     var list: seq[Action]
     for part in val.strip().split(","):
       let trimmedPart = part.strip()
-      if trimmedPart == "nil":
-        discard
-      elif trimmedPart == "cut":
-        return aCut
-      elif trimmedPart == "invert":
-        list.add Action(kind: actInvert)
+      if trimmedPart == "nil": discard
+      elif trimmedPart == "cut": return aCut
+      elif trimmedPart == "invert": list.add Action(kind: actInvert)
+      elif trimmedPart == "hflip": list.add Action(kind: actHflip)
+      elif trimmedPart == "vflip": list.add Action(kind: actVflip)
       elif trimmedPart.startsWith("speed:"):
         try:
           let value = parseFloat(trimmedPart[6 ..< trimmedPart.len])
@@ -287,9 +286,9 @@ proc actionFromUserSpeed(val: float64): Actions =
 proc parseSpeedRange(val: string): (Actions, PackedInt, PackedInt) =
   let vals = val.strip().split(",")
   if vals.len < 3:
-    error &"--set-speed has too few arguments"
+    error "--set-speed has too few arguments"
   if vals.len > 3:
-    error &"--set-speed has too many arguments"
+    error "--set-speed has too many arguments"
 
   let speed = parseSpeed(vals[0], "set-speed")
   let action = actionFromUserSpeed(speed)
@@ -455,7 +454,7 @@ judge making cuts.
         args.inputs[i] = downloadVideo(myInput, args)
     elif splitFile(myInput).ext == "":
       if dirExists(myInput):
-        error &"Input must be a file or a URL, not a directory."
+        error "Input must be a file or a URL, not a directory."
       if myInput.startsWith("-"):
         error &"Option/Input file doesn't exist: {myInput}"
       error &"Input file must have an extension: {myInput}"

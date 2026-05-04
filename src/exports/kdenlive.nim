@@ -1,5 +1,5 @@
 import std/[json, os, tables, strformat, xmltree, sysrand, strutils]
-import ../[log, timeline]
+import ../[action, log, timeline]
 import ../util/fun
 
 proc genUuid*(): string =

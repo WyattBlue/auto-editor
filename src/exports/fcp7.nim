@@ -3,7 +3,7 @@ from std/math import ceil
 when defined(windows):
   import std/strutils
 
-import ../[ffmpeg, log, media, timeline]
+import ../[action, ffmpeg, media, timeline]
 
 #[
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format

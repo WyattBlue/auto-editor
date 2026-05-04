@@ -2,9 +2,8 @@ import std/[json, math, strformat, strutils, sequtils, tables]
 when not defined(emscripten):
   import std/[memfiles, os]
 
-import ../[av, ffmpeg, log, timeline]
+import ../[action, av, ffmpeg, graph, log, timeline]
 import ../resampler
-import ../graph
 
 # Import C string functions for JSON capture
 proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
