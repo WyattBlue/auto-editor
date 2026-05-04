@@ -226,8 +226,8 @@ let x265 = Package(
 )
 let ffmpeg = Package(
   name: "ffmpeg",
-  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.1.tar.xz",
-  sha256: "b072aed6871998cce9b36e7774033105ca29e33632be5b6347f3206898e0756a",
+  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-8.1.1.tar.xz",
+  sha256: "b6863adde98898f42602017462871b5f6333e65aec803fdd7a6308639c52edf3",
 )
 
 proc selectPackages(crossWindowsArm: bool = false): seq[Package] =
