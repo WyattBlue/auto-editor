@@ -275,6 +275,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var targetWidth = tl.res[0]
   var targetHeight = tl.res[1]
   var scaleGraph: Graph = nil
+  var fxGraph: Graph = nil
+  var fxKey = ""
   var needsScaling = false
 
   if args.scale != 1.0:
@@ -554,64 +556,47 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
                 av_frame_free(addr oldFrame)
             let frameFmtName = $AVPixelFormat(frame.format)
             let zoomBufArgs = &"video_size={scaledW}x{scaledH}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            var zoomGraph = newGraph()
-            let bufferSrc = zoomGraph.add("buffer", zoomBufArgs)
-            if effect.val > 1.0:
-              let cropFilter = zoomGraph.add("crop", &"{origW}:{origH}")
-              let bufferSink = zoomGraph.add("buffersink")
-              zoomGraph.linkNodes(@[bufferSrc, cropFilter, bufferSink]).configure()
-            else:
-              let padFilter = zoomGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
-              let bufferSink = zoomGraph.add("buffersink")
-              zoomGraph.linkNodes(@[bufferSrc, padFilter, bufferSink]).configure()
-            zoomGraph.push(frame)
+            let zoomMode = if effect.val > 1.0: "crop" else: "pad"
+            let key = &"zoom|{zoomMode}|{origW}x{origH}|{bg}|{zoomBufArgs}"
+            if fxKey != key:
+              if fxGraph != nil:
+                fxGraph.cleanup()
+              fxGraph = newGraph()
+              let bufferSrc = fxGraph.add("buffer", zoomBufArgs)
+              let mid = if effect.val > 1.0:
+                  fxGraph.add("crop", &"{origW}:{origH}")
+                else:
+                  fxGraph.add("pad", &"{origW}:{origH}:-1:-1:color={bg}")
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(@[bufferSrc, mid, bufferSink]).configure()
+              fxKey = key
+            fxGraph.push(frame)
             let oldFrame2 = frame
-            frame = zoomGraph.pull()
+            frame = fxGraph.pull()
             if oldFrame2 != nil and oldFrame2 != nullFrame:
               av_frame_free(addr oldFrame2)
-            zoomGraph.cleanup()
-          elif effect.kind == actHflip:
+          elif effect.kind in {actHflip, actVflip, actInvert}:
+            let filterName = case effect.kind
+              of actHflip: "hflip"
+              of actVflip: "vflip"
+              else: "negate"
             let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            var negGraph = newGraph()
-            let bufferSrc = negGraph.add("buffer", bufferArgs)
-            let hFilter = negGraph.add("hflip")
-            let bufferSink = negGraph.add("buffersink")
-            negGraph.linkNodes(@[bufferSrc, hFilter, bufferSink]).configure()
-            negGraph.push(frame)
+            let key = filterName & "|" & bufferArgs
+            if fxKey != key:
+              if fxGraph != nil:
+                fxGraph.cleanup()
+              fxGraph = newGraph()
+              let bufferSrc = fxGraph.add("buffer", bufferArgs)
+              let filt = fxGraph.add(filterName)
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+              fxKey = key
+            fxGraph.push(frame)
             let oldFrame = frame
-            frame = negGraph.pull()
+            frame = fxGraph.pull()
             if oldFrame != nil and oldFrame != nullFrame:
               av_frame_free(addr oldFrame)
-            negGraph.cleanup()
-          elif effect.kind == actVflip:
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            var negGraph = newGraph()
-            let bufferSrc = negGraph.add("buffer", bufferArgs)
-            let vFilter = negGraph.add("vflip")
-            let bufferSink = negGraph.add("buffersink")
-            negGraph.linkNodes(@[bufferSrc, vFilter, bufferSink]).configure()
-            negGraph.push(frame)
-            let oldFrame = frame
-            frame = negGraph.pull()
-            if oldFrame != nil and oldFrame != nullFrame:
-              av_frame_free(addr oldFrame)
-            negGraph.cleanup()
-          elif effect.kind == actInvert:
-            let frameFmtName = $AVPixelFormat(frame.format)
-            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-            var negGraph = newGraph()
-            let bufferSrc = negGraph.add("buffer", bufferArgs)
-            let negFilter = negGraph.add("negate")
-            let bufferSink = negGraph.add("buffersink")
-            negGraph.linkNodes(@[bufferSrc, negFilter, bufferSink]).configure()
-            negGraph.push(frame)
-            let oldFrame = frame
-            frame = negGraph.pull()
-            if oldFrame != nil and oldFrame != nullFrame:
-              av_frame_free(addr oldFrame)
-            negGraph.cleanup()
 
       # Validate frame before reformatting
       if frame != nil and (frame.width <= 0 or frame.height <= 0):
@@ -648,6 +633,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
     if scaleGraph != nil:
       scaleGraph.cleanup()
+    if fxGraph != nil:
+      fxGraph.cleanup()
     if reformatCtx != nil:
       sws_free_context(addr reformatCtx)
     if lastProcessedFrame != nil and lastProcessedFrame != nullFrame:

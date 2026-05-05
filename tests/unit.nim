@@ -2,7 +2,7 @@ import unittest
 import std/[os, tempfiles]
 
 import ../src/[av, conductor, ffmpeg, media, timeline, wavutil]
-import ../src/util/[color, fun, lang]
+import ../src/util/[color, fun, lang, rational]
 import ../src/exports/[kdenlive, fcp11]
 import ../src/vendor/tinyre/tinyre
 

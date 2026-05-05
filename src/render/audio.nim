@@ -683,11 +683,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     analysisGraph.flush()
 
     # Pull all output frames from analysis (and discard them - we only need the stats)
-    while true:
-      let outputFrame = analysisGraph.tryPull()
-      if outputFrame == nil:
-        break
-      av_frame_free(addr outputFrame)
+    while analysisGraph.pullTransient() != nil:
+      discard
 
     analysisGraph.cleanup()
     disableLoudnormCapture()
@@ -759,7 +756,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     # Pull all output frames
     var outputSamplesWritten = 0
     while true:
-      let outputFrame = loudnormGraph.tryPull()
+      let outputFrame = loudnormGraph.pullTransient()
       if outputFrame == nil:
         break
 
@@ -812,7 +809,6 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         error &"Unexpected output format from loudnorm: {outputFrame.format}"
 
       outputSamplesWritten += frameSamples
-      av_frame_free(addr outputFrame)
 
     # Copy normalized data back to audioBuffer
     # Take only what fits in audioBuffer (which is sized for totalSamples)

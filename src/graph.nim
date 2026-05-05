@@ -4,21 +4,26 @@ import ffmpeg
 import log
 
 type Graph* = ref object
+  # nodes[0] is the buffer/abuffer source; nodes[^1] is the buffer/abuffer sink.
   nodes: seq[ptr AVFilterContext]
   graph: ptr AVFilterGraph
+  recvFrame: ptr AVFrame
   configured: bool = false
 
 proc newGraph*(): Graph =
   result = Graph()
-  result.nodes = @[]
   result.graph = avfilter_graph_alloc()
   if result.graph == nil:
     error "Could not allocate filter graph"
 
 proc cleanup*(graph: Graph) =
-  if graph != nil and graph.graph != nil:
+  if graph == nil:
+    return
+  if graph.recvFrame != nil:
+    av_frame_free(addr graph.recvFrame)
+  if graph.graph != nil:
     avfilter_graph_free(addr graph.graph)
-    graph.graph = nil
+    graph.nodes.setLen(0)
 
 proc add*(graph: Graph, name: string, filterArgs: string = ""): ptr AVFilterContext =
   if graph.configured:
@@ -51,7 +56,7 @@ proc linkNodes*(graph: Graph, nodes: seq[ptr AVFilterContext]): Graph =
 
   # Link nodes sequentially: nodes[0] -> nodes[1] -> nodes[2] -> ...
   for i in 0 ..< (nodes.len - 1):
-    var ret = avfilter_link(nodes[i], 0, nodes[i + 1], 0)
+    let ret = avfilter_link(nodes[i], 0, nodes[i + 1], 0)
     if ret < 0:
       error &"Could not link node {i} to node {i + 1}: {ret}"
 
@@ -60,6 +65,8 @@ proc linkNodes*(graph: Graph, nodes: seq[ptr AVFilterContext]): Graph =
 proc configure*(graph: Graph) =
   if graph.configured:
     return
+  if graph.nodes.len < 2:
+    error "Graph needs at least a source and a sink before configure"
 
   let ret = avfilter_graph_config(graph.graph, nil)
   if ret < 0:
@@ -67,53 +74,13 @@ proc configure*(graph: Graph) =
 
   graph.configured = true
 
-proc findBufferSource(graph: Graph): ptr AVFilterContext =
-  if not graph.configured:
-    error "Graph must be configured before finding buffer source"
-
-  if graph.graph == nil:
-    error "Filter graph is nil"
-
-  # Look for buffer or abuffer filter in the graph
-  for i in 0 ..< graph.graph.nb_filters:
-    let ctx = graph.graph.filters[i]
-    if ctx != nil and ctx.filter != nil:
-      let filterName = $ctx.filter.name
-      if filterName == "buffer" or filterName == "abuffer":
-        return ctx
-
-  error "No buffer source found in graph"
-
-proc findBufferSink(graph: Graph): ptr AVFilterContext =
-  if not graph.configured:
-    error "Graph must be configured before finding buffer sink"
-  if graph.graph == nil:
-    error "Filter graph is nil"
-
-  # Safety check for reasonable filter count
-  if graph.graph.nb_filters < 0 or graph.graph.nb_filters > 1000:
-    error &"Invalid filter count: {graph.graph.nb_filters}"
-
-  # Look for buffersink or abuffersink filter in the graph
-  for i in 0 ..< graph.graph.nb_filters:
-    let ctx = graph.graph.filters[i]
-    if ctx != nil and ctx.filter != nil:
-      let filterName = $ctx.filter.name
-      if filterName == "buffersink" or filterName == "abuffersink":
-        return ctx
-
-  error "No buffer sink found in graph"
-
 proc push*(graph: Graph, frame: ptr AVFrame) =
   if not graph.configured:
     error "Graph must be configured before pushing frames"
 
   if frame == nil:
     error "Frame shouldn't be nil here"
-
-  let bufferSource = graph.findBufferSource()
-
-  let ret = av_buffersrc_write_frame(bufferSource, frame)
+  let ret = av_buffersrc_write_frame(graph.nodes[0], frame)
   if ret < 0:
     error &"Error pushing frame to graph: {ret}"
 
@@ -121,43 +88,39 @@ proc pull*(graph: Graph): ptr AVFrame =
   # Caller responsible for freeing frames
   if not graph.configured:
     error "Graph must be configured before pulling frames"
-
-  let bufferSink = graph.findBufferSink()
   var frame = av_frame_alloc()
   if frame == nil:
     error "Could not allocate frame for pulling"
 
-  let ret = av_buffersink_get_frame(bufferSink, frame)
+  let ret = av_buffersink_get_frame(graph.nodes[^1], frame)
   if ret < 0:
     av_frame_free(addr frame)
     error &"Error pulling frame from graph: {ret}"
 
   return frame
 
-proc tryPull*(graph: Graph): ptr AVFrame =
-  # Try to pull a frame, return nil if none available
-  # Caller responsible for freeing frames
+proc pullTransient*(graph: Graph): ptr AVFrame =
+  # Returns a Graph-owned frame valid until the next pullTransient/cleanup.
+  # Caller must NOT free; data lifetime is tied to the Graph.
+  # Returns nil on EAGAIN/EOF.
   if not graph.configured:
     error "Graph must be configured before pulling frames"
+  if graph.recvFrame == nil:
+    graph.recvFrame = av_frame_alloc()
+    if graph.recvFrame == nil:
+      error "Could not allocate frame for pulling"
+  else:
+    av_frame_unref(graph.recvFrame)
 
-  let bufferSink = graph.findBufferSink()
-
-  var frame = av_frame_alloc()
-  if frame == nil:
-    error "Could not allocate frame for pulling"
-
-  let ret = av_buffersink_get_frame(bufferSink, frame)
+  let ret = av_buffersink_get_frame(graph.nodes[^1], graph.recvFrame)
   if ret < 0:
-    av_frame_free(addr frame)
     return nil
-  return frame
+  return graph.recvFrame
 
 proc flush*(graph: Graph) =
   # Flush the filter graph by sending a nil frame
   if not graph.configured:
     error "Graph must be configured before flushing"
-
-  let bufferSource = graph.findBufferSource()
-  let ret = av_buffersrc_write_frame(bufferSource, nil)
+  let ret = av_buffersrc_write_frame(graph.nodes[0], nil)
   if ret < 0:
     error &"Error flushing graph: {ret}"
