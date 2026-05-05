@@ -122,18 +122,12 @@ proc pull*(graph: Graph): ptr AVFrame =
   if not graph.configured:
     error "Graph must be configured before pulling frames"
 
-  debug "graph.pull: finding buffer sink"
   let bufferSink = graph.findBufferSink()
-  debug &"graph.pull: bufferSink={cast[int](bufferSink):#x}"
-
   var frame = av_frame_alloc()
   if frame == nil:
     error "Could not allocate frame for pulling"
-  debug &"graph.pull: allocated frame={cast[int](frame):#x}"
 
-  debug "graph.pull: calling av_buffersink_get_frame"
   let ret = av_buffersink_get_frame(bufferSink, frame)
-  debug &"graph.pull: av_buffersink_get_frame returned {ret}"
   if ret < 0:
     av_frame_free(addr frame)
     error &"Error pulling frame from graph: {ret}"
