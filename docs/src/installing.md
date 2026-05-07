@@ -5,11 +5,11 @@ title: Auto-Editor - Install
 # Installing Auto-Editor
 
 ## Method 1 (Recommended)
-Get the offical binary, available on Windows, MacOS, and x86_64 Linux.
+Get the official binary, available on Windows, MacOS, and Linux.
 
- 1. go to the [Releases page](https://github.com/WyattBlue/auto-editor/releases) on GitHub, and download the binary for your platform.
+ 1. Go to the [Releases page](https://github.com/WyattBlue/auto-editor/releases) on GitHub, and download the binary for your platform.
 
- 2. rename the binary to auto-editor (or auto-editor.exe for Windows).
+ 2. Rename the binary to auto-editor (or auto-editor.exe for Windows).
 
  3. In the terminal/PowerShell, `cd` into your downloads folder.
 
@@ -31,15 +31,9 @@ It's recommended to place the binary in a PATH directory so that `auto-editor` i
 
 
 ## Method 2: Platform Installers
-If you're on MacOS, it's recommend to use [Homebrew](https://homebrew.sh):
+If you're on MacOS, use [Homebrew](https://homebrew.sh):
 ```
 brew install auto-editor
-```
-
-Auto-Editor is available on apt:
-
-```
-sudo apt install auto-editor
 ```
 
 Auto-Editor is available on the Arch Linux AUR:
@@ -48,42 +42,26 @@ Auto-Editor is available on the Arch Linux AUR:
 yay -S auto-editor
 ```
 
-## Method 3: Pip
+### Notice for Pip Users
+The auto-editor cli is no longer being published on pip. It is recommended to switch to a different installation method.
 
-Notice: It is not recommended to use this method because new versions of auto-editor are no longer being published on pip.
+### Notice for 'Apt' Users
+The pkg versions available are very old. Either use the official binaries (recommened) or use [Homebrew for Linux](https://docs.brew.sh/Homebrew-on-Linux).
 
-First, download and install [Python](https://python.org)
-<blockquote><p>If you are installing on Windows, make sure "Add Python 3.x to PATH" is checked.</p></blockquote>
-
-Once that's done, you should have pip on your PATH. That means when you run `pip` on your console, you should get a list of commands and not `command not found`. If you don't have pip on your PATH, try reinstalling Python.
-
-Then run:
-```
-pip install auto-editor
-```
-
-Now run this command and it should list all the options you can use
-```
-auto-editor --help
-```
-
-If that works then congratulations, you have successfully installed auto-editor. You can use now use this with any other type of video or audio that you have.
-```
-auto-editor C:path\to\your\video.mp4
-```
-
-If you would like to uninstall auto-editor, run:
-```
-pip uninstall auto-editor
-```
-
-## Installing from Source (unix-like):
+## Installing from Source (Unix-Like):
 
 Install nim, make sure `nimble` is available. You'll also need cmake, meson, and ninja.
 
 ```
 nimble makeff  # Downloads and builds all dependencies
-nimble make
+nimble make  # Build statically
+```
+
+or build dynamically
+
+```
+# Needs ffmpeg libs installed.
+nimble brewmake
 ```
 
 ## Installing from Source (Windows)
@@ -94,6 +72,13 @@ Then run:
 ```
 nimble makeffwin
 nimble windows
+```
+
+For ARM, run:
+
+```
+nimble makeffwinarm
+nimble windowsarm
 ```
 
 ## Optional Dependencies
