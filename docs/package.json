@@ -7,8 +7,5 @@
   },
   "dependencies": {
     "express": "latest"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
   }
 }
