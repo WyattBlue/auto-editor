@@ -98,8 +98,19 @@ proc kdenliveWrite*(output: string, tl: v3) =
   else:
     clips = @[]
 
+  # Collect unique source paths in order of first appearance
+  var uniquePaths: seq[string] = @[]
+  for clip in clips:
+    let p = $clip.src[]
+    if p notin uniquePaths:
+      uniquePaths.add(p)
+
   var sourceIds = initTable[string, string]()
   var sourceId = 4
+  for path in uniquePaths:
+    sourceIds[path] = $sourceId
+    inc sourceId
+
   var clipPlaylists: seq[XmlNode] = @[]
   var chains = 0
   var playlists = 0
@@ -107,6 +118,11 @@ proc kdenliveWrite*(output: string, tl: v3) =
   let aChannels = tl.a.len
   let vChannels = tl.v.len
   var warpedClips: seq[int] = @[]
+
+  # Map (channel, source path) -> chain id, per-track type
+  var audioChainOf = initTable[(int, string), int]()
+  var videoChainOf = initTable[(int, string), int]()
+  var binChainOf = initTable[string, int]()
 
   for i, clip in clips:
     let effectGroup = tl.effects[clip.effects]
@@ -120,10 +136,6 @@ proc kdenliveWrite*(output: string, tl: v3) =
     for i in 0 ..< (aChannels + vChannels):
       let clip = clips[clipIdx]
       let path = $clip.src[]
-
-      if path notin sourceIds:
-        sourceIds[path] = $sourceId
-        inc sourceId
 
       let prod = newElement("producer")
       prod.attrs = {
@@ -217,51 +229,48 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
   # create chains, playlists and tractors for audio channels
   for i, audio in tl.a:
-    let path = $audio[0].src[]
+    for path in uniquePaths:
+      audioChainOf[(i, path)] = chains
+      let chain = newElement("chain")
+      chain.attrs = {"id": &"chain{chains}"}.toXmlAttributes()
 
-    if path notin sourceIds:
-      sourceIds[path] = $sourceId
-      inc sourceId
+      var chainProp = newElement("property")
+      chainProp.attrs = {"name": "resource"}.toXmlAttributes()
+      chainProp.add(newText(path))
+      chain.add(chainProp)
 
-    let chain = newElement("chain")
-    chain.attrs = {"id": &"chain{chains}"}.toXmlAttributes()
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "mlt_service"}.toXmlAttributes()
+      chainProp.add(newText("avformat-novalidate"))
+      chain.add(chainProp)
 
-    var chainProp = newElement("property")
-    chainProp.attrs = {"name": "resource"}.toXmlAttributes()
-    chainProp.add(newText(path))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "vstream"}.toXmlAttributes()
+      chainProp.add(newText("0"))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "mlt_service"}.toXmlAttributes()
-    chainProp.add(newText("avformat-novalidate"))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "astream"}.toXmlAttributes()
+      chainProp.add(newText($(aChannels - 1 - i)))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "vstream"}.toXmlAttributes()
-    chainProp.add(newText("0"))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "set.test_audio"}.toXmlAttributes()
+      chainProp.add(newText("0"))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "astream"}.toXmlAttributes()
-    chainProp.add(newText($(aChannels - 1 - i)))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "set.test_video"}.toXmlAttributes()
+      chainProp.add(newText("1"))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "set.test_audio"}.toXmlAttributes()
-    chainProp.add(newText("0"))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "kdenlive:id"}.toXmlAttributes()
+      chainProp.add(newText(sourceIds[path]))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "set.test_video"}.toXmlAttributes()
-    chainProp.add(newText("1"))
-    chain.add(chainProp)
-
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "kdenlive:id"}.toXmlAttributes()
-    chainProp.add(newText(sourceIds[path]))
-    chain.add(chainProp)
-
-    mlt.add(chain)
+      mlt.add(chain)
+      inc chains
 
     for _ in 0 ..< 2:
       let playlist = newElement("playlist")
@@ -278,7 +287,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
     let tractor = newElement("tractor")
     tractor.attrs = {
-      "id": &"tractor{chains}",
+      "id": &"tractor{i}",
       "in": "00:00:00.000",
       "out": globalOut
     }.toXmlAttributes()
@@ -306,55 +315,51 @@ proc kdenliveWrite*(output: string, tl: v3) =
     tractor.add(track)
 
     mlt.add(tractor)
-    inc chains
 
   # create chains, playlists and tractors for video channels
   for i, video in tl.v:
-    let path = $video[0].src[]
+    for path in uniquePaths:
+      videoChainOf[(i, path)] = chains
+      let chain = newElement("chain")
+      chain.attrs = {"id": &"chain{chains}"}.toXmlAttributes()
 
-    if path notin sourceIds:
-      sourceIds[path] = $sourceId
-      inc sourceId
+      var chainProp = newElement("property")
+      chainProp.attrs = {"name": "resource"}.toXmlAttributes()
+      chainProp.add(newText(path))
+      chain.add(chainProp)
 
-    let chain = newElement("chain")
-    chain.attrs = {"id": &"chain{chains}"}.toXmlAttributes()
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "mlt_service"}.toXmlAttributes()
+      chainProp.add(newText("avformat-novalidate"))
+      chain.add(chainProp)
 
-    var chainProp = newElement("property")
-    chainProp.attrs = {"name": "resource"}.toXmlAttributes()
-    chainProp.add(newText(path))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "vstream"}.toXmlAttributes()
+      chainProp.add(newText($(vChannels - 1 - i)))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "mlt_service"}.toXmlAttributes()
-    chainProp.add(newText("avformat-novalidate"))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "astream"}.toXmlAttributes()
+      chainProp.add(newText("0"))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "vstream"}.toXmlAttributes()
-    chainProp.add(newText($(vChannels - 1 - i)))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "set.test_audio"}.toXmlAttributes()
+      chainProp.add(newText("1"))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "astream"}.toXmlAttributes()
-    chainProp.add(newText("0"))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "set.test_video"}.toXmlAttributes()
+      chainProp.add(newText("0"))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "set.test_audio"}.toXmlAttributes()
-    chainProp.add(newText("1"))
-    chain.add(chainProp)
+      chainProp = newElement("property")
+      chainProp.attrs = {"name": "kdenlive:id"}.toXmlAttributes()
+      chainProp.add(newText(sourceIds[path]))
+      chain.add(chainProp)
 
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "set.test_video"}.toXmlAttributes()
-    chainProp.add(newText("0"))
-    chain.add(chainProp)
-
-    chainProp = newElement("property")
-    chainProp.attrs = {"name": "kdenlive:id"}.toXmlAttributes()
-    chainProp.add(newText(sourceIds[path]))
-    chain.add(chainProp)
-
-    mlt.add(chain)
+      mlt.add(chain)
+      inc chains
 
     for _ in 0 ..< 2:
       let playlist = newElement("playlist")
@@ -365,7 +370,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
 
     let tractor = newElement("tractor")
     tractor.attrs = {
-      "id": &"tractor{chains}",
+      "id": &"tractor{aChannels + i}",
       "in": "00:00:00.000",
       "out": globalOut
     }.toXmlAttributes()
@@ -384,11 +389,10 @@ proc kdenliveWrite*(output: string, tl: v3) =
     tractor.add(track)
 
     mlt.add(tractor)
-    inc chains
 
-  # final chain for the project bin
-  if clips.len > 0:
-    let path = $clips[0].src[]
+  # final chain for the project bin (one per unique source)
+  for path in uniquePaths:
+    binChainOf[path] = chains
     let chain = newElement("chain")
     chain.attrs = {"id": &"chain{chains}"}.toXmlAttributes()
 
@@ -428,6 +432,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
     chain.add(chainProp)
 
     mlt.add(chain)
+    inc chains
 
   var groups: seq[JsonNode] = @[]
   var groupCounter = 0
@@ -459,7 +464,12 @@ proc kdenliveWrite*(output: string, tl: v3) =
           clipProd = &"producer{producers}"
           inc producers
         else:
-          clipProd = &"chain{i div 2}"
+          let channelIdx = i div 2
+          let chainIdx = if channelIdx < aChannels:
+                           audioChainOf[(channelIdx, path)]
+                         else:
+                           videoChainOf[(channelIdx - aChannels, path)]
+          clipProd = &"chain{chainIdx}"
 
         let entry = newElement("entry")
         entry.attrs = {
@@ -505,7 +515,7 @@ proc kdenliveWrite*(output: string, tl: v3) =
   seqTrack.attrs = {"producer": "producer0"}.toXmlAttributes()
   sequence.add(seqTrack)
 
-  for i in 0 ..< chains:
+  for i in 0 ..< (aChannels + vChannels):
     seqTrack = newElement("track")
     seqTrack.attrs = {"producer": &"tractor{i}"}.toXmlAttributes()
     sequence.add(seqTrack)
@@ -539,19 +549,20 @@ proc kdenliveWrite*(output: string, tl: v3) =
   }.toXmlAttributes()
   playlistBin.add(binEntry)
 
-  binEntry = newElement("entry")
-  binEntry.attrs = {
-    "producer": &"chain{chains}",
-    "in": "00:00:00.000"
-  }.toXmlAttributes()
-  playlistBin.add(binEntry)
+  for path in uniquePaths:
+    binEntry = newElement("entry")
+    binEntry.attrs = {
+      "producer": &"chain{binChainOf[path]}",
+      "in": "00:00:00.000"
+    }.toXmlAttributes()
+    playlistBin.add(binEntry)
 
   mlt.add(playlistBin)
 
   # reserved last tractor for project
   let tractor = newElement("tractor")
   tractor.attrs = {
-    "id": &"tractor{chains}",
+    "id": &"tractor{aChannels + vChannels}",
     "in": "00:00:00.000",
     "out": globalOut
   }.toXmlAttributes()
