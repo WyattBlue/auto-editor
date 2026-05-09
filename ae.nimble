@@ -105,8 +105,8 @@ disableDecoders &= "adpcm_adx,adpcm_argo,adpcm_g722,adpcm_g726,adpcm_g726le,adpc
 
 # Technically obsolute
 disableDecoders &= "alias_pix,apac,ape,atrac1,atrac3,atrac3al,atrac3p,atrac3pal,atrac9,asv1,asv2,avrp,bmp,ccaption,cinepak,cljr,cllc,comfortnoise,dpx,eacmv,eamad,eatgq,eatgv,eatqi,eightbps,eightsvx_exp,eightsvx_fib,ffvhuff,ffwavesynth,flv,g723_1,g726,g726le,g728,g729,hnm4_video,huffyuv,ircam,jacosub,magicyuv,nellymoser,on2avc,pam,pbm,pcm_vidc,pgmyuv,pjs,qtrle,ra_144,roq,roq_dpcm,rpza,r10k,r210,sgi,speedhq,speex,smacker,smc,snow,sonic,sonic_ls,subrip,utvideo,v210,v308,v408,v410,wbmp,wrapped_avframe,ws_snd1,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
-disableMuxers &= "amv,cavsvideo,flv,f4v,g722,g723_1,g726,g726le,gxf,ircam,jacosub,mcc,mxf,mxf_d10,mxf_opatom,nut,pcm_vidc,rm,roq,rso,segafilm,sup,swf,truehd,ttml,voc,wsaud,wtv,wv".split(",")
-disableDemuxers &= "a64,alp,ape,apm,bethsoftvid,bink,binka,cavsvideo,dsicin,flv,g722,g723_1,g726,g726le,g728,g729,gxf,ircam,jacosub,kux,live_flv,mcc,mm,mxf,nistsphere,nut,pcm_vidc,pjs,pp_bnk,redspark,rm,roq,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,voc,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
+disableMuxers &= "amv,cavsvideo,f4v,g722,g723_1,g726,g726le,gxf,ircam,jacosub,mcc,mxf,mxf_d10,mxf_opatom,nut,pcm_vidc,rm,roq,rso,segafilm,sup,swf,truehd,ttml,voc,wsaud,wtv,wv".split(",")
+disableDemuxers &= "a64,alp,ape,apm,bethsoftvid,bink,binka,cavsvideo,dsicin,g722,g723_1,g726,g726le,g728,g729,gxf,ircam,jacosub,kux,live_flv,mcc,mm,mxf,nistsphere,nut,pcm_vidc,pjs,pp_bnk,redspark,rm,roq,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vmd,voc,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
 disableParsers &= "bmp,cavsvideo,cook,dpx,g723_1,g729,misc4,sipr,tak,xbm,xma,xwd".split(",")
 
 disableDemuxers &= ["pcm_alaw", "pcm_mulaw"]

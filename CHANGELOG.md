@@ -9,4 +9,5 @@
 
 ## Fixes
  - Use ffmpeg 8.1.1
+ - Enable `flv` muxer/demuxer
  - Fix incorrect rendering of some AV1 videos
