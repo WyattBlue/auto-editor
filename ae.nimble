@@ -325,6 +325,12 @@ proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm: bool
     cmakeArgs.add(&"-DCMAKE_C_FLAGS=-ffile-prefix-map={sourceDir}/=")
     cmakeArgs.add(&"-DCMAKE_CXX_FLAGS=-ffile-prefix-map={sourceDir}/=")
 
+  if package.name == "libsvtav1":
+    # SVT-AV1's CMakeLists writes archives into the source tree at
+    # Bin/${CMAKE_BUILD_TYPE}/. Override the CACHE PATH so the .a stays in
+    # the build dir and re-installs don't produce a hybrid BSD/GNU archive.
+    cmakeArgs.add(&"-DCMAKE_OUTPUT_DIRECTORY={cmakeBuildDir}/Bin")
+
   if crossWinArm:
     let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
@@ -340,10 +346,11 @@ proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm: bool
     cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
 
   withDir cmakeBuildDir:
-    let cmakeCmd = "cmake " & cmakeArgs.join(" ") & " " & sourceDir
-    echo "RUN: ", cmakeCmd
-    exec cmakeCmd
-    makeInstall()
+    if not fileExists("CMakeCache.txt"):
+      let cmakeCmd = "cmake " & cmakeArgs.join(" ") & " " & sourceDir
+      echo "RUN: ", cmakeCmd
+      exec cmakeCmd
+      makeInstall()
 
   # Fix whisper.pc file to include correct library order and dependencies
   if package.name == "whisper":
