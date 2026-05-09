@@ -1,4 +1,5 @@
 import std/[macros, strformat, strutils]
+import ./action
 
 type CmdDef* = object
   name*: string
@@ -54,6 +55,19 @@ type OptDef* = object
   metavar*: string # Shouldn't be set for flags.
   help*: string
 
+func buildWhenSilentHelp(): string =
+  result = "When a segment is inactive (defined by --edit) do an action. The default action being 'cut'\n\nActions available:"
+  for a in actionDefs:
+    var head = "\n  " & a.name
+    if a.argSpec != "":
+      head.add ":<" & a.argSpec & ">"
+    if a.range != "":
+      head.add ", range " & a.range
+    let firstLine = a.help.strip().splitLines()[0]
+    result.add head & "\n    " & firstLine
+
+const whenSilentHelp* = buildWhenSilentHelp()
+
 const whisperOptions*: seq[OptDef] = @[
   OptDef(names: "--debug", kind: Flag, datum: "isDebug", help: ""),
   OptDef(names: "-sw, --split-words", kind: Flag, datum: "splitWords", help: ""),
@@ -80,20 +94,7 @@ Set an expression which determines how to make auto edits. (default is "audio")"
   OptDef(names: "-w:1, --when-active, --when-normal", c: cEdit, datum: "when-normal", metavar: "ACTION",
     help: "When a segment is active (defined by --edit) do an action. The default action being 'nil'"),
   OptDef(names: "-w:0, --when-inactive, --when-silent", c: cEdit, datum: "when-silent", metavar: "ACTION",
-      help: """
-When a segment is inactive (defined by --edit) do an action. The default action being 'cut'
-
-Actions available:
-  nil, unchanged/do nothing
-  cut, remove completely
-  speed, (val: float),
-    change the speed while preserving pitch. val: between (0-99999)
-  varispeed, (val: float),
-    change the speed by varying pitch. val: between [0.2-100]
-  invert, invert all pixels in a video
-  zoom, (val: float),
-    zoom in/out with a factor of val. val: between (0-100]
-  """),
+      help: whenSilentHelp),
   OptDef(names: "-m, --margin", c: cEdit, datum: "margin", metavar: "LENGTH[,LENGTH?]",
       help: """
 Set sections near "loud" as "loud" too if section is less than LENGTH away. (default is "0.2s")"""),

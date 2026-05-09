@@ -25,7 +25,6 @@ These options have aliases:
 ## Available Actions
 
 ### nil
-**Syntax:** `nil`
 
 Do nothing. Keep the section unchanged at normal speed with normal pitch.
 
@@ -35,7 +34,6 @@ auto-editor video.mp4 --when-silent nil
 ```
 
 ### cut
-**Syntax:** `cut`
 
 Remove the section completely from the output.
 
@@ -48,10 +46,8 @@ auto-editor video.mp4 --when-normal cut
 ```
 
 ### speed
-**Syntax:** `speed:<value>`
 
 Change the playback speed while preserving pitch using time-stretching.
-- **Value range:** 0.0 to 99999.0
 
 ```bash
 # Speed up silent sections to 8x (preserving pitch)
@@ -64,7 +60,6 @@ auto-editor video.mp4 --when-normal speed:0.5
 **How it works:** Uses FFmpeg's `atempo` filter to change speed without affecting pitch.
 
 ### varispeed
-**Syntax:** `varispeed:<value>`
 
 Change the playback speed by varying pitch, like analog tape or vinyl.
 - **Value range:** 0.2 to 100.0
@@ -77,10 +72,7 @@ auto-editor video.mp4 --when-silent varispeed:2
 auto-editor video.mp4 --when-normal varispeed:0.5
 ```
 
-**How it works:** Uses FFmpeg's `asetrate` + `aresample` filters to change sample rate, which changes both speed and pitch together.
-
 ### volume
-**Syntax:** `volume:<value>`
 
 Adjust the audio volume level.
 - **1.0** = normal volume
@@ -96,7 +88,6 @@ auto-editor video.mp4 --when-normal volume:1.5
 ```
 
 ### invert
-**Syntax:** `invert`
 
 Invert all pixels in the video section.
 
@@ -105,7 +96,6 @@ auto-editor video.mp4 --when-silent invert
 ```
 
 ### zoom
-**Syntax:** `zoom:<value>`
 
 Zoom in or out by a factor.
 - **Value range:** greater than 0.0, up to 100.0
@@ -194,7 +184,7 @@ auto-editor video.mp4 --when-silent speed:6,volume:0.4
 
 ## Deprecated Options
 
-The following options are deprecated but still supported:
+The following options are deprecated:
 
 ```bash
 # Old way (deprecated)
@@ -205,5 +195,6 @@ auto-editor video.mp4 --when-silent speed:8 --when-normal speed:1
 ```
 
 ## See Also
+- [Complete Actions Reference](/ref/actions)
 - [Range Syntax](./range-syntax) - Manual editing with `--cut-out` and `--add-in`
 - [Audio Normalization](./anorm) - Volume normalization options
