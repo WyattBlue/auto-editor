@@ -492,6 +492,9 @@ proc x265Build(buildPath: string, crossWindows, crossWindowsArm: bool) =
   #  3: Build 8 bits version, linking also 10 and optionally 12 bits
   # By default supports 8 and 10 bits pixel formats (12-bit disabled for size)
 
+  if fileExists(buildPath / "lib" / "pkgconfig" / "x265.pc"):
+    return
+
   let sourceDir = absolutePath("source")
   let pkgDir = buildPath / "pkg"
   let dir12bit = pkgDir / "x265_12bit"
