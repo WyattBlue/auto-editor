@@ -167,6 +167,8 @@ iterator loudness*(processor: var AudioProcessor, container: InputContainer): fl
 
 proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     stream: int32): seq[float32] =
+  # Telling ffmpeg to go to the start of the file so multiple audio tracks can be analyzed
+  container.seek(0)
   if not noCache:
     let cacheData = readCache(path, tb, "audio", $stream)
     if cacheData.isSome:
