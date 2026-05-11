@@ -176,6 +176,8 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     error &"audio: audio stream '{stream}' does not exist."
 
   let audioStream: ptr AVStream = container.audio[stream]
+  # Rewind so a shared container can be re-read for additional streams.
+  container.seek(0)
 
   var processor = AudioProcessor(
     codecCtx: initDecoder(audioStream.codecpar),
