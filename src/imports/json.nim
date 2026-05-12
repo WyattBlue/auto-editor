@@ -6,6 +6,10 @@ import ../util/[color, lang, rational]
 proc parseAction(val: string): Action =
   if val == "invert":
     return Action(kind: actInvert)
+  if val == "hflip":
+    return Action(kind: actHflip)
+  if val == "vflip":
+    return Action(kind: actVflip)
 
   let parts = val.split(":")
   if parts.len == 2:
