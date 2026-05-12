@@ -114,8 +114,8 @@ disableMuxers &= ["pcm_alaw", "pcm_mulaw"]
 disableDecoders &= ["pcm_alaw", "pcm_mulaw"]
 
 ## h26 whatever
-disableDemuxers &= ["h261"]
-disableMuxers &= ["h261", "rtp", "rtp_mpegts"]
+disableDemuxers &= ["h261", "vvc"]
+disableMuxers &= ["h261", "rtp", "rtp_mpegts", "vvc"]
 disableDecoders &= ["h261"]
 disableParsers.add "h261"
 
