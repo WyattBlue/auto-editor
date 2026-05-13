@@ -18,6 +18,7 @@ else:
     if hostCPU == "wasm32": "build_wasm"
     elif hostOS == "windows" and hostCPU == "arm64": "build_winarm"
     elif hostOS == "windows" and hostCPU != "arm64": "build_win"
+    elif hostOS == "linux" and hostCPU == "arm": "build_armv7"
     else: "build"
   )
   switch("passC", &"-I./{buildPath}/include")
@@ -45,7 +46,8 @@ if not defined(dynamic):
   if hostCPU != "wasm32":
     if enableHevc:
       switch("passL", "-lx265")
-    if enableVpl and not (hostCPU == "arm64" and hostOS == "windows"):
+    if enableVpl and not (hostCPU == "arm64" and hostOS == "windows") and
+        not (hostCPU == "arm" and hostOS == "linux"):
       switch("passL", "-lvpl")
 
 when hostOS == "macosx":
@@ -61,9 +63,12 @@ elif hostOS == "windows":
 elif not defined(dynamic) and hostOS == "linux" and hostCPU != "wasm32":
   when hostCPU == "arm64":
     switch("passL", "-L./build/lib/aarch64-linux-gnu")
+    switch("passL", "-L./build/lib64")
+  elif hostCPU == "arm":
+    switch("passL", "-L./build_armv7/lib/arm-linux-gnueabihf")
   else:
     switch("passL", "-L./build/lib/x86_64-linux-gnu")
-  switch("passL", "-L./build/lib64")
+    switch("passL", "-L./build/lib64")
 
 if not defined(dynamic) and enableWhisper:
   switch("passL", "-lwhisper")
@@ -83,6 +88,11 @@ if not defined(dynamic):
   if enableHevc or enableWhisper or defined(linux):
     # Link the C++ standard library
     switch("passL", when defined(macosx): "-lc++" else: "-lstdc++")
+
+  # Static linking is order-sensitive: re-add libm/libpthread at the end so
+  # codec libs (x264, vpx, FFmpeg) can resolve math/threading symbols.
+  when defined(linux) and hostCPU == "arm":
+    switch("passL", "-lm -lpthread")
 
 # begin Nimble config (version 2)
 when withDir(thisDir(), system.fileExists("nimble.paths")):

@@ -117,3 +117,36 @@ jobs:
           files: auto-editor-windows-aarch64.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  linux-armv7:
+    runs-on: ubuntu-24.04-arm
+    env:
+      DISABLE_WHISPER: "1"
+      DISABLE_HEVC: "1"
+      DISABLE_VPL: "1"
+      DISABLE_SVTAV1: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Homebrew
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+      - name: Install nim
+        run: brew update && brew install nim
+      - name: Install ARMv7 cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config git meson \
+            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf binutils-arm-linux-gnueabihf
+      - name: Build FFmpeg
+        run: nimble makeffarmv7
+      - name: Compile
+        run: nimble armv7 && mv auto-editor auto-editor-linux-armv7
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: auto-editor-linux-armv7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
