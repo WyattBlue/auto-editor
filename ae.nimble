@@ -216,7 +216,7 @@ let x264 = Package(
   name: "x264",
   sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2",
   sha256: "6eeb82934e69fd51e043bd8c5b0d152839638d1ce7aa4eea65a3fedcf83ff224",
-  buildArguments: "--disable-cli --disable-lsmash --disable-swscale --disable-ffms --enable-strip".split(" "),
+  buildArguments: "--disable-cli --disable-lsmash --disable-swscale --disable-ffms --disable-opencl --enable-strip".split(" "),
   ffFlag: "--enable-libx264",
 )
 let x265 = Package(
