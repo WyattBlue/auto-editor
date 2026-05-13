@@ -12,7 +12,7 @@ requires "csort == 1.0.0"
 requires "nimcrypto == 0.7.3"
 
 # Tasks
-import std/[os, strutils, strformat]
+import std/[os, strutils, strformat, sequtils]
 
 var disableVpx = getEnv("DISABLE_VPX").len > 0
 var disableSvtAv1 = getEnv("DISABLE_SVTAV1").len > 0
@@ -25,6 +25,7 @@ let
   nativeBuildPath = absolutePath("build")
   winBuildPath = absolutePath("build_win")
   winArmBuildPath = absolutePath("build_winarm")
+  armv7BuildPath = absolutePath("build_armv7")
   wasmBuildPath = absolutePath("build_wasm")
   ffmpegSrcDir = absolutePath("ffmpeg_sources/ffmpeg")
 
@@ -68,6 +69,7 @@ task cleanff, "Clean build files":
   rmDir "build"
   rmDir "build_win"
   rmDir "build_winarm"
+  rmDir "build_armv7"
   rmDir "build_wasm"
   for kind, path in walkDir("ffmpeg_sources"):
     if kind == pcDir: rmDir path
@@ -230,11 +232,11 @@ let ffmpeg = Package(
   sha256: "b6863adde98898f42602017462871b5f6333e65aec803fdd7a6308639c52edf3",
 )
 
-proc selectPackages(crossWindowsArm: bool = false): seq[Package] =
+proc selectPackages(crossWindowsArm: bool = false, crossArmv7: bool = false): seq[Package] =
   result = @[]
-  if not defined(macosx) and not crossWindowsArm:
+  if not defined(macosx) and not crossWindowsArm and not crossArmv7:
     result.add nvheaders
-  if enableVpl and not crossWindowsArm:
+  if enableVpl and not crossWindowsArm and not crossArmv7:
     result.add libvpl
   if enableWhisper:
     result.add whisper
@@ -309,7 +311,7 @@ proc makeInstall =
     exec "make -j4"
   exec "make install"
 
-proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm: bool) =
+proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm, crossArmv7: bool) =
   let cmakeBuildDir = buildPath / "pkg" / package.name
   mkDir(cmakeBuildDir)
 
@@ -319,6 +321,11 @@ proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm: bool
     "-DBUILD_SHARED_LIBS=OFF",
     "-DBUILD_STATIC_LIBS=ON",
   ] & package.buildArguments
+
+  if crossArmv7 and package.name == "libsvtav1":
+    # SVT-AV1 enables NASM x86 asm; force off for ARM cross-compile
+    cmakeArgs = cmakeArgs.filterIt(it != "-DENABLE_NASM=ON")
+    cmakeArgs.add("-DENABLE_NASM=OFF")
 
   let sourceDir = absolutePath(".")
   if package.name == "libsvtav1" or package.name == "whisper":
@@ -333,6 +340,11 @@ proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm: bool
 
   if crossWinArm:
     let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
+    cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
+    if package.name == "whisper":
+      cmakeArgs.add("-DGGML_OPENMP=OFF")
+  elif crossArmv7:
+    let toolchainFile = buildPath.parentDir / "scripts" / "arm-linux-gnueabihf.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     if package.name == "whisper":
       cmakeArgs.add("-DGGML_OPENMP=OFF")
@@ -456,7 +468,7 @@ Libs.private: -lpthread -lm -lstdc++
 Cflags: -I${{includedir}}
 """)
 
-proc mesonBuild(package: Package, buildPath: string, wasm, crossWin, crossWinArm: bool) =
+proc mesonBuild(package: Package, buildPath: string, wasm, crossWin, crossWinArm, crossArmv7: bool) =
   let mesonBuildDir = buildPath / "pkg" / package.name
   let root = buildPath.parentDir
   mkDir(mesonBuildDir)
@@ -476,6 +488,8 @@ proc mesonBuild(package: Package, buildPath: string, wasm, crossWin, crossWinArm
     mesonArgs.add &"--cross-file={root}/scripts/wasm32-emcc.txt"
   elif crossWinArm:
     mesonArgs.add &"--cross-file={root}/scripts/aarch64-w64-mingw32.txt"
+  elif crossArmv7:
+    mesonArgs.add &"--cross-file={root}/scripts/arm-linux-gnueabihf.txt"
   elif crossWin:
     mesonArgs.add &"--cross-file={root}/scripts/x86_64-w64-mingw32.txt"
 
@@ -485,7 +499,7 @@ proc mesonBuild(package: Package, buildPath: string, wasm, crossWin, crossWinArm
     exec "ninja"
     exec "ninja install"
 
-proc x265Build(buildPath: string, crossWindows, crossWindowsArm: bool) =
+proc x265Build(buildPath: string, crossWindows, crossWindowsArm, crossArmv7: bool) =
   # Build x265 multiple times following the Homebrew approach:
   #  1: Build 12 bits static library version in separate directory (if enabled)
   #  2: Build 10 bits static library version in separate directory
@@ -620,7 +634,8 @@ proc x265Build(buildPath: string, crossWindows, crossWindowsArm: bool) =
 proc ffmpegSetup(buildPath: string): seq[Package] =
   let crossWindows = buildPath.endsWith("_win")
   let crossWindowsArm = buildPath.endsWith("_winarm")
-  let packages = selectPackages(crossWindowsArm)
+  let crossArmv7 = buildPath.endsWith("_armv7")
+  let packages = selectPackages(crossWindowsArm, crossArmv7)
 
   mkDir("ffmpeg_sources")
   withDir "ffmpeg_sources":
@@ -632,11 +647,11 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
 
       withDir package.name:
         if package.buildSystem == "cmake":
-          cmakeBuild(package, buildPath, crossWindows, crossWindowsArm)
+          cmakeBuild(package, buildPath, crossWindows, crossWindowsArm, crossArmv7)
         elif package.buildSystem == "meson":
-          mesonBuild(package, buildPath, false, crossWindows, crossWindowsArm)
+          mesonBuild(package, buildPath, false, crossWindows, crossWindowsArm, crossArmv7)
         elif package.buildSystem == "x265":
-          x265build(buildPath, crossWindows, crossWindowsArm)
+          x265build(buildPath, crossWindows, crossWindowsArm, crossArmv7)
         else:
           # Special handling for nv-codec-headers which doesn't use configure
           if package.name == "nv-codec-headers":
@@ -657,6 +672,18 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
                   if package.name == "opus":
                     args.add("--disable-rtcd")
                   envPrefix = "CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib "
+                elif crossArmv7:
+                  if package.name == "libvpx":
+                    args.add("--target=armv7-linux-gcc")
+                  else:
+                    args.add("--host=arm-linux-gnueabihf")
+                  if package.name == "x264":
+                    # x264 ARM asm uses R_ARM_MOVW_ABS_NC; needs PIC to link
+                    # into FFmpeg's -fPIC test programs.
+                    args.add("--enable-pic")
+                  envPrefix = "CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ AR=arm-linux-gnueabihf-ar STRIP=arm-linux-gnueabihf-strip RANLIB=arm-linux-gnueabihf-ranlib "
+                  if package.name == "libvpx":
+                    envPrefix &= "CROSS=arm-linux-gnueabihf- "
                 elif crossWindows:
                   if package.name == "libvpx":
                     args.add("--target=x86_64-win64-gcc")
@@ -671,7 +698,7 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
               makeInstall()
   return packages
 
-proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: bool = false): string =
+proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: bool = false, armv7: bool = false): string =
   var enableEncoders: seq[string] = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,prores,prores_aw,prores_ks,srt,ssa,text,webvtt".split(",")
 
   enableEncoders.add "pcm_f16le,pcm_f24le,pcm_f32be,pcm_f32le,pcm_f64be,pcm_f64le".split(",")
@@ -698,7 +725,8 @@ proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: b
     when defined(macosx):
       enableEncoders.add "aac_at,alac_at,h264_videotoolbox,hevc_videotoolbox,prores_videotoolbox".split(",")
     else:
-      enableEncoders.add "av1_nvenc,h264_nvenc,hevc_nvenc"
+      if not armv7:
+        enableEncoders.add "av1_nvenc,h264_nvenc,hevc_nvenc"
     if enableVpl:
       enableEncoders.add "av1_qsv,hevc_qsv,mjpeg_qsv,mpeg2_qsv,vc1_qsv,vp8_qsv,vp9_qsv,vvc_qsv"
 
@@ -730,13 +758,13 @@ proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: b
       commonFlags &= &"  {package.ffFlag} \\\n"
 
   if not crossWasm:
-    if defined(arm) or defined(arm64) or winArm:
+    if defined(arm) or defined(arm64) or winArm or armv7:
       commonFlags &= "  --enable-neon \\\n"
 
     if defined(macosx):
       commonFlags &= "  --enable-videotoolbox \\\n"
       commonFlags &= "  --enable-audiotoolbox \\\n"
-    elif not winArm:
+    elif not winArm and not armv7:
       commonFlags &= "  --enable-nvenc \\\n"
       commonFlags &= "  --enable-ffnvcodec \\\n"
 
@@ -862,6 +890,50 @@ task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
          "--out:auto-editor.exe src/main.nim"
     stripProgram(llvmWin=true)
 
+task makeffarmv7, "Build FFmpeg for Linux ARMv7 cross-compilation":
+  setupDeps()
+  let pkgConfigPath = armv7BuildPath / "lib/pkgconfig"
+  putEnv("PKG_CONFIG_PATH", pkgConfigPath)
+  putEnv("PKG_CONFIG_LIBDIR", pkgConfigPath)
+
+  let packages = ffmpegSetup(armv7BuildPath)
+
+  let ffmpegBuildDirArmv7 = armv7BuildPath / "pkg" / "ffmpeg"
+  mkDir(ffmpegBuildDirArmv7)
+  withDir ffmpegBuildDirArmv7:
+    try:
+      exec (&"""CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ AR=arm-linux-gnueabihf-ar STRIP=arm-linux-gnueabihf-strip RANLIB=arm-linux-gnueabihf-ranlib PKG_CONFIG_PATH="{pkgConfigPath}" PKG_CONFIG_LIBDIR="{pkgConfigPath}" {ffmpegSrcDir}/configure --prefix="{armv7BuildPath}" \
+        --pkg-config=pkg-config \
+        --pkg-config-flags="--static" \
+        --extra-cflags="-I{armv7BuildPath}/include -march=armv7-a -mfpu=neon-vfpv3 -mfloat-abi=hard" \
+        --extra-ldflags="-L{armv7BuildPath}/lib" \
+        --extra-libs="-lpthread -lm -lstdc++" \
+        --arch=arm \
+        --cpu=armv7-a \
+        --target-os=linux \
+        --cross-prefix=arm-linux-gnueabihf- \
+        --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, armv7=true))
+    except OSError:
+      exec "cat ffbuild/config.log"
+      quit(1)
+    makeInstall()
+
+task armv7, "Cross-compile to Linux ARMv7 (requires arm-linux-gnueabihf toolchain)":
+  echo "Cross-compiling for Linux ARMv7..."
+
+  if not dirExists(armv7BuildPath):
+    echo "FFmpeg for Linux ARMv7 not found. Run 'nimble makeffarmv7' first."
+  else:
+    exec "nim c -d:danger --panics:on --os:linux --cpu:arm --cc:gcc " &
+         "--gcc.exe:arm-linux-gnueabihf-gcc " &
+         "--gcc.linkerexe:arm-linux-gnueabihf-gcc " &
+         "--passC:-march=armv7-a --passC:-mfpu=neon-vfpv3 --passC:-mfloat-abi=hard " &
+         "--passL:-static " &
+         "--out:auto-editor src/main.nim"
+    exec "arm-linux-gnueabihf-strip -s auto-editor"
+    exec "stat -c \"%s bytes\" ./auto-editor"
+    echo ""
+
 
 proc autoconfBuildWasm(package: Package, buildPath: string) =
   let sourceDir = absolutePath(".")
@@ -901,7 +973,7 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
     withDir &"ffmpeg_sources/{package.name}":
       case package.buildSystem
       of "cmake": cmakeBuildWasm(package, wasmBuildPath)
-      of "meson": mesonBuild(package, wasmBuildPath, true, false, false)
+      of "meson": mesonBuild(package, wasmBuildPath, true, false, false, false)
       else: autoconfBuildWasm(package, wasmBuildPath)
 
   # lame ships no .pc file; create one so FFmpeg's configure can find it
