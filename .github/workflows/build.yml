@@ -123,8 +123,6 @@ jobs:
     env:
       DISABLE_WHISPER: "1"
       DISABLE_HEVC: "1"
-      DISABLE_VPL: "1"
-      DISABLE_SVTAV1: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v6

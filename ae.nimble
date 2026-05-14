@@ -326,6 +326,10 @@ proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm, cros
     # SVT-AV1 enables NASM x86 asm; force off for ARM cross-compile
     cmakeArgs = cmakeArgs.filterIt(it != "-DENABLE_NASM=ON")
     cmakeArgs.add("-DENABLE_NASM=OFF")
+    # Disable LTO: bitcode embeds -mfloat-abi=hard without -mfpu, so the LTO
+    # recompile during FFmpeg's link tests fails ("architecture lacks an FPU")
+    cmakeArgs.add("-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF")
+    cmakeArgs.add("-DSVT_AV1_LTO=OFF")
 
   let sourceDir = absolutePath(".")
   if package.name == "libsvtav1" or package.name == "whisper":
