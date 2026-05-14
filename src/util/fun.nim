@@ -118,14 +118,14 @@ func agSplitFile*(path: string): tuple[dir, name, ext: string] =
     elif path[i] == '/' or path[i] == '\\':
       if namePos == 0:
         namePos = i + 1
-      if dotPos > namePos:
+      if dotPos > namePos and dotPos < path.len - 1:
         result.name = substr(path, namePos, dotPos - 1)
         result.ext = substr(path, dotPos)
       else:
         result.name = substr(path, namePos)
       result.dir = substr(path, 0, max(0, namePos - 2))
       return
-  if dotPos > 0:
+  if dotPos > 0 and dotPos < path.len - 1:
     result.name = substr(path, 0, dotPos - 1)
     result.ext = substr(path, dotPos)
   else:
