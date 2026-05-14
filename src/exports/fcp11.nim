@@ -3,7 +3,7 @@ import std/[strformat, strutils]
 from std/math import round
 
 import ../[action, ffmpeg, log, media, timeline]
-import ../util/rational
+import ../util/[fun, rational]
 
 #[
 Export a FCPXML 11 file readable with Final Cut Pro 10.6.8 or later.
@@ -118,7 +118,7 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
     ptrToMi[ptrSrc] = mi
 
     if i == 0:
-      projName = splitFile(mi.path).name
+      projName = agSplitFile(mi.path).name
       srcDur = int(mi.duration * tl.tb)
       if resolve:
         tlDur = srcDur
@@ -136,7 +136,7 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
     let audioChannels = (if mi.a.len == 0: "2" else: $mi.a[0].channels)
 
     let startPoint = parseSMPTE(mi.timecode, tl.tb)
-    let r2 = <>asset(id = id2, name = splitFile(mi.path).name,
+    let r2 = <>asset(id = id2, name = agSplitFile(mi.path).name,
         start = fraction(startPoint), hasVideo = hasVideo, format = id,
         hasAudio = hasAudio, audioSources = "1",
         audioChannels = audioChannels, duration = fraction(tlDur))

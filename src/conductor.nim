@@ -102,15 +102,15 @@ proc setOutput(userOut, `export`, path: string): (string, string) =
   if userOut == "" or userOut == "-":
     if path == "":
       error "`--output` must be set." # When a timeline file is the input.
-    (dir, name, ext) = splitFile(path)
+    (dir, name, ext) = agSplitFile(path)
   else:
-    (dir, name, ext) = splitFile(userOut)
+    (dir, name, ext) = agSplitFile(userOut)
 
   let root = dir / name
 
   if ext == "":
     # Use `mp4` as the default, because it is most compatible.
-    ext = (if path == "": ".mp4" else: splitFile(path).ext)
+    ext = (if path == "": ".mp4" else: agSplitFile(path).ext)
 
   var myExport = `export` # Create mutable copy
   if myExport == "":
@@ -196,7 +196,7 @@ proc editMedia*(args: var mainArgs) =
     if args.inputs.len == 0:
       error "You need to give auto-editor an input file."
     let input = args.inputs[0]
-    let inputExt = splitFile(input).ext
+    let inputExt = agSplitFile(input).ext
 
     if inputExt in [".v1", ".v2", ".v3", ".json"]:
       tlV3 = readJson(readFile(input), interner)
@@ -312,7 +312,7 @@ proc editMedia*(args: var mainArgs) =
   if output == "-":
     error "Exporting media files to stdout is not supported."
 
-  let (_, _, outExt) = splitFile(output)
+  let (_, _, outExt) = agSplitFile(output)
   let rule = initRules(outExt.toLowerAscii)
   args.videoCodec = setVideoCodec(args.videoCodec, outExt, mi, rule)
   if args.audioCodec != "auto":
@@ -348,7 +348,7 @@ proc editMedia*(args: var mainArgs) =
       error "Timeline too complex to use clip-sequence export"
 
     func appendFilename(path, val: string): string =
-      let (dir, name, ext) = splitFile(path)
+      let (dir, name, ext) = agSplitFile(path)
       return (dir / name) & val & ext
 
     var clips2: seq[Clip2] = @[]

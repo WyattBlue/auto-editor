@@ -1,8 +1,8 @@
-import std/[heapqueue, os, options, sequtils, strformat, strutils, tables]
+import std/[heapqueue, options, sequtils, strformat, strutils, tables]
 from std/math import round
 
 import ../[av, ffmpeg, log, media, timeline]
-import ../util/[bar, rules, rational]
+import ../util/[bar, fun, rules, rational]
 import video
 import audio
 import subtitle
@@ -95,7 +95,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   var output = openWrite(outputPath)
   output.options = options
 
-  let (_, _, outExt) = splitFile(outputPath)
+  let (_, _, outExt) = agSplitFile(outputPath)
 
   var vEncCtx: ptr AVCodecContext = nil
   var vOutStream: ptr AVStream = nil

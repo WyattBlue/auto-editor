@@ -1,13 +1,13 @@
 import std/[algorithm, options, os, streams, strformat, strutils, times]
 
 import ./[about, ffmpeg, log]
-import ./util/rational
+import ./util/[fun, rational]
 
 import nimcrypto/sha
 
 proc procTag(path: string, tb: AVRational, kind, args: string): string =
   let modTime = getLastModificationTime(path).toUnix().int
-  let (_, name, ext) = splitFile(path)
+  let (_, name, ext) = agSplitFile(path)
   let key = &"{name}{ext}:{modTime:x}:{tb}:{args}"
   var ctx: sha1
   ctx.init()

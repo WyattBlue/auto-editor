@@ -452,7 +452,7 @@ judge making cuts.
         error "URL inputs are not supported in the wasm build."
       else:
         args.inputs[i] = downloadVideo(myInput, args)
-    elif splitFile(myInput).ext == "":
+    elif agSplitFile(myInput).ext == "":
       if dirExists(myInput):
         error "Input must be a file or a URL, not a directory."
       if myInput.startsWith("-"):

@@ -1,6 +1,7 @@
 import std/[os, strformat, terminal]
 
 import ../about
+import ../util/fun
 
 func formatBytes(intSize: BiggestInt): (string, string) =
   if intSize < 1024:
@@ -29,7 +30,7 @@ proc main*(args: seq[string]) =
         totalSize += size
         let (sizeNum, sizeUnit) = formatBytes(size)
 
-        let (_, key, _) = splitFile(path)
+        let (_, key, _) = agSplitFile(path)
         let hashPart = key[0 ..< 16]
         let restPart = key[16 .. ^1]
 
