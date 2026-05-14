@@ -145,6 +145,19 @@ test "re":
 test "smpte":
   check parseSMPTE("13:44:05:21", AVRational(num: 24000, den: 1001)) == 1186701
 
+test "agSplitFile":
+  check agSplitFile("/").ext == ""
+  check agSplitFile("/.").ext == ""
+  check agSplitFile("/.foo").ext == ""
+  check agSplitFile("./foo").ext == ""
+  check agSplitFile("/foo").ext == ""
+  check agSplitFile("/foo.txt").ext == ".txt"
+  check agSplitFile("/foo.txt/bar").ext == ""
+  check agSplitFile("C:\\").ext == ""
+  check agSplitFile("C:\\.").ext == ""
+  check agSplitFile("C:\\foo.txt").ext == ".txt"
+  check agSplitFile("C:\\foo.txt\\bar").ext == ""
+
 test "uuid":
   # Test that genUuid generates valid RFC 4122 version 4 UUIDs
   for i in 1..3:

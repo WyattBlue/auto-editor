@@ -1,5 +1,4 @@
 import std/[strformat, xmltree]
-from std/os import splitFile
 from std/math import log10
 
 import ../[action, ffmpeg, timeline]
@@ -125,7 +124,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
       producer.addProp("shotcut:producer", "avformat")
       if not lastSpeedWasVarispeed:
         producer.addProp("warp_pitch", "1")
-      producer.addProp("shotcut:caption", &"{splitFile(src).name} ({speedVal}x)")
+      producer.addProp("shotcut:caption", &"{agSplitFile(src).name} ({speedVal}x)")
 
       # Add volume filter if needed
       if volumeVal != 1.0:
@@ -144,7 +143,7 @@ proc shotcutWriteMlt*(output: string, tl: v3) =
       chain.addProp("eof", "pause")
       chain.addProp("resource", src)
       chain.addProp("mlt_service", "avformat")
-      chain.addProp("caption", splitFile(src).name)
+      chain.addProp("caption", agSplitFile(src).name)
 
       # Add volume filter if needed
       if volumeVal != 1.0:

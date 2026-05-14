@@ -4,7 +4,7 @@ when defined(windows):
   import std/strutils
 
 import ../[action, ffmpeg, media, timeline]
-import ../util/rational
+import ../util/[fun, rational]
 
 #[
 Premiere Pro uses the Final Cut Pro 7 XML Interchange Format
@@ -64,7 +64,7 @@ func speedup(speed: float): XmlNode =
 
 proc mediaDef(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
     ntsc: string) =
-  filedef.add elem("name", mi.path.splitFile.name)
+  filedef.add elem("name", agSplitFile(mi.path).name)
   filedef.add elem("pathurl", url)
 
   let timecode = newElement("timecode")
@@ -126,7 +126,7 @@ proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
 
       let clipitem = newElement("clipitem")
       clipitem.attrs = {"id": &"clipitem-{clipItemNum}"}.toXmlAttributes
-      clipitem.add elem("name", mi.path.splitFile.name)
+      clipitem.add elem("name", agSplitFile(mi.path).name)
       clipitem.add elem("start", startVal)
       clipitem.add elem("end", endVal)
       clipitem.add elem("enabled", "TRUE")
@@ -199,7 +199,7 @@ proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
           "id": &"clipitem-{clipItemNum}",
           "premiereChannelType": "stereo"
         }.toXmlAttributes
-        clipitem.add elem("name", src.path.splitFile.name)
+        clipitem.add elem("name", agSplitFile(src.path).name)
         clipitem.add elem("enabled", "TRUE")
         clipitem.add elem("start", startVal)
         clipitem.add elem("end", endVal)
@@ -296,7 +296,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
 
       let thisClipid = &"clipitem-{j + 1}"
       let clipitem = <>clipitem(id = thisClipid)
-      clipitem.add elem("name", clip.src[].splitFile.name)
+      clipitem.add elem("name", agSplitFile(clip.src[]).name)
       clipitem.add elem("enabled", "TRUE")
       clipitem.add elem("start", startVal)
       clipitem.add elem("end", endVal)

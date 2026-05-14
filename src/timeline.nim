@@ -2,7 +2,7 @@ import std/[options, os, sets, tables]
 from std/math import round
 
 import ./[action, av, ffmpeg, media, log, wavutil]
-import ./util/[color, lang, rational]
+import ./util/[color, fun, lang, rational]
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]
@@ -309,7 +309,7 @@ proc applyArgs*(tl: var v3, args: mainArgs) =
     tl.bg = args.background.get()
 
 func stem(path: string): string =
-  splitFile(path).name
+  agSplitFile(path).name
 
 func makeSaneTimebase*(tb: AVRational): AVRational =
   let tbFloat = round(tb.float64, 2)

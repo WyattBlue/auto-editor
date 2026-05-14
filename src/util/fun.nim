@@ -1,4 +1,4 @@
-import std/[base64, os, strutils, strformat]
+import std/[base64, strutils, strformat]
 from std/math import gcd, `mod`, round, trunc
 
 import ../log
@@ -107,8 +107,32 @@ func toTimecode*(secs: float, fmt: Code): string =
   of display:
     &"{sign}{h:d}:{m:02d}:{s.round.int:02d}"
 
+func agSplitFile*(path: string): tuple[dir, name, ext: string] =
+  ## Platform-independent splitFile. Treats both '/' and '\' as path separators
+  ## on every OS, so results don't drift between Linux, macOS, and Windows.
+  var namePos = 0
+  var dotPos = 0
+  for i in countdown(path.len - 1, 0):
+    if path[i] == '.' and dotPos == 0:
+      dotPos = i
+    elif path[i] == '/' or path[i] == '\\':
+      if namePos == 0:
+        namePos = i + 1
+      if dotPos > namePos:
+        result.name = substr(path, namePos, dotPos - 1)
+        result.ext = substr(path, dotPos)
+      else:
+        result.name = substr(path, namePos)
+      result.dir = substr(path, 0, max(0, namePos - 2))
+      return
+  if dotPos > 0:
+    result.name = substr(path, 0, dotPos - 1)
+    result.ext = substr(path, dotPos)
+  else:
+    result.name = path
+
 func splitext*(val: string): (string, string) =
-  let (dir, name, ext) = splitFile(val)
+  let (dir, name, ext) = agSplitFile(val)
   return (dir & "/" & name, ext)
 
 func aspectRatio*(width, height: int): tuple[w, h: int] =
