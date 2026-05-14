@@ -157,6 +157,7 @@ test "agSplitFile":
   check agSplitFile("C:\\.").ext == ""
   check agSplitFile("C:\\foo.txt").ext == ".txt"
   check agSplitFile("C:\\foo.txt\\bar").ext == ""
+  check agSplitFile("./foo..").ext == ""
 
 test "uuid":
   # Test that genUuid generates valid RFC 4122 version 4 UUIDs
