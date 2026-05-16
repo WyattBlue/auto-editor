@@ -1,41 +1,28 @@
 import std/strformat
 
+import ./fun
 import ../[ffmpeg, log]
 
 
 type Rules* = object
-  vcodecs*: seq[ptr AVCodec]
-  acodecs*: seq[ptr AVCodec]
-  scodecs*: seq[ptr AVCodec]
-  defaultVid*: AVCodecID
-  defaultAud*: AVCodecID
-  defaultSub*: AVCodecID
-  # maxVideos*: int = -1
-  # maxAudios*: int = -1
-  # maxSubtitles*: int = -1
-  allowImage*: bool
+  ofmt: ptr AVOutputFormat
 
-proc initRules*(ext: string): Rules =
-  let format = av_guess_format(nil, cstring(ext), nil)
+func allowsCodec*(self: Rules, codecId: AVCodecID): bool =
+  var tag: cuint = 0
+  return av_codec_get_tag2(self.ofmt.codec_tag, codecId, addr tag) > 0
+
+func defaultVid*(self: Rules): AVCodecID =
+  self.ofmt.video_codec
+
+func defaultAud*(self: Rules): AVCodecID =
+  self.ofmt.audio_codec
+
+func defaultSub*(self: Rules): AVCodecID =
+  if self.ofmt.name == "mp4": ID_MOV_TEXT else: self.ofmt.subtitle_codec
+
+proc initRules*(name: string): Rules =
+  let format = av_guess_format(nil, cstring(name), nil)
   if format == nil:
-    error &"Extension: {ext} has no known formats"
+    error &"Extension: {agSplitFile(name)[2]} has no known formats"
 
-  result.defaultVid = format.video_codec
-  result.defaultAud = format.audio_codec
-  result.defaultSub = format.subtitle_codec
-  result.allowImage = ext in ["mp4", "mkv"]
-
-  var codec: ptr AVCodec
-  let opaque: pointer = nil
-
-  while true:
-    codec = av_codec_iterate(addr opaque)
-    if codec == nil:
-      break
-    if avformat_query_codec(format, codec.id, FF_COMPLIANCE_NORMAL) == 1:
-      if codec.`type` == AVMEDIA_TYPE_VIDEO:
-        result.vcodecs.add codec
-      elif codec.`type` == AVMEDIA_TYPE_AUDIO:
-        result.acodecs.add codec
-      elif codec.`type` == AVMEDIA_TYPE_SUBTITLE:
-        result.scodecs.add codec
+  result.ofmt = format
