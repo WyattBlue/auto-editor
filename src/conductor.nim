@@ -143,35 +143,15 @@ proc setOutput(userOut, `export`, path: string): (string, string) =
 
   return (&"{root}{ext}", myExport)
 
+func setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules): string =
+  if inCodec != "auto":
+    return inCodec
 
-proc setAudioCodec(inCodec, ext: string, src: MediaInfo, rule: Rules): string =
-  var codec = inCodec
-  if codec == "auto":
-    if src.a.len == 0:
-      codec = $avcodec_get_name(rule.defaultAud)
-    else:
-      codec = $avcodec_get_name(src.a[0].codecId)
-      let avCodec = initCodec(codec)
-      if avCodec == nil or avCodec.sample_fmts == nil:
-        codec = "aac"
+  let codecId = if src.v.len == 0: ID_H264 else: src.v[0].codecId
 
-      # For PCM-based containers (WAV, etc.), prefer PCM even if other codecs are supported
-      if ext in [".wav", ".aiff", ".au"] and rule.defaultAud.isPCM:
-        codec = $avcodec_get_name(rule.defaultAud)
-      elif codec notin rule.acodecs.mapIt($it.name):
-        if rule.defaultAud != ID_NONE:
-          codec = $avcodec_get_name(rule.defaultAud)
-        else:
-          codec = "aac"
-  return codec
-
-proc setVideoCodec(inCodec, ext: string, src: MediaInfo, rule: Rules): string =
-  var codec = inCodec
-  if codec == "auto":
-    codec = (if src.v.len == 0: "h264" else: $avcodec_get_name(src.v[0].codecId))
-    if codec notin rule.vcodecs.mapIt($it.name) and rule.defaultVid != ID_NONE:
-      return $avcodec_get_name(rule.default_vid)
-  return codec
+  if rule.defaultVid == ID_NONE or rule.allowsCodec(codecId):
+    return $avcodec_get_name(codecId)
+  return $avcodec_get_name(rule.defaultVid)
 
 proc editMedia*(args: var mainArgs) =
   av_log_set_level(AV_LOG_QUIET)
@@ -312,11 +292,8 @@ proc editMedia*(args: var mainArgs) =
   if output == "-":
     error "Exporting media files to stdout is not supported."
 
-  let (_, _, outExt) = agSplitFile(output)
-  let rule = initRules(outExt.toLowerAscii)
-  args.videoCodec = setVideoCodec(args.videoCodec, outExt, mi, rule)
-  if args.audioCodec != "auto":
-    args.audioCodec = setAudioCodec(args.audioCodec, outExt, mi, rule)
+  let rule = initRules(output)
+  args.videoCodec = setVideoCodec(args.videoCodec, mi, rule)
 
   proc createAlphanumTempDir(length: int = 8): string =
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789"

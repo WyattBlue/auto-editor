@@ -83,6 +83,8 @@ type
     u_mask: uint64
     opaque: pointer
 
+  AVCodecTag* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
+
   AVOutputFormat* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
     name*: cstring
     long_name: cstring
@@ -92,6 +94,7 @@ type
     video_codec*: AVCodecID
     subtitle_codec*: AVCodecID
     flags*: cint
+    codec_tag*: ptr ptr AVCodecTag
 
   AVFormatContext* {.importc, incompleteStruct, header: "<libavformat/avformat.h>".} = object
     av_class*: pointer
@@ -300,6 +303,9 @@ proc av_get_channel_layout_string*(buf: cstring, buf_size: cint,
     header: "<libavutil/channel_layout.h>".}
 proc avformat_query_codec*(ofmt: ptr AVOutputFormat, codec_id: AVCodecID,
   std_compliance: cint): cint {.importc, header: "<libavformat/avformat.h>".}
+
+proc av_codec_get_tag2*(tags: ptr ptr AVCodecTag, id: AVCodecID,
+    tag: ptr cuint): cint {.importc, header: "<libavformat/avformat.h>".}
 
 proc av_codec_iterate*(opaque: ptr pointer): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
@@ -569,11 +575,13 @@ proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
 
 const
   ID_NONE* = AVCodecID(0)
+  ID_H264* = AVCodecID(27)
   ID_PNG* = AVCodecID(61)
   ID_HEVC* = AVCodecID(173)
   ID_AV1* = AVCodecID(225)
   ID_PCM_S16LE* = AVCodecID(65536)
   ID_AAC* = AVCodecID(86018)
+  ID_MOV_TEXT* = AVCodecID(0x17000 + 5)
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2
   AV_DISPOSITION_ATTACHED_PIC* = 0x0400.cint

@@ -1,4 +1,4 @@
-import std/[heapqueue, options, sequtils, strformat, strutils, tables]
+import std/[heapqueue, options, strformat, strutils, tables]
 from std/math import round
 
 import ../[av, ffmpeg, log, media, timeline]
@@ -34,10 +34,11 @@ func pngDimensions(data: ptr uint8, size: cint): (cint, cint) =
           (b[22].cint shl 8) or b[23].cint
   return (w, h)
 
-proc resolveAudioCodec(layer: seq[Clip], outExt: string, rules: Rules): AVCodecID =
+proc resolveAudioCodec(layer: seq[Clip], rules: Rules): AVCodecID =
   if layer.len == 0:
     return rules.defaultAud
-  if outExt in [".wav", ".aiff", ".au"] and rules.defaultAud.isPCM:
+  # PCM-first containers (WAV, AIFF, AU, W64, CAF, ...) prefer PCM over the source codec.
+  if rules.defaultAud.isPCM:
     return rules.defaultAud
 
   let firstClip = layer[0]
@@ -47,9 +48,9 @@ proc resolveAudioCodec(layer: seq[Clip], outExt: string, rules: Rules): AVCodecI
     return rules.defaultAud
 
   let codec = srcMi.a[stream].codecId
-  if codec notin rules.acodecs.mapIt(it.id):
-    return (if rules.defaultAud == ID_NONE: ID_AAC else: rules.defaultAud)
-  return codec
+  if rules.allowsCodec(codec):
+    return codec
+  return (if rules.defaultAud == ID_NONE: ID_AAC else: rules.defaultAud)
 
 proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
   if ctx.codec.sample_fmts == nil:
@@ -96,21 +97,23 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   output.options = options
 
   let (_, _, outExt) = agSplitFile(outputPath)
+  let includeVideo = not args.vn and rules.defaultVid notin [ID_NONE, ID_PNG]
+  let includeAudio = not args.an and rules.defaultAud != ID_NONE
+  let includeSubtitle = not args.sn and rules.defaultSub != ID_NONE
 
   var vEncCtx: ptr AVCodecContext = nil
   var vOutStream: ptr AVStream = nil
   var videoFrameIter: iterator(): (ptr AVFrame, int64) = iterator(): (ptr AVFrame, int64) =
     return
 
-  if rules.defaultVid notin [ID_NONE, ID_PNG] and tl.v.len > 0 and tl.v[0].len > 0:
-    if not args.vn:
-      (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args, cache)
+  if includeVideo and tl.v.len > 0 and tl.v[0].len > 0:
+    (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args, cache)
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
   var audioFrameIters: seq[iterator(): (ptr AVFrame, int64)] = @[]
 
-  if not args.an and args.mixAudioStreams and tl.a.len > 0:
+  if includeAudio and args.mixAudioStreams and tl.a.len > 0:
     # Create a single audio stream for mixed output
     var hasAnyClips = false
     for i in 0..<tl.a.len:
@@ -127,7 +130,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
             if layer.len > 0:
               firstLayer = layer
               break
-          $avcodec_get_name(resolveAudioCodec(firstLayer, outExt, rules))
+          $avcodec_get_name(resolveAudioCodec(firstLayer, rules))
       else:
         args.audioCodec
       var (aOutStream, aEncCtx) = output.addStream(mixCodec, rate = rate,
@@ -153,13 +156,13 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
       let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize, args.audioNormalize, cache)
       audioFrameIters.add(audioFrameIter)
-  elif not args.an:
+  elif includeAudio:
     # Create separate streams for each timeline layer
     for i in 0..<tl.a.len:
       if tl.a[i].len > 0: # Only create stream if track has clips
         let rate = AVRational(num: tl.sr, den: 1)
         let layerCodec = if args.audioCodec == "auto":
-          $avcodec_get_name(resolveAudioCodec(tl.a[i], outExt, rules))
+          $avcodec_get_name(resolveAudioCodec(tl.a[i], rules))
         else:
           args.audioCodec
         var (aOutStream, aEncCtx) = output.addStream(layerCodec, rate = rate,
@@ -197,7 +200,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   var subtitleStreams: seq[ptr AVStream] = @[]
   var subtitleSources: seq[string] = @[]
 
-  if not args.sn and tl.s.len > 0:
+  if includeSubtitle and tl.s.len > 0:
     for i in 0..<tl.s.len:
       if tl.s[i].len > 0:
         # Get source file and stream index from first clip
@@ -416,7 +419,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       av_packet_unref(outPacket)
 
   # Process subtitle streams
-  if not args.sn and subtitleStreams.len > 0:
+  if includeSubtitle:
     for i in 0..<subtitleStreams.len:
       let layer = tl.s[i]
       let sourcePath = subtitleSources[i]
