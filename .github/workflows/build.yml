@@ -79,7 +79,7 @@ jobs:
       - name: Build FFmpeg
         run: nimble makeffwin
       - name: Compile
-        run: nimble windows && mv auto-editor.exe auto-editor-windows-x86_64.exe
+        run: nimble makewin && mv auto-editor.exe auto-editor-windows-x86_64.exe
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
@@ -109,7 +109,7 @@ jobs:
       - name: Build FFmpeg
         run: nimble makeffwinarm
       - name: Compile
-        run: nimble windowsarm && mv auto-editor.exe auto-editor-windows-aarch64.exe
+        run: nimble makewinarm && mv auto-editor.exe auto-editor-windows-aarch64.exe
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
@@ -140,7 +140,7 @@ jobs:
       - name: Build FFmpeg
         run: nimble makeffarmv7
       - name: Compile
-        run: nimble armv7 && mv auto-editor auto-editor-linux-armv7
+        run: nimble makearmv7 && mv auto-editor auto-editor-linux-armv7
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
