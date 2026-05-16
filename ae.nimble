@@ -844,7 +844,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
       --enable-cross-compile \""" & "\n" & setupCommonFlags(packages))
     makeInstall()
 
-task windows, "Cross-compile to Windows (requires mingw-w64)":
+task makewin, "Cross-compile to Windows (requires mingw-w64)":
   echo "Cross-compiling for Windows (64-bit)..."
 
   if not dirExists(winBuildPath):
@@ -881,7 +881,7 @@ task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
       --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, winArm=true))
     makeInstall()
 
-task windowsarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
+task makewinarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
   echo "Cross-compiling for Windows ARM64..."
 
   if not dirExists(winArmBuildPath):
@@ -922,7 +922,7 @@ task makeffarmv7, "Build FFmpeg for Linux ARMv7 cross-compilation":
       quit(1)
     makeInstall()
 
-task armv7, "Cross-compile to Linux ARMv7 (requires arm-linux-gnueabihf toolchain)":
+task makearmv7, "Cross-compile to Linux ARMv7 (requires arm-linux-gnueabihf toolchain)":
   echo "Cross-compiling for Linux ARMv7..."
 
   if not dirExists(armv7BuildPath):
@@ -1017,7 +1017,7 @@ Cflags: -I${{includedir}}
     makeInstall()
 
 task makewasm, "Compile to wasm32 (requires emscripten, wabt)":
-  echo "Compiling for wasm (browser)..."
+  echo "Compiling for wasm (32-bit)..."
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
   else:

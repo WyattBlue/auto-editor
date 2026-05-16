@@ -134,7 +134,7 @@ jobs:
       - name: Build FFmpeg
         run: nimble makeffwin
       - name: Compile
-        run: nimble windows
+        run: nimble makewin
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
@@ -191,7 +191,7 @@ jobs:
       - name: Build FFmpeg
         run: nimble makeffwinarm
       - name: Compile
-        run: nimble windowsarm
+        run: nimble makewinarm
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
