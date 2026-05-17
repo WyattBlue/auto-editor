@@ -107,7 +107,6 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
   fcpxml.add(resources)
 
   var srcDur = 0
-  var tlDur: int64 = (if resolve: 0 else: tl.len)
   var projName: string
 
   var ptrToMi = initTable[ptr string, MediaInfo]()
@@ -117,11 +116,13 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
     let mi = initMediaInfo(ptrSrc[])
     ptrToMi[ptrSrc] = mi
 
+    # An asset's duration is that of the source media itself, not the
+    # (shorter) edited timeline. Clips reference positions in the source.
+    let assetDur = int(mi.duration * tl.tb)
+
     if i == 0:
       projName = agSplitFile(mi.path).name
-      srcDur = int(mi.duration * tl.tb)
-      if resolve:
-        tlDur = srcDur
+      srcDur = assetDur
 
     let id = "r" & $(i * 2 + 1)
     let width = $tl.res[0]
@@ -139,7 +140,7 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
     let r2 = <>asset(id = id2, name = agSplitFile(mi.path).name,
         start = fraction(startPoint), hasVideo = hasVideo, format = id,
         hasAudio = hasAudio, audioSources = "1",
-        audioChannels = audioChannels, duration = fraction(tlDur))
+        audioChannels = audioChannels, duration = fraction(assetDur))
 
     let mediaRep = newElement("media-rep")
     mediaRep.attrs = {"kind": "original-media", "src": mi.path.pathToUri()}.toXmlAttributes
@@ -152,8 +153,11 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
   let lib = <>library()
   let evt = <>event(name = group_name)
   let proj = <>project(name = projName)
+  # FCP/Resolve sequences only accept "stereo" or "surround"; map any
+  # other layout (e.g. "mono", "5.1") to one of these.
+  let audioLayout = (if tl.layout.nb_channels > 2: "surround" else: "stereo")
   let sequence = <>sequence(format = "r1", tcStart = "0s", tcFormat = "NDF",
-      audioLayout = $(tl.layout), audioRate = (if tl.sr ==
+      audioLayout = audioLayout, audioRate = (if tl.sr ==
       44100: "44.1k" else: "48k"))
   let spine = <>spine()
 
@@ -171,7 +175,7 @@ proc fcp11WriteXml*(groupName, version, output: string, resolve: bool, tl: v3) =
     asset.attrs = {
       "name": projName,
       "ref": `ref`,
-      "offset": fraction(clip.start + startPoint),
+      "offset": fraction(clip.start),
       "duration": fraction(clip.dur),
       "start": fraction(clip.offset + startPoint),
       "tcFormat": "NDF"
