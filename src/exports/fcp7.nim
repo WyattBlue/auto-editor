@@ -158,8 +158,44 @@ proc resolveWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
       track.add clipitem
     audio.add track
 
+type AudioTrackInfo = object
+  layerIdx: int         # Index into tl.a
+  isStereo: bool        # Stereo source -> exploded track-pair; else mono track
+  explodedIndex: int    # currentExplodedTrackIndex (0 or 1); 0 for mono
+  sourceTrackIndex: int # sourcetrack/trackindex into the source file
+  firstClipId: int      # clipitem id of this track's first clip
+
+proc planPremiereAudio(tl: v3, ptrToMi: Table[ptr string, MediaInfo],
+    firstAudioId: int): seq[AudioTrackInfo] =
+  ## Lay out the audio tracks. A stereo (or higher) source is split into two
+  ## exploded stereo tracks; a mono source becomes a single mono track. The
+  ## exploded structure can't represent mono: Premiere derives each channel
+  ## from currentExplodedTrackIndex, so a mono source's second exploded track
+  ## would read a non-existent channel and play silent on one side.
+  var nextId = firstAudioId
+  var channelOffset = 0
+  for layerIdx, alayer in tl.a:
+    var channels = 1
+    if alayer.len > 0:
+      let mi = ptrToMi[alayer[0].src]
+      let st = alayer[0].stream.int
+      if st >= 0 and st < mi.a.len:
+        channels = max(1, mi.a[st].channels.int)
+    let isStereo = channels >= 2
+    for explodedIndex in 0 ..< (if isStereo: 2 else: 1):
+      result.add AudioTrackInfo(
+        layerIdx: layerIdx,
+        isStereo: isStereo,
+        explodedIndex: explodedIndex,
+        sourceTrackIndex: channelOffset + explodedIndex + 1,
+        firstClipId: nextId,
+      )
+      nextId += alayer.len
+    channelOffset += channels
+
 proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
-    mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo]) =
+    mi: MediaInfo), tl: v3, ptrToMi: Table[ptr string, MediaInfo],
+    audioPlan: seq[AudioTrackInfo]) =
   audio.add elem("numOutputChannels", "2")
   let aformat = newElement("format")
   let aschar = newElement("samplecharacteristics")
@@ -169,62 +205,57 @@ proc premiereWriteAudio(audio: XmlNode, makeFiledef: proc(clipitem: XmlNode,
   audio.add aformat
 
   let hasVideo = tl.v.len > 0 and tl.v[0].len > 0
-  var t = 0
-  for alayer in tl.a:
-    for channelcount in 0..1: # Because "stereo" is hardcoded
-      t += 1
-      let track = newElement("track")
-      track.attrs = {
-        "currentExplodedTrackIndex": $channelcount,
-        "totalExplodedTrackCount": "2", # Because "stereo" is hardcoded
-        "premiereTrackType": "Stereo"
+  for atrack in audioPlan:
+    let alayer = tl.a[atrack.layerIdx]
+    let track = newElement("track")
+    track.attrs = {
+      "currentExplodedTrackIndex": $atrack.explodedIndex,
+      "totalExplodedTrackCount": (if atrack.isStereo: "2" else: "1"),
+      "premiereTrackType": (if atrack.isStereo: "Stereo" else: "Mono")
+    }.toXmlAttributes
+
+    if hasVideo and atrack.isStereo:
+      track.add elem("outputchannelindex", $(atrack.explodedIndex + 1))
+
+    for j, aclip in alayer.pairs:
+      let src = ptrToMi[aclip.src]
+
+      let startVal = $aclip.start
+      let endVal = $(aclip.start + aclip.dur)
+      let inVal = $aclip.offset
+      let outVal = $(aclip.offset + aclip.dur)
+
+      let clipitem = newElement("clipitem")
+      clipitem.attrs = {
+        "id": &"clipitem-{atrack.firstClipId + j}",
+        "premiereChannelType": (if atrack.isStereo: "stereo" else: "mono")
       }.toXmlAttributes
+      clipitem.add elem("name", agSplitFile(src.path).name)
+      clipitem.add elem("enabled", "TRUE")
+      clipitem.add elem("start", startVal)
+      clipitem.add elem("end", endVal)
+      clipitem.add elem("in", inVal)
+      clipitem.add elem("out", outVal)
 
-      if hasVideo:
-        track.add elem("outputchannelindex", $(channelcount + 1))
+      makeFiledef(clipitem, src)
 
-      for j, aclip in alayer.pairs:
-        let src = ptrToMi[aclip.src]
+      let sourcetrack = newElement("sourcetrack")
+      sourcetrack.add elem("mediatype", "audio")
+      sourcetrack.add elem("trackindex", $atrack.sourceTrackIndex)
+      clipitem.add sourcetrack
 
-        let startVal = $aclip.start
-        let endVal = $(aclip.start + aclip.dur)
-        let inVal = $aclip.offset
-        let outVal = $(aclip.offset + aclip.dur)
+      let labels = newElement("labels")
+      labels.add elem("label2", "Iris")
+      clipitem.add labels
 
-        let clipItemNum = if not hasVideo: j + 1 else: alayer.len + 1 + j + (
-            t * alayer.len)
+      let effectGroup = tl.effects[aclip.effects]
+      for effect in effectGroup:
+        if effect.kind in [actSpeed, actVarispeed]:
+          clipitem.add speedup(effect.val * 100)
+          break
 
-        let clipitem = newElement("clipitem")
-        clipitem.attrs = {
-          "id": &"clipitem-{clipItemNum}",
-          "premiereChannelType": "stereo"
-        }.toXmlAttributes
-        clipitem.add elem("name", agSplitFile(src.path).name)
-        clipitem.add elem("enabled", "TRUE")
-        clipitem.add elem("start", startVal)
-        clipitem.add elem("end", endVal)
-        clipitem.add elem("in", inVal)
-        clipitem.add elem("out", outVal)
-
-        makeFiledef(clipitem, src)
-
-        let sourcetrack = newElement("sourcetrack")
-        sourcetrack.add elem("mediatype", "audio")
-        sourcetrack.add elem("trackindex", $t)
-        clipitem.add sourcetrack
-
-        let labels = newElement("labels")
-        labels.add elem("label2", "Iris")
-        clipitem.add labels
-
-        let effectGroup = tl.effects[aclip.effects]
-        for effect in effectGroup:
-          if effect.kind in [actSpeed, actVarispeed]:
-            clipitem.add speedup(effect.val * 100)
-            break
-
-        track.add clipitem
-      audio.add track
+      track.add clipitem
+    audio.add track
 
 proc handlePath(src: string): string =
   let absPath = src.absolutePath()
@@ -259,6 +290,11 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
       fileDefs.incl(pathurl)
     clipitem.add filedef
 
+  let hasVideo = tl.v.len > 0 and tl.v[0].len > 0
+  let firstAudioId = (if hasVideo: tl.v[0].len + 1 else: 1)
+  let audioPlan = (if resolve: @[]
+                   else: planPremiereAudio(tl, ptrToMi, firstAudioId))
+
   let xmeml = <>xmeml(version = "5")
   let sequence = (if resolve: <>sequence() else: <>sequence(explodedTracks = "true"))
 
@@ -285,7 +321,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   vformat.add vschar
   video.add vformat
 
-  if tl.v.len > 0 and tl.v[0].len > 0:
+  if hasVideo:
     let track = newElement("track")
 
     for j, clip in tl.v[0].pairs:
@@ -322,11 +358,18 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
         link2.add elem("linkclipref", &"clipitem-{tl.v[0].len + j + 1}")
         clipitem.add link2
       else:
-        for i in 0..<(1 + mi.a.len * 2): # `2` because stereo
+        let vlink = newElement("link")
+        vlink.add elem("linkclipref", thisClipid)
+        vlink.add elem("mediatype", "video")
+        vlink.add elem("trackindex", "1")
+        vlink.add elem("clipindex", $(j + 1))
+        clipitem.add vlink
+        for k, atrack in audioPlan:
+          if j >= tl.a[atrack.layerIdx].len: continue
           let link = newElement("link")
-          link.add elem("linkclipref", &"clipitem-{(i * tl.v[0].len) + j + 1}")
-          link.add elem("mediatype", if i == 0: "video" else: "audio")
-          link.add elem("trackindex", $max(i, 1))
+          link.add elem("linkclipref", &"clipitem-{atrack.firstClipId + j}")
+          link.add elem("mediatype", "audio")
+          link.add elem("trackindex", $(k + 1))
           link.add elem("clipindex", $(j + 1))
           clipitem.add link
 
@@ -340,7 +383,7 @@ proc fcp7WriteXml*(name, output: string, resolve: bool, tl: v3) =
   if resolve:
     resolveWriteAudio(audio, makeFiledef, tl, ptrToMi)
   else:
-    premiereWriteAudio(audio, makeFiledef, tl, ptrToMi)
+    premiereWriteAudio(audio, makeFiledef, tl, ptrToMi, audioPlan)
 
   media.add audio
   sequence.add media
