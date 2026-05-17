@@ -4,6 +4,7 @@ import hashlib
 import itertools
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -558,6 +559,37 @@ class Runner:
 
             p_xml = self.main([f"resources/{test_name}"], ["-exp"], "out.xml")
             self.main([p_xml], [])
+
+    def test_premiere_mono(self) -> None:
+        # A mono source must export as a single `Mono` track, not an exploded
+        # stereo pair whose 2nd track hits a non-existent channel. See #856.
+        p_xml = self.main(["resources/mono.mp3"], ["-exp"], "mono.xml")
+        with open(p_xml) as file:
+            content = file.read()
+
+        assert 'premiereTrackType="Mono"' in content
+        assert 'totalExplodedTrackCount="1"' in content
+        assert 'premiereChannelType="mono"' in content
+        assert "<trackindex>2</trackindex>" not in content
+
+        ids = re.findall(r'clipitem id="([^"]+)"', content)
+        assert ids and len(ids) == len(set(ids))
+        self.main([p_xml], [])
+
+    def test_premiere_stereo(self) -> None:
+        p_xml = self.main(["resources/testsrc.mkv"], ["-exp"], "stereo.xml")
+        with open(p_xml) as file:
+            content = file.read()
+
+        assert 'premiereTrackType="Stereo"' in content
+        assert 'currentExplodedTrackIndex="0"' in content
+        assert 'currentExplodedTrackIndex="1"' in content
+        assert "<trackindex>1</trackindex>" in content
+        assert "<trackindex>2</trackindex>" in content
+
+        ids = re.findall(r'clipitem id="([^"]+)"', content)
+        assert ids and len(ids) == len(set(ids))
+        self.main([p_xml], [])
 
     def test_export(self):
         for test_name in all_files:
