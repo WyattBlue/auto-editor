@@ -35,7 +35,7 @@ proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: 
     if entry != nil and entry.isKeyframe:
       let frameNum = int(round(float(entry.timestamp) * float(tb.num) / float(tb.den) * float(fps)))
 
-      # Be a bit conservate by adding video_deplay (the worst-case DTS/PTS gap), even
+      # Be a bit conservative by adding video_deplay (the worst-case DTS/PTS gap), even
       # if some formats use PTS.
       result.frames.add(max(frameNum + reorderDelay, 0))
 
@@ -45,24 +45,6 @@ proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: 
     for i in 1 ..< result.frames.len:
       total += result.frames[i] - result.frames[i - 1]
     result.avgInterval = total div (result.frames.len - 1)
-
-proc findNearestKeyframeBefore(index: KeyframeIndex, targetFrame: int): int =
-  ## Find the nearest keyframe at or before targetFrame using binary search.
-  ## Returns -1 if no suitable keyframe found.
-  if index.frames.len == 0 or targetFrame < index.frames[0]:
-    return -1
-
-  var lo = 0
-  var hi = index.frames.len - 1
-
-  while lo < hi:
-    let mid = (lo + hi + 1) div 2
-    if index.frames[mid] <= targetFrame:
-      lo = mid
-    else:
-      hi = mid - 1
-
-  return index.frames[lo]
 
 func toInt(r: AVRational): int =
   (r.num div r.den).int
@@ -331,11 +313,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
     if len(cn.video) > 0:
       let stream = cn.video[0]
       let defaultInterval = toInt(targetFps * AVRational(num: 5, den: 1))
+
+      # tous (timebase units per source frame) turns a frame index into a seek
+      # timestamp.
+      tous[src] = int(float(stream.time_base.den) / float(stream.avg_frame_rate))
+
       if args.noSeek:
-        tous[src] = 1000
         keyframeIndices[src] = KeyframeIndex(frames: @[], hasIndex: false, avgInterval: high(int))
       else:
-        tous[src] = int(float(stream.time_base.den) / float(stream.avg_frame_rate))
         keyframeIndices[src] = buildKeyframeIndex(stream, stream.avg_frame_rate, defaultInterval)
 
         let kfIndex = keyframeIndices[src]
@@ -411,28 +396,37 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var objList: seq[VideoFrame] = @[]
   var lastProcessedFrame: ptr AVFrame = nil
   var lastFrameIndex = -1
-  var lastKeyframePos = initTable[ptr string, int]()
+  var observedKeyframes = initTable[ptr string, seq[int]]()
   var lastSeekTarget = initTable[ptr string, int]()
   let isNonlinear = tl.isNonlinear
 
   debug &"isNonlinear: {isNonlinear}"
 
-  # Initialize lastKeyframePos to 0 for all sources (frame 0 is always seekable)
+  # Decoding always begins on a keyframe, so frame 0 is always a valid seek
+  # point. Further keyframes are appended as they are decoded (see below).
   for src in tl.uniqueSources:
-    lastKeyframePos[src] = 0
+    observedKeyframes[src] = @[0]
     lastSeekTarget[src] = -1 # -1 means no seek has been performed yet
 
-  # Helper to find best keyframe for backward seeking
+  # Find the closest keyframe at or before targetFrame for backward seeking.
+  # A backward seek only ever targets a frame we have already decoded past, so
+  # every keyframe up to the current position has been observed -- and, having
+  # been demuxed, is now in the container's seek index.
+
+  # Upfront `keyframeIndices` is unreliable since sparsely-cued containers can
+  # report just a single keyframe.
   proc findBestKeyframe(src: ptr string, targetFrame: int): int =
-    let kfIndex = keyframeIndices[src]
-    if kfIndex.hasIndex and kfIndex.frames.len > 0:
-      let kf = findNearestKeyframeBefore(kfIndex, targetFrame)
-      if kf >= 0:
-        return kf
-    let fallback = lastKeyframePos[src]
-    if fallback <= targetFrame:
-      return fallback
-    return 0 # frame 0 is always seekable
+    let kfs = observedKeyframes[src]
+    var lo = 0
+    var hi = kfs.high
+    result = 0 # frame 0 is always a valid seek point
+    while lo <= hi:
+      let mid = (lo + hi) div 2
+      if kfs[mid] <= targetFrame:
+        result = kfs[mid]
+        lo = mid + 1
+      else:
+        hi = mid - 1
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int64) =
     # Process each frame in timeline order like Python version
@@ -513,10 +507,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             frame = decodedFrame
             frameIndex = int(round(decodedFrame.time(myStream.time_base) * srcTb.float))
 
-            # Track keyframe positions for smarter backward seeking
-            # Only track I-frames that are at or before our target to avoid overshooting
-            if decodedFrame.pict_type == AV_PICTURE_TYPE_I and frameIndex <= obj.index:
-              lastKeyframePos[obj.src] = frameIndex
+            # Record keyframes as they are decoded so backward seeks can land
+            # close to their target. Frames arrive in display order, so a
+            # strictly-greater check keeps the list sorted and de-duplicated
+            # (keyframes are re-seen when decoding resumes after a seek).
+            if decodedFrame.pict_type == AV_PICTURE_TYPE_I and
+                frameIndex > observedKeyframes[obj.src][^1]:
+              observedKeyframes[obj.src].add frameIndex
 
             foundFrame = true
             break
