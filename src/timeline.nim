@@ -1,5 +1,5 @@
 import std/[options, os, sets, tables]
-from std/math import round
+from std/math import round, ceil
 
 import ./[action, av, ffmpeg, media, log, wavutil]
 import ./util/[color, fun, lang, rational]
@@ -115,6 +115,21 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
     tl.layout = initLayout("stereo")
 
 
+func clipBounds(startFrame, endFrame: int64, speed: float64): (int64, int64) =
+  ## Map a source-frame range to a clip's (offset, dur), both in timeline frames.
+  ##
+  ## Both ends use ceil rather than truncation so the source frame the renderer
+  ## reconstructs as round(offset * speed) never lands before the chunk's true
+  ## start.
+  ##
+  ## Emptiness is decided by round()-based length, so a chunk that collapses to
+  ## nothing returns dur == 0 for the caller to drop. Deciding it from the ceil
+  ## values instead would wrongly keep a one-frame clip.
+  if int64(round(float64(endFrame - startFrame) / speed)) == 0:
+    return (0'i64, 0'i64)
+  let offset = int64(ceil(float64(startFrame) / speed))
+  (offset, int64(ceil(float64(endFrame) / speed)) - offset)
+
 proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
   effects: seq[Actions], actionIndex: seq[int]): v3 =
   var clips: seq[Clip] = @[]
@@ -146,11 +161,9 @@ proc initLinearTimeline*(src: ptr string, tb: AVRational, bg: RGBColor, mi: Medi
 
     # Make clips (skip cuts for actual output clips)
     if speed != 99999.0:
-      dur = int64(round(float64(chunk[1] - chunk[0]) / speed))
+      (offset, dur) = clipBounds(chunk[0], chunk[1], speed)
       if dur == 0:
         continue
-
-      offset = int64(float64(chunk[0]) / speed)
 
       if not (clips.len > 0 and clips[^1].start == start):
         clips.add Clip(src: src, start: start, dur: dur, offset: offset, effects: e)
@@ -188,11 +201,9 @@ proc appendLinearTimeline*(tl: var v3, src: ptr string, mi: MediaInfo, actionInd
     tl.clips2.add Clip2(start: chunk[0], `end`: chunk[1], effect: e)
 
     if speed != 99999.0:
-      dur = int64(round(float64(chunk[1] - chunk[0]) / speed))
+      (offset, dur) = clipBounds(chunk[0], chunk[1], speed)
       if dur == 0:
         continue
-
-      offset = int64(float64(chunk[0]) / speed)
 
       if not (clips.len > 0 and clips[^1].start == timelineStart):
         clips.add Clip(src: src, start: timelineStart, dur: dur, offset: offset, effects: e)
@@ -236,11 +247,9 @@ proc toNonLinear*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
 
   for chunk in chunks:
     if chunk[2] > 0.0 and chunk[2] < 99999.0:
-      dur = int64(round(float64(chunk[1] - chunk[0]) / chunk[2]))
+      (offset, dur) = clipBounds(chunk[0], chunk[1], chunk[2])
       if dur == 0:
         continue
-
-      offset = int64(float64(chunk[0]) / chunk[2])
 
       if not (clips.len > 0 and clips[^1].start == start):
         var effectIndex: int
@@ -284,11 +293,10 @@ proc toNonLinear2*(src: ptr string, tb: AVRational, bg: RGBColor, mi: MediaInfo,
       if effect.kind == actSpeed or effect.kind == actVarispeed:
         speed *= effect.val
 
-    dur = int64(round(float64(clip2.`end` - clip2.start) / speed))
+    (offset, dur) = clipBounds(clip2.start, clip2.`end`, speed)
     if dur == 0:
       continue
 
-    offset = int64(float64(clip2.start) / speed)
     clips.add(Clip(src: src, start: start, dur: dur, offset: offset, effects: clip2.effect))
 
     start += dur
