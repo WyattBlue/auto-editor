@@ -28,12 +28,16 @@ proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: 
 
   result.hasIndex = true
   let tb = stream.time_base
+  let reorderDelay = max(stream.codecpar.video_delay.int, 0)
 
   for i in 0 ..< count:
     let entry = avformat_index_get_entry(stream, i)
     if entry != nil and entry.isKeyframe:
       let frameNum = int(round(float(entry.timestamp) * float(tb.num) / float(tb.den) * float(fps)))
-      result.frames.add(frameNum)
+
+      # Be a bit conservate by adding video_deplay (the worst-case DTS/PTS gap), even
+      # if some formats use PTS.
+      result.frames.add(max(frameNum + reorderDelay, 0))
 
   # Compute average interval from actual keyframes
   if result.frames.len >= 2:
