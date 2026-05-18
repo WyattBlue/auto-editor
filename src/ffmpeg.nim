@@ -237,6 +237,7 @@ type
     chroma_sample_location*: cint
     max_b_frames*: cint
     profile*: cint
+    strict_std_compliance*: cint
     # ... other fields omitted for brevity
 
 proc `==`*(a: AVSampleFormat, b: cint): bool = cint(ord(a)) == b
