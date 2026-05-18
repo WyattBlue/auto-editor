@@ -280,7 +280,6 @@ class Runner:
         assert fast != nofast, "+faststart is not being applied"
         assert frag not in (fast, nofast), "fragmented output should diff."
 
-    @requires_lk
     def test_example(self) -> None:
         out = self.main(["example.mp4"], [], output="example_ALTERED.mp4")
         outdur = 0
@@ -305,11 +304,14 @@ class Runner:
             assert audio.language == "eng"
             assert audio.layout.name == "stereo"
 
+    @requires_lk
+    def test_2example_to_v3(self) -> None:
+        example_alt_dur = 17433008
+
         tlf = self.main(["example.mp4", "example.mp4"], ["--export", "v3"], output="out.v3")
         out2 = self.main([tlf], [], output="tl_out.mp4")
         with av.open(out2) as container:
-            assert container.duration is not None
-            assert container.duration == outdur * 2, outdur * 2
+            assert container.duration == example_alt_dur * 2
 
     def test_video_to_mp3(self) -> None:
         out = self.main(["example.mp4"], [], output="example_ALTERED.mp3")
@@ -381,14 +383,20 @@ class Runner:
         )
 
     def test_gif(self):
-        """
-        Feed auto-editor a gif file and make sure it can spit out a correctly formatted
-        gif. No editing is requested.
-        """
         input = ["resources/only-video/man-on-green-screen.gif"]
-        out = self.main(input, ["--edit", "none", "--cut-out", "2sec,end"], "out.gif")
-        assert fileinfo(out).videos[0].codec == "gif"
-        assert len(fileinfo(out).audios) == 0
+        out = self.main(input, ["--edit", "none", "--cut", "1sec,end"], "out.gif")
+        with av.open(out) as c:
+            assert len(c.streams) == 1
+            assert len(c.streams.video) == 1
+            assert c.streams.video[0].codec.name == "gif"
+
+    def test_gif_with_audio(self):
+        input = ["example.mp4"]
+        out = self.main(input, ["--edit", "none", "--cut", "1sec,end"], "outa.gif")
+        with av.open(out) as c:
+            assert len(c.streams) == 1
+            assert len(c.streams.video) == 1
+            assert c.streams.video[0].codec.name == "gif"
 
     def test_pcm_f32le(self):
         input = ["resources/wav/pcm-f32le.wav"]
@@ -607,9 +615,10 @@ class Runner:
             except Exception as e:
                 raise Exception(f"{test_file}: {e}") from e
 
-    def test_codecs(self) -> None:
-        self.main(["example.mp4"], ["--video-codec", "h264"])
-        self.main(["example.mp4"], ["--audio-codec", "ac3"])
+    def test_codec_opts(self) -> None:
+        input = ["example.mp4"]
+        self.main(input, ["-e", "none", "--cut", "0.1s,end", "--video-codec", "h264"])
+        self.main(input, ["-e", "none", "--cut", "0.5s,end", "--audio-codec", "ac3"])
 
     @requires_lk
     def test_concat_hetero_track(self):
