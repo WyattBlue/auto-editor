@@ -7,6 +7,9 @@ proc `|=`*[T](a: var T, b: T) =
   a = a or b
 
 proc initCodec*(name: string): ptr AVCodec =
+  if name == "opus":
+    return avcodec_find_encoder_by_name("libopus")
+
   result = avcodec_find_encoder_by_name(name.cstring)
   if result == nil:
     let desc = avcodec_descriptor_get_by_name(name.cstring)
@@ -366,6 +369,7 @@ proc open*(ctx: ptr AVCodecContext) =
       ctx.time_base = AVRational(num: 1, den: ctx.sample_rate)
     else:
       ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
+  ctx.strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL
   let codecName = if ctx.codec != nil and ctx.codec.name != nil: $ctx.codec.name else: "unknown"
   let ret = avcodec_open2(ctx, ctx.codec, nil)
   if ret < 0:
