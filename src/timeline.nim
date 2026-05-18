@@ -116,16 +116,7 @@ proc mutHelper(tl: var v3, mi: MediaInfo, clips: seq[Clip]) =
 
 
 func clipBounds(startFrame, endFrame: int64, speed: float64): (int64, int64) =
-  ## Map a source-frame range to a clip's (offset, dur), both in timeline frames.
-  ##
-  ## Both ends use ceil rather than truncation so the source frame the renderer
-  ## reconstructs as round(offset * speed) never lands before the chunk's true
-  ## start.
-  ##
-  ## Emptiness is decided by round()-based length, so a chunk that collapses to
-  ## nothing returns dur == 0 for the caller to drop. Deciding it from the ceil
-  ## values instead would wrongly keep a one-frame clip.
-  if int64(round(float64(endFrame - startFrame) / speed)) == 0:
+  if round(float64(endFrame - startFrame) / speed) == 0:
     return (0'i64, 0'i64)
   let offset = int64(ceil(float64(startFrame) / speed))
   (offset, int64(ceil(float64(endFrame) / speed)) - offset)
