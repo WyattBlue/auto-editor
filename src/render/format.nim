@@ -2,7 +2,7 @@ import std/[heapqueue, options, strformat, strutils, tables]
 from std/math import round
 
 import ../[av, ffmpeg, log, media, timeline]
-import ../util/[bar, fun, rules, rational]
+import ../util/[bar, rules, rational]
 import video
 import audio
 import subtitle
@@ -96,7 +96,6 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   var output = openWrite(outputPath)
   output.options = options
 
-  let (_, _, outExt) = agSplitFile(outputPath)
   let includeVideo = not args.vn and rules.defaultVid notin [ID_NONE, ID_PNG]
   let includeAudio = not args.an and rules.defaultAud != ID_NONE
   let includeSubtitle = not args.sn and rules.defaultSub != ID_NONE
@@ -283,7 +282,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
   output.startEncoding()
 
-  var title = &"({outExt[1 .. ^1]}) "
+  var title = &"({output.formatCtx.oformat.name}) "
   var encoderTitles: seq[string] = @[]
 
   if vEncCtx != nil:
