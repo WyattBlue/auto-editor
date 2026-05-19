@@ -389,13 +389,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       error "Failed to allocate reformat sws context"
     discard av_opt_set_int(reformatCtx, "threads", 0, 0)
 
-  # First few frames can have an abnormal keyframe count, so never seek there.
-  var seekThreshold = 10
-  var seekFrame = none(int)
   var framesSaved = 0
+  var frameIndices = initTable[ptr string, int]()
+  var seekThresholds = initTable[ptr string, int]()
+  var seekFrames = initTable[ptr string, Option[int]]()
 
   var nullFrame = makeSolid(targetWidth, targetHeight, tl.bg)
-  var frameIndex = -1
   var frame: ptr AVFrame = av_frame_clone(nullFrame)
   var objList: seq[VideoFrame] = @[]
   var lastProcessedFrame: ptr AVFrame = nil
@@ -411,6 +410,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   for src in tl.uniqueSources:
     observedKeyframes[src] = @[0]
     lastSeekTarget[src] = -1 # -1 means no seek has been performed yet
+    frameIndices[src] = -1
+    # First few frames can have an abnormal keyframe count, so never seek there.
+    seekThresholds[src] = 10
+    seekFrames[src] = none(int)
 
   # Find the closest keyframe at or before targetFrame for backward seeking.
   # A backward seek only ever targets a frame we have already decoded past, so
@@ -477,6 +480,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           continue
 
         var myStream: ptr AVStream = myCache.cns[obj.src].video[0]
+        var frameIndex = frameIndices[obj.src]
+        var seekThreshold = seekThresholds[obj.src]
+        var seekFrame = seekFrames[obj.src]
         if frameIndex > obj.index:
           let seekTarget = findBestKeyframe(obj.src, obj.index)
 
@@ -549,6 +555,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
           frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg)
           if oldFrame != nil and oldFrame != nullFrame:
             av_frame_free(addr oldFrame)
+
+        # Persist this source's decode position and seek state for next time.
+        frameIndices[obj.src] = frameIndex
+        seekThresholds[obj.src] = seekThreshold
+        seekFrames[obj.src] = seekFrame
 
       if scaleGraph != nil and frame.width != targetWidth:
         scaleGraph.push(frame)
