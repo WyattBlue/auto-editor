@@ -1,1 +1,1 @@
-const version* = "30.2.3"
+const version* = "30.2.4"
