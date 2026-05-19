@@ -466,7 +466,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       for obj in objList:
         # Check if we can reuse the last processed frame
         if obj.index == lastFrameIndex and lastProcessedFrame != nil:
+          let oldFrame = frame
           frame = av_frame_clone(lastProcessedFrame)
+          if oldFrame != nil and oldFrame != nullFrame:
+            av_frame_free(addr oldFrame)
           continue
 
         var myStream: ptr AVStream = myCache.cns[obj.src].video[0]
@@ -519,7 +522,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             break
 
           if not foundFrame:
+            let oldFrame = frame
             frame = av_frame_clone(nullFrame)
+            if oldFrame != nil and oldFrame != nullFrame:
+              av_frame_free(addr oldFrame)
             break
 
           if seekFrame.isSome:
@@ -621,7 +627,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       frame.pts = index.int64
       frame.time_base = av_inv_q(tl.tb)
-      frame.duration = index.int64
+      frame.duration = 1
 
       # Update cache for frame reuse BEFORE yielding (which will unref the frame)
       if objList.len > 0:
