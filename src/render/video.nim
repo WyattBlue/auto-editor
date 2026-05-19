@@ -395,6 +395,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
   var seekFrames = initTable[ptr string, Option[int]]()
 
   var nullFrame = makeSolid(targetWidth, targetHeight, tl.bg)
+  if nullFrame == nil:
+    error "Could not allocate fallback video frame"
   var frame: ptr AVFrame = av_frame_clone(nullFrame)
   var objList: seq[VideoFrame] = @[]
   var lastProcessedFrame: ptr AVFrame = nil
@@ -462,21 +464,17 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         frame = av_frame_clone(nullFrame)
       else:
         # Always start with a fresh frame to avoid reusing encoder-unref'd frames
-        let oldFrame = frame
+        av_frame_free(addr frame)
         if pix_fmt == AV_PIX_FMT_RGB8 and lastProcessedFrame != nil:
           frame = av_frame_clone(lastProcessedFrame)
         else:
           frame = av_frame_clone(nullFrame)
-        if oldFrame != nil and oldFrame != nullFrame:
-          av_frame_free(addr oldFrame)
 
       for obj in objList:
         # Check if we can reuse the last processed frame
         if obj.index == lastFrameIndex and lastProcessedFrame != nil:
-          let oldFrame = frame
+          av_frame_free(addr frame)
           frame = av_frame_clone(lastProcessedFrame)
-          if oldFrame != nil and oldFrame != nullFrame:
-            av_frame_free(addr oldFrame)
           continue
 
         var myStream: ptr AVStream = myCache.cns[obj.src].video[0]
@@ -534,10 +532,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
           if not foundFrame:
             didDecode = false
-            let oldFrame = frame
+            av_frame_free(addr frame)
             frame = av_frame_clone(nullFrame)
-            if oldFrame != nil and oldFrame != nullFrame:
-              av_frame_free(addr oldFrame)
             break
           didDecode = true
 
@@ -553,8 +549,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         if didDecode and (frame.width.int32, frame.height.int32) != tl.res:
           let oldFrame = frame
           frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg)
-          if oldFrame != nil and oldFrame != nullFrame:
-            av_frame_free(addr oldFrame)
+          av_frame_free(addr oldFrame)
 
         # Persist this source's decode position and seek state for next time.
         frameIndices[obj.src] = frameIndex
@@ -563,10 +558,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       if scaleGraph != nil and frame.width != targetWidth:
         scaleGraph.push(frame)
-        let oldFrame = frame
+        av_frame_free(addr frame)
         frame = scaleGraph.pull()
-        if oldFrame != nil and oldFrame != nullFrame:
-          av_frame_free(addr oldFrame)
 
       # Apply video effects in order
       if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
@@ -578,10 +571,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             let scaledH = max(cint(float(origH) * effect.val), 2)
             let scaledFrame = frame.reformat(AVPixelFormat(frame.format), scaledW, scaledH)
             if scaledFrame != frame:
-              let oldFrame = frame
+              av_frame_free(addr frame)
               frame = scaledFrame
-              if oldFrame != nil and oldFrame != nullFrame:
-                av_frame_free(addr oldFrame)
             let frameFmtName = $AVPixelFormat(frame.format)
             let zoomBufArgs = &"video_size={scaledW}x{scaledH}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             let zoomMode = if effect.val > 1.0: "crop" else: "pad"
@@ -599,10 +590,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               fxGraph.linkNodes(@[bufferSrc, mid, bufferSink]).configure()
               fxKey = key
             fxGraph.push(frame)
-            let oldFrame2 = frame
+            av_frame_free(addr frame)
             frame = fxGraph.pull()
-            if oldFrame2 != nil and oldFrame2 != nullFrame:
-              av_frame_free(addr oldFrame2)
           elif effect.kind in {actHflip, actVflip, actInvert}:
             let filterName = case effect.kind
               of actHflip: "hflip"
@@ -621,10 +610,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
               fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
               fxKey = key
             fxGraph.push(frame)
-            let oldFrame = frame
+            av_frame_free(addr frame)
             frame = fxGraph.pull()
-            if oldFrame != nil and oldFrame != nullFrame:
-              av_frame_free(addr oldFrame)
 
       # Validate frame before reformatting
       if frame != nil and (frame.width <= 0 or frame.height <= 0):
@@ -641,10 +628,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       let reformattedFrame = frame.reformat(pix_fmt, ctx = reformatCtx)
       if reformattedFrame != nil and reformattedFrame != frame:
-        let oldFrame = frame
+        av_frame_free(addr frame)
         frame = reformattedFrame
-        if oldFrame != nil and oldFrame != nullFrame:
-          av_frame_free(addr oldFrame)
 
       frame.pts = index.int64
       frame.time_base = av_inv_q(tl.tb)
@@ -652,8 +637,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
 
       # Update cache for frame reuse BEFORE yielding (which will unref the frame)
       if objList.len > 0:
-        if lastProcessedFrame != nil and lastProcessedFrame != nullFrame:
-          av_frame_free(addr lastProcessedFrame)
+        av_frame_free(addr lastProcessedFrame)
         lastProcessedFrame = av_frame_clone(frame)
         lastFrameIndex = objList[0].index
 
@@ -663,10 +647,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       scaleGraph.cleanup()
     if fxGraph != nil:
       fxGraph.cleanup()
-    if reformatCtx != nil:
-      sws_free_context(addr reformatCtx)
-    if lastProcessedFrame != nil and lastProcessedFrame != nullFrame:
-      av_frame_free(addr lastProcessedFrame)
+    sws_free_context(addr reformatCtx)
+    av_frame_free(addr lastProcessedFrame)
     av_frame_free(addr nullFrame)
     for src, decoder in decoders:
       var p = decoder
