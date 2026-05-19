@@ -32,7 +32,7 @@ proc buildKeyframeIndex(stream: ptr AVStream, fps: AVRational, defaultInterval: 
 
   for i in 0 ..< count:
     let entry = avformat_index_get_entry(stream, i)
-    if entry != nil and entry.isKeyframe:
+    if entry != nil and entry.isKeyframe and entry.timestamp != AV_NOPTS_VALUE:
       let frameNum = int(round(float(entry.timestamp) * float(tb.num) / float(tb.den) * float(fps)))
 
       # Be a bit conservative by adding video_deplay (the worst-case DTS/PTS gap), even
@@ -315,8 +315,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       let defaultInterval = toInt(targetFps * AVRational(num: 5, den: 1))
 
       # tous (timebase units per source frame) turns a frame index into a seek
-      # timestamp.
-      tous[src] = int(float(stream.time_base.den) / float(stream.avg_frame_rate))
+      # timestamp. avg_frame_rate can be 0/0 for streams with no declared frame
+      # rate; fall back to the timeline rate so the int conversion never sees
+      # inf/nan from a divide-by-zero.
+      let srcFps = float(stream.avg_frame_rate)
+      let fps = if srcFps > 0.0: srcFps else: float(targetFps)
+      tous[src] = int(float(stream.time_base.den) / fps)
 
       if args.noSeek:
         keyframeIndices[src] = KeyframeIndex(frames: @[], hasIndex: false, avgInterval: high(int))
