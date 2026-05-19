@@ -8,6 +8,16 @@ proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
 proc strncat(dest, src: cstring, n: csize_t): cstring {.importc, header: "<string.h>".}
 proc strlen(s: cstring): csize_t {.importc, header: "<string.h>".}
 
+# `va_copy` / `va_end` are macros that require lvalue access to their va_list
+# argument, so they can't be imported directly when Nim passes `var VaList`
+# as a pointer. Wrap them in tiny C helpers that dereference for us.
+{.emit: """#include <stdarg.h>
+static void nim_va_copy(va_list *dst, va_list src) { va_copy(*dst, src); }
+static void nim_va_end(va_list *ap) { va_end(*ap); }
+""".}
+proc va_copy(dest: var VaList, src: VaList) {.importc: "nim_va_copy", nodecl.}
+proc va_end(ap: var VaList) {.importc: "nim_va_end", nodecl.}
+
 # Static storage for captured JSON output from loudnorm filter
 var capturedJson: array[16384, char]
 var captureEnabled: bool = false
@@ -18,15 +28,22 @@ proc loudnormLogCallbackWrapper(avcl: pointer, level: cint, fmt: ConstCString, v
     av_log_default_callback(avcl, level, fmt, vl)
     return
 
+  # vsnprintf consumes its VaList, so format into our local buffer using a copy
+  # and leave `vl` untouched for the default callback below.
+  var vlCopy: VaList
+  va_copy(vlCopy, vl)
   var buffer: array[4096, char]
-  discard vsnprintf(cast[cstring](addr buffer[0]), 4096, fmt, vl)
+  discard vsnprintf(cast[cstring](addr buffer[0]), 4096, fmt, vlCopy)
+  va_end(vlCopy)
 
   # Look for JSON content
   let bufStr = cast[cstring](addr buffer[0])
   if strchr(bufStr, ord('{').cint) != nil and strchr(bufStr, ord('}').cint) != nil:
     let capturedPtr = cast[cstring](addr capturedJson[0])
-    let remaining = 16384 - strlen(capturedPtr) - 1
-    discard strncat(capturedPtr, bufStr, remaining.csize_t)
+    let used = strlen(capturedPtr).int
+    let remaining = capturedJson.len - used - 1
+    if remaining > 0:
+      discard strncat(capturedPtr, bufStr, remaining.csize_t)
 
   av_log_default_callback(avcl, level, fmt, vl)
 
@@ -139,6 +156,8 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   let decoderCtx = getter.decoderCtx
 
   let targetSamples = endSample - start
+  if targetSamples <= 0:
+    return @[]
 
   # Initialize result with proper size for interleaved multi-channel (default zero-filled)
   result = newSeq[int16](targetSamples * getter.channels)
@@ -146,6 +165,8 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   # Convert sample position to time and seek
   let sampleRate = stream.codecpar.sample_rate
   let timeBase = stream.time_base
+  if sampleRate <= 0 or timeBase.num == 0:
+    error "Invalid stream time base or sample rate"
   let startTimeInSeconds = start.float / sampleRate.float
   let startPts = int64(startTimeInSeconds * timeBase.den.float / timeBase.num.float)
 
@@ -159,7 +180,12 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
   avcodec_flush_buffers(decoderCtx)
 
   var packet = av_packet_alloc()
+  if packet == nil:
+    error "Could not allocate packet"
   var frame = av_frame_alloc()
+  if frame == nil:
+    av_packet_free(addr packet)
+    error "Could not allocate frame"
   defer:
     av_packet_free(addr packet)
     av_frame_free(addr frame)
@@ -239,25 +265,23 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
                   result[resultIndex + ch] = int16(clampedSample * 32767.0)
 
           elif frame.format == AV_SAMPLE_FMT_S32.cint:
-            # Interleaved 32-bit
+            # Interleaved 32-bit — arithmetic shift preserves sign
             let audioData = cast[ptr UncheckedArray[int32]](frame.data[0])
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
               let resultIndex = (totalSamples + i) * channels
               for ch in 0 ..< channels:
-                # Convert 32-bit to 16-bit by shifting right 16 bits
-                result[resultIndex + ch] = int16(audioData[frameIndex * channels + ch] shr 16)
+                result[resultIndex + ch] = int16(ashr(audioData[frameIndex * channels + ch], 16))
 
           elif frame.format == AV_SAMPLE_FMT_S32P.cint:
-            # Planar 32-bit
+            # Planar 32-bit — arithmetic shift preserves sign
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
               let resultIndex = (totalSamples + i) * channels
               for ch in 0 ..< channels:
                 if frame.data[ch] != nil:
                   let channelData = cast[ptr UncheckedArray[int32]](frame.data[ch])
-                  # Convert 32-bit to 16-bit by shifting right 16 bits
-                  result[resultIndex + ch] = int16(channelData[frameIndex] shr 16)
+                  result[resultIndex + ch] = int16(ashr(channelData[frameIndex], 16))
           else:
             error &"Unsupported audio format: {av_get_sample_fmt_name(frame.format)}"
 
@@ -275,13 +299,13 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: ref AVChannelLayout):
   let asink = avfilter_get_by_name("abuffersink")
 
   let bufferArgs = &"sample_rate={sr}:sample_fmt=s16p:channel_layout={layout}:time_base=1/{sr}"
-  let bufferSrc: ptr AVFilterContext = nil
+  var bufferSrc: ptr AVFilterContext = nil
   var ret = avfilter_graph_create_filter(addr bufferSrc, abuffer, nil,
                                          bufferArgs.cstring, nil, filterGraph)
   if ret < 0:
     error &"Cannot create audio buffer source: {ret}"
 
-  let bufferSink: ptr AVFilterContext = nil
+  var bufferSink: ptr AVFilterContext = nil
   ret = avfilter_graph_create_filter(addr bufferSink, asink, nil, nil, nil, filterGraph)
   if ret < 0:
     error &"Cannot create audio buffer sink: {ret}"
@@ -315,9 +339,12 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: ref AVChannelLayout):
   let filterChain = (if filters.len == 0: "anull" else: filters.join(","))
 
   var inputs = avfilter_inout_alloc()
+  if inputs == nil:
+    error "Could not allocate filter inputs"
   var outputs = avfilter_inout_alloc()
-  if inputs == nil or outputs == nil:
-    error "Could not allocate filter inputs/outputs"
+  if outputs == nil:
+    avfilter_inout_free(addr inputs)
+    error "Could not allocate filter outputs"
 
   outputs.name = av_strdup("in")
   outputs.filter_ctx = bufferSrc
@@ -546,6 +573,9 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   let tb = tl.tb
   let sr = tl.sr
 
+  if tb.num == 0:
+    error "Timeline timebase has zero numerator"
+
   conwrite "Creating audio"
 
   # Collect all unique audio sources from specified layers
@@ -645,7 +675,8 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     enableLoudnormCapture()
     let firstPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:print_format=json"
 
-    let bufferArgs = &"sample_rate={sr}:sample_fmt=fltp:channel_layout=stereo:time_base=1/{sr}"
+    let layoutDesc = $tl.layout
+    let bufferArgs = &"sample_rate={sr}:sample_fmt=fltp:channel_layout={layoutDesc}:time_base=1/{sr}"
     var analysisGraph = newGraph()
     let analysisSrc = analysisGraph.add("abuffer", bufferArgs)
     let analysisFilter = analysisGraph.add("loudnorm", firstPass)
@@ -659,7 +690,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
     analysisFrame.nb_samples = totalSamples.cint
     analysisFrame.format = AV_SAMPLE_FMT_FLTP.cint
-    av_channel_layout_default(addr analysisFrame.ch_layout, targetChannels)
+    discard av_channel_layout_copy(addr analysisFrame.ch_layout, addr tl.layout[])
     analysisFrame.sample_rate = sr.cint
     analysisFrame.pts = 0
 
@@ -706,7 +737,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
         measuredTP = parseLoudnormValue(jsonData, "input_tp")
         measuredThresh = parseLoudnormValue(jsonData, "input_thresh")
         debug &"Measured: i={measuredI:.2f} lra={measuredLRA:.2f} tp={measuredTP:.2f} thresh={measuredThresh:.2f}"
-      except:
+      except JsonParsingError, KeyError, ValueError:
         error "Error processing loudnorm output"
     else:
       error "Error processing loudnorm output"
@@ -730,7 +761,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
     inputFrame.nb_samples = totalSamples.cint
     inputFrame.format = AV_SAMPLE_FMT_FLTP.cint
-    av_channel_layout_default(addr inputFrame.ch_layout, targetChannels)
+    discard av_channel_layout_copy(addr inputFrame.ch_layout, addr tl.layout[])
     inputFrame.sample_rate = sr.cint
     inputFrame.pts = 0
 
