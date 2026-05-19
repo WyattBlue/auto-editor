@@ -33,6 +33,7 @@ else:
 switch("passC", "-fno-signaling-nans -fno-math-errno -fno-trapping-math -fno-signed-zeros")
 when defined(gcc):
   switch("passC", "-Wno-incompatible-pointer-types")
+  switch("passC", "-Wno-stringop-overflow")
 
 if not defined(dynamic):
   # Core FFmpeg libraries
