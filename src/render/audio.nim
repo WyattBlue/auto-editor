@@ -5,7 +5,6 @@ import ../util/rational
 
 # Import C string functions for JSON capture
 proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
-proc strncat(dest, src: cstring, n: csize_t): cstring {.importc, header: "<string.h>".}
 proc strlen(s: cstring): csize_t {.importc, header: "<string.h>".}
 
 # `va_copy` / `va_end` are macros that require lvalue access to their va_list
@@ -18,13 +17,19 @@ static void nim_va_end(va_list *ap) { va_end(*ap); }
 proc va_copy(dest: var VaList, src: VaList) {.importc: "nim_va_copy", nodecl.}
 proc va_end(ap: var VaList) {.importc: "nim_va_end", nodecl.}
 
-# Static storage for captured JSON output from loudnorm filter
-var capturedJson: array[16384, char]
-var captureEnabled: bool = false
+type LoudnormCapture = ref object
+  buffer: array[16384, char]
+  used: int
 
-# Custom log callback to capture loudnorm JSON output
+# Pointer to the currently active capture session, or nil. The C log callback
+# has no user-data parameter, so we have to route through a single global, but
+# the actual buffer state lives in a per-session object — concurrent or stale
+# captures can't clobber each other's storage.
+var activeCapture: LoudnormCapture = nil
+
 proc loudnormLogCallbackWrapper(avcl: pointer, level: cint, fmt: ConstCString, vl: VaList) {.cdecl.} =
-  if not captureEnabled:
+  let cap = activeCapture
+  if cap == nil:
     av_log_default_callback(avcl, level, fmt, vl)
     return
 
@@ -36,28 +41,36 @@ proc loudnormLogCallbackWrapper(avcl: pointer, level: cint, fmt: ConstCString, v
   discard vsnprintf(cast[cstring](addr buffer[0]), 4096, fmt, vlCopy)
   va_end(vlCopy)
 
-  # Look for JSON content
+  # Look for JSON content and append to the session's buffer
   let bufStr = cast[cstring](addr buffer[0])
   if strchr(bufStr, ord('{').cint) != nil and strchr(bufStr, ord('}').cint) != nil:
-    let capturedPtr = cast[cstring](addr capturedJson[0])
-    let used = strlen(capturedPtr).int
-    let remaining = capturedJson.len - used - 1
-    if remaining > 0:
-      discard strncat(capturedPtr, bufStr, remaining.csize_t)
+    let msgLen = strlen(bufStr).int
+    let remaining = cap.buffer.len - cap.used - 1
+    if remaining > 0 and msgLen > 0:
+      let toCopy = min(msgLen, remaining)
+      copyMem(addr cap.buffer[cap.used], bufStr, toCopy)
+      cap.used += toCopy
+      cap.buffer[cap.used] = '\0'
 
   av_log_default_callback(avcl, level, fmt, vl)
 
-proc enableLoudnormCapture() =
-  captureEnabled = true
-  capturedJson[0] = '\0'
+proc beginLoudnormCapture(): LoudnormCapture =
+  if activeCapture != nil:
+    error "loudnorm capture is already active"
+  result = LoudnormCapture(used: 0)
+  result.buffer[0] = '\0'
+  activeCapture = result
   av_log_set_callback(loudnormLogCallbackWrapper)
 
-proc disableLoudnormCapture() =
-  captureEnabled = false
+proc endLoudnormCapture(cap: LoudnormCapture) =
   av_log_set_callback(av_log_default_callback)
+  if activeCapture == cap:
+    activeCapture = nil
 
-proc getCapturedJson(): cstring =
-  return cast[cstring](addr capturedJson[0])
+proc getCaptured(cap: LoudnormCapture): string =
+  result = newString(cap.used)
+  if cap.used > 0:
+    copyMem(addr result[0], addr cap.buffer[0], cap.used)
 
 proc parseLoudnormValue(node: JsonNode, field: string): float32 =
   if node.hasKey(field):
@@ -265,7 +278,7 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
                   result[resultIndex + ch] = int16(clampedSample * 32767.0)
 
           elif frame.format == AV_SAMPLE_FMT_S32.cint:
-            # Interleaved 32-bit — arithmetic shift preserves sign
+            # Interleaved 32-bit
             let audioData = cast[ptr UncheckedArray[int32]](frame.data[0])
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
@@ -274,7 +287,7 @@ proc get(getter: Getter, start, endSample: int): seq[int16] =
                 result[resultIndex + ch] = int16(ashr(audioData[frameIndex * channels + ch], 16))
 
           elif frame.format == AV_SAMPLE_FMT_S32P.cint:
-            # Planar 32-bit — arithmetic shift preserves sign
+            # Planar 32-bit
             for i in 0..<samplesToProcess:
               let frameIndex = samplesSkippedInFrame + i
               let resultIndex = (totalSamples + i) * channels
@@ -672,7 +685,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
     # Create a temporary buffer for the normalized audio
     var normalizedBuffer = newSeq[int16](audioBuffer.len)
 
-    enableLoudnormCapture()
+    let capture = beginLoudnormCapture()
     let firstPass = &"i={norm.i}:lra={norm.lra}:tp={norm.tp}:offset={norm.gain}:print_format=json"
 
     let layoutDesc = $tl.layout
@@ -718,14 +731,14 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
       discard
 
     analysisGraph.cleanup()
-    disableLoudnormCapture()
+    endLoudnormCapture(capture)
 
     var measuredI = norm.i
     var measuredLRA = norm.lra
     var measuredTP = norm.tp
     var measuredThresh = -70.0'f32
 
-    let capturedJson = $getCapturedJson()
+    let capturedJson = capture.getCaptured()
     let jsonStart = capturedJson.find('{')
     let jsonEnd = capturedJson.rfind('}')
     if capturedJson.len > 0 and jsonStart >= 0 and jsonEnd > jsonStart:
