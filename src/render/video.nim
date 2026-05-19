@@ -492,6 +492,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         # obj.index is already in source frame coordinates, no conversion needed
         let srcTb = myStream.avg_frame_rate
 
+        var didDecode = false
         while frameIndex < obj.index:
           # Check if skipping ahead is worth it
           if obj.index - frameIndex > keyframeIndices[obj.src].avgInterval and frameIndex > seekThreshold:
@@ -522,11 +523,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             break
 
           if not foundFrame:
+            didDecode = false
             let oldFrame = frame
             frame = av_frame_clone(nullFrame)
             if oldFrame != nil and oldFrame != nullFrame:
               av_frame_free(addr oldFrame)
             break
+          didDecode = true
 
           if seekFrame.isSome:
             let framesAvoided = frameIndex - seekFrame.get
@@ -534,11 +537,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             framesSaved += framesAvoided
             seekFrame = none(int)
 
-          if (frame.width.int32, frame.height.int32) != tl.res:
-            let oldFrame = frame
-            frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg)
-            if oldFrame != nil and oldFrame != nullFrame:
-              av_frame_free(addr oldFrame)
+        # Scale only the final decoded frame to tl.res. Intermediate frames
+        # decoded just to advance frameIndex are fed back into flushDecode
+        # unscaled, so the resize costs one sws_scale instead of one per frame.
+        if didDecode and (frame.width.int32, frame.height.int32) != tl.res:
+          let oldFrame = frame
+          frame = scaleWithPad(frame, tl.res[0], tl.res[1], tl.bg)
+          if oldFrame != nil and oldFrame != nullFrame:
+            av_frame_free(addr oldFrame)
 
       if scaleGraph != nil and frame.width != targetWidth:
         scaleGraph.push(frame)
