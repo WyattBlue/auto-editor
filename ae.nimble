@@ -121,6 +121,8 @@ disableMuxers &= ["h261", "rtp", "rtp_mpegts", "vvc"]
 disableDecoders &= ["h261"]
 disableParsers &= ["h261", "vvc"]
 
+disableDecoders.add "opus"  # We use libopus
+
 # Irrelevant to this project
 disableDecoders &= "cc_dec,dirac,fits,jpeg2000,jpegls,mpl2,msrle,pgssub,qoi,sami,subviewer,subviewer1,sunrast,targa,tiff".split(",")
 disableMuxers &= "filmstrip,fits,framecrc,framehash,framemd5,hash,hls,ico,image2,image2pipe,md5,rawvideo,segment,smoothstreaming,stream_segment,streamhash,tee,uncodedframecrc".split(",")
