@@ -1,4 +1,4 @@
-import std/[json, strformat, strutils]
+import std/[json, sets, strformat, strutils]
 
 import ../[av, ffmpeg, log, media, timeline]
 import ../util/[fun, lang, rational]
@@ -181,48 +181,57 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
   }
 
 
-proc printEncoders(fmtName: string) =
-  let fakeName = "output." & fmtName
-  let ofmt = av_guess_format(nil, fakeName.cstring, nil)
-  if ofmt == nil:
-    error &"Unknown format: {fmtName}"
+type CodecListKind = enum clkEncoders, clkDecoders, clkCodecs
 
+proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
   var videos, audios, subs, others: seq[string]
+  var seen: HashSet[AVCodecID]
+
+  var bestVideo = ofmt.video_codec
+  var bestAudio = ofmt.audio_codec
+  var bestSubtitle = ofmt.subtitle_codec
+  if kind in {clkCodecs, clkEncoders}:
+    let fmtName = $ofmt.name
+    if fmtName == "mp4" or fmtName == "matroska":
+      let d = avcodec_descriptor_get_by_name("opus")
+      if d != nil: bestAudio = d.id
+    if fmtName == "mp4":
+      let d = avcodec_descriptor_get_by_name("mov_text")
+      if d != nil: bestSubtitle = d.id
+
   var opaque: pointer = nil
   while true:
     let codec = av_codec_iterate(addr opaque)
     if codec == nil: break
-    if av_codec_is_encoder(codec) == 0: continue
-    if avformat_query_codec(ofmt, codec.id, FF_COMPLIANCE_STRICT) > 0:
-      case codec.`type`
-      of AVMEDIA_TYPE_VIDEO: videos.add $codec.name
-      of AVMEDIA_TYPE_AUDIO: audios.add $codec.name
-      of AVMEDIA_TYPE_SUBTITLE: subs.add $codec.name
-      else: others.add $codec.name
 
-  echo "v: " & videos.join(",")
-  echo "a: " & audios.join(",")
-  echo "s: " & subs.join(",")
-  echo "other: " & others.join(",")
+    case kind
+    of clkEncoders:
+      if av_codec_is_encoder(codec) == 0: continue
+    of clkDecoders:
+      if av_codec_is_decoder(codec) == 0: continue
+    of clkCodecs:
+      if codec.id in seen: continue
+      if avcodec_find_encoder(codec.id) == nil: continue
 
-proc printDecoders(fmtName: string) =
-  let fakeName = "output." & fmtName
-  let ofmt = av_guess_format(nil, fakeName.cstring, nil)
-  if ofmt == nil:
-    error &"Unknown format: {fmtName}"
+    if avformat_query_codec(ofmt, codec.id, FF_COMPLIANCE_EXPERIMENTAL) <= 0:
+      continue
+    if kind == clkCodecs:
+      seen.incl(codec.id)
 
-  var videos, audios, subs, others: seq[string]
-  var opaque: pointer = nil
-  while true:
-    let codec = av_codec_iterate(addr opaque)
-    if codec == nil: break
-    if av_codec_is_decoder(codec) == 0: continue
-    if avformat_query_codec(ofmt, codec.id, FF_COMPLIANCE_STRICT) > 0:
-      case codec.`type`
-      of AVMEDIA_TYPE_VIDEO: videos.add $codec.name
-      of AVMEDIA_TYPE_AUDIO: audios.add $codec.name
-      of AVMEDIA_TYPE_SUBTITLE: subs.add $codec.name
-      else: others.add $codec.name
+    var name = if kind == clkCodecs: $avcodec_get_name(codec.id) else: $codec.name
+    if not noColor and
+        avformat_query_codec(ofmt, codec.id, FF_COMPLIANCE_STRICT) <= 0:
+      name = "\e[31m" & name & "\e[0m"
+
+    template bucket(list, best) =
+      if kind in {clkCodecs, clkEncoders} and codec.id == best: list.insert(name, 0)
+      else: list.add name
+
+    case codec.`type`
+    of AVMEDIA_TYPE_VIDEO: bucket(videos, bestVideo)
+    of AVMEDIA_TYPE_AUDIO: bucket(audios, bestAudio)
+    of AVMEDIA_TYPE_SUBTITLE: bucket(subs, bestSubtitle)
+    else: others.add name
 
   echo "v: " & videos.join(",")
   echo "a: " & audios.join(",")
@@ -233,8 +242,8 @@ proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
 
   var isJson = false
-  var encodersFmt = ""
-  var decodersFmt = ""
+  var queryExt = ""
+  var queryKind: CodecListKind
   var inputFiles: seq[string] = @[]
 
   var i = 0
@@ -242,28 +251,26 @@ proc main*(args: seq[string]) =
     let key = args[i]
     if key == "--json":
       isJson = true
-    elif key == "-encoders":
+    elif key in ["-encoders", "-decoders", "-codecs"]:
       inc i
       if i >= args.len:
-        error "-encoders requires a format argument"
-      encodersFmt = args[i]
-    elif key == "-decoders":
-      inc i
-      if i >= args.len:
-        error "-decoders requires a format argument"
-      decodersFmt = args[i]
+        error &"{key} requires a format argument"
+      queryExt = args[i]
+      queryKind = case key
+        of "-encoders": clkEncoders
+        of "-decoders": clkDecoders
+        else: clkCodecs
     else:
       if key.startsWith("--"):
         error &"Unknown option: {key}"
       inputFiles.add key
     inc i
 
-  if encodersFmt != "":
-    printEncoders(encodersFmt)
-    return
-
-  if decodersFmt != "":
-    printDecoders(decodersFmt)
+  if queryExt != "":
+    let ofmt = av_guess_format(nil, ("." & queryExt).cstring, nil)
+    if ofmt == nil:
+      error &"Unknown format: {queryExt}"
+    printCodecList(ofmt, queryKind)
     return
 
   var fileInfo: JsonNode = %* {}
