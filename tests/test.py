@@ -915,28 +915,33 @@ class Runner:
             assert container.streams[0].type == "audio", "stream 0 should be audio"
             assert container.streams[1].type == "video", "stream 1 should be video"
 
+        def assert_no_black_frames(out: str) -> None:
+            with av.open(out) as container:
+                assert len(container.streams.video) == 1
+                assert len(container.streams.audio) == 1
+
+                video_stream = container.streams.video[0]
+                non_black = 0
+                total = 0
+
+                for frame in container.decode(video_stream):
+                    # Check Y (luma) plane: all-zero Y means black
+                    if max(bytes(frame.planes[0])) > 10:
+                        non_black += 1
+                    total += 1
+                    if total >= 30:
+                        break
+
+                # With the stream-ordering bug, only the first ~thread_count frames
+                # are decoded correctly; the rest are black. Require 25/30 non-black
+                # to catch that regression while tolerating any machine up to ~24 cores.
+                assert non_black >= 25, f"Only {non_black}/30 non-black frames"
+
         out = self.main([input_path], [], "reordered_out.mp4")
+        assert_no_black_frames(out)
 
-        with av.open(out) as container:
-            assert len(container.streams.video) == 1
-            assert len(container.streams.audio) == 1
-
-            video_stream = container.streams.video[0]
-            non_black = 0
-            total = 0
-
-            for frame in container.decode(video_stream):
-                # Check Y (luma) plane: all-zero Y means black
-                if max(bytes(frame.planes[0])) > 10:
-                    non_black += 1
-                total += 1
-                if total >= 30:
-                    break
-
-            # With the stream-ordering bug, only the first ~thread_count frames
-            # are decoded correctly; the rest are black. Require 25/30 non-black
-            # to catch that regression while tolerating any machine up to ~24 cores.
-            assert non_black >= 25, f"Only {non_black}/30 non-black frames"
+        self.main([input_path], ["--export", "clip-sequence"], "reordered_out.mp4")
+        assert_no_black_frames(os.path.join(self.temp_dir, "reordered_out-0.mp4"))
 
 
 def run_tests(tests: list[Callable], args) -> None:

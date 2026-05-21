@@ -34,7 +34,7 @@ func pngDimensions(data: ptr uint8, size: cint): (cint, cint) =
           (b[22].cint shl 8) or b[23].cint
   return (w, h)
 
-proc resolveAudioCodec(layer: seq[Clip], rules: Rules): AVCodecID =
+proc resolveAudioCodec(layer: seq[Clip], rules: Rules, cache: MediaCache): AVCodecID =
   if layer.len == 0:
     return rules.defaultAud
   # PCM-first containers (WAV, AIFF, AU, W64, CAF, ...) prefer PCM over the source codec.
@@ -42,12 +42,20 @@ proc resolveAudioCodec(layer: seq[Clip], rules: Rules): AVCodecID =
     return rules.defaultAud
 
   let firstClip = layer[0]
-  let srcMi = initMediaInfo(firstClip.src[])
   let stream = int(firstClip.stream)
-  if stream >= srcMi.a.len:
-    return rules.defaultAud
 
-  let codec = srcMi.a[stream].codecId
+  var codec: AVCodecID
+  if cache != nil:
+    let container = cache.getContainer(firstClip.src)
+    if stream >= container.audio.len:
+      return rules.defaultAud
+    codec = container.audio[stream].codecpar.codec_id
+  else:
+    let srcMi = initMediaInfo(firstClip.src[])
+    if stream >= srcMi.a.len:
+      return rules.defaultAud
+    codec = srcMi.a[stream].codecId
+
   if rules.allowsCodec(codec):
     return codec
   return (if rules.defaultAud == ID_NONE: ID_AAC else: rules.defaultAud)
@@ -129,7 +137,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
             if layer.len > 0:
               firstLayer = layer
               break
-          $avcodec_get_name(resolveAudioCodec(firstLayer, rules))
+          $avcodec_get_name(resolveAudioCodec(firstLayer, rules, cache))
       else:
         args.audioCodec
       var (aOutStream, aEncCtx) = output.addStream(mixCodec, rate = rate,
@@ -161,7 +169,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       if tl.a[i].len > 0: # Only create stream if track has clips
         let rate = AVRational(num: tl.sr, den: 1)
         let layerCodec = if args.audioCodec == "auto":
-          $avcodec_get_name(resolveAudioCodec(tl.a[i], rules))
+          $avcodec_get_name(resolveAudioCodec(tl.a[i], rules, cache))
         else:
           args.audioCodec
         var (aOutStream, aEncCtx) = output.addStream(layerCodec, rate = rate,
@@ -207,8 +215,13 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         let sourcePath = firstClip.src[]
         let streamIdx = firstClip.stream
 
-        # Open source container to get subtitle stream info
-        let srcContainer = av.open(sourcePath)
+        var srcContainer: InputContainer
+        var ownsContainer = false
+        if cache != nil:
+          srcContainer = cache.getContainer(firstClip.src)
+        else:
+          srcContainer = av.open(sourcePath)
+          ownsContainer = true
         if streamIdx >= srcContainer.subtitle.len:
           error &"Subtitle stream {streamIdx} not found in {sourcePath}"
 
@@ -219,12 +232,14 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         subtitleStreams.add(sOutStream)
         subtitleSources.add(sourcePath)
 
-        srcContainer.close()
+        if ownsContainer:
+          srcContainer.close()
 
   var imageStreams: seq[(ptr AVStream, ptr AVPacket)] = @[]
   var imageSourceCtx: ptr AVFormatContext = nil
+  var ownsImageSourceCtx = false
   defer:
-    if imageSourceCtx != nil:
+    if ownsImageSourceCtx and imageSourceCtx != nil:
       avformat_close_input(addr imageSourceCtx)
 
   var outPacket = av_packet_alloc()
@@ -233,20 +248,24 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   defer: av_packet_free(addr outPacket)
 
   if not args.dn:
-    # Get the first source file from the timeline
-    var sourcePath: string = ""
+    # Get the first source pointer from the timeline so we can hit the cache.
+    var sourceSrc: ptr string = nil
     block findSource:
       for vlayer in tl.v:
         if vlayer.len > 0:
-          sourcePath = vlayer[0].src[]
+          sourceSrc = vlayer[0].src
           break findSource
       for alayer in tl.a:
         if alayer.len > 0:
-          sourcePath = alayer[0].src[]
+          sourceSrc = alayer[0].src
           break findSource
 
-    if sourcePath != "":
-      imageSourceCtx = av.openFormatCtx(sourcePath.cstring)
+    if sourceSrc != nil:
+      if cache != nil:
+        imageSourceCtx = cache.getContainer(sourceSrc).formatContext
+      else:
+        imageSourceCtx = av.openFormatCtx(sourceSrc[].cstring)
+        ownsImageSourceCtx = true
 
       for i in 0 ..< imageSourceCtx.nb_streams:
         let strm = imageSourceCtx.streams[i]

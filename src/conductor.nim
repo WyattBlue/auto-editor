@@ -340,11 +340,11 @@ proc editMedia*(args: var mainArgs) =
       break
     if src == nil:
       error "Trying to render an empty timeline"
-    let mi = initMediaInfo(src[])
-    const black = RGBColor(red: 0, green: 0, blue: 0)
-
     var cache = newMediaCache()
     defer: cache.close()
+
+    let mi = initMediaInfo(cache.getContainer(src).formatContext, src[])
+    const black = RGBColor(red: 0, green: 0, blue: 0)
 
     for clipNum, clip2 in clips2.pairs:
       var myTimeline = toNonLinear2(src, tlV3.tb, black, mi, @[clip2], tlV3.effects)
