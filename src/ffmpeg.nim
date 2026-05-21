@@ -477,6 +477,25 @@ proc avcodec_close*(avctx: ptr AVCodecContext): cint {.importc,
 proc avcodec_flush_buffers*(avctx: ptr AVCodecContext) {.importc,
     header: "<libavcodec/avcodec.h>".}
 
+# Hardware device probing
+type AVBufferRef* {.importc, incompleteStruct, header: "<libavutil/buffer.h>".} = object
+type AVHWDeviceType* {.importc: "enum AVHWDeviceType", header: "<libavutil/hwcontext.h>".} = enum
+  AV_HWDEVICE_TYPE_NONE
+
+proc av_hwdevice_ctx_create*(device_ctx: ptr ptr AVBufferRef, t: AVHWDeviceType,
+    device: cstring, opts: ptr AVDictionary, flags: cint): cint {.importc,
+    header: "<libavutil/hwcontext.h>".}
+proc av_buffer_unref*(buf: ptr ptr AVBufferRef) {.importc,
+    header: "<libavutil/buffer.h>".}
+
+type AVCodecHWConfig* {.importc, header: "<libavcodec/avcodec.h>".} = object
+  pix_fmt*: AVPixelFormat
+  methods*: cint
+  device_type*: AVHWDeviceType
+
+proc avcodec_get_hw_config*(codec: ptr AVCodec, index: cint): ptr AVCodecHWConfig {.
+    importc, header: "<libavcodec/avcodec.h>".}
+
 # Error
 template MKTAG*(a, b, c, d: static[char]): cint =
   cast[cint]((a.uint32) or (b.uint32 shl 8) or (c.uint32 shl 16) or (d.uint32 shl 24))

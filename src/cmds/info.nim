@@ -1,4 +1,4 @@
-import std/[json, sets, strformat, strutils]
+import std/[json, sets, strformat, strutils, tables]
 
 import ../[av, ffmpeg, log, media, timeline]
 import ../util/[fun, lang, rational]
@@ -183,6 +183,52 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
 
 type CodecListKind = enum clkEncoders, clkDecoders, clkCodecs
 
+var hwDeviceCache: Table[AVHWDeviceType, bool]
+
+proc hwDeviceAvailable(t: AVHWDeviceType): bool =
+  if t in hwDeviceCache:
+    return hwDeviceCache[t]
+  var ctx: ptr AVBufferRef = nil
+  let ok = av_hwdevice_ctx_create(addr ctx, t, nil, nil, 0) >= 0
+  if ctx != nil:
+    av_buffer_unref(addr ctx)
+  hwDeviceCache[t] = ok
+  return ok
+
+proc hwDeviceForEncoder(codec: ptr AVCodec): AVHWDeviceType =
+  # Ask the encoder which hw device type it needs.
+  var i: cint = 0
+  while true:
+    let cfg = avcodec_get_hw_config(codec, i)
+    if cfg == nil: break
+    if cfg.device_type != AV_HWDEVICE_TYPE_NONE:
+      return cfg.device_type
+    inc i
+  return AV_HWDEVICE_TYPE_NONE  # software encoder
+
+proc hwEncoderUsable(codec: ptr AVCodec): bool =
+  let deviceType = hwDeviceForEncoder(codec)
+  if deviceType == AV_HWDEVICE_TYPE_NONE:
+    return true
+  if not hwDeviceAvailable(deviceType):
+    return false
+  if codec.`type` != AVMEDIA_TYPE_VIDEO:
+    return true
+  var ctx = avcodec_alloc_context3(codec)
+  if ctx == nil:
+    return false
+  ctx.width = 1280
+  ctx.height = 720
+  ctx.bit_rate = 2_000_000
+  ctx.time_base = AVRational(num: 1, den: 25)
+  ctx.framerate = AVRational(num: 25, den: 1)
+  ctx.pix_fmt = AV_PIX_FMT_YUV420P
+  if codec.pix_fmts != nil and codec.pix_fmts[0] != AV_PIX_FMT_NONE:
+    ctx.pix_fmt = codec.pix_fmts[0]
+  let ok = avcodec_open2(ctx, codec, nil) >= 0
+  avcodec_free_context(addr ctx)
+  return ok
+
 proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
   var videos, audios, subs, others: seq[string]
   var seen: HashSet[AVCodecID]
@@ -207,6 +253,7 @@ proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
     case kind
     of clkEncoders:
       if av_codec_is_encoder(codec) == 0: continue
+      if not hwEncoderUsable(codec): continue
     of clkDecoders:
       if av_codec_is_decoder(codec) == 0: continue
     of clkCodecs:
