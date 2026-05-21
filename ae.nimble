@@ -243,11 +243,12 @@ let ffmpeg = Package(
   sha256: "b6863adde98898f42602017462871b5f6333e65aec803fdd7a6308639c52edf3",
 )
 
-proc selectPackages(crossWindowsArm: bool = false, crossArmv7: bool = false): seq[Package] =
+proc selectPackages(kind: CrossKind = native): seq[Package] =
   result = @[]
-  if not defined(macosx) and not crossWindowsArm and not crossArmv7:
+  let isMacNative = defined(macosx) and kind == native
+  if kind != armv7 and kind != llvmWin and not isMacNative:
     result.add nvheaders
-  if enableVpl and not crossWindowsArm and not crossArmv7:
+  if enableVpl and kind != llvmWin and kind != armv7:
     result.add libvpl
   if enableWhisper:
     result.add whisper
@@ -652,10 +653,7 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
     elif buildPath.endsWith("_win"): gccWin
     elif buildPath.endsWith("_armv7"): armv7
     else: native
-  let crossWindows = kind == gccWin
-  let crossWindowsArm = kind == llvmWin
-  let crossArmv7 = kind == armv7
-  let packages = selectPackages(crossWindowsArm, crossArmv7)
+  let packages = selectPackages(kind)
 
   mkDir("ffmpeg_sources")
   withDir "ffmpeg_sources":
@@ -684,7 +682,7 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
               if not fileExists("Makefile") or package.name == "x264":
                 var args = package.buildArguments
                 var envPrefix = ""
-                if crossWindowsArm:
+                if kind == llvmWin:
                   if package.name == "libvpx":
                     args.add("--target=arm64-win64-gcc")
                   else:
@@ -692,7 +690,7 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
                   if package.name == "opus":
                     args.add("--disable-rtcd")
                   envPrefix = "CC=aarch64-w64-mingw32-clang CXX=aarch64-w64-mingw32-clang++ AR=llvm-ar STRIP=llvm-strip RANLIB=llvm-ranlib "
-                elif crossArmv7:
+                elif kind == armv7:
                   if package.name == "libvpx":
                     args.add("--target=armv7-linux-gcc")
                   else:
@@ -704,7 +702,7 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
                   envPrefix = "CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ AR=arm-linux-gnueabihf-ar STRIP=arm-linux-gnueabihf-strip RANLIB=arm-linux-gnueabihf-ranlib "
                   if package.name == "libvpx":
                     envPrefix &= "CROSS=arm-linux-gnueabihf- "
-                elif crossWindows:
+                elif kind == gccWin:
                   if package.name == "libvpx":
                     args.add("--target=x86_64-win64-gcc")
                   else:
@@ -718,7 +716,7 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
               makeInstall()
   return packages
 
-proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: bool = false, armv7: bool = false): string =
+proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string =
   var enableEncoders: seq[string] = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,prores,prores_aw,prores_ks,srt,ssa,text,vorbis,webvtt".split(",")
 
   enableEncoders.add "pcm_f16le,pcm_f24le,pcm_f32be,pcm_f32le,pcm_f64be,pcm_f64le".split(",")
@@ -741,12 +739,14 @@ proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: b
     if package.name == "whisper":
       filters.add "whisper"
 
-  if not crossWasm:
-    when defined(macosx):
+  let isCrossWasm = kind == wasm32 or kind == wasm64
+  let isMacNative = defined(macosx) and kind == native
+
+  if not isCrossWasm:
+    if isMacNative:
       enableEncoders.add "aac_at,alac_at,h264_videotoolbox,hevc_videotoolbox,prores_videotoolbox".split(",")
-    else:
-      if not armv7:
-        enableEncoders.add "av1_nvenc,h264_nvenc,hevc_nvenc"
+    elif kind != armv7 and kind != llvmWin:
+      enableEncoders.add "av1_nvenc,h264_nvenc,hevc_nvenc"
     if enableVpl:
       enableEncoders.add "av1_qsv,hevc_qsv,mjpeg_qsv,mpeg2_qsv,vc1_qsv,vp8_qsv,vp9_qsv,vvc_qsv"
 
@@ -777,14 +777,14 @@ proc setupCommonFlags(packages: seq[Package], crossWasm: bool = false, winArm: b
     if package.ffFlag != "":
       commonFlags &= &"  {package.ffFlag} \\\n"
 
-  if not crossWasm:
-    if defined(arm) or defined(arm64) or winArm or armv7:
+  if not isCrossWasm:
+    if defined(arm) or defined(arm64) or kind == llvmWin or kind == armv7:
       commonFlags &= "  --enable-neon \\\n"
 
-    if defined(macosx):
+    if isMacNative:
       commonFlags &= "  --enable-videotoolbox \\\n"
       commonFlags &= "  --enable-audiotoolbox \\\n"
-    elif not winArm and not armv7:
+    elif kind != armv7 and kind != llvmWin:
       commonFlags &= "  --enable-nvenc \\\n"
       commonFlags &= "  --enable-ffnvcodec \\\n"
 
@@ -857,7 +857,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
       --arch=x86_64 \
       --target-os=mingw32 \
       --cross-prefix=x86_64-w64-mingw32- \
-      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages))
+      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, gccWin))
     makeInstall()
 
 task makewin, "Cross-compile to Windows (requires mingw-w64)":
@@ -894,7 +894,7 @@ task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
       --arch=aarch64 \
       --target-os=mingw32 \
       --cross-prefix=aarch64-w64-mingw32- \
-      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, winArm=true))
+      --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, llvmWin))
     makeInstall()
 
 task makewinarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
@@ -932,7 +932,7 @@ task makeffarmv7, "Build FFmpeg for Linux ARMv7 cross-compilation":
         --cpu=armv7-a \
         --target-os=linux \
         --cross-prefix=arm-linux-gnueabihf- \
-        --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, armv7=true))
+        --enable-cross-compile \""" & "\n" & setupCommonFlags(packages, armv7))
     except OSError:
       exec "cat ffbuild/config.log"
       quit(1)
@@ -1035,7 +1035,7 @@ Cflags: -I${{includedir}}
       --disable-w32threads \
       --disable-os2threads \
       --extra-cflags="-I{buildPath}/include -matomics -mbulk-memory -pthread{memArg}" \
-      --extra-ldflags="-L{buildPath}/lib -matomics -mbulk-memory -pthread{memArg}" \""" & "\n" & setupCommonFlags(wasmPackages, crossWasm=true))
+      --extra-ldflags="-L{buildPath}/lib -matomics -mbulk-memory -pthread{memArg}" \""" & "\n" & setupCommonFlags(wasmPackages, kind))
     makeInstall()
 
 task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
