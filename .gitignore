@@ -31,3 +31,4 @@ nimbledeps
 # Wasm Files
 *\.wasm
 *-web\.js
+*-web64\.js

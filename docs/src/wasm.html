@@ -36,7 +36,7 @@
 <section class="section">
 <div class="container">
   <h2 id="hero">Auto-Editor cli for wasm</h2>
-  <p class="tiny notice">wasm32 has a memory limit of 4GB. Importing or exporting big files may fail.</p>
+  <p id="memNotice" class="tiny notice" style="display:none">wasm32 fallback has a memory limit of 4GB. Importing or exporting big files may fail.</p>
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('main', this)">Main</button>
     <button class="tab-btn" onclick="switchTab('info', this)">Info</button>
@@ -69,8 +69,14 @@
   <div id="downloadArea"></div>
 
   <script>
-    const wasmBinaryPromise = fetch('auto-editor-web.wasm').then(r => r.arrayBuffer());
-    const mainScriptBlobPromise = fetch('auto-editor-web.js')
+    // Feature-detect wasm64 (memory section with i64 limits flag = 0x04).
+    const hasWasm64 = WebAssembly.validate(new Uint8Array([
+      0,97,115,109, 1,0,0,0, 5,3,1,4,1
+    ]));
+    if (!hasWasm64) document.getElementById('memNotice').style.display = '';
+    const wasmBase = hasWasm64 ? 'auto-editor-web64' : 'auto-editor-web';
+    const wasmBinaryPromise = fetch(wasmBase + '.wasm').then(r => r.arrayBuffer());
+    const mainScriptBlobPromise = fetch(wasmBase + '.js')
       .then(r => r.blob())
       .then(blob => {
         const url = URL.createObjectURL(blob);

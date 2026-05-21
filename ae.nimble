@@ -27,25 +27,33 @@ let
   winArmBuildPath = absolutePath("build_winarm")
   armv7BuildPath = absolutePath("build_armv7")
   wasmBuildPath = absolutePath("build_wasm")
+  wa64BuildPath = absolutePath("build_wasm64")
   ffmpegSrcDir = absolutePath("ffmpeg_sources/ffmpeg")
 
-proc stripProgram(forWasm, gccWin, llvmWin: bool = false) =
-  var file = "auto-editor"
-  if gccWin or llvmWin:
-    file = "auto-editor.exe"
-  elif forWasm:
-    file = "docs/src/auto-editor-web.wasm"
+type CrossKind = enum native, gccWin, llvmWin, armv7, wasm32, wasm64
 
-  if forWasm:
+proc stripProgram(kind: CrossKind = native) =
+  let file = (
+    if kind == gccWin or kind == llvmWin: "auto-editor.exe"
+    elif kind == wasm32: "docs/src/auto-editor-web.wasm"
+    elif kind == wasm64: "docs/src/auto-editor-web64.wasm"
+    else: "auto-editor"
+  )
+
+  case kind
+  of wasm32, wasm64:
     exec "wasm-strip " & file
-  elif gccWin:
+  of gccWin:
     exec "x86_64-w64-mingw32-strip -s " & file
-  elif llvmWin:
+  of llvmWin:
     exec "llvm-strip -s " & file
-  elif defined(macosx):
-    exec "strip -ur " & file
-  elif defined(linux):
-    exec "strip -s " & file
+  of armv7:
+    discard
+  of native:
+    when defined(macosx):
+      exec "strip -ur " & file
+    when defined(linux):
+      exec "strip -s " & file
 
   when defined(macosx):
     exec &"stat -f \"%z bytes\" ./{file}"
@@ -71,6 +79,7 @@ task cleanff, "Clean build files":
   rmDir "build_winarm"
   rmDir "build_armv7"
   rmDir "build_wasm"
+  rmDir "build_wasm64"
   for kind, path in walkDir("ffmpeg_sources"):
     if kind == pcDir: rmDir path
 
@@ -313,7 +322,7 @@ proc makeInstall =
     exec "make -j4"
   exec "make install"
 
-proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm, crossArmv7: bool) =
+proc cmakeBuild(package: Package, buildPath: string, kind: CrossKind) =
   let cmakeBuildDir = buildPath / "pkg" / package.name
   mkDir(cmakeBuildDir)
 
@@ -324,7 +333,7 @@ proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm, cros
     "-DBUILD_STATIC_LIBS=ON",
   ] & package.buildArguments
 
-  if crossArmv7 and package.name == "libsvtav1":
+  if kind == armv7 and package.name == "libsvtav1":
     # SVT-AV1 enables NASM x86 asm; force off for ARM cross-compile
     cmakeArgs = cmakeArgs.filterIt(it != "-DENABLE_NASM=ON")
     cmakeArgs.add("-DENABLE_NASM=OFF")
@@ -344,24 +353,19 @@ proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm, cros
     # the build dir and re-installs don't produce a hybrid BSD/GNU archive.
     cmakeArgs.add(&"-DCMAKE_OUTPUT_DIRECTORY={cmakeBuildDir}/Bin")
 
-  if crossWinArm:
+  if kind == gccWin:
+    let toolchainFile = buildPath.parentDir / "scripts" / "x86_64-w64-mingw32.cmake"
+    cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
+  elif kind == llvmWin:
     let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     if package.name == "whisper":
       cmakeArgs.add("-DGGML_OPENMP=OFF")
-  elif crossArmv7:
+  elif kind == armv7:
     let toolchainFile = buildPath.parentDir / "scripts" / "arm-linux-gnueabihf.cmake"
     cmakeArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     if package.name == "whisper":
       cmakeArgs.add("-DGGML_OPENMP=OFF")
-  elif crossWin:
-    cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-    cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
-    cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
-    cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
-    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
-    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
-    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
 
   withDir cmakeBuildDir:
     if not fileExists("CMakeCache.txt"):
@@ -401,7 +405,7 @@ proc cmakeBuild(package: Package, buildPath: string, crossWin, crossWinArm, cros
     else:
       let libs = "-L${libdir} -lwhisper -lggml-base -lggml -lggml-cpu"
       # OpenMP is disabled for Windows ARM cross-compile; native Linux uses libgomp
-      let libsPrivate = if crossWinArm: "-lpthread -lm -lstdc++"
+      let libsPrivate = if kind == llvmWin: "-lpthread -lm -lstdc++"
                         else: "-lgomp -lpthread -lm -lstdc++"
     writeFile(pcFile, &"""prefix={buildPath}
 exec_prefix=${{prefix}}
@@ -416,9 +420,10 @@ Libs.private: {libsPrivate}
 Cflags: -I${{includedir}}
 """)
 
-proc cmakeBuildWasm(package: Package, buildPath: string) =
+proc cmakeBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm32) =
   let cmakeBuildDir = buildPath / "pkg" / package.name
   mkDir(cmakeBuildDir)
+  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
 
   let sourceDir = absolutePath(".")
   withDir cmakeBuildDir:
@@ -436,16 +441,22 @@ proc cmakeBuildWasm(package: Package, buildPath: string) =
           "-DWHISPER_SDL2=OFF", "-DWHISPER_BUILD_EXAMPLES=OFF",
           "-DWHISPER_BUILD_TESTS=OFF", "-DWHISPER_BUILD_SERVER=OFF",
         ]
+        if kind == wasm64:
+          args &= @[
+            "\"-DCMAKE_C_FLAGS=-sMEMORY64=1\"",
+            "\"-DCMAKE_CXX_FLAGS=-sMEMORY64=1\"",
+            "\"-DCMAKE_EXE_LINKER_FLAGS=-sMEMORY64=1\"",
+          ]
       of "libsvtav1":
         args &= @[
           "-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=OFF",
-          "\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
-          "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\"",
+          &"\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory{memArg}\"",
+          &"\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory{memArg}\"",
         ]
       else:
         args &= package.buildArguments
-        args &= @["\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory\"",
-                  "\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory\""]
+        args &= @[&"\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory{memArg}\"",
+                  &"\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory{memArg}\""]
       exec "emcmake cmake " & sourceDir & " " & args.join(" ")
     exec "make -j4 && make install"
 
@@ -474,7 +485,7 @@ Libs.private: -lpthread -lm -lstdc++
 Cflags: -I${{includedir}}
 """)
 
-proc mesonBuild(package: Package, buildPath: string, wasm, crossWin, crossWinArm, crossArmv7: bool) =
+proc mesonBuild(package: Package, buildPath: string, kind: CrossKind) =
   let mesonBuildDir = buildPath / "pkg" / package.name
   let root = buildPath.parentDir
   mkDir(mesonBuildDir)
@@ -488,16 +499,20 @@ proc mesonBuild(package: Package, buildPath: string, wasm, crossWin, crossWinArm
     "-Denable_examples=false",
     "-Denable_tests=false"
   ]
-  if wasm:
+  if kind == wasm32 or kind == wasm64:
     mesonArgs.add "-Denable_asm=false"
-    mesonArgs.add "-Dc_args=\"-matomics -mbulk-memory\""
-    mesonArgs.add &"--cross-file={root}/scripts/wasm32-emcc.txt"
-  elif crossWinArm:
-    mesonArgs.add &"--cross-file={root}/scripts/aarch64-w64-mingw32.txt"
-  elif crossArmv7:
-    mesonArgs.add &"--cross-file={root}/scripts/arm-linux-gnueabihf.txt"
-  elif crossWin:
+    let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
+    mesonArgs.add &"-Dc_args=\"-matomics -mbulk-memory{memArg}\""
+    if kind == wasm64:
+      mesonArgs.add "-Dc_link_args=\"-sMEMORY64=1\""
+    let bits = (if kind == wasm64: "64" else: "32")
+    mesonArgs.add &"--cross-file={root}/scripts/wasm{bits}-emcc.txt"
+  elif kind == gccWin:
     mesonArgs.add &"--cross-file={root}/scripts/x86_64-w64-mingw32.txt"
+  elif kind == llvmWin:
+    mesonArgs.add &"--cross-file={root}/scripts/aarch64-w64-mingw32.txt"
+  elif kind == armv7:
+    mesonArgs.add &"--cross-file={root}/scripts/arm-linux-gnueabihf.txt"
 
   let sourceDir = absolutePath(".")
   withDir mesonBuildDir:
@@ -505,7 +520,7 @@ proc mesonBuild(package: Package, buildPath: string, wasm, crossWin, crossWinArm
     exec "ninja"
     exec "ninja install"
 
-proc x265Build(buildPath: string, crossWindows, crossWindowsArm, crossArmv7: bool) =
+proc x265Build(buildPath: string, kind: CrossKind) =
   # Build x265 multiple times following the Homebrew approach:
   #  1: Build 12 bits static library version in separate directory (if enabled)
   #  2: Build 10 bits static library version in separate directory
@@ -530,7 +545,7 @@ proc x265Build(buildPath: string, crossWindows, crossWindowsArm, crossArmv7: boo
   ]
   let isLinuxAarch64 = hostOS == "linux" and hostCPU == "arm64"
 
-  if hostCPU != "amd64" or crossWindowsArm:
+  if hostCPU != "amd64" or kind == llvmWin:
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")
 
   if isLinuxAarch64:
@@ -542,18 +557,13 @@ proc x265Build(buildPath: string, crossWindows, crossWindowsArm, crossArmv7: boo
     "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
   ]
 
-  if crossWindowsArm:
+  if kind == llvmWin:
     let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
     commonArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")  # No x86 assembly for ARM64
-  elif crossWindows:
-    commonArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
-    commonArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
-    commonArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
-    commonArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
-    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
-    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
-    commonArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+  elif kind == gccWin:
+    let toolchainFile = buildPath.parentDir / "scripts" / "x86_64-w64-mingw32.cmake"
+    commonArgs.add(&"-DCMAKE_TOOLCHAIN_FILE={toolchainFile}")
 
   # Build 12-bit version (optional, disabled by default for size)
   if enable12bit:
@@ -614,13 +624,12 @@ proc x265Build(buildPath: string, crossWindows, crossWindowsArm, crossArmv7: boo
     else:
       exec &"libtool -static -o {dir8bit}/libx265_combined.a {dir8bit}/libx265.a {dir10bit}/libx265_main10.a"
   else:
-    # For Linux or cross-compilation, use ar with MRI script
-    var arCommand = "ar"
-    if crossWindowsArm:
-      arCommand = "llvm-ar"
-    elif crossWindows:
-      arCommand = "x86_64-w64-mingw32-ar"
-
+    let arCommand = (
+      case kind
+      of llvmWin: "llvm-ar"
+      of gccWin: "x86_64-w64-mingw32-ar"
+      else: "ar"
+    )
     withDir dir8bit:
       exec "echo 'CREATE libx265_combined.a' > combine.mri"
       exec "echo 'ADDLIB libx265.a' >> combine.mri"
@@ -638,9 +647,14 @@ proc x265Build(buildPath: string, crossWindows, crossWindowsArm, crossArmv7: boo
   exec &"cmake --install {dir8bit}"
 
 proc ffmpegSetup(buildPath: string): seq[Package] =
-  let crossWindows = buildPath.endsWith("_win")
-  let crossWindowsArm = buildPath.endsWith("_winarm")
-  let crossArmv7 = buildPath.endsWith("_armv7")
+  let kind =
+    if buildPath.endsWith("_winarm"): llvmWin
+    elif buildPath.endsWith("_win"): gccWin
+    elif buildPath.endsWith("_armv7"): armv7
+    else: native
+  let crossWindows = kind == gccWin
+  let crossWindowsArm = kind == llvmWin
+  let crossArmv7 = kind == armv7
   let packages = selectPackages(crossWindowsArm, crossArmv7)
 
   mkDir("ffmpeg_sources")
@@ -653,11 +667,11 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
 
       withDir package.name:
         if package.buildSystem == "cmake":
-          cmakeBuild(package, buildPath, crossWindows, crossWindowsArm, crossArmv7)
+          cmakeBuild(package, buildPath, kind)
         elif package.buildSystem == "meson":
-          mesonBuild(package, buildPath, false, crossWindows, crossWindowsArm, crossArmv7)
+          mesonBuild(package, buildPath, kind)
         elif package.buildSystem == "x265":
-          x265build(buildPath, crossWindows, crossWindowsArm, crossArmv7)
+          x265Build(buildPath, kind)
         else:
           # Special handling for nv-codec-headers which doesn't use configure
           if package.name == "nv-codec-headers":
@@ -858,7 +872,7 @@ task makewin, "Cross-compile to Windows (requires mingw-w64)":
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
          "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
-    stripProgram(gccWin=true)
+    stripProgram(gccWin)
 
 task makeffwinarm, "Build FFmpeg for Windows ARM64 cross-compilation":
   setupDeps()
@@ -894,7 +908,7 @@ task makewinarm, "Cross-compile to Windows ARM64 (requires llvm-mingw)":
          "--clang.linkerexe:aarch64-w64-mingw32-clang " &
          "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
-    stripProgram(llvmWin=true)
+    stripProgram(llvmWin)
 
 task makeffarmv7, "Build FFmpeg for Linux ARMv7 cross-compilation":
   setupDeps()
@@ -941,34 +955,37 @@ task makearmv7, "Cross-compile to Linux ARMv7 (requires arm-linux-gnueabihf tool
     echo ""
 
 
-proc autoconfBuildWasm(package: Package, buildPath: string) =
+proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm32) =
   let sourceDir = absolutePath(".")
   let autoBuildDir = buildPath / "pkg" / package.name
   mkDir(autoBuildDir)
+  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
+  let ldFlags = if kind == wasm64: "-sMEMORY64=1" else: ""
+  let x264Host = if kind == wasm64: "x86_64-gnu" else: "i686-gnu"
   withDir autoBuildDir:
     case package.name
     of "x264":
       if not fileExists("config.mak"):
-        exec &"""CFLAGS="-matomics -mbulk-memory" emconfigure {sourceDir}/configure --prefix="{buildPath}" --host=i686-gnu --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
+        exec &"""CFLAGS="-matomics -mbulk-memory{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --host={x264Host} --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
       exec "emmake make -j4"
       exec "make install"
     of "libvpx":
       if not fileExists("Makefile"):
-        exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory" """
+        exec &"""LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory{memArg}" """
       makeInstall()
     else:
       # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
       let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
       if not fileExists("Makefile"):
         let args = (package.buildArguments & extraArgs).join(" ")
-        exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory" """
+        exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory{memArg}" LDFLAGS="{ldFlags}" """
       makeInstall()
 
-task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
+proc buildFFmpegForWasm(buildPath: string, kind: CrossKind) =
   setupDeps()
-  putEnv("PKG_CONFIG_PATH", wasmBuildPath / "lib/pkgconfig")
+  putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
   mkDir("ffmpeg_sources")
-  mkDir("build_wasm")
+  mkDir(buildPath)
 
   let wasmPackages = @[ffmpeg, lame, x264, opus, dav1d, vpx, whisper, svtav1]
   for package in wasmPackages:
@@ -978,13 +995,13 @@ task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
     if package.name == "ffmpeg": continue
     withDir &"ffmpeg_sources/{package.name}":
       case package.buildSystem
-      of "cmake": cmakeBuildWasm(package, wasmBuildPath)
-      of "meson": mesonBuild(package, wasmBuildPath, true, false, false, false)
-      else: autoconfBuildWasm(package, wasmBuildPath)
+      of "cmake": cmakeBuildWasm(package, buildPath, kind)
+      of "meson": mesonBuild(package, buildPath, kind)
+      else: autoconfBuildWasm(package, buildPath, kind)
 
   # lame ships no .pc file; create one so FFmpeg's configure can find it
-  mkDir(wasmBuildPath / "lib" / "pkgconfig")
-  writeFile(wasmBuildPath / "lib" / "pkgconfig" / "mp3lame.pc", &"""prefix={wasmBuildPath}
+  mkDir(buildPath / "lib" / "pkgconfig")
+  writeFile(buildPath / "lib" / "pkgconfig" / "mp3lame.pc", &"""prefix={buildPath}
 exec_prefix=${{prefix}}
 libdir=${{prefix}}/lib
 includedir=${{prefix}}/include
@@ -996,10 +1013,13 @@ Libs: -L${{libdir}} -lmp3lame
 Cflags: -I${{includedir}}
 """)
 
-  let ffmpegBuildDirWasm = wasmBuildPath / "pkg" / "ffmpeg"
-  mkDir(ffmpegBuildDirWasm)
-  withDir ffmpegBuildDirWasm:
-    exec (&"""PKG_CONFIG_PATH="{wasmBuildPath}/lib/pkgconfig" {ffmpegSrcDir}/configure --prefix="{wasmBuildPath}" \
+  let arch = if kind == wasm64: "x86_64" else: "x86_32"
+  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
+
+  let ffmpegBuildDir = buildPath / "pkg" / "ffmpeg"
+  mkDir(ffmpegBuildDir)
+  withDir ffmpegBuildDir:
+    exec (&"""PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" {ffmpegSrcDir}/configure --prefix="{buildPath}" \
       --cc=emcc \
       --cxx=em++ \
       --ar=emar \
@@ -1008,37 +1028,40 @@ Cflags: -I${{includedir}}
       --pkg-config-flags="--static" \
       --enable-cross-compile \
       --target-os=none \
-      --arch=x86_32 \
+      --arch={arch} \
       --disable-x86asm \
       --disable-inline-asm \
       --enable-pthreads \
       --disable-w32threads \
       --disable-os2threads \
-      --extra-cflags="-I{wasmBuildPath}/include -matomics -mbulk-memory -pthread" \
-      --extra-ldflags="-L{wasmBuildPath}/lib -matomics -mbulk-memory -pthread" \""" & "\n" & setupCommonFlags(wasmPackages, crossWasm=true))
+      --extra-cflags="-I{buildPath}/include -matomics -mbulk-memory -pthread{memArg}" \
+      --extra-ldflags="-L{buildPath}/lib -matomics -mbulk-memory -pthread{memArg}" \""" & "\n" & setupCommonFlags(wasmPackages, crossWasm=true))
     makeInstall()
+
+task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
+  buildFFmpegForWasm(wasmBuildPath, wasm32)
+
+task makeffwasm64, "Build FFmpeg for WebAssembly 64-bit (requires emscripten)":
+  buildFFmpegForWasm(wa64BuildPath, wasm64)
 
 task makewasm, "Compile to wasm32 (requires emscripten, wabt)":
   echo "Compiling for wasm (32-bit)..."
   if not dirExists("build_wasm"):
     echo "FFmpeg for wasm not found. Run 'nimble makeffwasm' first."
   else:
-    exec "nim c -d:danger --panics:on -d:emscripten --passC:-flto --passL:-flto --threads:on --os:linux --cpu:wasm32 " &
-        "--passC:-pthread " &
-        "--passC:-g0 " &
-        "--passL:-pthread " &
-        "--passL:-g0 " &
-        "--passL:-sINITIAL_MEMORY=67108864 " &
-        "--passL:-sALLOW_MEMORY_GROWTH=1 " &
-        "--passL:-sMAXIMUM_MEMORY=4294967296 " &
-        "--passL:-Wno-pthreads-mem-growth " &
-        "--passL:-sSTACK_SIZE=1048576 " &
-        "--passL:-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency " &
-        "--passL:-sPROXY_TO_PTHREAD=1 " &
-        "--passL:-sEXIT_RUNTIME=1 " &
-        "--passL:-sMODULARIZE=1 " &
-        "--passL:-sEXPORT_NAME=AutoEditor " &
-        "--passL:-sEXPORTED_RUNTIME_METHODS=[FS] " &
-        "--passL:-sENVIRONMENT=web,worker " &
+    exec "nim c -d:danger --panics:on -d:emscripten --passC:-flto --passL:-flto " &
+        "--threads:on --os:linux --cpu:wasm32 " &
         "--out:docs/src/auto-editor-web.js src/main.nim"
-    stripProgram(forWasm=true)
+    stripProgram(wasm32)
+
+task makewasm64, "Compile to wasm64 (requires emscripten, wabt)":
+  echo "Compiling for wasm (64-bit)..."
+  if not dirExists("build_wasm64"):
+    echo "FFmpeg for wasm64 not found. Run 'nimble makeffwasm64' first."
+  else:
+    # --cpu:riscv64 picked for its 64-bit pointer ABI; using --cpu:amd64 makes
+    # nimcrypto pull in x86 SHA/AVX intrinsics that emscripten can't compile.
+    exec "nim c -d:danger --panics:on -d:emscripten --passC:-flto --passL:-flto " &
+        "--threads:on --os:linux --cpu:riscv64 " &
+        "--out:docs/src/auto-editor-web64.js src/main.nim"
+    stripProgram(wasm64)
