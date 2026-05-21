@@ -184,6 +184,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
 type CodecListKind = enum clkEncoders, clkDecoders, clkCodecs
 
 var hwDeviceCache: Table[AVHWDeviceType, bool]
+var hwEncoderCache: Table[string, bool]
 
 proc hwDeviceAvailable(t: AVHWDeviceType): bool =
   if t in hwDeviceCache:
@@ -195,20 +196,44 @@ proc hwDeviceAvailable(t: AVHWDeviceType): bool =
   hwDeviceCache[t] = ok
   return ok
 
-proc hwEncoderUsable(name: string): bool =
+proc encoderOpens(codec: ptr AVCodec): bool =
+  # A device may be present while a specific encoder is unsupported by the
+  # underlying GPU (e.g. av1_nvenc on pre-Ada NVIDIA cards). Try opening the
+  # encoder with a minimal config to confirm the driver actually accepts it.
+  if codec.`type` != AVMEDIA_TYPE_VIDEO:
+    return true
+  var ctx = avcodec_alloc_context3(codec)
+  if ctx == nil:
+    return false
+  ctx.width = 64
+  ctx.height = 64
+  ctx.time_base = AVRational(num: 1, den: 25)
+  ctx.framerate = AVRational(num: 25, den: 1)
+  ctx.pix_fmt = AV_PIX_FMT_YUV420P
+  if codec.pix_fmts != nil and codec.pix_fmts[0] != AV_PIX_FMT_NONE:
+    ctx.pix_fmt = codec.pix_fmts[0]
+  let ok = avcodec_open2(ctx, codec, nil) >= 0
+  avcodec_free_context(addr ctx)
+  return ok
+
+proc hwEncoderUsable(codec: ptr AVCodec): bool =
   # Hardware encoders are linked unconditionally (the driver loads at runtime).
   # Probe the matching device so we don't list encoders that would fail to open.
-  if name.endsWith("_nvenc"):
-    return hwDeviceAvailable(AV_HWDEVICE_TYPE_CUDA)
-  if name.endsWith("_qsv"):
-    return hwDeviceAvailable(AV_HWDEVICE_TYPE_QSV)
-  if name.endsWith("_videotoolbox"):
-    return hwDeviceAvailable(AV_HWDEVICE_TYPE_VIDEOTOOLBOX)
-  if name.endsWith("_vaapi"):
-    return hwDeviceAvailable(AV_HWDEVICE_TYPE_VAAPI)
-  if name.endsWith("_amf"):
-    return hwDeviceAvailable(AV_HWDEVICE_TYPE_AMF)
-  return true
+  let name = $codec.name
+  let deviceType =
+    if name.endsWith("_nvenc"): AV_HWDEVICE_TYPE_CUDA
+    elif name.endsWith("_qsv") or name.endsWith("_vpl"): AV_HWDEVICE_TYPE_QSV
+    elif name.endsWith("_videotoolbox"): AV_HWDEVICE_TYPE_VIDEOTOOLBOX
+    elif name.endsWith("_vaapi"): AV_HWDEVICE_TYPE_VAAPI
+    elif name.endsWith("_amf"): AV_HWDEVICE_TYPE_AMF
+    else: return true
+  if not hwDeviceAvailable(deviceType):
+    return false
+  if name in hwEncoderCache:
+    return hwEncoderCache[name]
+  let ok = encoderOpens(codec)
+  hwEncoderCache[name] = ok
+  return ok
 
 proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
   var videos, audios, subs, others: seq[string]
@@ -234,7 +259,7 @@ proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
     case kind
     of clkEncoders:
       if av_codec_is_encoder(codec) == 0: continue
-      if not hwEncoderUsable($codec.name): continue
+      if not hwEncoderUsable(codec): continue
     of clkDecoders:
       if av_codec_is_decoder(codec) == 0: continue
     of clkCodecs:
