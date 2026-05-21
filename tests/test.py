@@ -2,6 +2,7 @@ import argparse
 import concurrent.futures
 import hashlib
 import itertools
+import json
 import os
 import random
 import re
@@ -606,6 +607,33 @@ class Runner:
             self.main([test_file], ["--export", "final-cut-pro:version=11"])
             self.main([test_file], ["-exs"])
             self.main([test_file], ["--stats"])
+
+    def test_export_otio(self) -> None:
+        for test_name in all_files:
+            self.main([f"resources/{test_name}"], ["--export", "premiere-otio"])
+
+        # The invert/hflip/vflip actions must survive the round-trip as
+        # Premiere's video effects, which the FCP7 XML export can't represent.
+        out = self.main(
+            ["example.mp4"],
+            ["--when-silent", "invert,hflip,vflip", "--export", "premiere-otio"],
+            "video-fx.otio",
+        )
+        with open(out) as file:
+            timeline = json.load(file)
+
+        assert timeline["OTIO_SCHEMA"] == "Timeline.1"
+        wanted = {"AE.ADBE Invert", "AE.ADBE Horizontal Flip", "AE.ADBE Vertical Flip"}
+        found: set[str] = set()
+        for track in timeline["tracks"]["children"]:
+            for clip in track["children"]:
+                for effect in clip["effects"]:
+                    match = effect.get("metadata", {}).get("PremierePro_OTIO", {})
+                    name = match.get("MatchName")
+                    if name in wanted:
+                        assert track["kind"] == "Video"
+                        found.add(name)
+        assert found == wanted
 
     def test_clip_sequence(self) -> None:
         for test_name in all_files:

@@ -7,7 +7,7 @@ import ./[av, action, edit, ffmpeg, log, media, timeline]
 import util/[color, bar, fun, rules, rational]
 
 import imports/[fcp7, json]
-import exports/[fcp7, fcp11, json, shotcut, kdenlive]
+import exports/[fcp7, fcp11, json, shotcut, kdenlive, otio]
 import render/format
 import stats
 
@@ -119,6 +119,7 @@ proc setOutput(userOut, `export`, path: string): (string, string) =
       of ".fcpxml": myExport = "final-cut-pro"
       of ".mlt": myExport = "shotcut"
       of ".kdenlive": myExport = "kdenlive"
+      of ".otio": myExport = "premiere-otio"
       of ".json", ".v1": myExport = "v1"
       of ".v2": myExport = "v2"
       of ".v3": myExport = "v3"
@@ -129,6 +130,7 @@ proc setOutput(userOut, `export`, path: string): (string, string) =
     of "final-cut-pro", "resolve": ext = ".fcpxml"
     of "shotcut": ext = ".mlt"
     of "kdenlive": ext = ".kdenlive"
+    of "premiere-otio": ext = ".otio"
     of "v1":
       if ext != ".json":
         ext = ".v1"
@@ -283,6 +285,9 @@ proc editMedia*(args: var mainArgs) =
     return
   of "kdenlive":
     kdenliveWrite(output, tlV3)
+    return
+  of "premiere-otio":
+    otioWrite(tlName, output, tlV3)
     return
   of "default", "clip-sequence":
     discard
