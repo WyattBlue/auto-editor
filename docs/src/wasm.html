@@ -44,22 +44,23 @@
   </div>
 
   <div id="tab-main" class="tab-panel active">
-    <label>Input file: <input type="file" id="fileInput"> <span id="fileSize" class="tiny notice"></span></label><br>
+    <label>Input files: <input type="file" id="fileInput" multiple></label><br>
+    <label>Other files (e.g. <code>example.srt</code>) [optional]: <input type="file" id="otherFilesInput" multiple></label><br>
     <label>Arguments: <input type="text" id="argsInput" value="-c:v h264" size="40"></label><br>
     <button id="runBtn" onclick="runEditor()">Run</button>
     <button onclick="clearLog()">Clear log</button>
   </div>
 
   <div id="tab-whisper" class="tab-panel">
-    <label>Input file: <input type="file" id="whisperFileInput"> <span id="whisperFileSize" class="tiny notice"></span></label><br>
-    <label>Model file: <input type="file" id="whisperModel" accept=".bin"> <span id="whisperModelSize" class="tiny notice"></span></label><br>
+    <label>Input file: <input type="file" id="whisperFileInput"></label><br>
+    <label>Model file: <input type="file" id="whisperModel" accept=".bin"></label><br>
     <label>Arguments: <input type="text" id="whisperArgs" value="" size="40"></label><br>
     <button id="whisperRunBtn" onclick="runWhisper()">Run</button>
     <button onclick="clearLog()">Clear log</button>
   </div>
 
   <div id="tab-info" class="tab-panel">
-    <label>Input file: <input type="file" id="infoFileInput"> <span id="infoFileSize" class="tiny notice"></span></label><br>
+    <label>Input files: <input type="file" id="infoFileInput" multiple></label><br>
     <button id="infoRunBtn" onclick="runInfo()">Run</button>
     <button onclick="clearLog()">Clear log</button>
   </div>
@@ -150,19 +151,11 @@
       }
     }
 
-    function mb(n) { return (n / 1024 / 1024).toFixed(1); }
-
-    function bindSizeLabel(inputId, spanId) {
-      const inp = document.getElementById(inputId);
-      const span = document.getElementById(spanId);
-      inp.addEventListener('change', () => {
-        span.textContent = inp.files.length ? `(${mb(inp.files[0].size)} MB)` : '';
-      });
+    function fmtSize(n) {
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+      return (n / 1024 / 1024).toFixed(1) + ' MB';
     }
-    bindSizeLabel('fileInput', 'fileSize');
-    bindSizeLabel('whisperFileInput', 'whisperFileSize');
-    bindSizeLabel('whisperModel', 'whisperModelSize');
-    bindSizeLabel('infoFileInput', 'infoFileSize');
 
     let downloadUrls = [];
     function clearDownloads() {
@@ -177,7 +170,7 @@
       const a = document.createElement('a');
       a.href = url;
       a.download = name;
-      a.textContent = `Download ${name} (${mb(blob.size)} MB)`;
+      a.textContent = `Download ${name} (${fmtSize(blob.size)})`;
       a.style.display = 'block';
       a.style.width = 'fit-content';
       document.getElementById('downloadArea').appendChild(a);
@@ -226,19 +219,21 @@
 
     async function runEditor() {
       const fileEl = document.getElementById('fileInput');
+      const otherEl = document.getElementById('otherFilesInput');
       const extraArgs = document.getElementById('argsInput').value.trim().split(/\s+/).filter(Boolean);
 
-      const hasFile = fileEl.files.length > 0;
-      const file = hasFile ? fileEl.files[0] : null;
-      const inputPath = hasFile ? '/' + file.name : null;
+      const inputFiles = Array.from(fileEl.files).map(f => ({file: f, path: '/' + f.name}));
+      const otherFiles = Array.from(otherEl.files).map(f => ({file: f, path: '/' + f.name}));
+      const allFiles = [...inputFiles, ...otherFiles];
+      const args = [...inputFiles.map(e => e.path), ...extraArgs];
 
-      const args = [...(inputPath ? [inputPath] : []), ...extraArgs];
-      const inputFiles = inputPath ? [{ file, path: inputPath }] : [];
+      const mod = await runModule(document.getElementById('runBtn'), args, allFiles);
+      offerOutputDownloads(mod, allFiles);
+    }
 
-      const mod = await runModule(document.getElementById('runBtn'), args, inputFiles);
+    // Scan FS root for anything the run produced and offer each as a download.
+    function offerOutputDownloads(mod, inputFiles) {
       if (!mod) return;
-
-      // Scan FS root for anything auto-editor wrote and offer downloads.
       const skip = new Set(['tmp', 'home', 'dev', 'proc']);
       const inputSet = new Set(inputFiles.map(e => e.path));
       const outputs = [];
@@ -271,28 +266,24 @@
       const inputPath = '/' + file.name;
       const extraArgs = document.getElementById('whisperArgs').value.trim().split(/\s+/).filter(Boolean);
 
+      const inputFiles = [{file, path: inputPath}, {file: modelEl.files[0], path: '/model.bin'}];
       const mod = await runModule(
         document.getElementById('whisperRunBtn'),
         ['whisper', inputPath, '/model.bin', ...extraArgs],
-        [{file, path: inputPath}, {file: modelEl.files[0], path: '/model.bin'}]
+        inputFiles
       );
-      if (!mod) return;
-
-      handleOutput('Done.');
-      const transcript = document.getElementById('log').textContent;
-      addDownload(new Blob([transcript], {type: 'text/plain'}), file.name.replace(/\.[^.]+$/, '') + '.txt');
+      offerOutputDownloads(mod, inputFiles);
     }
 
     async function runInfo() {
       const fileEl = document.getElementById('infoFileInput');
       if (!fileEl.files.length) { handleOutput('No file selected.'); return; }
-      const file = fileEl.files[0];
-      const inputPath = '/' + file.name;
+      const inputFiles = Array.from(fileEl.files).map(f => ({file: f, path: '/' + f.name}));
 
       await runModule(
         document.getElementById('infoRunBtn'),
-        ['info', inputPath],
-        [{file, path: inputPath}]
+        ['info', ...inputFiles.map(e => e.path)],
+        inputFiles
       );
     }
   </script>

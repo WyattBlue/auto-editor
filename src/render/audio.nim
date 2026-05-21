@@ -101,7 +101,6 @@ type
     decoderCtx*: ptr AVCodecContext
     layout*: ref AVChannelLayout
     rate*: cint
-    ownsContainer*: bool
 
   AudioBuffer = ref object
     memFile*: MemFile
@@ -144,23 +143,10 @@ proc newGetter(path: string, stream: int32, rate: cint): Getter =
   discard av_channel_layout_copy(
     addr result.layout[], addr result.stream.codecpar.ch_layout
   )
-  result.ownsContainer = true
-
-proc newGetter(container: InputContainer, stream: int32): Getter =
-  result = new(Getter)
-  result.container = container
-  result.stream = result.container.audio[stream]
-  result.rate = result.stream.codecpar.sample_rate
-  result.decoderCtx = initDecoder(result.stream.codecpar)
-  new(result.layout)
-  discard av_channel_layout_copy(
-    addr result.layout[], addr result.stream.codecpar.ch_layout
-  )
 
 proc close(getter: Getter) =
   avcodec_free_context(addr getter.decoderCtx)
-  if getter.ownsContainer:
-    getter.container.close()
+  getter.container.close()
 
 proc get(getter: Getter, start, endSample: int): seq[int16] =
   # start/end is in samples
@@ -589,16 +575,17 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
   conwrite "Creating audio"
 
-  # Collect all unique audio sources from specified layers
+  # Collect all unique audio sources from specified layers.
+  # Audio's getter calls av_seek_frame / av_read_frame on its container, so it
+  # must have an AVFormatContext that's independent of the video decoder's —
+  # otherwise interleaved video+audio reads desync and the video stream emits
+  # black frames after the first GOP.
   for layerIndex in layerIndices:
     if layerIndex < tl.a.len:
       for clip in tl.a[layerIndex]:
         let key = (clip.src[], clip.stream)
         if key notin samples:
-          if cache != nil and clip.src in cache.cns:
-            samples[key] = newGetter(cache.cns[clip.src], clip.stream)
-          else:
-            samples[key] = newGetter(clip.src[], clip.stream, sr)
+          samples[key] = newGetter(clip.src[], clip.stream, sr)
 
   # Calculate total duration across specified layers
   var totalDuration: int64 = 0

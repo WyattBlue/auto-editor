@@ -210,6 +210,10 @@ proc close*(cache: MediaCache) =
     cn.close()
   cache.cns.clear()
 
+proc getContainer*(cache: MediaCache, src: ptr string): InputContainer =
+  if src notin cache.cns:
+    cache.cns[src] = open(src[])
+  return cache.cns[src]
 
 type OutputContainer* = object
   file: string

@@ -51,6 +51,7 @@ else:
     else:
       switch("passC", "-sMEMORY64=1")
       switch("passL", "-sMEMORY64=1")
+      switch("passL", "-sMAXIMUM_MEMORY=17179869184")  # 16 GiB
 
 # See for details: https://simonbyrne.github.io/notes/fastmath/
 switch("passC", "-fno-signaling-nans -fno-math-errno -fno-trapping-math -fno-signed-zeros")
