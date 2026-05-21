@@ -1,4 +1,4 @@
-import std/[json, sets, strformat, strutils]
+import std/[json, sets, strformat, strutils, tables]
 
 import ../[av, ffmpeg, log, media, timeline]
 import ../util/[fun, lang, rational]
@@ -183,6 +183,33 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
 
 type CodecListKind = enum clkEncoders, clkDecoders, clkCodecs
 
+var hwDeviceCache: Table[AVHWDeviceType, bool]
+
+proc hwDeviceAvailable(t: AVHWDeviceType): bool =
+  if t in hwDeviceCache:
+    return hwDeviceCache[t]
+  var ctx: ptr AVBufferRef = nil
+  let ok = av_hwdevice_ctx_create(addr ctx, t, nil, nil, 0) >= 0
+  if ctx != nil:
+    av_buffer_unref(addr ctx)
+  hwDeviceCache[t] = ok
+  return ok
+
+proc hwEncoderUsable(name: string): bool =
+  # Hardware encoders are linked unconditionally (the driver loads at runtime).
+  # Probe the matching device so we don't list encoders that would fail to open.
+  if name.endsWith("_nvenc"):
+    return hwDeviceAvailable(AV_HWDEVICE_TYPE_CUDA)
+  if name.endsWith("_qsv"):
+    return hwDeviceAvailable(AV_HWDEVICE_TYPE_QSV)
+  if name.endsWith("_videotoolbox"):
+    return hwDeviceAvailable(AV_HWDEVICE_TYPE_VIDEOTOOLBOX)
+  if name.endsWith("_vaapi"):
+    return hwDeviceAvailable(AV_HWDEVICE_TYPE_VAAPI)
+  if name.endsWith("_amf"):
+    return hwDeviceAvailable(AV_HWDEVICE_TYPE_AMF)
+  return true
+
 proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
   var videos, audios, subs, others: seq[string]
   var seen: HashSet[AVCodecID]
@@ -207,6 +234,7 @@ proc printCodecList(ofmt: ptr AVOutputFormat, kind: CodecListKind) =
     case kind
     of clkEncoders:
       if av_codec_is_encoder(codec) == 0: continue
+      if not hwEncoderUsable($codec.name): continue
     of clkDecoders:
       if av_codec_is_decoder(codec) == 0: continue
     of clkCodecs:
