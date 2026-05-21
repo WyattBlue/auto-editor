@@ -16,6 +16,7 @@ when defined(dynamic):
 else:
   let buildPath = (
     if hostCPU == "wasm32": "build_wasm"
+    elif defined(emscripten): "build_wasm64"
     elif hostOS == "windows" and hostCPU == "arm64": "build_winarm"
     elif hostOS == "windows" and hostCPU != "arm64": "build_win"
     elif hostOS == "linux" and hostCPU == "arm": "build_armv7"
@@ -23,11 +24,33 @@ else:
   )
   switch("passC", &"-I./{buildPath}/include")
   switch("passL", &"-L./{buildPath}/lib")
-  when hostCPU == "wasm32":
+  when defined(emscripten):
     switch("define", "noSignalHandler")
     --cc:clang
     --clang.exe:emcc
     --clang.linkerexe:emcc
+
+    switch("passC", "-pthread")
+    switch("passC", "-g0")
+    switch("passL", "-pthread")
+    switch("passL", "-g0")
+    switch("passL", "-sINITIAL_MEMORY=67108864")
+    switch("passL", "-sALLOW_MEMORY_GROWTH=1")
+    switch("passL", "-Wno-pthreads-mem-growth")
+    switch("passL", "-sSTACK_SIZE=1048576")
+    switch("passL", "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency")
+    switch("passL", "-sPROXY_TO_PTHREAD=1")
+    switch("passL", "-sEXIT_RUNTIME=1")
+    switch("passL", "-sMODULARIZE=1")
+    switch("passL", "-sEXPORT_NAME=AutoEditor")
+    switch("passL", "-sEXPORTED_RUNTIME_METHODS=[FS]")
+    switch("passL", "-sENVIRONMENT=web,worker")
+
+    when hostCPU == "wasm32":
+      switch("passL", "-sMAXIMUM_MEMORY=4294967296")
+    else:
+      switch("passC", "-sMEMORY64=1")
+      switch("passL", "-sMEMORY64=1")
 
 # See for details: https://simonbyrne.github.io/notes/fastmath/
 switch("passC", "-fno-signaling-nans -fno-math-errno -fno-trapping-math -fno-signed-zeros")
@@ -44,7 +67,7 @@ if not defined(dynamic):
     switch("passL", "-lvpx")
   if enableSvtav1:
     switch("passL", "-lSvtAv1Enc")
-  if hostCPU != "wasm32":
+  when not defined(emscripten):
     if enableHevc:
       switch("passL", "-lx265")
     if enableVpl and not (hostCPU == "arm64" and hostOS == "windows") and
@@ -61,7 +84,7 @@ when hostOS == "macosx":
   switch("passL", "-framework CoreFoundation -framework CoreMedia -framework CoreVideo")
 elif hostOS == "windows":
   switch("passL", "-lpthread -lbcrypt -lsetupapi -lole32 -luuid")
-elif not defined(dynamic) and hostOS == "linux" and hostCPU != "wasm32":
+elif not defined(dynamic) and hostOS == "linux" and not defined(emscripten):
   when hostCPU == "arm64":
     switch("passL", "-L./build/lib/aarch64-linux-gnu")
     switch("passL", "-L./build/lib64")
@@ -82,7 +105,7 @@ if not defined(dynamic) and enableWhisper:
       switch("passL", "-lggml-metal")
     switch("passL", "-framework Accelerate")
     switch("passL", "-framework Metal -framework MetalKit -framework Foundation")
-  elif not (hostOS == "windows" and hostCPU == "arm64") and hostCPU != "wasm32":
+  elif not (hostOS == "windows" and hostCPU == "arm64") and not defined(emscripten):
     switch("passL", "-lgomp")
 
 if not defined(dynamic):

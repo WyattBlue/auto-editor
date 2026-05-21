@@ -425,7 +425,7 @@ judge making cuts.
     when defined(windows):
       echo "OS: Windows ", when hostCPU == "amd64": "x86_64" else: hostCPU
     elif defined(emscripten):
-      echo "OS: wasm32"
+      echo (when hostCPU == "wasm32": "OS: wasm32" else: "OS: wasm64")
     else:
       let plat = uname()
       echo "OS: ", plat.sysname, " ", plat.release, " ", plat.machine

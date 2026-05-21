@@ -1,0 +1,17 @@
+[binaries]
+c = 'emcc'
+cpp = 'em++'
+ar = 'emar'
+strip = 'wasm-strip'
+
+[host_machine]
+system = 'emscripten'
+cpu_family = 'wasm64'
+cpu = 'wasm64'
+endian = 'little'
+
+[built-in options]
+c_args = ['-sMEMORY64=1']
+c_link_args = ['-sMEMORY64=1']
+cpp_args = ['-sMEMORY64=1']
+cpp_link_args = ['-sMEMORY64=1']
