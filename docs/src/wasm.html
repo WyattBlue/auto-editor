@@ -44,23 +44,22 @@
   </div>
 
   <div id="tab-main" class="tab-panel active">
-    <label>Input file: <input type="file" id="fileInput"></label><br>
+    <label>Input file: <input type="file" id="fileInput"> <span id="fileSize" class="tiny notice"></span></label><br>
     <label>Arguments: <input type="text" id="argsInput" value="-c:v h264" size="40"></label><br>
-    <label>Output name: <input type="text" id="outputName" value="out.mp4" size="20"></label><br>
     <button id="runBtn" onclick="runEditor()">Run</button>
     <button onclick="clearLog()">Clear log</button>
   </div>
 
   <div id="tab-whisper" class="tab-panel">
-    <label>Input file: <input type="file" id="whisperFileInput"></label><br>
-    <label>Model file: <input type="file" id="whisperModel" accept=".bin"></label><br>
+    <label>Input file: <input type="file" id="whisperFileInput"> <span id="whisperFileSize" class="tiny notice"></span></label><br>
+    <label>Model file: <input type="file" id="whisperModel" accept=".bin"> <span id="whisperModelSize" class="tiny notice"></span></label><br>
     <label>Arguments: <input type="text" id="whisperArgs" value="" size="40"></label><br>
     <button id="whisperRunBtn" onclick="runWhisper()">Run</button>
     <button onclick="clearLog()">Clear log</button>
   </div>
 
   <div id="tab-info" class="tab-panel">
-    <label>Input file: <input type="file" id="infoFileInput"></label><br>
+    <label>Input file: <input type="file" id="infoFileInput"> <span id="infoFileSize" class="tiny notice"></span></label><br>
     <button id="infoRunBtn" onclick="runInfo()">Run</button>
     <button onclick="clearLog()">Clear log</button>
   </div>
@@ -104,7 +103,8 @@
     function clearLog() {
       document.getElementById('log').textContent = '';
       document.getElementById('downloadArea').replaceChildren();
-      if (downloadUrl) { URL.revokeObjectURL(downloadUrl); downloadUrl = null; }
+      for (const url of downloadUrls) URL.revokeObjectURL(url);
+      downloadUrls = [];
       progressLineActive = false;
       pendingOutput.length = 0;
       rafPending = false;
@@ -152,29 +152,45 @@
 
     function mb(n) { return (n / 1024 / 1024).toFixed(1); }
 
-    let downloadUrl = null;
-    function createDownload(data, name) {
-      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+    function bindSizeLabel(inputId, spanId) {
+      const inp = document.getElementById(inputId);
+      const span = document.getElementById(spanId);
+      inp.addEventListener('change', () => {
+        span.textContent = inp.files.length ? `(${mb(inp.files[0].size)} MB)` : '';
+      });
+    }
+    bindSizeLabel('fileInput', 'fileSize');
+    bindSizeLabel('whisperFileInput', 'whisperFileSize');
+    bindSizeLabel('whisperModel', 'whisperModelSize');
+    bindSizeLabel('infoFileInput', 'infoFileSize');
+
+    let downloadUrls = [];
+    function clearDownloads() {
+      for (const url of downloadUrls) URL.revokeObjectURL(url);
+      downloadUrls = [];
+      document.getElementById('downloadArea').replaceChildren();
+    }
+    function addDownload(data, name) {
       const blob = data instanceof Blob ? data : new Blob([data]);
-      downloadUrl = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      downloadUrls.push(url);
       const a = document.createElement('a');
-      a.href = downloadUrl;
+      a.href = url;
       a.download = name;
-      a.textContent = 'Download ' + name;
-      const area = document.getElementById('downloadArea');
-      area.replaceChildren(a);
+      a.textContent = `Download ${name} (${mb(blob.size)} MB)`;
+      a.style.display = 'block';
+      a.style.width = 'fit-content';
+      document.getElementById('downloadArea').appendChild(a);
     }
 
     async function runModule(btn, args, entries) {
       btn.disabled = true;
+      clearDownloads();
       try {
-        for (const {file} of entries)
-          handleOutput(`<wasm>load ${file.name} (${mb(file.size)} MB)</wasm>`);
-
         const buffers = await Promise.all(
           entries.map(({file}) => file.arrayBuffer().then(b => new Uint8Array(b)))
         );
-        handleOutput('<wasm>$ auto-editor ' + args.join(' ') + '</wasm>');
+        handleOutput('<wasm>auto-editor ' + args.join(' ') + '</wasm>');
 
         let resolve, reject;
         const done = new Promise((res, rej) => { resolve = res; reject = rej; });
@@ -210,32 +226,40 @@
 
     async function runEditor() {
       const fileEl = document.getElementById('fileInput');
-      const outputName = document.getElementById('outputName').value.trim();
-      const outputPath = '/' + outputName;
       const extraArgs = document.getElementById('argsInput').value.trim().split(/\s+/).filter(Boolean);
 
       const hasFile = fileEl.files.length > 0;
       const file = hasFile ? fileEl.files[0] : null;
-      const inputPath = hasFile ? '/input.' + file.name.split('.').pop() : null;
+      const inputPath = hasFile ? '/' + file.name : null;
 
-      const args = [
-        ...(inputPath ? [inputPath] : []),
-        ...extraArgs,
-        ...(outputName ? ['-o', outputPath] : []),
-      ];
+      const args = [...(inputPath ? [inputPath] : []), ...extraArgs];
       const inputFiles = inputPath ? [{ file, path: inputPath }] : [];
 
       const mod = await runModule(document.getElementById('runBtn'), args, inputFiles);
-      if (!mod || !outputName) return;
-      let outData;
-      try {
-        outData = mod.FS.readFile(outputPath);
-      } catch (e) {
-        handleOutput('<wasm>could not read output file: ' + e + '</wasm>');
+      if (!mod) return;
+
+      // Scan FS root for anything auto-editor wrote and offer downloads.
+      const skip = new Set(['tmp', 'home', 'dev', 'proc']);
+      const inputSet = new Set(inputFiles.map(e => e.path));
+      const outputs = [];
+      for (const name of mod.FS.readdir('/')) {
+        if (name === '.' || name === '..' || skip.has(name)) continue;
+        const path = '/' + name;
+        if (inputSet.has(path)) continue;
+        let st;
+        try { st = mod.FS.stat(path); } catch (e) { continue; }
+        if (mod.FS.isFile(st.mode)) outputs.push({name, path});
+      }
+      if (outputs.length === 0) {
+        handleOutput('<wasm>no output files produced</wasm>');
         return;
       }
-      handleOutput('<wasm>output size: ' + mb(outData.byteLength) + ' MB</wasm>');
-      createDownload(outData, outputName);
+      for (const {name, path} of outputs) {
+        let data;
+        try { data = mod.FS.readFile(path); }
+        catch (e) { handleOutput('<wasm>could not read ' + path + ': ' + e + '</wasm>'); continue; }
+        addDownload(data, name);
+      }
     }
 
     async function runWhisper() {
@@ -244,7 +268,7 @@
       if (!fileEl.files.length) { handleOutput('No file selected.'); return; }
       if (!modelEl.files.length) { handleOutput('No model file selected.'); return; }
       const file = fileEl.files[0];
-      const inputPath = '/input.' + file.name.split('.').pop();
+      const inputPath = '/' + file.name;
       const extraArgs = document.getElementById('whisperArgs').value.trim().split(/\s+/).filter(Boolean);
 
       const mod = await runModule(
@@ -256,14 +280,14 @@
 
       handleOutput('Done.');
       const transcript = document.getElementById('log').textContent;
-      createDownload(new Blob([transcript], {type: 'text/plain'}), file.name.replace(/\.[^.]+$/, '') + '.txt');
+      addDownload(new Blob([transcript], {type: 'text/plain'}), file.name.replace(/\.[^.]+$/, '') + '.txt');
     }
 
     async function runInfo() {
       const fileEl = document.getElementById('infoFileInput');
       if (!fileEl.files.length) { handleOutput('No file selected.'); return; }
       const file = fileEl.files[0];
-      const inputPath = '/input.' + file.name.split('.').pop();
+      const inputPath = '/' + file.name;
 
       await runModule(
         document.getElementById('infoRunBtn'),
