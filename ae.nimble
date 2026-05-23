@@ -717,7 +717,7 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
   enableEncoders &= basicPcms()
   enableEncoders &= "pcm_bluray,pcm_s32le_planar,pcm_s24le_planar,pcm_s16be_planar,pcm_s16le_planar,pcm_s8_planar".split(",")
 
-  var enableMuxers: seq[string] = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,mpegts,sox,flac,spdif,flv,obu,srt,gif,oga,w64,h263,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
+  var enableMuxers: seq[string] = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,matroska_audio,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,mpegts,sox,flac,spdif,flv,obu,srt,gif,oga,w64,h263,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
   enableMuxers &= basicPcms()
 
   let enableDemuxers = enableMuxers
