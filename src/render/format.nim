@@ -92,7 +92,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   var options: Table[string, string]
   var movFlags: seq[string] = @[]
   if args.fragmented and not args.noFragmented:
-    movFlags &= @["default_base_moof", "frag_keyframe", "separate_moof"]
+    movFlags &= @["empty_moov", "default_base_moof", "frag_keyframe", "separate_moof"]
     options["frag_duration"] = "0.2"
     if args.faststart:
       warning "Fragmented is enabled, will not apply faststart."
