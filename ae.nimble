@@ -85,8 +85,6 @@ task cleanff, "Clean build files":
 
 
 var disableDecoders: seq[string] = @[]
-var disableDemuxers: seq[string] = @[]
-var disableMuxers: seq[string] = @[]
 var disableParsers: seq[string] = @[]
 
 # Can only decode (ambiguous encoder), Video [A-C]
@@ -116,30 +114,18 @@ disableDecoders &= "adpcm_adx,adpcm_argo,adpcm_g722,adpcm_g726,adpcm_g726le,adpc
 
 # Technically obsolute
 disableDecoders &= "alias_pix,apac,ape,atrac1,atrac3,atrac3al,atrac3p,atrac3pal,atrac9,asv1,asv2,avrp,bmp,ccaption,cinepak,cljr,cllc,comfortnoise,dpx,eacmv,eamad,eatgq,eatgv,eatqi,eightbps,eightsvx_exp,eightsvx_fib,ffvhuff,ffwavesynth,flv,g723_1,g726,g726le,g728,g729,hnm4_video,huffyuv,ircam,jacosub,magicyuv,nellymoser,on2avc,pam,pbm,pcm_vidc,pgmyuv,pjs,qtrle,ra_144,roq,roq_dpcm,rpza,r10k,r210,sgi,speedhq,speex,smacker,smc,snow,sonic,sonic_ls,subrip,utvideo,v210,v308,v408,v410,wbmp,wrapped_avframe,ws_snd1,wsaud,xbm,xface,xsub,xwd,y41p,yuv4".split(",")
-disableMuxers &= "adx,amv,cavsvideo,daud,dirac,f4v,g722,g723_1,g726,g726le,gxf,ircam,ivf,jacosub,kvag,mcc,mxf,mxf_d10,mxf_opatom,nut,pcm_vidc,rm,roq,rso,segafilm,sup,swf,truehd,ttml,vc1,vc1t,voc,wsaud,wtv,wv".split(",")
-disableDemuxers &= "a64,adx,alp,ape,apm,bethsoftvid,bink,binka,bonk,cavsvideo,daud,dirac,dsicin,dxa,g722,g723_1,g726,g726le,g728,g729,gxf,ircam,ivf,jacosub,kux,kvag,live_flv,mcc,mm,mxf,nistsphere,nut,pcm_vidc,pjs,pp_bnk,redspark,rm,roq,rso,sdns,segafilm,smush,smacker,swf,tedcaptions,thp,vc1,vc1t,vmd,voc,wsaud,wtv,xa,xmd,xmv,xvag,xwma,yop".split(",")
-disableParsers &= "bmp,cavsvideo,cook,dpx,g723_1,g729,misc4,sipr,tak,xbm,xma,xwd".split(",")
 
-disableDemuxers &= ["pcm_alaw", "pcm_mulaw"]
-disableMuxers &= ["pcm_alaw", "pcm_mulaw"]
 disableDecoders &= ["pcm_alaw", "pcm_mulaw"]
 
-## h26 whatever
-disableDemuxers &= ["h261", "vvc"]
-disableMuxers &= ["h261", "rtp", "rtp_mpegts", "vvc"]
-disableDecoders &= ["h261"]
-disableParsers &= ["h261", "vvc"]
-
-disableDecoders.add "opus"  # We use libopus
+disableDecoders &= ["h261", "opus"]  # We use libopus
 
 # Irrelevant to this project
 disableDecoders &= "cc_dec,dirac,fits,jpeg2000,jpegls,mpl2,msrle,pgssub,qoi,sami,subviewer,subviewer1,sunrast,targa,tiff".split(",")
-disableMuxers &= "filmstrip,fits,framecrc,framehash,framemd5,hash,hls,ico,image2,image2pipe,md5,rawvideo,segment,smoothstreaming,stream_segment,streamhash,tee,uncodedframecrc".split(",")
-disableDemuxers &= "filmstrip,fits,hls,ico,image_tiff_pipe,image_svg_pipe,image2,image2pipe,jpegxl_anim,vplayer".split(",")
+
+disableParsers &= "bmp,cavsvideo,cook,dpx,g723_1,g729,misc4,sipr,tak,xbm,xma,xwd".split(",")
+
+disableParsers &= ["h261", "vvc"]
 disableParsers &= "adx,dirac,jpeg2000,jpegxs,qoi,vc1".split(",")
-
-disableDemuxers &= "image_bmp_pipe,image_cri_pipe,image_dds_pipe,image_dpx_pipe,image_exr_pipe,image_gem_pipe,image_gif_pipe,image_hdr_pipe,image_j2k_pipe,image_jpeg_pipe,image_jpegls_pipe,image_jpegxl_pipe,image_jpegxs_pipe,image_pam_pipe,image_pbm_pipe,image_pcx_pipe,image_pfm_pipe,image_pgm_pipe,image_pgmyuv_pipe,image_pgx_pipe,image_phm_pipe,image_photocd_pipe,image_pictor_pipe,image_png_pipe,image_ppm_pipe,image_psd_pipe,image_qdraw_pipe,image_qoi_pipe,image_sgi_pipe,image_sunrast_pipe,image_vbn_pipe,image_webp_pipe,image_xbm_pipe,image_xpm_pipe,image_xwd_pipe".split(",")
-
 
 type Package = object
   name: string
@@ -716,16 +702,25 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
               makeInstall()
   return packages
 
+
+func basicPcms(): seq[string] =
+  result.add "pcm_f32be,pcm_f32le,pcm_f64be,pcm_f64le".split(",")
+  for t in ["s", "u"]:
+    result.add &"pcm_{t}8"
+    for size in ["16", "24", "32", "64"]:
+      if t == "u" and size == "64": continue
+      result.add &"pcm_{t}{size}le"
+
 proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string =
   var enableEncoders: seq[string] = "aac,aac_fixed,ac3,ac3_fixed,alac,ass,cfhd,dvbsub,dvdsub,dvvideo,ffv1,flac,gif,h263,h263p,hdr,libmp3lame,libopus,libx264,libx264rgb,movtext,mp2,mp2fixed,mpeg1video,mpeg2video,mpeg4,prores,prores_aw,prores_ks,srt,ssa,text,vorbis,webvtt".split(",")
 
-  enableEncoders.add "pcm_f16le,pcm_f24le,pcm_f32be,pcm_f32le,pcm_f64be,pcm_f64le".split(",")
-  for t in ["s", "u"]:
-    enableEncoders.add &"pcm_{t}8"
-    for size in ["16", "24", "32", "64"]:
-      if t == "u" and size == "64": continue
-      enableEncoders.add &"pcm_{t}{size}le"
+  enableEncoders &= basicPcms()
   enableEncoders &= "pcm_bluray,pcm_s32le_planar,pcm_s24le_planar,pcm_s16be_planar,pcm_s16le_planar,pcm_s8_planar".split(",")
+
+  var enableMuxers: seq[string] = "ac3,latm,adts,lrc,aiff,m4v,asf,matroska,ass,ast,mov,au,mp2,avi,mp3,avif,mp4,mpeg1system,caf,mpeg1video,mpeg2dvd,dv,mpeg2video,psp,mpegts,sox,flac,spdif,flv,obu,srt,gif,oga,w64,h263,ogg,wav,h264,ogv,webm,hevc,oma,iamf,opus,ipod,webvtt,ismv".split(",")
+  enableMuxers &= basicPcms()
+
+  let enableDemuxers = enableMuxers
 
   var filters = "scale,crop,pad,format,gblur,hflip,lut,negate,vflip,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume,loudnorm,asetrate".split(",")
 
@@ -765,11 +760,13 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
   --enable-protocol=file \
   --disable-filters \
   --enable-filter={filters.join(",")} \
+  --disable-decoder={disableDecoders.join(",")} \
   --disable-encoders \
   --enable-encoder={enableEncoders.join(",")} \
-  --disable-decoder={disableDecoders.join(",")} \
-  --disable-demuxer={disableDemuxers.join(",")} \
-  --disable-muxer={disableMuxers.join(",")} \
+  --disable-demuxers \
+  --enable-demuxer={enableDemuxers.join(",")} \
+  --disable-muxers \
+  --enable-muxer={enableMuxers.join(",")} \
   --disable-parser={disableParsers.join(",")} \
 """
 
