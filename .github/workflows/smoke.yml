@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Cache tarballs
         id: cache-tarballs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ffmpeg_sources
           key: tarballs-${{ hashFiles('ae.nimble') }}
