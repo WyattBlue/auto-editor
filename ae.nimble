@@ -48,7 +48,7 @@ proc stripProgram(kind: CrossKind = native) =
   of llvmWin:
     exec "llvm-strip -s " & file
   of armv7:
-    discard
+    exec "arm-linux-gnueabihf-strip -s " & file
   of native:
     when defined(macosx):
       exec "strip -ur " & file
@@ -947,9 +947,7 @@ task makearmv7, "Cross-compile to Linux ARMv7 (requires arm-linux-gnueabihf tool
          "--passC:-march=armv7-a --passC:-mfpu=neon-vfpv3 --passC:-mfloat-abi=hard " &
          "--passL:-static " &
          "--out:auto-editor src/main.nim"
-    exec "arm-linux-gnueabihf-strip -s auto-editor"
-    exec "stat -c \"%s bytes\" ./auto-editor"
-    echo ""
+    stripProgram(armv7)
 
 
 proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm32) =
