@@ -43,7 +43,7 @@ else:
     switch("passL", "-sEXIT_RUNTIME=1")
     switch("passL", "-sMODULARIZE=1")
     switch("passL", "-sEXPORT_NAME=AutoEditor")
-    switch("passL", "-sEXPORTED_RUNTIME_METHODS=[FS]")
+    switch("passL", "-sEXPORTED_RUNTIME_METHODS=[FS,ENV]")
     switch("passL", "-sENVIRONMENT=web,worker")
 
     when hostCPU == "wasm32":
