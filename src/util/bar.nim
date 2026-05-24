@@ -46,6 +46,8 @@ type
     progress: Atomic[float]
     total: Atomic[float]
     shouldStop: Atomic[bool]
+    paused: Atomic[bool]   # set by end() to halt writes
+    sleeping: Atomic[bool] # set by worker to acknowledge it isn't writing
     title: string
     lenTitle: int
     begin: float
@@ -96,6 +98,13 @@ proc progressWorker(data: ThreadData) {.thread.} =
   var columns = terminalWidth()
 
   while not data.shouldStop.load():
+    if data.paused.load():
+      data.sleeping.store(true)
+      sleep(sleepRate)
+      continue
+
+    data.sleeping.store(false)
+
     when not defined(windows) and not defined(emscripten):
       if termResized.load():
         columns = terminalWidth()
@@ -105,6 +114,7 @@ proc progressWorker(data: ThreadData) {.thread.} =
 
     let currentProgress = data.progress.load()
     if currentProgress == lastProgress:
+      data.sleeping.store(true)
       sleep(sleepRate)
       continue
 
@@ -172,6 +182,7 @@ proc initBar*(barType: BarType): Bar =
       signal(SIGWINCH, sigwinchHandler)
     result.threadData = ThreadData(config: addr result.config)
     result.threadData.shouldStop.store(false)
+    result.threadData.paused.store(true) # start() unpauses; prevents writes before first bar
     createThread(result.progressThread, progressWorker, result.threadData)
 
 
@@ -201,11 +212,19 @@ proc start*(bar: Bar, total: float, title: string) =
   bar.threadData.total.store(total)
   bar.threadData.progress.store(0.0)
   bar.threadData.begin = epochTime()
+  bar.threadData.sleeping.store(false)
+  bar.threadData.paused.store(false)
 
 proc `end`*(bar: Bar) =
-  let columns = terminalWidth()
-  stdout.write(" ".repeat(max(0, columns - 2)) & "\r")
-  stdout.flushFile()
+  if not bar.hide:
+    bar.threadData.paused.store(true)
+    # Wait for the worker to observe the pause before clearing, so it can't
+    # re-draw the bar after we wipe the line.
+    while not bar.threadData.sleeping.load():
+      sleep(1)
+    let columns = terminalWidth()
+    stdout.write(" ".repeat(max(0, columns - 2)) & "\r")
+    stdout.flushFile()
   if bar.stack.len > 0:
     bar.stack.setLen(bar.stack.len - 1)
 
