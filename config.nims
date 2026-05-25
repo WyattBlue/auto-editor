@@ -68,9 +68,9 @@ if not defined(dynamic):
     switch("passL", "-lvpx")
   if enableSvtav1:
     switch("passL", "-lSvtAv1Enc")
+  if enableHevc:
+    switch("passL", "-lx265")
   when not defined(emscripten):
-    if enableHevc:
-      switch("passL", "-lx265")
     if enableVpl and not (hostCPU == "arm64" and hostOS == "windows") and
         not (hostCPU == "arm" and hostOS == "linux"):
       switch("passL", "-lvpl")

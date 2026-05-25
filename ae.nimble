@@ -232,9 +232,10 @@ let ffmpeg = Package(
 proc selectPackages(kind: CrossKind = native): seq[Package] =
   result = @[]
   let isMacNative = defined(macosx) and kind == native
-  if kind != armv7 and kind != llvmWin and not isMacNative:
+  let isWasm = kind == wasm32 or kind == wasm64
+  if kind != armv7 and kind != llvmWin and not isMacNative and not isWasm:
     result.add nvheaders
-  if enableVpl and kind != llvmWin and kind != armv7:
+  if enableVpl and kind != llvmWin and kind != armv7 and not isWasm:
     result.add libvpl
   if enableWhisper:
     result.add whisper
@@ -517,6 +518,10 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   if fileExists(buildPath / "lib" / "pkgconfig" / "x265.pc"):
     return
 
+  let isWasm = kind == wasm32 or kind == wasm64
+  let cmakePrefix = if isWasm: "emcmake cmake" else: "cmake"
+  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
+
   let sourceDir = absolutePath("source")
   let pkgDir = buildPath / "pkg"
   let dir12bit = pkgDir / "x265_12bit"
@@ -532,7 +537,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   ]
   let isLinuxAarch64 = hostOS == "linux" and hostCPU == "arm64"
 
-  if hostCPU != "amd64" or kind == llvmWin:
+  if hostCPU != "amd64" or kind == llvmWin or isWasm:
     highBitDepthArgs.add("-DENABLE_ASSEMBLY=0")
 
   if isLinuxAarch64:
@@ -543,6 +548,12 @@ proc x265Build(buildPath: string, kind: CrossKind) =
     "-DCMAKE_BUILD_TYPE=Release",
     "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
   ]
+
+  if isWasm:
+    commonArgs.add(&"\"-DCMAKE_C_FLAGS=-matomics -mbulk-memory -pthread{memArg}\"")
+    commonArgs.add(&"\"-DCMAKE_CXX_FLAGS=-matomics -mbulk-memory -pthread{memArg}\"")
+    if kind == wasm64:
+      commonArgs.add("\"-DCMAKE_EXE_LINKER_FLAGS=-sMEMORY64=1\"")
 
   if kind == llvmWin:
     let toolchainFile = buildPath.parentDir / "scripts" / "aarch64-w64-mingw32.cmake"
@@ -556,7 +567,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   if enable12bit:
     echo "Building x265 12-bit..."
     var cmake12Args = @["-S", sourceDir, "-B", dir12bit, "-DMAIN12=ON"] & highBitDepthArgs & commonArgs
-    let cmake12Cmd = "cmake " & cmake12Args.join(" ")
+    let cmake12Cmd = cmakePrefix & " " & cmake12Args.join(" ")
     echo "RUN: ", cmake12Cmd
     exec cmake12Cmd
     exec &"cmake --build {dir12bit}"
@@ -566,7 +577,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   echo "Building x265 10-bit..."
   var cmake10Args = @["-S", sourceDir, "-B", dir10bit] & highBitDepthArgs & commonArgs
   # Not applied for size: "-DENABLE_HDR10_PLUS=ON"
-  let cmake10Cmd = "cmake " & cmake10Args.join(" ")
+  let cmake10Cmd = cmakePrefix & " " & cmake10Args.join(" ")
   echo "RUN: ", cmake10Cmd
   exec cmake10Cmd
   exec &"cmake --build {dir10bit}"
@@ -580,7 +591,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   cpFile(dir10bit / "libx265_main10.a", dir8bit / "libx265_main10.a")
 
   # Build cmake command
-  var cmake8Cmd = &"cmake -S {sourceDir} -B {dir8bit}"
+  var cmake8Cmd = &"{cmakePrefix} -S {sourceDir} -B {dir8bit}"
   if enable12bit:
     # Copy 12-bit library and configure for 12-bit support
     cpFile(dir12bit / "libx265_main12.a", dir8bit / "libx265_main12.a")
@@ -593,6 +604,8 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   cmake8Cmd &= " -DLINKED_10BIT=1"
   cmake8Cmd &= " -DENABLE_SHARED=0"
   cmake8Cmd &= " -DENABLE_CLI=0"
+  if isWasm:
+    cmake8Cmd &= " -DENABLE_ASSEMBLY=0"
   for arg in commonArgs:
     cmake8Cmd &= " " & arg
 
@@ -605,7 +618,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
 
   # Manually combine libraries for multi-bit-depth support
   echo "Combining x265 libraries for multi-bit-depth support..."
-  when defined(macosx):
+  if defined(macosx) and not isWasm:
     if enable12bit:
       exec &"libtool -static -o {dir8bit}/libx265_combined.a {dir8bit}/libx265.a {dir10bit}/libx265_main10.a {dir12bit}/libx265_main12.a"
     else:
@@ -615,6 +628,7 @@ proc x265Build(buildPath: string, kind: CrossKind) =
       case kind
       of llvmWin: "llvm-ar"
       of gccWin: "x86_64-w64-mingw32-ar"
+      of wasm32, wasm64: "emar"
       else: "ar"
     )
     withDir dir8bit:
@@ -633,12 +647,41 @@ proc x265Build(buildPath: string, kind: CrossKind) =
   # Install from 8bit build
   exec &"cmake --install {dir8bit}"
 
+proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm32) =
+  let sourceDir = absolutePath(".")
+  let autoBuildDir = buildPath / "pkg" / package.name
+  mkDir(autoBuildDir)
+  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
+  let ldFlags = if kind == wasm64: "-sMEMORY64=1" else: ""
+  let x264Host = if kind == wasm64: "x86_64-gnu" else: "i686-gnu"
+  withDir autoBuildDir:
+    case package.name
+    of "x264":
+      if not fileExists("config.mak"):
+        exec &"""CFLAGS="-matomics -mbulk-memory{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --host={x264Host} --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
+      exec "emmake make -j4"
+      exec "make install"
+    of "libvpx":
+      if not fileExists("Makefile"):
+        exec &"""LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory{memArg}" """
+      makeInstall()
+    else:
+      # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
+      let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
+      if not fileExists("Makefile"):
+        let args = (package.buildArguments & extraArgs).join(" ")
+        exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory{memArg}" LDFLAGS="{ldFlags}" """
+      makeInstall()
+
 proc ffmpegSetup(buildPath: string): seq[Package] =
   let kind =
     if buildPath.endsWith("_winarm"): llvmWin
     elif buildPath.endsWith("_win"): gccWin
     elif buildPath.endsWith("_armv7"): armv7
+    elif buildPath.endsWith("_wasm64"): wasm64
+    elif buildPath.endsWith("_wasm"): wasm32
     else: native
+  let isWasm = kind == wasm32 or kind == wasm64
   let packages = selectPackages(kind)
 
   mkDir("ffmpeg_sources")
@@ -651,11 +694,16 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
 
       withDir package.name:
         if package.buildSystem == "cmake":
-          cmakeBuild(package, buildPath, kind)
+          if isWasm:
+            cmakeBuildWasm(package, buildPath, kind)
+          else:
+            cmakeBuild(package, buildPath, kind)
         elif package.buildSystem == "meson":
           mesonBuild(package, buildPath, kind)
         elif package.buildSystem == "x265":
           x265Build(buildPath, kind)
+        elif isWasm:
+          autoconfBuildWasm(package, buildPath, kind)
         else:
           # Special handling for nv-codec-headers which doesn't use configure
           if package.name == "nv-codec-headers":
@@ -950,49 +998,12 @@ task makearmv7, "Cross-compile to Linux ARMv7 (requires arm-linux-gnueabihf tool
     stripProgram(armv7)
 
 
-proc autoconfBuildWasm(package: Package, buildPath: string, kind: CrossKind = wasm32) =
-  let sourceDir = absolutePath(".")
-  let autoBuildDir = buildPath / "pkg" / package.name
-  mkDir(autoBuildDir)
-  let memArg = if kind == wasm64: " -sMEMORY64=1" else: ""
-  let ldFlags = if kind == wasm64: "-sMEMORY64=1" else: ""
-  let x264Host = if kind == wasm64: "x86_64-gnu" else: "i686-gnu"
-  withDir autoBuildDir:
-    case package.name
-    of "x264":
-      if not fileExists("config.mak"):
-        exec &"""CFLAGS="-matomics -mbulk-memory{memArg}" LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --host={x264Host} --enable-static --disable-cli --disable-asm --disable-lsmash --disable-swscale --disable-ffms --extra-cflags="-s USE_PTHREADS=1" """
-      exec "emmake make -j4"
-      exec "make install"
-    of "libvpx":
-      if not fileExists("Makefile"):
-        exec &"""LDFLAGS="{ldFlags}" emconfigure {sourceDir}/configure --prefix="{buildPath}" --target=generic-gnu --disable-dependency-tracking --disable-runtime-cpu-detect --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --extra-cflags="-matomics -mbulk-memory{memArg}" """
-      makeInstall()
-    else:
-      # lame, opus — use package.buildArguments; opus also needs --disable-rtcd
-      let extraArgs = if package.name == "opus": @["--disable-rtcd"] else: @[]
-      if not fileExists("Makefile"):
-        let args = (package.buildArguments & extraArgs).join(" ")
-        exec &"""emconfigure {sourceDir}/configure --prefix="{buildPath}" --enable-static --disable-shared {args} CFLAGS="-matomics -mbulk-memory{memArg}" LDFLAGS="{ldFlags}" """
-      makeInstall()
-
 proc buildFFmpegForWasm(buildPath: string, kind: CrossKind) =
   setupDeps()
   putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
-  mkDir("ffmpeg_sources")
   mkDir(buildPath)
 
-  let wasmPackages = @[ffmpeg, lame, x264, opus, dav1d, vpx, whisper, svtav1]
-  for package in wasmPackages:
-    withDir "ffmpeg_sources":
-      package.download()
-      package.extract()
-    if package.name == "ffmpeg": continue
-    withDir &"ffmpeg_sources/{package.name}":
-      case package.buildSystem
-      of "cmake": cmakeBuildWasm(package, buildPath, kind)
-      of "meson": mesonBuild(package, buildPath, kind)
-      else: autoconfBuildWasm(package, buildPath, kind)
+  let packages = ffmpegSetup(buildPath)
 
   # lame ships no .pc file; create one so FFmpeg's configure can find it
   mkDir(buildPath / "lib" / "pkgconfig")
@@ -1030,7 +1041,7 @@ Cflags: -I${{includedir}}
       --disable-w32threads \
       --disable-os2threads \
       --extra-cflags="-I{buildPath}/include -matomics -mbulk-memory -pthread{memArg}" \
-      --extra-ldflags="-L{buildPath}/lib -matomics -mbulk-memory -pthread{memArg}" \""" & "\n" & setupCommonFlags(wasmPackages, kind))
+      --extra-ldflags="-L{buildPath}/lib -matomics -mbulk-memory -pthread{memArg}" \""" & "\n" & setupCommonFlags(packages, kind))
     makeInstall()
 
 task makeffwasm, "Build FFmpeg for WebAssembly (requires emscripten)":
