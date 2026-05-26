@@ -4,6 +4,7 @@ type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actInvert, actZoom, actHflip, actVflip
 
+  # Represents a full-sized action.
   Action* = object
     case kind*: ActionKind
     of actInvert, actHflip, actVflip:
@@ -11,7 +12,9 @@ type
     of actSpeed, actVarispeed, actVolume, actZoom:
       val*: float32
 
-  Actions* = distinct int # A fat pointer to a list of Action(s).
+  Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
+
+  # atf-8: store actions in as small a space as possible, inspirited by utf-8.
 
   ActionParseError* = object of CatchableError
 
@@ -95,20 +98,34 @@ when not defined(nimscript):
     of actVolume: "volume:" & $act.val
     of actZoom: "zoom:" & $act.val
 
-  func len*(a: Actions): int =
-    if int(a) <= 1: 0
-    else: int(cast[ptr int32](int(a))[])
+  func actionByteSize(kind: ActionKind): int =
+    case kind
+    of actInvert, actHflip, actVflip: 1
+    of actSpeed, actVarispeed, actVolume, actZoom: 5
 
-  func `[]`*(a: Actions, i: int): Action =
-    let base = cast[ptr UncheckedArray[Action]](int(a) + sizeof(int32))
-    base[i]
+  func len*(a: Actions): int =  # byte length
+    if int(a) <= 1: 0
+    else: int(cast[ptr uint16](int(a))[])
 
   iterator items*(a: Actions): Action =
     if int(a) > 1:
       let n = a.len
-      let base = cast[ptr UncheckedArray[Action]](int(a) + sizeof(int32))
-      for i in 0 ..< n:
-        yield base[i]
+      let base = cast[ptr UncheckedArray[uint8]](int(a) + sizeof(uint16))
+      var i = 0
+      while i < n:
+        let kind = cast[ActionKind](base[i])
+        case kind
+        of actInvert, actHflip, actVflip:
+          yield Action(kind: kind)
+          i += 1
+        of actSpeed, actVarispeed, actVolume, actZoom:
+          var v: float32
+          copyMem(addr v, addr base[i + 1], sizeof(float32))
+          yield Action(kind: kind, val: v)
+          i += 5
+
+  func actionLen*(a: Actions): int =  # O(n)
+    for _ in a: inc result
 
   func `==`*(a, b: Actions): bool =
     let ia = int(a)
@@ -117,18 +134,31 @@ when not defined(nimscript):
     if ia <= 1 or ib <= 1: return false
     let n = a.len
     if n != b.len: return false
-    let pa = cast[ptr UncheckedArray[Action]](ia + sizeof(int32))
-    let pb = cast[ptr UncheckedArray[Action]](ib + sizeof(int32))
+    let pa = cast[ptr UncheckedArray[uint8]](ia + sizeof(uint16))
+    let pb = cast[ptr UncheckedArray[uint8]](ib + sizeof(uint16))
     for i in 0 ..< n:
       if pa[i] != pb[i]: return false
     true
 
   proc newActions*(list: openArray[Action]): Actions =
     if list.len == 0: return aNil
-    let p = alloc(sizeof(int32) + list.len * sizeof(Action))
-    cast[ptr int32](p)[] = int32(list.len)
-    let base = cast[ptr UncheckedArray[Action]](cast[int](p) + sizeof(int32))
-    for i, a in list: base[i] = a
+    var total = 0
+    for a in list: total += actionByteSize(a.kind)
+    if total > 65535:
+      raise newException(ActionParseError, "atf-8 buffer overflow: too many actions")
+    let p = alloc(sizeof(uint16) + total)
+    cast[ptr uint16](p)[] = uint16(total)
+    let base = cast[ptr UncheckedArray[uint8]](cast[int](p) + sizeof(uint16))
+    var i = 0
+    for a in list:
+      base[i] = uint8(ord(a.kind))
+      case a.kind
+      of actInvert, actHflip, actVflip:
+        i += 1
+      of actSpeed, actVarispeed, actVolume, actZoom:
+        var v = a.val
+        copyMem(addr base[i + 1], addr v, sizeof(float32))
+        i += 5
     Actions(cast[int](p))
 
   proc parseActions*(val: string): Actions =
