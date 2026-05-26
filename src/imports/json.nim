@@ -36,30 +36,36 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Ac
     result.effects = uint32(effectIndex)
 
 proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
-  var tb: AVRational
-  try:
-    tb = jsonNode["timebase"].getStr()
-  except ValueError as e:
-    error(e.msg)
-
-  result.tb = jsonNode["timebase"].getStr()
-
-  if not jsonNode.hasKey("samplerate") or not jsonNode.hasKey("background"):
-    error("sr/bg bad structure")
-
+  result.tb = (
+    try: jsonNode["timebase"].getStr()
+    except ValueError as e: error e.msg
+  )
+  if not jsonNode.hasKey("samplerate"):
+    error "Expected 'samplerate' key to exist"
   result.sr = jsonNode["samplerate"].getInt().cint
-  result.bg = parseColor(jsonNode["background"].getStr())
 
-  if not jsonNode.hasKey("resolution") or jsonNode["resolution"].kind != JArray:
-    error("'resolution' has bad structure")
+  if not jsonNode.hasKey("background"):
+    error "Expected 'background' key to exist"
+  if jsonNode["background"].kind != JString:
+    error "Expected 'background' key to be a string"
+  result.bg = (
+    try: parseColor(jsonNode["background"].getStr())
+    except ValueError as e: error e.msg
+  )
 
+  if not jsonNode.hasKey("layout"):
+    error "Expected 'layout' key to exist"
   result.layout = initLayout(jsonNode["layout"].getStr())
 
+  if not jsonNode.hasKey("resolution"):
+    error "Expected 'resolution' to exist"
+  if jsonNode["resolution"].kind != JArray:
+    error "Expected 'resolution' to be an array"
   let resArray = jsonNode["resolution"]
   if resArray.len >= 2:
     result.res = (resArray[0].getInt().int32, resArray[1].getInt().int32)
   else:
-    result.res = (1920'i32, 1080'i32)
+    error "Expected two elements in 'resolution' key"
 
   result.effects = @[]
 
