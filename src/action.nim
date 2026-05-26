@@ -2,14 +2,15 @@ import std/[options, strutils]
 
 type
   ActionKind* = enum
-    actSpeed, actVarispeed, actVolume, actInvert, actZoom, actHflip, actVflip
+    actSpeed, actVarispeed, actVolume, actInvert, actZoom, actHflip, actVflip,
+    actOpacity
 
   # Represents a full-sized action.
   Action* = object
     case kind*: ActionKind
     of actInvert, actHflip, actVflip:
       discard
-    of actSpeed, actVarispeed, actVolume, actZoom:
+    of actSpeed, actVarispeed, actVolume, actZoom, actOpacity:
       val*: float32
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
@@ -48,13 +49,15 @@ Adjust the audio volume by a factor of val. 1.0 = normal, 0.5 = half (-6dB), 2.0
     help: "Flip the video section vertically."),
   ActionDef(name: "zoom", argSpec: "val: float", range: "(0-100]",
     help: "Zoom in or out by a factor of val. 1.0 = no zoom."),
+  ActionDef(name: "opacity", argSpec: "val: float", range: "[0.0-1.0]",
+    help: "Blend the video section against the background. 1.0 = fully opaque, 0.0 = fully transparent."),
 ]
 
 func `==`*(a, b: Action): bool =
   if a.kind != b.kind: return false
   case a.kind
   of actInvert, actHflip, actVflip: true
-  of actSpeed, actVarispeed, actVolume, actZoom: a.val == b.val
+  of actSpeed, actVarispeed, actVolume, actZoom, actOpacity: a.val == b.val
 
 
 const aNil* = Actions(0)
@@ -83,6 +86,7 @@ func parseAction*(val: string): Option[Action] =
     of "volume": return some(Action(kind: actVolume, val: effectVal))
     of "varispeed": return some(Action(kind: actVarispeed, val: effectVal))
     of "zoom": return some(Action(kind: actZoom, val: effectVal))
+    of "opacity": return some(Action(kind: actOpacity, val: effectVal))
     else: return none(Action)
 
   return none(Action)
@@ -97,11 +101,12 @@ when not defined(nimscript):
     of actVarispeed: "varispeed:" & $act.val
     of actVolume: "volume:" & $act.val
     of actZoom: "zoom:" & $act.val
+    of actOpacity: "opacity:" & $act.val
 
   func actionByteSize(kind: ActionKind): int =
     case kind
     of actInvert, actHflip, actVflip: 1
-    of actSpeed, actVarispeed, actVolume, actZoom: 5
+    of actSpeed, actVarispeed, actVolume, actZoom, actOpacity: 5
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -118,7 +123,7 @@ when not defined(nimscript):
         of actInvert, actHflip, actVflip:
           yield Action(kind: kind)
           i += 1
-        of actSpeed, actVarispeed, actVolume, actZoom:
+        of actSpeed, actVarispeed, actVolume, actZoom, actOpacity:
           var v: float32
           copyMem(addr v, addr base[i + 1], sizeof(float32))
           yield Action(kind: kind, val: v)
@@ -155,7 +160,7 @@ when not defined(nimscript):
       case a.kind
       of actInvert, actHflip, actVflip:
         i += 1
-      of actSpeed, actVarispeed, actVolume, actZoom:
+      of actSpeed, actVarispeed, actVolume, actZoom, actOpacity:
         var v = a.val
         copyMem(addr base[i + 1], addr v, sizeof(float32))
         i += 5

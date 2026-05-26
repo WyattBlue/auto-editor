@@ -222,6 +222,8 @@ jobs:
   wasm:
     needs: fan
     runs-on: macos-latest
+    env:
+      DISABLE_HEVC: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v6
