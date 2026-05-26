@@ -612,6 +612,29 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.push(frame)
             av_frame_free(addr frame)
             frame = fxGraph.pull()
+          elif effect.kind == actOpacity and effect.val != 1.0:
+            let o = effect.val
+            let bgR = (1.0 - o) * float(tl.bg.red)
+            let bgG = (1.0 - o) * float(tl.bg.green)
+            let bgB = (1.0 - o) * float(tl.bg.blue)
+            let frameFmtName = $AVPixelFormat(frame.format)
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            let key = &"opacity|{o}|{bg}|{bufferArgs}"
+            if fxKey != key:
+              if fxGraph != nil:
+                fxGraph.cleanup()
+              fxGraph = newGraph()
+              let bufferSrc = fxGraph.add("buffer", bufferArgs)
+              let toRgb = fxGraph.add("format", "pix_fmts=rgb24")
+              let lut = fxGraph.add("lutrgb",
+                &"r=val*{o}+{bgR}:g=val*{o}+{bgG}:b=val*{o}+{bgB}")
+              let toOrig = fxGraph.add("format", &"pix_fmts={frameFmtName}")
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(@[bufferSrc, toRgb, lut, toOrig, bufferSink]).configure()
+              fxKey = key
+            fxGraph.push(frame)
+            av_frame_free(addr frame)
+            frame = fxGraph.pull()
 
       # Validate frame before reformatting
       if frame != nil and (frame.width <= 0 or frame.height <= 0):
