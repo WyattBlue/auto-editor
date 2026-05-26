@@ -233,45 +233,9 @@ proc listAvailableFilters(): string =
 
 proc parseActions(val: string): Actions =
   try:
-    var list: seq[Action]
-    for part in val.strip().split(","):
-      let trimmedPart = part.strip()
-      if trimmedPart == "nil": discard
-      elif trimmedPart == "cut": return aCut
-      elif trimmedPart == "invert": list.add Action(kind: actInvert)
-      elif trimmedPart == "hflip": list.add Action(kind: actHflip)
-      elif trimmedPart == "vflip": list.add Action(kind: actVflip)
-      elif trimmedPart.startsWith("speed:"):
-        try:
-          let value = parseFloat(trimmedPart[6 ..< trimmedPart.len])
-          list.add Action(kind: actSpeed, val: value)
-        except ValueError:
-          error &"Invalid speed value in action: {trimmedPart}"
-      elif trimmedPart.startsWith("varispeed:"):
-        try:
-          let value = parseFloat(trimmedPart[10 ..< trimmedPart.len])
-          list.add Action(kind: actVarispeed, val: value)
-        except ValueError:
-          error &"Invalid varispeed value in action: {trimmedPart}"
-      elif trimmedPart.startsWith("volume:"):
-        try:
-          let value = parseFloat(trimmedPart[7 ..< trimmedPart.len])
-          list.add Action(kind: actVolume, val: value)
-        except ValueError:
-          error &"Invalid volume value in action: {trimmedPart}"
-      elif trimmedPart.startsWith("zoom:"):
-        try:
-          let value = parseFloat(trimmedPart[5 ..< trimmedPart.len])
-          if value <= 0.0:
-            error "zoom value must be greater than 0.0"
-          list.add Action(kind: actZoom, val: value)
-        except ValueError:
-          error &"Invalid zoom value in action: {trimmedPart}"
-      else:
-        error &"Invalid action: {trimmedPart}"
-    return newActions(list)
-  except Exception as e:
-    error &"Error parsing actions '{val}': {e.msg}"
+    return action.parseActions(val)
+  except ActionParseError as e:
+    error e.msg
 
 proc parseSpeed(val, opt: string): float64 =
   result = parseNum(val, opt)

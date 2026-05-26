@@ -1,27 +1,11 @@
-import std/[strformat, strutils, json]
+import std/[json, options, strformat]
 
 import ../[action, av, ffmpeg, media, log, timeline]
 import ../util/[color, lang, rational]
 
-proc parseAction(val: string): Action =
-  if val == "invert":
-    return Action(kind: actInvert)
-  if val == "hflip":
-    return Action(kind: actHflip)
-  if val == "vflip":
-    return Action(kind: actVflip)
-
-  let parts = val.split(":")
-  if parts.len == 2:
-    let effectType = parts[0]
-    let effectVal = parseFloat(parts[1])
-    case effectType
-    of "speed": return Action(kind: actSpeed, val: effectVal)
-    of "volume": return Action(kind: actVolume, val: effectVal)
-    of "varispeed": return Action(kind: actVarispeed, val: effectVal)
-    of "zoom": return Action(kind: actZoom, val: effectVal)
-    else: error &"unknown action: {effectType}"
-
+proc parseActionOrErr(val: string): Action =
+  let a = parseAction(val)
+  if a.isSome: return a.unsafeGet
   error &"unknown action: {val}"
 
 proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Actions]): Clip =
@@ -40,7 +24,7 @@ proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Ac
         group = aCut
         break
       elif effectStr != "nil":
-        list.add parseAction(effectStr)
+        list.add parseActionOrErr(effectStr)
     if group.isEmpty:
       group = newActions(list)
 
@@ -133,7 +117,7 @@ proc parseV2*(jsonNode: JsonNode, interner: var StringInterner): v3 =
             group = aCut
             break
           elif s != "nil":
-            list.add parseAction(s)
+            list.add parseActionOrErr(s)
         if group.isEmpty:
           group = newActions(list)
       else:

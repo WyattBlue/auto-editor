@@ -1,4 +1,4 @@
-import std/strutils
+import std/[options, strutils]
 
 type
   ActionKind* = enum
@@ -12,6 +12,8 @@ type
       val*: float32
 
   Actions* = distinct int # A fat pointer to a list of Action(s).
+
+  ActionParseError* = object of CatchableError
 
   ActionDef* = object
     name*: string
@@ -57,6 +59,30 @@ const aCut* = Actions(1)
 
 func isCut*(a: Actions): bool = int(a) == 1
 func isEmpty*(a: Actions): bool = int(a) == 0
+
+func parseAction*(val: string): Option[Action] =
+  if val == "invert":
+    return some(Action(kind: actInvert))
+  if val == "hflip":
+    return some(Action(kind: actHflip))
+  if val == "vflip":
+    return some(Action(kind: actVflip))
+
+  let parts = val.split(":")
+  if parts.len == 2:
+    let effectType = parts[0]
+    let effectVal = (
+      try: parseFloat(parts[1])
+      except ValueError: return none(Action)
+    )
+    case effectType
+    of "speed": return some(Action(kind: actSpeed, val: effectVal))
+    of "volume": return some(Action(kind: actVolume, val: effectVal))
+    of "varispeed": return some(Action(kind: actVarispeed, val: effectVal))
+    of "zoom": return some(Action(kind: actZoom, val: effectVal))
+    else: return none(Action)
+
+  return none(Action)
 
 when not defined(nimscript):
   func `$`*(act: Action): string =
@@ -104,6 +130,23 @@ when not defined(nimscript):
     let base = cast[ptr UncheckedArray[Action]](cast[int](p) + sizeof(int32))
     for i, a in list: base[i] = a
     Actions(cast[int](p))
+
+  proc parseActions*(val: string): Actions =
+    var list: seq[Action]
+    for part in val.strip().split(","):
+      let trimmedPart = part.strip()
+      if trimmedPart == "nil":
+        continue
+      if trimmedPart == "cut":
+        return aCut
+      let a = parseAction(trimmedPart)
+      if a.isNone:
+        raise newException(ActionParseError, "Invalid action: " & trimmedPart)
+      let action = a.unsafeGet
+      if action.kind == actZoom and action.val <= 0.0:
+        raise newException(ActionParseError, "zoom value must be greater than 0.0")
+      list.add action
+    return newActions(list)
 
   func `$`*(a: Actions): string =
     if a.isCut: return "cut"
