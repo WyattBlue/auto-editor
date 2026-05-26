@@ -612,6 +612,23 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.push(frame)
             av_frame_free(addr frame)
             frame = fxGraph.pull()
+          elif effect.kind == actBlur and effect.val > 0.0:
+            let sigma = effect.val
+            let frameFmtName = $AVPixelFormat(frame.format)
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            let key = &"blur|{sigma}|{bufferArgs}"
+            if fxKey != key:
+              if fxGraph != nil:
+                fxGraph.cleanup()
+              fxGraph = newGraph()
+              let bufferSrc = fxGraph.add("buffer", bufferArgs)
+              let filt = fxGraph.add("gblur", &"sigma={sigma}")
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+              fxKey = key
+            fxGraph.push(frame)
+            av_frame_free(addr frame)
+            frame = fxGraph.pull()
           elif effect.kind == actOpacity and effect.val != 1.0:
             let o = effect.val
             let bgR = (1.0 - o) * float(tl.bg.red)
