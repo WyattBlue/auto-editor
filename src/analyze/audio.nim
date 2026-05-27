@@ -127,6 +127,25 @@ proc readChunk(iter: AudioIterator): float32 =
         maxAbs = v
     return float32(maxAbs) / 32767.0'f32
 
+proc readPeaks(iter: AudioIterator): tuple[lo, hi: float32] =
+  let sizeWithError = iter.exactSize + iter.accumulatedError
+  let currentSize = round(sizeWithError).int
+  iter.accumulatedError = sizeWithError - float64(currentSize)
+
+  let samples = cast[ptr UncheckedArray[int16]](iter.readBuffer)
+  let samplesRead = av_audio_fifo_read(
+    iter.fifo, cast[pointer](addr iter.readBuffer), currentSize.cint
+  )
+  let totalSamples = samplesRead * iter.channelCount
+
+  var minV: int32 = 0
+  var maxV: int32 = 0
+  for i in 0 ..< totalSamples:
+    let v = int32(samples[i])
+    if v < minV: minV = v
+    if v > maxV: maxV = v
+  return (float32(minV) / 32768.0'f32, float32(maxV) / 32768.0'f32)
+
 proc flushResampler(iter: AudioIterator) =
   # Flush the resampler by passing nil frame
   let flushedFrames = iter.resampler.resample(nil)
@@ -138,6 +157,45 @@ proc flushResampler(iter: AudioIterator) =
       error "Could not write flushed data to FIFO"
     iter.totalSamplesWritten += flushedFrame.nb_samples
     av_frame_free(addr flushedFrame)
+
+iterator peaks*(processor: var AudioProcessor, container: InputContainer,
+    audioStream: ptr AVStream): tuple[startSample: int64, lo, hi: float32] =
+  var frame = av_frame_alloc()
+  if frame == nil:
+    error "Could not allocate frame"
+
+  defer:
+    av_frame_free(addr frame)
+    if processor.`iterator` != nil:
+      processor.`iterator`.cleanup()
+    avcodec_free_context(addr processor.codecCtx)
+
+  var firstSamplePos: int64 = 0
+  var bucketIdx: int64 = 0
+  var spb: int64 = 0
+
+  for decodedFrame in container.decode(processor.audioIndex, processor.codecCtx, frame):
+    if processor.`iterator` == nil:
+      processor.`iterator` = newAudioIterator(decodedFrame.sample_rate,
+        addr decodedFrame.ch_layout, processor.chunkDuration)
+      spb = round(processor.chunkDuration * float64(decodedFrame.sample_rate)).int64
+      let tb = audioStream.time_base
+      let pts = (if decodedFrame.pts == AV_NOPTS_VALUE: 0'i64 else: decodedFrame.pts)
+      firstSamplePos = (pts * int64(decodedFrame.sample_rate) * int64(tb.num)) div int64(tb.den)
+
+    processor.`iterator`.writeFrame(decodedFrame)
+
+    while processor.`iterator`.hasChunk():
+      let (lo, hi) = processor.`iterator`.readPeaks()
+      yield (firstSamplePos + bucketIdx * spb, lo, hi)
+      bucketIdx += 1
+
+  if processor.`iterator` != nil:
+    processor.`iterator`.flushResampler()
+    while processor.`iterator`.hasChunk():
+      let (lo, hi) = processor.`iterator`.readPeaks()
+      yield (firstSamplePos + bucketIdx * spb, lo, hi)
+      bucketIdx += 1
 
 iterator loudness*(processor: var AudioProcessor, container: InputContainer): float32 =
   var frame = av_frame_alloc()
