@@ -1,4 +1,4 @@
-# 30.2.5
+# 30.3.0
 
 ## Major
  -
@@ -10,3 +10,4 @@
 ## Fixes
  - Add empty_moov for `--fragmented` mp4s  
  - Fix progress bars sometimes not clearing correctly
+ - Support for wasm64.
