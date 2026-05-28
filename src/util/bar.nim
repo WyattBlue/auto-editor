@@ -96,6 +96,9 @@ proc progressWorker(data: ThreadData) {.thread.} =
   let config = data.config[] # Dereference once and cache
   const sleepRate = 8 # ~120 FPS update rate
   var columns = terminalWidth()
+  when defined(windows):
+    var widthCounter = 0
+    const widthRefreshRate = 63 # refresh terminal width ~twice per second (500ms / 8ms)
 
   while not data.shouldStop.load():
     if data.paused.load():
@@ -109,8 +112,11 @@ proc progressWorker(data: ThreadData) {.thread.} =
       if termResized.load():
         columns = terminalWidth()
         termResized.store(false)
-    else:
-      columns = terminalWidth()
+    elif defined(windows):
+      inc widthCounter
+      if widthCounter >= widthRefreshRate:
+        columns = terminalWidth()
+        widthCounter = 0
 
     let currentProgress = data.progress.load()
     if currentProgress == lastProgress:
@@ -207,6 +213,10 @@ proc start*(bar: Bar, total: float, title: string) =
     elif c == 'm':
       inEscape = false
 
+  when defined(windows):
+    stdout.write("\x1b[?25l") # hide cursor to prevent visible jumps while drawing
+    stdout.flushFile()
+
   bar.threadData.title = title
   bar.threadData.lenTitle = lenTitle
   bar.threadData.total.store(total)
@@ -224,6 +234,8 @@ proc `end`*(bar: Bar) =
       sleep(1)
     let columns = terminalWidth()
     stdout.write(" ".repeat(max(0, columns - 2)) & "\r")
+    when defined(windows):
+      stdout.write("\x1b[?25h") # restore cursor
     stdout.flushFile()
   if bar.stack.len > 0:
     bar.stack.setLen(bar.stack.len - 1)
@@ -232,3 +244,10 @@ proc destroy*(bar: Bar) =
   if bar.threadData != nil:
     bar.threadData.shouldStop.store(true)
     joinThread(bar.progressThread)
+  when defined(windows):
+    if not bar.hide:
+      try:
+        stdout.write("\x1b[?25h")
+        stdout.flushFile()
+      except IOError:
+        discard
