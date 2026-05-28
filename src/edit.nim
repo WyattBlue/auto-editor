@@ -170,6 +170,42 @@ proc findExternSubs(input: string): Option[InputContainer] {.raises: [].} =
     except IOError:
       none(InputContainer)
 
+proc editNeeds*(edit: string): tuple[video, audio: bool] =
+  ## Report which media streams an --edit expression analyzes, so callers can
+  ## avoid fetching streams that no editing method will look at.
+  var lexer = initLexer("--edit", edit)
+  var parser = initParser(lexer)
+  let expressions =
+    try:
+      parser.parse()
+    except CatchableError:
+      return (true, true) # Malformed; interpretEdit will report the real error.
+  if expressions.len == 0:
+    return (false, false)
+
+  var video = false
+  var audio = false
+
+  proc walk(e: Expr) =
+    if e.kind == ExprList:
+      if e.elements.len == 0:
+        return
+      let head = e.elements[0]
+      if head.kind == ExprSym and
+          edit[head.`from` ..< head.to] in ["or", "and", "xor", "not"]:
+        for i in 1 ..< e.elements.len:
+          walk(e.elements[i])
+      else:
+        walk(head)
+    elif e.kind == ExprSym:
+      case edit[e.`from` ..< e.to]:
+      of "motion", "subtitle", "regex", "word": video = true
+      of "audio": audio = true
+      else: discard
+
+  walk(expressions[^1])
+  return (video, audio)
+
 proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRational, bar: Bar): seq[bool] =
   var lexer = initLexer("--edit", args.edit)
   var parser = initParser(lexer)

@@ -1,7 +1,7 @@
 import unittest
 import std/[os, tempfiles]
 
-import ../src/[av, conductor, ffmpeg, media, timeline, wavutil]
+import ../src/[av, conductor, edit, ffmpeg, media, timeline, wavutil]
 import ../src/util/[color, fun, lang, rational]
 import ../src/exports/[kdenlive, fcp11]
 import ../src/vendor/tinyre/tinyre
@@ -59,6 +59,19 @@ test "exports":
       "Hello \" World", "11"))
   check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere",
       "Hello \\ World", "11"))
+
+test "editNeeds":
+  check editNeeds("audio") == (false, true)
+  check editNeeds("motion") == (true, false)
+  check editNeeds("none") == (false, false)
+  check editNeeds("all") == (false, false)
+  check editNeeds("audio:threshold=4%") == (false, true)
+  check editNeeds("motion:width=200") == (true, false)
+  check editNeeds("(or audio motion)") == (true, true)
+  check editNeeds("(and audio (not motion))") == (true, true)
+  check editNeeds("(or (not audio:threshold=4%) audio:stream=1)") == (false, true)
+  check editNeeds("subtitle:pattern=foo") == (true, false)
+  check editNeeds("word:value=audio") == (true, false)
 
 test "margin":
   var levels: seq[bool]

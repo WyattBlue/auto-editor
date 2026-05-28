@@ -142,8 +142,6 @@ Examples:
 
   OptDef(names: "--yt-dlp-location", c: cUrl, datum: "yt-dlp-location", metavar: "PATH",
     help: &"Set a custom path to {ytDlp}"),
-  OptDef(names: "--download-format", c: cUrl, datum: "download-format", metavar: "FORMAT",
-    help: "Set the yt-dlp download format (--format, -f)"),
   OptDef(names: "--output-format", c: cUrl, datum: "output-format", metavar: "TEMPLATE",
     help: "Set the yt-dlp output file template (--output, -o)"),
   OptDef(names: "--yt-dlp-extras", c: cUrl, datum: "yt-dlp-extras", metavar: "CMD",

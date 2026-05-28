@@ -56,9 +56,9 @@ type mainArgs* = object
 
   # URL download Options
   ytDlpLocation*: string = "yt-dlp"
-  downloadFormat*: string
   outputFormat*: string
   ytDlpExtras*: string
+  urlInput*: bool = false
 
   # Timeline Options
   resolution*: (int32, int32) = (0, 0)

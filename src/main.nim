@@ -1,6 +1,6 @@
 import std/[options, os, parseutils, sequtils, strformat, strutils]
 when not defined(emscripten):
-  import std/[osproc, uri]
+  import std/osproc
   import cmds/completion
 when defined(emscripten):
   {.emit: """
@@ -174,32 +174,53 @@ proc validateKey(val: string): (bool, string) =
 
 
 when not defined(emscripten):
+  proc wantStreams(args: mainArgs): (bool, bool) =
+    ## Decide whether the video and/or audio streams are worth downloading,
+    ## based on what the output format holds and what --edit needs to analyze.
+    let (editV, editA) = editNeeds(args.edit)
+
+    var outV = true
+    var outA = true
+    if args.preview:
+      (outV, outA) = (false, false) # --stats/--preview writes no output file.
+    elif args.output notin ["", "-"]:
+      let fmt = av_guess_format(nil, cstring(args.output), nil)
+      if fmt != nil:
+        outV = not args.vn and fmt.video_codec notin [ID_NONE, ID_PNG]
+        outA = not args.an and fmt.audio_codec != ID_NONE
+
+    result = (outV or editV, outA or editA)
+    if result == (false, false):
+      result[1] = true # Always fetch something to read media duration from.
+
   proc downloadVideo(myInput: string, args: mainArgs): string =
-    conwrite("Downloading video...")
+    let (wantVideo, wantAudio) = wantStreams(args)
+    conwrite(if wantVideo: "Downloading video..." else: "Downloading audio...")
 
-    proc getDomain(url: string): string =
-      let parsed = parseUri(url)
-      var hostname = parsed.hostname
-      if hostname.startsWith("www."):
-        hostname = hostname[4..^1]
-      return hostname
-
-    var downloadFormat = args.downloadFormat
-    if downloadFormat == "" and getDomain(myInput) == "youtube.com":
-      downloadFormat = "bestvideo[ext=mp4]+bestaudio[ext=m4a]"
+    let maxHeight = args.resolution[1]
+    var downloadFormat = ""
+    let vid = (if maxHeight != 0: &"bestvideo[height<={maxHeight}]" else: "bestvideo")
+    if wantVideo and wantAudio:
+      downloadFormat = vid & "+bestaudio"
+    elif wantVideo:
+      downloadFormat = vid
+    else:
+      downloadFormat = "bestaudio"
 
     var outputFormat: string
-    if args.outputFormat == "":
-      outputFormat = replace(splitext(myInput)[0], re"\W+", "-") & ".%(ext)s"
-    else:
+    if args.outputFormat != "":
       outputFormat = args.outputFormat
+    else:
+      outputFormat = replace(splitext(myInput)[0], re"\W+", "-") & ".%(ext)s"
+      if args.preview:
+        outputFormat = getTempDir() / outputFormat
 
     var cmd: seq[string] = @[]
     if downloadFormat != "":
       cmd.add(@["-f", downloadFormat])
 
     cmd.add(@["-o", outputFormat, myInput])
-    if args.yt_dlp_extras != "":
+    if args.ytDlpExtras != "":
       cmd.add(args.ytDlpExtras.split(" "))
 
     let ytDlpPath = args.ytDlpLocation
@@ -325,8 +346,6 @@ judge making cuts.
       args.setAction.add parseActionAndRange(key)
     of "yt-dlp-location":
       args.ytDlpLocation = key
-    of "download-format":
-      args.downloadFormat = key
     of "output-format":
       args.outputFormat = key
     of "yt-dlp-extras":
@@ -416,6 +435,7 @@ judge making cuts.
         error "URL inputs are not supported in the wasm build."
       else:
         args.inputs[i] = downloadVideo(myInput, args)
+        args.urlInput = true
     elif agSplitFile(myInput).ext == "":
       if dirExists(myInput):
         error "Input must be a file or a URL, not a directory."
