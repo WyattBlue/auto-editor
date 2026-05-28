@@ -508,13 +508,18 @@ func dialogue*(assText: string): string =
     curChar = assText[i]
     nextChar = (if i + 1 >= textLen: '\0' else: assText[i + 1])
 
-    if curChar == '\\' and nextChar == 'N':
-      result &= "\n"
-      i += 2
-      continue
-
     if not state:
-      if curChar == '{' and nextChar != '\\':
+      if curChar == '\\' and nextChar == 'N':
+        # `\N` is a hard line break.
+        result &= "\n"
+        i += 2
+        continue
+      if curChar == '\\' and nextChar in {'n', 'h'}:
+        # `\n` (soft break) and `\h` (non-breaking space) collapse to a space.
+        result &= " "
+        i += 2
+        continue
+      if curChar == '{' and assText.find('}', int(i) + 1) != -1:
         state = true
       else:
         result &= curChar
