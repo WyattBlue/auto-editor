@@ -43,6 +43,21 @@ test "dialogue":
   check "0,0,Default,,0,0,0,,oop".dialogue == "oop"
   check "0,0,Default,,0,0,0,,boop".dialogue == "boop"
 
+  # Override blocks are stripped.
+  check "0,0,Default,,0,0,0,,{\\b1}bold{\\b0}".dialogue == "bold"
+  check "0,0,Default,,0,0,0,,{\\an8}top".dialogue == "top"
+
+  # Text escapes: \N -> newline, \n and \h -> space.
+  check "0,0,Default,,0,0,0,,a\\Nb".dialogue == "a\nb"
+  check "0,0,Default,,0,0,0,,a\\nb".dialogue == "a b"
+  check "0,0,Default,,0,0,0,,a\\hb".dialogue == "a b"
+
+  # A stray '{' with no closing '}' is literal text.
+  check "0,0,Default,,0,0,0,,cost is {5".dialogue == "cost is {5"
+
+  # Escapes inside an override block are not interpreted.
+  check "0,0,Default,,0,0,0,,{\\fnArial}hi".dialogue == "hi"
+
 test "encoder":
   let (_, encoderCtx) = initEncoder("pcm_s16le")
   check encoderCtx.codec_type == AVMEDIA_TYPE_AUDIO

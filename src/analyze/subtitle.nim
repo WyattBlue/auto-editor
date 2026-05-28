@@ -1,4 +1,4 @@
-from std/math import round
+from std/math import floor, ceil
 
 import ../[av, ffmpeg]
 import ../util/rational
@@ -35,8 +35,11 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
       let
         startFloat = float(packet.pts * subtitleStream.time_base)
         durFloat = float(packet.duration * subtitleStream.time_base)
-        start = round(startFloat * tb).int
-        `end` = round((startFloat + durFloat) * tb).int
+        # A subtitle is active for any frame it overlaps, so snap outward:
+        # floor the start, ceil the end. round() could clip a frame the
+        # subtitle actually touches.
+        start = floor(startFloat * tb).int
+        `end` = ceil((startFloat + durFloat) * tb).int
 
       var gotSubtitle: cint = 0
       let ret = avcodec_decode_subtitle2(codecCtx, addr subtitle,
