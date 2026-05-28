@@ -97,20 +97,25 @@ proc applyToRange(actionIndex: var seq[int], span: (PackedInt, PackedInt), tb: f
   for i in start ..< min(stop, actionIndex.len):
     actionIndex[i] = value
 
-proc setOutput(userOut, `export`, path: string): (string, string) =
+proc setOutput(userOut, `export`, path: string, isUrl = false): (string, string) =
   var dir, name, ext: string
   if userOut == "" or userOut == "-":
     if path == "":
       error "`--output` must be set." # When a timeline file is the input.
     (dir, name, ext) = agSplitFile(path)
+    if isUrl:
+      ext = "" # Don't inherit the downloaded file's container.
   else:
     (dir, name, ext) = agSplitFile(userOut)
 
   let root = dir / name
 
   if ext == "":
-    # Use `mp4` as the default, because it is most compatible.
-    ext = (if path == "": ".mp4" else: agSplitFile(path).ext)
+    # Default to `mkv` for URL inputs, otherwise `mp4` as the most compatible.
+    ext =
+      if isUrl: ".mkv"
+      elif path == "": ".mp4"
+      else: agSplitFile(path).ext
 
   var myExport = `export` # Create mutable copy
   if myExport == "":
@@ -145,11 +150,12 @@ proc setOutput(userOut, `export`, path: string): (string, string) =
 
   return (&"{root}{ext}", myExport)
 
-func setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules): string =
+func setVideoCodec(inCodec: string, src: MediaInfo, rule: Rules, isUrl = false): string =
   if inCodec != "auto":
     return inCodec
 
-  let codecId = if src.v.len == 0: ID_H264 else: src.v[0].codecId
+  let codecId =
+    if isUrl or src.v.len == 0: ID_H264 else: src.v[0].codecId
 
   if rule.defaultVid == ID_NONE or rule.allowsCodec(codecId):
     return $avcodec_get_name(codecId)
@@ -252,12 +258,12 @@ proc editMedia*(args: var mainArgs) =
 
   var exportKind, tlName, fcpVersion: string
   if args.`export` == "":
-    (output, exportKind) = setOutput(args.output, "", usePath)
+    (output, exportKind) = setOutput(args.output, "", usePath, args.urlInput)
     tlName = "Auto-Editor Media Group"
     fcpVersion = "11"
   else:
     (exportKind, tlName, fcpVersion) = parseExportString(args.`export`)
-    (output, _) = setOutput(args.output, exportKind, usePath)
+    (output, _) = setOutput(args.output, exportKind, usePath, args.urlInput)
 
   if args.preview:
     preview(tlV3)
@@ -298,7 +304,7 @@ proc editMedia*(args: var mainArgs) =
     error "Exporting media files to stdout is not supported."
 
   let rule = initRules(output)
-  args.videoCodec = setVideoCodec(args.videoCodec, mi, rule)
+  args.videoCodec = setVideoCodec(args.videoCodec, mi, rule, args.urlInput)
 
   proc createAlphanumTempDir(length: int = 8): string =
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
