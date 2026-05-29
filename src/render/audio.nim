@@ -561,6 +561,11 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
       result[i * channels + ch] = tempChannelData[ch][i]
 
 
+# Micro-fade applied at every clip edge to kill cut pops. A splice between two
+# clips is an instantaneous amplitude step (a click); ramping each edge to/from
+# zero over a few ms removes the discontinuity. ~3 ms is inaudible as a fade.
+const audioFadeMs = 3.0
+
 proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
     int], mixLayers: bool, norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
@@ -569,6 +574,7 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   let targetChannels = tl.layout.nb_channels
   let tb = tl.tb
   let sr = tl.sr
+  let fadeSamples = max(1, int(audioFadeMs / 1000.0 * sr.float64))
 
   if tb.num == 0:
     error "Timeline timebase has zero numerator"
@@ -626,21 +632,31 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
           if processedData.len > 0:
             let sourceChannels = getter.channels
             let numSamples = processedData.len div sourceChannels
-            for i in 0 ..< min(durSamples, numSamples):
+            let n = min(durSamples, numSamples)
+            for i in 0 ..< n:
               let outputSampleIndex = startSample + i
               if outputSampleIndex < totalSamples:
+                let fadeIn = (
+                  if i < fadeSamples: (i.float32 + 0.5) / fadeSamples.float32
+                  else: 1.0'f32
+                )
+                let tailDist = max(0, n - 1 - i)
+                let fadeOut = (
+                  if tailDist < fadeSamples: (tailDist.float32 + 0.5) / fadeSamples.float32
+                  else: 1.0'f32
+                )
+                let gain = min(1.0'f32, min(fadeIn, fadeOut))
                 let baseIndex = outputSampleIndex * targetChannels
                 for ch in 0 ..< min(targetChannels, sourceChannels):
                   let flatIndex = baseIndex + ch
                   let sourceIndex = i * sourceChannels + ch
                   if flatIndex < audioBuffer.len and sourceIndex < processedData.len:
+                    let newSample = int32(round(processedData[sourceIndex].float32 * gain))
                     if mixLayers:
-                      let currentSample = audioBuffer[flatIndex].int32
-                      let newSample = processedData[sourceIndex].int32
-                      let mixed = currentSample + newSample
+                      let mixed = audioBuffer[flatIndex].int32 + newSample
                       audioBuffer[flatIndex] = int16(max(-32768, min(32767, mixed)))
                     else:
-                      audioBuffer[flatIndex] = processedData[sourceIndex]
+                      audioBuffer[flatIndex] = int16(newSample)
 
   if norm.kind == nkPeak:
     # Calculate peak normalization adjustment (first pass analysis)
