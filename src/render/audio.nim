@@ -337,7 +337,12 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: ref AVChannelLayout):
       filters.add &"deesser=i={effect.intensity}:m={effect.maxd}:f={effect.freq}"
     else: discard
 
-  let filterChain = (if filters.len == 0: "anull" else: filters.join(","))
+  # Pin the chain's output to s16p. Some filters (e.g. deesser) emit dblp, which
+  # the frame-readback in processAudioClip can't convert, yielding silence.
+  let filterChain = (
+    if filters.len == 0: "anull"
+    else: filters.join(",") & ",aformat=sample_fmts=s16p"
+  )
 
   var inputs = avfilter_inout_alloc()
   if inputs == nil:
