@@ -1,5 +1,5 @@
 import std/[options, strutils]
-import ./util/unorm16
+import ./util/dnorm16
 
 type
   ActionKind* = enum
@@ -170,10 +170,10 @@ when not defined(nimscript):
     of actZoom: "zoom:" & $act.val
     of actOpacity: "opacity:" & $toUnorm16(act.val)
     of actBlur: "blur:" & $act.val
-    of actBrightness: "brightness:" & $act.val
+    of actBrightness: "brightness:" & $toSnorm16(act.val)
     of actLuv:
       var parts: seq[string]
-      if act.brighthue != luvBrighthueId: parts.add "brighthue:" & $act.brighthue
+      if act.brighthue != luvBrighthueId: parts.add "brighthue:" & $toSnorm16(act.brighthue)
       if act.contrast != luvContrastId: parts.add "contrast:" & $act.contrast
       if act.saturation != luvSaturationId: parts.add "saturation:" & $act.saturation
       if parts.len == 0: "brighthue:0.0" else: parts.join(",")
@@ -181,10 +181,10 @@ when not defined(nimscript):
   func actionByteSize(kind: ActionKind): int =
     case kind
     of actInvert, actHflip, actVflip: 1
-    of actOpacity: 3
-    of actSpeed, actVarispeed, actVolume, actZoom, actBlur, actBrightness: 5
+    of actOpacity, actBrightness: 3
+    of actSpeed, actVarispeed, actVolume, actZoom, actBlur: 5
     of actDeesser: 7
-    of actLuv: 13
+    of actLuv: 11
 
   func len*(a: Actions): int =  # byte length
     if int(a) <= 1: 0
@@ -201,7 +201,7 @@ when not defined(nimscript):
         of actInvert, actHflip, actVflip:
           yield Action(kind: kind)
           i += 1
-        of actSpeed, actVarispeed, actVolume, actZoom, actBlur, actBrightness:
+        of actSpeed, actVarispeed, actVolume, actZoom, actBlur:
           var v: float32
           copyMem(addr v, addr base[i + 1], sizeof(float32))
           yield Action(kind: kind, val: v)
@@ -211,6 +211,11 @@ when not defined(nimscript):
           copyMem(addr u, addr base[i + 1], sizeof(Unorm16))
           yield Action(kind: actOpacity, val: u)
           i += 3
+        of actBrightness:
+          var sv: Snorm16
+          copyMem(addr sv, addr base[i + 1], sizeof(Snorm16))
+          yield Action(kind: actBrightness, val: sv)
+          i += 3
         of actDeesser:
           var iu, mu, fu: Unorm16
           copyMem(addr iu, addr base[i + 1], sizeof(Unorm16))
@@ -219,12 +224,13 @@ when not defined(nimscript):
           yield Action(kind: actDeesser, intensity: iu, maxd: mu, freq: fu)
           i += 7
         of actLuv:
-          var b, c, s: float32
-          copyMem(addr b, addr base[i + 1], sizeof(float32))
-          copyMem(addr c, addr base[i + 5], sizeof(float32))
-          copyMem(addr s, addr base[i + 9], sizeof(float32))
-          yield Action(kind: actLuv, brighthue: b, contrast: c, saturation: s)
-          i += 13
+          var bh: Snorm16
+          var c, s: float32
+          copyMem(addr bh, addr base[i + 1], sizeof(Snorm16))
+          copyMem(addr c, addr base[i + 3], sizeof(float32))
+          copyMem(addr s, addr base[i + 7], sizeof(float32))
+          yield Action(kind: actLuv, brighthue: bh, contrast: c, saturation: s)
+          i += 11
 
   func actionLen*(a: Actions): int =  # O(n)
     for _ in a: inc result
@@ -257,13 +263,17 @@ when not defined(nimscript):
       case a.kind
       of actInvert, actHflip, actVflip:
         i += 1
-      of actSpeed, actVarispeed, actVolume, actZoom, actBlur, actBrightness:
+      of actSpeed, actVarispeed, actVolume, actZoom, actBlur:
         var v = a.val
         copyMem(addr base[i + 1], addr v, sizeof(float32))
         i += 5
       of actOpacity:
         var u = toUnorm16(a.val)
         copyMem(addr base[i + 1], addr u, sizeof(Unorm16))
+        i += 3
+      of actBrightness:
+        var sv = toSnorm16(a.val)
+        copyMem(addr base[i + 1], addr sv, sizeof(Snorm16))
         i += 3
       of actDeesser:
         var iu = toUnorm16(a.intensity)
@@ -274,13 +284,13 @@ when not defined(nimscript):
         copyMem(addr base[i + 5], addr fu, sizeof(Unorm16))
         i += 7
       of actLuv:
-        var b = a.brighthue
+        var bh = toSnorm16(a.brighthue)
         var c = a.contrast
         var s = a.saturation
-        copyMem(addr base[i + 1], addr b, sizeof(float32))
-        copyMem(addr base[i + 5], addr c, sizeof(float32))
-        copyMem(addr base[i + 9], addr s, sizeof(float32))
-        i += 13
+        copyMem(addr base[i + 1], addr bh, sizeof(Snorm16))
+        copyMem(addr base[i + 3], addr c, sizeof(float32))
+        copyMem(addr base[i + 7], addr s, sizeof(float32))
+        i += 11
     Actions(cast[int](p))
 
   proc parseActions*(val: string): Actions =
