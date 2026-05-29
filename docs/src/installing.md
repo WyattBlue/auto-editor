@@ -31,7 +31,7 @@ It's recommended to place the binary in a PATH directory so that `auto-editor` i
 
 
 ## Method 2: Platform Installers
-If you're on MacOS, use [Homebrew](https://homebrew.sh):
+If you're on MacOS, use [Homebrew](https://brew.sh):
 ```
 brew install auto-editor
 ```
@@ -71,14 +71,14 @@ Then run:
 
 ```
 nimble makeffwin
-nimble windows
+nimble makewin
 ```
 
 For ARM, run:
 
 ```
 nimble makeffwinarm
-nimble windowsarm
+nimble makewinarm
 ```
 
 ## Optional Dependencies

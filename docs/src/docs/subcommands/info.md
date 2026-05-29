@@ -107,5 +107,3 @@ auto-editor info example.mp4 --json
     }
 }
 ```
-
-You may call info with `aeinfo`.

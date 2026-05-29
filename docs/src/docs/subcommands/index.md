@@ -11,3 +11,4 @@ Subcommands are auxiliary programs that offer additional functionality. They hav
 [info](./info)
 [levels](./levels)
 [subdump](./subdump)
+[whisper](./whisper)

@@ -21,4 +21,6 @@ See also: [reference](../ref)
 ### Timeline Documentation
 [The v1 format](./v1)
 
+[The v2 format](./v2)
+
 [The v3 format](./v3)

@@ -16,7 +16,7 @@ auto-editor video.mp4 --add-in start,30sec -30sec,end
 ```
 
 ## How Range Syntax Works
-The `--add-in`, `--cut-out`, `--mark-as-loud`, `--mark-as-silent` options all use time range syntax.
+The `--add-in`, `--cut-out`, `--set-speed`, and `--set-action` options all use time range syntax.
 
 It describes two numbers, the start and end point, separated by a singe comma `,`. The start number is inclusive, while the end number is exclusive.
 
@@ -41,11 +41,11 @@ Time range syntax allows two variables: `start` and `end`
 `end` is the length of the timeline before any edits are applied.
 
 ```
-# This will mark everything in the beginning as silent
-auto-editor example.mp4 --mark-as-silent start,300
+# This will cut out everything in the beginning
+auto-editor example.mp4 --cut-out start,300
 
-# This will mark everything besides the beginning as loud
-auto-editor example.mp4 --mark-as-loud 300,end
+# This will keep everything besides the beginning, overriding other edits
+auto-editor example.mp4 --add-in 300,end
 
 # This will cut out everything
 auto-editor example.mp4 --cut-out start,end
