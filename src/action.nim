@@ -4,7 +4,7 @@ import ./util/dnorm16
 type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
-    actVflip, actOpacity, actBlur, actBrightness, actLuv
+    actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens
 
   # Represents a full-sized action.
   Action* = object
@@ -15,6 +15,8 @@ type
       nval*: Unorm16
     of actBrightness:
       sval*: Snorm16
+    of actLens:
+      k1*, k2*: Snorm16
     of actSpeed, actVarispeed, actVolume, actZoom, actBlur:
       val*: float32
     of actDeesser:
@@ -23,7 +25,6 @@ type
       contrast*: float32
       saturation*: float32
       brighthue*: Snorm16
-
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -36,11 +37,6 @@ type
     argSpec*: string  # e.g., "val: float"
     range*: string    # e.g., "(0-99999)"
     help*: string
-
-const
-  luvBrighthueId* = toSnorm16(0.0'f32)
-  luvContrastId* = 1.0'f32
-  luvSaturationId* = 1.0'f32
 
 const actionDefs*: seq[ActionDef] = @[
   ActionDef(name: "nil",
@@ -82,27 +78,22 @@ Positional args: `intensity` controls how much to de-ess (0.0 = none, 1.0 = maxi
     help: "Scale video contrast. 1.0 = unchanged. Implemented via FFmpeg's `lutyuv` filter."),
   ActionDef(name: "saturation", argSpec: "val: float", range: "[0.0, 3.0]",
     help: "Scale video saturation. 1.0 = unchanged, 0.0 = grayscale. Implemented via FFmpeg's `lutyuv` filter."),
+  ActionDef(name: "lens", argSpec: "k1[:k2]", range: "each [-1.0, 1.0]",
+    help: """
+Apply lens distortion correction. Implemented via FFmpeg's `lenscorrection` filter.
+Positional args: `k1` is the quadratic correction factor and `k2` is the double quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion). With no arguments, a fun fisheye lens is applied."""),
 ]
-
-func `==`*(a, b: Action): bool =
-  if a.kind != b.kind: return false
-  case a.kind
-  of actInvert, actHflip, actVflip: true
-  of actSpeed, actVarispeed, actVolume, actZoom, actBlur: a.val == b.val
-  of actOpacity: a.nval == b.nval
-  of actBrightness: a.sval == b.sval
-  of actDeesser:
-    a.intensity == b.intensity and a.maxd == b.maxd and a.freq == b.freq
-  of actLuv:
-    a.brighthue == b.brighthue and a.contrast == b.contrast and
-      a.saturation == b.saturation
-
 
 const aNil* = Actions(0)
 const aCut* = Actions(1)
 
 func isCut*(a: Actions): bool = int(a) == 1
 func isEmpty*(a: Actions): bool = int(a) == 0
+
+const
+  luvBrighthueId* = toSnorm16(0.0'f32)
+  luvContrastId* = 1.0'f32
+  luvSaturationId* = 1.0'f32
 
 func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if val == "invert":
@@ -127,6 +118,24 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
     return Action(kind: actDeesser,
       intensity: vals[0], maxd: vals[1], freq: vals[2]
     )
+
+  # lens takes positional args: [k1[:k2]]
+  if parts[0] == "lens" and parts.len <= 3:
+    if parts.len == 1:
+      # A fun fisheye bulge, used when `lens` is given with no arguments.
+      return Action(kind: actLens, k1: toSnorm16(-0.5'f32), k2: toSnorm16(0.0'f32))
+    var k = [0.0'f32, 0.0'f32]
+    for idx in 1 ..< parts.len:
+      k[idx - 1] = (
+        try:
+          parseFloat(parts[idx]).float32
+        except ValueError:
+          raise newException(ActionParseError, "Invalid float value")
+      )
+    for v in k:
+      if v < -1.0 or v > 1.0:
+        raise newException(ActionParseError, "lens factors must be in [-1.0, 1.0]")
+    return Action(kind: actLens, k1: toSnorm16(k[0]), k2: toSnorm16(k[1]))
 
   if parts.len == 2:
     let effectType = parts[0]
@@ -194,12 +203,13 @@ when not defined(nimscript):
       if act.contrast != luvContrastId: parts.add "contrast:" & $act.contrast
       if act.saturation != luvSaturationId: parts.add "saturation:" & $act.saturation
       if parts.len == 0: "brighthue:0.0" else: parts.join(",")
+    of actLens: "lens:" & $act.k1 & ":" & $act.k2
 
   func actionByteSize(kind: ActionKind): int =
     case kind
     of actInvert, actHflip, actVflip: 1
     of actOpacity, actBrightness: 3
-    of actSpeed, actVarispeed, actVolume, actZoom, actBlur: 5
+    of actSpeed, actVarispeed, actVolume, actZoom, actBlur, actLens: 5
     of actDeesser: 7
     of actLuv: 11
 
@@ -248,6 +258,12 @@ when not defined(nimscript):
           copyMem(addr s, addr base[i + 7], sizeof(float32))
           yield Action(kind: actLuv, brighthue: bh, contrast: c, saturation: s)
           i += 11
+        of actLens:
+          var k1v, k2v: Snorm16
+          copyMem(addr k1v, addr base[i + 1], sizeof(Snorm16))
+          copyMem(addr k2v, addr base[i + 3], sizeof(Snorm16))
+          yield Action(kind: actLens, k1: k1v, k2: k2v)
+          i += 5
 
   func actionLen*(a: Actions): int =  # O(n)
     for _ in a: inc result
@@ -308,6 +324,12 @@ when not defined(nimscript):
         copyMem(addr base[i + 3], addr c, sizeof(float32))
         copyMem(addr base[i + 7], addr s, sizeof(float32))
         i += 11
+      of actLens:
+        var k1v = a.k1
+        var k2v = a.k2
+        copyMem(addr base[i + 1], addr k1v, sizeof(Snorm16))
+        copyMem(addr base[i + 3], addr k2v, sizeof(Snorm16))
+        i += 5
     Actions(cast[int](p))
 
   proc parseActions*(val: string): Actions =
