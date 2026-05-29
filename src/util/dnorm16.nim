@@ -1,4 +1,4 @@
-import std/strutils
+import std/[math, strutils]
 
 type Unorm16* = distinct uint16
 
@@ -24,4 +24,30 @@ func `$`*(u: Unorm16): string =
     result = result.strip(leading = false, chars = {'0'})
     if result.endsWith('.'): result.add '0'
     if toUnorm16(parseFloat(result).float32) == u:
+      return result
+
+# Signed sibling of Unorm16: maps [-1.0, 1.0] onto int16 [-32767, 32767].
+type Snorm16* = distinct int16
+
+func `==`*(a, b: Snorm16): bool {.borrow.}
+
+const sinvMax32 = 1.0'f32 / 32767.0'f32
+const sinvMax64 = 1.0'f64 / 32767.0'f64
+
+func toSnorm16*(f: float32): Snorm16 =
+  let c = max(-1.0'f32, min(1.0'f32, f))
+  Snorm16(int16(round(c * 32767.0'f32)))
+
+converter toFloat32*(s: Snorm16): float32 =
+  max(-1.0'f32, int16(s).float32 * sinvMax32)
+
+func toFloat64*(s: Snorm16): float64 = max(-1.0'f64, int16(s).float64 * sinvMax64)
+
+func `$`*(s: Snorm16): string =
+  # Shortest decimal that re-quantizes to the same snorm16 (see Unorm16's `$`).
+  for prec in 1 .. 5:
+    result = formatFloat(toFloat64(s), ffDecimal, prec)
+    result = result.strip(leading = false, chars = {'0'})
+    if result.endsWith('.'): result.add '0'
+    if toSnorm16(parseFloat(result).float32) == s:
       return result

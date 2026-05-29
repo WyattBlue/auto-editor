@@ -1,9 +1,20 @@
 import std/[algorithm, options, os, streams, strformat, strutils, times]
 
 import ./[about, ffmpeg, log]
-import ./util/[fun, rational]
+import ./util/[fun, rational, dnorm16]
 
 import nimcrypto/sha
+
+type CacheCodec = enum
+  ccFloat32 = 0'u8  # raw float32
+  ccUnorm16 = 1'u8  # [0.0, 1.0]
+  ccSnorm16 = 2'u8  # [-1.0, 1.0]
+
+func codecFor(kind: string): CacheCodec =
+  case kind
+  of "audio", "motion": ccUnorm16
+  of "waveform": ccSnorm16
+  else: ccFloat32
 
 proc procTag(path: string, tb: AVRational, kind, args: string): string =
   let modTime = getLastModificationTime(path).toUnix().int
@@ -14,13 +25,19 @@ proc procTag(path: string, tb: AVRational, kind, args: string): string =
   ctx.update(key)
   return ($ctx.finish())[0..<16].toLowerAscii() & kind
 
-proc saveFloats(filename: string, data: seq[float32]) =
+proc saveFloats(filename: string, data: seq[float32], codec: CacheCodec) =
   let fs = newFileStream(filename, fmWrite)
   defer: fs.close()
 
+  fs.write(uint8(codec))
   fs.write(data.len.int32)
-  for value in data:
-    fs.write(value)
+  case codec
+  of ccFloat32:
+    for v in data: fs.write(v)
+  of ccUnorm16:
+    for v in data: fs.write(uint16(toUnorm16(v)))
+  of ccSnorm16:
+    for v in data: fs.write(int16(toSnorm16(v)))
 
 proc loadFloats(filename: string): seq[float32] =
   let fs = newFileStream(filename, fmRead)
@@ -28,10 +45,18 @@ proc loadFloats(filename: string): seq[float32] =
     raise newException(IOError, "")
   defer: fs.close()
 
+  let codec = fs.readUint8()
   let length = fs.readInt32()
   result = newSeq[float32](length)
-  for i in 0..<length:
-    result[i] = fs.readFloat32()
+  case codec
+  of uint8(ccFloat32):
+    for i in 0..<length: result[i] = fs.readFloat32()
+  of uint8(ccUnorm16):
+    for i in 0..<length: result[i] = toFloat32(Unorm16(fs.readUint16()))
+  of uint8(ccSnorm16):
+    for i in 0..<length: result[i] = toFloat32(Snorm16(fs.readInt16()))
+  else:
+    raise newException(IOError, "unknown cache codec")
 
 proc readCache*(path: string, tb: AVRational, kind, args: string): Option[seq[float32]] =
   let temp: string = getTempDir()
@@ -59,7 +84,7 @@ proc writeCache*(data: seq[float32], tb: AVRational, path, kind, args: string) =
   let cacheFile = workdir / &"{cacheTag}.bin"
 
   try:
-    saveFloats(cacheFile, data)
+    saveFloats(cacheFile, data, codecFor(kind))
   except Exception as e:
     error &"Cache write failed: {e.msg}"
 
