@@ -168,7 +168,7 @@ when not defined(nimscript):
       else:
         "deesser:" & $i
     of actZoom: "zoom:" & $act.val
-    of actOpacity: "opacity:" & $act.val
+    of actOpacity: "opacity:" & $toUnorm16(act.val)
     of actBlur: "blur:" & $act.val
     of actBrightness: "brightness:" & $act.val
     of actLuv:
@@ -181,7 +181,8 @@ when not defined(nimscript):
   func actionByteSize(kind: ActionKind): int =
     case kind
     of actInvert, actHflip, actVflip: 1
-    of actSpeed, actVarispeed, actVolume, actZoom, actOpacity, actBlur, actBrightness: 5
+    of actOpacity: 3
+    of actSpeed, actVarispeed, actVolume, actZoom, actBlur, actBrightness: 5
     of actDeesser: 7
     of actLuv: 13
 
@@ -200,11 +201,16 @@ when not defined(nimscript):
         of actInvert, actHflip, actVflip:
           yield Action(kind: kind)
           i += 1
-        of actSpeed, actVarispeed, actVolume, actZoom, actOpacity, actBlur, actBrightness:
+        of actSpeed, actVarispeed, actVolume, actZoom, actBlur, actBrightness:
           var v: float32
           copyMem(addr v, addr base[i + 1], sizeof(float32))
           yield Action(kind: kind, val: v)
           i += 5
+        of actOpacity:
+          var u: Unorm16
+          copyMem(addr u, addr base[i + 1], sizeof(Unorm16))
+          yield Action(kind: actOpacity, val: u)
+          i += 3
         of actDeesser:
           var iu, mu, fu: Unorm16
           copyMem(addr iu, addr base[i + 1], sizeof(Unorm16))
@@ -251,10 +257,14 @@ when not defined(nimscript):
       case a.kind
       of actInvert, actHflip, actVflip:
         i += 1
-      of actSpeed, actVarispeed, actVolume, actZoom, actOpacity, actBlur, actBrightness:
+      of actSpeed, actVarispeed, actVolume, actZoom, actBlur, actBrightness:
         var v = a.val
         copyMem(addr base[i + 1], addr v, sizeof(float32))
         i += 5
+      of actOpacity:
+        var u = toUnorm16(a.val)
+        copyMem(addr base[i + 1], addr u, sizeof(Unorm16))
+        i += 3
       of actDeesser:
         var iu = toUnorm16(a.intensity)
         var mu = toUnorm16(a.maxd)
@@ -291,6 +301,8 @@ when not defined(nimscript):
           (action.val < -1.0 or action.val > 1.0):
         raise newException(ActionParseError,
           "brightness must be in [-1.0, 1.0]")
+      if action.kind == actOpacity and (action.val < 0.0 or action.val > 1.0):
+        raise newException(ActionParseError, "opacity must be in [0.0, 1.0]")
       if action.kind == actDeesser:
         if action.intensity < 0.0 or action.intensity > 1.0:
           raise newException(ActionParseError,
