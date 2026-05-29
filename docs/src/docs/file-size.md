@@ -8,7 +8,7 @@ title: How To Shrink File Size
 This is generally good since auto-editor tries to preserve video quality as much as possible. However, there are tricks you can use to shrink file size with little to no quality loss.
 
 ## Video Bitrate
-Change the video bitrate to a lower value. Auto-Editor by default sets the video bitrate to `5M` or 5 Megabytes. This is a very high bitrate so most video encoders will use a lower value, however, the encoder still might set a bitrate too high for your liking. You can set it manually based on the file size you expect.
+Change the video bitrate to a lower value. By default, the video bitrate is set to `auto`, which lets the encoder choose. The encoder might set a bitrate too high for your liking, so you can set it manually based on the file size you expect.
 
 Assuming the video is 2 minutes, the file size will be about 27600k (2 * 60 * 230), not including audio size.
 ```
