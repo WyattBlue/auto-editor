@@ -18,13 +18,21 @@ func toFloat64*(u: Unorm16): float64 = uint16(u).float64 * invMax64
 func `$`*(u: Unorm16): string =
   # Shortest decimal that re-quantizes to the same unorm16. 1/65535 isn't a
   # round value (0.5 -> 0.5000076), so format-and-truncate would surface the
-  # quantization noise; instead try increasing precision until a clean string
-  # snaps back to the same bucket.
+  # quantization noise; instead build the rounded decimal in integer math at
+  # increasing precision and return the first that snaps back to this bucket.
+  let n = uint16(u).int
+  const d = 65535
   for prec in 1 .. 5:
-    result = formatFloat(toFloat64(u), ffDecimal, prec)
-    result = result.strip(leading = false, chars = {'0'})
-    if result.endsWith('.'): result.add '0'
-    if toUnorm16(parseFloat(result).float32) == u:
+    let scale = 10 ^ prec
+    let rounded = (n * scale + d div 2) div d # round(n/d * 10^prec)
+    let f = rounded.float32 / scale.float32
+    if toUnorm16(f) == u:
+      var s = $rounded
+      while s.len <= prec: s = "0" & s # zero-pad mantissa
+      let dot = s.len - prec
+      result = s[0 ..< dot] & "." & s[dot ..< s.len]
+      result = result.strip(leading = false, chars = {'0'})
+      if result.endsWith('.'): result.add '0'
       return result
 
 # Signed sibling of Unorm16: maps [-1.0, 1.0] onto int16 [-32767, 32767].
@@ -46,9 +54,20 @@ func toFloat64*(s: Snorm16): float64 = max(-1.0'f64, int16(s).float64 * sinvMax6
 
 func `$`*(s: Snorm16): string =
   # Shortest decimal that re-quantizes to the same snorm16 (see Unorm16's `$`).
+  let raw = int16(s).int
+  const d = 32767
+  let neg = raw < 0
+  let n = abs(raw)
   for prec in 1 .. 5:
-    result = formatFloat(toFloat64(s), ffDecimal, prec)
-    result = result.strip(leading = false, chars = {'0'})
-    if result.endsWith('.'): result.add '0'
-    if toSnorm16(parseFloat(result).float32) == s:
+    let scale = 10 ^ prec
+    let rounded = (n * scale + d div 2) div d
+    let f = (if neg: -rounded.float32 else: rounded.float32) / scale.float32
+    if toSnorm16(f) == s:
+      var t = $rounded
+      while t.len <= prec: t = "0" & t
+      let dot = t.len - prec
+      result = t[0 ..< dot] & "." & t[dot ..< t.len]
+      result = result.strip(leading = false, chars = {'0'})
+      if result.endsWith('.'): result.add '0'
+      if neg: result = "-" & result
       return result
