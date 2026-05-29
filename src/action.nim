@@ -1,4 +1,4 @@
-import std/[options, strutils]
+import std/strutils
 import ./util/dnorm16
 
 type
@@ -38,12 +38,9 @@ type
     help*: string
 
 const
-  luvBrighthueId*: float32 = 0.0
-  luvContrastId*: float32 = 1.0
-  luvSaturationId*: float32 = 1.0
-  # FFmpeg's deesser defaults for max-deessing (m) and split frequency (f).
-  deesserMaxId* = toUnorm16(0.5)
-  deesserFreqId* = toUnorm16(0.5)
+  luvBrighthueId* = toSnorm16(0.0'f32)
+  luvContrastId* = 1.0'f32
+  luvSaturationId* = 1.0'f32
 
 const actionDefs*: seq[ActionDef] = @[
   ActionDef(name: "nil",
@@ -91,7 +88,9 @@ func `==`*(a, b: Action): bool =
   if a.kind != b.kind: return false
   case a.kind
   of actInvert, actHflip, actVflip: true
-  of actSpeed, actVarispeed, actVolume, actZoom, actOpacity, actBlur, actBrightness: a.val == b.val
+  of actSpeed, actVarispeed, actVolume, actZoom, actBlur: a.val == b.val
+  of actOpacity: a.nval == b.nval
+  of actBrightness: a.sval == b.sval
   of actDeesser:
     a.intensity == b.intensity and a.maxd == b.maxd and a.freq == b.freq
   of actLuv:
@@ -105,54 +104,71 @@ const aCut* = Actions(1)
 func isCut*(a: Actions): bool = int(a) == 1
 func isEmpty*(a: Actions): bool = int(a) == 0
 
-func parseAction*(val: string): Option[Action] =
+func parseAction*(val: string): Action {.raises: [ActionParseError].} =
   if val == "invert":
-    return some(Action(kind: actInvert))
+    return Action(kind: actInvert)
   if val == "hflip":
-    return some(Action(kind: actHflip))
+    return Action(kind: actHflip)
   if val == "vflip":
-    return some(Action(kind: actVflip))
+    return Action(kind: actVflip)
 
   let parts = val.split(":")
 
   # deesser takes positional args: intensity[:max[:freq]]
   if parts.len >= 2 and parts.len <= 4 and parts[0] == "deesser":
-    var vals = [toUnorm16(0.0), deesserMaxId, deesserFreqId]
+    var vals = [toUnorm16(0.0), halfUnorm16, halfUnorm16]
     for idx in 1 ..< parts.len:
       vals[idx - 1] = (
-        try: toUnorm16(parseFloat(parts[idx]).float32)
-        except ValueError: return none(Action)
+        try:
+          toUnorm16(parseFloat(parts[idx]).float32)
+        except ValueError:
+          raise newException(ActionParseError, "Invalid float value")
       )
-    return some(Action(kind: actDeesser,
+    return Action(kind: actDeesser,
       intensity: vals[0], maxd: vals[1], freq: vals[2]
-    ))
+    )
 
   if parts.len == 2:
     let effectType = parts[0]
     let effectVal = (
-      try: parseFloat(parts[1]).float32
-      except ValueError: return none(Action)
+      try:
+        parseFloat(parts[1]).float32
+      except ValueError:
+        raise newException(ActionParseError, "Invalid float value")
     )
     case effectType
-    of "speed": return some(Action(kind: actSpeed, val: effectVal))
-    of "volume": return some(Action(kind: actVolume, val: effectVal))
-    of "varispeed": return some(Action(kind: actVarispeed, val: effectVal))
-    of "zoom": return some(Action(kind: actZoom, val: effectVal))
-    of "opacity": return some(Action(kind: actOpacity, nval: effectVal))
-    of "blur": return some(Action(kind: actBlur, val: effectVal))
-    of "brightness": return some(Action(kind: actBrightness, sval: effectVal))
+    of "speed": return Action(kind: actSpeed, val: effectVal)
+    of "volume": return Action(kind: actVolume, val: effectVal)
+    of "varispeed": return Action(kind: actVarispeed, val: effectVal)
+    of "zoom":
+      if effectVal <= 0.0:
+        raise newException(ActionParseError, "zoom value must be greater than 0.0")
+      return Action(kind: actZoom, val: effectVal)
+    of "opacity":
+      if effectVal > 1.0 or effectVal < 0.0:
+        raise newException(ActionParseError, "opacity must be in [0.0, 1.0]")
+      return Action(kind: actOpacity, nval: toUnorm16(effectVal))
+    of "blur": return Action(kind: actBlur, val: effectVal)
+    of "brightness":
+      if effectVal > 1.0 or effectVal < -1.0:
+        raise newException(ActionParseError, "brightness must be in [-1.0, 1.0]")
+      return Action(kind: actBrightness, sval: toSnorm16(effectVal))
     of "brighthue":
-      return some(Action(kind: actLuv, brighthue: effectVal,
-        contrast: luvContrastId, saturation: luvSaturationId))
+      return Action(kind: actLuv, brighthue: effectVal,
+        contrast: luvContrastId, saturation: luvSaturationId)
     of "contrast":
-      return some(Action(kind: actLuv, brighthue: luvBrighthueId,
-        contrast: effectVal, saturation: luvSaturationId))
+      if effectVal < -2.0 or effectVal > 2.0:
+        raise newException(ActionParseError, "contrast must be in [-2.0, 2.0]")
+      return Action(kind: actLuv, brighthue: luvBrighthueId,
+        contrast: effectVal, saturation: luvSaturationId)
     of "saturation":
-      return some(Action(kind: actLuv, brighthue: luvBrighthueId,
-        contrast: luvContrastId, saturation: effectVal))
+      if effectVal < 0.0 or effectVal > 3.0:
+        raise newException(ActionParseError, "saturation must be in [0.0, 3.0]")
+      return Action(kind: actLuv, brighthue: luvBrighthueId,
+        contrast: luvContrastId, saturation: effectVal)
     else: discard
 
-  return none(Action)
+  raise newException(ActionParseError, "Unknown action: " & val)
 
 when not defined(nimscript):
   func `$`*(act: Action): string =
@@ -164,17 +180,10 @@ when not defined(nimscript):
     of actVarispeed: "varispeed:" & $act.val
     of actVolume: "volume:" & $act.val
     of actDeesser:
-      # Quantize first and compare/stringify on the Unorm16 values, so defaults
-      # still register as default after a round-trip through the buffer.
-      let i = toUnorm16(act.intensity)
-      let m = toUnorm16(act.maxd)
-      let f = toUnorm16(act.freq)
-      if f != toUnorm16(deesserFreqId):
-        "deesser:" & $i & ":" & $m & ":" & $f
-      elif m != toUnorm16(deesserMaxId):
-        "deesser:" & $i & ":" & $m
-      else:
-        "deesser:" & $i
+      let i = act.intensity
+      let m = act.maxd
+      let f = act.freq
+      "deesser:" & $i & ":" & $m & ":" & $f
     of actZoom: "zoom:" & $act.val
     of actOpacity: "opacity:" & $act.nval
     of actBlur: "blur:" & $act.val
@@ -276,17 +285,17 @@ when not defined(nimscript):
         copyMem(addr base[i + 1], addr v, sizeof(float32))
         i += 5
       of actOpacity:
-        var u = toUnorm16(a.val)
+        var u = a.nval
         copyMem(addr base[i + 1], addr u, sizeof(Unorm16))
         i += 3
       of actBrightness:
-        var sv = toSnorm16(a.val)
+        var sv = a.sval
         copyMem(addr base[i + 1], addr sv, sizeof(Snorm16))
         i += 3
       of actDeesser:
-        var iu = toUnorm16(a.intensity)
-        var mu = toUnorm16(a.maxd)
-        var fu = toUnorm16(a.freq)
+        var iu = a.intensity
+        var mu = a.maxd
+        var fu = a.freq
         copyMem(addr base[i + 1], addr iu, sizeof(Unorm16))
         copyMem(addr base[i + 3], addr mu, sizeof(Unorm16))
         copyMem(addr base[i + 5], addr fu, sizeof(Unorm16))
@@ -309,39 +318,8 @@ when not defined(nimscript):
         continue
       if trimmedPart == "cut":
         return aCut
-      let a = parseAction(trimmedPart)
-      if a.isNone:
-        raise newException(ActionParseError, "Invalid action: " & trimmedPart)
-      let action = a.unsafeGet
-      if action.kind == actZoom and action.val <= 0.0:
-        raise newException(ActionParseError, "zoom value must be greater than 0.0")
-      if action.kind == actBrightness and
-          (action.val < -1.0 or action.val > 1.0):
-        raise newException(ActionParseError,
-          "brightness must be in [-1.0, 1.0]")
-      if action.kind == actOpacity and (action.val < 0.0 or action.val > 1.0):
-        raise newException(ActionParseError, "opacity must be in [0.0, 1.0]")
-      if action.kind == actDeesser:
-        if action.intensity < 0.0 or action.intensity > 1.0:
-          raise newException(ActionParseError,
-            "deesser intensity must be in [0.0, 1.0]")
-        if action.maxd < 0.0 or action.maxd > 1.0:
-          raise newException(ActionParseError,
-            "deesser max must be in [0.0, 1.0]")
-        if action.freq < 0.0 or action.freq > 1.0:
-          raise newException(ActionParseError,
-            "deesser frequency must be in [0.0, 1.0]")
+      let action = parseAction(trimmedPart)
       if action.kind == actLuv:
-        if action.brighthue < -1.0 or action.brighthue > 1.0:
-          raise newException(ActionParseError,
-            "brighthue must be in [-1.0, 1.0]")
-        if action.contrast < -2.0 or action.contrast > 2.0:
-          raise newException(ActionParseError,
-            "contrast must be in [-2.0, 2.0]")
-        if action.saturation < 0.0 or action.saturation > 3.0:
-          raise newException(ActionParseError,
-            "saturation must be in [0.0, 3.0]")
-
         # Adjacent-fusion: collapse this actLuv into the previous one if it's
         # also actLuv. Per field, the non-identity value wins; later wins on
         # genuine conflicts.

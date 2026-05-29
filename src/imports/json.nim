@@ -1,12 +1,11 @@
-import std/[json, options, strformat]
+import std/[json, strformat]
 
 import ../[action, av, ffmpeg, media, log, timeline]
 import ../util/[color, lang, rational]
 
-proc parseActionOrErr(val: string): Action =
-  let a = parseAction(val)
-  if a.isSome: return a.unsafeGet
-  error &"unknown action: {val}"
+proc parseActionOrErr(val: string): Action {.raises: [].} =
+  try: parseAction(val)
+  except ActionParseError as e: error e.msg
 
 proc parseClip(node: JsonNode, interner: var StringInterner, effects: var seq[Actions]): Clip =
   result.src = interner.intern(node["src"].getStr())

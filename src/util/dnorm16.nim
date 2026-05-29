@@ -4,6 +4,9 @@ type Unorm16* = distinct uint16
 
 func `==`*(a, b: Unorm16): bool {.borrow.}
 func `<=`*(a, b: Unorm16): bool {.borrow.}
+func `+`*(a, b: Unorm16): Unorm16 {.borrow.}
+func `-`*(a, b: Unorm16): Unorm16 {.borrow.}
+func high*(T: typedesc[Unorm16]): Unorm16 = Unorm16(high(uint16))
 
 const invMax32 = 1.0'f32 / 65535.0'f32
 const invMax64 = 1.0'f64 / 65535.0'f64
@@ -14,6 +17,8 @@ converter toUnorm16*(f: float32): Unorm16 =
 
 converter toFloat32*(u: Unorm16): float32 = uint16(u).float32 * invMax32
 func toFloat64*(u: Unorm16): float64 = uint16(u).float64 * invMax64
+
+const halfUnorm16* = toUnorm16(0.5'f32)
 
 func `$`*(u: Unorm16): string =
   # Shortest decimal that re-quantizes to the same unorm16. 1/65535 isn't a
@@ -40,6 +45,8 @@ type Snorm16* = distinct int16
 
 func `==`*(a, b: Snorm16): bool {.borrow.}
 func `<=`*(a, b: Snorm16): bool {.borrow.}
+func `+`*(a, b: Snorm16): Snorm16 {.borrow.}
+func `-`*(a, b: Snorm16): Snorm16 {.borrow.}
 
 const sinvMax32 = 1.0'f32 / 32767.0'f32
 const sinvMax64 = 1.0'f64 / 32767.0'f64
