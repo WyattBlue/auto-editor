@@ -687,12 +687,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             frame = fxGraph.pull()
           of actOpacity:
             let o = effect.nval
-            let unOne = toUnorm16(1.0)
-            if o == unOne:
+            if o == high(Unorm16):
               continue
-            let bgR = (unOne - o) * float(tl.bg.red)
-            let bgG = (unOne - o) * float(tl.bg.green)
-            let bgB = (unOne - o) * float(tl.bg.blue)
+            let bgR = (high(Unorm16) - o) * float(tl.bg.red)
+            let bgG = (high(Unorm16) - o) * float(tl.bg.green)
+            let bgB = (high(Unorm16) - o) * float(tl.bg.blue)
             let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             let key = &"opacity|{o}|{bg}|{bufferArgs}"
