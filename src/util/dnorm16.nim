@@ -5,12 +5,12 @@ type Unorm16* = distinct uint16
 func `==`*(a, b: Unorm16): bool {.borrow.}
 func `<=`*(a, b: Unorm16): bool {.borrow.}
 
-func toUnorm16*(f: float32): Unorm16 =
-  let c = max(0.0'f32, min(1.0'f32, f))
-  Unorm16(uint16(c * 65535.0'f32 + 0.5'f32))
-
 const invMax32 = 1.0'f32 / 65535.0'f32
 const invMax64 = 1.0'f64 / 65535.0'f64
+
+converter toUnorm16*(f: float32): Unorm16 =
+  let c = max(0.0'f32, min(1.0'f32, f))
+  Unorm16(uint16(c * 65535.0'f32 + 0.5'f32))
 
 converter toFloat32*(u: Unorm16): float32 = uint16(u).float32 * invMax32
 func toFloat64*(u: Unorm16): float64 = uint16(u).float64 * invMax64
@@ -39,11 +39,12 @@ func `$`*(u: Unorm16): string =
 type Snorm16* = distinct int16
 
 func `==`*(a, b: Snorm16): bool {.borrow.}
+func `<=`*(a, b: Snorm16): bool {.borrow.}
 
 const sinvMax32 = 1.0'f32 / 32767.0'f32
 const sinvMax64 = 1.0'f64 / 32767.0'f64
 
-func toSnorm16*(f: float32): Snorm16 =
+converter toSnorm16*(f: float32): Snorm16 =
   let c = max(-1.0'f32, min(1.0'f32, f))
   Snorm16(int16(round(c * 32767.0'f32)))
 

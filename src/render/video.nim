@@ -2,7 +2,7 @@ import std/[options, sets, strformat, tables]
 from std/math import round
 
 import ../[action, av, ffmpeg, graph, log, timeline]
-import ../util/[color, rational]
+import ../util/[color, dnorm16, rational]
 
 # Helps with timing, may be extended.
 type VideoFrame = object
@@ -564,7 +564,11 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
       # Apply video effects in order
       if objList.len > 0 and frame != nil and frame.width > 0 and frame.height > 0:
         for effect in objList[0].effects:
-          if effect.kind == actZoom and effect.val != 1.0:
+          case effect.kind:
+          of actSpeed, actVarispeed, actVolume, actDeesser: discard
+          of actZoom:
+            if effect.val == 1.0:
+              continue
             let origW = frame.width
             let origH = frame.height
             let scaledW = max(cint(float(origW) * effect.val), 2)
@@ -592,7 +596,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.push(frame)
             av_frame_free(addr frame)
             frame = fxGraph.pull()
-          elif effect.kind in {actHflip, actVflip, actInvert}:
+          of actHflip, actVflip, actInvert:
             let filterName = case effect.kind
               of actHflip: "hflip"
               of actVflip: "vflip"
@@ -612,8 +616,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.push(frame)
             av_frame_free(addr frame)
             frame = fxGraph.pull()
-          elif effect.kind == actBlur and effect.val > 0.0:
+          of actBlur:
             let sigma = effect.val
+            if sigma <= 0.0:
+              continue
             let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             let key = &"blur|{sigma}|{bufferArgs}"
@@ -629,8 +635,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.push(frame)
             av_frame_free(addr frame)
             frame = fxGraph.pull()
-          elif effect.kind == actBrightness and effect.val != 0.0:
-            let shift = effect.val * 255.0
+          of actBrightness:
+            if effect.sval == toSnorm16(0.0):
+              continue
+            let shift = effect.sval * 255.0'f32
             let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             let key = &"brightness|{shift}|{bufferArgs}"
@@ -649,10 +657,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.push(frame)
             av_frame_free(addr frame)
             frame = fxGraph.pull()
-          elif effect.kind == actLuv and
-              (effect.brighthue != luvBrighthueId or
-               effect.contrast != luvContrastId or
-               effect.saturation != luvSaturationId):
+          of actLuv:
+            if (effect.brighthue == luvBrighthueId and
+                effect.contrast == luvContrastId and
+                effect.saturation == luvSaturationId):
+              continue
+
             let b = effect.brighthue
             let c = effect.contrast
             let s = effect.saturation
@@ -675,11 +685,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.push(frame)
             av_frame_free(addr frame)
             frame = fxGraph.pull()
-          elif effect.kind == actOpacity and effect.val != 1.0:
-            let o = effect.val
-            let bgR = (1.0 - o) * float(tl.bg.red)
-            let bgG = (1.0 - o) * float(tl.bg.green)
-            let bgB = (1.0 - o) * float(tl.bg.blue)
+          of actOpacity:
+            let o = effect.nval
+            let unOne = toUnorm16(1.0)
+            if o == unOne:
+              continue
+            let bgR = (unOne - o) * float(tl.bg.red)
+            let bgG = (unOne - o) * float(tl.bg.green)
+            let bgB = (unOne - o) * float(tl.bg.blue)
             let frameFmtName = $AVPixelFormat(frame.format)
             let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
             let key = &"opacity|{o}|{bg}|{bufferArgs}"

@@ -11,12 +11,19 @@ type
     case kind*: ActionKind
     of actInvert, actHflip, actVflip:
       discard
-    of actSpeed, actVarispeed, actVolume, actZoom, actOpacity, actBlur, actBrightness:
+    of actOpacity:
+      nval*: Unorm16
+    of actBrightness:
+      sval*: Snorm16
+    of actSpeed, actVarispeed, actVolume, actZoom, actBlur:
       val*: float32
     of actDeesser:
-      intensity*, maxd*, freq*: float32
+      intensity*, maxd*, freq*: Unorm16
     of actLuv:
-      brighthue*, contrast*, saturation*: float32
+      contrast*: float32
+      saturation*: float32
+      brighthue*: Snorm16
+
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -35,8 +42,8 @@ const
   luvContrastId*: float32 = 1.0
   luvSaturationId*: float32 = 1.0
   # FFmpeg's deesser defaults for max-deessing (m) and split frequency (f).
-  deesserMaxId*: float32 = 0.5
-  deesserFreqId*: float32 = 0.5
+  deesserMaxId* = toUnorm16(0.5)
+  deesserFreqId* = toUnorm16(0.5)
 
 const actionDefs*: seq[ActionDef] = @[
   ActionDef(name: "nil",
@@ -110,19 +117,20 @@ func parseAction*(val: string): Option[Action] =
 
   # deesser takes positional args: intensity[:max[:freq]]
   if parts.len >= 2 and parts.len <= 4 and parts[0] == "deesser":
-    var vals = [0.0'f32, deesserMaxId, deesserFreqId]
+    var vals = [toUnorm16(0.0), deesserMaxId, deesserFreqId]
     for idx in 1 ..< parts.len:
       vals[idx - 1] = (
-        try: parseFloat(parts[idx]).float32
+        try: toUnorm16(parseFloat(parts[idx]).float32)
         except ValueError: return none(Action)
       )
     return some(Action(kind: actDeesser,
-      intensity: vals[0], maxd: vals[1], freq: vals[2]))
+      intensity: vals[0], maxd: vals[1], freq: vals[2]
+    ))
 
   if parts.len == 2:
     let effectType = parts[0]
     let effectVal = (
-      try: parseFloat(parts[1])
+      try: parseFloat(parts[1]).float32
       except ValueError: return none(Action)
     )
     case effectType
@@ -130,9 +138,9 @@ func parseAction*(val: string): Option[Action] =
     of "volume": return some(Action(kind: actVolume, val: effectVal))
     of "varispeed": return some(Action(kind: actVarispeed, val: effectVal))
     of "zoom": return some(Action(kind: actZoom, val: effectVal))
-    of "opacity": return some(Action(kind: actOpacity, val: effectVal))
+    of "opacity": return some(Action(kind: actOpacity, nval: effectVal))
     of "blur": return some(Action(kind: actBlur, val: effectVal))
-    of "brightness": return some(Action(kind: actBrightness, val: effectVal))
+    of "brightness": return some(Action(kind: actBrightness, sval: effectVal))
     of "brighthue":
       return some(Action(kind: actLuv, brighthue: effectVal,
         contrast: luvContrastId, saturation: luvSaturationId))
@@ -142,7 +150,7 @@ func parseAction*(val: string): Option[Action] =
     of "saturation":
       return some(Action(kind: actLuv, brighthue: luvBrighthueId,
         contrast: luvContrastId, saturation: effectVal))
-    else: return none(Action)
+    else: discard
 
   return none(Action)
 
@@ -168,12 +176,12 @@ when not defined(nimscript):
       else:
         "deesser:" & $i
     of actZoom: "zoom:" & $act.val
-    of actOpacity: "opacity:" & $toUnorm16(act.val)
+    of actOpacity: "opacity:" & $act.nval
     of actBlur: "blur:" & $act.val
-    of actBrightness: "brightness:" & $toSnorm16(act.val)
+    of actBrightness: "brightness:" & $act.sval
     of actLuv:
       var parts: seq[string]
-      if act.brighthue != luvBrighthueId: parts.add "brighthue:" & $toSnorm16(act.brighthue)
+      if act.brighthue != luvBrighthueId: parts.add "brighthue:" & $act.brighthue
       if act.contrast != luvContrastId: parts.add "contrast:" & $act.contrast
       if act.saturation != luvSaturationId: parts.add "saturation:" & $act.saturation
       if parts.len == 0: "brighthue:0.0" else: parts.join(",")
@@ -209,12 +217,12 @@ when not defined(nimscript):
         of actOpacity:
           var u: Unorm16
           copyMem(addr u, addr base[i + 1], sizeof(Unorm16))
-          yield Action(kind: actOpacity, val: u)
+          yield Action(kind: actOpacity, nval: u)
           i += 3
         of actBrightness:
           var sv: Snorm16
           copyMem(addr sv, addr base[i + 1], sizeof(Snorm16))
-          yield Action(kind: actBrightness, val: sv)
+          yield Action(kind: actBrightness, sval: sv)
           i += 3
         of actDeesser:
           var iu, mu, fu: Unorm16
