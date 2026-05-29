@@ -116,6 +116,7 @@ type
     probesize: int64
     max_analyze_duration: int64
     metadata*: ptr AVDictionary
+    max_interleave_delta*: int64
 
   AVPacket* {.importc, completeStruct, header: "<libavcodec/packet.h>"} = object
     buf*: pointer
