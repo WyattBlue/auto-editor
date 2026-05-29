@@ -1,6 +1,6 @@
 import std/[options, strformat, strutils]
 
-import ../util/rational
+import ../util/[rational, dnorm16]
 import ../[av, cache, ffmpeg, log]
 import ../analyze/audio
 
@@ -66,7 +66,7 @@ proc main*(strArgs: seq[string]) =
   echo "\n@start"
 
   if not windowed and not noCache:
-    let cacheData = readCache(inputFile, cacheTb, "waveform", cacheArgs)
+    let cacheData = readCache[Snorm16](inputFile, cacheTb, "waveform", cacheArgs)
     if cacheData.isSome:
       echo "@offset 0"
       let flat = cacheData.get()
@@ -110,7 +110,7 @@ proc main*(strArgs: seq[string]) =
     if lengthSamples < 0: high(int64)
     else: startSample + lengthSamples
 
-  var flat: seq[float32] = @[]
+  var flat: seq[Snorm16] = @[]
   var offsetEmitted = false
 
   for (bucketStart, lo, hi) in processor.peaks(container, audioStream):
@@ -121,9 +121,11 @@ proc main*(strArgs: seq[string]) =
     if not offsetEmitted:
       echo &"@offset {bucketStart}"
       offsetEmitted = true
-    echo &"{lo},{hi}"
-    flat.add lo
-    flat.add hi
+    let slo = toSnorm16(lo)
+    let shi = toSnorm16(hi)
+    echo &"{slo},{shi}"
+    flat.add slo
+    flat.add shi
 
   if not offsetEmitted:
     echo "@offset 0"

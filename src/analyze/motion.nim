@@ -1,7 +1,7 @@
 import std/[math, options, strformat]
 
 import ../[av, cache, ffmpeg, log]
-import ../util/[bar, rational]
+import ../util/[bar, rational, dnorm16]
 
 type VideoProcessor* = object
   formatCtx*: ptr AVFormatContext
@@ -186,10 +186,10 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32): float32
     prevIndex = index
 
 proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-  stream, width, blur: int32): seq[float32] =
+  stream, width, blur: int32): seq[Unorm16] =
   let cacheArgs = &"{stream},{width},{blur}"
   if not noCache:
-    let cacheData = readCache(path, tb, "motion", cacheArgs)
+    let cacheData = readCache[Unorm16](path, tb, "motion", cacheArgs)
     if cacheData.isSome:
       return cacheData.get()
 
@@ -214,7 +214,7 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   bar.start(inaccurateDur, "Analyzing motion")
   var i: float = 0
   for value in processor.motionness(width, blur):
-    result.add value
+    result.add toUnorm16(value)
     bar.tick(i)
     i += 1
 

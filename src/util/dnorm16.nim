@@ -3,6 +3,7 @@ import std/[math, strutils]
 type Unorm16* = distinct uint16
 
 func `==`*(a, b: Unorm16): bool {.borrow.}
+func `<=`*(a, b: Unorm16): bool {.borrow.}
 
 func toUnorm16*(f: float32): Unorm16 =
   let c = max(0.0'f32, min(1.0'f32, f))

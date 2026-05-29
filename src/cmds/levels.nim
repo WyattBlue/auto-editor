@@ -1,6 +1,6 @@
 import std/[options, strformat, strutils]
 
-import ../util/rational
+import ../util/[rational, dnorm16]
 import ../[av, cache, ffmpeg, log]
 import ../analyze/[audio, motion, subtitle]
 
@@ -129,7 +129,7 @@ proc main*(strArgs: seq[string]) =
   echo "\n@start"
 
   if not noCache:
-    let cacheData = readCache(inputFile, tb, editMethod, cacheArgs)
+    let cacheData = readCache[Unorm16](inputFile, tb, editMethod, cacheArgs)
     if cacheData.isSome:
       for loudnessValue in cacheData.get():
         echo loudnessValue
@@ -137,7 +137,7 @@ proc main*(strArgs: seq[string]) =
       return
 
   var container: InputContainer
-  var data: seq[float32] = @[]
+  var data: seq[Unorm16] = @[]
 
   try:
     container = av.open(inputFile)
@@ -159,8 +159,9 @@ proc main*(strArgs: seq[string]) =
     )
 
     for loudnessValue in processor.loudness(container):
-      echo loudnessValue
-      data.add loudnessValue
+      let u = toUnorm16(loudnessValue)
+      echo u
+      data.add u
     echo ""
 
   elif editMethod == "motion":
@@ -178,8 +179,9 @@ proc main*(strArgs: seq[string]) =
     )
 
     for value in processor.motionness(width, blur):
-      echo value
-      data.add value
+      let u = toUnorm16(value)
+      echo u
+      data.add u
     echo ""
 
   elif editMethod in ["subtitle", "word", "regex"]:
