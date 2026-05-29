@@ -1,7 +1,7 @@
 import std/[math, options, strformat]
 
 import ../[av, cache, ffmpeg, log, resampler]
-import ../util/[bar, rational]
+import ../util/[bar, rational, dnorm16]
 
 when defined(arm64) or defined(aarch64):
   type
@@ -224,9 +224,9 @@ iterator loudness*(processor: var AudioProcessor, container: InputContainer): fl
       yield processor.`iterator`.readChunk()
 
 proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-    stream: int32): seq[float32] =
+    stream: int32): seq[Unorm16] =
   if not noCache:
-    let cacheData = readCache(path, tb, "audio", $stream)
+    let cacheData = readCache[Unorm16](path, tb, "audio", $stream)
     if cacheData.isSome:
       return cacheData.get()
 
@@ -250,10 +250,10 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     inaccurateDur = container.duration / float(tb)
 
   bar.start(inaccurateDur, "Analyzing audio volume")
-  result = newSeqOfCap[float32](int(inaccurateDur) + 1)
+  result = newSeqOfCap[Unorm16](int(inaccurateDur) + 1)
   var i: float = 0
   for value in processor.loudness(container):
-    result.add value
+    result.add toUnorm16(value)
     bar.tick(i)
     i += 1
 

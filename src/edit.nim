@@ -1,7 +1,7 @@
 import std/[math, options, os, sequtils, strformat, strutils]
 import ./[av, editlexer, ffmpeg, log]
 import ./analyze/[audio, motion, subtitle]
-import ./util/[bar, fun, rational]
+import ./util/[bar, dnorm16, fun, rational]
 
 import ./vendor/tinyre/tinyre
 
@@ -32,31 +32,36 @@ func `not`(a: seq[bool]): seq[bool] =
   for i in 0 ..< a.len:
     result[i] = not a[i]
 
-proc orWithThreshold(result: var seq[bool], levels: seq[float32], threshold: float32) =
+proc orWithThreshold(result: var seq[bool], levels: seq[Unorm16], t: Unorm16) =
   if result.len == 0:
     result = newSeq[bool](levels.len)
     for i in 0 ..< levels.len:
-      result[i] = levels[i] >= threshold
+      result[i] = levels[i] >= t
   else:
     let n = min(result.len, levels.len)
     for i in 0 ..< n:
-      result[i] = result[i] or (levels[i] >= threshold)
+      result[i] = result[i] or (levels[i] >= t)
     for i in result.len ..< levels.len:
-      result.add levels[i] >= threshold
+      result.add levels[i] >= t
 
-proc parseThres(val: string): float32 =
+const
+  defaultAudioThres = toUnorm16(0.04)
+  defaultMotionThres = toUnorm16(0.02)
+
+proc parseThres(val: string): Unorm16 =
   let (num, unit) = splitNumStr(val)
+  var r: float32
   if unit == "%":
-    result = float32(num / 100)
+    r = float32(num / 100)
   elif unit == "dB":
-    result = float32(pow(10, num / 20))
+    r = float32(pow(10, num / 20))
   elif unit == "":
-    result = float32(num)
+    r = float32(num)
   else:
     error &"Unknown unit: {unit}"
-
-  if result < 0 or result > 1:
-    error &"Threshold not in range: {val} ({result})"
+  if r < 0 or r > 1:
+    error &"Threshold not in range: {val} ({r})"
+  return toUnorm16(r)
 
 proc parseFloatInRange(val: string, min, max: float32): float32 {.raises: [].} =
   try:
@@ -224,7 +229,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
       return editEval(node[0], text)
 
     var
-      threshold: float32 = 0.04
+      threshold: Unorm16 = defaultAudioThres
       stream: int32 = 0
       width: int32 = 400
       blur: int32 = 9
@@ -274,7 +279,7 @@ proc interpretEdit*(args: mainArgs, containers: seq[InputContainer], tb: AVRatio
             result.orWithThreshold(audio(bar, container, inp, tb, stream), threshold)
         return result
       of "motion":
-        threshold = 0.02 # Reduce default threshold
+        threshold = defaultMotionThres
         let argOrder = @["threshold", "stream", "width", "blur"]
 
         for expr in node[1 ..< node.len]:
