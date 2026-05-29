@@ -12,12 +12,13 @@ proc main*(strArgs: seq[string]) =
     samplesPerBucket: int32 = 256
     startSample: int64 = 0
     lengthSamples: int64 = -1
+    display = "float"
 
   for key in strArgs:
     case key
     of "--no-cache":
       noCache = true
-    of "--stream", "--samples-per-bucket", "--start-sample", "--length-samples":
+    of "--stream", "--samples-per-bucket", "--start-sample", "--length-samples", "--display":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -40,10 +41,15 @@ proc main*(strArgs: seq[string]) =
       of "length-samples":
         try: lengthSamples = parseBiggestInt(key).int64
         except ValueError: error &"Invalid length-samples: {key}"
+      of "display":
+        display = key
       expecting = ""
 
   if expecting != "":
     error &"--{expecting} needs argument."
+
+  if display notin ["float", "d16"]:
+    error &"Unknown display format: {display}"
 
   if inputFile == "":
     error "Expecting an input file."
@@ -63,6 +69,10 @@ proc main*(strArgs: seq[string]) =
   let cacheTb = AVRational(num: 1, den: 1)
   let cacheArgs = &"{userStream},{samplesPerBucket}"
 
+  proc emitPair(lo, hi: Snorm16) =
+    if display == "d16": echo &"{int16(lo)},{int16(hi)}"
+    else: echo &"{lo},{hi}"
+
   echo "\n@start"
 
   if not windowed and not noCache:
@@ -72,7 +82,7 @@ proc main*(strArgs: seq[string]) =
       let flat = cacheData.get()
       var i = 0
       while i + 1 < flat.len:
-        echo &"{flat[i]},{flat[i+1]}"
+        emitPair(flat[i], flat[i+1])
         i += 2
       echo ""
       return
@@ -123,7 +133,7 @@ proc main*(strArgs: seq[string]) =
       offsetEmitted = true
     let slo = toSnorm16(lo)
     let shi = toSnorm16(hi)
-    echo &"{slo},{shi}"
+    emitPair(slo, shi)
     flat.add slo
     flat.add shi
 

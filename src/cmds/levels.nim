@@ -83,6 +83,7 @@ proc main*(strArgs: seq[string]) =
     expecting = ""
     inputFile = ""
     edit = "audio"
+    display = "float"
     tb = AVRational(num: 30, den: 1)
 
   for key in strArgs:
@@ -91,7 +92,7 @@ proc main*(strArgs: seq[string]) =
       noCache = true
     of "-tb":
       expecting = "timebase"
-    of "--timebase", "--edit":
+    of "--timebase", "--edit", "--display":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -107,10 +108,15 @@ proc main*(strArgs: seq[string]) =
         except ValueError: error &"Invalid rational number: {key}"
       of "edit":
         edit = key
+      of "display":
+        display = key
       expecting = ""
 
   if expecting != "":
     error &"--{expecting} needs argument."
+
+  if display notin ["float", "d16"]:
+    error &"Unknown display format: {display}"
 
   if inputFile == "":
     error "Expecting an input file."
@@ -126,13 +132,16 @@ proc main*(strArgs: seq[string]) =
 
   let cacheArgs = if editMethod == "audio": $userStream else: &"{userStream},{width},{blur}"
 
+  template emit(u: Unorm16) =
+    if display == "d16": echo uint16(u) else: echo u
+
   echo "\n@start"
 
   if not noCache:
     let cacheData = readCache[Unorm16](inputFile, tb, editMethod, cacheArgs)
     if cacheData.isSome:
       for loudnessValue in cacheData.get():
-        echo loudnessValue
+        emit loudnessValue
       echo ""
       return
 
@@ -160,7 +169,7 @@ proc main*(strArgs: seq[string]) =
 
     for loudnessValue in processor.loudness(container):
       let u = toUnorm16(loudnessValue)
-      echo u
+      emit u
       data.add u
     echo ""
 
@@ -180,7 +189,7 @@ proc main*(strArgs: seq[string]) =
 
     for value in processor.motionness(width, blur):
       let u = toUnorm16(value)
-      echo u
+      emit u
       data.add u
     echo ""
 
