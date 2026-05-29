@@ -230,6 +230,15 @@ proc openWrite*(file: string): OutputContainer =
   if formatCtx == nil:
     error "Could not create output context"
 
+  # Never abandon interleaving. auto-editor feeds the muxer audio progressively
+  # further ahead of video (audio is fully buffered upfront, video lags through
+  # decode+encode), so the default 10s heuristic eventually flushes audio out of
+  # interleave order — leaving it tens of MB ahead of its video in the file. Once
+  # that happens, players seeking via the video cues land past the matching audio
+  # and never play sound. 0 forces full interleaving (buffers the ahead stream,
+  # which is the low-bitrate audio here, so memory stays small).
+  formatCtx.max_interleave_delta = 0
+
   for i in 0 ..< formatCtx.nb_streams:
     if formatCtx.streams[i].codecpar.codec_type == AVMEDIA_TYPE_VIDEO:
       result.video.add formatCtx.streams[i]
