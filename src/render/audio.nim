@@ -1,7 +1,7 @@
 import std/[json, math, memfiles, os, strformat, strutils, sequtils, tables]
 
 import ../[action, av, ffmpeg, graph, log, resampler, timeline]
-import ../util/rational
+import ../util/[dnorm16, rational]
 
 # Import C string functions for JSON capture
 proc strchr(s: cstring, c: cint): cstring {.importc, header: "<string.h>".}
