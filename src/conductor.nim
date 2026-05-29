@@ -111,11 +111,8 @@ proc setOutput(userOut, `export`, path: string, isUrl = false): (string, string)
   let root = dir / name
 
   if ext == "":
-    # Default to `mkv` for URL inputs, otherwise `mp4` as the most compatible.
-    ext =
-      if isUrl: ".mkv"
-      elif path == "": ".mp4"
-      else: agSplitFile(path).ext
+    # Use `mkv` as the default, because it can handle any encoder.
+    ext = (if path == "": ".mkv" else: agSplitFile(path).ext)
 
   var myExport = `export` # Create mutable copy
   if myExport == "":
