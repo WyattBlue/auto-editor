@@ -770,7 +770,7 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
 
   let enableDemuxers = enableMuxers & @["mpegts"]
 
-  var filters = "scale,crop,pad,format,gblur,hflip,lut,lutrgb,lutyuv,negate,vflip,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,deesser,volume,loudnorm,asetrate".split(",")
+  var filters = "aformat,abuffer,abuffersink,aresample,asetrate,atempo,anull,anullsrc,crop,deesser,format,gblur,hflip,lenscorrection,loudnorm,lut,lutrgb,lutyuv,negate,pad,scale,vflip,volume".split(",")
 
   for package in packages:
     if package.name == "libvpx":

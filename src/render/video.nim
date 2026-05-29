@@ -710,6 +710,26 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
             fxGraph.push(frame)
             av_frame_free(addr frame)
             frame = fxGraph.pull()
+          of actLens:
+            let k1 = effect.k1
+            let k2 = effect.k2
+            if k1 == 0.0'f32 and k2 == 0.0'f32:
+              continue
+            let frameFmtName = $AVPixelFormat(frame.format)
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            let key = &"lens|{k1}|{k2}|{bg}|{bufferArgs}"
+            if fxKey != key:
+              if fxGraph != nil:
+                fxGraph.cleanup()
+              fxGraph = newGraph()
+              let bufferSrc = fxGraph.add("buffer", bufferArgs)
+              let filt = fxGraph.add("lenscorrection", &"k1={k1}:k2={k2}:fc={bg}")
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+              fxKey = key
+            fxGraph.push(frame)
+            av_frame_free(addr frame)
+            frame = fxGraph.pull()
 
       # Validate frame before reformatting
       if frame != nil and (frame.width <= 0 or frame.height <= 0):
