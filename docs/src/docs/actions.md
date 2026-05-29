@@ -87,6 +87,22 @@ auto-editor video.mp4 --when-silent volume:0.2
 auto-editor video.mp4 --when-normal volume:1.5
 ```
 
+### deesser
+
+Reduce harsh "s" and "sh" sibilance in the audio section. Takes up to three
+positional args, `deesser:intensity[:max[:freq]]`, each in the range 0.0 to 1.0:
+- **intensity** — how much to de-ess (0.0 = none, 1.0 = maximum)
+- **max** — caps the maximum reduction (default 0.5)
+- **freq** — split frequency (default 0.5)
+
+```bash
+# De-ess active (spoken) sections
+auto-editor video.mp4 --when-normal deesser:0.5
+
+# Stronger de-essing with a higher max reduction and tuned frequency
+auto-editor video.mp4 --when-normal deesser:0.8:0.7:0.4
+```
+
 ### invert
 
 Invert all pixels in the video section.

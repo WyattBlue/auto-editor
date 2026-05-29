@@ -333,6 +333,8 @@ proc createFilterGraph(effects: Actions, sr: cint, layout: ref AVChannelLayout):
       filters.add &"aresample={sr}"
     of actVolume:
       filters.add &"volume={effect.val}"
+    of actDeesser:
+      filters.add &"deesser=i={effect.intensity}:m={effect.maxd}:f={effect.freq}"
     else: discard
 
   let filterChain = (if filters.len == 0: "anull" else: filters.join(","))
@@ -382,7 +384,7 @@ proc processAudioClip(ef: seq[Actions], clip: Clip, data: seq[int16], sourceSr, 
   let effectGroup = ef[clip.effects]
   var needsFiltering = false
   for effect in effectGroup:
-    if effect.kind in [actSpeed, actVarispeed, actVolume]:
+    if effect.kind in [actSpeed, actVarispeed, actVolume, actDeesser]:
       needsFiltering = true
       break
 

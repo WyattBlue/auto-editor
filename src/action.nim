@@ -1,9 +1,10 @@
 import std/[options, strutils]
+import ./util/unorm16
 
 type
   ActionKind* = enum
-    actSpeed, actVarispeed, actVolume, actInvert, actZoom, actHflip, actVflip,
-    actOpacity, actBlur, actBrightness, actLuv
+    actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
+    actVflip, actOpacity, actBlur, actBrightness, actLuv
 
   # Represents a full-sized action.
   Action* = object
@@ -12,10 +13,10 @@ type
       discard
     of actSpeed, actVarispeed, actVolume, actZoom, actOpacity, actBlur, actBrightness:
       val*: float32
+    of actDeesser:
+      intensity*, maxd*, freq*: float32
     of actLuv:
-      brighthue*: float32
-      contrast*: float32
-      saturation*: float32
+      brighthue*, contrast*, saturation*: float32
 
   Actions* = distinct int # A fat pointer to a list of action in atf-8 format.
 
@@ -33,6 +34,9 @@ const
   luvBrighthueId*: float32 = 0.0
   luvContrastId*: float32 = 1.0
   luvSaturationId*: float32 = 1.0
+  # FFmpeg's deesser defaults for max-deessing (m) and split frequency (f).
+  deesserMaxId*: float32 = 0.5
+  deesserFreqId*: float32 = 0.5
 
 const actionDefs*: seq[ActionDef] = @[
   ActionDef(name: "nil",
@@ -50,6 +54,10 @@ Implemented with FFmpeg's `asetrate` + `aresample` filters, which change the sam
   ActionDef(name: "volume", argSpec: "val: float",
     help: """
 Adjust the audio volume by a factor of val. 1.0 = normal, 0.5 = half (-6dB), 2.0 = double (+6dB)."""),
+  ActionDef(name: "deesser", argSpec: "intensity[:max[:freq]]", range: "each [0.0, 1.0]",
+    help: """
+Reduce harsh "s" and "sh" sibilance in the audio section. Implemented via FFmpeg's `deesser` filter.
+Positional args: `intensity` controls how much to de-ess (0.0 = none, 1.0 = maximum), `max` caps the maximum reduction (default 0.5), and `freq` sets the split frequency (default 0.5). `max` and `freq` are optional."""),
   ActionDef(name: "invert",
     help: "Invert all pixels in the video section."),
   ActionDef(name: "hflip",
@@ -77,6 +85,8 @@ func `==`*(a, b: Action): bool =
   case a.kind
   of actInvert, actHflip, actVflip: true
   of actSpeed, actVarispeed, actVolume, actZoom, actOpacity, actBlur, actBrightness: a.val == b.val
+  of actDeesser:
+    a.intensity == b.intensity and a.maxd == b.maxd and a.freq == b.freq
   of actLuv:
     a.brighthue == b.brighthue and a.contrast == b.contrast and
       a.saturation == b.saturation
@@ -97,6 +107,18 @@ func parseAction*(val: string): Option[Action] =
     return some(Action(kind: actVflip))
 
   let parts = val.split(":")
+
+  # deesser takes positional args: intensity[:max[:freq]]
+  if parts.len >= 2 and parts.len <= 4 and parts[0] == "deesser":
+    var vals = [0.0'f32, deesserMaxId, deesserFreqId]
+    for idx in 1 ..< parts.len:
+      vals[idx - 1] = (
+        try: parseFloat(parts[idx]).float32
+        except ValueError: return none(Action)
+      )
+    return some(Action(kind: actDeesser,
+      intensity: vals[0], maxd: vals[1], freq: vals[2]))
+
   if parts.len == 2:
     let effectType = parts[0]
     let effectVal = (
@@ -133,6 +155,18 @@ when not defined(nimscript):
     of actSpeed: "speed:" & $act.val
     of actVarispeed: "varispeed:" & $act.val
     of actVolume: "volume:" & $act.val
+    of actDeesser:
+      # Quantize first and compare/stringify on the Unorm16 values, so defaults
+      # still register as default after a round-trip through the buffer.
+      let i = toUnorm16(act.intensity)
+      let m = toUnorm16(act.maxd)
+      let f = toUnorm16(act.freq)
+      if f != toUnorm16(deesserFreqId):
+        "deesser:" & $i & ":" & $m & ":" & $f
+      elif m != toUnorm16(deesserMaxId):
+        "deesser:" & $i & ":" & $m
+      else:
+        "deesser:" & $i
     of actZoom: "zoom:" & $act.val
     of actOpacity: "opacity:" & $act.val
     of actBlur: "blur:" & $act.val
@@ -148,6 +182,7 @@ when not defined(nimscript):
     case kind
     of actInvert, actHflip, actVflip: 1
     of actSpeed, actVarispeed, actVolume, actZoom, actOpacity, actBlur, actBrightness: 5
+    of actDeesser: 7
     of actLuv: 13
 
   func len*(a: Actions): int =  # byte length
@@ -170,6 +205,13 @@ when not defined(nimscript):
           copyMem(addr v, addr base[i + 1], sizeof(float32))
           yield Action(kind: kind, val: v)
           i += 5
+        of actDeesser:
+          var iu, mu, fu: Unorm16
+          copyMem(addr iu, addr base[i + 1], sizeof(Unorm16))
+          copyMem(addr mu, addr base[i + 3], sizeof(Unorm16))
+          copyMem(addr fu, addr base[i + 5], sizeof(Unorm16))
+          yield Action(kind: actDeesser, intensity: iu, maxd: mu, freq: fu)
+          i += 7
         of actLuv:
           var b, c, s: float32
           copyMem(addr b, addr base[i + 1], sizeof(float32))
@@ -213,6 +255,14 @@ when not defined(nimscript):
         var v = a.val
         copyMem(addr base[i + 1], addr v, sizeof(float32))
         i += 5
+      of actDeesser:
+        var iu = toUnorm16(a.intensity)
+        var mu = toUnorm16(a.maxd)
+        var fu = toUnorm16(a.freq)
+        copyMem(addr base[i + 1], addr iu, sizeof(Unorm16))
+        copyMem(addr base[i + 3], addr mu, sizeof(Unorm16))
+        copyMem(addr base[i + 5], addr fu, sizeof(Unorm16))
+        i += 7
       of actLuv:
         var b = a.brighthue
         var c = a.contrast
@@ -241,6 +291,16 @@ when not defined(nimscript):
           (action.val < -1.0 or action.val > 1.0):
         raise newException(ActionParseError,
           "brightness must be in [-1.0, 1.0]")
+      if action.kind == actDeesser:
+        if action.intensity < 0.0 or action.intensity > 1.0:
+          raise newException(ActionParseError,
+            "deesser intensity must be in [0.0, 1.0]")
+        if action.maxd < 0.0 or action.maxd > 1.0:
+          raise newException(ActionParseError,
+            "deesser max must be in [0.0, 1.0]")
+        if action.freq < 0.0 or action.freq > 1.0:
+          raise newException(ActionParseError,
+            "deesser frequency must be in [0.0, 1.0]")
       if action.kind == actLuv:
         if action.brighthue < -1.0 or action.brighthue > 1.0:
           raise newException(ActionParseError,
