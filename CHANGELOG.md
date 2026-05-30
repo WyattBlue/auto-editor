@@ -12,4 +12,5 @@
  - URL inputs now default to an `mkv` container and the `h264` video codec (instead of inheriting the downloaded file's container/codec, e.g. webm/vp9).
 
 ## Fixes
+ - `info` now reports the intended display aspect ratio: it folds in the pixel aspect ratio so anamorphic video shows its true ratio (e.g. `720x480` with SAR `32:27` shows `16:9`), and snaps codec-rounding artifacts to the common ratio they approximate (e.g. `854x480` shows `16:9` instead of the meaningless exact reduction `427:240`).
  - Remove `--download-format` as it is now superfluous.

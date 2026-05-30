@@ -32,7 +32,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
   if fileInfo.v.len > 0:
     echo " - video:"
   for track, v in fileInfo.v:
-    let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height)
+    let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height, v.sar.num, v.sar.den)
 
     echo &"   - track {track}:"
     echo &"     - codec: {$avcodec_get_name(v.codecId)}"
@@ -89,7 +89,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
   if fileInfo.i.len > 0:
     echo " - image:"
   for track, i in fileInfo.i:
-    let (ratioWidth, ratioHeight) = aspectRatio(i.width, i.height)
+    let (ratioWidth, ratioHeight) = aspectRatio(i.width, i.height, i.sar.num, i.sar.den)
 
     echo &"   - track {track}:"
     echo &"     - codec: {$avcodec_get_name(i.codecId)}"
@@ -126,7 +126,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
     tb = makeSaneTimebase(fileInfo.v[0].avg_rate)
 
   for v in fileInfo.v:
-    let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height)
+    let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height, v.sar.num, v.sar.den)
     varr.add( %* {
       "codec": $avcodec_get_name(v.codecId),
       "fps": $v.avg_rate,
@@ -153,7 +153,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
     sarr.add( %* s)
 
   for i in fileInfo.i:
-    let (ratioWidth, ratioHeight) = aspectRatio(i.width, i.height)
+    let (ratioWidth, ratioHeight) = aspectRatio(i.width, i.height, i.sar.num, i.sar.den)
     iarr.add( %* {
       "codec": $avcodec_get_name(i.codecId),
       "resolution": [i.width, i.height],
