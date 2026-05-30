@@ -8,7 +8,6 @@
   {{ core_style }}
   label { color: var(--charcoal-100) }
   input, button, select { margin: 4px 0 }
-  #hero { font-family: monospace }
   .notice { color: var(--charcoal-400) }
   #log {
     font-family: monospace;
@@ -35,7 +34,9 @@
   {{ nav }}
 <section class="section">
 <div class="container">
-  <h2 id="hero">Auto-Editor cli for wasm</h2>
+  <h1 class="hero-title">
+    <p>Auto-Editor cli for wasm</p>
+  </h1>
   <p id="memNotice" class="tiny notice" style="display:none">wasm32 fallback has a memory limit of 4GB. Importing or exporting big files may fail.</p>
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('main', this)">Main</button>
