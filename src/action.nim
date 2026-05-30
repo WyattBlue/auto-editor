@@ -1,4 +1,4 @@
-import std/strutils
+import std/[strutils, options]
 import ./util/dnorm16
 
 type
@@ -32,56 +32,75 @@ type
 
   ActionParseError* = object of CatchableError
 
+  ActionType* = enum  # which media stream(s) the action affects
+    atAudio, atVideo, atBoth
+
+  RangeDoc* = object
+    lo*, hi*: float
+    loIncl*, hiIncl*: bool  # closed (inclusive) bounds
+    each*: bool             # the interval applies to each positional arg
+
   ActionDef* = object
     name*: string
-    argSpec*: string  # e.g., "val: float"
-    range*: string    # e.g., "(0-99999)"
+    atype*: ActionType
+    argSpec*: string  # storage type ("float32") or positional spec ("k1[:k2]")
+    range*: Option[RangeDoc]
     help*: string
 
+func rng(lo, hi: float; loIncl = true, hiIncl = true, each = false): Option[RangeDoc] =
+  some(RangeDoc(lo: lo, hi: hi, loIncl: loIncl, hiIncl: hiIncl, each: each))
+
+func `$`*(r: RangeDoc): string =
+  ## e.g. "(0.0, 99999.0)", "each [-1.0, 1.0]"
+  (if r.each: "each " else: "") &
+    (if r.loIncl: "[" else: "(") & $r.lo & ", " & $r.hi &
+    (if r.hiIncl: "]" else: ")")
+
+func `$`*(t: ActionType): string =
+  case t
+  of atAudio: "A"
+  of atVideo: "V"
+  of atBoth: "AV"
+
 const actionDefs*: seq[ActionDef] = @[
-  ActionDef(name: "nil",
+  ActionDef(name: "nil", atype: atBoth,
     help: "Do nothing. Keep the section unchanged at normal speed and pitch."),
-  ActionDef(name: "cut",
+  ActionDef(name: "cut", atype: atBoth,
     help: "Remove the section completely from the output."),
-  ActionDef(name: "speed", argSpec: "val: float", range: "(0-99999)",
+  ActionDef(name: "speed", atype: atBoth, argSpec: "float32", range: rng(0.0, 99999.0, loIncl = false, hiIncl = false),
+    help: "Change the playback speed while preserving pitch via time-stretching. 1.0 = unchanged, 2.0 = twice as fast, 0.5 = half speed. Implemented with ffmpeg's `atempo` filter."),
+  ActionDef(name: "varispeed", atype: atBoth, argSpec: "float32", range: rng(0.2, 100.0),
+    help: "Change the playback speed by resampling, so pitch shifts along with it, like analog tape or vinyl. 1.0 = unchanged, 2.0 = twice as fast and an octave higher. Implemented with ffmpeg's `asetrate` + `aresample` filters."),
+  ActionDef(name: "volume", atype: atAudio, argSpec: "float32",
+    help: "Scale the audio volume by val. 1.0 = unchanged, 0.5 = half (-6 dB), 2.0 = double (+6 dB)."),
+  ActionDef(name: "deesser", atype: atAudio, argSpec: "intensity[:max[:freq]]", range: rng(0.0, 1.0, each = true),
     help: """
-Change the playback speed while preserving pitch using time-stretching.
-Implemented with FFmpeg's `atempo` filter."""),
-  ActionDef(name: "varispeed", argSpec: "val: float", range: "[0.2-100]",
+Reduce harsh "s" and "sh" sibilance in the section. Implemented via ffmpeg's `deesser` filter.
+Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum), `max` caps the reduction (default 0.5), and `freq` sets the split frequency (default 0.5)."""),
+  ActionDef(name: "invert", atype: atVideo,
+    help: "Invert every pixel in the section, producing a photo-negative."),
+  ActionDef(name: "hflip", atype: atVideo,
+    help: "Flip the section horizontally, mirroring it left to right."),
+  ActionDef(name: "vflip", atype: atVideo,
+    help: "Flip the section vertically, mirroring it top to bottom."),
+  ActionDef(name: "zoom", atype: atVideo, argSpec: "float32", range: rng(0.0, 100.0, loIncl = false),
+    help: "Scale the picture about its center by val. 1.0 = no zoom, 2.0 = zoom in 2x, 0.5 = zoom out 2x."),
+  ActionDef(name: "opacity", atype: atVideo, argSpec: "unorm16", range: rng(0.0, 1.0),
+    help: "Blend the section against the background. 1.0 = fully opaque, 0.0 = fully transparent."),
+  ActionDef(name: "blur", atype: atVideo, argSpec: "float32", range: rng(0.0, 1024.0),
+    help: "Gaussian-blur the picture by sigma = val. 0.0 = no blur; larger values blur more."),
+  ActionDef(name: "brightness", atype: atVideo, argSpec: "snorm16", range: rng(-1.0, 1.0),
+    help: "Shift brightness by adding an equal offset to the R, G, and B channels. 0.0 = unchanged, positive brightens, negative darkens. Implemented via ffmpeg's `lutrgb` filter."),
+  ActionDef(name: "brighthue", atype: atVideo, argSpec: "snorm16", range: rng(-1.0, 1.0),
+    help: "Shift luma by offsetting the Y channel. 0.0 = unchanged, positive brightens, negative darkens."),
+  ActionDef(name: "contrast", atype: atVideo, argSpec: "float32", range: rng(-2.0, 2.0),
+    help: "Scale contrast around mid-gray. 1.0 = unchanged, higher values increase contrast, lower values reduce it. Implemented via ffmpeg's `lutyuv` filter."),
+  ActionDef(name: "saturation", atype: atVideo, argSpec: "float32", range: rng(0.0, 3.0),
+    help: "Scale color saturation. 1.0 = unchanged, 0.0 = grayscale, higher values are more vivid. Implemented via ffmpeg's `lutyuv` filter."),
+  ActionDef(name: "lens", atype: atVideo, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
     help: """
-Change the playback speed by varying pitch, like analog tape or vinyl.
-Implemented with FFmpeg's `asetrate` + `aresample` filters, which change the sample rate so speed and pitch shift together."""),
-  ActionDef(name: "volume", argSpec: "val: float",
-    help: """
-Adjust the audio volume by a factor of val. 1.0 = normal, 0.5 = half (-6dB), 2.0 = double (+6dB)."""),
-  ActionDef(name: "deesser", argSpec: "intensity[:max[:freq]]", range: "each [0.0, 1.0]",
-    help: """
-Reduce harsh "s" and "sh" sibilance in the audio section. Implemented via FFmpeg's `deesser` filter.
-Positional args: `intensity` controls how much to de-ess (0.0 = none, 1.0 = maximum), `max` caps the maximum reduction (default 0.5), and `freq` sets the split frequency (default 0.5). `max` and `freq` are optional."""),
-  ActionDef(name: "invert",
-    help: "Invert all pixels in the video section."),
-  ActionDef(name: "hflip",
-    help: "Flip the video section horizontally."),
-  ActionDef(name: "vflip",
-    help: "Flip the video section vertically."),
-  ActionDef(name: "zoom", argSpec: "val: float", range: "(0, 100]",
-    help: "Zoom in or out by a factor of val. 1.0 = no zoom."),
-  ActionDef(name: "opacity", argSpec: "val: float", range: "[0.0, 1.0]",
-    help: "Blend the video section against the background. 1.0 = fully opaque, 0.0 = fully transparent."),
-  ActionDef(name: "blur", argSpec: "val: float", range: "[0, 1024]",
-    help: "Gaussian blur the video section by sigma=val. 0 = no blur; larger values blur more."),
-  ActionDef(name: "brightness", argSpec: "val: float", range: "[-1.0, 1.0]",
-    help: "Shift video brightness (adds an equal offset to R, G, B). 0.0 = unchanged. Implemented via FFmpeg's `lutrgb` filter."),
-  ActionDef(name: "brighthue", argSpec: "val: float", range: "[-1.0, 1.0]",
-    help: "Shift video luma (Y channel). 0.0 = unchanged."),
-  ActionDef(name: "contrast", argSpec: "val: float", range: "[-2.0, 2.0]",
-    help: "Scale video contrast. 1.0 = unchanged. Implemented via FFmpeg's `lutyuv` filter."),
-  ActionDef(name: "saturation", argSpec: "val: float", range: "[0.0, 3.0]",
-    help: "Scale video saturation. 1.0 = unchanged, 0.0 = grayscale. Implemented via FFmpeg's `lutyuv` filter."),
-  ActionDef(name: "lens", argSpec: "k1[:k2]", range: "each [-1.0, 1.0]",
-    help: """
-Apply lens distortion correction. Implemented via FFmpeg's `lenscorrection` filter.
-Positional args: `k1` is the quadratic correction factor and `k2` is the double quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion). With no arguments, a fun fisheye lens is applied."""),
+Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
+Positional args: `k1` is the quadratic correction factor and `k2` the double-quadratic factor. Negative values bulge the image outward (fisheye); positive values pinch it inward (pincushion)."""),
 ]
 
 const aNil* = Actions(0)

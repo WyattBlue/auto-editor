@@ -13,6 +13,8 @@
   --charcoal-800: #45474A;
   --charcoal-900: #1B2326;
   --charcoal-1000: #131417;
+
+  --hero-weight: 800;
 }
 
 html {
@@ -29,6 +31,28 @@ html, p, h1, h2, h3, h4, html, blockquote {
   margin: 0;
   padding: 0;
 }
+
+h1 {
+  margin-bottom: 1.5rem;
+  line-height: 1.125;
+  word-break: break-word;
+  text-align: center;
+}
+.hero-title > p {
+  font-size: 2rem;
+  font-weight: var(--hero-weight);
+  line-height: 1.125;
+  word-break: break-word;
+}
+.hero-title > p {
+  text-align: left;
+}
+
+/* h2:not(:first-child) { margin-top: 1.1428em } */
+h2 { margin-bottom: .5714em }
+
+/* h3:not(:first-child) { margin-top: 1.3333em } */
+h3 { margin-bottom: .5em }
 
 li, ol {margin: 0}
 ul {margin-top: 0}
@@ -146,10 +170,7 @@ p {
   display: block;
   text-wrap: pretty;
   max-width: 88ch;
-  margin-block-start: 0.4em;
-  margin-block-end: 1em;
-  margin-inline-start: 0px;
-  margin-inline-end: 0px;
+  margin-bottom: 16px;
 }
 
 .section {padding: 1rem 0}
@@ -184,12 +205,6 @@ pre {line-height: 1.25}
 table { border-collapse: collapse }
 th, td { padding: 10px }
 
-h1 {
-  margin-bottom: 1.5rem;
-  line-height: 1.125;
-  word-break: break-word;
-  text-align: center;
-}
 h1, th, .bold {font-weight: bold}
 h2 {font-weight: 600}
 h3 {font-weight: 500}
@@ -203,7 +218,6 @@ h1, h2, h3, h4, p, code, pre, thead, tbody {color: #323232}
 blockquote {border-left: 5px solid #EAEAEA}
 blockquote > p {color: #696969}
 pre {background-color: #F9F5F5}
-code {background-color: #EAEAEA}
 th, td {border: 1px solid #323232}
 a {color: #0573D9}
 a:hover {color: #63C0F4}
@@ -213,8 +227,6 @@ li {color: black; text-decoration: black;}
 
 /* highlighting */
 .kw {color: #ad46ad; font-style: italic;}
-.keyword-import {color: #ad46ad;}
-.terminator {color: #B28372;}
 .function-name {color: #549ACF; }
 .dv {color: #4594e2; font-style: italic;}
 
@@ -226,7 +238,6 @@ li {color: black; text-decoration: black;}
   blockquote {border-left: 5px solid #4A4A4A}
   blockquote > p {color: #DBDBDB}
   pre {background-color: #323232}
-  code {background-color: #4A4A4A}
   th, td {border: 1px solid #F9F7F7}
   a {color: #63C0F4}
   a:hover {color: #A3DEFF}
@@ -236,8 +247,6 @@ li {color: black; text-decoration: black;}
 
    /* highlighting */
   .kw {color: #c78bc8; font-style: italic;}
-  .keyword-import {color: #c78bc8;}
-  .terminator {color: #A6ACB9;}
   .dv {color: #6eaadf; font-style: italic;}
   .st, .dt {color: #99c794;}
   .co {color: #a6acb9;}

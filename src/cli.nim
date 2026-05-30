@@ -1,5 +1,4 @@
 import std/[macros, strformat, strutils]
-import ./action
 
 type CmdDef* = object
   name*: string
@@ -42,6 +41,7 @@ func `$`(link: Link): string =
 
 const fragmented = Link(href: "https://ffmpeg.org/ffmpeg-formats.html#Fragmentation", a: "fragmented")
 const ytDlp = Link(href: "https://github.com/yt-dlp/yt-dlp", a: "yt-dlp")
+const actionsRef = Link(href: "https://auto-editor.com/ref/actions", a: "actions reference")
 
 type OptKind* = enum
   Regular # expecting = $datum
@@ -55,19 +55,6 @@ type OptDef* = object
   datum*: string
   metavar*: string # Shouldn't be set for flags.
   help*: string
-
-func buildWhenSilentHelp(): string =
-  result = "When a segment is inactive (defined by --edit) do an action. The default action being 'cut'\n\nActions available:"
-  for a in actionDefs:
-    var head = "\n  " & a.name
-    if a.argSpec != "":
-      head.add ":<" & a.argSpec & ">"
-    if a.range != "":
-      head.add ", range " & a.range
-    let firstLine = a.help.strip().splitLines()[0]
-    result.add head & "\n    " & firstLine
-
-const whenSilentHelp* = buildWhenSilentHelp()
 
 const whisperOptions*: seq[OptDef] = @[
   OptDef(names: "--debug", kind: Flag, datum: "isDebug", help: ""),
@@ -95,7 +82,8 @@ Set an expression which determines how to make auto edits. (default is "audio")"
   OptDef(names: "-w:1, --when-active, --when-normal", c: cEdit, datum: "when-normal", metavar: "ACTION",
     help: "When a segment is active (defined by --edit) do an action. The default action being 'nil'"),
   OptDef(names: "-w:0, --when-inactive, --when-silent", c: cEdit, datum: "when-silent", metavar: "ACTION",
-      help: whenSilentHelp),
+      help: &"""
+When a segment is inactive (defined by --edit) do an action. The default action being 'cut'. See the {actionsRef} for all available actions."""),
   OptDef(names: "-m, --margin", c: cEdit, datum: "margin", metavar: "LENGTH[,LENGTH?]",
       help: """
 Set sections near "loud" as "loud" too if section is less than LENGTH away. (default is "0.2s")"""),
@@ -106,13 +94,6 @@ Examples:
   --smooth 0.2s,0.1s  # Set mincut to 0.2 seconds, minclip to 0.1 seconds.
   --smooth 0  # Turn off smoothing"""),
   # TODO: Add `-s` for smoothing next major release.
-  OptDef(names: "-ex, --export", datum: "export",
-    metavar: "EXPORT:ATTRS?", help: "Choose the export mode"),
-  OptDef(names: "-exp, --export-to-premiere", kind: Special, datum: "premiere"),
-  OptDef(names: "-exr, --export-to-resolve", kind: Special, datum: "resolve"),
-  OptDef(names: "-exf, --export-to-final-cut-pro", kind: Special, datum: "final-cut-pro"),
-  OptDef(names: "-exs, --export-to-shotcut", kind: Special, datum: "shotcut"),
-  OptDef(names: "-exk, --export-to-kdenlive", kind: Special, datum: "kdenlive"),
   OptDef(names: "-o, --output", c: cEdit, datum: "output",
     metavar: "FILE", help: "Set the name/path of the new output file"),
   OptDef(names: "--cut-out, --cut", c: cEdit, datum: "cut-out",
@@ -131,6 +112,14 @@ Examples:
   OptDef(names: "--video-speed", c: cEdit, datum: "video-speed", metavar: "NUM",
     help: "[Deprecated] Set speed of active segments to NUM. (default is 1)"),
 
+  OptDef(names: "-exp, --export-to-premiere", kind: Special, datum: "premiere"),
+  OptDef(names: "-exr, --export-to-resolve", kind: Special, datum: "resolve"),
+  OptDef(names: "-exf, --export-to-final-cut-pro", kind: Special, datum: "final-cut-pro"),
+  OptDef(names: "-exs, --export-to-shotcut", kind: Special, datum: "shotcut"),
+  OptDef(names: "-exk, --export-to-kdenlive", kind: Special, datum: "kdenlive"),
+
+  OptDef(names: "-ex, --export", c: cTl, datum: "export",
+    metavar: "EXPORT:ATTRS?", help: "Choose the export mode"),
   OptDef(names: "-tb, --time-base, -r, -fps, --frame-rate", c: cTl, datum: "frame-rate",
     metavar: "NUM", help: "Set timeline frame rate"),
   OptDef(names: "-ar, --sample-rate", c: cTl, datum: "sample-rate", metavar: "NAT",
