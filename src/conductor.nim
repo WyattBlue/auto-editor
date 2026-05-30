@@ -112,7 +112,7 @@ proc setOutput(userOut, `export`, path: string, isUrl = false): (string, string)
 
   if ext == "":
     # Use `mkv` as the default, because it can handle any encoder.
-    ext = (if path == "": ".mkv" else: agSplitFile(path).ext)
+    ext = (if isUrl or path == "": ".mkv" else: agSplitFile(path).ext)
 
   var myExport = `export` # Create mutable copy
   if myExport == "":
