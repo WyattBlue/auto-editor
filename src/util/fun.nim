@@ -135,11 +135,46 @@ func splitext*(val: string): (string, string) =
   let (dir, name, ext) = agSplitFile(val)
   return (dir & "/" & name, ext)
 
-func aspectRatio*(width, height: int): tuple[w, h: int] =
-  if height == 0:
+const
+  commonAspectRatios = [
+    (1, 1), (5, 4), (4, 3), (3, 2), (16, 10), (16, 9), (2, 1), (64, 27)
+  ]
+  # Max drift, in stored pixels, between a dimension and what a common ratio
+  # would produce for us to treat the difference as codec-friendly rounding
+  # rather than a deliberate ratio. Absolute (not relative) so the snap stays
+  # tight at high resolutions where a percentage would be many pixels wide.
+  aspectSnapDrift = 2.0
+
+func aspectRatio*(width, height: int, sarNum = 1, sarDen = 1): tuple[w, h: int] =
+  if width <= 0 or height <= 0:
     return (0, 0)
-  let c = gcd(width, height)
-  return (width div c, height div c)
+
+  # Fold the sample (pixel) aspect ratio into the dimensions so anamorphic video
+  # reports its true display aspect ratio, the way ffmpeg's DAR does.
+  let
+    sn = max(sarNum, 1)
+    sd = max(sarDen, 1)
+    dispW = width * sn
+    dispH = height * sd
+    c = gcd(dispW, dispH)
+  result = (dispW div c, dispH div c)
+
+  # A clean, small reduction is already a meaningful ratio (16:9, 4:3, 8:5...).
+  if max(result.w, result.h) <= 50:
+    return
+
+  let (w, h) = (width.float, height.float)
+  var bestDrift = aspectSnapDrift
+  for (cw, ch) in commonAspectRatios:
+    for (a, b) in [(cw, ch), (ch, cw)]:
+      # Stored dimensions that would yield this display ratio for the given SAR.
+      let
+        ta = float(a * sd)  # storage-width units
+        tb = float(b * sn)  # storage-height units
+        drift = max(abs(w - h * ta / tb), abs(h - w * tb / ta))
+      if drift < bestDrift:
+        bestDrift = drift
+        result = (a, b)
 
 proc splitNumStr*(val: string): (float64, string) =
   var index = 0

@@ -209,3 +209,28 @@ test "uuid":
     for j, c in uuid:
       if j notin [8, 13, 18, 23]: # Skip dashes
         check(c in "0123456789abcdef")
+
+test "aspectRatio":
+  # Clean reductions are kept as-is.
+  check aspectRatio(1920, 1080) == (16, 9)
+  check aspectRatio(1280, 720) == (16, 9)
+  check aspectRatio(640, 480) == (4, 3)
+  check aspectRatio(1600, 1000) == (8, 5)
+  check aspectRatio(1080, 1920) == (9, 16)
+
+  # Codec-rounding artifacts snap to the intended display aspect ratio.
+  check aspectRatio(854, 480) == (16, 9)   # not 427:240
+  check aspectRatio(1366, 768) == (16, 9)  # not 683:384
+  check aspectRatio(2560, 1080) == (64, 27)
+
+  # Genuinely unusual ratios are left exact, not force-snapped.
+  check aspectRatio(1920, 800) == (12, 5)  # 2.40:1 stays as-is
+
+  # SAR is folded in, so anamorphic video reports its true display ratio.
+  check aspectRatio(720, 480, 32, 27) == (16, 9)  # NTSC anamorphic 16:9
+  check aspectRatio(720, 480, 8, 9) == (4, 3)     # NTSC 4:3
+  check aspectRatio(720, 576, 16, 15) == (4, 3)   # PAL 4:3
+  check aspectRatio(1440, 1080, 4, 3) == (16, 9)  # HDV anamorphic
+
+  # Degenerate input.
+  check aspectRatio(100, 0) == (0, 0)
