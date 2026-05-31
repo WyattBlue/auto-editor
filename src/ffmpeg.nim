@@ -49,8 +49,8 @@ converter toAVRational*(s: string): AVRational =
 
   return rational
 
-proc av_parse_color*(rgba_color: ptr uint8, color_string: cstring, slen: cint,
-    log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
+proc av_get_known_color_name*(color_idx: cint, rgbp: ptr ptr uint8): cstring
+    {.importc, header: "<libavutil/parseutils.h>".}
 
 type
   AVMediaType* = cint

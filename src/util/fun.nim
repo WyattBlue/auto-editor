@@ -75,7 +75,7 @@ func wrapText*(text: string, width, indent: int): string =
   result = outLines.join("\n")
 
 type Code* = enum
-  webvtt, srt, mov_text, standard, ass, rass, display
+  standard, ass, display
 
 func toTimecode*(secs: float, fmt: Code): string =
   var sign = ""
@@ -93,17 +93,10 @@ func toTimecode*(secs: float, fmt: Code): string =
   let s = totalSeconds mod 60.0
 
   case fmt:
-  of webvtt:
-    (if h == 0: &"{sign}{m:02d}:{s:06.3f}" else: &"{sign}{h:02d}:{m:02d}:{s:06.3f}")
-  of srt, mov_text:
-    let sStr = (&"{s:06.3f}").replace(".", ",")
-    &"{sign}{h:02d}:{m:02d}:{sStr}"
   of standard:
     &"{sign}{h:02d}:{m:02d}:{s:06.3f}"
   of ass:
     &"{sign}{h:d}:{m:02d}:{s:05.2f}"
-  of rass:
-    &"{sign}{h:d}:{m:02d}:{s:02.0f}"
   of display:
     &"{sign}{h:d}:{m:02d}:{s.round.int:02d}"
 
@@ -130,10 +123,6 @@ func agSplitFile*(path: string): tuple[dir, name, ext: string] =
     result.ext = substr(path, dotPos)
   else:
     result.name = path
-
-func splitext*(val: string): (string, string) =
-  let (dir, name, ext) = agSplitFile(val)
-  return (dir & "/" & name, ext)
 
 const
   commonAspectRatios = [

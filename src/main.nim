@@ -211,7 +211,8 @@ when not defined(emscripten):
     if args.outputFormat != "":
       outputFormat = args.outputFormat
     else:
-      outputFormat = replace(splitext(myInput)[0], re"\W+", "-") & ".%(ext)s"
+      let (dir, name, _) = agSplitFile(myInput)
+      outputFormat = replace(dir & "/" & name, re"\W+", "-") & ".%(ext)s"
       if args.preview:
         outputFormat = getTempDir() / outputFormat
 
@@ -355,7 +356,8 @@ judge making cuts.
     of "resolution":
       args.resolution = parseResolution(key, expecting)
     of "background":
-      args.background = some(parseColor(key))
+      try: args.background = some(parseColor(key))
+      except ValueError as e: error e.msg
     of "sample-rate":
       args.sampleRate = parseSampleRate(key)
     of "frame-rate":
