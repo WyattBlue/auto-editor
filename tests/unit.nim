@@ -38,6 +38,25 @@ test "color":
 
   check parseColor("black") == RGBColor(red: 0, green: 0, blue: 0)
   check parseColor("darkgreen") == RGBColor(red: 0, green: 100, blue: 0)
+  check parseColor("DarkGreen") == RGBColor(red: 0, green: 100, blue: 0)
+  check parseColor("WHITE") == RGBColor(red: 255, green: 255, blue: 255)
+
+  # The named path is strict: only real color names, no hex/random/alpha forms.
+  expect ValueError: discard parseColor("0xFF0000")
+  expect ValueError: discard parseColor("FF0000")
+  expect ValueError: discard parseColor("random")
+  expect ValueError: discard parseColor("black@0.5")
+
+  # toString round-trips through parseColor.
+  check RGBColor(red: 18, green: 52, blue: 86).toString == "#123456"
+  check parseColor(RGBColor(red: 1, green: 2, blue: 3).toString) ==
+    RGBColor(red: 1, green: 2, blue: 3)
+
+  # Malformed input is rejected, not silently coerced.
+  expect ValueError: discard parseColor("#12")
+  expect ValueError: discard parseColor("#12345")
+  expect ValueError: discard parseColor("#xyzxyz")
+  expect ValueError: discard parseColor("#xyz")
 
 test "dialogue":
   check "0,0,Default,,0,0,0,,oop".dialogue == "oop"
@@ -159,7 +178,7 @@ test "lang-to-string":
   check sizeof(Lang) == 4
   var a: Lang = ['a', 's', 'd', 'f']
   check $a == "asdf"
-  a  = ['e', 'n', 'g', '\0']
+  a = ['e', 'n', 'g', '\0']
   check $a == "eng"
 
 test "re":
@@ -219,18 +238,48 @@ test "aspectRatio":
   check aspectRatio(1080, 1920) == (9, 16)
 
   # Codec-rounding artifacts snap to the intended display aspect ratio.
-  check aspectRatio(854, 480) == (16, 9)   # not 427:240
-  check aspectRatio(1366, 768) == (16, 9)  # not 683:384
+  check aspectRatio(854, 480) == (16, 9) # not 427:240
+  check aspectRatio(1366, 768) == (16, 9) # not 683:384
   check aspectRatio(2560, 1080) == (64, 27)
 
   # Genuinely unusual ratios are left exact, not force-snapped.
-  check aspectRatio(1920, 800) == (12, 5)  # 2.40:1 stays as-is
+  check aspectRatio(1920, 800) == (12, 5) # 2.40:1 stays as-is
 
   # SAR is folded in, so anamorphic video reports its true display ratio.
-  check aspectRatio(720, 480, 32, 27) == (16, 9)  # NTSC anamorphic 16:9
-  check aspectRatio(720, 480, 8, 9) == (4, 3)     # NTSC 4:3
-  check aspectRatio(720, 576, 16, 15) == (4, 3)   # PAL 4:3
-  check aspectRatio(1440, 1080, 4, 3) == (16, 9)  # HDV anamorphic
+  check aspectRatio(720, 480, 32, 27) == (16, 9) # NTSC anamorphic 16:9
+  check aspectRatio(720, 480, 8, 9) == (4, 3) # NTSC 4:3
+  check aspectRatio(720, 576, 16, 15) == (4, 3) # PAL 4:3
+  check aspectRatio(1440, 1080, 4, 3) == (16, 9) # HDV anamorphic
 
   # Degenerate input.
   check aspectRatio(100, 0) == (0, 0)
+
+test "parseBitrate":
+  check parseBitrate("auto") == -1
+  check parseBitrate("500") == 500
+  check parseBitrate("128k") == 128000
+  check parseBitrate("128K") == 128000
+  check parseBitrate("5M") == 5_000_000
+
+test "toTimecode":
+  check toTimecode(3723.5, standard) == "01:02:03.500"
+  check toTimecode(0.0, standard) == "00:00:00.000"
+  check toTimecode(-1.5, standard) == "-00:00:01.500"
+  check toTimecode(3723.5, ass) == "1:02:03.50"
+  check toTimecode(3661.4, display) == "1:01:01"
+
+test "smoothing":
+  # A TRUE run shorter than minclip is dropped.
+  var island = @[false, false, true, false, false]
+  smoothing(island, 0, 2)
+  check island == @[false, false, false, false, false]
+
+  # A FALSE gap shorter than mincut is filled in.
+  var gap = @[true, true, false, true, true]
+  smoothing(gap, 2, 0)
+  check gap == @[true, true, true, true, true]
+
+  # A gap at/above mincut is left alone.
+  var bigGap = @[true, false, false, false, true]
+  smoothing(bigGap, 2, 0)
+  check bigGap == @[true, false, false, false, true]
