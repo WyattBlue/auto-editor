@@ -75,7 +75,7 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
   if myOut == nil:
     if ctx.codec.id == ID_AAC:
       if rate notin AAC_AT_RATES:
-        error &"AudioToolbox only supports these samplerates: " & AAC_AT_RATES.join(", ")
+        error "AudioToolbox only supports these samplerates: " & AAC_AT_RATES.join(", ")
     else:
       debug "audio encoder claims to support every samplerate"
       return
