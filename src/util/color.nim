@@ -2,16 +2,14 @@ import std/[strutils, strformat, parseutils]
 import ../ffmpeg
 
 type RGBColor* = object
-  red*: uint8
-  green*: uint8
-  blue*: uint8
+  red*, green*, blue*: uint8
 
 func toString*(color: RGBColor): string =
   let
     redHex = toHex(color.red, 2)
     greenHex = toHex(color.green, 2)
     blueHex = toHex(color.blue, 2)
-  result = (&"#{redHex}{greenHex}{blueHex}").toLowerAscii
+  return toLowerAscii(&"#{redHex}{greenHex}{blueHex}")
 
 func findColor(name: string): RGBColor {.raises: [ValueError].} =
   var rgba: array[4, uint8]
@@ -31,18 +29,14 @@ func parseColor*(hexString: string): RGBColor {.raises: [ValueError].} =
   let hexValue = hexString.substr(1)
   case hexValue.len
   of 3:
-    try:
-      discard parseHex(hexValue[0] & hexValue[0], result.red)
-      discard parseHex(hexValue[1] & hexValue[1], result.green)
-      discard parseHex(hexValue[2] & hexValue[2], result.blue)
-    except:
+    if parseHex(hexValue[0] & hexValue[0], result.red) != 2 or
+        parseHex(hexValue[1] & hexValue[1], result.green) != 2 or
+        parseHex(hexValue[2] & hexValue[2], result.blue) != 2:
       raise newException(ValueError, &"Invalid 3-digit hex color format: {hexString}")
   of 6:
-    try:
-      discard parseHex[uint8](hexValue[0..1], result.red)
-      discard parseHex[uint8](hexValue[2..3], result.green)
-      discard parseHex[uint8](hexValue[4..5], result.blue)
-    except:
+    if parseHex[uint8](hexValue[0..1], result.red) != 2 or
+        parseHex[uint8](hexValue[2..3], result.green) != 2 or
+        parseHex[uint8](hexValue[4..5], result.blue) != 2:
       raise newException(ValueError, &"Invalid 6-digit hex color format: {hexString}")
   else:
     raise newException(ValueError, &"Invalid hex color string length: {hexString}. Expected #RGB or #RRGGBB format.")

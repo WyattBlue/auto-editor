@@ -211,7 +211,8 @@ when not defined(emscripten):
     if args.outputFormat != "":
       outputFormat = args.outputFormat
     else:
-      outputFormat = replace(splitext(myInput)[0], re"\W+", "-") & ".%(ext)s"
+      let (dir, name, _) = agSplitFile(myInput)
+      outputFormat = replace(dir & "/" & name, re"\W+", "-") & ".%(ext)s"
       if args.preview:
         outputFormat = getTempDir() / outputFormat
 
