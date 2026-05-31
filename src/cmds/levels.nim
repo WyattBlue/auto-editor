@@ -33,7 +33,7 @@ proc parseEdit(editStr: string): (string, string, int32, int32, int32) =
       inc i
 
     if i >= paramsStr.len:
-      error &"No parameter found. Expected this format: method:key=value"
+      error "No parameter found. Expected this format: method:key=value"
 
     let paramName = paramsStr[paramStart..<i]
     inc i
