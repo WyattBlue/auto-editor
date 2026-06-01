@@ -12,7 +12,7 @@ int __main_argc_argv(int argc, char** argv) {
 when not defined(windows) and not defined(emscripten):
   import std/posix_utils
 
-import ./[about, action, cli, conductor, edit, ffmpeg, log]
+import ./[about, action, cli, conductor, edit, ffmpeg, log, media]
 import cmds/[info, desc, cache, levels, subdump, waveform, whisper]
 import util/[color, fun, term, rational]
 
@@ -213,8 +213,6 @@ when not defined(emscripten):
     else:
       let (dir, name, _) = agSplitFile(myInput)
       outputFormat = replace(dir & "/" & name, re"\W+", "-") & ".%(ext)s"
-      if args.preview:
-        outputFormat = getTempDir() / outputFormat
 
     var cmd: seq[string] = @[]
     if downloadFormat != "":
@@ -233,7 +231,19 @@ when not defined(emscripten):
     except OSError:
       error "Program `yt-dlp` must be installed and on PATH."
 
-    if not fileExists(location):
+    # Only reuse an existing download if it already has the streams we need.
+    var reusable = false
+    try:
+      let mi = initMediaInfo(location)
+      reusable = (not wantAudio or mi.a.len > 0) and
+                 (not wantVideo or mi.v.len > 0)
+    except IOError:
+      discard
+
+    if not reusable:
+      try: removeFile(location)
+      except OSError: error &"Couldn't remove old download: {location}"
+
       let p = startProcess(ytDlpPath, args = cmd, options = {poUsePath, poParentStreams})
       defer: p.close()
       discard p.waitForExit()
