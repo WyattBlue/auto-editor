@@ -120,7 +120,7 @@ disableDecoders &= ["pcm_alaw", "pcm_mulaw"]
 disableDecoders &= ["h261", "opus"]  # We use libopus
 
 # Irrelevant to this project
-disableDecoders &= "cc_dec,dirac,fits,jpeg2000,jpegls,mpl2,msrle,pgssub,qoi,sami,subviewer,subviewer1,sunrast,targa,tiff".split(",")
+disableDecoders &= "cc_dec,dirac,fits,jpeg2000,jpegls,mpl2,msrle,pgssub,qoi,sami,subviewer,subviewer1,sunrast,targa,tiff,vvc_qsv".split(",")
 
 disableParsers &= "bmp,cavsvideo,cook,dpx,g723_1,g729,misc4,sipr,tak,xbm,xma,xwd".split(",")
 
@@ -139,6 +139,14 @@ let nvheaders = Package(
   name: "nv-codec-headers",
   sourceUrl: "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.0.19.0.tar.gz",
   sha256: "86d15d1a7c0ac73a0eafdfc57bebfeba7da8264595bf531cf4d8db1c22940116",
+)
+# AMD AMF SDK headers (header-only); the runtime is loaded from the driver.
+# FFmpeg 8.1 requires AMF_VERSION >= 1.4.36.0.
+let amfheaders = Package(
+  name: "amf-headers",
+  sourceUrl: "https://github.com/GPUOpen-LibrariesAndSDKs/AMF/archive/refs/tags/v1.4.36.tar.gz",
+  sha256: "240a42033babc7920e5476506d5ac0c5628f67908833168e746406808d0ef146",
+  ffFlag: "--enable-amf",
 )
 let libvpl = Package(
   name: "libvpl",
@@ -235,6 +243,9 @@ proc selectPackages(kind: CrossKind = native): seq[Package] =
   let isWasm = kind == wasm32 or kind == wasm64
   if kind != armv7 and kind != llvmWin and not isMacNative and not isWasm:
     result.add nvheaders
+  # AMD AMF: x86_64 Windows and Linux only
+  if kind == gccWin or (kind == native and not isMacNative and hostCPU == "amd64"):
+    result.add amfheaders
   if enableVpl and kind != llvmWin and kind != armv7 and not isWasm:
     result.add libvpl
   if enableWhisper:
@@ -258,6 +269,8 @@ func dirName(package: Package): string =
     return "libvpl-2.16.0"
   if package.name == "nv-codec-headers":
     return "nv-codec-headers-n13.0.19.0"
+  if package.name == "amf-headers":
+    return "AMF-1.4.36"
   if package.name == "whisper":
     return "whisper.cpp-1.8.4"
 
@@ -708,6 +721,9 @@ proc ffmpegSetup(buildPath: string): seq[Package] =
           # Special handling for nv-codec-headers which doesn't use configure
           if package.name == "nv-codec-headers":
             exec &"make install PREFIX=\"{buildPath}\""
+          elif package.name == "amf-headers":
+            # Header-only: FFmpeg expects <AMF/core/Version.h>
+            exec &"rm -rf \"{buildPath}/include/AMF\" && mkdir -p \"{buildPath}/include\" && cp -r amf/public/include \"{buildPath}/include/AMF\""
           else:
             let sourceDir = absolutePath(".")
             let autoBuildDir = buildPath / "pkg" / package.name
@@ -779,6 +795,8 @@ proc setupCommonFlags(packages: seq[Package], kind: CrossKind = native): string 
       enableEncoders.add "libx265"
     if package.name == "libsvtav1":
       enableEncoders.add "libsvtav1"
+    if package.name == "amf-headers":
+      enableEncoders &= ["h264_amf", "hevc_amf", "av1_amf"]
     if package.name == "whisper":
       filters.add "whisper"
 
