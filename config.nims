@@ -31,6 +31,7 @@ else:
     --clang.linkerexe:emcc
 
     switch("passC", "-pthread")
+    switch("passC", "-msimd128")
     switch("passC", "-g0")
     switch("passL", "-pthread")
     switch("passL", "-g0")

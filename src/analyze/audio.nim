@@ -14,6 +14,19 @@ when defined(arm64) or defined(aarch64):
   proc neonMax16(a, b: Vec16x8): Vec16x8 {.importc: "vmaxq_s16", header: "<arm_neon.h>".}
   proc neonMaxAcross16(v: Vec16x8): int16 {.importc: "vmaxvq_s16", header: "<arm_neon.h>".}
 
+elif defined(emscripten):
+  type
+    V128 {.importc: "v128_t", header: "<wasm_simd128.h>".} = object
+
+  proc wasmSplat16(x: int16): V128 {.importc: "wasm_i16x8_splat", header: "<wasm_simd128.h>".}
+  proc wasmLoad(p: pointer): V128 {.importc: "wasm_v128_load", header: "<wasm_simd128.h>".}
+  proc wasmStore(p: pointer, v: V128) {.importc: "wasm_v128_store", header: "<wasm_simd128.h>".}
+  proc wasmSubSat16(a, b: V128): V128 {.importc: "wasm_i16x8_sub_sat", header: "<wasm_simd128.h>".}
+  proc wasmMax16(a, b: V128): V128 {.importc: "wasm_i16x8_max", header: "<wasm_simd128.h>".}
+  # Saturating abs: max(v, 0 - v). wasm_i16x8_abs would wrap -32768, so use
+  # sub_sat instead, which clamps -32768 -> 32767.
+  proc wasmAbs16(v: V128): V128 {.inline.} = wasmMax16(v, wasmSubSat16(wasmSplat16(0), v))
+
 elif defined(amd64) or defined(i386):
   type
     M128i {.importc: "__m128i", header: "<emmintrin.h>".} = object
@@ -138,6 +151,26 @@ proc readChunk(iter: AudioIterator): Unorm16 =
       vmax = neonMax16(vmax, neonQAbs16(neonLoad16(addr samples[i])))
       i += 8
     maxAbs = int32(neonMaxAcross16(vmax))
+    while i < totalSamples:
+      let v = abs(int32(samples[i]))
+      if v > maxAbs: maxAbs = v
+      i += 1
+  elif defined(emscripten):
+    var v0 = wasmSplat16(0)
+    var v1 = wasmSplat16(0)
+    var i = 0
+    while i + 16 <= totalSamples:
+      v0 = wasmMax16(v0, wasmAbs16(wasmLoad(addr samples[i])))
+      v1 = wasmMax16(v1, wasmAbs16(wasmLoad(addr samples[i + 8])))
+      i += 16
+    var vmax = wasmMax16(v0, v1)
+    while i + 8 <= totalSamples:
+      vmax = wasmMax16(vmax, wasmAbs16(wasmLoad(addr samples[i])))
+      i += 8
+    var lanes: array[8, int16]
+    wasmStore(addr lanes[0], vmax)
+    for lane in lanes:
+      if int32(lane) > maxAbs: maxAbs = int32(lane)
     while i < totalSamples:
       let v = abs(int32(samples[i]))
       if v > maxAbs: maxAbs = v
