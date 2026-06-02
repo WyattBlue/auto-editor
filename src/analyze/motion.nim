@@ -139,7 +139,7 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame 
         yield filteredFrame
         av_frame_unref(filteredFrame)
 
-iterator motionness*(processor: var VideoProcessor, width, blur: int32): float32 =
+iterator motionness*(processor: var VideoProcessor, width, blur: int32): Unorm16 =
   var totalPixels: int = 0
   var firstTime: bool = true
   var prevIndex: int64 = -1
@@ -165,7 +165,7 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32): float32
 
     copyMem(currentFrame, filteredFrame.data[0], totalPixels)
 
-    var value: float32 = 0.0
+    var value: Unorm16 = toUnorm16(0.0'f32)
     if not firstTime:
       # Calculate motion by comparing with previous frame
       var diffCount: int32 = 0
@@ -173,9 +173,8 @@ iterator motionness*(processor: var VideoProcessor, width, blur: int32): float32
         if prevFrame[i] != currentFrame[i]:
           inc diffCount
 
-      value = float32(diffCount) / float32(totalPixels)
+      value = toUnorm16(float32(diffCount) / float32(totalPixels))
     else:
-      value = 0.0
       firstTime = false
 
     # Yield value for each frame index between previous and current
@@ -220,7 +219,7 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     bar.startIndeterminate("Analyzing motion")
   var i: float = 0
   for value in processor.motionness(width, blur):
-    result.add toUnorm16(value)
+    result.add value
     bar.tick(i)
     i += 1
 
