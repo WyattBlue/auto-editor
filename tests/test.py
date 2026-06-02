@@ -256,7 +256,7 @@ class Runner:
 
         cmd = ["whisper", "resources/new-commentary.mp3", model, "--debug"]
         returncode, stdout, stderr = pipe_to_console(self.program + cmd)
-        assert "run transcription at 31752 ms, 106000/106000 samples" in stderr
+        assert "run transcription at 36 ms, 106000/106000 samples" in stderr
 
     def test_movflags(self) -> None:
         file = "resources/testsrc.mp4"
