@@ -41,6 +41,7 @@ proc main*(cArgs: seq[string]) =
   var language = "auto"
   var translate = false # to English
   var format = "text"
+  var formatExplicit = false
   var output = "-"
   var queue: int = 30
   var vadModel: string = ""
@@ -66,6 +67,7 @@ proc main*(cArgs: seq[string]) =
       language = key
     of "format":
       format = key
+      formatExplicit = true
     of "output":
       output = key.replace("\\", "\\\\").replace(":", "\\:")
     of "queue":
@@ -82,6 +84,12 @@ proc main*(cArgs: seq[string]) =
     error "A model is needed, you came find them here: https://huggingface.co/ggerganov/whisper.cpp"
   if queue < 1 or queue > 86400:
     error &"Invalid queue value: {queue}"
+  if output != "-" and not formatExplicit:
+    case output.splitFile.ext.toLowerAscii
+    of ".srt": format = "srt"
+    of ".json": format = "json"
+    of ".txt", ".text": format = "text"
+    else: discard
   if format notin ["text", "srt", "json"]:
     error &"Invalid format: {format}. Choices: text, srt, json"
 
