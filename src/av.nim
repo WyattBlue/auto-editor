@@ -131,10 +131,28 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   error "No audio or video stream found"
 
+proc setActiveStream*(container: InputContainer, index: cint) =
+  ## Tell the demuxer to discard packets for every stream except `index`, so
+  ## av_read_frame skips demuxing streams we don't decode (e.g. video while
+  ## analyzing audio). Call resetDiscards() when finished to restore the
+  ## container for callers that read every stream.
+  for i in 0 ..< container.formatContext.nb_streams.int:
+    let s = container.formatContext.streams[i]
+    s.discardLevel = (if s.index == index: AVDISCARD_DEFAULT else: AVDISCARD_ALL)
+
+proc resetDiscards*(container: InputContainer) =
+  for i in 0 ..< container.formatContext.nb_streams.int:
+    container.formatContext.streams[i].discardLevel = AVDISCARD_DEFAULT
+
 iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext,
     frame: ptr AVFrame): ptr AVFrame =
   var ret: cint
   var packet = container.packet
+  # We decode a single stream to EOF here, so let the demuxer skip every other
+  # stream instead of reading packets we'd only throw away (big win when
+  # analyzing audio in a high-bitrate video file).
+  container.setActiveStream(index)
+  defer: container.resetDiscards()
   while av_read_frame(container.formatContext, packet) >= 0:
     defer: av_packet_unref(packet)
 
