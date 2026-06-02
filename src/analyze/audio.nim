@@ -14,6 +14,18 @@ when defined(arm64) or defined(aarch64):
   proc neonMax16(a, b: Vec16x8): Vec16x8 {.importc: "vmaxq_s16", header: "<arm_neon.h>".}
   proc neonMaxAcross16(v: Vec16x8): int16 {.importc: "vmaxvq_s16", header: "<arm_neon.h>".}
 
+elif defined(amd64) or defined(i386):
+  type
+    M128i {.importc: "__m128i", header: "<emmintrin.h>".} = object
+
+  proc sseZero(): M128i {.importc: "_mm_setzero_si128", header: "<emmintrin.h>".}
+  proc sseLoad(p: pointer): M128i {.importc: "_mm_loadu_si128", header: "<emmintrin.h>".}
+  proc sseStore(p: pointer, v: M128i) {.importc: "_mm_storeu_si128", header: "<emmintrin.h>".}
+  proc sseSubs16(a, b: M128i): M128i {.importc: "_mm_subs_epi16", header: "<emmintrin.h>".}
+  proc sseMax16(a, b: M128i): M128i {.importc: "_mm_max_epi16", header: "<emmintrin.h>".}
+  # Saturating abs: max(v, 0 - v) clamps -32768 -> 32767 (subs saturates).
+  proc sseAbs16(v: M128i): M128i {.inline.} = sseMax16(v, sseSubs16(sseZero(), v))
+
 type
   AudioIterator = ref object
     resampler: AudioResampler
@@ -109,12 +121,43 @@ proc readChunk(iter: AudioIterator): Unorm16 =
 
   var maxAbs: int32 = 0
   when defined(arm64) or defined(aarch64):
-    var vmax = neonDup16(0'i16)
+    # Four independent accumulators hide the latency of the abs/max chain.
+    var v0 = neonDup16(0'i16)
+    var v1 = neonDup16(0'i16)
+    var v2 = neonDup16(0'i16)
+    var v3 = neonDup16(0'i16)
     var i = 0
+    while i + 32 <= totalSamples:
+      v0 = neonMax16(v0, neonQAbs16(neonLoad16(addr samples[i])))
+      v1 = neonMax16(v1, neonQAbs16(neonLoad16(addr samples[i + 8])))
+      v2 = neonMax16(v2, neonQAbs16(neonLoad16(addr samples[i + 16])))
+      v3 = neonMax16(v3, neonQAbs16(neonLoad16(addr samples[i + 24])))
+      i += 32
+    var vmax = neonMax16(neonMax16(v0, v1), neonMax16(v2, v3))
     while i + 8 <= totalSamples:
       vmax = neonMax16(vmax, neonQAbs16(neonLoad16(addr samples[i])))
       i += 8
     maxAbs = int32(neonMaxAcross16(vmax))
+    while i < totalSamples:
+      let v = abs(int32(samples[i]))
+      if v > maxAbs: maxAbs = v
+      i += 1
+  elif defined(amd64) or defined(i386):
+    var v0 = sseZero()
+    var v1 = sseZero()
+    var i = 0
+    while i + 16 <= totalSamples:
+      v0 = sseMax16(v0, sseAbs16(sseLoad(addr samples[i])))
+      v1 = sseMax16(v1, sseAbs16(sseLoad(addr samples[i + 8])))
+      i += 16
+    var vmax = sseMax16(v0, v1)
+    while i + 8 <= totalSamples:
+      vmax = sseMax16(vmax, sseAbs16(sseLoad(addr samples[i])))
+      i += 8
+    var lanes: array[8, int16]
+    sseStore(addr lanes[0], vmax)
+    for lane in lanes:
+      if int32(lane) > maxAbs: maxAbs = int32(lane)
     while i < totalSamples:
       let v = abs(int32(samples[i]))
       if v > maxAbs: maxAbs = v
@@ -124,6 +167,7 @@ proc readChunk(iter: AudioIterator): Unorm16 =
       let v = abs(int32(samples[i]))
       if v > maxAbs:
         maxAbs = v
+        if maxAbs >= 32767: break
 
   return toUnorm16(float32(maxAbs) / 32767.0'f32)
 
