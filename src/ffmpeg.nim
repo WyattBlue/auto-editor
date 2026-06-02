@@ -54,6 +54,7 @@ proc av_get_known_color_name*(color_idx: cint, rgbp: ptr ptr uint8): cstring
 
 type
   AVMediaType* = cint
+  AVDiscard* = cint
   AVCodecID* = cint
   AVColorRange* = cint
   AVColorPrimaries* = cint
@@ -145,6 +146,7 @@ type
     avg_frame_rate*: AVRational
     attached_pic*: AVPacket
     disposition*: cint
+    discardLevel* {.importc: "discard".}: AVDiscard
 
   AVCodec* {.importc, incompleteStruct, header: "<libavcodec/codec.h>".} = object
     name*: cstring
@@ -251,6 +253,8 @@ const
   AVMEDIA_TYPE_DATA* = AVMediaType(2)
   AVMEDIA_TYPE_SUBTITLE* = AVMediaType(3)
   AVMEDIA_TYPE_ATTACHMENT* = AVMediaType(4)
+  AVDISCARD_DEFAULT* = AVDiscard(0)  # Discard useless packets like 0-size packets in AVI
+  AVDISCARD_ALL* = AVDiscard(48)     # Discard all packets for the stream
   AVFMT_GLOBALHEADER* = 0x0040
   AV_CODEC_FLAG_GLOBAL_HEADER* = 4194304 # 1 << 22
   AV_TIME_BASE* = 1000000

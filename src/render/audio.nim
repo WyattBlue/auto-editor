@@ -137,6 +137,7 @@ proc newGetter(path: string, stream: int32, rate: cint): Getter =
   result = new(Getter)
   result.container = av.open(path)
   result.stream = result.container.audio[stream]
+  result.container.setActiveStream(result.stream.index)
   result.rate = rate
   result.decoderCtx = initDecoder(result.stream.codecpar)
   new(result.layout)
