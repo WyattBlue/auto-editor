@@ -110,7 +110,8 @@ proc main*(cArgs: seq[string]) =
 
   let sampleFmtName = av_get_sample_fmt_name(sampleFormat.cint)
   let chLayout = $audioStream.codecpar.ch_layout
-  let bufferArgs = &"sample_rate={sampleRate}:sample_fmt={sampleFmtName}:channel_layout={chLayout}"
+  let tb = audioStream.time_base
+  let bufferArgs = &"sample_rate={sampleRate}:sample_fmt={sampleFmtName}:channel_layout={chLayout}:time_base={tb.num}/{tb.den}"
 
   var bufferCtx: ptr AVFilterContext
   var ret = avfilter_graph_create_filter(addr bufferCtx, abuffer, nil, bufferArgs.cstring, nil, filterGraph)
