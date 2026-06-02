@@ -206,12 +206,18 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   )
 
   var inaccurateDur: float = 1024.0
+  var knownDur = true
   if videoStream.duration != AV_NOPTS_VALUE and videoStream.time_base != AV_NOPTS_VALUE:
     inaccurateDur = float(videoStream.duration) * float(videoStream.time_base * tb)
   elif container.duration != 0.0:
     inaccurateDur = container.duration / float(tb)
+  else:
+    knownDur = false
 
-  bar.start(inaccurateDur, "Analyzing motion")
+  if knownDur:
+    bar.start(inaccurateDur, "Analyzing motion")
+  else:
+    bar.startIndeterminate("Analyzing motion")
   var i: float = 0
   for value in processor.motionness(width, blur):
     result.add toUnorm16(value)

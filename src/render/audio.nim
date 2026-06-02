@@ -587,8 +587,6 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
   if tb.num == 0:
     error "Timeline timebase has zero numerator"
 
-  conwrite "Creating audio"
-
   # Collect all unique audio sources from specified layers.
   # Audio's getter calls av_seek_frame / av_read_frame on its container, so it
   # must have an AVFormatContext that's independent of the video decoder's —
@@ -926,11 +924,12 @@ proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: 
 
 proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int, norm: Norm,
     cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
-  # Create sequence of all layer indices efficiently
+
   let allLayerIndices = toSeq(0..<tl.a.len)
   return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, mixLayers = true, norm, cache)
 
 proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3,
     frameSize: int, norm: Norm, cache: MediaCache = nil): iterator(): (ptr AVFrame, int64) =
+
   return makeAudioFrames(fmt, tl, frameSize, @[index.int], mixLayers = false, norm, cache)
 
