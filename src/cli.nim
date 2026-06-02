@@ -58,10 +58,10 @@ type OptDef* = object
 
 const whisperOptions*: seq[OptDef] = @[
   OptDef(names: "--debug", kind: Flag, datum: "isDebug", help: ""),
-  OptDef(names: "-sw, --split-words", kind: Flag, datum: "splitWords", help: ""),
+  OptDef(names: "-sw, --split-word, --split-words", kind: Flag, datum: "splitWords", help: ""),
   OptDef(names: "-l, --language", datum: "language", metavar: "LANG",
     help: "Set the language instead of using \"auto\". Examples: en, ja"),
-  OptDef(names: "--format", datum: "format", metavar: "FORMAT",
+  OptDef(names: "-f, --format", datum: "format", metavar: "FORMAT",
     help: "Output in a specific format {text|srt|json} (default text)"),
   OptDef(names: "-o, --output", datum: "output", metavar: "FILE",
     help: "Choose where to output (defaults to stdout)"),
