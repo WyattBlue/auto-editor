@@ -95,7 +95,7 @@ proc hasChunk(iter: AudioIterator): bool =
   let needed = ceil(iter.exactSize).int
   return availableSamples >= needed
 
-proc readChunk(iter: AudioIterator): float32 =
+proc readChunk(iter: AudioIterator): Unorm16 =
   # Calculate chunk size with accumulated error
   let sizeWithError = iter.exactSize + iter.accumulatedError
   let currentSize = round(sizeWithError).int
@@ -107,25 +107,25 @@ proc readChunk(iter: AudioIterator): float32 =
   )
   let totalSamples = samplesRead * iter.channelCount
 
+  var maxAbs: int32 = 0
   when defined(arm64) or defined(aarch64):
     var vmax = neonDup16(0'i16)
     var i = 0
     while i + 8 <= totalSamples:
       vmax = neonMax16(vmax, neonQAbs16(neonLoad16(addr samples[i])))
       i += 8
-    var maxAbs = int32(neonMaxAcross16(vmax))
+    maxAbs = int32(neonMaxAcross16(vmax))
     while i < totalSamples:
       let v = abs(int32(samples[i]))
       if v > maxAbs: maxAbs = v
       i += 1
-    return float32(maxAbs) / 32767.0'f32
   else:
-    var maxAbs: int32 = 0
     for i in 0 ..< totalSamples:
       let v = abs(int32(samples[i]))
       if v > maxAbs:
         maxAbs = v
-    return float32(maxAbs) / 32767.0'f32
+
+  return toUnorm16(float32(maxAbs) / 32767.0'f32)
 
 proc readPeaks(iter: AudioIterator): tuple[lo, hi: float32] =
   let sizeWithError = iter.exactSize + iter.accumulatedError
@@ -197,7 +197,7 @@ iterator peaks*(processor: var AudioProcessor, container: InputContainer,
       yield (firstSamplePos + bucketIdx * spb, lo, hi)
       bucketIdx += 1
 
-iterator loudness*(processor: var AudioProcessor, container: InputContainer): float32 =
+iterator loudness*(processor: var AudioProcessor, container: InputContainer): Unorm16 =
   var frame = av_frame_alloc()
   if frame == nil:
     error "Could not allocate frame"
@@ -259,7 +259,7 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   result = newSeqOfCap[Unorm16](int(inaccurateDur) + 1)
   var i: float = 0
   for value in processor.loudness(container):
-    result.add toUnorm16(value)
+    result.add value
     bar.tick(i)
     i += 1
 

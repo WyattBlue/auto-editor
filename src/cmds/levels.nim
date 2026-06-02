@@ -167,8 +167,7 @@ proc main*(strArgs: seq[string]) =
       chunkDuration: chunkDuration
     )
 
-    for loudnessValue in processor.loudness(container):
-      let u = toUnorm16(loudnessValue)
+    for u in processor.loudness(container):
       emit u
       data.add u
     echo ""
@@ -187,8 +186,7 @@ proc main*(strArgs: seq[string]) =
       videoIndex: videoStream.index,
     )
 
-    for value in processor.motionness(width, blur):
-      let u = toUnorm16(value)
+    for u in processor.motionness(width, blur):
       emit u
       data.add u
     echo ""
