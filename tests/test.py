@@ -684,7 +684,7 @@ class Runner:
         info = fileinfo(out)
         assert len(info.audios) == 2
         assert info.audios[0].codec == "aac"
-        assert info.audios[1].codec == "pcm_s16le" # "aac" here isn't unreasonable tbh.
+        assert info.audios[1].codec == "aac"
 
     def test_frame_rate(self):
         cn = fileinfo(self.main(["example.mp4"], ["-r", "15", "--no-seek"], "fr.mp4"))

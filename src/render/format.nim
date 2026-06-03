@@ -60,6 +60,12 @@ proc resolveAudioCodec(layer: seq[Clip], rules: Rules, cache: MediaCache): AVCod
     return codec
   return (if rules.defaultAud == ID_NONE: ID_AAC else: rules.defaultAud)
 
+func opusRate(rate: cint): cint =
+  for r in [8000.cint, 12000, 16000, 24000, 48000]:
+    if rate <= r:
+      return r
+  return 48000
+
 proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
   if ctx.codec.sample_fmts == nil:
     error &"{ctx.codec.name}: No known audio formats avail."
@@ -87,7 +93,7 @@ proc checkAudioCtx(ctx: ptr AVCodecContext, rate: cint) =
 
   error &"samplerate '{rate}' not allowed for {ctx.codec.name}."
 
-proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: Bar,
+proc makeMedia*(args: mainArgs, tl: var v3, outputPath: string, rules: Rules, bar: Bar,
     cache: MediaCache = nil) =
   var options: Table[string, string]
   var movFlags: seq[string] = @[]
@@ -107,6 +113,22 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   let includeVideo = not args.vn and rules.defaultVid notin [ID_NONE, ID_PNG]
   let includeAudio = not args.an and rules.defaultAud != ID_NONE
   let includeSubtitle = not args.sn and rules.defaultSub != ID_NONE
+
+  var audCodec = ""
+  if includeAudio:
+    if args.audioCodec == "auto":
+      for layer in tl.a:
+        if layer.len > 0:
+          audCodec = $avcodec_get_name(resolveAudioCodec(layer, rules, cache))
+          break
+    else:
+      audCodec = args.audioCodec
+
+    if audCodec in ["opus", "libopus"]:
+      let snapped = opusRate(tl.sr)
+      if snapped != tl.sr:
+        debug &"opus: snapping sample rate {tl.sr} -> {snapped}"
+        tl.sr = snapped
 
   var vEncCtx: ptr AVCodecContext = nil
   var vOutStream: ptr AVStream = nil
@@ -130,17 +152,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
     if hasAnyClips:
       let rate = AVRational(num: tl.sr, den: 1)
-      let mixCodec = if args.audioCodec == "auto":
-        block:
-          var firstLayer: seq[Clip]
-          for layer in tl.a:
-            if layer.len > 0:
-              firstLayer = layer
-              break
-          $avcodec_get_name(resolveAudioCodec(firstLayer, rules, cache))
-      else:
-        args.audioCodec
-      var (aOutStream, aEncCtx) = output.addStream(mixCodec, rate = rate,
+      var (aOutStream, aEncCtx) = output.addStream(audCodec, rate = rate,
           lang = ['u', 'n', 'd', '\0'], layout = tl.layout)
       let encoder = aEncCtx.codec
       checkAudioCtx(aEncCtx, tl.sr)
@@ -169,11 +181,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
     for i in 0..<tl.a.len:
       if tl.a[i].len > 0: # Only create stream if track has clips
         let rate = AVRational(num: tl.sr, den: 1)
-        let layerCodec = if args.audioCodec == "auto":
-          $avcodec_get_name(resolveAudioCodec(tl.a[i], rules, cache))
-        else:
-          args.audioCodec
-        var (aOutStream, aEncCtx) = output.addStream(layerCodec, rate = rate,
+        var (aOutStream, aEncCtx) = output.addStream(audCodec, rate = rate,
             lang = tl.langs[tl.v.len + i], layout = tl.layout)
         let encoder = aEncCtx.codec
         checkAudioCtx(aEncCtx, tl.sr)
