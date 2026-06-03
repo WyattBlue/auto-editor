@@ -1,17 +1,17 @@
-import std/[strutils, options]
+import std/[math, strutils, options]
 import ./util/dnorm16
 
 type
   ActionKind* = enum
     actSpeed, actVarispeed, actVolume, actDeesser, actInvert, actZoom, actHflip,
-    actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens
+    actVflip, actOpacity, actBlur, actBrightness, actLuv, actLens, actRotate
 
   # Represents a full-sized action.
   Action* = object
     case kind*: ActionKind
     of actInvert, actHflip, actVflip:
       discard
-    of actOpacity:
+    of actOpacity, actRotate:
       nval*: Unorm16
     of actBrightness:
       sval*: Snorm16
@@ -97,6 +97,8 @@ Positional args: `intensity` sets how much to de-ess (0.0 = none, 1.0 = maximum)
     help: "Scale contrast around mid-gray. 1.0 = unchanged, higher values increase contrast, lower values reduce it. Implemented via ffmpeg's `lutyuv` filter."),
   ActionDef(name: "saturation", atype: atVideo, argSpec: "float32", range: rng(0.0, 3.0),
     help: "Scale color saturation. 1.0 = unchanged, 0.0 = grayscale, higher values are more vivid. Implemented via ffmpeg's `lutyuv` filter."),
+  ActionDef(name: "rotate", atype: atVideo, argSpec: "float32", range: rng(0.0, 360.0),
+    help: "Rotate the picture clockwise by val degrees about its center. The frame keeps the timeline resolution and the corners exposed by the rotation are filled with the background color. Implemented via ffmpeg's `rotate` filter."),
   ActionDef(name: "lens", atype: atVideo, argSpec: "k1[:k2]", range: rng(-1.0, 1.0, each = true),
     help: """
 Distort the picture like a camera lens. With no arguments, a fun fisheye is applied. Implemented via ffmpeg's `lenscorrection` filter.
@@ -177,6 +179,11 @@ func parseAction*(val: string): Action {.raises: [ActionParseError].} =
         raise newException(ActionParseError, "opacity must be in [0.0, 1.0]")
       return Action(kind: actOpacity, nval: toUnorm16(effectVal))
     of "blur": return Action(kind: actBlur, val: effectVal)
+    of "rotate":
+      let turns = effectVal / 360.0'f32
+      let frac = turns - floor(turns)  # [0.0, 1.0)
+      let code = uint16(int(round(frac * 65536.0'f32)) and 0xFFFF)
+      return Action(kind: actRotate, nval: Unorm16(code))
     of "brightness":
       if effectVal > 1.0 or effectVal < -1.0:
         raise newException(ActionParseError, "brightness must be in [-1.0, 1.0]")
@@ -215,6 +222,7 @@ when not defined(nimscript):
     of actZoom: "zoom:" & $act.val
     of actOpacity: "opacity:" & $act.nval
     of actBlur: "blur:" & $act.val
+    of actRotate: "rotate:" & $(uint16(act.nval).float32 / 65536.0'f32 * 360.0'f32)
     of actBrightness: "brightness:" & $act.sval
     of actLuv:
       var parts: seq[string]
@@ -227,7 +235,7 @@ when not defined(nimscript):
   func actionByteSize(kind: ActionKind): int =
     case kind
     of actInvert, actHflip, actVflip: 1
-    of actOpacity, actBrightness: 3
+    of actOpacity, actBrightness, actRotate: 3
     of actSpeed, actVarispeed, actVolume, actZoom, actBlur, actLens: 5
     of actDeesser: 7
     of actLuv: 11
@@ -252,10 +260,10 @@ when not defined(nimscript):
           copyMem(addr v, addr base[i + 1], sizeof(float32))
           yield Action(kind: kind, val: v)
           i += 5
-        of actOpacity:
+        of actOpacity, actRotate:
           var u: Unorm16
           copyMem(addr u, addr base[i + 1], sizeof(Unorm16))
-          yield Action(kind: actOpacity, nval: u)
+          yield Action(kind: kind, nval: u)
           i += 3
         of actBrightness:
           var sv: Snorm16
@@ -319,7 +327,7 @@ when not defined(nimscript):
         var v = a.val
         copyMem(addr base[i + 1], addr v, sizeof(float32))
         i += 5
-      of actOpacity:
+      of actOpacity, actRotate:
         var u = a.nval
         copyMem(addr base[i + 1], addr u, sizeof(Unorm16))
         i += 3

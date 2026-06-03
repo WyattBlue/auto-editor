@@ -566,6 +566,27 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs,
         for effect in objList[0].effects:
           case effect.kind:
           of actSpeed, actVarispeed, actVolume, actDeesser: discard
+          of actRotate:
+            let code = uint16(effect.nval)
+            if code == 0:
+              continue
+            # nval holds the angle as 1/65536-of-a-turn buckets, half-open [0, 360).
+            let radians = code.float32 / 65536.0'f32 * 2.0'f32 * 3.14159265358979'f32
+            let frameFmtName = $AVPixelFormat(frame.format)
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={frameFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            let key = &"rotate|{radians}|{bg}|{bufferArgs}"
+            if fxKey != key:
+              if fxGraph != nil:
+                fxGraph.cleanup()
+              fxGraph = newGraph()
+              let bufferSrc = fxGraph.add("buffer", bufferArgs)
+              let filt = fxGraph.add("rotate", &"a={radians}:c={bg}")
+              let bufferSink = fxGraph.add("buffersink")
+              fxGraph.linkNodes(@[bufferSrc, filt, bufferSink]).configure()
+              fxKey = key
+            fxGraph.push(frame)
+            av_frame_free(addr frame)
+            frame = fxGraph.pull()
           of actZoom:
             if effect.val == 1.0:
               continue
