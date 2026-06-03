@@ -4,6 +4,7 @@
  -
 
 ## Features
+ - Add the `rotate` action, which rotates the picture clockwise by a given number of degrees, filling the exposed corners with the background color.
  - Add AMD AMF hardware encoders (`h264_amf`, `hevc_amf`, `av1_amf`) for x86_64 Windows and Linux builds.
  - Show an indeterminate progress bar when the duration is unknown, instead of a misleading percentage.
 

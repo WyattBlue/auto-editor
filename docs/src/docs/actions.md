@@ -125,6 +125,23 @@ auto-editor video.mp4 --when-normal zoom:2
 auto-editor video.mp4 --when-silent zoom:0.5
 ```
 
+### rotate
+
+Rotate the video section clockwise by an angle in degrees, about the center. The
+frame keeps the timeline resolution, and the corners exposed by the rotation are
+filled with the background color.
+- **Value range:** 0.0 to 360.0 (other values wrap, so `rotate:-30` equals `rotate:330`)
+
+```bash
+# Rotate active sections 30 degrees clockwise
+auto-editor video.mp4 --when-normal rotate:30
+
+# Turn the picture upside-down
+auto-editor video.mp4 --when-normal rotate:180
+```
+
+**How it works:** Uses FFmpeg's `rotate` filter.
+
 ## Multiple Actions (Chaining)
 
 You can combine multiple actions using commas. Actions are applied in the order specified.
